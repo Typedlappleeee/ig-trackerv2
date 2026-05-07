@@ -458,6 +458,14 @@ class App:
         self._build_tools_tab()
         self._build_settings_tab()
 
+    def _bind_mousewheel(self, widget, canvas):
+        """Recursively bind mousewheel on widget and all descendants to scroll canvas."""
+        widget.bind("<MouseWheel>",
+                    lambda e: canvas.yview_scroll(int(-1*(e.delta/120)), "units"),
+                    add="+")
+        for child in widget.winfo_children():
+            self._bind_mousewheel(child, canvas)
+
     def _make_sidebar_btn(self, parent, text, key):
         base_bg  = SURFACE
         hover_bg = HL
@@ -766,10 +774,10 @@ class App:
         left_canvas.create_window((0, 0), window=left, anchor="nw", width=385)
         left.bind("<Configure>", lambda e: left_canvas.configure(
             scrollregion=left_canvas.bbox("all")))
-        left_canvas.bind("<MouseWheel>",
-            lambda e: left_canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
-        left.bind("<MouseWheel>",
-            lambda e: left_canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
+        def _lc_scroll(e): left_canvas.yview_scroll(int(-1*(e.delta/120)), "units")
+        left_canvas.bind("<MouseWheel>", _lc_scroll)
+        # Deferred recursive bind so all children exist
+        self.root.after(200, lambda: self._bind_mousewheel(left, left_canvas))
 
         tk.Label(left, text="🎬 Montage vidéo", font=("Segoe UI", 12, "bold"),
                  bg=BG, fg=TEXT).pack(anchor="w", padx=2, pady=(8, 6))
@@ -1057,7 +1065,24 @@ class App:
             return
         try:
             base = self._cached_pil_frame.copy()
-            w, h = base.size
+
+            # Apply color grading live
+            b = getattr(self, 'brightness_var', None)
+            c_var = getattr(self, 'contrast_var', None)
+            s_var = getattr(self, 'saturation_var', None)
+            if b:
+                bv = b.get()
+                if abs(bv) > 0.01:
+                    factor = 1.0 + bv
+                    base = ImageEnhance.Brightness(base).enhance(max(0, factor))
+            if c_var:
+                cv = c_var.get()
+                if abs(cv - 1.0) > 0.01:
+                    base = ImageEnhance.Contrast(base).enhance(max(0, cv))
+            if s_var:
+                sv = s_var.get()
+                if abs(sv - 1.0) > 0.01:
+                    base = ImageEnhance.Color(base).enhance(max(0, sv))
             txt = self._get_overlay_text()
             if txt:
                 draw = ImageDraw.Draw(base)
@@ -2225,21 +2250,17 @@ class App:
         inner_t = tk.Frame(canvas_tools, bg=BG)
         cw_id = canvas_tools.create_window((0, 0), window=inner_t, anchor="nw")
 
-        def _on_inner_configure(e):
-            canvas_tools.configure(scrollregion=canvas_tools.bbox("all"))
-        def _on_canvas_configure(e):
-            canvas_tools.itemconfig(cw_id, width=e.width)
-        inner_t.bind("<Configure>", _on_inner_configure)
-        canvas_tools.bind("<Configure>", _on_canvas_configure)
-
-        def _on_wheel(e):
-            canvas_tools.yview_scroll(-1 * (e.delta // 120), "units")
-        canvas_tools.bind("<MouseWheel>", _on_wheel)
-        inner_t.bind("<MouseWheel>", _on_wheel)
+        inner_t.bind("<Configure>",
+                     lambda e: canvas_tools.configure(scrollregion=canvas_tools.bbox("all")))
+        canvas_tools.bind("<Configure>",
+                          lambda e: canvas_tools.itemconfig(cw_id, width=e.width))
+        canvas_tools.bind("<MouseWheel>",
+                          lambda e: canvas_tools.yview_scroll(int(-1*(e.delta/120)), "units"))
+        # Deferred recursive bind so all children exist
+        self.root.after(300, lambda: self._bind_mousewheel(inner_t, canvas_tools))
 
         PAD = 60
 
-        # ── Helper: card frame ─────────────────────────────────────────────────
         def card(title, subtitle=""):
             c = tk.Frame(inner_t, bg=CARD, padx=20, pady=16)
             c.pack(fill="x", padx=PAD, pady=8)
@@ -2252,8 +2273,42 @@ class App:
                          bg=CARD, fg=TEXT2).pack(side="left", padx=(10, 0))
             return c
 
+        def _groq_call(prompt, on_success, on_error, max_tokens=400):
+            """Run a Groq API call in a background thread, call on_success(text) or on_error(msg)."""
+            def run():
+                try:
+                    from groq import Groq
+                    key = self.cfg.get("groq_api_key", "")
+                    if not key:
+                        raise ValueError("Clé API Groq manquante → Paramètres > API Keys")
+                    client = Groq(api_key=key)
+                    resp = client.chat.completions.create(
+                        model="llama-3.3-70b-versatile",
+                        messages=[{"role": "user", "content": prompt}],
+                        max_tokens=max_tokens
+                    )
+                    result = resp.choices[0].message.content.strip()
+                    self.root.after(0, lambda r=result: on_success(r))
+                except Exception as ex:
+                    msg = str(ex)
+                    self.root.after(0, lambda m=msg: on_error(m))
+            import threading
+            threading.Thread(target=run, daemon=True).start()
+
+        def _set_result(widget, text):
+            widget.config(state="normal")
+            widget.delete("1.0", "end")
+            widget.insert("1.0", text)
+            widget.config(state="disabled")
+
+        def _copy_widget(widget):
+            txt = widget.get("1.0", "end-1c").strip()
+            if txt and not txt.startswith("❌"):
+                self.root.clipboard_clear()
+                self.root.clipboard_append(txt)
+
         # ── 1. Générateur de hashtags ──────────────────────────────────────────
-        c1 = card("# Générateur de Hashtags", "Crée 30 hashtags ciblés pour ton contenu")
+        c1 = card("# Générateur de Hashtags", "30 hashtags ciblés pour ton contenu")
         tk.Label(c1, text="Décris ton contenu / niche :", font=("Segoe UI", 9),
                  bg=CARD, fg=TEXT2).pack(anchor="w")
         ht_topic = tk.Text(c1, height=2, bg=SURFACE2, fg=TEXT, insertbackground=TEXT,
@@ -2271,47 +2326,14 @@ class App:
             topic = ht_topic.get("1.0", "end-1c").strip()
             if not topic:
                 return
-            ht_result.config(state="normal")
-            ht_result.delete("1.0", "end")
-            ht_result.insert("1.0", "⏳ Génération...")
-            ht_result.config(state="disabled")
-            def run():
-                try:
-                    from groq import Groq
-                    key = self.cfg.get("groq_api_key", "")
-                    if not key:
-                        raise ValueError("Groq API key manquante (Paramètres → API Keys)")
-                    client = Groq(api_key=key)
-                    resp = client.chat.completions.create(
-                        model="llama-3.3-70b-versatile",
-                        messages=[{"role": "user", "content":
-                            f"Génère exactement 30 hashtags Instagram populaires et ciblés pour ce contenu : {topic}. "
-                            f"Format: une ligne avec les hashtags séparés par des espaces, commençant par #. "
-                            f"Inclus un mix de hashtags populaires (>1M posts) et de niche (<500K posts)."}],
-                        max_tokens=300
-                    )
-                    tags = resp.choices[0].message.content.strip()
-                    self.root.after(0, lambda: (
-                        ht_result.config(state="normal"),
-                        ht_result.delete("1.0", "end"),
-                        ht_result.insert("1.0", tags),
-                        ht_result.config(state="disabled")
-                    ))
-                except Exception as e:
-                    self.root.after(0, lambda: (
-                        ht_result.config(state="normal"),
-                        ht_result.delete("1.0", "end"),
-                        ht_result.insert("1.0", f"❌ {e}"),
-                        ht_result.config(state="disabled")
-                    ))
-            import threading
-            threading.Thread(target=run, daemon=True).start()
-
-        def copy_hashtags():
-            txt = ht_result.get("1.0", "end-1c")
-            if txt and not txt.startswith("❌"):
-                self.root.clipboard_clear()
-                self.root.clipboard_append(txt)
+            _set_result(ht_result, "⏳ Génération...")
+            prompt = (f"Génère exactement 30 hashtags Instagram populaires et ciblés pour : {topic}. "
+                      f"Une seule ligne, hashtags séparés par espaces, commençant par #. "
+                      f"Mix populaires (>1M) et niche (<500K).")
+            _groq_call(prompt,
+                       on_success=lambda t: _set_result(ht_result, t),
+                       on_error=lambda m: _set_result(ht_result, f"❌ {m}"),
+                       max_tokens=300)
 
         bf1 = tk.Frame(c1, bg=CARD)
         bf1.pack(fill="x")
@@ -2320,30 +2342,42 @@ class App:
                   padx=16, pady=6, command=gen_hashtags).pack(side="left")
         tk.Button(bf1, text="📋 Copier", font=("Segoe UI", 10),
                   bg=SURFACE2, fg=TEXT2, relief="flat", cursor="hand2",
-                  padx=12, pady=6, command=copy_hashtags).pack(side="left", padx=(8, 0))
+                  padx=12, pady=6, command=lambda: _copy_widget(ht_result)).pack(
+                      side="left", padx=(8, 0))
 
         # ── 2. Générateur de bio ───────────────────────────────────────────────
-        c2 = card("✍️  Générateur de Bio Instagram", "Crée une bio percutante pour ton profil")
-        bio_row = tk.Frame(c2, bg=CARD)
-        bio_row.pack(fill="x", pady=(0, 6))
-        for lbl, width in [("Pseudo IG", 14), ("Niche / activité", 20), ("Style", 12)]:
-            col = tk.Frame(bio_row, bg=CARD)
-            col.pack(side="left", fill="x", expand=True, padx=(0, 8))
-            tk.Label(col, text=lbl, font=("Segoe UI", 9), bg=CARD, fg=TEXT2).pack(anchor="w")
+        c2 = card("✍️  Générateur de Bio Instagram", "Bio percutante en 150 caractères")
 
+        bio_fields_row = tk.Frame(c2, bg=CARD)
+        bio_fields_row.pack(fill="x", pady=(0, 8))
+
+        bio_pseudo_col = tk.Frame(bio_fields_row, bg=CARD)
+        bio_pseudo_col.pack(side="left", fill="x", expand=True, padx=(0, 8))
+        tk.Label(bio_pseudo_col, text="Pseudo IG", font=("Segoe UI", 9),
+                 bg=CARD, fg=TEXT2).pack(anchor="w")
         self._bio_pseudo = tk.StringVar()
-        self._bio_niche  = tk.StringVar()
-        self._bio_style  = tk.StringVar(value="Pro & inspirant")
-        tk.Entry(bio_row.winfo_children()[0], textvariable=self._bio_pseudo,
+        tk.Entry(bio_pseudo_col, textvariable=self._bio_pseudo,
                  bg=SURFACE2, fg=TEXT, insertbackground=TEXT, relief="flat",
                  font=("Segoe UI", 10), highlightthickness=1,
                  highlightbackground=BORDER, highlightcolor=ACCENT).pack(fill="x", ipady=5)
-        tk.Entry(bio_row.winfo_children()[1], textvariable=self._bio_niche,
+
+        bio_niche_col = tk.Frame(bio_fields_row, bg=CARD)
+        bio_niche_col.pack(side="left", fill="x", expand=True, padx=(0, 8))
+        tk.Label(bio_niche_col, text="Niche / activité", font=("Segoe UI", 9),
+                 bg=CARD, fg=TEXT2).pack(anchor="w")
+        self._bio_niche = tk.StringVar()
+        tk.Entry(bio_niche_col, textvariable=self._bio_niche,
                  bg=SURFACE2, fg=TEXT, insertbackground=TEXT, relief="flat",
                  font=("Segoe UI", 10), highlightthickness=1,
                  highlightbackground=BORDER, highlightcolor=ACCENT).pack(fill="x", ipady=5)
-        style_cb = ttk.Combobox(bio_row.winfo_children()[2], textvariable=self._bio_style,
-                                 state="readonly", font=("Segoe UI", 9), width=14)
+
+        bio_style_col = tk.Frame(bio_fields_row, bg=CARD)
+        bio_style_col.pack(side="left", fill="x", expand=True)
+        tk.Label(bio_style_col, text="Style", font=("Segoe UI", 9),
+                 bg=CARD, fg=TEXT2).pack(anchor="w")
+        self._bio_style = tk.StringVar(value="Pro & inspirant")
+        style_cb = ttk.Combobox(bio_style_col, textvariable=self._bio_style,
+                                 state="readonly", font=("Segoe UI", 9))
         style_cb["values"] = ["Pro & inspirant", "Drôle & décontracté", "Mystérieux",
                                "Motivateur", "Minimaliste", "Luxueux"]
         style_cb.pack(fill="x", ipady=3)
@@ -2352,56 +2386,23 @@ class App:
                              relief="flat", font=("Segoe UI", 10), wrap="word",
                              highlightthickness=1, highlightbackground=BORDER,
                              state="disabled")
-        bio_result.pack(fill="x", pady=(8, 8))
+        bio_result.pack(fill="x", pady=(0, 8))
 
         def gen_bio():
-            pseudo = self._bio_pseudo.get().strip()
-            niche  = self._bio_niche.get().strip()
-            style  = self._bio_style.get()
+            niche = self._bio_niche.get().strip()
             if not niche:
                 return
-            bio_result.config(state="normal")
-            bio_result.delete("1.0", "end")
-            bio_result.insert("1.0", "⏳ Génération...")
-            bio_result.config(state="disabled")
-            def run():
-                try:
-                    from groq import Groq
-                    key = self.cfg.get("groq_api_key", "")
-                    if not key:
-                        raise ValueError("Groq API key manquante (Paramètres → API Keys)")
-                    client = Groq(api_key=key)
-                    prompt = (f"Crée une bio Instagram percutante (max 150 caractères) pour un compte "
-                              f"dans la niche : {niche}. Style : {style}. "
-                              + (f"Pseudo : @{pseudo}. " if pseudo else "")
-                              + "Inclus des emojis pertinents, un CTA si possible. Réponds uniquement avec la bio.")
-                    resp = client.chat.completions.create(
-                        model="llama-3.3-70b-versatile",
-                        messages=[{"role": "user", "content": prompt}],
-                        max_tokens=200
-                    )
-                    bio_txt = resp.choices[0].message.content.strip()
-                    self.root.after(0, lambda: (
-                        bio_result.config(state="normal"),
-                        bio_result.delete("1.0", "end"),
-                        bio_result.insert("1.0", bio_txt),
-                        bio_result.config(state="disabled")
-                    ))
-                except Exception as e:
-                    self.root.after(0, lambda: (
-                        bio_result.config(state="normal"),
-                        bio_result.delete("1.0", "end"),
-                        bio_result.insert("1.0", f"❌ {e}"),
-                        bio_result.config(state="disabled")
-                    ))
-            import threading
-            threading.Thread(target=run, daemon=True).start()
-
-        def copy_bio():
-            txt = bio_result.get("1.0", "end-1c")
-            if txt and not txt.startswith("❌"):
-                self.root.clipboard_clear()
-                self.root.clipboard_append(txt)
+            _set_result(bio_result, "⏳ Génération...")
+            pseudo = self._bio_pseudo.get().strip()
+            style  = self._bio_style.get()
+            prompt = (f"Crée une bio Instagram percutante (max 150 caractères) pour la niche : {niche}. "
+                      f"Style : {style}. "
+                      + (f"Pseudo : @{pseudo}. " if pseudo else "")
+                      + "Emojis pertinents, CTA si possible. Réponds uniquement avec la bio.")
+            _groq_call(prompt,
+                       on_success=lambda t: _set_result(bio_result, t),
+                       on_error=lambda m: _set_result(bio_result, f"❌ {m}"),
+                       max_tokens=200)
 
         bf2 = tk.Frame(c2, bg=CARD)
         bf2.pack(fill="x")
@@ -2410,11 +2411,12 @@ class App:
                   padx=16, pady=6, command=gen_bio).pack(side="left")
         tk.Button(bf2, text="📋 Copier", font=("Segoe UI", 10),
                   bg=SURFACE2, fg=TEXT2, relief="flat", cursor="hand2",
-                  padx=12, pady=6, command=copy_bio).pack(side="left", padx=(8, 0))
+                  padx=12, pady=6, command=lambda: _copy_widget(bio_result)).pack(
+                      side="left", padx=(8, 0))
 
         # ── 3. Analyse concurrents ─────────────────────────────────────────────
-        c3 = card("🔍  Analyse de Stratégie Concurrente", "Stratégie de contenu basée sur un compte rival")
-        tk.Label(c3, text="Pseudo d'un concurrent (@handle) :",
+        c3 = card("🔍  Stratégie Concurrente", "Recommandations basées sur une niche rivale")
+        tk.Label(c3, text="Pseudo concurrent ou niche :",
                  font=("Segoe UI", 9), bg=CARD, fg=TEXT2).pack(anchor="w")
         comp_entry = tk.Entry(c3, bg=SURFACE2, fg=TEXT, insertbackground=TEXT, relief="flat",
                               font=("Segoe UI", 10), highlightthickness=1,
@@ -2430,69 +2432,39 @@ class App:
             handle = comp_entry.get().strip().lstrip("@")
             if not handle:
                 return
-            comp_result.config(state="normal")
-            comp_result.delete("1.0", "end")
-            comp_result.insert("1.0", "⏳ Analyse en cours...")
-            comp_result.config(state="disabled")
-            def run():
-                try:
-                    from groq import Groq
-                    key = self.cfg.get("groq_api_key", "")
-                    if not key:
-                        raise ValueError("Groq API key manquante")
-                    client = Groq(api_key=key)
-                    prompt = (f"En tant qu'expert Instagram growth hacking, analyse la stratégie probable "
-                              f"d'un compte Instagram : @{handle}. "
-                              f"Donne des recommandations concrètes sur : "
-                              f"1) Type de contenu à publier, 2) Fréquence de publication optimale, "
-                              f"3) Heures de publication idéales, 4) Stratégie hashtags, "
-                              f"5) Idées de Reels viraux, 6) Engagement tactics. "
-                              f"Format: liste structurée avec bullet points.")
-                    resp = client.chat.completions.create(
-                        model="llama-3.3-70b-versatile",
-                        messages=[{"role": "user", "content": prompt}],
-                        max_tokens=600
-                    )
-                    txt = resp.choices[0].message.content.strip()
-                    self.root.after(0, lambda: (
-                        comp_result.config(state="normal"),
-                        comp_result.delete("1.0", "end"),
-                        comp_result.insert("1.0", txt),
-                        comp_result.config(state="disabled")
-                    ))
-                except Exception as e:
-                    self.root.after(0, lambda: (
-                        comp_result.config(state="normal"),
-                        comp_result.delete("1.0", "end"),
-                        comp_result.insert("1.0", f"❌ {e}"),
-                        comp_result.config(state="disabled")
-                    ))
-            import threading
-            threading.Thread(target=run, daemon=True).start()
+            _set_result(comp_result, "⏳ Analyse en cours...")
+            prompt = (f"Expert Instagram growth hacking. Analyse la stratégie pour la niche/compte : {handle}. "
+                      f"Recommandations sur : 1) Type de contenu, 2) Fréquence, 3) Heures de publication, "
+                      f"4) Stratégie hashtags, 5) Idées Reels viraux, 6) Engagement tactics. "
+                      f"Liste structurée avec bullet points.")
+            _groq_call(prompt,
+                       on_success=lambda t: _set_result(comp_result, t),
+                       on_error=lambda m: _set_result(comp_result, f"❌ {m}"),
+                       max_tokens=600)
 
-        tk.Button(c3, text="🔍 Analyser la stratégie", font=("Segoe UI", 10, "bold"),
+        tk.Button(c3, text="🔍 Analyser", font=("Segoe UI", 10, "bold"),
                   bg=ACCENT, fg="#06080f", relief="flat", cursor="hand2",
                   padx=16, pady=6, command=analyze_competitor).pack(anchor="w")
 
         # ── 4. Générateur de légendes / captions ──────────────────────────────
-        c4 = card("💬  Légendes & Captions Virales", "Crée des captions engageantes pour tes Reels")
-        cap_row = tk.Frame(c4, bg=CARD)
-        cap_row.pack(fill="x", pady=(0, 8))
-        cap_col1 = tk.Frame(cap_row, bg=CARD)
-        cap_col1.pack(side="left", fill="x", expand=True, padx=(0, 8))
-        cap_col2 = tk.Frame(cap_row, bg=CARD)
-        cap_col2.pack(side="left", fill="x", expand=True)
-        tk.Label(cap_col1, text="Sujet de la vidéo :", font=("Segoe UI", 9),
+        c4 = card("💬  Légendes & Captions Virales", "Captions engageantes pour tes Reels")
+        cap_fields = tk.Frame(c4, bg=CARD)
+        cap_fields.pack(fill="x", pady=(0, 8))
+        cap_subj_col = tk.Frame(cap_fields, bg=CARD)
+        cap_subj_col.pack(side="left", fill="x", expand=True, padx=(0, 8))
+        tk.Label(cap_subj_col, text="Sujet de la vidéo :", font=("Segoe UI", 9),
                  bg=CARD, fg=TEXT2).pack(anchor="w")
         self._cap_subject_var = tk.StringVar()
-        tk.Entry(cap_col1, textvariable=self._cap_subject_var,
+        tk.Entry(cap_subj_col, textvariable=self._cap_subject_var,
                  bg=SURFACE2, fg=TEXT, insertbackground=TEXT, relief="flat",
                  font=("Segoe UI", 10), highlightthickness=1,
                  highlightbackground=BORDER, highlightcolor=ACCENT).pack(fill="x", ipady=5)
-        tk.Label(cap_col2, text="Ton :", font=("Segoe UI", 9),
+        cap_tone_col = tk.Frame(cap_fields, bg=CARD)
+        cap_tone_col.pack(side="left", fill="x", expand=True)
+        tk.Label(cap_tone_col, text="Ton :", font=("Segoe UI", 9),
                  bg=CARD, fg=TEXT2).pack(anchor="w")
         self._cap_tone_var = tk.StringVar(value="Engageant")
-        tone_cb = ttk.Combobox(cap_col2, textvariable=self._cap_tone_var,
+        tone_cb = ttk.Combobox(cap_tone_col, textvariable=self._cap_tone_var,
                                 state="readonly", font=("Segoe UI", 9))
         tone_cb["values"] = ["Engageant", "Humoristique", "Informatif",
                               "Mystérieux", "Inspirant", "Provocateur"]
@@ -2506,63 +2478,30 @@ class App:
 
         def gen_caption():
             subj = self._cap_subject_var.get().strip()
-            tone = self._cap_tone_var.get()
             if not subj:
                 return
-            cap_result.config(state="normal")
-            cap_result.delete("1.0", "end")
-            cap_result.insert("1.0", "⏳ Génération...")
-            cap_result.config(state="disabled")
-            def run():
-                try:
-                    from groq import Groq
-                    key = self.cfg.get("groq_api_key", "")
-                    if not key:
-                        raise ValueError("Groq API key manquante")
-                    client = Groq(api_key=key)
-                    prompt = (f"Écris une légende Instagram virale pour un Reel sur : {subj}. "
-                              f"Style : {tone}. "
-                              f"Format : 1 accroche forte (1 ligne), corps (2-3 lignes), CTA, "
-                              f"puis 15 hashtags sur une nouvelle ligne. Max 300 mots.")
-                    resp = client.chat.completions.create(
-                        model="llama-3.3-70b-versatile",
-                        messages=[{"role": "user", "content": prompt}],
-                        max_tokens=400
-                    )
-                    txt = resp.choices[0].message.content.strip()
-                    self.root.after(0, lambda: (
-                        cap_result.config(state="normal"),
-                        cap_result.delete("1.0", "end"),
-                        cap_result.insert("1.0", txt),
-                        cap_result.config(state="disabled")
-                    ))
-                except Exception as e:
-                    self.root.after(0, lambda: (
-                        cap_result.config(state="normal"),
-                        cap_result.delete("1.0", "end"),
-                        cap_result.insert("1.0", f"❌ {e}"),
-                        cap_result.config(state="disabled")
-                    ))
-            import threading
-            threading.Thread(target=run, daemon=True).start()
-
-        def copy_caption():
-            txt = cap_result.get("1.0", "end-1c")
-            if txt and not txt.startswith("❌"):
-                self.root.clipboard_clear()
-                self.root.clipboard_append(txt)
+            _set_result(cap_result, "⏳ Génération...")
+            tone = self._cap_tone_var.get()
+            prompt = (f"Légende Instagram virale pour un Reel sur : {subj}. Style : {tone}. "
+                      f"Format : accroche forte (1 ligne), corps (2-3 lignes), CTA, "
+                      f"puis 15 hashtags. Max 250 mots.")
+            _groq_call(prompt,
+                       on_success=lambda t: _set_result(cap_result, t),
+                       on_error=lambda m: _set_result(cap_result, f"❌ {m}"),
+                       max_tokens=400)
 
         bf4 = tk.Frame(c4, bg=CARD)
         bf4.pack(fill="x")
-        tk.Button(bf4, text="✨ Générer la légende", font=("Segoe UI", 10, "bold"),
+        tk.Button(bf4, text="✨ Générer", font=("Segoe UI", 10, "bold"),
                   bg=ACCENT, fg="#06080f", relief="flat", cursor="hand2",
                   padx=16, pady=6, command=gen_caption).pack(side="left")
         tk.Button(bf4, text="📋 Copier", font=("Segoe UI", 10),
                   bg=SURFACE2, fg=TEXT2, relief="flat", cursor="hand2",
-                  padx=12, pady=6, command=copy_caption).pack(side="left", padx=(8, 0))
+                  padx=12, pady=6, command=lambda: _copy_widget(cap_result)).pack(
+                      side="left", padx=(8, 0))
 
         # ── 5. Planificateur de contenu ────────────────────────────────────────
-        c5 = card("📅  Planificateur de Contenu", "Génère un calendrier éditorial sur 7 jours")
+        c5 = card("📅  Planificateur de Contenu", "Calendrier éditorial sur 7 jours")
         tk.Label(c5, text="Ta niche / thématique :", font=("Segoe UI", 9),
                  bg=CARD, fg=TEXT2).pack(anchor="w")
         plan_topic = tk.Entry(c5, bg=SURFACE2, fg=TEXT, insertbackground=TEXT, relief="flat",
@@ -2579,42 +2518,14 @@ class App:
             topic = plan_topic.get().strip()
             if not topic:
                 return
-            plan_result.config(state="normal")
-            plan_result.delete("1.0", "end")
-            plan_result.insert("1.0", "⏳ Création du planning...")
-            plan_result.config(state="disabled")
-            def run():
-                try:
-                    from groq import Groq
-                    key = self.cfg.get("groq_api_key", "")
-                    if not key:
-                        raise ValueError("Groq API key manquante")
-                    client = Groq(api_key=key)
-                    prompt = (f"Crée un calendrier éditorial Instagram sur 7 jours pour la niche : {topic}. "
-                              f"Pour chaque jour : Heure optimale, Type de contenu (Reel/Story/Post), "
-                              f"Idée de contenu précise, Titre accrocheur, Hashtags clés (5). "
-                              f"Format: tableau ou liste structurée jour par jour.")
-                    resp = client.chat.completions.create(
-                        model="llama-3.3-70b-versatile",
-                        messages=[{"role": "user", "content": prompt}],
-                        max_tokens=800
-                    )
-                    txt = resp.choices[0].message.content.strip()
-                    self.root.after(0, lambda: (
-                        plan_result.config(state="normal"),
-                        plan_result.delete("1.0", "end"),
-                        plan_result.insert("1.0", txt),
-                        plan_result.config(state="disabled")
-                    ))
-                except Exception as e:
-                    self.root.after(0, lambda: (
-                        plan_result.config(state="normal"),
-                        plan_result.delete("1.0", "end"),
-                        plan_result.insert("1.0", f"❌ {e}"),
-                        plan_result.config(state="disabled")
-                    ))
-            import threading
-            threading.Thread(target=run, daemon=True).start()
+            _set_result(plan_result, "⏳ Création du planning...")
+            prompt = (f"Calendrier éditorial Instagram 7 jours pour : {topic}. "
+                      f"Chaque jour : heure optimale, type contenu (Reel/Story/Post), "
+                      f"idée précise, titre accrocheur, 5 hashtags. Liste jour par jour.")
+            _groq_call(prompt,
+                       on_success=lambda t: _set_result(plan_result, t),
+                       on_error=lambda m: _set_result(plan_result, f"❌ {m}"),
+                       max_tokens=800)
 
         tk.Button(c5, text="📅 Générer le planning", font=("Segoe UI", 10, "bold"),
                   bg=ACCENT, fg="#06080f", relief="flat", cursor="hand2",
@@ -2648,7 +2559,7 @@ class App:
             self._settings_panels[name].pack(fill="x")
             self._settings_nav_btns[name].config(bg=ACCENT, fg="#06080f")
 
-        for tab_name in ("Connexions", "API Keys", "Apparence"):
+        for tab_name in ("Profil", "Connexions", "API Keys", "Apparence"):
             b = tk.Button(nav, text=tab_name, font=("Segoe UI", 10, "bold"),
                           bg=SURFACE2, fg=TEXT2, relief="flat", cursor="hand2",
                           padx=16, pady=7,
@@ -2657,6 +2568,81 @@ class App:
             self._settings_nav_btns[tab_name] = b
             panel = tk.Frame(panel_host, bg=CARD, padx=24, pady=24)
             self._settings_panels[tab_name] = panel
+
+        # --- Profil panel ---
+        prof = self._settings_panels["Profil"]
+        tk.Label(prof, text="Mon Profil", font=("Segoe UI", 13, "bold"),
+                 bg=CARD, fg=TEXT).pack(anchor="w", pady=(0, 16))
+
+        prof_fields = [
+            ("Pseudo / Nom",        "profile_name",     ""),
+            ("Email",               "profile_email",    ""),
+            ("Niche principale",    "profile_niche",    "ex: Fitness, Crypto, Mode..."),
+            ("Dossier export vidéo","export_dir",       "Chemin vers le dossier d'export"),
+        ]
+        self._prof_vars = {}
+        for lbl, key, hint in prof_fields:
+            tk.Label(prof, text=lbl, font=("Segoe UI", 10), bg=CARD, fg=TEXT2,
+                     anchor="w").pack(fill="x", pady=(8, 2))
+            if hint:
+                tk.Label(prof, text=hint, font=("Segoe UI", 8), bg=CARD, fg=MUTED,
+                         anchor="w").pack(fill="x")
+            var = tk.StringVar(value=self.cfg.get(key, ""))
+            self._prof_vars[key] = var
+            row = tk.Frame(prof, bg=CARD)
+            row.pack(fill="x", pady=(2, 0))
+            tk.Entry(row, textvariable=var, font=("Segoe UI", 11),
+                     bg=SURFACE2, fg=TEXT, insertbackground=TEXT,
+                     relief="flat", bd=0, highlightthickness=1,
+                     highlightcolor=ACCENT, highlightbackground=BORDER).pack(
+                         side="left", fill="x", expand=True, ipady=7)
+            if key == "export_dir":
+                def _browse_dir(v=var):
+                    d = filedialog.askdirectory(title="Dossier d'export")
+                    if d:
+                        v.set(d)
+                tk.Button(row, text="📂", font=("Segoe UI", 11),
+                          bg=SURFACE2, fg=TEXT2, relief="flat", cursor="hand2", padx=10,
+                          command=_browse_dir).pack(side="right", padx=(4, 0))
+
+        tk.Label(prof, text="Mot de passe (laisser vide pour ne pas changer)",
+                 font=("Segoe UI", 10), bg=CARD, fg=TEXT2, anchor="w").pack(fill="x", pady=(14, 2))
+        self._prof_pwd_var = tk.StringVar()
+        self._prof_pwd2_var = tk.StringVar()
+        for pvar, hint_txt in [(self._prof_pwd_var, "Nouveau mot de passe"),
+                                (self._prof_pwd2_var, "Confirmer le mot de passe")]:
+            tk.Entry(prof, textvariable=pvar, show="•", font=("Segoe UI", 11),
+                     bg=SURFACE2, fg=TEXT, insertbackground=TEXT,
+                     relief="flat", bd=0, highlightthickness=1,
+                     highlightcolor=ACCENT, highlightbackground=BORDER,
+                     ).pack(fill="x", ipady=7, pady=(2, 0))
+            tk.Label(prof, text=hint_txt, font=("Segoe UI", 8), bg=CARD, fg=MUTED,
+                     anchor="w").pack(fill="x")
+
+        prof_status = tk.Label(prof, text="", font=("Segoe UI", 9), bg=CARD, fg=OK)
+        prof_status.pack(anchor="w", pady=(8, 0))
+
+        def _save_profile():
+            for key, var in self._prof_vars.items():
+                self.cfg[key] = var.get().strip()
+            pwd  = self._prof_pwd_var.get()
+            pwd2 = self._prof_pwd2_var.get()
+            if pwd or pwd2:
+                if pwd != pwd2:
+                    prof_status.config(text="❌ Les mots de passe ne correspondent pas", fg=DANGER)
+                    return
+                import hashlib
+                self.cfg["profile_password_hash"] = hashlib.sha256(pwd.encode()).hexdigest()
+                self._prof_pwd_var.set("")
+                self._prof_pwd2_var.set("")
+                prof_status.config(text="✅ Profil & mot de passe sauvegardés", fg=OK)
+            else:
+                prof_status.config(text="✅ Profil sauvegardé", fg=OK)
+            save_config(self.cfg)
+
+        tk.Button(prof, text="💾 Sauvegarder le profil", font=("Segoe UI", 11, "bold"),
+                  bg=ACCENT, fg="#06080f", relief="flat", cursor="hand2",
+                  pady=8, command=_save_profile).pack(fill="x", pady=(16, 0))
 
         # --- Connexions panel ---
         conn = self._settings_panels["Connexions"]
@@ -2738,7 +2724,7 @@ class App:
         self._theme_active_lbl.pack(anchor="w")
 
         # Show first panel by default
-        show_settings_panel("Connexions")
+        show_settings_panel("Profil")
 
         # Logs always at bottom
         tk.Label(f, text="LOGS", font=("Consolas", 9, "bold"),
