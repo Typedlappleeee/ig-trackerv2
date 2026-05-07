@@ -292,8 +292,8 @@ def scrape_ig(username, proxy=None, sessionid=None):
             }
             got_429 = False
             for api_base in (
-                "https://i.instagram.com/api/v1/users/web_profile_info/?username=",
                 "https://www.instagram.com/api/v1/users/web_profile_info/?username=",
+                "https://i.instagram.com/api/v1/users/web_profile_info/?username=",
             ):
                 try:
                     for attempt in range(2):
@@ -307,69 +307,88 @@ def scrape_ig(username, proxy=None, sessionid=None):
                         user = r.json().get("data", {}).get("user")
                         if user:
                             return _parse_ig_graphql(user, username)
-                        errors.append(f"A:{api_base[:30]}→200 user=null")
+                        errors.append(f"A:{api_base[:28]}→200 user=null")
                     elif r.status_code == 404:
                         return {"ig_status": "banned", "ig_error": "Compte introuvable"}
                     elif r.status_code == 401:
                         return {"ig_status": "private", "ig_error": "Compte privé"}
                     else:
-                        errors.append(f"A:{api_base[:30]}→HTTP{r.status_code}")
+                        errors.append(f"A:{api_base[:28]}→HTTP{r.status_code}")
                 except Exception as ex:
-                    errors.append(f"A:{api_base[:30]}→{ex}")
+                    errors.append(f"A:{api_base[:28]}→{ex}")
 
-            # ── Strategy A2: search endpoint (moins rate-limité) ──────────────
-            # Fonctionne avec sessionid, retourne follower_count directement
+            # ── Strategy A2: GraphQL query (très fiable avec sessionid) ───────
             try:
-                srch_hdrs = {**api_headers,
-                    "User-Agent": ("Instagram 275.0.0.27.98 Android "
-                                   "(33/13; 420dpi; 1080x2274; samsung; SM-G991B; "
-                                   "o1s; exynos2100; en_US; 459673581)"),
-                    "X-IG-App-ID":          "567067343352427",
-                    "X-IG-Capabilities":    "3brTvwE=",
-                    "X-IG-Connection-Type": "WIFI",
-                }
-                rs = client.get(
-                    f"https://i.instagram.com/api/v1/search/users/?q={username}&count=5",
-                    headers=srch_hdrs
-                )
-                if rs.status_code == 200:
-                    results = rs.json().get("users", [])
-                    for u in results:
-                        if u.get("username", "").lower() == username.lower():
-                            return {
-                                "ig_status":   "active",
-                                "ig_username": u.get("username", username),
-                                "full_name":   u.get("full_name", ""),
-                                "followers":   u.get("follower_count", 0),
-                                "following":   u.get("following_count", 0),
-                                "posts_count": u.get("media_count", 0),
-                                "bio":         u.get("biography", ""),
-                                "videos":      [],
-                                "last_checked": datetime.now().isoformat(),
-                            }
-                    errors.append(f"A2:search 200 mais '{username}' pas dans résultats")
+                import urllib.parse
+                variables = json.dumps({"username": username, "include_reel": True})
+                gql_url = ("https://www.instagram.com/graphql/query/"
+                           "?query_hash=c9100bf9110dd6361671f113dd02e7d"
+                           f"&variables={urllib.parse.quote(variables)}")
+                rg = client.get(gql_url, headers={**api_headers,
+                    "X-Requested-With": "XMLHttpRequest"})
+                if rg.status_code in (200, 201):
+                    try:
+                        user = rg.json().get("data", {}).get("user")
+                        if user:
+                            return _parse_ig_graphql(user, username)
+                        errors.append("A2:graphql→200 user=null")
+                    except Exception:
+                        errors.append("A2:graphql→JSON parse error")
                 else:
-                    errors.append(f"A2:search→HTTP{rs.status_code}")
+                    errors.append(f"A2:graphql→HTTP{rg.status_code}")
             except Exception as ex:
-                errors.append(f"A2:search→{ex}")
+                errors.append(f"A2:graphql→{ex}")
 
-            # ── Strategy B: ?__a=1 JSON shortcut ─────────────────────────────
+            # ── Strategy A3: search via www (pas i.instagram.com) ────────────
+            try:
+                rs = client.get(
+                    f"https://www.instagram.com/web/search/topsearch/"
+                    f"?context=blended&query={username}&count=5",
+                    headers={**api_headers, "X-Requested-With": "XMLHttpRequest"}
+                )
+                if rs.status_code in (200, 201):
+                    try:
+                        data = rs.json()
+                        users_list = data.get("users", [])
+                        for item in users_list:
+                            u = item.get("user", {})
+                            if u.get("username", "").lower() == username.lower():
+                                return {
+                                    "ig_status":   "active",
+                                    "ig_username": u.get("username", username),
+                                    "full_name":   u.get("full_name", ""),
+                                    "followers":   u.get("follower_count", 0),
+                                    "following":   u.get("following_count", 0),
+                                    "posts_count": u.get("media_count", 0),
+                                    "bio":         u.get("biography", ""),
+                                    "videos":      [],
+                                    "last_checked": datetime.now().isoformat(),
+                                }
+                        errors.append(f"A3:topsearch→200 '{username}' absent")
+                    except Exception:
+                        errors.append("A3:topsearch→JSON error")
+                else:
+                    errors.append(f"A3:topsearch→HTTP{rs.status_code}")
+            except Exception as ex:
+                errors.append(f"A3:topsearch→{ex}")
+
+            # ── Strategy B: ?__a=1  (accepte 200 ET 201) ─────────────────────
             try:
                 r2 = client.get(
                     f"https://www.instagram.com/{username}/?__a=1&__d=dis",
                     headers={**base_headers, "Accept": "application/json",
                              "X-Requested-With": "XMLHttpRequest"}
                 )
-                if r2.status_code == 200:
+                if r2.status_code in (200, 201):
                     try:
                         data = r2.json()
                         user = (data.get("graphql", {}).get("user")
                                 or data.get("data", {}).get("user"))
                         if user:
                             return _parse_ig_graphql(user, username)
-                        errors.append("B:200 mais pas de user dans JSON")
+                        errors.append("B:2xx mais pas de user dans JSON")
                     except Exception:
-                        errors.append("B:200 mais réponse non-JSON")
+                        errors.append("B:2xx mais réponse non-JSON")
                 else:
                     errors.append(f"B:HTTP{r2.status_code}")
             except Exception as ex:
