@@ -203,15 +203,13 @@ _BROWSER_UA = (
     "Chrome/124.0.0.0 Safari/537.36"
 )
 
-def _build_transport(proxy):
+def _proxy_url(proxy):
+    """Return a normalized proxy URL string, or None if invalid/placeholder."""
     if not proxy:
         return None
     p = normalize_proxy(proxy)
     if p and re.match(r'^(socks5|socks4|https?)://', p) and "user:pass" not in p:
-        try:
-            return httpx.HTTPTransport(proxy=p)
-        except Exception:
-            return None
+        return p
     return None
 
 def _parse_ig_graphql(user, username):
@@ -242,27 +240,38 @@ def _parse_ig_graphql(user, username):
         "last_checked": datetime.now().isoformat(),
     }
 
-def scrape_ig(username, proxy=None):
-    """Multi-strategy Instagram scraper: session cookies → API → ?__a=1 → HTML regex."""
-    transport = _build_transport(proxy)
+def scrape_ig(username, proxy=None, sessionid=None):
+    """Multi-strategy Instagram scraper. Best results with a valid sessionid cookie."""
+    purl = _proxy_url(proxy)
     kw = {"timeout": 25, "follow_redirects": True}
-    if transport:
-        kw["transport"] = transport
+    if purl:
+        kw["proxy"] = purl
 
     try:
         with httpx.Client(**kw) as client:
             # ── Step 1: acquire session cookies + csrf token ──────────────────
+            # If the caller gave us a real sessionid, inject it directly
             csrf = ""
-            try:
-                init = client.get("https://www.instagram.com/", headers={
-                    "User-Agent":      _BROWSER_UA,
-                    "Accept":          "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                    "Accept-Language": "fr-FR,fr;q=0.9,en-US;q=0.8",
-                    "Accept-Encoding": "gzip, deflate, br",
-                }, timeout=15)
-                csrf = init.cookies.get("csrftoken", "")
-            except Exception:
-                pass
+            if sessionid:
+                client.cookies.set("sessionid", sessionid, domain=".instagram.com")
+                # Derive csrftoken from a lightweight HEAD request
+                try:
+                    hd = client.head("https://www.instagram.com/", headers={
+                        "User-Agent": _BROWSER_UA}, timeout=10)
+                    csrf = hd.cookies.get("csrftoken", "")
+                except Exception:
+                    pass
+            else:
+                try:
+                    init = client.get("https://www.instagram.com/", headers={
+                        "User-Agent":      _BROWSER_UA,
+                        "Accept":          "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                        "Accept-Language": "fr-FR,fr;q=0.9,en-US;q=0.8",
+                        "Accept-Encoding": "gzip, deflate, br",
+                    }, timeout=15)
+                    csrf = init.cookies.get("csrftoken", "")
+                except Exception:
+                    pass
 
             base_headers = {
                 "User-Agent":      _BROWSER_UA,
@@ -2721,13 +2730,46 @@ class App:
         api = self._settings_panels["API Keys"]
         tk.Label(api, text="Clés API", font=("Segoe UI", 13, "bold"),
                  bg=CARD, fg=TEXT).pack(anchor="w", pady=(0, 16))
+
+        # Groq
         self.groq_key_var = tk.StringVar(value=self.cfg.get("groq_api_key", ""))
-        tk.Label(api, text="Groq API Key", font=("Segoe UI", 10), bg=CARD, fg=TEXT2, anchor="w").pack(fill="x", pady=(0, 2))
-        tk.Label(api, text="Gratuit sur groq.com → API Keys → Create", font=("Segoe UI", 8), bg=CARD, fg=MUTED, anchor="w").pack(fill="x")
+        tk.Label(api, text="Groq API Key", font=("Segoe UI", 10), bg=CARD, fg=TEXT2,
+                 anchor="w").pack(fill="x", pady=(0, 2))
+        tk.Label(api, text="Gratuit sur groq.com → API Keys → Create",
+                 font=("Segoe UI", 8), bg=CARD, fg=MUTED, anchor="w").pack(fill="x")
         tk.Entry(api, textvariable=self.groq_key_var, font=("Consolas", 11),
                  bg=SURFACE2, fg=TEXT, insertbackground=TEXT,
                  relief="flat", bd=0, highlightthickness=1,
-                 highlightcolor=ACCENT, highlightbackground=BORDER).pack(fill="x", ipady=7, pady=(2, 0))
+                 highlightcolor=ACCENT, highlightbackground=BORDER).pack(
+                     fill="x", ipady=7, pady=(2, 0))
+
+        # Instagram Session ID
+        tk.Label(api, text="Instagram Session ID", font=("Segoe UI", 10), bg=CARD, fg=TEXT2,
+                 anchor="w").pack(fill="x", pady=(16, 2))
+        tk.Label(api,
+                 text="Ouvre Instagram dans Chrome → F12 → Application → Cookies → sessionid",
+                 font=("Segoe UI", 8), bg=CARD, fg=MUTED, anchor="w").pack(fill="x")
+        self.ig_session_var = tk.StringVar(value=self.cfg.get("ig_sessionid", ""))
+        ig_sess_row = tk.Frame(api, bg=CARD)
+        ig_sess_row.pack(fill="x", pady=(2, 0))
+        ig_sess_entry = tk.Entry(ig_sess_row, textvariable=self.ig_session_var,
+                                  font=("Consolas", 10), show="•",
+                                  bg=SURFACE2, fg=TEXT, insertbackground=TEXT,
+                                  relief="flat", bd=0, highlightthickness=1,
+                                  highlightcolor=ACCENT, highlightbackground=BORDER)
+        ig_sess_entry.pack(side="left", fill="x", expand=True, ipady=7)
+        def _toggle_sess_show():
+            ig_sess_entry.config(show="" if ig_sess_entry.cget("show") == "•" else "•")
+        tk.Button(ig_sess_row, text="👁", font=("Segoe UI", 10),
+                  bg=SURFACE2, fg=TEXT2, relief="flat", cursor="hand2", padx=8,
+                  command=_toggle_sess_show).pack(side="right", padx=(4, 0))
+
+        # Session ID status indicator
+        sess_status = tk.Label(api, text="", font=("Segoe UI", 9), bg=CARD, fg=TEXT2)
+        sess_status.pack(anchor="w", pady=(4, 0))
+        if self.cfg.get("ig_sessionid"):
+            sess_status.config(text="✅ Session ID configurée", fg=OK)
+
         tk.Button(api, text="Sauvegarder", font=("Segoe UI", 11, "bold"),
                   bg=ACCENT, fg="#06080f", relief="flat", cursor="hand2",
                   pady=8, command=self._save_settings).pack(fill="x", pady=(16, 0))
@@ -2799,6 +2841,8 @@ class App:
         self.cfg["bearer_token"]  = self.bearer_var.get().strip()
         self.cfg["proxy"]         = normalized or raw_proxy
         self.cfg["groq_api_key"]  = self.groq_key_var.get().strip()
+        self.cfg["ig_sessionid"]  = getattr(self, 'ig_session_var',
+                                             tk.StringVar()).get().strip()
         save_config(self.cfg)
         self.log("Config sauvegardée ✓", "ok")
 
@@ -2975,9 +3019,10 @@ class App:
         username = d.get("ig_username", "")
         if not username:
             return
-        proxy = self.cfg.get("proxy", "").strip() or None
+        proxy     = self.cfg.get("proxy", "").strip() or None
+        sessionid = self.cfg.get("ig_sessionid", "").strip() or None
         self.log(f"Scraping @{username}...", "info")
-        res = scrape_ig(username, proxy)
+        res = scrape_ig(username, proxy, sessionid)
         self.data[pid].update(res)
         self.data[pid]["last_checked"] = datetime.now().isoformat()
         save_data(self.data)
