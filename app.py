@@ -2277,7 +2277,14 @@ class App:
             """Run a Groq API call in a background thread, call on_success(text) or on_error(msg)."""
             def run():
                 try:
-                    from groq import Groq
+                    try:
+                        from groq import Groq
+                    except ImportError:
+                        subprocess.run(
+                            [sys.executable, "-m", "pip", "install", "groq", "--quiet"],
+                            capture_output=True, timeout=60
+                        )
+                        from groq import Groq
                     key = self.cfg.get("groq_api_key", "")
                     if not key:
                         raise ValueError("Clé API Groq manquante → Paramètres > API Keys")
@@ -2307,114 +2314,7 @@ class App:
                 self.root.clipboard_clear()
                 self.root.clipboard_append(txt)
 
-        # ── 1. Générateur de hashtags ──────────────────────────────────────────
-        c1 = card("# Générateur de Hashtags", "30 hashtags ciblés pour ton contenu")
-        tk.Label(c1, text="Décris ton contenu / niche :", font=("Segoe UI", 9),
-                 bg=CARD, fg=TEXT2).pack(anchor="w")
-        ht_topic = tk.Text(c1, height=2, bg=SURFACE2, fg=TEXT, insertbackground=TEXT,
-                           relief="flat", font=("Segoe UI", 10), wrap="word",
-                           highlightthickness=1, highlightbackground=BORDER,
-                           highlightcolor=ACCENT)
-        ht_topic.pack(fill="x", pady=(4, 8))
-        ht_result = tk.Text(c1, height=5, bg=SURFACE, fg=ACCENT, insertbackground=TEXT,
-                            relief="flat", font=("Consolas", 9), wrap="word",
-                            highlightthickness=1, highlightbackground=BORDER,
-                            state="disabled")
-        ht_result.pack(fill="x", pady=(0, 8))
-
-        def gen_hashtags():
-            topic = ht_topic.get("1.0", "end-1c").strip()
-            if not topic:
-                return
-            _set_result(ht_result, "⏳ Génération...")
-            prompt = (f"Génère exactement 30 hashtags Instagram populaires et ciblés pour : {topic}. "
-                      f"Une seule ligne, hashtags séparés par espaces, commençant par #. "
-                      f"Mix populaires (>1M) et niche (<500K).")
-            _groq_call(prompt,
-                       on_success=lambda t: _set_result(ht_result, t),
-                       on_error=lambda m: _set_result(ht_result, f"❌ {m}"),
-                       max_tokens=300)
-
-        bf1 = tk.Frame(c1, bg=CARD)
-        bf1.pack(fill="x")
-        tk.Button(bf1, text="✨ Générer", font=("Segoe UI", 10, "bold"),
-                  bg=ACCENT, fg="#06080f", relief="flat", cursor="hand2",
-                  padx=16, pady=6, command=gen_hashtags).pack(side="left")
-        tk.Button(bf1, text="📋 Copier", font=("Segoe UI", 10),
-                  bg=SURFACE2, fg=TEXT2, relief="flat", cursor="hand2",
-                  padx=12, pady=6, command=lambda: _copy_widget(ht_result)).pack(
-                      side="left", padx=(8, 0))
-
-        # ── 2. Générateur de bio ───────────────────────────────────────────────
-        c2 = card("✍️  Générateur de Bio Instagram", "Bio percutante en 150 caractères")
-
-        bio_fields_row = tk.Frame(c2, bg=CARD)
-        bio_fields_row.pack(fill="x", pady=(0, 8))
-
-        bio_pseudo_col = tk.Frame(bio_fields_row, bg=CARD)
-        bio_pseudo_col.pack(side="left", fill="x", expand=True, padx=(0, 8))
-        tk.Label(bio_pseudo_col, text="Pseudo IG", font=("Segoe UI", 9),
-                 bg=CARD, fg=TEXT2).pack(anchor="w")
-        self._bio_pseudo = tk.StringVar()
-        tk.Entry(bio_pseudo_col, textvariable=self._bio_pseudo,
-                 bg=SURFACE2, fg=TEXT, insertbackground=TEXT, relief="flat",
-                 font=("Segoe UI", 10), highlightthickness=1,
-                 highlightbackground=BORDER, highlightcolor=ACCENT).pack(fill="x", ipady=5)
-
-        bio_niche_col = tk.Frame(bio_fields_row, bg=CARD)
-        bio_niche_col.pack(side="left", fill="x", expand=True, padx=(0, 8))
-        tk.Label(bio_niche_col, text="Niche / activité", font=("Segoe UI", 9),
-                 bg=CARD, fg=TEXT2).pack(anchor="w")
-        self._bio_niche = tk.StringVar()
-        tk.Entry(bio_niche_col, textvariable=self._bio_niche,
-                 bg=SURFACE2, fg=TEXT, insertbackground=TEXT, relief="flat",
-                 font=("Segoe UI", 10), highlightthickness=1,
-                 highlightbackground=BORDER, highlightcolor=ACCENT).pack(fill="x", ipady=5)
-
-        bio_style_col = tk.Frame(bio_fields_row, bg=CARD)
-        bio_style_col.pack(side="left", fill="x", expand=True)
-        tk.Label(bio_style_col, text="Style", font=("Segoe UI", 9),
-                 bg=CARD, fg=TEXT2).pack(anchor="w")
-        self._bio_style = tk.StringVar(value="Pro & inspirant")
-        style_cb = ttk.Combobox(bio_style_col, textvariable=self._bio_style,
-                                 state="readonly", font=("Segoe UI", 9))
-        style_cb["values"] = ["Pro & inspirant", "Drôle & décontracté", "Mystérieux",
-                               "Motivateur", "Minimaliste", "Luxueux"]
-        style_cb.pack(fill="x", ipady=3)
-
-        bio_result = tk.Text(c2, height=4, bg=SURFACE, fg=TEXT, insertbackground=TEXT,
-                             relief="flat", font=("Segoe UI", 10), wrap="word",
-                             highlightthickness=1, highlightbackground=BORDER,
-                             state="disabled")
-        bio_result.pack(fill="x", pady=(0, 8))
-
-        def gen_bio():
-            niche = self._bio_niche.get().strip()
-            if not niche:
-                return
-            _set_result(bio_result, "⏳ Génération...")
-            pseudo = self._bio_pseudo.get().strip()
-            style  = self._bio_style.get()
-            prompt = (f"Crée une bio Instagram percutante (max 150 caractères) pour la niche : {niche}. "
-                      f"Style : {style}. "
-                      + (f"Pseudo : @{pseudo}. " if pseudo else "")
-                      + "Emojis pertinents, CTA si possible. Réponds uniquement avec la bio.")
-            _groq_call(prompt,
-                       on_success=lambda t: _set_result(bio_result, t),
-                       on_error=lambda m: _set_result(bio_result, f"❌ {m}"),
-                       max_tokens=200)
-
-        bf2 = tk.Frame(c2, bg=CARD)
-        bf2.pack(fill="x")
-        tk.Button(bf2, text="✨ Générer la bio", font=("Segoe UI", 10, "bold"),
-                  bg=ACCENT, fg="#06080f", relief="flat", cursor="hand2",
-                  padx=16, pady=6, command=gen_bio).pack(side="left")
-        tk.Button(bf2, text="📋 Copier", font=("Segoe UI", 10),
-                  bg=SURFACE2, fg=TEXT2, relief="flat", cursor="hand2",
-                  padx=12, pady=6, command=lambda: _copy_widget(bio_result)).pack(
-                      side="left", padx=(8, 0))
-
-        # ── 3. Analyse concurrents ─────────────────────────────────────────────
+        # ── 1. Analyse concurrents ─────────────────────────────────────────────
         c3 = card("🔍  Stratégie Concurrente", "Recommandations basées sur une niche rivale")
         tk.Label(c3, text="Pseudo concurrent ou niche :",
                  font=("Segoe UI", 9), bg=CARD, fg=TEXT2).pack(anchor="w")
