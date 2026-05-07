@@ -2729,9 +2729,16 @@ class App:
                      highlightcolor=ACCENT, highlightbackground=BORDER).pack(fill="x", ipady=7, pady=(2, 0))
         self.proxy_status = tk.Label(conn, text="", font=("Segoe UI", 9), bg=CARD, fg=TEXT2)
         self.proxy_status.pack(anchor="w", pady=(4, 0))
-        tk.Button(conn, text="Sauvegarder", font=("Segoe UI", 11, "bold"),
+
+        btn_row = tk.Frame(conn, bg=CARD)
+        btn_row.pack(fill="x", pady=(12, 0))
+        tk.Button(btn_row, text="💾 Sauvegarder", font=("Segoe UI", 11, "bold"),
                   bg=ACCENT, fg="#06080f", relief="flat", cursor="hand2",
-                  pady=8, command=self._save_settings).pack(fill="x", pady=(16, 0))
+                  pady=8, command=self._save_settings).pack(side="left", fill="x", expand=True)
+        tk.Button(btn_row, text="🔌 Tester proxy + IG",
+                  font=("Segoe UI", 10), bg=SURFACE2, fg=TEXT2,
+                  relief="flat", cursor="hand2", pady=8,
+                  command=self._test_proxy).pack(side="left", fill="x", expand=True, padx=(8, 0))
 
         # --- API Keys panel ---
         api = self._settings_panels["API Keys"]
@@ -2852,6 +2859,105 @@ class App:
                                              tk.StringVar()).get().strip()
         save_config(self.cfg)
         self.log("Config sauvegardée ✓", "ok")
+
+    def _test_proxy(self):
+        proxy_raw  = self.proxy_var.get().strip()
+        sessionid  = getattr(self, 'ig_session_var', tk.StringVar()).get().strip()
+        proxy_norm = normalize_proxy(proxy_raw) if proxy_raw else ""
+
+        win = tk.Toplevel(self.root)
+        win.title("🔌 Test proxy + Instagram")
+        win.geometry("620x460")
+        win.configure(bg=BG)
+        tk.Label(win, text="🔌 Diagnostic proxy & Instagram",
+                 font=("Segoe UI", 13, "bold"), bg=BG, fg=TEXT).pack(anchor="w", padx=20, pady=(16,4))
+
+        log = scrolledtext.ScrolledText(win, bg=SURFACE, fg=TEXT2, font=("Consolas", 9),
+                                         relief="flat", state="disabled", wrap="word")
+        log.pack(fill="both", expand=True, padx=20, pady=(0,12))
+
+        def tlog(msg, color=None):
+            log.config(state="normal")
+            tag = f"c{id(color)}"
+            log.insert("end", msg + "\n", tag)
+            log.tag_config(tag, foreground=color or TEXT2)
+            log.see("end")
+            log.config(state="disabled")
+            win.update()
+
+        def run():
+            tlog(f"Proxy configuré : {proxy_norm or '(aucun)'}", TEXT2)
+            tlog(f"Session ID      : {'✅ présente' if sessionid else '❌ absente'}", OK if sessionid else DANGER)
+            tlog("")
+
+            kw = {"timeout": 15, "follow_redirects": True}
+            if proxy_norm:
+                kw["proxy"] = proxy_norm
+
+            # Step 1: connectivity via proxy
+            tlog("── Test 1 : connexion via proxy → httpbin.org ──", ACCENT)
+            try:
+                r = httpx.get("https://httpbin.org/ip", **kw)
+                ip = r.json().get("origin", "?")
+                tlog(f"   ✅ IP sortante : {ip}", OK)
+            except Exception as ex:
+                tlog(f"   ❌ Échec : {ex}", DANGER)
+                tlog("   → Proxy injoignable ou mauvais format", WARN)
+
+            # Step 2: reach instagram.com
+            tlog("── Test 2 : instagram.com (page principale) ──", ACCENT)
+            csrf = ""
+            try:
+                r2 = httpx.get("https://www.instagram.com/", headers={"User-Agent": _BROWSER_UA},
+                               **kw)
+                csrf = r2.cookies.get("csrftoken", "")
+                tlog(f"   HTTP {r2.status_code}  |  csrftoken : {'✅' if csrf else '❌ absent'}",
+                     OK if r2.status_code == 200 else WARN)
+            except Exception as ex:
+                tlog(f"   ❌ {ex}", DANGER)
+
+            # Step 3: API endpoint
+            tlog("── Test 3 : API i.instagram.com ──", ACCENT)
+            cookie_hdr = f"sessionid={sessionid}" if sessionid else ""
+            if csrf:
+                cookie_hdr += f"; csrftoken={csrf}" if cookie_hdr else f"csrftoken={csrf}"
+            api_hdrs = {
+                "User-Agent":     _BROWSER_UA,
+                "X-IG-App-ID":    "936619743392459",
+                "Accept":         "application/json",
+                "Origin":         "https://www.instagram.com",
+            }
+            if cookie_hdr:
+                api_hdrs["Cookie"] = cookie_hdr
+            if csrf:
+                api_hdrs["X-CSRFToken"] = csrf
+            try:
+                r3 = httpx.get("https://i.instagram.com/api/v1/users/web_profile_info/?username=instagram",
+                               headers=api_hdrs, **kw)
+                tlog(f"   HTTP {r3.status_code}", OK if r3.status_code == 200 else WARN)
+                if r3.status_code == 200:
+                    user = r3.json().get("data", {}).get("user", {})
+                    tlog(f"   ✅ Données reçues — followers instagram: {user.get('edge_followed_by',{}).get('count','?')}", OK)
+                elif r3.status_code == 401:
+                    tlog("   ❌ 401 — sessionid invalide ou expiré", DANGER)
+                elif r3.status_code == 403:
+                    tlog("   ❌ 403 — IP/proxy bloqué par Instagram", DANGER)
+                elif r3.status_code == 429:
+                    tlog("   ❌ 429 — trop de requêtes / proxy banni", DANGER)
+                else:
+                    tlog(f"   Réponse : {r3.text[:200]}", TEXT2)
+            except Exception as ex:
+                tlog(f"   ❌ {ex}", DANGER)
+
+            tlog("")
+            tlog("── Résumé ──", ACCENT)
+            if not proxy_norm:
+                tlog("⚠ Aucun proxy configuré — Instagram bloque les IPs normales", WARN)
+            if not sessionid:
+                tlog("⚠ Pas de Session ID — Paramètres → API Keys → Instagram Session ID", WARN)
+
+        import threading
+        threading.Thread(target=run, daemon=True).start()
 
     def _apply_theme(self, theme_name):
         apply_theme_globals(theme_name)
