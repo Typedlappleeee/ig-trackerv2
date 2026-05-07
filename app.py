@@ -1,16 +1,17 @@
 import tkinter as tk
-from tkinter import ttk, scrolledtext, messagebox, filedialog
+from tkinter import ttk, scrolledtext, messagebox, filedialog, colorchooser
 import threading, hashlib, time, json, httpx, sys, os, subprocess, shutil, random, re
 from datetime import datetime
 from pathlib import Path
 
-BASE_DIR    = Path(sys.argv[0]).parent if getattr(sys, 'frozen', False) else Path(__file__).parent
-DATA_FILE   = BASE_DIR / "data.json"
-CONFIG_FILE = BASE_DIR / "config.json"
-BANK_FILE   = BASE_DIR / "bank.json"
+BASE_DIR     = Path(sys.argv[0]).parent if getattr(sys, 'frozen', False) else Path(__file__).parent
+DATA_FILE    = BASE_DIR / "data.json"
+CONFIG_FILE  = BASE_DIR / "config.json"
+BANK_FILE    = BASE_DIR / "bank.json"
+PRESETS_FILE = BASE_DIR / "presets.json"
 
 try:
-    from PIL import Image, ImageTk, ImageDraw, ImageFont
+    from PIL import Image, ImageTk, ImageDraw, ImageFont, ImageFilter, ImageEnhance
     PIL_OK = True
 except ImportError:
     PIL_OK = False
@@ -104,6 +105,22 @@ def load_bank():
 def save_bank(b):
     try:
         BANK_FILE.write_text(json.dumps(b, indent=2, ensure_ascii=False), encoding="utf-8")
+    except:
+        pass
+
+def load_presets():
+    try:
+        if PRESETS_FILE.exists():
+            t = PRESETS_FILE.read_text(encoding="utf-8").strip()
+            if t:
+                return json.loads(t)
+    except:
+        pass
+    return {}
+
+def save_presets(p):
+    try:
+        PRESETS_FILE.write_text(json.dumps(p, indent=2, ensure_ascii=False), encoding="utf-8")
     except:
         pass
 
@@ -281,6 +298,11 @@ class App:
         self._bank_selected = None
         self._preview_after = None
         self.output_video_path = None
+        # Drag preview state
+        self._is_dragging = False
+        self._cached_pil_frame = None
+        self._preview_img_offset = (0, 0)
+        self._preview_img_size = (400, 500)
 
         self.root = tk.Tk()
         self.root.title("IG Tracker")
@@ -290,6 +312,7 @@ class App:
 
         self._setup_styles()
         self._build_layout()
+        self._setup_wallpaper()
         self._show_tab("phones")
 
         threading.Thread(target=self._load_phones, daemon=True).start()
@@ -687,7 +710,8 @@ class App:
                 draw(v)
                 val_lbl.config(text=fmt_fn(v))
                 entry_var.set(f"{v:.{decimals}f}")
-                self._schedule_preview()
+                if not self._is_dragging:
+                    self._schedule_preview()
             var.trace("w", on_var)
 
             def on_entry(e=None):
@@ -705,6 +729,36 @@ class App:
         make_slider(scard, "Position X",   self.pos_x_var,    0, 100, suffix="%")
         make_slider(scard, "Position Y",   self.pos_y_var,    0, 100, suffix="%")
         make_slider(scard, "Vitesse",       self.speed_var,    1.0, 1.1, decimals=3, suffix="x")
+
+        # Préréglages
+        pcard = tk.Frame(left, bg=CARD, padx=14, pady=10)
+        pcard.pack(fill="x", pady=(0, 8))
+        tk.Label(pcard, text="PRÉRÉGLAGES", font=("Consolas", 8, "bold"),
+                 bg=CARD, fg=MUTED).pack(anchor="w", pady=(0, 8))
+        save_row = tk.Frame(pcard, bg=CARD)
+        save_row.pack(fill="x", pady=(0, 4))
+        self.preset_name_var = tk.StringVar()
+        tk.Entry(save_row, textvariable=self.preset_name_var,
+                 font=("Segoe UI", 10), bg=SURFACE2, fg=TEXT,
+                 insertbackground=TEXT, relief="flat", bd=0,
+                 highlightthickness=1, highlightcolor=ACCENT,
+                 highlightbackground=BORDER).pack(side="left", fill="x", expand=True, ipady=5)
+        tk.Button(save_row, text="Sauvegarder", font=("Segoe UI", 9, "bold"),
+                  bg=ACCENT, fg="#06080f", relief="flat", cursor="hand2", padx=8,
+                  command=self._save_preset).pack(side="right", padx=(6, 0))
+        load_row = tk.Frame(pcard, bg=CARD)
+        load_row.pack(fill="x")
+        self.preset_combo_var = tk.StringVar()
+        self.preset_combo = ttk.Combobox(load_row, textvariable=self.preset_combo_var,
+                                          state="readonly", font=("Segoe UI", 10), width=18)
+        self.preset_combo.pack(side="left", fill="x", expand=True)
+        tk.Button(load_row, text="Charger", font=("Segoe UI", 9),
+                  bg=SURFACE2, fg=ACCENT, relief="flat", cursor="hand2", padx=8,
+                  command=self._load_preset).pack(side="right", padx=(4, 0))
+        tk.Button(load_row, text="✕", font=("Segoe UI", 9),
+                  bg=SURFACE2, fg=DANGER, relief="flat", cursor="hand2", padx=6,
+                  command=self._delete_preset).pack(side="right", padx=(4, 0))
+        self._refresh_preset_combo()
 
         # Caption Instagram
         ccard = tk.Frame(left, bg=CARD, padx=14, pady=12)
@@ -739,10 +793,11 @@ class App:
         self.preview_canvas = tk.Canvas(right, bg="#000", highlightthickness=0)
         self.preview_canvas.pack(fill="both", expand=True, padx=14, pady=(0, 6))
         # Drag du texte sur l'aperçu
-        self.preview_canvas.bind("<Button-1>", self._preview_click)
-        self.preview_canvas.bind("<B1-Motion>", self._preview_drag)
+        self.preview_canvas.bind("<Button-1>",        self._preview_click)
+        self.preview_canvas.bind("<B1-Motion>",       self._preview_drag)
+        self.preview_canvas.bind("<ButtonRelease-1>", self._preview_release)
         self.preview_img_ref = None
-        tk.Label(right, text="Glisse le texte directement sur l'aperçu pour le positionner",
+        tk.Label(right, text="✦ Clique et glisse le texte directement sur l'aperçu",
                  font=("Segoe UI", 8), bg=CARD, fg=MUTED).pack(pady=(0, 4))
         self.auto_log = scrolledtext.ScrolledText(right, bg=SURFACE, fg=TEXT2,
                                                    font=("Consolas", 9), relief="flat",
@@ -750,15 +805,86 @@ class App:
         self.auto_log.pack(fill="x", padx=14, pady=(0, 12))
 
     def _preview_click(self, e):
-        self._drag_start = (e.x, e.y)
+        self._is_dragging = True
 
     def _preview_drag(self, e):
         cw = self.preview_canvas.winfo_width() or 400
         ch = self.preview_canvas.winfo_height() or 500
-        px = max(0, min(100, int(e.x / cw * 100)))
-        py = max(0, min(100, int(e.y / ch * 100)))
+        ox, oy = self._preview_img_offset
+        iw, ih = self._preview_img_size
+        rx = (e.x - ox) / iw if iw else e.x / cw
+        ry = (e.y - oy) / ih if ih else e.y / ch
+        px = max(0.0, min(100.0, round(rx * 100, 1)))
+        py = max(0.0, min(100.0, round(ry * 100, 1)))
         self.pos_x_var.set(px)
         self.pos_y_var.set(py)
+        self._redraw_overlay_fast(glowing=True)
+
+    def _preview_release(self, e):
+        self._is_dragging = False
+        self._redraw_overlay_fast(glowing=False)
+
+    def _redraw_overlay_fast(self, glowing=False):
+        """Re-composite text on the cached PIL frame — no ffmpeg, instant."""
+        if not PIL_OK or self._cached_pil_frame is None:
+            return
+        try:
+            base = self._cached_pil_frame.copy()
+            w, h = base.size
+            txt = self.overlay_var.get()
+            if txt:
+                draw = ImageDraw.Draw(base)
+                fs = max(10, int(self.fontsize_var.get() * w / 1080))
+                try:
+                    font = ImageFont.truetype("arial.ttf", fs)
+                except:
+                    font = ImageFont.load_default()
+                px = self.pos_x_var.get() / 100
+                py = self.pos_y_var.get() / 100
+                bb = draw.textbbox((0, 0), txt, font=font)
+                tw, th = bb[2] - bb[0], bb[3] - bb[1]
+                x = int((w - tw) * px)
+                y = int((h - th) * py)
+                # Shadow
+                for dx, dy in [(-2,-2),(2,-2),(-2,2),(2,2),(0,2),(0,-2),(2,0),(-2,0)]:
+                    draw.text((x+dx, y+dy), txt, font=font, fill=(0,0,0,200))
+                # Glow halo when dragging
+                if glowing:
+                    for r in range(6, 0, -2):
+                        alpha = int(80 / r)
+                        for dx2, dy2 in [(-r,0),(r,0),(0,-r),(0,r),(-r,-r),(r,-r),(-r,r),(r,r)]:
+                            draw.text((x+dx2, y+dy2), txt, font=font,
+                                      fill=(212,245,60,alpha))
+                fill = "#d4f53c" if glowing else "white"
+                draw.text((x, y), txt, font=font, fill=fill)
+
+            cw = self.preview_canvas.winfo_width() or 400
+            ch = self.preview_canvas.winfo_height() or 500
+            base.thumbnail((cw, ch), Image.LANCZOS)
+            bw, bh = base.size
+            self._preview_img_size = (bw, bh)
+            self._preview_img_offset = ((cw - bw) // 2, (ch - bh) // 2)
+
+            photo = ImageTk.PhotoImage(base)
+            self.preview_canvas.delete("all")
+            self.preview_canvas.create_image(cw//2, ch//2, anchor="center", image=photo)
+            self.preview_img_ref = photo
+
+            # Center snap guides
+            px_val = self.pos_x_var.get()
+            py_val = self.pos_y_var.get()
+            ox, oy = self._preview_img_offset
+            iw2, ih2 = self._preview_img_size
+            if abs(px_val - 50) < 5:
+                cx = ox + iw2 // 2
+                self.preview_canvas.create_line(cx, oy, cx, oy + ih2,
+                    fill="#d4f53c", width=1, dash=(4,4), tags="guide")
+            if abs(py_val - 50) < 5:
+                cy = oy + ih2 // 2
+                self.preview_canvas.create_line(ox, cy, ox + iw2, cy,
+                    fill="#d4f53c", width=1, dash=(4,4), tags="guide")
+        except Exception as ex:
+            print(f"Overlay fast: {ex}")
 
     def _alog(self, msg, level="info"):
         colors = {"info": TEXT2, "ok": OK, "warn": WARN, "error": DANGER, "accent": ACCENT}
@@ -791,6 +917,7 @@ class App:
         self._preview_after = self.root.after(400, self._update_preview)
 
     def _update_preview(self):
+        """Extract frame from video (ffmpeg), cache it, then render overlay."""
         if not PIL_OK:
             return
         src = self.video_path_var.get()
@@ -809,32 +936,9 @@ class App:
         if not frame_path.exists():
             return
         try:
-            cw = self.preview_canvas.winfo_width() or 400
-            ch = self.preview_canvas.winfo_height() or 500
-            img = Image.open(frame_path)
-            img.thumbnail((cw, ch), Image.LANCZOS)
-            w, h = img.size
-            draw = ImageDraw.Draw(img)
-            txt = self.overlay_var.get()
-            if txt:
-                fs = max(10, int(self.fontsize_var.get() * w / 1080))
-                try:
-                    font = ImageFont.truetype("arial.ttf", fs)
-                except:
-                    font = ImageFont.load_default()
-                px = self.pos_x_var.get() / 100
-                py = self.pos_y_var.get() / 100
-                bb = draw.textbbox((0, 0), txt, font=font)
-                tw, th = bb[2] - bb[0], bb[3] - bb[1]
-                x = int((w - tw) * px)
-                y = int((h - th) * py)
-                for dx, dy in [(-2,-2),(2,-2),(-2,2),(2,2),(0,2),(0,-2),(2,0),(-2,0)]:
-                    draw.text((x + dx, y + dy), txt, font=font, fill="black")
-                draw.text((x, y), txt, font=font, fill="white")
-            photo = ImageTk.PhotoImage(img)
-            self.preview_canvas.delete("all")
-            self.preview_canvas.create_image(cw // 2, ch // 2, anchor="center", image=photo)
-            self.preview_img_ref = photo
+            img = Image.open(frame_path).convert("RGB")
+            self._cached_pil_frame = img  # cache raw frame
+            self._redraw_overlay_fast(glowing=False)
         except Exception as e:
             print(f"Preview: {e}")
 
@@ -855,6 +959,52 @@ class App:
                     ff = str(p)
                     break
         return ff
+
+    # ── Préréglages ───────────────────────────────────────────────────────────
+    def _refresh_preset_combo(self):
+        names = list(load_presets().keys())
+        self.preset_combo["values"] = names
+        if names and not self.preset_combo_var.get():
+            self.preset_combo_var.set(names[0])
+
+    def _save_preset(self):
+        name = self.preset_name_var.get().strip()
+        if not name:
+            return
+        presets = load_presets()
+        presets[name] = {
+            "text":     self.overlay_var.get(),
+            "fontsize": self.fontsize_var.get(),
+            "pos_x":    self.pos_x_var.get(),
+            "pos_y":    self.pos_y_var.get(),
+            "speed":    self.speed_var.get(),
+        }
+        save_presets(presets)
+        self._refresh_preset_combo()
+        self.preset_combo_var.set(name)
+
+    def _load_preset(self):
+        name = self.preset_combo_var.get()
+        if not name:
+            return
+        p = load_presets().get(name)
+        if not p:
+            return
+        if p.get("text"):
+            self.overlay_var.set(p["text"])
+        self.fontsize_var.set(p.get("fontsize", 52))
+        self.pos_x_var.set(p.get("pos_x", 50))
+        self.pos_y_var.set(p.get("pos_y", 78))
+        self.speed_var.set(p.get("speed", 1.0))
+
+    def _delete_preset(self):
+        name = self.preset_combo_var.get()
+        if not name:
+            return
+        presets = load_presets()
+        presets.pop(name, None)
+        save_presets(presets)
+        self._refresh_preset_combo()
 
     def _process_video(self):
         src = self.video_path_var.get()
@@ -1498,6 +1648,46 @@ class App:
                   bg=ACCENT, fg="#06080f", relief="flat", cursor="hand2",
                   pady=8, command=self._save_settings).pack(fill="x", pady=(16, 0))
 
+        # Fond d'écran personnalisé
+        wcard = tk.Frame(f, bg=CARD, padx=24, pady=20)
+        wcard.pack(padx=60, pady=(0, 16), fill="x")
+        tk.Label(wcard, text="Fond d'écran", font=("Segoe UI", 13, "bold"),
+                 bg=CARD, fg=TEXT).pack(anchor="w", pady=(0, 12))
+        tk.Label(wcard, text="Image de fond (sera floutée et assombrie)",
+                 font=("Segoe UI", 9), bg=CARD, fg=TEXT2).pack(anchor="w")
+        wp_row = tk.Frame(wcard, bg=CARD)
+        wp_row.pack(fill="x", pady=(4, 0))
+        self.wallpaper_var = tk.StringVar(value=self.cfg.get("wallpaper_path", ""))
+        wp_entry = tk.Entry(wp_row, textvariable=self.wallpaper_var,
+                            font=("Consolas", 10), bg=SURFACE2, fg=TEXT2,
+                            insertbackground=TEXT, relief="flat", bd=0,
+                            highlightthickness=1, highlightcolor=ACCENT,
+                            highlightbackground=BORDER, state="readonly")
+        wp_entry.pack(side="left", fill="x", expand=True, ipady=6)
+        tk.Button(wp_row, text="📂", font=("Segoe UI", 11), bg=ACCENT, fg="#06080f",
+                  relief="flat", cursor="hand2", padx=10,
+                  command=self._browse_wallpaper).pack(side="right", padx=(6, 0))
+        tk.Button(wp_row, text="✕", font=("Segoe UI", 10), bg=SURFACE2, fg=DANGER,
+                  relief="flat", cursor="hand2", padx=8,
+                  command=self._clear_wallpaper).pack(side="right", padx=(4, 0))
+
+        slider_row = tk.Frame(wcard, bg=CARD)
+        slider_row.pack(fill="x", pady=(10, 0))
+        for lbl, key, default in [("Flou", "wallpaper_blur", 8), ("Assombrir %", "wallpaper_dim", 50)]:
+            col = tk.Frame(slider_row, bg=CARD)
+            col.pack(side="left", fill="x", expand=True, padx=(0, 12))
+            tk.Label(col, text=lbl, font=("Segoe UI", 9), bg=CARD, fg=TEXT2).pack(anchor="w")
+            var = tk.IntVar(value=int(self.cfg.get(key, default)))
+            setattr(self, f"wp_{key}_var", var)
+            tk.Scale(col, variable=var, from_=0, to=20 if "blur" in key else 90,
+                     orient="horizontal", bg=CARD, fg=TEXT2, troughcolor=SURFACE2,
+                     highlightthickness=0, sliderrelief="flat", bd=0,
+                     font=("Segoe UI", 8)).pack(fill="x")
+
+        tk.Button(wcard, text="Appliquer le fond d'écran", font=("Segoe UI", 10, "bold"),
+                  bg=SURFACE2, fg=ACCENT, relief="flat", cursor="hand2", pady=7,
+                  command=self._apply_wallpaper_settings).pack(fill="x", pady=(12, 0))
+
         tk.Label(f, text="LOGS", font=("Consolas", 9, "bold"),
                  bg=BG, fg=MUTED).pack(anchor="w", padx=60, pady=(16, 4))
         self.log_box = scrolledtext.ScrolledText(
@@ -1521,6 +1711,58 @@ class App:
         self.cfg["groq_api_key"]  = self.groq_key_var.get().strip()
         save_config(self.cfg)
         self.log("Config sauvegardée ✓", "ok")
+
+    def _browse_wallpaper(self):
+        path = filedialog.askopenfilename(
+            title="Choisir une image de fond",
+            filetypes=[("Images", "*.jpg *.jpeg *.png *.bmp *.webp"), ("Tous", "*.*")])
+        if path:
+            self.wallpaper_var.set(path)
+
+    def _clear_wallpaper(self):
+        self.wallpaper_var.set("")
+        self.cfg["wallpaper_path"] = ""
+        save_config(self.cfg)
+        self._setup_wallpaper()
+
+    def _apply_wallpaper_settings(self):
+        self.cfg["wallpaper_path"] = self.wallpaper_var.get().strip()
+        self.cfg["wallpaper_blur"] = getattr(self, "wp_wallpaper_blur_var",
+                                              tk.IntVar(value=8)).get()
+        self.cfg["wallpaper_dim"]  = getattr(self, "wp_wallpaper_dim_var",
+                                              tk.IntVar(value=50)).get()
+        save_config(self.cfg)
+        self._setup_wallpaper()
+
+    def _setup_wallpaper(self):
+        if not PIL_OK:
+            return
+        path = self.cfg.get("wallpaper_path", "")
+        if not path or not Path(path).exists():
+            if hasattr(self, "_wallpaper_label"):
+                self._wallpaper_label.place_forget()
+            return
+        try:
+            img = Image.open(path).convert("RGB")
+            blur_r = int(self.cfg.get("wallpaper_blur", 8))
+            dim_pct = int(self.cfg.get("wallpaper_dim", 50))
+            if blur_r > 0:
+                img = img.filter(ImageFilter.GaussianBlur(radius=blur_r))
+            if dim_pct > 0:
+                img = ImageEnhance.Brightness(img).enhance(1.0 - dim_pct / 100)
+            w = self.root.winfo_width() or 1400
+            h = self.root.winfo_height() or 840
+            img = img.resize((w, h), Image.LANCZOS)
+            self._wallpaper_photo = ImageTk.PhotoImage(img)
+            if not hasattr(self, "_wallpaper_label"):
+                self._wallpaper_label = tk.Label(self.root,
+                    image=self._wallpaper_photo, bd=0)
+            else:
+                self._wallpaper_label.config(image=self._wallpaper_photo)
+            self._wallpaper_label.place(x=0, y=0, relwidth=1, relheight=1)
+            self._wallpaper_label.lower()
+        except Exception as ex:
+            print(f"Wallpaper: {ex}")
 
     # ══════════════════════════════════════════════════════════════════════════
     # TABLE TÉLÉPHONES
