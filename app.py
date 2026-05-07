@@ -1,0 +1,1717 @@
+import tkinter as tk
+from tkinter import ttk, scrolledtext, messagebox, filedialog
+import threading, hashlib, time, json, httpx, sys, os, subprocess, shutil, random, re
+from datetime import datetime
+from pathlib import Path
+
+BASE_DIR    = Path(sys.argv[0]).parent if getattr(sys, 'frozen', False) else Path(__file__).parent
+DATA_FILE   = BASE_DIR / "data.json"
+CONFIG_FILE = BASE_DIR / "config.json"
+BANK_FILE   = BASE_DIR / "bank.json"
+
+try:
+    from PIL import Image, ImageTk, ImageDraw, ImageFont
+    PIL_OK = True
+except ImportError:
+    PIL_OK = False
+
+# ── Couleurs ──────────────────────────────────────────────────────────────────
+BG       = "#06080f"
+SURFACE  = "#0d1017"
+SURFACE2 = "#131720"
+BORDER   = "#1a2035"
+CARD     = "#0f1420"
+HL       = "#1c2238"
+ACCENT   = "#d4f53c"
+ACCENT2  = "#a8c22a"
+DANGER   = "#ff3d51"
+OK       = "#23d18b"
+WARN     = "#ff9500"
+TEXT     = "#e8edf7"
+TEXT2    = "#6b778f"
+MUTED    = "#323a52"
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+def normalize_proxy(p: str) -> str:
+    """
+    Normalise les formats de proxy courants vers socks5://user:pass@host:port.
+    Gère : host:port:user:pass  et  socks5://host:port:user:pass
+    """
+    if not p or not p.strip():
+        return ""
+    p = p.strip()
+    # Déjà bien formé si on trouve @ après le schéma
+    if re.match(r'^(socks5|socks4|https?)://[^:@]+:[^@]+@', p):
+        return p
+    # Schéma présent mais sans @ : socks5://host:port:user:pass
+    m = re.match(r'^(socks5|socks4|https?)://([^:]+):(\d+):([^:]+):(.+)$', p)
+    if m:
+        scheme, host, port, user, pwd = m.groups()
+        return f"{scheme}://{user}:{pwd}@{host}:{port}"
+    # Sans schéma : host:port:user:pass
+    m = re.match(r'^([^:]+):(\d+):([^:]+):(.+)$', p)
+    if m:
+        host, port, user, pwd = m.groups()
+        return f"socks5://{user}:{pwd}@{host}:{port}"
+    return p  # on renvoie tel quel si on ne reconnaît pas le format
+
+def load_config():
+    try:
+        if CONFIG_FILE.exists():
+            t = CONFIG_FILE.read_text(encoding="utf-8").strip()
+            if t:
+                cfg = json.loads(t)
+                # Normalise le proxy au chargement
+                if cfg.get("proxy"):
+                    cfg["proxy"] = normalize_proxy(cfg["proxy"])
+                return cfg
+    except:
+        pass
+    return {}
+
+def save_config(c):
+    try:
+        CONFIG_FILE.write_text(json.dumps(c, indent=2), encoding="utf-8")
+    except:
+        pass
+
+def load_data():
+    try:
+        if DATA_FILE.exists():
+            t = DATA_FILE.read_text(encoding="utf-8").strip()
+            if t:
+                return json.loads(t)
+    except:
+        pass
+    return {}
+
+def save_data(d):
+    try:
+        DATA_FILE.write_text(json.dumps(d, indent=2, ensure_ascii=False), encoding="utf-8")
+    except:
+        pass
+
+def load_bank():
+    try:
+        if BANK_FILE.exists():
+            t = BANK_FILE.read_text(encoding="utf-8").strip()
+            if t:
+                return json.loads(t)
+    except:
+        pass
+    return []
+
+def save_bank(b):
+    try:
+        BANK_FILE.write_text(json.dumps(b, indent=2, ensure_ascii=False), encoding="utf-8")
+    except:
+        pass
+
+def fmt(n):
+    try:
+        n = int(n)
+    except:
+        return "0"
+    if n >= 1_000_000:
+        return f"{n/1_000_000:.1f}M"
+    if n >= 1_000:
+        return f"{n/1_000:.1f}K"
+    return str(n)
+
+def randomize_mp4_metadata(src, dst):
+    shutil.copy2(src, dst)
+    try:
+        with open(dst, 'r+b') as f:
+            data = bytearray(f.read(64))
+            for i in [12, 13, 14, 15, 24, 25]:
+                if i < len(data):
+                    data[i] = random.randint(0, 255)
+            f.seek(0)
+            f.write(bytes(data))
+    except:
+        pass
+
+# ── GéeLark ───────────────────────────────────────────────────────────────────
+def fetch_phones(bearer):
+    try:
+        items, page = [], 1
+        while True:
+            r = httpx.post(
+                "https://openapi.geelark.com/open/v1/phone/list",
+                json={"page": page, "pageSize": 50},
+                headers={"Content-Type": "application/json",
+                         "Authorization": f"Bearer {bearer}"},
+                timeout=20)
+            d = r.json()
+            if d.get("code") != 0:
+                break
+            batch = d.get("data", {}).get("items", [])
+            items.extend(batch)
+            if len(items) >= d.get("data", {}).get("total", 0) or not batch:
+                break
+            page += 1
+        return items
+    except:
+        return []
+
+# ── Instagram ─────────────────────────────────────────────────────────────────
+IG_HDR = {
+    "User-Agent":      "Instagram 269.0.0.18.75 Android",
+    "Accept-Language": "fr-FR,fr;q=0.9",
+    "X-IG-App-ID":     "936619743392459",
+}
+
+def scrape_ig(username, proxy=None):
+    url = f"https://i.instagram.com/api/v1/users/web_profile_info/?username={username}"
+    try:
+        kw = {"headers": IG_HDR, "timeout": 20, "follow_redirects": True}
+        if proxy:
+            p = normalize_proxy(proxy)
+            if p and "user:pass" not in p and re.match(r'^(socks5|socks4|https?)://', p):
+                kw["transport"] = httpx.HTTPTransport(proxy=p)
+        with httpx.Client(**kw) as c:
+            r = c.get(url)
+        if r.status_code == 404:
+            return {"ig_status": "banned", "ig_error": "Compte introuvable"}
+        if r.status_code == 401:
+            return {"ig_status": "private", "ig_error": "Compte privé"}
+        if r.status_code == 429:
+            return {"ig_status": "error", "ig_error": "429 — Proxy bloqué ou absent"}
+        if r.status_code != 200:
+            return {"ig_status": "error", "ig_error": f"HTTP {r.status_code}"}
+        user = r.json().get("data", {}).get("user")
+        if not user:
+            return {"ig_status": "banned", "ig_error": "Compte introuvable"}
+        posts = user.get("edge_owner_to_timeline_media", {})
+        videos = []
+        for e in posts.get("edges", []):
+            n = e.get("node", {})
+            if n.get("is_video"):
+                caps = n.get("edge_media_to_caption", {}).get("edges", [])
+                videos.append({
+                    "id":       n.get("shortcode"),
+                    "url":      f"https://www.instagram.com/reel/{n.get('shortcode')}/",
+                    "views":    n.get("video_view_count", 0),
+                    "likes":    n.get("edge_liked_by", {}).get("count", 0),
+                    "comments": n.get("edge_media_to_comment", {}).get("count", 0),
+                    "caption":  caps[0]["node"]["text"][:120] if caps else "",
+                })
+        return {
+            "ig_status":    "active",
+            "ig_username":  user.get("username"),
+            "full_name":    user.get("full_name", ""),
+            "followers":    user.get("edge_followed_by", {}).get("count", 0),
+            "following":    user.get("edge_follow", {}).get("count", 0),
+            "posts_count":  posts.get("count", 0),
+            "bio":          user.get("biography", ""),
+            "videos":       videos[:20],
+            "last_checked": datetime.now().isoformat(),
+        }
+    except httpx.TimeoutException:
+        return {"ig_status": "error", "ig_error": "Timeout"}
+    except Exception as e:
+        return {"ig_status": "error", "ig_error": str(e)}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# LOGIN
+# ══════════════════════════════════════════════════════════════════════════════
+class LoginWindow:
+    def __init__(self):
+        self.root = tk.Tk()
+        self.root.title("IG Tracker")
+        self.root.geometry("400x440")
+        self.root.configure(bg=BG)
+        self.root.resizable(False, False)
+        self._build()
+        self.root.mainloop()
+
+    def _build(self):
+        tk.Label(self.root, text="IG Tracker", font=("Segoe UI", 26, "bold"),
+                 bg=BG, fg=ACCENT).pack(pady=(40, 4))
+        tk.Label(self.root, text="OFM Dashboard", font=("Segoe UI", 11),
+                 bg=BG, fg=TEXT2).pack()
+        f = tk.Frame(self.root, bg=SURFACE, padx=24, pady=20)
+        f.pack(padx=32, fill="x", pady=20)
+        self.ev = tk.StringVar(value=load_config().get("email", ""))
+        self.pv = tk.StringVar()
+        for lbl, var, show in [("Email", self.ev, None), ("Mot de passe", self.pv, "●")]:
+            tk.Label(f, text=lbl, font=("Segoe UI", 10), bg=SURFACE,
+                     fg=TEXT2, anchor="w").pack(fill="x", pady=(8, 2))
+            tk.Entry(f, textvariable=var, font=("Consolas", 12), bg=SURFACE2, fg=TEXT,
+                     insertbackground=TEXT, relief="flat", bd=0, highlightthickness=1,
+                     highlightcolor=ACCENT, highlightbackground=BORDER,
+                     show=show).pack(fill="x", ipady=7)
+        self.err = tk.Label(self.root, text="", font=("Segoe UI", 10), bg=BG, fg=DANGER)
+        self.err.pack()
+        tk.Button(self.root, text="Connexion", font=("Segoe UI", 12, "bold"),
+                  bg=ACCENT, fg="#06080f", relief="flat", cursor="hand2",
+                  activebackground=ACCENT2,
+                  command=self._login).pack(padx=32, pady=10, fill="x")
+        self.root.bind("<Return>", lambda e: self._login())
+
+    def _login(self):
+        email, pw = self.ev.get().strip(), self.pv.get().strip()
+        if not email or not pw:
+            self.err.config(text="Champs requis")
+            return
+        cfg = load_config()
+        h = hashlib.sha256(pw.encode()).hexdigest()
+        if not cfg.get("password_hash"):
+            cfg.update({"email": email, "password_hash": h,
+                        "bearer_token": "", "proxy": ""})
+            save_config(cfg)
+            self.root.destroy()
+            App(email, cfg)
+        elif cfg.get("password_hash") == h and cfg.get("email") == email:
+            self.root.destroy()
+            App(email, cfg)
+        else:
+            self.err.config(text="Identifiants incorrects")
+
+# ══════════════════════════════════════════════════════════════════════════════
+# APP
+# ══════════════════════════════════════════════════════════════════════════════
+class App:
+    def __init__(self, email, cfg):
+        self.email   = email
+        self.cfg     = cfg
+        self.data    = load_data()
+        self.running = True
+        self.sel_ids = []
+        self._bank_selected = None
+        self._preview_after = None
+        self.output_video_path = None
+
+        self.root = tk.Tk()
+        self.root.title("IG Tracker")
+        self.root.geometry("1400x840")
+        self.root.configure(bg=BG)
+        self.root.protocol("WM_DELETE_WINDOW", self._on_close)
+
+        self._setup_styles()
+        self._build_layout()
+        self._show_tab("phones")
+
+        threading.Thread(target=self._load_phones, daemon=True).start()
+        threading.Thread(target=self._scheduler, daemon=True).start()
+        self.root.mainloop()
+
+    def _on_close(self):
+        self.running = False
+        self.root.destroy()
+
+    def _setup_styles(self):
+        style = ttk.Style()
+        style.theme_use("clam")
+        for name in ["T", "Bank", "Vid"]:
+            style.configure(f"{name}.Treeview",
+                background=SURFACE, fieldbackground=SURFACE, foreground=TEXT,
+                rowheight=32, font=("Segoe UI", 10), borderwidth=0)
+            style.configure(f"{name}.Treeview.Heading",
+                background=SURFACE2, foreground=TEXT2,
+                font=("Segoe UI", 9, "bold"), relief="flat")
+            style.map(f"{name}.Treeview", background=[("selected", HL)])
+
+    def log(self, msg, level="info"):
+        colors = {"info": TEXT2, "ok": OK, "warn": WARN, "error": DANGER, "accent": ACCENT}
+        ts = datetime.now().strftime("%H:%M:%S")
+        self.log_box.config(state="normal")
+        self.log_box.insert("end", f"[{ts}] {msg}\n", level)
+        self.log_box.tag_config(level, foreground=colors.get(level, TEXT2))
+        self.log_box.see("end")
+        self.log_box.config(state="disabled")
+
+    # ── LAYOUT ───────────────────────────────────────────────────────────────
+    def _build_layout(self):
+        self.sidebar = tk.Frame(self.root, bg=SURFACE, width=176)
+        self.sidebar.pack(side="left", fill="y")
+        self.sidebar.pack_propagate(False)
+
+        tk.Label(self.sidebar, text="IG Tracker", font=("Segoe UI", 14, "bold"),
+                 bg=SURFACE, fg=ACCENT).pack(pady=(20, 2), padx=16, anchor="w")
+        tk.Label(self.sidebar, text=self.email, font=("Segoe UI", 8),
+                 bg=SURFACE, fg=TEXT2, wraplength=160).pack(padx=16, anchor="w")
+        tk.Frame(self.sidebar, height=1, bg=BORDER).pack(fill="x", pady=14, padx=12)
+
+        self.tab_btns = {}
+        for k, lbl in [("phones",     "📱  Téléphones"),
+                        ("stats",      "📊  Stats Instagram"),
+                        ("automation", "🎬  Automatisation"),
+                        ("bank",       "🗂  Banque vidéos"),
+                        ("settings",   "⚙  Paramètres")]:
+            b = tk.Button(self.sidebar, text=lbl, font=("Segoe UI", 10),
+                          bg=SURFACE, fg=TEXT2, relief="flat", anchor="w",
+                          padx=16, pady=10, cursor="hand2",
+                          activebackground=HL,
+                          command=lambda x=k: self._show_tab(x))
+            b.pack(fill="x", pady=1)
+            self.tab_btns[k] = b
+
+        tk.Frame(self.sidebar, bg=SURFACE).pack(fill="both", expand=True)
+        self.refresh_btn = tk.Button(self.sidebar, text="↺  Refresh",
+            font=("Segoe UI", 10, "bold"), bg=ACCENT, fg="#06080f",
+            relief="flat", cursor="hand2", activebackground=ACCENT2,
+            pady=10, command=self._manual_refresh)
+        self.refresh_btn.pack(fill="x", padx=12, pady=(0, 6))
+        self.status_lbl = tk.Label(self.sidebar, text="—",
+            font=("Consolas", 8), bg=SURFACE, fg=MUTED)
+        self.status_lbl.pack(padx=12, pady=(0, 12))
+
+        main = tk.Frame(self.root, bg=BG)
+        main.pack(side="left", fill="both", expand=True)
+
+        sf = tk.Frame(main, bg=BG)
+        sf.pack(fill="x", padx=14, pady=(14, 8))
+        self.sv = {}
+        for k, lbl, col in [("phones", "TÉLÉPHONES", ACCENT),
+                             ("active", "IG ACTIFS",  OK),
+                             ("banned", "BANNIS",      DANGER),
+                             ("views",  "VUES TOTALES", WARN)]:
+            f = tk.Frame(sf, bg=CARD, padx=14, pady=12)
+            f.pack(side="left", fill="x", expand=True, padx=(0, 8))
+            tk.Frame(f, height=2, bg=col).pack(fill="x", pady=(0, 8))
+            tk.Label(f, text=lbl, font=("Consolas", 8), bg=CARD, fg=MUTED).pack(anchor="w")
+            v = tk.Label(f, text="—", font=("Segoe UI", 22, "bold"), bg=CARD, fg=col)
+            v.pack(anchor="w")
+            self.sv[k] = v
+
+        self.tab_container = tk.Frame(main, bg=BG)
+        self.tab_container.pack(fill="both", expand=True, padx=14, pady=(0, 14))
+
+        self.tabs = {}
+        self._build_phones_tab()
+        self._build_stats_tab()
+        self._build_automation_tab()
+        self._build_bank_tab()
+        self._build_settings_tab()
+
+    def _show_tab(self, key):
+        for k, b in self.tab_btns.items():
+            active = k == key
+            b.config(bg=HL if active else SURFACE,
+                     fg=ACCENT if active else TEXT2,
+                     font=("Segoe UI", 10, "bold") if active else ("Segoe UI", 10))
+        for k, frame in self.tabs.items():
+            if k == key:
+                frame.place(x=0, y=0, relwidth=1, relheight=1)
+                frame.lift()
+            else:
+                frame.place_forget()
+        if key == "stats":
+            self._refresh_ig_list()
+        if key == "bank":
+            self._refresh_bank()
+        if key == "automation":
+            self._refresh_auto_phones()
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # ONGLET TÉLÉPHONES
+    # ══════════════════════════════════════════════════════════════════════════
+    def _build_phones_tab(self):
+        f = tk.Frame(self.tab_container, bg=BG)
+        self.tabs["phones"] = f
+
+        tb1 = tk.Frame(f, bg=BG)
+        tb1.pack(fill="x", pady=(0, 4))
+        tk.Label(tb1, text="Groupe :", font=("Segoe UI", 10), bg=BG, fg=TEXT2).pack(side="left")
+        self.grp_var = tk.StringVar(value="Tous")
+        self.grp_combo = ttk.Combobox(tb1, textvariable=self.grp_var,
+                                       state="readonly", width=22, font=("Segoe UI", 10))
+        self.grp_combo["values"] = ["Tous"]
+        self.grp_combo.pack(side="left", padx=(4, 12))
+        self.grp_combo.bind("<<ComboboxSelected>>", lambda e: self._refresh_table())
+        tk.Label(tb1, text="Recherche :", font=("Segoe UI", 10), bg=BG, fg=TEXT2).pack(side="left")
+        self.search_var = tk.StringVar()
+        self.search_var.trace("w", lambda *a: self._refresh_table())
+        tk.Entry(tb1, textvariable=self.search_var, font=("Consolas", 10),
+                 bg=SURFACE2, fg=TEXT, insertbackground=TEXT, relief="flat", bd=0,
+                 highlightthickness=1, highlightcolor=ACCENT, highlightbackground=BORDER,
+                 width=20).pack(side="left", padx=(4, 0), ipady=4)
+        self.sel_lbl = tk.Label(tb1, text="", font=("Segoe UI", 9), bg=BG, fg=MUTED)
+        self.sel_lbl.pack(side="right")
+
+        tb2 = tk.Frame(f, bg=BG)
+        tb2.pack(fill="x", pady=(0, 8))
+        tk.Label(tb2, text="@Username IG :", font=("Segoe UI", 10), bg=BG, fg=TEXT2).pack(side="left")
+        self.link_var = tk.StringVar()
+        tk.Entry(tb2, textvariable=self.link_var, font=("Consolas", 10),
+                 bg=SURFACE2, fg=TEXT, insertbackground=TEXT, relief="flat", bd=0,
+                 highlightthickness=1, highlightcolor=ACCENT, highlightbackground=BORDER,
+                 width=24).pack(side="left", padx=(4, 6), ipady=4)
+        tk.Button(tb2, text="✓ Lier", font=("Segoe UI", 10, "bold"),
+                  bg=ACCENT, fg="#06080f", relief="flat", cursor="hand2",
+                  padx=10, pady=4, command=self._link).pack(side="left", padx=2)
+        tk.Button(tb2, text="✗ Délier", font=("Segoe UI", 10),
+                  bg=SURFACE2, fg=DANGER, relief="flat", cursor="hand2",
+                  padx=8, pady=4, command=self._unlink).pack(side="left", padx=2)
+        tk.Button(tb2, text="📊 Scraper sélectionnés", font=("Segoe UI", 10),
+                  bg=SURFACE2, fg=OK, relief="flat", cursor="hand2", padx=8, pady=4,
+                  command=lambda: threading.Thread(
+                      target=self._scrape_sel, daemon=True).start()).pack(side="left", padx=6)
+
+        cols = ("no", "name", "group", "ig", "status", "followers", "views", "vids", "checked")
+        self.tree = ttk.Treeview(f, columns=cols, show="headings",
+                                  style="T.Treeview", selectmode="extended")
+        for col, head, w in [
+            ("no",       "#",          45),
+            ("name",     "Téléphone",  170),
+            ("group",    "Groupe",     150),
+            ("ig",       "@Instagram", 150),
+            ("status",   "Statut",     120),
+            ("followers","Followers",  100),
+            ("views",    "Vues",       90),
+            ("vids",     "Vidéos",     70),
+            ("checked",  "Vérifié",    110),
+        ]:
+            self.tree.heading(col, text=head)
+            self.tree.column(col, width=w, anchor="center")
+        self.tree.tag_configure("active", foreground=OK)
+        self.tree.tag_configure("banned", foreground=DANGER)
+        self.tree.tag_configure("error",  foreground=WARN)
+        self.tree.tag_configure("noig",   foreground=MUTED)
+        self.tree.bind("<<TreeviewSelect>>", self._on_sel)
+        self.tree.bind("<Double-1>", self._on_dbl)
+        vsb = ttk.Scrollbar(f, orient="vertical", command=self.tree.yview)
+        self.tree.configure(yscrollcommand=vsb.set)
+        self.tree.pack(side="left", fill="both", expand=True)
+        vsb.pack(side="right", fill="y")
+
+    def _on_sel(self, e):
+        self.sel_ids = list(self.tree.selection())
+        self.sel_lbl.config(
+            text=f"{len(self.sel_ids)} sélectionné(s)" if self.sel_ids else "")
+
+    def _on_dbl(self, e):
+        if self.sel_ids:
+            d = self.data.get(self.sel_ids[0], {})
+            if d.get("ig_username"):
+                self._show_tab("stats")
+                self._show_ig_detail(self.sel_ids[0])
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # ONGLET STATS
+    # ══════════════════════════════════════════════════════════════════════════
+    def _build_stats_tab(self):
+        f = tk.Frame(self.tab_container, bg=BG)
+        self.tabs["stats"] = f
+
+        left = tk.Frame(f, bg=SURFACE, width=220)
+        left.pack(side="left", fill="y", padx=(0, 12))
+        left.pack_propagate(False)
+        tk.Label(left, text="COMPTES LIÉS", font=("Consolas", 8, "bold"),
+                 bg=SURFACE, fg=MUTED).pack(anchor="w", padx=12, pady=(12, 6))
+        self.ig_list = tk.Listbox(left, bg=SURFACE, fg=TEXT, selectbackground=HL,
+                                   selectforeground=ACCENT, relief="flat", bd=0,
+                                   font=("Segoe UI", 10), activestyle="none", cursor="hand2")
+        self.ig_list.pack(fill="both", expand=True, padx=4, pady=(0, 4))
+        self.ig_list.bind("<<ListboxSelect>>", lambda e: self._on_ig_list_sel())
+
+        right = tk.Frame(f, bg=BG)
+        right.pack(side="left", fill="both", expand=True)
+        hdr = tk.Frame(right, bg=CARD)
+        hdr.pack(fill="x", pady=(0, 10))
+        self.det_name = tk.Label(hdr, text="Sélectionne un compte",
+                                  font=("Segoe UI", 14, "bold"), bg=CARD, fg=TEXT)
+        self.det_name.pack(side="left", padx=16, pady=14)
+        self.det_status = tk.Label(hdr, text="", font=("Segoe UI", 10), bg=CARD, fg=TEXT2)
+        self.det_status.pack(side="left")
+
+        kf = tk.Frame(right, bg=BG)
+        kf.pack(fill="x", pady=(0, 10))
+        self.kpis = {}
+        for k, lbl, col in [("followers", "FOLLOWERS", ACCENT),
+                             ("following", "FOLLOWING", TEXT2),
+                             ("posts",     "POSTS",     TEXT2),
+                             ("views",     "VUES",      WARN)]:
+            kcard = tk.Frame(kf, bg=CARD, padx=12, pady=10)
+            kcard.pack(side="left", fill="x", expand=True, padx=(0, 8))
+            tk.Label(kcard, text=lbl, font=("Consolas", 8), bg=CARD, fg=MUTED).pack(anchor="w")
+            v = tk.Label(kcard, text="—", font=("Segoe UI", 18, "bold"), bg=CARD, fg=col)
+            v.pack(anchor="w")
+            self.kpis[k] = v
+
+        tk.Label(right, text="VIDÉOS", font=("Consolas", 8, "bold"),
+                 bg=BG, fg=MUTED).pack(anchor="w", pady=(0, 6))
+        vcols = ("id", "views", "likes", "comments", "caption")
+        self.vid_tree = ttk.Treeview(right, columns=vcols, show="headings",
+                                      style="Vid.Treeview", height=14)
+        for col, head, w, anch in [
+            ("id",       "Shortcode",  120, "center"),
+            ("views",    "Vues",       90,  "center"),
+            ("likes",    "Likes",      80,  "center"),
+            ("comments", "Comments",   100, "center"),
+            ("caption",  "Caption",    600, "w"),
+        ]:
+            self.vid_tree.heading(col, text=head)
+            self.vid_tree.column(col, width=w, anchor=anch)
+        vsb2 = ttk.Scrollbar(right, orient="vertical", command=self.vid_tree.yview)
+        self.vid_tree.configure(yscrollcommand=vsb2.set)
+        self.vid_tree.pack(side="left", fill="both", expand=True)
+        vsb2.pack(side="right", fill="y")
+
+    def _on_ig_list_sel(self):
+        sel = self.ig_list.curselection()
+        if not sel:
+            return
+        raw = self.ig_list.get(sel[0])
+        username = raw.split("@")[-1].strip()
+        for pid, d in self.data.items():
+            if d.get("ig_username") == username:
+                self._show_ig_detail(pid)
+                break
+
+    def _show_ig_detail(self, pid):
+        d = self.data.get(pid, {})
+        st = d.get("ig_status", "")
+        fn = d.get("full_name", "")
+        ig = d.get("ig_username", "")
+        self.det_name.config(text=f"@{ig}" + (f"  ·  {fn}" if fn else ""))
+        st_map = {"active": "✅ Actif", "banned": "❌ Banni",
+                  "private": "🔒 Privé", "error": "⚠ Erreur"}
+        col_map = {"active": OK, "banned": DANGER, "private": WARN, "error": WARN}
+        self.det_status.config(text=st_map.get(st, "—"), fg=col_map.get(st, MUTED))
+        self.kpis["followers"].config(text=fmt(d.get("followers", 0)))
+        self.kpis["following"].config(text=fmt(d.get("following", 0)))
+        self.kpis["posts"].config(text=str(d.get("posts_count", 0)))
+        self.kpis["views"].config(
+            text=fmt(sum(v.get("views", 0) for v in d.get("videos", []))))
+        self.vid_tree.delete(*self.vid_tree.get_children())
+        for v in d.get("videos", []):
+            self.vid_tree.insert("", "end", values=(
+                v.get("id", ""),
+                fmt(v.get("views", 0)),
+                fmt(v.get("likes", 0)),
+                fmt(v.get("comments", 0)),
+                v.get("caption", ""),
+            ))
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # ONGLET AUTOMATISATION
+    # ══════════════════════════════════════════════════════════════════════════
+    def _build_automation_tab(self):
+        f = tk.Frame(self.tab_container, bg=BG)
+        self.tabs["automation"] = f
+
+        left = tk.Frame(f, bg=BG, width=390)
+        left.pack(side="left", fill="y")
+        left.pack_propagate(False)
+
+        tk.Label(left, text="🎬 Nouveau montage", font=("Segoe UI", 12, "bold"),
+                 bg=BG, fg=TEXT).pack(anchor="w", pady=(0, 10))
+
+        # Vidéo source
+        vcard = tk.Frame(left, bg=CARD, padx=14, pady=12)
+        vcard.pack(fill="x", pady=(0, 8))
+        tk.Label(vcard, text="VIDÉO SOURCE", font=("Consolas", 8, "bold"),
+                 bg=CARD, fg=MUTED).pack(anchor="w", pady=(0, 8))
+        vrow = tk.Frame(vcard, bg=CARD)
+        vrow.pack(fill="x")
+        self.path_lbl = tk.Label(vrow, text="🎬  Glisse une vidéo ici ou clique 📂",
+                                  font=("Segoe UI", 9), bg=SURFACE2, fg=TEXT2,
+                                  anchor="w", padx=8, pady=6, wraplength=260)
+        self.path_lbl.pack(side="left", fill="x", expand=True)
+        tk.Button(vrow, text="📂", font=("Segoe UI", 11), bg=ACCENT, fg="#06080f",
+                  relief="flat", cursor="hand2", padx=10,
+                  command=self._browse_video).pack(side="right", padx=(6, 0))
+        self.video_path_var = tk.StringVar()
+
+        # Texte overlay
+        ocard = tk.Frame(left, bg=CARD, padx=14, pady=12)
+        ocard.pack(fill="x", pady=(0, 8))
+        tk.Label(ocard, text="TEXTE SUR LA VIDÉO", font=("Consolas", 8, "bold"),
+                 bg=CARD, fg=MUTED).pack(anchor="w", pady=(0, 8))
+        self.overlay_var = tk.StringVar()
+        self.overlay_var.trace("w", lambda *a: self._schedule_preview())
+        tk.Entry(ocard, textvariable=self.overlay_var, font=("Segoe UI", 13),
+                 bg=SURFACE2, fg=TEXT, insertbackground=TEXT,
+                 relief="flat", bd=0, highlightthickness=1,
+                 highlightcolor=ACCENT, highlightbackground=BORDER).pack(fill="x", ipady=9)
+
+        # Sliders
+        scard = tk.Frame(left, bg=CARD, padx=14, pady=12)
+        scard.pack(fill="x", pady=(0, 8))
+        tk.Label(scard, text="AJUSTEMENTS", font=("Consolas", 8, "bold"),
+                 bg=CARD, fg=MUTED).pack(anchor="w", pady=(0, 10))
+
+        self.fontsize_var = tk.DoubleVar(value=52)
+        self.pos_x_var    = tk.DoubleVar(value=50)
+        self.pos_y_var    = tk.DoubleVar(value=78)
+        self.speed_var    = tk.DoubleVar(value=1.0)
+
+        def make_slider(parent, label, var, lo, hi, decimals=0, suffix=""):
+            row = tk.Frame(parent, bg=CARD)
+            row.pack(fill="x", pady=4)
+            tk.Label(row, text=label, font=("Segoe UI", 9), bg=CARD,
+                     fg=TEXT2, width=13, anchor="w").pack(side="left")
+            fmt_fn = ((lambda v: f"{int(v)}{suffix}") if decimals == 0
+                      else (lambda v: f"{v:.{decimals}f}{suffix}"))
+            val_lbl = tk.Label(row, text=fmt_fn(var.get()),
+                               font=("Consolas", 10, "bold"), bg=CARD, fg=ACCENT, width=7)
+            val_lbl.pack(side="right")
+            entry_var = tk.StringVar(value=f"{var.get():.{decimals}f}")
+            entry = tk.Entry(row, textvariable=entry_var, font=("Consolas", 10),
+                             bg=SURFACE2, fg=ACCENT, insertbackground=ACCENT,
+                             relief="flat", bd=0, highlightthickness=1,
+                             highlightcolor=ACCENT, highlightbackground=BORDER,
+                             width=6, justify="center")
+            entry.pack(side="right", padx=(0, 4), ipady=3)
+            c = tk.Canvas(row, bg=SURFACE2, height=26, highlightthickness=0, cursor="hand2")
+            c.pack(side="left", fill="x", expand=True, padx=(4, 6))
+
+            def draw(val=None):
+                if val is None:
+                    val = var.get()
+                w = c.winfo_width() or 180
+                c.delete("all")
+                ratio = max(0, min(1, (val - lo) / (hi - lo) if hi != lo else 0))
+                fx = 8 + ratio * (w - 16)
+                c.create_rectangle(8, 12, w - 8, 15, fill=SURFACE, outline="")
+                if fx > 8:
+                    c.create_rectangle(8, 12, fx, 15, fill=ACCENT, outline="")
+                c.create_oval(fx - 8, 5, fx + 8, 21, fill=BG, outline=ACCENT, width=2)
+                c.create_oval(fx - 4, 9, fx + 4, 17, fill=ACCENT, outline="")
+
+            def on_drag(e):
+                w = c.winfo_width()
+                ratio = max(0, min(1, (e.x - 8) / (w - 16)))
+                val = lo + ratio * (hi - lo)
+                val = round(val, decimals) if decimals > 0 else int(val)
+                var.set(val)
+
+            c.bind("<Button-1>", on_drag)
+            c.bind("<B1-Motion>", on_drag)
+            c.bind("<Configure>", lambda e: draw())
+
+            def on_var(*a):
+                v = var.get()
+                draw(v)
+                val_lbl.config(text=fmt_fn(v))
+                entry_var.set(f"{v:.{decimals}f}")
+                self._schedule_preview()
+            var.trace("w", on_var)
+
+            def on_entry(e=None):
+                try:
+                    v = float(entry_var.get())
+                    v = max(lo, min(hi, round(v, decimals) if decimals > 0 else int(v)))
+                    var.set(v)
+                except:
+                    pass
+            entry.bind("<Return>", on_entry)
+            entry.bind("<FocusOut>", on_entry)
+            scard.after(100, draw)
+
+        make_slider(scard, "Taille texte", self.fontsize_var, 16, 120, suffix="px")
+        make_slider(scard, "Position X",   self.pos_x_var,    0, 100, suffix="%")
+        make_slider(scard, "Position Y",   self.pos_y_var,    0, 100, suffix="%")
+        make_slider(scard, "Vitesse",       self.speed_var,    1.0, 1.1, decimals=3, suffix="x")
+
+        # Caption Instagram
+        ccard = tk.Frame(left, bg=CARD, padx=14, pady=12)
+        ccard.pack(fill="x", pady=(0, 8))
+        tk.Label(ccard, text="CAPTION INSTAGRAM", font=("Consolas", 8, "bold"),
+                 bg=CARD, fg=MUTED).pack(anchor="w", pady=(0, 6))
+        self.caption_text = tk.Text(ccard, font=("Segoe UI", 10), bg=SURFACE2, fg=TEXT,
+                                     insertbackground=TEXT, relief="flat", bd=0, height=4,
+                                     highlightthickness=1, highlightcolor=ACCENT,
+                                     highlightbackground=BORDER, wrap="word", padx=8, pady=8)
+        self.caption_text.pack(fill="x")
+
+        # Boutons action
+        tk.Button(left, text="✂  Traiter & exporter",
+                  font=("Segoe UI", 10, "bold"), bg=SURFACE2, fg=ACCENT,
+                  relief="flat", cursor="hand2", pady=9,
+                  command=lambda: threading.Thread(
+                      target=self._process_video, daemon=True).start()).pack(fill="x", pady=(8, 4))
+        self.process_status = tk.Label(left, text="", font=("Segoe UI", 9),
+                                        bg=BG, fg=TEXT2, wraplength=380)
+        self.process_status.pack(fill="x", pady=(0, 6))
+        tk.Button(left, text="🚀  Poster sur les téléphones",
+                  font=("Segoe UI", 10, "bold"), bg=ACCENT, fg="#06080f",
+                  relief="flat", cursor="hand2", pady=9,
+                  command=self._open_post_window).pack(fill="x")
+
+        # Panneau droit : aperçu
+        right = tk.Frame(f, bg=CARD)
+        right.pack(side="left", fill="both", expand=True, padx=(10, 0))
+        tk.Label(right, text="APERÇU EN DIRECT", font=("Consolas", 8, "bold"),
+                 bg=CARD, fg=MUTED).pack(anchor="w", padx=14, pady=(12, 6))
+        self.preview_canvas = tk.Canvas(right, bg="#000", highlightthickness=0)
+        self.preview_canvas.pack(fill="both", expand=True, padx=14, pady=(0, 6))
+        # Drag du texte sur l'aperçu
+        self.preview_canvas.bind("<Button-1>", self._preview_click)
+        self.preview_canvas.bind("<B1-Motion>", self._preview_drag)
+        self.preview_img_ref = None
+        tk.Label(right, text="Glisse le texte directement sur l'aperçu pour le positionner",
+                 font=("Segoe UI", 8), bg=CARD, fg=MUTED).pack(pady=(0, 4))
+        self.auto_log = scrolledtext.ScrolledText(right, bg=SURFACE, fg=TEXT2,
+                                                   font=("Consolas", 9), relief="flat",
+                                                   state="disabled", wrap="word", height=5)
+        self.auto_log.pack(fill="x", padx=14, pady=(0, 12))
+
+    def _preview_click(self, e):
+        self._drag_start = (e.x, e.y)
+
+    def _preview_drag(self, e):
+        cw = self.preview_canvas.winfo_width() or 400
+        ch = self.preview_canvas.winfo_height() or 500
+        px = max(0, min(100, int(e.x / cw * 100)))
+        py = max(0, min(100, int(e.y / ch * 100)))
+        self.pos_x_var.set(px)
+        self.pos_y_var.set(py)
+
+    def _alog(self, msg, level="info"):
+        colors = {"info": TEXT2, "ok": OK, "warn": WARN, "error": DANGER, "accent": ACCENT}
+        self.auto_log.config(state="normal")
+        self.auto_log.insert("end", f"{msg}\n", level)
+        self.auto_log.tag_config(level, foreground=colors.get(level, TEXT2))
+        self.auto_log.see("end")
+        self.auto_log.config(state="disabled")
+
+    def _browse_video(self):
+        path = filedialog.askopenfilename(
+            title="Sélectionne une vidéo",
+            filetypes=[("Vidéos", "*.mp4 *.mov *.avi *.mkv *.webm"), ("Tous", "*.*")])
+        if path:
+            self._set_video(path)
+
+    def _set_video(self, path):
+        path = path.strip().strip("{}")
+        if not Path(path).exists():
+            return
+        self.video_path_var.set(path)
+        self.path_lbl.config(text=Path(path).name, fg=TEXT)
+        self.output_video_path = None
+        self.process_status.config(text="")
+        self._schedule_preview()
+
+    def _schedule_preview(self):
+        if self._preview_after:
+            self.root.after_cancel(self._preview_after)
+        self._preview_after = self.root.after(400, self._update_preview)
+
+    def _update_preview(self):
+        if not PIL_OK:
+            return
+        src = self.video_path_var.get()
+        if not src or not Path(src).exists():
+            return
+        ffmpeg = self._find_ffmpeg()
+        if not ffmpeg:
+            return
+        frame_path = BASE_DIR / "_prev.jpg"
+        try:
+            subprocess.run([ffmpeg, "-y", "-ss", "00:00:02", "-i", src,
+                            "-frames:v", "1", "-q:v", "3", str(frame_path)],
+                           capture_output=True, timeout=10)
+        except:
+            return
+        if not frame_path.exists():
+            return
+        try:
+            cw = self.preview_canvas.winfo_width() or 400
+            ch = self.preview_canvas.winfo_height() or 500
+            img = Image.open(frame_path)
+            img.thumbnail((cw, ch), Image.LANCZOS)
+            w, h = img.size
+            draw = ImageDraw.Draw(img)
+            txt = self.overlay_var.get()
+            if txt:
+                fs = max(10, int(self.fontsize_var.get() * w / 1080))
+                try:
+                    font = ImageFont.truetype("arial.ttf", fs)
+                except:
+                    font = ImageFont.load_default()
+                px = self.pos_x_var.get() / 100
+                py = self.pos_y_var.get() / 100
+                bb = draw.textbbox((0, 0), txt, font=font)
+                tw, th = bb[2] - bb[0], bb[3] - bb[1]
+                x = int((w - tw) * px)
+                y = int((h - th) * py)
+                for dx, dy in [(-2,-2),(2,-2),(-2,2),(2,2),(0,2),(0,-2),(2,0),(-2,0)]:
+                    draw.text((x + dx, y + dy), txt, font=font, fill="black")
+                draw.text((x, y), txt, font=font, fill="white")
+            photo = ImageTk.PhotoImage(img)
+            self.preview_canvas.delete("all")
+            self.preview_canvas.create_image(cw // 2, ch // 2, anchor="center", image=photo)
+            self.preview_img_ref = photo
+        except Exception as e:
+            print(f"Preview: {e}")
+
+    def _find_ffmpeg(self):
+        ff = shutil.which("ffmpeg")
+        if not ff:
+            desktop = Path.home() / "Desktop"
+            candidates = [BASE_DIR / "ffmpeg.exe",
+                          Path(r"C:\ffmpeg\bin\ffmpeg.exe")]
+            try:
+                for d in desktop.iterdir():
+                    if d.is_dir() and "ffmpeg" in d.name.lower():
+                        candidates.append(d / "bin" / "ffmpeg.exe")
+            except:
+                pass
+            for p in candidates:
+                if Path(p).exists():
+                    ff = str(p)
+                    break
+        return ff
+
+    def _process_video(self):
+        src = self.video_path_var.get()
+        if not src or not Path(src).exists():
+            self.root.after(0, lambda: self._alog("⚠ Sélectionne une vidéo", "warn"))
+            return
+        overlay = self.overlay_var.get().strip()
+        if not overlay:
+            self.root.after(0, lambda: self._alog("⚠ Entre un texte overlay", "warn"))
+            return
+        ffmpeg = self._find_ffmpeg()
+        if not ffmpeg:
+            self.root.after(0, lambda: self._alog("❌ ffmpeg non trouvé", "error"))
+            return
+
+        src_path = Path(src)
+        export_dir = self.cfg.get("export_dir", "").strip()
+        out_dir = (Path(export_dir) if export_dir and Path(export_dir).exists()
+                   else BASE_DIR)
+
+        # Numérotation automatique reels1, reels2, ...
+        bank = load_bank()
+        existing = {b.get("filename", "") for b in bank}
+        i = 1
+        while f"reels{i}.mp4" in existing or (out_dir / f"reels{i}.mp4").exists():
+            i += 1
+        out_path = out_dir / f"reels{i}.mp4"
+
+        fs    = int(self.fontsize_var.get())
+        px    = self.pos_x_var.get() / 100
+        py    = self.pos_y_var.get() / 100
+        speed = round(self.speed_var.get(), 3)
+        txt   = overlay.replace("\\", "\\\\").replace("'", "\\'").replace(":", r"\:")
+        drawtext = (f"drawtext=text='{txt}':fontcolor=white:fontsize={fs}:"
+                    f"x=(w-text_w)*{px:.4f}:y=(h-text_h)*{py:.4f}:"
+                    f"borderw=3:bordercolor=black:font=Arial")
+
+        if abs(speed - 1.0) > 0.001:
+            pts = round(1.0 / speed, 6)
+            vf  = f"{drawtext},setpts={pts}*PTS"
+            af  = f"atempo={speed}"
+            cmd = [ffmpeg, "-y", "-i", src, "-vf", vf, "-af", af,
+                   "-c:v", "libx264", "-preset", "fast", str(out_path)]
+        else:
+            cmd = [ffmpeg, "-y", "-i", src, "-vf", drawtext,
+                   "-c:a", "copy", "-c:v", "libx264", "-preset", "fast", str(out_path)]
+
+        self.root.after(0, lambda: self._alog("⏳ Traitement en cours...", "accent"))
+        self.root.after(0, lambda: self.process_status.config(text="⏳ Traitement...", fg=WARN))
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+            if result.returncode == 0:
+                self.output_video_path = str(out_path)
+                caption_txt = self.caption_text.get("1.0", "end").strip()
+                bank.insert(0, {
+                    "id":       f"{int(time.time())}_{random.randint(1000,9999)}",
+                    "filename": out_path.name,
+                    "path":     str(out_path),
+                    "overlay":  overlay,
+                    "caption":  caption_txt,
+                    "size_mb":  round(out_path.stat().st_size / 1_000_000, 1),
+                    "created":  datetime.now().isoformat(),
+                    "posted_to": [],
+                })
+                save_bank(bank)
+                self.root.after(0, lambda: self._alog(f"✅ Exportée → {out_path.name}", "ok"))
+                self.root.after(0, lambda: self.process_status.config(
+                    text=f"✅ {out_path.name}", fg=OK))
+            else:
+                err = result.stderr[-300:] if result.stderr else "?"
+                self.root.after(0, lambda: self._alog(f"❌ ffmpeg: {err}", "error"))
+                self.root.after(0, lambda: self.process_status.config(
+                    text="❌ Erreur ffmpeg", fg=DANGER))
+        except Exception as e:
+            self.root.after(0, lambda: self._alog(f"❌ {e}", "error"))
+
+    def _refresh_auto_phones(self):
+        if not hasattr(self, 'auto_phone_inner'):
+            return
+        for w in self.auto_phone_inner.winfo_children():
+            w.destroy()
+        self.auto_phone_vars = {}
+        grp = self.auto_grp_var.get() if hasattr(self, "auto_grp_var") else "Tous"
+        groups = set()
+        for d in self.data.values():
+            if d.get("group_name"):
+                groups.add(d["group_name"])
+        if hasattr(self, "auto_grp_combo"):
+            self.auto_grp_combo["values"] = ["Tous"] + sorted(groups)
+        for pid, d in sorted(self.data.items(),
+                             key=lambda x: int(x[1].get("serial_no", 0) or 0)):
+            if not d.get("phone_name"):
+                continue
+            if grp != "Tous" and d.get("group_name", "") != grp:
+                continue
+            var = tk.BooleanVar(value=False)
+            self.auto_phone_vars[pid] = var
+            row = tk.Frame(self.auto_phone_inner, bg=SURFACE)
+            row.pack(fill="x", padx=8, pady=1)
+            tk.Checkbutton(row, variable=var, bg=SURFACE,
+                           activebackground=SURFACE, selectcolor=SURFACE2).pack(side="left")
+            ig  = d.get("ig_username", "")
+            lbl = f"#{d.get('serial_no','')}  {d.get('phone_name', pid)}"
+            if ig:
+                lbl += f"  →  @{ig}"
+            tk.Label(row, text=lbl, font=("Segoe UI", 10), bg=SURFACE,
+                     fg=OK if ig else MUTED, anchor="w").pack(side="left", padx=4)
+
+    def _open_post_window(self):
+        if not self.output_video_path or not Path(self.output_video_path).exists():
+            messagebox.showwarning("Vidéo", "Traite d'abord la vidéo")
+            return
+        self._post_window(self.output_video_path, self.caption_text.get("1.0", "end").strip())
+
+    def _post_window(self, video_path, caption=""):
+        win = tk.Toplevel(self.root)
+        win.title("🚀 Poster")
+        win.geometry("680x680")
+        win.configure(bg=BG)
+        tk.Label(win, text="🚀 Poster sur les téléphones",
+                 font=("Segoe UI", 13, "bold"), bg=BG, fg=ACCENT).pack(
+                     anchor="w", padx=20, pady=(20, 4))
+        tk.Label(win, text=f"Vidéo : {Path(video_path).name}",
+                 font=("Segoe UI", 9), bg=BG, fg=TEXT2).pack(anchor="w", padx=20)
+
+        ff = tk.Frame(win, bg=BG)
+        ff.pack(fill="x", padx=20, pady=(10, 6))
+        tk.Label(ff, text="Groupe :", font=("Segoe UI", 10), bg=BG, fg=TEXT2).pack(side="left")
+        grp2 = tk.StringVar(value="Tous")
+        groups = set(d.get("group_name", "") for d in self.data.values()
+                     if d.get("group_name"))
+        gc2 = ttk.Combobox(ff, textvariable=grp2, state="readonly",
+                            width=20, font=("Segoe UI", 10))
+        gc2["values"] = ["Tous"] + sorted(groups)
+        gc2.pack(side="left", padx=(4, 12))
+
+        pv2 = {}
+        lf  = tk.Frame(win, bg=SURFACE)
+        lf.pack(fill="both", expand=True, padx=20, pady=(0, 8))
+        cv2 = tk.Canvas(lf, bg=SURFACE, highlightthickness=0)
+        cv2.pack(side="left", fill="both", expand=True)
+        sv2 = ttk.Scrollbar(lf, orient="vertical", command=cv2.yview)
+        sv2.pack(side="right", fill="y")
+        cv2.configure(yscrollcommand=sv2.set)
+        inner2 = tk.Frame(cv2, bg=SURFACE)
+        cv2.create_window((0, 0), window=inner2, anchor="nw")
+        inner2.bind("<Configure>", lambda e: cv2.configure(scrollregion=cv2.bbox("all")))
+
+        def populate(g="Tous"):
+            for w in inner2.winfo_children():
+                w.destroy()
+            pv2.clear()
+            for pid, d in sorted(self.data.items(),
+                                  key=lambda x: int(x[1].get("serial_no", 0) or 0)):
+                if not d.get("phone_name"):
+                    continue
+                if g != "Tous" and d.get("group_name", "") != g:
+                    continue
+                var = tk.BooleanVar()
+                pv2[pid] = var
+                row = tk.Frame(inner2, bg=SURFACE)
+                row.pack(fill="x", padx=8, pady=2)
+                tk.Checkbutton(row, variable=var, bg=SURFACE,
+                               activebackground=SURFACE, selectcolor=SURFACE2).pack(side="left")
+                ig  = d.get("ig_username", "")
+                lbl = (f"#{d.get('serial_no','')}  {d.get('phone_name', pid)}"
+                       f"  [{d.get('group_name','')}]")
+                if ig:
+                    lbl += f"  →  @{ig}"
+                tk.Label(row, text=lbl, font=("Segoe UI", 10), bg=SURFACE,
+                         fg=OK if ig else MUTED, anchor="w").pack(side="left", padx=4)
+        populate()
+        gc2.bind("<<ComboboxSelected>>", lambda e: populate(grp2.get()))
+
+        bf = tk.Frame(win, bg=BG)
+        bf.pack(fill="x", padx=20, pady=(0, 8))
+        tk.Button(bf, text="Tout sélectionner", font=("Segoe UI", 9),
+                  bg=SURFACE2, fg=TEXT2, relief="flat", cursor="hand2", padx=8, pady=4,
+                  command=lambda: [v.set(True) for v in pv2.values()]).pack(side="left")
+        tk.Button(bf, text="Tout désélectionner", font=("Segoe UI", 9),
+                  bg=SURFACE2, fg=TEXT2, relief="flat", cursor="hand2", padx=8, pady=4,
+                  command=lambda: [v.set(False) for v in pv2.values()]).pack(
+                      side="left", padx=6)
+
+        plog_box = scrolledtext.ScrolledText(win, bg=SURFACE, fg=TEXT2,
+                                              font=("Consolas", 9), relief="flat",
+                                              state="disabled", wrap="word", height=6)
+        plog_box.pack(fill="x", padx=20, pady=(0, 8))
+
+        def plog(msg, lv="info"):
+            colors = {"info": TEXT2, "ok": OK, "warn": WARN, "error": DANGER, "accent": ACCENT}
+            plog_box.config(state="normal")
+            plog_box.insert("end", f"{msg}\n", lv)
+            plog_box.tag_config(lv, foreground=colors.get(lv, TEXT2))
+            plog_box.see("end")
+            plog_box.config(state="disabled")
+
+        def do_post():
+            sel = [pid for pid, v in pv2.items() if v.get()]
+            if not sel:
+                plog("⚠ Sélectionne au moins un téléphone", "warn")
+                return
+            bearer = self.cfg.get("bearer_token", "")
+            threading.Thread(
+                target=self._upload_and_post,
+                args=(sel, bearer, caption, video_path, plog),
+                daemon=True).start()
+
+        tk.Button(win, text="🚀  Lancer le posting",
+                  font=("Segoe UI", 12, "bold"), bg=ACCENT, fg="#06080f",
+                  relief="flat", cursor="hand2", pady=10,
+                  command=do_post).pack(fill="x", padx=20, pady=(0, 16))
+
+    def _upload_and_post(self, selected, bearer, caption, video_path, log_fn):
+        hdrs = {"Content-Type": "application/json",
+                "Authorization": f"Bearer {bearer}"}
+        log_fn("📤 Upload vidéo...", "accent")
+        try:
+            r = httpx.post(
+                "https://openapi.geelark.com/open/v1/file/getUploadUrl",
+                json={"fileName": Path(video_path).name, "fileType": "video"},
+                headers=hdrs, timeout=20)
+            rj = r.json()
+            if rj.get("code") != 0:
+                log_fn(f"❌ {rj.get('msg')}", "error")
+                return
+            with open(video_path, "rb") as fl:
+                up = httpx.put(rj["data"]["uploadUrl"], content=fl.read(), timeout=180)
+            if up.status_code not in (200, 204):
+                log_fn(f"❌ Upload HTTP {up.status_code}", "error")
+                return
+            log_fn("✅ Uploadé", "ok")
+            file_key = rj["data"]["fileKey"]
+        except Exception as e:
+            log_fn(f"❌ {e}", "error")
+            return
+        for pid in selected:
+            name = self.data.get(pid, {}).get("phone_name", pid)
+            try:
+                r = httpx.post(
+                    "https://openapi.geelark.com/open/v1/file/uploadToPhone",
+                    json={"id": pid, "fileKey": file_key},
+                    headers=hdrs, timeout=30)
+                rj = r.json()
+                log_fn(f"{'✅' if rj.get('code')==0 else '⚠'} {name}",
+                       "ok" if rj.get("code") == 0 else "warn")
+            except Exception as e:
+                log_fn(f"❌ {name}: {e}", "error")
+            time.sleep(1)
+        log_fn("Terminé ✓", "ok")
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # ONGLET BANQUE
+    # ══════════════════════════════════════════════════════════════════════════
+    def _build_bank_tab(self):
+        f = tk.Frame(self.tab_container, bg=BG)
+        self.tabs["bank"] = f
+
+        tb = tk.Frame(f, bg=BG)
+        tb.pack(fill="x", pady=(0, 8))
+        tk.Label(tb, text="🗂  Banque de vidéos", font=("Segoe UI", 13, "bold"),
+                 bg=BG, fg=TEXT).pack(side="left")
+        tk.Button(tb, text="📂 Dossier export", font=("Segoe UI", 9),
+                  bg=SURFACE2, fg=TEXT2, relief="flat", cursor="hand2", padx=8, pady=4,
+                  command=self._choose_export_dir).pack(side="right")
+        tk.Button(tb, text="↺", font=("Segoe UI", 10), bg=SURFACE2, fg=TEXT2,
+                  relief="flat", cursor="hand2", padx=8, pady=4,
+                  command=self._refresh_bank).pack(side="right", padx=(0, 4))
+        self.export_dir_lbl = tk.Label(
+            tb, text=f"Export : {self.cfg.get('export_dir','Même dossier')}",
+            font=("Segoe UI", 9), bg=BG, fg=MUTED)
+        self.export_dir_lbl.pack(side="left", padx=(12, 0))
+
+        split = tk.Frame(f, bg=BG)
+        split.pack(fill="both", expand=True)
+
+        # Gauche : liste
+        lw = tk.Frame(split, bg=BG, width=420)
+        lw.pack(side="left", fill="y")
+        lw.pack_propagate(False)
+
+        cols = ("filename", "overlay", "size", "created")
+        self.bank_tree = ttk.Treeview(lw, columns=cols, show="headings",
+                                       style="Bank.Treeview", selectmode="extended")
+        for col, head, w in [("filename", "Fichier", 160), ("overlay", "Texte", 140),
+                              ("size", "Taille", 60),       ("created", "Date", 80)]:
+            self.bank_tree.heading(col, text=head)
+            self.bank_tree.column(col, width=w,
+                                  anchor="w" if col in ("filename", "overlay") else "center")
+        self.bank_tree.tag_configure("exists",  foreground=TEXT)
+        self.bank_tree.tag_configure("missing", foreground=MUTED)
+        vsb = ttk.Scrollbar(lw, orient="vertical", command=self.bank_tree.yview)
+        self.bank_tree.configure(yscrollcommand=vsb.set)
+        self.bank_tree.pack(side="left", fill="both", expand=True)
+        vsb.pack(side="right", fill="y")
+        self.bank_tree.bind("<<TreeviewSelect>>", self._on_bank_sel)
+
+        acts = tk.Frame(f, bg=BG)
+        acts.pack(fill="x", pady=(6, 0))
+        for txt, col, cmd in [
+            ("📥 Ouvrir",        TEXT2, self._bank_open),
+            ("🔀 Randomiser méta", WARN, lambda: threading.Thread(
+                target=self._randomize_meta, daemon=True).start()),
+            ("🚀 Poster",        ACCENT, self._post_from_bank),
+            ("🗑 Supprimer",     DANGER, self._bank_delete),
+        ]:
+            tk.Button(acts, text=txt,
+                      font=("Segoe UI", 9, "bold" if "Poster" in txt else "normal"),
+                      bg=ACCENT if "Poster" in txt else SURFACE2,
+                      fg="#06080f" if "Poster" in txt else col,
+                      relief="flat", cursor="hand2", padx=8, pady=5,
+                      command=cmd).pack(side="left", padx=(0, 4))
+        self.bank_status = tk.Label(acts, text="", font=("Segoe UI", 9), bg=BG, fg=TEXT2)
+        self.bank_status.pack(side="left", padx=8)
+
+        # Droite : aperçu + description
+        right = tk.Frame(split, bg=CARD)
+        right.pack(side="left", fill="both", expand=True, padx=(10, 0))
+
+        tk.Label(right, text="APERÇU", font=("Consolas", 8, "bold"),
+                 bg=CARD, fg=MUTED).pack(anchor="w", padx=14, pady=(12, 6))
+        self.bank_preview = tk.Canvas(right, bg="#000", highlightthickness=0, height=220)
+        self.bank_preview.pack(fill="x", padx=14, pady=(0, 8))
+        self.bank_preview_ref = None
+        self.bank_preview.create_text(200, 110, text="Clique sur une vidéo",
+                                       fill=MUTED, font=("Segoe UI", 10))
+
+        tk.Frame(right, height=1, bg=BORDER).pack(fill="x", padx=14, pady=(0, 8))
+
+        dh = tk.Frame(right, bg=CARD)
+        dh.pack(fill="x", padx=14, pady=(0, 6))
+        tk.Label(dh, text="DESCRIPTION INSTAGRAM",
+                 font=("Consolas", 8, "bold"), bg=CARD, fg=MUTED).pack(side="left")
+        self.gen_btn = tk.Button(dh, text="✨ Générer (Groq — gratuit)",
+                                  font=("Segoe UI", 9, "bold"), bg=ACCENT, fg="#06080f",
+                                  relief="flat", cursor="hand2", padx=10, pady=3,
+                                  command=lambda: threading.Thread(
+                                      target=self._generate_desc, daemon=True).start())
+        self.gen_btn.pack(side="right")
+
+        self.desc_box = tk.Text(right, font=("Segoe UI", 10), bg=SURFACE2, fg=TEXT,
+                                 insertbackground=TEXT, relief="flat", bd=0, height=9,
+                                 highlightthickness=1, highlightcolor=ACCENT,
+                                 highlightbackground=BORDER, wrap="word", padx=8, pady=8)
+        self.desc_box.pack(fill="x", padx=14, pady=(0, 6))
+
+        br = tk.Frame(right, bg=CARD)
+        br.pack(fill="x", padx=14, pady=(0, 10))
+        tk.Button(br, text="💾 Sauvegarder", font=("Segoe UI", 9),
+                  bg=SURFACE2, fg=TEXT2, relief="flat", cursor="hand2",
+                  padx=8, pady=4, command=self._save_desc).pack(side="left")
+        tk.Button(br, text="📋 Copier", font=("Segoe UI", 9),
+                  bg=SURFACE2, fg=TEXT2, relief="flat", cursor="hand2",
+                  padx=8, pady=4, command=self._copy_desc).pack(side="left", padx=(6, 0))
+        self.desc_status = tk.Label(br, text="", font=("Segoe UI", 9), bg=CARD, fg=TEXT2)
+        self.desc_status.pack(side="left", padx=10)
+
+    def _on_bank_sel(self, e):
+        sel = self.bank_tree.selection()
+        if not sel:
+            return
+        self._bank_selected = sel[0]
+        bank = load_bank()
+        entry = next((b for b in bank if b["id"] == self._bank_selected), None)
+        if not entry:
+            return
+        self.desc_box.delete("1.0", "end")
+        if entry.get("description"):
+            self.desc_box.insert("1.0", entry["description"])
+        self.desc_status.config(text="")
+        threading.Thread(target=self._load_bank_preview, args=(entry,), daemon=True).start()
+
+    def _load_bank_preview(self, entry):
+        if not PIL_OK:
+            return
+        p = Path(entry.get("path", ""))
+        if not p.exists():
+            return
+        ff = self._find_ffmpeg()
+        if not ff:
+            return
+        frame = BASE_DIR / "_bprev.jpg"
+        try:
+            subprocess.run([ff, "-y", "-ss", "00:00:01", "-i", str(p),
+                            "-frames:v", "1", "-q:v", "3", str(frame)],
+                           capture_output=True, timeout=10)
+        except:
+            return
+        if not frame.exists():
+            return
+        try:
+            cw = self.bank_preview.winfo_width() or 380
+            ch = 220
+            img = Image.open(frame)
+            img.thumbnail((cw, ch), Image.LANCZOS)
+            photo = ImageTk.PhotoImage(img)
+            def upd():
+                self.bank_preview.delete("all")
+                self.bank_preview.create_image(cw // 2, ch // 2,
+                                                anchor="center", image=photo)
+                self.bank_preview_ref = photo
+            self.root.after(0, upd)
+        except:
+            pass
+
+    def _generate_desc(self):
+        if not self._bank_selected:
+            self.root.after(0, lambda: self.desc_status.config(
+                text="⚠ Sélectionne une vidéo", fg=WARN))
+            return
+        bank = load_bank()
+        entry = next((b for b in bank if b["id"] == self._bank_selected), None)
+        if not entry:
+            return
+        theme = entry.get("overlay", "") or Path(entry.get("path", "")).stem
+        self.root.after(0, lambda: self.gen_btn.config(
+            state="disabled", text="⏳ Génération..."))
+        self.root.after(0, lambda: self.desc_status.config(text="En cours...", fg=WARN))
+        cfg = load_config()
+        GROQ_KEY = cfg.get("groq_api_key", "")
+        if not GROQ_KEY:
+            self.root.after(0, lambda: self.gen_btn.config(state="normal", text="Générer description"))
+            self.root.after(0, lambda: self.desc_status.config(
+                text="Clé Groq manquante (Settings → Groq API Key)", fg=ERR))
+            return
+        base = (
+            "J'ai 19 ans et peut-être que j'en montre un peu trop parfois… "
+            "ou juste assez pour faire parler. Je joue, je souris, je provoque… "
+            "mais tout ce que je fais, je le fais avec mon cœur. Et ça, on l'oublie souvent. "
+            "Derrière les tenues, les poses, les regards qui piquent un peu trop, y'a juste une "
+            "fille qui s'assume, mais qui ressent tout. Chaque message, chaque jugement, chaque "
+            "compliment volé ou chaque insulte glissée « juste pour rigoler »… je les lis. "
+            "Et parfois, ça pique. Mais tu sais quoi ? Je préfère vivre comme ça, entière, "
+            "imparfaite, libre… que de me cacher derrière une version sage de moi-même pour "
+            "rassurer les autres."
+        )
+        prompt = (
+            f"Voici une description de base pour un reel Instagram :\n\n{base}\n\n"
+            f"Le thème de la vidéo est : \"{theme}\"\n\n"
+            "Prends cette base et change l'histoire pour qu'elle convienne parfaitement au thème. "
+            "Garde le même style (voix féminine, intime, légèrement provocateur, authentique). "
+            "Ajoute 4 ou 5 emojis bien placés. "
+            "Réponds UNIQUEMENT avec la description finale, sans introduction."
+        )
+        try:
+            r = httpx.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers={"Authorization": f"Bearer {GROQ_KEY}",
+                         "Content-Type": "application/json"},
+                json={"model": "llama-3.3-70b-versatile", "max_tokens": 1024,
+                      "messages": [{"role": "user", "content": prompt}]},
+                timeout=30)
+            rj = r.json()
+            if r.status_code == 200:
+                text = rj["choices"][0]["message"]["content"].strip()
+                def upd():
+                    self.desc_box.delete("1.0", "end")
+                    self.desc_box.insert("1.0", text)
+                    self.desc_status.config(text="✅ Générée", fg=OK)
+                    self.gen_btn.config(state="normal",
+                                        text="✨ Générer (Groq — gratuit)")
+                self.root.after(0, upd)
+            else:
+                err = rj.get("error", {}).get("message", "Erreur")
+                self.root.after(0, lambda: self.desc_status.config(
+                    text=f"❌ {err[:50]}", fg=DANGER))
+                self.root.after(0, lambda: self.gen_btn.config(
+                    state="normal", text="✨ Générer (Groq — gratuit)"))
+        except Exception as e:
+            self.root.after(0, lambda: self.desc_status.config(
+                text=f"❌ {str(e)[:50]}", fg=DANGER))
+            self.root.after(0, lambda: self.gen_btn.config(
+                state="normal", text="✨ Générer (Groq — gratuit)"))
+
+    def _save_desc(self):
+        if not self._bank_selected:
+            return
+        text = self.desc_box.get("1.0", "end").strip()
+        bank = load_bank()
+        for e in bank:
+            if e["id"] == self._bank_selected:
+                e["description"] = text
+                break
+        save_bank(bank)
+        self.desc_status.config(text="✅ Sauvegardé", fg=OK)
+
+    def _copy_desc(self):
+        text = self.desc_box.get("1.0", "end").strip()
+        self.root.clipboard_clear()
+        self.root.clipboard_append(text)
+        self.desc_status.config(text="📋 Copié !", fg=OK)
+
+    def _choose_export_dir(self):
+        d = filedialog.askdirectory(title="Choisir le dossier d'export")
+        if d:
+            self.cfg["export_dir"] = d
+            save_config(self.cfg)
+            self.export_dir_lbl.config(text=f"Export : {d}")
+
+    def _refresh_bank(self):
+        self.bank_tree.delete(*self.bank_tree.get_children())
+        bank = load_bank()
+        export_dir = self.cfg.get("export_dir", "").strip()
+        known = {b["path"] for b in bank}
+        if export_dir and Path(export_dir).exists():
+            for fp in sorted(Path(export_dir).glob("*.mp4"),
+                             key=lambda x: x.stat().st_mtime, reverse=True):
+                if str(fp) not in known:
+                    bank.append({
+                        "id":       f"scan_{fp.stem}",
+                        "filename": fp.name,
+                        "path":     str(fp),
+                        "overlay":  "",
+                        "size_mb":  round(fp.stat().st_size / 1_000_000, 1),
+                        "created":  datetime.fromtimestamp(fp.stat().st_mtime).isoformat(),
+                        "posted_to": [],
+                    })
+        for e in bank:
+            exists = Path(e.get("path", "")).exists()
+            ts = e.get("created", "")
+            try:
+                ts = datetime.fromisoformat(ts).strftime("%d/%m %H:%M")
+            except:
+                pass
+            self.bank_tree.insert("", "end", iid=e["id"],
+                tags=("exists" if exists else "missing",),
+                values=(e.get("filename", ""), e.get("overlay", "—"),
+                        f"{e.get('size_mb',0)}Mo", ts))
+        self.bank_status.config(text=f"{len(bank)} vidéo(s)", fg=TEXT2)
+
+    def _get_bank_entry(self):
+        if not self._bank_selected:
+            return None, None
+        bank = load_bank()
+        return self._bank_selected, next(
+            (b for b in bank if b["id"] == self._bank_selected), None)
+
+    def _bank_open(self):
+        _, entry = self._get_bank_entry()
+        if not entry:
+            messagebox.showwarning("Sélection", "Sélectionne une vidéo")
+            return
+        p = Path(entry["path"])
+        if p.exists():
+            subprocess.run(["explorer", "/select,", str(p)])
+        else:
+            messagebox.showerror("Fichier", "Fichier introuvable")
+
+    def _randomize_meta(self):
+        _, entry = self._get_bank_entry()
+        if not entry:
+            self.root.after(0, lambda: self.bank_status.config(
+                text="⚠ Sélectionne une vidéo", fg=WARN))
+            return
+        src = Path(entry["path"])
+        if not src.exists():
+            self.root.after(0, lambda: self.bank_status.config(
+                text="❌ Fichier introuvable", fg=DANGER))
+            return
+        # Remplace le fichier original (pas de copie)
+        tmp = src.parent / f"_tmp_{random.randint(10000,99999)}{src.suffix}"
+        randomize_mp4_metadata(str(src), str(tmp))
+        src.unlink()
+        tmp.rename(src)
+        bank = load_bank()
+        for e in bank:
+            if e["id"] == self._bank_selected:
+                e["meta_randomized"] = True
+                e["meta_date"] = datetime.now().isoformat()
+                break
+        save_bank(bank)
+        self.root.after(0, self._refresh_bank)
+        self.root.after(0, lambda: self.bank_status.config(
+            text="✅ Métadonnées randomisées", fg=OK))
+
+    def _post_from_bank(self):
+        _, entry = self._get_bank_entry()
+        if not entry:
+            messagebox.showwarning("Sélection", "Sélectionne une vidéo")
+            return
+        if not Path(entry["path"]).exists():
+            messagebox.showerror("Fichier", "Fichier introuvable")
+            return
+        caption = entry.get("description") or entry.get("caption") or ""
+        self._post_window(entry["path"], caption)
+
+    def _bank_delete(self):
+        sels = self.bank_tree.selection()
+        if not sels:
+            return
+        if not messagebox.askyesno(
+                "Supprimer",
+                f"Supprimer {len(sels)} vidéo(s) de la banque ?\n(fichiers conservés sur disque)"):
+            return
+        bank = [b for b in load_bank() if b["id"] not in sels]
+        save_bank(bank)
+        self._bank_selected = None
+        self._refresh_bank()
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # ONGLET PARAMÈTRES
+    # ══════════════════════════════════════════════════════════════════════════
+    def _build_settings_tab(self):
+        f = tk.Frame(self.tab_container, bg=BG)
+        self.tabs["settings"] = f
+
+        card = tk.Frame(f, bg=CARD, padx=24, pady=24)
+        card.pack(padx=60, pady=30, fill="x")
+        tk.Label(card, text="Paramètres", font=("Segoe UI", 14, "bold"),
+                 bg=CARD, fg=TEXT).pack(anchor="w", pady=(0, 16))
+
+        self.bearer_var   = tk.StringVar(value=self.cfg.get("bearer_token", ""))
+        self.proxy_var    = tk.StringVar(value=self.cfg.get("proxy", ""))
+        self.groq_key_var = tk.StringVar(value=self.cfg.get("groq_api_key", ""))
+
+        fields = [
+            ("GéeLark Bearer Token", "Token API GéeLark (Settings → Open API)",
+             self.bearer_var),
+            ("Proxy SOCKS5",
+             "Format : socks5://user:pass@host:port  (ex: socks5://mhqkcjgp:pass@46.203.53.9:7509)",
+             self.proxy_var),
+            ("Groq API Key", "Clé API Groq pour la génération de descriptions (groq.com — gratuit)",
+             self.groq_key_var),
+        ]
+        for lbl, hint, var in fields:
+            tk.Label(card, text=lbl, font=("Segoe UI", 10),
+                     bg=CARD, fg=TEXT2, anchor="w").pack(fill="x", pady=(10, 2))
+            tk.Label(card, text=hint, font=("Segoe UI", 8),
+                     bg=CARD, fg=MUTED, anchor="w").pack(fill="x")
+            tk.Entry(card, textvariable=var, font=("Consolas", 11),
+                     bg=SURFACE2, fg=TEXT, insertbackground=TEXT,
+                     relief="flat", bd=0, highlightthickness=1,
+                     highlightcolor=ACCENT, highlightbackground=BORDER).pack(
+                         fill="x", ipady=7, pady=(2, 0))
+
+        self.proxy_status = tk.Label(card, text="", font=("Segoe UI", 9),
+                                      bg=CARD, fg=TEXT2)
+        self.proxy_status.pack(anchor="w", pady=(4, 0))
+
+        tk.Button(card, text="Sauvegarder", font=("Segoe UI", 11, "bold"),
+                  bg=ACCENT, fg="#06080f", relief="flat", cursor="hand2",
+                  pady=8, command=self._save_settings).pack(fill="x", pady=(16, 0))
+
+        tk.Label(f, text="LOGS", font=("Consolas", 9, "bold"),
+                 bg=BG, fg=MUTED).pack(anchor="w", padx=60, pady=(16, 4))
+        self.log_box = scrolledtext.ScrolledText(
+            f, bg=SURFACE, fg=TEXT2, font=("Consolas", 9),
+            relief="flat", state="disabled", wrap="word", height=16)
+        self.log_box.pack(fill="both", expand=True, padx=60, pady=(0, 14))
+
+    def _save_settings(self):
+        raw_proxy = self.proxy_var.get().strip()
+        normalized = normalize_proxy(raw_proxy) if raw_proxy else ""
+        if normalized != raw_proxy and normalized:
+            self.proxy_var.set(normalized)
+            self.proxy_status.config(
+                text=f"✅ Proxy normalisé : {normalized}", fg=OK)
+        elif raw_proxy and not normalized:
+            self.proxy_status.config(text="⚠ Format proxy non reconnu", fg=WARN)
+        else:
+            self.proxy_status.config(text="", fg=TEXT2)
+        self.cfg["bearer_token"]  = self.bearer_var.get().strip()
+        self.cfg["proxy"]         = normalized or raw_proxy
+        self.cfg["groq_api_key"]  = self.groq_key_var.get().strip()
+        save_config(self.cfg)
+        self.log("Config sauvegardée ✓", "ok")
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # TABLE TÉLÉPHONES
+    # ══════════════════════════════════════════════════════════════════════════
+    def _refresh_table(self):
+        prev = set(self.tree.selection())
+        self.tree.delete(*self.tree.get_children())
+        grp  = self.grp_var.get()
+        srch = self.search_var.get().lower().strip()
+        total = active = banned = views = 0
+        for pid, d in sorted(self.data.items(),
+                             key=lambda x: int(x[1].get("serial_no", 0) or 0)):
+            if not d.get("phone_name"):
+                continue
+            if grp != "Tous" and d.get("group_name", "") != grp:
+                continue
+            nm = d.get("phone_name", "").lower()
+            ig = (d.get("ig_username") or "").lower()
+            if srch and srch not in nm and srch not in ig:
+                continue
+            total += 1
+            st = d.get("ig_status", "")
+            if st == "active":
+                active += 1
+            if st == "banned":
+                banned += 1
+            v = sum(x.get("views", 0) for x in d.get("videos", []))
+            views += v
+            st_txt = {
+                "active":  "✅ Actif",
+                "banned":  "❌ Banni",
+                "private": "🔒 Privé",
+                "error":   "⚠ " + d.get("ig_error", "")[:20],
+            }.get(st, "— Sans IG" if not d.get("ig_username") else "○ Non vérifié")
+            chk = d.get("last_checked", "")
+            if chk:
+                try:
+                    ago = int((datetime.now() - datetime.fromisoformat(chk)).total_seconds())
+                    chk = (f"{ago//3600}h{(ago%3600)//60}m" if ago >= 3600
+                           else f"{ago//60}m")
+                except:
+                    pass
+            tag = st if st in ("active", "banned", "error") else "noig"
+            self.tree.insert("", "end", iid=pid, tags=(tag,), values=(
+                d.get("serial_no", ""),
+                d.get("phone_name", pid),
+                d.get("group_name", "—"),
+                "@" + d["ig_username"] if d.get("ig_username") else "—",
+                st_txt,
+                fmt(d.get("followers", 0)) if st == "active" else "—",
+                fmt(v),
+                len(d.get("videos", [])),
+                chk or "—",
+            ))
+            if pid in prev:
+                self.tree.selection_add(pid)
+        self.sv["phones"].config(text=str(total))
+        self.sv["active"].config(text=str(active))
+        self.sv["banned"].config(text=str(banned))
+        self.sv["views"].config(text=fmt(views))
+
+    def _refresh_ig_list(self):
+        self.ig_list.delete(0, "end")
+        for pid, d in self.data.items():
+            if d.get("ig_username") and d.get("phone_name"):
+                st = d.get("ig_status", "")
+                p  = "✅ " if st == "active" else "❌ " if st == "banned" else "○ "
+                self.ig_list.insert("end", p + "@" + d["ig_username"])
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # LINK / SCRAPE
+    # ══════════════════════════════════════════════════════════════════════════
+    def _link(self):
+        if not self.sel_ids:
+            messagebox.showwarning("Sélection", "Clique sur un téléphone d'abord")
+            return
+        username = self.link_var.get().strip().lstrip("@")
+        if not username:
+            messagebox.showwarning("Username", "Entre un @username")
+            return
+        pid = self.sel_ids[0]
+        if pid not in self.data:
+            self.data[pid] = {}
+        self.data[pid]["ig_username"] = username
+        save_data(self.data)
+        self.link_var.set("")
+        self.log(f"@{username} lié à {self.data[pid].get('phone_name', pid)}", "ok")
+        self._refresh_table()
+        threading.Thread(target=self._scrape_one, args=(pid,), daemon=True).start()
+
+    def _unlink(self):
+        for pid in self.sel_ids:
+            if pid in self.data:
+                old = self.data[pid].pop("ig_username", None)
+                for k in ["ig_status", "followers", "following", "posts_count",
+                           "videos", "full_name", "bio", "ig_error", "last_checked"]:
+                    self.data[pid].pop(k, None)
+                if old:
+                    self.log(f"@{old} délié", "warn")
+        save_data(self.data)
+        self._refresh_table()
+
+    def _scrape_one(self, pid):
+        d = self.data.get(pid, {})
+        username = d.get("ig_username", "")
+        if not username:
+            return
+        proxy = self.cfg.get("proxy", "").strip() or None
+        self.log(f"Scraping @{username}...", "info")
+        res = scrape_ig(username, proxy)
+        self.data[pid].update(res)
+        self.data[pid]["last_checked"] = datetime.now().isoformat()
+        save_data(self.data)
+        st = res.get("ig_status")
+        if st == "active":
+            self.log(f"✅ @{username} — {fmt(res.get('followers',0))} followers", "ok")
+        elif st == "banned":
+            self.log(f"❌ @{username} — banni !", "error")
+        elif "429" in res.get("ig_error", ""):
+            self.log(f"⚠ @{username} — 429 : configure le proxy dans Paramètres", "warn")
+        else:
+            self.log(f"⚠ @{username} — {res.get('ig_error','')}", "warn")
+        self.root.after(0, self._refresh_table)
+
+    def _scrape_sel(self):
+        targets = (self.sel_ids if self.sel_ids
+                   else [p for p, d in self.data.items()
+                         if d.get("ig_username") and d.get("phone_name")])
+        if not targets:
+            return
+        self.log(f"Scraping {len(targets)} compte(s)...", "accent")
+        for pid in targets:
+            self._scrape_one(pid)
+            time.sleep(2)
+        self.log("Terminé ✓", "ok")
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # GÉELARK + SCHEDULER
+    # ══════════════════════════════════════════════════════════════════════════
+    def _load_phones(self):
+        self.root.after(0, lambda: self.refresh_btn.config(
+            state="disabled", text="Chargement..."))
+        bearer = self.cfg.get("bearer_token", "")
+        if not bearer:
+            self.root.after(0, lambda: self.log(
+                "Bearer Token manquant — va dans Paramètres", "warn"))
+            self.root.after(0, lambda: self.refresh_btn.config(
+                state="normal", text="↺  Refresh"))
+            return
+        phones = fetch_phones(bearer)
+        if phones:
+            groups = set()
+            for p in phones:
+                pid = str(p.get("id", ""))
+                if pid not in self.data:
+                    self.data[pid] = {}
+                grp = (p.get("group", {}).get("name", "—") if p.get("group") else "—")
+                groups.add(grp)
+                self.data[pid].update({
+                    "phone_id":   pid,
+                    "phone_name": p.get("serialName", pid),
+                    "serial_no":  p.get("serialNo", ""),
+                    "group_name": grp,
+                    "gl_status":  p.get("status", 0),
+                })
+            save_data(self.data)
+            all_groups = ["Tous"] + sorted(groups)
+            self.root.after(0, lambda: self.grp_combo.config(values=all_groups))
+            self.root.after(0, self._refresh_table)
+            self.root.after(0, lambda: self.log(
+                f"{len(phones)} téléphones chargés ✓", "ok"))
+        else:
+            self.root.after(0, lambda: self.log(
+                "Aucun téléphone — vérifie le Bearer Token dans Paramètres", "warn"))
+        now = datetime.now().strftime("%H:%M:%S")
+        self.root.after(0, lambda: self.status_lbl.config(text=f"Màj {now}"))
+        self.root.after(0, lambda: self.refresh_btn.config(
+            state="normal", text="↺  Refresh"))
+
+    def _manual_refresh(self):
+        def full():
+            self._load_phones()
+            self._scrape_sel()
+        threading.Thread(target=full, daemon=True).start()
+
+    def _scheduler(self):
+        while self.running:
+            time.sleep(3600)
+            if self.running:
+                self._manual_refresh()
+
+
+if __name__ == "__main__":
+    LoginWindow()
