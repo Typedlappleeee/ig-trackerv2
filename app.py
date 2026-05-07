@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import ttk, scrolledtext, messagebox, filedialog, colorchooser
 import threading, hashlib, time, json, httpx, sys, os, subprocess, shutil, random, re
 import textwrap, concurrent.futures
+import http.server, socketserver, socket, urllib.parse as _urlparse
 from datetime import datetime
 from pathlib import Path
 
@@ -567,6 +568,91 @@ def scrape_ig(username, proxy=None, sessionid=None):
         return {"ig_status": "error", "ig_error": "Timeout (>25s)"}
     except Exception as ex:
         return {"ig_status": "error", "ig_error": str(ex)}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PUSH SERVER  — GéeLark phones POST stats to this local HTTP server
+# ══════════════════════════════════════════════════════════════════════════════
+def _safe_int(v):
+    try:
+        return int(str(v).replace(",", "").replace(" ", "").replace(".", ""))
+    except Exception:
+        return None
+
+class _PushHandler(http.server.BaseHTTPRequestHandler):
+    """Minimal HTTP handler for the push endpoint."""
+    app_ref = None  # set to App instance before server starts
+
+    def _respond(self, code, data):
+        body = json.dumps(data, ensure_ascii=False).encode()
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _handle(self, params):
+        def first(*keys):
+            for k in keys:
+                v = params.get(k)
+                if v:
+                    return v[0] if isinstance(v, list) else v
+            return None
+
+        username = (first("u", "username") or "").lstrip("@").strip()
+        if not username:
+            self._respond(400, {"ok": False, "error": "Param manquant: u=username"})
+            return
+        stats = {
+            "followers":   _safe_int(first("f", "followers")),
+            "following":   _safe_int(first("fw", "following")),
+            "posts_count": _safe_int(first("p", "posts")),
+            "full_name":   first("n", "name") or "",
+            "bio":         first("b", "bio") or "",
+        }
+        if self.app_ref:
+            self.app_ref.root.after(
+                0, lambda u=username, s=stats: self.app_ref._on_push_update(u, s)
+            )
+            self._respond(200, {"ok": True, "username": username,
+                                "followers": stats["followers"]})
+        else:
+            self._respond(500, {"ok": False, "error": "App non connectée"})
+
+    def do_GET(self):
+        parsed = _urlparse.urlparse(self.path)
+        if parsed.path not in ("/push", "/push/"):
+            self._respond(404, {"ok": False, "error": "Utilise /push?u=USERNAME&f=FOLLOWERS..."})
+            return
+        self._handle(_urlparse.parse_qs(parsed.query))
+
+    def do_POST(self):
+        parsed = _urlparse.urlparse(self.path)
+        if parsed.path not in ("/push", "/push/"):
+            self._respond(404, {"ok": False, "error": "Utilise POST /push avec JSON body"})
+            return
+        try:
+            length = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(length)
+            data = json.loads(body)
+        except Exception:
+            data = {}
+        # merge query params + body
+        qs = _urlparse.parse_qs(parsed.query)
+        merged = {k: v[0] if isinstance(v, list) else v for k, v in qs.items()}
+        merged.update({k: v for k, v in data.items()})
+        self._handle(merged)
+
+    def do_OPTIONS(self):
+        self.send_response(204)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.end_headers()
+
+    def log_message(self, *_):
+        pass  # suppress console noise
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # LOGIN
@@ -2887,6 +2973,55 @@ class App:
                   relief="flat", cursor="hand2", pady=8,
                   command=self._test_proxy).pack(side="left", fill="x", expand=True, padx=(8, 0))
 
+        # ── Push Server ────────────────────────────────────────────────────
+        tk.Frame(conn, bg=BORDER, height=1).pack(fill="x", pady=(20, 16))
+        tk.Label(conn, text="📲 Serveur Push (GéeLark → App)",
+                 font=("Segoe UI", 12, "bold"), bg=CARD, fg=TEXT).pack(anchor="w")
+        tk.Label(conn,
+                 text="Lance un serveur HTTP local. Appelle l'URL depuis le navigateur\n"
+                      "du téléphone GéeLark pour mettre à jour les stats d'un compte.",
+                 font=("Segoe UI", 8), bg=CARD, fg=MUTED, justify="left").pack(anchor="w", pady=(4, 10))
+
+        # Port row
+        port_row = tk.Frame(conn, bg=CARD)
+        port_row.pack(fill="x", pady=(0, 8))
+        tk.Label(port_row, text="Port :", font=("Segoe UI", 10), bg=CARD, fg=TEXT2).pack(side="left")
+        self.push_port_var = tk.StringVar(value=str(self.cfg.get("push_port", 8765)))
+        tk.Entry(port_row, textvariable=self.push_port_var, width=7,
+                 font=("Consolas", 11), bg=SURFACE2, fg=TEXT, insertbackground=TEXT,
+                 relief="flat", bd=0, highlightthickness=1,
+                 highlightcolor=ACCENT, highlightbackground=BORDER).pack(side="left", padx=(6, 0), ipady=5)
+        self._push_status_var = tk.StringVar(value="⏹ Serveur arrêté")
+        tk.Label(port_row, textvariable=self._push_status_var,
+                 font=("Segoe UI", 9), bg=CARD, fg=TEXT2).pack(side="left", padx=(12, 0))
+
+        # Start button
+        self._push_btn = tk.Button(conn, text="▶ Démarrer", font=("Segoe UI", 10, "bold"),
+                                   bg=ACCENT, fg="#06080f", relief="flat", cursor="hand2", pady=6,
+                                   command=self._start_push_server)
+        self._push_btn.pack(fill="x", pady=(0, 8))
+
+        # URL display + copy
+        tk.Label(conn, text="URL à ouvrir sur GéeLark :", font=("Segoe UI", 9),
+                 bg=CARD, fg=TEXT2).pack(anchor="w")
+        url_row = tk.Frame(conn, bg=CARD)
+        url_row.pack(fill="x", pady=(2, 0))
+        self._push_url_var = tk.StringVar(value="(lance le serveur d'abord)")
+        url_entry = tk.Entry(url_row, textvariable=self._push_url_var,
+                             font=("Consolas", 8), state="readonly",
+                             bg=SURFACE2, fg=MUTED, relief="flat", bd=0,
+                             readonlybackground=SURFACE2)
+        url_entry.pack(side="left", fill="x", expand=True, ipady=5)
+        def _copy_url():
+            self.root.clipboard_clear()
+            self.root.clipboard_append(self._push_url_var.get())
+        tk.Button(url_row, text="📋", font=("Segoe UI", 10),
+                  bg=SURFACE2, fg=TEXT2, relief="flat", cursor="hand2", padx=8,
+                  command=_copy_url).pack(side="right", padx=(4, 0))
+        tk.Label(conn,
+                 text="Remplace USERNAME par le @username, FOLLOWERS par le nombre, etc.",
+                 font=("Segoe UI", 7), bg=CARD, fg=MUTED, anchor="w").pack(fill="x", pady=(3, 0))
+
         # --- API Keys panel ---
         api = self._settings_panels["API Keys"]
         tk.Label(api, text="Clés API", font=("Segoe UI", 13, "bold"),
@@ -3004,6 +3139,11 @@ class App:
         self.cfg["groq_api_key"]  = self.groq_key_var.get().strip()
         self.cfg["ig_sessionid"]  = getattr(self, 'ig_session_var',
                                              tk.StringVar()).get().strip()
+        try:
+            self.cfg["push_port"] = int(getattr(self, "push_port_var",
+                                                  tk.StringVar(value="8765")).get())
+        except ValueError:
+            pass
         save_config(self.cfg)
         self.log("Config sauvegardée ✓", "ok")
 
@@ -3342,6 +3482,66 @@ class App:
             self._scrape_one(pid)
             time.sleep(2)
         self.log("Terminé ✓", "ok")
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # PUSH SERVER
+    # ══════════════════════════════════════════════════════════════════════════
+    def _get_local_ip(self):
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))
+            ip = s.getsockname()[0]
+            s.close()
+            return ip
+        except Exception:
+            return "127.0.0.1"
+
+    def _start_push_server(self):
+        port = int(self.cfg.get("push_port", 8765))
+        try:
+            _PushHandler.app_ref = self
+            srv = socketserver.TCPServer(("", port), _PushHandler)
+            srv.allow_reuse_address = True
+            self._push_server = srv
+            threading.Thread(target=srv.serve_forever, daemon=True).start()
+            ip = self._get_local_ip()
+            url = f"http://{ip}:{port}/push?u=USERNAME&f=FOLLOWERS&fw=FOLLOWING&p=POSTS"
+            self._push_url_var.set(url)
+            self._push_status_var.set(f"✅ Serveur actif sur :{port}")
+            self._push_btn.config(text="⏹ Arrêter", bg="#b83232",
+                                  command=self._stop_push_server)
+            self.log(f"Push serveur démarré — http://{ip}:{port}/push", "ok")
+        except OSError as ex:
+            self._push_status_var.set(f"❌ Erreur: {ex}")
+            self.log(f"Push serveur: {ex}", "error")
+
+    def _stop_push_server(self):
+        srv = getattr(self, "_push_server", None)
+        if srv:
+            srv.shutdown()
+            self._push_server = None
+        self._push_url_var.set("")
+        self._push_status_var.set("⏹ Serveur arrêté")
+        self._push_btn.config(text="▶ Démarrer", bg=ACCENT,
+                              command=self._start_push_server)
+        self.log("Push serveur arrêté", "warn")
+
+    def _on_push_update(self, username, stats):
+        username = username.lstrip("@").lower()
+        for pid, d in self.data.items():
+            if d.get("ig_username", "").lower() == username:
+                d["ig_status"]    = "active"
+                d["last_checked"] = datetime.now().isoformat()
+                for k, v in stats.items():
+                    if v is not None and v != "":
+                        d[k] = v
+                save_data(self.data)
+                self._refresh_table()
+                self.log(
+                    f"📲 Push reçu: @{username} — "
+                    f"{fmt(d.get('followers', 0))} followers", "ok")
+                return
+        self.log(f"⚠ Push @{username} ignoré — compte non trouvé dans la liste", "warn")
 
     # ══════════════════════════════════════════════════════════════════════════
     # GÉELARK + SCHEDULER
