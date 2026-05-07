@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter import ttk, scrolledtext, messagebox, filedialog, colorchooser
 import threading, hashlib, time, json, httpx, sys, os, subprocess, shutil, random, re
+import textwrap, concurrent.futures
 from datetime import datetime
 from pathlib import Path
 
@@ -16,7 +17,25 @@ try:
 except ImportError:
     PIL_OK = False
 
-# ── Couleurs ──────────────────────────────────────────────────────────────────
+try:
+    from tkinterdnd2 import TkinterDnD, DND_FILES
+    DND_OK = True
+except ImportError:
+    DND_OK = False
+
+# ── Thèmes de couleur ─────────────────────────────────────────────────────────
+THEMES = {
+    "Lime":    {"accent": "#d4f53c", "accent2": "#a8c22a", "ok": "#23d18b"},
+    "Bleu":    {"accent": "#3b9eff", "accent2": "#2076cc", "ok": "#23d18b"},
+    "Violet":  {"accent": "#b06cf0", "accent2": "#8a3ed4", "ok": "#23d18b"},
+    "Ambre":   {"accent": "#f59e0b", "accent2": "#d97706", "ok": "#23d18b"},
+    "Rouge":   {"accent": "#ff5c6e", "accent2": "#cc2d3e", "ok": "#23d18b"},
+    "Cyan":    {"accent": "#06d4f0", "accent2": "#0599b0", "ok": "#23d18b"},
+    "Rose":    {"accent": "#f472b6", "accent2": "#be185d", "ok": "#23d18b"},
+    "Vert":    {"accent": "#34d56a", "accent2": "#16a34a", "ok": "#23d18b"},
+}
+
+# ── Couleurs (modifiées par le thème au démarrage) ────────────────────────────
 BG       = "#06080f"
 SURFACE  = "#0d1017"
 SURFACE2 = "#131720"
@@ -31,6 +50,12 @@ WARN     = "#ff9500"
 TEXT     = "#e8edf7"
 TEXT2    = "#6b778f"
 MUTED    = "#323a52"
+
+def apply_theme_globals(theme_name):
+    global ACCENT, ACCENT2, OK
+    t = THEMES.get(theme_name, THEMES["Lime"])
+    ACCENT  = t["accent"]
+    ACCENT2 = t["accent2"]
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 def normalize_proxy(p: str) -> str:
@@ -308,15 +333,20 @@ class App:
         self._active_video_idx = 0
         self._thumb_jobs = {}
 
-        self.root = tk.Tk()
+        # Appliquer le thème avant de construire l'UI
+        apply_theme_globals(self.cfg.get("theme", "Lime"))
+
+        if DND_OK:
+            self.root = TkinterDnD.Tk()
+        else:
+            self.root = tk.Tk()
         self.root.title("IG Tracker")
-        self.root.geometry("1400x840")
+        self.root.geometry("1400x900")
         self.root.configure(bg=BG)
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
 
         self._setup_styles()
         self._build_layout()
-        self._setup_wallpaper()
         self._show_tab("phones")
 
         threading.Thread(target=self._load_phones, daemon=True).start()
@@ -370,7 +400,6 @@ class App:
             main_h    = sidebar_h
             self.bg_canvas.itemconfig(self._sidebar_win, height=sidebar_h)
             self.bg_canvas.itemconfig(self._main_win,    width=main_w, height=main_h)
-            self._redraw_wallpaper(w, h)
 
         self.bg_canvas.bind("<Configure>", _on_canvas_resize)
 
@@ -386,6 +415,7 @@ class App:
                         ("stats",      "📊  Stats Instagram"),
                         ("automation", "🎬  Automatisation"),
                         ("bank",       "🗂  Banque vidéos"),
+                        ("tools",      "🔧  Outils IA"),
                         ("settings",   "⚙  Paramètres")]:
             b = self._make_sidebar_btn(self.sidebar, lbl, k)
             b.pack(fill="x", pady=1)
@@ -425,6 +455,7 @@ class App:
         self._build_stats_tab()
         self._build_automation_tab()
         self._build_bank_tab()
+        self._build_tools_tab()
         self._build_settings_tab()
 
     def _make_sidebar_btn(self, parent, text, key):
@@ -677,79 +708,142 @@ class App:
             ))
 
     # ══════════════════════════════════════════════════════════════════════════
+    # HELPERS ACCORDION + PANNEAU SCROLLABLE
+    # ══════════════════════════════════════════════════════════════════════════
+    def _collapsible(self, parent, title, open_by_default=True):
+        """Crée une section accordion. Retourne le frame content."""
+        wrap = tk.Frame(parent, bg=BG)
+        wrap.pack(fill="x", pady=(0, 6))
+
+        hdr = tk.Frame(wrap, bg=HL, cursor="hand2")
+        hdr.pack(fill="x")
+
+        arrow = tk.Label(hdr, text="▼" if open_by_default else "▶",
+                         font=("Segoe UI", 8), bg=HL, fg=ACCENT)
+        arrow.pack(side="left", padx=(10, 4), pady=6)
+        tk.Label(hdr, text=title, font=("Consolas", 8, "bold"),
+                 bg=HL, fg=TEXT2).pack(side="left", pady=6)
+
+        content = tk.Frame(wrap, bg=CARD, padx=14, pady=10)
+        state = [open_by_default]
+
+        def toggle(e=None):
+            state[0] = not state[0]
+            if state[0]:
+                content.pack(fill="x")
+                arrow.config(text="▼")
+            else:
+                content.pack_forget()
+                arrow.config(text="▶")
+
+        for w in (hdr, arrow) + tuple(hdr.winfo_children()):
+            w.bind("<Button-1>", toggle)
+        hdr.bind("<Button-1>", toggle)
+
+        if open_by_default:
+            content.pack(fill="x")
+        return content
+
+    # ══════════════════════════════════════════════════════════════════════════
     # ONGLET AUTOMATISATION
     # ══════════════════════════════════════════════════════════════════════════
     def _build_automation_tab(self):
         f = tk.Frame(self.tab_container, bg=BG)
         self.tabs["automation"] = f
 
-        left = tk.Frame(f, bg=BG, width=390)
-        left.pack(side="left", fill="y")
-        left.pack_propagate(False)
+        # ── Panneau gauche scrollable ────────────────────────────────────────
+        left_wrap = tk.Frame(f, bg=BG, width=400)
+        left_wrap.pack(side="left", fill="y")
+        left_wrap.pack_propagate(False)
 
-        tk.Label(left, text="🎬 Nouveau montage", font=("Segoe UI", 12, "bold"),
-                 bg=BG, fg=TEXT).pack(anchor="w", pady=(0, 10))
+        left_canvas = tk.Canvas(left_wrap, bg=BG, highlightthickness=0, width=400)
+        left_scroll = ttk.Scrollbar(left_wrap, orient="vertical",
+                                     command=left_canvas.yview)
+        left_canvas.configure(yscrollcommand=left_scroll.set)
+        left_scroll.pack(side="right", fill="y")
+        left_canvas.pack(side="left", fill="both", expand=True)
+        left = tk.Frame(left_canvas, bg=BG)
+        left_canvas.create_window((0, 0), window=left, anchor="nw", width=385)
+        left.bind("<Configure>", lambda e: left_canvas.configure(
+            scrollregion=left_canvas.bbox("all")))
+        left_canvas.bind("<MouseWheel>",
+            lambda e: left_canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
+        left.bind("<MouseWheel>",
+            lambda e: left_canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
 
-        # Multi-video grid
-        vcard = tk.Frame(left, bg=CARD, padx=14, pady=12)
-        vcard.pack(fill="x", pady=(0, 8))
-        vtop = tk.Frame(vcard, bg=CARD)
+        tk.Label(left, text="🎬 Montage vidéo", font=("Segoe UI", 12, "bold"),
+                 bg=BG, fg=TEXT).pack(anchor="w", padx=2, pady=(8, 6))
+
+        # ── Section 1 : Vidéos source ────────────────────────────────────────
+        vs = self._collapsible(left, "VIDÉOS SOURCE", open_by_default=True)
+        vtop = tk.Frame(vs, bg=CARD)
         vtop.pack(fill="x", pady=(0, 8))
-        tk.Label(vtop, text="VIDÉOS SOURCE", font=("Consolas", 8, "bold"),
-                 bg=CARD, fg=MUTED).pack(side="left")
-        tk.Button(vtop, text="+ Ajouter vidéos", font=("Segoe UI", 9, "bold"),
-                  bg=ACCENT, fg="#06080f", relief="flat", cursor="hand2", padx=8, pady=3,
-                  command=self._add_videos).pack(side="right")
-        tk.Button(vtop, text="Vider", font=("Segoe UI", 9),
-                  bg=SURFACE2, fg=DANGER, relief="flat", cursor="hand2", padx=6, pady=3,
-                  command=self._clear_videos).pack(side="right", padx=(0, 4))
+        tk.Button(vtop, text="+ Ajouter vidéos",
+                  font=("Segoe UI", 9, "bold"), bg=ACCENT, fg="#06080f",
+                  relief="flat", cursor="hand2", padx=8, pady=4,
+                  command=self._add_videos).pack(side="left")
+        tk.Button(vtop, text="Vider",
+                  font=("Segoe UI", 9), bg=SURFACE2, fg=DANGER,
+                  relief="flat", cursor="hand2", padx=6, pady=4,
+                  command=self._clear_videos).pack(side="left", padx=(6, 0))
 
-        # Scrollable thumbnail grid
-        self.vgrid_canvas = tk.Canvas(vcard, bg=SURFACE, highlightthickness=0, height=120)
+        self.vgrid_canvas = tk.Canvas(vs, bg=SURFACE, highlightthickness=0, height=118)
         self.vgrid_canvas.pack(fill="x")
-        vgrid_scroll = ttk.Scrollbar(vcard, orient="horizontal",
+        vgrid_scroll = ttk.Scrollbar(vs, orient="horizontal",
                                       command=self.vgrid_canvas.xview)
         vgrid_scroll.pack(fill="x")
         self.vgrid_canvas.configure(xscrollcommand=vgrid_scroll.set)
         self.vgrid_inner = tk.Frame(self.vgrid_canvas, bg=SURFACE)
         self.vgrid_canvas.create_window((0, 0), window=self.vgrid_inner, anchor="nw")
-        self.vgrid_inner.bind("<Configure>",
-            lambda e: self.vgrid_canvas.configure(
-                scrollregion=self.vgrid_canvas.bbox("all")))
+        self.vgrid_inner.bind("<Configure>", lambda e: self.vgrid_canvas.configure(
+            scrollregion=self.vgrid_canvas.bbox("all")))
+
+        def _vgrid_wheel(e):
+            self.vgrid_canvas.xview_scroll(int(-1*(e.delta/120)), "units")
+        self.vgrid_canvas.bind("<MouseWheel>", _vgrid_wheel)
+        self.vgrid_inner.bind("<MouseWheel>", _vgrid_wheel)
+
+        # Drop zone label
+        if DND_OK:
+            self.vgrid_canvas.drop_target_register(DND_FILES)
+            self.vgrid_canvas.dnd_bind("<<Drop>>", self._on_video_drop)
+        dz_hint = "Ctrl+clic pour multi-sélection · Glisse depuis l'explorateur"
+        if not DND_OK:
+            dz_hint = "Ctrl+clic pour multi-sélection dans l'explorateur"
+        tk.Label(vs, text=dz_hint,
+                 font=("Segoe UI", 7), bg=CARD, fg=MUTED).pack(anchor="w", pady=(4, 0))
+
         self.video_path_var = tk.StringVar()
-        self.path_lbl = tk.Label(vcard, text="Aucune vidéo sélectionnée",
-                                  font=("Segoe UI", 9), bg=CARD, fg=MUTED,
-                                  anchor="w", pady=4)
-        self.path_lbl.pack(fill="x", pady=(4, 0))
+        self.path_lbl = tk.Label(vs, text="Aucune vidéo sélectionnée",
+                                  font=("Segoe UI", 9), bg=CARD, fg=MUTED, anchor="w")
+        self.path_lbl.pack(fill="x", pady=(2, 0))
 
-        # Texte overlay
-        ocard = tk.Frame(left, bg=CARD, padx=14, pady=12)
-        ocard.pack(fill="x", pady=(0, 8))
-        tk.Label(ocard, text="TEXTE SUR LA VIDÉO", font=("Consolas", 8, "bold"),
-                 bg=CARD, fg=MUTED).pack(anchor="w", pady=(0, 8))
-        self.overlay_var = tk.StringVar()
-        self.overlay_var.trace("w", lambda *a: self._schedule_preview())
-        tk.Entry(ocard, textvariable=self.overlay_var, font=("Segoe UI", 13),
-                 bg=SURFACE2, fg=TEXT, insertbackground=TEXT,
-                 relief="flat", bd=0, highlightthickness=1,
-                 highlightcolor=ACCENT, highlightbackground=BORDER).pack(fill="x", ipady=9)
+        # ── Section 2 : Texte overlay ────────────────────────────────────────
+        oc = self._collapsible(left, "TEXTE SUR LA VIDÉO", open_by_default=True)
+        self.overlay_text_widget = tk.Text(
+            oc, font=("Segoe UI", 12), bg=SURFACE2, fg=TEXT,
+            insertbackground=TEXT, relief="flat", bd=0, height=3,
+            highlightthickness=1, highlightcolor=ACCENT,
+            highlightbackground=BORDER, wrap="word", padx=8, pady=6)
+        self.overlay_text_widget.pack(fill="x")
+        self.overlay_text_widget.bind("<<Modified>>", self._on_overlay_modified)
+        self.overlay_var = tk.StringVar()  # kept for compat with preset system
+        tk.Label(oc, text="Maj+Entrée pour retour à la ligne",
+                 font=("Segoe UI", 7), bg=CARD, fg=MUTED).pack(anchor="w", pady=(3, 0))
 
-        # Sliders
-        scard = tk.Frame(left, bg=CARD, padx=14, pady=12)
-        scard.pack(fill="x", pady=(0, 8))
-        tk.Label(scard, text="AJUSTEMENTS", font=("Consolas", 8, "bold"),
-                 bg=CARD, fg=MUTED).pack(anchor="w", pady=(0, 10))
-
+        # ── Section 3 : Ajustements ──────────────────────────────────────────
+        sc = self._collapsible(left, "AJUSTEMENTS", open_by_default=True)
         self.fontsize_var = tk.DoubleVar(value=52)
         self.pos_x_var    = tk.DoubleVar(value=50)
         self.pos_y_var    = tk.DoubleVar(value=78)
         self.speed_var    = tk.DoubleVar(value=1.0)
+        self.wrap_var     = tk.DoubleVar(value=80)  # % de largeur image
 
         def make_slider(parent, label, var, lo, hi, decimals=0, suffix=""):
             row = tk.Frame(parent, bg=CARD)
-            row.pack(fill="x", pady=4)
+            row.pack(fill="x", pady=3)
             tk.Label(row, text=label, font=("Segoe UI", 9), bg=CARD,
-                     fg=TEXT2, width=13, anchor="w").pack(side="left")
+                     fg=TEXT2, width=14, anchor="w").pack(side="left")
             fmt_fn = ((lambda v: f"{int(v)}{suffix}") if decimals == 0
                       else (lambda v: f"{v:.{decimals}f}{suffix}"))
             val_lbl = tk.Label(row, text=fmt_fn(var.get()),
@@ -762,29 +856,28 @@ class App:
                              highlightcolor=ACCENT, highlightbackground=BORDER,
                              width=6, justify="center")
             entry.pack(side="right", padx=(0, 4), ipady=3)
-            c = tk.Canvas(row, bg=SURFACE2, height=26, highlightthickness=0, cursor="hand2")
+            c = tk.Canvas(row, bg=SURFACE2, height=22, highlightthickness=0, cursor="hand2")
             c.pack(side="left", fill="x", expand=True, padx=(4, 6))
 
             def draw(val=None):
                 if val is None:
                     val = var.get()
-                w = c.winfo_width() or 180
+                w = c.winfo_width() or 160
                 c.delete("all")
-                ratio = max(0, min(1, (val - lo) / (hi - lo) if hi != lo else 0))
-                fx = 8 + ratio * (w - 16)
-                c.create_rectangle(8, 12, w - 8, 15, fill=SURFACE, outline="")
+                ratio = max(0, min(1, (val-lo)/(hi-lo) if hi!=lo else 0))
+                fx = 8 + ratio*(w-16)
+                c.create_rectangle(8, 10, w-8, 13, fill=SURFACE, outline="")
                 if fx > 8:
-                    c.create_rectangle(8, 12, fx, 15, fill=ACCENT, outline="")
-                c.create_oval(fx - 8, 5, fx + 8, 21, fill=BG, outline=ACCENT, width=2)
-                c.create_oval(fx - 4, 9, fx + 4, 17, fill=ACCENT, outline="")
+                    c.create_rectangle(8, 10, fx, 13, fill=ACCENT, outline="")
+                c.create_oval(fx-7, 4, fx+7, 18, fill=BG, outline=ACCENT, width=2)
+                c.create_oval(fx-3, 8, fx+3, 14, fill=ACCENT, outline="")
 
             def on_drag(e):
                 w = c.winfo_width()
-                ratio = max(0, min(1, (e.x - 8) / (w - 16)))
-                val = lo + ratio * (hi - lo)
+                ratio = max(0, min(1, (e.x-8)/(w-16)))
+                val = lo + ratio*(hi-lo)
                 val = round(val, decimals) if decimals > 0 else int(val)
                 var.set(val)
-
             c.bind("<Button-1>", on_drag)
             c.bind("<B1-Motion>", on_drag)
             c.bind("<Configure>", lambda e: draw())
@@ -807,19 +900,31 @@ class App:
                     pass
             entry.bind("<Return>", on_entry)
             entry.bind("<FocusOut>", on_entry)
-            scard.after(100, draw)
+            sc.after(80, draw)
 
-        make_slider(scard, "Taille texte", self.fontsize_var, 16, 120, suffix="px")
-        make_slider(scard, "Position X",   self.pos_x_var,    0, 100, suffix="%")
-        make_slider(scard, "Position Y",   self.pos_y_var,    0, 100, suffix="%")
-        make_slider(scard, "Vitesse",       self.speed_var,    1.0, 1.1, decimals=3, suffix="x")
+        make_slider(sc, "Taille texte",  self.fontsize_var, 16,  120, suffix="px")
+        make_slider(sc, "Largeur texte", self.wrap_var,     20,  100, suffix="%")
+        make_slider(sc, "Position X",    self.pos_x_var,    0,   100, suffix="%")
+        make_slider(sc, "Position Y",    self.pos_y_var,    0,   100, suffix="%")
+        make_slider(sc, "Vitesse",       self.speed_var,    1.0, 1.1, decimals=3, suffix="x")
 
-        # Préréglages
-        pcard = tk.Frame(left, bg=CARD, padx=14, pady=10)
-        pcard.pack(fill="x", pady=(0, 8))
-        tk.Label(pcard, text="PRÉRÉGLAGES", font=("Consolas", 8, "bold"),
-                 bg=CARD, fg=MUTED).pack(anchor="w", pady=(0, 8))
-        save_row = tk.Frame(pcard, bg=CARD)
+        # ── Section 4 : Grading couleur ──────────────────────────────────────
+        gc = self._collapsible(left, "GRADING COULEUR", open_by_default=False)
+        self.brightness_var = tk.DoubleVar(value=0.0)
+        self.contrast_var   = tk.DoubleVar(value=1.0)
+        self.saturation_var = tk.DoubleVar(value=1.0)
+        make_slider(gc, "Luminosité",   self.brightness_var, -1.0, 1.0, decimals=2)
+        make_slider(gc, "Contraste",    self.contrast_var,    0.0, 3.0, decimals=2)
+        make_slider(gc, "Saturation",   self.saturation_var,  0.0, 3.0, decimals=2)
+        tk.Button(gc, text="Réinitialiser", font=("Segoe UI", 8),
+                  bg=SURFACE2, fg=TEXT2, relief="flat", cursor="hand2", padx=6, pady=3,
+                  command=lambda: [self.brightness_var.set(0.0),
+                                   self.contrast_var.set(1.0),
+                                   self.saturation_var.set(1.0)]).pack(anchor="e", pady=(4, 0))
+
+        # ── Section 5 : Préréglages ──────────────────────────────────────────
+        pc = self._collapsible(left, "PRÉRÉGLAGES", open_by_default=False)
+        save_row = tk.Frame(pc, bg=CARD)
         save_row.pack(fill="x", pady=(0, 4))
         self.preset_name_var = tk.StringVar()
         tk.Entry(save_row, textvariable=self.preset_name_var,
@@ -827,14 +932,14 @@ class App:
                  insertbackground=TEXT, relief="flat", bd=0,
                  highlightthickness=1, highlightcolor=ACCENT,
                  highlightbackground=BORDER).pack(side="left", fill="x", expand=True, ipady=5)
-        tk.Button(save_row, text="Sauvegarder", font=("Segoe UI", 9, "bold"),
+        tk.Button(save_row, text="💾 Sauvegarder", font=("Segoe UI", 9, "bold"),
                   bg=ACCENT, fg="#06080f", relief="flat", cursor="hand2", padx=8,
                   command=self._save_preset).pack(side="right", padx=(6, 0))
-        load_row = tk.Frame(pcard, bg=CARD)
+        load_row = tk.Frame(pc, bg=CARD)
         load_row.pack(fill="x")
         self.preset_combo_var = tk.StringVar()
         self.preset_combo = ttk.Combobox(load_row, textvariable=self.preset_combo_var,
-                                          state="readonly", font=("Segoe UI", 10), width=18)
+                                          state="readonly", font=("Segoe UI", 10), width=16)
         self.preset_combo.pack(side="left", fill="x", expand=True)
         tk.Button(load_row, text="Charger", font=("Segoe UI", 9),
                   bg=SURFACE2, fg=ACCENT, relief="flat", cursor="hand2", padx=8,
@@ -844,49 +949,56 @@ class App:
                   command=self._delete_preset).pack(side="right", padx=(4, 0))
         self._refresh_preset_combo()
 
-        # Caption Instagram
-        ccard = tk.Frame(left, bg=CARD, padx=14, pady=12)
-        ccard.pack(fill="x", pady=(0, 8))
-        tk.Label(ccard, text="CAPTION INSTAGRAM", font=("Consolas", 8, "bold"),
-                 bg=CARD, fg=MUTED).pack(anchor="w", pady=(0, 6))
-        self.caption_text = tk.Text(ccard, font=("Segoe UI", 10), bg=SURFACE2, fg=TEXT,
-                                     insertbackground=TEXT, relief="flat", bd=0, height=4,
-                                     highlightthickness=1, highlightcolor=ACCENT,
-                                     highlightbackground=BORDER, wrap="word", padx=8, pady=8)
-        self.caption_text.pack(fill="x")
+        # ── Boutons export ───────────────────────────────────────────────────
+        btn_area = tk.Frame(left, bg=BG)
+        btn_area.pack(fill="x", pady=(4, 8), padx=2)
 
-        # Boutons action
-        tk.Button(left, text="✂  Traiter & exporter",
-                  font=("Segoe UI", 10, "bold"), bg=SURFACE2, fg=ACCENT,
-                  relief="flat", cursor="hand2", pady=9,
-                  command=lambda: threading.Thread(
-                      target=self._process_video, daemon=True).start()).pack(fill="x", pady=(8, 4))
-        self.process_status = tk.Label(left, text="", font=("Segoe UI", 9),
+        self.process_btn = tk.Button(
+            btn_area, text="✂  Traiter & Exporter la vidéo sélectionnée",
+            font=("Segoe UI", 11, "bold"), bg=ACCENT, fg="#06080f",
+            relief="flat", cursor="hand2", pady=12,
+            command=lambda: threading.Thread(
+                target=self._process_video, daemon=True).start())
+        self.process_btn.pack(fill="x", pady=(0, 5))
+
+        tk.Button(
+            btn_area, text="⚡  Exporter toutes les vidéos en parallèle",
+            font=("Segoe UI", 10, "bold"), bg=HL, fg=TEXT,
+            relief="flat", cursor="hand2", pady=10,
+            command=lambda: threading.Thread(
+                target=self._batch_export, daemon=True).start()).pack(fill="x", pady=(0, 5))
+
+        self.process_status = tk.Label(btn_area, text="", font=("Segoe UI", 9),
                                         bg=BG, fg=TEXT2, wraplength=380)
-        self.process_status.pack(fill="x", pady=(0, 6))
-        tk.Button(left, text="🚀  Poster sur les téléphones",
-                  font=("Segoe UI", 10, "bold"), bg=ACCENT, fg="#06080f",
-                  relief="flat", cursor="hand2", pady=9,
-                  command=self._open_post_window).pack(fill="x")
+        self.process_status.pack(fill="x")
 
-        # Panneau droit : aperçu
+        tk.Button(
+            btn_area, text="🚀  Poster sur les téléphones",
+            font=("Segoe UI", 10, "bold"), bg=SURFACE2, fg=ACCENT,
+            relief="flat", cursor="hand2", pady=9,
+            command=self._open_post_window).pack(fill="x", pady=(5, 0))
+
+        # Compatible caption_text (banque)
+        self.caption_text = tk.Text(btn_area, height=1)
+        self.caption_text.pack_forget()
+
+        # ── Panneau droit : aperçu ───────────────────────────────────────────
         right = tk.Frame(f, bg=CARD)
         right.pack(side="left", fill="both", expand=True, padx=(10, 0))
         tk.Label(right, text="APERÇU EN DIRECT", font=("Consolas", 8, "bold"),
                  bg=CARD, fg=MUTED).pack(anchor="w", padx=14, pady=(12, 6))
         self.preview_canvas = tk.Canvas(right, bg="#000", highlightthickness=0)
-        self.preview_canvas.pack(fill="both", expand=True, padx=14, pady=(0, 6))
-        # Drag du texte sur l'aperçu
+        self.preview_canvas.pack(fill="both", expand=True, padx=14, pady=(0, 4))
         self.preview_canvas.bind("<Button-1>",        self._preview_click)
         self.preview_canvas.bind("<B1-Motion>",       self._preview_drag)
         self.preview_canvas.bind("<ButtonRelease-1>", self._preview_release)
         self.preview_img_ref = None
-        tk.Label(right, text="✦ Clique et glisse le texte directement sur l'aperçu",
+        tk.Label(right, text="✦ Glisse le texte · Snap magnétique au centre (±3%)",
                  font=("Segoe UI", 8), bg=CARD, fg=MUTED).pack(pady=(0, 4))
         self.auto_log = scrolledtext.ScrolledText(right, bg=SURFACE, fg=TEXT2,
                                                    font=("Consolas", 9), relief="flat",
                                                    state="disabled", wrap="word", height=5)
-        self.auto_log.pack(fill="x", padx=14, pady=(0, 12))
+        self.auto_log.pack(fill="x", padx=14, pady=(0, 10))
 
     def _preview_click(self, e):
         self._is_dragging = True
@@ -912,6 +1024,33 @@ class App:
         self._is_dragging = False
         self._redraw_overlay_fast(glowing=False)
 
+    def _get_overlay_text(self):
+        try:
+            return self.overlay_text_widget.get("1.0", "end-1c")
+        except:
+            return self.overlay_var.get()
+
+    def _on_overlay_modified(self, e=None):
+        try:
+            self.overlay_text_widget.edit_modified(False)
+        except:
+            pass
+        if not self._is_dragging:
+            self._schedule_preview()
+
+    def _on_video_drop(self, e):
+        raw = e.data
+        # tkinterdnd2 wraps paths with spaces in {}
+        paths = re.findall(r'\{([^}]+)\}|(\S+)', raw)
+        exts = {'.mp4', '.mov', '.avi', '.mkv', '.webm'}
+        for a, b in paths:
+            p = a or b
+            if p and Path(p).suffix.lower() in exts and p not in self._video_paths:
+                self._video_paths.append(p)
+        self._rebuild_video_grid()
+        if self._video_paths and not self.video_path_var.get():
+            self._select_video(0)
+
     def _redraw_overlay_fast(self, glowing=False):
         """Re-composite text on the cached PIL frame — no ffmpeg, instant."""
         if not PIL_OK or self._cached_pil_frame is None:
@@ -919,7 +1058,7 @@ class App:
         try:
             base = self._cached_pil_frame.copy()
             w, h = base.size
-            txt = self.overlay_var.get()
+            txt = self._get_overlay_text()
             if txt:
                 draw = ImageDraw.Draw(base)
                 fs = max(10, int(self.fontsize_var.get() * w / 1080))
@@ -927,24 +1066,47 @@ class App:
                     font = ImageFont.truetype("arial.ttf", fs)
                 except:
                     font = ImageFont.load_default()
-                px = self.pos_x_var.get() / 100
-                py = self.pos_y_var.get() / 100
-                bb = draw.textbbox((0, 0), txt, font=font)
-                tw, th = bb[2] - bb[0], bb[3] - bb[1]
-                x = int((w - tw) * px)
-                y = int((h - th) * py)
-                # Shadow
-                for dx, dy in [(-2,-2),(2,-2),(-2,2),(2,2),(0,2),(0,-2),(2,0),(-2,0)]:
-                    draw.text((x+dx, y+dy), txt, font=font, fill=(0,0,0,200))
-                # Glow halo when dragging
-                if glowing:
-                    for r in range(6, 0, -2):
-                        alpha = int(80 / r)
-                        for dx2, dy2 in [(-r,0),(r,0),(0,-r),(0,r),(-r,-r),(r,-r),(-r,r),(r,r)]:
-                            draw.text((x+dx2, y+dy2), txt, font=font,
-                                      fill=(212,245,60,alpha))
-                fill = "#d4f53c" if glowing else "white"
-                draw.text((x, y), txt, font=font, fill=fill)
+                px_pct = self.pos_x_var.get() / 100
+                py_pct = self.pos_y_var.get() / 100
+                wrap_w = int(w * (self.wrap_var.get() / 100))
+                # Wrap text manually for multi-line
+                lines = []
+                for raw_line in txt.split("\n"):
+                    if not raw_line.strip():
+                        lines.append("")
+                        continue
+                    # Wrap each paragraph
+                    words = raw_line.split()
+                    cur = ""
+                    for word in words:
+                        test = (cur + " " + word).strip()
+                        bb_t = draw.textbbox((0, 0), test, font=font)
+                        if bb_t[2] - bb_t[0] > wrap_w and cur:
+                            lines.append(cur)
+                            cur = word
+                        else:
+                            cur = test
+                    if cur:
+                        lines.append(cur)
+                # Measure total block
+                line_h = fs + max(4, fs // 8)
+                block_h = len(lines) * line_h
+                block_w = max((draw.textbbox((0,0), l, font=font)[2] for l in lines if l), default=0)
+                bx = int((w - block_w) * px_pct)
+                by = int((h - block_h) * py_pct)
+                for i, line in enumerate(lines):
+                    if not line:
+                        continue
+                    lx, ly = bx, by + i * line_h
+                    for dx, dy in [(-2,-2),(2,-2),(-2,2),(2,2),(0,2),(0,-2),(2,0),(-2,0)]:
+                        draw.text((lx+dx, ly+dy), line, font=font, fill=(0,0,0,200))
+                    if glowing:
+                        for r in range(6, 0, -2):
+                            for dx2, dy2 in [(-r,0),(r,0),(0,-r),(0,r),(-r,-r),(r,-r),(-r,r),(r,r)]:
+                                draw.text((lx+dx2, ly+dy2), line, font=font,
+                                          fill=(212,245,60, int(80/r)))
+                    fill_col = ACCENT if glowing else "white"
+                    draw.text((lx, ly), line, font=font, fill=fill_col)
 
             cw = self.preview_canvas.winfo_width() or 400
             ch = self.preview_canvas.winfo_height() or 500
@@ -952,25 +1114,23 @@ class App:
             bw, bh = base.size
             self._preview_img_size = (bw, bh)
             self._preview_img_offset = ((cw - bw) // 2, (ch - bh) // 2)
-
             photo = ImageTk.PhotoImage(base)
             self.preview_canvas.delete("all")
             self.preview_canvas.create_image(cw//2, ch//2, anchor="center", image=photo)
             self.preview_img_ref = photo
 
-            # Center snap guides
             px_val = self.pos_x_var.get()
             py_val = self.pos_y_var.get()
             ox, oy = self._preview_img_offset
             iw2, ih2 = self._preview_img_size
             if abs(px_val - 50) < 5:
                 cx = ox + iw2 // 2
-                self.preview_canvas.create_line(cx, oy, cx, oy + ih2,
-                    fill="#d4f53c", width=1, dash=(4,4), tags="guide")
+                self.preview_canvas.create_line(cx, oy, cx, oy+ih2,
+                    fill=ACCENT, width=1, dash=(4,4), tags="guide")
             if abs(py_val - 50) < 5:
                 cy = oy + ih2 // 2
-                self.preview_canvas.create_line(ox, cy, ox + iw2, cy,
-                    fill="#d4f53c", width=1, dash=(4,4), tags="guide")
+                self.preview_canvas.create_line(ox, cy, ox+iw2, cy,
+                    fill=ACCENT, width=1, dash=(4,4), tags="guide")
         except Exception as ex:
             print(f"Overlay fast: {ex}")
 
@@ -1149,7 +1309,7 @@ class App:
             return
         presets = load_presets()
         presets[name] = {
-            "text":     self.overlay_var.get(),
+            "text":     self._get_overlay_text(),
             "fontsize": self.fontsize_var.get(),
             "pos_x":    self.pos_x_var.get(),
             "pos_y":    self.pos_y_var.get(),
@@ -1167,7 +1327,11 @@ class App:
         if not p:
             return
         if p.get("text"):
-            self.overlay_var.set(p["text"])
+            try:
+                self.overlay_text_widget.delete("1.0", "end")
+                self.overlay_text_widget.insert("1.0", p["text"])
+            except:
+                self.overlay_var.set(p["text"])
         self.fontsize_var.set(p.get("fontsize", 52))
         self.pos_x_var.set(p.get("pos_x", 50))
         self.pos_y_var.set(p.get("pos_y", 78))
@@ -1191,7 +1355,7 @@ class App:
         if not src or not Path(src).exists():
             self.root.after(0, lambda: self._alog("⚠ Sélectionne une vidéo", "warn"))
             return
-        overlay = self.overlay_var.get().strip()
+        overlay = self._get_overlay_text().strip()
         if not overlay:
             self.root.after(0, lambda: self._alog("⚠ Entre un texte overlay", "warn"))
             return
@@ -1217,49 +1381,284 @@ class App:
         px    = self.pos_x_var.get() / 100
         py    = self.pos_y_var.get() / 100
         speed = round(self.speed_var.get(), 3)
-        txt   = overlay.replace("\\", "\\\\").replace("'", "\\'").replace(":", r"\:")
-        drawtext = (f"drawtext=text='{txt}':fontcolor=white:fontsize={fs}:"
-                    f"x=(w-text_w)*{px:.4f}:y=(h-text_h)*{py:.4f}:"
-                    f"borderw=3:bordercolor=black:font=Arial")
-
-        if abs(speed - 1.0) > 0.001:
-            pts = round(1.0 / speed, 6)
-            vf  = f"{drawtext},setpts={pts}*PTS"
-            af  = f"atempo={speed}"
-            cmd = [ffmpeg, "-y", "-i", src, "-vf", vf, "-af", af,
-                   "-c:v", "libx264", "-preset", "fast", str(out_path)]
-        else:
-            cmd = [ffmpeg, "-y", "-i", src, "-vf", drawtext,
-                   "-c:a", "copy", "-c:v", "libx264", "-preset", "fast", str(out_path)]
+        bright = getattr(self, 'brightness_var', None)
+        cont   = getattr(self, 'contrast_var', None)
+        sat    = getattr(self, 'saturation_var', None)
+        wrap_pct = getattr(self, 'wrap_var', None)
 
         self.root.after(0, lambda: self._alog("⏳ Traitement en cours...", "accent"))
         self.root.after(0, lambda: self.process_status.config(text="⏳ Traitement...", fg=WARN))
         try:
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
-            if result.returncode == 0:
-                self.output_video_path = str(out_path)
-                caption_txt = self.caption_text.get("1.0", "end").strip()
+            result = self._process_single_video(
+                src_path, out_path, overlay, fs, px, py, speed,
+                bright, cont, sat, wrap_pct, ffmpeg
+            )
+            if result == "ok":
+                bank = load_bank()
                 bank.insert(0, {
                     "id":       f"{int(time.time())}_{random.randint(1000,9999)}",
                     "filename": out_path.name,
                     "path":     str(out_path),
                     "overlay":  overlay,
-                    "caption":  caption_txt,
+                    "caption":  "",
                     "size_mb":  round(out_path.stat().st_size / 1_000_000, 1),
                     "created":  datetime.now().isoformat(),
                     "posted_to": [],
                 })
                 save_bank(bank)
+                self.output_video_path = str(out_path)
                 self.root.after(0, lambda: self._alog(f"✅ Exportée → {out_path.name}", "ok"))
                 self.root.after(0, lambda: self.process_status.config(
                     text=f"✅ {out_path.name}", fg=OK))
             else:
-                err = result.stderr[-300:] if result.stderr else "?"
-                self.root.after(0, lambda: self._alog(f"❌ ffmpeg: {err}", "error"))
+                self.root.after(0, lambda: self._alog(f"❌ {result}", "error"))
                 self.root.after(0, lambda: self.process_status.config(
-                    text="❌ Erreur ffmpeg", fg=DANGER))
+                    text="❌ Erreur", fg=DANGER))
         except Exception as e:
             self.root.after(0, lambda: self._alog(f"❌ {e}", "error"))
+
+    def _process_single_video(self, src_path, out_path, overlay, fs, px, py, speed,
+                               bright_var, cont_var, sat_var, wrap_var, ffmpeg):
+        """Process one video: overlay text via PIL overlay PNG + optional color grading + speed."""
+        src = str(src_path)
+        overlay_png = None
+
+        # Build PIL overlay PNG if PIL available (supports multi-line)
+        if PIL_OK and overlay.strip():
+            try:
+                import tempfile
+                # Get video dimensions via ffprobe / ffmpeg
+                probe = subprocess.run(
+                    [ffmpeg, "-i", src],
+                    capture_output=True, text=True, timeout=10
+                )
+                w, h = 1080, 1920
+                for line in probe.stderr.split("\n"):
+                    m = re.search(r"(\d{3,4})x(\d{3,4})", line)
+                    if m:
+                        w, h = int(m.group(1)), int(m.group(2))
+                        break
+
+                overlay_img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+                d = ImageDraw.Draw(overlay_img)
+                wrap_frac = (wrap_var.get() / 100) if wrap_var else 0.8
+                max_w = int(w * wrap_frac)
+
+                try:
+                    font = ImageFont.truetype("arialbd.ttf", fs)
+                except:
+                    try:
+                        font = ImageFont.truetype("arial.ttf", fs)
+                    except:
+                        font = ImageFont.load_default()
+
+                paragraphs = overlay.split("\n")
+                lines = []
+                for para in paragraphs:
+                    words = para.split()
+                    if not words:
+                        lines.append("")
+                        continue
+                    cur = ""
+                    for word in words:
+                        test = (cur + " " + word).strip()
+                        bb = d.textbbox((0, 0), test, font=font)
+                        if bb[2] - bb[0] <= max_w:
+                            cur = test
+                        else:
+                            if cur:
+                                lines.append(cur)
+                            cur = word
+                    if cur:
+                        lines.append(cur)
+
+                lh = fs + 8
+                total_h = len(lines) * lh
+                bx = int(w * px)
+                by = int(h * py) - total_h // 2
+
+                for i, line in enumerate(lines):
+                    if not line:
+                        continue
+                    bb = d.textbbox((0, 0), line, font=font)
+                    lw = bb[2] - bb[0]
+                    lx = bx - lw // 2
+                    ly = by + i * lh
+                    for ox2, oy2 in [(-2,-2),(2,-2),(-2,2),(2,2),(0,-3),(0,3),(-3,0),(3,0)]:
+                        d.text((lx+ox2, ly+oy2), line, font=font, fill=(0,0,0,200))
+                    d.text((lx, ly), line, font=font, fill=(255, 255, 255, 255))
+
+                tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+                overlay_img.save(tmp.name)
+                overlay_png = tmp.name
+            except Exception as e:
+                overlay_png = None
+
+        # Build ffmpeg filter chain
+        filters = []
+        if overlay_png:
+            filters.append(f"[0:v][1:v]overlay=0:0")
+        else:
+            txt = overlay.replace("\\", "\\\\").replace("'", "\\'").replace(":", r"\:")
+            filters.append(f"drawtext=text='{txt}':fontcolor=white:fontsize={fs}:"
+                           f"x=(w-text_w)*{px:.4f}:y=(h-text_h)*{py:.4f}:"
+                           f"borderw=3:bordercolor=black:font=Arial")
+
+        # Color grading
+        eq_parts = []
+        if bright_var:
+            b = bright_var.get()
+            if abs(b) > 0.01:
+                eq_parts.append(f"brightness={b/100:.3f}")
+        if cont_var:
+            c = cont_var.get()
+            if abs(c - 1.0) > 0.01:
+                eq_parts.append(f"contrast={c:.3f}")
+        if sat_var:
+            s = sat_var.get()
+            if abs(s - 1.0) > 0.01:
+                eq_parts.append(f"saturation={s:.3f}")
+        if eq_parts:
+            if overlay_png:
+                # chain after overlay
+                filters.append("eq=" + ":".join(eq_parts))
+            else:
+                filters[-1] += ",eq=" + ":".join(eq_parts)
+
+        if abs(speed - 1.0) > 0.001:
+            pts = round(1.0 / speed, 6)
+            if overlay_png:
+                filters.append(f"setpts={pts}*PTS")
+            else:
+                filters[-1] += f",setpts={pts}*PTS"
+
+        if overlay_png:
+            # complex filtergraph
+            vf_chain = ",".join(f for f in filters[1:]) if len(filters) > 1 else ""
+            if vf_chain:
+                fg = f"{filters[0]},{vf_chain}"
+            else:
+                fg = filters[0]
+            if abs(speed - 1.0) > 0.001:
+                af = f"atempo={speed}"
+                cmd = [ffmpeg, "-y", "-i", src, "-i", overlay_png,
+                       "-filter_complex", fg,
+                       "-af", af, "-c:v", "libx264", "-preset", "fast", str(out_path)]
+            else:
+                cmd = [ffmpeg, "-y", "-i", src, "-i", overlay_png,
+                       "-filter_complex", fg,
+                       "-c:a", "copy", "-c:v", "libx264", "-preset", "fast", str(out_path)]
+        else:
+            vf = filters[0]
+            if abs(speed - 1.0) > 0.001:
+                af = f"atempo={speed}"
+                cmd = [ffmpeg, "-y", "-i", src, "-vf", vf, "-af", af,
+                       "-c:v", "libx264", "-preset", "fast", str(out_path)]
+            else:
+                cmd = [ffmpeg, "-y", "-i", src, "-vf", vf,
+                       "-c:a", "copy", "-c:v", "libx264", "-preset", "fast", str(out_path)]
+
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        finally:
+            if overlay_png:
+                try:
+                    Path(overlay_png).unlink(missing_ok=True)
+                except:
+                    pass
+
+        if result.returncode == 0:
+            return "ok"
+        return result.stderr[-400:] if result.stderr else "ffmpeg error"
+
+    def _batch_export(self):
+        """Export all videos in parallel using the current overlay/settings."""
+        if not self._video_paths:
+            self._alog("⚠ Aucune vidéo dans la grille", "warn")
+            return
+        overlay = self._get_overlay_text().strip()
+        if not overlay:
+            self._alog("⚠ Entre un texte overlay", "warn")
+            return
+        ffmpeg = self._find_ffmpeg()
+        if not ffmpeg:
+            self._alog("❌ ffmpeg non trouvé", "error")
+            return
+
+        fs    = int(self.fontsize_var.get())
+        px    = self.pos_x_var.get() / 100
+        py    = self.pos_y_var.get() / 100
+        speed = round(self.speed_var.get(), 3)
+        bright = getattr(self, 'brightness_var', None)
+        cont   = getattr(self, 'contrast_var', None)
+        sat    = getattr(self, 'saturation_var', None)
+        wrap_pct = getattr(self, 'wrap_var', None)
+
+        export_dir = self.cfg.get("export_dir", "").strip()
+        out_dir = (Path(export_dir) if export_dir and Path(export_dir).exists() else BASE_DIR)
+
+        bank = load_bank()
+        existing = {b.get("filename", "") for b in bank}
+        # Assign unique output filenames
+        jobs = []
+        idx = 1
+        for vp in self._video_paths:
+            while f"reels{idx}.mp4" in existing or (out_dir / f"reels{idx}.mp4").exists():
+                idx += 1
+            out_path = out_dir / f"reels{idx}.mp4"
+            existing.add(f"reels{idx}.mp4")
+            jobs.append((Path(vp), out_path))
+            idx += 1
+
+        total = len(jobs)
+        self._alog(f"⏳ Export parallèle de {total} vidéos...", "accent")
+        self.process_status.config(text=f"⏳ Export {total} vidéos...", fg=WARN)
+
+        def run_batch():
+            done = 0
+            errors = 0
+            new_entries = []
+            with concurrent.futures.ThreadPoolExecutor(max_workers=min(4, total)) as ex:
+                future_map = {
+                    ex.submit(self._process_single_video,
+                              src, out, overlay, fs, px, py, speed,
+                              bright, cont, sat, wrap_pct, ffmpeg): (src, out)
+                    for src, out in jobs
+                }
+                for fut in concurrent.futures.as_completed(future_map):
+                    src, out = future_map[fut]
+                    res = fut.result()
+                    if res == "ok":
+                        done += 1
+                        new_entries.append({
+                            "id":       f"{int(time.time())}_{random.randint(1000,9999)}",
+                            "filename": out.name,
+                            "path":     str(out),
+                            "overlay":  overlay,
+                            "caption":  "",
+                            "size_mb":  round(out.stat().st_size / 1_000_000, 1),
+                            "created":  datetime.now().isoformat(),
+                            "posted_to": [],
+                        })
+                        self.root.after(0, lambda n=out.name: self._alog(f"✅ {n}", "ok"))
+                    else:
+                        errors += 1
+                        self.root.after(0, lambda e=res, n=src.name:
+                                        self._alog(f"❌ {n}: {e[:80]}", "error"))
+
+            if new_entries:
+                b2 = load_bank()
+                b2[0:0] = new_entries
+                save_bank(b2)
+
+            msg = f"✅ {done}/{total} exportées"
+            if errors:
+                msg += f"  ({errors} erreurs)"
+            self.root.after(0, lambda: self._alog(msg, "ok" if not errors else "warn"))
+            self.root.after(0, lambda: self.process_status.config(text=msg, fg=OK))
+
+        import threading
+        threading.Thread(target=run_batch, daemon=True).start()
 
     def _refresh_auto_phones(self):
         if not hasattr(self, 'auto_phone_inner'):
@@ -1297,7 +1696,7 @@ class App:
         if not self.output_video_path or not Path(self.output_video_path).exists():
             messagebox.showwarning("Vidéo", "Traite d'abord la vidéo")
             return
-        self._post_window(self.output_video_path, self.caption_text.get("1.0", "end").strip())
+        self._post_window(self.output_video_path, "")
 
     def _post_window(self, video_path, caption=""):
         win = tk.Toplevel(self.root)
@@ -1807,6 +2206,424 @@ class App:
         self._refresh_bank()
 
     # ══════════════════════════════════════════════════════════════════════════
+    # ONGLET OUTILS IA
+    # ══════════════════════════════════════════════════════════════════════════
+    def _build_tools_tab(self):
+        f = tk.Frame(self.tab_container, bg=BG)
+        self.tabs["tools"] = f
+
+        tk.Label(f, text="🔧  Outils IA", font=("Segoe UI", 16, "bold"),
+                 bg=BG, fg=TEXT).pack(anchor="w", padx=60, pady=(28, 4))
+        tk.Label(f, text="Outils alimentés par l'IA pour gérer vos comptes Instagram",
+                 font=("Segoe UI", 10), bg=BG, fg=TEXT2).pack(anchor="w", padx=60, pady=(0, 20))
+
+        canvas_tools = tk.Canvas(f, bg=BG, highlightthickness=0)
+        sb_tools = ttk.Scrollbar(f, orient="vertical", command=canvas_tools.yview)
+        sb_tools.pack(side="right", fill="y")
+        canvas_tools.pack(side="left", fill="both", expand=True)
+        canvas_tools.configure(yscrollcommand=sb_tools.set)
+        inner_t = tk.Frame(canvas_tools, bg=BG)
+        cw_id = canvas_tools.create_window((0, 0), window=inner_t, anchor="nw")
+
+        def _on_inner_configure(e):
+            canvas_tools.configure(scrollregion=canvas_tools.bbox("all"))
+        def _on_canvas_configure(e):
+            canvas_tools.itemconfig(cw_id, width=e.width)
+        inner_t.bind("<Configure>", _on_inner_configure)
+        canvas_tools.bind("<Configure>", _on_canvas_configure)
+
+        def _on_wheel(e):
+            canvas_tools.yview_scroll(-1 * (e.delta // 120), "units")
+        canvas_tools.bind("<MouseWheel>", _on_wheel)
+        inner_t.bind("<MouseWheel>", _on_wheel)
+
+        PAD = 60
+
+        # ── Helper: card frame ─────────────────────────────────────────────────
+        def card(title, subtitle=""):
+            c = tk.Frame(inner_t, bg=CARD, padx=20, pady=16)
+            c.pack(fill="x", padx=PAD, pady=8)
+            hdr = tk.Frame(c, bg=CARD)
+            hdr.pack(fill="x", pady=(0, 6))
+            tk.Label(hdr, text=title, font=("Segoe UI", 12, "bold"),
+                     bg=CARD, fg=TEXT).pack(side="left")
+            if subtitle:
+                tk.Label(hdr, text=subtitle, font=("Segoe UI", 9),
+                         bg=CARD, fg=TEXT2).pack(side="left", padx=(10, 0))
+            return c
+
+        # ── 1. Générateur de hashtags ──────────────────────────────────────────
+        c1 = card("# Générateur de Hashtags", "Crée 30 hashtags ciblés pour ton contenu")
+        tk.Label(c1, text="Décris ton contenu / niche :", font=("Segoe UI", 9),
+                 bg=CARD, fg=TEXT2).pack(anchor="w")
+        ht_topic = tk.Text(c1, height=2, bg=SURFACE2, fg=TEXT, insertbackground=TEXT,
+                           relief="flat", font=("Segoe UI", 10), wrap="word",
+                           highlightthickness=1, highlightbackground=BORDER,
+                           highlightcolor=ACCENT)
+        ht_topic.pack(fill="x", pady=(4, 8))
+        ht_result = tk.Text(c1, height=5, bg=SURFACE, fg=ACCENT, insertbackground=TEXT,
+                            relief="flat", font=("Consolas", 9), wrap="word",
+                            highlightthickness=1, highlightbackground=BORDER,
+                            state="disabled")
+        ht_result.pack(fill="x", pady=(0, 8))
+
+        def gen_hashtags():
+            topic = ht_topic.get("1.0", "end-1c").strip()
+            if not topic:
+                return
+            ht_result.config(state="normal")
+            ht_result.delete("1.0", "end")
+            ht_result.insert("1.0", "⏳ Génération...")
+            ht_result.config(state="disabled")
+            def run():
+                try:
+                    from groq import Groq
+                    key = self.cfg.get("groq_api_key", "")
+                    if not key:
+                        raise ValueError("Groq API key manquante (Paramètres → API Keys)")
+                    client = Groq(api_key=key)
+                    resp = client.chat.completions.create(
+                        model="llama-3.3-70b-versatile",
+                        messages=[{"role": "user", "content":
+                            f"Génère exactement 30 hashtags Instagram populaires et ciblés pour ce contenu : {topic}. "
+                            f"Format: une ligne avec les hashtags séparés par des espaces, commençant par #. "
+                            f"Inclus un mix de hashtags populaires (>1M posts) et de niche (<500K posts)."}],
+                        max_tokens=300
+                    )
+                    tags = resp.choices[0].message.content.strip()
+                    self.root.after(0, lambda: (
+                        ht_result.config(state="normal"),
+                        ht_result.delete("1.0", "end"),
+                        ht_result.insert("1.0", tags),
+                        ht_result.config(state="disabled")
+                    ))
+                except Exception as e:
+                    self.root.after(0, lambda: (
+                        ht_result.config(state="normal"),
+                        ht_result.delete("1.0", "end"),
+                        ht_result.insert("1.0", f"❌ {e}"),
+                        ht_result.config(state="disabled")
+                    ))
+            import threading
+            threading.Thread(target=run, daemon=True).start()
+
+        def copy_hashtags():
+            txt = ht_result.get("1.0", "end-1c")
+            if txt and not txt.startswith("❌"):
+                self.root.clipboard_clear()
+                self.root.clipboard_append(txt)
+
+        bf1 = tk.Frame(c1, bg=CARD)
+        bf1.pack(fill="x")
+        tk.Button(bf1, text="✨ Générer", font=("Segoe UI", 10, "bold"),
+                  bg=ACCENT, fg="#06080f", relief="flat", cursor="hand2",
+                  padx=16, pady=6, command=gen_hashtags).pack(side="left")
+        tk.Button(bf1, text="📋 Copier", font=("Segoe UI", 10),
+                  bg=SURFACE2, fg=TEXT2, relief="flat", cursor="hand2",
+                  padx=12, pady=6, command=copy_hashtags).pack(side="left", padx=(8, 0))
+
+        # ── 2. Générateur de bio ───────────────────────────────────────────────
+        c2 = card("✍️  Générateur de Bio Instagram", "Crée une bio percutante pour ton profil")
+        bio_row = tk.Frame(c2, bg=CARD)
+        bio_row.pack(fill="x", pady=(0, 6))
+        for lbl, width in [("Pseudo IG", 14), ("Niche / activité", 20), ("Style", 12)]:
+            col = tk.Frame(bio_row, bg=CARD)
+            col.pack(side="left", fill="x", expand=True, padx=(0, 8))
+            tk.Label(col, text=lbl, font=("Segoe UI", 9), bg=CARD, fg=TEXT2).pack(anchor="w")
+
+        self._bio_pseudo = tk.StringVar()
+        self._bio_niche  = tk.StringVar()
+        self._bio_style  = tk.StringVar(value="Pro & inspirant")
+        tk.Entry(bio_row.winfo_children()[0], textvariable=self._bio_pseudo,
+                 bg=SURFACE2, fg=TEXT, insertbackground=TEXT, relief="flat",
+                 font=("Segoe UI", 10), highlightthickness=1,
+                 highlightbackground=BORDER, highlightcolor=ACCENT).pack(fill="x", ipady=5)
+        tk.Entry(bio_row.winfo_children()[1], textvariable=self._bio_niche,
+                 bg=SURFACE2, fg=TEXT, insertbackground=TEXT, relief="flat",
+                 font=("Segoe UI", 10), highlightthickness=1,
+                 highlightbackground=BORDER, highlightcolor=ACCENT).pack(fill="x", ipady=5)
+        style_cb = ttk.Combobox(bio_row.winfo_children()[2], textvariable=self._bio_style,
+                                 state="readonly", font=("Segoe UI", 9), width=14)
+        style_cb["values"] = ["Pro & inspirant", "Drôle & décontracté", "Mystérieux",
+                               "Motivateur", "Minimaliste", "Luxueux"]
+        style_cb.pack(fill="x", ipady=3)
+
+        bio_result = tk.Text(c2, height=4, bg=SURFACE, fg=TEXT, insertbackground=TEXT,
+                             relief="flat", font=("Segoe UI", 10), wrap="word",
+                             highlightthickness=1, highlightbackground=BORDER,
+                             state="disabled")
+        bio_result.pack(fill="x", pady=(8, 8))
+
+        def gen_bio():
+            pseudo = self._bio_pseudo.get().strip()
+            niche  = self._bio_niche.get().strip()
+            style  = self._bio_style.get()
+            if not niche:
+                return
+            bio_result.config(state="normal")
+            bio_result.delete("1.0", "end")
+            bio_result.insert("1.0", "⏳ Génération...")
+            bio_result.config(state="disabled")
+            def run():
+                try:
+                    from groq import Groq
+                    key = self.cfg.get("groq_api_key", "")
+                    if not key:
+                        raise ValueError("Groq API key manquante (Paramètres → API Keys)")
+                    client = Groq(api_key=key)
+                    prompt = (f"Crée une bio Instagram percutante (max 150 caractères) pour un compte "
+                              f"dans la niche : {niche}. Style : {style}. "
+                              + (f"Pseudo : @{pseudo}. " if pseudo else "")
+                              + "Inclus des emojis pertinents, un CTA si possible. Réponds uniquement avec la bio.")
+                    resp = client.chat.completions.create(
+                        model="llama-3.3-70b-versatile",
+                        messages=[{"role": "user", "content": prompt}],
+                        max_tokens=200
+                    )
+                    bio_txt = resp.choices[0].message.content.strip()
+                    self.root.after(0, lambda: (
+                        bio_result.config(state="normal"),
+                        bio_result.delete("1.0", "end"),
+                        bio_result.insert("1.0", bio_txt),
+                        bio_result.config(state="disabled")
+                    ))
+                except Exception as e:
+                    self.root.after(0, lambda: (
+                        bio_result.config(state="normal"),
+                        bio_result.delete("1.0", "end"),
+                        bio_result.insert("1.0", f"❌ {e}"),
+                        bio_result.config(state="disabled")
+                    ))
+            import threading
+            threading.Thread(target=run, daemon=True).start()
+
+        def copy_bio():
+            txt = bio_result.get("1.0", "end-1c")
+            if txt and not txt.startswith("❌"):
+                self.root.clipboard_clear()
+                self.root.clipboard_append(txt)
+
+        bf2 = tk.Frame(c2, bg=CARD)
+        bf2.pack(fill="x")
+        tk.Button(bf2, text="✨ Générer la bio", font=("Segoe UI", 10, "bold"),
+                  bg=ACCENT, fg="#06080f", relief="flat", cursor="hand2",
+                  padx=16, pady=6, command=gen_bio).pack(side="left")
+        tk.Button(bf2, text="📋 Copier", font=("Segoe UI", 10),
+                  bg=SURFACE2, fg=TEXT2, relief="flat", cursor="hand2",
+                  padx=12, pady=6, command=copy_bio).pack(side="left", padx=(8, 0))
+
+        # ── 3. Analyse concurrents ─────────────────────────────────────────────
+        c3 = card("🔍  Analyse de Stratégie Concurrente", "Stratégie de contenu basée sur un compte rival")
+        tk.Label(c3, text="Pseudo d'un concurrent (@handle) :",
+                 font=("Segoe UI", 9), bg=CARD, fg=TEXT2).pack(anchor="w")
+        comp_entry = tk.Entry(c3, bg=SURFACE2, fg=TEXT, insertbackground=TEXT, relief="flat",
+                              font=("Segoe UI", 10), highlightthickness=1,
+                              highlightbackground=BORDER, highlightcolor=ACCENT)
+        comp_entry.pack(fill="x", ipady=5, pady=(4, 8))
+        comp_result = tk.Text(c3, height=8, bg=SURFACE, fg=TEXT2, insertbackground=TEXT,
+                              relief="flat", font=("Segoe UI", 9), wrap="word",
+                              highlightthickness=1, highlightbackground=BORDER,
+                              state="disabled")
+        comp_result.pack(fill="x", pady=(0, 8))
+
+        def analyze_competitor():
+            handle = comp_entry.get().strip().lstrip("@")
+            if not handle:
+                return
+            comp_result.config(state="normal")
+            comp_result.delete("1.0", "end")
+            comp_result.insert("1.0", "⏳ Analyse en cours...")
+            comp_result.config(state="disabled")
+            def run():
+                try:
+                    from groq import Groq
+                    key = self.cfg.get("groq_api_key", "")
+                    if not key:
+                        raise ValueError("Groq API key manquante")
+                    client = Groq(api_key=key)
+                    prompt = (f"En tant qu'expert Instagram growth hacking, analyse la stratégie probable "
+                              f"d'un compte Instagram : @{handle}. "
+                              f"Donne des recommandations concrètes sur : "
+                              f"1) Type de contenu à publier, 2) Fréquence de publication optimale, "
+                              f"3) Heures de publication idéales, 4) Stratégie hashtags, "
+                              f"5) Idées de Reels viraux, 6) Engagement tactics. "
+                              f"Format: liste structurée avec bullet points.")
+                    resp = client.chat.completions.create(
+                        model="llama-3.3-70b-versatile",
+                        messages=[{"role": "user", "content": prompt}],
+                        max_tokens=600
+                    )
+                    txt = resp.choices[0].message.content.strip()
+                    self.root.after(0, lambda: (
+                        comp_result.config(state="normal"),
+                        comp_result.delete("1.0", "end"),
+                        comp_result.insert("1.0", txt),
+                        comp_result.config(state="disabled")
+                    ))
+                except Exception as e:
+                    self.root.after(0, lambda: (
+                        comp_result.config(state="normal"),
+                        comp_result.delete("1.0", "end"),
+                        comp_result.insert("1.0", f"❌ {e}"),
+                        comp_result.config(state="disabled")
+                    ))
+            import threading
+            threading.Thread(target=run, daemon=True).start()
+
+        tk.Button(c3, text="🔍 Analyser la stratégie", font=("Segoe UI", 10, "bold"),
+                  bg=ACCENT, fg="#06080f", relief="flat", cursor="hand2",
+                  padx=16, pady=6, command=analyze_competitor).pack(anchor="w")
+
+        # ── 4. Générateur de légendes / captions ──────────────────────────────
+        c4 = card("💬  Légendes & Captions Virales", "Crée des captions engageantes pour tes Reels")
+        cap_row = tk.Frame(c4, bg=CARD)
+        cap_row.pack(fill="x", pady=(0, 8))
+        cap_col1 = tk.Frame(cap_row, bg=CARD)
+        cap_col1.pack(side="left", fill="x", expand=True, padx=(0, 8))
+        cap_col2 = tk.Frame(cap_row, bg=CARD)
+        cap_col2.pack(side="left", fill="x", expand=True)
+        tk.Label(cap_col1, text="Sujet de la vidéo :", font=("Segoe UI", 9),
+                 bg=CARD, fg=TEXT2).pack(anchor="w")
+        self._cap_subject_var = tk.StringVar()
+        tk.Entry(cap_col1, textvariable=self._cap_subject_var,
+                 bg=SURFACE2, fg=TEXT, insertbackground=TEXT, relief="flat",
+                 font=("Segoe UI", 10), highlightthickness=1,
+                 highlightbackground=BORDER, highlightcolor=ACCENT).pack(fill="x", ipady=5)
+        tk.Label(cap_col2, text="Ton :", font=("Segoe UI", 9),
+                 bg=CARD, fg=TEXT2).pack(anchor="w")
+        self._cap_tone_var = tk.StringVar(value="Engageant")
+        tone_cb = ttk.Combobox(cap_col2, textvariable=self._cap_tone_var,
+                                state="readonly", font=("Segoe UI", 9))
+        tone_cb["values"] = ["Engageant", "Humoristique", "Informatif",
+                              "Mystérieux", "Inspirant", "Provocateur"]
+        tone_cb.pack(fill="x", ipady=3)
+
+        cap_result = tk.Text(c4, height=6, bg=SURFACE, fg=TEXT, insertbackground=TEXT,
+                             relief="flat", font=("Segoe UI", 10), wrap="word",
+                             highlightthickness=1, highlightbackground=BORDER,
+                             state="disabled")
+        cap_result.pack(fill="x", pady=(0, 8))
+
+        def gen_caption():
+            subj = self._cap_subject_var.get().strip()
+            tone = self._cap_tone_var.get()
+            if not subj:
+                return
+            cap_result.config(state="normal")
+            cap_result.delete("1.0", "end")
+            cap_result.insert("1.0", "⏳ Génération...")
+            cap_result.config(state="disabled")
+            def run():
+                try:
+                    from groq import Groq
+                    key = self.cfg.get("groq_api_key", "")
+                    if not key:
+                        raise ValueError("Groq API key manquante")
+                    client = Groq(api_key=key)
+                    prompt = (f"Écris une légende Instagram virale pour un Reel sur : {subj}. "
+                              f"Style : {tone}. "
+                              f"Format : 1 accroche forte (1 ligne), corps (2-3 lignes), CTA, "
+                              f"puis 15 hashtags sur une nouvelle ligne. Max 300 mots.")
+                    resp = client.chat.completions.create(
+                        model="llama-3.3-70b-versatile",
+                        messages=[{"role": "user", "content": prompt}],
+                        max_tokens=400
+                    )
+                    txt = resp.choices[0].message.content.strip()
+                    self.root.after(0, lambda: (
+                        cap_result.config(state="normal"),
+                        cap_result.delete("1.0", "end"),
+                        cap_result.insert("1.0", txt),
+                        cap_result.config(state="disabled")
+                    ))
+                except Exception as e:
+                    self.root.after(0, lambda: (
+                        cap_result.config(state="normal"),
+                        cap_result.delete("1.0", "end"),
+                        cap_result.insert("1.0", f"❌ {e}"),
+                        cap_result.config(state="disabled")
+                    ))
+            import threading
+            threading.Thread(target=run, daemon=True).start()
+
+        def copy_caption():
+            txt = cap_result.get("1.0", "end-1c")
+            if txt and not txt.startswith("❌"):
+                self.root.clipboard_clear()
+                self.root.clipboard_append(txt)
+
+        bf4 = tk.Frame(c4, bg=CARD)
+        bf4.pack(fill="x")
+        tk.Button(bf4, text="✨ Générer la légende", font=("Segoe UI", 10, "bold"),
+                  bg=ACCENT, fg="#06080f", relief="flat", cursor="hand2",
+                  padx=16, pady=6, command=gen_caption).pack(side="left")
+        tk.Button(bf4, text="📋 Copier", font=("Segoe UI", 10),
+                  bg=SURFACE2, fg=TEXT2, relief="flat", cursor="hand2",
+                  padx=12, pady=6, command=copy_caption).pack(side="left", padx=(8, 0))
+
+        # ── 5. Planificateur de contenu ────────────────────────────────────────
+        c5 = card("📅  Planificateur de Contenu", "Génère un calendrier éditorial sur 7 jours")
+        tk.Label(c5, text="Ta niche / thématique :", font=("Segoe UI", 9),
+                 bg=CARD, fg=TEXT2).pack(anchor="w")
+        plan_topic = tk.Entry(c5, bg=SURFACE2, fg=TEXT, insertbackground=TEXT, relief="flat",
+                              font=("Segoe UI", 10), highlightthickness=1,
+                              highlightbackground=BORDER, highlightcolor=ACCENT)
+        plan_topic.pack(fill="x", ipady=5, pady=(4, 8))
+        plan_result = tk.Text(c5, height=10, bg=SURFACE, fg=TEXT2, insertbackground=TEXT,
+                              relief="flat", font=("Segoe UI", 9), wrap="word",
+                              highlightthickness=1, highlightbackground=BORDER,
+                              state="disabled")
+        plan_result.pack(fill="x", pady=(0, 8))
+
+        def gen_plan():
+            topic = plan_topic.get().strip()
+            if not topic:
+                return
+            plan_result.config(state="normal")
+            plan_result.delete("1.0", "end")
+            plan_result.insert("1.0", "⏳ Création du planning...")
+            plan_result.config(state="disabled")
+            def run():
+                try:
+                    from groq import Groq
+                    key = self.cfg.get("groq_api_key", "")
+                    if not key:
+                        raise ValueError("Groq API key manquante")
+                    client = Groq(api_key=key)
+                    prompt = (f"Crée un calendrier éditorial Instagram sur 7 jours pour la niche : {topic}. "
+                              f"Pour chaque jour : Heure optimale, Type de contenu (Reel/Story/Post), "
+                              f"Idée de contenu précise, Titre accrocheur, Hashtags clés (5). "
+                              f"Format: tableau ou liste structurée jour par jour.")
+                    resp = client.chat.completions.create(
+                        model="llama-3.3-70b-versatile",
+                        messages=[{"role": "user", "content": prompt}],
+                        max_tokens=800
+                    )
+                    txt = resp.choices[0].message.content.strip()
+                    self.root.after(0, lambda: (
+                        plan_result.config(state="normal"),
+                        plan_result.delete("1.0", "end"),
+                        plan_result.insert("1.0", txt),
+                        plan_result.config(state="disabled")
+                    ))
+                except Exception as e:
+                    self.root.after(0, lambda: (
+                        plan_result.config(state="normal"),
+                        plan_result.delete("1.0", "end"),
+                        plan_result.insert("1.0", f"❌ {e}"),
+                        plan_result.config(state="disabled")
+                    ))
+            import threading
+            threading.Thread(target=run, daemon=True).start()
+
+        tk.Button(c5, text="📅 Générer le planning", font=("Segoe UI", 10, "bold"),
+                  bg=ACCENT, fg="#06080f", relief="flat", cursor="hand2",
+                  padx=16, pady=6, command=gen_plan).pack(anchor="w")
+
+        # Bottom padding
+        tk.Frame(inner_t, bg=BG, height=40).pack()
+
+    # ══════════════════════════════════════════════════════════════════════════
     # ONGLET PARAMÈTRES
     # ══════════════════════════════════════════════════════════════════════════
     def _build_settings_tab(self):
@@ -1880,39 +2697,45 @@ class App:
 
         # --- Apparence panel ---
         app_pan = self._settings_panels["Apparence"]
-        tk.Label(app_pan, text="Fond d'écran", font=("Segoe UI", 13, "bold"),
-                 bg=CARD, fg=TEXT).pack(anchor="w", pady=(0, 12))
-        tk.Label(app_pan, text="Choisir une image (floutée + assombrie en arrière-plan)",
-                 font=("Segoe UI", 9), bg=CARD, fg=TEXT2).pack(anchor="w")
-        self.wallpaper_var = tk.StringVar(value=self.cfg.get("wallpaper_path", ""))
-        wp_row = tk.Frame(app_pan, bg=CARD)
-        wp_row.pack(fill="x", pady=(6, 0))
-        tk.Entry(wp_row, textvariable=self.wallpaper_var, font=("Consolas", 10),
-                 bg=SURFACE2, fg=TEXT2, insertbackground=TEXT, relief="flat", bd=0,
-                 highlightthickness=1, highlightcolor=ACCENT, highlightbackground=BORDER,
-                 state="readonly").pack(side="left", fill="x", expand=True, ipady=6)
-        tk.Button(wp_row, text="📂", font=("Segoe UI", 11), bg=ACCENT, fg="#06080f",
-                  relief="flat", cursor="hand2", padx=10,
-                  command=self._browse_wallpaper).pack(side="right", padx=(6, 0))
-        tk.Button(wp_row, text="✕", font=("Segoe UI", 10), bg=SURFACE2, fg=DANGER,
-                  relief="flat", cursor="hand2", padx=8,
-                  command=self._clear_wallpaper).pack(side="right", padx=(4, 0))
+        tk.Label(app_pan, text="Thème de couleur", font=("Segoe UI", 13, "bold"),
+                 bg=CARD, fg=TEXT).pack(anchor="w", pady=(0, 6))
+        tk.Label(app_pan, text="Choisissez l'accent couleur de l'interface",
+                 font=("Segoe UI", 9), bg=CARD, fg=TEXT2).pack(anchor="w", pady=(0, 14))
 
-        sliders_row = tk.Frame(app_pan, bg=CARD)
-        sliders_row.pack(fill="x", pady=(12, 0))
-        self.wp_blur_var = tk.IntVar(value=int(self.cfg.get("wallpaper_blur", 8)))
-        self.wp_dim_var  = tk.IntVar(value=int(self.cfg.get("wallpaper_dim", 55)))
-        for lbl, var, lo, hi in [("Flou", self.wp_blur_var, 0, 20),
-                                   ("Assombrir %", self.wp_dim_var, 0, 90)]:
-            col = tk.Frame(sliders_row, bg=CARD)
-            col.pack(side="left", fill="x", expand=True, padx=(0, 16))
-            tk.Label(col, text=lbl, font=("Segoe UI", 9), bg=CARD, fg=TEXT2).pack(anchor="w")
-            tk.Scale(col, variable=var, from_=lo, to=hi, orient="horizontal",
-                     bg=CARD, fg=TEXT2, troughcolor=SURFACE2, highlightthickness=0,
-                     sliderrelief="flat", bd=0, font=("Segoe UI", 8)).pack(fill="x")
-        tk.Button(app_pan, text="Appliquer", font=("Segoe UI", 11, "bold"),
-                  bg=ACCENT, fg="#06080f", relief="flat", cursor="hand2", pady=8,
-                  command=self._apply_wallpaper_settings).pack(fill="x", pady=(16, 0))
+        current_theme = self.cfg.get("theme", "Lime")
+        self._theme_var = tk.StringVar(value=current_theme)
+
+        swatches_outer = tk.Frame(app_pan, bg=CARD)
+        swatches_outer.pack(fill="x")
+        cols = 4
+        for idx, (tname, tvals) in enumerate(THEMES.items()):
+            row_f = idx // cols
+            col_f = idx % cols
+            if col_f == 0:
+                row_frame = tk.Frame(swatches_outer, bg=CARD)
+                row_frame.pack(fill="x", pady=4)
+            cell = tk.Frame(row_frame, bg=CARD)
+            cell.pack(side="left", padx=6, expand=True)
+            accent_c = tvals["accent"]
+            is_sel = (tname == current_theme)
+            border_c = TEXT if is_sel else BORDER
+            swatch_frame = tk.Frame(cell, bg=border_c, padx=2, pady=2)
+            swatch_frame.pack()
+            swatch_btn = tk.Button(
+                swatch_frame, bg=accent_c, width=4, height=2,
+                relief="flat", cursor="hand2",
+                command=lambda n=tname: self._apply_theme(n)
+            )
+            swatch_btn.pack()
+            tk.Label(cell, text=tname, font=("Segoe UI", 9),
+                     bg=CARD, fg=TEXT2).pack(pady=(4, 0))
+
+        tk.Label(app_pan, text="Thème actif :", font=("Segoe UI", 10),
+                 bg=CARD, fg=TEXT2).pack(anchor="w", pady=(20, 4))
+        self._theme_active_lbl = tk.Label(app_pan, text=current_theme,
+                                           font=("Segoe UI", 11, "bold"),
+                                           bg=CARD, fg=ACCENT)
+        self._theme_active_lbl.pack(anchor="w")
 
         # Show first panel by default
         show_settings_panel("Connexions")
@@ -1941,6 +2764,14 @@ class App:
         self.cfg["groq_api_key"]  = self.groq_key_var.get().strip()
         save_config(self.cfg)
         self.log("Config sauvegardée ✓", "ok")
+
+    def _apply_theme(self, theme_name):
+        apply_theme_globals(theme_name)
+        self.cfg["theme"] = theme_name
+        save_config(self.cfg)
+        if hasattr(self, '_theme_active_lbl'):
+            self._theme_active_lbl.config(text=theme_name, fg=ACCENT)
+        messagebox.showinfo("Thème", f"Thème « {theme_name} » appliqué.\nRedémarre l'app pour voir tous les changements.")
 
     def _browse_wallpaper(self):
         path = filedialog.askopenfilename(
