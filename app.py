@@ -283,24 +283,31 @@ def scrape_ig(username, proxy=None, sessionid=None):
             if csrf:
                 base_headers["X-CSRFToken"] = csrf
 
-            # ── Strategy A: official API endpoints ────────────────────────────
+            # ── Strategy A: official API endpoints (retry once on 429) ───────
             api_headers = {**base_headers,
                 "Accept":         "application/json",
                 "X-IG-App-ID":    "936619743392459",
                 "X-ASBD-ID":      "198387",
                 "X-IG-WWW-Claim": "0",
             }
+            got_429 = False
             for api_base in (
                 "https://i.instagram.com/api/v1/users/web_profile_info/?username=",
                 "https://www.instagram.com/api/v1/users/web_profile_info/?username=",
             ):
                 try:
-                    r = client.get(api_base + username, headers=api_headers)
+                    for attempt in range(2):
+                        r = client.get(api_base + username, headers=api_headers)
+                        if r.status_code == 429 and attempt == 0:
+                            got_429 = True
+                            time.sleep(3)
+                            continue
+                        break
                     if r.status_code == 200:
                         user = r.json().get("data", {}).get("user")
                         if user:
                             return _parse_ig_graphql(user, username)
-                        errors.append(f"A:{api_base[:30]}→200 mais user=null")
+                        errors.append(f"A:{api_base[:30]}→200 user=null")
                     elif r.status_code == 404:
                         return {"ig_status": "banned", "ig_error": "Compte introuvable"}
                     elif r.status_code == 401:
@@ -309,6 +316,42 @@ def scrape_ig(username, proxy=None, sessionid=None):
                         errors.append(f"A:{api_base[:30]}→HTTP{r.status_code}")
                 except Exception as ex:
                     errors.append(f"A:{api_base[:30]}→{ex}")
+
+            # ── Strategy A2: search endpoint (moins rate-limité) ──────────────
+            # Fonctionne avec sessionid, retourne follower_count directement
+            try:
+                srch_hdrs = {**api_headers,
+                    "User-Agent": ("Instagram 275.0.0.27.98 Android "
+                                   "(33/13; 420dpi; 1080x2274; samsung; SM-G991B; "
+                                   "o1s; exynos2100; en_US; 459673581)"),
+                    "X-IG-App-ID":          "567067343352427",
+                    "X-IG-Capabilities":    "3brTvwE=",
+                    "X-IG-Connection-Type": "WIFI",
+                }
+                rs = client.get(
+                    f"https://i.instagram.com/api/v1/search/users/?q={username}&count=5",
+                    headers=srch_hdrs
+                )
+                if rs.status_code == 200:
+                    results = rs.json().get("users", [])
+                    for u in results:
+                        if u.get("username", "").lower() == username.lower():
+                            return {
+                                "ig_status":   "active",
+                                "ig_username": u.get("username", username),
+                                "full_name":   u.get("full_name", ""),
+                                "followers":   u.get("follower_count", 0),
+                                "following":   u.get("following_count", 0),
+                                "posts_count": u.get("media_count", 0),
+                                "bio":         u.get("biography", ""),
+                                "videos":      [],
+                                "last_checked": datetime.now().isoformat(),
+                            }
+                    errors.append(f"A2:search 200 mais '{username}' pas dans résultats")
+                else:
+                    errors.append(f"A2:search→HTTP{rs.status_code}")
+            except Exception as ex:
+                errors.append(f"A2:search→{ex}")
 
             # ── Strategy B: ?__a=1 JSON shortcut ─────────────────────────────
             try:
@@ -2916,8 +2959,40 @@ class App:
             except Exception as ex:
                 tlog(f"   ❌ {ex}", DANGER)
 
-            # Step 3: API endpoint
-            tlog("── Test 3 : API i.instagram.com ──", ACCENT)
+            # Step 3: search endpoint (Android, moins rate-limité)
+            tlog("── Test 3a : search endpoint Android ──", ACCENT)
+            srch_hdrs = {
+                "User-Agent": ("Instagram 275.0.0.27.98 Android "
+                               "(33/13; 420dpi; 1080x2274; samsung; SM-G991B; "
+                               "o1s; exynos2100; en_US; 459673581)"),
+                "X-IG-App-ID":          "567067343352427",
+                "X-IG-Capabilities":    "3brTvwE=",
+                "X-IG-Connection-Type": "WIFI",
+                "Accept":               "application/json",
+                "Accept-Language":      "fr-FR,fr;q=0.9",
+            }
+            if cookie_hdr:
+                srch_hdrs["Cookie"] = cookie_hdr
+            try:
+                rs = httpx.get(
+                    "https://i.instagram.com/api/v1/search/users/?q=instagram&count=3",
+                    headers=srch_hdrs, **kw
+                )
+                tlog(f"   HTTP {rs.status_code}", OK if rs.status_code == 200 else WARN)
+                if rs.status_code == 200:
+                    users = rs.json().get("users", [])
+                    tlog(f"   ✅ Résultats reçus : {len(users)} user(s)", OK)
+                elif rs.status_code == 401:
+                    tlog("   ❌ 401 — sessionid invalide", DANGER)
+                elif rs.status_code == 429:
+                    tlog("   ❌ 429 — rate limited", DANGER)
+                else:
+                    tlog(f"   Réponse : {rs.text[:150]}", TEXT2)
+            except Exception as ex:
+                tlog(f"   ❌ {ex}", DANGER)
+
+            # Step 3b: web API endpoint
+            tlog("── Test 3b : API web i.instagram.com ──", ACCENT)
             cookie_hdr = f"sessionid={sessionid}" if sessionid else ""
             if csrf:
                 cookie_hdr += f"; csrftoken={csrf}" if cookie_hdr else f"csrftoken={csrf}"
