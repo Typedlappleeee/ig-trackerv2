@@ -274,7 +274,7 @@ def scrape_ig(username, proxy=None, sessionid=None):
             base_headers = {
                 "User-Agent":      _BROWSER_UA,
                 "Accept-Language": "fr-FR,fr;q=0.9",
-                "Accept-Encoding": "gzip, deflate, br",
+                "Accept-Encoding": "gzip, deflate",
                 "Origin":          "https://www.instagram.com",
                 "Referer":         f"https://www.instagram.com/{username}/",
             }
@@ -464,36 +464,66 @@ def scrape_ig(username, proxy=None, sessionid=None):
                         except Exception:
                             pass
 
-                    # C3: <script type="application/json" data-sjs> (Instagram 2024+)
-                    for sjs in re.findall(
-                        r'<script type="application/json"[^>]*data-sjs[^>]*>(.*?)</script>',
-                        html, re.DOTALL
-                    ):
-                        try:
-                            d = json.loads(sjs)
-                            raw = json.dumps(d)
-                            # look for follower_count inside nested structures
-                            fc_m = re.search(r'"follower_count"\s*:\s*(\d+)', raw)
-                            if fc_m:
-                                fwc_m  = re.search(r'"following_count"\s*:\s*(\d+)', raw)
-                                name_m = re.search(r'"full_name"\s*:\s*"((?:[^"\\]|\\.)*)"', raw)
-                                bio_m  = re.search(r'"biography"\s*:\s*"((?:[^"\\]|\\.)*)"', raw)
-                                mc_m   = re.search(r'"media_count"\s*:\s*(\d+)', raw)
-                                return {
-                                    "ig_status":   "active",
-                                    "ig_username": username,
-                                    "full_name":   name_m.group(1) if name_m else "",
-                                    "followers":   int(fc_m.group(1)),
-                                    "following":   int(fwc_m.group(1)) if fwc_m else 0,
-                                    "posts_count": int(mc_m.group(1)) if mc_m else 0,
-                                    "bio":         bio_m.group(1) if bio_m else "",
-                                    "videos":      [],
-                                    "last_checked": datetime.now().isoformat(),
-                                }
-                        except Exception:
-                            pass
+                    # C3: scan ALL <script> blocks for any follower data (2024+)
+                    # Instagram embeds data in various script types; search them all
+                    all_scripts = re.findall(r'<script[^>]*>(.*?)</script>', html, re.DOTALL)
+                    for script_content in all_scripts:
+                        if "follower_count" not in script_content and \
+                                "edge_followed_by" not in script_content:
+                            continue
+                        # try as JSON first
+                        for json_blob in re.findall(r'\{[^{}]{20,}\}', script_content):
+                            try:
+                                d = json.loads(json_blob)
+                                fc = (d.get("follower_count")
+                                      or d.get("edge_followed_by", {}).get("count"))
+                                if fc:
+                                    return {
+                                        "ig_status":   "active",
+                                        "ig_username": username,
+                                        "full_name":   d.get("full_name", ""),
+                                        "followers":   int(fc),
+                                        "following":   int(d.get("following_count")
+                                                          or d.get("edge_follow", {})
+                                                              .get("count", 0)),
+                                        "posts_count": int(d.get("media_count")
+                                                          or d.get("edge_owner_to_timeline_media",
+                                                                   {}).get("count", 0)),
+                                        "bio":         d.get("biography", ""),
+                                        "videos":      [],
+                                        "last_checked": datetime.now().isoformat(),
+                                    }
+                            except Exception:
+                                pass
+                        # fallback: regex directly on the script text
+                        fc_m = (re.search(r'"follower_count"\s*:\s*(\d+)', script_content)
+                                or re.search(r'"edge_followed_by":\{"count":(\d+)\}',
+                                             script_content))
+                        if fc_m:
+                            fwg_m  = (re.search(r'"following_count"\s*:\s*(\d+)', script_content)
+                                      or re.search(r'"edge_follow":\{"count":(\d+)\}',
+                                                   script_content))
+                            name_m = re.search(r'"full_name"\s*:\s*"((?:[^"\\]|\\.)*)"',
+                                               script_content)
+                            post_m = (re.search(r'"media_count"\s*:\s*(\d+)', script_content)
+                                      or re.search(
+                                          r'"edge_owner_to_timeline_media":\{"count":(\d+)',
+                                          script_content))
+                            bio_m  = re.search(r'"biography"\s*:\s*"((?:[^"\\]|\\.)*)"',
+                                               script_content)
+                            return {
+                                "ig_status":   "active",
+                                "ig_username": username,
+                                "full_name":   name_m.group(1) if name_m else "",
+                                "followers":   int(fc_m.group(1)),
+                                "following":   int(fwg_m.group(1)) if fwg_m else 0,
+                                "posts_count": int(post_m.group(1)) if post_m else 0,
+                                "bio":         bio_m.group(1) if bio_m else "",
+                                "videos":      [],
+                                "last_checked": datetime.now().isoformat(),
+                            }
 
-                    # C4: raw HTML regex (old format + 2024 follower_count key)
+                    # C4: last-resort regex on entire raw HTML
                     fol_m = (re.search(r'"edge_followed_by":\{"count":(\d+)\}', html)
                              or re.search(r'"follower_count"\s*:\s*(\d+)', html))
                     if fol_m:
@@ -515,7 +545,9 @@ def scrape_ig(username, proxy=None, sessionid=None):
                             "last_checked": datetime.now().isoformat(),
                         }
 
-                    errors.append("C:200 aucune donnée extraite du HTML")
+                    # Log a snippet of the HTML to help debug future misses
+                    snippet = html[1000:1200].replace("\n", " ") if len(html) > 1000 else html[:200]
+                    errors.append(f"C:200 no-data html_snippet={snippet!r:.120}")
                 elif r3.status_code in (404, 410):
                     return {"ig_status": "banned", "ig_error": "Compte introuvable"}
                 else:
@@ -523,8 +555,13 @@ def scrape_ig(username, proxy=None, sessionid=None):
             except Exception as ex:
                 errors.append(f"C:{ex}")
 
+            n429 = sum(1 for e in errors if "429" in e)
+            if n429 >= 3:
+                tip = " — IP bloquée, attendez 30min ou changez de proxy"
+            else:
+                tip = ""
             err_detail = " | ".join(errors) if errors else "toutes stratégies échouées"
-            return {"ig_status": "error", "ig_error": f"Échec ({err_detail})"}
+            return {"ig_status": "error", "ig_error": f"Échec{tip} ({err_detail})"}
 
     except httpx.TimeoutException:
         return {"ig_status": "error", "ig_error": "Timeout (>25s)"}
