@@ -247,43 +247,43 @@ def scrape_ig(username, proxy=None, sessionid=None):
     if purl:
         kw["proxy"] = purl
 
+    errors = []   # collect per-strategy errors for reporting
+
     try:
         with httpx.Client(**kw) as client:
-            # ── Step 1: acquire session cookies + csrf token ──────────────────
-            # If the caller gave us a real sessionid, inject it directly
+            # ── Step 1: get csrf token (always needed) ────────────────────────
             csrf = ""
+            try:
+                init = client.get("https://www.instagram.com/", headers={
+                    "User-Agent":      _BROWSER_UA,
+                    "Accept":          "text/html,application/xhtml+xml,*/*;q=0.8",
+                    "Accept-Language": "fr-FR,fr;q=0.9",
+                }, timeout=15)
+                csrf = init.cookies.get("csrftoken", "")
+            except Exception as ex:
+                errors.append(f"init:{ex}")
+
+            # Build cookie header — inject sessionid if provided
+            cookie_parts = []
             if sessionid:
-                client.cookies.set("sessionid", sessionid, domain=".instagram.com")
-                # Derive csrftoken from a lightweight HEAD request
-                try:
-                    hd = client.head("https://www.instagram.com/", headers={
-                        "User-Agent": _BROWSER_UA}, timeout=10)
-                    csrf = hd.cookies.get("csrftoken", "")
-                except Exception:
-                    pass
-            else:
-                try:
-                    init = client.get("https://www.instagram.com/", headers={
-                        "User-Agent":      _BROWSER_UA,
-                        "Accept":          "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                        "Accept-Language": "fr-FR,fr;q=0.9,en-US;q=0.8",
-                        "Accept-Encoding": "gzip, deflate, br",
-                    }, timeout=15)
-                    csrf = init.cookies.get("csrftoken", "")
-                except Exception:
-                    pass
+                cookie_parts.append(f"sessionid={sessionid}")
+            if csrf:
+                cookie_parts.append(f"csrftoken={csrf}")
+            cookie_hdr = "; ".join(cookie_parts)
 
             base_headers = {
                 "User-Agent":      _BROWSER_UA,
-                "Accept-Language": "fr-FR,fr;q=0.9,en-US;q=0.8",
+                "Accept-Language": "fr-FR,fr;q=0.9",
                 "Accept-Encoding": "gzip, deflate, br",
                 "Origin":          "https://www.instagram.com",
                 "Referer":         f"https://www.instagram.com/{username}/",
             }
+            if cookie_hdr:
+                base_headers["Cookie"] = cookie_hdr
             if csrf:
                 base_headers["X-CSRFToken"] = csrf
 
-            # ── Strategy A: both Instagram API variants ───────────────────────
+            # ── Strategy A: official API endpoints ────────────────────────────
             api_headers = {**base_headers,
                 "Accept":         "application/json",
                 "X-IG-App-ID":    "936619743392459",
@@ -300,12 +300,15 @@ def scrape_ig(username, proxy=None, sessionid=None):
                         user = r.json().get("data", {}).get("user")
                         if user:
                             return _parse_ig_graphql(user, username)
-                    if r.status_code == 404:
+                        errors.append(f"A:{api_base[:30]}→200 mais user=null")
+                    elif r.status_code == 404:
                         return {"ig_status": "banned", "ig_error": "Compte introuvable"}
-                    if r.status_code == 401:
+                    elif r.status_code == 401:
                         return {"ig_status": "private", "ig_error": "Compte privé"}
-                except Exception:
-                    pass
+                    else:
+                        errors.append(f"A:{api_base[:30]}→HTTP{r.status_code}")
+                except Exception as ex:
+                    errors.append(f"A:{api_base[:30]}→{ex}")
 
             # ── Strategy B: ?__a=1 JSON shortcut ─────────────────────────────
             try:
@@ -315,25 +318,31 @@ def scrape_ig(username, proxy=None, sessionid=None):
                              "X-Requested-With": "XMLHttpRequest"}
                 )
                 if r2.status_code == 200:
-                    data = r2.json()
-                    user = (data.get("graphql", {}).get("user")
-                            or data.get("data", {}).get("user"))
-                    if user:
-                        return _parse_ig_graphql(user, username)
-            except Exception:
-                pass
+                    try:
+                        data = r2.json()
+                        user = (data.get("graphql", {}).get("user")
+                                or data.get("data", {}).get("user"))
+                        if user:
+                            return _parse_ig_graphql(user, username)
+                        errors.append("B:200 mais pas de user dans JSON")
+                    except Exception:
+                        errors.append("B:200 mais réponse non-JSON")
+                else:
+                    errors.append(f"B:HTTP{r2.status_code}")
+            except Exception as ex:
+                errors.append(f"B:{ex}")
 
-            # ── Strategy C: scrape HTML page + regex ──────────────────────────
+            # ── Strategy C: scrape HTML page ──────────────────────────────────
             try:
                 r3 = client.get(
                     f"https://www.instagram.com/{username}/",
                     headers={**base_headers,
-                             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"}
+                             "Accept": "text/html,application/xhtml+xml,*/*;q=0.8"}
                 )
                 if r3.status_code == 200:
                     html = r3.text
 
-                    # Sub-strategy C1: window.__additionalDataLoaded chunks
+                    # C1: window.__additionalDataLoaded
                     for chunk in re.findall(
                         r'window\.__additionalDataLoaded\s*\([^,]+,\s*(\{.+?\})\s*\)',
                         html, re.DOTALL
@@ -347,43 +356,40 @@ def scrape_ig(username, proxy=None, sessionid=None):
                         except Exception:
                             pass
 
-                    # Sub-strategy C2: LD+JSON schema block (SEO data)
+                    # C2: LD+JSON schema block
                     for ld in re.findall(
                         r'<script type="application/ld\+json">(.*?)</script>',
                         html, re.DOTALL
                     ):
                         try:
                             d = json.loads(ld)
-                            items = d if isinstance(d, list) else [d]
-                            for item in items:
-                                stats = item.get("mainEntity", item).get(
-                                    "interactionStatistic", [])
-                                followers = 0
-                                for s in stats:
+                            for item in (d if isinstance(d, list) else [d]):
+                                for s in item.get("mainEntity", item).get(
+                                        "interactionStatistic", []):
                                     if "Follow" in s.get("interactionType", ""):
                                         followers = int(s.get("userInteractionCount", 0))
-                                if followers:
-                                    return {
-                                        "ig_status":   "active",
-                                        "ig_username": username,
-                                        "full_name":   item.get("name", ""),
-                                        "followers":   followers,
-                                        "following":   0,
-                                        "posts_count": 0,
-                                        "bio":         item.get("description", ""),
-                                        "videos":      [],
-                                        "last_checked": datetime.now().isoformat(),
-                                    }
+                                        if followers:
+                                            return {
+                                                "ig_status":   "active",
+                                                "ig_username": username,
+                                                "full_name":   item.get("name", ""),
+                                                "followers":   followers,
+                                                "following":   0,
+                                                "posts_count": 0,
+                                                "bio":         item.get("description", ""),
+                                                "videos":      [],
+                                                "last_checked": datetime.now().isoformat(),
+                                            }
                         except Exception:
                             pass
 
-                    # Sub-strategy C3: regex on raw HTML
+                    # C3: raw HTML regex
                     fol_m  = re.search(r'"edge_followed_by":\{"count":(\d+)\}', html)
-                    fwg_m  = re.search(r'"edge_follow":\{"count":(\d+)\}', html)
-                    name_m = re.search(r'"full_name":"((?:[^"\\]|\\.)*)"', html)
-                    post_m = re.search(r'"edge_owner_to_timeline_media":\{"count":(\d+)', html)
-                    bio_m  = re.search(r'"biography":"((?:[^"\\]|\\.)*)"', html)
                     if fol_m:
+                        fwg_m  = re.search(r'"edge_follow":\{"count":(\d+)\}', html)
+                        name_m = re.search(r'"full_name":"((?:[^"\\]|\\.)*)"', html)
+                        post_m = re.search(r'"edge_owner_to_timeline_media":\{"count":(\d+)', html)
+                        bio_m  = re.search(r'"biography":"((?:[^"\\]|\\.)*)"', html)
                         return {
                             "ig_status":   "active",
                             "ig_username": username,
@@ -400,14 +406,15 @@ def scrape_ig(username, proxy=None, sessionid=None):
                         return {"ig_status": "banned", "ig_error": "Compte introuvable"}
                     if "Log in" in html or "login" in str(r3.url):
                         return {"ig_status": "private",
-                                "ig_error": "Connexion requise (compte privé)"}
+                                "ig_error": "Connexion requise — sessionid invalide ?"}
+                    errors.append(f"C:200 mais aucune donnée trouvée dans le HTML")
+                else:
+                    errors.append(f"C:HTTP{r3.status_code}")
+            except Exception as ex:
+                errors.append(f"C:{ex}")
 
-            except Exception:
-                pass
-
-            # All strategies failed
-            return {"ig_status": "error",
-                    "ig_error": "Impossible de charger le profil — essaie avec un proxy"}
+            err_detail = " | ".join(errors[:4]) if errors else "toutes stratégies échouées"
+            return {"ig_status": "error", "ig_error": f"Échec ({err_detail})"}
 
     except httpx.TimeoutException:
         return {"ig_status": "error", "ig_error": "Timeout (>25s)"}
@@ -3021,7 +3028,9 @@ class App:
             return
         proxy     = self.cfg.get("proxy", "").strip() or None
         sessionid = self.cfg.get("ig_sessionid", "").strip() or None
-        self.log(f"Scraping @{username}...", "info")
+        proxy_str = f" via proxy" if proxy else " (sans proxy)"
+        sess_str  = " + sessionid" if sessionid else " (sans sessionid)"
+        self.log(f"Scraping @{username}{proxy_str}{sess_str}...", "info")
         res = scrape_ig(username, proxy, sessionid)
         self.data[pid].update(res)
         self.data[pid]["last_checked"] = datetime.now().isoformat()
@@ -3031,8 +3040,8 @@ class App:
             self.log(f"✅ @{username} — {fmt(res.get('followers',0))} followers", "ok")
         elif st == "banned":
             self.log(f"❌ @{username} — banni !", "error")
-        elif "429" in res.get("ig_error", ""):
-            self.log(f"⚠ @{username} — 429 : configure le proxy dans Paramètres", "warn")
+        elif st == "private":
+            self.log(f"🔒 @{username} — privé ou sessionid invalide", "warn")
         else:
             self.log(f"⚠ @{username} — {res.get('ig_error','')}", "warn")
         self.root.after(0, self._refresh_table)
