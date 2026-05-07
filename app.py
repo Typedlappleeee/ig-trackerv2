@@ -304,6 +304,10 @@ class App:
         self._preview_img_offset = (0, 0)
         self._preview_img_size = (400, 500)
 
+        self._video_paths = []
+        self._active_video_idx = 0
+        self._thumb_jobs = {}
+
         self.root = tk.Tk()
         self.root.title("IG Tracker")
         self.root.geometry("1400x840")
@@ -346,10 +350,31 @@ class App:
 
     # ── LAYOUT ───────────────────────────────────────────────────────────────
     def _build_layout(self):
-        self.sidebar = tk.Frame(self.root, bg=SURFACE, width=176)
-        self.sidebar.pack(side="left", fill="y")
-        self.sidebar.pack_propagate(False)
+        self.bg_canvas = tk.Canvas(self.root, bg=BG, highlightthickness=0)
+        self.bg_canvas.pack(fill="both", expand=True)
 
+        PAD = 8
+        self.sidebar = tk.Frame(self.bg_canvas, bg=SURFACE, width=180)
+        self.sidebar.pack_propagate(False)
+        self._sidebar_win = self.bg_canvas.create_window(
+            PAD, PAD, anchor="nw", window=self.sidebar, width=180)
+
+        self.main_frame = tk.Frame(self.bg_canvas, bg=BG)
+        self._main_win = self.bg_canvas.create_window(
+            PAD + 180 + PAD, PAD, anchor="nw", window=self.main_frame)
+
+        def _on_canvas_resize(e):
+            w, h = e.width, e.height
+            sidebar_h = max(0, h - PAD * 2)
+            main_w    = max(0, w - 180 - PAD * 3)
+            main_h    = sidebar_h
+            self.bg_canvas.itemconfig(self._sidebar_win, height=sidebar_h)
+            self.bg_canvas.itemconfig(self._main_win,    width=main_w, height=main_h)
+            self._redraw_wallpaper(w, h)
+
+        self.bg_canvas.bind("<Configure>", _on_canvas_resize)
+
+        # Sidebar content
         tk.Label(self.sidebar, text="IG Tracker", font=("Segoe UI", 14, "bold"),
                  bg=SURFACE, fg=ACCENT).pack(pady=(20, 2), padx=16, anchor="w")
         tk.Label(self.sidebar, text=self.email, font=("Segoe UI", 8),
@@ -362,11 +387,7 @@ class App:
                         ("automation", "🎬  Automatisation"),
                         ("bank",       "🗂  Banque vidéos"),
                         ("settings",   "⚙  Paramètres")]:
-            b = tk.Button(self.sidebar, text=lbl, font=("Segoe UI", 10),
-                          bg=SURFACE, fg=TEXT2, relief="flat", anchor="w",
-                          padx=16, pady=10, cursor="hand2",
-                          activebackground=HL,
-                          command=lambda x=k: self._show_tab(x))
+            b = self._make_sidebar_btn(self.sidebar, lbl, k)
             b.pack(fill="x", pady=1)
             self.tab_btns[k] = b
 
@@ -380,10 +401,8 @@ class App:
             font=("Consolas", 8), bg=SURFACE, fg=MUTED)
         self.status_lbl.pack(padx=12, pady=(0, 12))
 
-        main = tk.Frame(self.root, bg=BG)
-        main.pack(side="left", fill="both", expand=True)
-
-        sf = tk.Frame(main, bg=BG)
+        # Main frame content
+        sf = tk.Frame(self.main_frame, bg=BG)
         sf.pack(fill="x", padx=14, pady=(14, 8))
         self.sv = {}
         for k, lbl, col in [("phones", "TÉLÉPHONES", ACCENT),
@@ -398,7 +417,7 @@ class App:
             v.pack(anchor="w")
             self.sv[k] = v
 
-        self.tab_container = tk.Frame(main, bg=BG)
+        self.tab_container = tk.Frame(self.main_frame, bg=BG)
         self.tab_container.pack(fill="both", expand=True, padx=14, pady=(0, 14))
 
         self.tabs = {}
@@ -408,7 +427,55 @@ class App:
         self._build_bank_tab()
         self._build_settings_tab()
 
+    def _make_sidebar_btn(self, parent, text, key):
+        base_bg  = SURFACE
+        hover_bg = HL
+        base_fg  = TEXT2
+        hover_fg = TEXT
+
+        btn = tk.Button(parent, text=text, font=("Segoe UI", 10),
+                        bg=base_bg, fg=base_fg, relief="flat", anchor="w",
+                        padx=16, pady=10, cursor="hand2",
+                        activebackground=HL,
+                        command=lambda x=key: self._show_tab(x))
+
+        def _lerp_color(c1, c2, t):
+            r1, g1, b1 = parent.winfo_rgb(c1)
+            r2, g2, b2 = parent.winfo_rgb(c2)
+            r = int(r1 + (r2 - r1) * t) >> 8
+            g = int(g1 + (g2 - g1) * t) >> 8
+            b = int(b1 + (b2 - b1) * t) >> 8
+            return f"#{r:02x}{g:02x}{b:02x}"
+
+        _anim = [0]
+
+        def _animate_in():
+            _anim[0] = min(_anim[0] + 1, 5)
+            t = _anim[0] / 5
+            if btn.winfo_exists():
+                btn.config(bg=_lerp_color(base_bg, hover_bg, t),
+                           fg=_lerp_color(base_fg, hover_fg, t))
+            if _anim[0] < 5:
+                btn.after(20, _animate_in)
+
+        def _animate_out():
+            key_active = getattr(self, '_active_tab', '')
+            if self.tab_btns.get(key) is btn and key == key_active:
+                return
+            _anim[0] = max(_anim[0] - 1, 0)
+            t = _anim[0] / 5
+            if btn.winfo_exists():
+                btn.config(bg=_lerp_color(base_bg, hover_bg, t),
+                           fg=_lerp_color(base_fg, hover_fg, t))
+            if _anim[0] > 0:
+                btn.after(20, _animate_out)
+
+        btn.bind("<Enter>", lambda e: (_anim.__setitem__(0, _anim[0]), _animate_in()))
+        btn.bind("<Leave>", lambda e: _animate_out())
+        return btn
+
     def _show_tab(self, key):
+        self._active_tab = key
         for k, b in self.tab_btns.items():
             active = k == key
             b.config(bg=HL if active else SURFACE,
@@ -418,6 +485,7 @@ class App:
             if k == key:
                 frame.place(x=0, y=0, relwidth=1, relheight=1)
                 frame.lift()
+                frame.attributes = getattr(frame, 'attributes', {})
             else:
                 frame.place_forget()
         if key == "stats":
@@ -622,21 +690,37 @@ class App:
         tk.Label(left, text="🎬 Nouveau montage", font=("Segoe UI", 12, "bold"),
                  bg=BG, fg=TEXT).pack(anchor="w", pady=(0, 10))
 
-        # Vidéo source
+        # Multi-video grid
         vcard = tk.Frame(left, bg=CARD, padx=14, pady=12)
         vcard.pack(fill="x", pady=(0, 8))
-        tk.Label(vcard, text="VIDÉO SOURCE", font=("Consolas", 8, "bold"),
-                 bg=CARD, fg=MUTED).pack(anchor="w", pady=(0, 8))
-        vrow = tk.Frame(vcard, bg=CARD)
-        vrow.pack(fill="x")
-        self.path_lbl = tk.Label(vrow, text="🎬  Glisse une vidéo ici ou clique 📂",
-                                  font=("Segoe UI", 9), bg=SURFACE2, fg=TEXT2,
-                                  anchor="w", padx=8, pady=6, wraplength=260)
-        self.path_lbl.pack(side="left", fill="x", expand=True)
-        tk.Button(vrow, text="📂", font=("Segoe UI", 11), bg=ACCENT, fg="#06080f",
-                  relief="flat", cursor="hand2", padx=10,
-                  command=self._browse_video).pack(side="right", padx=(6, 0))
+        vtop = tk.Frame(vcard, bg=CARD)
+        vtop.pack(fill="x", pady=(0, 8))
+        tk.Label(vtop, text="VIDÉOS SOURCE", font=("Consolas", 8, "bold"),
+                 bg=CARD, fg=MUTED).pack(side="left")
+        tk.Button(vtop, text="+ Ajouter vidéos", font=("Segoe UI", 9, "bold"),
+                  bg=ACCENT, fg="#06080f", relief="flat", cursor="hand2", padx=8, pady=3,
+                  command=self._add_videos).pack(side="right")
+        tk.Button(vtop, text="Vider", font=("Segoe UI", 9),
+                  bg=SURFACE2, fg=DANGER, relief="flat", cursor="hand2", padx=6, pady=3,
+                  command=self._clear_videos).pack(side="right", padx=(0, 4))
+
+        # Scrollable thumbnail grid
+        self.vgrid_canvas = tk.Canvas(vcard, bg=SURFACE, highlightthickness=0, height=120)
+        self.vgrid_canvas.pack(fill="x")
+        vgrid_scroll = ttk.Scrollbar(vcard, orient="horizontal",
+                                      command=self.vgrid_canvas.xview)
+        vgrid_scroll.pack(fill="x")
+        self.vgrid_canvas.configure(xscrollcommand=vgrid_scroll.set)
+        self.vgrid_inner = tk.Frame(self.vgrid_canvas, bg=SURFACE)
+        self.vgrid_canvas.create_window((0, 0), window=self.vgrid_inner, anchor="nw")
+        self.vgrid_inner.bind("<Configure>",
+            lambda e: self.vgrid_canvas.configure(
+                scrollregion=self.vgrid_canvas.bbox("all")))
         self.video_path_var = tk.StringVar()
+        self.path_lbl = tk.Label(vcard, text="Aucune vidéo sélectionnée",
+                                  font=("Segoe UI", 9), bg=CARD, fg=MUTED,
+                                  anchor="w", pady=4)
+        self.path_lbl.pack(fill="x", pady=(4, 0))
 
         # Texte overlay
         ocard = tk.Frame(left, bg=CARD, padx=14, pady=12)
@@ -816,6 +900,10 @@ class App:
         ry = (e.y - oy) / ih if ih else e.y / ch
         px = max(0.0, min(100.0, round(rx * 100, 1)))
         py = max(0.0, min(100.0, round(ry * 100, 1)))
+        # Magnetic snap to center
+        SNAP = 3.0
+        if abs(px - 50.0) < SNAP: px = 50.0
+        if abs(py - 50.0) < SNAP: py = 50.0
         self.pos_x_var.set(px)
         self.pos_y_var.set(py)
         self._redraw_overlay_fast(glowing=True)
@@ -894,12 +982,100 @@ class App:
         self.auto_log.see("end")
         self.auto_log.config(state="disabled")
 
-    def _browse_video(self):
-        path = filedialog.askopenfilename(
-            title="Sélectionne une vidéo",
+    def _add_videos(self):
+        paths = filedialog.askopenfilenames(
+            title="Sélectionne des vidéos",
             filetypes=[("Vidéos", "*.mp4 *.mov *.avi *.mkv *.webm"), ("Tous", "*.*")])
-        if path:
-            self._set_video(path)
+        if not paths:
+            return
+        for p in paths:
+            if p not in self._video_paths:
+                self._video_paths.append(p)
+        self._rebuild_video_grid()
+        if self._video_paths:
+            self._select_video(0)
+
+    def _clear_videos(self):
+        self._video_paths.clear()
+        self._active_video_idx = 0
+        self.video_path_var.set("")
+        self.path_lbl.config(text="Aucune vidéo sélectionnée", fg=MUTED)
+        for w in self.vgrid_inner.winfo_children():
+            w.destroy()
+        self._cached_pil_frame = None
+
+    def _select_video(self, idx):
+        if idx < 0 or idx >= len(self._video_paths):
+            return
+        self._active_video_idx = idx
+        path = self._video_paths[idx]
+        self.video_path_var.set(path)
+        self.path_lbl.config(text=Path(path).name, fg=TEXT)
+        self.output_video_path = None
+        self.process_status.config(text="")
+        self._cached_pil_frame = None
+        self._schedule_preview()
+        self._highlight_grid_selection()
+
+    def _highlight_grid_selection(self):
+        for i, child in enumerate(self.vgrid_inner.winfo_children()):
+            is_sel = (i == self._active_video_idx)
+            child.config(bg=HL if is_sel else SURFACE)
+            for sub in child.winfo_children():
+                if isinstance(sub, tk.Canvas):
+                    sub.config(highlightthickness=2 if is_sel else 0,
+                               highlightbackground=ACCENT if is_sel else SURFACE)
+                elif isinstance(sub, tk.Label):
+                    sub.config(bg=HL if is_sel else SURFACE,
+                               fg=ACCENT if is_sel else TEXT2)
+
+    def _rebuild_video_grid(self):
+        for w in self.vgrid_inner.winfo_children():
+            w.destroy()
+        for idx, path in enumerate(self._video_paths):
+            self._add_video_thumb(idx, path)
+
+    def _add_video_thumb(self, idx, path):
+        cell = tk.Frame(self.vgrid_inner, bg=SURFACE, cursor="hand2",
+                        padx=3, pady=3)
+        cell.grid(row=0, column=idx, padx=(0, 4))
+        c = tk.Canvas(cell, width=90, height=90, bg=SURFACE2,
+                      highlightthickness=0, cursor="hand2")
+        c.pack()
+        c.create_text(45, 45, text="⏳", fill=MUTED, font=("Segoe UI", 18))
+        nm = Path(path).stem[:12]
+        lbl = tk.Label(cell, text=nm, font=("Segoe UI", 8), bg=SURFACE,
+                       fg=TEXT2, wraplength=90, justify="center")
+        lbl.pack()
+        cell.bind("<Button-1>", lambda e, i=idx: self._select_video(i))
+        c.bind("<Button-1>",    lambda e, i=idx: self._select_video(i))
+        lbl.bind("<Button-1>",  lambda e, i=idx: self._select_video(i))
+
+        def load_thumb(p=path, canvas=c, cell_ref=cell):
+            ffmpeg = self._find_ffmpeg()
+            if not ffmpeg or not PIL_OK:
+                return
+            tmp = BASE_DIR / f"_th_{abs(hash(p))}.jpg"
+            try:
+                subprocess.run([ffmpeg, "-y", "-ss", "00:00:01", "-i", p,
+                               "-frames:v", "1", "-q:v", "5",
+                               "-vf", "scale=90:90:force_original_aspect_ratio=increase,crop=90:90",
+                               str(tmp)], capture_output=True, timeout=8)
+                if tmp.exists():
+                    img = Image.open(tmp).resize((90, 90), Image.LANCZOS)
+                    photo = ImageTk.PhotoImage(img)
+                    self._thumb_jobs[p] = photo
+                    def update_canvas(c=canvas, ph=photo):
+                        if c.winfo_exists():
+                            c.delete("all")
+                            c.create_image(45, 45, anchor="center", image=ph)
+                    self.root.after(0, update_canvas)
+            except:
+                pass
+        threading.Thread(target=load_thumb, daemon=True).start()
+
+    def _browse_video(self):
+        self._add_videos()
 
     def _set_video(self, path):
         path = path.strip().strip("{}")
