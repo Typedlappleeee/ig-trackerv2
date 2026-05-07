@@ -197,62 +197,213 @@ def fetch_phones(bearer):
         return []
 
 # ── Instagram ─────────────────────────────────────────────────────────────────
-IG_HDR = {
-    "User-Agent":      "Instagram 269.0.0.18.75 Android",
-    "Accept-Language": "fr-FR,fr;q=0.9",
-    "X-IG-App-ID":     "936619743392459",
-}
+_BROWSER_UA = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/124.0.0.0 Safari/537.36"
+)
+
+def _build_transport(proxy):
+    if not proxy:
+        return None
+    p = normalize_proxy(proxy)
+    if p and re.match(r'^(socks5|socks4|https?)://', p) and "user:pass" not in p:
+        try:
+            return httpx.HTTPTransport(proxy=p)
+        except Exception:
+            return None
+    return None
+
+def _parse_ig_graphql(user, username):
+    """Extract standard result dict from a graphql user node."""
+    posts = user.get("edge_owner_to_timeline_media", {})
+    videos = []
+    for e in posts.get("edges", []):
+        n = e.get("node", {})
+        if n.get("is_video"):
+            caps = n.get("edge_media_to_caption", {}).get("edges", [])
+            videos.append({
+                "id":       n.get("shortcode"),
+                "url":      f"https://www.instagram.com/reel/{n.get('shortcode')}/",
+                "views":    n.get("video_view_count", 0),
+                "likes":    n.get("edge_liked_by", {}).get("count", 0),
+                "comments": n.get("edge_media_to_comment", {}).get("count", 0),
+                "caption":  (caps[0]["node"]["text"][:120] if caps else ""),
+            })
+    return {
+        "ig_status":   "active",
+        "ig_username": user.get("username", username),
+        "full_name":   user.get("full_name", ""),
+        "followers":   user.get("edge_followed_by", {}).get("count", 0),
+        "following":   user.get("edge_follow", {}).get("count", 0),
+        "posts_count": posts.get("count", 0),
+        "bio":         user.get("biography", ""),
+        "videos":      videos[:20],
+        "last_checked": datetime.now().isoformat(),
+    }
 
 def scrape_ig(username, proxy=None):
-    url = f"https://i.instagram.com/api/v1/users/web_profile_info/?username={username}"
+    """Multi-strategy Instagram scraper: session cookies → API → ?__a=1 → HTML regex."""
+    transport = _build_transport(proxy)
+    kw = {"timeout": 25, "follow_redirects": True}
+    if transport:
+        kw["transport"] = transport
+
     try:
-        kw = {"headers": IG_HDR, "timeout": 20, "follow_redirects": True}
-        if proxy:
-            p = normalize_proxy(proxy)
-            if p and "user:pass" not in p and re.match(r'^(socks5|socks4|https?)://', p):
-                kw["transport"] = httpx.HTTPTransport(proxy=p)
-        with httpx.Client(**kw) as c:
-            r = c.get(url)
-        if r.status_code == 404:
-            return {"ig_status": "banned", "ig_error": "Compte introuvable"}
-        if r.status_code == 401:
-            return {"ig_status": "private", "ig_error": "Compte privé"}
-        if r.status_code == 429:
-            return {"ig_status": "error", "ig_error": "429 — Proxy bloqué ou absent"}
-        if r.status_code != 200:
-            return {"ig_status": "error", "ig_error": f"HTTP {r.status_code}"}
-        user = r.json().get("data", {}).get("user")
-        if not user:
-            return {"ig_status": "banned", "ig_error": "Compte introuvable"}
-        posts = user.get("edge_owner_to_timeline_media", {})
-        videos = []
-        for e in posts.get("edges", []):
-            n = e.get("node", {})
-            if n.get("is_video"):
-                caps = n.get("edge_media_to_caption", {}).get("edges", [])
-                videos.append({
-                    "id":       n.get("shortcode"),
-                    "url":      f"https://www.instagram.com/reel/{n.get('shortcode')}/",
-                    "views":    n.get("video_view_count", 0),
-                    "likes":    n.get("edge_liked_by", {}).get("count", 0),
-                    "comments": n.get("edge_media_to_comment", {}).get("count", 0),
-                    "caption":  caps[0]["node"]["text"][:120] if caps else "",
-                })
-        return {
-            "ig_status":    "active",
-            "ig_username":  user.get("username"),
-            "full_name":    user.get("full_name", ""),
-            "followers":    user.get("edge_followed_by", {}).get("count", 0),
-            "following":    user.get("edge_follow", {}).get("count", 0),
-            "posts_count":  posts.get("count", 0),
-            "bio":          user.get("biography", ""),
-            "videos":       videos[:20],
-            "last_checked": datetime.now().isoformat(),
-        }
+        with httpx.Client(**kw) as client:
+            # ── Step 1: acquire session cookies + csrf token ──────────────────
+            csrf = ""
+            try:
+                init = client.get("https://www.instagram.com/", headers={
+                    "User-Agent":      _BROWSER_UA,
+                    "Accept":          "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                    "Accept-Language": "fr-FR,fr;q=0.9,en-US;q=0.8",
+                    "Accept-Encoding": "gzip, deflate, br",
+                }, timeout=15)
+                csrf = init.cookies.get("csrftoken", "")
+            except Exception:
+                pass
+
+            base_headers = {
+                "User-Agent":      _BROWSER_UA,
+                "Accept-Language": "fr-FR,fr;q=0.9,en-US;q=0.8",
+                "Accept-Encoding": "gzip, deflate, br",
+                "Origin":          "https://www.instagram.com",
+                "Referer":         f"https://www.instagram.com/{username}/",
+            }
+            if csrf:
+                base_headers["X-CSRFToken"] = csrf
+
+            # ── Strategy A: both Instagram API variants ───────────────────────
+            api_headers = {**base_headers,
+                "Accept":         "application/json",
+                "X-IG-App-ID":    "936619743392459",
+                "X-ASBD-ID":      "198387",
+                "X-IG-WWW-Claim": "0",
+            }
+            for api_base in (
+                "https://i.instagram.com/api/v1/users/web_profile_info/?username=",
+                "https://www.instagram.com/api/v1/users/web_profile_info/?username=",
+            ):
+                try:
+                    r = client.get(api_base + username, headers=api_headers)
+                    if r.status_code == 200:
+                        user = r.json().get("data", {}).get("user")
+                        if user:
+                            return _parse_ig_graphql(user, username)
+                    if r.status_code == 404:
+                        return {"ig_status": "banned", "ig_error": "Compte introuvable"}
+                    if r.status_code == 401:
+                        return {"ig_status": "private", "ig_error": "Compte privé"}
+                except Exception:
+                    pass
+
+            # ── Strategy B: ?__a=1 JSON shortcut ─────────────────────────────
+            try:
+                r2 = client.get(
+                    f"https://www.instagram.com/{username}/?__a=1&__d=dis",
+                    headers={**base_headers, "Accept": "application/json",
+                             "X-Requested-With": "XMLHttpRequest"}
+                )
+                if r2.status_code == 200:
+                    data = r2.json()
+                    user = (data.get("graphql", {}).get("user")
+                            or data.get("data", {}).get("user"))
+                    if user:
+                        return _parse_ig_graphql(user, username)
+            except Exception:
+                pass
+
+            # ── Strategy C: scrape HTML page + regex ──────────────────────────
+            try:
+                r3 = client.get(
+                    f"https://www.instagram.com/{username}/",
+                    headers={**base_headers,
+                             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"}
+                )
+                if r3.status_code == 200:
+                    html = r3.text
+
+                    # Sub-strategy C1: window.__additionalDataLoaded chunks
+                    for chunk in re.findall(
+                        r'window\.__additionalDataLoaded\s*\([^,]+,\s*(\{.+?\})\s*\)',
+                        html, re.DOTALL
+                    ):
+                        try:
+                            d = json.loads(chunk)
+                            user = (d.get("graphql", {}).get("user")
+                                    or d.get("data", {}).get("user"))
+                            if user and user.get("edge_followed_by"):
+                                return _parse_ig_graphql(user, username)
+                        except Exception:
+                            pass
+
+                    # Sub-strategy C2: LD+JSON schema block (SEO data)
+                    for ld in re.findall(
+                        r'<script type="application/ld\+json">(.*?)</script>',
+                        html, re.DOTALL
+                    ):
+                        try:
+                            d = json.loads(ld)
+                            items = d if isinstance(d, list) else [d]
+                            for item in items:
+                                stats = item.get("mainEntity", item).get(
+                                    "interactionStatistic", [])
+                                followers = 0
+                                for s in stats:
+                                    if "Follow" in s.get("interactionType", ""):
+                                        followers = int(s.get("userInteractionCount", 0))
+                                if followers:
+                                    return {
+                                        "ig_status":   "active",
+                                        "ig_username": username,
+                                        "full_name":   item.get("name", ""),
+                                        "followers":   followers,
+                                        "following":   0,
+                                        "posts_count": 0,
+                                        "bio":         item.get("description", ""),
+                                        "videos":      [],
+                                        "last_checked": datetime.now().isoformat(),
+                                    }
+                        except Exception:
+                            pass
+
+                    # Sub-strategy C3: regex on raw HTML
+                    fol_m  = re.search(r'"edge_followed_by":\{"count":(\d+)\}', html)
+                    fwg_m  = re.search(r'"edge_follow":\{"count":(\d+)\}', html)
+                    name_m = re.search(r'"full_name":"((?:[^"\\]|\\.)*)"', html)
+                    post_m = re.search(r'"edge_owner_to_timeline_media":\{"count":(\d+)', html)
+                    bio_m  = re.search(r'"biography":"((?:[^"\\]|\\.)*)"', html)
+                    if fol_m:
+                        return {
+                            "ig_status":   "active",
+                            "ig_username": username,
+                            "full_name":   name_m.group(1) if name_m else "",
+                            "followers":   int(fol_m.group(1)),
+                            "following":   int(fwg_m.group(1)) if fwg_m else 0,
+                            "posts_count": int(post_m.group(1)) if post_m else 0,
+                            "bio":         bio_m.group(1) if bio_m else "",
+                            "videos":      [],
+                            "last_checked": datetime.now().isoformat(),
+                        }
+
+                    if r3.status_code in (404, 410):
+                        return {"ig_status": "banned", "ig_error": "Compte introuvable"}
+                    if "Log in" in html or "login" in str(r3.url):
+                        return {"ig_status": "private",
+                                "ig_error": "Connexion requise (compte privé)"}
+
+            except Exception:
+                pass
+
+            # All strategies failed
+            return {"ig_status": "error",
+                    "ig_error": "Impossible de charger le profil — essaie avec un proxy"}
+
     except httpx.TimeoutException:
-        return {"ig_status": "error", "ig_error": "Timeout"}
-    except Exception as e:
-        return {"ig_status": "error", "ig_error": str(e)}
+        return {"ig_status": "error", "ig_error": "Timeout (>25s)"}
+    except Exception as ex:
+        return {"ig_status": "error", "ig_error": str(ex)}
 
 # ══════════════════════════════════════════════════════════════════════════════
 # LOGIN
