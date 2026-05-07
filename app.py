@@ -1180,7 +1180,11 @@ class App:
         presets = load_presets()
         presets.pop(name, None)
         save_presets(presets)
+        self.preset_combo_var.set("")
         self._refresh_preset_combo()
+        names = list(load_presets().keys())
+        if names:
+            self.preset_combo_var.set(names[0])
 
     def _process_video(self):
         src = self.video_path_var.get()
@@ -1482,6 +1486,7 @@ class App:
         acts.pack(fill="x", pady=(6, 0))
         for txt, col, cmd in [
             ("📥 Ouvrir",        TEXT2, self._bank_open),
+            ("⬇ Télécharger",   TEXT2, self._bank_download),
             ("🔀 Randomiser méta", WARN, lambda: threading.Thread(
                 target=self._randomize_meta, daemon=True).start()),
             ("🚀 Poster",        ACCENT, self._post_from_bank),
@@ -1729,6 +1734,27 @@ class App:
         else:
             messagebox.showerror("Fichier", "Fichier introuvable")
 
+    def _bank_download(self):
+        _, entry = self._get_bank_entry()
+        if not entry:
+            messagebox.showwarning("Sélection", "Sélectionne une vidéo")
+            return
+        src = Path(entry["path"])
+        if not src.exists():
+            messagebox.showerror("Fichier", "Fichier introuvable")
+            return
+        dst = filedialog.asksaveasfilename(
+            title="Enregistrer la vidéo",
+            initialfile=src.name,
+            defaultextension=".mp4",
+            filetypes=[("Vidéo MP4", "*.mp4"), ("Tous", "*.*")])
+        if dst:
+            try:
+                shutil.copy2(src, dst)
+                self.bank_status.config(text=f"✅ Téléchargé : {Path(dst).name}", fg=OK)
+            except Exception as ex:
+                messagebox.showerror("Erreur", str(ex))
+
     def _randomize_meta(self):
         _, entry = self._get_bank_entry()
         if not entry:
@@ -1787,59 +1813,84 @@ class App:
         f = tk.Frame(self.tab_container, bg=BG)
         self.tabs["settings"] = f
 
-        card = tk.Frame(f, bg=CARD, padx=24, pady=24)
-        card.pack(padx=60, pady=30, fill="x")
-        tk.Label(card, text="Paramètres", font=("Segoe UI", 14, "bold"),
+        # Sub-tab nav
+        nav = tk.Frame(f, bg=BG)
+        nav.pack(fill="x", padx=60, pady=(20, 0))
+
+        self._settings_panels = {}
+        self._settings_nav_btns = {}
+
+        panel_host = tk.Frame(f, bg=BG)
+        panel_host.pack(fill="x", padx=60, pady=(0, 12))
+
+        def show_settings_panel(name):
+            for k, p in self._settings_panels.items():
+                p.pack_forget()
+            for k, b in self._settings_nav_btns.items():
+                b.config(bg=SURFACE2, fg=TEXT2)
+            self._settings_panels[name].pack(fill="x")
+            self._settings_nav_btns[name].config(bg=ACCENT, fg="#06080f")
+
+        for tab_name in ("Connexions", "API Keys", "Apparence"):
+            b = tk.Button(nav, text=tab_name, font=("Segoe UI", 10, "bold"),
+                          bg=SURFACE2, fg=TEXT2, relief="flat", cursor="hand2",
+                          padx=16, pady=7,
+                          command=lambda n=tab_name: show_settings_panel(n))
+            b.pack(side="left", padx=(0, 4))
+            self._settings_nav_btns[tab_name] = b
+            panel = tk.Frame(panel_host, bg=CARD, padx=24, pady=24)
+            self._settings_panels[tab_name] = panel
+
+        # --- Connexions panel ---
+        conn = self._settings_panels["Connexions"]
+        tk.Label(conn, text="Connexions GéeLark", font=("Segoe UI", 13, "bold"),
                  bg=CARD, fg=TEXT).pack(anchor="w", pady=(0, 16))
-
-        self.bearer_var   = tk.StringVar(value=self.cfg.get("bearer_token", ""))
-        self.proxy_var    = tk.StringVar(value=self.cfg.get("proxy", ""))
-        self.groq_key_var = tk.StringVar(value=self.cfg.get("groq_api_key", ""))
-
-        fields = [
-            ("GéeLark Bearer Token", "Token API GéeLark (Settings → Open API)",
-             self.bearer_var),
-            ("Proxy SOCKS5",
-             "Format : socks5://user:pass@host:port  (ex: socks5://mhqkcjgp:pass@46.203.53.9:7509)",
-             self.proxy_var),
-            ("Groq API Key", "Clé API Groq pour la génération de descriptions (groq.com — gratuit)",
-             self.groq_key_var),
-        ]
-        for lbl, hint, var in fields:
-            tk.Label(card, text=lbl, font=("Segoe UI", 10),
-                     bg=CARD, fg=TEXT2, anchor="w").pack(fill="x", pady=(10, 2))
-            tk.Label(card, text=hint, font=("Segoe UI", 8),
-                     bg=CARD, fg=MUTED, anchor="w").pack(fill="x")
-            tk.Entry(card, textvariable=var, font=("Consolas", 11),
+        self.bearer_var = tk.StringVar(value=self.cfg.get("bearer_token", ""))
+        self.proxy_var  = tk.StringVar(value=self.cfg.get("proxy", ""))
+        for lbl, hint, var in [
+            ("GéeLark Bearer Token", "Token API GéeLark (Settings → Open API)", self.bearer_var),
+            ("Proxy SOCKS5", "Format : socks5://user:pass@host:port", self.proxy_var),
+        ]:
+            tk.Label(conn, text=lbl, font=("Segoe UI", 10), bg=CARD, fg=TEXT2, anchor="w").pack(fill="x", pady=(10, 2))
+            tk.Label(conn, text=hint, font=("Segoe UI", 8), bg=CARD, fg=MUTED, anchor="w").pack(fill="x")
+            tk.Entry(conn, textvariable=var, font=("Consolas", 11),
                      bg=SURFACE2, fg=TEXT, insertbackground=TEXT,
                      relief="flat", bd=0, highlightthickness=1,
-                     highlightcolor=ACCENT, highlightbackground=BORDER).pack(
-                         fill="x", ipady=7, pady=(2, 0))
-
-        self.proxy_status = tk.Label(card, text="", font=("Segoe UI", 9),
-                                      bg=CARD, fg=TEXT2)
+                     highlightcolor=ACCENT, highlightbackground=BORDER).pack(fill="x", ipady=7, pady=(2, 0))
+        self.proxy_status = tk.Label(conn, text="", font=("Segoe UI", 9), bg=CARD, fg=TEXT2)
         self.proxy_status.pack(anchor="w", pady=(4, 0))
-
-        tk.Button(card, text="Sauvegarder", font=("Segoe UI", 11, "bold"),
+        tk.Button(conn, text="Sauvegarder", font=("Segoe UI", 11, "bold"),
                   bg=ACCENT, fg="#06080f", relief="flat", cursor="hand2",
                   pady=8, command=self._save_settings).pack(fill="x", pady=(16, 0))
 
-        # Fond d'écran personnalisé
-        wcard = tk.Frame(f, bg=CARD, padx=24, pady=20)
-        wcard.pack(padx=60, pady=(0, 16), fill="x")
-        tk.Label(wcard, text="Fond d'écran", font=("Segoe UI", 13, "bold"),
+        # --- API Keys panel ---
+        api = self._settings_panels["API Keys"]
+        tk.Label(api, text="Clés API", font=("Segoe UI", 13, "bold"),
+                 bg=CARD, fg=TEXT).pack(anchor="w", pady=(0, 16))
+        self.groq_key_var = tk.StringVar(value=self.cfg.get("groq_api_key", ""))
+        tk.Label(api, text="Groq API Key", font=("Segoe UI", 10), bg=CARD, fg=TEXT2, anchor="w").pack(fill="x", pady=(0, 2))
+        tk.Label(api, text="Gratuit sur groq.com → API Keys → Create", font=("Segoe UI", 8), bg=CARD, fg=MUTED, anchor="w").pack(fill="x")
+        tk.Entry(api, textvariable=self.groq_key_var, font=("Consolas", 11),
+                 bg=SURFACE2, fg=TEXT, insertbackground=TEXT,
+                 relief="flat", bd=0, highlightthickness=1,
+                 highlightcolor=ACCENT, highlightbackground=BORDER).pack(fill="x", ipady=7, pady=(2, 0))
+        tk.Button(api, text="Sauvegarder", font=("Segoe UI", 11, "bold"),
+                  bg=ACCENT, fg="#06080f", relief="flat", cursor="hand2",
+                  pady=8, command=self._save_settings).pack(fill="x", pady=(16, 0))
+
+        # --- Apparence panel ---
+        app_pan = self._settings_panels["Apparence"]
+        tk.Label(app_pan, text="Fond d'écran", font=("Segoe UI", 13, "bold"),
                  bg=CARD, fg=TEXT).pack(anchor="w", pady=(0, 12))
-        tk.Label(wcard, text="Image de fond (sera floutée et assombrie)",
+        tk.Label(app_pan, text="Choisir une image (floutée + assombrie en arrière-plan)",
                  font=("Segoe UI", 9), bg=CARD, fg=TEXT2).pack(anchor="w")
-        wp_row = tk.Frame(wcard, bg=CARD)
-        wp_row.pack(fill="x", pady=(4, 0))
         self.wallpaper_var = tk.StringVar(value=self.cfg.get("wallpaper_path", ""))
-        wp_entry = tk.Entry(wp_row, textvariable=self.wallpaper_var,
-                            font=("Consolas", 10), bg=SURFACE2, fg=TEXT2,
-                            insertbackground=TEXT, relief="flat", bd=0,
-                            highlightthickness=1, highlightcolor=ACCENT,
-                            highlightbackground=BORDER, state="readonly")
-        wp_entry.pack(side="left", fill="x", expand=True, ipady=6)
+        wp_row = tk.Frame(app_pan, bg=CARD)
+        wp_row.pack(fill="x", pady=(6, 0))
+        tk.Entry(wp_row, textvariable=self.wallpaper_var, font=("Consolas", 10),
+                 bg=SURFACE2, fg=TEXT2, insertbackground=TEXT, relief="flat", bd=0,
+                 highlightthickness=1, highlightcolor=ACCENT, highlightbackground=BORDER,
+                 state="readonly").pack(side="left", fill="x", expand=True, ipady=6)
         tk.Button(wp_row, text="📂", font=("Segoe UI", 11), bg=ACCENT, fg="#06080f",
                   relief="flat", cursor="hand2", padx=10,
                   command=self._browse_wallpaper).pack(side="right", padx=(6, 0))
@@ -1847,28 +1898,31 @@ class App:
                   relief="flat", cursor="hand2", padx=8,
                   command=self._clear_wallpaper).pack(side="right", padx=(4, 0))
 
-        slider_row = tk.Frame(wcard, bg=CARD)
-        slider_row.pack(fill="x", pady=(10, 0))
-        for lbl, key, default in [("Flou", "wallpaper_blur", 8), ("Assombrir %", "wallpaper_dim", 50)]:
-            col = tk.Frame(slider_row, bg=CARD)
-            col.pack(side="left", fill="x", expand=True, padx=(0, 12))
+        sliders_row = tk.Frame(app_pan, bg=CARD)
+        sliders_row.pack(fill="x", pady=(12, 0))
+        self.wp_blur_var = tk.IntVar(value=int(self.cfg.get("wallpaper_blur", 8)))
+        self.wp_dim_var  = tk.IntVar(value=int(self.cfg.get("wallpaper_dim", 55)))
+        for lbl, var, lo, hi in [("Flou", self.wp_blur_var, 0, 20),
+                                   ("Assombrir %", self.wp_dim_var, 0, 90)]:
+            col = tk.Frame(sliders_row, bg=CARD)
+            col.pack(side="left", fill="x", expand=True, padx=(0, 16))
             tk.Label(col, text=lbl, font=("Segoe UI", 9), bg=CARD, fg=TEXT2).pack(anchor="w")
-            var = tk.IntVar(value=int(self.cfg.get(key, default)))
-            setattr(self, f"wp_{key}_var", var)
-            tk.Scale(col, variable=var, from_=0, to=20 if "blur" in key else 90,
-                     orient="horizontal", bg=CARD, fg=TEXT2, troughcolor=SURFACE2,
-                     highlightthickness=0, sliderrelief="flat", bd=0,
-                     font=("Segoe UI", 8)).pack(fill="x")
+            tk.Scale(col, variable=var, from_=lo, to=hi, orient="horizontal",
+                     bg=CARD, fg=TEXT2, troughcolor=SURFACE2, highlightthickness=0,
+                     sliderrelief="flat", bd=0, font=("Segoe UI", 8)).pack(fill="x")
+        tk.Button(app_pan, text="Appliquer", font=("Segoe UI", 11, "bold"),
+                  bg=ACCENT, fg="#06080f", relief="flat", cursor="hand2", pady=8,
+                  command=self._apply_wallpaper_settings).pack(fill="x", pady=(16, 0))
 
-        tk.Button(wcard, text="Appliquer le fond d'écran", font=("Segoe UI", 10, "bold"),
-                  bg=SURFACE2, fg=ACCENT, relief="flat", cursor="hand2", pady=7,
-                  command=self._apply_wallpaper_settings).pack(fill="x", pady=(12, 0))
+        # Show first panel by default
+        show_settings_panel("Connexions")
 
+        # Logs always at bottom
         tk.Label(f, text="LOGS", font=("Consolas", 9, "bold"),
-                 bg=BG, fg=MUTED).pack(anchor="w", padx=60, pady=(16, 4))
+                 bg=BG, fg=MUTED).pack(anchor="w", padx=60, pady=(8, 4))
         self.log_box = scrolledtext.ScrolledText(
             f, bg=SURFACE, fg=TEXT2, font=("Consolas", 9),
-            relief="flat", state="disabled", wrap="word", height=16)
+            relief="flat", state="disabled", wrap="word", height=14)
         self.log_box.pack(fill="both", expand=True, padx=60, pady=(0, 14))
 
     def _save_settings(self):
@@ -1903,10 +1957,10 @@ class App:
 
     def _apply_wallpaper_settings(self):
         self.cfg["wallpaper_path"] = self.wallpaper_var.get().strip()
-        self.cfg["wallpaper_blur"] = getattr(self, "wp_wallpaper_blur_var",
+        self.cfg["wallpaper_blur"] = getattr(self, "wp_blur_var",
                                               tk.IntVar(value=8)).get()
-        self.cfg["wallpaper_dim"]  = getattr(self, "wp_wallpaper_dim_var",
-                                              tk.IntVar(value=50)).get()
+        self.cfg["wallpaper_dim"]  = getattr(self, "wp_dim_var",
+                                              tk.IntVar(value=55)).get()
         save_config(self.cfg)
         self._setup_wallpaper()
 
@@ -1915,30 +1969,37 @@ class App:
             return
         path = self.cfg.get("wallpaper_path", "")
         if not path or not Path(path).exists():
-            if hasattr(self, "_wallpaper_label"):
-                self._wallpaper_label.place_forget()
+            self._wallpaper_src = None
+            self.bg_canvas.delete("wp")
+            self.bg_canvas.configure(bg=BG)
             return
         try:
-            img = Image.open(path).convert("RGB")
-            blur_r = int(self.cfg.get("wallpaper_blur", 8))
-            dim_pct = int(self.cfg.get("wallpaper_dim", 50))
+            self._wallpaper_src = Image.open(path).convert("RGB")
+            w = self.root.winfo_width() or 1400
+            h = self.root.winfo_height() or 840
+            self._redraw_wallpaper(w, h)
+        except Exception as ex:
+            print(f"Wallpaper: {ex}")
+
+    def _redraw_wallpaper(self, w, h):
+        if not PIL_OK or not getattr(self, '_wallpaper_src', None) or w < 10 or h < 10:
+            return
+        try:
+            img = self._wallpaper_src.copy()
+            blur_r  = int(self.cfg.get("wallpaper_blur", 8))
+            dim_pct = int(self.cfg.get("wallpaper_dim", 55))
             if blur_r > 0:
                 img = img.filter(ImageFilter.GaussianBlur(radius=blur_r))
             if dim_pct > 0:
                 img = ImageEnhance.Brightness(img).enhance(1.0 - dim_pct / 100)
-            w = self.root.winfo_width() or 1400
-            h = self.root.winfo_height() or 840
             img = img.resize((w, h), Image.LANCZOS)
             self._wallpaper_photo = ImageTk.PhotoImage(img)
-            if not hasattr(self, "_wallpaper_label"):
-                self._wallpaper_label = tk.Label(self.root,
-                    image=self._wallpaper_photo, bd=0)
-            else:
-                self._wallpaper_label.config(image=self._wallpaper_photo)
-            self._wallpaper_label.place(x=0, y=0, relwidth=1, relheight=1)
-            self._wallpaper_label.lower()
+            self.bg_canvas.delete("wp")
+            self.bg_canvas.create_image(0, 0, anchor="nw",
+                image=self._wallpaper_photo, tags="wp")
+            self.bg_canvas.tag_lower("wp")
         except Exception as ex:
-            print(f"Wallpaper: {ex}")
+            print(f"Wallpaper redraw: {ex}")
 
     # ══════════════════════════════════════════════════════════════════════════
     # TABLE TÉLÉPHONES
