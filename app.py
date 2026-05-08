@@ -1210,12 +1210,30 @@ class App:
         tk.Frame(logo_frame, height=3, bg=ACCENT).pack(fill="x")
 
         inner_logo = tk.Frame(logo_frame, bg=SURFACE)
-        inner_logo.pack(fill="x", padx=20, pady=(14, 10))
-        tk.Label(inner_logo, text="◈  IG Tracker",
-                 font=("Segoe UI", 13, "bold"), bg=SURFACE, fg=TEXT).pack(anchor="w")
+        inner_logo.pack(fill="x", padx=14, pady=(12, 10))
+
+        # Logo image
+        _logo_img_ref = [None]
+        if PIL_OK:
+            try:
+                _logo_path = BASE_DIR / "logo.png"
+                if _logo_path.exists():
+                    _pil = Image.open(str(_logo_path)).resize((36, 36), Image.LANCZOS)
+                    _logo_img_ref[0] = ImageTk.PhotoImage(_pil)
+            except Exception:
+                pass
+
+        title_row = tk.Frame(inner_logo, bg=SURFACE)
+        title_row.pack(anchor="w")
+        if _logo_img_ref[0]:
+            lbl_img = tk.Label(title_row, image=_logo_img_ref[0], bg=SURFACE)
+            lbl_img.image = _logo_img_ref[0]
+            lbl_img.pack(side="left", padx=(0, 8))
+        tk.Label(title_row, text="IG Tracker",
+                 font=("Segoe UI", 13, "bold"), bg=SURFACE, fg=TEXT).pack(side="left")
         email_short = (self.email[:22] + "…") if len(self.email) > 24 else self.email
         tk.Label(inner_logo, text=email_short, font=("Segoe UI", 8),
-                 bg=SURFACE, fg=TEXT2).pack(anchor="w", pady=(2, 0))
+                 bg=SURFACE, fg=TEXT2).pack(anchor="w", pady=(3, 0))
 
         tk.Frame(self.sidebar, height=1, bg=BORDER).pack(fill="x", pady=(0, 6))
 
