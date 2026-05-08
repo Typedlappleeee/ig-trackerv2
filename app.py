@@ -926,8 +926,24 @@ class App:
         self._build_layout()
         self._show_tab("phones")
 
+        self._auto_interval = int(self.cfg.get("auto_refresh_min", 5)) * 60
+        self._next_refresh   = 0   # epoch — 0 = pas encore planifié
+
         threading.Thread(target=self._load_phones, daemon=True).start()
         threading.Thread(target=self._scheduler, daemon=True).start()
+
+        # Auto-scrape au démarrage si au moins un compte a des credentials
+        def _startup_scrape():
+            time.sleep(2)   # laisse le temps à l'UI de s'initialiser
+            has_creds = any(
+                d.get("ig_sessionid") or d.get("ig_password")
+                for d in self.data.values()
+            )
+            if has_creds and self.running:
+                self._scrape_sel()
+
+        threading.Thread(target=_startup_scrape, daemon=True).start()
+        self._tick_countdown()
         self.root.mainloop()
 
     def _on_close(self):
@@ -1158,6 +1174,29 @@ class App:
         tk.Button(tb2, text="🔑 Identifiants", font=("Segoe UI", 10),
                   bg=SURFACE2, fg=ACCENT, relief="flat", cursor="hand2", padx=8, pady=4,
                   command=self._show_credentials_dialog).pack(side="left", padx=2)
+
+        # ── Auto-refresh controls ─────────────────────────────────────────────
+        tk.Frame(tb2, bg=BORDER, width=1).pack(side="left", fill="y", padx=(10, 8))
+        tk.Label(tb2, text="Auto :", font=("Segoe UI", 9), bg=BG, fg=TEXT2).pack(side="left")
+        self._auto_interval_var = tk.StringVar(value=str(self.cfg.get("auto_refresh_min", 5)))
+        interval_cb = ttk.Combobox(tb2, textvariable=self._auto_interval_var,
+                                    values=["1", "2", "5", "10", "30", "60"],
+                                    state="readonly", width=4, font=("Segoe UI", 9))
+        interval_cb.pack(side="left", padx=(2, 1))
+        tk.Label(tb2, text="min", font=("Segoe UI", 9), bg=BG, fg=TEXT2).pack(side="left")
+
+        def _on_interval_change(e=None):
+            try:
+                m = int(self._auto_interval_var.get())
+            except ValueError:
+                m = 5
+            self._set_auto_interval(m)
+
+        interval_cb.bind("<<ComboboxSelected>>", _on_interval_change)
+
+        self._countdown_var = tk.StringVar(value="↻ --:--")
+        tk.Label(tb2, textvariable=self._countdown_var,
+                 font=("Segoe UI", 9, "bold"), bg=BG, fg=ACCENT).pack(side="left", padx=(6, 0))
 
         cols = ("no", "name", "group", "ig", "status", "followers", "views", "vids", "checked")
         self.tree = ttk.Treeview(f, columns=cols, show="headings",
@@ -4129,10 +4168,42 @@ class App:
         threading.Thread(target=full, daemon=True).start()
 
     def _scheduler(self):
+        """Background thread: scrape all accounts at the configured interval."""
         while self.running:
-            time.sleep(3600)
-            if self.running:
-                self._manual_refresh()
+            interval = self._auto_interval
+            if interval <= 0:
+                time.sleep(10)
+                continue
+            self._next_refresh = time.time() + interval
+            # sleep in small chunks so we can react to interval changes
+            while self.running and time.time() < self._next_refresh:
+                time.sleep(1)
+            if self.running and interval > 0:
+                self._scrape_sel()
+
+    def _tick_countdown(self):
+        """Update the countdown label in the toolbar every second."""
+        if not self.running:
+            return
+        interval = self._auto_interval
+        if interval <= 0 or self._next_refresh == 0:
+            self._countdown_var.set("↻ Auto: OFF")
+        else:
+            remaining = max(0, int(self._next_refresh - time.time()))
+            m, s = divmod(remaining, 60)
+            self._countdown_var.set(f"↻ {m:02d}:{s:02d}")
+        self.root.after(1000, self._tick_countdown)
+
+    def _set_auto_interval(self, minutes: int):
+        self._auto_interval        = minutes * 60
+        self.cfg["auto_refresh_min"] = minutes
+        save_config(self.cfg)
+        if minutes > 0:
+            self._next_refresh = time.time() + self._auto_interval
+            self.log(f"Rafraîchissement auto toutes les {minutes} min", "ok")
+        else:
+            self._next_refresh = 0
+            self.log("Rafraîchissement auto désactivé", "warn")
 
 
 if __name__ == "__main__":
