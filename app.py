@@ -2469,9 +2469,18 @@ class App:
                   command=lambda: [v.set(False) for v in pv2.values()]).pack(
                       side="left", padx=6)
 
+        tk.Label(win, text="Caption :", font=("Segoe UI", 10), bg=BG, fg=TEXT2).pack(
+            anchor="w", padx=20, pady=(0, 2))
+        caption_box = tk.Text(win, bg=SURFACE, fg=TEXT, font=("Segoe UI", 10),
+                              relief="flat", height=4, wrap="word",
+                              insertbackground=TEXT, padx=8, pady=6)
+        caption_box.pack(fill="x", padx=20, pady=(0, 8))
+        if caption:
+            caption_box.insert("1.0", caption)
+
         plog_box = scrolledtext.ScrolledText(win, bg=SURFACE, fg=TEXT2,
                                               font=("Consolas", 9), relief="flat",
-                                              state="disabled", wrap="word", height=6)
+                                              state="disabled", wrap="word", height=5)
         plog_box.pack(fill="x", padx=20, pady=(0, 8))
 
         def plog(msg, lv="info"):
@@ -2487,10 +2496,14 @@ class App:
             if not sel:
                 plog("⚠ Sélectionne au moins un téléphone", "warn")
                 return
+            final_caption = caption_box.get("1.0", "end").strip()
+            if not final_caption:
+                plog("⚠ Entre une caption (obligatoire pour GéeLark)", "warn")
+                return
             bearer = self.cfg.get("bearer_token", "")
             threading.Thread(
                 target=self._upload_and_post,
-                args=(sel, bearer, caption, video_path, plog),
+                args=(sel, bearer, final_caption, video_path, plog),
                 daemon=True).start()
 
         tk.Button(win, text="🚀  Lancer le posting",
