@@ -943,6 +943,24 @@ class _PushHandler(http.server.BaseHTTPRequestHandler):
 # ══════════════════════════════════════════════════════════════════════════════
 # LOGIN
 # ══════════════════════════════════════════════════════════════════════════════
+def _set_window_icon(root):
+    """Set taskbar + title-bar icon from logo.png → icon.ico."""
+    ico = BASE_DIR / "icon.ico"
+    png = BASE_DIR / "logo.png"
+    try:
+        if ico.exists():
+            root.iconbitmap(str(ico))
+            return
+        if png.exists() and PIL_OK:
+            img = Image.open(str(png))
+            imgs = [img.resize((s, s), Image.LANCZOS) for s in (256,64,48,32,16)]
+            imgs[0].save(str(ico), format="ICO", sizes=[(s,s) for s in (256,64,48,32,16)],
+                         append_images=imgs[1:])
+            root.iconbitmap(str(ico))
+    except Exception:
+        pass
+
+
 class LoginWindow:
     def __init__(self):
         self.root = tk.Tk()
@@ -950,6 +968,7 @@ class LoginWindow:
         self.root.geometry("400x440")
         self.root.configure(bg=BG)
         self.root.resizable(False, False)
+        _set_window_icon(self.root)
         self._build()
         self.root.mainloop()
 
@@ -1030,6 +1049,7 @@ class App:
         self.root.geometry("1400x900")
         self.root.configure(bg=BG)
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
+        _set_window_icon(self.root)
 
         self._setup_styles()
         self._build_layout()

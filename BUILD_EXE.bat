@@ -25,6 +25,7 @@ pyinstaller ^
   --windowed ^
   --name "IG Tracker" ^
   %ICON_FLAG% ^
+  --add-data "logo.png;." ^
   --add-data "bank.json;." ^
   --add-data "data.json;." ^
   --add-data "config.json;." ^
