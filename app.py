@@ -3041,11 +3041,58 @@ class App:
         self._tl_cut_end = 0.0
         self._tl_thumbs_pil = []
 
-        # Compact log
+        # ── Info bar (rounded card with video stats) ────────────────────────
+        info_outer, info_card = self._round_card(right, radius=10, bg=SURFACE2,
+                                                   border=BORDER, border_w=1)
+        info_outer.pack(fill="x", padx=14, pady=(4, 4))
+        info_outer.configure(height=68)
+        info_outer.pack_propagate(False)
+
+        info_inner = tk.Frame(info_card, bg=SURFACE2, padx=14, pady=8)
+        info_inner.pack(fill="both", expand=True)
+
+        # Stat chips for: filename, duration, resolution, size
+        self._auto_info_chips = {}
+        chip_data = [
+            ("file", "🎬", "—",     ACCENT),
+            ("dur",  "⏱", "—",     OK),
+            ("res",  "📐", "—",     WARN),
+            ("size", "💾", "—",     TEXT2),
+            ("cut",  "✂",  "Aucune coupe", DANGER),
+        ]
+        for k, icon, val, col in chip_data:
+            chip = tk.Frame(info_inner, bg=SURFACE2)
+            chip.pack(side="left", padx=(0, 18))
+            tk.Label(chip, text=icon, font=("Segoe UI", 13, "bold"),
+                     bg=SURFACE2, fg=col).pack(side="left")
+            v = tk.Label(chip, text=val, font=("Segoe UI", 9, "bold"),
+                          bg=SURFACE2, fg=TEXT)
+            v.pack(side="left", padx=(4, 0))
+            self._auto_info_chips[k] = v
+
+        # ── Compact collapsible log ──────────────────────────────────────────
+        log_row = tk.Frame(right, bg=CARD)
+        log_row.pack(fill="x", padx=14, pady=(0, 10))
+        self._auto_log_visible = [False]
+        log_btn = tk.Label(log_row, text="▶  Journal",
+                            font=("Segoe UI", 8), bg=CARD, fg=TEXT2,
+                            cursor="hand2")
+        log_btn.pack(side="left", anchor="w")
+
         self.auto_log = scrolledtext.ScrolledText(right, bg=SURFACE, fg=TEXT2,
                                                    font=("Consolas", 8), relief="flat",
-                                                   state="disabled", wrap="word", height=3)
-        self.auto_log.pack(fill="x", padx=14, pady=(4, 10))
+                                                   state="disabled", wrap="word", height=4)
+
+        def _toggle_log(_e=None):
+            if self._auto_log_visible[0]:
+                self.auto_log.pack_forget()
+                log_btn.config(text="▶  Journal")
+                self._auto_log_visible[0] = False
+            else:
+                self.auto_log.pack(fill="x", padx=14, pady=(0, 10))
+                log_btn.config(text="▼  Journal")
+                self._auto_log_visible[0] = True
+        log_btn.bind("<Button-1>", _toggle_log)
 
     # ── Timeline interactions ───────────────────────────────────────────────
     def _tl_pos_to_time(self, x):
@@ -3162,6 +3209,17 @@ class App:
             else:
                 self._tl_cut_lbl.config(
                     text=f"Cut : {_fmt(cs)} → {_fmt(ce)}  ({_fmt(ce - cs)})")
+        except Exception:
+            pass
+        # Sync info chip
+        try:
+            chips = getattr(self, "_auto_info_chips", {})
+            if "cut" in chips:
+                if dur and (cs > 0.05 or (ce > 0 and ce < dur - 0.05)):
+                    chips["cut"].config(
+                        text=f"{_fmt(cs)}→{_fmt(ce)}", fg=DANGER)
+                else:
+                    chips["cut"].config(text="Aucune coupe", fg=TEXT2)
         except Exception:
             pass
 
@@ -3438,7 +3496,54 @@ class App:
         if hasattr(self, "_tl_canvas"):
             self._tl_redraw()
             self._tl_update_labels()
+        # Update info chips
+        threading.Thread(target=self._auto_update_info, args=(path,), daemon=True).start()
         self._schedule_preview()
+
+    def _auto_update_info(self, path):
+        """Populate the info chips with file metadata extracted via ffmpeg/ffprobe."""
+        if not hasattr(self, "_auto_info_chips"):
+            return
+        chips = self._auto_info_chips
+        p = Path(path)
+        try:
+            size_mb = p.stat().st_size / 1024 / 1024
+            self.root.after(0, lambda: chips["file"].config(
+                text=p.name[:24] + ("…" if len(p.name) > 24 else "")))
+            self.root.after(0, lambda: chips["size"].config(text=f"{size_mb:.1f} MB"))
+        except Exception:
+            pass
+        ffmpeg = self._find_ffmpeg()
+        if not ffmpeg:
+            return
+        try:
+            r = subprocess.run([ffmpeg, "-i", str(p)], capture_output=True,
+                               text=True, timeout=10)
+            out = (r.stdout or "") + (r.stderr or "")
+            # Duration
+            m = re.search(r"Duration:\s*(\d+):(\d+):(\d+\.?\d*)", out)
+            if m:
+                h, mi, s = m.groups()
+                dur = int(h) * 3600 + int(mi) * 60 + float(s)
+                dur_str = f"{int(dur)//60}:{int(dur)%60:02d}"
+                self.root.after(0, lambda d=dur_str: chips["dur"].config(text=d))
+            # Resolution
+            m = re.search(r"(\d{3,4})x(\d{3,4})", out)
+            if m:
+                w_v, h_v = m.groups()
+                self.root.after(0, lambda: chips["res"].config(text=f"{w_v}×{h_v}"))
+            # Cut info
+            def _refresh_cut():
+                cs = getattr(self, "_tl_cut_start", 0.0)
+                ce = getattr(self, "_tl_cut_end", 0.0)
+                d2 = getattr(self, "_tl_duration", 0.0)
+                if d2 and (cs > 0.05 or (ce > 0 and ce < d2 - 0.05)):
+                    chips["cut"].config(text=f"{int(cs)//60}:{int(cs)%60:02d}→{int(ce)//60}:{int(ce)%60:02d}", fg=DANGER)
+                else:
+                    chips["cut"].config(text="Aucune coupe", fg=TEXT2)
+            self.root.after(500, _refresh_cut)
+        except Exception:
+            pass
 
     def _schedule_preview(self):
         if self._preview_after:
