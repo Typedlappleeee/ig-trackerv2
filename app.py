@@ -2728,14 +2728,16 @@ class App:
                 except Exception: pass
             return
 
-        # ── Poll task status until all done or 15 min timeout ────────────────
-        log_fn("⏳ Suivi des tâches en cours...", "accent")
+        # ── Poll task status until all done or 8 min timeout ─────────────────
+        log_fn("⏳ Suivi des tâches...", "accent")
         STATUS = {1: "⏳ En attente", 2: "🔄 En cours", 3: "✅ Terminé", 4: "❌ Échoué", 7: "🚫 Annulé"}
-        deadline  = time.time() + 900  # 15 min
+        deadline  = time.time() + 480  # 8 min max
         pending   = dict(task_ids)
         reported  = set()
+        poll_num  = 0
         while pending and time.time() < deadline:
-            time.sleep(20)
+            time.sleep(15)
+            poll_num += 1
             try:
                 qr = httpx.post(
                     "https://openapi.geelark.com/open/v1/task/query",
@@ -2751,15 +2753,17 @@ class App:
                         reported.add(tid)
                         if pid in pending: del pending[pid]
                         lv = "ok" if status == 3 else "error"
-                        label = STATUS.get(status, str(status))
                         fail_desc = item.get("failDesc", "")
                         fail_code = item.get("failCode", "")
-                        msg = f"{label} {name}"
+                        msg = f"{STATUS.get(status, str(status))} {name}"
                         if fail_desc:
                             msg += f" — {fail_desc} (code {fail_code})"
                         log_fn(msg, lv)
-            except Exception:
-                pass
+                    elif status in (1, 2) and poll_num % 4 == 0:
+                        # Show progress every ~60s for still-pending tasks
+                        log_fn(f"  {STATUS.get(status, '?')} {name}...", "info")
+            except Exception as e:
+                log_fn(f"⚠ Erreur polling: {e}", "warn")
 
         if pending:
             for pid, tid in pending.items():
