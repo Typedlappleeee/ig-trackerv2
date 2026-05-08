@@ -2338,6 +2338,109 @@ class App:
                                          font=("Segoe UI", 11), bg=BG, fg=MUTED)
         self._st_placeholder.pack(pady=40)
 
+    def _render_reel_preview(self, top_video, ig_username):
+        """Draw an Instagram-Reel-style mockup on _st_reel_canvas."""
+        cv = getattr(self, "_st_reel_canvas", None)
+        if not cv or not cv.winfo_exists():
+            return
+        cv.delete("all")
+        W, H = 98, 170
+        r = 14  # rounded radius
+
+        # Phone frame (rounded rectangle) - dark frame
+        # Outer black
+        cv.create_polygon([
+            r, 0, W-r, 0, W, 0, W, r,
+            W, H-r, W, H, W-r, H,
+            r, H, 0, H, 0, H-r,
+            0, r, 0, 0,
+        ], smooth=True, splinesteps=24, fill="#000", outline=BORDER, width=1)
+
+        # Screen area inset
+        sx, sy = 4, 4
+        sw, sh = W - 8, H - 8
+
+        # Background gradient (using rectangles to fake gradient)
+        if top_video:
+            # Use a tinted gradient based on view popularity
+            views = top_video.get("views", 0)
+            if views > 5000:
+                grad_top, grad_bot = "#7e22ce", "#dc2626"  # purple → red
+            elif views > 1000:
+                grad_top, grad_bot = "#1e40af", "#7c3aed"  # blue → purple
+            else:
+                grad_top, grad_bot = "#374151", "#111827"  # gray
+        else:
+            grad_top, grad_bot = "#1f2937", "#111827"
+
+        # Fake gradient
+        for i in range(20):
+            t = i / 19
+            try:
+                rr = int(int(grad_top[1:3], 16) * (1 - t) + int(grad_bot[1:3], 16) * t)
+                gg = int(int(grad_top[3:5], 16) * (1 - t) + int(grad_bot[3:5], 16) * t)
+                bb = int(int(grad_top[5:7], 16) * (1 - t) + int(grad_bot[5:7], 16) * t)
+                col = f"#{rr:02x}{gg:02x}{bb:02x}"
+            except Exception:
+                col = grad_top
+            y0 = sy + i * sh / 20
+            y1 = sy + (i + 1) * sh / 20
+            cv.create_rectangle(sx, y0, sx + sw, y1, fill=col, outline="")
+
+        # ▶ Play icon center (subtle)
+        cx, cy = W // 2, H // 2 - 8
+        cv.create_polygon(cx - 7, cy - 9, cx - 7, cy + 9, cx + 9, cy,
+                          fill="#ffffff", outline="", smooth=False)
+        # Halo
+        cv.create_oval(cx - 16, cy - 16, cx + 16, cy + 16,
+                        outline="#ffffff66", width=2)
+
+        if not top_video:
+            cv.create_text(W // 2, H // 2 + 22, text="Aucun reel",
+                            fill="#ffffffaa", font=("Segoe UI", 8))
+            return
+
+        # Top: @username chip
+        uname = ig_username[:11] if ig_username else "user"
+        cv.create_text(sx + 6, sy + 8, anchor="w",
+                        text=f"@{uname}", fill="#ffffff",
+                        font=("Segoe UI", 8, "bold"))
+        # Online dot
+        cv.create_oval(sx + 4, sy + 5, sx + 10, sy + 11, fill=ACCENT, outline="")
+
+        # Right side: vertical stack of IG-style icons + counts
+        ix = sx + sw - 14
+        iy = sh - 14
+        for emoji, val in [
+            ("♥", fmt(top_video.get("likes", 0))),
+            ("✎", fmt(top_video.get("comments", 0))),
+            ("↗", fmt(top_video.get("shares", 0))),
+        ]:
+            cv.create_text(ix, iy, text=emoji, fill="#ffffff",
+                            font=("Segoe UI", 12, "bold"), anchor="center")
+            cv.create_text(ix, iy + 11, text=val, fill="#ffffff",
+                            font=("Segoe UI", 6, "bold"), anchor="center")
+            iy -= 26
+
+        # Bottom: views + caption
+        v = fmt(top_video.get("views", 0))
+        cv.create_text(sx + 6, sh - 18, anchor="w",
+                        text=f"▶ {v}", fill="#ffffff",
+                        font=("Segoe UI", 9, "bold"))
+
+        cap = (top_video.get("caption", "") or "")[:14]
+        if cap:
+            cv.create_text(sx + 6, sh - 8, anchor="w",
+                            text=cap + ("…" if len(top_video.get("caption", "")) > 14 else ""),
+                            fill="#ffffffcc", font=("Segoe UI", 7))
+
+        # Save URL for click
+        sc = top_video.get("id", "")
+        if sc:
+            self._st_reel_url[0] = f"https://www.instagram.com/reel/{sc}/"
+        else:
+            self._st_reel_url[0] = None
+
     def _stats_make_avatar(self, letter, color, size=54):
         """Return a circular PIL ImageTk with the given letter."""
         if not PIL_OK:
@@ -2453,11 +2556,19 @@ class App:
         self.det_status.config(text=st_text, fg="#07080d", bg=st_col)
 
         # KPIs
-        total_views = sum(v.get("views", 0) for v in d.get("videos", []))
+        videos = d.get("videos", [])
+        total_views = sum(v.get("views", 0) for v in videos)
         self.kpis["followers"].config(text=fmt(d.get("followers", 0)))
         self.kpis["following"].config(text=fmt(d.get("following", 0)))
         self.kpis["posts"].config(text=str(d.get("posts_count", 0)))
         self.kpis["views"].config(text=fmt(total_views))
+
+        # Render top-performing reel preview
+        top_video = max(videos, key=lambda v: v.get("views", 0)) if videos else None
+        try:
+            self._render_reel_preview(top_video, ig)
+        except Exception:
+            pass
 
         self._current_vid_pid[0] = pid
         self._refresh_vid_cards()
