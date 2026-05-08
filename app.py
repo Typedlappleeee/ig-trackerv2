@@ -2373,16 +2373,20 @@ class App:
         sv2.pack(side="right", fill="y")
         cv2.configure(yscrollcommand=sv2.set)
         inner2 = tk.Frame(cv2, bg=SURFACE)
-        cv2.create_window((0, 0), window=inner2, anchor="nw")
+        win2_id = cv2.create_window((0, 0), window=inner2, anchor="nw")
         inner2.bind("<Configure>", lambda e: cv2.configure(scrollregion=cv2.bbox("all")))
+        cv2.bind("<Configure>", lambda e: cv2.itemconfig(win2_id, width=e.width))
 
         def populate(g="Tous"):
             for w in inner2.winfo_children():
                 w.destroy()
             pv2.clear()
+            shown = 0
             for pid, d in sorted(self.data.items(),
-                                  key=lambda x: int(x[1].get("serial_no", 0) or 0)):
-                if not d.get("phone_name"):
+                                  key=lambda x: (int(x[1].get("serial_no") or 0))):
+                # show entries that have either a phone_name OR an ig_username
+                name = d.get("phone_name") or d.get("ig_username") or ""
+                if not name:
                     continue
                 if g != "Tous" and d.get("group_name", "") != g:
                     continue
@@ -2390,15 +2394,29 @@ class App:
                 pv2[pid] = var
                 row = tk.Frame(inner2, bg=SURFACE)
                 row.pack(fill="x", padx=8, pady=2)
-                tk.Checkbutton(row, variable=var, bg=SURFACE,
-                               activebackground=SURFACE, selectcolor=SURFACE2).pack(side="left")
+                cb = tk.Checkbutton(row, variable=var, bg=SURFACE,
+                                    activebackground=SURFACE, selectcolor=SURFACE2,
+                                    cursor="hand2")
+                cb.pack(side="left")
                 ig  = d.get("ig_username", "")
-                lbl = (f"#{d.get('serial_no','')}  {d.get('phone_name', pid)}"
-                       f"  [{d.get('group_name','')}]")
+                lbl = f"#{d.get('serial_no','')}  {d.get('phone_name', pid)}"
+                if d.get("group_name"):
+                    lbl += f"  [{d['group_name']}]"
                 if ig:
                     lbl += f"  →  @{ig}"
                 tk.Label(row, text=lbl, font=("Segoe UI", 10), bg=SURFACE,
-                         fg=OK if ig else MUTED, anchor="w").pack(side="left", padx=4)
+                         fg=OK if ig else TEXT2, anchor="w",
+                         cursor="hand2").pack(side="left", padx=4, fill="x", expand=True)
+                # click on the row also toggles the checkbox
+                row.bind("<Button-1>", lambda e, v=var: v.set(not v.get()))
+                shown += 1
+            if shown == 0:
+                tk.Label(inner2,
+                         text="Aucun téléphone trouvé.\n\n"
+                              "Configure le Bearer Token GéeLark dans\n"
+                              "Paramètres → Connexions puis clique Refresh.",
+                         font=("Segoe UI", 10), bg=SURFACE, fg=MUTED,
+                         justify="center").pack(pady=30)
         populate()
         gc2.bind("<<ComboboxSelected>>", lambda e: populate(grp2.get()))
 
