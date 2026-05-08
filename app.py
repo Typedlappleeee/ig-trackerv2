@@ -3699,15 +3699,20 @@ class App:
             except Exception as e:
                 raise RuntimeError(f"Impossible de charger les commentaires: {e}")
 
-        def _post_reply_api(sid, media_id, comment_text, replied_to_id):
+        def _post_reply_api(sid, media_id, comment_text, replied_to_id, _cl=None):
             clean_id = str(media_id).split("_")[0]
-            from instagrapi import Client as _IgClient
-            cl = _IgClient()
-            cl.delay_range = [1, 2]
-            cl.login_by_sessionid(sid)
-            # Post as a top-level comment mentioning the user
-            # (instagrapi uses private API endpoint directly for comment)
-            return cl.media_comment(clean_id, comment_text)
+            if _cl is None:
+                from instagrapi import Client as _IgClient
+                _cl = _IgClient()
+                _cl.delay_range = [1, 2]
+                _cl.login_by_sessionid(sid)
+            # Post as a threaded reply using the private API directly
+            # so replied_to_comment_id is always sent regardless of instagrapi version
+            data = {
+                "comment_text": comment_text,
+                "replied_to_comment_id": str(replied_to_id),
+            }
+            return _cl.private_request(f"media/{clean_id}/comments/", data=data)
 
         def _show_comments_in_panel(comments, replied_ids):
             self._ac_com_box.config(state="normal")
@@ -3860,6 +3865,15 @@ class App:
             state = _load_state()
             replied = state.setdefault(f"{ig}:{media_id}", {})
 
+            # Login once, reuse client for all replies (avoids re-auth per comment)
+            from instagrapi import Client as _IgClient
+            ig_cl = _IgClient()
+            ig_cl.delay_range = [1, 2]
+            try:
+                ig_cl.login_by_sessionid(sid)
+            except Exception as e:
+                self.root.after(0, lambda e=e: _ac_log(f"⚠ Login: {e}", "warn"))
+
             self.root.after(0, lambda: _ac_log(
                 f"▶ Démarré — @{ig} / {shortcode or media_id} — toutes les {interval_sec//60} min",
                 "accent"))
@@ -3889,7 +3903,7 @@ class App:
                             reply = _groq_reply(text, persona, groq_key)
                             self.root.after(0, lambda rp=reply:
                                 _ac_log(f"📤 Envoi: \"{rp[:60]}\"", "info"))
-                            _post_reply_api(sid, media_id, reply, replied_to_id=cid)
+                            _post_reply_api(sid, media_id, reply, replied_to_id=cid, _cl=ig_cl)
                             replied[cid] = reply
                             new_count += 1
                             state[f"{ig}:{media_id}"] = replied
