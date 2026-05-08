@@ -4439,13 +4439,13 @@ class App:
         panel_host = tk.Frame(panel_host_wrap, bg=BG)
         panel_host.pack(fill="x", padx=20, pady=12)
 
+        # _settings_panels stores (outer_frame, inner_content_frame)
         def show_settings_panel(name):
-            for k, p in self._settings_panels.items():
-                p.pack_forget()
+            for k, (outer, _) in self._settings_panels.items():
+                outer.pack_forget()
             for k, b in self._settings_nav_btns.items():
-                b.config(bg=SURFACE2, fg=TEXT2,
-                         font=("Segoe UI", 10))
-            self._settings_panels[name].pack(fill="x")
+                b.config(bg=SURFACE2, fg=TEXT2, font=("Segoe UI", 10))
+            self._settings_panels[name][0].pack(fill="x", pady=(8, 0))
             self._settings_nav_btns[name].config(
                 bg=ACCENT, fg="#06080f", font=("Segoe UI", 10, "bold"))
 
@@ -4461,10 +4461,10 @@ class App:
             tk.Frame(outer, height=2, bg=ACCENT).pack(fill="x")
             inner_p = tk.Frame(outer, bg=CARD, padx=24, pady=20)
             inner_p.pack(fill="both", expand=True)
-            self._settings_panels[tab_name] = inner_p
+            self._settings_panels[tab_name] = (outer, inner_p)
 
         # --- Profil panel ---
-        prof = self._settings_panels["Profil"]
+        prof = self._settings_panels["Profil"][1]
         tk.Label(prof, text="Mon Profil", font=("Segoe UI", 13, "bold"),
                  bg=CARD, fg=TEXT).pack(anchor="w", pady=(0, 16))
 
@@ -4539,7 +4539,7 @@ class App:
                      ).pack(fill="x", pady=(16, 0))
 
         # --- Connexions panel ---
-        conn = self._settings_panels["Connexions"]
+        conn = self._settings_panels["Connexions"][1]
         tk.Label(conn, text="Connexions GéeLark", font=("Segoe UI", 13, "bold"),
                  bg=CARD, fg=TEXT).pack(anchor="w", pady=(0, 16))
         self.bearer_var = tk.StringVar(value=self.cfg.get("bearer_token", ""))
@@ -4618,7 +4618,7 @@ class App:
                  font=("Segoe UI", 7), bg=CARD, fg=MUTED, anchor="w").pack(fill="x", pady=(3, 0))
 
         # --- API Keys panel ---
-        api = self._settings_panels["API Keys"]
+        api = self._settings_panels["API Keys"][1]
         tk.Label(api, text="Clés API", font=("Segoe UI", 13, "bold"),
                  bg=CARD, fg=TEXT).pack(anchor="w", pady=(0, 16))
 
@@ -4666,7 +4666,7 @@ class App:
                      ).pack(fill="x", pady=(16, 0))
 
         # --- Apparence panel ---
-        app_pan = self._settings_panels["Apparence"]
+        app_pan = self._settings_panels["Apparence"][1]
         tk.Label(app_pan, text="Thème de couleur", font=("Segoe UI", 13, "bold"),
                  bg=CARD, fg=TEXT).pack(anchor="w", pady=(0, 6))
         tk.Label(app_pan, text="Choisissez l'accent couleur de l'interface",
