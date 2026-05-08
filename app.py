@@ -630,37 +630,38 @@ def ig_client_get(username: str, password: str, proxy: str | None = None):
     return cl
 
 
-def scrape_ig_direct(username: str, password: str, proxy: str | None = None) -> dict:
+def scrape_ig_direct(username: str, password: str, proxy: str | None = None,
+                     challenge_callback=None) -> dict:
     """
     Get Instagram account stats using direct login (instagrapi).
+    challenge_callback(cl, username) → code_str | None  — called when Instagram
+    issues a security challenge; should block until the user enters the code.
     Returns the same dict format as scrape_ig().
     """
     try:
         from instagrapi.exceptions import (
             BadPassword, ChallengeRequired, TwoFactorRequired,
-            LoginRequired, UserNotFound, ClientError,
+            LoginRequired, UserNotFound,
         )
     except ImportError:
         _ensure_instagrapi()
         from instagrapi.exceptions import (
             BadPassword, ChallengeRequired, TwoFactorRequired,
-            LoginRequired, UserNotFound, ClientError,
+            LoginRequired, UserNotFound,
         )
 
-    # Clear any session that was created with a proxy (proxy=None now)
     session_file = IG_SESS_DIR / f"{username}.json"
+    # Purge sessions created with a proxy — we now connect without proxy
     if proxy is None and session_file.exists():
         try:
             import json as _j
-            s = _j.loads(session_file.read_text())
-            if s.get("proxy"):                    # session built with proxy → discard
+            if _j.loads(session_file.read_text()).get("proxy"):
                 session_file.unlink(missing_ok=True)
         except Exception:
             pass
 
-    try:
-        cl = ig_client_get(username, password, proxy)
-        u  = cl.user_info_by_username(username)
+    def _build_result(cl, username):
+        u = cl.user_info_by_username(username)
         return {
             "ig_status":    "active",
             "ig_username":  u.username,
@@ -675,24 +676,38 @@ def scrape_ig_direct(username: str, password: str, proxy: str | None = None) -> 
             "videos":       [],
             "last_checked": datetime.now().isoformat(),
         }
+
+    try:
+        cl = ig_client_get(username, password, proxy)
+        return _build_result(cl, username)
+
+    except ChallengeRequired:
+        session_file.unlink(missing_ok=True)
+        if challenge_callback is None:
+            return {"ig_status": "error",
+                    "ig_error": "⚠ Challenge Instagram — vérifie l'email/SMS du compte puis réessaie"}
+        # Ask UI for the code, then resolve
+        try:
+            code = challenge_callback(cl, username)
+            if not code:
+                return {"ig_status": "error", "ig_error": "Challenge annulé"}
+            cl.challenge_resolve(cl.last_challenge, code)
+            cl.dump_settings(session_file)
+            return _build_result(cl, username)
+        except Exception as ex:
+            return {"ig_status": "error", "ig_error": f"Challenge échoué: {ex}"}
+
     except BadPassword:
-        return {"ig_status": "error",
-                "ig_error": "❌ Mot de passe incorrect"}
+        return {"ig_status": "error", "ig_error": "❌ Mot de passe incorrect"}
     except TwoFactorRequired:
         return {"ig_status": "error",
                 "ig_error": "🔐 2FA requis — entre le code dans l'app ou désactive le 2FA"}
-    except ChallengeRequired:
-        session_file = IG_SESS_DIR / f"{username}.json"
-        session_file.unlink(missing_ok=True)
-        return {"ig_status": "error",
-                "ig_error": "⚠ Challenge Instagram — vérifie l'email/SMS du compte puis réessaie"}
     except UserNotFound:
         return {"ig_status": "banned", "ig_error": "Compte introuvable"}
     except LoginRequired:
-        session_file = IG_SESS_DIR / f"{username}.json"
         session_file.unlink(missing_ok=True)
         return {"ig_status": "error",
-                "ig_error": "Session expirée — re-scrape pour relancer le login"}
+                "ig_error": "Session expirée — relance le scrape"}
     except Exception as ex:
         return {"ig_status": "error", "ig_error": str(ex)}
 
@@ -3588,9 +3603,9 @@ class App:
         if password:
             # instagrapi uses i.instagram.com — never route through the SOCKS proxy
             # because most residential/datacenter proxies block that subdomain.
-            # Direct connection with real credentials is always more reliable.
-            self.log(f"🔑 Login direct @{username} (sans proxy)...", "info")
-            res = scrape_ig_direct(username, password, proxy=None)
+            self.log(f"🔑 Login direct @{username}...", "info")
+            res = scrape_ig_direct(username, password, proxy=None,
+                                   challenge_callback=self._make_challenge_cb())
         else:
             sessionid = self.cfg.get("ig_sessionid", "").strip() or None
             mode = "proxy" if proxy else "sans proxy"
@@ -3622,6 +3637,103 @@ class App:
             self._scrape_one(pid)
             time.sleep(2)
         self.log("Terminé ✓", "ok")
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # CHALLENGE RESOLUTION
+    # ══════════════════════════════════════════════════════════════════════════
+    def _make_challenge_cb(self):
+        """Return a challenge_callback that blocks the scrape thread until
+        the user enters the verification code in a popup dialog."""
+        def callback(cl, username):
+            code_holder = [None]
+            done        = threading.Event()
+
+            def show():
+                self._show_challenge_dialog(cl, username, code_holder, done)
+
+            self.root.after(0, show)
+            done.wait(timeout=300)   # wait up to 5 minutes
+            return code_holder[0]
+
+        return callback
+
+    def _show_challenge_dialog(self, cl, username, code_holder, done):
+        win = tk.Toplevel(self.root)
+        win.title(f"🔐 Vérification — @{username}")
+        win.geometry("440x340")
+        win.configure(bg=BG)
+        win.grab_set()
+        win.protocol("WM_DELETE_WINDOW", lambda: (_cancel()))
+
+        tk.Label(win, text="🔐 Vérification Instagram",
+                 font=("Segoe UI", 14, "bold"), bg=BG, fg=TEXT).pack(anchor="w", padx=20, pady=(18, 4))
+        tk.Label(win,
+                 text=f"Instagram a détecté une connexion depuis un nouvel appareil\n"
+                      f"pour @{username}.\n\n"
+                      f"Un code de vérification va être envoyé à l'adresse email\n"
+                      f"ou au numéro de téléphone lié au compte.",
+                 font=("Segoe UI", 10), bg=BG, fg=TEXT2, justify="left").pack(
+                     anchor="w", padx=20, pady=(0, 12))
+
+        # Send code buttons
+        send_row = tk.Frame(win, bg=BG)
+        send_row.pack(fill="x", padx=20, pady=(0, 10))
+        status_lbl = tk.Label(win, text="", font=("Segoe UI", 9), bg=BG, fg=OK)
+        status_lbl.pack(anchor="w", padx=20)
+
+        def _send(method):
+            try:
+                cl.challenge_send_security_code(method)
+                status_lbl.config(
+                    text="✅ Code envoyé — vérifie l'email / SMS du compte",
+                    fg=OK)
+            except Exception as ex:
+                status_lbl.config(text=f"❌ {ex}", fg=DANGER)
+
+        tk.Button(send_row, text="📧 Envoyer par email",
+                  font=("Segoe UI", 10), bg=SURFACE2, fg=TEXT,
+                  relief="flat", cursor="hand2", padx=10, pady=6,
+                  command=lambda: _send("0")).pack(side="left", fill="x", expand=True)
+        tk.Button(send_row, text="📱 Envoyer par SMS",
+                  font=("Segoe UI", 10), bg=SURFACE2, fg=TEXT,
+                  relief="flat", cursor="hand2", padx=10, pady=6,
+                  command=lambda: _send("1")).pack(side="left", fill="x", expand=True, padx=(6, 0))
+
+        # Code entry
+        tk.Label(win, text="Code reçu :", font=("Segoe UI", 10), bg=BG, fg=TEXT2).pack(
+            anchor="w", padx=20, pady=(8, 2))
+        code_var = tk.StringVar()
+        code_entry = tk.Entry(win, textvariable=code_var, font=("Consolas", 16),
+                              bg=SURFACE2, fg=TEXT, insertbackground=TEXT,
+                              relief="flat", bd=0, highlightthickness=1,
+                              highlightcolor=ACCENT, highlightbackground=BORDER,
+                              justify="center")
+        code_entry.pack(fill="x", padx=20, ipady=10, pady=(0, 12))
+        code_entry.focus_set()
+
+        def _submit():
+            code = code_var.get().strip().replace(" ", "")
+            if not code:
+                return
+            code_holder[0] = code
+            win.destroy()
+            done.set()
+
+        def _cancel():
+            win.destroy()
+            done.set()
+
+        code_entry.bind("<Return>", lambda e: _submit())
+        btn_row = tk.Frame(win, bg=BG)
+        btn_row.pack(fill="x", padx=20)
+        tk.Button(btn_row, text="✓ Valider le code",
+                  font=("Segoe UI", 11, "bold"), bg=ACCENT, fg="#06080f",
+                  relief="flat", cursor="hand2", pady=8,
+                  command=_submit).pack(side="left", fill="x", expand=True)
+        tk.Button(btn_row, text="Annuler",
+                  font=("Segoe UI", 10), bg=SURFACE2, fg=TEXT2,
+                  relief="flat", cursor="hand2", pady=8,
+                  command=_cancel).pack(side="right", padx=(8, 0))
 
     # ══════════════════════════════════════════════════════════════════════════
     # CREDENTIALS DIALOG
