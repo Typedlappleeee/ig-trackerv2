@@ -2670,32 +2670,35 @@ class App:
             log_fn(f"❌ Upload: {e}", "error")
             return
 
-        # ── Step 3: warmup + staggered Reels task per phone ──────────────────
+        # ── Step 3: start phones, create tasks, then poll status ─────────────
         import random
         base_time   = int(time.time())
         stagger_sec = stagger_min * 60
+
+        # Start all phones first so they're ready when the task fires
+        log_fn("📱 Démarrage des téléphones...", "accent")
+        try:
+            sr = httpx.post(
+                "https://openapi.geelark.com/open/v1/phone/start",
+                json={"ids": selected},
+                headers=api_hdrs, timeout=20, follow_redirects=False)
+            sj = sr.json() if sr.status_code == 200 else {}
+            ok  = sj.get("data", {}).get("successAmount", 0)
+            fail = sj.get("data", {}).get("failAmount", 0)
+            log_fn(f"  {ok} démarrés, {fail} déjà actifs/erreur", "info")
+        except Exception as e:
+            log_fn(f"  ⚠ Impossible de démarrer les téléphones: {e}", "warn")
+
+        # Give phones 30s to boot before first task
+        log_fn("⏳ Attente 30s (démarrage)...", "info")
+        time.sleep(30)
+
+        task_ids = {}  # pid → task_id
         for i, pid in enumerate(selected):
             name = self.data.get(pid, {}).get("phone_name", pid)
-            # Stagger: account i starts at base + i * stagger (±50%)
-            offset    = int(stagger_sec * (0.75 + random.random() * 0.5))
-            warmup_at = base_time + i * offset
-            post_at   = warmup_at + random.randint(180, 480)  # post 3-8 min after warmup
+            offset  = int(stagger_sec * (0.75 + random.random() * 0.5))
+            post_at = base_time + 30 + i * offset  # stagger after boot delay
 
-            # Warmup first (browse reels to look human)
-            try:
-                httpx.post(
-                    "https://openapi.geelark.com/open/v1/rpa/task/instagramWarmup",
-                    json={
-                        "id":         pid,
-                        "scheduleAt": warmup_at,
-                        "browseVideo": random.randint(3, 8),
-                    },
-                    headers=api_hdrs, timeout=15,
-                    follow_redirects=False)
-            except Exception:
-                pass  # warmup failure is non-critical
-
-            # Schedule the Reels post after warmup
             try:
                 r = httpx.post(
                     "https://openapi.geelark.com/open/v1/rpa/task/instagramPubReels",
@@ -2706,20 +2709,64 @@ class App:
                         "scheduleAt":  post_at,
                         "aiTag":       True,
                     },
-                    headers=api_hdrs, timeout=30,
-                    follow_redirects=False)
-                try:
-                    rj = r.json()
-                    if rj.get("code") == 0:
-                        mins = (post_at - base_time) // 60
-                        log_fn(f"✅ {name} — planifié dans ~{mins} min", "ok")
-                    else:
-                        log_fn(f"⚠ {name}: {rj.get('msg', rj)}", "warn")
-                except Exception:
-                    log_fn(f"⚠ {name}: réponse HTTP {r.status_code} — {r.text[:200]}", "warn")
+                    headers=api_hdrs, timeout=30, follow_redirects=False)
+                rj = r.json()
+                if rj.get("code") == 0:
+                    tid = rj["data"].get("taskId", "")
+                    task_ids[pid] = tid
+                    mins = max(0, (post_at - int(time.time())) // 60)
+                    log_fn(f"✅ {name} — tâche {tid} (dans ~{mins} min)", "ok")
+                else:
+                    log_fn(f"⚠ {name}: {rj.get('msg', str(rj))}", "warn")
             except Exception as e:
                 log_fn(f"❌ {name}: {e}", "error")
-        log_fn("Terminé ✓ — les posts sont planifiés avec délai aléatoire", "ok")
+
+        if not task_ids:
+            log_fn("❌ Aucune tâche créée", "error")
+            if done_cb:
+                try: self.root.after(0, done_cb)
+                except Exception: pass
+            return
+
+        # ── Poll task status until all done or 15 min timeout ────────────────
+        log_fn("⏳ Suivi des tâches en cours...", "accent")
+        STATUS = {1: "⏳ En attente", 2: "🔄 En cours", 3: "✅ Terminé", 4: "❌ Échoué", 7: "🚫 Annulé"}
+        deadline  = time.time() + 900  # 15 min
+        pending   = dict(task_ids)
+        reported  = set()
+        while pending and time.time() < deadline:
+            time.sleep(20)
+            try:
+                qr = httpx.post(
+                    "https://openapi.geelark.com/open/v1/task/query",
+                    json={"ids": list(pending.values())},
+                    headers=api_hdrs, timeout=15, follow_redirects=False)
+                items = qr.json().get("data", {}).get("items", [])
+                for item in items:
+                    tid    = item.get("id", "")
+                    status = item.get("status", 0)
+                    pid    = next((p for p, t in task_ids.items() if t == tid), None)
+                    name   = self.data.get(pid, {}).get("phone_name", pid) if pid else tid
+                    if status in (3, 4, 7) and tid not in reported:
+                        reported.add(tid)
+                        if pid in pending: del pending[pid]
+                        lv = "ok" if status == 3 else "error"
+                        label = STATUS.get(status, str(status))
+                        fail_desc = item.get("failDesc", "")
+                        fail_code = item.get("failCode", "")
+                        msg = f"{label} {name}"
+                        if fail_desc:
+                            msg += f" — {fail_desc} (code {fail_code})"
+                        log_fn(msg, lv)
+            except Exception:
+                pass
+
+        if pending:
+            for pid, tid in pending.items():
+                name = self.data.get(pid, {}).get("phone_name", pid)
+                log_fn(f"⏳ {name} — tâche toujours en cours (vérifie GéeLark)", "warn")
+
+        log_fn("Terminé ✓", "ok")
         if done_cb:
             try:
                 self.root.after(0, done_cb)
