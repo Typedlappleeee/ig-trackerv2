@@ -1034,6 +1034,7 @@ class App:
         self._setup_styles()
         self._build_layout()
         self._show_tab("phones")
+        self.root.after(600, self._show_beta_popup)
 
         self._auto_interval = int(self.cfg.get("auto_refresh_min", 5)) * 60
         self._next_refresh   = 0   # epoch — 0 = pas encore planifié
@@ -1058,6 +1059,85 @@ class App:
     def _on_close(self):
         self.running = False
         self.root.destroy()
+
+    def _show_beta_popup(self):
+        pop = tk.Toplevel(self.root)
+        pop.overrideredirect(True)          # sans barre de titre
+        pop.configure(bg=BG)
+        pop.attributes("-topmost", True)
+
+        W, H = 460, 340
+        rx = self.root.winfo_x() + (self.root.winfo_width()  - W) // 2
+        ry = self.root.winfo_y() + (self.root.winfo_height() - H) // 2
+        pop.geometry(f"{W}x{H}+{rx}+{ry}")
+
+        # Outer border frame
+        border = tk.Frame(pop, bg=ACCENT, padx=2, pady=2)
+        border.pack(fill="both", expand=True)
+        inner = tk.Frame(border, bg=BG)
+        inner.pack(fill="both", expand=True)
+
+        # Top accent bar
+        tk.Frame(inner, height=3, bg=ACCENT).pack(fill="x")
+
+        body = tk.Frame(inner, bg=BG, padx=32, pady=24)
+        body.pack(fill="both", expand=True)
+
+        # Badge
+        badge_row = tk.Frame(body, bg=BG)
+        badge_row.pack(anchor="w", pady=(0, 14))
+        tk.Label(badge_row, text="BETA", font=("Segoe UI", 9, "bold"),
+                 bg=ACCENT, fg="#07080d", padx=10, pady=3).pack(side="left")
+        tk.Label(badge_row, text="  v2.0", font=("Segoe UI", 9),
+                 bg=BG, fg=TEXT2).pack(side="left")
+
+        tk.Label(body, text="Bienvenue sur IG Tracker",
+                 font=("Segoe UI", 18, "bold"), bg=BG, fg=TEXT,
+                 anchor="w").pack(anchor="w")
+        tk.Label(body, text="Version Bêta — Accès Anticipé",
+                 font=("Segoe UI", 10), bg=BG, fg=ACCENT,
+                 anchor="w").pack(anchor="w", pady=(2, 16))
+
+        notes = [
+            ("⚡", "Fonctionnalités en cours de développement actif"),
+            ("🐛", "Des bugs peuvent survenir — merci de les signaler"),
+            ("🔒", "Tes données restent locales, rien n'est envoyé"),
+            ("🚀", "Twitter & Threads arrivent très bientôt"),
+        ]
+        for ico, txt in notes:
+            row = tk.Frame(body, bg=BG)
+            row.pack(anchor="w", pady=2)
+            tk.Label(row, text=ico, font=("Segoe UI", 11), bg=BG).pack(side="left")
+            tk.Label(row, text=f"  {txt}", font=("Segoe UI", 9),
+                     bg=BG, fg=TEXT2).pack(side="left")
+
+        # Close button
+        def _close():
+            pop.destroy()
+
+        btn_frame = tk.Frame(body, bg=BG)
+        btn_frame.pack(fill="x", pady=(20, 0))
+        close_btn = tk.Button(btn_frame, text="C'est parti  🚀",
+                              font=("Segoe UI", 11, "bold"),
+                              bg=ACCENT, fg="#07080d", relief="flat",
+                              cursor="hand2", pady=10, bd=0,
+                              command=_close)
+        close_btn.pack(fill="x")
+        self._bind_hover(close_btn, ACCENT, ACCENT2, "#07080d", "#07080d")
+
+        # Close on Escape
+        pop.bind("<Escape>", lambda e: _close())
+        pop.focus_force()
+
+        # Fade-in animation
+        pop.attributes("-alpha", 0.0)
+        def _fade(a=0.0):
+            a = min(a + 0.08, 1.0)
+            if pop.winfo_exists():
+                pop.attributes("-alpha", a)
+                if a < 1.0:
+                    pop.after(16, lambda: _fade(a))
+        _fade()
 
     def _setup_styles(self):
         style = ttk.Style()
@@ -1248,16 +1328,19 @@ class App:
             self._sidebar_indicators[key] = ind
 
         def _coming_soon(parent, icon, label):
-            """Grayed-out 'coming soon' group row."""
-            outer = tk.Frame(parent, bg=SURFACE)
-            outer.pack(fill="x")
+            """Prominent 'coming soon' row."""
+            outer = tk.Frame(parent, bg=SURFACE2,
+                             highlightthickness=1, highlightbackground=BORDER)
+            outer.pack(fill="x", padx=0, pady=1)
             tk.Frame(outer, width=3, bg=MUTED).pack(side="left", fill="y")
-            inner = tk.Frame(outer, bg=SURFACE)
-            inner.pack(side="left", fill="x", expand=True, padx=10, pady=9)
-            tk.Label(inner, text=f"{icon}  {label}", font=("Segoe UI", 9, "bold"),
-                     bg=SURFACE, fg=MUTED).pack(side="left")
-            tk.Label(inner, text="Bientôt", font=("Segoe UI", 7, "bold"),
-                     bg=MUTED, fg=BG, padx=5, pady=1).pack(side="left", padx=(7, 0))
+            inner = tk.Frame(outer, bg=SURFACE2)
+            inner.pack(side="left", fill="x", expand=True, padx=10, pady=8)
+            tk.Label(inner, text=f"{icon}  {label}", font=("Segoe UI", 10, "bold"),
+                     bg=SURFACE2, fg=TEXT2).pack(side="left")
+            badge = tk.Frame(inner, bg=SURFACE2)
+            badge.pack(side="right")
+            tk.Label(badge, text="BIENTÔT", font=("Segoe UI", 8, "bold"),
+                     bg=WARN, fg="#07080d", padx=7, pady=2).pack()
 
         # Standalone
         _reg("phones", "📱", "Téléphones")
