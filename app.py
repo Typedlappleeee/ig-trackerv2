@@ -3967,7 +3967,7 @@ class App:
             persona = self._ac_persona_box.get("1.0", "end").strip()
             self.cfg.update({"groq_api_key": groq_key, "ac_persona": persona,
                              "ac_interval_min": self._ac_intv_var.get()})
-            save_cfg(self.cfg)
+            save_config(self.cfg)
 
             interval_sec = self._ac_intv_var.get() * 60
             self._ac_running = True
