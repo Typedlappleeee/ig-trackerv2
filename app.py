@@ -712,6 +712,40 @@ def scrape_ig_direct(username: str, password: str, proxy: str | None = None,
         return {"ig_status": "error", "ig_error": str(ex)}
 
 
+def scrape_ig_by_session(username: str, sessionid: str) -> dict:
+    """
+    Get stats using an existing sessionid cookie (no new login, no challenge).
+    This is the most reliable method — reuses the session already active on
+    the GéeLark phone's Instagram app.
+    """
+    _ensure_instagrapi()
+    try:
+        from instagrapi import Client
+        cl = Client()
+        cl.login_by_sessionid(sessionid)
+        u = cl.user_info_by_username(username)
+        return {
+            "ig_status":    "active",
+            "ig_username":  u.username,
+            "full_name":    u.full_name or "",
+            "followers":    u.follower_count,
+            "following":    u.following_count,
+            "posts_count":  u.media_count,
+            "bio":          u.biography or "",
+            "is_private":   u.is_private,
+            "is_verified":  u.is_verified,
+            "profile_pic":  str(u.profile_pic_url or ""),
+            "videos":       [],
+            "last_checked": datetime.now().isoformat(),
+        }
+    except Exception as ex:
+        msg = str(ex)
+        if "login_required" in msg.lower() or "session" in msg.lower():
+            return {"ig_status": "error",
+                    "ig_error": "Session expirée — récupère un nouveau sessionid depuis GéeLark"}
+        return {"ig_status": "error", "ig_error": msg}
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # PUSH SERVER  — GéeLark phones POST stats to this local HTTP server
 # ══════════════════════════════════════════════════════════════════════════════
@@ -3595,22 +3629,29 @@ class App:
     def _scrape_one(self, pid):
         d        = self.data.get(pid, {})
         username = d.get("ig_username", "")
-        password = d.get("ig_password", "").strip()
         if not username:
             return
+
+        # Priority 1 — per-account sessionid (best: no new login, no challenge)
+        sessionid_acc = d.get("ig_sessionid", "").strip()
+        # Priority 2 — per-account password (direct login, may challenge on new IP)
+        password = d.get("ig_password", "").strip()
+        # Priority 3 — global sessionid from Settings
+        sessionid_global = self.cfg.get("ig_sessionid", "").strip()
         proxy = self.cfg.get("proxy", "").strip() or None
 
-        if password:
-            # instagrapi uses i.instagram.com — never route through the SOCKS proxy
-            # because most residential/datacenter proxies block that subdomain.
+        if sessionid_acc:
+            self.log(f"🍪 Session @{username}...", "info")
+            res = scrape_ig_by_session(username, sessionid_acc)
+        elif password:
+            # instagrapi uses i.instagram.com — bypass SOCKS proxy
             self.log(f"🔑 Login direct @{username}...", "info")
             res = scrape_ig_direct(username, password, proxy=None,
                                    challenge_callback=self._make_challenge_cb())
         else:
-            sessionid = self.cfg.get("ig_sessionid", "").strip() or None
             mode = "proxy" if proxy else "sans proxy"
             self.log(f"Scraping @{username} ({mode})...", "info")
-            res = scrape_ig(username, proxy, sessionid)
+            res = scrape_ig(username, proxy, sessionid_global or None)
 
         self.data[pid].update(res)
         self.data[pid]["last_checked"] = datetime.now().isoformat()
@@ -3749,9 +3790,9 @@ class App:
         tk.Label(win, text="🔑 Identifiants Instagram",
                  font=("Segoe UI", 14, "bold"), bg=BG, fg=TEXT).pack(anchor="w", padx=20, pady=(18, 4))
         tk.Label(win,
-                 text="Stocke le mot de passe de chaque compte pour un accès 100 % fiable via l'API mobile.\n"
-                      "Les sessions sont mises en cache localement (ig_sessions/) — "
-                      "pas besoin de relancer le login à chaque fois.",
+                 text="🍪 Session ID = méthode la plus fiable (aucun challenge).\n"
+                      "   Chrome sur GéeLark → F12 → Application → Cookies → instagram.com → sessionid\n"
+                      "🔑 Mot de passe = fallback si pas de session (peut déclencher un challenge).",
                  font=("Segoe UI", 9), bg=BG, fg=TEXT2, justify="left").pack(anchor="w", padx=20, pady=(0, 12))
 
         # ── Tab bar ─────────────────────────────────────────────────────────
@@ -3786,77 +3827,98 @@ class App:
         tab_bulk.pack(side="left", padx=(4, 0))
 
         # ── Per-account content ──────────────────────────────────────────────
-        tk.Label(per_frame,
-                 text="Sélectionne un compte et entre son mot de passe :",
+        tk.Label(per_frame, text="Sélectionne un compte :",
                  font=("Segoe UI", 9), bg=BG, fg=TEXT2).pack(anchor="w", pady=(8, 4))
 
-        # Listbox of linked accounts
         list_frame = tk.Frame(per_frame, bg=SURFACE2, highlightthickness=1,
                                highlightbackground=BORDER)
-        list_frame.pack(fill="x", pady=(0, 10))
+        list_frame.pack(fill="x", pady=(0, 8))
         accs_lb = tk.Listbox(list_frame, bg=SURFACE2, fg=TEXT, selectbackground=ACCENT,
                               selectforeground="#06080f", font=("Consolas", 10),
-                              relief="flat", height=6, bd=0)
+                              relief="flat", height=5, bd=0)
         accs_lb.pack(fill="both", padx=4, pady=4)
 
-        acc_map = {}  # listbox_index → pid
+        acc_map = {}
+        def _acc_label(d):
+            has_s = "🍪" if d.get("ig_sessionid") else ("🔑" if d.get("ig_password") else "  ")
+            return f"{has_s}  @{d.get('ig_username','')}  —  {d.get('phone_name','')}"
+
         for pid, d in self.data.items():
-            ig  = d.get("ig_username", "")
-            has = "🔑" if d.get("ig_password") else "  "
-            if ig:
+            if d.get("ig_username"):
                 idx = accs_lb.size()
-                accs_lb.insert("end", f"{has}  @{ig}  —  {d.get('phone_name', pid)}")
+                accs_lb.insert("end", _acc_label(d))
                 acc_map[idx] = pid
 
-        # Password entry
+        # Session ID row (priority 1)
+        sess_frame = tk.Frame(per_frame, bg=BG)
+        sess_frame.pack(fill="x", pady=(0, 4))
+        tk.Label(sess_frame, text="🍪 Session ID :", font=("Segoe UI", 10),
+                 bg=BG, fg=ACCENT, width=14, anchor="w").pack(side="left")
+        sess_var = tk.StringVar()
+        sess_entry = tk.Entry(sess_frame, textvariable=sess_var, show="•",
+                              font=("Consolas", 10), bg=SURFACE2, fg=TEXT,
+                              insertbackground=TEXT, relief="flat", bd=0,
+                              highlightthickness=1, highlightcolor=ACCENT,
+                              highlightbackground=BORDER)
+        sess_entry.pack(side="left", fill="x", expand=True, ipady=6, padx=(4, 4))
+        def _toggle_sess():
+            sess_entry.config(show="" if sess_entry.cget("show") == "•" else "•")
+        tk.Button(sess_frame, text="👁", font=("Segoe UI", 10), bg=SURFACE2, fg=TEXT2,
+                  relief="flat", cursor="hand2", padx=8,
+                  command=_toggle_sess).pack(side="right")
+
+        # Password row (fallback)
         pw_frame = tk.Frame(per_frame, bg=BG)
         pw_frame.pack(fill="x", pady=(0, 8))
-        tk.Label(pw_frame, text="Mot de passe :", font=("Segoe UI", 10),
+        tk.Label(pw_frame, text="🔑 Mot de passe :", font=("Segoe UI", 10),
                  bg=BG, fg=TEXT2, width=14, anchor="w").pack(side="left")
         pw_var = tk.StringVar()
         pw_entry = tk.Entry(pw_frame, textvariable=pw_var, show="•",
-                            font=("Consolas", 11), bg=SURFACE2, fg=TEXT,
+                            font=("Consolas", 10), bg=SURFACE2, fg=TEXT,
                             insertbackground=TEXT, relief="flat", bd=0,
                             highlightthickness=1, highlightcolor=ACCENT,
                             highlightbackground=BORDER)
-        pw_entry.pack(side="left", fill="x", expand=True, ipady=7, padx=(4, 4))
+        pw_entry.pack(side="left", fill="x", expand=True, ipady=6, padx=(4, 4))
         def _toggle_pw():
             pw_entry.config(show="" if pw_entry.cget("show") == "•" else "•")
         tk.Button(pw_frame, text="👁", font=("Segoe UI", 10), bg=SURFACE2, fg=TEXT2,
-                  relief="flat", cursor="hand2", padx=8, command=_toggle_pw).pack(side="right")
+                  relief="flat", cursor="hand2", padx=8,
+                  command=_toggle_pw).pack(side="right")
 
         def _on_acc_sel(e=None):
             sel = accs_lb.curselection()
             if sel:
                 pid = acc_map.get(sel[0])
                 if pid:
+                    sess_var.set(self.data[pid].get("ig_sessionid", ""))
                     pw_var.set(self.data[pid].get("ig_password", ""))
 
         accs_lb.bind("<<ListboxSelect>>", _on_acc_sel)
 
-        def _save_pw():
+        def _save_creds():
             sel = accs_lb.curselection()
             if not sel:
                 return
             pid = acc_map.get(sel[0])
             if not pid:
                 return
-            pw = pw_var.get().strip()
-            if pw:
-                self.data[pid]["ig_password"] = pw
+            d   = self.data[pid]
+            sess = sess_var.get().strip()
+            pw   = pw_var.get().strip()
+            if sess:
+                d["ig_sessionid"] = sess
             else:
-                self.data[pid].pop("ig_password", None)
-                # delete cached session
-                sess = IG_SESS_DIR / f"{self.data[pid].get('ig_username','')}.json"
-                sess.unlink(missing_ok=True)
+                d.pop("ig_sessionid", None)
+            if pw:
+                d["ig_password"] = pw
+            else:
+                d.pop("ig_password", None)
+                (IG_SESS_DIR / f"{d.get('ig_username','')}.json").unlink(missing_ok=True)
             save_data(self.data)
-            # refresh listbox label
-            ig  = self.data[pid].get("ig_username", "")
-            has = "🔑" if pw else "  "
             accs_lb.delete(sel[0])
-            accs_lb.insert(sel[0], f"{has}  @{ig}  —  {self.data[pid].get('phone_name', pid)}")
+            accs_lb.insert(sel[0], _acc_label(d))
             accs_lb.selection_set(sel[0])
-            self.log(f"Identifiants @{ig} {'sauvegardés' if pw else 'supprimés'}", "ok")
+            self.log(f"Identifiants @{d.get('ig_username','')} sauvegardés", "ok")
 
         def _test_now():
             sel = accs_lb.curselection()
@@ -3865,7 +3927,7 @@ class App:
             pid = acc_map.get(sel[0])
             if not pid:
                 return
-            _save_pw()
+            _save_creds()
             win.destroy()
             threading.Thread(target=self._scrape_one, args=(pid,), daemon=True).start()
 
@@ -3873,15 +3935,17 @@ class App:
         btns.pack(fill="x")
         tk.Button(btns, text="💾 Sauvegarder", font=("Segoe UI", 10, "bold"),
                   bg=ACCENT, fg="#06080f", relief="flat", cursor="hand2", pady=7,
-                  command=_save_pw).pack(side="left", fill="x", expand=True)
+                  command=_save_creds).pack(side="left", fill="x", expand=True)
         tk.Button(btns, text="▶ Tester maintenant", font=("Segoe UI", 10),
                   bg=OK, fg="#06080f", relief="flat", cursor="hand2", pady=7,
                   command=_test_now).pack(side="left", fill="x", expand=True, padx=(6, 0))
 
         # ── Bulk import content ──────────────────────────────────────────────
         tk.Label(bulk_frame,
-                 text="Colle ici une liste username:password (une par ligne).\n"
-                      "L'app associe automatiquement chaque ligne au compte correspondant.",
+                 text="Colle ici une liste — une par ligne — dans l'un de ces formats :\n"
+                      "  username:password          (login direct)\n"
+                      "  username::sessionid        (session cookie — recommandé)\n"
+                      "L'app associe chaque ligne au compte correspondant.",
                  font=("Segoe UI", 9), bg=BG, fg=TEXT2, justify="left").pack(
                      anchor="w", pady=(8, 6))
         bulk_txt = tk.Text(bulk_frame, font=("Consolas", 10), bg=SURFACE2, fg=TEXT,
@@ -3905,18 +3969,31 @@ class App:
             matched = 0
             for line in lines:
                 line = line.strip()
-                if ":" not in line:
+                if not line or line.startswith("#"):
                     continue
-                parts  = line.split(":", 1)
-                user   = parts[0].strip().lstrip("@").lower()
-                pw     = parts[1].strip()
-                if not user or not pw:
-                    continue
-                for pid, d in self.data.items():
-                    if d.get("ig_username", "").lower() == user:
-                        d["ig_password"] = pw
-                        matched += 1
-                        break
+                # username::sessionid  OR  username:password
+                if "::" in line:
+                    user, sessionid = line.split("::", 1)
+                    user = user.strip().lstrip("@").lower()
+                    sessionid = sessionid.strip()
+                    if not user or not sessionid:
+                        continue
+                    for pid, d in self.data.items():
+                        if d.get("ig_username", "").lower() == user:
+                            d["ig_sessionid"] = sessionid
+                            matched += 1
+                            break
+                elif ":" in line:
+                    parts = line.split(":", 1)
+                    user  = parts[0].strip().lstrip("@").lower()
+                    pw    = parts[1].strip()
+                    if not user or not pw:
+                        continue
+                    for pid, d in self.data.items():
+                        if d.get("ig_username", "").lower() == user:
+                            d["ig_password"] = pw
+                            matched += 1
+                            break
             save_data(self.data)
             result_lbl.config(text=f"✅ {matched} compte(s) mis à jour")
             self.log(f"{matched} identifiants importés", "ok")
