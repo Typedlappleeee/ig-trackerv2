@@ -1283,6 +1283,59 @@ class App:
         self.log_box.see("end")
         self.log_box.config(state="disabled")
 
+    def _show_toast(self, title, msg="", col=None, duration=4000):
+        """Toast notification in top-right corner."""
+        col = col or OK
+        try:
+            t = tk.Toplevel(self.root)
+            t.overrideredirect(True)
+            t.attributes("-topmost", True)
+            t.configure(bg=CARD)
+            tw, th = 340, 82
+            sw = self.root.winfo_screenwidth()
+            t.geometry(f"{tw}x{th}+{sw - tw - 24}+{24}")
+            f = tk.Frame(t, bg=CARD, highlightthickness=1, highlightbackground=col)
+            f.pack(fill="both", expand=True)
+            tk.Frame(f, height=3, bg=col).pack(fill="x")
+            inner = tk.Frame(f, bg=CARD, padx=14, pady=10)
+            inner.pack(fill="both", expand=True)
+            # icon row
+            ir = tk.Frame(inner, bg=CARD)
+            ir.pack(fill="x")
+            tk.Label(ir, text="●", font=("Segoe UI", 8), bg=CARD, fg=col).pack(side="left", padx=(0,6))
+            tk.Label(ir, text=title, font=("Segoe UI", 11, "bold"), bg=CARD, fg=TEXT).pack(side="left")
+            # close button
+            tk.Label(ir, text="✕", font=("Segoe UI", 9), bg=CARD, fg=MUTED, cursor="hand2").pack(side="right")
+            if msg:
+                tk.Label(inner, text=msg, font=("Segoe UI", 9), bg=CARD, fg=TEXT2,
+                         wraplength=300, anchor="w").pack(anchor="w", pady=(2, 0))
+            def dismiss(e=None):
+                try: t.destroy()
+                except: pass
+            for w in t.winfo_children() + [t]:
+                try: w.bind("<Button-1>", dismiss)
+                except: pass
+            t.after(duration, dismiss)
+            # Slide-in from right: animate x from sw to sw-tw-24
+            t.attributes("-alpha", 0.0)
+            def _fade(alpha=0.0):
+                if alpha >= 1.0 or not t.winfo_exists(): return
+                t.attributes("-alpha", min(1.0, alpha + 0.12))
+                t.after(20, lambda: _fade(alpha + 0.12))
+            _fade()
+        except Exception:
+            pass
+
+    def _play_notify_sound(self):
+        """Play notification sound if enabled."""
+        if not self.cfg.get("notify_sound", True):
+            return
+        try:
+            import winsound
+            winsound.MessageBeep(winsound.MB_ICONASTERISK)
+        except Exception:
+            pass
+
     # ── LAYOUT ───────────────────────────────────────────────────────────────
     def _build_layout(self):
         self.bg_canvas = tk.Canvas(self.root, bg=BG, highlightthickness=0)
@@ -3394,12 +3447,20 @@ class App:
         launch_btn.config(command=do_post)
 
     def _upload_and_post(self, selected, bearer, caption, video_path, log_fn,
-                         stagger_min=5, done_cb=None):
+                         stagger_min=5, done_cb=None, progress_fn=None):
         api_hdrs = {"Content-Type": "application/json",
                     "Authorization": f"Bearer {bearer}"}
 
+        def _progress(pct, step, detail=""):
+            if progress_fn:
+                try:
+                    self.root.after(0, lambda p=pct, s=step, d=detail: progress_fn(p, s, d))
+                except Exception:
+                    pass
+
         # ── Step 1: get a temporary upload URL from GéeLark ──────────────────
         log_fn("📤 Obtention de l'URL d'upload...", "accent")
+        _progress(5, "Upload", "Obtention URL...")
         try:
             r = httpx.post(
                 "https://openapi.geelark.com/open/v1/upload/getUrl",
@@ -3422,6 +3483,7 @@ class App:
 
         # ── Step 2: PUT the file — NO extra headers (OSS requirement) ────────
         log_fn("📤 Upload vidéo en cours...", "accent")
+        _progress(15, "Upload", "Envoi de la vidéo...")
         try:
             with open(video_path, "rb") as fl:
                 up = httpx.put(upload_url, content=fl.read(), timeout=300)
@@ -3429,6 +3491,7 @@ class App:
                 log_fn(f"❌ Upload échoué (HTTP {up.status_code}): {up.text[:200]}", "error")
                 return
             log_fn("✅ Vidéo uploadée", "ok")
+            _progress(30, "Upload", "Vidéo envoyée ✓")
         except Exception as e:
             log_fn(f"❌ Upload: {e}", "error")
             return
@@ -3440,6 +3503,7 @@ class App:
 
         # Start all phones first so they're ready when the task fires
         log_fn("📱 Démarrage des téléphones...", "accent")
+        _progress(35, "Démarrage", "Démarrage des téléphones...")
         try:
             sr = httpx.post(
                 "https://openapi.geelark.com/open/v1/phone/start",
@@ -3454,6 +3518,7 @@ class App:
 
         # Give phones 30s to boot before first task
         log_fn("⏳ Attente 30s (démarrage)...", "info")
+        _progress(40, "Boot", "Attente démarrage (30s)...")
         time.sleep(30)
 
         task_ids = {}  # pid → task_id
@@ -3483,6 +3548,8 @@ class App:
             except Exception as e:
                 log_fn(f"❌ {name}: {e}", "error")
 
+        _progress(70, "Polling", "Suivi des tâches...")
+
         if not task_ids:
             log_fn("❌ Aucune tâche créée", "error")
             if done_cb:
@@ -3492,6 +3559,7 @@ class App:
 
         # ── Poll task status until all done or 8 min timeout ─────────────────
         log_fn("⏳ Suivi des tâches...", "accent")
+        _progress(60, "Suivi", "Suivi des tâches...")
         STATUS = {1: "⏳ En attente", 2: "🔄 En cours", 3: "✅ Terminé", 4: "❌ Échoué", 7: "🚫 Annulé"}
         deadline  = time.time() + 480  # 8 min max
         pending   = dict(task_ids)
@@ -3542,6 +3610,7 @@ class App:
         except Exception as e:
             log_fn(f"⚠ Impossible d'éteindre les téléphones: {e}", "warn")
 
+        _progress(100, "Terminé", "Posting terminé ✓")
         log_fn("Terminé ✓", "ok")
         if done_cb:
             try:
@@ -3743,20 +3812,103 @@ class App:
         tk.Label(sched_inner, text="min entre chaque compte",
                  font=("Segoe UI", 9), bg=SURFACE, fg=MUTED).pack(side="left")
 
-        # Log
-        self.post_log_box = scrolledtext.ScrolledText(
-            right, bg=SURFACE, fg=TEXT2, font=("Consolas", 9),
-            relief="flat", state="disabled", wrap="word", height=10)
-        self.post_log_box.pack(fill="both", expand=True, pady=(10, 8))
+        # ── Progress card (replaces log) ─────────────────────────────────────
+        prog_card = tk.Frame(right, bg=CARD, highlightthickness=1,
+                             highlightbackground=BORDER)
+        prog_card.pack(fill="x", pady=(10, 0))
+        tk.Frame(prog_card, height=2, bg=ACCENT).pack(fill="x")
+        prog_inner = tk.Frame(prog_card, bg=CARD, padx=14, pady=10)
+        prog_inner.pack(fill="both", expand=True)
+
+        # Step + detail labels
+        prog_top = tk.Frame(prog_inner, bg=CARD)
+        prog_top.pack(fill="x")
+        self._post_step_lbl = tk.Label(prog_top, text="En attente",
+                                        font=("Segoe UI", 10, "bold"), bg=CARD, fg=TEXT)
+        self._post_step_lbl.pack(side="left")
+        self._post_pct_lbl = tk.Label(prog_top, text="",
+                                       font=("Consolas", 10, "bold"), bg=CARD, fg=ACCENT)
+        self._post_pct_lbl.pack(side="right")
+        self._post_detail_lbl = tk.Label(prog_inner, text="Sélectionne une vidéo et des comptes",
+                                          font=("Segoe UI", 9), bg=CARD, fg=TEXT2)
+        self._post_detail_lbl.pack(anchor="w", pady=(2, 6))
+
+        # Animated progress bar (Canvas)
+        bar_bg = tk.Frame(prog_inner, bg=SURFACE3, height=8,
+                          highlightthickness=1, highlightbackground=BORDER)
+        bar_bg.pack(fill="x", pady=(0, 4))
+        bar_bg.pack_propagate(False)
+        self._post_prog_bar = tk.Canvas(bar_bg, bg=SURFACE3, height=8,
+                                         highlightthickness=0)
+        self._post_prog_bar.pack(fill="both", expand=True)
+        self._post_prog_pct = [0]
+        self._post_prog_target = [0]
+
+        def _animate_bar():
+            """Smoothly animate bar toward target."""
+            cur = self._post_prog_pct[0]
+            tgt = self._post_prog_target[0]
+            if cur < tgt:
+                cur = min(tgt, cur + max(1, (tgt - cur) // 6))
+                self._post_prog_pct[0] = cur
+            w = self._post_prog_bar.winfo_width() or 300
+            self._post_prog_bar.delete("all")
+            if cur > 0:
+                fill_w = max(8, int(w * cur / 100))
+                col = OK if cur >= 100 else ACCENT
+                self._post_prog_bar.create_rectangle(
+                    0, 0, fill_w, 8, fill=col, outline="")
+                # shimmer highlight
+                self._post_prog_bar.create_rectangle(
+                    0, 0, fill_w, 3, fill="#ffffff22", outline="")
+            self.root.after(30, _animate_bar)
+        self.root.after(100, _animate_bar)
+
+        # Hidden log (toggle)
+        log_toggle_row = tk.Frame(prog_inner, bg=CARD)
+        log_toggle_row.pack(fill="x", pady=(4, 0))
+        self._log_visible = [False]
+        log_toggle_btn = tk.Label(log_toggle_row, text="▶  Journal détaillé",
+                                   font=("Segoe UI", 8), bg=CARD, fg=TEXT2,
+                                   cursor="hand2")
+        log_toggle_btn.pack(side="left")
+
+        self.post_log_box = tk.Text(prog_card, bg=SURFACE, fg=TEXT2,
+                                     font=("Consolas", 8), relief="flat",
+                                     state="disabled", wrap="word", height=6,
+                                     padx=8, pady=6)
+
+        def _toggle_log(e=None):
+            if self._log_visible[0]:
+                self.post_log_box.pack_forget()
+                log_toggle_btn.config(text="▶  Journal détaillé")
+                self._log_visible[0] = False
+            else:
+                self.post_log_box.pack(fill="both", expand=True, padx=8, pady=(0, 8))
+                log_toggle_btn.config(text="▼  Journal détaillé")
+                self._log_visible[0] = True
+        log_toggle_btn.bind("<Button-1>", _toggle_log)
 
         def _plog(msg, lv="info"):
             colors = {"info": TEXT2, "ok": OK, "warn": WARN, "error": DANGER, "accent": ACCENT}
-            self.post_log_box.config(state="normal")
-            ts = datetime.now().strftime("%H:%M:%S")
-            self.post_log_box.insert("end", f"[{ts}] {msg}\n", lv)
-            self.post_log_box.tag_config(lv, foreground=colors.get(lv, TEXT2))
-            self.post_log_box.see("end")
-            self.post_log_box.config(state="disabled")
+            try:
+                self.post_log_box.config(state="normal")
+                ts = datetime.now().strftime("%H:%M:%S")
+                self.post_log_box.insert("end", f"[{ts}] {msg}\n", lv)
+                self.post_log_box.tag_config(lv, foreground=colors.get(lv, TEXT2))
+                self.post_log_box.see("end")
+                self.post_log_box.config(state="disabled")
+            except Exception:
+                pass
+
+        def _post_set_progress(pct, step, detail=""):
+            col = OK if pct >= 100 else (DANGER if "❌" in detail else ACCENT)
+            self._post_prog_target[0] = pct
+            self._post_step_lbl.config(text=step, fg=TEXT)
+            self._post_pct_lbl.config(text=f"{pct}%", fg=col)
+            if detail:
+                self._post_detail_lbl.config(text=detail, fg=TEXT2)
+        self._post_set_progress = _post_set_progress
 
         self.post_launch_btn = tk.Button(
             right, text="🚀  Lancer le posting",
