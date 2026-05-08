@@ -1384,6 +1384,7 @@ class App:
 
         _reg("stats",       "📊", "Stats",         grp_children, indent=True)
         _reg("posting",     "🚀", "Posting",        grp_children, indent=True)
+        _reg("masspost",    "⚡", "Mass Posting",   grp_children, indent=True)
         _reg("bank",        "🗂", "Banque vidéos",  grp_children, indent=True)
         _reg("autocomment", "🤖", "Automatisation", grp_children, indent=True)
         _reg("tools",       "🔧", "Outils IA",      grp_children, indent=True)
@@ -1481,6 +1482,7 @@ class App:
         self._build_stats_tab()
         self._build_automation_tab()
         self._build_posting_tab()
+        self._build_masspost_tab()
         self._build_bank_tab()
         self._build_autocomment_tab()
         self._build_tools_tab()
@@ -1593,7 +1595,7 @@ class App:
     def _show_tab(self, key):
         self._active_tab = key
         # Auto-expand INSTA group if needed
-        _insta_keys = {"stats", "posting", "bank", "autocomment", "tools"}
+        _insta_keys = {"stats", "posting", "masspost", "bank", "autocomment", "tools"}
         if key in _insta_keys and hasattr(self, "_insta_group_children"):
             children = self._insta_group_children
             if not children.winfo_ismapped():
@@ -1619,6 +1621,7 @@ class App:
         if key == "stats":    self._refresh_ig_list()
         if key == "bank":     self._refresh_bank()
         if key == "automation": self._refresh_auto_phones()
+        if key == "masspost": self._mp_refresh_phones()
 
     def _on_global_scroll(self, event):
         """Route mousewheel to nearest scrollable ancestor."""
@@ -1813,136 +1816,287 @@ class App:
             self._refresh_table()
 
     # ══════════════════════════════════════════════════════════════════════════
-    # ONGLET STATS
+    # ONGLET STATS — Interface redesignée
     # ══════════════════════════════════════════════════════════════════════════
     def _build_stats_tab(self):
         f = tk.Frame(self.tab_container, bg=BG)
         self.tabs["stats"] = f
 
-        left = tk.Frame(f, bg=SURFACE, width=220)
-        left.pack(side="left", fill="y", padx=(0, 0))
+        # ── Left sidebar: account cards ───────────────────────────────────────
+        left = tk.Frame(f, bg=SURFACE, width=240)
+        left.pack(side="left", fill="y")
         left.pack_propagate(False)
-
-        # Sidebar header for accounts list
         tk.Frame(left, height=2, bg=OK).pack(fill="x")
-        tk.Label(left, text="COMPTES LIÉS", font=("Segoe UI", 8, "bold"),
-                 bg=SURFACE, fg=TEXT2).pack(anchor="w", padx=12, pady=(12, 6))
-        self.ig_list = tk.Listbox(left, bg=SURFACE, fg=TEXT, selectbackground=HL,
-                                   selectforeground=ACCENT, relief="flat", bd=0,
-                                   font=("Segoe UI", 10), activestyle="none", cursor="hand2")
-        self.ig_list.pack(fill="both", expand=True, padx=4, pady=(0, 4))
-        self.ig_list.bind("<<ListboxSelect>>", lambda e: self._on_ig_list_sel())
 
+        # Header
+        lhdr = tk.Frame(left, bg=SURFACE)
+        lhdr.pack(fill="x", padx=12, pady=(10, 6))
+        tk.Label(lhdr, text="COMPTES LIÉS", font=("Segoe UI", 8, "bold"),
+                 bg=SURFACE, fg=TEXT2).pack(side="left")
+        self._st_count_lbl = tk.Label(lhdr, text="", font=("Segoe UI", 8),
+                                       bg=SURFACE, fg=MUTED)
+        self._st_count_lbl.pack(side="right")
+
+        # Scrollable account list
+        acct_canvas = tk.Canvas(left, bg=SURFACE, highlightthickness=0)
+        acct_sb = ttk.Scrollbar(left, orient="vertical", command=acct_canvas.yview)
+        acct_canvas.configure(yscrollcommand=acct_sb.set)
+        acct_canvas.pack(side="left", fill="both", expand=True)
+        acct_sb.pack(side="right", fill="y")
+        self._st_acct_inner = tk.Frame(acct_canvas, bg=SURFACE)
+        acct_canvas.create_window((0, 0), window=self._st_acct_inner, anchor="nw")
+        def _acct_conf(e=None):
+            acct_canvas.configure(scrollregion=acct_canvas.bbox("all"))
+        self._st_acct_inner.bind("<Configure>", _acct_conf)
+        self._st_acct_canvas = acct_canvas
+        self._st_selected_pid = [None]
+
+        # ── Right detail panel ────────────────────────────────────────────────
         right = tk.Frame(f, bg=BG)
-        right.pack(side="left", fill="both", expand=True, padx=(12, 0))
+        right.pack(side="left", fill="both", expand=True)
 
-        # Account detail header card
-        hdr = tk.Frame(right, bg=CARD, highlightthickness=1, highlightbackground=BORDER)
-        hdr.pack(fill="x", pady=(0, 10))
-        tk.Frame(hdr, height=2, bg=OK).pack(fill="x")
-        hdr_inner = tk.Frame(hdr, bg=CARD)
-        hdr_inner.pack(fill="x", padx=16, pady=10)
-        self.det_name = tk.Label(hdr_inner, text="Sélectionne un compte",
+        # Profile header card
+        prof_card = tk.Frame(right, bg=CARD, highlightthickness=1,
+                             highlightbackground=BORDER)
+        prof_card.pack(fill="x", padx=(10, 0), pady=(0, 8))
+        tk.Frame(prof_card, height=2, bg=OK).pack(fill="x")
+        prof_inner = tk.Frame(prof_card, bg=CARD)
+        prof_inner.pack(fill="x", padx=16, pady=14)
+
+        # Avatar canvas (circular)
+        self._st_avatar_canvas = tk.Canvas(prof_inner, bg=CARD, highlightthickness=0,
+                                            width=60, height=60)
+        self._st_avatar_canvas.pack(side="left", padx=(0, 14))
+        self._st_avatar_img_ref = None
+
+        # Name + bio column
+        name_col = tk.Frame(prof_inner, bg=CARD)
+        name_col.pack(side="left", fill="x", expand=True)
+        name_row = tk.Frame(name_col, bg=CARD)
+        name_row.pack(fill="x")
+        self.det_name = tk.Label(name_row, text="Sélectionne un compte →",
                                   font=("Segoe UI", 14, "bold"), bg=CARD, fg=TEXT)
         self.det_name.pack(side="left")
-        self.det_status = tk.Label(hdr_inner, text="", font=("Segoe UI", 10), bg=CARD, fg=TEXT2)
-        self.det_status.pack(side="left", padx=(12, 0))
+        self.det_status = tk.Label(name_row, text="",
+                                    font=("Segoe UI", 9, "bold"), bg=CARD, fg=TEXT2,
+                                    padx=8, pady=3)
+        self.det_status.pack(side="left", padx=(10, 0))
+        self._st_fullname_lbl = tk.Label(name_col, text="",
+                                          font=("Segoe UI", 10), bg=CARD, fg=TEXT2)
+        self._st_fullname_lbl.pack(anchor="w")
+        self._st_bio_lbl = tk.Label(name_col, text="",
+                                     font=("Segoe UI", 9), bg=CARD, fg=MUTED,
+                                     wraplength=420, justify="left")
+        self._st_bio_lbl.pack(anchor="w", pady=(2, 0))
 
+        # KPI row
         kf = tk.Frame(right, bg=BG)
-        kf.pack(fill="x", pady=(0, 10))
+        kf.pack(fill="x", padx=(10, 0), pady=(0, 8))
         self.kpis = {}
-        for k, lbl, col in [("followers", "FOLLOWERS", ACCENT),
-                             ("following", "FOLLOWING", TEXT2),
-                             ("posts",     "POSTS",     OK),
-                             ("views",     "VUES",      WARN)]:
-            kcard = tk.Frame(kf, bg=CARD, padx=12, pady=12,
-                             highlightthickness=1, highlightbackground=BORDER)
-            kcard.pack(side="left", fill="x", expand=True, padx=(0, 8))
-            tk.Frame(kcard, height=2, bg=col).pack(fill="x", pady=(0, 8))
-            tk.Label(kcard, text=lbl, font=("Segoe UI", 8, "bold"),
-                     bg=CARD, fg=TEXT2).pack(anchor="w")
-            v = tk.Label(kcard, text="—", font=("Segoe UI", 20, "bold"), bg=CARD, fg=col)
-            v.pack(anchor="w", pady=(4, 0))
+        for k, icon, lbl, col in [
+            ("followers", "👥", "FOLLOWERS", ACCENT),
+            ("following", "➡", "FOLLOWING", TEXT2),
+            ("posts",     "📸", "POSTS",     OK),
+            ("views",     "👁", "VUES TOTAL", WARN),
+        ]:
+            kcard = tk.Frame(kf, bg=CARD, highlightthickness=1, highlightbackground=BORDER)
+            kcard.pack(side="left", fill="x", expand=True, padx=(0, 6))
+            tk.Frame(kcard, height=2, bg=col).pack(fill="x")
+            ki = tk.Frame(kcard, bg=CARD, padx=12, pady=10)
+            ki.pack(fill="x")
+            top_row = tk.Frame(ki, bg=CARD)
+            top_row.pack(fill="x")
+            tk.Label(top_row, text=icon, font=("Segoe UI", 14),
+                     bg=CARD, fg=col).pack(side="left", padx=(0, 6))
+            v = tk.Label(top_row, text="—", font=("Segoe UI", 18, "bold"), bg=CARD, fg=col)
+            v.pack(side="left")
             self.kpis[k] = v
+            tk.Label(ki, text=lbl, font=("Segoe UI", 7, "bold"),
+                     bg=CARD, fg=TEXT2).pack(anchor="w", pady=(2, 0))
 
-        # Video filter bar
+        # Sort / filter bar
         vfbar = tk.Frame(right, bg=BG)
-        vfbar.pack(fill="x", pady=(0, 4))
-        tk.Label(vfbar, text="VIDÉOS", font=("Consolas", 8, "bold"),
-                 bg=BG, fg=MUTED).pack(side="left")
+        vfbar.pack(fill="x", padx=(10, 0), pady=(0, 6))
+        self._st_vid_count_lbl = tk.Label(vfbar, text="VIDÉOS",
+                                           font=("Segoe UI", 9, "bold"),
+                                           bg=BG, fg=TEXT2)
+        self._st_vid_count_lbl.pack(side="left")
         tk.Label(vfbar, text="Trier :", font=("Segoe UI", 9),
-                 bg=BG, fg=TEXT2).pack(side="left", padx=(12, 4))
-        self._vid_sort_var = tk.StringVar(value="recent")
+                 bg=BG, fg=TEXT2).pack(side="left", padx=(14, 4))
+        self._vid_sort_var = tk.StringVar(value="Plus récent")
         sort_opts = [("recent", "Plus récent"), ("old", "Plus ancien"),
                      ("views_desc", "+ de vues"), ("views_asc", "- de vues"),
                      ("likes_desc", "+ de likes")]
+        self._vid_sort_keys = {lbl: key for key, lbl in sort_opts}
         sort_cb = ttk.Combobox(vfbar, textvariable=self._vid_sort_var,
                                state="readonly", width=14, font=("Segoe UI", 9))
         sort_cb["values"] = [lbl for _, lbl in sort_opts]
-        self._vid_sort_keys = {lbl: key for key, lbl in sort_opts}
         sort_cb.pack(side="left")
-        sort_cb.bind("<<ComboboxSelected>>",
-                     lambda e: self._refresh_vid_tree())
+        sort_cb.bind("<<ComboboxSelected>>", lambda e: self._refresh_vid_cards())
 
-        vcols = ("id", "views", "likes", "comments", "caption")
-        self.vid_tree = ttk.Treeview(right, columns=vcols, show="headings",
-                                      style="Vid.Treeview", height=13)
-        for col, head, w, anch in [
-            ("id",       "Shortcode",  120, "center"),
-            ("views",    "Vues",       90,  "center"),
-            ("likes",    "Likes",      80,  "center"),
-            ("comments", "Comments",   100, "center"),
-            ("caption",  "Caption",    600, "w"),
-        ]:
-            self.vid_tree.heading(col, text=head)
-            self.vid_tree.column(col, width=w, anchor=anch)
-        vsb2 = ttk.Scrollbar(right, orient="vertical", command=self.vid_tree.yview)
-        self.vid_tree.configure(yscrollcommand=vsb2.set)
-        self.vid_tree.pack(side="left", fill="both", expand=True)
-        vsb2.pack(side="right", fill="y")
-        self.vid_tree.bind("<<TreeviewSelect>>", self._on_vid_tree_sel)
+        # Video cards scrollable area
+        vid_outer = tk.Frame(right, bg=BG)
+        vid_outer.pack(fill="both", expand=True, padx=(10, 0))
+        self._st_vid_canvas = tk.Canvas(vid_outer, bg=BG, highlightthickness=0)
+        vid_sb = ttk.Scrollbar(vid_outer, orient="vertical",
+                                command=self._st_vid_canvas.yview)
+        self._st_vid_canvas.configure(yscrollcommand=vid_sb.set)
+        self._st_vid_canvas.pack(side="left", fill="both", expand=True)
+        vid_sb.pack(side="right", fill="y")
+        self._st_vid_inner = tk.Frame(self._st_vid_canvas, bg=BG)
+        self._st_vid_canvas.create_window((0, 0), window=self._st_vid_inner, anchor="nw")
+        def _vid_conf(e=None):
+            self._st_vid_canvas.configure(
+                scrollregion=self._st_vid_canvas.bbox("all"))
+        self._st_vid_inner.bind("<Configure>", _vid_conf)
         self._current_vid_pid = [None]
 
+        # Placeholder label
+        self._st_placeholder = tk.Label(self._st_vid_inner,
+                                         text="← Sélectionne un compte pour voir ses vidéos",
+                                         font=("Segoe UI", 11), bg=BG, fg=MUTED)
+        self._st_placeholder.pack(pady=40)
+
+    def _stats_make_avatar(self, letter, color, size=54):
+        """Return a circular PIL ImageTk with the given letter."""
+        if not PIL_OK:
+            return None
+        img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(img)
+        draw.ellipse([0, 0, size - 1, size - 1], fill=color)
+        # Draw letter
+        try:
+            font = ImageFont.truetype("arial.ttf", size // 2)
+        except Exception:
+            font = ImageFont.load_default()
+        bb = draw.textbbox((0, 0), letter, font=font)
+        tw, th = bb[2] - bb[0], bb[3] - bb[1]
+        draw.text(((size - tw) / 2 - bb[0], (size - th) / 2 - bb[1]),
+                  letter, fill="#07080d", font=font)
+        return ImageTk.PhotoImage(img)
+
+    def _stats_avatar_color(self, text):
+        """Deterministic color from text hash."""
+        palette = [ACCENT, OK, WARN, "#4f9eff", "#a56ef5", "#ff6ec7", "#00e5d4", "#2dde78"]
+        return palette[hash(text) % len(palette)]
+
+    def _refresh_ig_list(self):
+        for w in self._st_acct_inner.winfo_children():
+            w.destroy()
+        accounts = [(pid, d) for pid, d in self.data.items()
+                    if d.get("ig_username")]
+        self._st_count_lbl.config(text=f"{len(accounts)} comptes")
+        for pid, d in accounts:
+            ig   = d.get("ig_username", "")
+            fn   = d.get("full_name", "")
+            st   = d.get("ig_status", "")
+            fol  = d.get("followers", 0)
+            st_map = {"active": ("✅ Actif", OK), "banned": ("❌ Banni", DANGER),
+                      "private": ("🔒 Privé", WARN), "error": ("⚠ Erreur", DANGER)}
+            st_text, st_col = st_map.get(st, ("—", MUTED))
+            col  = self._stats_avatar_color(ig)
+            letter = (ig[0] if ig else "?").upper()
+
+            card = tk.Frame(self._st_acct_inner, bg=SURFACE2,
+                            highlightthickness=1, highlightbackground=BORDER,
+                            cursor="hand2")
+            card.pack(fill="x", padx=6, pady=3)
+
+            inner = tk.Frame(card, bg=SURFACE2)
+            inner.pack(fill="x", padx=10, pady=8)
+
+            # Small avatar
+            av_cv = tk.Canvas(inner, bg=SURFACE2, highlightthickness=0,
+                               width=38, height=38)
+            av_cv.pack(side="left", padx=(0, 10))
+            av_img = self._stats_make_avatar(letter, col, size=38)
+            if av_img:
+                av_cv.create_image(19, 19, image=av_img)
+                av_cv._img_ref = av_img
+
+            txt_col = tk.Frame(inner, bg=SURFACE2)
+            txt_col.pack(side="left", fill="x", expand=True)
+            tk.Label(txt_col, text=f"@{ig}", font=("Segoe UI", 10, "bold"),
+                     bg=SURFACE2, fg=TEXT, anchor="w").pack(anchor="w")
+            if fn:
+                tk.Label(txt_col, text=fn, font=("Segoe UI", 8),
+                         bg=SURFACE2, fg=TEXT2, anchor="w").pack(anchor="w")
+            bot_row = tk.Frame(txt_col, bg=SURFACE2)
+            bot_row.pack(fill="x")
+            tk.Label(bot_row, text=f"👥 {fmt(fol)}", font=("Segoe UI", 8),
+                     bg=SURFACE2, fg=TEXT2).pack(side="left")
+            tk.Label(bot_row, text=st_text, font=("Segoe UI", 7, "bold"),
+                     bg=SURFACE2, fg=st_col).pack(side="right")
+
+            # Hover + click
+            def _hover_in(e, c=card): c.config(highlightbackground=ACCENT)
+            def _hover_out(e, c=card): c.config(highlightbackground=BORDER)
+            def _click(e, p=pid): self._show_ig_detail(p)
+            for w in [card, inner, av_cv, txt_col, bot_row] + list(inner.winfo_children()) + list(txt_col.winfo_children()) + list(bot_row.winfo_children()):
+                try:
+                    w.bind("<Enter>", _hover_in)
+                    w.bind("<Leave>", _hover_out)
+                    w.bind("<Button-1>", _click)
+                except Exception:
+                    pass
+
+        self._st_acct_canvas.configure(
+            scrollregion=self._st_acct_canvas.bbox("all"))
+
     def _on_ig_list_sel(self):
-        sel = self.ig_list.curselection()
-        if not sel:
-            return
-        raw = self.ig_list.get(sel[0])
-        username = raw.split("@")[-1].strip()
-        for pid, d in self.data.items():
-            if d.get("ig_username") == username:
-                self._show_ig_detail(pid)
-                break
+        pass  # kept for compatibility; selection now via card click
 
     def _show_ig_detail(self, pid):
         d = self.data.get(pid, {})
-        st = d.get("ig_status", "")
-        fn = d.get("full_name", "")
-        ig = d.get("ig_username", "")
-        self.det_name.config(text=f"@{ig}" + (f"  ·  {fn}" if fn else ""))
-        st_map = {"active": "✅ Actif", "banned": "❌ Banni",
-                  "private": "🔒 Privé", "error": "⚠ Erreur"}
-        col_map = {"active": OK, "banned": DANGER, "private": WARN, "error": WARN}
-        self.det_status.config(text=st_map.get(st, "—"), fg=col_map.get(st, MUTED))
+        st   = d.get("ig_status", "")
+        fn   = d.get("full_name", "")
+        ig   = d.get("ig_username", "")
+        bio  = d.get("bio", "")
+
+        # Avatar
+        col    = self._stats_avatar_color(ig)
+        letter = (ig[0] if ig else "?").upper()
+        av_img = self._stats_make_avatar(letter, col, size=54)
+        self._st_avatar_canvas.delete("all")
+        if av_img:
+            self._st_avatar_canvas.create_image(30, 30, image=av_img)
+            self._st_avatar_img_ref = av_img
+
+        # Name / status
+        self.det_name.config(text=f"@{ig}")
+        self._st_fullname_lbl.config(text=fn)
+        self._st_bio_lbl.config(text=bio[:120] if bio else "")
+        st_map = {"active": ("✅ Actif", OK), "banned": ("❌ Banni", DANGER),
+                  "private": ("🔒 Privé", WARN), "error": ("⚠ Erreur", WARN)}
+        st_text, st_col = st_map.get(st, ("—", MUTED))
+        self.det_status.config(text=st_text, fg="#07080d", bg=st_col)
+
+        # KPIs
+        total_views = sum(v.get("views", 0) for v in d.get("videos", []))
         self.kpis["followers"].config(text=fmt(d.get("followers", 0)))
         self.kpis["following"].config(text=fmt(d.get("following", 0)))
         self.kpis["posts"].config(text=str(d.get("posts_count", 0)))
-        self.kpis["views"].config(
-            text=fmt(sum(v.get("views", 0) for v in d.get("videos", []))))
-        self._current_vid_pid[0] = pid
-        self._refresh_vid_tree()
+        self.kpis["views"].config(text=fmt(total_views))
 
-    def _refresh_vid_tree(self):
+        self._current_vid_pid[0] = pid
+        self._refresh_vid_cards()
+
+    def _refresh_vid_cards(self):
         pid = self._current_vid_pid[0] if hasattr(self, '_current_vid_pid') else None
+        # Clear existing cards
+        for w in self._st_vid_inner.winfo_children():
+            w.destroy()
         if not pid:
+            tk.Label(self._st_vid_inner,
+                     text="← Sélectionne un compte pour voir ses vidéos",
+                     font=("Segoe UI", 11), bg=BG, fg=MUTED).pack(pady=40)
             return
+
         d = self.data.get(pid, {})
         videos = list(d.get("videos", []))
-        sort_lbl = getattr(self, '_vid_sort_var', None)
-        sort_key = self._vid_sort_keys.get(sort_lbl.get(), "recent") if sort_lbl else "recent"
-        if sort_key == "recent":
-            pass  # keep original order (API returns newest first)
-        elif sort_key == "old":
+        sort_lbl = self._vid_sort_var.get()
+        sort_key = self._vid_sort_keys.get(sort_lbl, "recent")
+        if sort_key == "old":
             videos = list(reversed(videos))
         elif sort_key == "views_desc":
             videos.sort(key=lambda v: v.get("views", 0), reverse=True)
@@ -1950,24 +2104,111 @@ class App:
             videos.sort(key=lambda v: v.get("views", 0))
         elif sort_key == "likes_desc":
             videos.sort(key=lambda v: v.get("likes", 0), reverse=True)
-        self.vid_tree.delete(*self.vid_tree.get_children())
-        for v in videos:
-            self.vid_tree.insert("", "end", iid=v.get("id", ""), values=(
-                v.get("id", ""),
-                fmt(v.get("views", 0)),
-                fmt(v.get("likes", 0)),
-                fmt(v.get("comments", 0)),
-                v.get("caption", ""),
-            ))
+
+        count = len(videos)
+        self._st_vid_count_lbl.config(
+            text=f"VIDÉOS  ·  {count} reels")
+
+        if not videos:
+            tk.Label(self._st_vid_inner, text="Aucune vidéo enregistrée",
+                     font=("Segoe UI", 11), bg=BG, fg=MUTED).pack(pady=40)
+            return
+
+        # Max views for relative bar scaling
+        max_views = max((v.get("views", 0) for v in videos), default=1) or 1
+
+        # Grid: 3 cards per row
+        COLS = 3
+        grid_frame = tk.Frame(self._st_vid_inner, bg=BG)
+        grid_frame.pack(fill="both", expand=True, pady=4)
+
+        for i, vid in enumerate(videos):
+            row_idx = i // COLS
+            col_idx = i % COLS
+            sc       = vid.get("id", "")
+            views    = vid.get("views", 0)
+            likes    = vid.get("likes", 0)
+            comments = vid.get("comments", 0)
+            caption  = vid.get("caption", "")
+            url      = f"https://www.instagram.com/reel/{sc}/"
+
+            # Color accent per popularity
+            ratio = views / max_views
+            if ratio > 0.7:
+                accent_c = ACCENT
+            elif ratio > 0.3:
+                accent_c = OK
+            else:
+                accent_c = TEXT2
+
+            card = tk.Frame(grid_frame, bg=CARD, highlightthickness=1,
+                            highlightbackground=BORDER, cursor="hand2")
+            card.grid(row=row_idx, column=col_idx, padx=4, pady=4, sticky="nsew")
+            grid_frame.columnconfigure(col_idx, weight=1)
+
+            # Top accent bar
+            tk.Frame(card, height=3, bg=accent_c).pack(fill="x")
+
+            # REEL header + shortcode
+            th = tk.Frame(card, bg=SURFACE2)
+            th.pack(fill="x")
+            tk.Label(th, text="REEL", font=("Consolas", 7, "bold"),
+                     bg=SURFACE2, fg=accent_c, padx=8, pady=3).pack(side="left")
+            tk.Label(th, text=sc[:11] if sc else "", font=("Consolas", 7),
+                     bg=SURFACE2, fg=TEXT2, padx=6).pack(side="right")
+
+            # Progress bar (views relative)
+            bar_bg = tk.Frame(card, bg=SURFACE3, height=3)
+            bar_bg.pack(fill="x")
+            bar_fill_w = max(int(ratio * 100), 2)
+            bar_fill = tk.Frame(bar_bg, bg=accent_c, height=3)
+            bar_fill.place(relx=0, rely=0, relwidth=ratio, relheight=1)
+
+            # Stats row
+            stats_row = tk.Frame(card, bg=CARD)
+            stats_row.pack(fill="x", padx=8, pady=(6, 2))
+            for icon, val, col in [
+                ("👁", fmt(views),    WARN),
+                ("❤️", fmt(likes),    DANGER),
+                ("💬", fmt(comments), TEXT2),
+            ]:
+                chunk = tk.Frame(stats_row, bg=CARD)
+                chunk.pack(side="left", padx=(0, 10))
+                tk.Label(chunk, text=icon, font=("Segoe UI", 10),
+                         bg=CARD).pack(side="left")
+                tk.Label(chunk, text=val, font=("Segoe UI", 9, "bold"),
+                         bg=CARD, fg=col).pack(side="left", padx=(2, 0))
+
+            # Caption preview
+            cap_text = caption[:80].replace("\n", " ") if caption else "—"
+            if len(caption) > 80:
+                cap_text += "…"
+            tk.Label(card, text=cap_text, font=("Segoe UI", 8),
+                     bg=CARD, fg=TEXT2, wraplength=170, justify="left",
+                     anchor="w").pack(fill="x", padx=8, pady=(2, 8))
+
+            # Click to open reel
+            def _open(e, u=url):
+                import webbrowser
+                webbrowser.open(u)
+            def _hover_in(e, c=card): c.config(highlightbackground=accent_c)
+            def _hover_out(e, c=card): c.config(highlightbackground=BORDER)
+            for w in card.winfo_children() + [card]:
+                try:
+                    w.bind("<Button-1>", _open)
+                    w.bind("<Enter>", _hover_in)
+                    w.bind("<Leave>", _hover_out)
+                except Exception:
+                    pass
+
+        self._st_vid_canvas.configure(
+            scrollregion=self._st_vid_canvas.bbox("all"))
+
+    def _refresh_vid_tree(self):
+        self._refresh_vid_cards()
 
     def _on_vid_tree_sel(self, e=None):
-        sel = self.vid_tree.selection()
-        if not sel:
-            return
-        shortcode = sel[0]
-        url = f"https://www.instagram.com/reel/{shortcode}/"
-        import webbrowser
-        webbrowser.open(url)
+        pass
 
     # ══════════════════════════════════════════════════════════════════════════
     # HELPERS ACCORDION + PANNEAU SCROLLABLE
@@ -3571,6 +3812,542 @@ class App:
                 self.post_launch_btn.config(text=f"🚀  Lancer  ({n} en cours)")
 
         self.post_launch_btn.config(command=_do_post)
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # ONGLET MASS POSTING
+    # ══════════════════════════════════════════════════════════════════════════
+    def _build_masspost_tab(self):
+        f = tk.Frame(self.tab_container, bg=BG)
+        self.tabs["masspost"] = f
+
+        # ── Header ───────────────────────────────────────────────────────────
+        hdr_row = tk.Frame(f, bg=BG)
+        hdr_row.pack(fill="x")
+        self._tab_header(hdr_row, "⚡", "Mass Posting",
+                         "Pool de vidéos × captions → jusqu'à 20 téléphones simultanés", ACCENT)
+        # BETA badge
+        beta_lbl = tk.Label(hdr_row, text=" BETA ", font=("Segoe UI", 8, "bold"),
+                            bg=WARN, fg="#07080d", padx=6, pady=2)
+        beta_lbl.place(relx=1.0, x=-16, y=14, anchor="ne")
+
+        body = tk.Frame(f, bg=BG)
+        body.pack(fill="both", expand=True, padx=12, pady=(0, 12))
+
+        # ── Left panel: video + caption pools ────────────────────────────────
+        left = tk.Frame(body, bg=SURFACE, width=300,
+                        highlightthickness=1, highlightbackground=BORDER)
+        left.pack(side="left", fill="y", padx=(0, 10))
+        left.pack_propagate(False)
+        tk.Frame(left, height=2, bg=ACCENT).pack(fill="x")
+
+        linner = tk.Frame(left, bg=SURFACE)
+        linner.pack(fill="both", expand=True, padx=10, pady=10)
+
+        # -- Video pool --
+        tk.Label(linner, text="📹  POOL DE VIDÉOS", font=("Segoe UI", 9, "bold"),
+                 bg=SURFACE, fg=ACCENT).pack(anchor="w", pady=(0, 4))
+
+        self._mp_vid_paths = []
+        vlist_frame = tk.Frame(linner, bg=SURFACE2, highlightthickness=1,
+                               highlightbackground=BORDER)
+        vlist_frame.pack(fill="x")
+        self._mp_vid_lb = tk.Listbox(vlist_frame, bg=SURFACE2, fg=TEXT,
+                                      selectbackground=HL, selectforeground=ACCENT,
+                                      relief="flat", bd=0, height=7,
+                                      font=("Segoe UI", 9), activestyle="none",
+                                      cursor="hand2", exportselection=False)
+        self._mp_vid_lb.pack(fill="both", expand=True, padx=4, pady=4)
+
+        vbtn_row = tk.Frame(linner, bg=SURFACE)
+        vbtn_row.pack(fill="x", pady=(4, 10))
+        def _add_videos():
+            paths = filedialog.askopenfilenames(
+                title="Ajouter des vidéos",
+                filetypes=[("Vidéos", "*.mp4 *.mov *.avi *.mkv"), ("Tous", "*.*")])
+            for p in paths:
+                if p not in self._mp_vid_paths:
+                    self._mp_vid_paths.append(p)
+                    self._mp_vid_lb.insert("end", Path(p).name)
+        def _rem_videos():
+            sel = list(self._mp_vid_lb.curselection())
+            for i in reversed(sel):
+                self._mp_vid_lb.delete(i)
+                self._mp_vid_paths.pop(i)
+        self._mk_btn(vbtn_row, "+ Ajouter", "ok", _add_videos,
+                     font=("Segoe UI", 9)).pack(side="left", padx=(0, 4))
+        self._mk_btn(vbtn_row, "✕ Retirer", "danger", _rem_videos,
+                     font=("Segoe UI", 9)).pack(side="left")
+
+        tk.Frame(linner, height=1, bg=BORDER).pack(fill="x", pady=6)
+
+        # -- Caption pool --
+        tk.Label(linner, text="💬  POOL DE CAPTIONS", font=("Segoe UI", 9, "bold"),
+                 bg=SURFACE, fg=ACCENT).pack(anchor="w", pady=(0, 4))
+
+        centry_frame = tk.Frame(linner, bg=SURFACE)
+        centry_frame.pack(fill="x", pady=(0, 4))
+        self._mp_cap_entry = tk.Text(centry_frame, bg=SURFACE2, fg=TEXT, insertbackground=TEXT,
+                                      relief="flat", height=3, font=("Segoe UI", 9),
+                                      wrap="word", bd=1, highlightthickness=1,
+                                      highlightbackground=BORDER, highlightcolor=ACCENT)
+        self._mp_cap_entry.pack(fill="x")
+
+        self._mp_captions = []
+        clist_frame = tk.Frame(linner, bg=SURFACE2, highlightthickness=1,
+                               highlightbackground=BORDER)
+        clist_frame.pack(fill="x")
+        self._mp_cap_lb = tk.Listbox(clist_frame, bg=SURFACE2, fg=TEXT,
+                                      selectbackground=HL, selectforeground=ACCENT,
+                                      relief="flat", bd=0, height=6,
+                                      font=("Segoe UI", 9), activestyle="none",
+                                      cursor="hand2", exportselection=False)
+        self._mp_cap_lb.pack(fill="both", expand=True, padx=4, pady=4)
+
+        cbtn_row = tk.Frame(linner, bg=SURFACE)
+        cbtn_row.pack(fill="x", pady=(4, 4))
+        def _add_caption():
+            txt = self._mp_cap_entry.get("1.0", "end").strip()
+            if not txt:
+                return
+            self._mp_captions.append(txt)
+            preview = txt[:60].replace("\n", " ") + ("…" if len(txt) > 60 else "")
+            self._mp_cap_lb.insert("end", preview)
+            self._mp_cap_entry.delete("1.0", "end")
+        def _rem_caption():
+            sel = list(self._mp_cap_lb.curselection())
+            for i in reversed(sel):
+                self._mp_cap_lb.delete(i)
+                self._mp_captions.pop(i)
+        self._mk_btn(cbtn_row, "+ Ajouter", "ok", _add_caption,
+                     font=("Segoe UI", 9)).pack(side="left", padx=(0, 4))
+        self._mk_btn(cbtn_row, "✕ Retirer", "danger", _rem_caption,
+                     font=("Segoe UI", 9)).pack(side="left")
+
+        # ── Right panel ───────────────────────────────────────────────────────
+        right = tk.Frame(body, bg=BG)
+        right.pack(side="left", fill="both", expand=True)
+
+        # Config row
+        cfg_card = tk.Frame(right, bg=CARD, highlightthickness=1,
+                            highlightbackground=BORDER)
+        cfg_card.pack(fill="x", pady=(0, 8))
+        tk.Frame(cfg_card, height=2, bg=ACCENT).pack(fill="x")
+        cfg_inner = tk.Frame(cfg_card, bg=CARD)
+        cfg_inner.pack(fill="x", padx=12, pady=8)
+
+        tk.Label(cfg_inner, text="Max simultanés :", font=("Segoe UI", 9),
+                 bg=CARD, fg=TEXT2).pack(side="left", padx=(0, 4))
+        self._mp_max_var = tk.IntVar(value=20)
+        tk.Spinbox(cfg_inner, from_=1, to=20, textvariable=self._mp_max_var,
+                   width=4, bg=SURFACE2, fg=TEXT, relief="flat",
+                   font=("Segoe UI", 10), bd=0, buttonbackground=SURFACE3,
+                   highlightthickness=1, highlightbackground=BORDER,
+                   insertbackground=TEXT).pack(side="left", padx=(0, 16))
+
+        tk.Label(cfg_inner, text="Mode :", font=("Segoe UI", 9),
+                 bg=CARD, fg=TEXT2).pack(side="left", padx=(0, 4))
+        self._mp_mode_var = tk.StringVar(value="Aléatoire")
+        mode_cb = ttk.Combobox(cfg_inner, textvariable=self._mp_mode_var,
+                               state="readonly", width=12, font=("Segoe UI", 9))
+        mode_cb["values"] = ["Aléatoire", "Séquentiel"]
+        mode_cb.pack(side="left", padx=(0, 16))
+
+        tk.Label(cfg_inner, text="Écart (min) :", font=("Segoe UI", 9),
+                 bg=CARD, fg=TEXT2).pack(side="left", padx=(0, 4))
+        self._mp_stagger_var = tk.IntVar(value=5)
+        tk.Spinbox(cfg_inner, from_=0, to=60, textvariable=self._mp_stagger_var,
+                   width=4, bg=SURFACE2, fg=TEXT, relief="flat",
+                   font=("Segoe UI", 10), bd=0, buttonbackground=SURFACE3,
+                   highlightthickness=1, highlightbackground=BORDER,
+                   insertbackground=TEXT).pack(side="left")
+
+        # Phone selection
+        phone_card = tk.Frame(right, bg=CARD, highlightthickness=1,
+                              highlightbackground=BORDER)
+        phone_card.pack(fill="x", pady=(0, 8))
+        tk.Frame(phone_card, height=2, bg=OK).pack(fill="x")
+        ph_hdr = tk.Frame(phone_card, bg=CARD)
+        ph_hdr.pack(fill="x", padx=12, pady=(6, 4))
+        tk.Label(ph_hdr, text="📱  TÉLÉPHONES", font=("Segoe UI", 9, "bold"),
+                 bg=CARD, fg=OK).pack(side="left")
+        self._mp_sel_all_var = tk.BooleanVar(value=True)
+        def _toggle_all():
+            val = self._mp_sel_all_var.get()
+            for v in self._mp_phone_vars.values():
+                v.set(val)
+        tk.Checkbutton(ph_hdr, text="Tout", variable=self._mp_sel_all_var,
+                       command=_toggle_all, bg=CARD, fg=TEXT2, activebackground=CARD,
+                       selectcolor=SURFACE2, font=("Segoe UI", 9),
+                       relief="flat", cursor="hand2").pack(side="right")
+
+        # Scrollable checkbox grid
+        ph_canvas = tk.Canvas(phone_card, bg=CARD, highlightthickness=0, height=110)
+        ph_sb = ttk.Scrollbar(phone_card, orient="vertical", command=ph_canvas.yview)
+        ph_canvas.configure(yscrollcommand=ph_sb.set)
+        ph_canvas.pack(side="left", fill="both", expand=True, padx=(12, 0), pady=(0, 8))
+        ph_sb.pack(side="right", fill="y", pady=(0, 8))
+
+        self._mp_phone_inner = tk.Frame(ph_canvas, bg=CARD)
+        ph_canvas.create_window((0, 0), window=self._mp_phone_inner, anchor="nw")
+        def _ph_conf(e=None):
+            ph_canvas.configure(scrollregion=ph_canvas.bbox("all"))
+        self._mp_phone_inner.bind("<Configure>", _ph_conf)
+        self._mp_phone_vars = {}
+        self._mp_phone_canvas = ph_canvas
+
+        # Launch / Stop buttons
+        launch_row = tk.Frame(right, bg=BG)
+        launch_row.pack(fill="x", pady=(0, 8))
+        self._mp_running = [False]
+        self._mp_stop_flag = [False]
+
+        def _launch():
+            if self._mp_running[0]:
+                return
+            vids = list(self._mp_vid_paths)
+            caps = list(self._mp_captions)
+            phones = [pid for pid, v in self._mp_phone_vars.items() if v.get()]
+            if not vids:
+                messagebox.showwarning("Mass Posting", "Ajoute au moins une vidéo.")
+                return
+            if not caps:
+                messagebox.showwarning("Mass Posting", "Ajoute au moins une caption.")
+                return
+            if not phones:
+                messagebox.showwarning("Mass Posting", "Sélectionne au moins un téléphone.")
+                return
+            bearer = self.cfg.get("geelark_token", "")
+            if not bearer:
+                messagebox.showwarning("Mass Posting",
+                    "Token GéeLark manquant — configure-le dans Paramètres.")
+                return
+            self._mp_running[0] = True
+            self._mp_stop_flag[0] = False
+            self._mp_launch_btn.config(state="disabled")
+            self._mp_stop_btn.config(state="normal")
+            self._mp_log_clear()
+            self._mp_progress_clear(phones)
+            threading.Thread(target=self._run_mass_post,
+                             args=(phones, vids, caps, bearer),
+                             daemon=True).start()
+
+        def _stop():
+            self._mp_stop_flag[0] = True
+            self._mp_log("⏹ Arrêt demandé...", "warn")
+            self._mp_stop_btn.config(state="disabled")
+
+        self._mp_launch_btn = self._mk_btn(launch_row, "⚡  LANCER MASS POST",
+                                            "primary", _launch,
+                                            font=("Segoe UI", 11, "bold"), pady=10)
+        self._mp_launch_btn.pack(side="left", fill="x", expand=True, padx=(0, 6))
+        self._mp_stop_btn = self._mk_btn(launch_row, "⏹  Arrêter", "danger", _stop,
+                                          font=("Segoe UI", 11, "bold"), pady=10)
+        self._mp_stop_btn.config(state="disabled")
+        self._mp_stop_btn.pack(side="left", fill="x", expand=True)
+
+        # Progress area (per-phone status)
+        prog_card = tk.Frame(right, bg=CARD, highlightthickness=1,
+                             highlightbackground=BORDER)
+        prog_card.pack(fill="x", pady=(0, 8))
+        tk.Frame(prog_card, height=2, bg=WARN).pack(fill="x")
+        tk.Label(prog_card, text="PROGRESSION", font=("Segoe UI", 8, "bold"),
+                 bg=CARD, fg=TEXT2).pack(anchor="w", padx=12, pady=(4, 2))
+        prog_canvas = tk.Canvas(prog_card, bg=CARD, highlightthickness=0, height=100)
+        prog_sb = ttk.Scrollbar(prog_card, orient="vertical", command=prog_canvas.yview)
+        prog_canvas.configure(yscrollcommand=prog_sb.set)
+        prog_canvas.pack(side="left", fill="both", expand=True, padx=12, pady=(0, 8))
+        prog_sb.pack(side="right", fill="y", pady=(0, 8))
+        self._mp_prog_inner = tk.Frame(prog_canvas, bg=CARD)
+        prog_canvas.create_window((0, 0), window=self._mp_prog_inner, anchor="nw")
+        def _prog_conf(e=None):
+            prog_canvas.configure(scrollregion=prog_canvas.bbox("all"))
+        self._mp_prog_inner.bind("<Configure>", _prog_conf)
+        self._mp_prog_labels = {}
+
+        # Log area
+        log_card = tk.Frame(right, bg=CARD, highlightthickness=1,
+                            highlightbackground=BORDER)
+        log_card.pack(fill="both", expand=True)
+        tk.Frame(log_card, height=2, bg=MUTED).pack(fill="x")
+        log_hdr = tk.Frame(log_card, bg=CARD)
+        log_hdr.pack(fill="x", padx=12, pady=(4, 2))
+        tk.Label(log_hdr, text="LOG", font=("Segoe UI", 8, "bold"),
+                 bg=CARD, fg=TEXT2).pack(side="left")
+        self._mk_btn(log_hdr, "Effacer", "ghost", self._mp_log_clear,
+                     font=("Segoe UI", 8), pady=2).pack(side="right")
+        self._mp_log_box = tk.Text(log_card, bg=SURFACE, fg=TEXT2,
+                                   relief="flat", state="disabled",
+                                   font=("Consolas", 9), wrap="word",
+                                   insertbackground=TEXT)
+        mp_log_sb = ttk.Scrollbar(log_card, orient="vertical",
+                                   command=self._mp_log_box.yview)
+        self._mp_log_box.configure(yscrollcommand=mp_log_sb.set)
+        self._mp_log_box.pack(side="left", fill="both", expand=True, padx=(12, 0), pady=(0, 8))
+        mp_log_sb.pack(side="right", fill="y", pady=(0, 8))
+        for tag, col in [("ok", OK), ("warn", WARN), ("error", DANGER),
+                         ("accent", ACCENT), ("info", TEXT2)]:
+            self._mp_log_box.tag_config(tag, foreground=col)
+
+        # Populate phone checkboxes when tab is shown
+        self._mp_needs_phone_refresh = True
+
+    def _mp_refresh_phones(self):
+        for w in self._mp_phone_inner.winfo_children():
+            w.destroy()
+        self._mp_phone_vars.clear()
+        phones = [(pid, d.get("phone_name", pid))
+                  for pid, d in self.data.items() if d.get("phone_name")]
+        phones.sort(key=lambda x: x[1])
+        col, row = 0, 0
+        for pid, name in phones:
+            v = tk.BooleanVar(value=True)
+            self._mp_phone_vars[pid] = v
+            short = name[:22] + "…" if len(name) > 22 else name
+            cb = tk.Checkbutton(self._mp_phone_inner, text=short, variable=v,
+                                bg=CARD, fg=TEXT, activebackground=CARD,
+                                selectcolor=SURFACE2, font=("Segoe UI", 9),
+                                relief="flat", cursor="hand2", anchor="w")
+            cb.grid(row=row, column=col, sticky="w", padx=(0, 16), pady=1)
+            col += 1
+            if col >= 3:
+                col = 0
+                row += 1
+        self._mp_phone_canvas.configure(scrollregion=self._mp_phone_canvas.bbox("all"))
+
+    def _mp_log(self, msg, level="info"):
+        colors = {"ok": OK, "warn": WARN, "error": DANGER, "accent": ACCENT, "info": TEXT2}
+        ts = datetime.now().strftime("%H:%M:%S")
+        self._mp_log_box.config(state="normal")
+        self._mp_log_box.insert("end", f"[{ts}] {msg}\n", level)
+        self._mp_log_box.tag_config(level, foreground=colors.get(level, TEXT2))
+        self._mp_log_box.see("end")
+        self._mp_log_box.config(state="disabled")
+
+    def _mp_log_clear(self):
+        self._mp_log_box.config(state="normal")
+        self._mp_log_box.delete("1.0", "end")
+        self._mp_log_box.config(state="disabled")
+
+    def _mp_progress_clear(self, phone_ids):
+        for w in self._mp_prog_inner.winfo_children():
+            w.destroy()
+        self._mp_prog_labels.clear()
+        for pid in phone_ids:
+            name = self.data.get(pid, {}).get("phone_name", pid)
+            row = tk.Frame(self._mp_prog_inner, bg=CARD)
+            row.pack(fill="x", pady=1)
+            tk.Label(row, text=f"📱 {name[:24]}", font=("Segoe UI", 9),
+                     bg=CARD, fg=TEXT2, width=26, anchor="w").pack(side="left")
+            lbl = tk.Label(row, text="⏳ En attente", font=("Segoe UI", 9),
+                           bg=CARD, fg=TEXT2, anchor="w")
+            lbl.pack(side="left")
+            self._mp_prog_labels[pid] = lbl
+
+    def _mp_set_status(self, pid, text, col):
+        lbl = self._mp_prog_labels.get(pid)
+        if lbl:
+            try:
+                self.root.after(0, lambda l=lbl, t=text, c=col: l.config(text=t, fg=c))
+            except Exception:
+                pass
+
+    def _run_mass_post(self, phone_ids, video_paths, captions, bearer):
+        api_hdrs = {"Content-Type": "application/json",
+                    "Authorization": f"Bearer {bearer}"}
+        mode = self._mp_mode_var.get()
+        stagger_min = self._mp_stagger_var.get()
+        max_workers = min(self._mp_max_var.get(), len(phone_ids))
+
+        def done():
+            self._mp_running[0] = False
+            try:
+                self.root.after(0, lambda: self._mp_launch_btn.config(state="normal"))
+                self.root.after(0, lambda: self._mp_stop_btn.config(state="disabled"))
+            except Exception:
+                pass
+
+        # ── Step 1: upload each unique video once ─────────────────────────────
+        resource_urls = {}
+        unique_paths = list(dict.fromkeys(video_paths))
+        for vp in unique_paths:
+            if self._mp_stop_flag[0]:
+                self._mp_log("⏹ Arrêté avant upload.", "warn")
+                done()
+                return
+            vname = Path(vp).name
+            self._mp_log(f"📤 Upload: {vname}...", "accent")
+            try:
+                r = httpx.post("https://openapi.geelark.com/open/v1/upload/getUrl",
+                               json={"fileType": "mp4"}, headers=api_hdrs,
+                               timeout=20, follow_redirects=False)
+                rj = r.json()
+                if rj.get("code") != 0:
+                    self._mp_log(f"❌ GéeLark upload URL: {rj.get('msg', rj)}", "error")
+                    done()
+                    return
+                upload_url   = rj["data"]["uploadUrl"]
+                resource_url = rj["data"]["resourceUrl"]
+            except Exception as e:
+                self._mp_log(f"❌ Upload URL: {e}", "error")
+                done()
+                return
+
+            try:
+                with open(vp, "rb") as fl:
+                    up = httpx.put(upload_url, content=fl.read(), timeout=300)
+                if up.status_code not in (200, 204):
+                    self._mp_log(f"❌ PUT vidéo échoué ({up.status_code})", "error")
+                    done()
+                    return
+                resource_urls[vp] = resource_url
+                self._mp_log(f"✅ {vname} uploadée", "ok")
+            except Exception as e:
+                self._mp_log(f"❌ Upload vidéo: {e}", "error")
+                done()
+                return
+
+        if not resource_urls:
+            self._mp_log("❌ Aucune vidéo uploadée", "error")
+            done()
+            return
+
+        res_list = list(resource_urls.values())
+        cap_list = captions
+
+        # ── Step 2: build per-phone assignments ───────────────────────────────
+        assignments = {}
+        for i, pid in enumerate(phone_ids):
+            if mode == "Aléatoire":
+                res = random.choice(res_list)
+                cap = random.choice(cap_list)
+            else:
+                res = res_list[i % len(res_list)]
+                cap = cap_list[i % len(cap_list)]
+            assignments[pid] = (res, cap)
+
+        # ── Step 3: start phones ──────────────────────────────────────────────
+        self._mp_log(f"📱 Démarrage de {len(phone_ids)} téléphones...", "accent")
+        try:
+            sr = httpx.post("https://openapi.geelark.com/open/v1/phone/start",
+                            json={"ids": phone_ids}, headers=api_hdrs,
+                            timeout=20, follow_redirects=False)
+            sj = sr.json() if sr.status_code == 200 else {}
+            ok_c  = sj.get("data", {}).get("successAmount", 0)
+            fail_c = sj.get("data", {}).get("failAmount", 0)
+            self._mp_log(f"  {ok_c} démarrés, {fail_c} déjà actifs/erreur", "info")
+        except Exception as e:
+            self._mp_log(f"⚠ Démarrage téléphones: {e}", "warn")
+
+        self._mp_log("⏳ Attente 30s (boot)...", "info")
+        for _ in range(30):
+            if self._mp_stop_flag[0]:
+                self._mp_log("⏹ Arrêté pendant le boot.", "warn")
+                done()
+                return
+            time.sleep(1)
+
+        # ── Step 4: create tasks (batched by max_workers) ─────────────────────
+        base_time   = int(time.time())
+        stagger_sec = stagger_min * 60
+        task_ids = {}
+
+        batches = [phone_ids[i:i+max_workers]
+                   for i in range(0, len(phone_ids), max_workers)]
+        for batch_num, batch in enumerate(batches):
+            if self._mp_stop_flag[0]:
+                self._mp_log("⏹ Arrêté avant création tâches.", "warn")
+                break
+            for j, pid in enumerate(batch):
+                if self._mp_stop_flag[0]:
+                    break
+                name = self.data.get(pid, {}).get("phone_name", pid)
+                res, cap = assignments[pid]
+                offset  = int(stagger_sec * (0.75 + random.random() * 0.5))
+                post_at = base_time + 30 + (batch_num * len(batch) + j) * max(offset, 1)
+                self._mp_set_status(pid, "🔄 Création tâche...", ACCENT)
+                try:
+                    r = httpx.post(
+                        "https://openapi.geelark.com/open/v1/rpa/task/instagramPubReels",
+                        json={"id": pid, "description": cap,
+                              "video": [res], "scheduleAt": post_at},
+                        headers=api_hdrs, timeout=30, follow_redirects=False)
+                    rj = r.json()
+                    if rj.get("code") == 0:
+                        tid = rj["data"].get("taskId", "")
+                        task_ids[pid] = tid
+                        mins = max(0, (post_at - int(time.time())) // 60)
+                        self._mp_log(f"✅ {name} — tâche {tid} (~{mins}min)", "ok")
+                        self._mp_set_status(pid, f"📅 Planifié dans ~{mins}min", OK)
+                    else:
+                        self._mp_log(f"⚠ {name}: {rj.get('msg', str(rj))}", "warn")
+                        self._mp_set_status(pid, "⚠ Échec tâche", WARN)
+                except Exception as e:
+                    self._mp_log(f"❌ {name}: {e}", "error")
+                    self._mp_set_status(pid, "❌ Erreur", DANGER)
+
+        if not task_ids:
+            self._mp_log("❌ Aucune tâche créée", "error")
+            done()
+            return
+
+        # ── Step 5: poll until all done or stopped ────────────────────────────
+        self._mp_log("⏳ Suivi des tâches en cours...", "accent")
+        STATUS = {1: "⏳ En attente", 2: "🔄 En cours", 3: "✅ Terminé",
+                  4: "❌ Échoué", 7: "🚫 Annulé"}
+        STATUS_COL = {3: OK, 4: DANGER, 7: WARN}
+        deadline = time.time() + 600
+        pending  = dict(task_ids)
+        reported = set()
+        poll_n   = 0
+        while pending and time.time() < deadline:
+            if self._mp_stop_flag[0]:
+                self._mp_log("⏹ Polling arrêté.", "warn")
+                break
+            time.sleep(15)
+            poll_n += 1
+            try:
+                qr = httpx.post("https://openapi.geelark.com/open/v1/task/query",
+                                json={"ids": list(pending.values())},
+                                headers=api_hdrs, timeout=15, follow_redirects=False)
+                items = qr.json().get("data", {}).get("items", [])
+                for item in items:
+                    tid    = item.get("id", "")
+                    status = item.get("status", 0)
+                    pid    = next((p for p, t in task_ids.items() if t == tid), None)
+                    name   = self.data.get(pid, {}).get("phone_name", pid) if pid else tid
+                    if status in (3, 4, 7) and tid not in reported:
+                        reported.add(tid)
+                        if pid in pending:
+                            del pending[pid]
+                        lv = "ok" if status == 3 else "error"
+                        fd = item.get("failDesc", "")
+                        msg = f"{STATUS.get(status, str(status))} {name}"
+                        if fd:
+                            msg += f" — {fd}"
+                        self._mp_log(msg, lv)
+                        self._mp_set_status(pid, STATUS.get(status, "?"),
+                                            STATUS_COL.get(status, WARN))
+                    elif status in (1, 2) and poll_n % 4 == 0 and pid:
+                        self._mp_set_status(pid, STATUS.get(status, "?"), TEXT2)
+            except Exception as e:
+                self._mp_log(f"⚠ Polling: {e}", "warn")
+
+        for pid in list(pending):
+            name = self.data.get(pid, {}).get("phone_name", pid)
+            self._mp_log(f"⏳ {name} — tâche encore en cours (vérifie GéeLark)", "warn")
+
+        # ── Step 6: stop phones ───────────────────────────────────────────────
+        self._mp_log("📴 Arrêt des téléphones...", "info")
+        try:
+            httpx.post("https://openapi.geelark.com/open/v1/phone/stop",
+                       json={"ids": phone_ids}, headers=api_hdrs,
+                       timeout=15, follow_redirects=False)
+            self._mp_log("✅ Téléphones éteints", "ok")
+        except Exception as e:
+            self._mp_log(f"⚠ Arrêt: {e}", "warn")
+
+        self._mp_log("⚡ Mass Posting terminé ✓", "accent")
+        done()
 
     # ══════════════════════════════════════════════════════════════════════════
     # ONGLET BANQUE
@@ -5281,14 +6058,6 @@ class App:
         self.sv["active"].config(text=str(active))
         self.sv["banned"].config(text=str(banned))
         self.sv["views"].config(text=fmt(views))
-
-    def _refresh_ig_list(self):
-        self.ig_list.delete(0, "end")
-        for pid, d in self.data.items():
-            if d.get("ig_username") and d.get("phone_name"):
-                st = d.get("ig_status", "")
-                p  = "✅ " if st == "active" else "❌ " if st == "banned" else "○ "
-                self.ig_list.insert("end", p + "@" + d["ig_username"])
 
     # ══════════════════════════════════════════════════════════════════════════
     # LINK / SCRAPE
