@@ -2856,27 +2856,66 @@ class App:
         left.pack(side="left", fill="y")
         left.pack_propagate(False)
 
-        # Video selection
-        tk.Label(left, text="Vidéo à poster", font=("Segoe UI", 10, "bold"),
-                 bg=BG, fg=TEXT2).pack(anchor="w")
-        vid_row = tk.Frame(left, bg=BG)
-        vid_row.pack(fill="x", pady=(4, 0))
-        self.post_vid_lbl = tk.Label(vid_row, text="Aucune vidéo sélectionnée",
-                                     font=("Segoe UI", 9), bg=SURFACE2, fg=MUTED,
-                                     anchor="w", padx=8, pady=6)
-        self.post_vid_lbl.pack(side="left", fill="x", expand=True)
-        self.post_vid_path = [None]
+        # Video selection from bank
+        vid_hdr = tk.Frame(left, bg=BG)
+        vid_hdr.pack(fill="x")
+        tk.Label(vid_hdr, text="Vidéo à poster", font=("Segoe UI", 10, "bold"),
+                 bg=BG, fg=TEXT2).pack(side="left")
+        tk.Button(vid_hdr, text="↺", font=("Segoe UI", 9), bg=SURFACE2, fg=TEXT2,
+                  relief="flat", cursor="hand2", padx=6, pady=2,
+                  command=lambda: self._post_refresh_bank()).pack(side="right")
 
-        def _pick_video():
-            from tkinter import filedialog
-            p = filedialog.askopenfilename(
-                filetypes=[("Vidéo", "*.mp4 *.mov *.avi *.mkv"), ("Tous", "*.*")])
-            if p:
-                self.post_vid_path[0] = p
-                self.post_vid_lbl.config(text=Path(p).name, fg=TEXT)
-        tk.Button(vid_row, text="📂", font=("Segoe UI", 10), bg=SURFACE2, fg=TEXT2,
-                  relief="flat", cursor="hand2", padx=8, pady=4,
-                  command=_pick_video).pack(side="right")
+        self.post_vid_path = [None]
+        self._post_bank_entries = []
+
+        bank_frame = tk.Frame(left, bg=SURFACE, highlightthickness=1,
+                              highlightbackground=BORDER, height=160)
+        bank_frame.pack(fill="x", pady=(4, 0))
+        bank_frame.pack_propagate(False)
+
+        self.post_bank_lb = tk.Listbox(bank_frame, bg=SURFACE, fg=TEXT,
+                                       font=("Segoe UI", 9), relief="flat",
+                                       selectbackground=ACCENT, selectforeground="#06080f",
+                                       activestyle="none", cursor="hand2")
+        sb_bk = ttk.Scrollbar(bank_frame, orient="vertical",
+                               command=self.post_bank_lb.yview)
+        self.post_bank_lb.configure(yscrollcommand=sb_bk.set)
+        sb_bk.pack(side="right", fill="y")
+        self.post_bank_lb.pack(side="left", fill="both", expand=True)
+
+        self.post_vid_lbl = tk.Label(left, text="Aucune vidéo sélectionnée",
+                                     font=("Segoe UI", 8), bg=BG, fg=MUTED,
+                                     anchor="w", wraplength=300)
+        self.post_vid_lbl.pack(fill="x", pady=(2, 0))
+
+        def _on_bank_lb_sel(evt=None):
+            idx = self.post_bank_lb.curselection()
+            if not idx:
+                return
+            entry = self._post_bank_entries[idx[0]]
+            self.post_vid_path[0] = entry["path"]
+            self.post_vid_lbl.config(text=Path(entry["path"]).name, fg=TEXT)
+            cap = entry.get("description") or entry.get("caption") or ""
+            self.post_caption_box.delete("1.0", "end")
+            self.post_caption_box.insert("1.0", cap)
+            n = len(cap)
+            self.post_char_lbl.config(text=f"{n} / 2200",
+                                       fg=DANGER if n > 2200 else MUTED)
+
+        self.post_bank_lb.bind("<<ListboxSelect>>", _on_bank_lb_sel)
+
+        def _post_refresh_bank():
+            self._post_bank_entries = load_bank()
+            self.post_bank_lb.delete(0, "end")
+            for e in self._post_bank_entries:
+                name = e.get("filename") or Path(e["path"]).name
+                exists = "✓" if Path(e["path"]).exists() else "✗"
+                self.post_bank_lb.insert("end", f"{exists}  {name}")
+            if not self._post_bank_entries:
+                self.post_bank_lb.insert("end", "  Banque vide — ajoute des vidéos")
+
+        self._post_refresh_bank = _post_refresh_bank
+        _post_refresh_bank()
 
         # Phone list
         tk.Label(left, text="Comptes cibles", font=("Segoe UI", 10, "bold"),
@@ -3020,7 +3059,7 @@ class App:
                 return
             vpath = self.post_vid_path[0]
             if not vpath or not Path(vpath).exists():
-                _plog("⚠ Sélectionne une vidéo d'abord (bouton 📂)", "warn")
+                _plog("⚠ Sélectionne une vidéo dans la banque", "warn")
                 return
             cap = self.post_caption_box.get("1.0", "end").strip()
             if not cap:
@@ -3396,8 +3435,19 @@ class App:
         if not Path(entry["path"]).exists():
             messagebox.showerror("Fichier", "Fichier introuvable")
             return
-        caption = entry.get("description") or entry.get("caption") or ""
-        self._post_window(entry["path"], caption)
+
+        # Navigate to posting tab
+        self._show_tab("posting")
+
+        # Refresh bank list in posting tab and pre-select the matching entry
+        self._post_refresh_bank()
+        for i, e in enumerate(self._post_bank_entries):
+            if e["id"] == entry["id"]:
+                self.post_bank_lb.selection_clear(0, "end")
+                self.post_bank_lb.selection_set(i)
+                self.post_bank_lb.see(i)
+                self.post_bank_lb.event_generate("<<ListboxSelect>>")
+                break
 
     def _bank_delete(self):
         sels = self.bank_tree.selection()
