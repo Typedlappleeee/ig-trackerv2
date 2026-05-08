@@ -3675,128 +3675,66 @@ class App:
             if _log:
                 self.root.after(0, lambda: _log(f"🔎 media_id: {clean_id}", "info"))
 
-            def _extract(raw):
+            # instagrapi handles Bearer token auth which is required for comments endpoint
+            from instagrapi import Client as _IgClient
+            cl = _IgClient()
+            cl.delay_range = [1, 2]
+            try:
+                cl.login_by_sessionid(sid)
+            except Exception as e:
+                if _log:
+                    self.root.after(0, lambda e=e: _log(f"⚠ login_by_sessionid: {e}", "warn"))
+
+            # Try instagrapi v1 (private API with proper auth)
+            try:
+                raw_list = cl.media_comments_v1(clean_id, amount=100)
                 out = []
-                for c in (raw.get("comments") or raw.get("comment_list") or []):
-                    out.append(c)
-                    for ch in (c.get("child_comment_list") or []):
-                        out.append(ch)
+                for c in raw_list:
+                    # instagrapi Comment object
+                    out.append({
+                        "pk": str(getattr(c, "pk", "") or ""),
+                        "user": {"username": getattr(getattr(c, "user", None), "username", "?")},
+                        "text": getattr(c, "text", ""),
+                    })
+                if _log:
+                    self.root.after(0, lambda n=len(out):
+                        _log(f"✅ instagrapi: {n} commentaire(s) trouvé(s)", "ok"))
                 return out
-
-            def _is_ok(raw):
-                return raw.get("status") == "ok" or "comments" in raw
-
-            import httpx as _httpx
-
-            # Step 1: get csrftoken from Instagram home (required for API calls)
-            csrf = ""
-            try:
-                init_r = _httpx.get(
-                    "https://www.instagram.com/",
-                    headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                             "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"},
-                    cookies={"sessionid": sid},
-                    follow_redirects=True,
-                    timeout=10,
-                )
-                csrf = init_r.cookies.get("csrftoken", "")
-            except Exception:
-                pass
-
-            web_headers = {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                              "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-                "X-IG-App-ID": "936619743392459",
-                "X-CSRFToken": csrf,
-                "X-Requested-With": "XMLHttpRequest",
-                "Referer": f"https://www.instagram.com/",
-                "Accept": "application/json, text/plain, */*",
-                "Accept-Language": "en-US,en;q=0.9",
-            }
-            web_cookies = {"sessionid": sid}
-            if csrf:
-                web_cookies["csrftoken"] = csrf
-
-            # Try 1 — www.instagram.com web API
-            try:
-                with _httpx.Client(
-                    headers=web_headers,
-                    cookies=web_cookies,
-                    base_url="https://www.instagram.com",
-                    follow_redirects=False,
-                    timeout=15,
-                ) as wcl:
-                    r = wcl.get(f"/api/v1/media/{clean_id}/comments/",
-                                params={"can_support_threading": "true", "count": "50"})
-                    if _log:
-                        self.root.after(0, lambda s=r.status_code, b=r.text[:80]:
-                            _log(f"📡 www HTTP {s} — {b}", "info"))
-                    if r.status_code == 200:
-                        raw = r.json()
-                        if _is_ok(raw):
-                            out = _extract(raw)
-                            nxt = raw.get("next_min_id") or raw.get("next_max_id")
-                            while nxt and len(out) < 200:
-                                r2 = wcl.get(f"/api/v1/media/{clean_id}/comments/",
-                                             params={"can_support_threading": "true",
-                                                     "min_id": nxt, "count": "50"})
-                                if r2.status_code != 200:
-                                    break
-                                pg = _extract(r2.json())
-                                if not pg:
-                                    break
-                                out.extend(pg)
-                                nxt = r2.json().get("next_min_id") or r2.json().get("next_max_id")
-                            return out
             except Exception as e1:
                 if _log:
-                    self.root.after(0, lambda e=e1: _log(f"⚠ www error: {e}", "warn"))
+                    self.root.after(0, lambda e=e1:
+                        _log(f"⚠ media_comments_v1: {e}", "warn"))
 
-            # Try 2 — i.instagram.com mobile API (more headers)
-            mobile_extra = {
-                "X-IG-Capabilities": "3brTvwE=",
-                "X-IG-Connection-Type": "WIFI",
-                "X-CSRFToken": csrf,
-            }
-            with _ig_session_client(sid) as cl:
-                cl.headers.update(mobile_extra)
-                if csrf:
-                    cl.cookies.set("csrftoken", csrf)
-                r = cl.get(f"/api/v1/media/{clean_id}/comments/",
-                           params={"can_support_threading": "true", "count": "50"})
+            # Fallback: instagrapi generic media_comments
+            try:
+                raw_list = cl.media_comments(clean_id, amount=100)
+                out = []
+                for c in raw_list:
+                    out.append({
+                        "pk": str(getattr(c, "pk", "") or ""),
+                        "user": {"username": getattr(getattr(c, "user", None), "username", "?")},
+                        "text": getattr(c, "text", ""),
+                    })
                 if _log:
-                    self.root.after(0, lambda s=r.status_code, b=r.text[:80]:
-                        _log(f"📡 i.ig HTTP {s} — {b}", "info"))
-                if r.status_code != 200:
-                    raise RuntimeError(f"HTTP {r.status_code}: {r.text[:200]}")
-                raw = r.json()
-                if not _is_ok(raw):
-                    msg = raw.get("message", str(raw)[:120])
-                    raise RuntimeError(f"Instagram: {msg}")
-                out = _extract(raw)
-                nxt = raw.get("next_min_id") or raw.get("next_max_id")
-                while nxt and len(out) < 200:
-                    r2 = cl.get(f"/api/v1/media/{clean_id}/comments/",
-                                params={"can_support_threading": "true",
-                                        "min_id": nxt, "count": "50"})
-                    if r2.status_code != 200:
-                        break
-                    pg = _extract(r2.json())
-                    if not pg:
-                        break
-                    out.extend(pg)
-                    nxt = r2.json().get("next_min_id") or r2.json().get("next_max_id")
+                    self.root.after(0, lambda n=len(out):
+                        _log(f"✅ instagrapi fallback: {n} commentaire(s)", "ok"))
                 return out
+            except Exception as e2:
+                raise RuntimeError(f"Impossible de charger les commentaires: {e2}")
 
         def _post_reply_api(sid, media_id, comment_text, replied_to_id):
-            clean_id = media_id.split("_")[0] if "_" in str(media_id) else media_id
-            payload = {"comment_text": comment_text,
-                       "replied_to_comment_id": replied_to_id}
-            with _ig_session_client(sid) as cl:
-                r = cl.post(f"/api/v1/media/{clean_id}/comments/", data=payload)
-                if r.status_code not in (200, 201):
-                    raise RuntimeError(f"HTTP {r.status_code}: {r.text[:200]}")
-                return r.json()
+            clean_id = str(media_id).split("_")[0]
+            from instagrapi import Client as _IgClient
+            cl = _IgClient()
+            cl.delay_range = [1, 2]
+            cl.login_by_sessionid(sid)
+            # instagrapi comment_reply posts a threaded reply
+            try:
+                return cl.media_comment(clean_id, comment_text,
+                                        replied_to_comment_id=int(replied_to_id))
+            except TypeError:
+                # older instagrapi without replied_to_comment_id param
+                return cl.media_comment(clean_id, f"@{replied_to_id} {comment_text}")
 
         def _show_comments_in_panel(comments, replied_ids):
             self._ac_com_box.config(state="normal")
