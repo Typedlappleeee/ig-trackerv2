@@ -2550,10 +2550,31 @@ class App:
             log_fn(f"❌ Upload: {e}", "error")
             return
 
-        # ── Step 3: create an RPA Reels task for each selected phone ─────────
-        schedule_at = int(time.time()) + 10  # post in ~10 seconds
-        for pid in selected:
+        # ── Step 3: warmup + staggered Reels task per phone ──────────────────
+        import random
+        base_time = int(time.time())
+        # Each account gets a warmup (browse 3-8 videos) then posts 3-8 min later
+        for i, pid in enumerate(selected):
             name = self.data.get(pid, {}).get("phone_name", pid)
+            # Stagger: account i starts at base + i * random(3-6 min)
+            warmup_at = base_time + i * random.randint(180, 360)
+            post_at   = warmup_at + random.randint(180, 480)  # post 3-8 min after warmup
+
+            # Warmup first (browse reels to look human)
+            try:
+                httpx.post(
+                    "https://openapi.geelark.com/open/v1/rpa/task/instagramWarmup",
+                    json={
+                        "id":         pid,
+                        "scheduleAt": warmup_at,
+                        "browseVideo": random.randint(3, 8),
+                    },
+                    headers=api_hdrs, timeout=15,
+                    follow_redirects=False)
+            except Exception:
+                pass  # warmup failure is non-critical
+
+            # Schedule the Reels post after warmup
             try:
                 r = httpx.post(
                     "https://openapi.geelark.com/open/v1/rpa/task/instagramPubReels",
@@ -2561,22 +2582,23 @@ class App:
                         "id":          pid,
                         "description": caption,
                         "video":       [resource_url],
-                        "scheduleAt":  schedule_at,
+                        "scheduleAt":  post_at,
+                        "aiTag":       True,
                     },
                     headers=api_hdrs, timeout=30,
                     follow_redirects=False)
                 try:
                     rj = r.json()
                     if rj.get("code") == 0:
-                        log_fn(f"✅ {name} — tâche créée (id: {rj['data'].get('taskId','')})", "ok")
+                        mins = (post_at - base_time) // 60
+                        log_fn(f"✅ {name} — planifié dans ~{mins} min", "ok")
                     else:
                         log_fn(f"⚠ {name}: {rj.get('msg', rj)}", "warn")
                 except Exception:
                     log_fn(f"⚠ {name}: réponse HTTP {r.status_code} — {r.text[:200]}", "warn")
             except Exception as e:
                 log_fn(f"❌ {name}: {e}", "error")
-            time.sleep(1)
-        log_fn("Terminé ✓", "ok")
+        log_fn("Terminé ✓ — les posts sont planifiés avec délai aléatoire", "ok")
 
     # ══════════════════════════════════════════════════════════════════════════
     # ONGLET BANQUE
