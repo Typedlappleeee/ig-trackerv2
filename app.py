@@ -3070,14 +3070,32 @@ class App:
                 _plog("❌ Bearer Token GéeLark manquant — va dans Paramètres", "error")
                 return
             stagger = self.post_stagger_var.get()
-            self.post_launch_btn.config(state="disabled", text="⏳ En cours...")
-            def _done():
-                if self.post_launch_btn.winfo_exists():
-                    self.post_launch_btn.config(state="normal", text="🚀  Lancer le posting")
+            job_id = getattr(self, "_post_job_counter", 0) + 1
+            self._post_job_counter = job_id
+            active = getattr(self, "_post_active_jobs", 0) + 1
+            self._post_active_jobs = active
+            _update_launch_btn()
+            vid_name = Path(vpath).name
+            _plog(f"── Job #{job_id} : {vid_name} → {len(sel)} compte(s) ──", "accent")
+
+            def _done(jid=job_id):
+                self._post_active_jobs = max(0, getattr(self, "_post_active_jobs", 1) - 1)
+                self.root.after(0, _update_launch_btn)
+                self.root.after(0, lambda: _plog(f"── Job #{jid} terminé ──", "accent"))
+
             threading.Thread(
                 target=self._upload_and_post,
                 args=(sel, bearer, cap, vpath, _plog, stagger, _done),
                 daemon=True).start()
+
+        def _update_launch_btn():
+            n = getattr(self, "_post_active_jobs", 0)
+            if not self.post_launch_btn.winfo_exists():
+                return
+            if n == 0:
+                self.post_launch_btn.config(text="🚀  Lancer le posting")
+            else:
+                self.post_launch_btn.config(text=f"🚀  Lancer  ({n} en cours)")
 
         self.post_launch_btn.config(command=_do_post)
 
