@@ -27,37 +27,39 @@ except ImportError:
 
 # ── Thèmes de couleur ─────────────────────────────────────────────────────────
 THEMES = {
-    "Lime":    {"accent": "#d4f53c", "accent2": "#a8c22a", "ok": "#23d18b"},
-    "Bleu":    {"accent": "#3b9eff", "accent2": "#2076cc", "ok": "#23d18b"},
-    "Violet":  {"accent": "#b06cf0", "accent2": "#8a3ed4", "ok": "#23d18b"},
-    "Ambre":   {"accent": "#f59e0b", "accent2": "#d97706", "ok": "#23d18b"},
-    "Rouge":   {"accent": "#ff5c6e", "accent2": "#cc2d3e", "ok": "#23d18b"},
-    "Cyan":    {"accent": "#06d4f0", "accent2": "#0599b0", "ok": "#23d18b"},
-    "Rose":    {"accent": "#f472b6", "accent2": "#be185d", "ok": "#23d18b"},
-    "Vert":    {"accent": "#34d56a", "accent2": "#16a34a", "ok": "#23d18b"},
+    "Lime":    {"accent": "#c8f135", "accent2": "#9bbf1a", "ok": "#00d4aa"},
+    "Bleu":    {"accent": "#4f9eff", "accent2": "#2070dd", "ok": "#00d4aa"},
+    "Violet":  {"accent": "#a56ef5", "accent2": "#7c3ed4", "ok": "#00d4aa"},
+    "Ambre":   {"accent": "#ffb830", "accent2": "#e09000", "ok": "#00d4aa"},
+    "Rouge":   {"accent": "#ff5c6e", "accent2": "#cc2d3e", "ok": "#00d4aa"},
+    "Cyan":    {"accent": "#00e5d4", "accent2": "#00aaa0", "ok": "#00d4aa"},
+    "Rose":    {"accent": "#ff6ec7", "accent2": "#cc1a8a", "ok": "#00d4aa"},
+    "Vert":    {"accent": "#2dde78", "accent2": "#1aaa55", "ok": "#00d4aa"},
 }
 
-# ── Couleurs (modifiées par le thème au démarrage) ────────────────────────────
-BG       = "#06080f"
-SURFACE  = "#0d1017"
-SURFACE2 = "#131720"
-BORDER   = "#1a2035"
-CARD     = "#0f1420"
-HL       = "#1c2238"
-ACCENT   = "#d4f53c"
-ACCENT2  = "#a8c22a"
+# ── Palette principale ────────────────────────────────────────────────────────
+BG       = "#07080d"
+SURFACE  = "#0c0e17"
+SURFACE2 = "#12141f"
+SURFACE3 = "#181b28"
+BORDER   = "#1e2133"
+CARD     = "#0f1119"
+HL       = "#191d2e"
+ACCENT   = "#c8f135"
+ACCENT2  = "#9bbf1a"
 DANGER   = "#ff3d51"
-OK       = "#23d18b"
-WARN     = "#ff9500"
-TEXT     = "#e8edf7"
-TEXT2    = "#6b778f"
-MUTED    = "#323a52"
+OK       = "#00d4aa"
+WARN     = "#ff9f1c"
+TEXT     = "#dde3f0"
+TEXT2    = "#5d6680"
+MUTED    = "#2a2f44"
 
 def apply_theme_globals(theme_name):
     global ACCENT, ACCENT2, OK
     t = THEMES.get(theme_name, THEMES["Lime"])
     ACCENT  = t["accent"]
     ACCENT2 = t["accent2"]
+    OK      = t["ok"]
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 def normalize_proxy(p: str) -> str:
@@ -1063,11 +1065,104 @@ class App:
         for name in ["T", "Bank", "Vid"]:
             style.configure(f"{name}.Treeview",
                 background=SURFACE, fieldbackground=SURFACE, foreground=TEXT,
-                rowheight=32, font=("Segoe UI", 10), borderwidth=0)
+                rowheight=34, font=("Segoe UI", 10), borderwidth=0)
             style.configure(f"{name}.Treeview.Heading",
                 background=SURFACE2, foreground=TEXT2,
-                font=("Segoe UI", 9, "bold"), relief="flat")
-            style.map(f"{name}.Treeview", background=[("selected", HL)])
+                font=("Segoe UI", 9, "bold"), relief="flat", padding=(8, 6))
+            style.map(f"{name}.Treeview",
+                background=[("selected", HL)],
+                foreground=[("selected", TEXT)])
+        style.configure("TCombobox",
+            fieldbackground=SURFACE2, background=SURFACE2,
+            foreground=TEXT, selectbackground=HL,
+            arrowcolor=TEXT2, borderwidth=0)
+        style.map("TCombobox",
+            fieldbackground=[("readonly", SURFACE2)],
+            foreground=[("readonly", TEXT)])
+        style.configure("TScrollbar",
+            background=SURFACE2, troughcolor=SURFACE,
+            borderwidth=0, arrowsize=0)
+
+    # ── Animation helpers ─────────────────────────────────────────────────────
+    def _pulse_widget(self, widget, color_a, color_b, interval=900, _state=None):
+        """Alternate widget foreground between two colors forever."""
+        if _state is None:
+            _state = [True]
+        if not widget.winfo_exists():
+            return
+        widget.config(fg=color_a if _state[0] else color_b)
+        _state[0] = not _state[0]
+        widget.after(interval, lambda: self._pulse_widget(
+            widget, color_a, color_b, interval, _state))
+
+    def _animate_value(self, label, target, prefix="", suffix="", steps=12):
+        """Count-up animation for stat labels."""
+        try:
+            target = int(str(target).replace(",", "").replace(" ", ""))
+        except Exception:
+            label.config(text=f"{prefix}{target}{suffix}")
+            return
+        current = [0]
+        step = max(1, target // steps)
+        def _tick():
+            if not label.winfo_exists():
+                return
+            current[0] = min(current[0] + step, target)
+            label.config(text=f"{prefix}{current[0]:,}{suffix}".replace(",", " "))
+            if current[0] < target:
+                label.after(40, _tick)
+        _tick()
+
+    def _mk_btn(self, parent, text, kind="secondary", cmd=None, **kw):
+        """Styled button with hover animation. kind: primary|secondary|danger|ok|warn|ghost"""
+        palettes = {
+            "primary":   (ACCENT,   ACCENT2,  "#07080d", "#07080d"),
+            "secondary": (SURFACE2, SURFACE3, TEXT2,     TEXT),
+            "danger":    (SURFACE2, DANGER,   DANGER,    "#07080d"),
+            "ok":        (SURFACE2, OK,       OK,        "#07080d"),
+            "warn":      (SURFACE2, WARN,     WARN,      "#07080d"),
+            "ghost":     (BG,       SURFACE2, TEXT2,     TEXT),
+        }
+        bg_n, bg_h, fg_n, fg_h = palettes.get(kind, palettes["secondary"])
+        defaults = dict(font=("Segoe UI", 10), relief="flat", cursor="hand2",
+                        padx=12, pady=6, bd=0, activebackground=bg_h,
+                        activeforeground=fg_h)
+        defaults.update(kw)
+        b = tk.Button(parent, text=text, bg=bg_n, fg=fg_n,
+                      command=cmd, **defaults)
+        self._bind_hover(b, bg_n, bg_h, fg_n, fg_h)
+        return b
+
+    def _tab_header(self, parent, icon, title, subtitle=None, accent_col=None):
+        """Consistent tab header with accent bar + icon + title."""
+        col = accent_col or ACCENT
+        hdr = tk.Frame(parent, bg=BG)
+        hdr.pack(fill="x", padx=0, pady=(0, 12))
+        # Top accent line
+        tk.Frame(hdr, height=2, bg=col).pack(fill="x")
+        inner = tk.Frame(hdr, bg=BG)
+        inner.pack(fill="x", padx=20, pady=(12, 0))
+        title_row = tk.Frame(inner, bg=BG)
+        title_row.pack(fill="x")
+        tk.Label(title_row, text=icon, font=("Segoe UI", 20),
+                 bg=BG, fg=col).pack(side="left", padx=(0, 10))
+        text_col = tk.Frame(title_row, bg=BG)
+        text_col.pack(side="left", fill="x", expand=True)
+        tk.Label(text_col, text=title, font=("Segoe UI", 15, "bold"),
+                 bg=BG, fg=TEXT, anchor="w").pack(anchor="w")
+        if subtitle:
+            tk.Label(text_col, text=subtitle, font=("Segoe UI", 9),
+                     bg=BG, fg=TEXT2, anchor="w").pack(anchor="w", pady=(1, 0))
+        return hdr
+
+    def _section_label(self, parent, text, col=None):
+        """Small section divider label."""
+        row = tk.Frame(parent, bg=BG)
+        row.pack(fill="x", pady=(10, 4))
+        tk.Frame(row, width=3, bg=col or ACCENT).pack(side="left", fill="y", padx=(0, 8))
+        tk.Label(row, text=text, font=("Segoe UI", 9, "bold"),
+                 bg=BG, fg=TEXT2).pack(side="left")
+        return row
 
     def log(self, msg, level="info"):
         colors = {"info": TEXT2, "ok": OK, "warn": WARN, "error": DANGER, "accent": ACCENT}
@@ -1083,74 +1178,122 @@ class App:
         self.bg_canvas = tk.Canvas(self.root, bg=BG, highlightthickness=0)
         self.bg_canvas.pack(fill="both", expand=True)
 
-        PAD = 8
-        self.sidebar = tk.Frame(self.bg_canvas, bg=SURFACE, width=180)
+        SIDEBAR_W = 210
+        PAD = 0
+
+        self.sidebar = tk.Frame(self.bg_canvas, bg=SURFACE, width=SIDEBAR_W)
         self.sidebar.pack_propagate(False)
         self._sidebar_win = self.bg_canvas.create_window(
-            PAD, PAD, anchor="nw", window=self.sidebar, width=180)
+            0, 0, anchor="nw", window=self.sidebar, width=SIDEBAR_W)
+
+        # Thin separator line between sidebar and content
+        self._sep_win = self.bg_canvas.create_line(
+            SIDEBAR_W, 0, SIDEBAR_W, 800, fill=BORDER, width=1)
 
         self.main_frame = tk.Frame(self.bg_canvas, bg=BG)
         self._main_win = self.bg_canvas.create_window(
-            PAD + 180 + PAD, PAD, anchor="nw", window=self.main_frame)
+            SIDEBAR_W + 1, 0, anchor="nw", window=self.main_frame)
 
         def _on_canvas_resize(e):
             w, h = e.width, e.height
-            sidebar_h = max(0, h - PAD * 2)
-            main_w    = max(0, w - 180 - PAD * 3)
-            main_h    = sidebar_h
-            self.bg_canvas.itemconfig(self._sidebar_win, height=sidebar_h)
-            self.bg_canvas.itemconfig(self._main_win,    width=main_w, height=main_h)
+            self.bg_canvas.itemconfig(self._sidebar_win, height=h)
+            self.bg_canvas.coords(self._sep_win, SIDEBAR_W, 0, SIDEBAR_W, h)
+            self.bg_canvas.itemconfig(self._main_win, width=max(0, w - SIDEBAR_W - 1), height=h)
 
         self.bg_canvas.bind("<Configure>", _on_canvas_resize)
 
-        # Sidebar content
-        tk.Label(self.sidebar, text="IG Tracker", font=("Segoe UI", 14, "bold"),
-                 bg=SURFACE, fg=ACCENT).pack(pady=(20, 2), padx=16, anchor="w")
-        tk.Label(self.sidebar, text=self.email, font=("Segoe UI", 8),
-                 bg=SURFACE, fg=TEXT2, wraplength=160).pack(padx=16, anchor="w")
-        tk.Frame(self.sidebar, height=1, bg=BORDER).pack(fill="x", pady=14, padx=12)
+        # ── Sidebar: logo ──────────────────────────────────────────────────────
+        logo_frame = tk.Frame(self.sidebar, bg=SURFACE)
+        logo_frame.pack(fill="x", padx=0, pady=(0, 0))
 
+        # Accent bar at top of sidebar
+        tk.Frame(logo_frame, height=3, bg=ACCENT).pack(fill="x")
+
+        inner_logo = tk.Frame(logo_frame, bg=SURFACE)
+        inner_logo.pack(fill="x", padx=20, pady=(14, 10))
+        tk.Label(inner_logo, text="◈  IG Tracker",
+                 font=("Segoe UI", 13, "bold"), bg=SURFACE, fg=TEXT).pack(anchor="w")
+        email_short = (self.email[:22] + "…") if len(self.email) > 24 else self.email
+        tk.Label(inner_logo, text=email_short, font=("Segoe UI", 8),
+                 bg=SURFACE, fg=TEXT2).pack(anchor="w", pady=(2, 0))
+
+        tk.Frame(self.sidebar, height=1, bg=BORDER).pack(fill="x", pady=(0, 6))
+
+        # ── Sidebar: nav ───────────────────────────────────────────────────────
+        nav_items = [
+            ("phones",      "📱", "Téléphones"),
+            ("stats",       "📊", "Stats Instagram"),
+            ("automation",  "🎬", "Montage"),
+            ("posting",     "🚀", "Posting"),
+            ("bank",        "🗂", "Banque vidéos"),
+            ("autocomment", "🤖", "Automatisation"),
+            ("tools",       "🔧", "Outils IA"),
+            ("settings",    "⚙",  "Paramètres"),
+        ]
         self.tab_btns = {}
-        for k, lbl in [("phones",     "📱  Téléphones"),
-                        ("stats",      "📊  Stats Instagram"),
-                        ("automation", "🎬  Montage"),
-                        ("posting",    "🚀  Posting"),
-                        ("bank",       "🗂  Banque vidéos"),
-                        ("autocomment", "🤖  Automatisation"),
-                        ("tools",      "🔧  Outils IA"),
-                        ("settings",   "⚙  Paramètres")]:
-            b = self._make_sidebar_btn(self.sidebar, lbl, k)
-            b.pack(fill="x", pady=1)
-            self.tab_btns[k] = b
+        self._sidebar_indicators = {}
+        for k, icon, label in nav_items:
+            row, btn, ind = self._make_sidebar_item(self.sidebar, icon, label, k)
+            row.pack(fill="x", pady=0)
+            self.tab_btns[k] = btn
+            self._sidebar_indicators[k] = ind
 
+        # ── Sidebar: bottom ────────────────────────────────────────────────────
         tk.Frame(self.sidebar, bg=SURFACE).pack(fill="both", expand=True)
-        self.refresh_btn = tk.Button(self.sidebar, text="↺  Refresh",
-            font=("Segoe UI", 10, "bold"), bg=ACCENT, fg="#06080f",
+
+        # Refresh button
+        ref_frame = tk.Frame(self.sidebar, bg=SURFACE, padx=14, pady=6)
+        ref_frame.pack(fill="x")
+        self.refresh_btn = tk.Button(ref_frame, text="↺  Rafraîchir",
+            font=("Segoe UI", 10, "bold"), bg=ACCENT, fg="#07080d",
             relief="flat", cursor="hand2", activebackground=ACCENT2,
-            pady=10, command=self._manual_refresh)
-        self.refresh_btn.pack(fill="x", padx=12, pady=(0, 6))
+            pady=9, bd=0, command=self._manual_refresh)
+        self.refresh_btn.pack(fill="x")
+        self._bind_hover(self.refresh_btn, ACCENT, ACCENT2, "#07080d", "#07080d")
+
         self.status_lbl = tk.Label(self.sidebar, text="—",
             font=("Consolas", 8), bg=SURFACE, fg=MUTED)
-        self.status_lbl.pack(padx=12, pady=(0, 12))
+        self.status_lbl.pack(padx=16, pady=(2, 14))
 
-        # Main frame content
+        # ── Main: stat cards ───────────────────────────────────────────────────
         sf = tk.Frame(self.main_frame, bg=BG)
-        sf.pack(fill="x", padx=14, pady=(14, 8))
+        sf.pack(fill="x", padx=18, pady=(18, 10))
+
         self.sv = {}
-        for k, lbl, col in [("phones", "TÉLÉPHONES", ACCENT),
-                             ("active", "IG ACTIFS",  OK),
-                             ("banned", "BANNIS",      DANGER),
-                             ("views",  "VUES TOTALES", WARN)]:
-            f = tk.Frame(sf, bg=CARD, padx=14, pady=12)
-            f.pack(side="left", fill="x", expand=True, padx=(0, 8))
-            tk.Frame(f, height=2, bg=col).pack(fill="x", pady=(0, 8))
-            tk.Label(f, text=lbl, font=("Consolas", 8), bg=CARD, fg=MUTED).pack(anchor="w")
-            v = tk.Label(f, text="—", font=("Segoe UI", 22, "bold"), bg=CARD, fg=col)
-            v.pack(anchor="w")
+        card_data = [
+            ("phones", "📱", "TÉLÉPHONES",   ACCENT),
+            ("active", "✅", "IG ACTIFS",    OK),
+            ("banned", "🚫", "BANNIS",       DANGER),
+            ("views",  "👁", "VUES TOTALES", WARN),
+        ]
+        for k, ico, lbl, col in card_data:
+            card = tk.Frame(sf, bg=CARD, padx=0, pady=0,
+                            highlightthickness=1, highlightbackground=BORDER)
+            card.pack(side="left", fill="x", expand=True, padx=(0, 10))
+
+            top_bar = tk.Frame(card, height=3, bg=col)
+            top_bar.pack(fill="x")
+
+            inner = tk.Frame(card, bg=CARD, padx=16, pady=14)
+            inner.pack(fill="both", expand=True)
+
+            row_top = tk.Frame(inner, bg=CARD)
+            row_top.pack(fill="x")
+            tk.Label(row_top, text=ico, font=("Segoe UI", 14), bg=CARD, fg=col).pack(side="left")
+            tk.Label(row_top, text=lbl, font=("Segoe UI", 8, "bold"),
+                     bg=CARD, fg=TEXT2).pack(side="left", padx=(6, 0), pady=2)
+
+            v = tk.Label(inner, text="—", font=("Segoe UI", 26, "bold"), bg=CARD, fg=col)
+            v.pack(anchor="w", pady=(4, 0))
             self.sv[k] = v
 
+            # Hover glow
+            for w in [card, inner, row_top, v]:
+                w.bind("<Enter>", lambda e, c=card: c.config(highlightbackground=col))
+                w.bind("<Leave>", lambda e, c=card: c.config(highlightbackground=BORDER))
+
         self.tab_container = tk.Frame(self.main_frame, bg=BG)
-        self.tab_container.pack(fill="both", expand=True, padx=14, pady=(0, 14))
+        self.tab_container.pack(fill="both", expand=True, padx=18, pady=(0, 18))
 
         self.tabs = {}
         self._build_phones_tab()
@@ -1163,74 +1306,97 @@ class App:
         self._build_settings_tab()
 
     def _bind_mousewheel(self, widget, canvas):
-        """Recursively bind mousewheel on widget and all descendants to scroll canvas."""
         widget.bind("<MouseWheel>",
                     lambda e: canvas.yview_scroll(int(-1*(e.delta/120)), "units"),
                     add="+")
         for child in widget.winfo_children():
             self._bind_mousewheel(child, canvas)
 
-    def _make_sidebar_btn(self, parent, text, key):
-        base_bg  = SURFACE
-        hover_bg = HL
-        base_fg  = TEXT2
-        hover_fg = TEXT
-
-        btn = tk.Button(parent, text=text, font=("Segoe UI", 10),
-                        bg=base_bg, fg=base_fg, relief="flat", anchor="w",
-                        padx=16, pady=10, cursor="hand2",
-                        activebackground=HL,
-                        command=lambda x=key: self._show_tab(x))
-
-        def _lerp_color(c1, c2, t):
-            r1, g1, b1 = parent.winfo_rgb(c1)
-            r2, g2, b2 = parent.winfo_rgb(c2)
-            r = int(r1 + (r2 - r1) * t) >> 8
-            g = int(g1 + (g2 - g1) * t) >> 8
-            b = int(b1 + (b2 - b1) * t) >> 8
-            return f"#{r:02x}{g:02x}{b:02x}"
-
+    def _bind_hover(self, widget, bg_normal, bg_hover, fg_normal=None, fg_hover=None):
+        """Smooth hover animation on any button/label."""
         _anim = [0]
 
-        def _animate_in():
-            _anim[0] = min(_anim[0] + 1, 5)
-            t = _anim[0] / 5
-            if btn.winfo_exists():
-                btn.config(bg=_lerp_color(base_bg, hover_bg, t),
-                           fg=_lerp_color(base_fg, hover_fg, t))
-            if _anim[0] < 5:
-                btn.after(20, _animate_in)
+        def _lerp(c1, c2, t):
+            try:
+                r1,g1,b1 = widget.winfo_rgb(c1)
+                r2,g2,b2 = widget.winfo_rgb(c2)
+                r = int(r1+(r2-r1)*t)>>8
+                g = int(g1+(g2-g1)*t)>>8
+                b = int(b1+(b2-b1)*t)>>8
+                return f"#{r:02x}{g:02x}{b:02x}"
+            except Exception:
+                return c2 if t > 0.5 else c1
 
-        def _animate_out():
-            key_active = getattr(self, '_active_tab', '')
-            if self.tab_btns.get(key) is btn and key == key_active:
-                return
-            _anim[0] = max(_anim[0] - 1, 0)
-            t = _anim[0] / 5
-            if btn.winfo_exists():
-                btn.config(bg=_lerp_color(base_bg, hover_bg, t),
-                           fg=_lerp_color(base_fg, hover_fg, t))
-            if _anim[0] > 0:
-                btn.after(20, _animate_out)
+        def _tick(direction):
+            _anim[0] = max(0, min(6, _anim[0] + direction))
+            t = _anim[0] / 6
+            if widget.winfo_exists():
+                kw = {"bg": _lerp(bg_normal, bg_hover, t)}
+                if fg_normal and fg_hover:
+                    kw["fg"] = _lerp(fg_normal, fg_hover, t)
+                try:
+                    widget.config(**kw)
+                except Exception:
+                    pass
+            if (direction > 0 and _anim[0] < 6) or (direction < 0 and _anim[0] > 0):
+                widget.after(18, lambda: _tick(direction))
 
-        btn.bind("<Enter>", lambda e: (_anim.__setitem__(0, _anim[0]), _animate_in()))
-        btn.bind("<Leave>", lambda e: _animate_out())
-        return btn
+        widget.bind("<Enter>", lambda e: _tick(1), add="+")
+        widget.bind("<Leave>", lambda e: _tick(-1), add="+")
+
+    def _make_sidebar_item(self, parent, icon, label, key):
+        """Returns (outer_row, button, indicator_frame)."""
+        outer = tk.Frame(parent, bg=SURFACE)
+
+        indicator = tk.Frame(outer, width=3, bg=SURFACE)
+        indicator.pack(side="left", fill="y")
+
+        btn = tk.Button(outer,
+                        text=f"  {icon}  {label}",
+                        font=("Segoe UI", 10), bg=SURFACE, fg=TEXT2,
+                        relief="flat", anchor="w", padx=12, pady=10,
+                        cursor="hand2", activebackground=SURFACE3,
+                        bd=0, command=lambda x=key: self._show_tab(x))
+        btn.pack(side="left", fill="x", expand=True)
+
+        def _in(e):
+            if getattr(self, "_active_tab", "") != key:
+                btn.config(bg=SURFACE3, fg=TEXT)
+        def _out(e):
+            if getattr(self, "_active_tab", "") != key:
+                btn.config(bg=SURFACE, fg=TEXT2)
+
+        btn.bind("<Enter>", _in)
+        btn.bind("<Leave>", _out)
+        outer.bind("<Enter>", _in)
+        outer.bind("<Leave>", _out)
+
+        return outer, btn, indicator
 
     def _show_tab(self, key):
         self._active_tab = key
-        for k, b in self.tab_btns.items():
+
+        # Update sidebar indicators
+        for k, ind in self._sidebar_indicators.items():
             active = k == key
-            b.config(bg=HL if active else SURFACE,
-                     fg=ACCENT if active else TEXT2,
-                     font=("Segoe UI", 10, "bold") if active else ("Segoe UI", 10))
+            btn = self.tab_btns[k]
+            if active:
+                ind.config(bg=ACCENT)
+                btn.config(bg=SURFACE3, fg=TEXT,
+                           font=("Segoe UI", 10, "bold"))
+            else:
+                ind.config(bg=SURFACE)
+                btn.config(bg=SURFACE, fg=TEXT2,
+                           font=("Segoe UI", 10))
+
+        # Fade-in new tab
         for k, frame in self.tabs.items():
             if k == key:
                 frame.place(x=0, y=0, relwidth=1, relheight=1)
                 frame.lift()
-                frame.attributes = getattr(frame, 'attributes', {})
             else:
                 frame.place_forget()
+
         if key == "stats":
             self._refresh_ig_list()
         if key == "bank":
@@ -1245,46 +1411,57 @@ class App:
         f = tk.Frame(self.tab_container, bg=BG)
         self.tabs["phones"] = f
 
-        tb1 = tk.Frame(f, bg=BG)
-        tb1.pack(fill="x", pady=(0, 4))
-        tk.Label(tb1, text="Groupe :", font=("Segoe UI", 10), bg=BG, fg=TEXT2).pack(side="left")
+        self._tab_header(f, "📱", "Téléphones GéeLark",
+                         "Gérez vos cloud phones et comptes Instagram liés", ACCENT)
+
+        # ── Toolbar row 1: filters ─────────────────────────────────────────────
+        tb1 = tk.Frame(f, bg=SURFACE2, padx=12, pady=8,
+                       highlightthickness=1, highlightbackground=BORDER)
+        tb1.pack(fill="x", pady=(0, 2))
+
+        tk.Label(tb1, text="Groupe", font=("Segoe UI", 9),
+                 bg=SURFACE2, fg=TEXT2).pack(side="left")
         self.grp_var = tk.StringVar(value="Tous")
         self.grp_combo = ttk.Combobox(tb1, textvariable=self.grp_var,
-                                       state="readonly", width=22, font=("Segoe UI", 10))
+                                       state="readonly", width=18, font=("Segoe UI", 9))
         self.grp_combo["values"] = ["Tous"]
-        self.grp_combo.pack(side="left", padx=(4, 12))
+        self.grp_combo.pack(side="left", padx=(6, 16))
         self.grp_combo.bind("<<ComboboxSelected>>", lambda e: self._refresh_table())
-        tk.Label(tb1, text="Recherche :", font=("Segoe UI", 10), bg=BG, fg=TEXT2).pack(side="left")
+
+        tk.Label(tb1, text="🔍", font=("Segoe UI", 11),
+                 bg=SURFACE2, fg=TEXT2).pack(side="left")
         self.search_var = tk.StringVar()
         self.search_var.trace("w", lambda *a: self._refresh_table())
-        tk.Entry(tb1, textvariable=self.search_var, font=("Consolas", 10),
-                 bg=SURFACE2, fg=TEXT, insertbackground=TEXT, relief="flat", bd=0,
+        tk.Entry(tb1, textvariable=self.search_var, font=("Segoe UI", 10),
+                 bg=SURFACE, fg=TEXT, insertbackground=TEXT, relief="flat", bd=0,
                  highlightthickness=1, highlightcolor=ACCENT, highlightbackground=BORDER,
-                 width=20).pack(side="left", padx=(4, 0), ipady=4)
-        self.sel_lbl = tk.Label(tb1, text="", font=("Segoe UI", 9), bg=BG, fg=MUTED)
+                 width=22).pack(side="left", padx=(4, 0), ipady=5)
+
+        self.sel_lbl = tk.Label(tb1, text="", font=("Segoe UI", 9), bg=SURFACE2, fg=MUTED)
         self.sel_lbl.pack(side="right")
 
-        tb2 = tk.Frame(f, bg=BG)
+        # ── Toolbar row 2: actions ─────────────────────────────────────────────
+        tb2 = tk.Frame(f, bg=BG, pady=6)
         tb2.pack(fill="x", pady=(0, 8))
-        tk.Label(tb2, text="@Username IG :", font=("Segoe UI", 10), bg=BG, fg=TEXT2).pack(side="left")
+
+        tk.Label(tb2, text="@Username IG :", font=("Segoe UI", 9),
+                 bg=BG, fg=TEXT2).pack(side="left")
         self.link_var = tk.StringVar()
         tk.Entry(tb2, textvariable=self.link_var, font=("Consolas", 10),
                  bg=SURFACE2, fg=TEXT, insertbackground=TEXT, relief="flat", bd=0,
                  highlightthickness=1, highlightcolor=ACCENT, highlightbackground=BORDER,
-                 width=24).pack(side="left", padx=(4, 6), ipady=4)
-        tk.Button(tb2, text="✓ Lier", font=("Segoe UI", 10, "bold"),
-                  bg=ACCENT, fg="#06080f", relief="flat", cursor="hand2",
-                  padx=10, pady=4, command=self._link).pack(side="left", padx=2)
-        tk.Button(tb2, text="✗ Délier", font=("Segoe UI", 10),
-                  bg=SURFACE2, fg=DANGER, relief="flat", cursor="hand2",
-                  padx=8, pady=4, command=self._unlink).pack(side="left", padx=2)
-        tk.Button(tb2, text="📊 Scraper", font=("Segoe UI", 10),
-                  bg=SURFACE2, fg=OK, relief="flat", cursor="hand2", padx=8, pady=4,
-                  command=lambda: threading.Thread(
-                      target=self._scrape_sel, daemon=True).start()).pack(side="left", padx=6)
-        tk.Button(tb2, text="🔑 Identifiants", font=("Segoe UI", 10),
-                  bg=SURFACE2, fg=ACCENT, relief="flat", cursor="hand2", padx=8, pady=4,
-                  command=self._show_credentials_dialog).pack(side="left", padx=2)
+                 width=22).pack(side="left", padx=(6, 8), ipady=5)
+
+        self._mk_btn(tb2, "✓  Lier", "primary", self._link, pady=5).pack(side="left", padx=2)
+        self._mk_btn(tb2, "✗  Délier", "danger", self._unlink, pady=5).pack(side="left", padx=2)
+
+        tk.Frame(tb2, bg=BORDER, width=1).pack(side="left", fill="y", padx=10)
+
+        self._mk_btn(tb2, "📊  Scraper", "ok", pady=5,
+            cmd=lambda: threading.Thread(target=self._scrape_sel, daemon=True).start()
+        ).pack(side="left", padx=2)
+        self._mk_btn(tb2, "🔑  Identifiants", "secondary", self._show_credentials_dialog,
+                     pady=5).pack(side="left", padx=2)
 
         # ── Auto-refresh controls ─────────────────────────────────────────────
         tk.Frame(tb2, bg=BORDER, width=1).pack(side="left", fill="y", padx=(10, 8))
@@ -1356,10 +1533,13 @@ class App:
         self.tabs["stats"] = f
 
         left = tk.Frame(f, bg=SURFACE, width=220)
-        left.pack(side="left", fill="y", padx=(0, 12))
+        left.pack(side="left", fill="y", padx=(0, 0))
         left.pack_propagate(False)
-        tk.Label(left, text="COMPTES LIÉS", font=("Consolas", 8, "bold"),
-                 bg=SURFACE, fg=MUTED).pack(anchor="w", padx=12, pady=(12, 6))
+
+        # Sidebar header for accounts list
+        tk.Frame(left, height=2, bg=OK).pack(fill="x")
+        tk.Label(left, text="COMPTES LIÉS", font=("Segoe UI", 8, "bold"),
+                 bg=SURFACE, fg=TEXT2).pack(anchor="w", padx=12, pady=(12, 6))
         self.ig_list = tk.Listbox(left, bg=SURFACE, fg=TEXT, selectbackground=HL,
                                    selectforeground=ACCENT, relief="flat", bd=0,
                                    font=("Segoe UI", 10), activestyle="none", cursor="hand2")
@@ -1367,27 +1547,35 @@ class App:
         self.ig_list.bind("<<ListboxSelect>>", lambda e: self._on_ig_list_sel())
 
         right = tk.Frame(f, bg=BG)
-        right.pack(side="left", fill="both", expand=True)
-        hdr = tk.Frame(right, bg=CARD)
+        right.pack(side="left", fill="both", expand=True, padx=(12, 0))
+
+        # Account detail header card
+        hdr = tk.Frame(right, bg=CARD, highlightthickness=1, highlightbackground=BORDER)
         hdr.pack(fill="x", pady=(0, 10))
-        self.det_name = tk.Label(hdr, text="Sélectionne un compte",
+        tk.Frame(hdr, height=2, bg=OK).pack(fill="x")
+        hdr_inner = tk.Frame(hdr, bg=CARD)
+        hdr_inner.pack(fill="x", padx=16, pady=10)
+        self.det_name = tk.Label(hdr_inner, text="Sélectionne un compte",
                                   font=("Segoe UI", 14, "bold"), bg=CARD, fg=TEXT)
-        self.det_name.pack(side="left", padx=16, pady=14)
-        self.det_status = tk.Label(hdr, text="", font=("Segoe UI", 10), bg=CARD, fg=TEXT2)
-        self.det_status.pack(side="left")
+        self.det_name.pack(side="left")
+        self.det_status = tk.Label(hdr_inner, text="", font=("Segoe UI", 10), bg=CARD, fg=TEXT2)
+        self.det_status.pack(side="left", padx=(12, 0))
 
         kf = tk.Frame(right, bg=BG)
         kf.pack(fill="x", pady=(0, 10))
         self.kpis = {}
         for k, lbl, col in [("followers", "FOLLOWERS", ACCENT),
                              ("following", "FOLLOWING", TEXT2),
-                             ("posts",     "POSTS",     TEXT2),
+                             ("posts",     "POSTS",     OK),
                              ("views",     "VUES",      WARN)]:
-            kcard = tk.Frame(kf, bg=CARD, padx=12, pady=10)
+            kcard = tk.Frame(kf, bg=CARD, padx=12, pady=12,
+                             highlightthickness=1, highlightbackground=BORDER)
             kcard.pack(side="left", fill="x", expand=True, padx=(0, 8))
-            tk.Label(kcard, text=lbl, font=("Consolas", 8), bg=CARD, fg=MUTED).pack(anchor="w")
-            v = tk.Label(kcard, text="—", font=("Segoe UI", 18, "bold"), bg=CARD, fg=col)
-            v.pack(anchor="w")
+            tk.Frame(kcard, height=2, bg=col).pack(fill="x", pady=(0, 8))
+            tk.Label(kcard, text=lbl, font=("Segoe UI", 8, "bold"),
+                     bg=CARD, fg=TEXT2).pack(anchor="w")
+            v = tk.Label(kcard, text="—", font=("Segoe UI", 20, "bold"), bg=CARD, fg=col)
+            v.pack(anchor="w", pady=(4, 0))
             self.kpis[k] = v
 
         # Video filter bar
@@ -1558,21 +1746,19 @@ class App:
         # Deferred recursive bind so all children exist
         self.root.after(200, lambda: self._bind_mousewheel(left, left_canvas))
 
-        tk.Label(left, text="🎬 Montage vidéo", font=("Segoe UI", 12, "bold"),
-                 bg=BG, fg=TEXT).pack(anchor="w", padx=2, pady=(8, 6))
+        tk.Label(left, text="🎬  Montage", font=("Segoe UI", 13, "bold"),
+                 bg=BG, fg=TEXT).pack(anchor="w", padx=2, pady=(8, 2))
+        tk.Label(left, text="Composition automatique de vidéos", font=("Segoe UI", 9),
+                 bg=BG, fg=TEXT2).pack(anchor="w", padx=2, pady=(0, 8))
 
         # ── Section 1 : Vidéos source ────────────────────────────────────────
         vs = self._collapsible(left, "VIDÉOS SOURCE", open_by_default=True)
         vtop = tk.Frame(vs, bg=CARD)
         vtop.pack(fill="x", pady=(0, 8))
-        tk.Button(vtop, text="+ Ajouter vidéos",
-                  font=("Segoe UI", 9, "bold"), bg=ACCENT, fg="#06080f",
-                  relief="flat", cursor="hand2", padx=8, pady=4,
-                  command=self._add_videos).pack(side="left")
-        tk.Button(vtop, text="Vider",
-                  font=("Segoe UI", 9), bg=SURFACE2, fg=DANGER,
-                  relief="flat", cursor="hand2", padx=6, pady=4,
-                  command=self._clear_videos).pack(side="left", padx=(6, 0))
+        self._mk_btn(vtop, "+ Ajouter vidéos", "primary", self._add_videos,
+                     pady=5).pack(side="left")
+        self._mk_btn(vtop, "Vider", "danger", self._clear_videos,
+                     pady=5).pack(side="left", padx=(6, 0))
 
         self.vgrid_canvas = tk.Canvas(vs, bg=SURFACE, highlightthickness=0, height=118)
         self.vgrid_canvas.pack(fill="x")
@@ -1740,30 +1926,26 @@ class App:
         btn_area = tk.Frame(left, bg=BG)
         btn_area.pack(fill="x", pady=(4, 8), padx=2)
 
-        self.process_btn = tk.Button(
-            btn_area, text="✂  Traiter & Exporter la vidéo sélectionnée",
-            font=("Segoe UI", 11, "bold"), bg=ACCENT, fg="#06080f",
-            relief="flat", cursor="hand2", pady=12,
-            command=lambda: threading.Thread(
-                target=self._process_video, daemon=True).start())
+        self.process_btn = self._mk_btn(
+            btn_area, "✂  Traiter & Exporter la vidéo sélectionnée",
+            "primary", font=("Segoe UI", 11, "bold"), pady=12,
+            cmd=lambda: threading.Thread(target=self._process_video, daemon=True).start())
         self.process_btn.pack(fill="x", pady=(0, 5))
+        self._bind_hover(self.process_btn, ACCENT, ACCENT2, "#06080f", "#06080f")
 
-        tk.Button(
-            btn_area, text="⚡  Exporter toutes les vidéos en parallèle",
-            font=("Segoe UI", 10, "bold"), bg=HL, fg=TEXT,
-            relief="flat", cursor="hand2", pady=10,
-            command=lambda: threading.Thread(
-                target=self._batch_export, daemon=True).start()).pack(fill="x", pady=(0, 5))
+        self._mk_btn(btn_area, "⚡  Exporter toutes les vidéos en parallèle",
+                     "secondary", font=("Segoe UI", 10, "bold"), pady=10,
+                     cmd=lambda: threading.Thread(
+                         target=self._batch_export, daemon=True).start()
+                     ).pack(fill="x", pady=(0, 5))
 
         self.process_status = tk.Label(btn_area, text="", font=("Segoe UI", 9),
                                         bg=BG, fg=TEXT2, wraplength=380)
         self.process_status.pack(fill="x")
 
-        tk.Button(
-            btn_area, text="🚀  Poster sur les téléphones",
-            font=("Segoe UI", 10, "bold"), bg=SURFACE2, fg=ACCENT,
-            relief="flat", cursor="hand2", pady=9,
-            command=self._open_post_window).pack(fill="x", pady=(5, 0))
+        self._mk_btn(btn_area, "🚀  Poster sur les téléphones",
+                     "ok", self._open_post_window, pady=9
+                     ).pack(fill="x", pady=(5, 0))
 
         # Compatible caption_text (banque)
         self.caption_text = tk.Text(btn_area, height=1)
@@ -2847,11 +3029,11 @@ class App:
         f = tk.Frame(self.tab_container, bg=BG)
         self.tabs["posting"] = f
 
-        tk.Label(f, text="🚀  Posting", font=("Segoe UI", 14, "bold"),
-                 bg=BG, fg=ACCENT).pack(anchor="w", padx=20, pady=(16, 0))
+        self._tab_header(f, "🚀", "Posting",
+                         "Publiez des Reels sur vos comptes GéeLark", ACCENT)
 
         main = tk.Frame(f, bg=BG)
-        main.pack(fill="both", expand=True, padx=20, pady=10)
+        main.pack(fill="both", expand=True, padx=20, pady=0)
 
         # ── LEFT: video picker + phone selector ──────────────────────────────
         left = tk.Frame(main, bg=BG, width=320)
@@ -3051,8 +3233,10 @@ class App:
         self.post_launch_btn = tk.Button(
             right, text="🚀  Lancer le posting",
             font=("Segoe UI", 12, "bold"), bg=ACCENT, fg="#06080f",
-            relief="flat", cursor="hand2", pady=10)
-        self.post_launch_btn.pack(fill="x")
+            relief="flat", cursor="hand2", pady=12, bd=0,
+            activebackground=ACCENT2, activeforeground="#06080f")
+        self.post_launch_btn.pack(fill="x", pady=(8, 0))
+        self._bind_hover(self.post_launch_btn, ACCENT, ACCENT2, "#06080f", "#06080f")
 
         def _do_post():
             sel = [pid for pid, v in self._post_pvars.items() if v.get()]
@@ -3108,16 +3292,16 @@ class App:
         f = tk.Frame(self.tab_container, bg=BG)
         self.tabs["bank"] = f
 
+        hdr_row = tk.Frame(f, bg=BG)
+        hdr_row.pack(fill="x", pady=(0, 4))
+        self._tab_header(hdr_row, "🗂", "Banque de vidéos",
+                         "Stockez et gérez vos vidéos prêtes à poster", WARN)
         tb = tk.Frame(f, bg=BG)
         tb.pack(fill="x", pady=(0, 8))
-        tk.Label(tb, text="🗂  Banque de vidéos", font=("Segoe UI", 13, "bold"),
-                 bg=BG, fg=TEXT).pack(side="left")
-        tk.Button(tb, text="📂 Dossier export", font=("Segoe UI", 9),
-                  bg=SURFACE2, fg=TEXT2, relief="flat", cursor="hand2", padx=8, pady=4,
-                  command=self._choose_export_dir).pack(side="right")
-        tk.Button(tb, text="↺", font=("Segoe UI", 10), bg=SURFACE2, fg=TEXT2,
-                  relief="flat", cursor="hand2", padx=8, pady=4,
-                  command=self._refresh_bank).pack(side="right", padx=(0, 4))
+        self._mk_btn(tb, "↺  Rafraîchir", "ghost", self._refresh_bank,
+                     pady=5).pack(side="right", padx=(4, 0))
+        self._mk_btn(tb, "📂  Dossier export", "secondary", self._choose_export_dir,
+                     pady=5).pack(side="right")
         self.export_dir_lbl = tk.Label(
             tb, text=f"Export : {self.cfg.get('export_dir','Même dossier')}",
             font=("Segoe UI", 9), bg=BG, fg=MUTED)
@@ -3149,20 +3333,14 @@ class App:
 
         acts = tk.Frame(f, bg=BG)
         acts.pack(fill="x", pady=(6, 0))
-        for txt, col, cmd in [
-            ("📥 Ouvrir",        TEXT2, self._bank_open),
-            ("⬇ Télécharger",   TEXT2, self._bank_download),
-            ("🔀 Randomiser méta", WARN, lambda: threading.Thread(
-                target=self._randomize_meta, daemon=True).start()),
-            ("🚀 Poster",        ACCENT, self._post_from_bank),
-            ("🗑 Supprimer",     DANGER, self._bank_delete),
-        ]:
-            tk.Button(acts, text=txt,
-                      font=("Segoe UI", 9, "bold" if "Poster" in txt else "normal"),
-                      bg=ACCENT if "Poster" in txt else SURFACE2,
-                      fg="#06080f" if "Poster" in txt else col,
-                      relief="flat", cursor="hand2", padx=8, pady=5,
-                      command=cmd).pack(side="left", padx=(0, 4))
+        self._mk_btn(acts, "📥  Ouvrir",          "ghost",   self._bank_open,       pady=5).pack(side="left", padx=(0, 3))
+        self._mk_btn(acts, "⬇  Télécharger",      "secondary", self._bank_download, pady=5).pack(side="left", padx=(0, 3))
+        self._mk_btn(acts, "🔀  Randomiser méta",  "warn",
+                     cmd=lambda: threading.Thread(target=self._randomize_meta, daemon=True).start(),
+                     pady=5).pack(side="left", padx=(0, 3))
+        self._mk_btn(acts, "🚀  Poster",           "primary", self._post_from_bank, pady=5,
+                     font=("Segoe UI", 9, "bold")).pack(side="left", padx=(0, 3))
+        self._mk_btn(acts, "🗑  Supprimer",        "danger",  self._bank_delete,    pady=5).pack(side="left", padx=(0, 3))
         self.bank_status = tk.Label(acts, text="", font=("Segoe UI", 9), bg=BG, fg=TEXT2)
         self.bank_status.pack(side="left", padx=8)
 
@@ -3184,11 +3362,9 @@ class App:
         dh.pack(fill="x", padx=14, pady=(0, 6))
         tk.Label(dh, text="DESCRIPTION INSTAGRAM",
                  font=("Consolas", 8, "bold"), bg=CARD, fg=MUTED).pack(side="left")
-        self.gen_btn = tk.Button(dh, text="✨ Générer (Groq — gratuit)",
-                                  font=("Segoe UI", 9, "bold"), bg=ACCENT, fg="#06080f",
-                                  relief="flat", cursor="hand2", padx=10, pady=3,
-                                  command=lambda: threading.Thread(
-                                      target=self._generate_desc, daemon=True).start())
+        self.gen_btn = self._mk_btn(dh, "✨  Générer (Groq)", "primary", pady=4,
+                                    cmd=lambda: threading.Thread(
+                                        target=self._generate_desc, daemon=True).start())
         self.gen_btn.pack(side="right")
 
         self.desc_box = tk.Text(right, font=("Segoe UI", 10), bg=SURFACE2, fg=TEXT,
@@ -3199,12 +3375,9 @@ class App:
 
         br = tk.Frame(right, bg=CARD)
         br.pack(fill="x", padx=14, pady=(0, 10))
-        tk.Button(br, text="💾 Sauvegarder", font=("Segoe UI", 9),
-                  bg=SURFACE2, fg=TEXT2, relief="flat", cursor="hand2",
-                  padx=8, pady=4, command=self._save_desc).pack(side="left")
-        tk.Button(br, text="📋 Copier", font=("Segoe UI", 9),
-                  bg=SURFACE2, fg=TEXT2, relief="flat", cursor="hand2",
-                  padx=8, pady=4, command=self._copy_desc).pack(side="left", padx=(6, 0))
+        self._mk_btn(br, "💾  Sauvegarder", "ok", self._save_desc, pady=5).pack(side="left")
+        self._mk_btn(br, "📋  Copier", "secondary", self._copy_desc,
+                     pady=5).pack(side="left", padx=(6, 0))
         self.desc_status = tk.Label(br, text="", font=("Segoe UI", 9), bg=CARD, fg=TEXT2)
         self.desc_status.pack(side="left", padx=10)
 
@@ -3504,10 +3677,8 @@ class App:
         f = tk.Frame(self.tab_container, bg=BG)
         self.tabs["autocomment"] = f
 
-        tk.Label(f, text="🤖  Automatisation", font=("Segoe UI", 14, "bold"),
-                 bg=BG, fg=ACCENT).pack(anchor="w", padx=20, pady=(16, 0))
-        tk.Label(f, text="Compte → Vidéo → Commentaires → Réponse auto via Groq",
-                 font=("Segoe UI", 9), bg=BG, fg=MUTED).pack(anchor="w", padx=20, pady=(2, 8))
+        self._tab_header(f, "🤖", "Automatisation",
+                         "Réponses automatiques aux commentaires via Groq AI", OK)
 
         main = tk.Frame(f, bg=BG)
         main.pack(fill="both", expand=True, padx=20, pady=(0, 10))
@@ -3611,8 +3782,10 @@ class App:
         self._ac_stop_flag = [False]
         self._ac_btn = tk.Button(left, text="▶  Démarrer",
                                  font=("Segoe UI", 11, "bold"), bg=OK, fg="#06080f",
-                                 relief="flat", cursor="hand2", pady=8)
-        self._ac_btn.pack(fill="x")
+                                 relief="flat", cursor="hand2", pady=10, bd=0,
+                                 activebackground="#00a882", activeforeground="#06080f")
+        self._ac_btn.pack(fill="x", pady=(8, 0))
+        self._bind_hover(self._ac_btn, OK, "#00a882", "#06080f", "#06080f")
 
         # ═══ COLONNE MILIEU : commentaires ═══════════════════════════════════
         mid = tk.Frame(main, bg=BG, width=260)
@@ -4019,10 +4192,8 @@ class App:
         f = tk.Frame(self.tab_container, bg=BG)
         self.tabs["tools"] = f
 
-        tk.Label(f, text="🔧  Outils IA", font=("Segoe UI", 16, "bold"),
-                 bg=BG, fg=TEXT).pack(anchor="w", padx=60, pady=(28, 4))
-        tk.Label(f, text="Outils alimentés par l'IA pour gérer vos comptes Instagram",
-                 font=("Segoe UI", 10), bg=BG, fg=TEXT2).pack(anchor="w", padx=60, pady=(0, 20))
+        self._tab_header(f, "🔧", "Outils IA",
+                         "Génération de contenu & stratégie Instagram via Groq", WARN)
 
         canvas_tools = tk.Canvas(f, bg=BG, highlightthickness=0)
         sb_tools = ttk.Scrollbar(f, orient="vertical", command=canvas_tools.yview)
@@ -4041,19 +4212,24 @@ class App:
         # Deferred recursive bind so all children exist
         self.root.after(300, lambda: self._bind_mousewheel(inner_t, canvas_tools))
 
-        PAD = 60
+        PAD = 20
 
-        def card(title, subtitle=""):
-            c = tk.Frame(inner_t, bg=CARD, padx=20, pady=16)
-            c.pack(fill="x", padx=PAD, pady=8)
-            hdr = tk.Frame(c, bg=CARD)
-            hdr.pack(fill="x", pady=(0, 6))
+        def card(title, subtitle="", accent=None):
+            col = accent or WARN
+            c = tk.Frame(inner_t, bg=CARD, padx=0, pady=0,
+                         highlightthickness=1, highlightbackground=BORDER)
+            c.pack(fill="x", padx=PAD, pady=6)
+            tk.Frame(c, height=2, bg=col).pack(fill="x")
+            inner_c = tk.Frame(c, bg=CARD, padx=18, pady=14)
+            inner_c.pack(fill="both", expand=True)
+            hdr = tk.Frame(inner_c, bg=CARD)
+            hdr.pack(fill="x", pady=(0, 8))
             tk.Label(hdr, text=title, font=("Segoe UI", 12, "bold"),
                      bg=CARD, fg=TEXT).pack(side="left")
             if subtitle:
                 tk.Label(hdr, text=subtitle, font=("Segoe UI", 9),
                          bg=CARD, fg=TEXT2).pack(side="left", padx=(10, 0))
-            return c
+            return inner_c
 
         def _groq_call(prompt, on_success, on_error, max_tokens=400):
             """Run a Groq API call in a background thread, call on_success(text) or on_error(msg)."""
@@ -4124,9 +4300,8 @@ class App:
                        on_error=lambda m: _set_result(comp_result, f"❌ {m}"),
                        max_tokens=600)
 
-        tk.Button(c3, text="🔍 Analyser", font=("Segoe UI", 10, "bold"),
-                  bg=ACCENT, fg="#06080f", relief="flat", cursor="hand2",
-                  padx=16, pady=6, command=analyze_competitor).pack(anchor="w")
+        self._mk_btn(c3, "🔍  Analyser", "primary", analyze_competitor,
+                     pady=7).pack(anchor="w")
 
         # ── 4. Générateur de légendes / captions ──────────────────────────────
         c4 = card("💬  Légendes & Captions Virales", "Captions engageantes pour tes Reels")
@@ -4174,13 +4349,9 @@ class App:
 
         bf4 = tk.Frame(c4, bg=CARD)
         bf4.pack(fill="x")
-        tk.Button(bf4, text="✨ Générer", font=("Segoe UI", 10, "bold"),
-                  bg=ACCENT, fg="#06080f", relief="flat", cursor="hand2",
-                  padx=16, pady=6, command=gen_caption).pack(side="left")
-        tk.Button(bf4, text="📋 Copier", font=("Segoe UI", 10),
-                  bg=SURFACE2, fg=TEXT2, relief="flat", cursor="hand2",
-                  padx=12, pady=6, command=lambda: _copy_widget(cap_result)).pack(
-                      side="left", padx=(8, 0))
+        self._mk_btn(bf4, "✨  Générer", "primary", gen_caption, pady=7).pack(side="left")
+        self._mk_btn(bf4, "📋  Copier", "secondary",
+                     lambda: _copy_widget(cap_result), pady=7).pack(side="left", padx=(8, 0))
 
         # ── 5. Planificateur de contenu ────────────────────────────────────────
         c5 = card("📅  Planificateur de Contenu", "Calendrier éditorial sur 7 jours")
@@ -4209,9 +4380,7 @@ class App:
                        on_error=lambda m: _set_result(plan_result, f"❌ {m}"),
                        max_tokens=800)
 
-        tk.Button(c5, text="📅 Générer le planning", font=("Segoe UI", 10, "bold"),
-                  bg=ACCENT, fg="#06080f", relief="flat", cursor="hand2",
-                  padx=16, pady=6, command=gen_plan).pack(anchor="w")
+        self._mk_btn(c5, "📅  Générer le planning", "primary", gen_plan, pady=7).pack(anchor="w")
 
         # Bottom padding
         tk.Frame(inner_t, bg=BG, height=40).pack()
@@ -4223,33 +4392,58 @@ class App:
         f = tk.Frame(self.tab_container, bg=BG)
         self.tabs["settings"] = f
 
+        self._tab_header(f, "⚙", "Paramètres",
+                         "Configuration de l'application et des connexions", TEXT2)
+
         # Sub-tab nav
-        nav = tk.Frame(f, bg=BG)
-        nav.pack(fill="x", padx=60, pady=(20, 0))
+        nav = tk.Frame(f, bg=SURFACE2, highlightthickness=1, highlightbackground=BORDER)
+        nav.pack(fill="x", padx=20, pady=(0, 0))
+        nav_inner = tk.Frame(nav, bg=SURFACE2)
+        nav_inner.pack(fill="x", padx=8, pady=6)
 
         self._settings_panels = {}
         self._settings_nav_btns = {}
 
-        panel_host = tk.Frame(f, bg=BG)
-        panel_host.pack(fill="x", padx=60, pady=(0, 12))
+        canvas_s = tk.Canvas(f, bg=BG, highlightthickness=0)
+        sb_s = ttk.Scrollbar(f, orient="vertical", command=canvas_s.yview)
+        sb_s.pack(side="right", fill="y")
+        canvas_s.pack(side="left", fill="both", expand=True)
+        canvas_s.configure(yscrollcommand=sb_s.set)
+        panel_host_wrap = tk.Frame(canvas_s, bg=BG)
+        pw_id = canvas_s.create_window((0, 0), window=panel_host_wrap, anchor="nw")
+        panel_host_wrap.bind("<Configure>",
+            lambda e: canvas_s.configure(scrollregion=canvas_s.bbox("all")))
+        canvas_s.bind("<Configure>",
+            lambda e: canvas_s.itemconfig(pw_id, width=e.width))
+        canvas_s.bind("<MouseWheel>",
+            lambda e: canvas_s.yview_scroll(int(-1*(e.delta/120)), "units"))
+
+        panel_host = tk.Frame(panel_host_wrap, bg=BG)
+        panel_host.pack(fill="x", padx=20, pady=12)
 
         def show_settings_panel(name):
             for k, p in self._settings_panels.items():
                 p.pack_forget()
             for k, b in self._settings_nav_btns.items():
-                b.config(bg=SURFACE2, fg=TEXT2)
+                b.config(bg=SURFACE2, fg=TEXT2,
+                         font=("Segoe UI", 10))
             self._settings_panels[name].pack(fill="x")
-            self._settings_nav_btns[name].config(bg=ACCENT, fg="#06080f")
+            self._settings_nav_btns[name].config(
+                bg=ACCENT, fg="#06080f", font=("Segoe UI", 10, "bold"))
 
         for tab_name in ("Profil", "Connexions", "API Keys", "Apparence"):
-            b = tk.Button(nav, text=tab_name, font=("Segoe UI", 10, "bold"),
+            b = tk.Button(nav_inner, text=tab_name, font=("Segoe UI", 10),
                           bg=SURFACE2, fg=TEXT2, relief="flat", cursor="hand2",
-                          padx=16, pady=7,
+                          padx=16, pady=6,
                           command=lambda n=tab_name: show_settings_panel(n))
             b.pack(side="left", padx=(0, 4))
             self._settings_nav_btns[tab_name] = b
-            panel = tk.Frame(panel_host, bg=CARD, padx=24, pady=24)
-            self._settings_panels[tab_name] = panel
+            outer = tk.Frame(panel_host, bg=CARD,
+                             highlightthickness=1, highlightbackground=BORDER)
+            tk.Frame(outer, height=2, bg=ACCENT).pack(fill="x")
+            inner_p = tk.Frame(outer, bg=CARD, padx=24, pady=20)
+            inner_p.pack(fill="both", expand=True)
+            self._settings_panels[tab_name] = inner_p
 
         # --- Profil panel ---
         prof = self._settings_panels["Profil"]
@@ -4322,9 +4516,9 @@ class App:
                 prof_status.config(text="✅ Profil sauvegardé", fg=OK)
             save_config(self.cfg)
 
-        tk.Button(prof, text="💾 Sauvegarder le profil", font=("Segoe UI", 11, "bold"),
-                  bg=ACCENT, fg="#06080f", relief="flat", cursor="hand2",
-                  pady=8, command=_save_profile).pack(fill="x", pady=(16, 0))
+        self._mk_btn(prof, "💾  Sauvegarder le profil", "primary", _save_profile,
+                     font=("Segoe UI", 11, "bold"), pady=10
+                     ).pack(fill="x", pady=(16, 0))
 
         # --- Connexions panel ---
         conn = self._settings_panels["Connexions"]
@@ -4347,13 +4541,11 @@ class App:
 
         btn_row = tk.Frame(conn, bg=CARD)
         btn_row.pack(fill="x", pady=(12, 0))
-        tk.Button(btn_row, text="💾 Sauvegarder", font=("Segoe UI", 11, "bold"),
-                  bg=ACCENT, fg="#06080f", relief="flat", cursor="hand2",
-                  pady=8, command=self._save_settings).pack(side="left", fill="x", expand=True)
-        tk.Button(btn_row, text="🔌 Tester proxy + IG",
-                  font=("Segoe UI", 10), bg=SURFACE2, fg=TEXT2,
-                  relief="flat", cursor="hand2", pady=8,
-                  command=self._test_proxy).pack(side="left", fill="x", expand=True, padx=(8, 0))
+        self._mk_btn(btn_row, "💾  Sauvegarder", "primary", self._save_settings,
+                     font=("Segoe UI", 11, "bold"), pady=8
+                     ).pack(side="left", fill="x", expand=True)
+        self._mk_btn(btn_row, "🔌  Tester proxy + IG", "secondary", self._test_proxy,
+                     pady=8).pack(side="left", fill="x", expand=True, padx=(8, 0))
 
         # ── Push Server ────────────────────────────────────────────────────
         tk.Frame(conn, bg=BORDER, height=1).pack(fill="x", pady=(20, 16))
@@ -4378,10 +4570,13 @@ class App:
                  font=("Segoe UI", 9), bg=CARD, fg=TEXT2).pack(side="left", padx=(12, 0))
 
         # Start button
-        self._push_btn = tk.Button(conn, text="▶ Démarrer", font=("Segoe UI", 10, "bold"),
-                                   bg=ACCENT, fg="#06080f", relief="flat", cursor="hand2", pady=6,
+        self._push_btn = tk.Button(conn, text="▶  Démarrer", font=("Segoe UI", 10, "bold"),
+                                   bg=ACCENT, fg="#06080f", relief="flat", cursor="hand2",
+                                   pady=8, bd=0, activebackground=ACCENT2,
+                                   activeforeground="#06080f",
                                    command=self._start_push_server)
         self._push_btn.pack(fill="x", pady=(0, 8))
+        self._bind_hover(self._push_btn, ACCENT, ACCENT2, "#06080f", "#06080f")
 
         # URL display + copy
         tk.Label(conn, text="URL à ouvrir sur GéeLark :", font=("Segoe UI", 9),
@@ -4448,9 +4643,9 @@ class App:
         if self.cfg.get("ig_sessionid"):
             sess_status.config(text="✅ Session ID configurée", fg=OK)
 
-        tk.Button(api, text="Sauvegarder", font=("Segoe UI", 11, "bold"),
-                  bg=ACCENT, fg="#06080f", relief="flat", cursor="hand2",
-                  pady=8, command=self._save_settings).pack(fill="x", pady=(16, 0))
+        self._mk_btn(api, "💾  Sauvegarder les clés API", "primary", self._save_settings,
+                     font=("Segoe UI", 11, "bold"), pady=10
+                     ).pack(fill="x", pady=(16, 0))
 
         # --- Apparence panel ---
         app_pan = self._settings_panels["Apparence"]
@@ -4498,12 +4693,17 @@ class App:
         show_settings_panel("Profil")
 
         # Logs always at bottom
-        tk.Label(f, text="LOGS", font=("Consolas", 9, "bold"),
-                 bg=BG, fg=MUTED).pack(anchor="w", padx=60, pady=(8, 4))
+        log_header = tk.Frame(panel_host_wrap, bg=BG)
+        log_header.pack(fill="x", padx=20, pady=(8, 0))
+        tk.Label(log_header, text="TERMINAL", font=("Consolas", 8, "bold"),
+                 bg=BG, fg=TEXT2).pack(side="left")
+        tk.Frame(log_header, height=1, bg=BORDER).pack(side="left", fill="x",
+                                                        expand=True, padx=(10, 0))
         self.log_box = scrolledtext.ScrolledText(
-            f, bg=SURFACE, fg=TEXT2, font=("Consolas", 9),
-            relief="flat", state="disabled", wrap="word", height=14)
-        self.log_box.pack(fill="both", expand=True, padx=60, pady=(0, 14))
+            panel_host_wrap, bg=SURFACE, fg=TEXT2, font=("Consolas", 9),
+            relief="flat", state="disabled", wrap="word", height=10,
+            highlightthickness=1, highlightbackground=BORDER)
+        self.log_box.pack(fill="x", padx=20, pady=(4, 16))
 
     def _save_settings(self):
         raw_proxy = self.proxy_var.get().strip()
