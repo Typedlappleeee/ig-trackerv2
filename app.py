@@ -647,6 +647,17 @@ def scrape_ig_direct(username: str, password: str, proxy: str | None = None) -> 
             LoginRequired, UserNotFound, ClientError,
         )
 
+    # Clear any session that was created with a proxy (proxy=None now)
+    session_file = IG_SESS_DIR / f"{username}.json"
+    if proxy is None and session_file.exists():
+        try:
+            import json as _j
+            s = _j.loads(session_file.read_text())
+            if s.get("proxy"):                    # session built with proxy → discard
+                session_file.unlink(missing_ok=True)
+        except Exception:
+            pass
+
     try:
         cl = ig_client_get(username, password, proxy)
         u  = cl.user_info_by_username(username)
@@ -3575,8 +3586,11 @@ class App:
         proxy = self.cfg.get("proxy", "").strip() or None
 
         if password:
-            self.log(f"🔑 Login direct @{username}...", "info")
-            res = scrape_ig_direct(username, password, proxy)
+            # instagrapi uses i.instagram.com — never route through the SOCKS proxy
+            # because most residential/datacenter proxies block that subdomain.
+            # Direct connection with real credentials is always more reliable.
+            self.log(f"🔑 Login direct @{username} (sans proxy)...", "info")
+            res = scrape_ig_direct(username, password, proxy=None)
         else:
             sessionid = self.cfg.get("ig_sessionid", "").strip() or None
             mode = "proxy" if proxy else "sans proxy"
