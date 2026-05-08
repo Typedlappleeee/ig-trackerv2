@@ -769,25 +769,55 @@ def scrape_ig_by_session(username: str, sessionid: str) -> dict:
                 except Exception:
                     pass
 
-            # Recent media — video_view_count for videos, play_count for reels
-            videos = []
+            # Fetch all media: regular feed + reels (clips have play_count)
+            media_map = {}  # code -> item dict
+
+            # 1) Regular feed (photos + videos)
             try:
                 mr = cl.get(f"/api/v1/feed/user/{user_id}/", params={"count": "20"})
                 if mr.status_code == 200:
                     for item in mr.json().get("items", []):
-                        views = (item.get("play_count") or
-                                 item.get("video_view_count") or
-                                 item.get("view_count") or 0)
-                        caps  = item.get("caption") or {}
-                        videos.append({
-                            "id":       item.get("code", ""),
-                            "views":    views,
-                            "likes":    item.get("like_count", 0),
-                            "comments": item.get("comment_count", 0),
-                            "caption":  (caps.get("text", "") if isinstance(caps, dict) else "")[:80],
-                        })
+                        code = item.get("code", "")
+                        if code:
+                            media_map[code] = item
             except Exception:
                 pass
+
+            # 2) Reels/Clips — this endpoint returns play_count reliably
+            try:
+                cr = cl.post("/api/v1/clips/user/",
+                             json={"target_user_id": str(user_id), "page_size": 20})
+                if cr.status_code == 200:
+                    for item in cr.json().get("items", []):
+                        media = item.get("media", item)
+                        code  = media.get("code", "")
+                        if code:
+                            # Merge: keep feed entry but override with reel play_count
+                            existing = media_map.get(code, {})
+                            existing.update({
+                                "code":       code,
+                                "play_count": media.get("play_count") or media.get("view_count") or 0,
+                                "like_count": media.get("like_count", existing.get("like_count", 0)),
+                                "comment_count": media.get("comment_count", existing.get("comment_count", 0)),
+                                "caption":    media.get("caption"),
+                            })
+                            media_map[code] = existing
+            except Exception:
+                pass
+
+            videos = []
+            for code, item in list(media_map.items())[:20]:
+                views = (item.get("play_count") or
+                         item.get("video_view_count") or
+                         item.get("view_count") or 0)
+                caps  = item.get("caption") or {}
+                videos.append({
+                    "id":       code,
+                    "views":    views,
+                    "likes":    item.get("like_count", 0),
+                    "comments": item.get("comment_count", 0),
+                    "caption":  (caps.get("text", "") if isinstance(caps, dict) else "")[:80],
+                })
 
             return {
                 "ig_status":    "active",
