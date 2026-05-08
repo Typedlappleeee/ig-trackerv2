@@ -2499,14 +2499,16 @@ class App:
                   command=do_post).pack(fill="x", padx=20, pady=(0, 16))
 
     def _upload_and_post(self, selected, bearer, caption, video_path, log_fn):
-        hdrs = {"Content-Type": "application/json",
-                "Authorization": f"Bearer {bearer}"}
-        log_fn("📤 Upload vidéo...", "accent")
+        api_hdrs = {"Content-Type": "application/json",
+                    "Authorization": f"Bearer {bearer}"}
+
+        # ── Step 1: get a temporary upload URL from GéeLark ──────────────────
+        log_fn("📤 Obtention de l'URL d'upload...", "accent")
         try:
             r = httpx.post(
-                "https://openapi.geelark.com/open/v1/file/getUploadUrl",
-                json={"fileName": Path(video_path).name, "fileType": "video"},
-                headers=hdrs, timeout=20)
+                "https://openapi.geelark.com/open/v1/upload/getUrl",
+                json={"fileType": "mp4"},
+                headers=api_hdrs, timeout=20)
             try:
                 rj = r.json()
             except Exception:
@@ -2515,27 +2517,45 @@ class App:
             if rj.get("code") != 0:
                 log_fn(f"❌ GéeLark: {rj.get('msg', rj)}", "error")
                 return
-            with open(video_path, "rb") as fl:
-                up = httpx.put(rj["data"]["uploadUrl"], content=fl.read(), timeout=180)
-            if up.status_code not in (200, 204):
-                log_fn(f"❌ Upload HTTP {up.status_code}", "error")
-                return
-            log_fn("✅ Uploadé", "ok")
-            file_key = rj["data"]["fileKey"]
+            upload_url   = rj["data"]["uploadUrl"]
+            resource_url = rj["data"]["resourceUrl"]
         except Exception as e:
             log_fn(f"❌ {e}", "error")
             return
+
+        # ── Step 2: PUT the file — NO extra headers (OSS requirement) ────────
+        log_fn("📤 Upload vidéo en cours...", "accent")
+        try:
+            with open(video_path, "rb") as fl:
+                up = httpx.put(upload_url, content=fl.read(), timeout=300)
+            if up.status_code not in (200, 204):
+                log_fn(f"❌ Upload échoué (HTTP {up.status_code}): {up.text[:200]}", "error")
+                return
+            log_fn("✅ Vidéo uploadée", "ok")
+        except Exception as e:
+            log_fn(f"❌ Upload: {e}", "error")
+            return
+
+        # ── Step 3: create an RPA Reels task for each selected phone ─────────
+        schedule_at = int(time.time()) + 10  # post in ~10 seconds
         for pid in selected:
             name = self.data.get(pid, {}).get("phone_name", pid)
             try:
                 r = httpx.post(
-                    "https://openapi.geelark.com/open/v1/file/uploadToPhone",
-                    json={"id": pid, "fileKey": file_key},
-                    headers=hdrs, timeout=30)
+                    "https://openapi.geelark.com/open/v1/rpa/task/instagramPubReels",
+                    json={
+                        "id":          pid,
+                        "description": caption,
+                        "video":       [resource_url],
+                        "scheduleAt":  schedule_at,
+                    },
+                    headers=api_hdrs, timeout=30)
                 try:
                     rj = r.json()
-                    log_fn(f"{'✅' if rj.get('code')==0 else '⚠'} {name}",
-                           "ok" if rj.get("code") == 0 else "warn")
+                    if rj.get("code") == 0:
+                        log_fn(f"✅ {name} — tâche créée (id: {rj['data'].get('taskId','')})", "ok")
+                    else:
+                        log_fn(f"⚠ {name}: {rj.get('msg', rj)}", "warn")
                 except Exception:
                     log_fn(f"⚠ {name}: réponse HTTP {r.status_code} — {r.text[:200]}", "warn")
             except Exception as e:
