@@ -661,7 +661,8 @@ def scrape_ig_direct(username: str, password: str, proxy: str | None = None,
             pass
 
     def _build_result(cl, username):
-        u = cl.user_info_by_username(username)
+        uid = cl.user_id_from_username(username)
+        u = cl.user_info(uid)
         videos = []
         try:
             for m in cl.user_medias(u.pk, amount=20):
@@ -736,7 +737,9 @@ def scrape_ig_by_session(username: str, sessionid: str) -> dict:
         from instagrapi import Client
         cl = Client()
         cl.login_by_sessionid(sessionid)
-        u = cl.user_info_by_username(username)
+        # Force private mobile API (i.instagram.com) — avoids 401 on web GraphQL
+        uid = cl.user_id_from_username(username)
+        u = cl.user_info(uid)
         videos = []
         try:
             for m in cl.user_medias(u.pk, amount=20):
