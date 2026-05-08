@@ -4527,10 +4527,11 @@ class App:
         self.post_vid_path = [None]
         self._post_bank_entries = []
 
-        bank_frame = tk.Frame(left, bg=SURFACE, highlightthickness=1,
-                              highlightbackground=BORDER, height=160)
-        bank_frame.pack(fill="x", pady=(4, 0))
-        bank_frame.pack_propagate(False)
+        _bank_outer, bank_frame = self._round_card(left, radius=10, bg=SURFACE,
+                                                    border=BORDER)
+        _bank_outer.pack(fill="x", pady=(4, 0))
+        _bank_outer.configure(height=160)
+        _bank_outer.pack_propagate(False)
 
         self.post_bank_lb = tk.Listbox(bank_frame, bg=SURFACE, fg=TEXT,
                                        font=("Segoe UI", 9), relief="flat",
@@ -4588,9 +4589,9 @@ class App:
                                            state="readonly", width=14, font=("Segoe UI", 9))
         self._post_grp_cb.pack(side="left", padx=(4, 0))
 
-        phone_frame = tk.Frame(left, bg=SURFACE, highlightthickness=1,
-                               highlightbackground=BORDER)
-        phone_frame.pack(fill="both", expand=True, pady=(6, 0))
+        _phone_outer, phone_frame = self._round_card(left, radius=10, bg=SURFACE,
+                                                      border=BORDER)
+        _phone_outer.pack(fill="both", expand=True, pady=(6, 0))
         cv_p    = tk.Canvas(phone_frame, bg=SURFACE, highlightthickness=0)
         sv_p    = ttk.Scrollbar(phone_frame, orient="vertical", command=cv_p.yview)
         inn_p   = tk.Frame(cv_p, bg=SURFACE)
@@ -4677,9 +4678,9 @@ class App:
         self.post_caption_box.bind("<KeyRelease>", _update_char)
 
         # Schedule row
-        sched_f = tk.Frame(right, bg=SURFACE, highlightthickness=1,
-                           highlightbackground=BORDER)
-        sched_f.pack(fill="x", pady=(10, 0))
+        _sched_outer, sched_f = self._round_card(right, radius=10, bg=SURFACE,
+                                                  border=BORDER)
+        _sched_outer.pack(fill="x", pady=(10, 0))
         sched_inner = tk.Frame(sched_f, bg=SURFACE)
         sched_inner.pack(fill="x", padx=12, pady=8)
         tk.Label(sched_inner, text="Délai entre comptes :",
@@ -4692,9 +4693,9 @@ class App:
                  font=("Segoe UI", 9), bg=SURFACE, fg=MUTED).pack(side="left")
 
         # ── Progress card (replaces log) ─────────────────────────────────────
-        prog_card = tk.Frame(right, bg=CARD, highlightthickness=1,
-                             highlightbackground=BORDER)
-        prog_card.pack(fill="x", pady=(10, 0))
+        _prog_outer, prog_card = self._round_card(right, radius=12, bg=CARD,
+                                                   border=BORDER)
+        _prog_outer.pack(fill="x", pady=(10, 0))
         tk.Frame(prog_card, height=2, bg=ACCENT).pack(fill="x")
         prog_inner = tk.Frame(prog_card, bg=CARD, padx=14, pady=10)
         prog_inner.pack(fill="both", expand=True)
@@ -4877,10 +4878,11 @@ class App:
         body.pack(fill="both", expand=True, padx=12, pady=(0, 12))
 
         # ── Left panel: video + caption pools ────────────────────────────────
-        left = tk.Frame(body, bg=SURFACE, width=300,
-                        highlightthickness=1, highlightbackground=BORDER)
-        left.pack(side="left", fill="y", padx=(0, 10))
-        left.pack_propagate(False)
+        _left_outer, left = self._round_card(body, radius=12, bg=SURFACE,
+                                              border=BORDER)
+        _left_outer.pack(side="left", fill="y", padx=(0, 10))
+        _left_outer.configure(width=300)
+        _left_outer.pack_propagate(False)
         tk.Frame(left, height=2, bg=ACCENT).pack(fill="x")
 
         linner = tk.Frame(left, bg=SURFACE)
@@ -4971,9 +4973,9 @@ class App:
         right.pack(side="left", fill="both", expand=True)
 
         # Config row
-        cfg_card = tk.Frame(right, bg=CARD, highlightthickness=1,
-                            highlightbackground=BORDER)
-        cfg_card.pack(fill="x", pady=(0, 8))
+        _cfg_outer, cfg_card = self._round_card(right, radius=12, bg=CARD,
+                                                 border=BORDER)
+        _cfg_outer.pack(fill="x", pady=(0, 8))
         tk.Frame(cfg_card, height=2, bg=ACCENT).pack(fill="x")
         cfg_inner = tk.Frame(cfg_card, bg=CARD)
         cfg_inner.pack(fill="x", padx=12, pady=8)
@@ -5005,9 +5007,9 @@ class App:
                    insertbackground=TEXT).pack(side="left")
 
         # Phone selection
-        phone_card = tk.Frame(right, bg=CARD, highlightthickness=1,
-                              highlightbackground=BORDER)
-        phone_card.pack(fill="x", pady=(0, 8))
+        _phone_card_outer, phone_card = self._round_card(right, radius=12, bg=CARD,
+                                                          border=BORDER)
+        _phone_card_outer.pack(fill="x", pady=(0, 8))
         tk.Frame(phone_card, height=2, bg=OK).pack(fill="x")
         ph_hdr = tk.Frame(phone_card, bg=CARD)
         ph_hdr.pack(fill="x", padx=12, pady=(6, 4))
@@ -5089,9 +5091,9 @@ class App:
         self._mp_stop_btn.pack(side="left", fill="x", expand=True)
 
         # Progress area (per-phone status)
-        prog_card = tk.Frame(right, bg=CARD, highlightthickness=1,
-                             highlightbackground=BORDER)
-        prog_card.pack(fill="x", pady=(0, 8))
+        _mp_prog_outer, prog_card = self._round_card(right, radius=12, bg=CARD,
+                                                      border=BORDER)
+        _mp_prog_outer.pack(fill="x", pady=(0, 8))
         tk.Frame(prog_card, height=2, bg=WARN).pack(fill="x")
         tk.Label(prog_card, text="PROGRESSION", font=("Segoe UI", 8, "bold"),
                  bg=CARD, fg=TEXT2).pack(anchor="w", padx=12, pady=(4, 2))
@@ -5108,9 +5110,9 @@ class App:
         self._mp_prog_labels = {}
 
         # Log area
-        log_card = tk.Frame(right, bg=CARD, highlightthickness=1,
-                            highlightbackground=BORDER)
-        log_card.pack(fill="both", expand=True)
+        _log_outer, log_card = self._round_card(right, radius=12, bg=CARD,
+                                                 border=BORDER)
+        _log_outer.pack(fill="both", expand=True)
         tk.Frame(log_card, height=2, bg=MUTED).pack(fill="x")
         log_hdr = tk.Frame(log_card, bg=CARD)
         log_hdr.pack(fill="x", padx=12, pady=(4, 2))
