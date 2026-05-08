@@ -2406,48 +2406,60 @@ class App:
         self._post_window(self.output_video_path, "")
 
     def _post_window(self, video_path, caption=""):
+        import random as _random
         win = tk.Toplevel(self.root)
-        win.title("🚀 Poster")
-        win.geometry("680x680")
+        win.title("🚀 Publier un Reel")
+        win.geometry("760x720")
         win.configure(bg=BG)
-        tk.Label(win, text="🚀 Poster sur les téléphones",
-                 font=("Segoe UI", 13, "bold"), bg=BG, fg=ACCENT).pack(
-                     anchor="w", padx=20, pady=(20, 4))
-        tk.Label(win, text=f"Vidéo : {Path(video_path).name}",
-                 font=("Segoe UI", 9), bg=BG, fg=TEXT2).pack(anchor="w", padx=20)
 
-        ff = tk.Frame(win, bg=BG)
-        ff.pack(fill="x", padx=20, pady=(10, 6))
-        tk.Label(ff, text="Groupe :", font=("Segoe UI", 10), bg=BG, fg=TEXT2).pack(side="left")
-        grp2 = tk.StringVar(value="Tous")
-        groups = set(d.get("group_name", "") for d in self.data.values()
-                     if d.get("group_name"))
-        gc2 = ttk.Combobox(ff, textvariable=grp2, state="readonly",
-                            width=20, font=("Segoe UI", 10))
+        # ── Header ──────────────────────────────────────────────────────────
+        hdr = tk.Frame(win, bg=BG)
+        hdr.pack(fill="x", padx=20, pady=(16, 0))
+        tk.Label(hdr, text="🚀 Publier un Reel",
+                 font=("Segoe UI", 13, "bold"), bg=BG, fg=ACCENT).pack(side="left")
+        tk.Label(hdr, text=f"  {Path(video_path).name}",
+                 font=("Segoe UI", 9), bg=BG, fg=MUTED).pack(side="left")
+
+        # ── Main split: left=phones, right=options ───────────────────────────
+        main = tk.Frame(win, bg=BG)
+        main.pack(fill="both", expand=True, padx=20, pady=10)
+
+        # LEFT — phone selector
+        left = tk.Frame(main, bg=BG, width=280)
+        left.pack(side="left", fill="y")
+        left.pack_propagate(False)
+
+        hdr2 = tk.Frame(left, bg=BG)
+        hdr2.pack(fill="x")
+        tk.Label(hdr2, text="Comptes cibles", font=("Segoe UI", 10, "bold"),
+                 bg=BG, fg=TEXT2).pack(side="left")
+        groups = set(d.get("group_name", "") for d in self.data.values() if d.get("group_name"))
+        grp2   = tk.StringVar(value="Tous")
+        gc2    = ttk.Combobox(hdr2, textvariable=grp2, state="readonly",
+                              width=12, font=("Segoe UI", 9))
         gc2["values"] = ["Tous"] + sorted(groups)
-        gc2.pack(side="left", padx=(4, 12))
+        gc2.pack(side="right")
 
-        pv2 = {}
-        lf  = tk.Frame(win, bg=SURFACE)
-        lf.pack(fill="both", expand=True, padx=20, pady=(0, 8))
-        cv2 = tk.Canvas(lf, bg=SURFACE, highlightthickness=0)
-        cv2.pack(side="left", fill="both", expand=True)
-        sv2 = ttk.Scrollbar(lf, orient="vertical", command=cv2.yview)
-        sv2.pack(side="right", fill="y")
-        cv2.configure(yscrollcommand=sv2.set)
-        inner2 = tk.Frame(cv2, bg=SURFACE)
+        phone_frame = tk.Frame(left, bg=SURFACE, highlightthickness=1,
+                               highlightbackground=BORDER)
+        phone_frame.pack(fill="both", expand=True, pady=(6, 0))
+        cv2     = tk.Canvas(phone_frame, bg=SURFACE, highlightthickness=0)
+        sv2     = ttk.Scrollbar(phone_frame, orient="vertical", command=cv2.yview)
+        inner2  = tk.Frame(cv2, bg=SURFACE)
         win2_id = cv2.create_window((0, 0), window=inner2, anchor="nw")
         inner2.bind("<Configure>", lambda e: cv2.configure(scrollregion=cv2.bbox("all")))
-        cv2.bind("<Configure>", lambda e: cv2.itemconfig(win2_id, width=e.width))
+        cv2.bind("<Configure>",    lambda e: cv2.itemconfig(win2_id, width=e.width))
+        cv2.configure(yscrollcommand=sv2.set)
+        sv2.pack(side="right", fill="y")
+        cv2.pack(side="left",  fill="both", expand=True)
 
+        pv2 = {}
         def populate(g="Tous"):
             for w in inner2.winfo_children():
                 w.destroy()
             pv2.clear()
-            shown = 0
             for pid, d in sorted(self.data.items(),
-                                  key=lambda x: (int(x[1].get("serial_no") or 0))):
-                # show entries that have either a phone_name OR an ig_username
+                                  key=lambda x: int(x[1].get("serial_no") or 0)):
                 name = d.get("phone_name") or d.get("ig_username") or ""
                 if not name:
                     continue
@@ -2456,56 +2468,84 @@ class App:
                 var = tk.BooleanVar()
                 pv2[pid] = var
                 row = tk.Frame(inner2, bg=SURFACE)
-                row.pack(fill="x", padx=8, pady=2)
-                cb = tk.Checkbutton(row, variable=var, bg=SURFACE,
-                                    activebackground=SURFACE, selectcolor=SURFACE2,
-                                    cursor="hand2")
-                cb.pack(side="left")
+                row.pack(fill="x", padx=6, pady=2)
+                tk.Checkbutton(row, variable=var, bg=SURFACE,
+                               activebackground=SURFACE, selectcolor=SURFACE2,
+                               cursor="hand2").pack(side="left")
                 ig  = d.get("ig_username", "")
-                lbl = f"#{d.get('serial_no','')}  {d.get('phone_name', pid)}"
-                if d.get("group_name"):
-                    lbl += f"  [{d['group_name']}]"
+                lbl = f"{d.get('phone_name', pid)}"
                 if ig:
-                    lbl += f"  →  @{ig}"
-                tk.Label(row, text=lbl, font=("Segoe UI", 10), bg=SURFACE,
-                         fg=OK if ig else TEXT2, anchor="w",
-                         cursor="hand2").pack(side="left", padx=4, fill="x", expand=True)
-                # click on the row also toggles the checkbox
+                    lbl += f"\n  @{ig}"
+                fg = OK if ig else MUTED
+                tk.Label(row, text=lbl, font=("Segoe UI", 9), bg=SURFACE,
+                         fg=fg, anchor="w", justify="left",
+                         cursor="hand2").pack(side="left", padx=4)
                 row.bind("<Button-1>", lambda e, v=var: v.set(not v.get()))
-                shown += 1
-            if shown == 0:
-                tk.Label(inner2,
-                         text="Aucun téléphone trouvé.\n\n"
-                              "Configure le Bearer Token GéeLark dans\n"
-                              "Paramètres → Connexions puis clique Refresh.",
-                         font=("Segoe UI", 10), bg=SURFACE, fg=MUTED,
-                         justify="center").pack(pady=30)
+            if not pv2:
+                tk.Label(inner2, text="Aucun téléphone.\nAjoute un Bearer Token\ndans Paramètres.",
+                         font=("Segoe UI", 9), bg=SURFACE, fg=MUTED, justify="center").pack(pady=20)
+
         populate()
         gc2.bind("<<ComboboxSelected>>", lambda e: populate(grp2.get()))
 
-        bf = tk.Frame(win, bg=BG)
-        bf.pack(fill="x", padx=20, pady=(0, 8))
-        tk.Button(bf, text="Tout sélectionner", font=("Segoe UI", 9),
-                  bg=SURFACE2, fg=TEXT2, relief="flat", cursor="hand2", padx=8, pady=4,
+        sel_row = tk.Frame(left, bg=BG)
+        sel_row.pack(fill="x", pady=(4, 0))
+        tk.Button(sel_row, text="Tout", font=("Segoe UI", 8), bg=SURFACE2, fg=TEXT2,
+                  relief="flat", cursor="hand2", padx=6, pady=2,
                   command=lambda: [v.set(True) for v in pv2.values()]).pack(side="left")
-        tk.Button(bf, text="Tout désélectionner", font=("Segoe UI", 9),
-                  bg=SURFACE2, fg=TEXT2, relief="flat", cursor="hand2", padx=8, pady=4,
-                  command=lambda: [v.set(False) for v in pv2.values()]).pack(
-                      side="left", padx=6)
+        tk.Button(sel_row, text="Aucun", font=("Segoe UI", 8), bg=SURFACE2, fg=TEXT2,
+                  relief="flat", cursor="hand2", padx=6, pady=2,
+                  command=lambda: [v.set(False) for v in pv2.values()]).pack(side="left", padx=(4,0))
 
-        tk.Label(win, text="Caption :", font=("Segoe UI", 10), bg=BG, fg=TEXT2).pack(
-            anchor="w", padx=20, pady=(0, 2))
-        caption_box = tk.Text(win, bg=SURFACE, fg=TEXT, font=("Segoe UI", 10),
-                              relief="flat", height=4, wrap="word",
-                              insertbackground=TEXT, padx=8, pady=6)
-        caption_box.pack(fill="x", padx=20, pady=(0, 8))
+        # RIGHT — caption + schedule
+        right = tk.Frame(main, bg=BG)
+        right.pack(side="left", fill="both", expand=True, padx=(14, 0))
+
+        tk.Label(right, text="Caption", font=("Segoe UI", 10, "bold"),
+                 bg=BG, fg=TEXT2).pack(anchor="w")
+        caption_box = tk.Text(right, bg=SURFACE, fg=TEXT, font=("Segoe UI", 10),
+                              relief="flat", height=6, wrap="word",
+                              insertbackground=TEXT, padx=8, pady=6,
+                              highlightthickness=1, highlightbackground=BORDER,
+                              highlightcolor=ACCENT)
+        caption_box.pack(fill="x", pady=(4, 10))
         if caption:
             caption_box.insert("1.0", caption)
 
-        plog_box = scrolledtext.ScrolledText(win, bg=SURFACE, fg=TEXT2,
-                                              font=("Consolas", 9), relief="flat",
-                                              state="disabled", wrap="word", height=5)
-        plog_box.pack(fill="x", padx=20, pady=(0, 8))
+        # Schedule options
+        sched_frame = tk.Frame(right, bg=SURFACE, highlightthickness=1,
+                               highlightbackground=BORDER)
+        sched_frame.pack(fill="x", pady=(0, 10))
+        tk.Label(sched_frame, text="📅  Planification", font=("Segoe UI", 10, "bold"),
+                 bg=SURFACE, fg=TEXT2).pack(anchor="w", padx=12, pady=(10, 6))
+
+        mode_var = tk.StringVar(value="now")
+        modes = [
+            ("now",      "🚀  Maintenant  (warmup 3-8 min avant chaque post)"),
+            ("stagger",  "⏱  Échelonné  (délai aléatoire entre chaque compte)"),
+        ]
+        for val, lbl in modes:
+            tk.Radiobutton(sched_frame, text=lbl, variable=mode_var, value=val,
+                           font=("Segoe UI", 9), bg=SURFACE, fg=TEXT2,
+                           selectcolor=SURFACE2, activebackground=SURFACE,
+                           cursor="hand2").pack(anchor="w", padx=20)
+
+        stagger_row = tk.Frame(sched_frame, bg=SURFACE)
+        stagger_row.pack(fill="x", padx=20, pady=(4, 10))
+        tk.Label(stagger_row, text="Délai entre comptes :", font=("Segoe UI", 9),
+                 bg=SURFACE, fg=TEXT2).pack(side="left")
+        stagger_min = tk.IntVar(value=10)
+        tk.Spinbox(stagger_row, from_=2, to=120, textvariable=stagger_min,
+                   font=("Segoe UI", 9), bg=SURFACE2, fg=TEXT, width=4,
+                   relief="flat", buttonbackground=SURFACE2).pack(side="left", padx=4)
+        tk.Label(stagger_row, text="min (±50%)", font=("Segoe UI", 9),
+                 bg=SURFACE, fg=MUTED).pack(side="left")
+
+        # Log output
+        plog_box = scrolledtext.ScrolledText(right, bg=SURFACE, fg=TEXT2,
+                                             font=("Consolas", 8), relief="flat",
+                                             state="disabled", wrap="word", height=6)
+        plog_box.pack(fill="both", expand=True, pady=(0, 8))
 
         def plog(msg, lv="info"):
             colors = {"info": TEXT2, "ok": OK, "warn": WARN, "error": DANGER, "accent": ACCENT}
@@ -2515,6 +2555,11 @@ class App:
             plog_box.see("end")
             plog_box.config(state="disabled")
 
+        launch_btn = tk.Button(win, text="🚀  Lancer le posting",
+                               font=("Segoe UI", 12, "bold"), bg=ACCENT, fg="#06080f",
+                               relief="flat", cursor="hand2", pady=10)
+        launch_btn.pack(fill="x", padx=20, pady=(0, 16))
+
         def do_post():
             sel = [pid for pid, v in pv2.items() if v.get()]
             if not sel:
@@ -2522,20 +2567,27 @@ class App:
                 return
             final_caption = caption_box.get("1.0", "end").strip()
             if not final_caption:
-                plog("⚠ Entre une caption (obligatoire pour GéeLark)", "warn")
+                plog("⚠ La caption est obligatoire pour GéeLark", "warn")
                 return
             bearer = self.cfg.get("bearer_token", "")
+            if not bearer:
+                plog("❌ Bearer Token GéeLark manquant — va dans Paramètres", "error")
+                return
+            launch_btn.config(state="disabled", text="⏳ En cours...")
+            def _done():
+                if launch_btn.winfo_exists():
+                    launch_btn.config(state="normal", text="🚀  Lancer le posting")
+            mode     = mode_var.get()
+            stagger  = stagger_min.get() if mode == "stagger" else 5
             threading.Thread(
                 target=self._upload_and_post,
-                args=(sel, bearer, final_caption, video_path, plog),
+                args=(sel, bearer, final_caption, video_path, plog, stagger, _done),
                 daemon=True).start()
 
-        tk.Button(win, text="🚀  Lancer le posting",
-                  font=("Segoe UI", 12, "bold"), bg=ACCENT, fg="#06080f",
-                  relief="flat", cursor="hand2", pady=10,
-                  command=do_post).pack(fill="x", padx=20, pady=(0, 16))
+        launch_btn.config(command=do_post)
 
-    def _upload_and_post(self, selected, bearer, caption, video_path, log_fn):
+    def _upload_and_post(self, selected, bearer, caption, video_path, log_fn,
+                         stagger_min=5, done_cb=None):
         api_hdrs = {"Content-Type": "application/json",
                     "Authorization": f"Bearer {bearer}"}
 
@@ -2576,12 +2628,13 @@ class App:
 
         # ── Step 3: warmup + staggered Reels task per phone ──────────────────
         import random
-        base_time = int(time.time())
-        # Each account gets a warmup (browse 3-8 videos) then posts 3-8 min later
+        base_time   = int(time.time())
+        stagger_sec = stagger_min * 60
         for i, pid in enumerate(selected):
             name = self.data.get(pid, {}).get("phone_name", pid)
-            # Stagger: account i starts at base + i * random(3-6 min)
-            warmup_at = base_time + i * random.randint(180, 360)
+            # Stagger: account i starts at base + i * stagger (±50%)
+            offset    = int(stagger_sec * (0.75 + random.random() * 0.5))
+            warmup_at = base_time + i * offset
             post_at   = warmup_at + random.randint(180, 480)  # post 3-8 min after warmup
 
             # Warmup first (browse reels to look human)
@@ -2623,6 +2676,11 @@ class App:
             except Exception as e:
                 log_fn(f"❌ {name}: {e}", "error")
         log_fn("Terminé ✓ — les posts sont planifiés avec délai aléatoire", "ok")
+        if done_cb:
+            try:
+                self.root.after(0, done_cb)
+            except Exception:
+                pass
 
     # ══════════════════════════════════════════════════════════════════════════
     # ONGLET BANQUE
@@ -3980,244 +4038,238 @@ class App:
     # CREDENTIALS DIALOG
     # ══════════════════════════════════════════════════════════════════════════
     def _show_credentials_dialog(self):
-        """Open the dialog to manage per-account Instagram credentials."""
+        """Session ID manager — simplified single-action interface."""
         win = tk.Toplevel(self.root)
-        win.title("🔑 Identifiants Instagram")
-        win.geometry("700x560")
+        win.title("🍪 Session IDs")
+        win.geometry("780x620")
         win.configure(bg=BG)
         win.grab_set()
 
-        tk.Label(win, text="🔑 Identifiants Instagram",
+        # ── Header ──────────────────────────────────────────────────────────
+        tk.Label(win, text="🍪 Session IDs Instagram",
                  font=("Segoe UI", 14, "bold"), bg=BG, fg=TEXT).pack(anchor="w", padx=20, pady=(18, 4))
-        tk.Label(win,
-                 text="🍪 Session ID = méthode la plus fiable (aucun challenge).\n"
-                      "   Chrome sur GéeLark → F12 → Application → Cookies → instagram.com → sessionid\n"
-                      "🔑 Mot de passe = fallback si pas de session (peut déclencher un challenge).",
-                 font=("Segoe UI", 9), bg=BG, fg=TEXT2, justify="left").pack(anchor="w", padx=20, pady=(0, 12))
 
-        # ── Tab bar ─────────────────────────────────────────────────────────
-        tab_bar = tk.Frame(win, bg=BG)
-        tab_bar.pack(fill="x", padx=20)
-        content = tk.Frame(win, bg=BG)
-        content.pack(fill="both", expand=True, padx=20, pady=8)
+        # ── Guide box ───────────────────────────────────────────────────────
+        guide = tk.Frame(win, bg=SURFACE, highlightthickness=1, highlightbackground=BORDER)
+        guide.pack(fill="x", padx=20, pady=(0, 12))
+        guide_text = (
+            "📌  Comment récupérer ta Session ID (à faire une seule fois par compte) :\n"
+            "\n"
+            "  1. Sur le téléphone GéeLark, ouvre Chrome → va sur  www.instagram.com\n"
+            "  2. Connecte-toi avec le compte Instagram du téléphone\n"
+            "  3. Appuie sur F12 (ou ⋮ → Plus d'outils → Outils développeur)\n"
+            "  4. Onglet Application → Cookies → https://www.instagram.com\n"
+            "  5. Trouve la ligne  sessionid  → copie la valeur (longue chaîne de chiffres:lettres)\n"
+            "\n"
+            "  ✅  La session dure plusieurs mois — pas besoin de la renouveler sauf si tu changes le mdp."
+        )
+        tk.Label(guide, text=guide_text, font=("Segoe UI", 9), bg=SURFACE, fg=TEXT2,
+                 justify="left").pack(padx=14, pady=10, anchor="w")
 
-        # ── Per-account tab ─────────────────────────────────────────────────
-        per_frame = tk.Frame(content, bg=BG)
-        bulk_frame = tk.Frame(content, bg=BG)
+        # ── Main pane: left = account list, right = session input ───────────
+        pane = tk.Frame(win, bg=BG)
+        pane.pack(fill="both", expand=True, padx=20, pady=(0, 8))
 
-        def show_per():
-            bulk_frame.pack_forget()
-            per_frame.pack(fill="both", expand=True)
-            tab_per.config(bg=ACCENT, fg="#06080f")
-            tab_bulk.config(bg=SURFACE2, fg=TEXT2)
+        # Left: phone list
+        left = tk.Frame(pane, bg=BG, width=300)
+        left.pack(side="left", fill="y")
+        left.pack_propagate(False)
 
-        def show_bulk():
-            per_frame.pack_forget()
-            bulk_frame.pack(fill="both", expand=True)
-            tab_bulk.config(bg=ACCENT, fg="#06080f")
-            tab_per.config(bg=SURFACE2, fg=TEXT2)
+        tk.Label(left, text="Téléphones", font=("Segoe UI", 10, "bold"),
+                 bg=BG, fg=TEXT2).pack(anchor="w", pady=(0, 4))
 
-        tab_per  = tk.Button(tab_bar, text="Par compte", font=("Segoe UI", 10, "bold"),
-                             bg=ACCENT, fg="#06080f", relief="flat", cursor="hand2",
-                             padx=14, pady=5, command=show_per)
-        tab_per.pack(side="left")
-        tab_bulk = tk.Button(tab_bar, text="Import en masse",
-                             font=("Segoe UI", 10), bg=SURFACE2, fg=TEXT2,
-                             relief="flat", cursor="hand2", padx=14, pady=5, command=show_bulk)
-        tab_bulk.pack(side="left", padx=(4, 0))
+        list_frame = tk.Frame(left, bg=SURFACE2, highlightthickness=1,
+                              highlightbackground=BORDER)
+        list_frame.pack(fill="both", expand=True)
 
-        # ── Per-account content ──────────────────────────────────────────────
-        tk.Label(per_frame, text="Sélectionne un compte :",
-                 font=("Segoe UI", 9), bg=BG, fg=TEXT2).pack(anchor="w", pady=(8, 4))
+        lb = tk.Listbox(list_frame, bg=SURFACE2, fg=TEXT, selectbackground=ACCENT,
+                        selectforeground="#06080f", font=("Consolas", 10),
+                        relief="flat", bd=0, activestyle="none")
+        lbsb = ttk.Scrollbar(list_frame, orient="vertical", command=lb.yview)
+        lb.configure(yscrollcommand=lbsb.set)
+        lbsb.pack(side="right", fill="y")
+        lb.pack(fill="both", expand=True, padx=2, pady=2)
 
-        list_frame = tk.Frame(per_frame, bg=SURFACE2, highlightthickness=1,
-                               highlightbackground=BORDER)
-        list_frame.pack(fill="x", pady=(0, 8))
-        accs_lb = tk.Listbox(list_frame, bg=SURFACE2, fg=TEXT, selectbackground=ACCENT,
-                              selectforeground="#06080f", font=("Consolas", 10),
-                              relief="flat", height=5, bd=0)
-        accs_lb.pack(fill="both", padx=4, pady=4)
+        acc_map = {}  # listbox index → pid
+        def _lb_label(d):
+            if d.get("ig_sessionid"):
+                icon = "🟢"
+            elif d.get("ig_password"):
+                icon = "🔑"
+            else:
+                icon = "⚪"
+            ig  = f"@{d['ig_username']}" if d.get("ig_username") else "— pas lié"
+            tel = d.get("phone_name", "")
+            return f"{icon}  {ig:<22} {tel}"
 
-        acc_map = {}
-        def _acc_label(d):
-            has_s = "🍪" if d.get("ig_sessionid") else ("🔑" if d.get("ig_password") else "  ")
-            return f"{has_s}  @{d.get('ig_username','')}  —  {d.get('phone_name','')}"
-
-        for pid, d in self.data.items():
-            if d.get("ig_username"):
-                idx = accs_lb.size()
-                accs_lb.insert("end", _acc_label(d))
+        def _rebuild_list():
+            lb.delete(0, "end")
+            acc_map.clear()
+            for pid, d in self.data.items():
+                idx = lb.size()
+                lb.insert("end", _lb_label(d))
                 acc_map[idx] = pid
 
-        # Session ID row (priority 1)
-        sess_frame = tk.Frame(per_frame, bg=BG)
-        sess_frame.pack(fill="x", pady=(0, 4))
-        tk.Label(sess_frame, text="🍪 Session ID :", font=("Segoe UI", 10),
-                 bg=BG, fg=ACCENT, width=14, anchor="w").pack(side="left")
+        _rebuild_list()
+
+        # Right: session input panel
+        right = tk.Frame(pane, bg=BG)
+        right.pack(side="left", fill="both", expand=True, padx=(16, 0))
+
+        sel_lbl = tk.Label(right, text="← Sélectionne un téléphone",
+                           font=("Segoe UI", 11), bg=BG, fg=MUTED)
+        sel_lbl.pack(anchor="w", pady=(0, 12))
+
+        field_frame = tk.Frame(right, bg=BG)
+        field_frame.pack(fill="x")
+
+        tk.Label(field_frame, text="🍪 Session ID", font=("Segoe UI", 10, "bold"),
+                 bg=BG, fg=ACCENT).pack(anchor="w", pady=(0, 4))
+
+        sess_row = tk.Frame(field_frame, bg=BG)
+        sess_row.pack(fill="x")
         sess_var = tk.StringVar()
-        sess_entry = tk.Entry(sess_frame, textvariable=sess_var, show="•",
+        sess_entry = tk.Entry(sess_row, textvariable=sess_var, show="•",
                               font=("Consolas", 10), bg=SURFACE2, fg=TEXT,
                               insertbackground=TEXT, relief="flat", bd=0,
                               highlightthickness=1, highlightcolor=ACCENT,
                               highlightbackground=BORDER)
-        sess_entry.pack(side="left", fill="x", expand=True, ipady=6, padx=(4, 4))
-        def _toggle_sess():
-            sess_entry.config(show="" if sess_entry.cget("show") == "•" else "•")
-        tk.Button(sess_frame, text="👁", font=("Segoe UI", 10), bg=SURFACE2, fg=TEXT2,
+        sess_entry.pack(side="left", fill="x", expand=True, ipady=8, padx=(0, 4))
+        tk.Button(sess_row, text="👁", font=("Segoe UI", 10), bg=SURFACE2, fg=TEXT2,
                   relief="flat", cursor="hand2", padx=8,
-                  command=_toggle_sess).pack(side="right")
+                  command=lambda: sess_entry.config(
+                      show="" if sess_entry.cget("show") == "•" else "•")).pack(side="right")
 
-        # Password row (fallback)
-        pw_frame = tk.Frame(per_frame, bg=BG)
-        pw_frame.pack(fill="x", pady=(0, 8))
-        tk.Label(pw_frame, text="🔑 Mot de passe :", font=("Segoe UI", 10),
-                 bg=BG, fg=TEXT2, width=14, anchor="w").pack(side="left")
-        pw_var = tk.StringVar()
-        pw_entry = tk.Entry(pw_frame, textvariable=pw_var, show="•",
-                            font=("Consolas", 10), bg=SURFACE2, fg=TEXT,
-                            insertbackground=TEXT, relief="flat", bd=0,
-                            highlightthickness=1, highlightcolor=ACCENT,
-                            highlightbackground=BORDER)
-        pw_entry.pack(side="left", fill="x", expand=True, ipady=6, padx=(4, 4))
-        def _toggle_pw():
-            pw_entry.config(show="" if pw_entry.cget("show") == "•" else "•")
-        tk.Button(pw_frame, text="👁", font=("Segoe UI", 10), bg=SURFACE2, fg=TEXT2,
-                  relief="flat", cursor="hand2", padx=8,
-                  command=_toggle_pw).pack(side="right")
+        status_lbl = tk.Label(field_frame, text="", font=("Segoe UI", 9),
+                              bg=BG, fg=OK)
+        status_lbl.pack(anchor="w", pady=(4, 0))
 
         selected_pid = [None]
-        selected_idx = [None]   # survit aux clics dans les champs texte
+        selected_idx = [None]
 
-        def _on_acc_sel(e=None):
-            sel = accs_lb.curselection()
-            if sel:
-                pid = acc_map.get(sel[0])
-                if pid:
-                    selected_pid[0] = pid
-                    selected_idx[0] = sel[0]
-                    sess_var.set(self.data[pid].get("ig_sessionid", ""))
-                    pw_var.set(self.data[pid].get("ig_password", ""))
+        def _on_sel(e=None):
+            sel = lb.curselection()
+            if not sel:
+                return
+            pid = acc_map.get(sel[0])
+            if not pid:
+                return
+            selected_pid[0] = pid
+            selected_idx[0] = sel[0]
+            d = self.data[pid]
+            ig  = d.get("ig_username", "")
+            tel = d.get("phone_name", pid)
+            sel_lbl.config(text=f"{tel}  {'— @'+ig if ig else ''}", fg=TEXT)
+            sess_var.set(d.get("ig_sessionid", ""))
+            if d.get("ig_sessionid"):
+                status_lbl.config(text="🟢 Session enregistrée", fg=OK)
+            else:
+                status_lbl.config(text="⚪ Aucune session", fg=MUTED)
 
-        accs_lb.bind("<<ListboxSelect>>", _on_acc_sel)
+        lb.bind("<<ListboxSelect>>", _on_sel)
 
-        def _save_creds():
+        def _save():
             pid = selected_pid[0]
             if not pid:
-                messagebox.showwarning("Sélection", "Clique d'abord sur un compte dans la liste",
-                                       parent=win)
                 return
-            d   = self.data[pid]
+            d    = self.data[pid]
             sess = sess_var.get().strip()
-            pw   = pw_var.get().strip()
             if sess:
                 d["ig_sessionid"] = sess
+                save_data(self.data)
+                idx = selected_idx[0]
+                lb.delete(idx)
+                lb.insert(idx, _lb_label(d))
+                lb.selection_set(idx)
+                status_lbl.config(text="✅ Sauvegardé", fg=OK)
+                self.log(f"Session ID sauvegardée pour {d.get('phone_name', pid)}", "ok")
             else:
                 d.pop("ig_sessionid", None)
-            if pw:
-                d["ig_password"] = pw
-            else:
-                d.pop("ig_password", None)
-                (IG_SESS_DIR / f"{d.get('ig_username','')}.json").unlink(missing_ok=True)
-            save_data(self.data)
-            idx = selected_idx[0]
-            accs_lb.delete(idx)
-            accs_lb.insert(idx, _acc_label(d))
-            accs_lb.selection_set(idx)
-            self.log(f"Identifiants @{d.get('ig_username','')} sauvegardés", "ok")
+                save_data(self.data)
+                idx = selected_idx[0]
+                lb.delete(idx)
+                lb.insert(idx, _lb_label(d))
+                lb.selection_set(idx)
+                status_lbl.config(text="⚪ Session supprimée", fg=MUTED)
 
-        def _test_now():
+        def _save_and_scrape():
             pid = selected_pid[0]
             if not pid:
-                messagebox.showwarning("Sélection", "Clique d'abord sur un compte dans la liste",
-                                       parent=win)
                 return
-            _save_creds()
+            _save()
             win.destroy()
             threading.Thread(target=self._scrape_one, args=(pid,), daemon=True).start()
 
-        btns = tk.Frame(per_frame, bg=BG)
-        btns.pack(fill="x")
-        tk.Button(btns, text="💾 Sauvegarder", font=("Segoe UI", 10, "bold"),
-                  bg=ACCENT, fg="#06080f", relief="flat", cursor="hand2", pady=7,
-                  command=_save_creds).pack(side="left", fill="x", expand=True)
-        tk.Button(btns, text="▶ Tester maintenant", font=("Segoe UI", 10),
-                  bg=OK, fg="#06080f", relief="flat", cursor="hand2", pady=7,
-                  command=_test_now).pack(side="left", fill="x", expand=True, padx=(6, 0))
+        btn_row = tk.Frame(right, bg=BG)
+        btn_row.pack(fill="x", pady=(12, 0))
+        tk.Button(btn_row, text="💾 Sauvegarder", font=("Segoe UI", 10, "bold"),
+                  bg=ACCENT, fg="#06080f", relief="flat", cursor="hand2", pady=8,
+                  command=_save).pack(side="left", fill="x", expand=True)
+        tk.Button(btn_row, text="▶ Sauvegarder + Tester", font=("Segoe UI", 10),
+                  bg=OK, fg="#06080f", relief="flat", cursor="hand2", pady=8,
+                  command=_save_and_scrape).pack(side="left", fill="x", expand=True, padx=(6, 0))
 
-        # ── Bulk import content ──────────────────────────────────────────────
-        tk.Label(bulk_frame,
-                 text="Colle ici une liste — une par ligne — dans l'un de ces formats :\n"
-                      "  username:password          (login direct)\n"
-                      "  username::sessionid        (session cookie — recommandé)\n"
-                      "L'app associe chaque ligne au compte correspondant.",
-                 font=("Segoe UI", 9), bg=BG, fg=TEXT2, justify="left").pack(
-                     anchor="w", pady=(8, 6))
-        bulk_txt = tk.Text(bulk_frame, font=("Consolas", 10), bg=SURFACE2, fg=TEXT,
+        # ── Bulk import ──────────────────────────────────────────────────────
+        sep = tk.Frame(win, bg=BORDER, height=1)
+        sep.pack(fill="x", padx=20, pady=(0, 8))
+
+        bulk_hdr = tk.Frame(win, bg=BG)
+        bulk_hdr.pack(fill="x", padx=20)
+        tk.Label(bulk_hdr, text="Import en masse  (format: username::sessionid — une par ligne)",
+                 font=("Segoe UI", 9), bg=BG, fg=TEXT2).pack(side="left")
+
+        bulk_txt = tk.Text(win, font=("Consolas", 9), bg=SURFACE2, fg=TEXT,
                            insertbackground=TEXT, relief="flat", bd=0,
                            highlightthickness=1, highlightcolor=ACCENT,
-                           highlightbackground=BORDER, height=10)
-        bulk_txt.pack(fill="both", expand=True, pady=(0, 8))
-        # pre-fill with existing
-        for pid, d in self.data.items():
-            ig = d.get("ig_username", "")
-            pw = d.get("ig_password", "")
-            if ig and pw:
-                bulk_txt.insert("end", f"{ig}:{pw}\n")
+                           highlightbackground=BORDER, height=5)
+        bulk_txt.pack(fill="x", padx=20, pady=(4, 0))
 
-        result_lbl = tk.Label(bulk_frame, text="", font=("Segoe UI", 9),
-                              bg=BG, fg=OK, anchor="w")
-        result_lbl.pack(anchor="w")
+        bulk_status = tk.Label(win, text="", font=("Segoe UI", 9), bg=BG, fg=OK, anchor="w")
+        bulk_status.pack(anchor="w", padx=20)
 
         def _import_bulk():
             lines = bulk_txt.get("1.0", "end").strip().splitlines()
             matched = 0
+            new_pids = []
             for line in lines:
                 line = line.strip()
                 if not line or line.startswith("#"):
                     continue
-                # username::sessionid  OR  username:password
                 if "::" in line:
-                    user, sessionid = line.split("::", 1)
+                    user, sid = line.split("::", 1)
                     user = user.strip().lstrip("@").lower()
-                    sessionid = sessionid.strip()
-                    if not user or not sessionid:
+                    sid  = sid.strip()
+                    if not user or not sid:
                         continue
                     for pid, d in self.data.items():
                         if d.get("ig_username", "").lower() == user:
-                            d["ig_sessionid"] = sessionid
+                            d["ig_sessionid"] = sid
                             matched += 1
-                            break
-                elif ":" in line:
-                    parts = line.split(":", 1)
-                    user  = parts[0].strip().lstrip("@").lower()
-                    pw    = parts[1].strip()
-                    if not user or not pw:
-                        continue
-                    for pid, d in self.data.items():
-                        if d.get("ig_username", "").lower() == user:
-                            d["ig_password"] = pw
-                            matched += 1
+                            new_pids.append(pid)
                             break
             save_data(self.data)
-            result_lbl.config(text=f"✅ {matched} compte(s) mis à jour")
-            self.log(f"{matched} identifiants importés", "ok")
+            _rebuild_list()
+            bulk_status.config(text=f"✅ {matched} compte(s) mis à jour")
+            self.log(f"{matched} sessions importées", "ok")
+            return new_pids
 
         def _import_and_scrape():
-            _import_bulk()
+            pids = _import_bulk()
             win.destroy()
-            threading.Thread(target=self._scrape_sel, daemon=True).start()
+            def _run():
+                for pid in pids:
+                    self._scrape_one(pid)
+                    time.sleep(2)
+            threading.Thread(target=_run, daemon=True).start()
 
-        bulk_btns = tk.Frame(bulk_frame, bg=BG)
-        bulk_btns.pack(fill="x", pady=(4, 0))
+        bulk_btns = tk.Frame(win, bg=BG)
+        bulk_btns.pack(fill="x", padx=20, pady=(4, 16))
         tk.Button(bulk_btns, text="💾 Importer", font=("Segoe UI", 10, "bold"),
-                  bg=ACCENT, fg="#06080f", relief="flat", cursor="hand2", pady=7,
-                  command=_import_bulk).pack(side="left", fill="x", expand=True)
-        tk.Button(bulk_btns, text="▶ Importer + Scraper tout",
-                  font=("Segoe UI", 10), bg=OK, fg="#06080f",
-                  relief="flat", cursor="hand2", pady=7,
-                  command=_import_and_scrape).pack(side="left", fill="x", expand=True, padx=(6, 0))
-
-        show_per()  # default tab
+                  bg=ACCENT, fg="#06080f", relief="flat", cursor="hand2", pady=6,
+                  command=_import_bulk).pack(side="left")
+        tk.Button(bulk_btns, text="▶ Importer + Scraper", font=("Segoe UI", 10),
+                  bg=OK, fg="#06080f", relief="flat", cursor="hand2", pady=6,
+                  command=_import_and_scrape).pack(side="left", padx=(6, 0))
 
     # ══════════════════════════════════════════════════════════════════════════
     # PUSH SERVER
