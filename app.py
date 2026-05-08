@@ -3689,7 +3689,7 @@ class App:
             self._post_bank_entries = load_bank()
             self.post_bank_lb.delete(0, "end")
             for e in self._post_bank_entries:
-                name = e.get("filename") or Path(e["path"]).name
+                name = e.get("display_name") or e.get("filename") or Path(e["path"]).name
                 exists = "✓" if Path(e["path"]).exists() else "✗"
                 self.post_bank_lb.insert("end", f"{exists}  {name}")
             if not self._post_bank_entries:
@@ -3743,14 +3743,15 @@ class App:
                 row = tk.Frame(inn_p, bg=SURFACE)
                 row.pack(fill="x", padx=6, pady=2)
                 tk.Checkbutton(row, variable=var, bg=SURFACE,
-                               activebackground=SURFACE, selectcolor=SURFACE2,
+                               activebackground=SURFACE, selectcolor=SURFACE3,
+                               fg=TEXT, activeforeground=TEXT,
                                cursor="hand2").pack(side="left")
                 ig  = d.get("ig_username", "")
                 lbl = f"{d.get('phone_name', pid)}"
                 if ig:
                     lbl += f"  @{ig}"
                 tk.Label(row, text=lbl, font=("Segoe UI", 9), bg=SURFACE,
-                         fg=OK if ig else MUTED, anchor="w",
+                         fg=TEXT if ig else TEXT2, anchor="w",
                          cursor="hand2").pack(side="left", padx=4)
                 row.bind("<Button-1>", lambda e, v=var: v.set(not v.get()))
             if not self._post_pvars:
@@ -3922,18 +3923,22 @@ class App:
             sel = [pid for pid, v in self._post_pvars.items() if v.get()]
             if not sel:
                 _plog("⚠ Sélectionne au moins un téléphone", "warn")
+                _post_set_progress(0, "En attente", "⚠ Sélectionne au moins un téléphone")
                 return
             vpath = self.post_vid_path[0]
             if not vpath or not Path(vpath).exists():
                 _plog("⚠ Sélectionne une vidéo dans la banque", "warn")
+                _post_set_progress(0, "En attente", "⚠ Sélectionne une vidéo dans la banque")
                 return
             cap = self.post_caption_box.get("1.0", "end").strip()
             if not cap:
                 _plog("⚠ La caption est obligatoire pour GéeLark", "warn")
+                _post_set_progress(0, "En attente", "⚠ La caption est obligatoire")
                 return
             bearer = self.cfg.get("bearer_token", "")
             if not bearer:
                 _plog("❌ Bearer Token GéeLark manquant — va dans Paramètres", "error")
+                _post_set_progress(0, "Erreur", "❌ Bearer Token GéeLark manquant")
                 return
             stagger = self.post_stagger_var.get()
             job_id = getattr(self, "_post_job_counter", 0) + 1
@@ -3948,10 +3953,18 @@ class App:
                 self._post_active_jobs = max(0, getattr(self, "_post_active_jobs", 1) - 1)
                 self.root.after(0, _update_launch_btn)
                 self.root.after(0, lambda: _plog(f"── Job #{jid} terminé ──", "accent"))
+                n_phones = len(sel)
+                self.root.after(0, lambda: self._show_toast(
+                    "✅ Posting terminé",
+                    f"Job #{jid} · {n_phones} compte(s) · Reel publié",
+                    col=OK))
+                self.root.after(0, self._play_notify_sound)
 
+            _post_set_progress(0, "Démarrage...", "Initialisation du posting...")
             threading.Thread(
                 target=self._upload_and_post,
                 args=(sel, bearer, cap, vpath, _plog, stagger, _done),
+                kwargs={"progress_fn": _post_set_progress},
                 daemon=True).start()
 
         def _update_launch_btn():
@@ -4546,6 +4559,7 @@ class App:
         self.bank_tree.pack(side="left", fill="both", expand=True)
         vsb.pack(side="right", fill="y")
         self.bank_tree.bind("<<TreeviewSelect>>", self._on_bank_sel)
+        self.bank_tree.bind("<Button-3>", self._bank_context_menu)
 
         acts = tk.Frame(f, bg=BG)
         acts.pack(fill="x", pady=(6, 0))
@@ -4764,9 +4778,10 @@ class App:
                 ts = datetime.fromisoformat(ts).strftime("%d/%m %H:%M")
             except:
                 pass
+            name = e.get("display_name") or e.get("filename") or Path(e["path"]).name
             self.bank_tree.insert("", "end", iid=e["id"],
                 tags=("exists" if exists else "missing",),
-                values=(e.get("filename", ""), e.get("overlay", "—"),
+                values=(name, e.get("overlay", "—"),
                         f"{e.get('size_mb',0)}Mo", ts))
         self.bank_status.config(text=f"{len(bank)} vidéo(s)", fg=TEXT2)
 
@@ -4870,6 +4885,84 @@ class App:
         save_bank(bank)
         self._bank_selected = None
         self._refresh_bank()
+
+    def _bank_context_menu(self, event):
+        iid = self.bank_tree.identify_row(event.y)
+        if not iid:
+            return
+        self.bank_tree.selection_set(iid)
+        self._bank_selected = iid
+        menu = tk.Menu(self.root, tearoff=0, bg=SURFACE2, fg=TEXT,
+                       activebackground=HL, activeforeground=ACCENT,
+                       font=("Segoe UI", 10), bd=0, relief="flat")
+        menu.add_command(label="✏  Renommer",    command=self._bank_rename)
+        menu.add_command(label="🗑  Supprimer",   command=self._bank_delete)
+        menu.add_separator()
+        menu.add_command(label="ℹ  Voir détails",  command=self._bank_show_details)
+        menu.add_command(label="📁  Ouvrir dossier", command=self._bank_open_folder)
+        try:
+            menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            menu.grab_release()
+
+    def _bank_rename(self):
+        if not hasattr(self, "_bank_selected") or not self._bank_selected:
+            return
+        bank = load_bank()
+        entry = next((b for b in bank if b["id"] == self._bank_selected), None)
+        if not entry:
+            return
+        current = entry.get("display_name") or entry.get("filename") or Path(entry.get("path","")).name
+        new_name = simpledialog.askstring(
+            "Renommer", "Nouveau nom :", initialvalue=current, parent=self.root)
+        if not new_name or new_name.strip() == current:
+            return
+        new_name = new_name.strip()
+        for e in bank:
+            if e["id"] == self._bank_selected:
+                e["display_name"] = new_name
+                break
+        save_bank(bank)
+        self._refresh_bank()
+        self._post_refresh_bank()
+        self.bank_status.config(text=f"✓ Renommé en « {new_name} »", fg=OK)
+        self.root.after(3000, lambda: self.bank_status.config(text=""))
+
+    def _bank_show_details(self):
+        if not hasattr(self, "_bank_selected") or not self._bank_selected:
+            return
+        bank = load_bank()
+        entry = next((b for b in bank if b["id"] == self._bank_selected), None)
+        if not entry:
+            return
+        p = Path(entry.get("path", ""))
+        size_mb = f"{p.stat().st_size / 1024 / 1024:.1f} MB" if p.exists() else "Introuvable"
+        name = entry.get("display_name") or entry.get("filename") or p.name
+        info = (f"Nom : {name}\n"
+                f"Fichier : {p.name}\n"
+                f"Taille : {size_mb}\n"
+                f"Chemin : {p}\n"
+                f"Overlay : {entry.get('overlay','—')}")
+        messagebox.showinfo("Détails de la vidéo", info, parent=self.root)
+
+    def _bank_open_folder(self):
+        if not hasattr(self, "_bank_selected") or not self._bank_selected:
+            return
+        bank = load_bank()
+        entry = next((b for b in bank if b["id"] == self._bank_selected), None)
+        if not entry:
+            return
+        p = Path(entry.get("path", ""))
+        folder = p.parent if p.exists() else BASE_DIR
+        try:
+            if sys.platform == "win32":
+                subprocess.Popen(["explorer", str(folder)])
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", str(folder)])
+            else:
+                subprocess.Popen(["xdg-open", str(folder)])
+        except Exception as e:
+            messagebox.showerror("Erreur", str(e))
 
     # ══════════════════════════════════════════════════════════════════════════
     # ══════════════════════════════════════════════════════════════════════════
