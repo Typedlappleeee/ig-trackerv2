@@ -662,6 +662,19 @@ def scrape_ig_direct(username: str, password: str, proxy: str | None = None,
 
     def _build_result(cl, username):
         u = cl.user_info_by_username(username)
+        videos = []
+        try:
+            for m in cl.user_medias(u.pk, amount=20):
+                views = getattr(m, "view_count", 0) or getattr(m, "play_count", 0) or 0
+                videos.append({
+                    "id":       m.code,
+                    "views":    views,
+                    "likes":    m.like_count or 0,
+                    "comments": m.comment_count or 0,
+                    "caption":  (m.caption_text or "")[:80],
+                })
+        except Exception:
+            pass
         return {
             "ig_status":    "active",
             "ig_username":  u.username,
@@ -673,7 +686,7 @@ def scrape_ig_direct(username: str, password: str, proxy: str | None = None,
             "is_private":   u.is_private,
             "is_verified":  u.is_verified,
             "profile_pic":  str(u.profile_pic_url or ""),
-            "videos":       [],
+            "videos":       videos,
             "last_checked": datetime.now().isoformat(),
         }
 
@@ -724,6 +737,19 @@ def scrape_ig_by_session(username: str, sessionid: str) -> dict:
         cl = Client()
         cl.login_by_sessionid(sessionid)
         u = cl.user_info_by_username(username)
+        videos = []
+        try:
+            for m in cl.user_medias(u.pk, amount=20):
+                views = getattr(m, "view_count", 0) or getattr(m, "play_count", 0) or 0
+                videos.append({
+                    "id":       m.code,
+                    "views":    views,
+                    "likes":    m.like_count or 0,
+                    "comments": m.comment_count or 0,
+                    "caption":  (m.caption_text or "")[:80],
+                })
+        except Exception:
+            pass
         return {
             "ig_status":    "active",
             "ig_username":  u.username,
@@ -735,7 +761,7 @@ def scrape_ig_by_session(username: str, sessionid: str) -> dict:
             "is_private":   u.is_private,
             "is_verified":  u.is_verified,
             "profile_pic":  str(u.profile_pic_url or ""),
-            "videos":       [],
+            "videos":       videos,
             "last_checked": datetime.now().isoformat(),
         }
     except Exception as ex:
