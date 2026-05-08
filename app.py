@@ -230,6 +230,7 @@ def _parse_ig_graphql(user, username):
                 "views":    n.get("video_view_count", 0),
                 "likes":    n.get("edge_liked_by", {}).get("count", 0),
                 "comments": n.get("edge_media_to_comment", {}).get("count", 0),
+                "shares":   n.get("reshare_count", 0),
                 "caption":  (caps[0]["node"]["text"][:120] if caps else ""),
             })
     return {
@@ -674,6 +675,7 @@ def scrape_ig_direct(username: str, password: str, proxy: str | None = None,
                     "views":    views,
                     "likes":    m.like_count or 0,
                     "comments": m.comment_count or 0,
+                    "shares":   getattr(m, "reshare_count", 0) or 0,
                     "caption":  (m.caption_text or "")[:80],
                 })
         except Exception:
@@ -818,6 +820,7 @@ def scrape_ig_by_session(username: str, sessionid: str) -> dict:
                     "views":    views,
                     "likes":    item.get("like_count", 0),
                     "comments": item.get("comment_count", 0),
+                    "shares":   item.get("reshare_count", 0),
                     "caption":  (caps.get("text", "") if isinstance(caps, dict) else "")[:80],
                 })
 
@@ -1283,8 +1286,66 @@ class App:
         self.log_box.see("end")
         self.log_box.config(state="disabled")
 
+    def _round_card(self, parent, radius=12, bg=None, border=None, border_w=1,
+                     hover_border=None, parent_bg=None):
+        """
+        Create a card with truly rounded corners using a Canvas backdrop.
+        Returns (outer_frame, content_frame).
+        Pack/place the outer; populate the content as if it were a regular Frame.
+        """
+        bg     = bg or CARD
+        border = border or BORDER
+        try:
+            pbg = parent_bg or parent.cget("bg")
+        except Exception:
+            pbg = BG
+        outer = tk.Frame(parent, bg=pbg)
+        cv = tk.Canvas(outer, bg=pbg, highlightthickness=0, bd=0)
+        cv.pack(fill="both", expand=True)
+        content = tk.Frame(cv, bg=bg)
+        win_id = [None]
+
+        def _redraw(_e=None):
+            w = cv.winfo_width()
+            h = cv.winfo_height()
+            if w < 4 or h < 4:
+                return
+            cv.delete("bg")
+            r = max(2, min(radius, w // 2, h // 2))
+            pts = [
+                r, 0, w - r, 0, w, 0, w, r,
+                w, h - r, w, h, w - r, h,
+                r, h, 0, h, 0, h - r,
+                0, r, 0, 0,
+            ]
+            cv.create_polygon(pts, smooth=True, splinesteps=24,
+                              fill=bg, outline=border, width=border_w, tags="bg")
+            if win_id[0] is None:
+                win_id[0] = cv.create_window(border_w + 1, border_w + 1,
+                                              anchor="nw", window=content)
+            cv.itemconfig(win_id[0],
+                          width=max(1, w - 2 * (border_w + 1)),
+                          height=max(1, h - 2 * (border_w + 1)))
+            cv.tag_raise(win_id[0])
+
+        cv.bind("<Configure>", _redraw)
+        outer._cv = cv
+        outer._content = content
+        outer._set_border = lambda c: cv.itemconfig("bg", outline=c) if cv.find_withtag("bg") else None
+
+        if hover_border:
+            def _h(_e): outer._set_border(hover_border)
+            def _u(_e): outer._set_border(border)
+            for w in (cv, content):
+                w.bind("<Enter>", _h, add="+")
+                w.bind("<Leave>", _u, add="+")
+
+        return outer, content
+
     def _show_toast(self, title, msg="", col=None, duration=4000):
         """Toast notification in top-right corner."""
+        if not self.cfg.get("notify_popup", True):
+            return
         col = col or OK
         try:
             t = tk.Toplevel(self.root)
@@ -1488,15 +1549,18 @@ class App:
             ("views",  "👁", "VUES TOTALES", WARN,   "views"),
         ]
         for k, ico, lbl, col, filt in card_data:
-            card = tk.Frame(sf, bg=CARD, padx=0, pady=0,
-                            highlightthickness=1, highlightbackground=BORDER,
-                            cursor="hand2")
-            card.pack(side="left", fill="x", expand=True, padx=(0, 10))
+            card_outer, card = self._round_card(sf, radius=14, bg=CARD,
+                                                 border=BORDER, border_w=1,
+                                                 hover_border=col)
+            card_outer.pack(side="left", fill="both", expand=True, padx=(0, 10), ipady=0)
+            card_outer.configure(height=110)
+            # Force min height for consistent display
+            card_outer.pack_propagate(False)
 
-            top_bar = tk.Frame(card, height=3, bg=col, cursor="hand2")
+            top_bar = tk.Frame(card, height=3, bg=col)
             top_bar.pack(fill="x")
 
-            inner = tk.Frame(card, bg=CARD, padx=16, pady=14, cursor="hand2")
+            inner = tk.Frame(card, bg=CARD, padx=16, pady=12, cursor="hand2")
             inner.pack(fill="both", expand=True)
 
             row_top = tk.Frame(inner, bg=CARD, cursor="hand2")
@@ -1519,10 +1583,11 @@ class App:
                 self._show_tab("phones")
                 self._refresh_table()
 
-            for w in [card, inner, row_top, v, hint, top_bar]:
-                w.bind("<Button-1>", _card_click)
-                w.bind("<Enter>", lambda e, c=card, cl=col: c.config(highlightbackground=cl))
-                w.bind("<Leave>", lambda e, c=card: c.config(highlightbackground=BORDER))
+            for w in [card, inner, row_top, v, hint, top_bar, card_outer._cv]:
+                try:
+                    w.bind("<Button-1>", _card_click, add="+")
+                except Exception:
+                    pass
 
         # Global mousewheel routing
         self.root.bind_all("<MouseWheel>", self._on_global_scroll, add="+")
@@ -1952,19 +2017,22 @@ class App:
             ("posts",     "📸", "POSTS",     OK),
             ("views",     "👁", "VUES TOTAL", WARN),
         ]:
-            kcard = tk.Frame(kf, bg=CARD, highlightthickness=1, highlightbackground=BORDER)
-            kcard.pack(side="left", fill="x", expand=True, padx=(0, 6))
-            tk.Frame(kcard, height=2, bg=col).pack(fill="x")
-            ki = tk.Frame(kcard, bg=CARD, padx=12, pady=10)
-            ki.pack(fill="x")
-            top_row = tk.Frame(ki, bg=CARD)
+            kc_outer, ki = self._round_card(kf, radius=12, bg=CARD,
+                                             border=BORDER, border_w=1)
+            kc_outer.pack(side="left", fill="both", expand=True, padx=(0, 6))
+            kc_outer.configure(height=78)
+            kc_outer.pack_propagate(False)
+            tk.Frame(ki, height=2, bg=col).pack(fill="x")
+            kp = tk.Frame(ki, bg=CARD, padx=12, pady=8)
+            kp.pack(fill="both", expand=True)
+            top_row = tk.Frame(kp, bg=CARD)
             top_row.pack(fill="x")
             tk.Label(top_row, text=icon, font=("Segoe UI", 14),
                      bg=CARD, fg=col).pack(side="left", padx=(0, 6))
             v = tk.Label(top_row, text="—", font=("Segoe UI", 18, "bold"), bg=CARD, fg=col)
             v.pack(side="left")
             self.kpis[k] = v
-            tk.Label(ki, text=lbl, font=("Segoe UI", 7, "bold"),
+            tk.Label(kp, text=lbl, font=("Segoe UI", 7, "bold"),
                      bg=CARD, fg=TEXT2).pack(anchor="w", pady=(2, 0))
 
         # Sort / filter bar
@@ -2182,6 +2250,7 @@ class App:
             views    = vid.get("views", 0)
             likes    = vid.get("likes", 0)
             comments = vid.get("comments", 0)
+            shares   = vid.get("shares", 0)
             caption  = vid.get("caption", "")
             url      = f"https://www.instagram.com/reel/{sc}/"
 
@@ -2217,20 +2286,30 @@ class App:
             bar_fill = tk.Frame(bar_bg, bg=accent_c, height=3)
             bar_fill.place(relx=0, rely=0, relwidth=ratio, relheight=1)
 
-            # Stats row
+            # Stats row 1: views (large)
             stats_row = tk.Frame(card, bg=CARD)
-            stats_row.pack(fill="x", padx=8, pady=(6, 2))
+            stats_row.pack(fill="x", padx=10, pady=(8, 2))
+            tk.Label(stats_row, text="▶", font=("Segoe UI", 13),
+                     bg=CARD, fg=WARN).pack(side="left")
+            tk.Label(stats_row, text=fmt(views), font=("Segoe UI", 14, "bold"),
+                     bg=CARD, fg=WARN).pack(side="left", padx=(4, 0))
+            tk.Label(stats_row, text="vues", font=("Segoe UI", 8),
+                     bg=CARD, fg=TEXT2).pack(side="left", padx=(2, 0), pady=(4, 0))
+
+            # Stats row 2: likes / comments / shares (icons)
+            stats_row2 = tk.Frame(card, bg=CARD)
+            stats_row2.pack(fill="x", padx=10, pady=(2, 4))
             for icon, val, col in [
-                ("👁", fmt(views),    WARN),
-                ("❤️", fmt(likes),    DANGER),
-                ("💬", fmt(comments), TEXT2),
+                ("♥",  fmt(likes),    DANGER),
+                ("✎",  fmt(comments), ACCENT),
+                ("↗",  fmt(shares),   OK),
             ]:
-                chunk = tk.Frame(stats_row, bg=CARD)
-                chunk.pack(side="left", padx=(0, 10))
-                tk.Label(chunk, text=icon, font=("Segoe UI", 10),
-                         bg=CARD).pack(side="left")
-                tk.Label(chunk, text=val, font=("Segoe UI", 9, "bold"),
-                         bg=CARD, fg=col).pack(side="left", padx=(2, 0))
+                chunk = tk.Frame(stats_row2, bg=CARD)
+                chunk.pack(side="left", padx=(0, 12))
+                tk.Label(chunk, text=icon, font=("Segoe UI", 11, "bold"),
+                         bg=CARD, fg=col).pack(side="left")
+                tk.Label(chunk, text=val, font=("Segoe UI", 10, "bold"),
+                         bg=CARD, fg=TEXT).pack(side="left", padx=(3, 0))
 
             # Caption preview
             cap_text = caption[:80].replace("\n", " ") if caption else "—"
@@ -5740,7 +5819,7 @@ class App:
             self._settings_nav_btns[name].config(
                 bg=ACCENT, fg="#06080f", font=("Segoe UI", 10, "bold"))
 
-        for tab_name in ("Profil", "Connexions", "API Keys", "Apparence"):
+        for tab_name in ("Profil", "Connexions", "API Keys", "Apparence", "Notifications"):
             b = tk.Button(nav_inner, text=tab_name, font=("Segoe UI", 10),
                           bg=SURFACE2, fg=TEXT2, relief="flat", cursor="hand2",
                           padx=16, pady=6,
@@ -5997,6 +6076,89 @@ class App:
                                            font=("Segoe UI", 11, "bold"),
                                            bg=CARD, fg=ACCENT)
         self._theme_active_lbl.pack(anchor="w")
+
+        # --- Notifications panel ---
+        notif = self._settings_panels["Notifications"][1]
+        tk.Label(notif, text="Notifications", font=("Segoe UI", 13, "bold"),
+                 bg=CARD, fg=TEXT).pack(anchor="w", pady=(0, 6))
+        tk.Label(notif, text="Configure les alertes affichées et les sons",
+                 font=("Segoe UI", 9), bg=CARD, fg=TEXT2).pack(anchor="w", pady=(0, 14))
+
+        self._notify_popup_var = tk.BooleanVar(value=self.cfg.get("notify_popup", True))
+        self._notify_sound_var = tk.BooleanVar(value=self.cfg.get("notify_sound", True))
+
+        def _make_toggle(parent, label, hint, var, color):
+            row_outer, row_in = self._round_card(parent, radius=10, bg=SURFACE2,
+                                                  border=BORDER, border_w=1)
+            row_outer.pack(fill="x", pady=(0, 8))
+            row_outer.configure(height=66)
+            row_outer.pack_propagate(False)
+            inner = tk.Frame(row_in, bg=SURFACE2, padx=14, pady=10)
+            inner.pack(fill="both", expand=True)
+            txt_col = tk.Frame(inner, bg=SURFACE2)
+            txt_col.pack(side="left", fill="x", expand=True)
+            tk.Label(txt_col, text=label, font=("Segoe UI", 11, "bold"),
+                     bg=SURFACE2, fg=TEXT).pack(anchor="w")
+            tk.Label(txt_col, text=hint, font=("Segoe UI", 9),
+                     bg=SURFACE2, fg=TEXT2).pack(anchor="w")
+            # Toggle switch (Canvas pill)
+            sw = tk.Canvas(inner, width=44, height=22, bg=SURFACE2,
+                           highlightthickness=0, cursor="hand2")
+            sw.pack(side="right", padx=(10, 0))
+            def _draw():
+                sw.delete("all")
+                on = var.get()
+                bg_c = color if on else MUTED
+                # Pill bg
+                sw.create_oval(0, 0, 22, 22, fill=bg_c, outline="")
+                sw.create_oval(22, 0, 44, 22, fill=bg_c, outline="")
+                sw.create_rectangle(11, 0, 33, 22, fill=bg_c, outline="")
+                # Knob
+                kx = 24 if on else 2
+                sw.create_oval(kx, 2, kx + 18, 20, fill="#ffffff", outline="")
+            def _toggle(e=None):
+                var.set(not var.get())
+                _draw()
+            sw.bind("<Button-1>", _toggle)
+            for w in (inner, txt_col, row_outer._cv) + tuple(txt_col.winfo_children()):
+                try: w.bind("<Button-1>", _toggle, add="+")
+                except: pass
+            _draw()
+            return sw
+
+        _make_toggle(notif, "Popup à la fin du posting",
+                      "Affiche un toast en haut à droite quand un post est terminé",
+                      self._notify_popup_var, OK)
+        _make_toggle(notif, "Son de notification",
+                      "Joue un bip quand un posting se termine (Windows)",
+                      self._notify_sound_var, ACCENT)
+
+        notif_status = tk.Label(notif, text="", font=("Segoe UI", 9), bg=CARD, fg=OK)
+        notif_status.pack(anchor="w", pady=(8, 6))
+
+        def _save_notif():
+            self.cfg["notify_popup"] = self._notify_popup_var.get()
+            self.cfg["notify_sound"] = self._notify_sound_var.get()
+            save_config(self.cfg)
+            notif_status.config(text="✅ Préférences enregistrées", fg=OK)
+            self.root.after(2500, lambda: notif_status.config(text=""))
+
+        def _test_notif():
+            if self._notify_popup_var.get():
+                self._show_toast("🔔 Test", "Notifications activées", col=OK)
+            if self._notify_sound_var.get():
+                self._play_notify_sound()
+            if not (self._notify_popup_var.get() or self._notify_sound_var.get()):
+                notif_status.config(text="Active au moins une option pour tester",
+                                     fg=WARN)
+                self.root.after(2500, lambda: notif_status.config(text=""))
+
+        btn_row = tk.Frame(notif, bg=CARD)
+        btn_row.pack(fill="x", pady=(4, 0))
+        self._mk_btn(btn_row, "💾  Enregistrer", "primary", _save_notif,
+                     font=("Segoe UI", 10, "bold"), pady=8).pack(side="left")
+        self._mk_btn(btn_row, "🔔  Tester", "secondary", _test_notif,
+                     font=("Segoe UI", 10), pady=8).pack(side="left", padx=(8, 0))
 
         # Show first panel by default
         show_settings_panel("Profil")
