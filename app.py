@@ -3531,9 +3531,14 @@ class App:
             for pid, d in sorted(self.data.items(),
                                   key=lambda x: int(x[1].get("serial_no") or 0)):
                 ig = d.get("ig_username", "")
-                sid = d.get("session_id", "")
-                if ig and sid:
-                    self._ac_acc_map[f"@{ig}"] = (pid, d)
+                if not ig:
+                    ig = d.get("phone_name", "")
+                if not ig:
+                    continue
+                sid = d.get("ig_sessionid", "").strip()
+                icon = "🟢" if sid else "🔴"
+                label = f"{icon} @{ig}" if ig.startswith("@") is False else f"{icon} {ig}"
+                self._ac_acc_map[label] = (pid, d)
             self._ac_acc_cb["values"] = list(self._ac_acc_map.keys())
             if self._ac_acc_map and not self._ac_acc_var.get():
                 self._ac_acc_cb.current(0)
@@ -3573,9 +3578,12 @@ class App:
                 _ac_log("⚠ Sélectionne un compte d'abord", "warn")
                 return
             _, d = self._ac_acc_map[key]
-            sid = d.get("session_id", "")
+            sid = d.get("ig_sessionid", "").strip()
             uid = str(d.get("ig_user_id") or d.get("user_id") or "")
             ig = d.get("ig_username", "")
+            if not sid:
+                _ac_log("❌ Ce compte n'a pas de Session ID — ajoute-le dans Paramètres", "error")
+                return
 
             self._ac_vid_lb.delete(0, "end")
             self._ac_media_items.clear()
@@ -3838,7 +3846,10 @@ class App:
 
             _, d = self._ac_acc_map[key]
             ig = d.get("ig_username", "")
-            sid = d.get("session_id", "")
+            sid = d.get("ig_sessionid", "").strip()
+            if not sid:
+                _ac_log("❌ Ce compte n'a pas de Session ID — ajoute-le dans Paramètres", "error")
+                return
             interval_sec = self._ac_intv_var.get() * 60
 
             self._ac_running = True
