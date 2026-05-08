@@ -1067,7 +1067,11 @@ class App:
         self._setup_styles()
         self._build_layout()
         self._show_tab("phones")
-        self.root.after(600, self._show_beta_popup)
+        # First launch wizard (chained: beta → wizard if first run)
+        if not self.cfg.get("first_run_done"):
+            self.root.after(600, self._show_first_launch_wizard)
+        else:
+            self.root.after(600, self._show_beta_popup)
 
         self._auto_interval = int(self.cfg.get("auto_refresh_min", 5)) * 60
         self._next_refresh   = 0   # epoch — 0 = pas encore planifié
@@ -1170,6 +1174,231 @@ class App:
                 pop.attributes("-alpha", a)
                 if a < 1.0:
                     pop.after(16, lambda: _fade(a))
+        _fade()
+
+    def _show_first_launch_wizard(self):
+        """Multi-step setup wizard shown on first launch."""
+        wiz = tk.Toplevel(self.root)
+        wiz.overrideredirect(True)
+        wiz.configure(bg=BG)
+        wiz.attributes("-topmost", True)
+        W, H = 540, 540
+        rx = self.root.winfo_x() + (self.root.winfo_width()  - W) // 2
+        ry = self.root.winfo_y() + (self.root.winfo_height() - H) // 2
+        wiz.geometry(f"{W}x{H}+{rx}+{ry}")
+
+        border = tk.Frame(wiz, bg=ACCENT, padx=2, pady=2)
+        border.pack(fill="both", expand=True)
+        inner = tk.Frame(border, bg=BG)
+        inner.pack(fill="both", expand=True)
+        tk.Frame(inner, height=3, bg=ACCENT).pack(fill="x")
+
+        # Step indicator
+        steps = ["Bienvenue", "GéeLark", "Groq IA", "Terminé"]
+        step_idx = [0]
+
+        step_bar = tk.Frame(inner, bg=BG, padx=24, pady=14)
+        step_bar.pack(fill="x")
+        step_dots = []
+        for i, s in enumerate(steps):
+            chunk = tk.Frame(step_bar, bg=BG)
+            chunk.pack(side="left", expand=True, fill="x")
+            dot = tk.Canvas(chunk, width=20, height=20, bg=BG, highlightthickness=0)
+            dot.pack()
+            dot.create_oval(2, 2, 18, 18, fill=MUTED, outline="", tags="circle")
+            dot.create_text(10, 10, text=str(i + 1), font=("Segoe UI", 8, "bold"),
+                             fill=TEXT, tags="num")
+            tk.Label(chunk, text=s, font=("Segoe UI", 8),
+                     bg=BG, fg=TEXT2).pack()
+            step_dots.append(dot)
+
+        body = tk.Frame(inner, bg=BG, padx=32, pady=8)
+        body.pack(fill="both", expand=True)
+
+        # Variables to collect
+        bearer_var = tk.StringVar(value=self.cfg.get("bearer_token", ""))
+        groq_var   = tk.StringVar(value=self.cfg.get("groq_api_key", ""))
+
+        # Step containers
+        s1 = tk.Frame(body, bg=BG)
+        s2 = tk.Frame(body, bg=BG)
+        s3 = tk.Frame(body, bg=BG)
+        s4 = tk.Frame(body, bg=BG)
+
+        # ─── STEP 1: Welcome ───────────────────────────────────────────────────
+        tk.Label(s1, text="🚀  Bienvenue !", font=("Segoe UI", 22, "bold"),
+                 bg=BG, fg=TEXT).pack(anchor="w", pady=(20, 6))
+        tk.Label(s1, text="On va te configurer en 30 secondes.",
+                 font=("Segoe UI", 11), bg=BG, fg=ACCENT).pack(anchor="w")
+        tk.Label(s1,
+                 text=("\nIG Tracker te permet de :\n\n"
+                       "• Suivre tes comptes Instagram (followers, vues, likes…)\n"
+                       "• Poster sur tes téléphones GéeLark depuis ton PC\n"
+                       "• Faire du Mass Posting jusqu'à 20 phones simultanés\n"
+                       "• Monter tes vidéos (texte overlay, cuts, effets)\n"
+                       "• Et plein d'autres trucs cool 😎"),
+                 font=("Segoe UI", 10), bg=BG, fg=TEXT2,
+                 justify="left").pack(anchor="w")
+
+        tk.Label(s1,
+                 text="Tu peux cliquer sur « Plus tard » pour configurer après.",
+                 font=("Segoe UI", 9), bg=BG, fg=MUTED).pack(anchor="w", pady=(20, 0))
+
+        # ─── STEP 2: GéeLark Token ─────────────────────────────────────────────
+        tk.Label(s2, text="🔑  Bearer Token GéeLark",
+                 font=("Segoe UI", 18, "bold"), bg=BG, fg=TEXT).pack(anchor="w", pady=(10, 6))
+        tk.Label(s2, text="Indispensable pour piloter tes téléphones cloud",
+                 font=("Segoe UI", 10), bg=BG, fg=ACCENT).pack(anchor="w")
+
+        tk.Label(s2,
+                 text="\nComment l'obtenir :\n\n"
+                      "1. Va sur app.geelark.com → Profile → API\n"
+                      "2. Clique sur « Create Token » et copie la clé\n"
+                      "3. Colle-la ci-dessous",
+                 font=("Segoe UI", 10), bg=BG, fg=TEXT2,
+                 justify="left").pack(anchor="w", pady=(0, 14))
+
+        tk.Label(s2, text="Bearer Token :", font=("Segoe UI", 10, "bold"),
+                 bg=BG, fg=TEXT).pack(anchor="w")
+        be = tk.Entry(s2, textvariable=bearer_var, show="•", font=("Segoe UI", 11),
+                      bg=SURFACE2, fg=TEXT, insertbackground=TEXT,
+                      relief="flat", bd=0, highlightthickness=1,
+                      highlightcolor=ACCENT, highlightbackground=BORDER)
+        be.pack(fill="x", ipady=8, pady=(4, 6))
+
+        show_b = tk.IntVar(value=0)
+        def _toggle_show():
+            be.config(show="" if show_b.get() else "•")
+        tk.Checkbutton(s2, text="Afficher le token", variable=show_b,
+                       command=_toggle_show, bg=BG, fg=TEXT2,
+                       activebackground=BG, selectcolor=SURFACE2,
+                       font=("Segoe UI", 9), cursor="hand2").pack(anchor="w")
+
+        tk.Label(s2,
+                 text="Tu peux aussi cliquer sur « Plus tard » et le mettre dans Paramètres.",
+                 font=("Segoe UI", 9), bg=BG, fg=MUTED, wraplength=440,
+                 justify="left").pack(anchor="w", pady=(14, 0))
+
+        # ─── STEP 3: Groq (optional) ───────────────────────────────────────────
+        tk.Label(s3, text="✨  Clé API Groq",
+                 font=("Segoe UI", 18, "bold"), bg=BG, fg=TEXT).pack(anchor="w", pady=(10, 6))
+        tk.Label(s3, text="Optionnel — pour générer des captions IG par IA",
+                 font=("Segoe UI", 10), bg=BG, fg=OK).pack(anchor="w")
+
+        tk.Label(s3,
+                 text="\nGroq fournit Llama-3 GRATUITEMENT (jusqu'à 14 400 req/jour).\n\n"
+                      "1. Va sur console.groq.com\n"
+                      "2. Crée un compte (gratuit, sans carte bleue)\n"
+                      "3. API Keys → Create Key → copie la clé",
+                 font=("Segoe UI", 10), bg=BG, fg=TEXT2, justify="left"
+                 ).pack(anchor="w", pady=(0, 14))
+
+        tk.Label(s3, text="Groq API Key :", font=("Segoe UI", 10, "bold"),
+                 bg=BG, fg=TEXT).pack(anchor="w")
+        ge = tk.Entry(s3, textvariable=groq_var, show="•", font=("Segoe UI", 11),
+                      bg=SURFACE2, fg=TEXT, insertbackground=TEXT,
+                      relief="flat", bd=0, highlightthickness=1,
+                      highlightcolor=ACCENT, highlightbackground=BORDER)
+        ge.pack(fill="x", ipady=8, pady=(4, 6))
+
+        show_g = tk.IntVar(value=0)
+        def _toggle_show_g():
+            ge.config(show="" if show_g.get() else "•")
+        tk.Checkbutton(s3, text="Afficher la clé", variable=show_g,
+                       command=_toggle_show_g, bg=BG, fg=TEXT2,
+                       activebackground=BG, selectcolor=SURFACE2,
+                       font=("Segoe UI", 9), cursor="hand2").pack(anchor="w")
+
+        tk.Label(s3, text="Tu peux passer cette étape — ce n'est pas obligatoire.",
+                 font=("Segoe UI", 9), bg=BG, fg=MUTED).pack(anchor="w", pady=(14, 0))
+
+        # ─── STEP 4: Done ──────────────────────────────────────────────────────
+        tk.Label(s4, text="🎉  Tu es prêt !",
+                 font=("Segoe UI", 24, "bold"), bg=BG, fg=ACCENT).pack(pady=(40, 6))
+        tk.Label(s4, text="La config a été enregistrée.",
+                 font=("Segoe UI", 11), bg=BG, fg=TEXT2).pack()
+        tk.Label(s4,
+                 text=("\nQuelques tips pour démarrer :\n\n"
+                       "📱  Onglet Téléphones → tes phones GéeLark\n"
+                       "🚀  Onglet Posting → poster une vidéo\n"
+                       "⚡  Onglet Mass Posting → poster sur 20 phones\n"
+                       "📊  Onglet Stats → voir tes métriques IG\n"
+                       "⚙   Paramètres → modifier les clés à tout moment"),
+                 font=("Segoe UI", 10), bg=BG, fg=TEXT2,
+                 justify="left").pack(pady=(0, 10))
+
+        screens = [s1, s2, s3, s4]
+
+        # Footer with nav buttons
+        footer = tk.Frame(inner, bg=BG, padx=24, pady=14)
+        footer.pack(fill="x", side="bottom")
+        tk.Frame(inner, height=1, bg=BORDER).pack(fill="x", side="bottom")
+
+        prev_btn = self._mk_btn(footer, "◀  Précédent", "ghost",
+                                 cmd=lambda: _go(-1),
+                                 font=("Segoe UI", 10), pady=8)
+        prev_btn.pack(side="left")
+
+        skip_btn = self._mk_btn(footer, "Plus tard", "ghost",
+                                 cmd=lambda: _finish(skip=True),
+                                 font=("Segoe UI", 10), pady=8)
+        skip_btn.pack(side="left", padx=(8, 0))
+
+        next_btn = self._mk_btn(footer, "Suivant  ▶", "primary",
+                                 cmd=lambda: _go(1),
+                                 font=("Segoe UI", 10, "bold"), pady=8)
+        next_btn.pack(side="right")
+
+        def _render():
+            for sc in screens:
+                sc.pack_forget()
+            screens[step_idx[0]].pack(fill="both", expand=True)
+            # update step dots
+            for i, dot in enumerate(step_dots):
+                fill = ACCENT if i == step_idx[0] else (OK if i < step_idx[0] else MUTED)
+                dot.itemconfig("circle", fill=fill)
+                dot.itemconfig("num", fill="#07080d" if i <= step_idx[0] else TEXT)
+            prev_btn.config(state="normal" if step_idx[0] > 0 else "disabled")
+            if step_idx[0] == len(screens) - 1:
+                next_btn.config(text="Terminer  🚀")
+                skip_btn.pack_forget()
+            else:
+                next_btn.config(text="Suivant  ▶")
+                try: skip_btn.pack(side="left", padx=(8, 0))
+                except: pass
+
+        def _go(delta):
+            new = step_idx[0] + delta
+            if new < 0:
+                return
+            if new >= len(screens):
+                return _finish(skip=False)
+            step_idx[0] = new
+            _render()
+
+        def _finish(skip):
+            if not skip:
+                self.cfg["bearer_token"] = bearer_var.get().strip()
+                self.cfg["groq_api_key"] = groq_var.get().strip()
+            self.cfg["first_run_done"] = True
+            save_config(self.cfg)
+            try: wiz.destroy()
+            except: pass
+            self._show_toast("✅ Configuration enregistrée",
+                              "Tu peux modifier ces valeurs dans Paramètres",
+                              col=OK, duration=4000)
+
+        _render()
+
+        wiz.bind("<Escape>", lambda e: _finish(skip=True))
+        wiz.focus_force()
+        wiz.attributes("-alpha", 0.0)
+        def _fade(a=0.0):
+            a = min(a + 0.08, 1.0)
+            if wiz.winfo_exists():
+                wiz.attributes("-alpha", a)
+                if a < 1.0:
+                    wiz.after(16, lambda: _fade(a))
         _fade()
 
     def _setup_styles(self):
@@ -1986,39 +2215,57 @@ class App:
         right = tk.Frame(f, bg=BG)
         right.pack(side="left", fill="both", expand=True)
 
-        # Profile header card
-        prof_card = tk.Frame(right, bg=CARD, highlightthickness=1,
-                             highlightbackground=BORDER)
-        prof_card.pack(fill="x", padx=(10, 0), pady=(0, 8))
-        tk.Frame(prof_card, height=2, bg=OK).pack(fill="x")
-        prof_inner = tk.Frame(prof_card, bg=CARD)
-        prof_inner.pack(fill="x", padx=16, pady=14)
+        # Profile header card (rounded, with Reel preview on the right)
+        prof_outer, prof_inner_card = self._round_card(right, radius=14, bg=CARD,
+                                                        border=BORDER, border_w=1)
+        prof_outer.pack(fill="x", padx=(10, 0), pady=(0, 8))
+        prof_outer.configure(height=200)
+        prof_outer.pack_propagate(False)
+        tk.Frame(prof_inner_card, height=2, bg=OK).pack(fill="x")
+        prof_inner = tk.Frame(prof_inner_card, bg=CARD)
+        prof_inner.pack(fill="both", expand=True, padx=18, pady=14)
 
-        # Avatar canvas (circular)
+        # ── REEL preview on the RIGHT (phone-frame mockup) ───────────────────
+        self._st_reel_canvas = tk.Canvas(prof_inner, bg=CARD, highlightthickness=0,
+                                          width=98, height=170, cursor="hand2")
+        self._st_reel_canvas.pack(side="right", padx=(14, 0))
+        self._st_reel_img_ref = None
+        self._st_reel_url = [None]
+
+        def _open_reel(_e=None):
+            if self._st_reel_url[0]:
+                import webbrowser
+                webbrowser.open(self._st_reel_url[0])
+        self._st_reel_canvas.bind("<Button-1>", _open_reel)
+
+        # Avatar canvas (circular) - bigger for premium feel
         self._st_avatar_canvas = tk.Canvas(prof_inner, bg=CARD, highlightthickness=0,
-                                            width=60, height=60)
-        self._st_avatar_canvas.pack(side="left", padx=(0, 14))
+                                            width=72, height=72)
+        self._st_avatar_canvas.pack(side="left", padx=(0, 16))
         self._st_avatar_img_ref = None
 
         # Name + bio column
         name_col = tk.Frame(prof_inner, bg=CARD)
-        name_col.pack(side="left", fill="x", expand=True)
+        name_col.pack(side="left", fill="both", expand=True)
         name_row = tk.Frame(name_col, bg=CARD)
         name_row.pack(fill="x")
         self.det_name = tk.Label(name_row, text="Sélectionne un compte →",
-                                  font=("Segoe UI", 14, "bold"), bg=CARD, fg=TEXT)
+                                  font=("Segoe UI", 16, "bold"), bg=CARD, fg=TEXT)
         self.det_name.pack(side="left")
         self.det_status = tk.Label(name_row, text="",
                                     font=("Segoe UI", 9, "bold"), bg=CARD, fg=TEXT2,
                                     padx=8, pady=3)
         self.det_status.pack(side="left", padx=(10, 0))
         self._st_fullname_lbl = tk.Label(name_col, text="",
-                                          font=("Segoe UI", 10), bg=CARD, fg=TEXT2)
-        self._st_fullname_lbl.pack(anchor="w")
+                                          font=("Segoe UI", 11), bg=CARD, fg=TEXT2)
+        self._st_fullname_lbl.pack(anchor="w", pady=(2, 0))
         self._st_bio_lbl = tk.Label(name_col, text="",
                                      font=("Segoe UI", 9), bg=CARD, fg=MUTED,
-                                     wraplength=420, justify="left")
-        self._st_bio_lbl.pack(anchor="w", pady=(2, 0))
+                                     wraplength=320, justify="left")
+        self._st_bio_lbl.pack(anchor="w", pady=(4, 0))
+
+        # Render placeholder Reel
+        self.root.after(150, lambda: self._render_reel_preview(None, ""))
 
         # KPI row
         kf = tk.Frame(right, bg=BG)
@@ -4596,10 +4843,10 @@ class App:
             if not phones:
                 messagebox.showwarning("Mass Posting", "Sélectionne au moins un téléphone.")
                 return
-            bearer = self.cfg.get("geelark_token", "")
+            bearer = self.cfg.get("bearer_token", "") or self.cfg.get("geelark_token", "")
             if not bearer:
                 messagebox.showwarning("Mass Posting",
-                    "Token GéeLark manquant — configure-le dans Paramètres.")
+                    "Bearer Token GéeLark manquant — configure-le dans Paramètres → API Keys.")
                 return
             self._mp_running[0] = True
             self._mp_stop_flag[0] = False
@@ -4954,27 +5201,45 @@ class App:
         split = tk.Frame(f, bg=BG)
         split.pack(fill="both", expand=True)
 
-        # Gauche : liste
-        lw = tk.Frame(split, bg=BG, width=420)
-        lw.pack(side="left", fill="y")
+        # Gauche : grille de cartes scrollable
+        lw = tk.Frame(split, bg=BG, width=620)
+        lw.pack(side="left", fill="both")
         lw.pack_propagate(False)
 
-        cols = ("filename", "overlay", "size", "created")
-        self.bank_tree = ttk.Treeview(lw, columns=cols, show="headings",
-                                       style="Bank.Treeview", selectmode="extended")
-        for col, head, w in [("filename", "Fichier", 160), ("overlay", "Texte", 140),
-                              ("size", "Taille", 60),       ("created", "Date", 80)]:
-            self.bank_tree.heading(col, text=head)
-            self.bank_tree.column(col, width=w,
-                                  anchor="w" if col in ("filename", "overlay") else "center")
-        self.bank_tree.tag_configure("exists",  foreground=TEXT)
-        self.bank_tree.tag_configure("missing", foreground=MUTED)
-        vsb = ttk.Scrollbar(lw, orient="vertical", command=self.bank_tree.yview)
-        self.bank_tree.configure(yscrollcommand=vsb.set)
-        self.bank_tree.pack(side="left", fill="both", expand=True)
-        vsb.pack(side="right", fill="y")
-        self.bank_tree.bind("<<TreeviewSelect>>", self._on_bank_sel)
-        self.bank_tree.bind("<Button-3>", self._bank_context_menu)
+        # Canvas scrollable pour les cartes
+        self.bank_grid_canvas = tk.Canvas(lw, bg=BG, highlightthickness=0, bd=0)
+        bank_vsb = ttk.Scrollbar(lw, orient="vertical",
+                                 command=self.bank_grid_canvas.yview)
+        self.bank_grid_canvas.configure(yscrollcommand=bank_vsb.set)
+        bank_vsb.pack(side="right", fill="y")
+        self.bank_grid_canvas.pack(side="left", fill="both", expand=True)
+
+        self.bank_grid_inner = tk.Frame(self.bank_grid_canvas, bg=BG)
+        self._bank_grid_window = self.bank_grid_canvas.create_window(
+            (0, 0), window=self.bank_grid_inner, anchor="nw")
+
+        def _bank_grid_configure(_e=None):
+            self.bank_grid_canvas.configure(
+                scrollregion=self.bank_grid_canvas.bbox("all"))
+        self.bank_grid_inner.bind("<Configure>", _bank_grid_configure)
+
+        def _bank_canvas_resize(e):
+            self.bank_grid_canvas.itemconfig(self._bank_grid_window, width=e.width)
+        self.bank_grid_canvas.bind("<Configure>", _bank_canvas_resize)
+
+        def _bank_wheel(e):
+            self.bank_grid_canvas.yview_scroll(int(-1 * (e.delta / 120)), "units")
+        self.bank_grid_canvas.bind("<MouseWheel>", _bank_wheel)
+        self.bank_grid_inner.bind("<MouseWheel>", _bank_wheel)
+        self._bank_grid_wheel = _bank_wheel
+
+        # Stockage des références pour les cartes
+        self._bank_card_widgets = {}      # entry_id → outer frame
+        self._bank_card_thumbs = {}       # entry_id → thumb label
+        self._bank_thumb_refs = []        # liste pour empêcher GC des PhotoImage
+        self._bank_thumb_jobs = set()     # entry_ids en cours de chargement async
+        self._bank_grid_cols = 3
+        self.bank_tree = None             # rétro-compat (anciennes refs Tree)
 
         acts = tk.Frame(f, bg=BG)
         acts.pack(fill="x", pady=(6, 0))
@@ -5026,20 +5291,40 @@ class App:
         self.desc_status = tk.Label(br, text="", font=("Segoe UI", 9), bg=CARD, fg=TEXT2)
         self.desc_status.pack(side="left", padx=10)
 
-    def _on_bank_sel(self, e):
-        sel = self.bank_tree.selection()
-        if not sel:
+    def _on_bank_sel(self, e=None):
+        # Conservé pour rétro-compatibilité ; la sélection se fait désormais via cartes.
+        if self._bank_selected:
+            self._on_bank_sel_card(self._bank_selected)
+
+    def _on_bank_sel_card(self, entry_id):
+        """Click handler pour les cartes de la grille bank."""
+        if not entry_id:
             return
-        self._bank_selected = sel[0]
+        self._bank_selected = entry_id
         bank = load_bank()
-        entry = next((b for b in bank if b["id"] == self._bank_selected), None)
+        entry = next((b for b in bank if b["id"] == entry_id), None)
         if not entry:
             return
-        self.desc_box.delete("1.0", "end")
-        if entry.get("description"):
-            self.desc_box.insert("1.0", entry["description"])
-        self.desc_status.config(text="")
-        threading.Thread(target=self._load_bank_preview, args=(entry,), daemon=True).start()
+        # Mise à jour visuelle des bordures de carte
+        for eid, outer in list(self._bank_card_widgets.items()):
+            try:
+                col = ACCENT if eid == entry_id else BORDER
+                if hasattr(outer, "_set_border") and outer._set_border:
+                    outer._set_border(col)
+                outer._sel_border = col
+            except Exception:
+                pass
+        # Description
+        try:
+            self.desc_box.delete("1.0", "end")
+            if entry.get("description"):
+                self.desc_box.insert("1.0", entry["description"])
+            self.desc_status.config(text="")
+        except Exception:
+            pass
+        # Aperçu vidéo
+        threading.Thread(target=self._load_bank_preview,
+                          args=(entry,), daemon=True).start()
 
     def _load_bank_preview(self, entry):
         if not PIL_OK:
@@ -5169,7 +5454,18 @@ class App:
             self.export_dir_lbl.config(text=f"Export : {d}")
 
     def _refresh_bank(self):
-        self.bank_tree.delete(*self.bank_tree.get_children())
+        # Reconstruction de la grille de cartes
+        if not hasattr(self, "bank_grid_inner"):
+            return
+        for child in list(self.bank_grid_inner.winfo_children()):
+            try:
+                child.destroy()
+            except Exception:
+                pass
+        self._bank_card_widgets = {}
+        self._bank_card_thumbs = {}
+        self._bank_thumb_refs = []
+
         bank = load_bank()
         export_dir = self.cfg.get("export_dir", "").strip()
         known = {b["path"] for b in bank}
@@ -5186,19 +5482,220 @@ class App:
                         "created":  datetime.fromtimestamp(fp.stat().st_mtime).isoformat(),
                         "posted_to": [],
                     })
-        for e in bank:
-            exists = Path(e.get("path", "")).exists()
-            ts = e.get("created", "")
+
+        cols = max(1, getattr(self, "_bank_grid_cols", 3))
+        for c in range(cols):
             try:
-                ts = datetime.fromisoformat(ts).strftime("%d/%m %H:%M")
-            except:
+                self.bank_grid_inner.grid_columnconfigure(c, weight=1, uniform="bankcol")
+            except Exception:
                 pass
-            name = e.get("display_name") or e.get("filename") or Path(e["path"]).name
-            self.bank_tree.insert("", "end", iid=e["id"],
-                tags=("exists" if exists else "missing",),
-                values=(name, e.get("overlay", "—"),
-                        f"{e.get('size_mb',0)}Mo", ts))
+
+        if not bank:
+            empty = tk.Label(self.bank_grid_inner,
+                              text="Aucune vidéo en banque\nLance un export pour la peupler.",
+                              font=("Segoe UI", 10), bg=BG, fg=TEXT2, justify="center")
+            empty.grid(row=0, column=0, columnspan=cols, padx=10, pady=40, sticky="nsew")
+            empty.bind("<MouseWheel>", self._bank_grid_wheel)
+            self.bank_status.config(text="0 vidéo(s)", fg=TEXT2)
+            return
+
+        for idx, e in enumerate(bank):
+            r, c = divmod(idx, cols)
+            self._build_bank_card(self.bank_grid_inner, e, r, c)
+
+        # Reset du scroll
+        self.bank_grid_inner.update_idletasks()
+        try:
+            self.bank_grid_canvas.configure(
+                scrollregion=self.bank_grid_canvas.bbox("all"))
+        except Exception:
+            pass
         self.bank_status.config(text=f"{len(bank)} vidéo(s)", fg=TEXT2)
+
+        # Restaurer la sélection visuelle
+        if self._bank_selected and self._bank_selected in self._bank_card_widgets:
+            outer = self._bank_card_widgets[self._bank_selected]
+            try:
+                outer._set_border(ACCENT)
+            except Exception:
+                pass
+
+    def _build_bank_card(self, parent, entry, row, col):
+        """Construit une carte vidéo dans la grille."""
+        eid = entry["id"]
+        exists = Path(entry.get("path", "")).exists()
+        name = (entry.get("display_name")
+                or entry.get("filename")
+                or Path(entry.get("path", "")).name or "—")
+        overlay = entry.get("overlay") or "—"
+        size_mb = entry.get("size_mb", 0)
+        ts = entry.get("created", "")
+        try:
+            ts = datetime.fromisoformat(ts).strftime("%d/%m %H:%M")
+        except Exception:
+            pass
+
+        outer, content = self._round_card(parent, radius=12, bg=CARD,
+                                            border=BORDER, hover_border=ACCENT)
+        outer.grid(row=row, column=col, sticky="nsew", padx=6, pady=6)
+        outer._sel_border = BORDER
+
+        # Thumbnail (placeholder gris foncé)
+        thumb_h = 180
+        thumb_lbl = tk.Label(content, bg=SURFACE2, text="🎬",
+                             font=("Segoe UI", 24), fg=MUTED,
+                             height=8, anchor="center")
+        thumb_lbl.pack(fill="x", padx=8, pady=(8, 6))
+        # Hauteur fixe via configure pour assurer un aspect homogène
+        try:
+            thumb_lbl.configure(height=int(thumb_h / 18))
+        except Exception:
+            pass
+        self._bank_card_thumbs[eid] = thumb_lbl
+
+        # Bandeau titre + badge
+        title_row = tk.Frame(content, bg=CARD)
+        title_row.pack(fill="x", padx=10, pady=(0, 2))
+        max_chars = 24
+        disp = name if len(name) <= max_chars else name[:max_chars - 1] + "…"
+        title_lbl = tk.Label(title_row, text=disp,
+                              font=("Segoe UI", 10, "bold"),
+                              bg=CARD, fg=TEXT if exists else TEXT2,
+                              anchor="w")
+        title_lbl.pack(side="left", fill="x", expand=True)
+        badge = tk.Label(title_row,
+                          text="✓" if exists else "✗",
+                          font=("Segoe UI", 10, "bold"),
+                          bg=CARD, fg=OK if exists else DANGER)
+        badge.pack(side="right", padx=(4, 0))
+
+        # Sous-titre overlay
+        ov_disp = overlay if len(overlay) <= 28 else overlay[:27] + "…"
+        ov_lbl = tk.Label(content, text=ov_disp,
+                           font=("Segoe UI", 9), bg=CARD, fg=TEXT2,
+                           anchor="w", justify="left")
+        ov_lbl.pack(fill="x", padx=10, pady=(0, 2))
+
+        # Pied : taille + date
+        meta = tk.Frame(content, bg=CARD)
+        meta.pack(fill="x", padx=10, pady=(0, 10))
+        size_lbl = tk.Label(meta, text=f"{size_mb} Mo",
+                             font=("Consolas", 8), bg=CARD, fg=MUTED)
+        size_lbl.pack(side="left")
+        date_lbl = tk.Label(meta, text=ts or "",
+                             font=("Consolas", 8), bg=CARD, fg=MUTED)
+        date_lbl.pack(side="right")
+
+        # Bindings clic / clic-droit / molette sur tous les widgets de la carte
+        def _click(_e=None, _id=eid):
+            self._on_bank_sel_card(_id)
+        def _rclick(e, _id=eid):
+            self._bank_card_context(e, _id)
+
+        widgets = [outer, content, thumb_lbl, title_row, title_lbl, badge,
+                    ov_lbl, meta, size_lbl, date_lbl]
+        try:
+            widgets.append(outer._cv)
+        except Exception:
+            pass
+        for w in widgets:
+            try:
+                w.bind("<Button-1>", _click, add="+")
+                w.bind("<Button-3>", _rclick, add="+")
+                w.bind("<MouseWheel>", self._bank_grid_wheel, add="+")
+                w.configure(cursor="hand2")
+            except Exception:
+                pass
+
+        self._bank_card_widgets[eid] = outer
+
+        # Lance le chargement async du thumbnail
+        if exists and PIL_OK:
+            threading.Thread(target=self._async_load_bank_thumb,
+                              args=(entry,), daemon=True).start()
+
+    def _extract_bank_thumb(self, entry):
+        """Renvoie une PIL.Image (ou None) pour la vidéo de l'entrée bank.
+        Cache JPEG dans BASE_DIR/_bank_thumbs/{id}.jpg."""
+        if not PIL_OK:
+            return None
+        eid = entry.get("id") or ""
+        path = Path(entry.get("path", ""))
+        if not path.exists():
+            return None
+        cache_dir = BASE_DIR / "_bank_thumbs"
+        try:
+            cache_dir.mkdir(parents=True, exist_ok=True)
+        except Exception:
+            pass
+        # Nom de cache safe (l'id peut contenir des caractères divers)
+        safe = re.sub(r"[^A-Za-z0-9_.-]", "_", str(eid)) or "thumb"
+        cache_file = cache_dir / f"{safe}.jpg"
+
+        # Si le cache est plus récent que la vidéo, on le réutilise
+        try:
+            if (cache_file.exists()
+                    and cache_file.stat().st_mtime >= path.stat().st_mtime):
+                return Image.open(cache_file).convert("RGB")
+        except Exception:
+            pass
+
+        ff = self._find_ffmpeg()
+        if not ff:
+            return None
+        try:
+            subprocess.run(
+                [ff, "-y", "-ss", "00:00:01", "-i", str(path),
+                 "-frames:v", "1", "-vf", "scale=180:-2",
+                 "-q:v", "3", str(cache_file)],
+                capture_output=True, timeout=15)
+        except Exception:
+            return None
+        if not cache_file.exists():
+            return None
+        try:
+            return Image.open(cache_file).convert("RGB")
+        except Exception:
+            return None
+
+    def _async_load_bank_thumb(self, entry):
+        """Charge le thumbnail en thread, met à jour le label via root.after."""
+        eid = entry.get("id")
+        if not eid or eid in self._bank_thumb_jobs:
+            return
+        self._bank_thumb_jobs.add(eid)
+        try:
+            img = self._extract_bank_thumb(entry)
+        finally:
+            self._bank_thumb_jobs.discard(eid)
+        if img is None:
+            return
+        try:
+            # Limite douce pour ne pas exploser le rendu
+            img.thumbnail((220, 180), Image.LANCZOS)
+            photo = ImageTk.PhotoImage(img)
+        except Exception:
+            return
+
+        def _apply():
+            lbl = self._bank_card_thumbs.get(eid)
+            if not lbl:
+                return
+            try:
+                lbl.configure(image=photo, text="", height=0)
+                lbl.image = photo
+                self._bank_thumb_refs.append(photo)
+            except Exception:
+                pass
+        try:
+            self.root.after(0, _apply)
+        except Exception:
+            pass
+
+    def _bank_card_context(self, event, entry_id):
+        """Right-click sur une carte : sélectionne puis affiche le menu contextuel."""
+        self._on_bank_sel_card(entry_id)
+        self._bank_context_menu(event)
 
     def _get_bank_entry(self):
         if not self._bank_selected:
@@ -5289,9 +5786,9 @@ class App:
                 break
 
     def _bank_delete(self):
-        sels = self.bank_tree.selection()
-        if not sels:
+        if not self._bank_selected:
             return
+        sels = {self._bank_selected}
         if not messagebox.askyesno(
                 "Supprimer",
                 f"Supprimer {len(sels)} vidéo(s) de la banque ?\n(fichiers conservés sur disque)"):
@@ -5302,11 +5799,9 @@ class App:
         self._refresh_bank()
 
     def _bank_context_menu(self, event):
-        iid = self.bank_tree.identify_row(event.y)
-        if not iid:
+        # Avec la grille de cartes, l'entry id est déjà sélectionné par le wrapper.
+        if not self._bank_selected:
             return
-        self.bank_tree.selection_set(iid)
-        self._bank_selected = iid
         menu = tk.Menu(self.root, tearoff=0, bg=SURFACE2, fg=TEXT,
                        activebackground=HL, activeforeground=ACCENT,
                        font=("Segoe UI", 10), bd=0, relief="flat")
