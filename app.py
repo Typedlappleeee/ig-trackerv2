@@ -54,6 +54,83 @@ TEXT     = "#dde3f0"
 TEXT2    = "#5d6680"
 MUTED    = "#2a2f44"
 
+# ── Internationalisation ──────────────────────────────────────────────────────
+TRANSLATIONS = {
+    "fr": {
+        # Sidebar
+        "tab.phones":       "Téléphones",
+        "tab.insta":        "INSTA",
+        "tab.stats":        "Stats",
+        "tab.posting":      "Posting",
+        "tab.masspost":     "Mass Posting",
+        "tab.bank":         "Banque vidéos",
+        "tab.autocomment":  "Automatisation",
+        "tab.tools":        "Outils IA",
+        "tab.montage":      "MONTAGE",
+        "tab.automation":   "Montage vidéo",
+        "tab.settings":     "Paramètres",
+        # Stat cards
+        "card.phones":      "TÉLÉPHONES",
+        "card.active":      "IG ACTIFS",
+        "card.banned":      "BANNIS",
+        "card.views":       "VUES TOTALES",
+        "card.click_filter": "cliquer pour filtrer",
+        # Common
+        "common.refresh":   "↺  Rafraîchir",
+        "common.save":      "💾  Sauvegarder",
+        "common.cancel":    "Annuler",
+        "common.delete":    "Supprimer",
+        "common.rename":    "Renommer",
+        # Settings sub-tabs
+        "settings.profile":      "Profil",
+        "settings.connections":  "Connexions",
+        "settings.api":          "API Keys",
+        "settings.appearance":   "Apparence",
+        "settings.notifications": "Notifications",
+        "settings.language":     "Langue",
+        # Coming soon
+        "soon.label":            "BIENTÔT",
+        "soon.twitter":          "Twitter",
+        "soon.threads":          "Threads",
+    },
+    "en": {
+        "tab.phones":       "Phones",
+        "tab.insta":        "INSTA",
+        "tab.stats":        "Stats",
+        "tab.posting":      "Posting",
+        "tab.masspost":     "Mass Posting",
+        "tab.bank":         "Video Bank",
+        "tab.autocomment":  "Automation",
+        "tab.tools":        "AI Tools",
+        "tab.montage":      "EDITING",
+        "tab.automation":   "Video Editor",
+        "tab.settings":     "Settings",
+        "card.phones":      "PHONES",
+        "card.active":      "IG ACTIVE",
+        "card.banned":      "BANNED",
+        "card.views":       "TOTAL VIEWS",
+        "card.click_filter": "click to filter",
+        "common.refresh":   "↺  Refresh",
+        "common.save":      "💾  Save",
+        "common.cancel":    "Cancel",
+        "common.delete":    "Delete",
+        "common.rename":    "Rename",
+        "settings.profile":      "Profile",
+        "settings.connections":  "Connections",
+        "settings.api":          "API Keys",
+        "settings.appearance":   "Appearance",
+        "settings.notifications": "Notifications",
+        "settings.language":     "Language",
+        "soon.label":            "SOON",
+        "soon.twitter":          "Twitter",
+        "soon.threads":          "Threads",
+    },
+}
+
+def t(key, lang="fr"):
+    """Translate a key. Falls back to French if missing in target language."""
+    return TRANSLATIONS.get(lang, {}).get(key) or TRANSLATIONS["fr"].get(key, key)
+
 def apply_theme_globals(theme_name):
     global ACCENT, ACCENT2, OK
     t = THEMES.get(theme_name, THEMES["Lime"])
@@ -1751,37 +1828,42 @@ class App:
                      bg=SURFACE2, fg=TEXT2).pack(side="left")
             badge = tk.Frame(inner, bg=SURFACE2)
             badge.pack(side="right")
-            tk.Label(badge, text="BIENTÔT", font=("Segoe UI", 8, "bold"),
+            tk.Label(badge, text=t("soon.label", self.cfg.get("lang","fr")),
+                     font=("Segoe UI", 8, "bold"),
                      bg=WARN, fg="#07080d", padx=7, pady=2).pack()
 
+        # Use translation function
+        L = self.cfg.get("lang", "fr")
+        _ = lambda k: t(k, L)
+
         # Standalone
-        _reg("phones", "📱", "Téléphones")
+        _reg("phones", "📱", _("tab.phones"))
         tk.Frame(self.sidebar, height=1, bg=BORDER).pack(fill="x", pady=2)
 
         # INSTA BETA group
         grp_outer, grp_children = self._make_sidebar_group(
-            self.sidebar, "✦", "INSTA", badge="BETA", col=OK)
+            self.sidebar, "✦", _("tab.insta"), badge="BETA", col=OK)
         grp_outer.pack(fill="x")
         self._insta_group_children = grp_children
 
-        _reg("stats",       "📊", "Stats",         grp_children, indent=True)
-        _reg("posting",     "🚀", "Posting",        grp_children, indent=True)
-        _reg("masspost",    "⚡", "Mass Posting",   grp_children, indent=True,
+        _reg("stats",       "📊", _("tab.stats"),       grp_children, indent=True)
+        _reg("posting",     "🚀", _("tab.posting"),     grp_children, indent=True)
+        _reg("masspost",    "⚡", _("tab.masspost"),    grp_children, indent=True,
              badge="BETA", badge_col=WARN)
-        _reg("bank",        "🗂", "Banque vidéos",  grp_children, indent=True)
-        _reg("autocomment", "🤖", "Automatisation", grp_children, indent=True)
-        _reg("tools",       "🔧", "Outils IA",      grp_children, indent=True)
+        _reg("bank",        "🗂", _("tab.bank"),        grp_children, indent=True)
+        _reg("autocomment", "🤖", _("tab.autocomment"), grp_children, indent=True)
+        _reg("tools",       "🔧", _("tab.tools"),       grp_children, indent=True)
 
         tk.Frame(self.sidebar, height=1, bg=BORDER).pack(fill="x", pady=2)
 
         # Montage group
         mont_outer, mont_children = self._make_sidebar_group(
-            self.sidebar, "🎬", "MONTAGE", col=WARN)
+            self.sidebar, "🎬", _("tab.montage"), col=WARN)
         mont_outer.pack(fill="x")
-        _reg("automation", "✂", "Montage vidéo", mont_children, indent=True)
+        _reg("automation", "✂", _("tab.automation"), mont_children, indent=True)
 
         tk.Frame(self.sidebar, height=1, bg=BORDER).pack(fill="x", pady=2)
-        _reg("settings", "⚙", "Paramètres")
+        _reg("settings", "⚙", _("tab.settings"))
 
         # ── Sidebar: bottom (spacer + coming soon + refresh) ───────────────────
         tk.Frame(self.sidebar, bg=SURFACE).pack(fill="both", expand=True)
@@ -1795,7 +1877,7 @@ class App:
         # Refresh button
         ref_frame = tk.Frame(self.sidebar, bg=SURFACE, padx=14, pady=6)
         ref_frame.pack(fill="x")
-        self.refresh_btn = tk.Button(ref_frame, text="↺  Rafraîchir",
+        self.refresh_btn = tk.Button(ref_frame, text=_("common.refresh"),
             font=("Segoe UI", 10, "bold"), bg=ACCENT, fg="#07080d",
             relief="flat", cursor="hand2", activebackground=ACCENT2,
             pady=9, bd=0, command=self._manual_refresh)
@@ -1812,10 +1894,10 @@ class App:
 
         self.sv = {}
         card_data = [
-            ("phones", "📱", "TÉLÉPHONES",   ACCENT, "all"),
-            ("active", "✅", "IG ACTIFS",    OK,     "active"),
-            ("banned", "🚫", "BANNIS",       DANGER, "banned"),
-            ("views",  "👁", "VUES TOTALES", WARN,   "views"),
+            ("phones", "📱", _("card.phones"), ACCENT, "all"),
+            ("active", "✅", _("card.active"), OK,     "active"),
+            ("banned", "🚫", _("card.banned"), DANGER, "banned"),
+            ("views",  "👁", _("card.views"),  WARN,   "views"),
         ]
         for k, ico, lbl, col, filt in card_data:
             card_outer, card = self._round_card(sf, radius=14, bg=CARD,
@@ -1842,7 +1924,7 @@ class App:
             v = tk.Label(inner, text="—", font=("Segoe UI", 26, "bold"), bg=CARD, fg=col,
                          cursor="hand2")
             v.pack(anchor="w", pady=(4, 0))
-            hint = tk.Label(inner, text="cliquer pour filtrer", font=("Segoe UI", 7),
+            hint = tk.Label(inner, text=_("card.click_filter"), font=("Segoe UI", 7),
                             bg=CARD, fg=MUTED, cursor="hand2")
             hint.pack(anchor="w")
             self.sv[k] = v
@@ -3135,11 +3217,18 @@ class App:
                                       font=("Segoe UI", 8), bg=CARD, fg=TEXT2)
         self._tl_cut_lbl.pack(side="left", padx=(10, 0))
 
-        # Cut buttons
-        self._mk_btn(tl_hdr, "✂  Couper ici (début)", "ok",
+        # Play / Rogner buttons
+        self._tl_playing = [False]
+        self._tl_play_after = [None]
+        self._tl_play_btn = self._mk_btn(tl_hdr, "▶  Lecture", "primary",
+                                          lambda: self._tl_toggle_play(),
+                                          font=("Segoe UI", 8, "bold"), pady=2)
+        self._tl_play_btn.pack(side="left", padx=(10, 4))
+
+        self._mk_btn(tl_hdr, "✂  Rogner début", "ok",
                      lambda: self._tl_set_cut("start"),
                      font=("Segoe UI", 8), pady=2).pack(side="right", padx=(4, 0))
-        self._mk_btn(tl_hdr, "✂  Couper ici (fin)", "danger",
+        self._mk_btn(tl_hdr, "✂  Rogner fin", "danger",
                      lambda: self._tl_set_cut("end"),
                      font=("Segoe UI", 8), pady=2).pack(side="right", padx=(4, 0))
         self._mk_btn(tl_hdr, "↺ Reset", "ghost",
@@ -3296,6 +3385,57 @@ class App:
         except Exception:
             pass
         self._tl_update_labels()
+
+    def _tl_toggle_play(self):
+        """Toggle play/pause for timeline preview."""
+        if self._tl_playing[0]:
+            self._tl_stop_play()
+        else:
+            self._tl_start_play()
+
+    def _tl_start_play(self):
+        if not self.video_path_var.get() or not getattr(self, "_tl_duration", 0):
+            return
+        self._tl_playing[0] = True
+        try:
+            self._tl_play_btn.config(text="⏸  Pause")
+        except Exception:
+            pass
+        self._tl_play_step()
+
+    def _tl_stop_play(self):
+        self._tl_playing[0] = False
+        try:
+            self._tl_play_btn.config(text="▶  Lecture")
+        except Exception:
+            pass
+        if self._tl_play_after[0] is not None:
+            try: self.root.after_cancel(self._tl_play_after[0])
+            except Exception: pass
+            self._tl_play_after[0] = None
+
+    def _tl_play_step(self):
+        """Advance playhead by ~0.4s and update preview."""
+        if not self._tl_playing[0]:
+            return
+        dur = getattr(self, "_tl_duration", 0)
+        if not dur:
+            self._tl_stop_play()
+            return
+        ce = getattr(self, "_tl_cut_end", dur) or dur
+        cs = getattr(self, "_tl_cut_start", 0.0)
+        cur = getattr(self, "_tl_playhead_t", 0.0)
+        # Loop within cut region
+        if cur >= ce - 0.05 or cur < cs:
+            cur = cs
+        cur += 0.4
+        if cur >= ce:
+            cur = cs
+        self._tl_playhead_t = cur
+        self._tl_redraw()
+        self._tl_update_labels()
+        self._tl_do_seek()
+        self._tl_play_after[0] = self.root.after(420, self._tl_play_step)
 
     def _tl_set_cut(self, side):
         ph = getattr(self, "_tl_playhead_t", 0)
@@ -3607,6 +3747,9 @@ class App:
         self.path_lbl.config(text=Path(path).name, fg=TEXT)
         self.output_video_path = None
         self.process_status.config(text="")
+        # Stop any current playback
+        try: self._tl_stop_play()
+        except Exception: pass
         # Reset timeline state for the new video
         self._tl_duration = 0.0
         self._tl_playhead_t = 1.0
@@ -7246,6 +7389,78 @@ class App:
                                            font=("Segoe UI", 11, "bold"),
                                            bg=CARD, fg=ACCENT)
         self._theme_active_lbl.pack(anchor="w")
+
+        # ── Language switcher ────────────────────────────────────────────────
+        tk.Frame(app_pan, height=1, bg=BORDER).pack(fill="x", pady=(20, 14))
+        tk.Label(app_pan, text="Langue · Language",
+                 font=("Segoe UI", 13, "bold"),
+                 bg=CARD, fg=TEXT).pack(anchor="w", pady=(0, 6))
+        tk.Label(app_pan, text="Choisis la langue de l'interface (relance requise pour tout traduire)",
+                 font=("Segoe UI", 9), bg=CARD, fg=TEXT2).pack(anchor="w", pady=(0, 12))
+
+        self._lang_var = tk.StringVar(value=self.cfg.get("lang", "fr"))
+        lang_row = tk.Frame(app_pan, bg=CARD)
+        lang_row.pack(fill="x")
+
+        def _make_lang_btn(code, flag, label):
+            outer, inner = self._round_card(lang_row, radius=12, bg=SURFACE2,
+                                              border=BORDER, border_w=1,
+                                              hover_border=ACCENT)
+            outer.pack(side="left", padx=(0, 10))
+            outer.configure(width=140, height=72)
+            outer.pack_propagate(False)
+
+            content = tk.Frame(inner, bg=SURFACE2, cursor="hand2")
+            content.pack(fill="both", expand=True, padx=14, pady=10)
+            flag_lbl = tk.Label(content, text=flag, font=("Segoe UI", 22),
+                                 bg=SURFACE2, cursor="hand2")
+            flag_lbl.pack(side="left", padx=(0, 10))
+            txt_col = tk.Frame(content, bg=SURFACE2, cursor="hand2")
+            txt_col.pack(side="left", fill="both", expand=True)
+            tk.Label(txt_col, text=label, font=("Segoe UI", 11, "bold"),
+                     bg=SURFACE2, fg=TEXT, cursor="hand2").pack(anchor="w")
+            check = tk.Label(txt_col, text="", font=("Segoe UI", 9, "bold"),
+                              bg=SURFACE2, fg=OK, cursor="hand2")
+            check.pack(anchor="w")
+
+            def _refresh():
+                if self._lang_var.get() == code:
+                    outer._set_border(ACCENT)
+                    check.config(text="✓ Sélectionné" if code == "fr" else "✓ Selected")
+                else:
+                    outer._set_border(BORDER)
+                    check.config(text="")
+
+            def _select(_e=None):
+                self._lang_var.get()
+                self._lang_var.set(code)
+                self.cfg["lang"] = code
+                save_config(self.cfg)
+                lang_status.config(
+                    text=("✅ Langue enregistrée — relance l'app pour appliquer"
+                          if code == "fr"
+                          else "✅ Language saved — restart the app to apply"),
+                    fg=OK)
+                # Refresh all 3 buttons
+                for r in _refresh_all:
+                    r()
+
+            for w in (outer._cv, content, flag_lbl, txt_col, check) + tuple(txt_col.winfo_children()):
+                try: w.bind("<Button-1>", _select, add="+")
+                except: pass
+            return _refresh
+
+        _refresh_all = []
+        _refresh_all.append(_make_lang_btn("fr", "🇫🇷", "Français"))
+        _refresh_all.append(_make_lang_btn("en", "🇬🇧", "English"))
+
+        lang_status = tk.Label(app_pan, text="", font=("Segoe UI", 9),
+                                bg=CARD, fg=TEXT2)
+        lang_status.pack(anchor="w", pady=(12, 0))
+
+        # Initial render
+        for r in _refresh_all:
+            r()
 
         # --- Notifications panel ---
         notif = self._settings_panels["Notifications"][1]
