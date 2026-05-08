@@ -737,12 +737,11 @@ def scrape_ig_by_session(username: str, sessionid: str) -> dict:
         from instagrapi import Client
         cl = Client()
         cl.login_by_sessionid(sessionid)
-        # Force private mobile API (i.instagram.com) — avoids 401 on web GraphQL
-        uid = cl.user_id_from_username(username)
-        u = cl.user_info(uid)
+        # account_info() uses /accounts/current_user/ — pure private API, no web GraphQL
+        u = cl.account_info()
         videos = []
         try:
-            for m in cl.user_medias(u.pk, amount=20):
+            for m in cl.user_medias(cl.user_id, amount=20):
                 views = getattr(m, "view_count", 0) or getattr(m, "play_count", 0) or 0
                 videos.append({
                     "id":       m.code,
