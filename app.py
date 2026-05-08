@@ -3686,32 +3686,53 @@ class App:
             def _is_ok(raw):
                 return raw.get("status") == "ok" or "comments" in raw
 
-            # Try 1 — www.instagram.com (web session, more permissive)
+            import httpx as _httpx
+
+            # Step 1: get csrftoken from Instagram home (required for API calls)
+            csrf = ""
+            try:
+                init_r = _httpx.get(
+                    "https://www.instagram.com/",
+                    headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                             "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"},
+                    cookies={"sessionid": sid},
+                    follow_redirects=True,
+                    timeout=10,
+                )
+                csrf = init_r.cookies.get("csrftoken", "")
+            except Exception:
+                pass
+
             web_headers = {
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
                               "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
                 "X-IG-App-ID": "936619743392459",
+                "X-CSRFToken": csrf,
                 "X-Requested-With": "XMLHttpRequest",
-                "Referer": "https://www.instagram.com/",
-                "Accept": "*/*",
+                "Referer": f"https://www.instagram.com/",
+                "Accept": "application/json, text/plain, */*",
+                "Accept-Language": "en-US,en;q=0.9",
             }
+            web_cookies = {"sessionid": sid}
+            if csrf:
+                web_cookies["csrftoken"] = csrf
+
+            # Try 1 — www.instagram.com web API
             try:
-                import httpx as _httpx
                 with _httpx.Client(
                     headers=web_headers,
-                    cookies={"sessionid": sid},
+                    cookies=web_cookies,
                     base_url="https://www.instagram.com",
-                    follow_redirects=True,
+                    follow_redirects=False,
                     timeout=15,
                 ) as wcl:
                     r = wcl.get(f"/api/v1/media/{clean_id}/comments/",
                                 params={"can_support_threading": "true", "count": "50"})
+                    if _log:
+                        self.root.after(0, lambda s=r.status_code, b=r.text[:80]:
+                            _log(f"📡 www HTTP {s} — {b}", "info"))
                     if r.status_code == 200:
                         raw = r.json()
-                        if _log:
-                            self.root.after(0, lambda raw=raw: _log(
-                                f"📡 www — clés: {list(raw.keys())} count: {raw.get('comment_count','?')}",
-                                "info"))
                         if _is_ok(raw):
                             out = _extract(raw)
                             nxt = raw.get("next_min_id") or raw.get("next_max_id")
@@ -3721,28 +3742,34 @@ class App:
                                                      "min_id": nxt, "count": "50"})
                                 if r2.status_code != 200:
                                     break
-                                raw2 = r2.json()
-                                pg = _extract(raw2)
+                                pg = _extract(r2.json())
                                 if not pg:
                                     break
                                 out.extend(pg)
-                                nxt = raw2.get("next_min_id") or raw2.get("next_max_id")
+                                nxt = r2.json().get("next_min_id") or r2.json().get("next_max_id")
                             return out
             except Exception as e1:
                 if _log:
-                    self.root.after(0, lambda e=e1: _log(f"⚠ www fallback error: {e}", "warn"))
+                    self.root.after(0, lambda e=e1: _log(f"⚠ www error: {e}", "warn"))
 
-            # Try 2 — i.instagram.com (mobile Android client)
+            # Try 2 — i.instagram.com mobile API (more headers)
+            mobile_extra = {
+                "X-IG-Capabilities": "3brTvwE=",
+                "X-IG-Connection-Type": "WIFI",
+                "X-CSRFToken": csrf,
+            }
             with _ig_session_client(sid) as cl:
+                cl.headers.update(mobile_extra)
+                if csrf:
+                    cl.cookies.set("csrftoken", csrf)
                 r = cl.get(f"/api/v1/media/{clean_id}/comments/",
                            params={"can_support_threading": "true", "count": "50"})
+                if _log:
+                    self.root.after(0, lambda s=r.status_code, b=r.text[:80]:
+                        _log(f"📡 i.ig HTTP {s} — {b}", "info"))
                 if r.status_code != 200:
                     raise RuntimeError(f"HTTP {r.status_code}: {r.text[:200]}")
                 raw = r.json()
-                if _log:
-                    self.root.after(0, lambda raw=raw: _log(
-                        f"📡 i.ig — clés: {list(raw.keys())} count: {raw.get('comment_count','?')}",
-                        "info"))
                 if not _is_ok(raw):
                     msg = raw.get("message", str(raw)[:120])
                     raise RuntimeError(f"Instagram: {msg}")
@@ -3754,12 +3781,11 @@ class App:
                                         "min_id": nxt, "count": "50"})
                     if r2.status_code != 200:
                         break
-                    raw2 = r2.json()
-                    pg = _extract(raw2)
+                    pg = _extract(r2.json())
                     if not pg:
                         break
                     out.extend(pg)
-                    nxt = raw2.get("next_min_id") or raw2.get("next_max_id")
+                    nxt = r2.json().get("next_min_id") or r2.json().get("next_max_id")
                 return out
 
         def _post_reply_api(sid, media_id, comment_text, replied_to_id):
