@@ -1247,8 +1247,20 @@ class App:
             self.tab_btns[key] = btn
             self._sidebar_indicators[key] = ind
 
+        def _coming_soon(parent, icon, label):
+            """Grayed-out 'coming soon' group row."""
+            outer = tk.Frame(parent, bg=SURFACE)
+            outer.pack(fill="x")
+            tk.Frame(outer, width=3, bg=MUTED).pack(side="left", fill="y")
+            inner = tk.Frame(outer, bg=SURFACE)
+            inner.pack(side="left", fill="x", expand=True, padx=10, pady=9)
+            tk.Label(inner, text=f"{icon}  {label}", font=("Segoe UI", 9, "bold"),
+                     bg=SURFACE, fg=MUTED).pack(side="left")
+            tk.Label(inner, text="Bientôt", font=("Segoe UI", 7, "bold"),
+                     bg=MUTED, fg=BG, padx=5, pady=1).pack(side="left", padx=(7, 0))
+
         # Standalone
-        _reg("phones",     "📱", "Téléphones")
+        _reg("phones", "📱", "Téléphones")
         tk.Frame(self.sidebar, height=1, bg=BORDER).pack(fill="x", pady=2)
 
         # INSTA BETA group
@@ -1257,15 +1269,28 @@ class App:
         grp_outer.pack(fill="x")
         self._insta_group_children = grp_children
 
-        _reg("stats",       "📊", "Stats",           grp_children, indent=True)
-        _reg("posting",     "🚀", "Posting",          grp_children, indent=True)
-        _reg("bank",        "🗂", "Banque vidéos",    grp_children, indent=True)
-        _reg("autocomment", "🤖", "Automatisation",   grp_children, indent=True)
-        _reg("tools",       "🔧", "Outils IA",        grp_children, indent=True)
+        _reg("stats",       "📊", "Stats",         grp_children, indent=True)
+        _reg("posting",     "🚀", "Posting",        grp_children, indent=True)
+        _reg("bank",        "🗂", "Banque vidéos",  grp_children, indent=True)
+        _reg("autocomment", "🤖", "Automatisation", grp_children, indent=True)
+        _reg("tools",       "🔧", "Outils IA",      grp_children, indent=True)
 
         tk.Frame(self.sidebar, height=1, bg=BORDER).pack(fill="x", pady=2)
-        _reg("automation",  "🎬", "Montage")
-        _reg("settings",    "⚙",  "Paramètres")
+
+        # Montage group
+        mont_outer, mont_children = self._make_sidebar_group(
+            self.sidebar, "🎬", "MONTAGE", col=WARN)
+        mont_outer.pack(fill="x")
+        _reg("automation", "✂", "Montage vidéo", mont_children, indent=True)
+
+        tk.Frame(self.sidebar, height=1, bg=BORDER).pack(fill="x", pady=2)
+
+        # Coming soon platforms
+        _coming_soon(self.sidebar, "𝕏", "Twitter")
+        _coming_soon(self.sidebar, "🧵", "Threads")
+
+        tk.Frame(self.sidebar, height=1, bg=BORDER).pack(fill="x", pady=2)
+        _reg("settings", "⚙", "Paramètres")
 
         # ── Sidebar: bottom ────────────────────────────────────────────────────
         tk.Frame(self.sidebar, bg=SURFACE).pack(fill="both", expand=True)
