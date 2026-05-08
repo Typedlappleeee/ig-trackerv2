@@ -3670,29 +3670,33 @@ class App:
             self._ac_log_box.see("end")
             self._ac_log_box.config(state="disabled")
 
-        def _fetch_comments_api(sid, media_id):
-            # Strip user-id suffix if present (e.g. "3412345_123456" → "3412345")
-            clean_id = media_id.split("_")[0] if "_" in str(media_id) else media_id
+        def _fetch_comments_api(sid, media_id, _log=None):
+            clean_id = str(media_id).split("_")[0]
+            if _log:
+                self.root.after(0, lambda: _log(f"🔎 media_id utilisé: {clean_id}", "info"))
             with _ig_session_client(sid) as cl:
-                # Try threaded endpoint first (works for Reels)
                 r = cl.get(f"/api/v1/media/{clean_id}/comments/",
                            params={"can_support_threading": "true",
                                    "permalink_enabled": "false",
                                    "count": "50"})
                 if r.status_code != 200:
-                    raise RuntimeError(f"HTTP {r.status_code}: {r.text[:200]}")
+                    raise RuntimeError(f"HTTP {r.status_code}: {r.text[:300]}")
                 raw = r.json()
-                # Instagram may return comments under several keys
-                comments_raw = (raw.get("comments")
-                                or raw.get("comment_list")
-                                or raw.get("data", {}).get("comments")
-                                or [])
-                out = []
-                for c in comments_raw:
-                    out.append(c)
-                    for ch in (c.get("child_comment_list") or []):
-                        out.append(ch)
-                # Handle pagination
+                if _log:
+                    keys = list(raw.keys())
+                    cnt = raw.get("comment_count", "?")
+                    self.root.after(0, lambda: _log(
+                        f"📡 Réponse API — clés: {keys} — comment_count: {cnt}", "info"))
+
+                def _extract(obj):
+                    out = []
+                    for c in (obj.get("comments") or obj.get("comment_list") or []):
+                        out.append(c)
+                        for ch in (c.get("child_comment_list") or []):
+                            out.append(ch)
+                    return out
+
+                out = _extract(raw)
                 next_id = raw.get("next_min_id") or raw.get("next_max_id")
                 while next_id and len(out) < 200:
                     r2 = cl.get(f"/api/v1/media/{clean_id}/comments/",
@@ -3701,13 +3705,10 @@ class App:
                     if r2.status_code != 200:
                         break
                     raw2 = r2.json()
-                    page = (raw2.get("comments") or raw2.get("comment_list") or [])
+                    page = _extract(raw2)
                     if not page:
                         break
-                    for c in page:
-                        out.append(c)
-                        for ch in (c.get("child_comment_list") or []):
-                            out.append(ch)
+                    out.extend(page)
                     next_id = raw2.get("next_min_id") or raw2.get("next_max_id")
                 return out
 
@@ -3775,7 +3776,8 @@ class App:
                         items = r.json().get("items", [])
                     media = []
                     for it in items:
-                        mid = it.get("id", "")
+                        # pk is the clean numeric ID, id may include _ownerid suffix
+                        mid = str(it.get("pk") or it.get("id", "")).split("_")[0]
                         code = it.get("code") or it.get("shortcode", "")
                         taken = it.get("taken_at", 0)
                         from datetime import datetime as _dt
@@ -3834,7 +3836,7 @@ class App:
 
             def _fetch_com():
                 try:
-                    comments = _fetch_comments_api(sid, media_id)
+                    comments = _fetch_comments_api(sid, media_id, _log=_ac_log)
                     lv = "ok" if comments else "warn"
                     msg = (f"✅ {len(comments)} commentaire(s) chargé(s)"
                            if comments else
@@ -3878,7 +3880,7 @@ class App:
             while not self._ac_stop_flag[0]:
                 self.root.after(0, lambda: _ac_log("🔍 Récupération des commentaires…", "info"))
                 try:
-                    comments = _fetch_comments_api(sid, media_id)
+                    comments = _fetch_comments_api(sid, media_id, _log=_ac_log)
                     self.root.after(0, lambda n=len(comments):
                         _ac_log(f"📋 {n} commentaire(s) trouvé(s)", "info"))
 
