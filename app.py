@@ -3625,6 +3625,9 @@ class App:
         self._ac_com_count_lbl = tk.Label(hdr_m, text="", font=("Segoe UI", 8),
                                            bg=BG, fg=MUTED)
         self._ac_com_count_lbl.pack(side="right")
+        tk.Button(hdr_m, text="⟳", font=("Segoe UI", 9), bg=SURFACE2, fg=TEXT2,
+                  relief="flat", cursor="hand2", padx=6, pady=2,
+                  command=lambda: _on_vid_select()).pack(side="right", padx=(0, 4))
 
         com_frame = tk.Frame(mid, bg=SURFACE, highlightthickness=1,
                              highlightbackground=BORDER)
@@ -3668,27 +3671,54 @@ class App:
             self._ac_log_box.config(state="disabled")
 
         def _fetch_comments_api(sid, media_id):
+            # Strip user-id suffix if present (e.g. "3412345_123456" → "3412345")
+            clean_id = media_id.split("_")[0] if "_" in str(media_id) else media_id
             with _ig_session_client(sid) as cl:
-                r = cl.get(f"/api/v1/media/{media_id}/comments/",
+                # Try threaded endpoint first (works for Reels)
+                r = cl.get(f"/api/v1/media/{clean_id}/comments/",
                            params={"can_support_threading": "true",
-                                   "permalink_enabled": "false"})
+                                   "permalink_enabled": "false",
+                                   "count": "50"})
                 if r.status_code != 200:
-                    raise RuntimeError(f"HTTP {r.status_code}: {r.text[:120]}")
+                    raise RuntimeError(f"HTTP {r.status_code}: {r.text[:200]}")
                 raw = r.json()
+                # Instagram may return comments under several keys
+                comments_raw = (raw.get("comments")
+                                or raw.get("comment_list")
+                                or raw.get("data", {}).get("comments")
+                                or [])
                 out = []
-                for c in raw.get("comments", []):
+                for c in comments_raw:
                     out.append(c)
-                    for ch in c.get("child_comment_list", []):
+                    for ch in (c.get("child_comment_list") or []):
                         out.append(ch)
+                # Handle pagination
+                next_id = raw.get("next_min_id") or raw.get("next_max_id")
+                while next_id and len(out) < 200:
+                    r2 = cl.get(f"/api/v1/media/{clean_id}/comments/",
+                                params={"can_support_threading": "true",
+                                        "min_id": next_id, "count": "50"})
+                    if r2.status_code != 200:
+                        break
+                    raw2 = r2.json()
+                    page = (raw2.get("comments") or raw2.get("comment_list") or [])
+                    if not page:
+                        break
+                    for c in page:
+                        out.append(c)
+                        for ch in (c.get("child_comment_list") or []):
+                            out.append(ch)
+                    next_id = raw2.get("next_min_id") or raw2.get("next_max_id")
                 return out
 
         def _post_reply_api(sid, media_id, comment_text, replied_to_id):
+            clean_id = media_id.split("_")[0] if "_" in str(media_id) else media_id
             payload = {"comment_text": comment_text,
                        "replied_to_comment_id": replied_to_id}
             with _ig_session_client(sid) as cl:
-                r = cl.post(f"/api/v1/media/{media_id}/comments/", data=payload)
+                r = cl.post(f"/api/v1/media/{clean_id}/comments/", data=payload)
                 if r.status_code not in (200, 201):
-                    raise RuntimeError(f"HTTP {r.status_code}: {r.text[:120]}")
+                    raise RuntimeError(f"HTTP {r.status_code}: {r.text[:200]}")
                 return r.json()
 
         def _show_comments_in_panel(comments, replied_ids):
@@ -3805,9 +3835,13 @@ class App:
             def _fetch_com():
                 try:
                     comments = _fetch_comments_api(sid, media_id)
-                    self.root.after(0, lambda c=comments, r=replied_ids:
-                        [_show_comments_in_panel(c, r),
-                         _ac_log(f"✅ {len(c)} commentaire(s) chargé(s)", "ok")])
+                    lv = "ok" if comments else "warn"
+                    msg = (f"✅ {len(comments)} commentaire(s) chargé(s)"
+                           if comments else
+                           "⚠ 0 commentaire — la vidéo n'en a peut-être pas encore, "
+                           "ou le compte qui a commenté est le même que le compte cible")
+                    self.root.after(0, lambda c=comments, r=replied_ids, m=msg, lv=lv:
+                        [_show_comments_in_panel(c, r), _ac_log(m, lv)])
                 except Exception as e:
                     self.root.after(0, lambda e=e: [
                         _ac_log(f"❌ Erreur commentaires: {e}", "error"),
