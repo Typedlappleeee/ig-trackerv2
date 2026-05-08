@@ -1114,6 +1114,7 @@ class App:
         for k, lbl in [("phones",     "📱  Téléphones"),
                         ("stats",      "📊  Stats Instagram"),
                         ("automation", "🎬  Automatisation"),
+                        ("posting",    "🚀  Posting"),
                         ("bank",       "🗂  Banque vidéos"),
                         ("tools",      "🔧  Outils IA"),
                         ("settings",   "⚙  Paramètres")]:
@@ -1154,6 +1155,7 @@ class App:
         self._build_phones_tab()
         self._build_stats_tab()
         self._build_automation_tab()
+        self._build_posting_tab()
         self._build_bank_tab()
         self._build_tools_tab()
         self._build_settings_tab()
@@ -1386,11 +1388,28 @@ class App:
             v.pack(anchor="w")
             self.kpis[k] = v
 
-        tk.Label(right, text="VIDÉOS", font=("Consolas", 8, "bold"),
-                 bg=BG, fg=MUTED).pack(anchor="w", pady=(0, 6))
+        # Video filter bar
+        vfbar = tk.Frame(right, bg=BG)
+        vfbar.pack(fill="x", pady=(0, 4))
+        tk.Label(vfbar, text="VIDÉOS", font=("Consolas", 8, "bold"),
+                 bg=BG, fg=MUTED).pack(side="left")
+        tk.Label(vfbar, text="Trier :", font=("Segoe UI", 9),
+                 bg=BG, fg=TEXT2).pack(side="left", padx=(12, 4))
+        self._vid_sort_var = tk.StringVar(value="recent")
+        sort_opts = [("recent", "Plus récent"), ("old", "Plus ancien"),
+                     ("views_desc", "+ de vues"), ("views_asc", "- de vues"),
+                     ("likes_desc", "+ de likes")]
+        sort_cb = ttk.Combobox(vfbar, textvariable=self._vid_sort_var,
+                               state="readonly", width=14, font=("Segoe UI", 9))
+        sort_cb["values"] = [lbl for _, lbl in sort_opts]
+        self._vid_sort_keys = {lbl: key for key, lbl in sort_opts}
+        sort_cb.pack(side="left")
+        sort_cb.bind("<<ComboboxSelected>>",
+                     lambda e: self._refresh_vid_tree())
+
         vcols = ("id", "views", "likes", "comments", "caption")
         self.vid_tree = ttk.Treeview(right, columns=vcols, show="headings",
-                                      style="Vid.Treeview", height=14)
+                                      style="Vid.Treeview", height=13)
         for col, head, w, anch in [
             ("id",       "Shortcode",  120, "center"),
             ("views",    "Vues",       90,  "center"),
@@ -1404,6 +1423,8 @@ class App:
         self.vid_tree.configure(yscrollcommand=vsb2.set)
         self.vid_tree.pack(side="left", fill="both", expand=True)
         vsb2.pack(side="right", fill="y")
+        self.vid_tree.bind("<<TreeviewSelect>>", self._on_vid_tree_sel)
+        self._current_vid_pid = [None]
 
     def _on_ig_list_sel(self):
         sel = self.ig_list.curselection()
@@ -1431,15 +1452,45 @@ class App:
         self.kpis["posts"].config(text=str(d.get("posts_count", 0)))
         self.kpis["views"].config(
             text=fmt(sum(v.get("views", 0) for v in d.get("videos", []))))
+        self._current_vid_pid[0] = pid
+        self._refresh_vid_tree()
+
+    def _refresh_vid_tree(self):
+        pid = self._current_vid_pid[0] if hasattr(self, '_current_vid_pid') else None
+        if not pid:
+            return
+        d = self.data.get(pid, {})
+        videos = list(d.get("videos", []))
+        sort_lbl = getattr(self, '_vid_sort_var', None)
+        sort_key = self._vid_sort_keys.get(sort_lbl.get(), "recent") if sort_lbl else "recent"
+        if sort_key == "recent":
+            pass  # keep original order (API returns newest first)
+        elif sort_key == "old":
+            videos = list(reversed(videos))
+        elif sort_key == "views_desc":
+            videos.sort(key=lambda v: v.get("views", 0), reverse=True)
+        elif sort_key == "views_asc":
+            videos.sort(key=lambda v: v.get("views", 0))
+        elif sort_key == "likes_desc":
+            videos.sort(key=lambda v: v.get("likes", 0), reverse=True)
         self.vid_tree.delete(*self.vid_tree.get_children())
-        for v in d.get("videos", []):
-            self.vid_tree.insert("", "end", values=(
+        for v in videos:
+            self.vid_tree.insert("", "end", iid=v.get("id", ""), values=(
                 v.get("id", ""),
                 fmt(v.get("views", 0)),
                 fmt(v.get("likes", 0)),
                 fmt(v.get("comments", 0)),
                 v.get("caption", ""),
             ))
+
+    def _on_vid_tree_sel(self, e=None):
+        sel = self.vid_tree.selection()
+        if not sel:
+            return
+        shortcode = sel[0]
+        url = f"https://www.instagram.com/reel/{shortcode}/"
+        import webbrowser
+        webbrowser.open(url)
 
     # ══════════════════════════════════════════════════════════════════════════
     # HELPERS ACCORDION + PANNEAU SCROLLABLE
@@ -2707,7 +2758,6 @@ class App:
                         "description": caption,
                         "video":       [resource_url],
                         "scheduleAt":  post_at,
-                        "aiTag":       True,
                     },
                     headers=api_hdrs, timeout=30, follow_redirects=False)
                 rj = r.json()
@@ -2770,12 +2820,227 @@ class App:
                 name = self.data.get(pid, {}).get("phone_name", pid)
                 log_fn(f"⏳ {name} — tâche toujours en cours (vérifie GéeLark)", "warn")
 
+        # Stop all phones that were started
+        log_fn("📴 Arrêt des téléphones...", "info")
+        try:
+            httpx.post("https://openapi.geelark.com/open/v1/phone/stop",
+                       json={"ids": selected},
+                       headers=api_hdrs, timeout=15, follow_redirects=False)
+            log_fn("✅ Téléphones éteints", "ok")
+        except Exception as e:
+            log_fn(f"⚠ Impossible d'éteindre les téléphones: {e}", "warn")
+
         log_fn("Terminé ✓", "ok")
         if done_cb:
             try:
                 self.root.after(0, done_cb)
             except Exception:
                 pass
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # ONGLET POSTING PERMANENT
+    # ══════════════════════════════════════════════════════════════════════════
+    def _build_posting_tab(self):
+        import random as _random
+        f = tk.Frame(self.tab_container, bg=BG)
+        self.tabs["posting"] = f
+
+        tk.Label(f, text="🚀  Posting", font=("Segoe UI", 14, "bold"),
+                 bg=BG, fg=ACCENT).pack(anchor="w", padx=20, pady=(16, 0))
+
+        main = tk.Frame(f, bg=BG)
+        main.pack(fill="both", expand=True, padx=20, pady=10)
+
+        # ── LEFT: video picker + phone selector ──────────────────────────────
+        left = tk.Frame(main, bg=BG, width=320)
+        left.pack(side="left", fill="y")
+        left.pack_propagate(False)
+
+        # Video selection
+        tk.Label(left, text="Vidéo à poster", font=("Segoe UI", 10, "bold"),
+                 bg=BG, fg=TEXT2).pack(anchor="w")
+        vid_row = tk.Frame(left, bg=BG)
+        vid_row.pack(fill="x", pady=(4, 0))
+        self.post_vid_lbl = tk.Label(vid_row, text="Aucune vidéo sélectionnée",
+                                     font=("Segoe UI", 9), bg=SURFACE2, fg=MUTED,
+                                     anchor="w", padx=8, pady=6)
+        self.post_vid_lbl.pack(side="left", fill="x", expand=True)
+        self.post_vid_path = [None]
+
+        def _pick_video():
+            from tkinter import filedialog
+            p = filedialog.askopenfilename(
+                filetypes=[("Vidéo", "*.mp4 *.mov *.avi *.mkv"), ("Tous", "*.*")])
+            if p:
+                self.post_vid_path[0] = p
+                self.post_vid_lbl.config(text=Path(p).name, fg=TEXT)
+        tk.Button(vid_row, text="📂", font=("Segoe UI", 10), bg=SURFACE2, fg=TEXT2,
+                  relief="flat", cursor="hand2", padx=8, pady=4,
+                  command=_pick_video).pack(side="right")
+
+        # Phone list
+        tk.Label(left, text="Comptes cibles", font=("Segoe UI", 10, "bold"),
+                 bg=BG, fg=TEXT2).pack(anchor="w", pady=(12, 0))
+        grp_row = tk.Frame(left, bg=BG)
+        grp_row.pack(fill="x", pady=(4, 0))
+        tk.Label(grp_row, text="Groupe :", font=("Segoe UI", 9),
+                 bg=BG, fg=TEXT2).pack(side="left")
+        self._post_grp_var = tk.StringVar(value="Tous")
+        self._post_grp_cb  = ttk.Combobox(grp_row, textvariable=self._post_grp_var,
+                                           state="readonly", width=14, font=("Segoe UI", 9))
+        self._post_grp_cb.pack(side="left", padx=(4, 0))
+
+        phone_frame = tk.Frame(left, bg=SURFACE, highlightthickness=1,
+                               highlightbackground=BORDER)
+        phone_frame.pack(fill="both", expand=True, pady=(6, 0))
+        cv_p    = tk.Canvas(phone_frame, bg=SURFACE, highlightthickness=0)
+        sv_p    = ttk.Scrollbar(phone_frame, orient="vertical", command=cv_p.yview)
+        inn_p   = tk.Frame(cv_p, bg=SURFACE)
+        wid_p   = cv_p.create_window((0, 0), window=inn_p, anchor="nw")
+        inn_p.bind("<Configure>", lambda e: cv_p.configure(scrollregion=cv_p.bbox("all")))
+        cv_p.bind("<Configure>",  lambda e: cv_p.itemconfig(wid_p, width=e.width))
+        cv_p.configure(yscrollcommand=sv_p.set)
+        sv_p.pack(side="right", fill="y")
+        cv_p.pack(side="left", fill="both", expand=True)
+
+        self._post_pvars = {}
+
+        def _populate_phones(g="Tous"):
+            for w in inn_p.winfo_children():
+                w.destroy()
+            self._post_pvars.clear()
+            groups = set(d.get("group_name", "") for d in self.data.values() if d.get("group_name"))
+            self._post_grp_cb["values"] = ["Tous"] + sorted(groups)
+            for pid, d in sorted(self.data.items(),
+                                  key=lambda x: int(x[1].get("serial_no") or 0)):
+                name = d.get("phone_name") or d.get("ig_username") or ""
+                if not name:
+                    continue
+                if g != "Tous" and d.get("group_name", "") != g:
+                    continue
+                var = tk.BooleanVar()
+                self._post_pvars[pid] = var
+                row = tk.Frame(inn_p, bg=SURFACE)
+                row.pack(fill="x", padx=6, pady=2)
+                tk.Checkbutton(row, variable=var, bg=SURFACE,
+                               activebackground=SURFACE, selectcolor=SURFACE2,
+                               cursor="hand2").pack(side="left")
+                ig  = d.get("ig_username", "")
+                lbl = f"{d.get('phone_name', pid)}"
+                if ig:
+                    lbl += f"  @{ig}"
+                tk.Label(row, text=lbl, font=("Segoe UI", 9), bg=SURFACE,
+                         fg=OK if ig else MUTED, anchor="w",
+                         cursor="hand2").pack(side="left", padx=4)
+                row.bind("<Button-1>", lambda e, v=var: v.set(not v.get()))
+            if not self._post_pvars:
+                tk.Label(inn_p, text="Aucun téléphone.\nAjoute un Bearer Token\ndans Paramètres.",
+                         font=("Segoe UI", 9), bg=SURFACE, fg=MUTED, justify="center").pack(pady=20)
+
+        self._post_populate_phones = _populate_phones
+        _populate_phones()
+        self._post_grp_cb.bind("<<ComboboxSelected>>",
+                               lambda e: _populate_phones(self._post_grp_var.get()))
+
+        sel_row2 = tk.Frame(left, bg=BG)
+        sel_row2.pack(fill="x", pady=(4, 0))
+        tk.Button(sel_row2, text="Tout", font=("Segoe UI", 8), bg=SURFACE2, fg=TEXT2,
+                  relief="flat", cursor="hand2", padx=6, pady=2,
+                  command=lambda: [v.set(True) for v in self._post_pvars.values()]).pack(side="left")
+        tk.Button(sel_row2, text="Aucun", font=("Segoe UI", 8), bg=SURFACE2, fg=TEXT2,
+                  relief="flat", cursor="hand2", padx=6, pady=2,
+                  command=lambda: [v.set(False) for v in self._post_pvars.values()]).pack(side="left", padx=4)
+
+        # ── RIGHT: caption + options + log ──────────────────────────────────
+        right = tk.Frame(main, bg=BG)
+        right.pack(side="left", fill="both", expand=True, padx=(16, 0))
+
+        tk.Label(right, text="Caption", font=("Segoe UI", 10, "bold"),
+                 bg=BG, fg=TEXT2).pack(anchor="w")
+        tk.Label(right, text="Ctrl+A pour tout sélectionner · Ctrl+V pour coller",
+                 font=("Segoe UI", 8), bg=BG, fg=MUTED).pack(anchor="w")
+        self.post_caption_box = tk.Text(right, bg=SURFACE, fg=TEXT, font=("Segoe UI", 11),
+                                        relief="flat", height=8, wrap="word",
+                                        insertbackground=TEXT, padx=10, pady=8,
+                                        highlightthickness=1, highlightbackground=BORDER,
+                                        highlightcolor=ACCENT)
+        self.post_caption_box.pack(fill="x", pady=(4, 0))
+
+        # Char counter
+        self.post_char_lbl = tk.Label(right, text="0 / 2200",
+                                      font=("Segoe UI", 8), bg=BG, fg=MUTED, anchor="e")
+        self.post_char_lbl.pack(fill="x")
+
+        def _update_char(*_):
+            n = len(self.post_caption_box.get("1.0", "end").strip())
+            self.post_char_lbl.config(text=f"{n} / 2200",
+                                       fg=DANGER if n > 2200 else MUTED)
+        self.post_caption_box.bind("<KeyRelease>", _update_char)
+
+        # Schedule row
+        sched_f = tk.Frame(right, bg=SURFACE, highlightthickness=1,
+                           highlightbackground=BORDER)
+        sched_f.pack(fill="x", pady=(10, 0))
+        sched_inner = tk.Frame(sched_f, bg=SURFACE)
+        sched_inner.pack(fill="x", padx=12, pady=8)
+        tk.Label(sched_inner, text="Délai entre comptes :",
+                 font=("Segoe UI", 9), bg=SURFACE, fg=TEXT2).pack(side="left")
+        self.post_stagger_var = tk.IntVar(value=5)
+        tk.Spinbox(sched_inner, from_=0, to=120, textvariable=self.post_stagger_var,
+                   font=("Segoe UI", 9), bg=SURFACE2, fg=TEXT, width=4,
+                   relief="flat", buttonbackground=SURFACE2).pack(side="left", padx=6)
+        tk.Label(sched_inner, text="min entre chaque compte",
+                 font=("Segoe UI", 9), bg=SURFACE, fg=MUTED).pack(side="left")
+
+        # Log
+        self.post_log_box = scrolledtext.ScrolledText(
+            right, bg=SURFACE, fg=TEXT2, font=("Consolas", 9),
+            relief="flat", state="disabled", wrap="word", height=10)
+        self.post_log_box.pack(fill="both", expand=True, pady=(10, 8))
+
+        def _plog(msg, lv="info"):
+            colors = {"info": TEXT2, "ok": OK, "warn": WARN, "error": DANGER, "accent": ACCENT}
+            self.post_log_box.config(state="normal")
+            ts = datetime.now().strftime("%H:%M:%S")
+            self.post_log_box.insert("end", f"[{ts}] {msg}\n", lv)
+            self.post_log_box.tag_config(lv, foreground=colors.get(lv, TEXT2))
+            self.post_log_box.see("end")
+            self.post_log_box.config(state="disabled")
+
+        self.post_launch_btn = tk.Button(
+            right, text="🚀  Lancer le posting",
+            font=("Segoe UI", 12, "bold"), bg=ACCENT, fg="#06080f",
+            relief="flat", cursor="hand2", pady=10)
+        self.post_launch_btn.pack(fill="x")
+
+        def _do_post():
+            sel = [pid for pid, v in self._post_pvars.items() if v.get()]
+            if not sel:
+                _plog("⚠ Sélectionne au moins un téléphone", "warn")
+                return
+            vpath = self.post_vid_path[0]
+            if not vpath or not Path(vpath).exists():
+                _plog("⚠ Sélectionne une vidéo d'abord (bouton 📂)", "warn")
+                return
+            cap = self.post_caption_box.get("1.0", "end").strip()
+            if not cap:
+                _plog("⚠ La caption est obligatoire pour GéeLark", "warn")
+                return
+            bearer = self.cfg.get("bearer_token", "")
+            if not bearer:
+                _plog("❌ Bearer Token GéeLark manquant — va dans Paramètres", "error")
+                return
+            stagger = self.post_stagger_var.get()
+            self.post_launch_btn.config(state="disabled", text="⏳ En cours...")
+            def _done():
+                if self.post_launch_btn.winfo_exists():
+                    self.post_launch_btn.config(state="normal", text="🚀  Lancer le posting")
+            threading.Thread(
+                target=self._upload_and_post,
+                args=(sel, bearer, cap, vpath, _plog, stagger, _done),
+                daemon=True).start()
+
+        self.post_launch_btn.config(command=_do_post)
 
     # ══════════════════════════════════════════════════════════════════════════
     # ONGLET BANQUE
