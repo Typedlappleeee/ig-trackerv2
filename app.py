@@ -3506,38 +3506,36 @@ class App:
 
         tk.Label(f, text="🤖  Automatisation", font=("Segoe UI", 14, "bold"),
                  bg=BG, fg=ACCENT).pack(anchor="w", padx=20, pady=(16, 0))
-        tk.Label(f, text="Choisir un compte → charger les vidéos → choisir une vidéo → réponse auto aux commentaires via Groq",
+        tk.Label(f, text="Compte → Vidéo → Commentaires → Réponse auto via Groq",
                  font=("Segoe UI", 9), bg=BG, fg=MUTED).pack(anchor="w", padx=20, pady=(2, 8))
 
         main = tk.Frame(f, bg=BG)
         main.pack(fill="both", expand=True, padx=20, pady=(0, 10))
 
-        # ═══ COLONNE GAUCHE (sélection compte + vidéo + config) ═══════════════
-        left = tk.Frame(main, bg=BG, width=310)
+        # ═══ COLONNE GAUCHE : sélections + config ════════════════════════════
+        left = tk.Frame(main, bg=BG, width=290)
         left.pack(side="left", fill="y")
         left.pack_propagate(False)
 
-        # ── 1. Compte ──────────────────────────────────────────────────────────
-        tk.Label(left, text="1. Compte Instagram", font=("Segoe UI", 9, "bold"),
+        # 1. Compte
+        tk.Label(left, text="1. Compte", font=("Segoe UI", 9, "bold"),
                  bg=BG, fg=TEXT2).pack(anchor="w")
         self._ac_acc_var = tk.StringVar()
-        self._ac_acc_map = {}  # "@username" → (pid, d)
+        self._ac_acc_map = {}
         self._ac_acc_cb = ttk.Combobox(left, textvariable=self._ac_acc_var,
                                         state="readonly", font=("Segoe UI", 9))
-        self._ac_acc_cb.pack(fill="x", pady=(4, 6))
+        self._ac_acc_cb.pack(fill="x", pady=(3, 6))
 
         def _refresh_accounts():
             self._ac_acc_map.clear()
             for pid, d in sorted(self.data.items(),
                                   key=lambda x: int(x[1].get("serial_no") or 0)):
-                ig = d.get("ig_username", "")
-                if not ig:
-                    ig = d.get("phone_name", "")
+                ig = d.get("ig_username") or d.get("phone_name") or ""
                 if not ig:
                     continue
                 sid = d.get("ig_sessionid", "").strip()
                 icon = "🟢" if sid else "🔴"
-                label = f"{icon} @{ig}" if ig.startswith("@") is False else f"{icon} {ig}"
+                label = f"{icon} @{ig}".replace("@@", "@")
                 self._ac_acc_map[label] = (pid, d)
             self._ac_acc_cb["values"] = list(self._ac_acc_map.keys())
             if self._ac_acc_map and not self._ac_acc_var.get():
@@ -3545,128 +3543,58 @@ class App:
 
         _refresh_accounts()
 
-        # ── 2. Vidéos du compte ────────────────────────────────────────────────
+        # 2. Vidéos
         hdr2 = tk.Frame(left, bg=BG)
-        hdr2.pack(fill="x", pady=(6, 0))
+        hdr2.pack(fill="x")
         tk.Label(hdr2, text="2. Vidéo cible", font=("Segoe UI", 9, "bold"),
                  bg=BG, fg=TEXT2).pack(side="left")
         load_vid_btn = tk.Button(hdr2, text="⟳ Charger", font=("Segoe UI", 8),
-                                  bg=SURFACE2, fg=TEXT2, relief="flat", cursor="hand2",
-                                  padx=6, pady=2)
+                                  bg=SURFACE2, fg=TEXT2, relief="flat",
+                                  cursor="hand2", padx=6, pady=2)
         load_vid_btn.pack(side="right")
 
         vid_frame = tk.Frame(left, bg=SURFACE, highlightthickness=1,
-                             highlightbackground=BORDER, height=130)
-        vid_frame.pack(fill="x", pady=(4, 6))
+                             highlightbackground=BORDER, height=120)
+        vid_frame.pack(fill="x", pady=(3, 6))
         vid_frame.pack_propagate(False)
-
         self._ac_vid_lb = tk.Listbox(vid_frame, bg=SURFACE, fg=TEXT,
-                                     font=("Segoe UI", 9), relief="flat",
+                                     font=("Segoe UI", 8), relief="flat",
                                      selectbackground=ACCENT, selectforeground="#06080f",
                                      activestyle="none", cursor="hand2")
-        vsb_vid = ttk.Scrollbar(vid_frame, orient="vertical", command=self._ac_vid_lb.yview)
-        self._ac_vid_lb.configure(yscrollcommand=vsb_vid.set)
-        vsb_vid.pack(side="right", fill="y")
+        vsb_v = ttk.Scrollbar(vid_frame, orient="vertical", command=self._ac_vid_lb.yview)
+        self._ac_vid_lb.configure(yscrollcommand=vsb_v.set)
+        vsb_v.pack(side="right", fill="y")
         self._ac_vid_lb.pack(side="left", fill="both", expand=True)
+        self._ac_media_items = []
 
-        # media_id stored parallel to listbox items
-        self._ac_media_items = []  # list of (display, media_id, shortcode)
-
-        def _load_videos():
-            key = self._ac_acc_var.get()
-            if not key or key not in self._ac_acc_map:
-                _ac_log("⚠ Sélectionne un compte d'abord", "warn")
-                return
-            _, d = self._ac_acc_map[key]
-            sid = d.get("ig_sessionid", "").strip()
-            uid = str(d.get("ig_user_id") or d.get("user_id") or "")
-            ig = d.get("ig_username", "")
-            if not sid:
-                _ac_log("❌ Ce compte n'a pas de Session ID — ajoute-le dans Paramètres", "error")
-                return
-
-            self._ac_vid_lb.delete(0, "end")
-            self._ac_media_items.clear()
-            self._ac_vid_lb.insert("end", "⏳ Chargement...")
-            load_vid_btn.config(state="disabled")
-
-            def _fetch():
-                nonlocal uid
-                try:
-                    with _ig_session_client(sid) as cl:
-                        if not uid:
-                            r = cl.get("/api/v1/accounts/current_user/", params={"edit": "false"})
-                            u = r.json().get("user", {})
-                            uid = str(u.get("pk") or u.get("id") or "")
-                        r = cl.get(f"/api/v1/feed/user/{uid}/", params={"count": "12"})
-                        items = r.json().get("items", [])
-                    media = []
-                    for it in items:
-                        mid = it.get("id", "")
-                        code = it.get("code") or it.get("shortcode", "")
-                        taken = it.get("taken_at", 0)
-                        from datetime import datetime as _dt
-                        date_s = _dt.fromtimestamp(taken).strftime("%d/%m %H:%M") if taken else "?"
-                        kind = "🎥" if it.get("media_type") in (2, "2") else "🖼"
-                        caption_text = ""
-                        cap_node = it.get("caption") or {}
-                        if isinstance(cap_node, dict):
-                            caption_text = (cap_node.get("text") or "")[:30]
-                        display = f"{kind} {date_s}  {caption_text}"
-                        media.append((display, mid, code))
-                    self.root.after(0, lambda m=media: _show_videos(m))
-                except Exception as e:
-                    self.root.after(0, lambda e=e: (
-                        self._ac_vid_lb.delete(0, "end"),
-                        self._ac_vid_lb.insert("end", f"❌ {e}"),
-                        load_vid_btn.config(state="normal")))
-
-            def _show_videos(media):
-                self._ac_vid_lb.delete(0, "end")
-                self._ac_media_items.clear()
-                if not media:
-                    self._ac_vid_lb.insert("end", "Aucune vidéo trouvée")
-                    load_vid_btn.config(state="normal")
-                    return
-                for display, mid, code in media:
-                    self._ac_vid_lb.insert("end", display)
-                    self._ac_media_items.append((display, mid, code))
-                load_vid_btn.config(state="normal")
-                _ac_log(f"✅ {len(media)} vidéo(s) chargée(s) pour {key}", "ok")
-
-            threading.Thread(target=_fetch, daemon=True).start()
-
-        load_vid_btn.config(command=_load_videos)
-
-        # ── 3. Config Groq ─────────────────────────────────────────────────────
+        # 3. Clé Groq
         tk.Label(left, text="3. Clé API Groq", font=("Segoe UI", 9, "bold"),
-                 bg=BG, fg=TEXT2).pack(anchor="w", pady=(6, 0))
+                 bg=BG, fg=TEXT2).pack(anchor="w")
         groq_row = tk.Frame(left, bg=BG)
-        groq_row.pack(fill="x", pady=(4, 4))
+        groq_row.pack(fill="x", pady=(3, 6))
         self._ac_groq_var = tk.StringVar(value=self.cfg.get("groq_api_key", ""))
-        groq_e = tk.Entry(groq_row, textvariable=self._ac_groq_var,
-                          bg=SURFACE, fg=TEXT, font=("Segoe UI", 9),
-                          relief="flat", show="•", insertbackground=TEXT)
+        groq_e = tk.Entry(groq_row, textvariable=self._ac_groq_var, bg=SURFACE, fg=TEXT,
+                          font=("Segoe UI", 9), relief="flat", show="•",
+                          insertbackground=TEXT)
         groq_e.pack(side="left", fill="x", expand=True, ipady=5, padx=(0, 4))
         tk.Button(groq_row, text="👁", font=("Segoe UI", 9), bg=SURFACE2, fg=TEXT2,
-                  relief="flat", cursor="hand2", padx=6, pady=4,
+                  relief="flat", cursor="hand2", padx=6, pady=3,
                   command=lambda: groq_e.config(
                       show="" if groq_e.cget("show") == "•" else "•")).pack(side="right")
 
-        # ── 4. Persona ─────────────────────────────────────────────────────────
-        tk.Label(left, text="4. Persona (instructions Groq)", font=("Segoe UI", 9, "bold"),
-                 bg=BG, fg=TEXT2).pack(anchor="w", pady=(6, 0))
-        self._ac_persona_box = tk.Text(left, bg=SURFACE, fg=TEXT, font=("Segoe UI", 9),
+        # 4. Persona
+        tk.Label(left, text="4. Persona Groq", font=("Segoe UI", 9, "bold"),
+                 bg=BG, fg=TEXT2).pack(anchor="w")
+        self._ac_persona_box = tk.Text(left, bg=SURFACE, fg=TEXT, font=("Segoe UI", 8),
                                        relief="flat", height=4, wrap="word",
-                                       insertbackground=TEXT, padx=8, pady=6,
+                                       insertbackground=TEXT, padx=6, pady=5,
                                        highlightthickness=1, highlightbackground=BORDER)
-        self._ac_persona_box.pack(fill="x", pady=(4, 6))
+        self._ac_persona_box.pack(fill="x", pady=(3, 6))
         self._ac_persona_box.insert("1.0", self.cfg.get("ac_persona",
             "Tu es un créateur de contenu Instagram sympathique. "
-            "Réponds en français, de façon courte (1-2 phrases max), "
-            "chaleureuse et engageante."))
+            "Réponds en français, de façon courte (1-2 phrases), chaleureuse et engageante."))
 
-        # ── 5. Intervalle ──────────────────────────────────────────────────────
+        # 5. Intervalle
         intv_row = tk.Frame(left, bg=BG)
         intv_row.pack(fill="x", pady=(0, 8))
         tk.Label(intv_row, text="Vérifier toutes les", font=("Segoe UI", 9),
@@ -3678,7 +3606,6 @@ class App:
         tk.Label(intv_row, text="min", font=("Segoe UI", 9),
                  bg=BG, fg=MUTED).pack(side="left")
 
-        # ── Start/Stop ─────────────────────────────────────────────────────────
         self._ac_running = False
         self._ac_stop_flag = [False]
         self._ac_btn = tk.Button(left, text="▶  Démarrer",
@@ -3686,9 +3613,34 @@ class App:
                                  relief="flat", cursor="hand2", pady=8)
         self._ac_btn.pack(fill="x")
 
-        # ═══ COLONNE DROITE (log) ══════════════════════════════════════════════
+        # ═══ COLONNE MILIEU : commentaires ═══════════════════════════════════
+        mid = tk.Frame(main, bg=BG, width=260)
+        mid.pack(side="left", fill="y", padx=(12, 0))
+        mid.pack_propagate(False)
+
+        hdr_m = tk.Frame(mid, bg=BG)
+        hdr_m.pack(fill="x")
+        tk.Label(hdr_m, text="Commentaires", font=("Segoe UI", 10, "bold"),
+                 bg=BG, fg=TEXT2).pack(side="left")
+        self._ac_com_count_lbl = tk.Label(hdr_m, text="", font=("Segoe UI", 8),
+                                           bg=BG, fg=MUTED)
+        self._ac_com_count_lbl.pack(side="right")
+
+        com_frame = tk.Frame(mid, bg=SURFACE, highlightthickness=1,
+                             highlightbackground=BORDER)
+        com_frame.pack(fill="both", expand=True, pady=(4, 0))
+        self._ac_com_box = scrolledtext.ScrolledText(
+            com_frame, bg=SURFACE, fg=TEXT, font=("Segoe UI", 9),
+            relief="flat", state="disabled", wrap="word", padx=8, pady=6)
+        self._ac_com_box.pack(fill="both", expand=True)
+        self._ac_com_box.tag_config("author", foreground=ACCENT, font=("Segoe UI", 9, "bold"))
+        self._ac_com_box.tag_config("replied", foreground=OK)
+        self._ac_com_box.tag_config("text", foreground=TEXT)
+        self._ac_com_box.tag_config("sep", foreground=BORDER)
+
+        # ═══ COLONNE DROITE : log ════════════════════════════════════════════
         right = tk.Frame(main, bg=BG)
-        right.pack(side="left", fill="both", expand=True, padx=(16, 0))
+        right.pack(side="left", fill="both", expand=True, padx=(12, 0))
 
         hdr_r = tk.Frame(right, bg=BG)
         hdr_r.pack(fill="x")
@@ -3703,8 +3655,9 @@ class App:
         self._ac_log_box = scrolledtext.ScrolledText(
             right, bg=SURFACE, fg=TEXT2, font=("Consolas", 9),
             relief="flat", state="disabled", wrap="word")
-        self._ac_log_box.pack(fill="both", expand=True, pady=(6, 0))
+        self._ac_log_box.pack(fill="both", expand=True, pady=(4, 0))
 
+        # ── helpers définis en premier pour que les closures les trouvent ─────
         def _ac_log(msg, lv="info"):
             colors = {"info": TEXT2, "ok": OK, "warn": WARN, "error": DANGER, "accent": ACCENT}
             self._ac_log_box.config(state="normal")
@@ -3714,7 +3667,157 @@ class App:
             self._ac_log_box.see("end")
             self._ac_log_box.config(state="disabled")
 
-        # ── Logique principale ─────────────────────────────────────────────────
+        def _fetch_comments_api(sid, media_id):
+            with _ig_session_client(sid) as cl:
+                r = cl.get(f"/api/v1/media/{media_id}/comments/",
+                           params={"can_support_threading": "true",
+                                   "permalink_enabled": "false"})
+                if r.status_code != 200:
+                    raise RuntimeError(f"HTTP {r.status_code}: {r.text[:120]}")
+                raw = r.json()
+                out = []
+                for c in raw.get("comments", []):
+                    out.append(c)
+                    for ch in c.get("child_comment_list", []):
+                        out.append(ch)
+                return out
+
+        def _post_reply_api(sid, media_id, comment_text, replied_to_id):
+            payload = {"comment_text": comment_text,
+                       "replied_to_comment_id": replied_to_id}
+            with _ig_session_client(sid) as cl:
+                r = cl.post(f"/api/v1/media/{media_id}/comments/", data=payload)
+                if r.status_code not in (200, 201):
+                    raise RuntimeError(f"HTTP {r.status_code}: {r.text[:120]}")
+                return r.json()
+
+        def _show_comments_in_panel(comments, replied_ids):
+            self._ac_com_box.config(state="normal")
+            self._ac_com_box.delete("1.0", "end")
+            if not comments:
+                self._ac_com_box.insert("end", "Aucun commentaire sur cette vidéo.")
+                self._ac_com_box.config(state="disabled")
+                self._ac_com_count_lbl.config(text="0 commentaire(s)")
+                return
+            self._ac_com_count_lbl.config(text=f"{len(comments)} commentaire(s)")
+            for c in comments:
+                cid = str(c.get("pk") or c.get("id") or "")
+                author = c.get("user", {}).get("username", "?")
+                text = (c.get("text") or "").strip()
+                already = cid in replied_ids
+                self._ac_com_box.insert("end", f"@{author}  ", "author")
+                tag = "replied" if already else "text"
+                suffix = "  ✓" if already else ""
+                self._ac_com_box.insert("end", f"{text}{suffix}\n", tag)
+                self._ac_com_box.insert("end", "─" * 38 + "\n", "sep")
+            self._ac_com_box.config(state="disabled")
+
+        # ── charger vidéos ────────────────────────────────────────────────────
+        def _load_videos():
+            key = self._ac_acc_var.get()
+            if not key or key not in self._ac_acc_map:
+                _ac_log("⚠ Sélectionne un compte d'abord", "warn")
+                return
+            _, d = self._ac_acc_map[key]
+            sid = d.get("ig_sessionid", "").strip()
+            if not sid:
+                _ac_log("❌ Pas de Session ID pour ce compte — ajoute-le dans Paramètres", "error")
+                return
+            uid = str(d.get("ig_user_id") or d.get("user_id") or "")
+            ig = d.get("ig_username", "")
+
+            self._ac_vid_lb.delete(0, "end")
+            self._ac_media_items.clear()
+            self._ac_vid_lb.insert("end", "⏳ Chargement...")
+            load_vid_btn.config(state="disabled")
+            _ac_log(f"📥 Chargement des vidéos de @{ig}…", "info")
+
+            def _fetch():
+                nonlocal uid
+                try:
+                    with _ig_session_client(sid) as cl:
+                        if not uid:
+                            r = cl.get("/api/v1/accounts/current_user/",
+                                       params={"edit": "false"})
+                            u = r.json().get("user", {})
+                            uid = str(u.get("pk") or u.get("id") or "")
+                        r = cl.get(f"/api/v1/feed/user/{uid}/", params={"count": "12"})
+                        items = r.json().get("items", [])
+                    media = []
+                    for it in items:
+                        mid = it.get("id", "")
+                        code = it.get("code") or it.get("shortcode", "")
+                        taken = it.get("taken_at", 0)
+                        from datetime import datetime as _dt
+                        date_s = _dt.fromtimestamp(taken).strftime("%d/%m %H:%M") if taken else "?"
+                        kind = "🎥" if it.get("media_type") in (2, "2") else "🖼"
+                        cap = it.get("caption") or {}
+                        cap_text = (cap.get("text") or "")[:28] if isinstance(cap, dict) else ""
+                        display = f"{kind} {date_s}  {cap_text}"
+                        media.append((display, mid, code))
+                    self.root.after(0, lambda m=media: _show_videos(m))
+                except Exception as e:
+                    self.root.after(0, lambda e=e: [
+                        self._ac_vid_lb.delete(0, "end"),
+                        self._ac_vid_lb.insert("end", "❌ Erreur"),
+                        load_vid_btn.config(state="normal"),
+                        _ac_log(f"❌ Erreur chargement vidéos: {e}", "error")])
+
+            def _show_videos(media):
+                self._ac_vid_lb.delete(0, "end")
+                self._ac_media_items.clear()
+                for display, mid, code in media:
+                    self._ac_vid_lb.insert("end", display)
+                    self._ac_media_items.append((display, mid, code))
+                load_vid_btn.config(state="normal")
+                _ac_log(f"✅ {len(media)} vidéo(s) — clique sur une pour voir ses commentaires",
+                        "ok")
+
+            threading.Thread(target=_fetch, daemon=True).start()
+
+        load_vid_btn.config(command=_load_videos)
+
+        # ── clic sur une vidéo → charger commentaires ─────────────────────────
+        def _on_vid_select(evt=None):
+            idx = self._ac_vid_lb.curselection()
+            if not idx or not self._ac_media_items:
+                return
+            _, media_id, shortcode = self._ac_media_items[idx[0]]
+            key = self._ac_acc_var.get()
+            if not key or key not in self._ac_acc_map:
+                return
+            _, d = self._ac_acc_map[key]
+            sid = d.get("ig_sessionid", "").strip()
+            ig = d.get("ig_username", "")
+            if not sid:
+                return
+
+            self._ac_com_box.config(state="normal")
+            self._ac_com_box.delete("1.0", "end")
+            self._ac_com_box.insert("end", "⏳ Chargement des commentaires…")
+            self._ac_com_box.config(state="disabled")
+            self._ac_com_count_lbl.config(text="…")
+            _ac_log(f"📋 Chargement commentaires — {shortcode or media_id}", "info")
+
+            state_now = _load_state()
+            replied_ids = state_now.get(f"{ig}:{media_id}", {})
+
+            def _fetch_com():
+                try:
+                    comments = _fetch_comments_api(sid, media_id)
+                    self.root.after(0, lambda c=comments, r=replied_ids:
+                        [_show_comments_in_panel(c, r),
+                         _ac_log(f"✅ {len(c)} commentaire(s) chargé(s)", "ok")])
+                except Exception as e:
+                    self.root.after(0, lambda e=e: [
+                        _ac_log(f"❌ Erreur commentaires: {e}", "error"),
+                        _show_comments_in_panel([], {})])
+
+            threading.Thread(target=_fetch_com, daemon=True).start()
+
+        self._ac_vid_lb.bind("<<ListboxSelect>>", _on_vid_select)
+
+        # ── boucle principale ──────────────────────────────────────────────────
         def _groq_reply(comment_text, persona, groq_key):
             from groq import Groq
             client = Groq(api_key=groq_key)
@@ -3723,48 +3826,28 @@ class App:
                 messages=[
                     {"role": "system", "content": persona},
                     {"role": "user",
-                     "content": f"Commentaire Instagram reçu : \"{comment_text}\"\n\nRéponds à ce commentaire."}
+                     "content": f"Commentaire Instagram : \"{comment_text}\"\n\nRéponds à ce commentaire."}
                 ],
                 max_tokens=120,
                 temperature=0.8,
             )
             return resp.choices[0].message.content.strip()
 
-        def _fetch_comments_for_media(sessionid, media_id):
-            with _ig_session_client(sessionid) as cl:
-                params = {"can_support_threading": "true", "permalink_enabled": "false"}
-                r = cl.get(f"/api/v1/media/{media_id}/comments/", params=params)
-                if r.status_code != 200:
-                    return []
-                data = r.json()
-                comments = data.get("comments", [])
-                # also pull threaded replies inside each comment
-                all_c = []
-                for c in comments:
-                    all_c.append(c)
-                    for child in c.get("child_comment_list", []):
-                        all_c.append(child)
-                return all_c
-
-        def _post_reply(sessionid, media_id, comment_text, replied_to_id=None):
-            payload = {"comment_text": comment_text}
-            if replied_to_id:
-                payload["replied_to_comment_id"] = replied_to_id
-            with _ig_session_client(sessionid) as cl:
-                r = cl.post(f"/api/v1/media/{media_id}/comments/", data=payload)
-                r.raise_for_status()
-                return r.json()
-
         def _loop_worker(ig, sid, media_id, shortcode, groq_key, persona, interval_sec):
             state = _load_state()
             replied = state.setdefault(f"{ig}:{media_id}", {})
+
             self.root.after(0, lambda: _ac_log(
-                f"▶ @{ig} — vidéo {shortcode} — vérif. toutes les {interval_sec//60} min",
+                f"▶ Démarré — @{ig} / {shortcode or media_id} — toutes les {interval_sec//60} min",
                 "accent"))
 
             while not self._ac_stop_flag[0]:
+                self.root.after(0, lambda: _ac_log("🔍 Récupération des commentaires…", "info"))
                 try:
-                    comments = _fetch_comments_for_media(sid, media_id)
+                    comments = _fetch_comments_api(sid, media_id)
+                    self.root.after(0, lambda n=len(comments):
+                        _ac_log(f"📋 {n} commentaire(s) trouvé(s)", "info"))
+
                     new_count = 0
                     for c in comments:
                         if self._ac_stop_flag[0]:
@@ -3777,32 +3860,44 @@ class App:
                         if cid in replied:
                             continue
 
+                        self.root.after(0, lambda a=author, t=text:
+                            _ac_log(f"✍️ Génération réponse pour @{a}: \"{t[:40]}\"…", "info"))
                         try:
                             reply = _groq_reply(text, persona, groq_key)
-                            _post_reply(sid, media_id, reply, replied_to_id=cid)
+                            self.root.after(0, lambda rp=reply:
+                                _ac_log(f"📤 Envoi: \"{rp[:60]}\"", "info"))
+                            _post_reply_api(sid, media_id, reply, replied_to_id=cid)
                             replied[cid] = reply
                             new_count += 1
                             state[f"{ig}:{media_id}"] = replied
                             _save_state(state)
-                            self.root.after(0, lambda t=text, rp=reply:
-                                _ac_log(f"💬 \"{t[:45]}\"  →  \"{rp[:60]}\"", "ok"))
-                            _time.sleep(8)  # gentle rate-limit buffer
+                            self.root.after(0, lambda a=author, t=text, rp=reply:
+                                _ac_log(f"✅ @{a} — \"{t[:35]}\" → \"{rp[:50]}\"", "ok"))
+                            # refresh comment panel
+                            sc = _load_state().get(f"{ig}:{media_id}", {})
+                            self.root.after(0, lambda cm=list(comments), sc=sc:
+                                _show_comments_in_panel(cm, sc))
+                            _time.sleep(8)
                         except Exception as e:
                             self.root.after(0, lambda e=e:
-                                _ac_log(f"❌ Erreur réponse: {e}", "error"))
+                                _ac_log(f"❌ Erreur envoi réponse: {e}", "error"))
 
                     if new_count == 0:
                         self.root.after(0, lambda:
-                            _ac_log("— Aucun nouveau commentaire", "info"))
+                            _ac_log("— Aucun nouveau commentaire à traiter", "info"))
+                    else:
+                        self.root.after(0, lambda n=new_count:
+                            _ac_log(f"✅ {n} réponse(s) envoyée(s)", "ok"))
 
                 except Exception as e:
                     self.root.after(0, lambda e=e:
-                        _ac_log(f"❌ Erreur fetch commentaires: {e}", "error"))
+                        _ac_log(f"❌ Erreur récupération commentaires: {e}", "error"))
 
                 if self._ac_stop_flag[0]:
                     break
+
                 self.root.after(0, lambda iv=interval_sec:
-                    _ac_log(f"⏳ Prochaine vérification dans {iv//60} min", "info"))
+                    _ac_log(f"⏳ Pause {iv//60} min avant prochaine vérification…", "info"))
                 for _ in range(interval_sec):
                     if self._ac_stop_flag[0]:
                         break
@@ -3816,7 +3911,7 @@ class App:
         def _toggle_ac():
             if self._ac_running:
                 self._ac_stop_flag[0] = True
-                self._ac_btn.config(state="disabled", text="⏳ Arrêt...")
+                self._ac_btn.config(state="disabled", text="⏳ Arrêt…")
                 return
 
             key = self._ac_acc_var.get()
@@ -3831,12 +3926,19 @@ class App:
 
             _, media_id, shortcode = self._ac_media_items[idx[0]]
             if not media_id:
-                _ac_log("❌ media_id introuvable", "error")
+                _ac_log("❌ media_id manquant", "error")
                 return
 
             groq_key = self._ac_groq_var.get().strip() or self.cfg.get("groq_api_key", "")
             if not groq_key:
-                _ac_log("❌ Clé API Groq manquante", "error")
+                _ac_log("❌ Clé API Groq manquante (étape 3)", "error")
+                return
+
+            _, d = self._ac_acc_map[key]
+            ig = d.get("ig_username", "")
+            sid = d.get("ig_sessionid", "").strip()
+            if not sid:
+                _ac_log("❌ Pas de Session ID pour ce compte", "error")
                 return
 
             persona = self._ac_persona_box.get("1.0", "end").strip()
@@ -3844,14 +3946,7 @@ class App:
                              "ac_interval_min": self._ac_intv_var.get()})
             save_cfg(self.cfg)
 
-            _, d = self._ac_acc_map[key]
-            ig = d.get("ig_username", "")
-            sid = d.get("ig_sessionid", "").strip()
-            if not sid:
-                _ac_log("❌ Ce compte n'a pas de Session ID — ajoute-le dans Paramètres", "error")
-                return
             interval_sec = self._ac_intv_var.get() * 60
-
             self._ac_running = True
             self._ac_stop_flag[0] = False
             self._ac_btn.config(text="⏹  Arrêter", bg=DANGER, fg=TEXT)
