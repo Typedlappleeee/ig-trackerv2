@@ -3700,17 +3700,35 @@ class App:
                 raise RuntimeError(f"Impossible de charger les commentaires: {e}")
 
         def _post_reply_api(sid, media_id, comment_text, replied_to_id, _cl=None):
+            import uuid as _uuid
+            import inspect as _inspect
             clean_id = str(media_id).split("_")[0]
             if _cl is None:
                 from instagrapi import Client as _IgClient
                 _cl = _IgClient()
                 _cl.delay_range = [1, 2]
                 _cl.login_by_sessionid(sid)
-            # Post as a threaded reply using the private API directly
-            # so replied_to_comment_id is always sent regardless of instagrapi version
+
+            # Try instagrapi media_comment with replied_to_comment_id param
+            try:
+                sig = _inspect.signature(_cl.media_comment)
+                if "replied_to_comment_id" in sig.parameters:
+                    return _cl.media_comment(clean_id, comment_text,
+                                             replied_to_comment_id=int(replied_to_id))
+            except Exception:
+                pass
+
+            # Full private API payload — same fields the IG app sends for a reply
             data = {
                 "comment_text": comment_text,
                 "replied_to_comment_id": str(replied_to_id),
+                "delivery_class": "organic",
+                "feed_position": "0",
+                "container_module": "self_comments_v2_feed_contextual_self_profile",
+                "user_breadcrumb": _cl.gen_user_breadcrumb(len(comment_text))
+                    if hasattr(_cl, "gen_user_breadcrumb") else "",
+                "idempotence_token": str(_uuid.uuid4()),
+                "bootstrap_ufi_param": "",
             }
             return _cl.private_request(f"media/{clean_id}/comments/", data=data)
 
