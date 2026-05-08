@@ -1521,6 +1521,9 @@ class App:
         Create a card with truly rounded corners using a Canvas backdrop.
         Returns (outer_frame, content_frame).
         Pack/place the outer; populate the content as if it were a regular Frame.
+
+        Auto-grows the card height to match the content's natural reqheight,
+        unless the caller pins outer.configure(height=...) + pack_propagate(False).
         """
         bg     = bg or CARD
         border = border or BORDER
@@ -1533,6 +1536,8 @@ class App:
         cv.pack(fill="both", expand=True)
         content = tk.Frame(cv, bg=bg)
         win_id = [None]
+        _last_req = [(0, 0)]
+        _manual_height = [False]
 
         def _redraw(_e=None):
             w = cv.winfo_width()
@@ -1558,6 +1563,38 @@ class App:
             cv.tag_raise(win_id[0])
 
         cv.bind("<Configure>", _redraw)
+
+        def _content_resize(_e=None):
+            """Auto-grow canvas height to fit content's natural reqheight."""
+            if _manual_height[0]:
+                return
+            try:
+                rw = content.winfo_reqwidth()
+                rh = content.winfo_reqheight()
+                # Skip tiny / unchanged sizes
+                if rh < 5 or (abs(rh - _last_req[0][1]) < 2 and abs(rw - _last_req[0][0]) < 2):
+                    return
+                _last_req[0] = (rw, rh)
+                target_h = rh + 2 * (border_w + 1)
+                cv.configure(height=target_h)
+            except Exception:
+                pass
+        content.bind("<Configure>", _content_resize)
+
+        # Mark that the user manually pinned a height when they call
+        # outer.configure(height=...) + pack_propagate(False)
+        _orig_configure = outer.configure
+        def _wrapped_configure(*a, **kw):
+            if "height" in kw and kw["height"] > 5:
+                _manual_height[0] = True
+                try:
+                    cv.configure(height=kw["height"])
+                except Exception:
+                    pass
+            return _orig_configure(*a, **kw)
+        outer.configure = _wrapped_configure
+        outer.config = _wrapped_configure
+
         outer._cv = cv
         outer._content = content
         outer._set_border = lambda c: cv.itemconfig("bg", outline=c) if cv.find_withtag("bg") else None
@@ -1984,17 +2021,46 @@ class App:
         if key == "masspost": self._mp_refresh_phones()
 
     def _on_global_scroll(self, event):
-        """Route mousewheel to nearest scrollable ancestor."""
+        """Route mousewheel only to widgets that genuinely need scrolling.
+        Walk up from cursor; only scroll widgets that have actual scroll content:
+        - Listbox / Text / Treeview: always allowed
+        - Canvas: only if scrollregion is bigger than visible area
+        - Spinbox: handle its own value changes
+        - All other widget types (Frame, Toplevel, Tk, Button, etc.): skip
+        Stop walking once we cross a Toplevel/Tk boundary.
+        """
         w = event.widget
-        for _ in range(12):
+        delta = int(-1 * (event.delta / 120)) if event.delta else 0
+        if delta == 0:
+            return
+        for _ in range(15):
             if w is None:
-                break
-            if hasattr(w, "yview_scroll"):
+                return
+            try:
+                cls = w.winfo_class()
+            except Exception:
+                return
+            if cls in ("Listbox", "Text", "Treeview"):
                 try:
-                    w.yview_scroll(int(-1 * (event.delta / 120)), "units")
-                    return
+                    w.yview_scroll(delta, "units")
                 except Exception:
                     pass
+                return
+            if cls == "Canvas":
+                try:
+                    sr = w.cget("scrollregion")
+                    if sr and str(sr).strip():
+                        parts = str(sr).split()
+                        if len(parts) == 4:
+                            sr_h = float(parts[3]) - float(parts[1])
+                            visible_h = w.winfo_height()
+                            if sr_h > visible_h + 2:
+                                w.yview_scroll(delta, "units")
+                                return
+                except Exception:
+                    pass
+            if cls in ("Toplevel", "Tk", "Wm"):
+                return
             w = getattr(w, "master", None)
 
     # ══════════════════════════════════════════════════════════════════════════
@@ -2325,11 +2391,17 @@ class App:
         self._st_vid_canvas.pack(side="left", fill="both", expand=True)
         vid_sb.pack(side="right", fill="y")
         self._st_vid_inner = tk.Frame(self._st_vid_canvas, bg=BG)
-        self._st_vid_canvas.create_window((0, 0), window=self._st_vid_inner, anchor="nw")
+        self._st_vid_inner_id = self._st_vid_canvas.create_window(
+            (0, 0), window=self._st_vid_inner, anchor="nw")
         def _vid_conf(e=None):
             self._st_vid_canvas.configure(
                 scrollregion=self._st_vid_canvas.bbox("all"))
+        def _vid_canvas_conf(e=None):
+            # Match inner frame width to canvas width so cards fill horizontally
+            self._st_vid_canvas.itemconfig(
+                self._st_vid_inner_id, width=self._st_vid_canvas.winfo_width())
         self._st_vid_inner.bind("<Configure>", _vid_conf)
+        self._st_vid_canvas.bind("<Configure>", _vid_canvas_conf)
         self._current_vid_pid = [None]
 
         # Placeholder label
@@ -2537,13 +2609,13 @@ class App:
         ig   = d.get("ig_username", "")
         bio  = d.get("bio", "")
 
-        # Avatar
+        # Avatar (centered in 72x72 canvas)
         col    = self._stats_avatar_color(ig)
         letter = (ig[0] if ig else "?").upper()
-        av_img = self._stats_make_avatar(letter, col, size=54)
+        av_img = self._stats_make_avatar(letter, col, size=64)
         self._st_avatar_canvas.delete("all")
         if av_img:
-            self._st_avatar_canvas.create_image(30, 30, image=av_img)
+            self._st_avatar_canvas.create_image(36, 36, image=av_img)
             self._st_avatar_img_ref = av_img
 
         # Name / status
@@ -2609,11 +2681,15 @@ class App:
         # Max views for relative bar scaling
         max_views = max((v.get("views", 0) for v in videos), default=1) or 1
 
-        # Row-based layout (one wide row per video)
-        list_frame = tk.Frame(self._st_vid_inner, bg=BG)
-        list_frame.pack(fill="both", expand=True, pady=2)
+        # 2-column card grid (like banque tab)
+        grid = tk.Frame(self._st_vid_inner, bg=BG)
+        grid.pack(fill="both", expand=True, padx=2, pady=2)
+        COLS = 2
+        for c in range(COLS):
+            grid.columnconfigure(c, weight=1, uniform="vidcol")
 
         for i, vid in enumerate(videos):
+            r, c = divmod(i, COLS)
             sc       = vid.get("id", "")
             views    = vid.get("views", 0)
             likes    = vid.get("likes", 0)
@@ -2622,83 +2698,128 @@ class App:
             caption  = vid.get("caption", "")
             url      = f"https://www.instagram.com/reel/{sc}/"
             ratio    = views / max_views
-            accent_c = ACCENT if ratio > 0.7 else (OK if ratio > 0.3 else TEXT2)
+            # Color tier per popularity
+            if ratio > 0.7:
+                tier_top, tier_bot = "#7e22ce", "#dc2626"  # purple → red (top)
+                accent_c = ACCENT
+            elif ratio > 0.3:
+                tier_top, tier_bot = "#1e40af", "#7c3aed"  # blue → purple (mid)
+                accent_c = OK
+            else:
+                tier_top, tier_bot = "#374151", "#111827"  # gray
+                accent_c = TEXT2
 
-            # Rounded row
-            row_outer, row = self._round_card(list_frame, radius=10, bg=CARD,
-                                                border=BORDER, border_w=1,
-                                                hover_border=accent_c)
-            row_outer.pack(fill="x", pady=3)
-            row_outer.configure(height=72)
-            row_outer.pack_propagate(False)
+            # Rounded card
+            card_outer, card = self._round_card(grid, radius=12, bg=CARD,
+                                                 border=BORDER, border_w=1,
+                                                 hover_border=accent_c)
+            card_outer.grid(row=r, column=c, padx=4, pady=4, sticky="nsew")
+            card_outer.configure(height=210)
+            card_outer.pack_propagate(False)
 
-            # Left accent bar
-            tk.Frame(row, width=3, bg=accent_c).pack(side="left", fill="y")
+            # ── Top: gradient banner with REEL chip (Instagram-style) ────────
+            banner = tk.Canvas(card, bg=CARD, height=86,
+                                highlightthickness=0)
+            banner.pack(fill="x")
 
-            inner = tk.Frame(row, bg=CARD)
-            inner.pack(side="left", fill="both", expand=True, padx=14, pady=8)
+            def _draw_banner(cv=banner, top=tier_top, bot=tier_bot,
+                              s=sc, ac=accent_c, vw=views):
+                cv.delete("all")
+                w = cv.winfo_width() or 200
+                h = 86
+                # Gradient
+                for k in range(20):
+                    t = k / 19
+                    try:
+                        rr = int(int(top[1:3], 16) * (1 - t) + int(bot[1:3], 16) * t)
+                        gg = int(int(top[3:5], 16) * (1 - t) + int(bot[3:5], 16) * t)
+                        bb = int(int(top[5:7], 16) * (1 - t) + int(bot[5:7], 16) * t)
+                        col = f"#{rr:02x}{gg:02x}{bb:02x}"
+                    except Exception:
+                        col = top
+                    cv.create_rectangle(0, k * h / 20, w, (k + 1) * h / 20,
+                                         fill=col, outline="")
+                # Center play icon
+                cx, cy = w // 2, h // 2
+                cv.create_oval(cx - 18, cy - 18, cx + 18, cy + 18,
+                                outline="#ffffff66", width=2)
+                cv.create_polygon(cx - 6, cy - 9, cx - 6, cy + 9, cx + 9, cy,
+                                   fill="#ffffff", outline="")
+                # REEL chip top-right
+                cv.create_rectangle(w - 56, 6, w - 6, 22,
+                                     fill="#00000066", outline="")
+                cv.create_text(w - 31, 14,
+                                text=f"REEL", fill="#ffffff",
+                                font=("Consolas", 7, "bold"))
+                # Shortcode chip top-left
+                if s:
+                    cv.create_rectangle(6, 6, 6 + 8 + len(s[:11]) * 6, 22,
+                                         fill="#00000066", outline="")
+                    cv.create_text(10, 14, anchor="w", text=s[:11],
+                                    fill="#ffffffcc", font=("Consolas", 7))
+            banner.bind("<Configure>", lambda e, fn=_draw_banner: fn())
 
-            # Top line: views (hero) + REEL id (right)
-            top = tk.Frame(inner, bg=CARD)
-            top.pack(fill="x")
-            views_chunk = tk.Frame(top, bg=CARD)
-            views_chunk.pack(side="left")
-            tk.Label(views_chunk, text="▶", font=("Segoe UI", 14, "bold"),
+            # ── Body: stats ──────────────────────────────────────────────────
+            body = tk.Frame(card, bg=CARD, padx=14, pady=10)
+            body.pack(fill="both", expand=True)
+
+            # Hero: views
+            hero = tk.Frame(body, bg=CARD)
+            hero.pack(fill="x")
+            tk.Label(hero, text="▶", font=("Segoe UI", 18, "bold"),
                      bg=CARD, fg=accent_c).pack(side="left")
-            tk.Label(views_chunk, text=fmt(views), font=("Segoe UI", 16, "bold"),
-                     bg=CARD, fg=TEXT).pack(side="left", padx=(4, 4))
-            tk.Label(views_chunk, text="vues", font=("Segoe UI", 9),
-                     bg=CARD, fg=TEXT2).pack(side="left", pady=(4, 0))
+            tk.Label(hero, text=fmt(views),
+                     font=("Segoe UI", 20, "bold"),
+                     bg=CARD, fg=TEXT).pack(side="left", padx=(6, 4))
+            tk.Label(hero, text="vues", font=("Segoe UI", 9),
+                     bg=CARD, fg=TEXT2).pack(side="left", pady=(8, 0))
 
-            # Right side: shortcode chip
-            tk.Label(top, text=f" {sc[:14]} " if sc else "",
-                     font=("Consolas", 8), bg=SURFACE2, fg=TEXT2,
-                     padx=4, pady=1).pack(side="right")
-
-            # Progress bar (views relative)
-            bar_bg = tk.Frame(inner, bg=SURFACE3, height=2)
-            bar_bg.pack(fill="x", pady=(4, 4))
+            # Progress bar (relative)
+            bar_bg = tk.Frame(body, bg=SURFACE3, height=3)
+            bar_bg.pack(fill="x", pady=(6, 8))
             bar_bg.pack_propagate(False)
-            bar_fill = tk.Frame(bar_bg, bg=accent_c, height=2)
-            bar_fill.place(relx=0, rely=0, relwidth=max(ratio, 0.02), relheight=1)
+            tk.Frame(bar_bg, bg=accent_c, height=3).place(
+                relx=0, rely=0, relwidth=max(ratio, 0.02), relheight=1)
 
-            # Bottom: icons row + caption
-            bot = tk.Frame(inner, bg=CARD)
-            bot.pack(fill="x")
-
-            # White icons - much more readable
+            # Stats row (♥ ✎ ↗) - white icons
+            stats = tk.Frame(body, bg=CARD)
+            stats.pack(fill="x")
             for icon, val in [
-                ("♥",  fmt(likes)),
-                ("✎",  fmt(comments)),
-                ("↗",  fmt(shares)),
+                ("♥", fmt(likes)),
+                ("✎", fmt(comments)),
+                ("↗", fmt(shares)),
             ]:
-                chunk = tk.Frame(bot, bg=CARD)
+                chunk = tk.Frame(stats, bg=CARD)
                 chunk.pack(side="left", padx=(0, 14))
-                tk.Label(chunk, text=icon, font=("Segoe UI", 11, "bold"),
+                tk.Label(chunk, text=icon, font=("Segoe UI", 12, "bold"),
                          bg=CARD, fg=TEXT).pack(side="left")
                 tk.Label(chunk, text=val, font=("Segoe UI", 10, "bold"),
                          bg=CARD, fg=TEXT).pack(side="left", padx=(3, 0))
 
-            # Caption (right side, truncated)
+            # Caption
             if caption:
-                cap_text = caption[:80].replace("\n", " ")
-                if len(caption) > 80:
+                cap_text = caption[:60].replace("\n", " ")
+                if len(caption) > 60:
                     cap_text += "…"
-                tk.Label(bot, text=cap_text, font=("Segoe UI", 9),
-                         bg=CARD, fg=TEXT2, anchor="w").pack(side="left",
-                                                              fill="x", expand=True,
-                                                              padx=(8, 0))
+                tk.Label(body, text=cap_text, font=("Segoe UI", 8),
+                         bg=CARD, fg=TEXT2, wraplength=240, justify="left",
+                         anchor="w").pack(fill="x", pady=(6, 0))
 
-            # Click to open reel
+            # Click → open reel
             def _open(e=None, u=url):
                 import webbrowser
                 webbrowser.open(u)
-            row_outer._cv.bind("<Button-1>", _open, add="+")
-            for w in [row, inner, top, views_chunk, bot] + list(bot.winfo_children()) + list(top.winfo_children()) + list(views_chunk.winfo_children()):
+            for w in [card, banner, body, hero, stats] + list(stats.winfo_children()) + list(hero.winfo_children()):
                 try:
                     w.bind("<Button-1>", _open, add="+")
+                    w.config(cursor="hand2")
                 except Exception:
                     pass
+            try:
+                card_outer._cv.bind("<Button-1>", _open, add="+")
+                card_outer._cv.config(cursor="hand2")
+            except Exception:
+                pass
 
         self._st_vid_canvas.configure(
             scrollregion=self._st_vid_canvas.bbox("all"))
