@@ -746,6 +746,19 @@ def scrape_ig_by_session(username: str, sessionid: str) -> dict:
         return {"ig_status": "error", "ig_error": msg}
 
 
+def get_username_from_session(sessionid: str) -> str | None:
+    """Fetch the Instagram username for the given session ID (no username needed)."""
+    _ensure_instagrapi()
+    try:
+        from instagrapi import Client
+        cl = Client()
+        cl.login_by_sessionid(sessionid)
+        info = cl.account_info()
+        return info.username
+    except Exception:
+        return None
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # PUSH SERVER  — GéeLark phones POST stats to this local HTTP server
 # ══════════════════════════════════════════════════════════════════════════════
@@ -2468,9 +2481,13 @@ class App:
                 "https://openapi.geelark.com/open/v1/file/getUploadUrl",
                 json={"fileName": Path(video_path).name, "fileType": "video"},
                 headers=hdrs, timeout=20)
-            rj = r.json()
+            try:
+                rj = r.json()
+            except Exception:
+                log_fn(f"❌ Réponse invalide de GéeLark (HTTP {r.status_code}): {r.text[:300]}", "error")
+                return
             if rj.get("code") != 0:
-                log_fn(f"❌ {rj.get('msg')}", "error")
+                log_fn(f"❌ GéeLark: {rj.get('msg', rj)}", "error")
                 return
             with open(video_path, "rb") as fl:
                 up = httpx.put(rj["data"]["uploadUrl"], content=fl.read(), timeout=180)
@@ -2489,9 +2506,12 @@ class App:
                     "https://openapi.geelark.com/open/v1/file/uploadToPhone",
                     json={"id": pid, "fileKey": file_key},
                     headers=hdrs, timeout=30)
-                rj = r.json()
-                log_fn(f"{'✅' if rj.get('code')==0 else '⚠'} {name}",
-                       "ok" if rj.get("code") == 0 else "warn")
+                try:
+                    rj = r.json()
+                    log_fn(f"{'✅' if rj.get('code')==0 else '⚠'} {name}",
+                           "ok" if rj.get("code") == 0 else "warn")
+                except Exception:
+                    log_fn(f"⚠ {name}: réponse HTTP {r.status_code} — {r.text[:200]}", "warn")
             except Exception as e:
                 log_fn(f"❌ {name}: {e}", "error")
             time.sleep(1)
@@ -3686,8 +3706,24 @@ class App:
     def _scrape_one(self, pid):
         d        = self.data.get(pid, {})
         username = d.get("ig_username", "")
+
+        # Auto-detect username from session ID if not manually linked
         if not username:
-            return
+            sessionid_acc = d.get("ig_sessionid", "").strip()
+            if sessionid_acc:
+                self.log("🔍 Détection auto du username depuis la session...", "info")
+                detected = get_username_from_session(sessionid_acc)
+                if detected:
+                    self.data[pid]["ig_username"] = detected
+                    username = detected
+                    save_data(self.data)
+                    self.log(f"✅ Username détecté : @{username}", "ok")
+                    self.root.after(0, self._refresh_table)
+                else:
+                    self.log("⚠ Session invalide — impossible de détecter le username", "warn")
+                    return
+            else:
+                return
 
         # Priority 1 — per-account sessionid (best: no new login, no challenge)
         sessionid_acc = d.get("ig_sessionid", "").strip()
