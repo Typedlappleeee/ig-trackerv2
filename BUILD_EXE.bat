@@ -8,7 +8,7 @@ echo  =============================================
 echo.
 
 echo  [1/4] Installation des dependances...
-pip install pyinstaller pillow httpx[socks] groq tkinterdnd2 --quiet
+pip install pyinstaller pillow httpx[socks] groq tkinterdnd2 instagrapi --quiet
 
 echo  [2/4] Generation de l'icone...
 python make_icon.py
@@ -33,6 +33,11 @@ pyinstaller ^
   --hidden-import=PIL.ImageFont ^
   --hidden-import=groq ^
   --hidden-import=tkinterdnd2 ^
+  --hidden-import=instagrapi ^
+  --hidden-import=instagrapi.mixins ^
+  --hidden-import=instagrapi.exceptions ^
+  --hidden-import=pycryptodomex ^
+  --hidden-import=Crypto ^
   app.py
 
 echo.

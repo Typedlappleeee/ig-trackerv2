@@ -6,11 +6,12 @@ import http.server, socketserver, socket, urllib.parse as _urlparse
 from datetime import datetime
 from pathlib import Path
 
-BASE_DIR     = Path(sys.argv[0]).parent if getattr(sys, 'frozen', False) else Path(__file__).parent
-DATA_FILE    = BASE_DIR / "data.json"
-CONFIG_FILE  = BASE_DIR / "config.json"
-BANK_FILE    = BASE_DIR / "bank.json"
-PRESETS_FILE = BASE_DIR / "presets.json"
+BASE_DIR      = Path(sys.argv[0]).parent if getattr(sys, 'frozen', False) else Path(__file__).parent
+DATA_FILE     = BASE_DIR / "data.json"
+CONFIG_FILE   = BASE_DIR / "config.json"
+BANK_FILE     = BASE_DIR / "bank.json"
+PRESETS_FILE  = BASE_DIR / "presets.json"
+IG_SESS_DIR   = BASE_DIR / "ig_sessions"
 
 try:
     from PIL import Image, ImageTk, ImageDraw, ImageFont, ImageFilter, ImageEnhance
@@ -570,6 +571,122 @@ def scrape_ig(username, proxy=None, sessionid=None):
         return {"ig_status": "error", "ig_error": str(ex)}
 
 # ══════════════════════════════════════════════════════════════════════════════
+# DIRECT LOGIN  — instagrapi (private mobile API, 100 % fiable pour comptes
+#                 qu'on possède, même IP bloquée sur le scraping public)
+# ══════════════════════════════════════════════════════════════════════════════
+def _ensure_instagrapi():
+    """Import instagrapi, auto-install if missing. Returns the module."""
+    try:
+        import instagrapi
+        return instagrapi
+    except ImportError:
+        subprocess.run(
+            [sys.executable, "-m", "pip", "install", "instagrapi", "--quiet"],
+            capture_output=True
+        )
+        import instagrapi
+        return instagrapi
+
+
+def ig_client_get(username: str, password: str, proxy: str | None = None):
+    """
+    Return an authenticated instagrapi Client.
+    Reuses a cached session (ig_sessions/{username}.json) when possible.
+    Raises exceptions from instagrapi on auth errors.
+    """
+    ig = _ensure_instagrapi()
+    from instagrapi import Client
+    from instagrapi.exceptions import LoginRequired
+
+    IG_SESS_DIR.mkdir(exist_ok=True)
+    session_file = IG_SESS_DIR / f"{username}.json"
+
+    cl = Client()
+    cl.delay_range = [1, 3]
+    if proxy:
+        purl = _proxy_url(proxy)
+        if purl:
+            cl.set_proxy(purl)
+
+    # Try restoring cached session
+    if session_file.exists():
+        try:
+            cl.load_settings(session_file)
+            cl.login(username, password)          # refreshes token if needed
+            cl.get_timeline_feed()                # smoke-test
+            return cl
+        except Exception:
+            session_file.unlink(missing_ok=True)
+            cl = Client()
+            cl.delay_range = [1, 3]
+            if proxy:
+                purl = _proxy_url(proxy)
+                if purl:
+                    cl.set_proxy(purl)
+
+    # Fresh login
+    cl.login(username, password)
+    cl.dump_settings(session_file)
+    return cl
+
+
+def scrape_ig_direct(username: str, password: str, proxy: str | None = None) -> dict:
+    """
+    Get Instagram account stats using direct login (instagrapi).
+    Returns the same dict format as scrape_ig().
+    """
+    try:
+        from instagrapi.exceptions import (
+            BadPassword, ChallengeRequired, TwoFactorRequired,
+            LoginRequired, UserNotFound, ClientError,
+        )
+    except ImportError:
+        _ensure_instagrapi()
+        from instagrapi.exceptions import (
+            BadPassword, ChallengeRequired, TwoFactorRequired,
+            LoginRequired, UserNotFound, ClientError,
+        )
+
+    try:
+        cl = ig_client_get(username, password, proxy)
+        u  = cl.user_info_by_username(username)
+        return {
+            "ig_status":    "active",
+            "ig_username":  u.username,
+            "full_name":    u.full_name or "",
+            "followers":    u.follower_count,
+            "following":    u.following_count,
+            "posts_count":  u.media_count,
+            "bio":          u.biography or "",
+            "is_private":   u.is_private,
+            "is_verified":  u.is_verified,
+            "profile_pic":  str(u.profile_pic_url or ""),
+            "videos":       [],
+            "last_checked": datetime.now().isoformat(),
+        }
+    except BadPassword:
+        return {"ig_status": "error",
+                "ig_error": "❌ Mot de passe incorrect"}
+    except TwoFactorRequired:
+        return {"ig_status": "error",
+                "ig_error": "🔐 2FA requis — entre le code dans l'app ou désactive le 2FA"}
+    except ChallengeRequired:
+        session_file = IG_SESS_DIR / f"{username}.json"
+        session_file.unlink(missing_ok=True)
+        return {"ig_status": "error",
+                "ig_error": "⚠ Challenge Instagram — vérifie l'email/SMS du compte puis réessaie"}
+    except UserNotFound:
+        return {"ig_status": "banned", "ig_error": "Compte introuvable"}
+    except LoginRequired:
+        session_file = IG_SESS_DIR / f"{username}.json"
+        session_file.unlink(missing_ok=True)
+        return {"ig_status": "error",
+                "ig_error": "Session expirée — re-scrape pour relancer le login"}
+    except Exception as ex:
+        return {"ig_status": "error", "ig_error": str(ex)}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # PUSH SERVER  — GéeLark phones POST stats to this local HTTP server
 # ══════════════════════════════════════════════════════════════════════════════
 def _safe_int(v):
@@ -974,10 +1091,13 @@ class App:
         tk.Button(tb2, text="✗ Délier", font=("Segoe UI", 10),
                   bg=SURFACE2, fg=DANGER, relief="flat", cursor="hand2",
                   padx=8, pady=4, command=self._unlink).pack(side="left", padx=2)
-        tk.Button(tb2, text="📊 Scraper sélectionnés", font=("Segoe UI", 10),
+        tk.Button(tb2, text="📊 Scraper", font=("Segoe UI", 10),
                   bg=SURFACE2, fg=OK, relief="flat", cursor="hand2", padx=8, pady=4,
                   command=lambda: threading.Thread(
                       target=self._scrape_sel, daemon=True).start()).pack(side="left", padx=6)
+        tk.Button(tb2, text="🔑 Identifiants", font=("Segoe UI", 10),
+                  bg=SURFACE2, fg=ACCENT, relief="flat", cursor="hand2", padx=8, pady=4,
+                  command=self._show_credentials_dialog).pack(side="left", padx=2)
 
         cols = ("no", "name", "group", "ig", "status", "followers", "views", "vids", "checked")
         self.tree = ttk.Treeview(f, columns=cols, show="headings",
@@ -3447,16 +3567,22 @@ class App:
         self._refresh_table()
 
     def _scrape_one(self, pid):
-        d = self.data.get(pid, {})
+        d        = self.data.get(pid, {})
         username = d.get("ig_username", "")
+        password = d.get("ig_password", "").strip()
         if not username:
             return
-        proxy     = self.cfg.get("proxy", "").strip() or None
-        sessionid = self.cfg.get("ig_sessionid", "").strip() or None
-        proxy_str = f" via proxy" if proxy else " (sans proxy)"
-        sess_str  = " + sessionid" if sessionid else " (sans sessionid)"
-        self.log(f"Scraping @{username}{proxy_str}{sess_str}...", "info")
-        res = scrape_ig(username, proxy, sessionid)
+        proxy = self.cfg.get("proxy", "").strip() or None
+
+        if password:
+            self.log(f"🔑 Login direct @{username}...", "info")
+            res = scrape_ig_direct(username, password, proxy)
+        else:
+            sessionid = self.cfg.get("ig_sessionid", "").strip() or None
+            mode = "proxy" if proxy else "sans proxy"
+            self.log(f"Scraping @{username} ({mode})...", "info")
+            res = scrape_ig(username, proxy, sessionid)
+
         self.data[pid].update(res)
         self.data[pid]["last_checked"] = datetime.now().isoformat()
         save_data(self.data)
@@ -3466,7 +3592,7 @@ class App:
         elif st == "banned":
             self.log(f"❌ @{username} — banni !", "error")
         elif st == "private":
-            self.log(f"🔒 @{username} — privé ou sessionid invalide", "warn")
+            self.log(f"🔒 @{username} — privé", "warn")
         else:
             self.log(f"⚠ @{username} — {res.get('ig_error','')}", "warn")
         self.root.after(0, self._refresh_table)
@@ -3482,6 +3608,209 @@ class App:
             self._scrape_one(pid)
             time.sleep(2)
         self.log("Terminé ✓", "ok")
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # CREDENTIALS DIALOG
+    # ══════════════════════════════════════════════════════════════════════════
+    def _show_credentials_dialog(self):
+        """Open the dialog to manage per-account Instagram credentials."""
+        win = tk.Toplevel(self.root)
+        win.title("🔑 Identifiants Instagram")
+        win.geometry("700x560")
+        win.configure(bg=BG)
+        win.grab_set()
+
+        tk.Label(win, text="🔑 Identifiants Instagram",
+                 font=("Segoe UI", 14, "bold"), bg=BG, fg=TEXT).pack(anchor="w", padx=20, pady=(18, 4))
+        tk.Label(win,
+                 text="Stocke le mot de passe de chaque compte pour un accès 100 % fiable via l'API mobile.\n"
+                      "Les sessions sont mises en cache localement (ig_sessions/) — "
+                      "pas besoin de relancer le login à chaque fois.",
+                 font=("Segoe UI", 9), bg=BG, fg=TEXT2, justify="left").pack(anchor="w", padx=20, pady=(0, 12))
+
+        # ── Tab bar ─────────────────────────────────────────────────────────
+        tab_bar = tk.Frame(win, bg=BG)
+        tab_bar.pack(fill="x", padx=20)
+        content = tk.Frame(win, bg=BG)
+        content.pack(fill="both", expand=True, padx=20, pady=8)
+
+        # ── Per-account tab ─────────────────────────────────────────────────
+        per_frame = tk.Frame(content, bg=BG)
+        bulk_frame = tk.Frame(content, bg=BG)
+
+        def show_per():
+            bulk_frame.pack_forget()
+            per_frame.pack(fill="both", expand=True)
+            tab_per.config(bg=ACCENT, fg="#06080f")
+            tab_bulk.config(bg=SURFACE2, fg=TEXT2)
+
+        def show_bulk():
+            per_frame.pack_forget()
+            bulk_frame.pack(fill="both", expand=True)
+            tab_bulk.config(bg=ACCENT, fg="#06080f")
+            tab_per.config(bg=SURFACE2, fg=TEXT2)
+
+        tab_per  = tk.Button(tab_bar, text="Par compte", font=("Segoe UI", 10, "bold"),
+                             bg=ACCENT, fg="#06080f", relief="flat", cursor="hand2",
+                             padx=14, pady=5, command=show_per)
+        tab_per.pack(side="left")
+        tab_bulk = tk.Button(tab_bar, text="Import en masse",
+                             font=("Segoe UI", 10), bg=SURFACE2, fg=TEXT2,
+                             relief="flat", cursor="hand2", padx=14, pady=5, command=show_bulk)
+        tab_bulk.pack(side="left", padx=(4, 0))
+
+        # ── Per-account content ──────────────────────────────────────────────
+        tk.Label(per_frame,
+                 text="Sélectionne un compte et entre son mot de passe :",
+                 font=("Segoe UI", 9), bg=BG, fg=TEXT2).pack(anchor="w", pady=(8, 4))
+
+        # Listbox of linked accounts
+        list_frame = tk.Frame(per_frame, bg=SURFACE2, highlightthickness=1,
+                               highlightbackground=BORDER)
+        list_frame.pack(fill="x", pady=(0, 10))
+        accs_lb = tk.Listbox(list_frame, bg=SURFACE2, fg=TEXT, selectbackground=ACCENT,
+                              selectforeground="#06080f", font=("Consolas", 10),
+                              relief="flat", height=6, bd=0)
+        accs_lb.pack(fill="both", padx=4, pady=4)
+
+        acc_map = {}  # listbox_index → pid
+        for pid, d in self.data.items():
+            ig  = d.get("ig_username", "")
+            has = "🔑" if d.get("ig_password") else "  "
+            if ig:
+                idx = accs_lb.size()
+                accs_lb.insert("end", f"{has}  @{ig}  —  {d.get('phone_name', pid)}")
+                acc_map[idx] = pid
+
+        # Password entry
+        pw_frame = tk.Frame(per_frame, bg=BG)
+        pw_frame.pack(fill="x", pady=(0, 8))
+        tk.Label(pw_frame, text="Mot de passe :", font=("Segoe UI", 10),
+                 bg=BG, fg=TEXT2, width=14, anchor="w").pack(side="left")
+        pw_var = tk.StringVar()
+        pw_entry = tk.Entry(pw_frame, textvariable=pw_var, show="•",
+                            font=("Consolas", 11), bg=SURFACE2, fg=TEXT,
+                            insertbackground=TEXT, relief="flat", bd=0,
+                            highlightthickness=1, highlightcolor=ACCENT,
+                            highlightbackground=BORDER)
+        pw_entry.pack(side="left", fill="x", expand=True, ipady=7, padx=(4, 4))
+        def _toggle_pw():
+            pw_entry.config(show="" if pw_entry.cget("show") == "•" else "•")
+        tk.Button(pw_frame, text="👁", font=("Segoe UI", 10), bg=SURFACE2, fg=TEXT2,
+                  relief="flat", cursor="hand2", padx=8, command=_toggle_pw).pack(side="right")
+
+        def _on_acc_sel(e=None):
+            sel = accs_lb.curselection()
+            if sel:
+                pid = acc_map.get(sel[0])
+                if pid:
+                    pw_var.set(self.data[pid].get("ig_password", ""))
+
+        accs_lb.bind("<<ListboxSelect>>", _on_acc_sel)
+
+        def _save_pw():
+            sel = accs_lb.curselection()
+            if not sel:
+                return
+            pid = acc_map.get(sel[0])
+            if not pid:
+                return
+            pw = pw_var.get().strip()
+            if pw:
+                self.data[pid]["ig_password"] = pw
+            else:
+                self.data[pid].pop("ig_password", None)
+                # delete cached session
+                sess = IG_SESS_DIR / f"{self.data[pid].get('ig_username','')}.json"
+                sess.unlink(missing_ok=True)
+            save_data(self.data)
+            # refresh listbox label
+            ig  = self.data[pid].get("ig_username", "")
+            has = "🔑" if pw else "  "
+            accs_lb.delete(sel[0])
+            accs_lb.insert(sel[0], f"{has}  @{ig}  —  {self.data[pid].get('phone_name', pid)}")
+            accs_lb.selection_set(sel[0])
+            self.log(f"Identifiants @{ig} {'sauvegardés' if pw else 'supprimés'}", "ok")
+
+        def _test_now():
+            sel = accs_lb.curselection()
+            if not sel:
+                return
+            pid = acc_map.get(sel[0])
+            if not pid:
+                return
+            _save_pw()
+            win.destroy()
+            threading.Thread(target=self._scrape_one, args=(pid,), daemon=True).start()
+
+        btns = tk.Frame(per_frame, bg=BG)
+        btns.pack(fill="x")
+        tk.Button(btns, text="💾 Sauvegarder", font=("Segoe UI", 10, "bold"),
+                  bg=ACCENT, fg="#06080f", relief="flat", cursor="hand2", pady=7,
+                  command=_save_pw).pack(side="left", fill="x", expand=True)
+        tk.Button(btns, text="▶ Tester maintenant", font=("Segoe UI", 10),
+                  bg=OK, fg="#06080f", relief="flat", cursor="hand2", pady=7,
+                  command=_test_now).pack(side="left", fill="x", expand=True, padx=(6, 0))
+
+        # ── Bulk import content ──────────────────────────────────────────────
+        tk.Label(bulk_frame,
+                 text="Colle ici une liste username:password (une par ligne).\n"
+                      "L'app associe automatiquement chaque ligne au compte correspondant.",
+                 font=("Segoe UI", 9), bg=BG, fg=TEXT2, justify="left").pack(
+                     anchor="w", pady=(8, 6))
+        bulk_txt = tk.Text(bulk_frame, font=("Consolas", 10), bg=SURFACE2, fg=TEXT,
+                           insertbackground=TEXT, relief="flat", bd=0,
+                           highlightthickness=1, highlightcolor=ACCENT,
+                           highlightbackground=BORDER, height=10)
+        bulk_txt.pack(fill="both", expand=True, pady=(0, 8))
+        # pre-fill with existing
+        for pid, d in self.data.items():
+            ig = d.get("ig_username", "")
+            pw = d.get("ig_password", "")
+            if ig and pw:
+                bulk_txt.insert("end", f"{ig}:{pw}\n")
+
+        result_lbl = tk.Label(bulk_frame, text="", font=("Segoe UI", 9),
+                              bg=BG, fg=OK, anchor="w")
+        result_lbl.pack(anchor="w")
+
+        def _import_bulk():
+            lines = bulk_txt.get("1.0", "end").strip().splitlines()
+            matched = 0
+            for line in lines:
+                line = line.strip()
+                if ":" not in line:
+                    continue
+                parts  = line.split(":", 1)
+                user   = parts[0].strip().lstrip("@").lower()
+                pw     = parts[1].strip()
+                if not user or not pw:
+                    continue
+                for pid, d in self.data.items():
+                    if d.get("ig_username", "").lower() == user:
+                        d["ig_password"] = pw
+                        matched += 1
+                        break
+            save_data(self.data)
+            result_lbl.config(text=f"✅ {matched} compte(s) mis à jour")
+            self.log(f"{matched} identifiants importés", "ok")
+
+        def _import_and_scrape():
+            _import_bulk()
+            win.destroy()
+            threading.Thread(target=self._scrape_sel, daemon=True).start()
+
+        bulk_btns = tk.Frame(bulk_frame, bg=BG)
+        bulk_btns.pack(fill="x", pady=(4, 0))
+        tk.Button(bulk_btns, text="💾 Importer", font=("Segoe UI", 10, "bold"),
+                  bg=ACCENT, fg="#06080f", relief="flat", cursor="hand2", pady=7,
+                  command=_import_bulk).pack(side="left", fill="x", expand=True)
+        tk.Button(bulk_btns, text="▶ Importer + Scraper tout",
+                  font=("Segoe UI", 10), bg=OK, fg="#06080f",
+                  relief="flat", cursor="hand2", pady=7,
+                  command=_import_and_scrape).pack(side="left", fill="x", expand=True, padx=(6, 0))
+
+        show_per()  # default tab
 
     # ══════════════════════════════════════════════════════════════════════════
     # PUSH SERVER
