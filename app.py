@@ -3885,7 +3885,8 @@ class App:
                   relief="flat", cursor="hand2", padx=8,
                   command=_toggle_pw).pack(side="right")
 
-        selected_pid = [None]   # survit aux clics dans les champs texte
+        selected_pid = [None]
+        selected_idx = [None]   # survit aux clics dans les champs texte
 
         def _on_acc_sel(e=None):
             sel = accs_lb.curselection()
@@ -3893,6 +3894,7 @@ class App:
                 pid = acc_map.get(sel[0])
                 if pid:
                     selected_pid[0] = pid
+                    selected_idx[0] = sel[0]
                     sess_var.set(self.data[pid].get("ig_sessionid", ""))
                     pw_var.set(self.data[pid].get("ig_password", ""))
 
@@ -3917,9 +3919,10 @@ class App:
                 d.pop("ig_password", None)
                 (IG_SESS_DIR / f"{d.get('ig_username','')}.json").unlink(missing_ok=True)
             save_data(self.data)
-            accs_lb.delete(sel[0])
-            accs_lb.insert(sel[0], _acc_label(d))
-            accs_lb.selection_set(sel[0])
+            idx = selected_idx[0]
+            accs_lb.delete(idx)
+            accs_lb.insert(idx, _acc_label(d))
+            accs_lb.selection_set(idx)
             self.log(f"Identifiants @{d.get('ig_username','')} sauvegardés", "ok")
 
         def _test_now():
