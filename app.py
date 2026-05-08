@@ -3687,6 +3687,11 @@ class App:
                     cnt = raw.get("comment_count", "?")
                     self.root.after(0, lambda: _log(
                         f"📡 Réponse API — clés: {keys} — comment_count: {cnt}", "info"))
+                # Instagram returns HTTP 200 with error body on some failures
+                if raw.get("status") == "fail" or "message" in raw and "comments" not in raw:
+                    msg = raw.get("message", "erreur inconnue")
+                    code = raw.get("status_code", "")
+                    raise RuntimeError(f"Instagram erreur {code}: {msg}")
 
                 def _extract(obj):
                     out = []
