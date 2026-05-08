@@ -726,65 +726,87 @@ def scrape_ig_direct(username: str, password: str, proxy: str | None = None,
         return {"ig_status": "error", "ig_error": str(ex)}
 
 
+_IG_PRIVATE_HEADERS = {
+    "User-Agent":      "Instagram 275.0.0.27.98 Android (33/13; 420dpi; 1080x2400; samsung; SM-G991B; o1s; exynos2100)",
+    "X-IG-App-ID":     "936619743392459",
+    "Accept-Language": "en-US",
+    "Accept-Encoding": "gzip, deflate",
+    "Connection":      "keep-alive",
+}
+
+def _ig_session_client(sessionid: str) -> httpx.Client:
+    """Return an httpx client pre-configured with the Instagram session cookie."""
+    return httpx.Client(
+        headers=_IG_PRIVATE_HEADERS,
+        cookies={"sessionid": sessionid},
+        base_url="https://i.instagram.com",
+        follow_redirects=True,
+        timeout=15,
+    )
+
 def scrape_ig_by_session(username: str, sessionid: str) -> dict:
-    """
-    Get stats using an existing sessionid cookie (no new login, no challenge).
-    This is the most reliable method — reuses the session already active on
-    the GéeLark phone's Instagram app.
-    """
-    _ensure_instagrapi()
+    """Direct private API call — no instagrapi, no web GraphQL, no challenges."""
     try:
-        from instagrapi import Client
-        cl = Client()
-        cl.login_by_sessionid(sessionid)
-        # account_info() uses /accounts/current_user/ — pure private API, no web GraphQL
-        u = cl.account_info()
-        videos = []
-        try:
-            for m in cl.user_medias(cl.user_id, amount=20):
-                views = getattr(m, "view_count", 0) or getattr(m, "play_count", 0) or 0
-                videos.append({
-                    "id":       m.code,
-                    "views":    views,
-                    "likes":    m.like_count or 0,
-                    "comments": m.comment_count or 0,
-                    "caption":  (m.caption_text or "")[:80],
-                })
-        except Exception:
-            pass
-        return {
-            "ig_status":    "active",
-            "ig_username":  u.username,
-            "full_name":    u.full_name or "",
-            "followers":    u.follower_count,
-            "following":    u.following_count,
-            "posts_count":  u.media_count,
-            "bio":          u.biography or "",
-            "is_private":   u.is_private,
-            "is_verified":  u.is_verified,
-            "profile_pic":  str(u.profile_pic_url or ""),
-            "videos":       videos,
-            "last_checked": datetime.now().isoformat(),
-        }
+        with _ig_session_client(sessionid) as cl:
+            # Own account info
+            r = cl.get("/api/v1/accounts/current_user/", params={"edit": "true"})
+            if r.status_code == 401:
+                return {"ig_status": "error",
+                        "ig_error": "Session expirée — récupère un nouveau sessionid depuis GéeLark"}
+            r.raise_for_status()
+            u = r.json()["user"]
+            user_id = u["pk"]
+
+            # Recent media for views/likes/comments
+            videos = []
+            try:
+                mr = cl.get(f"/api/v1/feed/user/{user_id}/", params={"count": 20})
+                if mr.status_code == 200:
+                    for item in mr.json().get("items", []):
+                        views = item.get("view_count") or item.get("play_count") or 0
+                        caps  = item.get("caption") or {}
+                        videos.append({
+                            "id":       item.get("code", ""),
+                            "views":    views,
+                            "likes":    item.get("like_count", 0),
+                            "comments": item.get("comment_count", 0),
+                            "caption":  (caps.get("text", "") if isinstance(caps, dict) else "")[:80],
+                        })
+            except Exception:
+                pass
+
+            return {
+                "ig_status":    "active",
+                "ig_username":  u.get("username", username),
+                "full_name":    u.get("full_name", ""),
+                "followers":    u.get("follower_count", 0),
+                "following":    u.get("following_count", 0),
+                "posts_count":  u.get("media_count", 0),
+                "bio":          u.get("biography", ""),
+                "is_private":   u.get("is_private", False),
+                "is_verified":  u.get("is_verified", False),
+                "profile_pic":  u.get("profile_pic_url", ""),
+                "videos":       videos,
+                "last_checked": datetime.now().isoformat(),
+            }
     except Exception as ex:
         msg = str(ex)
-        if "login_required" in msg.lower() or "session" in msg.lower():
+        if "401" in msg or "login" in msg.lower():
             return {"ig_status": "error",
                     "ig_error": "Session expirée — récupère un nouveau sessionid depuis GéeLark"}
         return {"ig_status": "error", "ig_error": msg}
 
 
 def get_username_from_session(sessionid: str) -> str | None:
-    """Fetch the Instagram username for the given session ID (no username needed)."""
-    _ensure_instagrapi()
+    """Fetch the Instagram username for a session ID — no instagrapi."""
     try:
-        from instagrapi import Client
-        cl = Client()
-        cl.login_by_sessionid(sessionid)
-        info = cl.account_info()
-        return info.username
+        with _ig_session_client(sessionid) as cl:
+            r = cl.get("/api/v1/accounts/current_user/", params={"edit": "true"})
+            if r.status_code == 200:
+                return r.json()["user"]["username"]
     except Exception:
-        return None
+        pass
+    return None
 
 
 # ══════════════════════════════════════════════════════════════════════════════
