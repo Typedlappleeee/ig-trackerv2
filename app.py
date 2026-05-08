@@ -2508,7 +2508,8 @@ class App:
             r = httpx.post(
                 "https://openapi.geelark.com/open/v1/upload/getUrl",
                 json={"fileType": "mp4"},
-                headers=api_hdrs, timeout=20)
+                headers=api_hdrs, timeout=20,
+                follow_redirects=False)
             try:
                 rj = r.json()
             except Exception:
@@ -2549,7 +2550,8 @@ class App:
                         "video":       [resource_url],
                         "scheduleAt":  schedule_at,
                     },
-                    headers=api_hdrs, timeout=30)
+                    headers=api_hdrs, timeout=30,
+                    follow_redirects=False)
                 try:
                     rj = r.json()
                     if rj.get("code") == 0:
