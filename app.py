@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import ttk, scrolledtext, messagebox, filedialog, colorchooser
+from tkinter import ttk, scrolledtext, messagebox, filedialog, colorchooser, simpledialog
 import threading, hashlib, time, json, httpx, sys, os, subprocess, shutil, random, re
 import textwrap, concurrent.futures
 import http.server, socketserver, socket, urllib.parse as _urlparse
@@ -1065,13 +1065,13 @@ class App:
         for name in ["T", "Bank", "Vid"]:
             style.configure(f"{name}.Treeview",
                 background=SURFACE, fieldbackground=SURFACE, foreground=TEXT,
-                rowheight=34, font=("Segoe UI", 10), borderwidth=0)
+                rowheight=36, font=("Segoe UI", 10), borderwidth=0)
             style.configure(f"{name}.Treeview.Heading",
                 background=SURFACE2, foreground=TEXT2,
-                font=("Segoe UI", 9, "bold"), relief="flat", padding=(8, 6))
+                font=("Segoe UI", 9, "bold"), relief="flat", padding=(8, 8))
             style.map(f"{name}.Treeview",
                 background=[("selected", HL)],
-                foreground=[("selected", TEXT)])
+                foreground=[("selected", ACCENT)])
         style.configure("TCombobox",
             fieldbackground=SURFACE2, background=SURFACE2,
             foreground=TEXT, selectbackground=HL,
@@ -1080,7 +1080,7 @@ class App:
             fieldbackground=[("readonly", SURFACE2)],
             foreground=[("readonly", TEXT)])
         style.configure("TScrollbar",
-            background=SURFACE2, troughcolor=SURFACE,
+            background=SURFACE3, troughcolor=SURFACE,
             borderwidth=0, arrowsize=0)
 
     # ── Animation helpers ─────────────────────────────────────────────────────
@@ -1235,26 +1235,37 @@ class App:
         tk.Label(inner_logo, text=email_short, font=("Segoe UI", 8),
                  bg=SURFACE, fg=TEXT2).pack(anchor="w", pady=(3, 0))
 
-        tk.Frame(self.sidebar, height=1, bg=BORDER).pack(fill="x", pady=(0, 6))
+        tk.Frame(self.sidebar, height=1, bg=BORDER).pack(fill="x", pady=(0, 4))
 
         # ── Sidebar: nav ───────────────────────────────────────────────────────
-        nav_items = [
-            ("phones",      "📱", "Téléphones"),
-            ("stats",       "📊", "Stats Instagram"),
-            ("automation",  "🎬", "Montage"),
-            ("posting",     "🚀", "Posting"),
-            ("bank",        "🗂", "Banque vidéos"),
-            ("autocomment", "🤖", "Automatisation"),
-            ("tools",       "🔧", "Outils IA"),
-            ("settings",    "⚙",  "Paramètres"),
-        ]
         self.tab_btns = {}
         self._sidebar_indicators = {}
-        for k, icon, label in nav_items:
-            row, btn, ind = self._make_sidebar_item(self.sidebar, icon, label, k)
-            row.pack(fill="x", pady=0)
-            self.tab_btns[k] = btn
-            self._sidebar_indicators[k] = ind
+
+        def _reg(key, icon, label, parent=self.sidebar, indent=False):
+            row, btn, ind = self._make_sidebar_item(parent, icon, label, key, indent=indent)
+            row.pack(fill="x")
+            self.tab_btns[key] = btn
+            self._sidebar_indicators[key] = ind
+
+        # Standalone
+        _reg("phones",     "📱", "Téléphones")
+        tk.Frame(self.sidebar, height=1, bg=BORDER).pack(fill="x", pady=2)
+
+        # INSTA BETA group
+        grp_outer, grp_children = self._make_sidebar_group(
+            self.sidebar, "✦", "INSTA", badge="BETA", col=OK)
+        grp_outer.pack(fill="x")
+        self._insta_group_children = grp_children
+
+        _reg("stats",       "📊", "Stats",           grp_children, indent=True)
+        _reg("posting",     "🚀", "Posting",          grp_children, indent=True)
+        _reg("bank",        "🗂", "Banque vidéos",    grp_children, indent=True)
+        _reg("autocomment", "🤖", "Automatisation",   grp_children, indent=True)
+        _reg("tools",       "🔧", "Outils IA",        grp_children, indent=True)
+
+        tk.Frame(self.sidebar, height=1, bg=BORDER).pack(fill="x", pady=2)
+        _reg("automation",  "🎬", "Montage")
+        _reg("settings",    "⚙",  "Paramètres")
 
         # ── Sidebar: bottom ────────────────────────────────────────────────────
         tk.Frame(self.sidebar, bg=SURFACE).pack(fill="both", expand=True)
@@ -1279,36 +1290,50 @@ class App:
 
         self.sv = {}
         card_data = [
-            ("phones", "📱", "TÉLÉPHONES",   ACCENT),
-            ("active", "✅", "IG ACTIFS",    OK),
-            ("banned", "🚫", "BANNIS",       DANGER),
-            ("views",  "👁", "VUES TOTALES", WARN),
+            ("phones", "📱", "TÉLÉPHONES",   ACCENT, "all"),
+            ("active", "✅", "IG ACTIFS",    OK,     "active"),
+            ("banned", "🚫", "BANNIS",       DANGER, "banned"),
+            ("views",  "👁", "VUES TOTALES", WARN,   "views"),
         ]
-        for k, ico, lbl, col in card_data:
+        for k, ico, lbl, col, filt in card_data:
             card = tk.Frame(sf, bg=CARD, padx=0, pady=0,
-                            highlightthickness=1, highlightbackground=BORDER)
+                            highlightthickness=1, highlightbackground=BORDER,
+                            cursor="hand2")
             card.pack(side="left", fill="x", expand=True, padx=(0, 10))
 
-            top_bar = tk.Frame(card, height=3, bg=col)
+            top_bar = tk.Frame(card, height=3, bg=col, cursor="hand2")
             top_bar.pack(fill="x")
 
-            inner = tk.Frame(card, bg=CARD, padx=16, pady=14)
+            inner = tk.Frame(card, bg=CARD, padx=16, pady=14, cursor="hand2")
             inner.pack(fill="both", expand=True)
 
-            row_top = tk.Frame(inner, bg=CARD)
+            row_top = tk.Frame(inner, bg=CARD, cursor="hand2")
             row_top.pack(fill="x")
-            tk.Label(row_top, text=ico, font=("Segoe UI", 14), bg=CARD, fg=col).pack(side="left")
+            tk.Label(row_top, text=ico, font=("Segoe UI", 14), bg=CARD, fg=col,
+                     cursor="hand2").pack(side="left")
             tk.Label(row_top, text=lbl, font=("Segoe UI", 8, "bold"),
-                     bg=CARD, fg=TEXT2).pack(side="left", padx=(6, 0), pady=2)
+                     bg=CARD, fg=TEXT2, cursor="hand2").pack(side="left", padx=(6, 0), pady=2)
 
-            v = tk.Label(inner, text="—", font=("Segoe UI", 26, "bold"), bg=CARD, fg=col)
+            v = tk.Label(inner, text="—", font=("Segoe UI", 26, "bold"), bg=CARD, fg=col,
+                         cursor="hand2")
             v.pack(anchor="w", pady=(4, 0))
+            hint = tk.Label(inner, text="cliquer pour filtrer", font=("Segoe UI", 7),
+                            bg=CARD, fg=MUTED, cursor="hand2")
+            hint.pack(anchor="w")
             self.sv[k] = v
 
-            # Hover glow
-            for w in [card, inner, row_top, v]:
-                w.bind("<Enter>", lambda e, c=card: c.config(highlightbackground=col))
+            def _card_click(e, f2=filt):
+                self._phone_stat_filter = f2
+                self._show_tab("phones")
+                self._refresh_table()
+
+            for w in [card, inner, row_top, v, hint, top_bar]:
+                w.bind("<Button-1>", _card_click)
+                w.bind("<Enter>", lambda e, c=card, cl=col: c.config(highlightbackground=cl))
                 w.bind("<Leave>", lambda e, c=card: c.config(highlightbackground=BORDER))
+
+        # Global mousewheel routing
+        self.root.bind_all("<MouseWheel>", self._on_global_scroll, add="+")
 
         self.tab_container = tk.Frame(self.main_frame, bg=BG)
         self.tab_container.pack(fill="both", expand=True, padx=18, pady=(0, 18))
@@ -1362,17 +1387,16 @@ class App:
         widget.bind("<Enter>", lambda e: _tick(1), add="+")
         widget.bind("<Leave>", lambda e: _tick(-1), add="+")
 
-    def _make_sidebar_item(self, parent, icon, label, key):
+    def _make_sidebar_item(self, parent, icon, label, key, indent=False):
         """Returns (outer_row, button, indicator_frame)."""
         outer = tk.Frame(parent, bg=SURFACE)
-
         indicator = tk.Frame(outer, width=3, bg=SURFACE)
         indicator.pack(side="left", fill="y")
-
+        pad = 22 if indent else 12
         btn = tk.Button(outer,
                         text=f"  {icon}  {label}",
                         font=("Segoe UI", 10), bg=SURFACE, fg=TEXT2,
-                        relief="flat", anchor="w", padx=12, pady=10,
+                        relief="flat", anchor="w", padx=pad, pady=9,
                         cursor="hand2", activebackground=SURFACE3,
                         bd=0, command=lambda x=key: self._show_tab(x))
         btn.pack(side="left", fill="x", expand=True)
@@ -1384,30 +1408,69 @@ class App:
             if getattr(self, "_active_tab", "") != key:
                 btn.config(bg=SURFACE, fg=TEXT2)
 
-        btn.bind("<Enter>", _in)
-        btn.bind("<Leave>", _out)
-        outer.bind("<Enter>", _in)
-        outer.bind("<Leave>", _out)
-
+        btn.bind("<Enter>", _in); btn.bind("<Leave>", _out)
+        outer.bind("<Enter>", _in); outer.bind("<Leave>", _out)
         return outer, btn, indicator
+
+    def _make_sidebar_group(self, parent, icon, label, badge=None, col=None):
+        """Collapsible group header. Returns (outer, children_frame)."""
+        accent = col or ACCENT
+        outer = tk.Frame(parent, bg=SURFACE)
+        _open = [True]
+
+        hdr = tk.Frame(outer, bg=SURFACE3, cursor="hand2")
+        hdr.pack(fill="x")
+        tk.Frame(hdr, width=3, bg=accent).pack(side="left", fill="y")
+
+        inner_h = tk.Frame(hdr, bg=SURFACE3)
+        inner_h.pack(side="left", fill="x", expand=True, padx=10, pady=8)
+        tk.Label(inner_h, text=f"{icon}  {label}", font=("Segoe UI", 9, "bold"),
+                 bg=SURFACE3, fg=TEXT).pack(side="left")
+        if badge:
+            badge_lbl = tk.Label(inner_h, text=badge, font=("Segoe UI", 7, "bold"),
+                                 bg=accent, fg="#07080d", padx=5, pady=1)
+            badge_lbl.pack(side="left", padx=(7, 0))
+
+        arrow = tk.Label(hdr, text="▾", font=("Segoe UI", 11),
+                         bg=SURFACE3, fg=TEXT2)
+        arrow.pack(side="right", padx=10)
+
+        children = tk.Frame(outer, bg=SURFACE)
+        children.pack(fill="x")
+
+        def _toggle(e=None):
+            _open[0] = not _open[0]
+            if _open[0]:
+                children.pack(fill="x")
+                arrow.config(text="▾")
+            else:
+                children.pack_forget()
+                arrow.config(text="▸")
+
+        for w in [hdr, inner_h, arrow] + inner_h.winfo_children():
+            w.bind("<Button-1>", _toggle)
+
+        return outer, children
 
     def _show_tab(self, key):
         self._active_tab = key
+        # Auto-expand INSTA group if needed
+        _insta_keys = {"stats", "posting", "bank", "autocomment", "tools"}
+        if key in _insta_keys and hasattr(self, "_insta_group_children"):
+            children = self._insta_group_children
+            if not children.winfo_ismapped():
+                children.pack(fill="x")
 
-        # Update sidebar indicators
         for k, ind in self._sidebar_indicators.items():
             active = k == key
             btn = self.tab_btns[k]
             if active:
                 ind.config(bg=ACCENT)
-                btn.config(bg=SURFACE3, fg=TEXT,
-                           font=("Segoe UI", 10, "bold"))
+                btn.config(bg=SURFACE3, fg=TEXT, font=("Segoe UI", 10, "bold"))
             else:
                 ind.config(bg=SURFACE)
-                btn.config(bg=SURFACE, fg=TEXT2,
-                           font=("Segoe UI", 10))
+                btn.config(bg=SURFACE, fg=TEXT2, font=("Segoe UI", 10))
 
-        # Fade-in new tab
         for k, frame in self.tabs.items():
             if k == key:
                 frame.place(x=0, y=0, relwidth=1, relheight=1)
@@ -1415,12 +1478,23 @@ class App:
             else:
                 frame.place_forget()
 
-        if key == "stats":
-            self._refresh_ig_list()
-        if key == "bank":
-            self._refresh_bank()
-        if key == "automation":
-            self._refresh_auto_phones()
+        if key == "stats":    self._refresh_ig_list()
+        if key == "bank":     self._refresh_bank()
+        if key == "automation": self._refresh_auto_phones()
+
+    def _on_global_scroll(self, event):
+        """Route mousewheel to nearest scrollable ancestor."""
+        w = event.widget
+        for _ in range(12):
+            if w is None:
+                break
+            if hasattr(w, "yview_scroll"):
+                try:
+                    w.yview_scroll(int(-1 * (event.delta / 120)), "units")
+                    return
+                except Exception:
+                    pass
+            w = getattr(w, "master", None)
 
     # ══════════════════════════════════════════════════════════════════════════
     # ONGLET TÉLÉPHONES
@@ -1456,40 +1530,20 @@ class App:
                  width=22).pack(side="left", padx=(4, 0), ipady=5)
 
         self.sel_lbl = tk.Label(tb1, text="", font=("Segoe UI", 9), bg=SURFACE2, fg=MUTED)
-        self.sel_lbl.pack(side="right")
+        self.sel_lbl.pack(side="right", padx=6)
 
-        # ── Toolbar row 2: actions ─────────────────────────────────────────────
-        tb2 = tk.Frame(f, bg=BG, pady=6)
-        tb2.pack(fill="x", pady=(0, 8))
-
-        tk.Label(tb2, text="@Username IG :", font=("Segoe UI", 9),
-                 bg=BG, fg=TEXT2).pack(side="left")
-        self.link_var = tk.StringVar()
-        tk.Entry(tb2, textvariable=self.link_var, font=("Consolas", 10),
-                 bg=SURFACE2, fg=TEXT, insertbackground=TEXT, relief="flat", bd=0,
-                 highlightthickness=1, highlightcolor=ACCENT, highlightbackground=BORDER,
-                 width=22).pack(side="left", padx=(6, 8), ipady=5)
-
-        self._mk_btn(tb2, "✓  Lier", "primary", self._link, pady=5).pack(side="left", padx=2)
-        self._mk_btn(tb2, "✗  Délier", "danger", self._unlink, pady=5).pack(side="left", padx=2)
-
-        tk.Frame(tb2, bg=BORDER, width=1).pack(side="left", fill="y", padx=10)
-
-        self._mk_btn(tb2, "📊  Scraper", "ok", pady=5,
-            cmd=lambda: threading.Thread(target=self._scrape_sel, daemon=True).start()
-        ).pack(side="left", padx=2)
-        self._mk_btn(tb2, "🔑  Identifiants", "secondary", self._show_credentials_dialog,
-                     pady=5).pack(side="left", padx=2)
-
-        # ── Auto-refresh controls ─────────────────────────────────────────────
-        tk.Frame(tb2, bg=BORDER, width=1).pack(side="left", fill="y", padx=(10, 8))
-        tk.Label(tb2, text="Auto :", font=("Segoe UI", 9), bg=BG, fg=TEXT2).pack(side="left")
+        # ── Auto-refresh mini controls ────────────────────────────────────────
+        tk.Frame(tb1, bg=BORDER, width=1).pack(side="right", fill="y", padx=(8, 8))
+        self._countdown_var = tk.StringVar(value="↻ --:--")
+        tk.Label(tb1, textvariable=self._countdown_var,
+                 font=("Segoe UI", 9, "bold"), bg=SURFACE2, fg=ACCENT).pack(side="right")
+        tk.Label(tb1, text="min", font=("Segoe UI", 9), bg=SURFACE2, fg=TEXT2).pack(side="right")
         self._auto_interval_var = tk.StringVar(value=str(self.cfg.get("auto_refresh_min", 5)))
-        interval_cb = ttk.Combobox(tb2, textvariable=self._auto_interval_var,
+        interval_cb = ttk.Combobox(tb1, textvariable=self._auto_interval_var,
                                     values=["1", "2", "5", "10", "30", "60"],
-                                    state="readonly", width=4, font=("Segoe UI", 9))
-        interval_cb.pack(side="left", padx=(2, 1))
-        tk.Label(tb2, text="min", font=("Segoe UI", 9), bg=BG, fg=TEXT2).pack(side="left")
+                                    state="readonly", width=3, font=("Segoe UI", 9))
+        interval_cb.pack(side="right", padx=(2, 2))
+        tk.Label(tb1, text="Auto :", font=("Segoe UI", 9), bg=SURFACE2, fg=TEXT2).pack(side="right")
 
         def _on_interval_change(e=None):
             try:
@@ -1497,35 +1551,42 @@ class App:
             except ValueError:
                 m = 5
             self._set_auto_interval(m)
-
         interval_cb.bind("<<ComboboxSelected>>", _on_interval_change)
 
-        self._countdown_var = tk.StringVar(value="↻ --:--")
-        tk.Label(tb2, textvariable=self._countdown_var,
-                 font=("Segoe UI", 9, "bold"), bg=BG, fg=ACCENT).pack(side="left", padx=(6, 0))
+        # Hidden link_var for compatibility
+        self.link_var = tk.StringVar()
 
-        cols = ("no", "name", "group", "ig", "status", "followers", "views", "vids", "checked")
+        # ── Treeview with ⋮ actions column ────────────────────────────────────
+        cols = ("no", "name", "group", "ig", "status", "followers", "views", "vids", "checked", "act")
         self.tree = ttk.Treeview(f, columns=cols, show="headings",
                                   style="T.Treeview", selectmode="extended")
-        for col, head, w in [
-            ("no",       "#",          45),
-            ("name",     "Téléphone",  170),
-            ("group",    "Groupe",     150),
-            ("ig",       "@Instagram", 150),
-            ("status",   "Statut",     120),
-            ("followers","Followers",  100),
-            ("views",    "Vues",       90),
-            ("vids",     "Vidéos",     70),
-            ("checked",  "Vérifié",    110),
+        for col, head, w, anchor in [
+            ("no",       "#",          40,  "center"),
+            ("name",     "Téléphone",  155, "w"),
+            ("group",    "Groupe",     120, "center"),
+            ("ig",       "@Instagram", 140, "w"),
+            ("status",   "Statut",     100, "center"),
+            ("followers","Followers",  90,  "center"),
+            ("views",    "Vues",       80,  "center"),
+            ("vids",     "Vidéos",     60,  "center"),
+            ("checked",  "Vérifié",    90,  "center"),
+            ("act",      "  ⋮",        36,  "center"),
         ]:
             self.tree.heading(col, text=head)
-            self.tree.column(col, width=w, anchor="center")
-        self.tree.tag_configure("active", foreground=OK)
-        self.tree.tag_configure("banned", foreground=DANGER)
-        self.tree.tag_configure("error",  foreground=WARN)
-        self.tree.tag_configure("noig",   foreground=MUTED)
+            self.tree.column(col, width=w, anchor=anchor, minwidth=w)
+
+        self.tree.tag_configure("active",  foreground=OK)
+        self.tree.tag_configure("banned",  foreground=DANGER)
+        self.tree.tag_configure("error",   foreground=WARN)
+        self.tree.tag_configure("noig",    foreground=MUTED)
+        self.tree.tag_configure("odd",     background=SURFACE)
+        self.tree.tag_configure("even",    background=CARD)
+
         self.tree.bind("<<TreeviewSelect>>", self._on_sel)
-        self.tree.bind("<Double-1>", self._on_dbl)
+        self.tree.bind("<Double-1>",         self._on_dbl)
+        self.tree.bind("<Button-3>",         self._phone_context_menu)
+        self.tree.bind("<ButtonRelease-1>",  self._phone_dot_click)
+
         vsb = ttk.Scrollbar(f, orient="vertical", command=self.tree.yview)
         self.tree.configure(yscrollcommand=vsb.set)
         self.tree.pack(side="left", fill="both", expand=True)
@@ -1542,6 +1603,76 @@ class App:
             if d.get("ig_username"):
                 self._show_tab("stats")
                 self._show_ig_detail(self.sel_ids[0])
+
+    def _phone_dot_click(self, event):
+        """Show context menu when the ⋮ column is clicked."""
+        region = self.tree.identify("region", event.x, event.y)
+        col    = self.tree.identify_column(event.x)
+        if region == "cell" and col == "#10":  # act column = 10th
+            row = self.tree.identify_row(event.y)
+            if row:
+                self.tree.selection_set(row)
+                self._show_phone_menu(event.x_root, event.y_root)
+
+    def _phone_context_menu(self, event):
+        """Right-click context menu on treeview."""
+        row = self.tree.identify_row(event.y)
+        if row:
+            if row not in self.tree.selection():
+                self.tree.selection_set(row)
+            self._show_phone_menu(event.x_root, event.y_root)
+
+    def _show_phone_menu(self, x, y):
+        """Popup actions menu for a phone row."""
+        pid = self.sel_ids[0] if self.sel_ids else None
+        d   = self.data.get(pid, {}) if pid else {}
+        ig  = d.get("ig_username", "")
+
+        menu = tk.Menu(self.root, tearoff=0,
+                       bg=SURFACE3, fg=TEXT, activebackground=ACCENT,
+                       activeforeground="#07080d", relief="flat",
+                       font=("Segoe UI", 10), bd=0)
+
+        # Link / Unlink
+        def _do_link():
+            val = simpledialog.askstring(
+                "Lier Instagram", "Entrez le @username Instagram :",
+                parent=self.root)
+            if val:
+                self.link_var.set(val.strip().lstrip("@"))
+                self._link()
+
+        menu.add_command(label="  🔗  Lier Instagram…",    command=_do_link)
+        menu.add_command(label="  ✂️  Délier Instagram",   command=self._unlink)
+        menu.add_separator()
+        menu.add_command(label="  📊  Scraper les stats",
+                         command=lambda: threading.Thread(
+                             target=self._scrape_sel, daemon=True).start())
+        menu.add_command(label="  🔑  Identifiants",       command=self._show_credentials_dialog)
+        menu.add_separator()
+        if ig:
+            menu.add_command(label=f"  📈  Voir stats @{ig}",
+                             command=lambda: (self._show_tab("stats"),
+                                             self._show_ig_detail(pid)))
+        menu.add_separator()
+        menu.add_command(label="  🗑  Supprimer ce téléphone",
+                         foreground=DANGER, activebackground=DANGER,
+                         activeforeground="#07080d",
+                         command=self._delete_selected)
+        try:
+            menu.tk_popup(x, y)
+        finally:
+            menu.grab_release()
+
+    def _delete_selected(self):
+        if not self.sel_ids:
+            return
+        if messagebox.askyesno("Supprimer",
+                               f"Supprimer {len(self.sel_ids)} téléphone(s) ?"):
+            for pid in self.sel_ids:
+                self.data.pop(pid, None)
+            save_data(self.data)
+            self._refresh_table()
 
     # ══════════════════════════════════════════════════════════════════════════
     # ONGLET STATS
@@ -4951,9 +5082,11 @@ class App:
     def _refresh_table(self):
         prev = set(self.tree.selection())
         self.tree.delete(*self.tree.get_children())
-        grp  = self.grp_var.get()
-        srch = self.search_var.get().lower().strip()
+        grp   = self.grp_var.get()
+        srch  = self.search_var.get().lower().strip()
+        filt  = getattr(self, "_phone_stat_filter", "all")
         total = active = banned = views = 0
+        row_idx = 0
         for pid, d in sorted(self.data.items(),
                              key=lambda x: int(x[1].get("serial_no", 0) or 0)):
             if not d.get("phone_name"):
@@ -4964,12 +5097,15 @@ class App:
             ig = (d.get("ig_username") or "").lower()
             if srch and srch not in nm and srch not in ig:
                 continue
-            total += 1
             st = d.get("ig_status", "")
-            if st == "active":
-                active += 1
-            if st == "banned":
-                banned += 1
+            # Apply stat card filter
+            if filt == "active" and st != "active":
+                continue
+            if filt == "banned" and st != "banned":
+                continue
+            total += 1
+            if st == "active": active += 1
+            if st == "banned": banned += 1
             v = sum(x.get("views", 0) for x in d.get("videos", []))
             views += v
             st_txt = {
@@ -4987,7 +5123,9 @@ class App:
                 except:
                     pass
             tag = st if st in ("active", "banned", "error") else "noig"
-            self.tree.insert("", "end", iid=pid, tags=(tag,), values=(
+            stripe = "odd" if row_idx % 2 == 0 else "even"
+            row_idx += 1
+            self.tree.insert("", "end", iid=pid, tags=(tag, stripe), values=(
                 d.get("serial_no", ""),
                 d.get("phone_name", pid),
                 d.get("group_name", "—"),
@@ -4997,6 +5135,7 @@ class App:
                 fmt(v),
                 len(d.get("videos", [])),
                 chk or "—",
+                "  ⋮",
             ))
             if pid in prev:
                 self.tree.selection_add(pid)
