@@ -3885,22 +3885,24 @@ class App:
                   relief="flat", cursor="hand2", padx=8,
                   command=_toggle_pw).pack(side="right")
 
+        selected_pid = [None]   # survit aux clics dans les champs texte
+
         def _on_acc_sel(e=None):
             sel = accs_lb.curselection()
             if sel:
                 pid = acc_map.get(sel[0])
                 if pid:
+                    selected_pid[0] = pid
                     sess_var.set(self.data[pid].get("ig_sessionid", ""))
                     pw_var.set(self.data[pid].get("ig_password", ""))
 
         accs_lb.bind("<<ListboxSelect>>", _on_acc_sel)
 
         def _save_creds():
-            sel = accs_lb.curselection()
-            if not sel:
-                return
-            pid = acc_map.get(sel[0])
+            pid = selected_pid[0]
             if not pid:
+                messagebox.showwarning("Sélection", "Clique d'abord sur un compte dans la liste",
+                                       parent=win)
                 return
             d   = self.data[pid]
             sess = sess_var.get().strip()
@@ -3921,11 +3923,10 @@ class App:
             self.log(f"Identifiants @{d.get('ig_username','')} sauvegardés", "ok")
 
         def _test_now():
-            sel = accs_lb.curselection()
-            if not sel:
-                return
-            pid = acc_map.get(sel[0])
+            pid = selected_pid[0]
             if not pid:
+                messagebox.showwarning("Sélection", "Clique d'abord sur un compte dans la liste",
+                                       parent=win)
                 return
             _save_creds()
             win.destroy()
