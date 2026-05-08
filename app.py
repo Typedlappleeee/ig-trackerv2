@@ -748,22 +748,36 @@ def scrape_ig_by_session(username: str, sessionid: str) -> dict:
     """Direct private API call — no instagrapi, no web GraphQL, no challenges."""
     try:
         with _ig_session_client(sessionid) as cl:
-            # Own account info
-            r = cl.get("/api/v1/accounts/current_user/", params={"edit": "true"})
+            # Own account info — edit=false returns full stats (follower/following counts)
+            r = cl.get("/api/v1/accounts/current_user/", params={"edit": "false"})
             if r.status_code == 401:
                 return {"ig_status": "error",
                         "ig_error": "Session expirée — récupère un nouveau sessionid depuis GéeLark"}
             r.raise_for_status()
             u = r.json()["user"]
-            user_id = u["pk"]
+            user_id = u.get("pk") or u.get("id", "")
 
-            # Recent media for views/likes/comments
+            # If follower_count still 0, fetch from user info endpoint
+            if not u.get("follower_count"):
+                try:
+                    ui = cl.get(f"/api/v1/users/{user_id}/info/")
+                    if ui.status_code == 200:
+                        u2 = ui.json().get("user", {})
+                        u["follower_count"] = u2.get("follower_count", 0)
+                        u["following_count"] = u2.get("following_count", 0)
+                        u["media_count"]     = u2.get("media_count", 0)
+                except Exception:
+                    pass
+
+            # Recent media — video_view_count for videos, play_count for reels
             videos = []
             try:
-                mr = cl.get(f"/api/v1/feed/user/{user_id}/", params={"count": 20})
+                mr = cl.get(f"/api/v1/feed/user/{user_id}/", params={"count": "20"})
                 if mr.status_code == 200:
                     for item in mr.json().get("items", []):
-                        views = item.get("view_count") or item.get("play_count") or 0
+                        views = (item.get("play_count") or
+                                 item.get("video_view_count") or
+                                 item.get("view_count") or 0)
                         caps  = item.get("caption") or {}
                         videos.append({
                             "id":       item.get("code", ""),
