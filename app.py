@@ -944,19 +944,29 @@ class _PushHandler(http.server.BaseHTTPRequestHandler):
 # LOGIN
 # ══════════════════════════════════════════════════════════════════════════════
 def _set_window_icon(root):
-    """Set taskbar + title-bar icon from logo.png → icon.ico."""
-    ico = BASE_DIR / "icon.ico"
+    """Set taskbar + title-bar icon from logo.png (Windows + Linux)."""
     png = BASE_DIR / "logo.png"
+    ico = BASE_DIR / "icon.ico"
     try:
-        if ico.exists():
-            root.iconbitmap(str(ico))
-            return
-        if png.exists() and PIL_OK:
-            img = Image.open(str(png))
-            imgs = [img.resize((s, s), Image.LANCZOS) for s in (256,64,48,32,16)]
-            imgs[0].save(str(ico), format="ICO", sizes=[(s,s) for s in (256,64,48,32,16)],
-                         append_images=imgs[1:])
-            root.iconbitmap(str(ico))
+        if PIL_OK and png.exists():
+            img = Image.open(str(png)).convert("RGBA")
+            # iconphoto works on both Windows and Linux (always applied)
+            sizes = [256, 128, 64, 48, 32, 16]
+            tk_imgs = [ImageTk.PhotoImage(img.resize((s, s), Image.LANCZOS))
+                       for s in sizes]
+            root.wm_iconphoto(True, *tk_imgs)
+            # Store refs so GC doesn't collect them
+            root._icon_refs = tk_imgs
+            # Also try iconbitmap on Windows for taskbar
+            if not ico.exists():
+                frames = [img.resize((s, s), Image.LANCZOS) for s in sizes]
+                frames[0].save(str(ico), format="ICO",
+                               sizes=[(s, s) for s in sizes],
+                               append_images=frames[1:])
+            try:
+                root.iconbitmap(default=str(ico))
+            except Exception:
+                pass
     except Exception:
         pass
 
@@ -1387,16 +1397,16 @@ class App:
         _reg("automation", "✂", "Montage vidéo", mont_children, indent=True)
 
         tk.Frame(self.sidebar, height=1, bg=BORDER).pack(fill="x", pady=2)
-
-        # Coming soon platforms
-        _coming_soon(self.sidebar, "𝕏", "Twitter")
-        _coming_soon(self.sidebar, "🧵", "Threads")
-
-        tk.Frame(self.sidebar, height=1, bg=BORDER).pack(fill="x", pady=2)
         _reg("settings", "⚙", "Paramètres")
 
-        # ── Sidebar: bottom ────────────────────────────────────────────────────
+        # ── Sidebar: bottom (spacer + coming soon + refresh) ───────────────────
         tk.Frame(self.sidebar, bg=SURFACE).pack(fill="both", expand=True)
+
+        # Coming soon platforms pinned to bottom
+        tk.Frame(self.sidebar, height=1, bg=BORDER).pack(fill="x")
+        _coming_soon(self.sidebar, "𝕏", "Twitter")
+        _coming_soon(self.sidebar, "🧵", "Threads")
+        tk.Frame(self.sidebar, height=1, bg=BORDER).pack(fill="x")
 
         # Refresh button
         ref_frame = tk.Frame(self.sidebar, bg=SURFACE, padx=14, pady=6)
