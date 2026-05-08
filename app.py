@@ -3560,7 +3560,8 @@ class App:
         self._ac_vid_lb = tk.Listbox(vid_frame, bg=SURFACE, fg=TEXT,
                                      font=("Segoe UI", 8), relief="flat",
                                      selectbackground=ACCENT, selectforeground="#06080f",
-                                     activestyle="none", cursor="hand2")
+                                     activestyle="none", cursor="hand2",
+                                     exportselection=False)
         vsb_v = ttk.Scrollbar(vid_frame, orient="vertical", command=self._ac_vid_lb.yview)
         self._ac_vid_lb.configure(yscrollcommand=vsb_v.set)
         vsb_v.pack(side="right", fill="y")
@@ -3685,27 +3686,6 @@ class App:
                 if _log:
                     self.root.after(0, lambda e=e: _log(f"⚠ login_by_sessionid: {e}", "warn"))
 
-            # Try instagrapi v1 (private API with proper auth)
-            try:
-                raw_list = cl.media_comments_v1(clean_id, amount=100)
-                out = []
-                for c in raw_list:
-                    # instagrapi Comment object
-                    out.append({
-                        "pk": str(getattr(c, "pk", "") or ""),
-                        "user": {"username": getattr(getattr(c, "user", None), "username", "?")},
-                        "text": getattr(c, "text", ""),
-                    })
-                if _log:
-                    self.root.after(0, lambda n=len(out):
-                        _log(f"✅ instagrapi: {n} commentaire(s) trouvé(s)", "ok"))
-                return out
-            except Exception as e1:
-                if _log:
-                    self.root.after(0, lambda e=e1:
-                        _log(f"⚠ media_comments_v1: {e}", "warn"))
-
-            # Fallback: instagrapi generic media_comments
             try:
                 raw_list = cl.media_comments(clean_id, amount=100)
                 out = []
@@ -3715,12 +3695,9 @@ class App:
                         "user": {"username": getattr(getattr(c, "user", None), "username", "?")},
                         "text": getattr(c, "text", ""),
                     })
-                if _log:
-                    self.root.after(0, lambda n=len(out):
-                        _log(f"✅ instagrapi fallback: {n} commentaire(s)", "ok"))
                 return out
-            except Exception as e2:
-                raise RuntimeError(f"Impossible de charger les commentaires: {e2}")
+            except Exception as e:
+                raise RuntimeError(f"Impossible de charger les commentaires: {e}")
 
         def _post_reply_api(sid, media_id, comment_text, replied_to_id):
             clean_id = str(media_id).split("_")[0]
@@ -3728,13 +3705,9 @@ class App:
             cl = _IgClient()
             cl.delay_range = [1, 2]
             cl.login_by_sessionid(sid)
-            # instagrapi comment_reply posts a threaded reply
-            try:
-                return cl.media_comment(clean_id, comment_text,
-                                        replied_to_comment_id=int(replied_to_id))
-            except TypeError:
-                # older instagrapi without replied_to_comment_id param
-                return cl.media_comment(clean_id, f"@{replied_to_id} {comment_text}")
+            # Post as a top-level comment mentioning the user
+            # (instagrapi uses private API endpoint directly for comment)
+            return cl.media_comment(clean_id, comment_text)
 
         def _show_comments_in_panel(comments, replied_ids):
             self._ac_com_box.config(state="normal")
