@@ -1,7 +1,7 @@
 import tkinter as tk
-from tkinter import ttk, scrolledtext, messagebox, filedialog, colorchooser, simpledialog
-import threading, hashlib, time, json, httpx, sys, os, subprocess, shutil, random, re
-import textwrap, concurrent.futures
+from tkinter import ttk, scrolledtext, messagebox, filedialog, simpledialog
+import threading, hashlib, time, json, httpx, sys, subprocess, shutil, random, re
+import concurrent.futures
 import http.server, socketserver, socket, urllib.parse as _urlparse
 from datetime import datetime
 from pathlib import Path
