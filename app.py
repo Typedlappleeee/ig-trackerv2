@@ -3673,48 +3673,93 @@ class App:
         def _fetch_comments_api(sid, media_id, _log=None):
             clean_id = str(media_id).split("_")[0]
             if _log:
-                self.root.after(0, lambda: _log(f"🔎 media_id utilisé: {clean_id}", "info"))
+                self.root.after(0, lambda: _log(f"🔎 media_id: {clean_id}", "info"))
+
+            def _extract(raw):
+                out = []
+                for c in (raw.get("comments") or raw.get("comment_list") or []):
+                    out.append(c)
+                    for ch in (c.get("child_comment_list") or []):
+                        out.append(ch)
+                return out
+
+            def _is_ok(raw):
+                return raw.get("status") == "ok" or "comments" in raw
+
+            # Try 1 — www.instagram.com (web session, more permissive)
+            web_headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                              "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+                "X-IG-App-ID": "936619743392459",
+                "X-Requested-With": "XMLHttpRequest",
+                "Referer": "https://www.instagram.com/",
+                "Accept": "*/*",
+            }
+            try:
+                import httpx as _httpx
+                with _httpx.Client(
+                    headers=web_headers,
+                    cookies={"sessionid": sid},
+                    base_url="https://www.instagram.com",
+                    follow_redirects=True,
+                    timeout=15,
+                ) as wcl:
+                    r = wcl.get(f"/api/v1/media/{clean_id}/comments/",
+                                params={"can_support_threading": "true", "count": "50"})
+                    if r.status_code == 200:
+                        raw = r.json()
+                        if _log:
+                            self.root.after(0, lambda raw=raw: _log(
+                                f"📡 www — clés: {list(raw.keys())} count: {raw.get('comment_count','?')}",
+                                "info"))
+                        if _is_ok(raw):
+                            out = _extract(raw)
+                            nxt = raw.get("next_min_id") or raw.get("next_max_id")
+                            while nxt and len(out) < 200:
+                                r2 = wcl.get(f"/api/v1/media/{clean_id}/comments/",
+                                             params={"can_support_threading": "true",
+                                                     "min_id": nxt, "count": "50"})
+                                if r2.status_code != 200:
+                                    break
+                                raw2 = r2.json()
+                                pg = _extract(raw2)
+                                if not pg:
+                                    break
+                                out.extend(pg)
+                                nxt = raw2.get("next_min_id") or raw2.get("next_max_id")
+                            return out
+            except Exception as e1:
+                if _log:
+                    self.root.after(0, lambda e=e1: _log(f"⚠ www fallback error: {e}", "warn"))
+
+            # Try 2 — i.instagram.com (mobile Android client)
             with _ig_session_client(sid) as cl:
                 r = cl.get(f"/api/v1/media/{clean_id}/comments/",
-                           params={"can_support_threading": "true",
-                                   "permalink_enabled": "false",
-                                   "count": "50"})
+                           params={"can_support_threading": "true", "count": "50"})
                 if r.status_code != 200:
-                    raise RuntimeError(f"HTTP {r.status_code}: {r.text[:300]}")
+                    raise RuntimeError(f"HTTP {r.status_code}: {r.text[:200]}")
                 raw = r.json()
                 if _log:
-                    keys = list(raw.keys())
-                    cnt = raw.get("comment_count", "?")
-                    self.root.after(0, lambda: _log(
-                        f"📡 Réponse API — clés: {keys} — comment_count: {cnt}", "info"))
-                # Instagram returns HTTP 200 with error body on some failures
-                if raw.get("status") == "fail" or "message" in raw and "comments" not in raw:
-                    msg = raw.get("message", "erreur inconnue")
-                    code = raw.get("status_code", "")
-                    raise RuntimeError(f"Instagram erreur {code}: {msg}")
-
-                def _extract(obj):
-                    out = []
-                    for c in (obj.get("comments") or obj.get("comment_list") or []):
-                        out.append(c)
-                        for ch in (c.get("child_comment_list") or []):
-                            out.append(ch)
-                    return out
-
+                    self.root.after(0, lambda raw=raw: _log(
+                        f"📡 i.ig — clés: {list(raw.keys())} count: {raw.get('comment_count','?')}",
+                        "info"))
+                if not _is_ok(raw):
+                    msg = raw.get("message", str(raw)[:120])
+                    raise RuntimeError(f"Instagram: {msg}")
                 out = _extract(raw)
-                next_id = raw.get("next_min_id") or raw.get("next_max_id")
-                while next_id and len(out) < 200:
+                nxt = raw.get("next_min_id") or raw.get("next_max_id")
+                while nxt and len(out) < 200:
                     r2 = cl.get(f"/api/v1/media/{clean_id}/comments/",
                                 params={"can_support_threading": "true",
-                                        "min_id": next_id, "count": "50"})
+                                        "min_id": nxt, "count": "50"})
                     if r2.status_code != 200:
                         break
                     raw2 = r2.json()
-                    page = _extract(raw2)
-                    if not page:
+                    pg = _extract(raw2)
+                    if not pg:
                         break
-                    out.extend(page)
-                    next_id = raw2.get("next_min_id") or raw2.get("next_max_id")
+                    out.extend(pg)
+                    nxt = raw2.get("next_min_id") or raw2.get("next_max_id")
                 return out
 
         def _post_reply_api(sid, media_id, comment_text, replied_to_id):
