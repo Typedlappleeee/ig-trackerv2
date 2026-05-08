@@ -1465,8 +1465,10 @@ class App:
         self.tab_btns = {}
         self._sidebar_indicators = {}
 
-        def _reg(key, icon, label, parent=self.sidebar, indent=False):
-            row, btn, ind = self._make_sidebar_item(parent, icon, label, key, indent=indent)
+        def _reg(key, icon, label, parent=self.sidebar, indent=False, badge=None, badge_col=None):
+            row, btn, ind = self._make_sidebar_item(parent, icon, label, key,
+                                                     indent=indent, badge=badge,
+                                                     badge_col=badge_col)
             row.pack(fill="x")
             self.tab_btns[key] = btn
             self._sidebar_indicators[key] = ind
@@ -1498,7 +1500,8 @@ class App:
 
         _reg("stats",       "📊", "Stats",         grp_children, indent=True)
         _reg("posting",     "🚀", "Posting",        grp_children, indent=True)
-        _reg("masspost",    "⚡", "Mass Posting",   grp_children, indent=True)
+        _reg("masspost",    "⚡", "Mass Posting",   grp_children, indent=True,
+             badge="BETA", badge_col=WARN)
         _reg("bank",        "🗂", "Banque vidéos",  grp_children, indent=True)
         _reg("autocomment", "🤖", "Automatisation", grp_children, indent=True)
         _reg("tools",       "🔧", "Outils IA",      grp_children, indent=True)
@@ -1645,12 +1648,22 @@ class App:
         widget.bind("<Enter>", lambda e: _tick(1), add="+")
         widget.bind("<Leave>", lambda e: _tick(-1), add="+")
 
-    def _make_sidebar_item(self, parent, icon, label, key, indent=False):
-        """Returns (outer_row, button, indicator_frame)."""
+    def _make_sidebar_item(self, parent, icon, label, key, indent=False, badge=None, badge_col=None):
+        """Returns (outer_row, button, indicator_frame). Optional badge ('BETA', 'NEW'...)."""
         outer = tk.Frame(parent, bg=SURFACE)
         indicator = tk.Frame(outer, width=3, bg=SURFACE)
         indicator.pack(side="left", fill="y")
         pad = 22 if indent else 12
+
+        # Badge packed BEFORE the expanding button so it claims its space first
+        if badge:
+            bcol = badge_col or WARN
+            blbl = tk.Label(outer, text=f" {badge} ", font=("Segoe UI", 7, "bold"),
+                            bg=bcol, fg="#07080d", padx=2, pady=1,
+                            cursor="hand2")
+            blbl.pack(side="right", padx=(0, 10))
+            blbl.bind("<Button-1>", lambda e, x=key: self._show_tab(x))
+
         btn = tk.Button(outer,
                         text=f"  {icon}  {label}",
                         font=("Segoe UI", 10), bg=SURFACE, fg=TEXT2,
@@ -2238,14 +2251,11 @@ class App:
         # Max views for relative bar scaling
         max_views = max((v.get("views", 0) for v in videos), default=1) or 1
 
-        # Grid: 3 cards per row
-        COLS = 3
-        grid_frame = tk.Frame(self._st_vid_inner, bg=BG)
-        grid_frame.pack(fill="both", expand=True, pady=4)
+        # Row-based layout (one wide row per video)
+        list_frame = tk.Frame(self._st_vid_inner, bg=BG)
+        list_frame.pack(fill="both", expand=True, pady=2)
 
         for i, vid in enumerate(videos):
-            row_idx = i // COLS
-            col_idx = i % COLS
             sc       = vid.get("id", "")
             views    = vid.get("views", 0)
             likes    = vid.get("likes", 0)
@@ -2253,83 +2263,82 @@ class App:
             shares   = vid.get("shares", 0)
             caption  = vid.get("caption", "")
             url      = f"https://www.instagram.com/reel/{sc}/"
+            ratio    = views / max_views
+            accent_c = ACCENT if ratio > 0.7 else (OK if ratio > 0.3 else TEXT2)
 
-            # Color accent per popularity
-            ratio = views / max_views
-            if ratio > 0.7:
-                accent_c = ACCENT
-            elif ratio > 0.3:
-                accent_c = OK
-            else:
-                accent_c = TEXT2
+            # Rounded row
+            row_outer, row = self._round_card(list_frame, radius=10, bg=CARD,
+                                                border=BORDER, border_w=1,
+                                                hover_border=accent_c)
+            row_outer.pack(fill="x", pady=3)
+            row_outer.configure(height=72)
+            row_outer.pack_propagate(False)
 
-            card = tk.Frame(grid_frame, bg=CARD, highlightthickness=1,
-                            highlightbackground=BORDER, cursor="hand2")
-            card.grid(row=row_idx, column=col_idx, padx=4, pady=4, sticky="nsew")
-            grid_frame.columnconfigure(col_idx, weight=1)
+            # Left accent bar
+            tk.Frame(row, width=3, bg=accent_c).pack(side="left", fill="y")
 
-            # Top accent bar
-            tk.Frame(card, height=3, bg=accent_c).pack(fill="x")
+            inner = tk.Frame(row, bg=CARD)
+            inner.pack(side="left", fill="both", expand=True, padx=14, pady=8)
 
-            # REEL header + shortcode
-            th = tk.Frame(card, bg=SURFACE2)
-            th.pack(fill="x")
-            tk.Label(th, text="REEL", font=("Consolas", 7, "bold"),
-                     bg=SURFACE2, fg=accent_c, padx=8, pady=3).pack(side="left")
-            tk.Label(th, text=sc[:11] if sc else "", font=("Consolas", 7),
-                     bg=SURFACE2, fg=TEXT2, padx=6).pack(side="right")
+            # Top line: views (hero) + REEL id (right)
+            top = tk.Frame(inner, bg=CARD)
+            top.pack(fill="x")
+            views_chunk = tk.Frame(top, bg=CARD)
+            views_chunk.pack(side="left")
+            tk.Label(views_chunk, text="▶", font=("Segoe UI", 14, "bold"),
+                     bg=CARD, fg=accent_c).pack(side="left")
+            tk.Label(views_chunk, text=fmt(views), font=("Segoe UI", 16, "bold"),
+                     bg=CARD, fg=TEXT).pack(side="left", padx=(4, 4))
+            tk.Label(views_chunk, text="vues", font=("Segoe UI", 9),
+                     bg=CARD, fg=TEXT2).pack(side="left", pady=(4, 0))
+
+            # Right side: shortcode chip
+            tk.Label(top, text=f" {sc[:14]} " if sc else "",
+                     font=("Consolas", 8), bg=SURFACE2, fg=TEXT2,
+                     padx=4, pady=1).pack(side="right")
 
             # Progress bar (views relative)
-            bar_bg = tk.Frame(card, bg=SURFACE3, height=3)
-            bar_bg.pack(fill="x")
-            bar_fill_w = max(int(ratio * 100), 2)
-            bar_fill = tk.Frame(bar_bg, bg=accent_c, height=3)
-            bar_fill.place(relx=0, rely=0, relwidth=ratio, relheight=1)
+            bar_bg = tk.Frame(inner, bg=SURFACE3, height=2)
+            bar_bg.pack(fill="x", pady=(4, 4))
+            bar_bg.pack_propagate(False)
+            bar_fill = tk.Frame(bar_bg, bg=accent_c, height=2)
+            bar_fill.place(relx=0, rely=0, relwidth=max(ratio, 0.02), relheight=1)
 
-            # Stats row 1: views (large)
-            stats_row = tk.Frame(card, bg=CARD)
-            stats_row.pack(fill="x", padx=10, pady=(8, 2))
-            tk.Label(stats_row, text="▶", font=("Segoe UI", 13),
-                     bg=CARD, fg=WARN).pack(side="left")
-            tk.Label(stats_row, text=fmt(views), font=("Segoe UI", 14, "bold"),
-                     bg=CARD, fg=WARN).pack(side="left", padx=(4, 0))
-            tk.Label(stats_row, text="vues", font=("Segoe UI", 8),
-                     bg=CARD, fg=TEXT2).pack(side="left", padx=(2, 0), pady=(4, 0))
+            # Bottom: icons row + caption
+            bot = tk.Frame(inner, bg=CARD)
+            bot.pack(fill="x")
 
-            # Stats row 2: likes / comments / shares (icons)
-            stats_row2 = tk.Frame(card, bg=CARD)
-            stats_row2.pack(fill="x", padx=10, pady=(2, 4))
-            for icon, val, col in [
-                ("♥",  fmt(likes),    DANGER),
-                ("✎",  fmt(comments), ACCENT),
-                ("↗",  fmt(shares),   OK),
+            # White icons - much more readable
+            for icon, val in [
+                ("♥",  fmt(likes)),
+                ("✎",  fmt(comments)),
+                ("↗",  fmt(shares)),
             ]:
-                chunk = tk.Frame(stats_row2, bg=CARD)
-                chunk.pack(side="left", padx=(0, 12))
+                chunk = tk.Frame(bot, bg=CARD)
+                chunk.pack(side="left", padx=(0, 14))
                 tk.Label(chunk, text=icon, font=("Segoe UI", 11, "bold"),
-                         bg=CARD, fg=col).pack(side="left")
+                         bg=CARD, fg=TEXT).pack(side="left")
                 tk.Label(chunk, text=val, font=("Segoe UI", 10, "bold"),
                          bg=CARD, fg=TEXT).pack(side="left", padx=(3, 0))
 
-            # Caption preview
-            cap_text = caption[:80].replace("\n", " ") if caption else "—"
-            if len(caption) > 80:
-                cap_text += "…"
-            tk.Label(card, text=cap_text, font=("Segoe UI", 8),
-                     bg=CARD, fg=TEXT2, wraplength=170, justify="left",
-                     anchor="w").pack(fill="x", padx=8, pady=(2, 8))
+            # Caption (right side, truncated)
+            if caption:
+                cap_text = caption[:80].replace("\n", " ")
+                if len(caption) > 80:
+                    cap_text += "…"
+                tk.Label(bot, text=cap_text, font=("Segoe UI", 9),
+                         bg=CARD, fg=TEXT2, anchor="w").pack(side="left",
+                                                              fill="x", expand=True,
+                                                              padx=(8, 0))
 
             # Click to open reel
-            def _open(e, u=url):
+            def _open(e=None, u=url):
                 import webbrowser
                 webbrowser.open(u)
-            def _hover_in(e, c=card): c.config(highlightbackground=accent_c)
-            def _hover_out(e, c=card): c.config(highlightbackground=BORDER)
-            for w in card.winfo_children() + [card]:
+            row_outer._cv.bind("<Button-1>", _open, add="+")
+            for w in [row, inner, top, views_chunk, bot] + list(bot.winfo_children()) + list(top.winfo_children()) + list(views_chunk.winfo_children()):
                 try:
-                    w.bind("<Button-1>", _open)
-                    w.bind("<Enter>", _hover_in)
-                    w.bind("<Leave>", _hover_out)
+                    w.bind("<Button-1>", _open, add="+")
                 except Exception:
                     pass
 
@@ -2611,23 +2620,192 @@ class App:
         self.caption_text = tk.Text(btn_area, height=1)
         self.caption_text.pack_forget()
 
-        # ── Panneau droit : aperçu ───────────────────────────────────────────
+        # ── Panneau droit : aperçu + timeline ────────────────────────────────
         right = tk.Frame(f, bg=CARD)
         right.pack(side="left", fill="both", expand=True, padx=(10, 0))
-        tk.Label(right, text="APERÇU EN DIRECT", font=("Consolas", 8, "bold"),
-                 bg=CARD, fg=MUTED).pack(anchor="w", padx=14, pady=(12, 6))
+
+        # Header
+        prh = tk.Frame(right, bg=CARD)
+        prh.pack(fill="x", padx=14, pady=(12, 6))
+        tk.Label(prh, text="APERÇU EN DIRECT", font=("Consolas", 8, "bold"),
+                 bg=CARD, fg=MUTED).pack(side="left")
+        self._tl_time_lbl = tk.Label(prh, text="0:00 / 0:00",
+                                       font=("Consolas", 9, "bold"),
+                                       bg=CARD, fg=ACCENT)
+        self._tl_time_lbl.pack(side="right")
+
+        # Preview canvas (fills available space)
         self.preview_canvas = tk.Canvas(right, bg="#000", highlightthickness=0)
         self.preview_canvas.pack(fill="both", expand=True, padx=14, pady=(0, 4))
         self.preview_canvas.bind("<Button-1>",        self._preview_click)
         self.preview_canvas.bind("<B1-Motion>",       self._preview_drag)
         self.preview_canvas.bind("<ButtonRelease-1>", self._preview_release)
         self.preview_img_ref = None
-        tk.Label(right, text="✦ Glisse le texte · Snap magnétique au centre (±3%)",
+        tk.Label(right, text="✦ Glisse le texte sur l'aperçu · Snap au centre (±3%)",
                  font=("Segoe UI", 8), bg=CARD, fg=MUTED).pack(pady=(0, 4))
+
+        # ── Timeline ─────────────────────────────────────────────────────────
+        tl_wrap = tk.Frame(right, bg=CARD)
+        tl_wrap.pack(fill="x", padx=14, pady=(2, 4))
+
+        tl_hdr = tk.Frame(tl_wrap, bg=CARD)
+        tl_hdr.pack(fill="x", pady=(0, 4))
+        tk.Label(tl_hdr, text="TIMELINE", font=("Consolas", 8, "bold"),
+                 bg=CARD, fg=MUTED).pack(side="left")
+        self._tl_cut_lbl = tk.Label(tl_hdr, text="",
+                                      font=("Segoe UI", 8), bg=CARD, fg=TEXT2)
+        self._tl_cut_lbl.pack(side="left", padx=(10, 0))
+
+        # Cut buttons
+        self._mk_btn(tl_hdr, "✂  Couper ici (début)", "ok",
+                     lambda: self._tl_set_cut("start"),
+                     font=("Segoe UI", 8), pady=2).pack(side="right", padx=(4, 0))
+        self._mk_btn(tl_hdr, "✂  Couper ici (fin)", "danger",
+                     lambda: self._tl_set_cut("end"),
+                     font=("Segoe UI", 8), pady=2).pack(side="right", padx=(4, 0))
+        self._mk_btn(tl_hdr, "↺ Reset", "ghost",
+                     lambda: self._tl_reset_cut(),
+                     font=("Segoe UI", 8), pady=2).pack(side="right")
+
+        self._tl_canvas = tk.Canvas(tl_wrap, bg=SURFACE, highlightthickness=1,
+                                     highlightbackground=BORDER, height=72)
+        self._tl_canvas.pack(fill="x")
+        self._tl_canvas.bind("<Configure>", lambda e: self._tl_redraw())
+        self._tl_canvas.bind("<Button-1>",  self._tl_click)
+        self._tl_canvas.bind("<B1-Motion>", self._tl_drag)
+        self._tl_canvas.bind("<ButtonRelease-1>", self._tl_release)
+        self._tl_drag_target = [None]   # 'playhead' | 'start' | 'end' | None
+
+        # Init state
+        self._tl_duration = 0.0
+        self._tl_playhead_t = 2.0
+        self._tl_cut_start = 0.0
+        self._tl_cut_end = 0.0
+        self._tl_thumbs_pil = []
+
+        # Compact log
         self.auto_log = scrolledtext.ScrolledText(right, bg=SURFACE, fg=TEXT2,
-                                                   font=("Consolas", 9), relief="flat",
-                                                   state="disabled", wrap="word", height=5)
-        self.auto_log.pack(fill="x", padx=14, pady=(0, 10))
+                                                   font=("Consolas", 8), relief="flat",
+                                                   state="disabled", wrap="word", height=3)
+        self.auto_log.pack(fill="x", padx=14, pady=(4, 10))
+
+    # ── Timeline interactions ───────────────────────────────────────────────
+    def _tl_pos_to_time(self, x):
+        w = self._tl_canvas.winfo_width() or 600
+        dur = getattr(self, "_tl_duration", 0)
+        if not dur:
+            return 0.0
+        return max(0.0, min(dur, x / w * dur))
+
+    def _tl_click(self, e):
+        dur = getattr(self, "_tl_duration", 0)
+        if not dur:
+            return
+        w = self._tl_canvas.winfo_width() or 600
+        cs = getattr(self, "_tl_cut_start", 0.0)
+        ce = getattr(self, "_tl_cut_end", dur)
+        x_cs = int(cs / dur * w)
+        x_ce = int(ce / dur * w)
+        # Decide which marker is closest (within 12px)
+        if abs(e.x - x_cs) < 12:
+            self._tl_drag_target[0] = "start"
+        elif abs(e.x - x_ce) < 12:
+            self._tl_drag_target[0] = "end"
+        else:
+            self._tl_drag_target[0] = "playhead"
+            self._tl_playhead_t = self._tl_pos_to_time(e.x)
+            self._tl_redraw()
+            self._tl_seek_preview()
+
+    def _tl_drag(self, e):
+        target = self._tl_drag_target[0]
+        if not target:
+            return
+        t = self._tl_pos_to_time(e.x)
+        if target == "playhead":
+            self._tl_playhead_t = t
+        elif target == "start":
+            self._tl_cut_start = min(t, self._tl_cut_end - 0.1)
+        elif target == "end":
+            self._tl_cut_end = max(t, self._tl_cut_start + 0.1)
+        self._tl_update_labels()
+        self._tl_redraw()
+        if target == "playhead":
+            self._tl_seek_preview()
+
+    def _tl_release(self, e):
+        if self._tl_drag_target[0] in ("start", "end"):
+            # Move playhead to that cut point for visual feedback
+            if self._tl_drag_target[0] == "start":
+                self._tl_playhead_t = self._tl_cut_start
+            else:
+                self._tl_playhead_t = self._tl_cut_end
+            self._tl_seek_preview()
+        self._tl_drag_target[0] = None
+
+    def _tl_seek_preview(self):
+        """Debounced preview update at the new playhead position."""
+        if hasattr(self, "_tl_seek_after") and self._tl_seek_after:
+            try: self.root.after_cancel(self._tl_seek_after)
+            except Exception: pass
+        self._tl_seek_after = self.root.after(150, self._tl_do_seek)
+
+    def _tl_do_seek(self):
+        src = self.video_path_var.get()
+        if not src or not Path(src).exists():
+            return
+        ffmpeg = self._find_ffmpeg()
+        if not ffmpeg or not PIL_OK:
+            return
+        seek = getattr(self, "_tl_playhead_t", 0)
+        frame = BASE_DIR / "_seek.jpg"
+        try:
+            subprocess.run([ffmpeg, "-y", "-ss", f"{seek:.2f}", "-i", src,
+                            "-frames:v", "1", "-q:v", "3", str(frame)],
+                           capture_output=True, timeout=8)
+            if frame.exists():
+                img = Image.open(frame).convert("RGB")
+                self._cached_pil_frame = img
+                self._redraw_overlay_fast(glowing=False)
+        except Exception:
+            pass
+        self._tl_update_labels()
+
+    def _tl_set_cut(self, side):
+        ph = getattr(self, "_tl_playhead_t", 0)
+        if side == "start":
+            self._tl_cut_start = min(ph, self._tl_cut_end - 0.1)
+        else:
+            self._tl_cut_end = max(ph, self._tl_cut_start + 0.1)
+        self._tl_update_labels()
+        self._tl_redraw()
+
+    def _tl_reset_cut(self):
+        self._tl_cut_start = 0.0
+        self._tl_cut_end = getattr(self, "_tl_duration", 0.0)
+        self._tl_update_labels()
+        self._tl_redraw()
+
+    def _tl_update_labels(self):
+        def _fmt(t):
+            t = max(0, t)
+            return f"{int(t)//60}:{int(t)%60:02d}"
+        dur = getattr(self, "_tl_duration", 0.0)
+        ph  = getattr(self, "_tl_playhead_t", 0.0)
+        try:
+            self._tl_time_lbl.config(text=f"{_fmt(ph)} / {_fmt(dur)}")
+        except Exception:
+            pass
+        cs = getattr(self, "_tl_cut_start", 0.0)
+        ce = getattr(self, "_tl_cut_end", dur)
+        try:
+            if abs(cs) < 0.01 and abs(ce - dur) < 0.01:
+                self._tl_cut_lbl.config(text="(pas de découpe)")
+            else:
+                self._tl_cut_lbl.config(
+                    text=f"Cut : {_fmt(cs)} → {_fmt(ce)}  ({_fmt(ce - cs)})")
+        except Exception:
+            pass
 
     def _preview_click(self, e):
         self._is_dragging = True
@@ -2686,6 +2864,7 @@ class App:
             return
         try:
             base = self._cached_pil_frame.copy()
+            w, h = base.size
 
             # Apply color grading live
             b = getattr(self, 'brightness_var', None)
@@ -2891,6 +3070,16 @@ class App:
         self.path_lbl.config(text=Path(path).name, fg=TEXT)
         self.output_video_path = None
         self.process_status.config(text="")
+        # Reset timeline state for the new video
+        self._tl_duration = 0.0
+        self._tl_playhead_t = 1.0
+        self._tl_cut_start = 0.0
+        self._tl_cut_end = 0.0
+        self._tl_thumbs_pil = []
+        self._tl_thumbs_loaded_for = None
+        if hasattr(self, "_tl_canvas"):
+            self._tl_redraw()
+            self._tl_update_labels()
         self._schedule_preview()
 
     def _schedule_preview(self):
@@ -2909,8 +3098,10 @@ class App:
         if not ffmpeg:
             return
         frame_path = BASE_DIR / "_prev.jpg"
+        # Seek to current scrubber position (default 2s)
+        seek = getattr(self, "_tl_playhead_t", 2.0)
         try:
-            subprocess.run([ffmpeg, "-y", "-ss", "00:00:02", "-i", src,
+            subprocess.run([ffmpeg, "-y", "-ss", f"{seek:.2f}", "-i", src,
                             "-frames:v", "1", "-q:v", "3", str(frame_path)],
                            capture_output=True, timeout=10)
         except:
@@ -2923,6 +3114,137 @@ class App:
             self._redraw_overlay_fast(glowing=False)
         except Exception as e:
             print(f"Preview: {e}")
+        # Refresh timeline thumbnails (debounced)
+        if not getattr(self, "_tl_thumbs_loaded_for", None) == src:
+            self._tl_thumbs_loaded_for = src
+            threading.Thread(target=self._tl_load_thumbnails,
+                             args=(src,), daemon=True).start()
+            threading.Thread(target=self._tl_get_duration,
+                             args=(src,), daemon=True).start()
+
+    def _tl_get_duration(self, src):
+        ffmpeg = self._find_ffmpeg()
+        if not ffmpeg:
+            return
+        try:
+            r = subprocess.run([ffmpeg, "-i", src],
+                               capture_output=True, text=True, timeout=10)
+            out = (r.stdout or "") + (r.stderr or "")
+            m = re.search(r"Duration:\s*(\d+):(\d+):(\d+\.?\d*)", out)
+            if m:
+                h, mi, s = m.groups()
+                dur = int(h) * 3600 + int(mi) * 60 + float(s)
+                self._tl_duration = dur
+                # Reset cut markers if newly loaded
+                self._tl_cut_start = 0.0
+                self._tl_cut_end = dur
+                self.root.after(0, self._tl_redraw)
+        except Exception as e:
+            print(f"Duration: {e}")
+
+    def _tl_load_thumbnails(self, src):
+        """Extract evenly-spaced thumbnails for timeline strip."""
+        ffmpeg = self._find_ffmpeg()
+        if not ffmpeg or not PIL_OK:
+            return
+        # Wait until we know the duration
+        for _ in range(40):
+            if hasattr(self, "_tl_duration") and self._tl_duration:
+                break
+            time.sleep(0.1)
+        dur = getattr(self, "_tl_duration", 0)
+        if not dur:
+            return
+        N = 10
+        thumbs = []
+        for i in range(N):
+            t = (i + 0.5) * dur / N
+            tmp = BASE_DIR / f"_tl_{i}.jpg"
+            try:
+                subprocess.run([ffmpeg, "-y", "-ss", f"{t:.2f}", "-i", src,
+                                "-frames:v", "1", "-vf", "scale=-2:60",
+                                "-q:v", "5", str(tmp)],
+                               capture_output=True, timeout=5)
+                if tmp.exists():
+                    img = Image.open(tmp).convert("RGB")
+                    thumbs.append(img)
+            except Exception:
+                continue
+        self._tl_thumbs_pil = thumbs
+        self.root.after(0, self._tl_redraw)
+
+    def _tl_redraw(self):
+        """Redraw the timeline canvas: thumbs + playhead + cut markers."""
+        if not hasattr(self, "_tl_canvas") or not self._tl_canvas.winfo_exists():
+            return
+        cv = self._tl_canvas
+        cv.delete("all")
+        w = cv.winfo_width() or 600
+        h = cv.winfo_height() or 70
+        dur = getattr(self, "_tl_duration", 0)
+        if not dur:
+            cv.create_text(w // 2, h // 2, text="Charge une vidéo pour la timeline",
+                           fill=MUTED, font=("Segoe UI", 9))
+            return
+
+        # Draw thumbnail strip
+        thumbs = getattr(self, "_tl_thumbs_pil", [])
+        self._tl_thumb_imgs = []  # keep refs
+        if thumbs and PIL_OK:
+            tw = w // max(1, len(thumbs))
+            for i, im in enumerate(thumbs):
+                try:
+                    im2 = im.resize((tw, h - 18), Image.LANCZOS)
+                    photo = ImageTk.PhotoImage(im2)
+                    cv.create_image(i * tw, 0, anchor="nw", image=photo)
+                    self._tl_thumb_imgs.append(photo)
+                except Exception:
+                    pass
+        else:
+            cv.create_rectangle(0, 0, w, h - 18, fill=SURFACE2, outline="")
+
+        # Time ruler
+        cv.create_rectangle(0, h - 18, w, h, fill=SURFACE3, outline="")
+        for i in range(0, 11):
+            x = i * w // 10
+            t = i * dur / 10
+            mins = int(t) // 60
+            secs = int(t) % 60
+            cv.create_line(x, h - 18, x, h - 14, fill=TEXT2, width=1)
+            cv.create_text(x + 1, h - 6, anchor="w" if i < 10 else "e",
+                            text=f"{mins}:{secs:02d}",
+                            fill=TEXT2, font=("Consolas", 7))
+
+        # Cut region (selected range) - subtle accent overlay
+        cs = getattr(self, "_tl_cut_start", 0.0)
+        ce = getattr(self, "_tl_cut_end", dur)
+        x_cs = int(cs / dur * w) if dur else 0
+        x_ce = int(ce / dur * w) if dur else w
+        # Dim outside region
+        if x_cs > 0:
+            cv.create_rectangle(0, 0, x_cs, h - 18, fill="#000000", outline="",
+                                stipple="gray50")
+        if x_ce < w:
+            cv.create_rectangle(x_ce, 0, w, h - 18, fill="#000000", outline="",
+                                stipple="gray50")
+        # Cut start marker (green)
+        cv.create_rectangle(x_cs - 1, 0, x_cs + 1, h - 18, fill=OK, outline="",
+                            tags="cs_marker")
+        cv.create_polygon(x_cs - 6, 0, x_cs + 6, 0, x_cs, 8,
+                          fill=OK, outline="", tags="cs_marker")
+        # Cut end marker (red)
+        cv.create_rectangle(x_ce - 1, 0, x_ce + 1, h - 18, fill=DANGER, outline="",
+                            tags="ce_marker")
+        cv.create_polygon(x_ce - 6, 0, x_ce + 6, 0, x_ce, 8,
+                          fill=DANGER, outline="", tags="ce_marker")
+
+        # Playhead (yellow)
+        ph = getattr(self, "_tl_playhead_t", 2.0)
+        x_ph = int(ph / dur * w) if dur else 0
+        cv.create_rectangle(x_ph - 1, 0, x_ph + 1, h - 18, fill=ACCENT,
+                            outline="", tags="ph_marker")
+        cv.create_polygon(x_ph - 6, h - 18, x_ph + 6, h - 18, x_ph, h - 26,
+                          fill=ACCENT, outline="", tags="ph_marker")
 
     def _find_ffmpeg(self):
         ff = shutil.which("ffmpeg")
@@ -3178,6 +3500,20 @@ class App:
             else:
                 filters[-1] += f",setpts={pts}*PTS"
 
+        # Build cut flags from timeline markers
+        cut_args = []
+        try:
+            cs = float(getattr(self, "_tl_cut_start", 0.0))
+            ce = float(getattr(self, "_tl_cut_end", 0.0))
+            dur = float(getattr(self, "_tl_duration", 0.0))
+            if dur and (cs > 0.05 or (ce > 0 and ce < dur - 0.05)):
+                if cs > 0.05:
+                    cut_args += ["-ss", f"{cs:.2f}"]
+                if ce > 0 and ce < dur - 0.05:
+                    cut_args += ["-to", f"{ce:.2f}"]
+        except Exception:
+            cut_args = []
+
         if overlay_png:
             # complex filtergraph
             vf_chain = ",".join(f for f in filters[1:]) if len(filters) > 1 else ""
@@ -3187,21 +3523,21 @@ class App:
                 fg = filters[0]
             if abs(speed - 1.0) > 0.001:
                 af = f"atempo={speed}"
-                cmd = [ffmpeg, "-y", "-i", src, "-i", overlay_png,
+                cmd = [ffmpeg, "-y"] + cut_args + ["-i", src, "-i", overlay_png,
                        "-filter_complex", fg,
                        "-af", af, "-c:v", "libx264", "-preset", "fast", str(out_path)]
             else:
-                cmd = [ffmpeg, "-y", "-i", src, "-i", overlay_png,
+                cmd = [ffmpeg, "-y"] + cut_args + ["-i", src, "-i", overlay_png,
                        "-filter_complex", fg,
                        "-c:a", "copy", "-c:v", "libx264", "-preset", "fast", str(out_path)]
         else:
             vf = filters[0]
             if abs(speed - 1.0) > 0.001:
                 af = f"atempo={speed}"
-                cmd = [ffmpeg, "-y", "-i", src, "-vf", vf, "-af", af,
+                cmd = [ffmpeg, "-y"] + cut_args + ["-i", src, "-vf", vf, "-af", af,
                        "-c:v", "libx264", "-preset", "fast", str(out_path)]
             else:
-                cmd = [ffmpeg, "-y", "-i", src, "-vf", vf,
+                cmd = [ffmpeg, "-y"] + cut_args + ["-i", src, "-vf", vf,
                        "-c:a", "copy", "-c:v", "libx264", "-preset", "fast", str(out_path)]
 
         try:
