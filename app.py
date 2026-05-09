@@ -1905,7 +1905,7 @@ class App:
         self._sep_win = self.bg_canvas.create_line(
             SIDEBAR_W, 0, SIDEBAR_W, 800, fill="#1a2235", width=1)
 
-        self.main_frame = tk.Frame(self.bg_canvas, bg="#050810")
+        self.main_frame = tk.Frame(self.bg_canvas, bg="#080b14")
         self._main_win  = self.bg_canvas.create_window(
             SIDEBAR_W + 1, 0, anchor="nw", window=self.main_frame)
 
@@ -1925,10 +1925,10 @@ class App:
         logo_row.pack(fill="x", padx=14, pady=(16, 12))
 
         # App icon rounded square
-        ico_cv = tk.Canvas(logo_row, bg="#4f8ef7", width=34, height=34,
+        ico_cv = tk.Canvas(logo_row, bg="#3d7ae5", width=34, height=34,
                            highlightthickness=0)
         ico_cv.pack(side="left")
-        ico_cv.create_rectangle(4, 4, 30, 30, fill="#4f8ef7", outline="",
+        ico_cv.create_rectangle(4, 4, 30, 30, fill="#3d7ae5", outline="",
                                  width=0)
         ico_cv.create_text(17, 17, text="📱", font=("Segoe UI", 14))
 
