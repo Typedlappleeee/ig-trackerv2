@@ -2373,19 +2373,6 @@ class App:
         prof_inner = tk.Frame(prof_inner_card, bg=CARD)
         prof_inner.pack(fill="both", expand=True, padx=18, pady=14)
 
-        # ── REEL preview on the RIGHT (phone-frame mockup) ───────────────────
-        self._st_reel_canvas = tk.Canvas(prof_inner, bg=CARD, highlightthickness=0,
-                                          width=98, height=170, cursor="hand2")
-        self._st_reel_canvas.pack(side="right", padx=(14, 0))
-        self._st_reel_img_ref = None
-        self._st_reel_url = [None]
-
-        def _open_reel(_e=None):
-            if self._st_reel_url[0]:
-                import webbrowser
-                webbrowser.open(self._st_reel_url[0])
-        self._st_reel_canvas.bind("<Button-1>", _open_reel)
-
         # Avatar canvas (circular) - bigger for premium feel
         self._st_avatar_canvas = tk.Canvas(prof_inner, bg=CARD, highlightthickness=0,
                                             width=72, height=72)
@@ -2411,9 +2398,6 @@ class App:
                                      font=("Segoe UI", 9), bg=CARD, fg=MUTED,
                                      wraplength=320, justify="left")
         self._st_bio_lbl.pack(anchor="w", pady=(4, 0))
-
-        # Render placeholder Reel
-        self.root.after(150, lambda: self._render_reel_preview(None, ""))
 
         # KPI row
         kf = tk.Frame(right, bg=BG)
@@ -2717,13 +2701,6 @@ class App:
         self.kpis["posts"].config(text=str(d.get("posts_count", 0)))
         self.kpis["views"].config(text=fmt(total_views))
 
-        # Render top-performing reel preview
-        top_video = max(videos, key=lambda v: v.get("views", 0)) if videos else None
-        try:
-            self._render_reel_preview(top_video, ig)
-        except Exception:
-            pass
-
         self._current_vid_pid[0] = pid
         self._refresh_vid_cards()
 
@@ -2799,47 +2776,89 @@ class App:
             card_outer.configure(height=210)
             card_outer.pack_propagate(False)
 
-            # ── Top: gradient banner with REEL chip (Instagram-style) ────────
-            banner = tk.Canvas(card, bg=CARD, height=86,
+            # ── Top: thumbnail banner ─────────────────────────────────────────
+            thumb_url = vid.get("thumbnail_url", "")
+            banner = tk.Canvas(card, bg="#111", height=90,
                                 highlightthickness=0)
             banner.pack(fill="x")
+            banner._img_ref = None  # prevent GC
 
-            def _draw_banner(cv=banner, top=tier_top, bot=tier_bot,
-                              s=sc, ac=accent_c, vw=views):
-                cv.delete("all")
-                w = cv.winfo_width() or 200
-                h = 86
-                # Gradient
-                for k in range(20):
-                    t = k / 19
+            def _load_thumb(cv=banner, s=sc, tu=thumb_url,
+                            top=tier_top, bot=tier_bot, ac=accent_c):
+                """Try to load IG CDN thumbnail, fall back to gradient."""
+                img_pil = None
+                if tu and PIL_OK:
                     try:
-                        rr = int(int(top[1:3], 16) * (1 - t) + int(bot[1:3], 16) * t)
-                        gg = int(int(top[3:5], 16) * (1 - t) + int(bot[3:5], 16) * t)
-                        bb = int(int(top[5:7], 16) * (1 - t) + int(bot[5:7], 16) * t)
-                        col = f"#{rr:02x}{gg:02x}{bb:02x}"
+                        import urllib.request
+                        with urllib.request.urlopen(tu, timeout=8) as resp:
+                            data = resp.read()
+                        from io import BytesIO
+                        img_pil = Image.open(BytesIO(data)).convert("RGB")
                     except Exception:
-                        col = top
-                    cv.create_rectangle(0, k * h / 20, w, (k + 1) * h / 20,
-                                         fill=col, outline="")
-                # Center play icon
-                cx, cy = w // 2, h // 2
-                cv.create_oval(cx - 18, cy - 18, cx + 18, cy + 18,
-                                outline="#ffffff66", width=2)
-                cv.create_polygon(cx - 6, cy - 9, cx - 6, cy + 9, cx + 9, cy,
-                                   fill="#ffffff", outline="")
-                # REEL chip top-right
-                cv.create_rectangle(w - 56, 6, w - 6, 22,
-                                     fill="#00000066", outline="")
-                cv.create_text(w - 31, 14,
-                                text=f"REEL", fill="#ffffff",
-                                font=("Consolas", 7, "bold"))
-                # Shortcode chip top-left
-                if s:
-                    cv.create_rectangle(6, 6, 6 + 8 + len(s[:11]) * 6, 22,
-                                         fill="#00000066", outline="")
-                    cv.create_text(10, 14, anchor="w", text=s[:11],
-                                    fill="#ffffffcc", font=("Consolas", 7))
-            banner.bind("<Configure>", lambda e, fn=_draw_banner: fn())
+                        img_pil = None
+
+                def _apply(img=img_pil):
+                    if not cv.winfo_exists():
+                        return
+                    w = cv.winfo_width() or 200
+                    h = 90
+                    cv.delete("all")
+                    if img and PIL_OK:
+                        # Crop to 16:9-ish, fill width
+                        iw, ih = img.size
+                        target_ratio = w / h
+                        src_ratio = iw / ih
+                        if src_ratio > target_ratio:
+                            new_w = int(ih * target_ratio)
+                            left = (iw - new_w) // 2
+                            img_c = img.crop((left, 0, left + new_w, ih))
+                        else:
+                            new_h = int(iw / target_ratio)
+                            top_c = (ih - new_h) // 2
+                            img_c = img.crop((0, top_c, iw, top_c + new_h))
+                        img_r = img_c.resize((w, h), Image.LANCZOS)
+                        # Dark overlay for readability
+                        overlay = Image.new("RGBA", (w, h), (0, 0, 0, 90))
+                        img_rgba = img_r.convert("RGBA")
+                        img_final = Image.alpha_composite(img_rgba, overlay).convert("RGB")
+                        photo = ImageTk.PhotoImage(img_final)
+                        cv._img_ref = photo
+                        cv.create_image(0, 0, anchor="nw", image=photo)
+                    else:
+                        # Gradient fallback
+                        for k in range(20):
+                            t = k / 19
+                            try:
+                                rr = int(int(top[1:3], 16)*(1-t) + int(bot[1:3], 16)*t)
+                                gg = int(int(top[3:5], 16)*(1-t) + int(bot[3:5], 16)*t)
+                                bb = int(int(top[5:7], 16)*(1-t) + int(bot[5:7], 16)*t)
+                                col = f"#{rr:02x}{gg:02x}{bb:02x}"
+                            except Exception:
+                                col = top
+                            cv.create_rectangle(0, k*h/20, w, (k+1)*h/20,
+                                                 fill=col, outline="")
+                    # Play circle overlay
+                    cx, cy = w // 2, h // 2
+                    cv.create_oval(cx-18, cy-18, cx+18, cy+18,
+                                    outline="#ffffff88", width=2)
+                    cv.create_polygon(cx-6, cy-9, cx-6, cy+9, cx+9, cy,
+                                       fill="#ffffff", outline="")
+                    # REEL chip
+                    cv.create_rectangle(w-56, 6, w-6, 22,
+                                         fill="#00000099", outline="")
+                    cv.create_text(w-31, 14, text="REEL", fill="#ffffff",
+                                    font=("Consolas", 7, "bold"))
+
+                try:
+                    cv.after(0, _apply)
+                except Exception:
+                    pass
+
+            # Draw gradient immediately, load thumb async
+            def _init_banner(cv=banner, fn=_load_thumb):
+                cv.after(10, lambda: threading.Thread(target=fn, daemon=True).start())
+            banner.bind("<Configure>", lambda e, fn=_init_banner: fn() if not getattr(banner, '_loaded', False) else None)
+            banner._loaded = False
 
             # ── Body: stats ──────────────────────────────────────────────────
             body = tk.Frame(card, bg=CARD, padx=14, pady=10)
@@ -3225,13 +3244,13 @@ class App:
                                           font=("Segoe UI", 8, "bold"), pady=2)
         self._tl_play_btn.pack(side="left", padx=(10, 4))
 
-        self._mk_btn(tl_hdr, "✂  Rogner début", "ok",
+        self._mk_btn(tl_hdr, "✂ Rogner ici →", "ok",
                      lambda: self._tl_set_cut("start"),
                      font=("Segoe UI", 8), pady=2).pack(side="right", padx=(4, 0))
-        self._mk_btn(tl_hdr, "✂  Rogner fin", "danger",
+        self._mk_btn(tl_hdr, "← Rogner ici ✂", "danger",
                      lambda: self._tl_set_cut("end"),
                      font=("Segoe UI", 8), pady=2).pack(side="right", padx=(4, 0))
-        self._mk_btn(tl_hdr, "↺ Reset", "ghost",
+        self._mk_btn(tl_hdr, "↺", "ghost",
                      lambda: self._tl_reset_cut(),
                      font=("Segoe UI", 8), pady=2).pack(side="right")
 
@@ -3242,6 +3261,7 @@ class App:
         self._tl_canvas.bind("<Button-1>",  self._tl_click)
         self._tl_canvas.bind("<B1-Motion>", self._tl_drag)
         self._tl_canvas.bind("<ButtonRelease-1>", self._tl_release)
+        self._tl_canvas.bind("<Button-3>", self._tl_right_click)
         self._tl_drag_target = [None]   # 'playhead' | 'start' | 'end' | None
 
         # Init state
@@ -3280,11 +3300,63 @@ class App:
             v.pack(side="left", padx=(4, 0))
             self._auto_info_chips[k] = v
 
+        # ── Progress bar card ─────────────────────────────────────────────────
+        auto_prog_outer, auto_prog_card = self._round_card(right, radius=10,
+                                                            bg=SURFACE2, border=BORDER)
+        auto_prog_outer.pack(fill="x", padx=14, pady=(0, 6))
+        auto_prog_outer.configure(height=72)
+        auto_prog_outer.pack_propagate(False)
+        ap_inner = tk.Frame(auto_prog_card, bg=SURFACE2, padx=12, pady=8)
+        ap_inner.pack(fill="both", expand=True)
+
+        ap_top = tk.Frame(ap_inner, bg=SURFACE2)
+        ap_top.pack(fill="x")
+        self._auto_step_lbl = tk.Label(ap_top, text="En attente",
+                                        font=("Segoe UI", 9, "bold"),
+                                        bg=SURFACE2, fg=TEXT)
+        self._auto_step_lbl.pack(side="left")
+        self._auto_pct_lbl = tk.Label(ap_top, text="",
+                                       font=("Consolas", 9, "bold"),
+                                       bg=SURFACE2, fg=ACCENT)
+        self._auto_pct_lbl.pack(side="right")
+
+        ap_bar_bg = tk.Frame(ap_inner, bg=SURFACE3, height=6)
+        ap_bar_bg.pack(fill="x", pady=(6, 0))
+        ap_bar_bg.pack_propagate(False)
+        self._auto_prog_bar = tk.Canvas(ap_bar_bg, bg=SURFACE3, height=6,
+                                         highlightthickness=0)
+        self._auto_prog_bar.pack(fill="both", expand=True)
+        self._auto_prog_pct = [0]
+        self._auto_prog_target = [0]
+
+        def _auto_animate_bar():
+            cur = self._auto_prog_pct[0]
+            tgt = self._auto_prog_target[0]
+            if cur < tgt:
+                cur = min(tgt, cur + max(1, (tgt - cur) // 5))
+                self._auto_prog_pct[0] = cur
+            w = self._auto_prog_bar.winfo_width() or 300
+            self._auto_prog_bar.delete("all")
+            if cur > 0:
+                fw = max(6, int(w * cur / 100))
+                col = OK if cur >= 100 else ACCENT
+                self._auto_prog_bar.create_rectangle(0, 0, fw, 6, fill=col, outline="")
+                self._auto_prog_bar.create_rectangle(0, 0, fw, 2, fill="#ffffff22", outline="")
+            self.root.after(30, _auto_animate_bar)
+        self.root.after(120, _auto_animate_bar)
+
+        def _auto_set_progress(pct, step, detail=""):
+            self._auto_prog_target[0] = pct
+            col = OK if pct >= 100 else (DANGER if "❌" in step else ACCENT)
+            self._auto_step_lbl.config(text=step, fg=TEXT)
+            self._auto_pct_lbl.config(text=f"{pct}%" if pct > 0 else "", fg=col)
+        self._auto_set_progress = _auto_set_progress
+
         # ── Compact collapsible log ──────────────────────────────────────────
         log_row = tk.Frame(right, bg=CARD)
         log_row.pack(fill="x", padx=14, pady=(0, 10))
         self._auto_log_visible = [False]
-        log_btn = tk.Label(log_row, text="▶  Journal",
+        log_btn = tk.Label(log_row, text="▶  Journal détaillé",
                             font=("Segoe UI", 8), bg=CARD, fg=TEXT2,
                             cursor="hand2")
         log_btn.pack(side="left", anchor="w")
@@ -3296,11 +3368,11 @@ class App:
         def _toggle_log(_e=None):
             if self._auto_log_visible[0]:
                 self.auto_log.pack_forget()
-                log_btn.config(text="▶  Journal")
+                log_btn.config(text="▶  Journal détaillé")
                 self._auto_log_visible[0] = False
             else:
                 self.auto_log.pack(fill="x", padx=14, pady=(0, 10))
-                log_btn.config(text="▼  Journal")
+                log_btn.config(text="▼  Journal détaillé")
                 self._auto_log_visible[0] = True
         log_btn.bind("<Button-1>", _toggle_log)
 
@@ -3365,7 +3437,7 @@ class App:
             except Exception: pass
         self._tl_seek_after = self.root.after(150, self._tl_do_seek)
 
-    def _tl_do_seek(self):
+    def _tl_do_seek(self, fast=False):
         src = self.video_path_var.get()
         if not src or not Path(src).exists():
             return
@@ -3375,16 +3447,20 @@ class App:
         seek = getattr(self, "_tl_playhead_t", 0)
         frame = BASE_DIR / "_seek.jpg"
         try:
-            subprocess.run([ffmpeg, "-y", "-ss", f"{seek:.2f}", "-i", src,
-                            "-frames:v", "1", "-q:v", "3", str(frame)],
-                           capture_output=True, timeout=8)
+            cmd = [ffmpeg, "-y", "-ss", f"{seek:.2f}", "-i", src,
+                   "-frames:v", "1", "-q:v", "4"]
+            # Low-res preview during playback for speed
+            if getattr(self, "_tl_playing", [False])[0]:
+                cmd += ["-vf", "scale=540:-2"]
+            cmd.append(str(frame))
+            subprocess.run(cmd, capture_output=True, timeout=5)
             if frame.exists():
                 img = Image.open(frame).convert("RGB")
                 self._cached_pil_frame = img
-                self._redraw_overlay_fast(glowing=False)
+                self.root.after(0, lambda: self._redraw_overlay_fast(glowing=False))
         except Exception:
             pass
-        self._tl_update_labels()
+        self.root.after(0, self._tl_update_labels)
 
     def _tl_toggle_play(self):
         """Toggle play/pause for timeline preview."""
@@ -3415,7 +3491,7 @@ class App:
             self._tl_play_after[0] = None
 
     def _tl_play_step(self):
-        """Advance playhead by ~0.4s and update preview."""
+        """Advance playhead by ~0.25s and update preview in background thread."""
         if not self._tl_playing[0]:
             return
         dur = getattr(self, "_tl_duration", 0)
@@ -3425,17 +3501,22 @@ class App:
         ce = getattr(self, "_tl_cut_end", dur) or dur
         cs = getattr(self, "_tl_cut_start", 0.0)
         cur = getattr(self, "_tl_playhead_t", 0.0)
-        # Loop within cut region
         if cur >= ce - 0.05 or cur < cs:
             cur = cs
-        cur += 0.4
+        cur += 0.25
         if cur >= ce:
             cur = cs
         self._tl_playhead_t = cur
         self._tl_redraw()
         self._tl_update_labels()
-        self._tl_do_seek()
-        self._tl_play_after[0] = self.root.after(420, self._tl_play_step)
+
+        # Extract frame async; schedule next step when done
+        def _extract_and_advance():
+            self._tl_do_seek()
+            if self._tl_playing[0]:
+                self._tl_play_after[0] = self.root.after(0, self._tl_play_step)
+
+        threading.Thread(target=_extract_and_advance, daemon=True).start()
 
     def _tl_set_cut(self, side):
         ph = getattr(self, "_tl_playhead_t", 0)
@@ -3449,6 +3530,51 @@ class App:
     def _tl_reset_cut(self):
         self._tl_cut_start = 0.0
         self._tl_cut_end = getattr(self, "_tl_duration", 0.0)
+        self._tl_update_labels()
+        self._tl_redraw()
+
+    def _tl_right_click(self, event):
+        """Right-click on timeline: context menu to delete cut region or reset."""
+        dur = getattr(self, "_tl_duration", 0)
+        if not dur:
+            return
+        cs = getattr(self, "_tl_cut_start", 0.0)
+        ce = getattr(self, "_tl_cut_end", dur)
+        click_t = self._tl_pos_to_time(event.x)
+        has_cut = cs > 0.05 or ce < dur - 0.05
+
+        menu = tk.Menu(self.root, tearoff=0, bg=SURFACE2, fg=TEXT,
+                       activebackground=ACCENT, activeforeground="#06080f",
+                       relief="flat", bd=1)
+
+        def _fmt(t):
+            return f"{int(t)//60}:{int(t)%60:02d}"
+
+        if has_cut and cs <= click_t <= ce:
+            menu.add_command(
+                label=f"  ✂  Supprimer ce segment  ({_fmt(cs)}–{_fmt(ce)})",
+                command=self._tl_reset_cut)
+            menu.add_separator()
+
+        menu.add_command(label="  ✂ Rogner ici → (début)",
+                         command=lambda: self._tl_set_cut_at(click_t, "start"))
+        menu.add_command(label="  ← Rogner ici ✂ (fin)",
+                         command=lambda: self._tl_set_cut_at(click_t, "end"))
+        if has_cut:
+            menu.add_separator()
+            menu.add_command(label="  ↺  Réinitialiser la découpe",
+                             command=self._tl_reset_cut)
+        try:
+            menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            menu.grab_release()
+
+    def _tl_set_cut_at(self, t, side):
+        if side == "start":
+            self._tl_cut_start = min(t, self._tl_cut_end - 0.1)
+        else:
+            self._tl_cut_end = max(t, self._tl_cut_start + 0.1)
+        self._tl_playhead_t = t
         self._tl_update_labels()
         self._tl_redraw()
 
@@ -3643,6 +3769,15 @@ class App:
         self.auto_log.tag_config(level, foreground=colors.get(level, TEXT2))
         self.auto_log.see("end")
         self.auto_log.config(state="disabled")
+        # Mirror important messages to progress label
+        fn = getattr(self, "_auto_set_progress", None)
+        if fn:
+            if level == "ok" and "✅" in msg:
+                fn(100, msg[:60], "")
+            elif level == "error":
+                fn(0, msg[:60], "")
+            elif level == "accent":
+                fn(50, msg[:60], "")
 
     def _add_videos(self):
         paths = filedialog.askopenfilenames(
@@ -4083,6 +4218,8 @@ class App:
 
         self.root.after(0, lambda: self._alog("⏳ Traitement en cours...", "accent"))
         self.root.after(0, lambda: self.process_status.config(text="⏳ Traitement...", fg=WARN))
+        if fn := getattr(self, "_auto_set_progress", None):
+            self.root.after(0, lambda: fn(20, "⏳ Traitement en cours…", ""))
         try:
             result = self._process_single_video(
                 src_path, out_path, overlay, fs, px, py, speed,
@@ -4625,10 +4762,26 @@ class App:
 
         # ── Step 2: PUT the file — NO extra headers (OSS requirement) ────────
         log_fn("📤 Upload vidéo en cours...", "accent")
-        _progress(15, "Upload", "Envoi de la vidéo...")
+        _progress(10, "Upload", "Envoi de la vidéo...")
         try:
-            with open(video_path, "rb") as fl:
-                up = httpx.put(upload_url, content=fl.read(), timeout=300)
+            file_size = Path(video_path).stat().st_size
+            chunk_size = 262144  # 256 KB
+            uploaded = 0
+
+            def _chunked_iter():
+                nonlocal uploaded
+                with open(video_path, "rb") as fl:
+                    while True:
+                        chunk = fl.read(chunk_size)
+                        if not chunk:
+                            break
+                        uploaded += len(chunk)
+                        pct = 10 + int(uploaded / file_size * 20) if file_size else 20
+                        _progress(pct, "Upload",
+                                  f"Envoi… {uploaded//(1024*1024)}/{file_size//(1024*1024)} Mo")
+                        yield chunk
+
+            up = httpx.put(upload_url, content=_chunked_iter(), timeout=300)
             if up.status_code not in (200, 204):
                 log_fn(f"❌ Upload échoué (HTTP {up.status_code}): {up.text[:200]}", "error")
                 return
@@ -4660,8 +4813,9 @@ class App:
 
         # Give phones 30s to boot before first task
         log_fn("⏳ Attente 30s (démarrage)...", "info")
-        _progress(40, "Boot", "Attente démarrage (30s)...")
-        time.sleep(30)
+        for _bi in range(30):
+            _progress(35 + _bi, "Boot", f"Démarrage téléphones… {_bi+1}/30s")
+            time.sleep(1)
 
         task_ids = {}  # pid → task_id
         for i, pid in enumerate(selected):
@@ -4701,14 +4855,21 @@ class App:
 
         # ── Poll task status until all done or 8 min timeout ─────────────────
         log_fn("⏳ Suivi des tâches...", "accent")
-        _progress(60, "Suivi", "Suivi des tâches...")
+        _progress(70, "Suivi", "Suivi des tâches...")
         STATUS = {1: "⏳ En attente", 2: "🔄 En cours", 3: "✅ Terminé", 4: "❌ Échoué", 7: "🚫 Annulé"}
         deadline  = time.time() + 480  # 8 min max
         pending   = dict(task_ids)
         reported  = set()
         poll_num  = 0
+        n_total   = len(task_ids)
         while pending and time.time() < deadline:
-            time.sleep(15)
+            for _pi in range(15):
+                elapsed_ratio = min(1.0, (480 - (deadline - time.time())) / 480)
+                pct = 70 + int(elapsed_ratio * 25)
+                done = n_total - len(pending)
+                _progress(pct, "Suivi",
+                          f"{done}/{n_total} terminés • poll #{poll_num+1}")
+                time.sleep(1)
             poll_num += 1
             try:
                 qr = httpx.post(
@@ -6023,12 +6184,11 @@ class App:
         outer._sel_border = BORDER
 
         # Thumbnail (placeholder gris foncé)
-        thumb_h = 180
+        thumb_h = 108
         thumb_lbl = tk.Label(content, bg=SURFACE2, text="🎬",
-                             font=("Segoe UI", 24), fg=MUTED,
-                             height=8, anchor="center")
-        thumb_lbl.pack(fill="x", padx=8, pady=(8, 6))
-        # Hauteur fixe via configure pour assurer un aspect homogène
+                             font=("Segoe UI", 18), fg=MUTED,
+                             height=5, anchor="center")
+        thumb_lbl.pack(fill="x", padx=8, pady=(8, 4))
         try:
             thumb_lbl.configure(height=int(thumb_h / 18))
         except Exception:
@@ -6060,7 +6220,7 @@ class App:
 
         # Pied : taille + date
         meta = tk.Frame(content, bg=CARD)
-        meta.pack(fill="x", padx=10, pady=(0, 10))
+        meta.pack(fill="x", padx=10, pady=(0, 6))
         size_lbl = tk.Label(meta, text=f"{size_mb} Mo",
                              font=("Consolas", 8), bg=CARD, fg=MUTED)
         size_lbl.pack(side="left")
@@ -7132,7 +7292,7 @@ class App:
             self._settings_nav_btns[name].config(
                 bg=ACCENT, fg="#06080f", font=("Segoe UI", 10, "bold"))
 
-        for tab_name in ("Profil", "Connexions", "API Keys", "Apparence", "Notifications"):
+        for tab_name in ("Profil", "Connexions", "Paramètres généraux"):
             b = tk.Button(nav_inner, text=tab_name, font=("Segoe UI", 10),
                           bg=SURFACE2, fg=TEXT2, relief="flat", cursor="hand2",
                           padx=16, pady=6,
@@ -7145,6 +7305,48 @@ class App:
             inner_p = tk.Frame(outer, bg=CARD, padx=24, pady=20)
             inner_p.pack(fill="both", expand=True)
             self._settings_panels[tab_name] = (outer, inner_p)
+
+        # Virtual sub-panels: API Keys → section inside Connexions
+        conn_outer, conn_inner_ref = self._settings_panels["Connexions"]
+        tk.Frame(conn_inner_ref, bg=BORDER, height=1).pack(fill="x", pady=(20, 0))
+        tk.Label(conn_inner_ref, text="🔑 Clés API",
+                 font=("Segoe UI", 12, "bold"), bg=CARD, fg=TEXT).pack(
+                     anchor="w", pady=(12, 0))
+        api_section = tk.Frame(conn_inner_ref, bg=CARD)
+        api_section.pack(fill="x")
+        self._settings_panels["API Keys"] = (conn_outer, api_section)
+
+        # Virtual sub-panels: Apparence + Notifications → inside Paramètres généraux
+        gen_outer, gen_inner_ref = self._settings_panels["Paramètres généraux"]
+        _gen_sub_panels = {}
+        _gen_sub_btns = {}
+
+        def _show_gen_sub(name, _sps=_gen_sub_panels, _sbs=_gen_sub_btns):
+            for k, spf in _sps.items():
+                spf.pack_forget()
+            for k, sb in _sbs.items():
+                sb.config(bg=SURFACE2, fg=TEXT2, font=("Segoe UI", 9))
+            _sps[name].pack(fill="x")
+            _sbs[name].config(bg=ACCENT, fg="#06080f", font=("Segoe UI", 9, "bold"))
+
+        gen_sub_nav = tk.Frame(gen_inner_ref, bg=SURFACE2,
+                               highlightthickness=1, highlightbackground=BORDER)
+        gen_sub_nav.pack(fill="x", pady=(0, 14))
+        gen_sub_nav_inner = tk.Frame(gen_sub_nav, bg=SURFACE2)
+        gen_sub_nav_inner.pack(fill="x", padx=6, pady=4)
+
+        for _sname in ("Apparence", "Notifications", "Langue"):
+            _sb = tk.Button(gen_sub_nav_inner, text=_sname, font=("Segoe UI", 9),
+                            bg=SURFACE2, fg=TEXT2, relief="flat", cursor="hand2",
+                            padx=12, pady=4,
+                            command=lambda n=_sname: _show_gen_sub(n))
+            _sb.pack(side="left", padx=(0, 2))
+            _gen_sub_btns[_sname] = _sb
+            _spf = tk.Frame(gen_inner_ref, bg=CARD)
+            _gen_sub_panels[_sname] = _spf
+            self._settings_panels[_sname] = (gen_outer, _spf)
+
+        _show_gen_sub("Apparence")
 
         # --- Profil panel ---
         prof = self._settings_panels["Profil"][1]
@@ -7391,15 +7593,15 @@ class App:
         self._theme_active_lbl.pack(anchor="w")
 
         # ── Language switcher ────────────────────────────────────────────────
-        tk.Frame(app_pan, height=1, bg=BORDER).pack(fill="x", pady=(20, 14))
-        tk.Label(app_pan, text="Langue · Language",
+        lang_pan = self._settings_panels["Langue"][1]
+        tk.Label(lang_pan, text="Langue · Language",
                  font=("Segoe UI", 13, "bold"),
                  bg=CARD, fg=TEXT).pack(anchor="w", pady=(0, 6))
-        tk.Label(app_pan, text="Choisis la langue de l'interface (relance requise pour tout traduire)",
+        tk.Label(lang_pan, text="Choisis la langue de l'interface (relance requise pour tout traduire)",
                  font=("Segoe UI", 9), bg=CARD, fg=TEXT2).pack(anchor="w", pady=(0, 12))
 
         self._lang_var = tk.StringVar(value=self.cfg.get("lang", "fr"))
-        lang_row = tk.Frame(app_pan, bg=CARD)
+        lang_row = tk.Frame(lang_pan, bg=CARD)
         lang_row.pack(fill="x")
 
         def _make_lang_btn(code, flag, label):
@@ -7454,7 +7656,7 @@ class App:
         _refresh_all.append(_make_lang_btn("fr", "🇫🇷", "Français"))
         _refresh_all.append(_make_lang_btn("en", "🇬🇧", "English"))
 
-        lang_status = tk.Label(app_pan, text="", font=("Segoe UI", 9),
+        lang_status = tk.Label(lang_pan, text="", font=("Segoe UI", 9),
                                 bg=CARD, fg=TEXT2)
         lang_status.pack(anchor="w", pady=(12, 0))
 
