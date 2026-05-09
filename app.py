@@ -38,21 +38,21 @@ THEMES = {
 }
 
 # ── Palette principale ────────────────────────────────────────────────────────
-BG       = "#07080d"
-SURFACE  = "#0c0e17"
-SURFACE2 = "#12141f"
-SURFACE3 = "#181b28"
-BORDER   = "#1e2133"
-CARD     = "#0f1119"
-HL       = "#191d2e"
+BG       = "#080b14"
+SURFACE  = "#0c0f1c"
+SURFACE2 = "#111528"
+SURFACE3 = "#171c30"
+BORDER   = "#1a2035"
+CARD     = "#0d1120"
+HL       = "#141a2c"
 ACCENT   = "#4f8ef7"
 ACCENT2  = "#3d7ae5"
-DANGER   = "#ff3d51"
-OK       = "#00d4aa"
-WARN     = "#ff9f1c"
-TEXT     = "#dde3f0"
-TEXT2    = "#5d6680"
-MUTED    = "#2a2f44"
+DANGER   = "#f03d55"
+OK       = "#00ccaa"
+WARN     = "#ffaa2a"
+TEXT     = "#d4dcf0"
+TEXT2    = "#5a6882"
+MUTED    = "#1e2640"
 
 # ── Internationalisation ──────────────────────────────────────────────────────
 TRANSLATIONS = {
@@ -1676,11 +1676,11 @@ class App:
     def _mk_btn(self, parent, text, kind="secondary", cmd=None, **kw):
         """Styled button with hover animation. kind: primary|secondary|danger|ok|warn|ghost"""
         palettes = {
-            "primary":   (ACCENT,   ACCENT2,  "#07080d", "#07080d"),
+            "primary":   (ACCENT,   ACCENT2,  "#ffffff", "#ffffff"),
             "secondary": (SURFACE2, SURFACE3, TEXT2,     TEXT),
-            "danger":    (SURFACE2, DANGER,   DANGER,    "#07080d"),
-            "ok":        (SURFACE2, OK,       OK,        "#07080d"),
-            "warn":      (SURFACE2, WARN,     WARN,      "#07080d"),
+            "danger":    (SURFACE2, DANGER,   DANGER,    "#ffffff"),
+            "ok":        (SURFACE2, OK,       OK,        "#ffffff"),
+            "warn":      (SURFACE2, WARN,     WARN,      "#ffffff"),
             "ghost":     (BG,       SURFACE2, TEXT2,     TEXT),
         }
         bg_n, bg_h, fg_n, fg_h = palettes.get(kind, palettes["secondary"])
@@ -1697,31 +1697,35 @@ class App:
         """Consistent tab header with accent bar + icon + title."""
         col = accent_col or ACCENT
         hdr = tk.Frame(parent, bg=BG)
-        hdr.pack(fill="x", padx=0, pady=(0, 12))
-        # Top accent line
+        hdr.pack(fill="x", padx=0, pady=(0, 14))
+        # Top accent line (slightly thicker gradient feel)
         tk.Frame(hdr, height=2, bg=col).pack(fill="x")
         inner = tk.Frame(hdr, bg=BG)
-        inner.pack(fill="x", padx=20, pady=(12, 0))
+        inner.pack(fill="x", padx=22, pady=(14, 2))
         title_row = tk.Frame(inner, bg=BG)
         title_row.pack(fill="x")
-        tk.Label(title_row, text=icon, font=("Segoe UI", 13),
-                 bg=BG, fg=col).pack(side="left", padx=(0, 10))
+        # Icon in a subtle pill background
+        ico_wrap = tk.Frame(title_row, bg="#0d1525", padx=6, pady=4)
+        ico_wrap.pack(side="left", padx=(0, 12))
+        tk.Label(ico_wrap, text=icon, font=("Segoe UI", 12),
+                 bg="#0d1525", fg=col).pack()
         text_col = tk.Frame(title_row, bg=BG)
         text_col.pack(side="left", fill="x", expand=True)
-        tk.Label(text_col, text=title, font=("Segoe UI", 12, "bold"),
+        tk.Label(text_col, text=title, font=("Segoe UI", 11, "bold"),
                  bg=BG, fg=TEXT, anchor="w").pack(anchor="w")
         if subtitle:
-            tk.Label(text_col, text=subtitle, font=("Segoe UI", 9),
-                     bg=BG, fg=TEXT2, anchor="w").pack(anchor="w", pady=(1, 0))
+            tk.Label(text_col, text=subtitle, font=("Segoe UI", 8),
+                     bg=BG, fg=TEXT2, anchor="w").pack(anchor="w", pady=(2, 0))
+        tk.Frame(hdr, bg=BORDER, height=1).pack(fill="x", pady=(10, 0))
         return hdr
 
     def _section_label(self, parent, text, col=None):
         """Small section divider label."""
         row = tk.Frame(parent, bg=BG)
         row.pack(fill="x", pady=(10, 4))
-        tk.Frame(row, width=3, bg=col or ACCENT).pack(side="left", fill="y", padx=(0, 8))
-        tk.Label(row, text=text, font=("Segoe UI", 9, "bold"),
-                 bg=BG, fg=TEXT2).pack(side="left")
+        tk.Frame(row, width=2, bg=col or ACCENT).pack(side="left", fill="y", padx=(0, 8))
+        tk.Label(row, text=text, font=("Segoe UI", 8, "bold"),
+                 bg=BG, fg="#4a5878").pack(side="left")
         return row
 
     def log(self, msg, level="info"):
@@ -1899,7 +1903,7 @@ class App:
             0, 0, anchor="nw", window=self.sidebar, width=SIDEBAR_W)
 
         self._sep_win = self.bg_canvas.create_line(
-            SIDEBAR_W, 0, SIDEBAR_W, 800, fill="#141c2e", width=1)
+            SIDEBAR_W, 0, SIDEBAR_W, 800, fill="#1a2235", width=1)
 
         self.main_frame = tk.Frame(self.bg_canvas, bg="#050810")
         self._main_win  = self.bg_canvas.create_window(
@@ -2019,19 +2023,23 @@ class App:
             wy = widget.winfo_rooty()
             tip.geometry(f"+{wx}+{wy}")
 
-        def _soon(icon, label, tooltip_title=None, tooltip_body=None, tip_accent="#4f8ef7"):
+        def _soon(icon, label, tooltip_title=None, tooltip_body=None, tip_accent="#4f8ef7", bright=False):
             row = tk.Frame(self.sidebar, bg=SB_BG)
             row.pack(fill="x")
             tk.Frame(row, bg=SB_BG, width=3).pack(side="left", fill="y")
             tk.Frame(row, bg=SB_BG, width=10).pack(side="left")
+            _ico_fg = "#5060a0" if bright else "#2e3d58"
+            _txt_fg = "#7090c8" if bright else "#384d6e"
             ico_lbl = tk.Label(row, text=icon, font=("Segoe UI", 11),
-                     bg=SB_BG, fg="#222d42", width=2, anchor="center")
+                     bg=SB_BG, fg=_ico_fg, width=2, anchor="center")
             ico_lbl.pack(side="left")
             txt_lbl = tk.Label(row, text=label, font=("Segoe UI", 9),
-                     bg=SB_BG, fg="#2a3550", padx=8, pady=9, anchor="w")
+                     bg=SB_BG, fg=_txt_fg, padx=8, pady=9, anchor="w")
             txt_lbl.pack(side="left", fill="x", expand=True)
+            _badge_bg = "#1a1410" if bright else "#1a1808"
+            _badge_fg = "#a070d0" if bright else "#907030"
             tk.Label(row, text="Soon", font=("Segoe UI", 7, "bold"),
-                     bg="#1a1208", fg="#7a6020",
+                     bg=_badge_bg, fg=_badge_fg,
                      padx=5, pady=1).pack(side="right", padx=(0, 14))
             if tooltip_title and tooltip_body:
                 for w in [row, ico_lbl, txt_lbl]:
@@ -2045,7 +2053,7 @@ class App:
         _soon("🌐", "Multiposting",
               tooltip_title="🌐  Multiposting — Bientôt disponible !",
               tooltip_body="Poste le même Reel sur plusieurs réseaux en même temps avec un seul clic.\nInstagram · Twitter · Threads · Reddit et plus encore.",
-              tip_accent="#a56ef5")
+              tip_accent="#a56ef5", bright=True)
 
         # Spacer pushes bottom items down
         tk.Frame(self.sidebar, bg=SB_BG).pack(fill="both", expand=True)
@@ -2241,8 +2249,8 @@ class App:
     def _make_sidebar_item(self, parent, icon, label, key,
                            indent=False, badge=None, badge_col=None):
         SB  = "#0b0e18"
-        HOV = "#131b2e"
-        ACT = "#162040"
+        HOV = "#0f1728"
+        ACT = "#132040"
 
         outer = tk.Frame(parent, bg=SB, cursor="hand2")
 
@@ -2256,14 +2264,14 @@ class App:
 
         # Icon label (colored separately for active state)
         icon_lbl = tk.Label(outer, text=icon, font=("Segoe UI", 11),
-                            bg=SB, fg="#3d4a63",
+                            bg=SB, fg="#4d5e80",
                             cursor="hand2", anchor="center", width=2)
         icon_lbl.pack(side="left", pady=0)
 
         # Text label
         text_lbl = tk.Label(outer, text=label,
                             font=("Segoe UI", 9),
-                            bg=SB, fg="#6b7a99",
+                            bg=SB, fg="#6e80a2",
                             cursor="hand2", anchor="w", padx=8, pady=9)
         text_lbl.pack(side="left", fill="x", expand=True)
 
@@ -2285,8 +2293,8 @@ class App:
                 bg2 = HOV if on else SB
                 for w2 in (outer, icon_lbl, text_lbl, lpad):
                     w2.config(bg=bg2)
-                text_lbl.config(fg="#b0bcd6" if on else "#6b7a99")
-                icon_lbl.config(fg="#8899bb" if on else "#3d4a63")
+                text_lbl.config(fg="#c8d4ea" if on else "#6e80a2")
+                icon_lbl.config(fg="#9ab0d4" if on else "#4d5e80")
         outer.bind("<Enter>",  lambda e: _hl(True))
         outer.bind("<Leave>",  lambda e: _hl(False))
         icon_lbl.bind("<Enter>",  lambda e: _hl(True))
@@ -2319,7 +2327,7 @@ class App:
         SB = "#0b0e18"
         tk.Label(parent, text=label.upper(),
                  font=("Segoe UI", 7, "bold"),
-                 bg=SB, fg="#2e3d55",
+                 bg=SB, fg="#3d5070",
                  anchor="w", padx=16, pady=(8)).pack(fill="x")
 
     def _make_collapsible_section(self, parent, label, initially_open=True):
@@ -2341,12 +2349,12 @@ class App:
         hdr.pack(fill="x")
 
         chevron = tk.Label(hdr, text="▾" if initially_open else "▸",
-                           font=("Segoe UI", 8), bg=SB, fg="#3a4d66",
+                           font=("Segoe UI", 8), bg=SB, fg="#4a6082",
                            cursor="hand2")
         chevron.pack(side="right", padx=(0, 12))
         tk.Label(hdr, text=label.upper(),
                  font=("Segoe UI", 7, "bold"),
-                 bg=SB, fg="#3a4d66",
+                 bg=SB, fg="#4a6082",
                  anchor="w", padx=16, pady=8,
                  cursor="hand2").pack(side="left")
 
