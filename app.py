@@ -3052,7 +3052,7 @@ class App:
         # Hidden link_var for compatibility
         self.link_var = tk.StringVar()
 
-        # ── Treeview with ⋮ actions column ────────────────────────────────────
+        # ── Hidden Treeview (data backend only — not displayed) ──────────────
         cols = ("no", "name", "group", "ig", "status", "followers", "views", "vids", "checked", "act")
         self.tree = ttk.Treeview(f, columns=cols, show="headings",
                                   style="T.Treeview", selectmode="extended")
@@ -3070,23 +3070,304 @@ class App:
         ]:
             self.tree.heading(col, text=head)
             self.tree.column(col, width=w, anchor=anchor, minwidth=w)
-
         self.tree.tag_configure("active",  foreground=OK)
         self.tree.tag_configure("banned",  foreground=DANGER)
         self.tree.tag_configure("error",   foreground=WARN)
         self.tree.tag_configure("noig",    foreground=MUTED)
         self.tree.tag_configure("odd",     background=SURFACE)
         self.tree.tag_configure("even",    background=CARD)
+        # NOT packed — visual canvas replaces it
 
-        self.tree.bind("<<TreeviewSelect>>", self._on_sel)
-        self.tree.bind("<Double-1>",         self._on_dbl)
-        self.tree.bind("<Button-3>",         self._phone_context_menu)
-        self.tree.bind("<ButtonRelease-1>",  self._phone_dot_click)
+        # ── Column header bar ─────────────────────────────────────────────────
+        _T_BG   = "#0b0e18"
+        _T_ODD  = "#0d1117"
+        _T_EVEN = "#0b0f1c"
+        _T_SEL  = "#162040"
+        _T_SEP  = "#1a2235"
+        _T_HDR  = "#0b0e18"
+        _T_HFGA = "#4f8ef7"
+        _T_HFGM = "#2e3d55"
+        _T_TEXT = "#c9d1d9"
+        _T_MUTE = "#6b7a99"
+        _T_ONG  = "#f97316"   # orange profile ID
+        _T_BLUE = "#4f8ef7"   # phone icon
+        _T_GRN  = "#22c55e"   # android green
+        self._p_colors = dict(
+            BG=_T_BG, ODD=_T_ODD, EVEN=_T_EVEN, SEL=_T_SEL, SEP=_T_SEP,
+            TEXT=_T_TEXT, MUTED=_T_MUTE, ONG=_T_ONG, BLUE=_T_BLUE, GRN=_T_GRN,
+        )
 
-        vsb = ttk.Scrollbar(f, orient="vertical", command=self.tree.yview)
-        self.tree.configure(yscrollcommand=vsb.set)
-        self.tree.pack(side="left", fill="both", expand=True)
-        vsb.pack(side="right", fill="y")
+        # (key, px_width, anchor, label)
+        _COLS = [
+            ("no",        40,  "center", "#"),
+            ("icon",      44,  "center", ""),
+            ("device",   180,  "w",      "Téléphone"),
+            ("name",     145,  "w",      "Nom"),
+            ("group",    100,  "center", "Groupe"),
+            ("ig",       145,  "w",      "@Instagram"),
+            ("status",   110,  "center", "Statut"),
+            ("followers", 85,  "center", "Followers"),
+            ("views",     70,  "center", "Vues"),
+            ("vids",      55,  "center", "Vidéos"),
+            ("checked",   85,  "center", "Vérifié"),
+            ("gl",        44,  "center", ""),
+            ("act",       40,  "center", "⋮"),
+        ]
+        self._p_cols = _COLS
+
+        hdr = tk.Frame(f, bg=_T_HDR, height=34)
+        hdr.pack(fill="x")
+        hdr.pack_propagate(False)
+        tk.Frame(hdr, bg=_T_SEP, height=1).pack(side="bottom", fill="x")
+        for key, w, anc, lbl in _COLS:
+            cell = tk.Frame(hdr, bg=_T_HDR, width=w if key not in ("device","name","ig") else w)
+            if key in ("device", "name", "ig"):
+                cell.pack(side="left", fill="y", expand=(key == "ig"))
+            else:
+                cell.pack(side="left", fill="y")
+                cell.pack_propagate(False)
+            fg = _T_HFGA if lbl and lbl not in ("⋮",) else _T_HFGM
+            tk.Label(cell, text=lbl, font=("Segoe UI", 8, "bold"),
+                     bg=_T_HDR, fg=fg, anchor=anc, padx=4
+                     ).pack(fill="both", expand=True)
+            if key != "act":
+                tk.Frame(hdr, bg=_T_SEP, width=1).pack(side="left", fill="y", pady=6)
+
+        # ── Scrollable rows canvas ────────────────────────────────────────────
+        rows_wrap = tk.Frame(f, bg=_T_ODD)
+        rows_wrap.pack(fill="both", expand=True)
+
+        _p_vsb = ttk.Scrollbar(rows_wrap, orient="vertical")
+        _p_vsb.pack(side="right", fill="y")
+
+        rc = tk.Canvas(rows_wrap, bg=_T_ODD, highlightthickness=0,
+                       yscrollcommand=_p_vsb.set)
+        rc.pack(side="left", fill="both", expand=True)
+        _p_vsb.config(command=rc.yview)
+
+        ri = tk.Frame(rc, bg=_T_ODD)
+        rc.create_window((0, 0), window=ri, anchor="nw", tags="inner")
+        ri.bind("<Configure>",
+                lambda e: rc.configure(scrollregion=rc.bbox("all")))
+        rc.bind("<MouseWheel>",
+                lambda e: rc.yview_scroll(int(-1*(e.delta/120)), "units"))
+
+        self._p_rows_inner  = ri
+        self._p_rows_canvas = rc
+        self._p_row_frames  = {}
+        self._p_sel_iid     = [None]
+
+    # ── Visual phone table ────────────────────────────────────────────────────
+    def _phones_draw_table(self):
+        """Rebuild the custom visual rows from the hidden self.tree data."""
+        if not hasattr(self, "_p_rows_inner"):
+            return
+        c = self._p_colors
+
+        for w in self._p_rows_inner.winfo_children():
+            w.destroy()
+        self._p_row_frames.clear()
+
+        iids = self.tree.get_children()
+        if not iids:
+            emp = tk.Frame(self._p_rows_inner, bg=c["ODD"])
+            emp.pack(fill="both", expand=True, pady=80)
+            tk.Label(emp, text="📱", font=("Segoe UI", 36),
+                     bg=c["ODD"], fg="#1a2540").pack()
+            tk.Label(emp, text="Aucun téléphone",
+                     font=("Segoe UI", 13, "bold"),
+                     bg=c["ODD"], fg=c["MUTED"]).pack(pady=(8, 2))
+            tk.Label(emp, text="Synchronise tes cloud phones depuis GeeLark",
+                     font=("Segoe UI", 9), bg=c["ODD"], fg="#1e2d45").pack()
+            return
+
+        sel = self._p_sel_iid[0]
+
+        def _set_bg(widget, bg):
+            try: widget.config(bg=bg)
+            except Exception: pass
+            for ch in widget.winfo_children():
+                _set_bg(ch, bg)
+
+        for i, iid in enumerate(iids):
+            d      = self.data.get(iid, {})
+            vals   = self.tree.item(iid, "values")
+            is_sel = (iid == sel)
+            base   = c["SEL"] if is_sel else (c["ODD"] if i % 2 == 0 else c["EVEN"])
+            has_ig = bool(d.get("ig_username"))
+
+            row = tk.Frame(self._p_rows_inner, bg=base, height=50, cursor="hand2")
+            row.pack(fill="x")
+            row.pack_propagate(False)
+            tk.Frame(row, bg=c["SEP"], height=1).pack(side="bottom", fill="x")
+
+            inner = tk.Frame(row, bg=base)
+            inner.pack(fill="both", expand=True)
+
+            def _sep(bg=base):
+                tk.Frame(inner, bg=c["SEP"], width=1).pack(
+                    side="left", fill="y", pady=5)
+
+            def _cell(w, expand=False, bg=base):
+                f2 = tk.Frame(inner, bg=bg, width=w)
+                if expand:
+                    f2.pack(side="left", fill="both", expand=True)
+                else:
+                    f2.pack(side="left", fill="y")
+                    f2.pack_propagate(False)
+                return f2
+
+            def _lbl(parent, text, font=("Segoe UI", 9), fg=None,
+                     anchor="center", bg=base, padx=4):
+                tk.Label(parent, text=text, font=font,
+                         bg=bg, fg=fg or c["TEXT"],
+                         anchor=anchor, padx=padx
+                         ).pack(fill="both", expand=True)
+
+            # ── # ──────────────────────────────────────────────────────────
+            _lbl(_cell(40), str(i + 1), fg=c["MUTED"], font=("Segoe UI", 9))
+            _sep()
+
+            # ── Phone icon ─────────────────────────────────────────────────
+            ic = _cell(44)
+            tk.Label(ic, text="📱", font=("Segoe UI", 15),
+                     bg=base, fg=c["BLUE"]).pack(fill="both", expand=True)
+            _sep()
+
+            # ── Serial + Profile ID (2 lines) ──────────────────────────────
+            dev = _cell(180)
+            serial_txt  = str(d.get("serial_no") or (vals[0] if vals else ""))
+            pid_txt     = str(d.get("phone_id")  or iid)
+            tk.Label(dev, text=serial_txt,
+                     font=("Segoe UI", 10, "bold"),
+                     bg=base, fg=c["TEXT"] if has_ig else c["MUTED"],
+                     anchor="w", padx=6).pack(fill="x", pady=(9, 0))
+            tk.Label(dev, text=pid_txt,
+                     font=("Consolas", 7),
+                     bg=base, fg=c["ONG"] if has_ig else "#2e3d55",
+                     anchor="w", padx=6).pack(fill="x", pady=(0, 9))
+            _sep()
+
+            # ── Phone name ─────────────────────────────────────────────────
+            name_txt = d.get("phone_name") or (vals[1] if vals else "—")
+            _lbl(_cell(145), name_txt,
+                 fg=c["TEXT"] if has_ig else c["MUTED"],
+                 anchor="w", padx=8)
+            _sep()
+
+            # ── Groupe ─────────────────────────────────────────────────────
+            grp_txt = d.get("group_name") or (vals[2] if vals else "—") or "—"
+            _lbl(_cell(100), grp_txt, fg=c["MUTED"], anchor="center")
+            _sep()
+
+            # ── @Instagram ─────────────────────────────────────────────────
+            ig_u  = d.get("ig_username", "")
+            ig_lbl = ("@" + ig_u) if ig_u else "—"
+            ig_fg  = c["BLUE"] if ig_u else c["MUTED"]
+            _lbl(_cell(145, expand=True), ig_lbl, fg=ig_fg, anchor="w", padx=8)
+            _sep()
+
+            # ── Statut ─────────────────────────────────────────────────────
+            st     = d.get("ig_status", "")
+            st_map = {
+                "active":  ("● Actif",   OK),
+                "banned":  ("● Banni",   DANGER),
+                "private": ("● Privé",   WARN),
+                "error":   ("● Erreur",  WARN),
+            }
+            st_txt2, st_fg = st_map.get(
+                st, ("— Sans IG" if not ig_u else "○ Non vérifié", c["MUTED"]))
+            _lbl(_cell(110), st_txt2, fg=st_fg, anchor="center")
+            _sep()
+
+            # ── Followers ──────────────────────────────────────────────────
+            fol = vals[5] if vals else "—"
+            _lbl(_cell(85), str(fol), fg=c["TEXT"], anchor="center")
+            _sep()
+
+            # ── Vues ───────────────────────────────────────────────────────
+            vws = vals[6] if vals else "—"
+            _lbl(_cell(70), str(vws), fg=c["TEXT"], anchor="center")
+            _sep()
+
+            # ── Vidéos ─────────────────────────────────────────────────────
+            vds = vals[7] if vals else "—"
+            _lbl(_cell(55), str(vds), fg=c["TEXT"], anchor="center")
+            _sep()
+
+            # ── Vérifié ────────────────────────────────────────────────────
+            chk = vals[8] if vals else "—"
+            _lbl(_cell(85), str(chk), font=("Segoe UI", 8),
+                 fg=c["MUTED"], anchor="center")
+            _sep()
+
+            # ── GL / Android icon ──────────────────────────────────────────
+            gl_ok = d.get("gl_status", 0) == 1
+            gl_lbl = tk.Label(_cell(44), text="🤖",
+                              font=("Segoe UI", 13),
+                              bg=base, fg=c["GRN"] if gl_ok else c["MUTED"])
+            gl_lbl.pack(fill="both", expand=True)
+            _sep()
+
+            # ── ⋮ ──────────────────────────────────────────────────────────
+            dot = tk.Label(_cell(40), text="⋮",
+                           font=("Segoe UI", 14, "bold"),
+                           bg=base, fg=c["MUTED"], cursor="hand2")
+            dot.pack(fill="both", expand=True)
+
+            # ── Bindings ───────────────────────────────────────────────────
+            def _click(e, iid2=iid, row2=row, base2=base, hi=has_ig):
+                old = self._p_sel_iid[0]
+                self._p_sel_iid[0] = iid2
+                if old and old in self._p_row_frames:
+                    old_i   = list(self.tree.get_children()).index(old)
+                    old_bg  = c["ODD"] if old_i % 2 == 0 else c["EVEN"]
+                    _set_bg(self._p_row_frames[old], old_bg)
+                _set_bg(row2, c["SEL"])
+                self.sel_ids = [iid2]
+                self.tree.selection_set(iid2)
+                self.sel_lbl.config(text="1 sélectionné(s)")
+                if hi:
+                    self._show_tab("stats")
+                    self._show_ig_detail(iid2)
+
+            def _dbl(e, iid2=iid):
+                d2 = self.data.get(iid2, {})
+                if d2.get("ig_username"):
+                    self._show_tab("stats")
+                    self._show_ig_detail(iid2)
+
+            def _dots(e, iid2=iid):
+                self.sel_ids  = [iid2]
+                self._p_sel_iid[0] = iid2
+                self.tree.selection_set(iid2)
+                self._show_phone_menu(e.x_root, e.y_root)
+                return "break"
+
+            def _hover_on(e, row2=row, base2=base, i2=i):
+                if self._p_sel_iid[0] != iid:
+                    hov = "#131b2e"
+                    _set_bg(row2, hov)
+
+            def _hover_off(e, row2=row, base2=base, i2=i):
+                if self._p_sel_iid[0] != iid:
+                    _set_bg(row2, base2)
+
+            for wgt in [row, inner] + row.winfo_children() + inner.winfo_children():
+                try:
+                    wgt.bind("<Button-1>",  _click)
+                    wgt.bind("<Double-1>",  _dbl)
+                    wgt.bind("<Enter>",     _hover_on)
+                    wgt.bind("<Leave>",     _hover_off)
+                except Exception:
+                    pass
+            dot.bind("<Button-1>", _dots)
+
+            self._p_row_frames[iid] = row
+
+        self._p_rows_canvas.update_idletasks()
+        self._p_rows_canvas.configure(
+            scrollregion=self._p_rows_canvas.bbox("all"))
 
     def _on_sel(self, e):
         self.sel_ids = list(self.tree.selection())
@@ -10422,6 +10703,12 @@ class App:
             self.sv["active"].config(text=str(active))
             self.sv["banned"].config(text=str(banned))
             self.sv["views"].config(text=fmt(views))
+
+        # Redraw custom visual table
+        try:
+            self._phones_draw_table()
+        except Exception:
+            pass
 
         # Dashboard snapshot + redraw (live)
         try:
