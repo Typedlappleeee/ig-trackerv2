@@ -13,23 +13,13 @@ export const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist')
 let win: BrowserWindow | null = null
 
 // ── Instagram persistent hidden browser ───────────────────────────────────────
-// Reused across calls so session cookies accumulate (GDPR consent accepted once,
-// rate-limit cookies carried over). A new browser is created only if the old one
-// is destroyed.
 let _igBrowser: BrowserWindow | null = null
 
 function getIgBrowser(): BrowserWindow {
   if (!_igBrowser || _igBrowser.isDestroyed()) {
     _igBrowser = new BrowserWindow({
-      show: false,
-      width: 1280,
-      height: 900,
-      webPreferences: {
-        nodeIntegration: false,
-        contextIsolation: false,
-        webSecurity: true,
-        sandbox: false,
-      },
+      show: false, width: 1280, height: 900,
+      webPreferences: { nodeIntegration: false, contextIsolation: false, webSecurity: true, sandbox: false },
     })
     _igBrowser.webContents.setUserAgent(
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
@@ -39,14 +29,46 @@ function getIgBrowser(): BrowserWindow {
   return _igBrowser
 }
 
-// Fetch Instagram profile HTML via the persistent hidden browser.
-// Handles the GDPR cookie-consent page that Instagram shows to fresh sessions:
-//   1. did-stop-loading fires → check for consent modal → click "Allow all"
-//   2. Instagram reloads → did-stop-loading fires again → extract profile HTML
-// Using `on` (not `once`) so we see all navigation events from a single loadURL call.
+// Fetch Instagram profile HTML.
+// Strategy: try the web_profile_info JSON API first (fast, uses session cookies from the
+// hidden browser so it works after the first browser visit). Fall back to loading the
+// full profile page in the hidden browser (slower, handles GDPR consent automatically).
 ipcMain.handle('fetch-instagram-html', async (_event, username: string) => {
+  const profileUrl = `https://www.instagram.com/${encodeURIComponent(username)}/`
+
+  // ── Fast path: API call with session cookies ──────────────────────────────
+  // session.defaultSession.fetch() automatically sends all instagram.com cookies
+  // (csrftoken, ig_did, etc.) set by the hidden browser. net.fetch does NOT do this.
+  try {
+    const cookies = await session.defaultSession.cookies.get({ domain: '.instagram.com' })
+    const csrftoken = cookies.find(c => c.name === 'csrftoken')?.value
+
+    if (csrftoken) {
+      console.log('[IG] Trying API with session cookies...')
+      const apiRes = await session.defaultSession.fetch(
+        `https://www.instagram.com/api/v1/users/web_profile_info/?username=${encodeURIComponent(username)}`,
+        {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+            'X-IG-App-ID': '936619743392459',
+            'X-CSRFToken': csrftoken,
+            'Accept': '*/*',
+          },
+        }
+      )
+      console.log(`[IG] API status: ${apiRes.status}`)
+      if (apiRes.ok) {
+        const json = await apiRes.json() as Record<string, unknown>
+        return { ok: true, apiJson: json }
+      }
+    }
+  } catch (e) {
+    console.log('[IG] API fast-path failed:', String(e))
+  }
+
+  // ── Slow path: full browser page load ────────────────────────────────────
+  // Handles GDPR cookie consent automatically, then extracts HTML.
   const browser = getIgBrowser()
-  const url = `https://www.instagram.com/${encodeURIComponent(username)}/`
 
   return new Promise<unknown>(resolve => {
     let settled = false
@@ -60,7 +82,10 @@ ipcMain.handle('fetch-instagram-html', async (_event, username: string) => {
       resolve(result)
     }
 
-    const globalTimer = setTimeout(() => finish({ ok: false, error: 'timeout' }), 32000)
+    const globalTimer = setTimeout(() => {
+      console.log('[IG] Browser timeout')
+      finish({ ok: false, error: 'timeout' })
+    }, 35000)
 
     const extractHtml = async () => {
       if (settled || browser.isDestroyed()) return
@@ -69,7 +94,9 @@ ipcMain.handle('fetch-instagram-html', async (_event, username: string) => {
           url: location.href,
           html: document.documentElement.innerHTML.slice(0, 200000)
         })`)
-        finish({ ok: true, ...(data as object) })
+        const d = data as { url: string; html: string }
+        console.log(`[IG] Extracted from ${d.url} (${d.html.length} chars)`)
+        finish({ ok: true, ...d })
       } catch (e) {
         finish({ ok: false, error: String(e) })
       }
@@ -78,28 +105,30 @@ ipcMain.handle('fetch-instagram-html', async (_event, username: string) => {
     const onLoad = async () => {
       if (settled || browser.isDestroyed()) return
       loadCount++
-      if (loadCount > 5) { finish({ ok: false, error: 'too many navigations' }); return }
+      if (loadCount > 6) { finish({ ok: false, error: 'too many navigations' }); return }
 
-      // Wait for SPA/React render (shorter on subsequent loads which already have cookies)
-      await new Promise(r => setTimeout(r, loadCount === 1 ? 2500 : 3500))
+      await new Promise(r => setTimeout(r, 2500))
       if (settled || browser.isDestroyed()) return
 
-      // Detect and click GDPR cookie-consent button (Instagram in Europe)
+      const currentUrl = browser.webContents.getURL()
+      console.log(`[IG] Browser load ${loadCount}: ${currentUrl}`)
+
+      if (currentUrl.includes('/accounts/login') || currentUrl.includes('/challenge/')) {
+        console.log('[IG] Login/challenge page — giving up')
+        finish({ ok: false, error: 'login required' })
+        return
+      }
+
+      // Accept GDPR cookie consent if shown
       const accepted = await browser.webContents.executeJavaScript(`
         (() => {
-          // Try known data-attribute selectors first
           const byAttr = document.querySelector('[data-cookiebanner="accept_button"]')
             || document.querySelector('[data-testid="cookie-policy-manage-dialog-accept-button"]')
           if (byAttr) { byAttr.click(); return true }
-
-          // Text-based fallback: find any visible button whose text matches "accept all" variants
           const btn = [...document.querySelectorAll('button')].find(b => {
             const t = (b.textContent || '').trim().toLowerCase()
-            return t === 'allow all cookies'
-              || t === 'allow all'
-              || t === 'accept all'
-              || t === 'autoriser tout'
-              || t === 'tout accepter'
+            return t === 'allow all cookies' || t === 'allow all' || t === 'accept all'
+              || t === 'autoriser tout' || t === 'tout accepter'
               || t === 'autoriser tous les cookies'
               || t === 'allow essential and optional cookies'
           })
@@ -108,23 +137,38 @@ ipcMain.handle('fetch-instagram-html', async (_event, username: string) => {
         })()
       `).catch(() => false)
 
-      if (accepted && !settled) {
-        // Consent was clicked. Instagram will either:
-        //   A) Reload the same URL (new did-stop-loading will fire → onLoad handles it)
-        //   B) Update the page in-place (no reload → we extract after waiting)
-        // Wait to see which case applies; if a new navigation fires first, it will
-        // call extractHtml via onLoad, making settled=true, and the timeout below is a no-op.
+      if (accepted) {
+        console.log('[IG] Consent clicked — waiting for page update')
+        // Give Instagram time to reload (or update in-place). The next did-stop-loading
+        // will call onLoad again if a full navigation happens.
         await new Promise(r => setTimeout(r, 5000))
-        if (!settled) await extractHtml()
-      } else if (!settled) {
-        // No consent button → this is the actual profile page
+        if (settled) return
+
+        // Check where we ended up
+        const afterUrl = browser.webContents.getURL()
+        console.log(`[IG] After consent: ${afterUrl}`)
+
+        if (!afterUrl.includes(`/${username}`)) {
+          // Consent redirected us to homepage — navigate back to the profile
+          console.log('[IG] Redirected away, navigating back to profile')
+          browser.loadURL(profileUrl)
+          return
+        }
+        // Page updated in-place — extract now
+        await extractHtml()
+      } else {
+        // No consent button — check we're on the right page
+        if (!currentUrl.includes(`/${username}`)) {
+          console.log('[IG] Wrong page, navigating to profile')
+          browser.loadURL(profileUrl)
+          return
+        }
         await extractHtml()
       }
     }
 
     browser.webContents.on('did-stop-loading', onLoad)
-
-    browser.loadURL(url, {
+    browser.loadURL(profileUrl, {
       extraHeaders: [
         'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
         'Accept-Language: fr-FR,fr;q=0.9,en-US;q=0.8',
@@ -133,7 +177,12 @@ ipcMain.handle('fetch-instagram-html', async (_event, username: string) => {
   })
 })
 
+
 // ── IPC: proxy HTTP requests from renderer (bypass CORS) ───────────────────
+// For instagram.com: use session.defaultSession.fetch() which automatically sends
+// session cookies (set by the hidden browser). net.fetch does NOT forward session
+// cookies, causing Instagram API calls to get 401 responses.
+// For other domains (GéeLark, Groq): use net.fetch with no-referrer policy.
 ipcMain.handle('geelark-request', async (_event, opts: {
   method: 'GET' | 'POST' | 'PUT'
   url: string
@@ -142,16 +191,27 @@ ipcMain.handle('geelark-request', async (_event, opts: {
   isText?: boolean
 }) => {
   try {
-    // Strip any Referer the caller set — Electron's network delegate rejects
-    // cross-origin referrers (e.g. www.instagram.com → i.instagram.com) before
-    // the request even leaves the process. Let the network layer omit it.
     const { Referer: _r, referer: _r2, Origin: _o, origin: _o2, ...safeHeaders } = opts.headers ?? {}
-    const response = await net.fetch(opts.url, {
-      method: opts.method,
-      headers: { 'Content-Type': 'application/json', ...safeHeaders },
-      body: opts.body ? JSON.stringify(opts.body) : undefined,
-      referrerPolicy: 'no-referrer',
-    } as RequestInit)
+    const reqHeaders: Record<string, string> = { 'Content-Type': 'application/json', ...safeHeaders }
+    const reqBody = opts.body ? JSON.stringify(opts.body) : undefined
+
+    let response: Response
+    if (opts.url.includes('instagram.com')) {
+      // session.fetch always sends cookies → works with Instagram's auth requirements
+      response = await session.defaultSession.fetch(opts.url, {
+        method: opts.method,
+        headers: reqHeaders,
+        body: reqBody,
+      })
+    } else {
+      response = await net.fetch(opts.url, {
+        method: opts.method,
+        headers: reqHeaders,
+        body: reqBody,
+        referrerPolicy: 'no-referrer',
+      } as RequestInit)
+    }
+
     const data = opts.isText ? await response.text() : await response.json()
     return { ok: true, status: response.status, data }
   } catch (err: unknown) {

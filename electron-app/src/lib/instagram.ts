@@ -64,12 +64,40 @@ function parseHtml(html: string, fallbackUsername: string): IgStats | null {
   return { username: unameM?.[1] ?? fallbackUsername, followers, following, posts, bio, total_views }
 }
 
-// ── Method 1: Hidden BrowserWindow (primary — real browser, cookies, JS) ────
+// ── Method 1: Hidden BrowserWindow + API fast-path ──────────────────────────
+// The IPC handler first tries the Instagram API with session cookies (fast).
+// Falls back to loading the full page in a hidden browser (slow but handles GDPR).
 async function fetchViaBrowser(clean: string): Promise<IgStats | null> {
   if (!window.electronAPI?.fetchInstagramHtml) return null
   const res = await window.electronAPI.fetchInstagramHtml(clean)
-  if (!res.ok || !res.html || !res.url) return null
-  if (res.url.includes('/accounts/login') || res.url.includes('/challenge')) return null
+  if (!res.ok) return null
+
+  // Fast path: IPC returned structured API JSON
+  if (res.apiJson) {
+    try {
+      const json = res.apiJson as Record<string, unknown>
+      const user = ((json['data'] as Record<string, unknown>)?.['user']) as Record<string, unknown>
+      if (!user) return null
+      const timeline    = user['edge_owner_to_timeline_media'] as Record<string, unknown> | undefined
+      const edges       = (timeline?.['edges'] as unknown[]) ?? []
+      const total_views = edges.reduce((s, e) => {
+        const n = (e as Record<string, unknown>)['node'] as Record<string, unknown>
+        return s + (((n['video_view_count'] as number) ?? 0))
+      }, 0)
+      return {
+        username:    (user['username'] as string) ?? clean,
+        followers:   ((user['edge_followed_by'] as Record<string, number>)?.count) ?? 0,
+        following:   ((user['edge_follow']     as Record<string, number>)?.count) ?? 0,
+        posts:       ((timeline?.['count'] as number) ?? 0),
+        total_views,
+        bio:         (user['biography'] as string) ?? '',
+      }
+    } catch { return null }
+  }
+
+  // Slow path: parse HTML from full browser page load
+  if (!res.html || !res.url) return null
+  if ((res.url as string).includes('/accounts/login') || (res.url as string).includes('/challenge')) return null
   return parseHtml(res.html, clean)
 }
 
