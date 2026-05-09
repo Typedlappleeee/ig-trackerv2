@@ -1319,247 +1319,138 @@ class App:
     # ══════════════════════════════════════════════════════════════════════════
     def _show_splash_animation(self, on_done=None):
         """Full-screen startup animation. Calls on_done() when finished."""
-        import math
-        import random as _rnd
+        # Parse configured geometry — available before mainloop starts
+        try:
+            g   = self.root.geometry()          # "1400x900+x+y"
+            W   = int(g.split('x')[0])
+            H   = int(g.split('x')[1].split('+')[0])
+        except Exception:
+            W, H = 1400, 900
+        cx, cy = W // 2, H // 2
 
-        cv = tk.Canvas(self.root, bg="#03050c", highlightthickness=0, bd=0)
-        cv.place(relx=0, rely=0, relwidth=1, relheight=1)
+        cv = tk.Canvas(self.root, bg="#03050c",
+                       width=W, height=H, highlightthickness=0, bd=0)
+        cv.place(x=0, y=0)
         cv.lift()
 
-        t       = [0]
-        state   = [None]   # holds computed layout once dimensions are known
-        FPS     = 60
-        TICK    = 1000 // FPS
+        t     = [0]
+        TICK  = 33            # ~30 fps
+        # Phase ticks: 0-20 fade-in, 20-45 hold, 45-65 fade-out
+        T_IN  = 20
+        T_HLD = 45
+        T_OUT = 65
 
-        # ── timing helpers ────────────────────────────────────────────────────
-        def _ease_out_cubic(x):
-            return 1 - (1 - max(0, min(1, x))) ** 3
+        BAR_W = 240
+        bx    = cx - BAR_W // 2
+        by    = cy + 108
 
-        def _ease_in_out(x):
-            x = max(0, min(1, x))
+        def _sm(x):
+            x = max(0.0, min(1.0, x))
             return x * x * (3 - 2 * x)
 
-        def _lerp(a, b, t2):
-            return a + (b - a) * t2
-
-        def _hex_lerp(c1, c2, t2):
-            t2 = max(0.0, min(1.0, t2))
-            r1 = int(c1[1:3], 16); g1 = int(c1[3:5], 16); b1 = int(c1[5:7], 16)
-            r2 = int(c2[1:3], 16); g2 = int(c2[3:5], 16); b2 = int(c2[5:7], 16)
+        def _lc(c1, c2, f):
+            f = max(0.0, min(1.0, f))
+            r1,g1,b1 = int(c1[1:3],16),int(c1[3:5],16),int(c1[5:7],16)
+            r2,g2,b2 = int(c2[1:3],16),int(c2[3:5],16),int(c2[5:7],16)
             return "#{:02x}{:02x}{:02x}".format(
-                int(r1 + (r2-r1)*t2),
-                int(g1 + (g2-g1)*t2),
-                int(b1 + (b2-b1)*t2))
+                int(r1+(r2-r1)*f), int(g1+(g2-g1)*f), int(b1+(b2-b1)*f))
 
-        # ── colour palette ────────────────────────────────────────────────────
-        BG_COL   = "#03050c"
-        GLOW1    = "#4f8ef7"
-        GLOW2    = "#1a3a80"
-        LOGO_COL = "#4f8ef7"
-        TEXT_COL = "#e8eaf0"
-        SUB_COL  = "#6b7a99"
-        APP_BG   = "#05080f"
-
-        def _init_state(W, H):
-            cx, cy = W // 2, H // 2
-            _rnd.seed(42)
-            particles = []
-            for _ in range(35):
-                angle = _rnd.uniform(0, 2*math.pi)
-                dist  = _rnd.uniform(180, min(W, H) * 0.48)
-                tx2   = cx + math.cos(angle) * _rnd.uniform(20, 50)
-                ty2   = cy + math.sin(angle) * _rnd.uniform(20, 50)
-                sx    = cx + math.cos(angle) * dist
-                sy    = cy + math.sin(angle) * dist
-                size  = _rnd.uniform(2, 5)
-                col   = _rnd.choice(["#4f8ef7","#2563eb","#6ea6ff","#93c5fd"])
-                particles.append((sx, sy, tx2, ty2, size, col))
-            return {
-                "cx": cx, "cy": cy,
-                "particles": particles,
-                "BAR_W": 260, "BAR_H": 4,
-                "BAR_Y": cy + 130,
-                "BAR_X": cx - 130,
-                "LOGO_R": 46,
-            }
+        BG0  = "#03050c"
+        BG1  = "#05080f"
+        ACC  = "#4f8ef7"
+        DRK  = "#0a1a3a"
 
         def _draw():
             try:
-                W = cv.winfo_width()
-                H = cv.winfo_height()
-                if W < 10 or H < 10:
-                    cv.after(50, _draw)
-                    return
-
-                if state[0] is None:
-                    state[0] = _init_state(W, H)
-
-                s    = state[0]
                 tick = t[0]
-                cx   = s["cx"]; cy = s["cy"]
-                BAR_X = s["BAR_X"]; BAR_Y = s["BAR_Y"]
-                BAR_W = s["BAR_W"]; BAR_H = s["BAR_H"]
-                LOGO_R = s["LOGO_R"]
-                particles = s["particles"]
+
+                # Compute alpha: fade-in → hold → fade-out
+                if tick <= T_IN:
+                    a_in  = _sm(tick / T_IN)
+                    a_out = 0.0
+                elif tick <= T_HLD:
+                    a_in  = 1.0
+                    a_out = 0.0
+                else:
+                    a_in  = 1.0
+                    a_out = _sm((tick - T_HLD) / (T_OUT - T_HLD))
+
+                alpha = a_in * (1.0 - a_out)
 
                 cv.delete("all")
 
-                # Background
-                cv.create_rectangle(0, 0, W, H, fill=BG_COL, outline="")
+                # Background — fades from splash-bg to app-bg on exit
+                bg_col = _lc(BG0, BG1, a_out)
+                cv.create_rectangle(0, 0, W, H, fill=bg_col, outline="")
 
-                # ── GLOW RINGS ───────────────────────────────────────────────
-                for ring_i in range(4):
-                    ring_start = ring_i * 8
-                    ring_t = (tick - ring_start) / 55
-                    if ring_t <= 0:
-                        continue
-                    ring_t = min(ring_t, 1.0)
-                    r   = int(_ease_out_cubic(ring_t) * (90 + ring_i * 50))
-                    alp = max(0, 1 - ring_t) * (0.25 - ring_i * 0.04)
-                    if r <= 0 or alp <= 0:
-                        continue
-                    col = _hex_lerp(BG_COL,
-                                    ["#1e3a6e","#162a5a","#0e1e40","#080e22"][ring_i],
-                                    alp * 4)
-                    cv.create_oval(cx-r, cy-r, cx+r, cy+r,
-                                   outline=col, width=2 - ring_i * 0.3)
+                if alpha > 0.02:
+                    # ── Glow rings behind logo ────────────────────────────────
+                    for gi, (gr, gf) in enumerate(
+                            [(66, 0.18), (54, 0.28), (44, 0.40)]):
+                        gc = _lc(BG0, DRK, alpha * gf)
+                        cv.create_oval(cx-gr, cy-gr-28,
+                                       cx+gr, cy+gr-28,
+                                       fill=gc, outline="")
 
-                # ── PARTICLES ────────────────────────────────────────────────
-                p_t = min(1.0, tick / 45)
-                p_e = _ease_out_cubic(p_t)
-                for sx, sy, tx2, ty2, size, col in particles:
-                    px = _lerp(sx, tx2, p_e)
-                    py = _lerp(sy, ty2, p_e)
-                    fade = min(1, p_t * 2) * max(0, 1 - max(0, (tick-35)/15))
-                    if fade <= 0:
-                        continue
-                    pcol = _hex_lerp(BG_COL, col, fade)
-                    r2 = max(1, int(size * fade))
-                    cv.create_oval(px-r2, py-r2, px+r2, py+r2,
-                                   fill=pcol, outline="")
+                    # ── Logo circle ───────────────────────────────────────────
+                    lc = _lc(BG0, ACC, alpha)
+                    cv.create_oval(cx-42, cy-70, cx+42, cy+14,
+                                   fill=lc, outline="")
 
-                # ── LOGO CIRCLE ──────────────────────────────────────────────
-                logo_raw = (tick - 15) / 35
-                if logo_raw > 0:
-                    logo_t = max(0, min(1.2, logo_raw))
-                    if logo_t <= 1.0:
-                        scale = _ease_out_cubic(logo_t)
-                        if logo_t > 0.7:
-                            overshoot = math.sin((logo_t - 0.7) / 0.3 * math.pi) * 0.08
-                            scale = min(1.0 + overshoot, scale + overshoot)
-                    else:
-                        scale = 1.0
-                    scale = min(scale, 1.0)
-                    r = max(1, int(LOGO_R * scale))
-                    for gi in range(3):
-                        gr = r + 8 + gi * 7
-                        gcol = _hex_lerp(BG_COL, GLOW2,
-                                         (0.4 - gi * 0.1) * min(1, logo_raw))
-                        cv.create_oval(cx-gr, cy-gr, cx+gr, cy+gr,
-                                       fill=gcol, outline="")
-                    cv.create_oval(cx-r, cy-r, cx+r, cy+r,
-                                   fill=LOGO_COL, outline="")
-                    hr = max(1, r-4)
-                    cv.create_arc(cx-hr, cy-hr, cx+hr, cy+hr,
-                                  start=120, extent=90,
-                                  outline=_hex_lerp(LOGO_COL, "#ffffff", 0.4),
-                                  width=2, style="arc")
-                    icon_alpha = min(1.0, max(0, (logo_raw - 0.5) * 2))
-                    if icon_alpha > 0.1:
-                        ic = _hex_lerp(LOGO_COL, "#ffffff", icon_alpha)
-                        cv.create_text(cx, cy, text="📱",
-                                       font=("Segoe UI", int(26 * scale)),
-                                       fill=ic)
+                    # Highlight arc
+                    ha = _lc(ACC, "#ffffff", 0.45 * alpha)
+                    cv.create_arc(cx-36, cy-64, cx+36, cy+8,
+                                  start=115, extent=95,
+                                  outline=ha, width=2, style="arc")
 
-                # ── APP NAME ─────────────────────────────────────────────────
-                name_t = max(0, (tick - 42) / 22)
-                if name_t > 0:
-                    name_e = _ease_out_cubic(min(1, name_t))
-                    name_col = _hex_lerp(BG_COL, TEXT_COL, name_e)
-                    name_size = int(24 + (1 - name_e) * 12)
-                    cv.create_text(cx, cy + 70,
+                    # Icon
+                    ic = _lc(BG0, "#ffffff", alpha)
+                    cv.create_text(cx, cy - 28, text="📱",
+                                   font=("Segoe UI", 24), fill=ic)
+
+                    # ── App name ──────────────────────────────────────────────
+                    nc = _lc(BG0, "#e8eaf0", alpha)
+                    cv.create_text(cx, cy + 42,
                                    text="IG Tracker",
-                                   font=("Segoe UI", name_size, "bold"),
-                                   fill=name_col)
+                                   font=("Segoe UI", 26, "bold"), fill=nc)
 
-                # ── SUBTITLE ─────────────────────────────────────────────────
-                sub_t = max(0, (tick - 58) / 18)
-                if sub_t > 0:
-                    sub_e = _ease_in_out(min(1, sub_t))
-                    sub_col = _hex_lerp(BG_COL, SUB_COL, sub_e)
-                    cv.create_text(cx, cy + 100,
+                    # ── Subtitle ──────────────────────────────────────────────
+                    sc = _lc(BG0, "#6b7a99", alpha)
+                    cv.create_text(cx, cy + 76,
                                    text="Tableau de bord Instagram",
-                                   font=("Segoe UI", 10),
-                                   fill=sub_col)
+                                   font=("Segoe UI", 10), fill=sc)
 
-                # ── PROGRESS BAR ─────────────────────────────────────────────
-                bar_t = max(0, (tick - 62) / 32)
-                if bar_t > 0:
-                    bar_e = _ease_in_out(min(1, bar_t))
-                    cv.create_rectangle(BAR_X, BAR_Y,
-                                        BAR_X + BAR_W, BAR_Y + BAR_H,
-                                        fill="#111827", outline="")
-                    fill_w = int(BAR_W * bar_e)
-                    if fill_w > 0:
-                        fill_col = _hex_lerp(GLOW2, GLOW1, bar_e)
-                        cv.create_rectangle(BAR_X, BAR_Y,
-                                            BAR_X + fill_w, BAR_Y + BAR_H,
-                                            fill=fill_col, outline="")
-                    if 0 < bar_e < 1:
-                        tip_x = BAR_X + fill_w
-                        cv.create_oval(tip_x-4, BAR_Y-3,
-                                       tip_x+4, BAR_Y+BAR_H+3,
-                                       fill="#93c5fd", outline="")
-                    pct = int(min(100, bar_e * 100))
-                    cv.create_text(cx, BAR_Y + 18,
-                                   text=f"{pct}%",
-                                   font=("Consolas", 8),
-                                   fill=_hex_lerp(BG_COL, SUB_COL,
-                                                  min(1, bar_t * 2)))
+                    # ── Progress bar ──────────────────────────────────────────
+                    tc = _lc(BG0, "#111827", alpha)
+                    cv.create_rectangle(bx, by, bx+BAR_W, by+3,
+                                        fill=tc, outline="")
+                    prog = min(1.0, tick / T_HLD)
+                    fw   = int(BAR_W * prog)
+                    if fw > 0:
+                        fc = _lc(BG0, ACC, alpha)
+                        cv.create_rectangle(bx, by, bx+fw, by+3,
+                                            fill=fc, outline="")
 
-                # ── PULSE ────────────────────────────────────────────────────
-                hold_t = max(0, (tick - 97) / 12)
-                if 0 < hold_t < 1:
-                    pulse_r = LOGO_R + int(hold_t * 24)
-                    pulse_a = 1 - hold_t
-                    pc = _hex_lerp(BG_COL, "#4f8ef7", pulse_a * 0.6)
-                    cv.create_oval(cx-pulse_r, cy-pulse_r,
-                                   cx+pulse_r, cy+pulse_r,
-                                   outline=pc, width=2)
-
-                # ── FADE OUT ─────────────────────────────────────────────────
-                if tick >= 110:
-                    fade_t = (tick - 110) / 50
-                    fade_e = _ease_in_out(min(1, fade_t))
-                    fade_col = _hex_lerp(BG_COL, APP_BG, fade_e)
-                    cv.create_rectangle(0, 0, W, H, fill=fade_col, outline="")
-                    if fade_e >= 0.98:
-                        cv.place_forget()
-                        cv.after(50, cv.destroy)
-                        if on_done:
-                            try:
-                                on_done()
-                            except Exception:
-                                pass
-                        return
+                # ── Done ──────────────────────────────────────────────────────
+                if tick >= T_OUT:
+                    cv.place_forget()
+                    cv.after(30, cv.destroy)
+                    if on_done:
+                        try: on_done()
+                        except Exception: pass
+                    return
 
                 t[0] += 1
-                if t[0] < 200:
-                    cv.after(TICK, _draw)
+                cv.after(TICK, _draw)
 
             except Exception:
-                cv.place_forget()
-                try:
-                    cv.destroy()
-                except Exception:
-                    pass
+                try: cv.place_forget(); cv.destroy()
+                except Exception: pass
                 if on_done:
-                    try:
-                        on_done()
-                    except Exception:
-                        pass
+                    try: on_done()
+                    except Exception: pass
 
-        self.root.after(200, _draw)
+        cv.after(40, _draw)
 
     def _show_beta_popup(self):
         pop = tk.Toplevel(self.root)
@@ -3208,16 +3099,25 @@ class App:
         f = tk.Frame(self.tab_container, bg=BG)
         self.tabs["phones"] = f
 
-        self._tab_header(f, "📱",
-                         "Téléphones GéeLark" if L == "fr" else "GéeLark Phones",
-                         ("Gérez vos cloud phones et comptes Instagram liés"
-                          if L == "fr"
-                          else "Manage your cloud phones and linked Instagram accounts"),
-                         ACCENT)
+        # ── Table color palette ───────────────────────────────────────────────
+        P_BG    = "#0b0e18"
+        P_HDR   = "#0b0e18"
+        P_ODD   = "#0d1117"
+        P_EVEN  = "#0b1020"
+        P_SEL   = "#162040"
+        P_HOV   = "#131b2e"
+        P_SEP   = "#1a2235"
+        P_HFGA  = "#4f8ef7"   # header fg accent
+        P_HFGM  = "#2e3d55"   # header fg muted
+        P_TEXT  = "#c9d1d9"
+        P_MUTED = "#6b7a99"
+        P_SER   = "#e8eaf0"   # serial number
+        P_PID   = "#f97316"   # profile id (orange)
+        P_AND   = "#22c55e"   # android green
 
-        # ── Stat cards row ────────────────────────────────────────────────────
+        # ── Stat cards ────────────────────────────────────────────────────────
         sf = tk.Frame(f, bg=BG)
-        sf.pack(fill="x", padx=0, pady=(0, 10))
+        sf.pack(fill="x", pady=(0, 0))
         card_data = [
             ("phones", "📱", _("card.phones"), ACCENT, "all"),
             ("active", "✅", _("card.active"), OK,     "active"),
@@ -3234,108 +3134,149 @@ class App:
             tk.Frame(card, height=2, bg=col).pack(fill="x")
             inner = tk.Frame(card, bg=CARD, padx=14, pady=10, cursor="hand2")
             inner.pack(fill="both", expand=True)
-            row_top = tk.Frame(inner, bg=CARD)
-            row_top.pack(fill="x")
-            tk.Label(row_top, text=ico, font=("Segoe UI", 12), bg=CARD, fg=col,
+            rt = tk.Frame(inner, bg=CARD)
+            rt.pack(fill="x")
+            tk.Label(rt, text=ico, font=("Segoe UI", 12), bg=CARD, fg=col,
                      cursor="hand2").pack(side="left")
-            tk.Label(row_top, text=lbl, font=("Segoe UI", 8, "bold"),
-                     bg=CARD, fg=TEXT2, cursor="hand2").pack(side="left", padx=(5, 0))
-            v = tk.Label(inner, text="—", font=("Segoe UI", 22, "bold"), bg=CARD, fg=col,
-                         cursor="hand2")
+            tk.Label(rt, text=lbl, font=("Segoe UI", 8, "bold"),
+                     bg=CARD, fg=TEXT2, cursor="hand2").pack(side="left", padx=(5,0))
+            v = tk.Label(inner, text="—", font=("Segoe UI", 22, "bold"),
+                         bg=CARD, fg=col, cursor="hand2")
             v.pack(anchor="w", pady=(2, 0))
             self.sv[k] = v
             def _card_click(e, f2=filt):
                 self._phone_stat_filter = f2
                 self._refresh_table()
-            for w in [card, inner, row_top, v, card_outer._cv]:
+            for w in [card, inner, rt, v, card_outer._cv]:
                 try: w.bind("<Button-1>", _card_click, add="+")
                 except Exception: pass
 
-        # ── Toolbar row 1: filters ─────────────────────────────────────────────
-        tb1 = tk.Frame(f, bg=SURFACE2, padx=12, pady=8,
-                       highlightthickness=1, highlightbackground=BORDER)
-        tb1.pack(fill="x", pady=(0, 2))
-
-        tk.Label(tb1, text="Groupe", font=("Segoe UI", 9),
-                 bg=SURFACE2, fg=TEXT2).pack(side="left")
+        # ── Toolbar ───────────────────────────────────────────────────────────
+        tb = tk.Frame(f, bg=P_BG, padx=14, pady=9)
+        tb.pack(fill="x")
+        tk.Label(tb, text="Groupe", font=("Segoe UI", 9),
+                 bg=P_BG, fg=P_MUTED).pack(side="left")
         self.grp_var = tk.StringVar(value="Tous")
-        self.grp_combo = ttk.Combobox(tb1, textvariable=self.grp_var,
-                                       state="readonly", width=18, font=("Segoe UI", 9))
+        self.grp_combo = ttk.Combobox(tb, textvariable=self.grp_var,
+                                       state="readonly", width=14, font=("Segoe UI", 9))
         self.grp_combo["values"] = ["Tous"]
         self.grp_combo.pack(side="left", padx=(6, 16))
         self.grp_combo.bind("<<ComboboxSelected>>", lambda e: self._refresh_table())
 
-        tk.Label(tb1, text="🔍", font=("Segoe UI", 11),
-                 bg=SURFACE2, fg=TEXT2).pack(side="left")
+        sf2 = tk.Frame(tb, bg="#0d1117",
+                       highlightthickness=1, highlightbackground=P_SEP,
+                       highlightcolor=ACCENT)
+        sf2.pack(side="left", padx=(0, 12))
+        tk.Label(sf2, text="🔍", font=("Segoe UI", 10),
+                 bg="#0d1117", fg=P_MUTED).pack(side="left", padx=(8,2), pady=3)
         self.search_var = tk.StringVar()
         self.search_var.trace("w", lambda *a: self._refresh_table())
-        tk.Entry(tb1, textvariable=self.search_var, font=("Segoe UI", 10),
-                 bg=SURFACE, fg=TEXT, insertbackground=TEXT, relief="flat", bd=0,
-                 highlightthickness=1, highlightcolor=ACCENT, highlightbackground=BORDER,
-                 width=22).pack(side="left", padx=(4, 0), ipady=5)
+        tk.Entry(sf2, textvariable=self.search_var, font=("Segoe UI", 10),
+                 bg="#0d1117", fg=P_TEXT, insertbackground=P_TEXT,
+                 relief="flat", bd=0, width=18).pack(side="left", ipady=3, padx=(0,8))
 
-        self.sel_lbl = tk.Label(tb1, text="", font=("Segoe UI", 9), bg=SURFACE2, fg=MUTED)
+        self.sel_lbl = tk.Label(tb, text="", font=("Segoe UI", 9),
+                                bg=P_BG, fg=P_MUTED)
         self.sel_lbl.pack(side="right", padx=6)
-
-        # ── Auto-refresh mini controls ────────────────────────────────────────
-        tk.Frame(tb1, bg=BORDER, width=1).pack(side="right", fill="y", padx=(8, 8))
+        tk.Frame(tb, bg=P_SEP, width=1).pack(side="right", fill="y", padx=8)
         self._countdown_var = tk.StringVar(value="↻ --:--")
-        tk.Label(tb1, textvariable=self._countdown_var,
-                 font=("Segoe UI", 9, "bold"), bg=SURFACE2, fg=ACCENT).pack(side="right")
-        tk.Label(tb1, text="min", font=("Segoe UI", 9), bg=SURFACE2, fg=TEXT2).pack(side="right")
-        self._auto_interval_var = tk.StringVar(value=str(self.cfg.get("auto_refresh_min", 5)))
-        interval_cb = ttk.Combobox(tb1, textvariable=self._auto_interval_var,
-                                    values=["1", "2", "5", "10", "30", "60"],
-                                    state="readonly", width=3, font=("Segoe UI", 9))
-        interval_cb.pack(side="right", padx=(2, 2))
-        tk.Label(tb1, text="Auto :", font=("Segoe UI", 9), bg=SURFACE2, fg=TEXT2).pack(side="right")
-
-        def _on_interval_change(e=None):
-            try:
-                m = int(self._auto_interval_var.get())
-            except ValueError:
-                m = 5
+        tk.Label(tb, textvariable=self._countdown_var,
+                 font=("Segoe UI", 9, "bold"), bg=P_BG, fg=ACCENT).pack(side="right")
+        tk.Label(tb, text="min", font=("Segoe UI", 9),
+                 bg=P_BG, fg=P_MUTED).pack(side="right")
+        self._auto_interval_var = tk.StringVar(
+            value=str(self.cfg.get("auto_refresh_min", 5)))
+        icb = ttk.Combobox(tb, textvariable=self._auto_interval_var,
+                            values=["1","2","5","10","30","60"],
+                            state="readonly", width=3, font=("Segoe UI", 9))
+        icb.pack(side="right", padx=2)
+        tk.Label(tb, text="Auto :", font=("Segoe UI", 9),
+                 bg=P_BG, fg=P_MUTED).pack(side="right")
+        def _on_int(e=None):
+            try: m = int(self._auto_interval_var.get())
+            except ValueError: m = 5
             self._set_auto_interval(m)
-        interval_cb.bind("<<ComboboxSelected>>", _on_interval_change)
-
-        # Hidden link_var for compatibility
+        icb.bind("<<ComboboxSelected>>", _on_int)
         self.link_var = tk.StringVar()
 
-        # ── Treeview with ⋮ actions column ────────────────────────────────────
-        cols = ("no", "name", "group", "ig", "status", "followers", "views", "vids", "checked", "act")
+        # ── Column header bar ─────────────────────────────────────────────────
+        # (key, width, anchor, label, expand)
+        _COLS = [
+            ("chk",    34,  "center", "",                           False),
+            ("no",     52,  "center", "#",                          False),
+            ("cat",    60,  "center", "Catégorie",                  False),
+            ("serial", 210, "w",      "N° de série / Profile ID",   True),
+            ("name",   150, "w",      "Nom",                        False),
+            ("rem",    130, "center", "Remarques",                  False),
+            ("op",     110, "center", "Opération",                  False),
+        ]
+        self._p_cols = _COLS
+
+        hdr = tk.Frame(f, bg=P_HDR, height=36)
+        hdr.pack(fill="x")
+        hdr.pack_propagate(False)
+        tk.Frame(hdr, bg=P_SEP, width=1).pack(side="left", fill="y", pady=0)
+        for i, (key, w, anc, label, exp) in enumerate(_COLS):
+            if exp:
+                cell = tk.Label(hdr, text=label,
+                                font=("Segoe UI", 8, "bold"),
+                                bg=P_HDR,
+                                fg=P_HFGA if label else P_HFGM,
+                                anchor=anc, padx=8)
+                cell.pack(side="left", fill="both", expand=True)
+            else:
+                cell = tk.Frame(hdr, bg=P_HDR, width=w)
+                cell.pack(side="left", fill="y")
+                cell.pack_propagate(False)
+                if label:
+                    tk.Label(cell, text=label,
+                             font=("Segoe UI", 8, "bold"),
+                             bg=P_HDR,
+                             fg=P_HFGA if i > 1 else P_HFGM,
+                             anchor=anc).pack(fill="both", expand=True, padx=6)
+            tk.Frame(hdr, bg=P_SEP, width=1).pack(side="left", fill="y", pady=0)
+
+        # ── Scrollable rows canvas ─────────────────────────────────────────────
+        rows_outer = tk.Frame(f, bg=P_ODD)
+        rows_outer.pack(fill="both", expand=True)
+
+        rc = tk.Canvas(rows_outer, bg=P_ODD, highlightthickness=0)
+        vsb2 = ttk.Scrollbar(rows_outer, orient="vertical", command=rc.yview)
+        rc.configure(yscrollcommand=vsb2.set)
+        vsb2.pack(side="right", fill="y")
+        rc.pack(side="left", fill="both", expand=True)
+
+        ri = tk.Frame(rc, bg=P_ODD)
+        _wid = rc.create_window((0, 0), window=ri, anchor="nw")
+        ri.bind("<Configure>",
+                lambda e: rc.configure(scrollregion=rc.bbox("all")))
+        rc.bind("<Configure>",
+                lambda e: rc.itemconfig(_wid, width=e.width))
+        rc.bind_all("<MouseWheel>",
+                    lambda e: rc.yview_scroll(int(-1*(e.delta/120)), "units"))
+
+        self._p_rows_inner  = ri
+        self._p_rows_canvas = rc
+        self._p_colors = dict(ODD=P_ODD, EVEN=P_EVEN, SEL=P_SEL, HOV=P_HOV,
+                              SEP=P_SEP, TEXT=P_TEXT, MUTED=P_MUTED,
+                              SER=P_SER, PID=P_PID, AND=P_AND, BG=P_BG)
+        self._p_sel_iid   = [None]
+        self._p_row_frames = {}
+
+        # ── Hidden Treeview — keeps all existing data/logic intact ────────────
+        cols = ("no","name","group","ig","status","followers","views","vids","checked","act")
         self.tree = ttk.Treeview(f, columns=cols, show="headings",
                                   style="T.Treeview", selectmode="extended")
         for col, head, w, anchor in [
-            ("no",       "#",          40,  "center"),
-            ("name",     "Téléphone",  155, "w"),
-            ("group",    "Groupe",     120, "center"),
-            ("ig",       "@Instagram", 140, "w"),
-            ("status",   "Statut",     100, "center"),
-            ("followers","Followers",  90,  "center"),
-            ("views",    "Vues",       80,  "center"),
-            ("vids",     "Vidéos",     60,  "center"),
-            ("checked",  "Vérifié",    90,  "center"),
-            ("act",      "  ⋮",        36,  "center"),
+            ("no","#",40,"center"), ("name","Téléphone",155,"w"),
+            ("group","Groupe",120,"center"), ("ig","@Instagram",140,"w"),
+            ("status","Statut",100,"center"), ("followers","Followers",90,"center"),
+            ("views","Vues",80,"center"), ("vids","Vidéos",60,"center"),
+            ("checked","Vérifié",90,"center"), ("act","  ⋮",36,"center"),
         ]:
             self.tree.heading(col, text=head)
             self.tree.column(col, width=w, anchor=anchor, minwidth=w)
-
-        self.tree.tag_configure("active",  foreground=OK)
-        self.tree.tag_configure("banned",  foreground=DANGER)
-        self.tree.tag_configure("error",   foreground=WARN)
-        self.tree.tag_configure("noig",    foreground=MUTED)
-        self.tree.tag_configure("odd",     background=SURFACE)
-        self.tree.tag_configure("even",    background=CARD)
-
-        self.tree.bind("<<TreeviewSelect>>", self._on_sel)
-        self.tree.bind("<Double-1>",         self._on_dbl)
-        self.tree.bind("<Button-3>",         self._phone_context_menu)
-        self.tree.bind("<ButtonRelease-1>",  self._phone_dot_click)
-
-        vsb = ttk.Scrollbar(f, orient="vertical", command=self.tree.yview)
-        self.tree.configure(yscrollcommand=vsb.set)
-        self.tree.pack(side="left", fill="both", expand=True)
-        vsb.pack(side="right", fill="y")
+        # NOT packed — visual canvas layer replaces it
 
     def _on_sel(self, e):
         self.sel_ids = list(self.tree.selection())
@@ -3418,6 +3359,173 @@ class App:
                 self.data.pop(pid, None)
             save_data(self.data)
             self._refresh_table()
+
+    def _phones_draw_table(self):
+        """Rebuild the GeeLark-style visual phone table from hidden self.tree."""
+        if not hasattr(self, "_p_rows_inner"):
+            return
+        c = self._p_colors
+
+        for w in self._p_rows_inner.winfo_children():
+            w.destroy()
+        self._p_row_frames.clear()
+
+        iids = self.tree.get_children()
+        if not iids:
+            emp = tk.Frame(self._p_rows_inner, bg=c["ODD"])
+            emp.pack(fill="both", expand=True, pady=70)
+            tk.Label(emp, text="📱", font=("Segoe UI", 34),
+                     bg=c["ODD"], fg="#1e2a3a").pack()
+            tk.Label(emp, text="Aucun téléphone",
+                     font=("Segoe UI", 13, "bold"),
+                     bg=c["ODD"], fg=c["MUTED"]).pack(pady=(8, 2))
+            tk.Label(emp, text="Synchronisez vos cloud phones depuis GeeLark",
+                     font=("Segoe UI", 9), bg=c["ODD"], fg="#2e3d55").pack()
+            return
+
+        sel = self._p_sel_iid[0]
+
+        def _set_bg_all(widget, bg):
+            try: widget.config(bg=bg)
+            except Exception: pass
+            for ch in widget.winfo_children():
+                _set_bg_all(ch, bg)
+
+        for i, iid in enumerate(iids):
+            d      = self.data.get(iid, {})
+            is_sel = (iid == sel)
+            base   = c["SEL"] if is_sel else (c["ODD"] if i % 2 == 0 else c["EVEN"])
+
+            row = tk.Frame(self._p_rows_inner, bg=base,
+                           height=58, cursor="hand2")
+            row.pack(fill="x")
+            row.pack_propagate(False)
+            tk.Frame(row, bg=c["SEP"], height=1).pack(side="bottom", fill="x")
+
+            inner = tk.Frame(row, bg=base)
+            inner.pack(fill="both", expand=True)
+
+            def _mk_sep():
+                tk.Frame(inner, bg=c["SEP"], width=1).pack(
+                    side="left", fill="y", pady=0)
+
+            # ── Checkbox placeholder ──────────────────────────────────────────
+            cf = tk.Frame(inner, bg=base, width=34)
+            cf.pack(side="left", fill="y"); cf.pack_propagate(False)
+            cv2 = tk.Canvas(cf, bg=base, width=14, height=14,
+                            highlightthickness=0)
+            cv2.place(relx=0.5, rely=0.5, anchor="center")
+            cv2.create_rectangle(1, 1, 13, 13,
+                                 outline="#2e3d55", fill="", width=1)
+            _mk_sep()
+
+            # ── # ─────────────────────────────────────────────────────────────
+            nf = tk.Frame(inner, bg=base, width=52)
+            nf.pack(side="left", fill="y"); nf.pack_propagate(False)
+            tk.Label(nf, text=str(i + 1), font=("Segoe UI", 10, "bold"),
+                     bg=base, fg=c["TEXT"], anchor="center").pack(
+                         fill="both", expand=True)
+            _mk_sep()
+
+            # ── Category icon ─────────────────────────────────────────────────
+            catf = tk.Frame(inner, bg=base, width=60)
+            catf.pack(side="left", fill="y"); catf.pack_propagate(False)
+            tk.Label(catf, text="📱", font=("Segoe UI", 14),
+                     bg=base, fg="#4f8ef7", anchor="center").pack(
+                         fill="both", expand=True)
+            _mk_sep()
+
+            # ── Serial / Profile ID (2 lines, expands) ────────────────────────
+            serf = tk.Frame(inner, bg=base)
+            serf.pack(side="left", fill="both", expand=True, padx=(8, 0))
+            tk.Label(serf, text=str(d.get("serial_no") or "—"),
+                     font=("Segoe UI", 10, "bold"),
+                     bg=base, fg=c["SER"], anchor="w").pack(
+                         fill="x", pady=(10, 0))
+            tk.Label(serf, text=str(iid),
+                     font=("Consolas", 8),
+                     bg=base, fg=c["PID"], anchor="w").pack(
+                         fill="x", pady=(0, 10))
+            _mk_sep()
+
+            # ── Name ──────────────────────────────────────────────────────────
+            nmf = tk.Frame(inner, bg=base, width=150)
+            nmf.pack(side="left", fill="y"); nmf.pack_propagate(False)
+            # Show IG username below name if linked
+            name_txt = d.get("phone_name", "—")
+            ig_txt   = ("@" + d["ig_username"]) if d.get("ig_username") else ""
+            tk.Label(nmf, text=name_txt, font=("Segoe UI", 10),
+                     bg=base, fg=c["TEXT"], anchor="w",
+                     padx=8).pack(fill="x", pady=(10, 0))
+            if ig_txt:
+                tk.Label(nmf, text=ig_txt, font=("Segoe UI", 8),
+                         bg=base, fg="#4f8ef7", anchor="w",
+                         padx=8).pack(fill="x", pady=(0, 10))
+            _mk_sep()
+
+            # ── Remarks (group + status) ──────────────────────────────────────
+            remf = tk.Frame(inner, bg=base, width=130)
+            remf.pack(side="left", fill="y"); remf.pack_propagate(False)
+            st = d.get("ig_status", "")
+            st_txt = {
+                "active":  "✅ Actif",
+                "banned":  "❌ Banni",
+                "private": "🔒 Privé",
+            }.get(st, d.get("group_name") or "--")
+            st_fg = (OK if st == "active" else
+                     DANGER if st == "banned" else c["MUTED"])
+            tk.Label(remf, text=st_txt, font=("Segoe UI", 9),
+                     bg=base, fg=st_fg, anchor="center").pack(
+                         fill="both", expand=True)
+            _mk_sep()
+
+            # ── Operation ────────────────────────────────────────────────────
+            opf = tk.Frame(inner, bg=base, width=110)
+            opf.pack(side="left", fill="y"); opf.pack_propagate(False)
+            op_inner = tk.Frame(opf, bg=base)
+            op_inner.place(relx=0.5, rely=0.5, anchor="center")
+            and_btn = tk.Label(op_inner, text="🤖", font=("Segoe UI", 14),
+                               bg=base, fg=c["AND"], cursor="hand2")
+            and_btn.pack(side="left", padx=(0, 8))
+            dot_btn = tk.Label(op_inner, text="⋮", font=("Segoe UI", 14, "bold"),
+                               bg=base, fg=c["MUTED"], cursor="hand2",
+                               padx=4)
+            dot_btn.pack(side="left")
+
+            # ── Bindings ──────────────────────────────────────────────────────
+            def _click(e, iid2=iid, row2=row, base2=base, idx=i):
+                old = self._p_sel_iid[0]
+                self._p_sel_iid[0] = iid2
+                if old and old in self._p_row_frames:
+                    old_idx = list(self.tree.get_children()).index(old)
+                    old_bg  = c["ODD"] if old_idx % 2 == 0 else c["EVEN"]
+                    _set_bg_all(self._p_row_frames[old], old_bg)
+                _set_bg_all(row2, c["SEL"])
+                self.sel_ids = [iid2]
+                self.tree.selection_set(iid2)
+                n = len(self.sel_ids)
+                self.sel_lbl.config(
+                    text=f"{n} sélectionné(s)" if n else "")
+
+            def _dbl(e, iid2=iid):
+                d2 = self.data.get(iid2, {})
+                if d2.get("ig_username"):
+                    self._show_tab("stats")
+                    self._show_ig_detail(iid2)
+
+            def _dots(e, iid2=iid):
+                self.sel_ids = [iid2]
+                self.tree.selection_set(iid2)
+                self._show_phone_menu(e.x_root, e.y_root)
+                return "break"
+
+            for wgt in [row, inner, cf, nf, catf, serf, nmf, remf, opf]:
+                wgt.bind("<Button-1>", _click)
+                wgt.bind("<Double-1>", _dbl)
+            dot_btn.bind("<Button-1>", _dots)
+            and_btn.bind("<Button-1>", _dots)
+
+            self._p_row_frames[iid] = row
 
     # ══════════════════════════════════════════════════════════════════════════
     # ONGLET STATS — Interface redesignée
@@ -10671,6 +10779,12 @@ class App:
             self.sv["active"].config(text=str(active))
             self.sv["banned"].config(text=str(banned))
             self.sv["views"].config(text=fmt(views))
+
+        # Redraw GeeLark-style visual table
+        try:
+            self._phones_draw_table()
+        except Exception:
+            pass
 
         # Dashboard snapshot + redraw (live)
         try:
