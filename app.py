@@ -2456,7 +2456,7 @@ class App:
         self._dash_range_btns = {}
         rng_frame = tk.Frame(trend_hdr, bg=BG)
         rng_frame.pack(side="right")
-        for code, lbl in [("7d", "7j"), ("30d", "30j"), ("all", "Tout")]:
+        for code, lbl in [("24h", "24h"), ("7d", "7j"), ("30d", "30j"), ("all", "Tout")]:
             b = tk.Button(rng_frame, text=lbl, font=("Segoe UI", 9),
                           bg=SURFACE2, fg=TEXT2, relief="flat", cursor="hand2",
                           padx=10, pady=4, bd=0,
@@ -2577,7 +2577,9 @@ class App:
 
         rng = self._dash_range.get()
         all_keys = sorted(hist.keys())
-        if rng == "7d":
+        if rng == "24h":
+            keys = all_keys[-2:]
+        elif rng == "7d":
             keys = all_keys[-7:]
         elif rng == "30d":
             keys = all_keys[-30:]
