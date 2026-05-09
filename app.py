@@ -10739,6 +10739,20 @@ class App:
             tk.Label(cell, text=tname, font=("Segoe UI", 9),
                      bg=CARD, fg=TEXT2).pack(pady=(4, 0))
 
+        # Show "67" swatch if already unlocked
+        if current_theme == "67":
+            secret_row = tk.Frame(swatches_outer, bg=CARD)
+            secret_row.pack(fill="x", pady=4)
+            secret_cell = tk.Frame(secret_row, bg=CARD)
+            secret_cell.pack(side="left", padx=6)
+            secret_frame = tk.Frame(secret_cell, bg=TEXT, padx=2, pady=2)
+            secret_frame.pack()
+            tk.Button(secret_frame, bg="#22aadd", width=4, height=2,
+                      relief="flat", cursor="hand2",
+                      command=lambda: None).pack()
+            tk.Label(secret_cell, text="67", font=("Segoe UI", 9, "bold"),
+                     bg=CARD, fg="#55aaff").pack(pady=(4, 0))
+
         tk.Label(app_pan, text="Thème actif :", font=("Segoe UI", 10),
                  bg=CARD, fg=TEXT2).pack(anchor="w", pady=(20, 4))
         self._theme_active_lbl = tk.Label(app_pan, text=current_theme,
@@ -11077,10 +11091,8 @@ class App:
         self.cfg["theme"] = "67"
         save_config(self.cfg)
         if hasattr(self, '_theme_active_lbl'):
-            self._theme_active_lbl.config(text="✨ 67", fg=ACCENT)
-        # Full-screen celebration canvas — the actual visible pixel art reveal
+            self._theme_active_lbl.config(text="67", fg=ACCENT)
         self._show_pixel_celebration()
-        # Persistent sidebar decoration
         self._draw_pixel_bg()
 
     def _show_pixel_celebration(self):
@@ -11088,158 +11100,222 @@ class App:
         rh = self.root.winfo_height() or 840
         rx = self.root.winfo_rootx()
         ry = self.root.winfo_rooty()
+
+        # Centered popup — NOT fullscreen so settings remain accessible after dismiss
+        pw, ph = min(rw - 80, 900), min(rh - 80, 680)
+        px = rx + (rw - pw) // 2
+        py = ry + (rh - ph) // 2
+
         cel = tk.Toplevel(self.root)
         cel.overrideredirect(True)
         cel.attributes("-topmost", True)
-        cel.geometry(f"{rw}x{rh}+{rx}+{ry}")
-        cv = tk.Canvas(cel, bg="#0a0e2a", highlightthickness=0)
+        cel.geometry(f"{pw}x{ph}+{px}+{py}")
+
+        cv = tk.Canvas(cel, bg="#07091e", highlightthickness=3,
+                       highlightbackground="#55aaff")
         cv.pack(fill="both", expand=True)
-        self._draw_pixel_scene_on_canvas(cv, rw, rh)
-        # Unlock banner at center-top
-        bw, bh = 420, 90
-        bx, by = rw // 2, 80
-        cv.create_rectangle(bx - bw // 2, by - bh // 2, bx + bw // 2, by + bh // 2,
-                             fill="#0d1530", outline="#55aaff", width=2)
-        cv.create_text(bx, by - 18, text="🎮  Thème 67 débloqué !",
-                        font=("Segoe UI", 18, "bold"), fill="#55aaff", anchor="center")
-        cv.create_text(bx, by + 16, text="Easter egg trouvé — clique n'importe où pour fermer",
-                        font=("Segoe UI", 10), fill="#7090c0", anchor="center")
-        cv.bind("<Button-1>", lambda e: cel.destroy())
-        self.root.after(5000, lambda: cel.winfo_exists() and cel.destroy())
+
+        self._draw_pixel_scene_on_canvas(cv, pw, ph)
+
+        # "67" title drawn large at top
+        cv.create_text(pw // 2, 36, text="67",
+                       font=("Courier", 36, "bold"), fill="#55aaff", anchor="center",
+                       tags="pscene_ui")
+        cv.create_text(pw // 2, 72, text="Theme secret debloque !",
+                       font=("Segoe UI", 13), fill="#aaccff", anchor="center",
+                       tags="pscene_ui")
+
+        # Big visible close button at bottom
+        btn_w, btn_h = 200, 40
+        btn_x = pw // 2
+        btn_y = ph - 28
+        btn = tk.Button(cel, text="  Fermer  ", font=("Segoe UI", 11, "bold"),
+                        bg="#55aaff", fg="#000820", relief="flat", cursor="hand2",
+                        activebackground="#3377cc", activeforeground="#ffffff",
+                        command=cel.destroy)
+        cv.create_window(btn_x, btn_y, window=btn, anchor="center")
+
+        # Also close on Escape
+        cel.bind("<Escape>", lambda e: cel.destroy())
 
     def _draw_pixel_scene_on_canvas(self, cv, w, h):
-        BS = 20  # block size in pixels
+        BS = max(14, min(22, w // 50))  # adaptive block size
         cols = w // BS + 2
         rows = h // BS + 2
 
-        sky_palette = ["#0a0e2a", "#0b1030", "#0d1235", "#0f1438"]
-        wall_palette = ["#7a3a0c", "#8b4513", "#6b3010", "#9a4c18", "#5a2808", "#a05015"]
-        floor_palette = ["#7a0000", "#8b0000", "#660000", "#990000", "#550000", "#880000"]
+        # Background zones
+        floor_rows = 3
+        wall_rows  = 4
+        floor_start = rows - floor_rows
+        wall_start  = rows - floor_rows - wall_rows
 
-        floor_start = rows - 3
-        wall_start = rows - 6
+        sky_shades  = ["#07091e", "#080b22", "#090d28", "#0b1030"]
+        wall_shades = ["#8b4513", "#7a3a0c", "#a05015", "#6b3010", "#5a2808", "#9a4c18"]
+        floor_shades= ["#8b0000", "#7a0000", "#990000", "#660000", "#880000", "#550000"]
 
-        # Sky
+        # Draw sky
         for gy in range(wall_start):
-            col = sky_palette[min(gy // 4, len(sky_palette) - 1)]
+            c = sky_shades[min(gy * len(sky_shades) // max(wall_start, 1), len(sky_shades) - 1)]
             for gx in range(cols):
-                cv.create_rectangle(gx * BS, gy * BS, (gx + 1) * BS, (gy + 1) * BS,
-                                     fill=col, outline="", tags="pscene")
-        # Wall (brick pattern)
+                cv.create_rectangle(gx*BS, gy*BS, (gx+1)*BS, (gy+1)*BS,
+                                    fill=c, outline="", tags="pscene")
+
+        # Draw brick walls
         for gy in range(wall_start, floor_start):
             for gx in range(cols):
-                shade_idx = (gx + gy * 3) % len(wall_palette)
-                # Mortar lines every other row at offset
-                if (gy % 2 == 0 and gx % 3 == 0) or (gy % 2 == 1 and gx % 3 == 2):
-                    fill = "#3a1a06"
-                else:
-                    fill = wall_palette[shade_idx]
-                cv.create_rectangle(gx * BS, gy * BS, (gx + 1) * BS, (gy + 1) * BS,
-                                     fill=fill, outline="", tags="pscene")
-        # Floor
+                # mortar gap
+                mortar = (gy % 2 == 0 and gx % 4 == 0) or (gy % 2 == 1 and gx % 4 == 2)
+                c = "#3a1a06" if mortar else wall_shades[(gx * 2 + gy) % len(wall_shades)]
+                cv.create_rectangle(gx*BS, gy*BS, (gx+1)*BS, (gy+1)*BS,
+                                    fill=c, outline="", tags="pscene")
+
+        # Draw red floor
         for gy in range(floor_start, rows):
             for gx in range(cols):
-                shade_idx = (gx + gy) % len(floor_palette)
-                if gx % 4 == 0 or gy == floor_start:
-                    fill = "#440000"
-                else:
-                    fill = floor_palette[shade_idx]
-                cv.create_rectangle(gx * BS, gy * BS, (gx + 1) * BS, (gy + 1) * BS,
-                                     fill=fill, outline="", tags="pscene")
+                mortar = (gx % 5 == 0)
+                c = "#550000" if mortar else floor_shades[(gx + gy) % len(floor_shades)]
+                cv.create_rectangle(gx*BS, gy*BS, (gx+1)*BS, (gy+1)*BS,
+                                    fill=c, outline="", tags="pscene")
 
-        # Stars in sky
+        # Stars
         import random as _rnd
-        _rnd.seed(99)
-        for _ in range(80):
-            sx = _rnd.randint(0, w)
-            sy = _rnd.randint(0, wall_start * BS - BS)
-            ss = _rnd.choice([2, 3, 3, 4])
-            cv.create_rectangle(sx, sy, sx + ss, sy + ss, fill="#c0d8ff", outline="", tags="pscene")
+        _rnd.seed(7)
+        for _ in range(60):
+            sx = _rnd.randint(2, w - 2)
+            sy = _rnd.randint(2, wall_start * BS - 4)
+            ss = _rnd.choice([2, 2, 3])
+            cv.create_rectangle(sx, sy, sx+ss, sy+ss, fill="#b0ccff", outline="", tags="pscene")
 
-        # ── Blue pixel robot ──────────────────────────────────────────────────
-        # Robot centered, standing on floor top edge
-        robot_cx = w // 2
-        robot_bot = floor_start * BS  # bottom of robot = top of floor
-        B = BS  # one block
-        # Robot is 5 blocks wide, 9 blocks tall
-        rx0 = robot_cx - 2 * B   # left edge of 5-wide body
-        ry0 = robot_bot - 9 * B  # top of robot
+        # ── Robot (pixel art matching reference image) ────────────────────────
+        # The character: wide blocky blue robot, big round eyes, arms extended,
+        # wide stance legs, gray/light feet and hands
+        B = BS
+        robot_bot = floor_start * BS         # robot feet touch floor
+        robot_h   = 13 * B                   # total robot height
+        ry0 = robot_bot - robot_h            # top-left y
+        rx0 = w // 2 - 5 * B                # center: 10-wide robot → offset 5
 
-        def blk(gx, gy, color, outline="#000820"):
-            x = rx0 + gx * B
-            y = ry0 + gy * B
-            cv.create_rectangle(x, y, x + B, y + B, fill=color, outline=outline, tags="pscene")
+        # Colors matching the image
+        BLU  = "#22aadd"   # main bright cyan-blue
+        BLU2 = "#1a88bb"   # slightly darker blue
+        DBL  = "#0d3a7a"   # dark blue (accents, joints)
+        WHT  = "#ffffff"   # eye white
+        PPL  = "#081533"   # dark pupil
+        GRY  = "#8899bb"   # gray (feet, hands)
+        LGY  = "#aabbcc"   # light gray (palm/sole highlight)
+        DGY  = "#556677"   # dark gray joint
+        SKY  = "#07091e"   # transparent background = sky
 
-        HEAD = "#1e4db5"
-        BODY = "#173a8f"
-        ARM  = "#1a3a99"
-        LEG  = "#112870"
-        FOOT = "#0c1f55"
-        EYE  = "#ffffff"
-        PUPIL = "#000000"
-        CHEST = "#55aaff"
-        ANT  = "#55aaff"
-        ANT2 = "#aaddff"
+        def b(gx, gy, col, w_=1, h_=1):
+            x1 = rx0 + gx * B
+            y1 = ry0 + gy * B
+            cv.create_rectangle(x1, y1, x1 + B*w_, y1 + B*h_,
+                                 fill=col, outline="#05070f", width=1, tags="pscene")
 
-        # Antenna (above head)
-        blk(2, 0, ANT2)
-        blk(2, 1, ANT)
-        # Head row 2-3 (5 wide at top, 3 wide neck below)
-        for hx in range(1, 4):
-            blk(hx, 2, HEAD)
-        for hx in range(1, 4):
-            blk(hx, 3, HEAD)
-        # Eyes
-        blk(1, 3, EYE)
-        blk(3, 3, EYE)
-        cv.create_rectangle(rx0 + B + 5, ry0 + 3 * B + 5, rx0 + B + B - 5, ry0 + 3 * B + B - 5,
-                             fill=PUPIL, outline="", tags="pscene")
-        cv.create_rectangle(rx0 + 3 * B + 5, ry0 + 3 * B + 5, rx0 + 3 * B + B - 5, ry0 + 3 * B + B - 5,
-                             fill=PUPIL, outline="", tags="pscene")
-        # Neck
-        blk(2, 4, "#152f80")
-        # Body (5 wide, 3 tall: rows 5-7)
-        for bx in range(5):
-            for by_ in range(5, 8):
-                blk(bx, by_, BODY)
-        # Arms (outside the 5-wide body: col -1 and 5)
-        for ay in range(5, 8):
-            blk(-1, ay, ARM)
-            blk(5, ay, ARM)
-        # Chest glow
-        blk(2, 6, CHEST)
-        # Legs (rows 8-9 at col 1 and 3)
-        blk(1, 8, LEG)
-        blk(3, 8, LEG)
-        blk(1, 9, LEG)
-        blk(3, 9, LEG)
-        # Feet
-        blk(0, 9, FOOT)
-        blk(1, 9, FOOT)
-        blk(3, 9, FOOT)
-        blk(4, 9, FOOT)
+        # ── Head (10 wide, 4 tall: rows 0-3) ─────────────────────────────────
+        # Top of head row 0
+        for hx in range(1, 9):
+            b(hx, 0, BLU)
+        # Main head rows 1-2 (full width 10)
+        for hx in range(10):
+            b(hx, 1, BLU)
+            b(hx, 2, BLU)
+        # Chin row 3
+        for hx in range(1, 9):
+            b(hx, 3, BLU)
+
+        # Eyes — large circular look: 3×3 white + 2×2 pupil, at cols 1-3 and 6-8
+        # Left eye (columns 1,2,3 rows 1,2,3)
+        for ex in range(1, 4):
+            for ey in range(1, 4):
+                b(ex, ey, WHT)
+        # Left pupil center
+        b(2, 2, PPL)
+        # Right eye
+        for ex in range(6, 9):
+            for ey in range(1, 4):
+                b(ex, ey, WHT)
+        # Right pupil
+        b(7, 2, PPL)
+        # Nose bridge (center separator)
+        b(4, 2, BLU2)
+        b(5, 2, BLU2)
+
+        # ── Neck (2 wide, 1 tall: row 4, cols 4-5) ───────────────────────────
+        b(4, 4, DBL)
+        b(5, 4, DBL)
+
+        # ── Torso (8 wide, 4 tall: rows 5-8) ─────────────────────────────────
+        for tx in range(1, 9):
+            for ty in range(5, 9):
+                b(tx, ty, BLU)
+        # Chest symbol — dark blue square center
+        for tx in range(4, 6):
+            for ty in range(6, 8):
+                b(tx, ty, DBL)
+        # Chest highlight
+        b(4, 6, BLU2)
+
+        # ── Arms (rows 5-8, extending out wide: cols -3 to 0 and 10 to 13) ───
+        # Left arm extends left from col 1
+        for ax in range(-3, 0):
+            for ay in range(5, 8):
+                b(ax, ay, BLU2)
+        # Left hand (gray)
+        b(-3, 7, GRY)
+        b(-3, 6, LGY)
+        # Right arm extends right from col 8
+        for ax in range(10, 13):
+            for ay in range(5, 8):
+                b(ax, ay, BLU2)
+        # Right hand (gray)
+        b(12, 7, GRY)
+        b(12, 6, LGY)
+        # Shoulder joints dark
+        b(1, 5, DBL)
+        b(8, 5, DBL)
+
+        # ── Legs (rows 9-11, wide apart: cols 1-3 and 6-8) ──────────────────
+        for ly in range(9, 12):
+            for lx in range(1, 4):
+                b(lx, ly, BLU)
+            for lx in range(6, 9):
+                b(lx, ly, BLU)
+        # Knee accents
+        b(2, 10, DBL)
+        b(7, 10, DBL)
+
+        # ── Feet (rows 12-13, wider spread: cols 0-4 and 5-9) ────────────────
+        for fx in range(0, 4):
+            b(fx, 12, GRY)
+            b(fx, 12, GRY)
+        b(1, 12, LGY)
+        for fx in range(6, 10):
+            b(fx, 12, GRY)
+        b(7, 12, LGY)
+        # Foot sole highlights
+        b(0, 12, DGY)
+        b(3, 12, DGY)
+        b(6, 12, DGY)
+        b(9, 12, DGY)
 
     def _draw_pixel_bg(self):
-        # Draw mini pixel art scene in the sidebar spacer area
         if not hasattr(self, '_sidebar_spacer'):
             return
-        # Remove old pixel canvas if any
         if hasattr(self, '_sidebar_pixel_cv') and self._sidebar_pixel_cv:
             try:
                 self._sidebar_pixel_cv.destroy()
             except Exception:
                 pass
-        spw = self._sidebar_spacer.winfo_width() or 230
-        sph = min(self._sidebar_spacer.winfo_height() or 220, 260)
-        sph = max(sph, 180)
-        pac = tk.Canvas(self._sidebar_spacer, bg="#0a0e2a", highlightthickness=0,
+            self._sidebar_pixel_cv = None
+        spw = 230
+        sph = 200
+        pac = tk.Canvas(self._sidebar_spacer, bg="#07091e", highlightthickness=0,
                         height=sph, width=spw)
-        pac.pack(fill="both", expand=True)
+        pac.pack(fill="x")
         self._sidebar_pixel_cv = pac
-        # Draw the scene scaled to sidebar width
         self._draw_pixel_scene_on_canvas(pac, spw, sph)
-        # Change canvas bg to dark sky (visible in the 1px gap between sidebar and main)
-        self.bg_canvas.configure(bg="#0a0e2a")
+        self.bg_canvas.configure(bg="#07091e")
 
     def _apply_theme(self, theme_name):
         apply_theme_globals(theme_name)
@@ -11247,7 +11323,6 @@ class App:
         save_config(self.cfg)
         if hasattr(self, '_theme_active_lbl'):
             self._theme_active_lbl.config(text=theme_name, fg=ACCENT)
-        # Remove pixel sidebar art when switching away from 67 theme
         if theme_name != "67":
             if hasattr(self, '_sidebar_pixel_cv') and self._sidebar_pixel_cv:
                 try:
