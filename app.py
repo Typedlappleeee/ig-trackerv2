@@ -1290,8 +1290,8 @@ class App:
             else self._show_beta_popup()
         ))
 
-        self._auto_interval = int(self.cfg.get("auto_refresh_min", 5)) * 60
-        self._next_refresh   = 0   # epoch — 0 = pas encore planifié
+        self._auto_interval  = int(self.cfg.get("auto_refresh_min", 5)) * 60
+        self._next_refresh   = time.time() + self._auto_interval
 
         threading.Thread(target=self._load_phones, daemon=True).start()
         threading.Thread(target=self._scheduler, daemon=True).start()
@@ -3099,6 +3099,21 @@ class App:
         f = tk.Frame(self.tab_container, bg=BG)
         self.tabs["phones"] = f
 
+        # ── Top action bar ────────────────────────────────────────────────────
+        top_bar = tk.Frame(f, bg="#070a10", padx=14, pady=8)
+        top_bar.pack(fill="x")
+        tk.Label(top_bar, text="📱  Téléphones GéeLark",
+                 font=("Segoe UI", 12, "bold"),
+                 bg="#070a10", fg="#e8eaf0").pack(side="left")
+        tk.Button(top_bar, text="🔑  Identifiants",
+                  font=("Segoe UI", 9), bg="#162040", fg="#4f8ef7",
+                  relief="flat", bd=0, padx=10, pady=4, cursor="hand2",
+                  activebackground="#1e3060", activeforeground="#4f8ef7",
+                  command=self._show_credentials_dialog).pack(side="right")
+        self.status_lbl = tk.Label(top_bar, text="", font=("Segoe UI", 8),
+                                   bg="#070a10", fg="#6b7a99")
+        self.status_lbl.pack(side="right", padx=12)
+
         # ── Table color palette ───────────────────────────────────────────────
         P_BG    = "#0b0e18"
         P_HDR   = "#0b0e18"
@@ -3395,6 +3410,8 @@ class App:
             vals   = self.tree.item(iid, "values")
             is_sel = (iid == sel)
             base   = c["SEL"] if is_sel else (c["ODD"] if i % 2 == 0 else c["EVEN"])
+            # Phones with no IG linked get a dimmed look
+            has_ig = bool(d.get("ig_username"))
 
             row = tk.Frame(self._p_rows_inner, bg=base,
                            height=52, cursor="hand2")
@@ -3433,14 +3450,15 @@ class App:
             nmf = _cell(170)
             name_txt   = d.get("phone_name") or (vals[1] if vals else "—")
             serial_txt = str(d.get("serial_no") or "")
+            name_fg = c["TEXT"] if has_ig else c["MUTED"]
             tk.Label(nmf, text=name_txt, font=("Segoe UI", 9, "bold"),
-                     bg=base, fg=c["TEXT"], anchor="w",
+                     bg=base, fg=name_fg, anchor="w",
                      padx=6).pack(fill="x", pady=(8, 0))
             if serial_txt:
                 tk.Label(nmf, text=serial_txt,
                          font=("Consolas", 7),
-                         bg=base, fg=c["PID"], anchor="w",
-                         padx=6).pack(fill="x", pady=(0, 8))
+                         bg=base, fg=c["PID"] if has_ig else "#2e3d55",
+                         anchor="w", padx=6).pack(fill="x", pady=(0, 8))
             _mk_sep()
 
             # ── Groupe ────────────────────────────────────────────────────────
@@ -3498,7 +3516,8 @@ class App:
             dot_btn.pack(fill="both", expand=True)
 
             # ── Bindings ──────────────────────────────────────────────────────
-            def _click(e, iid2=iid, row2=row, base2=base, idx=i):
+            def _click(e, iid2=iid, row2=row, base2=base, idx=i,
+                       hi=has_ig):
                 old = self._p_sel_iid[0]
                 self._p_sel_iid[0] = iid2
                 if old and old in self._p_row_frames:
@@ -3509,6 +3528,9 @@ class App:
                 self.sel_ids = [iid2]
                 self.tree.selection_set(iid2)
                 self.sel_lbl.config(text="1 sélectionné(s)")
+                if hi:
+                    self._show_tab("stats")
+                    self._show_ig_detail(iid2)
 
             def _dbl(e, iid2=iid):
                 d2 = self.data.get(iid2, {})
@@ -5432,13 +5454,28 @@ class App:
         ff = shutil.which("ffmpeg")
         if not ff:
             desktop = Path.home() / "Desktop"
-            candidates = [BASE_DIR / "ffmpeg.exe",
-                          Path(r"C:\ffmpeg\bin\ffmpeg.exe")]
+            candidates = [
+                # Linux system locations
+                Path("/opt/pw-browsers/ffmpeg-1011/ffmpeg-linux"),
+                Path("/usr/local/bin/ffmpeg"),
+                Path("/usr/bin/ffmpeg"),
+                # Windows locations
+                BASE_DIR / "ffmpeg.exe",
+                Path(r"C:\ffmpeg\bin\ffmpeg.exe"),
+            ]
             try:
                 for d in desktop.iterdir():
                     if d.is_dir() and "ffmpeg" in d.name.lower():
                         candidates.append(d / "bin" / "ffmpeg.exe")
-            except:
+                        candidates.append(d / "bin" / "ffmpeg")
+            except Exception:
+                pass
+            # Also scan /opt for any ffmpeg binary
+            try:
+                for p in Path("/opt").rglob("ffmpeg*"):
+                    if p.is_file() and "ffmpeg" in p.name.lower():
+                        candidates.append(p)
+            except Exception:
                 pass
             for p in candidates:
                 if Path(p).exists():
