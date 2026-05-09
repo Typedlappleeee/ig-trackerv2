@@ -63,14 +63,15 @@ ipcMain.handle('fetch-instagram-html', async (_event, username: string) => {
         return { ok: true, apiJson: json }
       }
       if (apiRes.status === 401) {
-        // Rate-limited — clear cookies & destroy browser so next call gets a fresh session
-        console.log('[IG] 401 rate-limit — resetting session cookies')
+        // Session expired/rate-limited — clear cookies so browser slow-path starts fresh
+        console.log('[IG] 401 — clearing session, falling back to browser')
         const all = await session.defaultSession.cookies.get({ domain: '.instagram.com' })
-        await Promise.all(all.map(c =>
-          session.defaultSession.cookies.remove('https://www.instagram.com', c.name)
-        ))
+        await Promise.all(all.flatMap(c => [
+          session.defaultSession.cookies.remove('https://www.instagram.com', c.name),
+          session.defaultSession.cookies.remove('https://instagram.com', c.name),
+        ]))
         if (_igBrowser && !_igBrowser.isDestroyed()) { _igBrowser.destroy(); _igBrowser = null }
-        return { ok: false, error: 'rate-limited' }
+        // Fall through to browser slow-path below (do NOT return here)
       }
     }
   } catch (e) {
