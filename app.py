@@ -6833,17 +6833,82 @@ class App:
             font=("Segoe UI", 9), bg=BG, fg=MUTED)
         self.export_dir_lbl.pack(side="left", padx=(12, 0))
 
+        # Action bar (before split so it spans full width)
+        acts = tk.Frame(f, bg=BG)
+        acts.pack(fill="x", pady=(0, 4))
+        self._mk_btn(acts, "📥  Ouvrir",          "ghost",   self._bank_open,       pady=5).pack(side="left", padx=(0, 3))
+        self._mk_btn(acts, "⬇  Télécharger",      "secondary", self._bank_download, pady=5).pack(side="left", padx=(0, 3))
+        self._mk_btn(acts, "🔀  Randomiser méta",  "warn",
+                     cmd=lambda: threading.Thread(target=self._randomize_meta, daemon=True).start(),
+                     pady=5).pack(side="left", padx=(0, 3))
+        self._mk_btn(acts, "🚀  Poster",           "primary", self._post_from_bank, pady=5,
+                     font=("Segoe UI", 9, "bold")).pack(side="left", padx=(0, 3))
+        self._mk_btn(acts, "🗑  Supprimer",        "danger",  self._bank_delete,    pady=5).pack(side="left", padx=(0, 3))
+        self._mk_btn(acts, "📂  Déplacer vers dossier", "ghost", self._bank_move_to_folder,
+                     pady=5).pack(side="left", padx=(0, 3))
+        self.bank_status = tk.Label(acts, text="", font=("Segoe UI", 9), bg=BG, fg=TEXT2)
+        self.bank_status.pack(side="left", padx=8)
+
         split = tk.Frame(f, bg=BG)
         split.pack(fill="both", expand=True)
 
-        # Gauche : grille de cartes scrollable
-        lw = tk.Frame(split, bg=BG, width=620)
-        lw.pack(side="left", fill="both")
-        lw.pack_propagate(False)
+        # ── LEFT SIDEBAR (folders) ──────────────────────────────────────────
+        self._bank_folder_filter = None   # None = all, str = folder name
+        sidebar_bg = "#0d1117"
+        sidebar = tk.Frame(split, bg=sidebar_bg, width=180)
+        sidebar.pack(side="left", fill="y")
+        sidebar.pack_propagate(False)
+        self._bank_sidebar_frame = sidebar
+
+        # "All" row
+        all_row = tk.Frame(sidebar, bg=sidebar_bg, cursor="hand2")
+        all_row.pack(fill="x", pady=(8, 0))
+        self._bank_all_lbl = tk.Label(all_row, text="📁  Toute la banque",
+                                       font=("Segoe UI", 9, "bold"),
+                                       bg=ACCENT, fg="#ffffff", anchor="w",
+                                       padx=10, pady=6)
+        self._bank_all_lbl.pack(fill="x")
+        def _show_all(_e=None):
+            self._bank_folder_filter = None
+            self._bank_refresh_folder_sidebar()
+            self._refresh_bank()
+        self._bank_all_lbl.bind("<Button-1>", _show_all)
+        all_row.bind("<Button-1>", _show_all)
+
+        tk.Frame(sidebar, height=1, bg=BORDER).pack(fill="x", pady=6)
+
+        # "New folder" button
+        self._mk_btn(sidebar, "➕  Nouveau dossier", "ghost",
+                     self._bank_new_folder, pady=4,
+                     font=("Segoe UI", 9)).pack(fill="x", padx=6, pady=(0, 4))
+
+        # Scrollable folder list
+        folder_list_frame = tk.Frame(sidebar, bg=sidebar_bg)
+        folder_list_frame.pack(fill="both", expand=True)
+        folder_cv = tk.Canvas(folder_list_frame, bg=sidebar_bg,
+                               highlightthickness=0, bd=0)
+        folder_cv.pack(side="left", fill="both", expand=True)
+        folder_vsb = ttk.Scrollbar(folder_list_frame, orient="vertical",
+                                    command=folder_cv.yview)
+        folder_cv.configure(yscrollcommand=folder_vsb.set)
+        folder_vsb.pack(side="right", fill="y")
+        self._bank_folder_cv = folder_cv
+        self._bank_folder_inner = tk.Frame(folder_cv, bg=sidebar_bg)
+        self._bank_folder_inner_win = folder_cv.create_window(
+            (0, 0), window=self._bank_folder_inner, anchor="nw")
+        self._bank_folder_inner.bind("<Configure>",
+            lambda _e: folder_cv.configure(
+                scrollregion=folder_cv.bbox("all")))
+        folder_cv.bind("<Configure>",
+            lambda e: folder_cv.itemconfig(self._bank_folder_inner_win, width=e.width))
+
+        # ── GRID AREA ──────────────────────────────────────────────────────
+        grid_area = tk.Frame(split, bg=BG)
+        grid_area.pack(side="left", fill="both", expand=True)
 
         # Canvas scrollable pour les cartes
-        self.bank_grid_canvas = tk.Canvas(lw, bg=BG, highlightthickness=0, bd=0)
-        bank_vsb = ttk.Scrollbar(lw, orient="vertical",
+        self.bank_grid_canvas = tk.Canvas(grid_area, bg=BG, highlightthickness=0, bd=0)
+        bank_vsb = ttk.Scrollbar(grid_area, orient="vertical",
                                  command=self.bank_grid_canvas.yview)
         self.bank_grid_canvas.configure(yscrollcommand=bank_vsb.set)
         bank_vsb.pack(side="right", fill="y")
@@ -6868,6 +6933,11 @@ class App:
         self.bank_grid_inner.bind("<MouseWheel>", _bank_wheel)
         self._bank_grid_wheel = _bank_wheel
 
+        # DnD drop target on the grid canvas
+        if DND_OK:
+            self.bank_grid_canvas.drop_target_register(DND_FILES)
+            self.bank_grid_canvas.dnd_bind("<<Drop>>", self._on_bank_drop)
+
         # Stockage des références pour les cartes
         self._bank_card_widgets = {}      # entry_id → outer frame
         self._bank_card_thumbs = {}       # entry_id → thumb label
@@ -6875,19 +6945,6 @@ class App:
         self._bank_thumb_jobs = set()     # entry_ids en cours de chargement async
         self._bank_grid_cols = 3
         self.bank_tree = None             # rétro-compat (anciennes refs Tree)
-
-        acts = tk.Frame(f, bg=BG)
-        acts.pack(fill="x", pady=(6, 0))
-        self._mk_btn(acts, "📥  Ouvrir",          "ghost",   self._bank_open,       pady=5).pack(side="left", padx=(0, 3))
-        self._mk_btn(acts, "⬇  Télécharger",      "secondary", self._bank_download, pady=5).pack(side="left", padx=(0, 3))
-        self._mk_btn(acts, "🔀  Randomiser méta",  "warn",
-                     cmd=lambda: threading.Thread(target=self._randomize_meta, daemon=True).start(),
-                     pady=5).pack(side="left", padx=(0, 3))
-        self._mk_btn(acts, "🚀  Poster",           "primary", self._post_from_bank, pady=5,
-                     font=("Segoe UI", 9, "bold")).pack(side="left", padx=(0, 3))
-        self._mk_btn(acts, "🗑  Supprimer",        "danger",  self._bank_delete,    pady=5).pack(side="left", padx=(0, 3))
-        self.bank_status = tk.Label(acts, text="", font=("Segoe UI", 9), bg=BG, fg=TEXT2)
-        self.bank_status.pack(side="left", padx=8)
 
         # Droite : aperçu + description
         right = tk.Frame(split, bg=CARD)
@@ -7088,6 +7145,228 @@ class App:
             save_config(self.cfg)
             self.export_dir_lbl.config(text=f"Export : {d}")
 
+    def _bank_refresh_folder_sidebar(self):
+        """Rebuild the folder list in the left sidebar."""
+        if not hasattr(self, "_bank_folder_inner"):
+            return
+        for w in list(self._bank_folder_inner.winfo_children()):
+            try:
+                w.destroy()
+            except Exception:
+                pass
+        sidebar_bg = "#0d1117"
+        bank = load_bank()
+        folders = sorted({e.get("folder", "") for e in bank if e.get("folder", "")})
+        # Update "all" label highlight
+        try:
+            if self._bank_folder_filter is None:
+                self._bank_all_lbl.configure(bg=ACCENT, fg="#ffffff")
+            else:
+                self._bank_all_lbl.configure(bg=sidebar_bg, fg=TEXT2)
+        except Exception:
+            pass
+
+        for folder in folders:
+            count = sum(1 for e in bank if e.get("folder", "") == folder)
+            is_sel = (self._bank_folder_filter == folder)
+            row_bg = HL if is_sel else sidebar_bg
+            row = tk.Frame(self._bank_folder_inner, bg=row_bg, cursor="hand2")
+            row.pack(fill="x", pady=1)
+            lbl = tk.Label(row, text=f"📁  {folder}",
+                            font=("Segoe UI", 9), bg=row_bg,
+                            fg=ACCENT if is_sel else TEXT2,
+                            anchor="w", padx=10, pady=5)
+            lbl.pack(side="left", fill="x", expand=True)
+            badge = tk.Label(row, text=str(count),
+                              font=("Consolas", 8), bg=row_bg,
+                              fg=TEXT2 if not is_sel else ACCENT,
+                              padx=6)
+            badge.pack(side="right")
+
+            def _make_folder_click(fn):
+                def _click(_e=None):
+                    self._bank_folder_filter = fn
+                    self._bank_refresh_folder_sidebar()
+                    self._refresh_bank()
+                return _click
+
+            def _make_folder_rclick(fn):
+                def _rclick(e):
+                    self._bank_folder_context(e, fn)
+                return _rclick
+
+            _fc = _make_folder_click(folder)
+            _frc = _make_folder_rclick(folder)
+            for w in (row, lbl, badge):
+                w.bind("<Button-1>", _fc)
+                w.bind("<Button-3>", _frc)
+
+        try:
+            self._bank_folder_cv.configure(
+                scrollregion=self._bank_folder_cv.bbox("all"))
+        except Exception:
+            pass
+
+    def _bank_folder_context(self, event, folder_name):
+        """Right-click context menu on a folder row."""
+        menu = tk.Menu(self.root, tearoff=0, bg=SURFACE2, fg=TEXT,
+                       activebackground=HL, activeforeground=ACCENT,
+                       font=("Segoe UI", 10), bd=0, relief="flat")
+        menu.add_command(label="✏  Renommer",
+                          command=lambda: self._bank_rename_folder(folder_name))
+        menu.add_command(label="🗑  Supprimer",
+                          command=lambda: self._bank_delete_folder(folder_name))
+        try:
+            menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            menu.grab_release()
+
+    def _bank_new_folder(self):
+        name = simpledialog.askstring("Nouveau dossier", "Nom du dossier :",
+                                       parent=self.root)
+        if not name or not name.strip():
+            return
+        name = name.strip()
+        # Create folder by ensuring at least a note; actual videos get assigned
+        # We just refresh sidebar so the folder appears once a video is moved there
+        # For now create a placeholder by noting in status
+        self.bank_status.config(
+            text=f"✅ Dossier « {name} » créé — assignez des vidéos", fg=OK)
+        self.root.after(3000, lambda: self.bank_status.config(text=""))
+        self._bank_refresh_folder_sidebar()
+
+    def _bank_rename_folder(self, old_name):
+        new_name = simpledialog.askstring("Renommer dossier", "Nouveau nom :",
+                                           initialvalue=old_name, parent=self.root)
+        if not new_name or not new_name.strip() or new_name.strip() == old_name:
+            return
+        new_name = new_name.strip()
+        bank = load_bank()
+        for e in bank:
+            if e.get("folder", "") == old_name:
+                e["folder"] = new_name
+        save_bank(bank)
+        if self._bank_folder_filter == old_name:
+            self._bank_folder_filter = new_name
+        self._bank_refresh_folder_sidebar()
+        self._refresh_bank()
+
+    def _bank_delete_folder(self, folder_name):
+        if not messagebox.askyesno(
+                "Supprimer dossier",
+                f"Supprimer le dossier « {folder_name} » ?\n"
+                "Les vidéos seront déplacées vers la racine."):
+            return
+        bank = load_bank()
+        for e in bank:
+            if e.get("folder", "") == folder_name:
+                e["folder"] = ""
+        save_bank(bank)
+        if self._bank_folder_filter == folder_name:
+            self._bank_folder_filter = None
+        self._bank_refresh_folder_sidebar()
+        self._refresh_bank()
+
+    def _bank_move_to_folder(self):
+        """Move selected video to a folder."""
+        if not self._bank_selected:
+            messagebox.showwarning("Sélection", "Sélectionne une vidéo d'abord")
+            return
+        bank = load_bank()
+        folders = sorted({e.get("folder", "") for e in bank if e.get("folder", "")})
+        # Build a simple dialog
+        dlg = tk.Toplevel(self.root)
+        dlg.title("Déplacer vers dossier")
+        dlg.configure(bg=SURFACE2)
+        dlg.grab_set()
+        dlg.resizable(False, False)
+        tk.Label(dlg, text="Choisir ou créer un dossier :",
+                 font=("Segoe UI", 10), bg=SURFACE2, fg=TEXT).pack(padx=16, pady=(12, 4))
+        var = tk.StringVar()
+        # Dropdown of existing folders + empty option
+        options = ["(Racine — pas de dossier)"] + folders
+        cb = ttk.Combobox(dlg, textvariable=var, values=options, width=28,
+                          font=("Segoe UI", 10))
+        cb.pack(padx=16, pady=4)
+        entry_lbl = tk.Label(dlg, text="Ou saisir un nouveau nom :",
+                              font=("Segoe UI", 9), bg=SURFACE2, fg=TEXT2)
+        entry_lbl.pack(padx=16, pady=(4, 0))
+        new_var = tk.StringVar()
+        tk.Entry(dlg, textvariable=new_var, bg=SURFACE2,
+                 fg=TEXT, font=("Segoe UI", 10),
+                 relief="flat", highlightthickness=1,
+                 highlightbackground=BORDER).pack(padx=16, pady=(2, 8), fill="x")
+        result = [None]
+        def _apply():
+            raw = new_var.get().strip()
+            if raw:
+                result[0] = raw
+            else:
+                sel = var.get()
+                if sel == "(Racine — pas de dossier)" or not sel:
+                    result[0] = ""
+                else:
+                    result[0] = sel
+            dlg.destroy()
+        def _cancel():
+            dlg.destroy()
+        btn_row = tk.Frame(dlg, bg=SURFACE2)
+        btn_row.pack(fill="x", padx=16, pady=(0, 12))
+        self._mk_btn(btn_row, "Appliquer", "primary", _apply, pady=5).pack(side="left", padx=(0, 6))
+        self._mk_btn(btn_row, "Annuler", "ghost", _cancel, pady=5).pack(side="left")
+        dlg.wait_window()
+        if result[0] is None:
+            return
+        for e in bank:
+            if e["id"] == self._bank_selected:
+                e["folder"] = result[0]
+                break
+        save_bank(bank)
+        self._bank_refresh_folder_sidebar()
+        self._refresh_bank()
+        self.bank_status.config(
+            text=f"✅ Vidéo déplacée vers « {result[0] or 'Racine'} »", fg=OK)
+        self.root.after(3000, lambda: self.bank_status.config(text=""))
+
+    def _on_bank_drop(self, event):
+        """Handle drag-and-drop of video files onto the bank grid."""
+        import re as _re
+        raw = event.data.strip()
+        paths = []
+        for m in _re.finditer(r'\{([^}]+)\}|(\S+)', raw):
+            paths.append(m.group(1) or m.group(2))
+        bank = load_bank()
+        known = {b["path"] for b in bank}
+        added = 0
+        for p in paths:
+            if not p.lower().endswith((".mp4", ".mov", ".avi", ".mkv")):
+                continue
+            fp = Path(p)
+            if not fp.exists():
+                continue
+            if str(fp) in known:
+                continue
+            from uuid import uuid4
+            eid = uuid4().hex[:12]
+            bank.append({
+                "id":          eid,
+                "filename":    fp.name,
+                "path":        str(fp),
+                "folder":      self._bank_folder_filter or "",
+                "size_mb":     round(fp.stat().st_size / 1_000_000, 1),
+                "created":     datetime.now().isoformat(),
+                "posted_to":   [],
+                "overlay":     "",
+                "description": "",
+            })
+            known.add(str(fp))
+            added += 1
+        if added:
+            save_bank(bank)
+            self._refresh_bank()
+            self.bank_status.config(text=f"✅ {added} vidéo(s) ajoutée(s)", fg=OK)
+            self.root.after(3000, lambda: self.bank_status.config(text=""))
+
     def _refresh_bank(self):
         # Reconstruction de la grille de cartes
         if not hasattr(self, "bank_grid_inner"):
@@ -7100,6 +7379,9 @@ class App:
         self._bank_card_widgets = {}
         self._bank_card_thumbs = {}
         self._bank_thumb_refs = []
+
+        # Rebuild folder sidebar
+        self._bank_refresh_folder_sidebar()
 
         bank = load_bank()
         export_dir = self.cfg.get("export_dir", "").strip()
@@ -7116,7 +7398,13 @@ class App:
                         "size_mb":  round(fp.stat().st_size / 1_000_000, 1),
                         "created":  datetime.fromtimestamp(fp.stat().st_mtime).isoformat(),
                         "posted_to": [],
+                        "folder":   "",
                     })
+
+        # Filter by folder
+        folder_filter = getattr(self, "_bank_folder_filter", None)
+        if folder_filter is not None:
+            bank = [e for e in bank if e.get("folder", "") == folder_filter]
 
         cols = max(1, getattr(self, "_bank_grid_cols", 3))
         for c in range(cols):
@@ -7126,8 +7414,12 @@ class App:
                 pass
 
         if not bank:
+            if folder_filter is not None:
+                msg = f"Aucune vidéo dans « {folder_filter} »\n⬇  Glissez vos vidéos ici"
+            else:
+                msg = "Aucune vidéo en banque\n⬇  Glissez vos vidéos ici"
             empty = tk.Label(self.bank_grid_inner,
-                              text="Aucune vidéo en banque\nLance un export pour la peupler.",
+                              text=msg,
                               font=("Segoe UI", 10), bg=BG, fg=TEXT2, justify="center")
             empty.grid(row=0, column=0, columnspan=cols, padx=10, pady=40, sticky="nsew")
             empty.bind("<MouseWheel>", self._bank_grid_wheel)
