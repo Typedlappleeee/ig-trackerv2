@@ -1,15 +1,15 @@
 const BASE = 'https://openapi.geelark.com/open/v1'
 
-// Raw phone shape returned by GéeLark API (some fields may be null/missing)
+// Raw phone shape returned by GéeLark API
 export interface GeelarkPhone {
-  id:           string
-  serialNo?:    string | null
-  name?:        string | null
-  serialName?:  string | null
-  phoneName?:   string | null
-  groupName?:   string | null
-  status:       number  // 0=offline, 1=online, 2=error
-  remark?:      string | null
+  id:          string
+  serialNo?:   string | null
+  serialName?: string | null  // display name in GéeLark UI
+  name?:       string | null
+  group?:      { name?: string } | null
+  groupName?:  string | null
+  status:      number  // 0=stopped/offline, 1=running/online
+  remark?:     string | null
 }
 
 function authHeaders(bearer: string) {
@@ -51,6 +51,7 @@ export async function fetchAllPhones(bearer: string): Promise<GeelarkPhone[]> {
   return items
 }
 
+// GéeLark: 0 = stopped/offline, 1 = running/online
 export function geelarkStatusLabel(status: number): string {
-  return status === 1 ? 'online' : status === 2 ? 'error' : 'offline'
+  return status === 1 ? 'online' : 'offline'
 }
