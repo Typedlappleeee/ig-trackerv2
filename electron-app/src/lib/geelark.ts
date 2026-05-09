@@ -51,7 +51,13 @@ export async function fetchAllPhones(bearer: string): Promise<GeelarkPhone[]> {
   return items
 }
 
-// GéeLark: 0 = stopped/offline, 1 = running/online
+// GéeLark: 0 = stopped, anything else (1=running, 2=starting, 3=stopping…) = online
 export function geelarkStatusLabel(status: number): string {
-  return status === 1 ? 'online' : 'offline'
+  return status !== 0 ? 'online' : 'offline'
+}
+
+// Lightweight: fetch only the status of all phones (same endpoint, minimal processing)
+export async function fetchPhoneStatuses(bearer: string): Promise<Map<string, string>> {
+  const phones = await fetchAllPhones(bearer)
+  return new Map(phones.map(p => [p.id, geelarkStatusLabel(p.status)]))
 }
