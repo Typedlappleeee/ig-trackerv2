@@ -2645,6 +2645,42 @@ class App:
                           else "Manage your cloud phones and linked Instagram accounts"),
                          ACCENT)
 
+        # ── Stat cards row ────────────────────────────────────────────────────
+        sf = tk.Frame(f, bg=BG)
+        sf.pack(fill="x", padx=0, pady=(0, 10))
+        card_data = [
+            ("phones", "📱", _("card.phones"), ACCENT, "all"),
+            ("active", "✅", _("card.active"), OK,     "active"),
+            ("banned", "🚫", _("card.banned"), DANGER, "banned"),
+            ("views",  "👁", _("card.views"),  WARN,   "views"),
+        ]
+        for k, ico, lbl, col, filt in card_data:
+            card_outer, card = self._round_card(sf, radius=12, bg=CARD,
+                                                 border=BORDER, border_w=1,
+                                                 hover_border=col)
+            card_outer.pack(side="left", fill="both", expand=True, padx=(0, 8))
+            card_outer.configure(height=90)
+            card_outer.pack_propagate(False)
+            tk.Frame(card, height=2, bg=col).pack(fill="x")
+            inner = tk.Frame(card, bg=CARD, padx=14, pady=10, cursor="hand2")
+            inner.pack(fill="both", expand=True)
+            row_top = tk.Frame(inner, bg=CARD)
+            row_top.pack(fill="x")
+            tk.Label(row_top, text=ico, font=("Segoe UI", 12), bg=CARD, fg=col,
+                     cursor="hand2").pack(side="left")
+            tk.Label(row_top, text=lbl, font=("Segoe UI", 8, "bold"),
+                     bg=CARD, fg=TEXT2, cursor="hand2").pack(side="left", padx=(5, 0))
+            v = tk.Label(inner, text="—", font=("Segoe UI", 22, "bold"), bg=CARD, fg=col,
+                         cursor="hand2")
+            v.pack(anchor="w", pady=(2, 0))
+            self.sv[k] = v
+            def _card_click(e, f2=filt):
+                self._phone_stat_filter = f2
+                self._refresh_table()
+            for w in [card, inner, row_top, v, card_outer._cv]:
+                try: w.bind("<Button-1>", _card_click, add="+")
+                except Exception: pass
+
         # ── Toolbar row 1: filters ─────────────────────────────────────────────
         tb1 = tk.Frame(f, bg=SURFACE2, padx=12, pady=8,
                        highlightthickness=1, highlightbackground=BORDER)
@@ -8721,7 +8757,11 @@ class App:
             ))
             if pid in prev:
                 self.tree.selection_add(pid)
-        # stat cards removed; sv is now a no-op dict
+        if self.sv:
+            self.sv["phones"].config(text=str(total))
+            self.sv["active"].config(text=str(active))
+            self.sv["banned"].config(text=str(banned))
+            self.sv["views"].config(text=fmt(views))
 
         # Dashboard snapshot + redraw (live)
         try:
