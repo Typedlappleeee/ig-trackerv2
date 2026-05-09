@@ -74,11 +74,16 @@ ipcMain.handle('geelark-request', async (_event, opts: {
   isText?: boolean
 }) => {
   try {
+    // Strip any Referer the caller set — Electron's network delegate rejects
+    // cross-origin referrers (e.g. www.instagram.com → i.instagram.com) before
+    // the request even leaves the process. Let the network layer omit it.
+    const { Referer: _r, referer: _r2, Origin: _o, origin: _o2, ...safeHeaders } = opts.headers ?? {}
     const response = await net.fetch(opts.url, {
       method: opts.method,
-      headers: { 'Content-Type': 'application/json', ...(opts.headers ?? {}) },
+      headers: { 'Content-Type': 'application/json', ...safeHeaders },
       body: opts.body ? JSON.stringify(opts.body) : undefined,
-    })
+      referrerPolicy: 'no-referrer',
+    } as RequestInit)
     const data = opts.isText ? await response.text() : await response.json()
     return { ok: true, status: response.status, data }
   } catch (err: unknown) {
