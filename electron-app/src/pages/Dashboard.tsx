@@ -93,7 +93,19 @@ export function Dashboard({ user }: DashboardProps) {
 
   useEffect(() => {
     supabase.from('phones').select('*').eq('user_id', user.id).order('phone_name')
-      .then(({ data }) => { setPhones(data ?? []); setLoading(false) })
+      .then(({ data }) => {
+        const loaded = data ?? []
+        setPhones(loaded)
+        setLoading(false)
+        // Auto-snapshot current views on every dashboard visit so the chart fills over time
+        const withViews = loaded.filter(p => (p.total_views ?? 0) > 0)
+        if (withViews.length > 0) {
+          const now = new Date().toISOString()
+          supabase.from('views_history').insert(
+            withViews.map(p => ({ user_id: user.id, phone_id: p.id, views: p.total_views, recorded_at: now }))
+          ).then(() => {}) // fire-and-forget, don't block render
+        }
+      })
   }, [])
 
   useEffect(() => { loadChart() }, [selectedPhone, range, phones])

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell, ipcMain, net, dialog } from 'electron'
+import { app, BrowserWindow, shell, ipcMain, net, dialog, session } from 'electron'
 import { fileURLToPath } from 'node:url'
 import { existsSync, readFileSync } from 'node:fs'
 import { execFile } from 'node:child_process'
@@ -12,58 +12,56 @@ export const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist')
 
 let win: BrowserWindow | null = null
 
-// ── Instagram hidden browser (persistent, reused across calls) ────────────
-let _igBrowser: BrowserWindow | null = null
-function getIgBrowser(): BrowserWindow {
-  if (!_igBrowser || _igBrowser.isDestroyed()) {
-    _igBrowser = new BrowserWindow({
-      show: false,
-      width: 1280,
-      height: 800,
-      webPreferences: {
-        nodeIntegration: false,
-        contextIsolation: false,   // allows executeJavaScript to read window vars
-        webSecurity: true,
-        sandbox: false,
-      },
-    })
-    _igBrowser.webContents.setUserAgent(
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
-    )
-    _igBrowser.on('closed', () => { _igBrowser = null })
-  }
-  return _igBrowser
-}
-
-// Fetch Instagram profile HTML via a real browser context (bypasses API blocks)
+// Fetch Instagram profile HTML via a fresh hidden browser per request.
+// A new window per call avoids session reuse that triggers Instagram rate-limits.
+// The window uses the defaultSession so cookies it sets are visible to net.fetch / session.defaultSession.fetch.
 ipcMain.handle('fetch-instagram-html', async (_event, username: string) => {
-  const browser = getIgBrowser()
+  const browser = new BrowserWindow({
+    show: false,
+    width: 1280,
+    height: 900,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: false,
+      webSecurity: true,
+      sandbox: false,
+    },
+  })
+  browser.webContents.setUserAgent(
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+  )
+
   const url = `https://www.instagram.com/${encodeURIComponent(username)}/`
+
   return new Promise<unknown>(resolve => {
-    const timer = setTimeout(() => {
-      resolve({ ok: false, error: 'timeout' })
-    }, 18000)
+    const done = (result: unknown) => {
+      if (!browser.isDestroyed()) browser.destroy()
+      resolve(result)
+    }
+    const timer = setTimeout(() => done({ ok: false, error: 'timeout' }), 22000)
+
     browser.webContents.once('did-finish-load', () => {
-      // Give React 2s to hydrate the page before reading the DOM
+      // Wait 3 s for React hydration and XHR data to settle
       setTimeout(async () => {
         clearTimeout(timer)
         try {
           const data = await browser.webContents.executeJavaScript(`({
             url: location.href,
-            html: document.documentElement.innerHTML.slice(0, 120000)
+            html: document.documentElement.innerHTML.slice(0, 150000)
           })`)
-          resolve({ ok: true, ...(data as object) })
+          done({ ok: true, ...(data as object) })
         } catch (e) {
-          resolve({ ok: false, error: String(e) })
+          done({ ok: false, error: String(e) })
         }
-      }, 2500)
+      }, 3000)
     })
+
     browser.loadURL(url, {
       extraHeaders: [
         'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
         'Accept-Language: fr-FR,fr;q=0.9,en-US;q=0.8',
       ].join('\r\n'),
-    }).catch(err => { clearTimeout(timer); resolve({ ok: false, error: String(err) }) })
+    }).catch(err => { clearTimeout(timer); done({ ok: false, error: String(err) }) })
   })
 })
 
@@ -207,13 +205,15 @@ ipcMain.handle('pick-output-file', async (_event, opts: { defaultName: string })
   return result.canceled ? null : result.filePath
 })
 
-// ── IPC: fetch image as base64 data URL (bypass CORS for CDN images) ─────────
+// ── IPC: fetch image as base64 data URL ──────────────────────────────────────
+// Uses session.defaultSession.fetch so Instagram session cookies are included,
+// allowing CDN thumbnails to load after the hidden browser has visited a profile.
 ipcMain.handle('fetch-image', async (_event, opts: { url: string; headers?: Record<string, string> }) => {
   try {
-    const response = await net.fetch(opts.url, {
+    const response = await session.defaultSession.fetch(opts.url, {
       method: 'GET',
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
         ...(opts.headers ?? {}),
       },
     })

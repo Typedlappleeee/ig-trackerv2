@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase, type Phone } from '@/lib/supabase'
 import { fetchIgStats } from '@/lib/instagram'
@@ -62,12 +62,13 @@ async function fetchIgVideos(username: string): Promise<IgVideo[]> {
 function VideoThumbnail({ src }: { src: string }) {
   const [dataUrl, setDataUrl] = useState<string | null>(null)
   const [failed, setFailed]   = useState(false)
-  const tried = useRef(false)
 
   useEffect(() => {
-    if (!src || tried.current) return
-    tried.current = true
+    setDataUrl(null)
+    setFailed(false)
+    if (!src) { setFailed(true); return }
     if (!window.electronAPI?.fetchImage) { setFailed(true); return }
+    let cancelled = false
     window.electronAPI.fetchImage({
       url: src,
       headers: {
@@ -75,9 +76,11 @@ function VideoThumbnail({ src }: { src: string }) {
         'Origin':  'https://www.instagram.com',
       },
     }).then(res => {
+      if (cancelled) return
       if (res.ok && res.dataUrl) setDataUrl(res.dataUrl)
       else setFailed(true)
-    }).catch(() => setFailed(true))
+    }).catch(() => { if (!cancelled) setFailed(true) })
+    return () => { cancelled = true }
   }, [src])
 
   if (failed || !src) {
@@ -127,20 +130,23 @@ export function Stats({ user }: StatsProps) {
     else { setLS(true); setLL(true) }
 
     try {
-      const [s, v] = await Promise.all([
-        fetchIgStats(phone.ig_username),
-        fetchIgVideos(phone.ig_username),
-      ])
-      setStats(s)
-      setVideos(v)
+      // Load stats first (hidden browser sets Instagram session cookies),
+      // then videos (net.fetch benefits from those cookies for the API call)
+      const s = await fetchIgStats(phone.ig_username)
+      setStats(s); setLS(false)
+
+      const v = await fetchIgVideos(phone.ig_username)
+      setVideos(v); setLL(false)
+
       if (!s && v.length === 0) {
         setLoadErr('Instagram indisponible ou compte privé. Réessaie dans quelques secondes.')
       }
     } catch {
       setLoadErr('Erreur lors du chargement. Clique sur Réessayer.')
+      setLS(false); setLL(false)
     }
 
-    setLS(false); setLL(false); setRetrying(false)
+    setRetrying(false)
   }
 
   const sorted = [...videos].sort((a, b) => {
