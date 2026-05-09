@@ -2028,58 +2028,9 @@ class App:
             font=("Consolas", 8), bg=SURFACE, fg=MUTED)
         self.status_lbl.pack(padx=16, pady=(2, 14))
 
-        # ── Main: stat cards ───────────────────────────────────────────────────
-        sf = tk.Frame(self.main_frame, bg=BG)
-        sf.pack(fill="x", padx=18, pady=(18, 10))
-        self._top_stat_cards = sf
+        # Top stat cards removed per user request
 
-        self.sv = {}
-        card_data = [
-            ("phones", "📱", _("card.phones"), ACCENT, "all"),
-            ("active", "✅", _("card.active"), OK,     "active"),
-            ("banned", "🚫", _("card.banned"), DANGER, "banned"),
-            ("views",  "👁", _("card.views"),  WARN,   "views"),
-        ]
-        for k, ico, lbl, col, filt in card_data:
-            card_outer, card = self._round_card(sf, radius=14, bg=CARD,
-                                                 border=BORDER, border_w=1,
-                                                 hover_border=col)
-            card_outer.pack(side="left", fill="both", expand=True, padx=(0, 10), ipady=0)
-            card_outer.configure(height=110)
-            # Force min height for consistent display
-            card_outer.pack_propagate(False)
-
-            top_bar = tk.Frame(card, height=3, bg=col)
-            top_bar.pack(fill="x")
-
-            inner = tk.Frame(card, bg=CARD, padx=16, pady=12, cursor="hand2")
-            inner.pack(fill="both", expand=True)
-
-            row_top = tk.Frame(inner, bg=CARD, cursor="hand2")
-            row_top.pack(fill="x")
-            tk.Label(row_top, text=ico, font=("Segoe UI", 14), bg=CARD, fg=col,
-                     cursor="hand2").pack(side="left")
-            tk.Label(row_top, text=lbl, font=("Segoe UI", 8, "bold"),
-                     bg=CARD, fg=TEXT2, cursor="hand2").pack(side="left", padx=(6, 0), pady=2)
-
-            v = tk.Label(inner, text="—", font=("Segoe UI", 26, "bold"), bg=CARD, fg=col,
-                         cursor="hand2")
-            v.pack(anchor="w", pady=(4, 0))
-            hint = tk.Label(inner, text=_("card.click_filter"), font=("Segoe UI", 7),
-                            bg=CARD, fg=MUTED, cursor="hand2")
-            hint.pack(anchor="w")
-            self.sv[k] = v
-
-            def _card_click(e, f2=filt):
-                self._phone_stat_filter = f2
-                self._show_tab("phones")
-                self._refresh_table()
-
-            for w in [card, inner, row_top, v, hint, top_bar, card_outer._cv]:
-                try:
-                    w.bind("<Button-1>", _card_click, add="+")
-                except Exception:
-                    pass
+        self.sv = {}  # kept as a no-op dict to avoid AttributeError in _refresh_table
 
         # Global mousewheel routing
         self.root.bind_all("<MouseWheel>", self._on_global_scroll, add="+")
@@ -2472,6 +2423,8 @@ class App:
         self._dash_chart.bind("<Configure>", lambda e: self._dash_redraw_chart())
 
         self._dash_set_range("7d")
+        # Delayed draw so canvas has real dimensions after layout
+        self.root.after(300, self._dash_redraw_chart)
 
     def _dash_set_range(self, code):
         self._dash_range.set(code)
@@ -2505,8 +2458,11 @@ class App:
             cv.delete("all")
             w = cv.winfo_width() or 600
             h = cv.winfo_height() or 240
-            cv.create_text(w//2, h//2, text=t("dash.empty", L),
-                           fill=MUTED, font=("Segoe UI", 11))
+            msg = ("Aucune donnée — effectuez d'abord une actualisation"
+                   if L == "fr" else
+                   "No data yet — refresh your phones first")
+            cv.create_text(w//2, h//2, text=msg,
+                           fill=TEXT2, font=("Segoe UI", 11))
             for k, lbl in self._dash_kpis.items():
                 lbl.config(text="—")
             return
@@ -2609,7 +2565,7 @@ class App:
                 poly.append(py)
             poly.append(pts[-1][0])
             poly.append(margin_t + plot_h)
-            cv.create_polygon(*poly, fill="#c8f13522", outline="")
+            cv.create_polygon(*poly, fill="#1a3318", outline="")
 
         # Line
         if len(pts) >= 2:
@@ -8718,10 +8674,7 @@ class App:
             ))
             if pid in prev:
                 self.tree.selection_add(pid)
-        self.sv["phones"].config(text=str(total))
-        self.sv["active"].config(text=str(active))
-        self.sv["banned"].config(text=str(banned))
-        self.sv["views"].config(text=fmt(views))
+        # stat cards removed; sv is now a no-op dict
 
         # Dashboard snapshot + redraw (live)
         try:
