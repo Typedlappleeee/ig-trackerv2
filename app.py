@@ -1986,22 +1986,66 @@ class App:
         # ── Bientôt section ────────────────────────────────────────────────────
         self._make_sidebar_section(self.sidebar, "Bientôt" if L == "fr" else "Coming soon")
 
-        def _soon(icon, label):
+        # Shared tooltip window for "Soon" items
+        _sb_tooltip = {"win": None}
+
+        def _hide_tooltip():
+            if _sb_tooltip["win"]:
+                try:
+                    _sb_tooltip["win"].destroy()
+                except Exception:
+                    pass
+                _sb_tooltip["win"] = None
+
+        def _show_tooltip(widget, title, body, accent="#4f8ef7"):
+            _hide_tooltip()
+            tip = tk.Toplevel(self.root)
+            tip.overrideredirect(True)
+            tip.attributes("-topmost", True)
+            tip.configure(bg="#0c111a")
+            _sb_tooltip["win"] = tip
+            # border frame
+            border = tk.Frame(tip, bg="#1a2235", padx=1, pady=1)
+            border.pack()
+            inner = tk.Frame(border, bg="#0c111a", padx=14, pady=10)
+            inner.pack()
+            tk.Label(inner, text=title, font=("Segoe UI", 9, "bold"),
+                     bg="#0c111a", fg=accent).pack(anchor="w")
+            tk.Label(inner, text=body, font=("Segoe UI", 8),
+                     bg="#0c111a", fg="#8b93a8", wraplength=240, justify="left").pack(anchor="w", pady=(4, 0))
+            # Position near widget
+            self.root.update_idletasks()
+            wx = widget.winfo_rootx() + widget.winfo_width() + 6
+            wy = widget.winfo_rooty()
+            tip.geometry(f"+{wx}+{wy}")
+
+        def _soon(icon, label, tooltip_title=None, tooltip_body=None, tip_accent="#4f8ef7"):
             row = tk.Frame(self.sidebar, bg=SB_BG)
             row.pack(fill="x")
             tk.Frame(row, bg=SB_BG, width=3).pack(side="left", fill="y")
             tk.Frame(row, bg=SB_BG, width=10).pack(side="left")
-            tk.Label(row, text=icon, font=("Segoe UI", 11),
-                     bg=SB_BG, fg="#222d42", width=2, anchor="center").pack(side="left")
-            tk.Label(row, text=label, font=("Segoe UI", 9),
-                     bg=SB_BG, fg="#2a3550", padx=8, pady=9,
-                     anchor="w").pack(side="left", fill="x", expand=True)
+            ico_lbl = tk.Label(row, text=icon, font=("Segoe UI", 11),
+                     bg=SB_BG, fg="#222d42", width=2, anchor="center")
+            ico_lbl.pack(side="left")
+            txt_lbl = tk.Label(row, text=label, font=("Segoe UI", 9),
+                     bg=SB_BG, fg="#2a3550", padx=8, pady=9, anchor="w")
+            txt_lbl.pack(side="left", fill="x", expand=True)
             tk.Label(row, text="Soon", font=("Segoe UI", 7, "bold"),
                      bg="#1a1208", fg="#7a6020",
                      padx=5, pady=1).pack(side="right", padx=(0, 14))
+            if tooltip_title and tooltip_body:
+                for w in [row, ico_lbl, txt_lbl]:
+                    w.bind("<Enter>", lambda e, r=row, t=tooltip_title, b=tooltip_body, a=tip_accent:
+                           _show_tooltip(r, t, b, a))
+                    w.bind("<Leave>", lambda e: _hide_tooltip())
 
         _soon("𝕏",  "Twitter / X")
         _soon("🧵", "Threads")
+        _soon("🟠", "Reddit")
+        _soon("🌐", "Multiposting",
+              tooltip_title="🌐  Multiposting — Bientôt disponible !",
+              tooltip_body="Poste le même Reel sur plusieurs réseaux en même temps avec un seul clic.\nInstagram · Twitter · Threads · Reddit et plus encore.",
+              tip_accent="#a56ef5")
 
         # Spacer pushes bottom items down
         tk.Frame(self.sidebar, bg=SB_BG).pack(fill="both", expand=True)
