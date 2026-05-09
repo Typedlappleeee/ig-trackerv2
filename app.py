@@ -7188,28 +7188,42 @@ class App:
         _mp_draw_empty_preview()
 
         def _mp_load_preview(path):
+            # Runs in background thread — all tkinter calls go through after(0,...)
+            import tempfile, os as _os
+            tmp_path = None
             try:
                 from PIL import Image, ImageTk
-                import subprocess, tempfile, os
                 with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
                     tmp_path = tmp.name
-                ffmpeg = "/usr/bin/ffmpeg"
-                subprocess.run(
+                ffmpeg = shutil.which("ffmpeg") or "/usr/bin/ffmpeg"
+                result = subprocess.run(
                     [ffmpeg, "-y", "-i", path, "-ss", "00:00:01", "-vframes", "1",
                      "-vf", "scale=108:192:force_original_aspect_ratio=increase,crop=108:192",
                      tmp_path],
-                    capture_output=True, timeout=8)
-                if os.path.exists(tmp_path) and os.path.getsize(tmp_path) > 0:
-                    img = Image.open(tmp_path).resize((108, 192), Image.LANCZOS)
+                    capture_output=True, timeout=10)
+                if _os.path.exists(tmp_path) and _os.path.getsize(tmp_path) > 0:
+                    img   = Image.open(tmp_path).resize((108, 192), Image.LANCZOS)
                     photo = ImageTk.PhotoImage(img)
-                    self._mp_preview_img_ref = photo
-                    _mp_preview_cv.delete("all")
-                    _mp_preview_cv.create_image(0, 0, anchor="nw", image=photo)
-                    os.unlink(tmp_path)
+                    try:
+                        _os.unlink(tmp_path)
+                    except Exception:
+                        pass
+                    def _show(ph=photo):
+                        self._mp_preview_img_ref = ph
+                        _mp_preview_cv.delete("all")
+                        _mp_preview_cv.create_image(0, 0, anchor="nw", image=ph)
+                    self.root.after(0, _show)
                 else:
-                    _mp_draw_empty_preview(Path(path).stem[:12])
+                    stem = Path(path).stem[:12]
+                    self.root.after(0, lambda s=stem: _mp_draw_empty_preview(s))
             except Exception:
-                _mp_draw_empty_preview(Path(path).stem[:12])
+                stem = Path(path).stem[:12]
+                self.root.after(0, lambda s=stem: _mp_draw_empty_preview(s))
+                if tmp_path:
+                    try:
+                        import os as _os2; _os2.unlink(tmp_path)
+                    except Exception:
+                        pass
 
         # ── Scrollable video list ─────────────────────────────────────────────
         _mp_list_outer = tk.Frame(linner, bg="#0d1520",
@@ -7240,21 +7254,23 @@ class App:
         self._mp_pool_inner.bind("<MouseWheel>", _mp_pool_wheel)
 
         def _mp_select_video(path):
-            """Called when user clicks a video row — load preview."""
+            """Click on a video row: load its thumbnail preview and sync its caption."""
             self._mp_selected_vid[0] = path
+            # Preview in background thread (all canvas calls marshalled via after(0,...))
             threading.Thread(target=_mp_load_preview, args=(path,), daemon=True).start()
-            # Pre-fill caption from bank if available
+            # Always sync caption to this video's bank entry (clear if no caption)
+            cap = ""
             try:
                 bank = load_bank()
-                for e in bank:
-                    if e.get("path") == path:
-                        cap = e.get("description") or e.get("caption") or ""
-                        if cap and not self._mp_cap_box.get("1.0", "end").strip():
-                            self._mp_cap_box.delete("1.0", "end")
-                            self._mp_cap_box.insert("1.0", cap)
+                for entry in bank:
+                    if entry.get("path") == path:
+                        cap = entry.get("description") or entry.get("caption") or ""
                         break
             except Exception:
                 pass
+            self._mp_cap_box.delete("1.0", "end")
+            if cap:
+                self._mp_cap_box.insert("1.0", cap)
 
         def _mp_on_pick(paths):
             self._mp_vid_paths = list(paths)
