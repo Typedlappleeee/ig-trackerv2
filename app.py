@@ -3214,6 +3214,9 @@ class App:
         rc.create_window((0, 0), window=ri, anchor="nw", tags="inner")
         ri.bind("<Configure>",
                 lambda e: rc.configure(scrollregion=rc.bbox("all")))
+        # Force ri to always match canvas width so rows fill "x" correctly
+        rc.bind("<Configure>",
+                lambda e: rc.itemconfig("inner", width=e.width))
         rc.bind("<MouseWheel>",
                 lambda e: rc.yview_scroll(int(-1*(e.delta/120)), "units"))
 
