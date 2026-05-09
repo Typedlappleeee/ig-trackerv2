@@ -1,228 +1,164 @@
 import { useState, useEffect } from 'react'
 import type { User } from '@supabase/supabase-js'
-import { supabase, type UserItem } from '@/lib/supabase'
-import { Button } from '@/components/ui/Button'
-import { Input }  from '@/components/ui/Input'
-import { Spinner } from '@/components/ui/Spinner'
+import { supabase } from '@/lib/supabase'
+import { Spinner }  from '@/components/ui/Spinner'
+import { Button }   from '@/components/ui/Button'
 
 interface DashboardProps {
   user: User
 }
 
-export function Dashboard({ user }: DashboardProps) {
-  const [items, setItems]       = useState<UserItem[]>([])
-  const [loading, setLoading]   = useState(true)
-  const [adding, setAdding]     = useState(false)
-  const [newTitle, setNewTitle] = useState('')
-  const [newContent, setNewContent] = useState('')
-  const [error, setError]       = useState<string | null>(null)
+interface KPIs {
+  phones:       number
+  phonesOnline: number
+  phonesError:  number
+  totalViews:   number
+  bankCount:    number
+}
 
-  // ── Chargement des données ──────────────────────────────────────────────────
-  useEffect(() => {
-    loadItems()
-  }, [])
+interface KpiCardProps {
+  icon:  string
+  label: string
+  value: string | number
+  color: string
+  sub?:  string
+}
 
-  async function loadItems() {
-    setLoading(true)
-    // RLS garantit que chaque utilisateur ne voit QUE ses données
-    const { data, error } = await supabase
-      .from('user_items')
-      .select('*')
-      .order('created_at', { ascending: false })
-
-    if (error) {
-      setError('Erreur lors du chargement.')
-    } else {
-      setItems(data || [])
-    }
-    setLoading(false)
-  }
-
-  // ── Ajouter un élément ─────────────────────────────────────────────────────
-  async function addItem() {
-    if (!newTitle.trim()) return
-    setAdding(true)
-    setError(null)
-
-    const { data, error } = await supabase
-      .from('user_items')
-      .insert({
-        user_id: user.id,        // Lié à l'utilisateur connecté
-        title:   newTitle.trim(),
-        content: newContent.trim(),
-      })
-      .select()
-      .single()
-
-    if (error) {
-      setError('Erreur lors de l\'ajout.')
-    } else {
-      setItems(prev => [data, ...prev])  // Ajoute en haut de la liste
-      setNewTitle('')
-      setNewContent('')
-    }
-    setAdding(false)
-  }
-
-  // ── Supprimer un élément ───────────────────────────────────────────────────
-  async function deleteItem(id: string) {
-    const { error } = await supabase
-      .from('user_items')
-      .delete()
-      .eq('id', id)
-
-    if (!error) {
-      setItems(prev => prev.filter(item => item.id !== id))
-    }
-  }
-
-  // ── Déconnexion ────────────────────────────────────────────────────────────
-  async function signOut() {
-    await supabase.auth.signOut()
-    // useAuth() détecte la déconnexion → App revient sur AuthPage
-  }
-
-  // ── UI ─────────────────────────────────────────────────────────────────────
+function KpiCard({ icon, label, value, color, sub }: KpiCardProps) {
   return (
-    <div className="min-h-screen bg-bg flex">
-
-      {/* Sidebar */}
-      <aside className="w-56 flex-shrink-0 flex flex-col border-r border-border bg-surface">
-        {/* Logo */}
-        <div className="px-5 py-5 flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold bg-accent/10 text-accent">
-            IG
-          </div>
-          <span className="font-semibold text-sm text-text">IG Tracker</span>
-        </div>
-
-        {/* Nav */}
-        <nav className="flex-1 px-2 py-2 space-y-0.5">
-          <SidebarItem icon="📊" label="Dashboard" active />
-          <SidebarItem icon="📱" label="Téléphones" />
-          <SidebarItem icon="🎬" label="Banque vidéos" />
-          <SidebarItem icon="⚙️" label="Paramètres" />
-        </nav>
-
-        {/* User footer */}
-        <div className="px-3 py-3 border-t border-border">
-          <div className="flex items-center gap-3">
-            <div className="w-7 h-7 rounded-full bg-accent/20 text-accent flex items-center justify-center text-xs font-bold flex-shrink-0">
-              {user.email?.[0].toUpperCase()}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs text-text truncate">{user.email}</p>
-            </div>
-            <button
-              onClick={signOut}
-              className="text-text2 hover:text-danger transition-colors text-xs p-1 rounded"
-              title="Se déconnecter"
-            >
-              ↩
-            </button>
-          </div>
-        </div>
-      </aside>
-
-      {/* Main */}
-      <main className="flex-1 overflow-auto">
-        <div className="max-w-3xl mx-auto p-8">
-
-          {/* Header */}
-          <div className="mb-8">
-            <h1 className="text-2xl font-bold text-text">Dashboard</h1>
-            <p className="text-text2 text-sm mt-1">Tes données synchronisées en temps réel</p>
-          </div>
-
-          {/* Formulaire d'ajout */}
-          <div className="bg-card border border-border rounded-xl p-5 mb-6">
-            <h2 className="text-sm font-semibold text-text mb-4">Ajouter un élément</h2>
-            <div className="space-y-3">
-              <Input
-                placeholder="Titre…"
-                value={newTitle}
-                onChange={e => setNewTitle(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && !e.shiftKey && addItem()}
-              />
-              <Input
-                placeholder="Contenu (optionnel)…"
-                value={newContent}
-                onChange={e => setNewContent(e.target.value)}
-              />
-              <Button onClick={addItem} loading={adding} disabled={!newTitle.trim()}>
-                + Ajouter
-              </Button>
-            </div>
-          </div>
-
-          {/* Erreur */}
-          {error && (
-            <div className="mb-4 px-4 py-3 rounded-lg bg-danger/10 border border-danger/20 text-danger text-sm">
-              {error}
-            </div>
-          )}
-
-          {/* Liste */}
-          {loading ? (
-            <div className="flex justify-center py-12">
-              <Spinner size="lg" />
-            </div>
-          ) : items.length === 0 ? (
-            <div className="text-center py-12 text-text2">
-              <p className="text-3xl mb-3">📭</p>
-              <p className="text-sm">Aucun élément — ajoute-en un ci-dessus.</p>
-            </div>
-          ) : (
-            <div className="space-y-3 animate-fade-in">
-              {items.map(item => (
-                <div
-                  key={item.id}
-                  className="bg-card border border-border rounded-xl p-4 flex items-start justify-between gap-3 hover:border-accent/30 transition-colors"
-                >
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-text">{item.title}</p>
-                    {item.content && (
-                      <p className="text-xs text-text2 mt-1">{item.content}</p>
-                    )}
-                    <p className="text-xs text-muted mt-2">
-                      {new Date(item.created_at).toLocaleDateString('fr-FR', {
-                        day: '2-digit', month: 'short', year: 'numeric',
-                        hour: '2-digit', minute: '2-digit',
-                      })}
-                    </p>
-                  </div>
-                  <Button
-                    variant="danger"
-                    size="sm"
-                    onClick={() => deleteItem(item.id)}
-                    className="flex-shrink-0"
-                  >
-                    ✕
-                  </Button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </main>
+    <div className="bg-card border border-border rounded-xl p-5 border-t-2" style={{ borderTopColor: color }}>
+      <div className="flex items-center gap-2 mb-3">
+        <span>{icon}</span>
+        <span className="text-xs font-semibold text-text2 uppercase tracking-wider">{label}</span>
+      </div>
+      <p className="text-3xl font-bold" style={{ color }}>
+        {typeof value === 'number' ? value.toLocaleString('fr-FR') : value}
+      </p>
+      {sub && <p className="text-xs text-text2 mt-1">{sub}</p>}
     </div>
   )
 }
 
-// Composant sidebar item
-function SidebarItem({ icon, label, active = false }: { icon: string; label: string; active?: boolean }) {
+export function Dashboard({ user }: DashboardProps) {
+  const [kpis, setKpis]       = useState<KPIs | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError]     = useState<string | null>(null)
+
+  useEffect(() => { loadKPIs() }, [])
+
+  async function loadKPIs() {
+    setLoading(true)
+    setError(null)
+    try {
+      const [phonesRes, bankRes] = await Promise.all([
+        supabase
+          .from('phones')
+          .select('status, total_views')
+          .eq('user_id', user.id),
+        supabase
+          .from('content_bank')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', user.id),
+      ])
+
+      if (phonesRes.error) throw phonesRes.error
+      if (bankRes.error)   throw bankRes.error
+
+      const phones = phonesRes.data ?? []
+      setKpis({
+        phones:       phones.length,
+        phonesOnline: phones.filter(p => p.status === 'online').length,
+        phonesError:  phones.filter(p => p.status === 'error').length,
+        totalViews:   phones.reduce((s, p) => s + (p.total_views ?? 0), 0),
+        bankCount:    bankRes.count ?? 0,
+      })
+    } catch {
+      setError('Erreur lors du chargement des données.')
+    }
+    setLoading(false)
+  }
+
   return (
-    <button
-      className={`
-        w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-150 text-left
-        ${active
-          ? 'bg-surface2 text-text border-l-2 border-accent pl-[10px]'
-          : 'text-text2 hover:bg-surface2 hover:text-text'
-        }
-      `}
-    >
-      <span>{icon}</span>
-      <span>{label}</span>
-    </button>
+    <div className="p-8 space-y-8">
+      {/* Header */}
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-text">Dashboard</h1>
+          <p className="text-text2 text-sm mt-1">Vue d'ensemble de ton activité IG</p>
+        </div>
+        <Button variant="secondary" size="sm" onClick={loadKPIs} loading={loading}>
+          ↺ Rafraîchir
+        </Button>
+      </div>
+
+      {/* KPIs */}
+      {loading ? (
+        <div className="flex justify-center py-16"><Spinner size="lg" /></div>
+      ) : error ? (
+        <div className="px-4 py-3 rounded-lg bg-danger/10 border border-danger/20 text-danger text-sm">
+          {error}
+        </div>
+      ) : kpis ? (
+        <>
+          <div className="grid grid-cols-3 gap-4">
+            <KpiCard
+              icon="📱" label="Téléphones" color="#4f9eff"
+              value={kpis.phones}
+              sub={`${kpis.phonesOnline} en ligne`}
+            />
+            <KpiCard
+              icon="👁" label="Vues totales" color="#ffaa2a"
+              value={kpis.totalViews}
+              sub="Cumul tous téléphones"
+            />
+            <KpiCard
+              icon="🎬" label="Banque vidéos" color="#00ccaa"
+              value={kpis.bankCount}
+              sub="Contenus disponibles"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <KpiCard
+              icon="✅" label="Phones en ligne" color="#00ccaa"
+              value={kpis.phonesOnline}
+              sub={kpis.phones > 0 ? `${Math.round(kpis.phonesOnline / kpis.phones * 100)}% du parc` : undefined}
+            />
+            <KpiCard
+              icon="🚫" label="Phones en erreur" color="#f03d55"
+              value={kpis.phonesError}
+              sub={kpis.phonesError > 0 ? 'Vérifier dans Téléphones' : 'Aucune erreur'}
+            />
+          </div>
+        </>
+      ) : null}
+
+      {/* Quick-start tips */}
+      <div className="bg-card border border-border rounded-xl p-5">
+        <h2 className="text-sm font-semibold text-text mb-4">Démarrage rapide</h2>
+        <div className="space-y-2 text-sm text-text2">
+          {kpis && kpis.phones > 0 && kpis.bankCount > 0 ? (
+            <p className="text-ok">
+              ✓ Tout est prêt — {kpis.phones} phone{kpis.phones > 1 ? 's' : ''}, {kpis.bankCount} vidéo{kpis.bankCount > 1 ? 's' : ''} disponible{kpis.bankCount > 1 ? 's' : ''}.
+            </p>
+          ) : (
+            <>
+              <div className="flex items-start gap-2">
+                <span className="text-accent">1.</span>
+                <span>Configure ton <span className="text-text font-medium">Bearer Token GéeLark</span> dans <span className="text-text font-medium">Paramètres</span>.</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="text-accent">2.</span>
+                <span>Va dans <span className="text-text font-medium">Téléphones</span> et clique sur Synchroniser GéeLark.</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="text-accent">3.</span>
+                <span>Ajoute tes vidéos dans la <span className="text-text font-medium">Banque vidéos</span>.</span>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
   )
 }
