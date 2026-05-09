@@ -7229,80 +7229,94 @@ class App:
     # ONGLET BANQUE
     # ══════════════════════════════════════════════════════════════════════════
     def _build_bank_tab(self):
+        # ── Vault Pro style dark media library ─────────────────────────────
+        SB_BG    = "#0b0e18"
+        CARD_BG  = "#161d2b"
+        FILTER_BG = "#070a10"
+        ACCENT_C = "#4f8ef7"
+        TEXT_C   = "#e8eaf0"
+        TEXT2_C  = "#6b7a99"
+
         f = tk.Frame(self.tab_container, bg=BG)
         self.tabs["bank"] = f
 
-        hdr_row = tk.Frame(f, bg=BG)
-        hdr_row.pack(fill="x", pady=(0, 4))
-        L = self.cfg.get("lang", "fr")
-        self._tab_header(hdr_row, "🗂", t("bank.title", L),
-                         ("Stockez et gérez vos vidéos prêtes à poster"
-                          if L == "fr"
-                          else "Store and manage your videos ready to post"), WARN)
-        tb = tk.Frame(f, bg=BG)
-        tb.pack(fill="x", pady=(0, 8))
-        self._mk_btn(tb, "↺  Rafraîchir", "ghost", self._refresh_bank,
-                     pady=5).pack(side="right", padx=(4, 0))
-        self._mk_btn(tb, "📂  Dossier export", "secondary", self._choose_export_dir,
-                     pady=5).pack(side="right")
+        # ── TOP BAR ────────────────────────────────────────────────────────
+        top_bar = tk.Frame(f, bg=FILTER_BG, height=52)
+        top_bar.pack(fill="x")
+        top_bar.pack_propagate(False)
+
+        tk.Label(top_bar, text="🗂  Banque de médias",
+                 font=("Segoe UI", 13, "bold"),
+                 bg=FILTER_BG, fg=TEXT_C).pack(side="left", padx=16)
+
+        # right-side action buttons (packed right-to-left)
         self.export_dir_lbl = tk.Label(
-            tb, text=f"Export : {self.cfg.get('export_dir','Même dossier')}",
-            font=("Segoe UI", 9), bg=BG, fg=MUTED)
-        self.export_dir_lbl.pack(side="left", padx=(12, 0))
+            top_bar,
+            text=f"Export : {self.cfg.get('export_dir', 'Même dossier')}",
+            font=("Segoe UI", 8), bg=FILTER_BG, fg=TEXT2_C)
+        self.export_dir_lbl.pack(side="right", padx=(0, 10))
 
-        # Action bar (before split so it spans full width)
-        acts = tk.Frame(f, bg=BG)
-        acts.pack(fill="x", pady=(0, 4))
-        self._mk_btn(acts, "📥  Ouvrir",          "ghost",   self._bank_open,       pady=5).pack(side="left", padx=(0, 3))
-        self._mk_btn(acts, "⬇  Télécharger",      "secondary", self._bank_download, pady=5).pack(side="left", padx=(0, 3))
-        self._mk_btn(acts, "🔀  Randomiser méta",  "warn",
-                     cmd=lambda: threading.Thread(target=self._randomize_meta, daemon=True).start(),
-                     pady=5).pack(side="left", padx=(0, 3))
-        self._mk_btn(acts, "🚀  Poster",           "primary", self._post_from_bank, pady=5,
-                     font=("Segoe UI", 9, "bold")).pack(side="left", padx=(0, 3))
-        self._mk_btn(acts, "🗑  Supprimer",        "danger",  self._bank_delete,    pady=5).pack(side="left", padx=(0, 3))
-        self._mk_btn(acts, "📂  Déplacer vers dossier", "ghost", self._bank_move_to_folder,
-                     pady=5).pack(side="left", padx=(0, 3))
-        self.bank_status = tk.Label(acts, text="", font=("Segoe UI", 9), bg=BG, fg=TEXT2)
-        self.bank_status.pack(side="left", padx=8)
+        self._mk_btn(top_bar, "+ Ajouter un média", "primary",
+                     cmd=self._bank_add_media, pady=4,
+                     font=("Segoe UI", 9, "bold")).pack(side="right", padx=(0, 8))
+        self._mk_btn(top_bar, "⬇ Télécharger", "secondary",
+                     self._bank_download, pady=4).pack(side="right", padx=(0, 4))
+        self._mk_btn(top_bar, "📂 Export dir", "secondary",
+                     self._choose_export_dir, pady=4).pack(side="right", padx=(0, 4))
+        self._mk_btn(top_bar, "🔀 Randomiser", "warn",
+                     cmd=lambda: threading.Thread(
+                         target=self._randomize_meta, daemon=True).start(),
+                     pady=4).pack(side="right", padx=(0, 4))
+        self._mk_btn(top_bar, "↺ Rafraîchir", "ghost",
+                     self._refresh_bank, pady=4).pack(side="right", padx=(0, 4))
 
-        split = tk.Frame(f, bg=BG)
-        split.pack(fill="both", expand=True)
+        # ── BODY (sidebar + main area) ─────────────────────────────────────
+        body = tk.Frame(f, bg=BG)
+        body.pack(fill="both", expand=True)
 
-        # ── LEFT SIDEBAR (folders) ──────────────────────────────────────────
+        # ── LEFT SIDEBAR ───────────────────────────────────────────────────
         self._bank_folder_filter = None   # None = all, str = folder name
-        sidebar_bg = "#0d1117"
-        sidebar = tk.Frame(split, bg=sidebar_bg, width=180)
+        sidebar = tk.Frame(body, bg=SB_BG, width=190)
         sidebar.pack(side="left", fill="y")
         sidebar.pack_propagate(False)
         self._bank_sidebar_frame = sidebar
 
-        # "All" row
-        all_row = tk.Frame(sidebar, bg=sidebar_bg, cursor="hand2")
-        all_row.pack(fill="x", pady=(8, 0))
-        self._bank_all_lbl = tk.Label(all_row, text="📁  Toute la banque",
-                                       font=("Segoe UI", 9, "bold"),
-                                       bg=ACCENT, fg="#ffffff", anchor="w",
-                                       padx=10, pady=6)
-        self._bank_all_lbl.pack(fill="x")
+        # Sidebar header
+        sb_hdr = tk.Frame(sidebar, bg=SB_BG)
+        sb_hdr.pack(fill="x", padx=8, pady=(10, 4))
+        tk.Label(sb_hdr, text="Personnalisé",
+                 font=("Segoe UI", 8), bg=SB_BG, fg=TEXT2_C).pack(side="left")
+        tk.Button(sb_hdr, text="🔍", relief="flat", bd=0,
+                  bg=SB_BG, fg=TEXT2_C, font=("Segoe UI", 9), cursor="hand2",
+                  command=lambda: None).pack(side="right")
+        tk.Button(sb_hdr, text="+", relief="flat", bd=0,
+                  bg=SB_BG, fg=TEXT2_C, font=("Segoe UI", 10, "bold"), cursor="hand2",
+                  command=self._bank_new_folder).pack(side="right", padx=(0, 2))
+
+        tk.Frame(sidebar, height=1, bg="#1a2035").pack(fill="x")
+
+        # "Tous les médias" row
         def _show_all(_e=None):
             self._bank_folder_filter = None
             self._bank_refresh_folder_sidebar()
             self._refresh_bank()
+
+        all_media_row = tk.Frame(sidebar, bg=SB_BG, cursor="hand2")
+        all_media_row.pack(fill="x", pady=(6, 2))
+        self._bank_all_lbl = tk.Label(
+            all_media_row, text="🗂 Tous les médias",
+            font=("Segoe UI", 9, "bold"), bg=ACCENT_C, fg="#ffffff",
+            anchor="w", padx=10, pady=6)
+        self._bank_all_lbl.pack(fill="x")
         self._bank_all_lbl.bind("<Button-1>", _show_all)
-        all_row.bind("<Button-1>", _show_all)
+        all_media_row.bind("<Button-1>", _show_all)
 
-        tk.Frame(sidebar, height=1, bg=BORDER).pack(fill="x", pady=6)
-
-        # "New folder" button
-        self._mk_btn(sidebar, "➕  Nouveau dossier", "ghost",
-                     self._bank_new_folder, pady=4,
-                     font=("Segoe UI", 9)).pack(fill="x", padx=6, pady=(0, 4))
+        tk.Frame(sidebar, height=1, bg="#1a2035").pack(fill="x", pady=(4, 0))
 
         # Scrollable folder list
-        folder_list_frame = tk.Frame(sidebar, bg=sidebar_bg)
+        folder_list_frame = tk.Frame(sidebar, bg=SB_BG)
         folder_list_frame.pack(fill="both", expand=True)
-        folder_cv = tk.Canvas(folder_list_frame, bg=sidebar_bg,
+        folder_cv = tk.Canvas(folder_list_frame, bg=SB_BG,
                                highlightthickness=0, bd=0)
         folder_cv.pack(side="left", fill="both", expand=True)
         folder_vsb = ttk.Scrollbar(folder_list_frame, orient="vertical",
@@ -7310,7 +7324,7 @@ class App:
         folder_cv.configure(yscrollcommand=folder_vsb.set)
         folder_vsb.pack(side="right", fill="y")
         self._bank_folder_cv = folder_cv
-        self._bank_folder_inner = tk.Frame(folder_cv, bg=sidebar_bg)
+        self._bank_folder_inner = tk.Frame(folder_cv, bg=SB_BG)
         self._bank_folder_inner_win = folder_cv.create_window(
             (0, 0), window=self._bank_folder_inner, anchor="nw")
         self._bank_folder_inner.bind("<Configure>",
@@ -7319,14 +7333,85 @@ class App:
         folder_cv.bind("<Configure>",
             lambda e: folder_cv.itemconfig(self._bank_folder_inner_win, width=e.width))
 
-        # ── GRID AREA ──────────────────────────────────────────────────────
-        grid_area = tk.Frame(split, bg=BG)
-        grid_area.pack(side="left", fill="both", expand=True)
+        # ── MAIN AREA (right of sidebar) ──────────────────────────────────
+        main_area = tk.Frame(body, bg=BG)
+        main_area.pack(side="left", fill="both", expand=True)
 
-        # Canvas scrollable pour les cartes
-        self.bank_grid_canvas = tk.Canvas(grid_area, bg=BG, highlightthickness=0, bd=0)
-        bank_vsb = ttk.Scrollbar(grid_area, orient="vertical",
-                                 command=self.bank_grid_canvas.yview)
+        # Filter bar
+        filter_bar = tk.Frame(main_area, bg=FILTER_BG)
+        filter_bar.pack(fill="x", padx=0, pady=0)
+
+        self._bank_search_var = tk.StringVar()
+        search_entry = tk.Entry(
+            filter_bar, textvariable=self._bank_search_var,
+            font=("Segoe UI", 10), bg="#0e1424", fg=TEXT2_C,
+            insertbackground=TEXT2_C, relief="flat", bd=0,
+            highlightthickness=1, highlightbackground="#1e2a3a",
+            highlightcolor=ACCENT_C)
+        search_entry.pack(side="left", padx=12, pady=8, ipadx=8, ipady=4, fill="x", expand=True)
+        search_entry.insert(0, "🔍  Rechercher…")
+        def _on_search_focus_in(e):
+            if search_entry.get() == "🔍  Rechercher…":
+                search_entry.delete(0, "end")
+                search_entry.config(fg=TEXT_C)
+        def _on_search_focus_out(e):
+            if not search_entry.get():
+                search_entry.insert(0, "🔍  Rechercher…")
+                search_entry.config(fg=TEXT2_C)
+        search_entry.bind("<FocusIn>", _on_search_focus_in)
+        search_entry.bind("<FocusOut>", _on_search_focus_out)
+        self._bank_search_var.trace_add("write", lambda *_: self._refresh_bank())
+
+        tk.Label(filter_bar, text="Récent ▼",
+                 font=("Segoe UI", 9), bg=FILTER_BG, fg=TEXT2_C,
+                 cursor="hand2").pack(side="right", padx=8)
+        tk.Label(filter_bar, text="⊞",
+                 font=("Segoe UI", 12), bg=FILTER_BG, fg=ACCENT_C,
+                 cursor="hand2").pack(side="right", padx=(0, 4))
+        tk.Label(filter_bar, text="≡",
+                 font=("Segoe UI", 12), bg=FILTER_BG, fg=TEXT2_C,
+                 cursor="hand2").pack(side="right", padx=(0, 2))
+
+        # Type tabs / pills bar
+        self._bank_type_filter = "all"
+        type_bar = tk.Frame(main_area, bg="#080b12")
+        type_bar.pack(fill="x")
+        _pill_types = [("Tous", "all"), ("Vidéo", "video"), ("Photo", "photo"),
+                       ("GIF", "gif"), ("Audio", "audio")]
+        self._bank_pill_btns = {}
+        def _make_pill_cmd(tkey):
+            def _cmd():
+                self._bank_type_filter = tkey
+                for k, b in self._bank_pill_btns.items():
+                    b.config(bg=ACCENT_C if k == tkey else "#080b12",
+                             fg="#ffffff" if k == tkey else TEXT2_C)
+                self._refresh_bank()
+            return _cmd
+        for label, tkey in _pill_types:
+            is_active = (tkey == "all")
+            btn = tk.Button(
+                type_bar, text=label,
+                font=("Segoe UI", 9), relief="flat", bd=0, cursor="hand2",
+                bg=ACCENT_C if is_active else "#080b12",
+                fg="#ffffff" if is_active else TEXT2_C,
+                padx=12, pady=5, command=_make_pill_cmd(tkey))
+            btn.pack(side="left", padx=(8 if tkey == "all" else 2, 0), pady=6)
+            self._bank_pill_btns[tkey] = btn
+
+        # Status bar
+        self.bank_status = tk.Label(
+            type_bar, text="", font=("Segoe UI", 8),
+            bg="#080b12", fg=TEXT2_C)
+        self.bank_status.pack(side="right", padx=12)
+
+        # Grid frame (canvas + scrollbar)
+        grid_frame = tk.Frame(main_area, bg=BG)
+        grid_frame.pack(fill="both", expand=True)
+
+        self.bank_grid_canvas = tk.Canvas(grid_frame, bg=BG,
+                                           highlightthickness=0, bd=0)
+        bank_vsb = ttk.Scrollbar(grid_frame, orient="vertical",
+                                  command=self.bank_grid_canvas.yview)
         self.bank_grid_canvas.configure(yscrollcommand=bank_vsb.set)
         bank_vsb.pack(side="right", fill="y")
         self.bank_grid_canvas.pack(side="left", fill="both", expand=True)
@@ -7355,50 +7440,83 @@ class App:
             self.bank_grid_canvas.drop_target_register(DND_FILES)
             self.bank_grid_canvas.dnd_bind("<<Drop>>", self._on_bank_drop)
 
-        # Stockage des références pour les cartes
-        self._bank_card_widgets = {}      # entry_id → outer frame
-        self._bank_card_thumbs = {}       # entry_id → thumb label
-        self._bank_thumb_refs = []        # liste pour empêcher GC des PhotoImage
-        self._bank_thumb_jobs = set()     # entry_ids en cours de chargement async
-        self._bank_grid_cols = 3
-        self.bank_tree = None             # rétro-compat (anciennes refs Tree)
+        # Card storage
+        self._bank_card_widgets = {}      # entry_id → canvas card
+        self._bank_card_thumbs = {}       # entry_id → canvas card (alias)
+        self._bank_thumb_refs = []        # GC prevention for PhotoImage refs
+        self._bank_thumb_jobs = set()     # entry_ids loading async
+        self._bank_grid_cols = 4
+        self.bank_tree = None             # retro-compat
 
-        # Droite : aperçu + description
-        right = tk.Frame(split, bg=CARD)
-        right.pack(side="left", fill="both", expand=True, padx=(10, 0))
+        # ── DETAIL PANEL (bottom, initially hidden) ────────────────────────
+        detail_panel = tk.Frame(main_area, bg=CARD, height=260)
+        # Store for show/hide
+        self._bank_detail_panel = detail_panel
+        self._bank_detail_visible = False
 
-        tk.Label(right, text="APERÇU", font=("Consolas", 8, "bold"),
-                 bg=CARD, fg=MUTED).pack(anchor="w", padx=14, pady=(12, 6))
-        self.bank_preview = tk.Canvas(right, bg="#000", highlightthickness=0, height=220)
-        self.bank_preview.pack(fill="x", padx=14, pady=(0, 8))
+        # Detail panel header
+        dp_hdr = tk.Frame(detail_panel, bg=CARD)
+        dp_hdr.pack(fill="x", padx=14, pady=(8, 0))
+        tk.Label(dp_hdr, text="APERÇU", font=("Consolas", 8, "bold"),
+                 bg=CARD, fg=MUTED).pack(side="left")
+        tk.Button(dp_hdr, text="✕", relief="flat", bd=0,
+                  bg=CARD, fg=TEXT2, font=("Segoe UI", 9), cursor="hand2",
+                  command=self._bank_hide_detail).pack(side="right")
+
+        # Detail panel content (preview + description side by side)
+        dp_body = tk.Frame(detail_panel, bg=CARD)
+        dp_body.pack(fill="both", expand=True, padx=14, pady=(4, 8))
+
+        # Preview canvas (left)
+        self.bank_preview = tk.Canvas(dp_body, bg="#000",
+                                       highlightthickness=0, height=190, width=240)
+        self.bank_preview.pack(side="left", padx=(0, 14))
         self.bank_preview_ref = None
-        self.bank_preview.create_text(200, 110, text="Clique sur une vidéo",
-                                       fill=MUTED, font=("Segoe UI", 10))
+        self.bank_preview.create_text(120, 95, text="Sélectionne un média",
+                                       fill=MUTED, font=("Segoe UI", 9))
 
-        tk.Frame(right, height=1, bg=BORDER).pack(fill="x", padx=14, pady=(0, 8))
+        # Description area (right)
+        desc_area = tk.Frame(dp_body, bg=CARD)
+        desc_area.pack(side="left", fill="both", expand=True)
 
-        dh = tk.Frame(right, bg=CARD)
-        dh.pack(fill="x", padx=14, pady=(0, 6))
-        tk.Label(dh, text="DESCRIPTION INSTAGRAM",
-                 font=("Consolas", 8, "bold"), bg=CARD, fg=MUTED).pack(side="left")
-        self.gen_btn = self._mk_btn(dh, "✨  Générer (Groq)", "primary", pady=4,
-                                    cmd=lambda: threading.Thread(
-                                        target=self._generate_desc, daemon=True).start())
+        dh = tk.Frame(desc_area, bg=CARD)
+        dh.pack(fill="x", pady=(0, 4))
+        tk.Label(dh, text="DESCRIPTION", font=("Consolas", 8, "bold"),
+                 bg=CARD, fg=MUTED).pack(side="left")
+        self.gen_btn = self._mk_btn(
+            dh, "✨ Générer (Groq)", "primary", pady=3,
+            cmd=lambda: threading.Thread(
+                target=self._generate_desc, daemon=True).start(),
+            font=("Segoe UI", 8))
         self.gen_btn.pack(side="right")
 
-        self.desc_box = tk.Text(right, font=("Segoe UI", 10), bg=SURFACE2, fg=TEXT,
-                                 insertbackground=TEXT, relief="flat", bd=0, height=9,
-                                 highlightthickness=1, highlightcolor=ACCENT,
-                                 highlightbackground=BORDER, wrap="word", padx=8, pady=8)
-        self.desc_box.pack(fill="x", padx=14, pady=(0, 6))
+        self.desc_box = tk.Text(
+            desc_area, font=("Segoe UI", 9), bg=SURFACE2, fg=TEXT,
+            insertbackground=TEXT, relief="flat", bd=0, height=6,
+            highlightthickness=1, highlightcolor=ACCENT,
+            highlightbackground=BORDER, wrap="word", padx=6, pady=6)
+        self.desc_box.pack(fill="both", expand=True, pady=(0, 4))
 
-        br = tk.Frame(right, bg=CARD)
-        br.pack(fill="x", padx=14, pady=(0, 10))
-        self._mk_btn(br, "💾  Sauvegarder", "ok", self._save_desc, pady=5).pack(side="left")
-        self._mk_btn(br, "📋  Copier", "secondary", self._copy_desc,
-                     pady=5).pack(side="left", padx=(6, 0))
-        self.desc_status = tk.Label(br, text="", font=("Segoe UI", 9), bg=CARD, fg=TEXT2)
-        self.desc_status.pack(side="left", padx=10)
+        br = tk.Frame(desc_area, bg=CARD)
+        br.pack(fill="x")
+        self._mk_btn(br, "💾 Sauvegarder", "ok", self._save_desc,
+                     pady=3, font=("Segoe UI", 8)).pack(side="left")
+        self._mk_btn(br, "📋 Copier", "secondary", self._copy_desc,
+                     pady=3, font=("Segoe UI", 8)).pack(side="left", padx=(4, 0))
+        self.desc_status = tk.Label(br, text="", font=("Segoe UI", 8),
+                                     bg=CARD, fg=TEXT2)
+        self.desc_status.pack(side="left", padx=6)
+
+        br2 = tk.Frame(desc_area, bg=CARD)
+        br2.pack(fill="x", pady=(4, 0))
+        self._mk_btn(br2, "📥 Ouvrir", "ghost", self._bank_open,
+                     pady=3, font=("Segoe UI", 8)).pack(side="left")
+        self._mk_btn(br2, "⬇ DL", "secondary", self._bank_download,
+                     pady=3, font=("Segoe UI", 8)).pack(side="left", padx=(4, 0))
+        self._mk_btn(br2, "🗑 Suppr.", "danger", self._bank_delete,
+                     pady=3, font=("Segoe UI", 8)).pack(side="left", padx=(4, 0))
+        self._mk_btn(br2, "📂 Déplacer", "ghost", self._bank_move_to_folder,
+                     pady=3, font=("Segoe UI", 8)).pack(side="left", padx=(4, 0))
 
     def _on_bank_sel(self, e=None):
         # Conservé pour rétro-compatibilité ; la sélection se fait désormais via cartes.
