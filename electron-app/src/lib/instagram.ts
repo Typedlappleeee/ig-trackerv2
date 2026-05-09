@@ -24,18 +24,42 @@ function parseHtml(html: string, fallbackUsername: string): IgStats | null {
   function num(pats: RegExp[]): number {
     for (const re of pats) {
       const m = html.match(re)
-      if (m) return parseInt(m[1].replace(/,/g, ''))
+      if (m) return parseInt(m[1].replace(/[,\s]/g, ''))
     }
     return 0
   }
-  const followers = num([/"edge_followed_by":\{"count":(\d+)\}/, /"follower_count":(\d+)/])
-  const following = num([/"edge_follow":\{"count":(\d+)\}/, /"following_count":(\d+)/])
-  const posts     = num([/"edge_owner_to_timeline_media":\{"count":(\d+)/, /"media_count":(\d+)/])
+
+  const followers = num([
+    /"edge_followed_by":\{"count":(\d+)\}/,
+    /"follower_count":(\d+)/,
+    /"userInteractionCount":(\d+)/,         // schema.org embed
+    /(\d+)\s*(?:followers|abonnés)/i,       // visible text fallback
+  ])
+  const following = num([
+    /"edge_follow":\{"count":(\d+)\}/,
+    /"following_count":(\d+)/,
+  ])
+  const posts = num([
+    /"edge_owner_to_timeline_media":\{"count":(\d+)/,
+    /"media_count":(\d+)/,
+    /"timeline_media_count":(\d+)/,
+  ])
+
   const bioMatch  = html.match(/"biography":"((?:[^"\\]|\\.)*)"/)
-  const bio       = bioMatch ? bioMatch[1].replace(/\\n/g, '\n').replace(/\\u[\dA-Fa-f]{4}/g, c => String.fromCharCode(parseInt(c.slice(2), 16))) : ''
-  const viewMs    = [...html.matchAll(/"video_view_count":(\d+)/g)]
-  const total_views = viewMs.reduce((s, m) => s + parseInt(m[1]), 0)
-  const unameM    = html.match(/"username":"([^"]+)"/)
+  const bio       = bioMatch
+    ? bioMatch[1]
+        .replace(/\\n/g, '\n')
+        .replace(/\\u[\dA-Fa-f]{4}/g, c => String.fromCharCode(parseInt(c.slice(2), 16)))
+    : ''
+
+  const viewMs      = [...html.matchAll(/"video_view_count":(\d+)/g)]
+  const playMs      = [...html.matchAll(/"play_count":(\d+)/g)]
+  const allViews    = viewMs.length ? viewMs : playMs
+  const total_views = allViews.reduce((s, m) => s + parseInt(m[1]), 0)
+
+  const unameM = html.match(/"username":"([^"]+)"/)
+
+  // If we got zero on everything the page was probably a consent/login wall
   if (followers === 0 && following === 0 && posts === 0) return null
   return { username: unameM?.[1] ?? fallbackUsername, followers, following, posts, bio, total_views }
 }

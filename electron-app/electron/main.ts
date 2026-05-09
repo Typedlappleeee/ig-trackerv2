@@ -12,56 +12,124 @@ export const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist')
 
 let win: BrowserWindow | null = null
 
-// Fetch Instagram profile HTML via a fresh hidden browser per request.
-// A new window per call avoids session reuse that triggers Instagram rate-limits.
-// The window uses the defaultSession so cookies it sets are visible to net.fetch / session.defaultSession.fetch.
-ipcMain.handle('fetch-instagram-html', async (_event, username: string) => {
-  const browser = new BrowserWindow({
-    show: false,
-    width: 1280,
-    height: 900,
-    webPreferences: {
-      nodeIntegration: false,
-      contextIsolation: false,
-      webSecurity: true,
-      sandbox: false,
-    },
-  })
-  browser.webContents.setUserAgent(
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
-  )
+// ── Instagram persistent hidden browser ───────────────────────────────────────
+// Reused across calls so session cookies accumulate (GDPR consent accepted once,
+// rate-limit cookies carried over). A new browser is created only if the old one
+// is destroyed.
+let _igBrowser: BrowserWindow | null = null
 
+function getIgBrowser(): BrowserWindow {
+  if (!_igBrowser || _igBrowser.isDestroyed()) {
+    _igBrowser = new BrowserWindow({
+      show: false,
+      width: 1280,
+      height: 900,
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: false,
+        webSecurity: true,
+        sandbox: false,
+      },
+    })
+    _igBrowser.webContents.setUserAgent(
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+    )
+    _igBrowser.on('closed', () => { _igBrowser = null })
+  }
+  return _igBrowser
+}
+
+// Fetch Instagram profile HTML via the persistent hidden browser.
+// Handles the GDPR cookie-consent page that Instagram shows to fresh sessions:
+//   1. did-stop-loading fires → check for consent modal → click "Allow all"
+//   2. Instagram reloads → did-stop-loading fires again → extract profile HTML
+// Using `on` (not `once`) so we see all navigation events from a single loadURL call.
+ipcMain.handle('fetch-instagram-html', async (_event, username: string) => {
+  const browser = getIgBrowser()
   const url = `https://www.instagram.com/${encodeURIComponent(username)}/`
 
   return new Promise<unknown>(resolve => {
-    const done = (result: unknown) => {
-      if (!browser.isDestroyed()) browser.destroy()
+    let settled = false
+    let loadCount = 0
+
+    const finish = (result: unknown) => {
+      if (settled) return
+      settled = true
+      browser.webContents.removeListener('did-stop-loading', onLoad)
+      clearTimeout(globalTimer)
       resolve(result)
     }
-    const timer = setTimeout(() => done({ ok: false, error: 'timeout' }), 22000)
 
-    browser.webContents.once('did-finish-load', () => {
-      // Wait 3 s for React hydration and XHR data to settle
-      setTimeout(async () => {
-        clearTimeout(timer)
-        try {
-          const data = await browser.webContents.executeJavaScript(`({
-            url: location.href,
-            html: document.documentElement.innerHTML.slice(0, 150000)
-          })`)
-          done({ ok: true, ...(data as object) })
-        } catch (e) {
-          done({ ok: false, error: String(e) })
-        }
-      }, 3000)
-    })
+    const globalTimer = setTimeout(() => finish({ ok: false, error: 'timeout' }), 32000)
+
+    const extractHtml = async () => {
+      if (settled || browser.isDestroyed()) return
+      try {
+        const data = await browser.webContents.executeJavaScript(`({
+          url: location.href,
+          html: document.documentElement.innerHTML.slice(0, 200000)
+        })`)
+        finish({ ok: true, ...(data as object) })
+      } catch (e) {
+        finish({ ok: false, error: String(e) })
+      }
+    }
+
+    const onLoad = async () => {
+      if (settled || browser.isDestroyed()) return
+      loadCount++
+      if (loadCount > 5) { finish({ ok: false, error: 'too many navigations' }); return }
+
+      // Wait for SPA/React render (shorter on subsequent loads which already have cookies)
+      await new Promise(r => setTimeout(r, loadCount === 1 ? 2500 : 3500))
+      if (settled || browser.isDestroyed()) return
+
+      // Detect and click GDPR cookie-consent button (Instagram in Europe)
+      const accepted = await browser.webContents.executeJavaScript(`
+        (() => {
+          // Try known data-attribute selectors first
+          const byAttr = document.querySelector('[data-cookiebanner="accept_button"]')
+            || document.querySelector('[data-testid="cookie-policy-manage-dialog-accept-button"]')
+          if (byAttr) { byAttr.click(); return true }
+
+          // Text-based fallback: find any visible button whose text matches "accept all" variants
+          const btn = [...document.querySelectorAll('button')].find(b => {
+            const t = (b.textContent || '').trim().toLowerCase()
+            return t === 'allow all cookies'
+              || t === 'allow all'
+              || t === 'accept all'
+              || t === 'autoriser tout'
+              || t === 'tout accepter'
+              || t === 'autoriser tous les cookies'
+              || t === 'allow essential and optional cookies'
+          })
+          if (btn) { btn.click(); return true }
+          return false
+        })()
+      `).catch(() => false)
+
+      if (accepted && !settled) {
+        // Consent was clicked. Instagram will either:
+        //   A) Reload the same URL (new did-stop-loading will fire → onLoad handles it)
+        //   B) Update the page in-place (no reload → we extract after waiting)
+        // Wait to see which case applies; if a new navigation fires first, it will
+        // call extractHtml via onLoad, making settled=true, and the timeout below is a no-op.
+        await new Promise(r => setTimeout(r, 5000))
+        if (!settled) await extractHtml()
+      } else if (!settled) {
+        // No consent button → this is the actual profile page
+        await extractHtml()
+      }
+    }
+
+    browser.webContents.on('did-stop-loading', onLoad)
 
     browser.loadURL(url, {
       extraHeaders: [
         'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
         'Accept-Language: fr-FR,fr;q=0.9,en-US;q=0.8',
       ].join('\r\n'),
-    }).catch(err => { clearTimeout(timer); done({ ok: false, error: String(err) }) })
+    }).catch(err => finish({ ok: false, error: String(err) }))
   })
 })
 
