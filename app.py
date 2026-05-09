@@ -2291,15 +2291,20 @@ class App:
             if not children.winfo_ismapped():
                 children.pack(fill="x")
 
-        # Show top stat cards only on data-heavy tabs
+        # Show top stat cards only on data-heavy tabs (hide via children, not pack/forget)
         if hasattr(self, "_top_stat_cards"):
             keep = {"dashboard", "phones", "stats", "posting"}
-            if key in keep:
-                if not self._top_stat_cards.winfo_ismapped():
-                    self._top_stat_cards.pack(fill="x", padx=18, pady=(18, 10),
-                                               before=self.tab_container)
-            else:
-                self._top_stat_cards.pack_forget()
+            visible = key in keep
+            for child in self._top_stat_cards.winfo_children():
+                if visible:
+                    if not child.winfo_ismapped():
+                        try:
+                            child.pack(side="left", fill="both", expand=True,
+                                        padx=(0, 10))
+                        except Exception:
+                            pass
+                else:
+                    child.pack_forget()
 
         for k, ind in self._sidebar_indicators.items():
             active = k == key
@@ -2646,13 +2651,10 @@ class App:
                           else "Manage your cloud phones and linked Instagram accounts"),
                          ACCENT)
 
-        # ── Toolbar row 1: filters (rounded card) ──────────────────────────────
-        tb_outer, tb1 = self._round_card(f, radius=10, bg=SURFACE2,
-                                          border=BORDER, border_w=1)
-        tb_outer.pack(fill="x", padx=20, pady=(0, 6))
-        tk.Frame(tb1, height=2, bg=ACCENT).pack(fill="x")
-        tb1 = tk.Frame(tb1, bg=SURFACE2, padx=12, pady=8)
-        tb1.pack(fill="x")
+        # ── Toolbar row 1: filters ─────────────────────────────────────────────
+        tb1 = tk.Frame(f, bg=SURFACE2, padx=12, pady=8,
+                       highlightthickness=1, highlightbackground=BORDER)
+        tb1.pack(fill="x", pady=(0, 2))
 
         tk.Label(tb1, text="Groupe", font=("Segoe UI", 9),
                  bg=SURFACE2, fg=TEXT2).pack(side="left")
@@ -2730,16 +2732,10 @@ class App:
         self.tree.bind("<Button-3>",         self._phone_context_menu)
         self.tree.bind("<ButtonRelease-1>",  self._phone_dot_click)
 
-        # Wrap tree in rounded card for consistent look
-        tree_outer, tree_inner = self._round_card(f, radius=10, bg=CARD,
-                                                    border=BORDER, border_w=1)
-        tree_outer.pack(fill="both", expand=True, padx=20, pady=(0, 18))
-
-        vsb = ttk.Scrollbar(tree_inner, orient="vertical", command=self.tree.yview)
+        vsb = ttk.Scrollbar(f, orient="vertical", command=self.tree.yview)
         self.tree.configure(yscrollcommand=vsb.set)
-        self.tree.pack(in_=tree_inner, side="left", fill="both", expand=True,
-                        padx=(2, 0), pady=2)
-        vsb.pack(in_=tree_inner, side="right", fill="y")
+        self.tree.pack(side="left", fill="both", expand=True)
+        vsb.pack(side="right", fill="y")
 
     def _on_sel(self, e):
         self.sel_ids = list(self.tree.selection())
