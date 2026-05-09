@@ -7,3 +7,4 @@ build/
 *.spec
 icon.ico
 _prev.jpg
+app.py.backup_*
