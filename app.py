@@ -1287,12 +1287,12 @@ class App:
         if self.cfg.get("theme") == "67":
             self.root.after(800, self._draw_pixel_bg)
         self._show_tab("phones")
-        self.root.after(80, self._show_startup_splash)
-        # First launch wizard (chained: beta → wizard if first run)
+        # Store which popup to show — triggered AFTER splash finishes
         if not self.cfg.get("first_run_done"):
-            self.root.after(600, self._show_first_launch_wizard)
+            self._pending_startup_popup = self._show_first_launch_wizard
         else:
-            self.root.after(600, self._show_beta_popup)
+            self._pending_startup_popup = self._show_beta_popup
+        self.root.after(80, self._show_startup_splash)
 
         self._auto_interval = int(self.cfg.get("auto_refresh_min", 5)) * 60
         self._next_refresh   = 0   # epoch — 0 = pas encore planifié
@@ -11161,6 +11161,11 @@ class App:
             return
         if step < total - 1:
             self.root.after(18, lambda: self._fade_in_root(step + 1))
+        else:
+            # Splash fully done — now show the welcome/beta popup
+            popup = getattr(self, '_pending_startup_popup', None)
+            if popup:
+                self.root.after(400, popup)
 
     def _unlock_pixel_theme(self):
         apply_theme_globals("67")
