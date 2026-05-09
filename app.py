@@ -1282,19 +1282,14 @@ class App:
         self._setup_styles()
         self._build_layout()
         self._show_tab("phones")
+        # First launch wizard (chained: beta → wizard if first run)
+        if not self.cfg.get("first_run_done"):
+            self.root.after(600, self._show_first_launch_wizard)
+        else:
+            self.root.after(600, self._show_beta_popup)
 
-        # ── Splash animation before first-run wizard ──────────────────────────
-        self._show_splash_animation(on_done=lambda: (
-            self._show_first_launch_wizard()
-            if not self.cfg.get("first_run_done")
-            else self._show_beta_popup()
-        ))
-
-        self._auto_interval  = int(self.cfg.get("auto_refresh_min", 5)) * 60
-        self._next_refresh   = time.time() + self._auto_interval
-
-        # Show locally cached phones immediately, before API fetch completes
-        self.root.after(300, self._refresh_table)
+        self._auto_interval = int(self.cfg.get("auto_refresh_min", 5)) * 60
+        self._next_refresh   = 0   # epoch — 0 = pas encore planifié
 
         threading.Thread(target=self._load_phones, daemon=True).start()
         threading.Thread(target=self._scheduler, daemon=True).start()
@@ -1316,144 +1311,6 @@ class App:
     def _on_close(self):
         self.running = False
         self.root.destroy()
-
-    # ══════════════════════════════════════════════════════════════════════════
-    # SPLASH ANIMATION
-    # ══════════════════════════════════════════════════════════════════════════
-    def _show_splash_animation(self, on_done=None):
-        """Full-screen startup animation. Calls on_done() when finished."""
-        # Parse configured geometry — available before mainloop starts
-        try:
-            g   = self.root.geometry()          # "1400x900+x+y"
-            W   = int(g.split('x')[0])
-            H   = int(g.split('x')[1].split('+')[0])
-        except Exception:
-            W, H = 1400, 900
-        cx, cy = W // 2, H // 2
-
-        cv = tk.Canvas(self.root, bg="#03050c",
-                       width=W, height=H, highlightthickness=0, bd=0)
-        cv.place(x=0, y=0)
-        cv.lift()
-
-        t     = [0]
-        TICK  = 33            # ~30 fps
-        # Phase ticks: 0-20 fade-in, 20-45 hold, 45-65 fade-out
-        T_IN  = 20
-        T_HLD = 45
-        T_OUT = 65
-
-        BAR_W = 240
-        bx    = cx - BAR_W // 2
-        by    = cy + 108
-
-        def _sm(x):
-            x = max(0.0, min(1.0, x))
-            return x * x * (3 - 2 * x)
-
-        def _lc(c1, c2, f):
-            f = max(0.0, min(1.0, f))
-            r1,g1,b1 = int(c1[1:3],16),int(c1[3:5],16),int(c1[5:7],16)
-            r2,g2,b2 = int(c2[1:3],16),int(c2[3:5],16),int(c2[5:7],16)
-            return "#{:02x}{:02x}{:02x}".format(
-                int(r1+(r2-r1)*f), int(g1+(g2-g1)*f), int(b1+(b2-b1)*f))
-
-        BG0  = "#03050c"
-        BG1  = "#05080f"
-        ACC  = "#4f8ef7"
-        DRK  = "#0a1a3a"
-
-        def _draw():
-            try:
-                tick = t[0]
-
-                # Compute alpha: fade-in → hold → fade-out
-                if tick <= T_IN:
-                    a_in  = _sm(tick / T_IN)
-                    a_out = 0.0
-                elif tick <= T_HLD:
-                    a_in  = 1.0
-                    a_out = 0.0
-                else:
-                    a_in  = 1.0
-                    a_out = _sm((tick - T_HLD) / (T_OUT - T_HLD))
-
-                alpha = a_in * (1.0 - a_out)
-
-                cv.delete("all")
-
-                # Background — fades from splash-bg to app-bg on exit
-                bg_col = _lc(BG0, BG1, a_out)
-                cv.create_rectangle(0, 0, W, H, fill=bg_col, outline="")
-
-                if alpha > 0.02:
-                    # ── Glow rings behind logo ────────────────────────────────
-                    for gi, (gr, gf) in enumerate(
-                            [(66, 0.18), (54, 0.28), (44, 0.40)]):
-                        gc = _lc(BG0, DRK, alpha * gf)
-                        cv.create_oval(cx-gr, cy-gr-28,
-                                       cx+gr, cy+gr-28,
-                                       fill=gc, outline="")
-
-                    # ── Logo circle ───────────────────────────────────────────
-                    lc = _lc(BG0, ACC, alpha)
-                    cv.create_oval(cx-42, cy-70, cx+42, cy+14,
-                                   fill=lc, outline="")
-
-                    # Highlight arc
-                    ha = _lc(ACC, "#ffffff", 0.45 * alpha)
-                    cv.create_arc(cx-36, cy-64, cx+36, cy+8,
-                                  start=115, extent=95,
-                                  outline=ha, width=2, style="arc")
-
-                    # Icon
-                    ic = _lc(BG0, "#ffffff", alpha)
-                    cv.create_text(cx, cy - 28, text="📱",
-                                   font=("Segoe UI", 24), fill=ic)
-
-                    # ── App name ──────────────────────────────────────────────
-                    nc = _lc(BG0, "#e8eaf0", alpha)
-                    cv.create_text(cx, cy + 42,
-                                   text="IG Tracker",
-                                   font=("Segoe UI", 26, "bold"), fill=nc)
-
-                    # ── Subtitle ──────────────────────────────────────────────
-                    sc = _lc(BG0, "#6b7a99", alpha)
-                    cv.create_text(cx, cy + 76,
-                                   text="Tableau de bord Instagram",
-                                   font=("Segoe UI", 10), fill=sc)
-
-                    # ── Progress bar ──────────────────────────────────────────
-                    tc = _lc(BG0, "#111827", alpha)
-                    cv.create_rectangle(bx, by, bx+BAR_W, by+3,
-                                        fill=tc, outline="")
-                    prog = min(1.0, tick / T_HLD)
-                    fw   = int(BAR_W * prog)
-                    if fw > 0:
-                        fc = _lc(BG0, ACC, alpha)
-                        cv.create_rectangle(bx, by, bx+fw, by+3,
-                                            fill=fc, outline="")
-
-                # ── Done ──────────────────────────────────────────────────────
-                if tick >= T_OUT:
-                    cv.place_forget()
-                    cv.after(30, cv.destroy)
-                    if on_done:
-                        try: on_done()
-                        except Exception: pass
-                    return
-
-                t[0] += 1
-                cv.after(TICK, _draw)
-
-            except Exception:
-                try: cv.place_forget(); cv.destroy()
-                except Exception: pass
-                if on_done:
-                    try: on_done()
-                    except Exception: pass
-
-        cv.after(40, _draw)
 
     def _show_beta_popup(self):
         pop = tk.Toplevel(self.root)
@@ -1866,17 +1723,12 @@ class App:
 
     def log(self, msg, level="info"):
         colors = {"info": TEXT2, "ok": OK, "warn": WARN, "error": DANGER, "accent": ACCENT}
-        def _do():
-            ts = datetime.now().strftime("%H:%M:%S")
-            self.log_box.config(state="normal")
-            self.log_box.insert("end", f"[{ts}] {msg}\n", level)
-            self.log_box.tag_config(level, foreground=colors.get(level, TEXT2))
-            self.log_box.see("end")
-            self.log_box.config(state="disabled")
-        if threading.current_thread() is threading.main_thread():
-            _do()
-        else:
-            self.root.after(0, _do)
+        ts = datetime.now().strftime("%H:%M:%S")
+        self.log_box.config(state="normal")
+        self.log_box.insert("end", f"[{ts}] {msg}\n", level)
+        self.log_box.tag_config(level, foreground=colors.get(level, TEXT2))
+        self.log_box.see("end")
+        self.log_box.config(state="disabled")
 
     def _round_card(self, parent, radius=12, bg=None, border=None, border_w=1,
                      hover_border=None, parent_bg=None):
@@ -3107,40 +2959,16 @@ class App:
         f = tk.Frame(self.tab_container, bg=BG)
         self.tabs["phones"] = f
 
-        # ── Top action bar ────────────────────────────────────────────────────
-        top_bar = tk.Frame(f, bg="#070a10", padx=14, pady=8)
-        top_bar.pack(fill="x")
-        tk.Label(top_bar, text="📱  Téléphones GéeLark",
-                 font=("Segoe UI", 12, "bold"),
-                 bg="#070a10", fg="#e8eaf0").pack(side="left")
-        tk.Button(top_bar, text="🔑  Identifiants",
-                  font=("Segoe UI", 9), bg="#162040", fg="#4f8ef7",
-                  relief="flat", bd=0, padx=10, pady=4, cursor="hand2",
-                  activebackground="#1e3060", activeforeground="#4f8ef7",
-                  command=self._show_credentials_dialog).pack(side="right")
-        self.status_lbl = tk.Label(top_bar, text="", font=("Segoe UI", 8),
-                                   bg="#070a10", fg="#6b7a99")
-        self.status_lbl.pack(side="right", padx=12)
+        self._tab_header(f, "📱",
+                         "Téléphones GéeLark" if L == "fr" else "GéeLark Phones",
+                         ("Gérez vos cloud phones et comptes Instagram liés"
+                          if L == "fr"
+                          else "Manage your cloud phones and linked Instagram accounts"),
+                         ACCENT)
 
-        # ── Table color palette ───────────────────────────────────────────────
-        P_BG    = "#0b0e18"
-        P_HDR   = "#0b0e18"
-        P_ODD   = "#0d1117"
-        P_EVEN  = "#0b1020"
-        P_SEL   = "#162040"
-        P_HOV   = "#131b2e"
-        P_SEP   = "#1a2235"
-        P_HFGA  = "#4f8ef7"   # header fg accent
-        P_HFGM  = "#2e3d55"   # header fg muted
-        P_TEXT  = "#c9d1d9"
-        P_MUTED = "#6b7a99"
-        P_SER   = "#e8eaf0"   # serial number
-        P_PID   = "#f97316"   # profile id (orange)
-        P_AND   = "#22c55e"   # android green
-
-        # ── Stat cards ────────────────────────────────────────────────────────
+        # ── Stat cards row ────────────────────────────────────────────────────
         sf = tk.Frame(f, bg=BG)
-        sf.pack(fill="x", pady=(0, 0))
+        sf.pack(fill="x", padx=0, pady=(0, 10))
         card_data = [
             ("phones", "📱", _("card.phones"), ACCENT, "all"),
             ("active", "✅", _("card.active"), OK,     "active"),
@@ -3157,148 +2985,108 @@ class App:
             tk.Frame(card, height=2, bg=col).pack(fill="x")
             inner = tk.Frame(card, bg=CARD, padx=14, pady=10, cursor="hand2")
             inner.pack(fill="both", expand=True)
-            rt = tk.Frame(inner, bg=CARD)
-            rt.pack(fill="x")
-            tk.Label(rt, text=ico, font=("Segoe UI", 12), bg=CARD, fg=col,
+            row_top = tk.Frame(inner, bg=CARD)
+            row_top.pack(fill="x")
+            tk.Label(row_top, text=ico, font=("Segoe UI", 12), bg=CARD, fg=col,
                      cursor="hand2").pack(side="left")
-            tk.Label(rt, text=lbl, font=("Segoe UI", 8, "bold"),
-                     bg=CARD, fg=TEXT2, cursor="hand2").pack(side="left", padx=(5,0))
-            v = tk.Label(inner, text="—", font=("Segoe UI", 22, "bold"),
-                         bg=CARD, fg=col, cursor="hand2")
+            tk.Label(row_top, text=lbl, font=("Segoe UI", 8, "bold"),
+                     bg=CARD, fg=TEXT2, cursor="hand2").pack(side="left", padx=(5, 0))
+            v = tk.Label(inner, text="—", font=("Segoe UI", 22, "bold"), bg=CARD, fg=col,
+                         cursor="hand2")
             v.pack(anchor="w", pady=(2, 0))
             self.sv[k] = v
             def _card_click(e, f2=filt):
                 self._phone_stat_filter = f2
                 self._refresh_table()
-            for w in [card, inner, rt, v, card_outer._cv]:
+            for w in [card, inner, row_top, v, card_outer._cv]:
                 try: w.bind("<Button-1>", _card_click, add="+")
                 except Exception: pass
 
-        # ── Toolbar ───────────────────────────────────────────────────────────
-        tb = tk.Frame(f, bg=P_BG, padx=14, pady=9)
-        tb.pack(fill="x")
-        tk.Label(tb, text="Groupe", font=("Segoe UI", 9),
-                 bg=P_BG, fg=P_MUTED).pack(side="left")
+        # ── Toolbar row 1: filters ─────────────────────────────────────────────
+        tb1 = tk.Frame(f, bg=SURFACE2, padx=12, pady=8,
+                       highlightthickness=1, highlightbackground=BORDER)
+        tb1.pack(fill="x", pady=(0, 2))
+
+        tk.Label(tb1, text="Groupe", font=("Segoe UI", 9),
+                 bg=SURFACE2, fg=TEXT2).pack(side="left")
         self.grp_var = tk.StringVar(value="Tous")
-        self.grp_combo = ttk.Combobox(tb, textvariable=self.grp_var,
-                                       state="readonly", width=14, font=("Segoe UI", 9))
+        self.grp_combo = ttk.Combobox(tb1, textvariable=self.grp_var,
+                                       state="readonly", width=18, font=("Segoe UI", 9))
         self.grp_combo["values"] = ["Tous"]
         self.grp_combo.pack(side="left", padx=(6, 16))
         self.grp_combo.bind("<<ComboboxSelected>>", lambda e: self._refresh_table())
 
-        sf2 = tk.Frame(tb, bg="#0d1117",
-                       highlightthickness=1, highlightbackground=P_SEP,
-                       highlightcolor=ACCENT)
-        sf2.pack(side="left", padx=(0, 12))
-        tk.Label(sf2, text="🔍", font=("Segoe UI", 10),
-                 bg="#0d1117", fg=P_MUTED).pack(side="left", padx=(8,2), pady=3)
+        tk.Label(tb1, text="🔍", font=("Segoe UI", 11),
+                 bg=SURFACE2, fg=TEXT2).pack(side="left")
         self.search_var = tk.StringVar()
         self.search_var.trace("w", lambda *a: self._refresh_table())
-        tk.Entry(sf2, textvariable=self.search_var, font=("Segoe UI", 10),
-                 bg="#0d1117", fg=P_TEXT, insertbackground=P_TEXT,
-                 relief="flat", bd=0, width=18).pack(side="left", ipady=3, padx=(0,8))
+        tk.Entry(tb1, textvariable=self.search_var, font=("Segoe UI", 10),
+                 bg=SURFACE, fg=TEXT, insertbackground=TEXT, relief="flat", bd=0,
+                 highlightthickness=1, highlightcolor=ACCENT, highlightbackground=BORDER,
+                 width=22).pack(side="left", padx=(4, 0), ipady=5)
 
-        self.sel_lbl = tk.Label(tb, text="", font=("Segoe UI", 9),
-                                bg=P_BG, fg=P_MUTED)
+        self.sel_lbl = tk.Label(tb1, text="", font=("Segoe UI", 9), bg=SURFACE2, fg=MUTED)
         self.sel_lbl.pack(side="right", padx=6)
-        tk.Frame(tb, bg=P_SEP, width=1).pack(side="right", fill="y", padx=8)
+
+        # ── Auto-refresh mini controls ────────────────────────────────────────
+        tk.Frame(tb1, bg=BORDER, width=1).pack(side="right", fill="y", padx=(8, 8))
         self._countdown_var = tk.StringVar(value="↻ --:--")
-        tk.Label(tb, textvariable=self._countdown_var,
-                 font=("Segoe UI", 9, "bold"), bg=P_BG, fg=ACCENT).pack(side="right")
-        tk.Label(tb, text="min", font=("Segoe UI", 9),
-                 bg=P_BG, fg=P_MUTED).pack(side="right")
-        self._auto_interval_var = tk.StringVar(
-            value=str(self.cfg.get("auto_refresh_min", 5)))
-        icb = ttk.Combobox(tb, textvariable=self._auto_interval_var,
-                            values=["1","2","5","10","30","60"],
-                            state="readonly", width=3, font=("Segoe UI", 9))
-        icb.pack(side="right", padx=2)
-        tk.Label(tb, text="Auto :", font=("Segoe UI", 9),
-                 bg=P_BG, fg=P_MUTED).pack(side="right")
-        def _on_int(e=None):
-            try: m = int(self._auto_interval_var.get())
-            except ValueError: m = 5
+        tk.Label(tb1, textvariable=self._countdown_var,
+                 font=("Segoe UI", 9, "bold"), bg=SURFACE2, fg=ACCENT).pack(side="right")
+        tk.Label(tb1, text="min", font=("Segoe UI", 9), bg=SURFACE2, fg=TEXT2).pack(side="right")
+        self._auto_interval_var = tk.StringVar(value=str(self.cfg.get("auto_refresh_min", 5)))
+        interval_cb = ttk.Combobox(tb1, textvariable=self._auto_interval_var,
+                                    values=["1", "2", "5", "10", "30", "60"],
+                                    state="readonly", width=3, font=("Segoe UI", 9))
+        interval_cb.pack(side="right", padx=(2, 2))
+        tk.Label(tb1, text="Auto :", font=("Segoe UI", 9), bg=SURFACE2, fg=TEXT2).pack(side="right")
+
+        def _on_interval_change(e=None):
+            try:
+                m = int(self._auto_interval_var.get())
+            except ValueError:
+                m = 5
             self._set_auto_interval(m)
-        icb.bind("<<ComboboxSelected>>", _on_int)
+        interval_cb.bind("<<ComboboxSelected>>", _on_interval_change)
+
+        # Hidden link_var for compatibility
         self.link_var = tk.StringVar()
 
-        # ── Column header bar ─────────────────────────────────────────────────
-        # Same columns as original treeview, GeeLark style
-        # (key, width, anchor, label, expand)
-        _COLS = [
-            ("no",        42,  "center", "#",          False),
-            ("name",      170, "w",      "Téléphone",  False),
-            ("group",     100, "center", "Groupe",     False),
-            ("ig",        145, "w",      "@Instagram", False),
-            ("status",    115, "center", "Statut",     False),
-            ("followers",  90, "center", "Followers",  False),
-            ("views",      75, "center", "Vues",       False),
-            ("vids",       60, "center", "Vidéos",     False),
-            ("checked",    90, "center", "Vérifié",    False),
-            ("act",        42, "center", "⋮",          False),
-        ]
-        self._p_cols = _COLS
-
-        hdr = tk.Frame(f, bg=P_HDR, height=36)
-        hdr.pack(fill="x")
-        hdr.pack_propagate(False)
-        for i, (key, w, anc, label, exp) in enumerate(_COLS):
-            cell = tk.Frame(hdr, bg=P_HDR, width=w)
-            if key == "ig":
-                cell.pack(side="left", fill="both", expand=True)
-            else:
-                cell.pack(side="left", fill="y")
-                cell.pack_propagate(False)
-            tk.Label(cell, text=label,
-                     font=("Segoe UI", 8, "bold"),
-                     bg=P_HDR,
-                     fg=P_HFGA if i > 0 else P_HFGM,
-                     anchor=anc).pack(fill="both", expand=True, padx=6)
-            if i < len(_COLS) - 1:
-                tk.Frame(hdr, bg=P_SEP, width=1).pack(
-                    side="left", fill="y", pady=6)
-
-        # ── Scrollable rows canvas ─────────────────────────────────────────────
-        rows_outer = tk.Frame(f, bg=P_ODD)
-        rows_outer.pack(fill="both", expand=True)
-
-        rc = tk.Canvas(rows_outer, bg=P_ODD, highlightthickness=0)
-        vsb2 = ttk.Scrollbar(rows_outer, orient="vertical", command=rc.yview)
-        rc.configure(yscrollcommand=vsb2.set)
-        vsb2.pack(side="right", fill="y")
-        rc.pack(side="left", fill="both", expand=True)
-
-        ri = tk.Frame(rc, bg=P_ODD)
-        _wid = rc.create_window((0, 0), window=ri, anchor="nw")
-        ri.bind("<Configure>",
-                lambda e: rc.configure(scrollregion=rc.bbox("all")))
-        rc.bind("<Configure>",
-                lambda e: rc.itemconfig(_wid, width=e.width))
-        rc.bind_all("<MouseWheel>",
-                    lambda e: rc.yview_scroll(int(-1*(e.delta/120)), "units"))
-
-        self._p_rows_inner  = ri
-        self._p_rows_canvas = rc
-        self._p_colors = dict(ODD=P_ODD, EVEN=P_EVEN, SEL=P_SEL, HOV=P_HOV,
-                              SEP=P_SEP, TEXT=P_TEXT, MUTED=P_MUTED,
-                              SER=P_SER, PID=P_PID, AND=P_AND, BG=P_BG)
-        self._p_sel_iid   = [None]
-        self._p_row_frames = {}
-
-        # ── Hidden Treeview — keeps all existing data/logic intact ────────────
-        cols = ("no","name","group","ig","status","followers","views","vids","checked","act")
+        # ── Treeview with ⋮ actions column ────────────────────────────────────
+        cols = ("no", "name", "group", "ig", "status", "followers", "views", "vids", "checked", "act")
         self.tree = ttk.Treeview(f, columns=cols, show="headings",
                                   style="T.Treeview", selectmode="extended")
         for col, head, w, anchor in [
-            ("no","#",40,"center"), ("name","Téléphone",155,"w"),
-            ("group","Groupe",120,"center"), ("ig","@Instagram",140,"w"),
-            ("status","Statut",100,"center"), ("followers","Followers",90,"center"),
-            ("views","Vues",80,"center"), ("vids","Vidéos",60,"center"),
-            ("checked","Vérifié",90,"center"), ("act","  ⋮",36,"center"),
+            ("no",       "#",          40,  "center"),
+            ("name",     "Téléphone",  155, "w"),
+            ("group",    "Groupe",     120, "center"),
+            ("ig",       "@Instagram", 140, "w"),
+            ("status",   "Statut",     100, "center"),
+            ("followers","Followers",  90,  "center"),
+            ("views",    "Vues",       80,  "center"),
+            ("vids",     "Vidéos",     60,  "center"),
+            ("checked",  "Vérifié",    90,  "center"),
+            ("act",      "  ⋮",        36,  "center"),
         ]:
             self.tree.heading(col, text=head)
             self.tree.column(col, width=w, anchor=anchor, minwidth=w)
-        # NOT packed — visual canvas layer replaces it
+
+        self.tree.tag_configure("active",  foreground=OK)
+        self.tree.tag_configure("banned",  foreground=DANGER)
+        self.tree.tag_configure("error",   foreground=WARN)
+        self.tree.tag_configure("noig",    foreground=MUTED)
+        self.tree.tag_configure("odd",     background=SURFACE)
+        self.tree.tag_configure("even",    background=CARD)
+
+        self.tree.bind("<<TreeviewSelect>>", self._on_sel)
+        self.tree.bind("<Double-1>",         self._on_dbl)
+        self.tree.bind("<Button-3>",         self._phone_context_menu)
+        self.tree.bind("<ButtonRelease-1>",  self._phone_dot_click)
+
+        vsb = ttk.Scrollbar(f, orient="vertical", command=self.tree.yview)
+        self.tree.configure(yscrollcommand=vsb.set)
+        self.tree.pack(side="left", fill="both", expand=True)
+        vsb.pack(side="right", fill="y")
 
     def _on_sel(self, e):
         self.sel_ids = list(self.tree.selection())
@@ -3381,186 +3169,6 @@ class App:
                 self.data.pop(pid, None)
             save_data(self.data)
             self._refresh_table()
-
-    def _phones_draw_table(self):
-        """Rebuild the GeeLark-style visual phone table from hidden self.tree."""
-        if not hasattr(self, "_p_rows_inner"):
-            return
-        c = self._p_colors
-
-        for w in self._p_rows_inner.winfo_children():
-            w.destroy()
-        self._p_row_frames.clear()
-
-        iids = self.tree.get_children()
-        if not iids:
-            emp = tk.Frame(self._p_rows_inner, bg=c["ODD"])
-            emp.pack(fill="both", expand=True, pady=70)
-            tk.Label(emp, text="📱", font=("Segoe UI", 34),
-                     bg=c["ODD"], fg="#1e2a3a").pack()
-            tk.Label(emp, text="Aucun téléphone",
-                     font=("Segoe UI", 13, "bold"),
-                     bg=c["ODD"], fg=c["MUTED"]).pack(pady=(8, 2))
-            tk.Label(emp, text="Synchronisez vos cloud phones depuis GeeLark",
-                     font=("Segoe UI", 9), bg=c["ODD"], fg="#2e3d55").pack()
-            return
-
-        sel = self._p_sel_iid[0]
-
-        def _set_bg_all(widget, bg):
-            try: widget.config(bg=bg)
-            except Exception: pass
-            for ch in widget.winfo_children():
-                _set_bg_all(ch, bg)
-
-        for i, iid in enumerate(iids):
-            d      = self.data.get(iid, {})
-            vals   = self.tree.item(iid, "values")
-            is_sel = (iid == sel)
-            base   = c["SEL"] if is_sel else (c["ODD"] if i % 2 == 0 else c["EVEN"])
-            # Phones with no IG linked get a dimmed look
-            has_ig = bool(d.get("ig_username"))
-
-            row = tk.Frame(self._p_rows_inner, bg=base,
-                           height=52, cursor="hand2")
-            row.pack(fill="x")
-            row.pack_propagate(False)
-            tk.Frame(row, bg=c["SEP"], height=1).pack(side="bottom", fill="x")
-
-            inner = tk.Frame(row, bg=base)
-            inner.pack(fill="both", expand=True)
-
-            def _mk_sep(bg=base):
-                tk.Frame(inner, bg=c["SEP"], width=1).pack(
-                    side="left", fill="y", pady=4)
-
-            def _cell(w, expand=False, bg=base):
-                f2 = tk.Frame(inner, bg=bg, width=w)
-                if expand:
-                    f2.pack(side="left", fill="both", expand=True)
-                else:
-                    f2.pack(side="left", fill="y")
-                    f2.pack_propagate(False)
-                return f2
-
-            def _lbl(parent, text, font=("Segoe UI", 9), fg=None, anchor="center",
-                     bg=base, padx=6):
-                fg = fg or c["TEXT"]
-                tk.Label(parent, text=text, font=font, bg=bg, fg=fg,
-                         anchor=anchor, padx=padx).pack(fill="both", expand=True)
-
-            # ── # ─────────────────────────────────────────────────────────────
-            _lbl(_cell(42), str(i + 1),
-                 font=("Segoe UI", 9), fg=c["MUTED"], anchor="center")
-            _mk_sep()
-
-            # ── Téléphone (name + serial below) ──────────────────────────────
-            nmf = _cell(170)
-            name_txt   = d.get("phone_name") or (vals[1] if vals else "—")
-            serial_txt = str(d.get("serial_no") or "")
-            name_fg = c["TEXT"] if has_ig else c["MUTED"]
-            tk.Label(nmf, text=name_txt, font=("Segoe UI", 9, "bold"),
-                     bg=base, fg=name_fg, anchor="w",
-                     padx=6).pack(fill="x", pady=(8, 0))
-            if serial_txt:
-                tk.Label(nmf, text=serial_txt,
-                         font=("Consolas", 7),
-                         bg=base, fg=c["PID"] if has_ig else "#2e3d55",
-                         anchor="w", padx=6).pack(fill="x", pady=(0, 8))
-            _mk_sep()
-
-            # ── Groupe ────────────────────────────────────────────────────────
-            grp_txt = d.get("group_name") or (vals[2] if vals else "—") or "—"
-            _lbl(_cell(100), grp_txt, fg=c["MUTED"], anchor="center")
-            _mk_sep()
-
-            # ── @Instagram ────────────────────────────────────────────────────
-            igf = _cell(145, expand=True)
-            ig  = d.get("ig_username", "")
-            ig_disp = ("@" + ig) if ig else "—"
-            ig_fg   = "#4f8ef7" if ig else c["MUTED"]
-            _lbl(igf, ig_disp, fg=ig_fg, anchor="w", padx=8)
-            _mk_sep()
-
-            # ── Statut ────────────────────────────────────────────────────────
-            st     = d.get("ig_status", "")
-            st_map = {
-                "active":  ("● Actif",   OK),
-                "banned":  ("● Banni",   DANGER),
-                "private": ("● Privé",   WARN),
-                "error":   ("● Erreur",  WARN),
-            }
-            st_txt2, st_fg = st_map.get(
-                st, ("— Sans IG" if not ig else "○ Non vérifié",
-                     c["MUTED"]))
-            _lbl(_cell(115), st_txt2, fg=st_fg, anchor="center")
-            _mk_sep()
-
-            # ── Followers ─────────────────────────────────────────────────────
-            fol = vals[5] if vals else "—"
-            _lbl(_cell(90), str(fol), fg=c["TEXT"], anchor="center")
-            _mk_sep()
-
-            # ── Vues ──────────────────────────────────────────────────────────
-            views_v = vals[6] if vals else "—"
-            _lbl(_cell(75), str(views_v), fg=c["TEXT"], anchor="center")
-            _mk_sep()
-
-            # ── Vidéos ────────────────────────────────────────────────────────
-            vids_v = vals[7] if vals else "—"
-            _lbl(_cell(60), str(vids_v), fg=c["TEXT"], anchor="center")
-            _mk_sep()
-
-            # ── Vérifié ───────────────────────────────────────────────────────
-            chk_v = vals[8] if vals else "—"
-            _lbl(_cell(90), str(chk_v),
-                 font=("Segoe UI", 8), fg=c["MUTED"], anchor="center")
-            _mk_sep()
-
-            # ── ⋮ menu ────────────────────────────────────────────────────────
-            opf = _cell(42)
-            dot_btn = tk.Label(opf, text="⋮", font=("Segoe UI", 13, "bold"),
-                               bg=base, fg=c["MUTED"], cursor="hand2")
-            dot_btn.pack(fill="both", expand=True)
-
-            # ── Bindings ──────────────────────────────────────────────────────
-            def _click(e, iid2=iid, row2=row, base2=base, idx=i,
-                       hi=has_ig):
-                old = self._p_sel_iid[0]
-                self._p_sel_iid[0] = iid2
-                if old and old in self._p_row_frames:
-                    old_idx = list(self.tree.get_children()).index(old)
-                    old_bg  = c["ODD"] if old_idx % 2 == 0 else c["EVEN"]
-                    _set_bg_all(self._p_row_frames[old], old_bg)
-                _set_bg_all(row2, c["SEL"])
-                self.sel_ids = [iid2]
-                self.tree.selection_set(iid2)
-                self.sel_lbl.config(text="1 sélectionné(s)")
-                if hi:
-                    self._show_tab("stats")
-                    self._show_ig_detail(iid2)
-
-            def _dbl(e, iid2=iid):
-                d2 = self.data.get(iid2, {})
-                if d2.get("ig_username"):
-                    self._show_tab("stats")
-                    self._show_ig_detail(iid2)
-
-            def _dots(e, iid2=iid):
-                self.sel_ids = [iid2]
-                self.tree.selection_set(iid2)
-                self._show_phone_menu(e.x_root, e.y_root)
-                return "break"
-
-            for wgt in row.winfo_children() + [row, inner]:
-                try:
-                    wgt.bind("<Button-1>", _click)
-                    wgt.bind("<Double-1>", _dbl)
-                except Exception:
-                    pass
-            dot_btn.bind("<Button-1>", _dots)
-
-            self._p_row_frames[iid] = row
 
     # ══════════════════════════════════════════════════════════════════════════
     # ONGLET STATS — Interface redesignée
@@ -5462,28 +5070,13 @@ class App:
         ff = shutil.which("ffmpeg")
         if not ff:
             desktop = Path.home() / "Desktop"
-            candidates = [
-                # Linux system locations
-                Path("/opt/pw-browsers/ffmpeg-1011/ffmpeg-linux"),
-                Path("/usr/local/bin/ffmpeg"),
-                Path("/usr/bin/ffmpeg"),
-                # Windows locations
-                BASE_DIR / "ffmpeg.exe",
-                Path(r"C:\ffmpeg\bin\ffmpeg.exe"),
-            ]
+            candidates = [BASE_DIR / "ffmpeg.exe",
+                          Path(r"C:\ffmpeg\bin\ffmpeg.exe")]
             try:
                 for d in desktop.iterdir():
                     if d.is_dir() and "ffmpeg" in d.name.lower():
                         candidates.append(d / "bin" / "ffmpeg.exe")
-                        candidates.append(d / "bin" / "ffmpeg")
-            except Exception:
-                pass
-            # Also scan /opt for any ffmpeg binary
-            try:
-                for p in Path("/opt").rglob("ffmpeg*"):
-                    if p.is_file() and "ffmpeg" in p.name.lower():
-                        candidates.append(p)
-            except Exception:
+            except:
                 pass
             for p in candidates:
                 if Path(p).exists():
@@ -8995,59 +8588,25 @@ class App:
         self._ac_running  = False
         self._ac_stop_flag = [False]
 
-        # ── TOP BAR: account dropdown ─────────────────────────────────────────
-        top_bar = tk.Frame(f, bg=TAB_BG, padx=14, pady=11)
-        top_bar.pack(fill="x")
+        # ── ACCOUNT TABS BAR (top) ────────────────────────────────────────────
+        tabs_bar = tk.Frame(f, bg=TAB_BG, height=58)
+        tabs_bar.pack(fill="x")
+        tabs_bar.pack_propagate(False)
 
-        tk.Label(top_bar, text="💬  Auto Commentaire",
-                 font=("Segoe UI", 11, "bold"),
-                 bg=TAB_BG, fg=TEXT_C).pack(side="left")
-
-        tk.Label(top_bar, text="Compte :",
-                 font=("Segoe UI", 9),
-                 bg=TAB_BG, fg=TEXT2_C).pack(side="left", padx=(28, 6))
-
-        self._ac_acc_dropdown = ttk.Combobox(
-            top_bar, textvariable=self._ac_acc_var,
-            state="readonly", width=26, font=("Segoe UI", 9))
-        self._ac_acc_dropdown.pack(side="left")
-
-        def _on_dropdown_change(e=None):
-            key = self._ac_acc_var.get()
-            if key in self._ac_acc_map:
-                _, d2 = self._ac_acc_map[key]
-                ig2 = d2.get("ig_username", "")
-                try:
-                    self._ac_lhdr_lbl.config(
-                        text=f"@{ig2}" if ig2 else "Sélectionne un compte")
-                except Exception:
-                    pass
-            self._ac_media_items.clear()
-            self._ac_sel_idx[0] = None
-            self._ac_vid_lb.delete(0, "end")
-            try:
-                self._ac_content_frame.place_forget()
-                self._ac_empty_frame.place(relx=0, rely=0,
-                                           relwidth=1, relheight=1)
-            except Exception:
-                pass
-            try:
-                _ac_rebuild_visual_list()
-            except Exception:
-                pass
-
-        self._ac_acc_dropdown.bind("<<ComboboxSelected>>", _on_dropdown_change)
-
-        tk.Button(top_bar, text="⟳",
-                  font=("Segoe UI", 11), bg=TAB_BG, fg=TEXT2_C,
-                  relief="flat", bd=0, cursor="hand2", padx=6,
-                  activebackground=TAB_BG, activeforeground=TEXT_C,
-                  command=lambda: _rebuild_acct_tabs()).pack(side="left", padx=(6, 0))
-
+        # Thin accent line at bottom of tab bar
         tk.Frame(f, bg=SEP_C, height=1).pack(fill="x")
 
-        # Kept for backward-compat closures; not packed
-        self._ac_tabs_inner = tk.Frame(f, bg=TAB_BG)
+        # Scrollable tabs container
+        tabs_inner_wrap = tk.Frame(tabs_bar, bg=TAB_BG)
+        tabs_inner_wrap.pack(side="left", fill="both", expand=True, pady=0)
+        self._ac_tabs_inner = tk.Frame(tabs_inner_wrap, bg=TAB_BG)
+        self._ac_tabs_inner.pack(side="left", fill="y", padx=(8, 0))
+
+        # "+" refresh button at right
+        tk.Button(tabs_bar, text="+", font=("Segoe UI", 14),
+                  bg=TAB_BG, fg=TEXT2_C, relief="flat", bd=0, cursor="hand2",
+                  activebackground=TAB_BG,
+                  command=lambda: _rebuild_acct_tabs()).pack(side="right", padx=12)
 
         # ── BODY (left panel + right panel) ───────────────────────────────────
         body = tk.Frame(f, bg=BG)
@@ -9225,7 +8784,7 @@ class App:
                     self._ac_vid_lb.selection_clear(0, "end")
                     self._ac_vid_lb.selection_set(_idx)
                     _ac_rebuild_visual_list()
-                    _on_vid_select(_force_idx=_idx)
+                    _on_vid_select()
 
                 for w in (row, av_cv, txt_col):
                     w.bind("<Button-1>", _row_click)
@@ -9281,9 +8840,7 @@ class App:
         self._ac_com_count_lbl.pack(side="left", padx=4)
         tk.Button(com_hdr, text="⟳", font=("Segoe UI", 10),
                   bg="#070a10", fg=TEXT2_C, relief="flat", bd=0, cursor="hand2",
-                  command=lambda: _on_vid_select(
-                      _force_idx=self._ac_sel_idx[0])
-                  ).pack(side="right", padx=14)
+                  command=lambda: _on_vid_select()).pack(side="right", padx=14)
 
         self._ac_com_box = scrolledtext.ScrolledText(
             com_area, bg="#0a0f1a", fg=TEXT_C,
@@ -9383,24 +8940,88 @@ class App:
             wrap="word", height=5)
         self._ac_log_box.pack(fill="x", padx=0, pady=0)
 
-        # ── ACCOUNT LIST BUILDER ──────────────────────────────────────────────
+        # ── ACCOUNT TABS BUILDER ───────────────────────────────────────────────
         def _rebuild_acct_tabs():
+            for w in list(self._ac_tabs_inner.winfo_children()):
+                try:
+                    w.destroy()
+                except Exception:
+                    pass
             self._ac_acc_map.clear()
+            accts = []
             for pid, d in sorted(self.data.items(),
-                                  key=lambda x: int(x[1].get("serial_no") or 0)):
+                                   key=lambda x: int(x[1].get("serial_no") or 0)):
                 ig = d.get("ig_username") or d.get("phone_name") or ""
                 if not ig:
                     continue
                 sid = d.get("ig_sessionid", "").strip()
                 label = f"{'🟢' if sid else '🔴'} @{ig}".replace("@@", "@")
                 self._ac_acc_map[label] = (pid, d)
+                accts.append((label, pid, d, ig, bool(sid)))
 
-            keys = list(self._ac_acc_map.keys())
-            self._ac_acc_cb["values"]       = keys
-            self._ac_acc_dropdown["values"] = keys
-            if keys and not self._ac_acc_var.get():
-                self._ac_acc_var.set(keys[0])
-                _on_dropdown_change()
+            self._ac_acc_cb["values"] = list(self._ac_acc_map.keys())
+            if self._ac_acc_map and not self._ac_acc_var.get():
+                self._ac_acc_cb.current(0)
+
+            cur_key = self._ac_acc_var.get()
+            for i, (label, pid, d, ig, has_sid) in enumerate(accts):
+                is_act = (label == cur_key)
+                tab_col = _AVATAR_COLS[i % len(_AVATAR_COLS)]
+                tab_bg  = TAB_ACT if is_act else TAB_BG
+                tab = tk.Frame(self._ac_tabs_inner, bg=tab_bg,
+                                cursor="hand2",
+                                highlightthickness=1 if is_act else 0,
+                                highlightbackground=ACCENT_C)
+                tab.pack(side="left", padx=(0, 2), pady=4)
+
+                # Avatar circle
+                av = tk.Canvas(tab, bg=tab_bg, width=28, height=28,
+                                highlightthickness=0)
+                av.pack(side="left", padx=(8, 4), pady=8)
+                av.create_oval(0, 0, 28, 28, fill=tab_col, outline="")
+                av.create_text(14, 14, text=ig[:2].upper(),
+                                font=("Segoe UI", 8, "bold"), fill="#ffffff")
+
+                # Status dot + name
+                name_col = tk.Frame(tab, bg=tab_bg)
+                name_col.pack(side="left", pady=4, padx=(0, 8))
+                tk.Label(name_col, text=f"@{ig}",
+                          font=("Segoe UI", 8, "bold" if is_act else "normal"),
+                          bg=tab_bg,
+                          fg=TEXT_C if is_act else TEXT2_C).pack(anchor="w")
+                dot_row = tk.Frame(name_col, bg=tab_bg)
+                dot_row.pack(anchor="w")
+                dot_cv = tk.Canvas(dot_row, bg=tab_bg, width=6, height=6,
+                                    highlightthickness=0)
+                dot_cv.pack(side="left")
+                dot_cv.create_oval(0, 0, 6, 6,
+                                    fill=OK_C if has_sid else "#ef4444",
+                                    outline="")
+                tk.Label(dot_row,
+                          text="  session" if has_sid else "  no session",
+                          font=("Segoe UI", 6), bg=tab_bg,
+                          fg=OK_C if has_sid else "#ef4444").pack(side="left")
+
+                # Bottom accent bar for active tab
+                if is_act:
+                    tk.Frame(tab, bg=ACCENT_C, height=2).pack(fill="x",
+                                                                side="bottom")
+
+                def _tab_click(_e=None, lbl=label, _ig=ig):
+                    self._ac_acc_var.set(lbl)
+                    self._ac_lhdr_lbl.config(text=f"@{_ig}")
+                    self._ac_media_items.clear()
+                    self._ac_sel_idx[0] = None
+                    self._ac_vid_lb.delete(0, "end")
+                    # Show empty state
+                    self._ac_content_frame.place_forget()
+                    self._ac_empty_frame.place(relx=0, rely=0,
+                                                relwidth=1, relheight=1)
+                    _rebuild_acct_tabs()
+                    _ac_rebuild_visual_list()
+
+                for w in (tab, av, name_col, dot_row, dot_cv):
+                    w.bind("<Button-1>", _tab_click)
 
         _rebuild_acct_tabs()
 
@@ -9584,38 +9205,18 @@ class App:
         load_vid_btn.config(command=_load_videos)
 
         # ── clic sur une vidéo → charger commentaires ─────────────────────────
-        def _on_vid_select(evt=None, _force_idx=None):
-            if _force_idx is not None:
-                raw_idx = (_force_idx,)
-            else:
-                raw_idx = self._ac_vid_lb.curselection()
-            if not raw_idx or not self._ac_media_items:
+        def _on_vid_select(evt=None):
+            idx = self._ac_vid_lb.curselection()
+            if not idx or not self._ac_media_items:
                 return
-            item_idx = raw_idx[0]
-            if item_idx >= len(self._ac_media_items):
-                return
-            _, media_id, shortcode = self._ac_media_items[item_idx]
+            _, media_id, shortcode = self._ac_media_items[idx[0]]
             key = self._ac_acc_var.get()
             if not key or key not in self._ac_acc_map:
-                _show_content()
-                self._ac_com_box.config(state="normal")
-                self._ac_com_box.delete("1.0", "end")
-                self._ac_com_box.insert("end",
-                    "⚠ Sélectionne un compte dans le menu déroulant en haut.")
-                self._ac_com_box.config(state="disabled")
                 return
             _, d = self._ac_acc_map[key]
             sid = d.get("ig_sessionid", "").strip()
             ig = d.get("ig_username", "")
             if not sid:
-                _show_content()
-                self._ac_com_box.config(state="normal")
-                self._ac_com_box.delete("1.0", "end")
-                self._ac_com_box.insert("end",
-                    f"❌ Pas de Session ID pour @{ig}.\n\n"
-                    "Ajoute-le dans l'onglet Téléphones → ⋮ → Identifiants.")
-                self._ac_com_box.config(state="disabled")
-                self._ac_com_count_lbl.config(text="No session")
                 return
 
             _show_content()
@@ -10822,12 +10423,6 @@ class App:
             self.sv["banned"].config(text=str(banned))
             self.sv["views"].config(text=fmt(views))
 
-        # Redraw GeeLark-style visual table
-        try:
-            self._phones_draw_table()
-        except Exception:
-            pass
-
         # Dashboard snapshot + redraw (live)
         try:
             self._views_history_snapshot()
@@ -11382,39 +10977,28 @@ class App:
     def _scheduler(self):
         """Background thread: scrape all accounts at the configured interval."""
         while self.running:
-            try:
-                interval = self._auto_interval
-                if interval <= 0:
-                    time.sleep(10)
-                    continue
-                self._next_refresh = time.time() + interval
-                # sleep in small chunks so we can react to interval changes
-                while self.running and time.time() < self._next_refresh:
-                    time.sleep(1)
-                if self.running and interval > 0:
-                    self._scrape_sel()
-            except Exception:
-                time.sleep(30)
+            interval = self._auto_interval
+            if interval <= 0:
+                time.sleep(10)
+                continue
+            self._next_refresh = time.time() + interval
+            # sleep in small chunks so we can react to interval changes
+            while self.running and time.time() < self._next_refresh:
+                time.sleep(1)
+            if self.running and interval > 0:
+                self._scrape_sel()
 
     def _tick_countdown(self):
         """Update the countdown label in the toolbar every second."""
         if not self.running:
             return
-        try:
-            interval = getattr(self, "_auto_interval", 0)
-            nxt      = getattr(self, "_next_refresh", 0)
-            var      = getattr(self, "_countdown_var", None)
-            if var is None:
-                self.root.after(1000, self._tick_countdown)
-                return
-            if interval <= 0 or nxt == 0:
-                var.set("↻ Auto: OFF")
-            else:
-                remaining = max(0, int(nxt - time.time()))
-                m, s = divmod(remaining, 60)
-                var.set(f"↻ {m:02d}:{s:02d}")
-        except Exception:
-            pass
+        interval = self._auto_interval
+        if interval <= 0 or self._next_refresh == 0:
+            self._countdown_var.set("↻ Auto: OFF")
+        else:
+            remaining = max(0, int(self._next_refresh - time.time()))
+            m, s = divmod(remaining, 60)
+            self._countdown_var.set(f"↻ {m:02d}:{s:02d}")
         self.root.after(1000, self._tick_countdown)
 
     def _set_auto_interval(self, minutes: int):
