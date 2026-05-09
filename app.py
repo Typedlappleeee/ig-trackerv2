@@ -7522,7 +7522,6 @@ class App:
         # (do NOT pack here; _on_bank_sel_card will pack it when needed)
 
     def _bank_hide_detail(self):
-        """Hide the detail panel."""
         try:
             self._bank_detail_panel.pack_forget()
             self._bank_detail_visible = False
@@ -7530,13 +7529,52 @@ class App:
             pass
 
     def _bank_show_detail(self):
-        """Show the detail panel (pack below grid frame)."""
         try:
             if not self._bank_detail_visible:
                 self._bank_detail_panel.pack(fill="x", side="bottom")
                 self._bank_detail_visible = True
         except Exception:
             pass
+
+    def _bank_add_media(self):
+        """Open file dialog to add videos to the bank."""
+        from uuid import uuid4
+        paths = filedialog.askopenfilenames(
+            title="Ajouter des médias à la banque",
+            filetypes=[("Vidéos", "*.mp4 *.mov *.avi *.mkv *.webm *.m4v"),
+                       ("Tous les fichiers", "*.*")])
+        if not paths:
+            return
+        bank = load_bank()
+        known = {b["path"] for b in bank}
+        added = 0
+        for p in paths:
+            fp = Path(p)
+            if not fp.exists() or str(fp) in known:
+                continue
+            eid = uuid4().hex[:12]
+            bank.append({
+                "id":          eid,
+                "filename":    fp.name,
+                "path":        str(fp),
+                "folder":      getattr(self, "_bank_folder_filter", "") or "",
+                "size_mb":     round(fp.stat().st_size / 1_000_000, 1),
+                "created":     datetime.now().isoformat(),
+                "posted_to":   [],
+                "overlay":     "",
+                "description": "",
+            })
+            known.add(str(fp))
+            added += 1
+        if added:
+            save_bank(bank)
+            self._refresh_bank()
+            try:
+                self.bank_status.config(
+                    text=f"✅ {added} média(s) ajouté(s)", fg=OK)
+                self.root.after(3000, lambda: self.bank_status.config(text=""))
+            except Exception:
+                pass
 
     def _on_bank_sel(self, e=None):
         # Conservé pour rétro-compatibilité ; la sélection se fait désormais via cartes.
