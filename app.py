@@ -1293,6 +1293,9 @@ class App:
         self._auto_interval  = int(self.cfg.get("auto_refresh_min", 5)) * 60
         self._next_refresh   = time.time() + self._auto_interval
 
+        # Show locally cached phones immediately, before API fetch completes
+        self.root.after(300, self._refresh_table)
+
         threading.Thread(target=self._load_phones, daemon=True).start()
         threading.Thread(target=self._scheduler, daemon=True).start()
 
@@ -1863,12 +1866,17 @@ class App:
 
     def log(self, msg, level="info"):
         colors = {"info": TEXT2, "ok": OK, "warn": WARN, "error": DANGER, "accent": ACCENT}
-        ts = datetime.now().strftime("%H:%M:%S")
-        self.log_box.config(state="normal")
-        self.log_box.insert("end", f"[{ts}] {msg}\n", level)
-        self.log_box.tag_config(level, foreground=colors.get(level, TEXT2))
-        self.log_box.see("end")
-        self.log_box.config(state="disabled")
+        def _do():
+            ts = datetime.now().strftime("%H:%M:%S")
+            self.log_box.config(state="normal")
+            self.log_box.insert("end", f"[{ts}] {msg}\n", level)
+            self.log_box.tag_config(level, foreground=colors.get(level, TEXT2))
+            self.log_box.see("end")
+            self.log_box.config(state="disabled")
+        if threading.current_thread() is threading.main_thread():
+            _do()
+        else:
+            self.root.after(0, _do)
 
     def _round_card(self, parent, radius=12, bg=None, border=None, border_w=1,
                      hover_border=None, parent_bg=None):
@@ -11374,28 +11382,39 @@ class App:
     def _scheduler(self):
         """Background thread: scrape all accounts at the configured interval."""
         while self.running:
-            interval = self._auto_interval
-            if interval <= 0:
-                time.sleep(10)
-                continue
-            self._next_refresh = time.time() + interval
-            # sleep in small chunks so we can react to interval changes
-            while self.running and time.time() < self._next_refresh:
-                time.sleep(1)
-            if self.running and interval > 0:
-                self._scrape_sel()
+            try:
+                interval = self._auto_interval
+                if interval <= 0:
+                    time.sleep(10)
+                    continue
+                self._next_refresh = time.time() + interval
+                # sleep in small chunks so we can react to interval changes
+                while self.running and time.time() < self._next_refresh:
+                    time.sleep(1)
+                if self.running and interval > 0:
+                    self._scrape_sel()
+            except Exception:
+                time.sleep(30)
 
     def _tick_countdown(self):
         """Update the countdown label in the toolbar every second."""
         if not self.running:
             return
-        interval = self._auto_interval
-        if interval <= 0 or self._next_refresh == 0:
-            self._countdown_var.set("↻ Auto: OFF")
-        else:
-            remaining = max(0, int(self._next_refresh - time.time()))
-            m, s = divmod(remaining, 60)
-            self._countdown_var.set(f"↻ {m:02d}:{s:02d}")
+        try:
+            interval = getattr(self, "_auto_interval", 0)
+            nxt      = getattr(self, "_next_refresh", 0)
+            var      = getattr(self, "_countdown_var", None)
+            if var is None:
+                self.root.after(1000, self._tick_countdown)
+                return
+            if interval <= 0 or nxt == 0:
+                var.set("↻ Auto: OFF")
+            else:
+                remaining = max(0, int(nxt - time.time()))
+                m, s = divmod(remaining, 60)
+                var.set(f"↻ {m:02d}:{s:02d}")
+        except Exception:
+            pass
         self.root.after(1000, self._tick_countdown)
 
     def _set_auto_interval(self, minutes: int):
