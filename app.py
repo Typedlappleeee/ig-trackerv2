@@ -1320,103 +1320,94 @@ class App:
     def _show_splash_animation(self, on_done=None):
         """Full-screen startup animation. Calls on_done() when finished."""
         import math
+        import random as _rnd
 
-        # Wait for window to be realized, then run
-        def _start():
-            try:
-                W = self.root.winfo_width()
-                H = self.root.winfo_height()
-            except Exception:
-                W, H = 1400, 900
-            if W < 100:
-                W, H = 1400, 900
+        cv = tk.Canvas(self.root, bg="#03050c", highlightthickness=0, bd=0)
+        cv.place(relx=0, rely=0, relwidth=1, relheight=1)
+        cv.lift()
 
-            cv = tk.Canvas(self.root, bg="#03050c",
-                           highlightthickness=0, bd=0)
-            cv.place(x=0, y=0, width=W, height=H)
-            cv.lift()
+        t       = [0]
+        state   = [None]   # holds computed layout once dimensions are known
+        FPS     = 60
+        TICK    = 1000 // FPS
 
+        # ── timing helpers ────────────────────────────────────────────────────
+        def _ease_out_cubic(x):
+            return 1 - (1 - max(0, min(1, x))) ** 3
+
+        def _ease_in_out(x):
+            x = max(0, min(1, x))
+            return x * x * (3 - 2 * x)
+
+        def _lerp(a, b, t2):
+            return a + (b - a) * t2
+
+        def _hex_lerp(c1, c2, t2):
+            t2 = max(0.0, min(1.0, t2))
+            r1 = int(c1[1:3], 16); g1 = int(c1[3:5], 16); b1 = int(c1[5:7], 16)
+            r2 = int(c2[1:3], 16); g2 = int(c2[3:5], 16); b2 = int(c2[5:7], 16)
+            return "#{:02x}{:02x}{:02x}".format(
+                int(r1 + (r2-r1)*t2),
+                int(g1 + (g2-g1)*t2),
+                int(b1 + (b2-b1)*t2))
+
+        # ── colour palette ────────────────────────────────────────────────────
+        BG_COL   = "#03050c"
+        GLOW1    = "#4f8ef7"
+        GLOW2    = "#1a3a80"
+        LOGO_COL = "#4f8ef7"
+        TEXT_COL = "#e8eaf0"
+        SUB_COL  = "#6b7a99"
+        APP_BG   = "#05080f"
+
+        def _init_state(W, H):
             cx, cy = W // 2, H // 2
-            t = [0]          # animation tick (0 → TOTAL_TICKS)
-            FPS     = 60
-            TICK    = 1000 // FPS   # ms per frame
-
-            # ── timing helpers ────────────────────────────────────────────────
-            def _ease_out_cubic(x):
-                return 1 - (1 - max(0, min(1, x))) ** 3
-
-            def _ease_in_out(x):
-                x = max(0, min(1, x))
-                return x * x * (3 - 2 * x)
-
-            def _lerp(a, b, t2):
-                return a + (b - a) * t2
-
-            def _hex_lerp(c1, c2, t2):
-                """Interpolate between two hex colours."""
-                t2 = max(0.0, min(1.0, t2))
-                r1 = int(c1[1:3], 16); g1 = int(c1[3:5], 16); b1 = int(c1[5:7], 16)
-                r2 = int(c2[1:3], 16); g2 = int(c2[3:5], 16); b2 = int(c2[5:7], 16)
-                return "#{:02x}{:02x}{:02x}".format(
-                    int(r1 + (r2-r1)*t2),
-                    int(g1 + (g2-g1)*t2),
-                    int(b1 + (b2-b1)*t2))
-
-            # ── colour palette ────────────────────────────────────────────────
-            BG_COL    = "#03050c"
-            GLOW1     = "#4f8ef7"
-            GLOW2     = "#1a3a80"
-            RING1     = "#1e3a6e"
-            RING2     = "#0a1a3a"
-            LOGO_COL  = "#4f8ef7"
-            BAR_COL   = "#4f8ef7"
-            TEXT_COL  = "#e8eaf0"
-            SUB_COL   = "#6b7a99"
-            APP_BG    = "#05080f"   # main app bg colour (fade target)
-
-            # ── particles ─────────────────────────────────────────────────────
-            import random as _rnd
             _rnd.seed(42)
             particles = []
             for _ in range(35):
                 angle = _rnd.uniform(0, 2*math.pi)
-                dist  = _rnd.uniform(180, min(W, H)*0.48)
-                tx    = cx + math.cos(angle) * _rnd.uniform(20, 50)
-                ty    = cy + math.sin(angle) * _rnd.uniform(20, 50)
+                dist  = _rnd.uniform(180, min(W, H) * 0.48)
+                tx2   = cx + math.cos(angle) * _rnd.uniform(20, 50)
+                ty2   = cy + math.sin(angle) * _rnd.uniform(20, 50)
                 sx    = cx + math.cos(angle) * dist
                 sy    = cy + math.sin(angle) * dist
                 size  = _rnd.uniform(2, 5)
                 col   = _rnd.choice(["#4f8ef7","#2563eb","#6ea6ff","#93c5fd"])
-                particles.append((sx, sy, tx, ty, size, col))
+                particles.append((sx, sy, tx2, ty2, size, col))
+            return {
+                "cx": cx, "cy": cy,
+                "particles": particles,
+                "BAR_W": 260, "BAR_H": 4,
+                "BAR_Y": cy + 130,
+                "BAR_X": cx - 130,
+                "LOGO_R": 46,
+            }
 
-            APP_NAME   = "IG Tracker"
-            SUBTITLE   = "Tableau de bord Instagram"
-            LOGO_R     = 46   # logo circle radius
-            BAR_W      = 260
-            BAR_H      = 4
-            BAR_Y      = cy + 130
-            BAR_X      = cx - BAR_W // 2
+        def _draw():
+            try:
+                W = cv.winfo_width()
+                H = cv.winfo_height()
+                if W < 10 or H < 10:
+                    cv.after(50, _draw)
+                    return
 
-            # ── main draw function ────────────────────────────────────────────
-            def _draw():
+                if state[0] is None:
+                    state[0] = _init_state(W, H)
+
+                s    = state[0]
                 tick = t[0]
+                cx   = s["cx"]; cy = s["cy"]
+                BAR_X = s["BAR_X"]; BAR_Y = s["BAR_Y"]
+                BAR_W = s["BAR_W"]; BAR_H = s["BAR_H"]
+                LOGO_R = s["LOGO_R"]
+                particles = s["particles"]
+
                 cv.delete("all")
-
-                # ── Phase timings (in ticks at 60fps) ─────────────────────────
-                # 0 – 30  : particles fly in
-                # 0 – 40  : glow rings pulse out
-                # 20 – 55 : logo scales in (bounce)
-                # 45 – 75 : app name fades/scales in
-                # 65 – 95 : subtitle fades in + progress bar
-                # 90 – 110: hold + pulse
-                # 110 – 160: fade out to app bg
-
-                TOTAL = 160
 
                 # Background
                 cv.create_rectangle(0, 0, W, H, fill=BG_COL, outline="")
 
-                # ── GLOW RINGS (expand outward) ─────────────────────────────
+                # ── GLOW RINGS ───────────────────────────────────────────────
                 for ring_i in range(4):
                     ring_start = ring_i * 8
                     ring_t = (tick - ring_start) / 55
@@ -1427,19 +1418,18 @@ class App:
                     alp = max(0, 1 - ring_t) * (0.25 - ring_i * 0.04)
                     if r <= 0 or alp <= 0:
                         continue
-                    # Simulate alpha with color lerp to bg
                     col = _hex_lerp(BG_COL,
-                                     ["#1e3a6e","#162a5a","#0e1e40","#080e22"][ring_i],
-                                     alp * 4)
+                                    ["#1e3a6e","#162a5a","#0e1e40","#080e22"][ring_i],
+                                    alp * 4)
                     cv.create_oval(cx-r, cy-r, cx+r, cy+r,
                                    outline=col, width=2 - ring_i * 0.3)
 
-                # ── PARTICLES fly toward center ──────────────────────────────
+                # ── PARTICLES ────────────────────────────────────────────────
                 p_t = min(1.0, tick / 45)
                 p_e = _ease_out_cubic(p_t)
-                for sx, sy, tx, ty, size, col in particles:
-                    px = _lerp(sx, tx, p_e)
-                    py = _lerp(sy, ty, p_e)
+                for sx, sy, tx2, ty2, size, col in particles:
+                    px = _lerp(sx, tx2, p_e)
+                    py = _lerp(sy, ty2, p_e)
                     fade = min(1, p_t * 2) * max(0, 1 - max(0, (tick-35)/15))
                     if fade <= 0:
                         continue
@@ -1448,14 +1438,12 @@ class App:
                     cv.create_oval(px-r2, py-r2, px+r2, py+r2,
                                    fill=pcol, outline="")
 
-                # ── LOGO CIRCLE (scale in with bounce) ─────────────────────
+                # ── LOGO CIRCLE ──────────────────────────────────────────────
                 logo_raw = (tick - 15) / 35
                 if logo_raw > 0:
-                    # Bounce easing: overshoot slightly
                     logo_t = max(0, min(1.2, logo_raw))
                     if logo_t <= 1.0:
                         scale = _ease_out_cubic(logo_t)
-                        # Overshoot
                         if logo_t > 0.7:
                             overshoot = math.sin((logo_t - 0.7) / 0.3 * math.pi) * 0.08
                             scale = min(1.0 + overshoot, scale + overshoot)
@@ -1463,27 +1451,19 @@ class App:
                         scale = 1.0
                     scale = min(scale, 1.0)
                     r = max(1, int(LOGO_R * scale))
-
-                    # Outer glow
                     for gi in range(3):
                         gr = r + 8 + gi * 7
                         gcol = _hex_lerp(BG_COL, GLOW2,
-                                          (0.4 - gi * 0.1) * min(1, logo_raw))
+                                         (0.4 - gi * 0.1) * min(1, logo_raw))
                         cv.create_oval(cx-gr, cy-gr, cx+gr, cy+gr,
                                        fill=gcol, outline="")
-
-                    # Logo circle
                     cv.create_oval(cx-r, cy-r, cx+r, cy+r,
                                    fill=LOGO_COL, outline="")
-
-                    # Inner highlight arc (top-left, lighter)
                     hr = max(1, r-4)
                     cv.create_arc(cx-hr, cy-hr, cx+hr, cy+hr,
-                                   start=120, extent=90,
-                                   outline=_hex_lerp(LOGO_COL, "#ffffff", 0.4),
-                                   width=2, style="arc")
-
-                    # Icon text
+                                  start=120, extent=90,
+                                  outline=_hex_lerp(LOGO_COL, "#ffffff", 0.4),
+                                  width=2, style="arc")
                     icon_alpha = min(1.0, max(0, (logo_raw - 0.5) * 2))
                     if icon_alpha > 0.1:
                         ic = _hex_lerp(LOGO_COL, "#ffffff", icon_alpha)
@@ -1491,24 +1471,24 @@ class App:
                                        font=("Segoe UI", int(26 * scale)),
                                        fill=ic)
 
-                # ── APP NAME (scale + fade in) ──────────────────────────────
+                # ── APP NAME ─────────────────────────────────────────────────
                 name_t = max(0, (tick - 42) / 22)
                 if name_t > 0:
                     name_e = _ease_out_cubic(min(1, name_t))
                     name_col = _hex_lerp(BG_COL, TEXT_COL, name_e)
-                    name_size = int(24 + (1 - name_e) * 12)  # 36→24
+                    name_size = int(24 + (1 - name_e) * 12)
                     cv.create_text(cx, cy + 70,
-                                   text=APP_NAME,
+                                   text="IG Tracker",
                                    font=("Segoe UI", name_size, "bold"),
                                    fill=name_col)
 
-                # ── SUBTITLE (fade in) ───────────────────────────────────────
+                # ── SUBTITLE ─────────────────────────────────────────────────
                 sub_t = max(0, (tick - 58) / 18)
                 if sub_t > 0:
                     sub_e = _ease_in_out(min(1, sub_t))
                     sub_col = _hex_lerp(BG_COL, SUB_COL, sub_e)
                     cv.create_text(cx, cy + 100,
-                                   text=SUBTITLE,
+                                   text="Tableau de bord Instagram",
                                    font=("Segoe UI", 10),
                                    fill=sub_col)
 
@@ -1516,59 +1496,46 @@ class App:
                 bar_t = max(0, (tick - 62) / 32)
                 if bar_t > 0:
                     bar_e = _ease_in_out(min(1, bar_t))
-                    # Track
                     cv.create_rectangle(BAR_X, BAR_Y,
-                                         BAR_X + BAR_W, BAR_Y + BAR_H,
-                                         fill="#111827", outline="")
-                    # Fill (shifts color as it fills)
+                                        BAR_X + BAR_W, BAR_Y + BAR_H,
+                                        fill="#111827", outline="")
                     fill_w = int(BAR_W * bar_e)
                     if fill_w > 0:
                         fill_col = _hex_lerp(GLOW2, GLOW1, bar_e)
                         cv.create_rectangle(BAR_X, BAR_Y,
-                                             BAR_X + fill_w, BAR_Y + BAR_H,
-                                             fill=fill_col, outline="")
-                    # Glow dot at bar tip
+                                            BAR_X + fill_w, BAR_Y + BAR_H,
+                                            fill=fill_col, outline="")
                     if 0 < bar_e < 1:
                         tip_x = BAR_X + fill_w
                         cv.create_oval(tip_x-4, BAR_Y-3,
-                                        tip_x+4, BAR_Y+BAR_H+3,
-                                        fill="#93c5fd", outline="")
-
-                # Percentage text below bar
-                if bar_t > 0:
+                                       tip_x+4, BAR_Y+BAR_H+3,
+                                       fill="#93c5fd", outline="")
                     pct = int(min(100, bar_e * 100))
                     cv.create_text(cx, BAR_Y + 18,
                                    text=f"{pct}%",
                                    font=("Consolas", 8),
                                    fill=_hex_lerp(BG_COL, SUB_COL,
-                                                   min(1, bar_t * 2)))
+                                                  min(1, bar_t * 2)))
 
-                # ── PULSE at hold ────────────────────────────────────────────
+                # ── PULSE ────────────────────────────────────────────────────
                 hold_t = max(0, (tick - 97) / 12)
                 if 0 < hold_t < 1:
                     pulse_r = LOGO_R + int(hold_t * 24)
                     pulse_a = 1 - hold_t
                     pc = _hex_lerp(BG_COL, "#4f8ef7", pulse_a * 0.6)
                     cv.create_oval(cx-pulse_r, cy-pulse_r,
-                                    cx+pulse_r, cy+pulse_r,
-                                    outline=pc, width=2)
+                                   cx+pulse_r, cy+pulse_r,
+                                   outline=pc, width=2)
 
-                # ── FADE OUT ────────────────────────────────────────────────
+                # ── FADE OUT ─────────────────────────────────────────────────
                 if tick >= 110:
                     fade_t = (tick - 110) / 50
                     fade_e = _ease_in_out(min(1, fade_t))
-                    # Overlay the bg colour on top of everything
                     fade_col = _hex_lerp(BG_COL, APP_BG, fade_e)
-                    # Draw fade rect
-                    cv.create_rectangle(0, 0, W, H,
-                                         fill=fade_col, outline="",
-                                         stipple="" if fade_e < 0.98 else "")
-                    # Final invisible: destroy
+                    cv.create_rectangle(0, 0, W, H, fill=fade_col, outline="")
                     if fade_e >= 0.98:
-                        try:
-                            cv.destroy()
-                        except Exception:
-                            pass
+                        cv.place_forget()
+                        cv.after(50, cv.destroy)
                         if on_done:
                             try:
                                 on_done()
@@ -1576,17 +1543,23 @@ class App:
                                 pass
                         return
 
-                # Next frame
                 t[0] += 1
                 if t[0] < 200:
                     cv.after(TICK, _draw)
 
-            # Kick off after window is visible
-            self.root.after(80, _draw)
+            except Exception:
+                cv.place_forget()
+                try:
+                    cv.destroy()
+                except Exception:
+                    pass
+                if on_done:
+                    try:
+                        on_done()
+                    except Exception:
+                        pass
 
-        # Defer until window is mapped
-        self.root.update_idletasks()
-        self.root.after(0, _start)
+        self.root.after(200, _draw)
 
     def _show_beta_popup(self):
         pop = tk.Toplevel(self.root)
