@@ -62,7 +62,7 @@ export function Phones({ user }: PhonesProps) {
     try {
       const items = await fetchAllPhones(bearer)
       if (items.length === 0) {
-        setError('Aucun téléphone trouvé — vérifie ton token.')
+        setError('Aucun téléphone trouvé sur ce compte GéeLark.')
         setSyncing(false)
         return
       }

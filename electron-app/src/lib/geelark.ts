@@ -29,13 +29,17 @@ async function geelarkFetch(method: 'GET' | 'POST', path: string, body?: unknown
   return result.data as Record<string, unknown>
 }
 
-// Fetch all phones (paginates automatically)
+// Fetch all phones (paginates automatically).
+// Throws a descriptive error if the API rejects the token.
 export async function fetchAllPhones(bearer: string): Promise<GeelarkPhone[]> {
   const items: GeelarkPhone[] = []
   let page = 1
   while (true) {
     const d = await geelarkFetch('POST', '/phone/list', { page, pageSize: 50 }, bearer)
-    if (d['code'] !== 0) break
+    if (d['code'] !== 0) {
+      const msg = d['msg'] ?? d['message'] ?? `code ${d['code']}`
+      throw new Error(`GéeLark API: ${msg}`)
+    }
     const batch = ((d['data'] as Record<string, unknown>)?.['items'] ?? []) as GeelarkPhone[]
     const total = ((d['data'] as Record<string, unknown>)?.['total'] ?? 0) as number
     items.push(...batch)
