@@ -2353,84 +2353,192 @@ class App:
 
     def _build_dashboard_tab(self):
         L = self.cfg.get("lang", "fr")
-        _ = lambda k: t(k, L)
 
         f = tk.Frame(self.tab_container, bg=BG)
         self.tabs["dashboard"] = f
 
-        self._tab_header(f, "📈", _("dash.title"), _("dash.subtitle"), ACCENT)
+        # ── Scrollable container ───────────────────────────────────────────────
+        scroll_cv = tk.Canvas(f, bg=BG, highlightthickness=0)
+        scroll_sb = ttk.Scrollbar(f, orient="vertical", command=scroll_cv.yview)
+        scroll_cv.configure(yscrollcommand=scroll_sb.set)
+        scroll_sb.pack(side="right", fill="y")
+        scroll_cv.pack(side="left", fill="both", expand=True)
+        inner = tk.Frame(scroll_cv, bg=BG)
+        _scroll_win = scroll_cv.create_window((0, 0), window=inner, anchor="nw")
+        def _on_inner_cfg(e):
+            scroll_cv.configure(scrollregion=scroll_cv.bbox("all"))
+            scroll_cv.itemconfig(_scroll_win, width=scroll_cv.winfo_width())
+        inner.bind("<Configure>", _on_inner_cfg)
+        scroll_cv.bind("<Configure>",
+                       lambda e: scroll_cv.itemconfig(_scroll_win, width=e.width))
+        self._bind_mousewheel(inner, scroll_cv)
 
-        # Range selector
-        ctrl = tk.Frame(f, bg=BG)
-        ctrl.pack(fill="x", padx=20, pady=(4, 8))
+        pad = dict(padx=20, pady=(0, 16))
 
-        self._dash_range = tk.StringVar(value="7d")
+        # ══════════════════════════════════════════════════════════════════════
+        # SECTION 1 — Earnings summary style
+        # ══════════════════════════════════════════════════════════════════════
+        summ_lbl = tk.Label(inner,
+                            text=("Résumé des vues" if L == "fr" else "Views summary"),
+                            font=("Segoe UI", 11, "bold"), bg=BG, fg=TEXT)
+        summ_lbl.pack(anchor="w", padx=20, pady=(14, 8))
+
+        summ_row = tk.Frame(inner, bg=CARD,
+                            highlightthickness=1, highlightbackground=BORDER)
+        summ_row.pack(fill="x", **pad)
+
+        # Left: total icon + big number
+        tot_frame = tk.Frame(summ_row, bg=CARD, padx=24, pady=20)
+        tot_frame.pack(side="left")
+
+        icon_circle = tk.Canvas(tot_frame, bg=ACCENT, width=46, height=46,
+                                highlightthickness=0)
+        icon_circle.pack()
+        icon_circle.create_oval(0, 0, 46, 46, fill=ACCENT, outline="")
+        icon_circle.create_text(23, 23, text="👁", font=("Segoe UI", 16))
+
+        tk.Label(tot_frame, text=("Total vues" if L == "fr" else "Total views"),
+                 font=("Segoe UI", 9), bg=CARD, fg=ACCENT).pack(pady=(6, 0))
+        self._dash_total_lbl = tk.Label(tot_frame, text="—",
+                                         font=("Segoe UI", 26, "bold"),
+                                         bg=CARD, fg=TEXT)
+        self._dash_total_lbl.pack()
+
+        # Separator
+        tk.Frame(summ_row, bg=BORDER, width=1).pack(side="left", fill="y",
+                                                      padx=(0, 0), pady=12)
+
+        # Right: 2×3 grid of stat mini-cards
+        grid_frame = tk.Frame(summ_row, bg=CARD)
+        grid_frame.pack(side="left", fill="both", expand=True, padx=10, pady=10)
+
+        self._dash_kpis = {}
+        stat_defs = [
+            ("today",   "👁",  ("Vues aujourd'hui" if L == "fr" else "Today's views"),   ACCENT),
+            ("delta",   "📈",  ("Croissance"       if L == "fr" else "Growth"),           OK),
+            ("phones",  "📱",  ("Téléphones actifs" if L == "fr" else "Active phones"),   "#5b9cf6"),
+            ("peak",    "🏆",  ("Record journalier" if L == "fr" else "Daily peak"),      WARN),
+            ("avg",     "📊",  ("Moyenne / jour"   if L == "fr" else "Daily average"),    TEXT2),
+            ("banned",  "🚫",  ("Bannis"           if L == "fr" else "Banned"),           DANGER),
+        ]
+        for idx, (k, ico, lbl, col) in enumerate(stat_defs):
+            r, c = divmod(idx, 3)
+            cell = tk.Frame(grid_frame, bg=SURFACE2,
+                            highlightthickness=1, highlightbackground=BORDER)
+            cell.grid(row=r, column=c, padx=4, pady=4, sticky="nsew")
+            grid_frame.columnconfigure(c, weight=1)
+            top_r = tk.Frame(cell, bg=SURFACE2)
+            top_r.pack(fill="x", padx=10, pady=(8, 0))
+            val_lbl = tk.Label(top_r, text="—",
+                               font=("Segoe UI", 18, "bold"), bg=SURFACE2, fg=col)
+            val_lbl.pack(side="left")
+            # small icon circle
+            ico_cv = tk.Canvas(top_r, bg=SURFACE3, width=30, height=30,
+                               highlightthickness=0)
+            ico_cv.pack(side="right")
+            ico_cv.create_oval(1, 1, 29, 29, fill=SURFACE3, outline=col, width=1)
+            ico_cv.create_text(15, 15, text=ico, font=("Segoe UI", 11))
+            tk.Label(cell, text=lbl, font=("Segoe UI", 8), bg=SURFACE2,
+                     fg=TEXT2).pack(anchor="w", padx=10, pady=(2, 8))
+            self._dash_kpis[k] = val_lbl
+
+        # ══════════════════════════════════════════════════════════════════════
+        # SECTION 2 — Bar chart (Earnings trends style)
+        # ══════════════════════════════════════════════════════════════════════
+        trend_hdr = tk.Frame(inner, bg=BG)
+        trend_hdr.pack(fill="x", padx=20, pady=(0, 6))
+        tk.Label(trend_hdr,
+                 text=("Tendances des vues" if L == "fr" else "Views trends"),
+                 font=("Segoe UI", 11, "bold"), bg=BG, fg=TEXT).pack(side="left")
+
+        # Range buttons
+        self._dash_range = tk.StringVar(value="30d")
         self._dash_range_btns = {}
-        for code, lbl in [("24h", _("dash.range.24h")),
-                          ("7d",  _("dash.range.7d")),
-                          ("30d", _("dash.range.30d")),
-                          ("all", _("dash.range.all"))]:
-            b = tk.Button(ctrl, text=lbl, font=("Segoe UI", 9),
+        rng_frame = tk.Frame(trend_hdr, bg=BG)
+        rng_frame.pack(side="right")
+        for code, lbl in [("7d", "7j"), ("30d", "30j"), ("all", "Tout")]:
+            b = tk.Button(rng_frame, text=lbl, font=("Segoe UI", 9),
                           bg=SURFACE2, fg=TEXT2, relief="flat", cursor="hand2",
-                          padx=14, pady=6, bd=0,
+                          padx=10, pady=4, bd=0,
                           command=lambda c=code: self._dash_set_range(c))
-            b.pack(side="left", padx=(0, 6))
+            b.pack(side="left", padx=(0, 4))
             self._dash_range_btns[code] = b
 
-        # KPI row
-        kpi_row = tk.Frame(f, bg=BG)
-        kpi_row.pack(fill="x", padx=20, pady=(0, 10))
-        self._dash_kpis = {}
-        for k, lbl, col in [
-            ("today", _("dash.kpi.today"), ACCENT),
-            ("delta", _("dash.kpi.delta"), OK),
-            ("peak",  _("dash.kpi.peak"),  WARN),
-            ("avg",   _("dash.kpi.avg"),   TEXT2),
-        ]:
-            kc_outer, ki = self._round_card(kpi_row, radius=12, bg=CARD,
-                                             border=BORDER, border_w=1)
-            kc_outer.pack(side="left", fill="both", expand=True, padx=(0, 8))
-            kc_outer.configure(height=82)
-            kc_outer.pack_propagate(False)
-            tk.Frame(ki, height=2, bg=col).pack(fill="x")
-            kp = tk.Frame(ki, bg=CARD, padx=14, pady=10)
-            kp.pack(fill="both", expand=True)
-            tk.Label(kp, text=lbl, font=("Segoe UI", 7, "bold"),
-                     bg=CARD, fg=TEXT2).pack(anchor="w")
-            v = tk.Label(kp, text="—", font=("Segoe UI", 22, "bold"),
-                         bg=CARD, fg=col)
-            v.pack(anchor="w", pady=(2, 0))
-            self._dash_kpis[k] = v
+        # Chart container
+        chart_frame = tk.Frame(inner, bg=CARD,
+                               highlightthickness=1, highlightbackground=BORDER)
+        chart_frame.pack(fill="x", **pad)
 
-        # Chart card
-        chart_outer, chart_inner = self._round_card(f, radius=14, bg=CARD,
-                                                     border=BORDER, border_w=1)
-        chart_outer.pack(fill="both", expand=True, padx=20, pady=(0, 18))
-        tk.Frame(chart_inner, height=2, bg=ACCENT).pack(fill="x")
-
-        chart_top = tk.Frame(chart_inner, bg=CARD, padx=18, pady=(12, 6))
-        chart_top.pack(fill="x")
-        tk.Label(chart_top, text=("📊  COURBE DES VUES"
-                                  if L == "fr" else "📊  VIEWS CURVE"),
-                 font=("Consolas", 9, "bold"), bg=CARD, fg=TEXT2).pack(side="left")
-        self._dash_status = tk.Label(chart_top, text="", font=("Segoe UI", 8),
-                                       bg=CARD, fg=MUTED)
-        self._dash_status.pack(side="right")
-
-        self._dash_chart = tk.Canvas(chart_inner, bg="#0a0d14",
-                                      highlightthickness=0, height=280)
-        self._dash_chart.pack(fill="both", expand=True, padx=18, pady=(0, 18))
+        self._dash_chart = tk.Canvas(chart_frame, bg=CARD,
+                                      highlightthickness=0, height=300)
+        self._dash_chart.pack(fill="both", expand=True, padx=0, pady=0)
         self._dash_chart.bind("<Configure>", lambda e: self._dash_redraw_chart())
+        self._dash_chart.bind("<Motion>",    self._dash_on_hover)
+        self._dash_chart.bind("<Leave>",     lambda e: self._dash_hide_tooltip())
+        self._dash_bar_rects = []   # list of (x1, x2, bar_top, value, key_str)
+        self._dash_tooltip_ids = []
 
-        self._dash_set_range("7d")
-        # Delayed draw so canvas has real dimensions after layout
+        self._dash_set_range("30d")
         self.root.after(300, self._dash_redraw_chart)
+
+    def _dash_on_hover(self, event):
+        cv = self._dash_chart
+        x, y = event.x, event.y
+        hit = None
+        for (x1, x2, bar_top, value, key_str, prev_v) in self._dash_bar_rects:
+            if x1 <= x <= x2:
+                hit = (x1, x2, bar_top, value, key_str, prev_v)
+                break
+        self._dash_hide_tooltip()
+        if not hit:
+            return
+        x1, x2, bar_top, value, key_str, prev_v = hit
+        try:
+            d = datetime.strptime(key_str, "%Y-%m-%d")
+            date_lbl = d.strftime("%d %b %Y")
+        except Exception:
+            date_lbl = key_str
+        growth = ((value - prev_v) / max(1, prev_v) * 100) if prev_v else 0
+        sign   = "+" if growth >= 0 else ""
+        lines  = [date_lbl, f"Vues : {fmt(value)}", f"Variation : {sign}{growth:.2f}%"]
+        L_tip  = 160
+        H_tip  = 58
+        tx = (x1 + x2) // 2
+        ty = max(10, bar_top - H_tip - 8)
+        if tx + L_tip // 2 > cv.winfo_width():
+            tx = cv.winfo_width() - L_tip // 2 - 6
+        if tx - L_tip // 2 < 0:
+            tx = L_tip // 2 + 6
+        ids = []
+        ids.append(cv.create_rectangle(tx - L_tip//2, ty,
+                                        tx + L_tip//2, ty + H_tip,
+                                        fill="#1a1f2e", outline=ACCENT, width=1))
+        ids.append(cv.create_line((x1+x2)//2, bar_top, (x1+x2)//2, ty+H_tip,
+                                   fill=ACCENT, dash=(2,3)))
+        for li, line in enumerate(lines):
+            col = TEXT if li == 0 else (ACCENT if li == 1 else
+                                         (OK if growth >= 0 else DANGER))
+            fnt = ("Segoe UI", 8, "bold") if li == 0 else ("Segoe UI", 8)
+            ids.append(cv.create_text(tx, ty + 10 + li * 16,
+                                       text=line, fill=col, font=fnt))
+        self._dash_tooltip_ids = ids
+
+    def _dash_hide_tooltip(self):
+        cv = getattr(self, "_dash_chart", None)
+        if not cv:
+            return
+        for iid in getattr(self, "_dash_tooltip_ids", []):
+            try:
+                cv.delete(iid)
+            except Exception:
+                pass
+        self._dash_tooltip_ids = []
 
     def _dash_set_range(self, code):
         self._dash_range.set(code)
         for c, b in self._dash_range_btns.items():
             if c == code:
-                b.config(bg=ACCENT, fg="#06080f", font=("Segoe UI", 9, "bold"))
+                b.config(bg="#3d5a99", fg="#ffffff", font=("Segoe UI", 9, "bold"))
             else:
                 b.config(bg=SURFACE2, fg=TEXT2, font=("Segoe UI", 9))
         self._dash_redraw_chart()
@@ -2469,9 +2577,7 @@ class App:
 
         rng = self._dash_range.get()
         all_keys = sorted(hist.keys())
-        if rng == "24h":
-            keys = all_keys[-2:]
-        elif rng == "7d":
+        if rng == "7d":
             keys = all_keys[-7:]
         elif rng == "30d":
             keys = all_keys[-30:]
@@ -2482,155 +2588,106 @@ class App:
 
         values = [int(hist.get(k, 0)) for k in keys]
 
-        # KPIs
+        # ── KPI updates ───────────────────────────────────────────────────────
         today_v = values[-1] if values else 0
         prev_v  = values[-2] if len(values) > 1 else today_v
         delta   = today_v - prev_v
         peak    = max(values) if values else 0
         avg     = sum(values) // max(1, len(values))
+        total   = sum(values)
+
         self._dash_kpis["today"].config(text=fmt(today_v))
-        sign = "+" if delta >= 0 else ""
+        pct = (delta / max(1, prev_v) * 100)
+        sign = "+" if pct >= 0 else ""
         self._dash_kpis["delta"].config(
-            text=f"{sign}{fmt(delta)}",
-            fg=OK if delta >= 0 else DANGER)
+            text=f"{sign}{pct:.1f}%",
+            fg=OK if pct >= 0 else DANGER)
         self._dash_kpis["peak"].config(text=fmt(peak))
         self._dash_kpis["avg"].config(text=fmt(avg))
+        self._dash_total_lbl.config(text=fmt(total))
 
-        # Status
-        if self._dash_status:
-            self._dash_status.config(
-                text=f"{len(keys)} jour(s) · maj " + datetime.now().strftime("%H:%M:%S")
-                if L == "fr" else
-                f"{len(keys)} day(s) · updated " + datetime.now().strftime("%H:%M:%S"))
+        # phones / banned from live data
+        try:
+            active = sum(1 for d in self.data.values()
+                        if d.get("ig_status") == "active")
+            banned = sum(1 for d in self.data.values()
+                        if d.get("ig_status") == "banned")
+            self._dash_kpis["phones"].config(text=str(active))
+            self._dash_kpis["banned"].config(text=str(banned))
+        except Exception:
+            pass
 
-        # Draw chart
+        # ── Bar chart ─────────────────────────────────────────────────────────
+        self._dash_bar_rects = []
         cv.delete("all")
-        w = cv.winfo_width() or 600
-        h = cv.winfo_height() or 260
-        margin_l, margin_r = 62, 28
-        margin_t, margin_b = 22, 40
-
-        plot_w = w - margin_l - margin_r
-        plot_h = h - margin_t - margin_b
+        w = cv.winfo_width() or 800
+        h = cv.winfo_height() or 300
+        ml, mr, mt, mb = 56, 20, 20, 44
+        plot_w = w - ml - mr
+        plot_h = h - mt - mb
         if plot_w < 10 or plot_h < 10:
             return
 
-        max_v = max(values) if values else 1
-        min_v = min(values) if values else 0
-        # Give 10% headroom above max
-        pad = max(1, int((max_v - min_v) * 0.10))
-        chart_max = max_v + pad
-        chart_min = max(0, min_v - pad // 2)
-        rng_v = max(1, chart_max - chart_min)
+        max_v    = max(values) if values else 1
+        chart_max = max_v * 1.12            # 12% headroom
+        chart_min = 0
+        rng_v    = max(1, chart_max - chart_min)
 
-        # Background chart area
-        cv.create_rectangle(margin_l, margin_t, w - margin_r, margin_t + plot_h,
-                            fill="#0d1117", outline=BORDER, width=1)
-
-        # Y-axis grid + labels (5 lines)
-        for i in range(6):
-            y = margin_t + i * plot_h / 5
-            cv.create_line(margin_l, y, w - margin_r, y,
-                            fill="#1c2130", dash=(3, 5))
-            v_at = chart_max - (i * rng_v / 5)
-            cv.create_text(margin_l - 8, y, anchor="e",
-                            text=fmt(int(v_at)),
-                            fill=TEXT2, font=("Consolas", 8))
-
-        # X labels + tick marks
         n = len(keys)
-        if n == 1:
-            xs = [margin_l + plot_w / 2]
-        else:
-            xs = [margin_l + i * plot_w / (n - 1) for i in range(n)]
-        step = max(1, n // 7)
-        for i, k in enumerate(keys):
-            if i % step != 0 and i != n - 1:
-                continue
-            try:
-                d = datetime.strptime(k, "%Y-%m-%d")
-                lbl = d.strftime("%d/%m")
-            except Exception:
-                lbl = k
-            cv.create_line(xs[i], margin_t + plot_h, xs[i], margin_t + plot_h + 4,
-                           fill=BORDER)
-            cv.create_text(xs[i], margin_t + plot_h + 14, anchor="n",
-                            text=lbl, fill=TEXT2, font=("Consolas", 8))
+        # Horizontal grid lines with labels (OnlyFans style: dashed)
+        grid_steps = 5
+        for i in range(grid_steps + 1):
+            gy = mt + i * plot_h / grid_steps
+            gv = chart_max - (i * chart_max / grid_steps)
+            cv.create_line(ml, gy, w - mr, gy, fill="#2a2f44", dash=(4, 6))
+            cv.create_text(ml - 6, gy, anchor="e", text=fmt(int(gv)),
+                           fill="#666d85", font=("Segoe UI", 8))
 
-        # Build line points
-        pts = []
-        for i, v in enumerate(values):
-            x = xs[i]
-            y = margin_t + plot_h - (v - chart_min) / rng_v * plot_h
-            pts.append((x, y))
+        # Bottom axis line
+        cv.create_line(ml, mt + plot_h, w - mr, mt + plot_h,
+                       fill="#3a3f55", width=1)
 
-        # Filled area below line (simulate gradient with 3 stacked polygons)
-        if len(pts) >= 2:
-            base_y = margin_t + plot_h
-            # Darkest layer (full fill)
-            poly = [pts[0][0], base_y]
-            for px, py in pts:
-                poly += [px, py]
-            poly += [pts[-1][0], base_y]
-            cv.create_polygon(*poly, fill="#0d2b0d", outline="")
-            # Mid layer (upper 60%)
-            mid_pts = [(px, py + (base_y - py) * 0.4) for px, py in pts]
-            poly2 = [mid_pts[0][0], base_y]
-            for px, py in mid_pts:
-                poly2 += [px, py]
-            poly2 += [mid_pts[-1][0], base_y]
-            cv.create_polygon(*poly2, fill="#0f3a0f", outline="")
-            # Top highlight strip
-            top_pts = [(px, py + (base_y - py) * 0.1) for px, py in pts]
-            poly3 = [top_pts[0][0], base_y]
-            for px, py in top_pts:
-                poly3 += [px, py]
-            poly3 += [top_pts[-1][0], base_y]
-            cv.create_polygon(*poly3, fill="#154d15", outline="")
-
-        # Glow shadow under line
-        if len(pts) >= 2:
-            flat_glow = []
-            for px, py in pts:
-                flat_glow += [px, py + 2]
-            cv.create_line(*flat_glow, fill="#3fa83f", width=4, smooth=True)
-
-        # Main line
-        if len(pts) >= 2:
-            flat = []
-            for px, py in pts:
-                flat += [px, py]
-            cv.create_line(*flat, fill=ACCENT, width=2, smooth=True)
-
-        # Today vertical marker (last point)
-        if pts:
-            last_x = pts[-1][0]
-            cv.create_line(last_x, margin_t, last_x, margin_t + plot_h,
-                           fill="#ffffff22" if False else ACCENT,
-                           dash=(2, 4), width=1)
-
-        # Dots
+        # Bar width + gap
+        total_slots = n
+        bar_gap  = max(2, int(plot_w / total_slots * 0.18))
+        bar_w    = max(4, int(plot_w / total_slots) - bar_gap)
         today_key = datetime.now().strftime("%Y-%m-%d")
-        for i, (px, py) in enumerate(pts):
-            is_last = (i == len(pts) - 1)
-            is_today = (keys[i] == today_key)
-            r = 5 if is_last else 3
-            dot_col = "#ffffff" if is_today else ACCENT
-            # Draw outer ring for last point
-            if is_last:
-                cv.create_oval(px - r - 3, py - r - 3, px + r + 3, py + r + 3,
-                               fill="", outline=ACCENT, width=1)
-            cv.create_oval(px - r, py - r, px + r, py + r,
-                            fill=dot_col, outline=ACCENT, width=2)
-            # Value tooltip on last point
-            if is_last:
-                lbl_txt = fmt(values[i])
-                # Badge background
-                bx, by = px + 10, py - 16
-                cv.create_rectangle(bx - 2, by - 10, bx + len(lbl_txt) * 7 + 4, by + 4,
-                                    fill=ACCENT, outline="")
-                cv.create_text(bx, by - 3, anchor="w", text=lbl_txt,
-                               fill="#06080f", font=("Segoe UI", 8, "bold"))
+
+        # Date label step: show every N days to avoid crowding
+        step = max(1, n // 14)
+
+        for i, (k, v) in enumerate(zip(keys, values)):
+            slot_x = ml + i * plot_w / total_slots
+            bx1 = int(slot_x + bar_gap / 2)
+            bx2 = int(bx1 + bar_w)
+            bar_h_px = int((v - chart_min) / rng_v * plot_h)
+            by1 = mt + plot_h - bar_h_px
+            by2 = mt + plot_h
+
+            is_today = (k == today_key)
+            bar_col  = "#5b7fd4" if not is_today else ACCENT
+
+            # Bar body
+            cv.create_rectangle(bx1, by1, bx2, by2,
+                                 fill=bar_col, outline="", width=0)
+            # Slight highlight on top edge
+            cv.create_rectangle(bx1, by1, bx2, by1 + 2,
+                                 fill="#8aabef" if not is_today else "#d4f96a",
+                                 outline="", width=0)
+
+            prev_val = values[i - 1] if i > 0 else v
+            self._dash_bar_rects.append((bx1, bx2, by1, v, k, prev_val))
+
+            # X date labels
+            if i % step == 0 or i == n - 1:
+                try:
+                    d = datetime.strptime(k, "%Y-%m-%d")
+                    x_lbl = d.strftime("%-d %b") if hasattr(d, "day") else d.strftime("%d/%m")
+                except Exception:
+                    x_lbl = k
+                cv.create_text((bx1 + bx2) // 2, mt + plot_h + 14,
+                               anchor="n", text=x_lbl,
+                               fill="#666d85", font=("Segoe UI", 8))
 
     def _build_phones_tab(self):
         L = self.cfg.get("lang", "fr")
