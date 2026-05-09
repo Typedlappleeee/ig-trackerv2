@@ -23,6 +23,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
   fetchImage: (opts: { url: string; headers?: Record<string, string> }) =>
     ipcRenderer.invoke('fetch-image', opts),
 
+  // Run FFmpeg to export montage
+  runFfmpeg: (opts: {
+    clips:      Array<{ filePath: string; trimStart: number; trimEnd: number }>
+    outputPath: string
+    preset:     '9:16' | '1:1' | '16:9'
+    transition: 'cut' | 'fade'
+  }) => ipcRenderer.invoke('run-ffmpeg', opts),
+
+  // Open native save-file dialog
+  pickOutputFile: (opts: { defaultName: string }) =>
+    ipcRenderer.invoke('pick-output-file', opts),
+
   // Groq AI API call (returns chat completion)
   groqRequest: (opts: {
     apiKey: string

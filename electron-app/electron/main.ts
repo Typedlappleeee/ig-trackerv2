@@ -1,6 +1,7 @@
 import { app, BrowserWindow, shell, ipcMain, net, dialog } from 'electron'
 import { fileURLToPath } from 'node:url'
 import { existsSync, readFileSync } from 'node:fs'
+import { execFile } from 'node:child_process'
 import path from 'node:path'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -84,6 +85,71 @@ ipcMain.handle('upload-video-geelark', async (_event, opts: {
   } catch (err: unknown) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) }
   }
+})
+
+// ── IPC: run FFmpeg montage ──────────────────────────────────────────────────
+// Builds a concat + scale filter and runs ffmpeg.
+// Returns { ok, outputPath } or { ok: false, error, command }
+ipcMain.handle('run-ffmpeg', async (_event, opts: {
+  clips:      Array<{ filePath: string; trimStart: number; trimEnd: number }>
+  outputPath: string
+  preset:     '9:16' | '1:1' | '16:9'
+  transition: 'cut' | 'fade'
+}) => {
+  // Detect ffmpeg binary
+  const ffmpegBin = process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg'
+
+  const scale = opts.preset === '9:16'  ? 'scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:-1:-1:color=black'
+              : opts.preset === '1:1'   ? 'scale=1080:1080:force_original_aspect_ratio=decrease,pad=1080:1080:-1:-1:color=black'
+              :                           'scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:-1:-1:color=black'
+
+  // Build input args + filtergraph
+  const inputs: string[] = []
+  const filterParts: string[] = []
+  const n = opts.clips.length
+
+  opts.clips.forEach((c, i) => {
+    const end = c.trimEnd > 0 ? c.trimEnd : 999999
+    inputs.push('-ss', String(c.trimStart), '-to', String(end), '-i', c.filePath)
+    filterParts.push(`[${i}:v]${scale},setsar=1[v${i}];[${i}:a]aformat=sample_rates=44100:channel_layouts=stereo[a${i}]`)
+  })
+
+  const concatIn = opts.clips.map((_, i) => `[v${i}][a${i}]`).join('')
+  filterParts.push(`${concatIn}concat=n=${n}:v=1:a=1[vout][aout]`)
+
+  const args = [
+    ...inputs,
+    '-filter_complex', filterParts.join(';'),
+    '-map', '[vout]', '-map', '[aout]',
+    '-c:v', 'libx264', '-preset', 'fast', '-crf', '23',
+    '-c:a', 'aac', '-b:a', '128k',
+    '-movflags', '+faststart',
+    '-y', opts.outputPath,
+  ]
+
+  const command = `ffmpeg ${args.map(a => a.includes(' ') ? `"${a}"` : a).join(' ')}`
+
+  return new Promise(resolve => {
+    execFile(ffmpegBin, args, { maxBuffer: 100 * 1024 * 1024 }, (err) => {
+      if (err) {
+        // If ffmpeg not found, return the command so user can run it manually
+        resolve({ ok: false, error: err.message, command })
+      } else {
+        resolve({ ok: true, outputPath: opts.outputPath, command })
+      }
+    })
+  })
+})
+
+// ── IPC: pick output file path ───────────────────────────────────────────────
+ipcMain.handle('pick-output-file', async (_event, opts: { defaultName: string }) => {
+  if (!win) return null
+  const result = await dialog.showSaveDialog(win, {
+    title: 'Enregistrer le montage',
+    defaultPath: opts.defaultName,
+    filters: [{ name: 'Vidéo MP4', extensions: ['mp4'] }],
+  })
+  return result.canceled ? null : result.filePath
 })
 
 // ── IPC: fetch image as base64 data URL (bypass CORS for CDN images) ─────────
