@@ -2,6 +2,7 @@ import { app, BrowserWindow, shell, ipcMain, net, dialog, session } from 'electr
 import { fileURLToPath } from 'node:url'
 import { existsSync, readFileSync } from 'node:fs'
 import { execFile } from 'node:child_process'
+import https from 'node:https'
 import path from 'node:path'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -60,6 +61,16 @@ ipcMain.handle('fetch-instagram-html', async (_event, username: string) => {
       if (apiRes.ok) {
         const json = await apiRes.json() as Record<string, unknown>
         return { ok: true, apiJson: json }
+      }
+      if (apiRes.status === 401) {
+        // Rate-limited — clear cookies & destroy browser so next call gets a fresh session
+        console.log('[IG] 401 rate-limit — resetting session cookies')
+        const all = await session.defaultSession.cookies.get({ domain: '.instagram.com' })
+        await Promise.all(all.map(c =>
+          session.defaultSession.cookies.remove('https://www.instagram.com', c.name)
+        ))
+        if (_igBrowser && !_igBrowser.isDestroyed()) { _igBrowser.destroy(); _igBrowser = null }
+        return { ok: false, error: 'rate-limited' }
       }
     }
   } catch (e) {
@@ -339,33 +350,47 @@ ipcMain.handle('pick-output-file', async (_event, opts: { defaultName: string })
 })
 
 // ── IPC: fetch image as base64 data URL ──────────────────────────────────────
-// CDN thumbnails are signed URLs — no auth needed, but Electron rejects cross-origin
-// Referer headers (www.instagram.com → scontent-*.cdninstagram.com). Strip them and
-// verify we got an image (not an HTML redirect page encoded as base64).
-ipcMain.handle('fetch-image', async (_event, opts: { url: string; headers?: Record<string, string> }) => {
-  try {
-    // Strip cross-origin Referer/Origin — same fix as geelark-request
-    const { Referer: _r, referer: _r2, Origin: _o, origin: _o2, ...safeHeaders } = opts.headers ?? {}
-    const response = await net.fetch(opts.url, {
-      method: 'GET',
+// Uses Node.js https.get directly — bypasses Electron's network service entirely,
+// avoiding the cross-origin Referer restriction that blocked CDN thumbnail loading.
+function collectImage(
+  res: import('node:http').IncomingMessage,
+  resolve: (v: { ok: boolean; dataUrl?: string; error?: string }) => void
+) {
+  if (res.statusCode !== 200) { resolve({ ok: false, error: `HTTP ${res.statusCode}` }); res.destroy(); return }
+  const ct = String(res.headers['content-type'] ?? 'image/jpeg')
+  if (!ct.startsWith('image/') && !ct.includes('octet-stream')) {
+    resolve({ ok: false, error: `Not an image: ${ct}` }); res.destroy(); return
+  }
+  const chunks: Buffer[] = []
+  res.on('data', (c: Buffer) => chunks.push(c))
+  res.on('end', () => {
+    const b64 = Buffer.concat(chunks).toString('base64')
+    resolve({ ok: true, dataUrl: `data:${ct};base64,${b64}` })
+  })
+  res.on('error', (e: Error) => resolve({ ok: false, error: e.message }))
+}
+
+ipcMain.handle('fetch-image', async (_event, opts: { url: string }) => {
+  return new Promise<{ ok: boolean; dataUrl?: string; error?: string }>(resolve => {
+    const req = https.get(opts.url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-        ...safeHeaders,
+        'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
       },
-      referrerPolicy: 'no-referrer',
-    } as RequestInit)
-    if (!response.ok) return { ok: false, error: `HTTP ${response.status}` }
-    const contentType = response.headers.get('content-type') ?? 'image/jpeg'
-    // Guard: if Instagram returned an HTML login page instead of an image, bail out
-    if (!contentType.startsWith('image/') && !contentType.includes('octet-stream')) {
-      return { ok: false, error: `Not an image: ${contentType}` }
-    }
-    const buffer = await response.arrayBuffer()
-    const b64 = Buffer.from(buffer).toString('base64')
-    return { ok: true, dataUrl: `data:${contentType};base64,${b64}` }
-  } catch (err: unknown) {
-    return { ok: false, error: err instanceof Error ? err.message : String(err) }
-  }
+    }, (res) => {
+      // Follow one level of redirect
+      if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        res.destroy()
+        https.get(res.headers.location, { headers: { 'User-Agent': 'Mozilla/5.0' } }, (res2) => {
+          collectImage(res2, resolve)
+        }).on('error', (e) => resolve({ ok: false, error: e.message }))
+        return
+      }
+      collectImage(res, resolve)
+    })
+    req.on('error', (e) => resolve({ ok: false, error: e.message }))
+    req.setTimeout(10000, () => { req.destroy(); resolve({ ok: false, error: 'timeout' }) })
+  })
 })
 
 // ── IPC: Groq API call (proxy to avoid CORS) ────────────────────────────────

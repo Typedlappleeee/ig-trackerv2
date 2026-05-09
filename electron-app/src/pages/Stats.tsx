@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase, type Phone } from '@/lib/supabase'
-import { fetchIgStats } from '@/lib/instagram'
+import { fetchIgStats, invalidateIgCache } from '@/lib/instagram'
 import { Spinner } from '@/components/ui/Spinner'
 import { Button }  from '@/components/ui/Button'
 
@@ -124,9 +124,11 @@ export function Stats({ user }: StatsProps) {
     else { setLS(true); setLL(true) }
 
     try {
-      // Load stats first (hidden browser sets Instagram session cookies),
-      // then videos (net.fetch benefits from those cookies for the API call)
-      const s = await fetchIgStats(phone.ig_username)
+      // Force-bypass cache only when user explicitly clicks Refresh/Réessayer
+      const force = retry
+      if (force) invalidateIgCache(phone.ig_username)
+
+      const s = await fetchIgStats(phone.ig_username, { force })
       setStats(s); setLS(false)
 
       const v = await fetchIgVideos(phone.ig_username)

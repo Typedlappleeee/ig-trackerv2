@@ -149,15 +149,34 @@ async function fetchViaNetHtml(clean: string): Promise<IgStats | null> {
   return parseHtml(res.data, clean)
 }
 
+// ── In-memory cache (8 min TTL) ──────────────────────────────────────────────
+// Instagram rate-limits after ~4 unauthenticated requests per session.
+// Caching avoids redundant fetches when the user clicks Refresh repeatedly.
+const _statsCache = new Map<string, { stats: IgStats; ts: number }>()
+const CACHE_TTL = 8 * 60 * 1000
+
 // ── Public entry point ───────────────────────────────────────────────────────
-export async function fetchIgStats(username: string): Promise<IgStats | null> {
+export async function fetchIgStats(username: string, { force = false } = {}): Promise<IgStats | null> {
   if (!window.electronAPI) return null
   const clean = username.replace(/^@/, '').trim()
   if (!clean) return null
-  return (
+
+  if (!force) {
+    const cached = _statsCache.get(clean.toLowerCase())
+    if (cached && Date.now() - cached.ts < CACHE_TTL) return cached.stats
+  }
+
+  const result =
     await fetchViaBrowser(clean)             ??
     await fetchViaApi(clean)                 ??
     await fetchViaApi(clean, 'https://i.instagram.com') ??
     await fetchViaNetHtml(clean)
-  )
+
+  if (result) _statsCache.set(clean.toLowerCase(), { stats: result, ts: Date.now() })
+  return result
+}
+
+// Force-invalidate the cache for a username (call when user explicitly presses Refresh)
+export function invalidateIgCache(username: string) {
+  _statsCache.delete(username.replace(/^@/, '').trim().toLowerCase())
 }
