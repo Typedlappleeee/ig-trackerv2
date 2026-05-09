@@ -1281,11 +1281,13 @@ class App:
         _set_window_icon(self.root)
 
         self._setup_styles()
+        self.root.withdraw()         # hidden until splash finishes
         self._build_layout()
         # Restore pixel decoration if 67 theme was saved
         if self.cfg.get("theme") == "67":
-            self.root.after(300, self._draw_pixel_bg)
+            self.root.after(800, self._draw_pixel_bg)
         self._show_tab("phones")
+        self.root.after(80, self._show_startup_splash)
         # First launch wizard (chained: beta → wizard if first run)
         if not self.cfg.get("first_run_done"):
             self.root.after(600, self._show_first_launch_wizard)
@@ -10715,14 +10717,16 @@ class App:
                 # Only apply (and show messagebox) on the first click
                 self._apply_theme(tname)
 
-        for idx, (tname, tvals) in enumerate(THEMES.items()):
+        placed = 0  # counts themes actually placed (skip "67" in grid, add separately)
+        row_frame = None
+        for tname, tvals in THEMES.items():
             if tname == "67":
-                continue  # hidden from normal list until unlocked
-            row_f = idx // cols
-            col_f = idx % cols
+                continue  # shown separately below
+            col_f = placed % cols
             if col_f == 0:
                 row_frame = tk.Frame(swatches_outer, bg=CARD)
                 row_frame.pack(fill="x", pady=4)
+            placed += 1
             cell = tk.Frame(row_frame, bg=CARD)
             cell.pack(side="left", padx=6, expand=True)
             accent_c = tvals["accent"]
@@ -10739,19 +10743,21 @@ class App:
             tk.Label(cell, text=tname, font=("Segoe UI", 9),
                      bg=CARD, fg=TEXT2).pack(pady=(4, 0))
 
-        # Show "67" swatch if already unlocked
-        if current_theme == "67":
-            secret_row = tk.Frame(swatches_outer, bg=CARD)
-            secret_row.pack(fill="x", pady=4)
-            secret_cell = tk.Frame(secret_row, bg=CARD)
-            secret_cell.pack(side="left", padx=6)
-            secret_frame = tk.Frame(secret_cell, bg=TEXT, padx=2, pady=2)
-            secret_frame.pack()
-            tk.Button(secret_frame, bg="#22aadd", width=4, height=2,
-                      relief="flat", cursor="hand2",
-                      command=lambda: None).pack()
-            tk.Label(secret_cell, text="67", font=("Segoe UI", 9, "bold"),
-                     bg=CARD, fg="#55aaff").pack(pady=(4, 0))
+        # "67" secret swatch — always visible once unlocked (theme=="67")
+        if current_theme == "67" and "67" in THEMES:
+            try:
+                sr = tk.Frame(swatches_outer, bg=CARD)
+                sr.pack(fill="x", pady=4)
+                sc = tk.Frame(sr, bg=CARD)
+                sc.pack(side="left", padx=6)
+                sf = tk.Frame(sc, bg=TEXT, padx=2, pady=2)
+                sf.pack()
+                tk.Button(sf, bg="#22aadd", width=4, height=2,
+                          relief="flat").pack()
+                tk.Label(sc, text="67", font=("Segoe UI", 9, "bold"),
+                         bg=CARD, fg="#22aadd").pack(pady=(4, 0))
+            except Exception:
+                pass
 
         tk.Label(app_pan, text="Thème actif :", font=("Segoe UI", 10),
                  bg=CARD, fg=TEXT2).pack(anchor="w", pady=(20, 4))
@@ -11086,6 +11092,76 @@ class App:
         import threading
         threading.Thread(target=run, daemon=True).start()
 
+    def _show_startup_splash(self):
+        sw = self.root.winfo_screenwidth()
+        sh = self.root.winfo_screenheight()
+        sp_w, sp_h = 480, 300
+        sp_x = (sw - sp_w) // 2
+        sp_y = (sh - sp_h) // 2
+
+        sp = tk.Toplevel()
+        sp.overrideredirect(True)
+        sp.geometry(f"{sp_w}x{sp_h}+{sp_x}+{sp_y}")
+        sp.attributes("-topmost", True)
+        sp.configure(bg="#07091e")
+
+        cv = tk.Canvas(sp, bg="#07091e", highlightthickness=2,
+                       highlightbackground="#4f8ef7")
+        cv.pack(fill="both", expand=True)
+
+        # App name
+        cv.create_text(sp_w // 2, 90, text="IG", font=("Courier", 52, "bold"),
+                       fill="#4f8ef7", anchor="center")
+        cv.create_text(sp_w // 2, 148, text="TRACKER", font=("Courier", 20, "bold"),
+                       fill="#4f8ef7", anchor="center")
+        cv.create_text(sp_w // 2, 178, text="v2", font=("Segoe UI", 10),
+                       fill="#253050", anchor="center")
+
+        # Separator
+        cv.create_line(sp_w // 2 - 90, 200, sp_w // 2 + 90, 200,
+                       fill="#1a2a4a", width=1)
+
+        # Progress bar track
+        bar_x, bar_y, bar_w, bar_h = 80, 228, 320, 5
+        cv.create_rectangle(bar_x, bar_y, bar_x + bar_w, bar_y + bar_h,
+                             fill="#0d1a30", outline="")
+        bar_fill_id = cv.create_rectangle(bar_x, bar_y, bar_x, bar_y + bar_h,
+                                          fill="#4f8ef7", outline="")
+        dot_id = cv.create_text(sp_w // 2, bar_y + 22, text="Chargement",
+                                font=("Segoe UI", 9), fill="#2a3a60", anchor="center")
+
+        total = 35  # steps × 50ms = 1750ms
+        state = [0]
+
+        def _tick():
+            if not sp.winfo_exists():
+                return
+            s = state[0]
+            # Update bar
+            bw = int(bar_w * s / total)
+            cv.coords(bar_fill_id, bar_x, bar_y, bar_x + bw, bar_y + bar_h)
+            dots = "." * (s % 4)
+            cv.itemconfig(dot_id, text=f"Chargement{dots}")
+            state[0] += 1
+            if s < total:
+                sp.after(50, _tick)
+            else:
+                sp.destroy()
+                self.root.deiconify()
+                self.root.attributes("-alpha", 0.0)
+                self._fade_in_root()
+
+        sp.after(80, _tick)
+
+    def _fade_in_root(self, step=0):
+        total = 18
+        try:
+            self.root.attributes("-alpha", min((step + 1) / total, 1.0))
+        except Exception:
+            return
+        if step < total - 1:
+            self.root.after(18, lambda: self._fade_in_root(step + 1))
+
     def _unlock_pixel_theme(self):
         apply_theme_globals("67")
         self.cfg["theme"] = "67"
@@ -11101,45 +11177,41 @@ class App:
         rx = self.root.winfo_rootx()
         ry = self.root.winfo_rooty()
 
-        # Centered popup — NOT fullscreen so settings remain accessible after dismiss
-        pw, ph = min(rw - 80, 900), min(rh - 80, 680)
+        pw, ph = min(rw - 100, 860), min(rh - 100, 640)
         px = rx + (rw - pw) // 2
         py = ry + (rh - ph) // 2
 
         cel = tk.Toplevel(self.root)
-        cel.overrideredirect(True)
-        cel.attributes("-topmost", True)
+        cel.title("67")
         cel.geometry(f"{pw}x{ph}+{px}+{py}")
+        cel.resizable(False, False)
+        cel.configure(bg="#07091e")
+        cel.attributes("-topmost", True)
 
-        cv = tk.Canvas(cel, bg="#07091e", highlightthickness=3,
-                       highlightbackground="#55aaff")
+        # ── BUTTON FIRST so pack gives it space ───────────────────────────────
+        bottom_bar = tk.Frame(cel, bg="#0d1530", pady=10)
+        bottom_bar.pack(side="bottom", fill="x")
+        tk.Button(bottom_bar, text="  ✕  Fermer  ", font=("Segoe UI", 11, "bold"),
+                  bg="#22aadd", fg="#000820", relief="flat", cursor="hand2",
+                  activebackground="#1188bb", command=cel.destroy).pack()
+
+        # ── Canvas fills the rest ─────────────────────────────────────────────
+        cv = tk.Canvas(cel, bg="#07091e", highlightthickness=0)
         cv.pack(fill="both", expand=True)
 
-        self._draw_pixel_scene_on_canvas(cv, pw, ph)
+        self._draw_pixel_scene_on_canvas(cv, pw, ph - 50)  # -50 for button bar
 
-        # "67" title drawn large at top
-        cv.create_text(pw // 2, 36, text="67",
-                       font=("Courier", 36, "bold"), fill="#55aaff", anchor="center",
-                       tags="pscene_ui")
-        cv.create_text(pw // 2, 72, text="Theme secret debloque !",
-                       font=("Segoe UI", 13), fill="#aaccff", anchor="center",
-                       tags="pscene_ui")
+        # "67" at top
+        cv.create_text(pw // 2, 38, text="67",
+                       font=("Courier", 40, "bold"), fill="#22aadd", anchor="center")
+        cv.create_text(pw // 2, 76, text="Theme secret debloque  -  bien joue !",
+                       font=("Segoe UI", 11), fill="#6699bb", anchor="center")
 
-        # Big visible close button at bottom
-        btn_w, btn_h = 200, 40
-        btn_x = pw // 2
-        btn_y = ph - 28
-        btn = tk.Button(cel, text="  Fermer  ", font=("Segoe UI", 11, "bold"),
-                        bg="#55aaff", fg="#000820", relief="flat", cursor="hand2",
-                        activebackground="#3377cc", activeforeground="#ffffff",
-                        command=cel.destroy)
-        cv.create_window(btn_x, btn_y, window=btn, anchor="center")
-
-        # Also close on Escape
         cel.bind("<Escape>", lambda e: cel.destroy())
+        cel.focus_force()
 
     def _draw_pixel_scene_on_canvas(self, cv, w, h):
-        BS = max(14, min(22, w // 50))  # adaptive block size
+        BS = max(12, min(20, w // 55))  # adaptive block size
         cols = w // BS + 2
         rows = h // BS + 2
 
@@ -11186,118 +11258,86 @@ class App:
             ss = _rnd.choice([2, 2, 3])
             cv.create_rectangle(sx, sy, sx+ss, sy+ss, fill="#b0ccff", outline="", tags="pscene")
 
-        # ── Robot (pixel art matching reference image) ────────────────────────
-        # The character: wide blocky blue robot, big round eyes, arms extended,
-        # wide stance legs, gray/light feet and hands
+        # ── Robot pixel art (based on reference image) ───────────────────────
+        # Wide blue character: huge round eyes, trapezoidal body,
+        # extended arms, wide stance, gray feet/hands
         B = BS
-        robot_bot = floor_start * BS         # robot feet touch floor
-        robot_h   = 13 * B                   # total robot height
-        ry0 = robot_bot - robot_h            # top-left y
-        rx0 = w // 2 - 5 * B                # center: 10-wide robot → offset 5
+        robot_bot = floor_start * BS
+        # Robot: 12 cols wide, 15 rows tall
+        robot_h = 15 * B
+        ry0 = robot_bot - robot_h
+        rx0 = w // 2 - 6 * B   # centered (12 wide → offset 6)
 
-        # Colors matching the image
-        BLU  = "#22aadd"   # main bright cyan-blue
-        BLU2 = "#1a88bb"   # slightly darker blue
-        DBL  = "#0d3a7a"   # dark blue (accents, joints)
-        WHT  = "#ffffff"   # eye white
-        PPL  = "#081533"   # dark pupil
-        GRY  = "#8899bb"   # gray (feet, hands)
-        LGY  = "#aabbcc"   # light gray (palm/sole highlight)
-        DGY  = "#556677"   # dark gray joint
-        SKY  = "#07091e"   # transparent background = sky
+        BLU  = "#22aadd"   # bright cyan-blue (main body)
+        BLU2 = "#1a88bb"   # mid blue (arms, shading)
+        DBL  = "#0c2f6a"   # dark navy (chest detail, joints)
+        WHT  = "#ffffff"   # eye whites
+        PPL  = "#06122e"   # dark pupil
+        GRY  = "#7799aa"   # gray (hands, feet)
+        LGY  = "#b0c8d8"   # light gray highlight
 
-        def b(gx, gy, col, w_=1, h_=1):
+        # pixel map: each row is a list of (col, color) for filled blocks
+        # None = skip (background)
+        def b(gx, gy, col):
             x1 = rx0 + gx * B
             y1 = ry0 + gy * B
-            cv.create_rectangle(x1, y1, x1 + B*w_, y1 + B*h_,
-                                 fill=col, outline="#05070f", width=1, tags="pscene")
+            cv.create_rectangle(x1, y1, x1+B, y1+B,
+                                 fill=col, outline="#050d1a", width=1, tags="pscene")
 
-        # ── Head (10 wide, 4 tall: rows 0-3) ─────────────────────────────────
-        # Top of head row 0
-        for hx in range(1, 9):
-            b(hx, 0, BLU)
-        # Main head rows 1-2 (full width 10)
-        for hx in range(10):
-            b(hx, 1, BLU)
-            b(hx, 2, BLU)
-        # Chin row 3
-        for hx in range(1, 9):
-            b(hx, 3, BLU)
+        # ── Head: 12 wide ──────────────────────────────────────────────────────
+        # Row 0: top curve (cols 2-9)
+        for gx in range(2, 10): b(gx, 0, BLU)
+        # Row 1-2: full 12 wide
+        for gy in range(1, 3):
+            for gx in range(12): b(gx, gy, BLU)
+        # Row 3: face (12 wide)
+        for gx in range(12): b(gx, 3, BLU)
+        # Row 4: chin (cols 2-9)
+        for gx in range(2, 10): b(gx, 4, BLU)
 
-        # Eyes — large circular look: 3×3 white + 2×2 pupil, at cols 1-3 and 6-8
-        # Left eye (columns 1,2,3 rows 1,2,3)
-        for ex in range(1, 4):
-            for ey in range(1, 4):
-                b(ex, ey, WHT)
-        # Left pupil center
-        b(2, 2, PPL)
-        # Right eye
-        for ex in range(6, 9):
-            for ey in range(1, 4):
-                b(ex, ey, WHT)
-        # Right pupil
-        b(7, 2, PPL)
-        # Nose bridge (center separator)
-        b(4, 2, BLU2)
-        b(5, 2, BLU2)
+        # Eyes: 3×3 white at cols 1-3 and 8-10, rows 1-3
+        for ey in range(1, 4):
+            for ex in (1, 2, 3): b(ex, ey, WHT)
+            for ex in (8, 9, 10): b(ex, ey, WHT)
+        # Pupils (2×2) at center of each eye
+        for ey in range(2, 4):
+            b(2, ey, PPL); b(9, ey, PPL)
 
-        # ── Neck (2 wide, 1 tall: row 4, cols 4-5) ───────────────────────────
-        b(4, 4, DBL)
-        b(5, 4, DBL)
+        # ── Neck: cols 5-6, row 5 ────────────────────────────────────────────
+        b(5, 5, DBL); b(6, 5, DBL)
 
-        # ── Torso (8 wide, 4 tall: rows 5-8) ─────────────────────────────────
-        for tx in range(1, 9):
-            for ty in range(5, 9):
-                b(tx, ty, BLU)
-        # Chest symbol — dark blue square center
-        for tx in range(4, 6):
-            for ty in range(6, 8):
-                b(tx, ty, DBL)
+        # ── Torso: cols 2-9, rows 6-10 ────────────────────────────────────────
+        for ty in range(6, 11):
+            for tx in range(2, 10): b(tx, ty, BLU)
+        # Dark chest detail (cols 5-6, rows 7-9)
+        for ty in range(7, 10):
+            b(5, ty, DBL); b(6, ty, DBL)
         # Chest highlight
-        b(4, 6, BLU2)
+        b(5, 7, BLU2)
 
-        # ── Arms (rows 5-8, extending out wide: cols -3 to 0 and 10 to 13) ───
-        # Left arm extends left from col 1
-        for ax in range(-3, 0):
-            for ay in range(5, 8):
-                b(ax, ay, BLU2)
-        # Left hand (gray)
-        b(-3, 7, GRY)
-        b(-3, 6, LGY)
-        # Right arm extends right from col 8
-        for ax in range(10, 13):
-            for ay in range(5, 8):
-                b(ax, ay, BLU2)
-        # Right hand (gray)
-        b(12, 7, GRY)
-        b(12, 6, LGY)
-        # Shoulder joints dark
-        b(1, 5, DBL)
-        b(8, 5, DBL)
+        # ── Arms: col -3 to 1 (left) and 11 to 14 (right), rows 6-9 ─────────
+        for ay in range(6, 10):
+            for ax in range(-3, 2): b(ax, ay, BLU2)   # left arm
+            for ax in range(10, 15): b(ax, ay, BLU2)  # right arm
+        # Hands (gray pads) at arm ends
+        for ay in range(7, 10):
+            b(-3, ay, GRY); b(14, ay, GRY)
+        b(-3, 8, LGY); b(14, 8, LGY)      # highlight on hands
+        # Shoulder joints
+        b(2, 6, DBL); b(9, 6, DBL)
 
-        # ── Legs (rows 9-11, wide apart: cols 1-3 and 6-8) ──────────────────
-        for ly in range(9, 12):
-            for lx in range(1, 4):
-                b(lx, ly, BLU)
-            for lx in range(6, 9):
-                b(lx, ly, BLU)
-        # Knee accents
-        b(2, 10, DBL)
-        b(7, 10, DBL)
+        # ── Legs: cols 2-4 and 7-9, rows 11-13 ───────────────────────────────
+        for ly in range(11, 14):
+            for lx in range(2, 5): b(lx, ly, BLU)
+            for lx in range(7, 10): b(lx, ly, BLU)
+        # Knee joints
+        b(3, 12, DBL); b(8, 12, DBL)
 
-        # ── Feet (rows 12-13, wider spread: cols 0-4 and 5-9) ────────────────
-        for fx in range(0, 4):
-            b(fx, 12, GRY)
-            b(fx, 12, GRY)
-        b(1, 12, LGY)
-        for fx in range(6, 10):
-            b(fx, 12, GRY)
-        b(7, 12, LGY)
-        # Foot sole highlights
-        b(0, 12, DGY)
-        b(3, 12, DGY)
-        b(6, 12, DGY)
-        b(9, 12, DGY)
+        # ── Feet: cols 1-5 and 6-10, row 14 ─────────────────────────────────
+        for fx in range(1, 6): b(fx, 14, GRY)
+        for fx in range(6, 11): b(fx, 14, GRY)
+        # Sole highlights
+        b(2, 14, LGY); b(8, 14, LGY)
 
     def _draw_pixel_bg(self):
         if not hasattr(self, '_sidebar_spacer'):
