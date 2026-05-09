@@ -8555,169 +8555,495 @@ class App:
         def _save_state(s):
             STATE_FILE.write_text(_json.dumps(s, indent=2))
 
+        # ── colour palette ────────────────────────────────────────────────────
+        SB_BG    = "#0b0e18"
+        TAB_BG   = "#070a10"
+        TAB_ACT  = "#131b2e"
+        ITEM_BG  = "#0e1220"
+        ITEM_HOV = "#141e30"
+        ITEM_SEL = "#162040"
+        ACCENT_C = "#4f8ef7"
+        OK_C     = "#22c55e"
+        TEXT_C   = "#e8eaf0"
+        TEXT2_C  = "#6b7a99"
+        MUTED_C  = "#3d4a63"
+        SEP_C    = "#141c2e"
+
+        _AVATAR_COLS = ["#4f8ef7","#22c55e","#f59e0b","#e0245e",
+                        "#8b5cf6","#06b6d4","#f97316","#ec4899"]
+
         f = tk.Frame(self.tab_container, bg=BG)
         self.tabs["autocomment"] = f
-
         L = self.cfg.get("lang", "fr")
-        self._tab_header(f, "🤖",
-                         "Automatisation" if L == "fr" else "Automation",
-                         ("Réponses automatiques aux commentaires via Groq AI"
-                          if L == "fr"
-                          else "Automatic comment replies via Groq AI"), OK)
 
-        main = tk.Frame(f, bg=BG)
-        main.pack(fill="both", expand=True, padx=20, pady=(0, 10))
+        # ── hidden functional widgets (logic reads from these) ─────────────
+        self._ac_acc_var  = tk.StringVar()
+        self._ac_acc_map  = {}
+        self._ac_acc_cb   = ttk.Combobox(f, textvariable=self._ac_acc_var,
+                                          state="readonly")  # hidden, not packed
+        self._ac_media_items = []
+        self._ac_vid_lb   = tk.Listbox(f, exportselection=False)  # hidden
+        self._ac_groq_var = tk.StringVar(value=self.cfg.get("groq_api_key", ""))
+        self._ac_intv_var = tk.IntVar(value=int(self.cfg.get("ac_interval_min", 5)))
+        self._ac_running  = False
+        self._ac_stop_flag = [False]
 
-        # ═══ COLONNE GAUCHE : sélections + config ════════════════════════════
-        left = tk.Frame(main, bg=BG, width=290)
-        left.pack(side="left", fill="y")
-        left.pack_propagate(False)
+        # ── ACCOUNT TABS BAR (top) ────────────────────────────────────────────
+        tabs_bar = tk.Frame(f, bg=TAB_BG, height=58)
+        tabs_bar.pack(fill="x")
+        tabs_bar.pack_propagate(False)
 
-        # 1. Compte
-        tk.Label(left, text="1. Compte", font=("Segoe UI", 9, "bold"),
-                 bg=BG, fg=TEXT2).pack(anchor="w")
-        self._ac_acc_var = tk.StringVar()
-        self._ac_acc_map = {}
-        self._ac_acc_cb = ttk.Combobox(left, textvariable=self._ac_acc_var,
-                                        state="readonly", font=("Segoe UI", 9))
-        self._ac_acc_cb.pack(fill="x", pady=(3, 6))
+        # Thin accent line at bottom of tab bar
+        tk.Frame(f, bg=SEP_C, height=1).pack(fill="x")
 
-        def _refresh_accounts():
-            self._ac_acc_map.clear()
-            for pid, d in sorted(self.data.items(),
-                                  key=lambda x: int(x[1].get("serial_no") or 0)):
-                ig = d.get("ig_username") or d.get("phone_name") or ""
-                if not ig:
-                    continue
-                sid = d.get("ig_sessionid", "").strip()
-                icon = "🟢" if sid else "🔴"
-                label = f"{icon} @{ig}".replace("@@", "@")
-                self._ac_acc_map[label] = (pid, d)
-            self._ac_acc_cb["values"] = list(self._ac_acc_map.keys())
-            if self._ac_acc_map and not self._ac_acc_var.get():
-                self._ac_acc_cb.current(0)
+        # Scrollable tabs container
+        tabs_inner_wrap = tk.Frame(tabs_bar, bg=TAB_BG)
+        tabs_inner_wrap.pack(side="left", fill="both", expand=True, pady=0)
+        self._ac_tabs_inner = tk.Frame(tabs_inner_wrap, bg=TAB_BG)
+        self._ac_tabs_inner.pack(side="left", fill="y", padx=(8, 0))
 
-        _refresh_accounts()
+        # "+" refresh button at right
+        tk.Button(tabs_bar, text="+", font=("Segoe UI", 14),
+                  bg=TAB_BG, fg=TEXT2_C, relief="flat", bd=0, cursor="hand2",
+                  activebackground=TAB_BG,
+                  command=lambda: _rebuild_acct_tabs()).pack(side="right", padx=12)
 
-        # 2. Vidéos
-        hdr2 = tk.Frame(left, bg=BG)
-        hdr2.pack(fill="x")
-        tk.Label(hdr2, text="2. Vidéo cible", font=("Segoe UI", 9, "bold"),
-                 bg=BG, fg=TEXT2).pack(side="left")
-        load_vid_btn = tk.Button(hdr2, text="⟳ Charger", font=("Segoe UI", 8),
-                                  bg=SURFACE2, fg=TEXT2, relief="flat",
-                                  cursor="hand2", padx=6, pady=2)
+        # ── BODY (left panel + right panel) ───────────────────────────────────
+        body = tk.Frame(f, bg=BG)
+        body.pack(fill="both", expand=True)
+
+        # ── LEFT PANEL (post list) ─────────────────────────────────────────────
+        left_panel = tk.Frame(body, bg=SB_BG, width=310)
+        left_panel.pack(side="left", fill="y")
+        left_panel.pack_propagate(False)
+        tk.Frame(body, bg=SEP_C, width=1).pack(side="left", fill="y")
+
+        # Left header
+        lhdr = tk.Frame(left_panel, bg=SB_BG, pady=10)
+        lhdr.pack(fill="x", padx=14)
+        self._ac_lhdr_lbl = tk.Label(lhdr, text="Sélectionne un compte",
+                                      font=("Segoe UI", 11, "bold"),
+                                      bg=SB_BG, fg=TEXT_C)
+        self._ac_lhdr_lbl.pack(side="left")
+        # Reload videos button
+        load_vid_btn = tk.Button(lhdr, text="⟳", font=("Segoe UI", 11),
+                                  bg=SB_BG, fg=TEXT2_C, relief="flat", bd=0,
+                                  cursor="hand2", activebackground=SB_BG,
+                                  activeforeground=TEXT_C)
         load_vid_btn.pack(side="right")
 
-        vid_frame = tk.Frame(left, bg=SURFACE, highlightthickness=1,
-                             highlightbackground=BORDER, height=120)
-        vid_frame.pack(fill="x", pady=(3, 6))
-        vid_frame.pack_propagate(False)
-        self._ac_vid_lb = tk.Listbox(vid_frame, bg=SURFACE, fg=TEXT,
-                                     font=("Segoe UI", 8), relief="flat",
-                                     selectbackground=ACCENT, selectforeground="#06080f",
-                                     activestyle="none", cursor="hand2",
-                                     exportselection=False)
-        vsb_v = ttk.Scrollbar(vid_frame, orient="vertical", command=self._ac_vid_lb.yview)
-        self._ac_vid_lb.configure(yscrollcommand=vsb_v.set)
-        vsb_v.pack(side="right", fill="y")
-        self._ac_vid_lb.pack(side="left", fill="both", expand=True)
-        self._ac_media_items = []
+        tk.Frame(left_panel, bg=SEP_C, height=1).pack(fill="x")
 
-        # 3. Clé Groq
-        tk.Label(left, text="3. Clé API Groq", font=("Segoe UI", 9, "bold"),
-                 bg=BG, fg=TEXT2).pack(anchor="w")
-        groq_row = tk.Frame(left, bg=BG)
-        groq_row.pack(fill="x", pady=(3, 6))
-        self._ac_groq_var = tk.StringVar(value=self.cfg.get("groq_api_key", ""))
-        groq_e = tk.Entry(groq_row, textvariable=self._ac_groq_var, bg=SURFACE, fg=TEXT,
-                          font=("Segoe UI", 9), relief="flat", show="•",
-                          insertbackground=TEXT)
-        groq_e.pack(side="left", fill="x", expand=True, ipady=5, padx=(0, 4))
-        tk.Button(groq_row, text="👁", font=("Segoe UI", 9), bg=SURFACE2, fg=TEXT2,
-                  relief="flat", cursor="hand2", padx=6, pady=3,
+        # Filter pills
+        pill_bar = tk.Frame(left_panel, bg=SB_BG)
+        pill_bar.pack(fill="x", padx=10, pady=8)
+        _pill_filter = ["all"]
+
+        def _make_pill(parent, text, fkey, bg_act=ACCENT_C, bg_idle=SB_BG):
+            btn = tk.Button(parent, text=text,
+                            font=("Segoe UI", 8, "bold"),
+                            relief="flat", bd=0, cursor="hand2",
+                            padx=10, pady=4,
+                            bg=bg_act if _pill_filter[0] == fkey else bg_idle,
+                            fg="#ffffff" if _pill_filter[0] == fkey else TEXT2_C)
+            def _cmd(k=fkey, b=btn):
+                _pill_filter[0] = k
+                for pb in _all_pills:
+                    pb.config(bg=SB_BG, fg=TEXT2_C)
+                b.config(bg=ACCENT_C, fg="#ffffff")
+                _ac_rebuild_visual_list()
+            btn.config(command=_cmd)
+            return btn
+
+        _all_pills = []
+        p1 = _make_pill(pill_bar, "Tous", "all")
+        p2 = _make_pill(pill_bar, "✓ Commentés", "replied",
+                        bg_act=OK_C)
+        p3 = _make_pill(pill_bar, "Nouveau", "new",
+                        bg_act="#e0245e")
+        p1.config(bg=ACCENT_C, fg="#ffffff")
+        for p in (p1, p2, p3):
+            _all_pills.append(p)
+            p.pack(side="left", padx=(0, 4))
+
+        tk.Frame(left_panel, bg=SEP_C, height=1).pack(fill="x")
+
+        # Scrollable post list
+        list_outer = tk.Frame(left_panel, bg=SB_BG)
+        list_outer.pack(fill="both", expand=True)
+        list_canvas = tk.Canvas(list_outer, bg=SB_BG,
+                                 highlightthickness=0, bd=0)
+        list_sb = ttk.Scrollbar(list_outer, orient="vertical",
+                                 command=list_canvas.yview)
+        list_canvas.configure(yscrollcommand=list_sb.set)
+        list_sb.pack(side="right", fill="y")
+        list_canvas.pack(side="left", fill="both", expand=True)
+        self._ac_list_inner = tk.Frame(list_canvas, bg=SB_BG)
+        _list_win = list_canvas.create_window(
+            (0, 0), window=self._ac_list_inner, anchor="nw")
+        self._ac_list_inner.bind("<Configure>",
+            lambda _e: list_canvas.configure(
+                scrollregion=list_canvas.bbox("all")))
+        list_canvas.bind("<Configure>",
+            lambda e: list_canvas.itemconfig(_list_win, width=e.width))
+
+        def _list_wheel(e):
+            list_canvas.yview_scroll(int(-1*(e.delta/120)), "units")
+        list_canvas.bind("<MouseWheel>", _list_wheel)
+        self._ac_list_inner.bind("<MouseWheel>", _list_wheel)
+
+        # Selected item index
+        self._ac_sel_idx = [None]
+
+        def _ac_rebuild_visual_list():
+            for w in list(self._ac_list_inner.winfo_children()):
+                try:
+                    w.destroy()
+                except Exception:
+                    pass
+            items = self._ac_media_items
+            if not items:
+                tk.Label(self._ac_list_inner,
+                         text="⟳  Charge les vidéos du compte",
+                         font=("Segoe UI", 9), bg=SB_BG, fg=MUTED_C,
+                         pady=40).pack()
+                return
+            state_now = _load_state()
+            key = self._ac_acc_var.get()
+            ig = ""
+            if key in self._ac_acc_map:
+                _, d = self._ac_acc_map[key]
+                ig = d.get("ig_username", "")
+            for idx, (display, mid, code) in enumerate(items):
+                replied_ids = state_now.get(f"{ig}:{mid}", {})
+                has_replied = bool(replied_ids)
+                # Filter
+                flt = _pill_filter[0]
+                if flt == "replied" and not has_replied:
+                    continue
+                if flt == "new" and has_replied:
+                    continue
+
+                is_sel = (self._ac_sel_idx[0] == idx)
+                row_bg = ITEM_SEL if is_sel else ITEM_BG
+
+                row = tk.Frame(self._ac_list_inner, bg=row_bg, cursor="hand2")
+                row.pack(fill="x")
+
+                # Avatar circle (Canvas)
+                av_col = _AVATAR_COLS[idx % len(_AVATAR_COLS)]
+                av_cv = tk.Canvas(row, bg=row_bg, width=44, height=44,
+                                   highlightthickness=0)
+                av_cv.pack(side="left", padx=(12, 8), pady=8)
+                av_cv.create_oval(2, 2, 42, 42, fill=av_col, outline="")
+                av_cv.create_text(22, 22, text="🎥" if "🎥" in display else "🖼",
+                                   font=("Segoe UI", 13))
+                # Status badge bottom-left of avatar
+                badge_text = f"{len(replied_ids)}" if has_replied else "NEW"
+                badge_col  = OK_C if has_replied else "#e0245e"
+                av_cv.create_oval(28, 28, 44, 44, fill=badge_col, outline="")
+                av_cv.create_text(36, 36, text=badge_text[:2],
+                                   font=("Segoe UI", 7, "bold"), fill="#ffffff")
+
+                # Text area
+                txt_col = tk.Frame(row, bg=row_bg)
+                txt_col.pack(side="left", fill="x", expand=True)
+
+                # Parse display: "🎥 DD/MM HH:MM  caption..."
+                parts = display.split("  ", 1)
+                date_part = parts[0].strip()  # "🎥 12/05 03:12"
+                cap_part  = (parts[1] if len(parts) > 1 else "").strip()
+
+                tk.Label(txt_col, text=date_part,
+                          font=("Segoe UI", 9, "bold"),
+                          bg=row_bg, fg=TEXT_C, anchor="w").pack(fill="x")
+                if cap_part:
+                    cap_short = cap_part[:36] + "…" if len(cap_part) > 36 else cap_part
+                    tk.Label(txt_col, text=cap_short,
+                              font=("Segoe UI", 8), bg=row_bg,
+                              fg=TEXT2_C, anchor="w").pack(fill="x")
+                tk.Label(txt_col,
+                          text=f"ID: {mid[:14]}…" if len(mid) > 14 else f"ID: {mid}",
+                          font=("Consolas", 7), bg=row_bg,
+                          fg=MUTED_C, anchor="w").pack(fill="x")
+
+                # Count badge right
+                if has_replied:
+                    badge_lbl = tk.Label(row,
+                                          text=str(len(replied_ids)),
+                                          font=("Segoe UI", 8, "bold"),
+                                          bg=OK_C, fg="#ffffff",
+                                          width=2, padx=4)
+                    badge_lbl.pack(side="right", padx=(0, 14))
+
+                tk.Frame(self._ac_list_inner, bg=SEP_C, height=1).pack(fill="x")
+
+                # Click handler
+                def _row_click(_e=None, _idx=idx):
+                    self._ac_sel_idx[0] = _idx
+                    self._ac_vid_lb.selection_clear(0, "end")
+                    self._ac_vid_lb.selection_set(_idx)
+                    _ac_rebuild_visual_list()
+                    _on_vid_select()
+
+                for w in (row, av_cv, txt_col):
+                    w.bind("<Button-1>", _row_click)
+                    w.bind("<Enter>",
+                           lambda e, r=row, bg=row_bg: r.config(bg=ITEM_HOV if not
+                               (self._ac_sel_idx[0] == items.index(
+                                    next((x for x in items
+                                          if str(x[1]) in str(r)), items[0]))
+                                if items else False) else ITEM_SEL))
+                    w.bind("<Leave>", lambda e, r=row, bg=row_bg: r.config(bg=bg))
+
+            list_canvas.configure(scrollregion=list_canvas.bbox("all"))
+
+        self._ac_rebuild_visual_list = _ac_rebuild_visual_list
+
+        # ── RIGHT PANEL ────────────────────────────────────────────────────────
+        right_panel = tk.Frame(body, bg=BG)
+        right_panel.pack(side="left", fill="both", expand=True)
+
+        # Empty state (paper plane)
+        self._ac_empty_frame = tk.Frame(right_panel, bg=BG)
+        self._ac_empty_frame.place(relx=0, rely=0, relwidth=1, relheight=1)
+        tk.Canvas(self._ac_empty_frame, bg=BG, highlightthickness=0,
+                  width=80, height=80).pack(pady=(80, 0))
+        # Draw a paper plane on canvas
+        _pp_cv = tk.Canvas(self._ac_empty_frame, bg=BG, highlightthickness=0,
+                           width=80, height=80)
+        _pp_cv.pack(pady=(80, 0))
+        _pp_cv.create_polygon(10,70, 75,10, 75,70, fill="#4f8ef7", outline="")
+        _pp_cv.create_polygon(10,70, 75,10, 40,50, fill="#2563eb", outline="")
+        _pp_cv.create_polygon(40,50, 75,70, 55,70, fill="#1d4ed8", outline="")
+        tk.Label(self._ac_empty_frame,
+                 text="Sélectionne une vidéo pour commencer",
+                 font=("Segoe UI", 11), bg=BG, fg=TEXT2_C).pack(pady=16)
+
+        # Content frame (shown when a video is selected)
+        self._ac_content_frame = tk.Frame(right_panel, bg=BG)
+        # (placed dynamically)
+
+        # Comments area
+        com_area = tk.Frame(self._ac_content_frame, bg=BG)
+        com_area.pack(fill="both", expand=True, padx=0, pady=0)
+
+        com_hdr = tk.Frame(com_area, bg="#070a10", height=40)
+        com_hdr.pack(fill="x")
+        com_hdr.pack_propagate(False)
+        tk.Label(com_hdr, text="💬  Commentaires",
+                 font=("Segoe UI", 10, "bold"),
+                 bg="#070a10", fg=TEXT_C).pack(side="left", padx=14)
+        self._ac_com_count_lbl = tk.Label(com_hdr, text="",
+                                           font=("Segoe UI", 8),
+                                           bg="#070a10", fg=TEXT2_C)
+        self._ac_com_count_lbl.pack(side="left", padx=4)
+        tk.Button(com_hdr, text="⟳", font=("Segoe UI", 10),
+                  bg="#070a10", fg=TEXT2_C, relief="flat", bd=0, cursor="hand2",
+                  command=lambda: _on_vid_select()).pack(side="right", padx=14)
+
+        self._ac_com_box = scrolledtext.ScrolledText(
+            com_area, bg="#0a0f1a", fg=TEXT_C,
+            font=("Segoe UI", 9), relief="flat", state="disabled",
+            wrap="word", padx=12, pady=8)
+        self._ac_com_box.pack(fill="both", expand=True)
+        self._ac_com_box.tag_config("author",
+                                     foreground=ACCENT_C,
+                                     font=("Segoe UI", 9, "bold"))
+        self._ac_com_box.tag_config("replied", foreground=OK_C)
+        self._ac_com_box.tag_config("text", foreground=TEXT_C)
+        self._ac_com_box.tag_config("sep", foreground="#141c2e")
+
+        # Config + log panel (bottom of right, collapsible feel)
+        cfg_panel = tk.Frame(self._ac_content_frame, bg="#070a10")
+        cfg_panel.pack(fill="x", side="bottom")
+
+        tk.Frame(cfg_panel, bg=SEP_C, height=1).pack(fill="x")
+
+        cfg_inner = tk.Frame(cfg_panel, bg="#070a10", padx=16, pady=12)
+        cfg_inner.pack(fill="x")
+
+        # Row 1: Groq key + persona label
+        cfg_r1 = tk.Frame(cfg_inner, bg="#070a10")
+        cfg_r1.pack(fill="x", pady=(0, 8))
+
+        cfg_key_col = tk.Frame(cfg_r1, bg="#070a10")
+        cfg_key_col.pack(side="left", fill="x", expand=True, padx=(0, 16))
+        tk.Label(cfg_key_col, text="Clé Groq API",
+                 font=("Segoe UI", 8, "bold"), bg="#070a10",
+                 fg=TEXT2_C, anchor="w").pack(fill="x")
+        groq_row = tk.Frame(cfg_key_col, bg="#070a10")
+        groq_row.pack(fill="x", pady=(3, 0))
+        groq_e = tk.Entry(groq_row, textvariable=self._ac_groq_var,
+                           bg="#0e1424", fg=TEXT_C, relief="flat", show="•",
+                           font=("Segoe UI", 9), insertbackground=TEXT_C,
+                           highlightthickness=1, highlightbackground="#1e2a3a",
+                           highlightcolor=ACCENT_C)
+        groq_e.pack(side="left", fill="x", expand=True, ipady=4, padx=(0, 4))
+        tk.Button(groq_row, text="👁", font=("Segoe UI", 9),
+                  bg="#0e1424", fg=TEXT2_C, relief="flat", cursor="hand2",
                   command=lambda: groq_e.config(
-                      show="" if groq_e.cget("show") == "•" else "•")).pack(side="right")
+                      show="" if groq_e.cget("show") == "•" else "•")
+                  ).pack(side="right")
 
-        # 4. Persona
-        tk.Label(left, text="4. Persona Groq", font=("Segoe UI", 9, "bold"),
-                 bg=BG, fg=TEXT2).pack(anchor="w")
-        self._ac_persona_box = tk.Text(left, bg=SURFACE, fg=TEXT, font=("Segoe UI", 8),
-                                       relief="flat", height=4, wrap="word",
-                                       insertbackground=TEXT, padx=6, pady=5,
-                                       highlightthickness=1, highlightbackground=BORDER)
-        self._ac_persona_box.pack(fill="x", pady=(3, 6))
+        cfg_intv_col = tk.Frame(cfg_r1, bg="#070a10")
+        cfg_intv_col.pack(side="left")
+        tk.Label(cfg_intv_col, text="Intervalle",
+                 font=("Segoe UI", 8, "bold"), bg="#070a10",
+                 fg=TEXT2_C, anchor="w").pack(fill="x")
+        intv_row = tk.Frame(cfg_intv_col, bg="#070a10")
+        intv_row.pack(pady=(3, 0))
+        tk.Spinbox(intv_row, from_=1, to=120, textvariable=self._ac_intv_var,
+                   font=("Segoe UI", 9), bg="#0e1424", fg=TEXT_C, width=4,
+                   relief="flat", buttonbackground="#0e1424").pack(side="left")
+        tk.Label(intv_row, text=" min", font=("Segoe UI", 8),
+                 bg="#070a10", fg=TEXT2_C).pack(side="left")
+
+        # Row 2: Persona + start/stop
+        cfg_r2 = tk.Frame(cfg_inner, bg="#070a10")
+        cfg_r2.pack(fill="x")
+        tk.Label(cfg_r2, text="Persona IA",
+                 font=("Segoe UI", 8, "bold"), bg="#070a10",
+                 fg=TEXT2_C, anchor="w").pack(fill="x")
+        self._ac_persona_box = tk.Text(
+            cfg_r2, bg="#0e1424", fg=TEXT_C, font=("Segoe UI", 8),
+            relief="flat", height=3, wrap="word",
+            insertbackground=TEXT_C, padx=6, pady=4,
+            highlightthickness=1, highlightbackground="#1e2a3a",
+            highlightcolor=ACCENT_C)
+        self._ac_persona_box.pack(fill="x", pady=(3, 8))
         self._ac_persona_box.insert("1.0", self.cfg.get("ac_persona",
             "Tu es un créateur de contenu Instagram sympathique. "
             "Réponds en français, de façon courte (1-2 phrases), chaleureuse et engageante."))
 
-        # 5. Intervalle
-        intv_row = tk.Frame(left, bg=BG)
-        intv_row.pack(fill="x", pady=(0, 8))
-        tk.Label(intv_row, text="Vérifier toutes les", font=("Segoe UI", 9),
-                 bg=BG, fg=TEXT2).pack(side="left")
-        self._ac_intv_var = tk.IntVar(value=int(self.cfg.get("ac_interval_min", 5)))
-        tk.Spinbox(intv_row, from_=1, to=120, textvariable=self._ac_intv_var,
-                   font=("Segoe UI", 9), bg=SURFACE2, fg=TEXT, width=4,
-                   relief="flat", buttonbackground=SURFACE2).pack(side="left", padx=6)
-        tk.Label(intv_row, text="min", font=("Segoe UI", 9),
-                 bg=BG, fg=MUTED).pack(side="left")
+        btn_row = tk.Frame(cfg_r2, bg="#070a10")
+        btn_row.pack(fill="x")
+        self._ac_btn = tk.Button(btn_row, text="▶  Démarrer",
+                                  font=("Segoe UI", 10, "bold"),
+                                  bg=OK_C, fg="#06080f",
+                                  relief="flat", cursor="hand2", pady=8, bd=0,
+                                  activebackground="#00a882",
+                                  activeforeground="#06080f")
+        self._ac_btn.pack(side="left", fill="x", expand=True)
 
-        self._ac_running = False
-        self._ac_stop_flag = [False]
-        self._ac_btn = tk.Button(left, text="▶  Démarrer",
-                                 font=("Segoe UI", 11, "bold"), bg=OK, fg="#06080f",
-                                 relief="flat", cursor="hand2", pady=10, bd=0,
-                                 activebackground="#00a882", activeforeground="#06080f")
-        self._ac_btn.pack(fill="x", pady=(8, 0))
-        self._bind_hover(self._ac_btn, OK, "#00a882", "#06080f", "#06080f")
-
-        # ═══ COLONNE MILIEU : commentaires ═══════════════════════════════════
-        mid = tk.Frame(main, bg=BG, width=260)
-        mid.pack(side="left", fill="y", padx=(12, 0))
-        mid.pack_propagate(False)
-
-        hdr_m = tk.Frame(mid, bg=BG)
-        hdr_m.pack(fill="x")
-        tk.Label(hdr_m, text="Commentaires", font=("Segoe UI", 10, "bold"),
-                 bg=BG, fg=TEXT2).pack(side="left")
-        self._ac_com_count_lbl = tk.Label(hdr_m, text="", font=("Segoe UI", 8),
-                                           bg=BG, fg=MUTED)
-        self._ac_com_count_lbl.pack(side="right")
-        tk.Button(hdr_m, text="⟳", font=("Segoe UI", 9), bg=SURFACE2, fg=TEXT2,
-                  relief="flat", cursor="hand2", padx=6, pady=2,
-                  command=lambda: _on_vid_select()).pack(side="right", padx=(0, 4))
-
-        com_frame = tk.Frame(mid, bg=SURFACE, highlightthickness=1,
-                             highlightbackground=BORDER)
-        com_frame.pack(fill="both", expand=True, pady=(4, 0))
-        self._ac_com_box = scrolledtext.ScrolledText(
-            com_frame, bg=SURFACE, fg=TEXT, font=("Segoe UI", 9),
-            relief="flat", state="disabled", wrap="word", padx=8, pady=6)
-        self._ac_com_box.pack(fill="both", expand=True)
-        self._ac_com_box.tag_config("author", foreground=ACCENT, font=("Segoe UI", 9, "bold"))
-        self._ac_com_box.tag_config("replied", foreground=OK)
-        self._ac_com_box.tag_config("text", foreground=TEXT)
-        self._ac_com_box.tag_config("sep", foreground=BORDER)
-
-        # ═══ COLONNE DROITE : log ════════════════════════════════════════════
-        right = tk.Frame(main, bg=BG)
-        right.pack(side="left", fill="both", expand=True, padx=(12, 0))
-
-        hdr_r = tk.Frame(right, bg=BG)
-        hdr_r.pack(fill="x")
-        tk.Label(hdr_r, text="Journal", font=("Segoe UI", 10, "bold"),
-                 bg=BG, fg=TEXT2).pack(side="left")
-        tk.Button(hdr_r, text="🗑", font=("Segoe UI", 9), bg=SURFACE2, fg=TEXT2,
-                  relief="flat", cursor="hand2", padx=6, pady=2,
+        # Log (compact, right side of btn row)
+        tk.Button(btn_row, text="🗑", font=("Segoe UI", 9),
+                  bg="#070a10", fg=TEXT2_C, relief="flat", bd=0, cursor="hand2",
                   command=lambda: (self._ac_log_box.config(state="normal"),
                                    self._ac_log_box.delete("1.0", "end"),
-                                   self._ac_log_box.config(state="disabled"))).pack(side="right")
+                                   self._ac_log_box.config(state="disabled"))
+                  ).pack(side="right", padx=(8, 0))
 
         self._ac_log_box = scrolledtext.ScrolledText(
-            right, bg=SURFACE, fg=TEXT2, font=("Consolas", 9),
-            relief="flat", state="disabled", wrap="word")
-        self._ac_log_box.pack(fill="both", expand=True, pady=(4, 0))
+            cfg_panel, bg="#050810", fg=TEXT2_C,
+            font=("Consolas", 8), relief="flat", state="disabled",
+            wrap="word", height=5)
+        self._ac_log_box.pack(fill="x", padx=0, pady=0)
+
+        # ── ACCOUNT TABS BUILDER ───────────────────────────────────────────────
+        def _rebuild_acct_tabs():
+            for w in list(self._ac_tabs_inner.winfo_children()):
+                try:
+                    w.destroy()
+                except Exception:
+                    pass
+            self._ac_acc_map.clear()
+            accts = []
+            for pid, d in sorted(self.data.items(),
+                                   key=lambda x: int(x[1].get("serial_no") or 0)):
+                ig = d.get("ig_username") or d.get("phone_name") or ""
+                if not ig:
+                    continue
+                sid = d.get("ig_sessionid", "").strip()
+                label = f"{'🟢' if sid else '🔴'} @{ig}".replace("@@", "@")
+                self._ac_acc_map[label] = (pid, d)
+                accts.append((label, pid, d, ig, bool(sid)))
+
+            self._ac_acc_cb["values"] = list(self._ac_acc_map.keys())
+            if self._ac_acc_map and not self._ac_acc_var.get():
+                self._ac_acc_cb.current(0)
+
+            cur_key = self._ac_acc_var.get()
+            for i, (label, pid, d, ig, has_sid) in enumerate(accts):
+                is_act = (label == cur_key)
+                tab_col = _AVATAR_COLS[i % len(_AVATAR_COLS)]
+                tab_bg  = TAB_ACT if is_act else TAB_BG
+                tab = tk.Frame(self._ac_tabs_inner, bg=tab_bg,
+                                cursor="hand2",
+                                highlightthickness=1 if is_act else 0,
+                                highlightbackground=ACCENT_C)
+                tab.pack(side="left", padx=(0, 2), pady=4)
+
+                # Avatar circle
+                av = tk.Canvas(tab, bg=tab_bg, width=28, height=28,
+                                highlightthickness=0)
+                av.pack(side="left", padx=(8, 4), pady=8)
+                av.create_oval(0, 0, 28, 28, fill=tab_col, outline="")
+                av.create_text(14, 14, text=ig[:2].upper(),
+                                font=("Segoe UI", 8, "bold"), fill="#ffffff")
+
+                # Status dot + name
+                name_col = tk.Frame(tab, bg=tab_bg)
+                name_col.pack(side="left", pady=4, padx=(0, 8))
+                tk.Label(name_col, text=f"@{ig}",
+                          font=("Segoe UI", 8, "bold" if is_act else "normal"),
+                          bg=tab_bg,
+                          fg=TEXT_C if is_act else TEXT2_C).pack(anchor="w")
+                dot_row = tk.Frame(name_col, bg=tab_bg)
+                dot_row.pack(anchor="w")
+                dot_cv = tk.Canvas(dot_row, bg=tab_bg, width=6, height=6,
+                                    highlightthickness=0)
+                dot_cv.pack(side="left")
+                dot_cv.create_oval(0, 0, 6, 6,
+                                    fill=OK_C if has_sid else "#ef4444",
+                                    outline="")
+                tk.Label(dot_row,
+                          text="  session" if has_sid else "  no session",
+                          font=("Segoe UI", 6), bg=tab_bg,
+                          fg=OK_C if has_sid else "#ef4444").pack(side="left")
+
+                # Bottom accent bar for active tab
+                if is_act:
+                    tk.Frame(tab, bg=ACCENT_C, height=2).pack(fill="x",
+                                                                side="bottom")
+
+                def _tab_click(_e=None, lbl=label, _ig=ig):
+                    self._ac_acc_var.set(lbl)
+                    self._ac_lhdr_lbl.config(text=f"@{_ig}")
+                    self._ac_media_items.clear()
+                    self._ac_sel_idx[0] = None
+                    self._ac_vid_lb.delete(0, "end")
+                    # Show empty state
+                    self._ac_content_frame.place_forget()
+                    self._ac_empty_frame.place(relx=0, rely=0,
+                                                relwidth=1, relheight=1)
+                    _rebuild_acct_tabs()
+                    _ac_rebuild_visual_list()
+
+                for w in (tab, av, name_col, dot_row, dot_cv):
+                    w.bind("<Button-1>", _tab_click)
+
+        _rebuild_acct_tabs()
+
+        # Show content when video selected
+        def _show_content():
+            self._ac_empty_frame.place_forget()
+            self._ac_content_frame.place(relx=0, rely=0,
+                                          relwidth=1, relheight=1)
+
+        # ── HELPERS (used by functional code below) ────────────────────────────
+        def _refresh_accounts():
+            _rebuild_acct_tabs()
+
+        def _ac_log(msg, lv="info"):
+            colors = {"info": TEXT2_C, "ok": OK_C, "warn": WARN,
+                      "error": DANGER, "accent": ACCENT_C}
+            self._ac_log_box.config(state="normal")
+            ts = datetime.now().strftime("%H:%M:%S")
+            self._ac_log_box.insert("end", f"[{ts}] {msg}\n", lv)
+            self._ac_log_box.tag_config(lv, foreground=colors.get(lv, TEXT2_C))
+            self._ac_log_box.see("end")
+            self._ac_log_box.config(state="disabled")
 
         # ── helpers définis en premier pour que les closures les trouvent ─────
         def _ac_log(msg, lv="info"):
@@ -8870,6 +9196,7 @@ class App:
                     self._ac_vid_lb.insert("end", display)
                     self._ac_media_items.append((display, mid, code))
                 load_vid_btn.config(state="normal")
+                _ac_rebuild_visual_list()
                 _ac_log(f"✅ {len(media)} vidéo(s) — clique sur une pour voir ses commentaires",
                         "ok")
 
@@ -8892,6 +9219,8 @@ class App:
             if not sid:
                 return
 
+            _show_content()
+
             self._ac_com_box.config(state="normal")
             self._ac_com_box.delete("1.0", "end")
             self._ac_com_box.insert("end", "⏳ Chargement des commentaires…")
@@ -8911,7 +9240,8 @@ class App:
                            "⚠ 0 commentaire — la vidéo n'en a peut-être pas encore, "
                            "ou le compte qui a commenté est le même que le compte cible")
                     self.root.after(0, lambda c=comments, r=replied_ids, m=msg, lv=lv:
-                        [_show_comments_in_panel(c, r), _ac_log(m, lv)])
+                        [_show_comments_in_panel(c, r), _ac_log(m, lv),
+                         _ac_rebuild_visual_list()])
                 except Exception as e:
                     self.root.after(0, lambda e=e: [
                         _ac_log(f"❌ Erreur commentaires: {e}", "error"),
