@@ -2274,7 +2274,12 @@ class App:
         if key == "stats":    self._refresh_ig_list()
         if key == "bank":     self._refresh_bank()
         if key == "automation": self._refresh_auto_phones()
-        if key == "masspost": self._mp_refresh_phones()
+        if key == "masspost":
+            self._mp_refresh_phones()
+            try:
+                self._mp_refresh_bank_pool()
+            except Exception:
+                pass
         if key == "dashboard":
             try: self._dash_refresh_sidebar()
             except Exception: pass
@@ -6242,63 +6247,74 @@ class App:
         linner = tk.Frame(left, bg=SURFACE, padx=12, pady=10)
         linner.pack(fill="both", expand=True)
 
-        tk.Label(linner, text="📹  POOL DE VIDÉOS", font=("Segoe UI", 9, "bold"),
-                 bg=SURFACE, fg=ACCENT).pack(anchor="w", pady=(0, 6))
+        # Header row with label + select-all / deselect-all buttons
+        pool_hdr = tk.Frame(linner, bg=SURFACE)
+        pool_hdr.pack(fill="x", pady=(0, 4))
+        tk.Label(pool_hdr, text="📹  Sélectionner depuis la banque",
+                 font=("Segoe UI", 9, "bold"),
+                 bg=SURFACE, fg=ACCENT).pack(side="left")
 
         # Thumbnail preview
         self._mp_preview_canvas = tk.Canvas(linner, bg="#000", height=130,
                                              highlightthickness=1,
                                              highlightbackground=BORDER)
-        self._mp_preview_canvas.pack(fill="x", pady=(0, 8))
+        self._mp_preview_canvas.pack(fill="x", pady=(0, 6))
         self._mp_preview_img_ref = None
 
-        # Video listbox
+        # Select-all / deselect-all buttons
+        sel_btns = tk.Frame(linner, bg=SURFACE)
+        sel_btns.pack(fill="x", pady=(0, 4))
+
+        def _mp_select_all():
+            for var in self._mp_bank_card_vars.values():
+                var.set(True)
+            self._mp_sync_vid_paths()
+
+        def _mp_deselect_all():
+            for var in self._mp_bank_card_vars.values():
+                var.set(False)
+            self._mp_sync_vid_paths()
+
+        self._mk_btn(sel_btns, "Tout sélectionner", "ok", _mp_select_all,
+                     font=("Segoe UI", 8), pady=3).pack(side="left", padx=(0, 4))
+        self._mk_btn(sel_btns, "Tout désélectionner", "ghost", _mp_deselect_all,
+                     font=("Segoe UI", 8), pady=3).pack(side="left")
+
+        # Scrollable bank pool grid
         self._mp_vid_paths = []
-        lbf = tk.Frame(linner, bg=SURFACE2, highlightthickness=1,
-                       highlightbackground=BORDER)
-        lbf.pack(fill="both", expand=True)
-        self._mp_vid_lb = tk.Listbox(lbf, bg=SURFACE2, fg=TEXT,
-                                      selectbackground=HL, selectforeground=ACCENT,
-                                      relief="flat", bd=0, height=10,
-                                      font=("Segoe UI", 9), activestyle="none",
-                                      cursor="hand2", exportselection=False)
-        self._mp_vid_lb.pack(fill="both", expand=True, padx=4, pady=4)
+        self._mp_bank_card_vars = {}   # path → BooleanVar
+        self._mp_bank_thumb_refs = []  # prevent GC of PhotoImage
 
-        def _on_mp_sel(_e=None):
-            sel = self._mp_vid_lb.curselection()
-            if sel:
-                self._post_load_preview_into(
-                    self._mp_preview_canvas,
-                    self._mp_vid_paths[sel[0]],
-                    ref_attr="_mp_preview_img_ref")
-            _mp_rebuild_assign()
+        pool_cv_frame = tk.Frame(linner, bg=SURFACE2, highlightthickness=1,
+                                  highlightbackground=BORDER)
+        pool_cv_frame.pack(fill="both", expand=True)
+        self._mp_pool_canvas = tk.Canvas(pool_cv_frame, bg=SURFACE2,
+                                          highlightthickness=0, bd=0)
+        pool_sb = ttk.Scrollbar(pool_cv_frame, orient="vertical",
+                                 command=self._mp_pool_canvas.yview)
+        self._mp_pool_canvas.configure(yscrollcommand=pool_sb.set)
+        pool_sb.pack(side="right", fill="y")
+        self._mp_pool_canvas.pack(side="left", fill="both", expand=True)
+        self._mp_pool_inner = tk.Frame(self._mp_pool_canvas, bg=SURFACE2)
+        self._mp_pool_win = self._mp_pool_canvas.create_window(
+            (0, 0), window=self._mp_pool_inner, anchor="nw")
+        self._mp_pool_inner.bind(
+            "<Configure>",
+            lambda _e: self._mp_pool_canvas.configure(
+                scrollregion=self._mp_pool_canvas.bbox("all")))
+        self._mp_pool_canvas.bind(
+            "<Configure>",
+            lambda e: self._mp_pool_canvas.itemconfig(
+                self._mp_pool_win, width=e.width))
 
-        self._mp_vid_lb.bind("<<ListboxSelect>>", _on_mp_sel)
+        def _mp_pool_wheel(e):
+            self._mp_pool_canvas.yview_scroll(int(-1 * (e.delta / 120)), "units")
+        self._mp_pool_canvas.bind("<MouseWheel>", _mp_pool_wheel)
+        self._mp_pool_inner.bind("<MouseWheel>", _mp_pool_wheel)
 
-        vbtn = tk.Frame(linner, bg=SURFACE)
-        vbtn.pack(fill="x", pady=(6, 0))
-
-        def _add_vids():
-            paths = filedialog.askopenfilenames(
-                title="Ajouter des vidéos au pool",
-                filetypes=[("Vidéos", "*.mp4 *.mov *.avi *.mkv"), ("Tous", "*.*")])
-            for p in paths:
-                if p not in self._mp_vid_paths:
-                    self._mp_vid_paths.append(p)
-                    self._mp_vid_lb.insert("end", Path(p).name)
-            _mp_rebuild_assign()
-
-        def _rem_vids():
-            sel = list(self._mp_vid_lb.curselection())
-            for i in reversed(sel):
-                self._mp_vid_lb.delete(i)
-                self._mp_vid_paths.pop(i)
-            _mp_rebuild_assign()
-
-        self._mk_btn(vbtn, "+ Ajouter vidéos", "ok", _add_vids,
-                     font=("Segoe UI", 9)).pack(side="left", padx=(0, 6))
-        self._mk_btn(vbtn, "✕", "danger", _rem_vids,
-                     font=("Segoe UI", 9)).pack(side="left")
+        # Keep a legacy stub so existing code referencing _mp_rebuild_assign still works
+        # (defined later); _mp_vid_lb attribute kept as None for safety
+        self._mp_vid_lb = None
 
         # Caption (shared for all phones)
         tk.Frame(linner, height=1, bg=BORDER).pack(fill="x", pady=10)
@@ -6572,6 +6588,134 @@ class App:
             self._mp_rebuild_assign()
         except Exception:
             pass
+
+    def _mp_sync_vid_paths(self):
+        """Sync self._mp_vid_paths from checked bank card vars, then rebuild assign."""
+        self._mp_vid_paths = [p for p, v in self._mp_bank_card_vars.items() if v.get()]
+        try:
+            self._mp_rebuild_assign()
+        except Exception:
+            pass
+
+    def _mp_refresh_bank_pool(self):
+        """Rebuild the mass-posting bank pool thumbnail grid from bank.json."""
+        if not hasattr(self, "_mp_pool_inner"):
+            return
+        for w in list(self._mp_pool_inner.winfo_children()):
+            try:
+                w.destroy()
+            except Exception:
+                pass
+        self._mp_bank_card_vars = {}
+        self._mp_bank_thumb_refs = []
+
+        bank = load_bank()
+        if not bank:
+            tk.Label(self._mp_pool_inner,
+                     text="Aucune vidéo en banque\nAjoute des vidéos dans la Banque",
+                     font=("Segoe UI", 9), bg=SURFACE2, fg=MUTED,
+                     justify="center").pack(padx=8, pady=20)
+            self._mp_vid_paths = []
+            try:
+                self._mp_rebuild_assign()
+            except Exception:
+                pass
+            return
+
+        COLS = 2
+        for idx, entry in enumerate(bank):
+            path = entry.get("path", "")
+            exists = Path(path).exists()
+            name = (entry.get("filename") or Path(path).name or "—")
+            short = name[:18] + "…" if len(name) > 18 else name
+
+            # Keep previous checkbox state if path already known
+            checked_before = self._mp_bank_card_vars.get(path)
+            var = tk.BooleanVar(value=bool(checked_before and checked_before.get()))
+            self._mp_bank_card_vars[path] = var
+
+            r, c = divmod(idx, COLS)
+            card = tk.Frame(self._mp_pool_inner, bg=CARD,
+                            highlightthickness=1, highlightbackground=BORDER,
+                            cursor="hand2")
+            card.grid(row=r, column=c, sticky="nsew", padx=3, pady=3)
+            self._mp_pool_inner.grid_columnconfigure(c, weight=1, uniform="mpcol")
+
+            # Checkbox top-left
+            cb = tk.Checkbutton(card, variable=var,
+                                command=self._mp_sync_vid_paths,
+                                bg=CARD, activebackground=CARD,
+                                selectcolor=SURFACE2, relief="flat",
+                                cursor="hand2")
+            cb.grid(row=0, column=0, sticky="nw", padx=2, pady=2)
+
+            # Thumbnail label
+            thumb_lbl = tk.Label(card, bg=SURFACE2, text="🎬",
+                                  font=("Segoe UI", 12), fg=MUTED,
+                                  height=4, anchor="center")
+            thumb_lbl.grid(row=0, column=1, rowspan=2, sticky="nsew",
+                            padx=(0, 4), pady=4)
+            card.grid_columnconfigure(1, weight=1)
+
+            # Filename label
+            name_lbl = tk.Label(card, text=short,
+                                 font=("Segoe UI", 8), bg=CARD,
+                                 fg=TEXT if exists else TEXT2,
+                                 anchor="w", justify="left", wraplength=90)
+            name_lbl.grid(row=1, column=0, sticky="w", padx=4, pady=(0, 4))
+
+            # Click anywhere on card toggles checkbox
+            def _make_toggle(v, _card=card):
+                def _toggle(_e=None):
+                    v.set(not v.get())
+                    self._mp_sync_vid_paths()
+                    # Load preview
+                    try:
+                        p = [k for k, vv in self._mp_bank_card_vars.items()
+                             if vv is v]
+                        if p:
+                            self._post_load_preview_into(
+                                self._mp_preview_canvas, p[0],
+                                ref_attr="_mp_preview_img_ref")
+                    except Exception:
+                        pass
+                return _toggle
+
+            _toggle_fn = _make_toggle(var)
+            for w in (card, thumb_lbl, name_lbl):
+                w.bind("<Button-1>", _toggle_fn)
+
+            # Async thumbnail load
+            if exists and PIL_OK:
+                def _load_thumb(e=entry, lbl=thumb_lbl):
+                    img = self._extract_bank_thumb(e)
+                    if img is None:
+                        return
+                    try:
+                        img.thumbnail((80, 60), Image.LANCZOS)
+                        photo = ImageTk.PhotoImage(img)
+                    except Exception:
+                        return
+                    def _apply(l=lbl, ph=photo):
+                        try:
+                            l.configure(image=ph, text="", height=0)
+                            l.image = ph
+                            self._mp_bank_thumb_refs.append(ph)
+                        except Exception:
+                            pass
+                    try:
+                        self.root.after(0, _apply)
+                    except Exception:
+                        pass
+                threading.Thread(target=_load_thumb, daemon=True).start()
+
+        try:
+            self._mp_pool_canvas.configure(
+                scrollregion=self._mp_pool_canvas.bbox("all"))
+        except Exception:
+            pass
+        # Rebuild _mp_vid_paths from current checked state
+        self._mp_sync_vid_paths()
 
     def _mp_log(self, msg, level="info"):
         colors = {"ok": OK, "warn": WARN, "error": DANGER, "accent": ACCENT, "info": TEXT2}
