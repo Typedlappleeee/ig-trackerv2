@@ -2279,26 +2279,35 @@ class App:
                  anchor="w", padx=16, pady=(8)).pack(fill="x")
 
     def _make_collapsible_section(self, parent, label, initially_open=True):
-        """Collapsible sidebar section — returns (children_frame, expand_fn)."""
+        """Collapsible sidebar section — returns (children_frame, expand_fn).
+
+        Uses an outer wrapper so pack_forget/pack on children never moves
+        them to the bottom of the sidebar.
+        """
         SB  = "#0b0e18"
         HOV = "#0f1420"
-        state   = [initially_open]
-        children = tk.Frame(parent, bg=SB)
+        state = [initially_open]
 
-        hdr = tk.Frame(parent, bg=SB, cursor="hand2")
+        # Outer wrapper — always packed at the correct position in parent
+        outer = tk.Frame(parent, bg=SB)
+        outer.pack(fill="x")
+
+        # Header inside outer
+        hdr = tk.Frame(outer, bg=SB, cursor="hand2")
         hdr.pack(fill="x")
 
         chevron = tk.Label(hdr, text="▾" if initially_open else "▸",
                            font=("Segoe UI", 8), bg=SB, fg="#3a4d66",
                            cursor="hand2")
         chevron.pack(side="right", padx=(0, 12))
-
         tk.Label(hdr, text=label.upper(),
                  font=("Segoe UI", 7, "bold"),
                  bg=SB, fg="#3a4d66",
                  anchor="w", padx=16, pady=8,
                  cursor="hand2").pack(side="left")
 
+        # Children container inside outer — pack/forget stays within outer
+        children = tk.Frame(outer, bg=SB)
         if initially_open:
             children.pack(fill="x")
 
