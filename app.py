@@ -2417,8 +2417,8 @@ class App:
                                        bg=CARD, fg=MUTED)
         self._dash_status.pack(side="right")
 
-        self._dash_chart = tk.Canvas(chart_inner, bg=CARD,
-                                      highlightthickness=0)
+        self._dash_chart = tk.Canvas(chart_inner, bg="#0a0d14",
+                                      highlightthickness=0, height=280)
         self._dash_chart.pack(fill="both", expand=True, padx=18, pady=(0, 18))
         self._dash_chart.bind("<Configure>", lambda e: self._dash_redraw_chart())
 
@@ -2507,8 +2507,8 @@ class App:
         cv.delete("all")
         w = cv.winfo_width() or 600
         h = cv.winfo_height() or 260
-        margin_l, margin_r = 56, 24
-        margin_t, margin_b = 18, 36
+        margin_l, margin_r = 62, 28
+        margin_t, margin_b = 22, 40
 
         plot_w = w - margin_l - margin_r
         plot_h = h - margin_t - margin_b
@@ -2516,27 +2516,34 @@ class App:
             return
 
         max_v = max(values) if values else 1
-        min_v = 0
-        rng_v = max(1, max_v - min_v)
+        min_v = min(values) if values else 0
+        # Give 10% headroom above max
+        pad = max(1, int((max_v - min_v) * 0.10))
+        chart_max = max_v + pad
+        chart_min = max(0, min_v - pad // 2)
+        rng_v = max(1, chart_max - chart_min)
 
-        # Y-axis grid + labels
-        for i in range(5):
-            y = margin_t + i * plot_h / 4
+        # Background chart area
+        cv.create_rectangle(margin_l, margin_t, w - margin_r, margin_t + plot_h,
+                            fill="#0d1117", outline=BORDER, width=1)
+
+        # Y-axis grid + labels (5 lines)
+        for i in range(6):
+            y = margin_t + i * plot_h / 5
             cv.create_line(margin_l, y, w - margin_r, y,
-                            fill=BORDER, dash=(2, 4))
-            v_at = max_v - (i * rng_v / 4)
-            cv.create_text(margin_l - 6, y, anchor="e",
+                            fill="#1c2130", dash=(3, 5))
+            v_at = chart_max - (i * rng_v / 5)
+            cv.create_text(margin_l - 8, y, anchor="e",
                             text=fmt(int(v_at)),
                             fill=TEXT2, font=("Consolas", 8))
 
-        # X labels
+        # X labels + tick marks
         n = len(keys)
         if n == 1:
             xs = [margin_l + plot_w / 2]
         else:
             xs = [margin_l + i * plot_w / (n - 1) for i in range(n)]
-        # Show only ~6 evenly-spaced date labels
-        step = max(1, n // 6)
+        step = max(1, n // 7)
         for i, k in enumerate(keys):
             if i % step != 0 and i != n - 1:
                 continue
@@ -2545,45 +2552,85 @@ class App:
                 lbl = d.strftime("%d/%m")
             except Exception:
                 lbl = k
-            cv.create_text(xs[i], h - margin_b + 14, anchor="n",
+            cv.create_line(xs[i], margin_t + plot_h, xs[i], margin_t + plot_h + 4,
+                           fill=BORDER)
+            cv.create_text(xs[i], margin_t + plot_h + 14, anchor="n",
                             text=lbl, fill=TEXT2, font=("Consolas", 8))
 
         # Build line points
         pts = []
         for i, v in enumerate(values):
             x = xs[i]
-            y = margin_t + plot_h - (v - min_v) / rng_v * plot_h
+            y = margin_t + plot_h - (v - chart_min) / rng_v * plot_h
             pts.append((x, y))
 
-        # Filled area below line
+        # Filled area below line (simulate gradient with 3 stacked polygons)
         if len(pts) >= 2:
-            poly = []
-            poly.append(pts[0][0])
-            poly.append(margin_t + plot_h)
+            base_y = margin_t + plot_h
+            # Darkest layer (full fill)
+            poly = [pts[0][0], base_y]
             for px, py in pts:
-                poly.append(px)
-                poly.append(py)
-            poly.append(pts[-1][0])
-            poly.append(margin_t + plot_h)
-            cv.create_polygon(*poly, fill="#1a3318", outline="")
+                poly += [px, py]
+            poly += [pts[-1][0], base_y]
+            cv.create_polygon(*poly, fill="#0d2b0d", outline="")
+            # Mid layer (upper 60%)
+            mid_pts = [(px, py + (base_y - py) * 0.4) for px, py in pts]
+            poly2 = [mid_pts[0][0], base_y]
+            for px, py in mid_pts:
+                poly2 += [px, py]
+            poly2 += [mid_pts[-1][0], base_y]
+            cv.create_polygon(*poly2, fill="#0f3a0f", outline="")
+            # Top highlight strip
+            top_pts = [(px, py + (base_y - py) * 0.1) for px, py in pts]
+            poly3 = [top_pts[0][0], base_y]
+            for px, py in top_pts:
+                poly3 += [px, py]
+            poly3 += [top_pts[-1][0], base_y]
+            cv.create_polygon(*poly3, fill="#154d15", outline="")
 
-        # Line
+        # Glow shadow under line
+        if len(pts) >= 2:
+            flat_glow = []
+            for px, py in pts:
+                flat_glow += [px, py + 2]
+            cv.create_line(*flat_glow, fill="#3fa83f", width=4, smooth=True)
+
+        # Main line
         if len(pts) >= 2:
             flat = []
             for px, py in pts:
                 flat += [px, py]
             cv.create_line(*flat, fill=ACCENT, width=2, smooth=True)
 
+        # Today vertical marker (last point)
+        if pts:
+            last_x = pts[-1][0]
+            cv.create_line(last_x, margin_t, last_x, margin_t + plot_h,
+                           fill="#ffffff22" if False else ACCENT,
+                           dash=(2, 4), width=1)
+
         # Dots
+        today_key = datetime.now().strftime("%Y-%m-%d")
         for i, (px, py) in enumerate(pts):
-            r = 4 if i == len(pts) - 1 else 3
-            col = ACCENT if i < len(pts) - 1 else "#ffffff"
+            is_last = (i == len(pts) - 1)
+            is_today = (keys[i] == today_key)
+            r = 5 if is_last else 3
+            dot_col = "#ffffff" if is_today else ACCENT
+            # Draw outer ring for last point
+            if is_last:
+                cv.create_oval(px - r - 3, py - r - 3, px + r + 3, py + r + 3,
+                               fill="", outline=ACCENT, width=1)
             cv.create_oval(px - r, py - r, px + r, py + r,
-                            fill=col, outline=ACCENT, width=2)
-            # Value label on last point
-            if i == len(pts) - 1:
-                cv.create_text(px, py - 14, text=fmt(values[i]),
-                                fill=TEXT, font=("Segoe UI", 9, "bold"))
+                            fill=dot_col, outline=ACCENT, width=2)
+            # Value tooltip on last point
+            if is_last:
+                lbl_txt = fmt(values[i])
+                # Badge background
+                bx, by = px + 10, py - 16
+                cv.create_rectangle(bx - 2, by - 10, bx + len(lbl_txt) * 7 + 4, by + 4,
+                                    fill=ACCENT, outline="")
+                cv.create_text(bx, by - 3, anchor="w", text=lbl_txt,
+                               fill="#06080f", font=("Segoe UI", 8, "bold"))
 
     def _build_phones_tab(self):
         L = self.cfg.get("lang", "fr")
