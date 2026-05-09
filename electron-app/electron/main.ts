@@ -279,20 +279,28 @@ ipcMain.handle('pick-output-file', async (_event, opts: { defaultName: string })
 })
 
 // ── IPC: fetch image as base64 data URL ──────────────────────────────────────
-// Uses session.defaultSession.fetch so Instagram session cookies are included,
-// allowing CDN thumbnails to load after the hidden browser has visited a profile.
+// CDN thumbnails are signed URLs — no auth needed, but Electron rejects cross-origin
+// Referer headers (www.instagram.com → scontent-*.cdninstagram.com). Strip them and
+// verify we got an image (not an HTML redirect page encoded as base64).
 ipcMain.handle('fetch-image', async (_event, opts: { url: string; headers?: Record<string, string> }) => {
   try {
-    const response = await session.defaultSession.fetch(opts.url, {
+    // Strip cross-origin Referer/Origin — same fix as geelark-request
+    const { Referer: _r, referer: _r2, Origin: _o, origin: _o2, ...safeHeaders } = opts.headers ?? {}
+    const response = await net.fetch(opts.url, {
       method: 'GET',
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-        ...(opts.headers ?? {}),
+        ...safeHeaders,
       },
-    })
+      referrerPolicy: 'no-referrer',
+    } as RequestInit)
     if (!response.ok) return { ok: false, error: `HTTP ${response.status}` }
-    const buffer = await response.arrayBuffer()
     const contentType = response.headers.get('content-type') ?? 'image/jpeg'
+    // Guard: if Instagram returned an HTML login page instead of an image, bail out
+    if (!contentType.startsWith('image/') && !contentType.includes('octet-stream')) {
+      return { ok: false, error: `Not an image: ${contentType}` }
+    }
+    const buffer = await response.arrayBuffer()
     const b64 = Buffer.from(buffer).toString('base64')
     return { ok: true, dataUrl: `data:${contentType};base64,${b64}` }
   } catch (err: unknown) {

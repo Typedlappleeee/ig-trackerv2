@@ -69,13 +69,7 @@ function VideoThumbnail({ src }: { src: string }) {
     if (!src) { setFailed(true); return }
     if (!window.electronAPI?.fetchImage) { setFailed(true); return }
     let cancelled = false
-    window.electronAPI.fetchImage({
-      url: src,
-      headers: {
-        'Referer': 'https://www.instagram.com/',
-        'Origin':  'https://www.instagram.com',
-      },
-    }).then(res => {
+    window.electronAPI.fetchImage({ url: src }).then(res => {
       if (cancelled) return
       if (res.ok && res.dataUrl) setDataUrl(res.dataUrl)
       else setFailed(true)
