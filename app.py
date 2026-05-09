@@ -58,6 +58,7 @@ MUTED    = "#2a2f44"
 TRANSLATIONS = {
     "fr": {
         # Sidebar
+        "tab.dashboard":    "Dashboard",
         "tab.phones":       "Téléphones",
         "tab.insta":        "INSTA",
         "tab.stats":        "Stats",
@@ -69,6 +70,18 @@ TRANSLATIONS = {
         "tab.montage":      "MONTAGE",
         "tab.automation":   "Montage vidéo",
         "tab.settings":     "Paramètres",
+        # Dashboard
+        "dash.title":       "Dashboard",
+        "dash.subtitle":    "Vues totales par jour — temps réel",
+        "dash.range.24h":   "24 h",
+        "dash.range.7d":    "7 jours",
+        "dash.range.30d":   "30 jours",
+        "dash.range.all":   "Tout",
+        "dash.kpi.today":   "VUES AUJOURD'HUI",
+        "dash.kpi.delta":   "ÉVOLUTION 24 H",
+        "dash.kpi.peak":    "PIC MAX",
+        "dash.kpi.avg":     "MOYENNE / JOUR",
+        "dash.empty":       "Pas encore d'historique — rafraîchis pour démarrer le suivi",
         # Stat cards
         "card.phones":      "TÉLÉPHONES",
         "card.active":      "IG ACTIFS",
@@ -92,8 +105,58 @@ TRANSLATIONS = {
         "soon.label":            "BIENTÔT",
         "soon.twitter":          "Twitter",
         "soon.threads":          "Threads",
+        # Posting tab
+        "post.title":            "Posting",
+        "post.subtitle":         "Publiez des Reels sur vos comptes GéeLark",
+        "post.video":            "Vidéo à poster",
+        "post.no_video":         "Aucune vidéo sélectionnée",
+        "post.bank_empty":       "Banque vide — ajoute des vidéos",
+        "post.targets":          "Comptes cibles",
+        "post.group":            "Groupe :",
+        "post.all":              "Tous",
+        "post.caption":          "Caption",
+        "post.caption_hint":     "Ctrl+A pour tout sélectionner · Ctrl+V pour coller",
+        "post.delay":            "Délai entre comptes :",
+        "post.delay_hint":       "min entre chaque compte",
+        "post.launch":           "🚀  Lancer le posting",
+        "post.waiting":          "En attente",
+        "post.no_account":       "⚠ Sélectionne au moins un téléphone",
+        "post.no_video_msg":     "⚠ Sélectionne une vidéo dans la banque",
+        "post.no_caption":       "⚠ La caption est obligatoire",
+        "post.no_token":         "❌ Bearer Token GéeLark manquant",
+        "post.journal":          "Journal détaillé",
+        # Mass posting
+        "mp.title":              "Mass Posting",
+        "mp.video_pool":         "📹  POOL DE VIDÉOS",
+        "mp.caption_pool":       "💬  POOL DE CAPTIONS",
+        "mp.add":                "+ Ajouter",
+        "mp.remove":             "✕ Retirer",
+        # Bank tab
+        "bank.title":            "Banque de vidéos",
+        "bank.subtitle":         "Toutes tes vidéos exportées",
+        "bank.empty":            "Aucune vidéo — exporte depuis Montage",
+        # Stats tab
+        "stats.title":           "Stats Instagram",
+        "stats.subtitle":        "Statistiques de tes comptes Instagram",
+        "stats.select":          "Sélectionne un compte →",
+        "stats.no_videos":       "Aucune vidéo enregistrée",
+        "stats.sort_recent":     "Plus récent",
+        "stats.sort_old":        "Plus ancien",
+        "stats.sort_views_desc": "+ de vues",
+        "stats.sort_views_asc":  "- de vues",
+        "stats.sort_likes_desc": "+ de likes",
+        # Common
+        "common.add":            "Ajouter",
+        "common.load":           "Charger",
+        "common.export":         "Exporter",
+        "common.start":          "▶ Démarrer",
+        "common.stop":           "■ Arrêter",
+        "common.test":           "Tester",
+        "common.copy":           "📋 Copier",
+        "common.browse":         "📂 Parcourir",
     },
     "en": {
+        "tab.dashboard":    "Dashboard",
         "tab.phones":       "Phones",
         "tab.insta":        "INSTA",
         "tab.stats":        "Stats",
@@ -105,6 +168,17 @@ TRANSLATIONS = {
         "tab.montage":      "EDITING",
         "tab.automation":   "Video Editor",
         "tab.settings":     "Settings",
+        "dash.title":       "Dashboard",
+        "dash.subtitle":    "Total views per day — live",
+        "dash.range.24h":   "24 h",
+        "dash.range.7d":    "7 days",
+        "dash.range.30d":   "30 days",
+        "dash.range.all":   "All",
+        "dash.kpi.today":   "VIEWS TODAY",
+        "dash.kpi.delta":   "24H CHANGE",
+        "dash.kpi.peak":    "PEAK",
+        "dash.kpi.avg":     "AVG / DAY",
+        "dash.empty":       "No history yet — refresh to start tracking",
         "card.phones":      "PHONES",
         "card.active":      "IG ACTIVE",
         "card.banned":      "BANNED",
@@ -121,6 +195,50 @@ TRANSLATIONS = {
         "settings.appearance":   "Appearance",
         "settings.notifications": "Notifications",
         "settings.language":     "Language",
+        "post.title":            "Posting",
+        "post.subtitle":         "Publish Reels to your GéeLark accounts",
+        "post.video":            "Video to post",
+        "post.no_video":         "No video selected",
+        "post.bank_empty":       "Bank empty — add videos",
+        "post.targets":          "Target accounts",
+        "post.group":            "Group:",
+        "post.all":              "All",
+        "post.caption":          "Caption",
+        "post.caption_hint":     "Ctrl+A to select all · Ctrl+V to paste",
+        "post.delay":            "Delay between accounts:",
+        "post.delay_hint":       "min between each account",
+        "post.launch":           "🚀  Launch posting",
+        "post.waiting":          "Waiting",
+        "post.no_account":       "⚠ Select at least one phone",
+        "post.no_video_msg":     "⚠ Select a video from the bank",
+        "post.no_caption":       "⚠ Caption is required",
+        "post.no_token":         "❌ GéeLark Bearer Token missing",
+        "post.journal":          "Detailed log",
+        "mp.title":              "Mass Posting",
+        "mp.video_pool":         "📹  VIDEO POOL",
+        "mp.caption_pool":       "💬  CAPTION POOL",
+        "mp.add":                "+ Add",
+        "mp.remove":             "✕ Remove",
+        "bank.title":            "Video bank",
+        "bank.subtitle":         "All your exported videos",
+        "bank.empty":            "No videos — export from Editor",
+        "stats.title":           "Instagram Stats",
+        "stats.subtitle":        "Stats for your Instagram accounts",
+        "stats.select":          "Select an account →",
+        "stats.no_videos":       "No videos recorded",
+        "stats.sort_recent":     "Most recent",
+        "stats.sort_old":        "Oldest",
+        "stats.sort_views_desc": "Most views",
+        "stats.sort_views_asc":  "Fewest views",
+        "stats.sort_likes_desc": "Most likes",
+        "common.add":            "Add",
+        "common.load":           "Load",
+        "common.export":         "Export",
+        "common.start":          "▶ Start",
+        "common.stop":           "■ Stop",
+        "common.test":           "Test",
+        "common.copy":           "📋 Copy",
+        "common.browse":         "📂 Browse",
         "soon.label":            "SOON",
         "soon.twitter":          "Twitter",
         "soon.threads":          "Threads",
@@ -302,13 +420,16 @@ def _parse_ig_graphql(user, username):
         if n.get("is_video"):
             caps = n.get("edge_media_to_caption", {}).get("edges", [])
             videos.append({
-                "id":       n.get("shortcode"),
-                "url":      f"https://www.instagram.com/reel/{n.get('shortcode')}/",
-                "views":    n.get("video_view_count", 0),
-                "likes":    n.get("edge_liked_by", {}).get("count", 0),
-                "comments": n.get("edge_media_to_comment", {}).get("count", 0),
-                "shares":   n.get("reshare_count", 0),
-                "caption":  (caps[0]["node"]["text"][:120] if caps else ""),
+                "id":            n.get("shortcode"),
+                "url":           f"https://www.instagram.com/reel/{n.get('shortcode')}/",
+                "views":         n.get("video_view_count", 0),
+                "likes":         n.get("edge_liked_by", {}).get("count", 0),
+                "comments":      n.get("edge_media_to_comment", {}).get("count", 0),
+                "shares":        n.get("reshare_count", 0),
+                "caption":       (caps[0]["node"]["text"][:120] if caps else ""),
+                "thumbnail_url": n.get("thumbnail_src") or n.get("display_url", ""),
+                "display_url":   n.get("display_url", ""),
+                "taken_at":      n.get("taken_at_timestamp", 0),
             })
     return {
         "ig_status":   "active",
@@ -747,13 +868,19 @@ def scrape_ig_direct(username: str, password: str, proxy: str | None = None,
         try:
             for m in cl.user_medias(u.pk, amount=20):
                 views = getattr(m, "view_count", 0) or getattr(m, "play_count", 0) or 0
+                tu = getattr(m, "thumbnail_url", "") or ""
+                if not tu:
+                    pic = getattr(m, "video_url", "") or getattr(m, "display_uri", "") or ""
+                    tu = str(pic) if pic else ""
                 videos.append({
-                    "id":       m.code,
-                    "views":    views,
-                    "likes":    m.like_count or 0,
-                    "comments": m.comment_count or 0,
-                    "shares":   getattr(m, "reshare_count", 0) or 0,
-                    "caption":  (m.caption_text or "")[:80],
+                    "id":            m.code,
+                    "views":         views,
+                    "likes":         m.like_count or 0,
+                    "comments":      m.comment_count or 0,
+                    "shares":        getattr(m, "reshare_count", 0) or 0,
+                    "caption":       (m.caption_text or "")[:80],
+                    "thumbnail_url": str(tu),
+                    "taken_at":      int(getattr(m, "taken_at", 0).timestamp()) if getattr(m, "taken_at", None) else 0,
                 })
         except Exception:
             pass
@@ -892,13 +1019,24 @@ def scrape_ig_by_session(username: str, sessionid: str) -> dict:
                          item.get("video_view_count") or
                          item.get("view_count") or 0)
                 caps  = item.get("caption") or {}
+                # Best thumbnail: image_versions2.candidates[0].url
+                thumb_url = ""
+                try:
+                    iv2 = item.get("image_versions2", {}) or {}
+                    cands = iv2.get("candidates") or []
+                    if cands:
+                        thumb_url = cands[0].get("url", "")
+                except Exception:
+                    pass
                 videos.append({
-                    "id":       code,
-                    "views":    views,
-                    "likes":    item.get("like_count", 0),
-                    "comments": item.get("comment_count", 0),
-                    "shares":   item.get("reshare_count", 0),
-                    "caption":  (caps.get("text", "") if isinstance(caps, dict) else "")[:80],
+                    "id":            code,
+                    "views":         views,
+                    "likes":         item.get("like_count", 0),
+                    "comments":      item.get("comment_count", 0),
+                    "shares":        item.get("reshare_count", 0),
+                    "caption":       (caps.get("text", "") if isinstance(caps, dict) else "")[:80],
+                    "thumbnail_url": thumb_url,
+                    "taken_at":      int(item.get("taken_at") or 0),
                 })
 
             return {
@@ -1837,6 +1975,8 @@ class App:
         _ = lambda k: t(k, L)
 
         # Standalone
+        _reg("dashboard", "📈", _("tab.dashboard"))
+        tk.Frame(self.sidebar, height=1, bg=BORDER).pack(fill="x", pady=2)
         _reg("phones", "📱", _("tab.phones"))
         tk.Frame(self.sidebar, height=1, bg=BORDER).pack(fill="x", pady=2)
 
@@ -1891,6 +2031,7 @@ class App:
         # ── Main: stat cards ───────────────────────────────────────────────────
         sf = tk.Frame(self.main_frame, bg=BG)
         sf.pack(fill="x", padx=18, pady=(18, 10))
+        self._top_stat_cards = sf
 
         self.sv = {}
         card_data = [
@@ -1947,6 +2088,7 @@ class App:
         self.tab_container.pack(fill="both", expand=True, padx=18, pady=(0, 18))
 
         self.tabs = {}
+        self._build_dashboard_tab()
         self._build_phones_tab()
         self._build_stats_tab()
         self._build_automation_tab()
@@ -1963,6 +2105,75 @@ class App:
                     add="+")
         for child in widget.winfo_children():
             self._bind_mousewheel(child, canvas)
+
+    def _post_load_preview_into(self, cv, video_path, ref_attr):
+        """Extract a thumbnail from video_path and render onto canvas cv."""
+        if not cv or not cv.winfo_exists() or not PIL_OK:
+            return
+        ffmpeg = self._find_ffmpeg()
+        if not ffmpeg or not Path(video_path).exists():
+            return
+
+        def _bg():
+            try:
+                cache_dir = BASE_DIR / "_bank_thumbs"
+                cache_dir.mkdir(exist_ok=True)
+                key = hashlib.md5(str(video_path).encode()).hexdigest()[:12]
+                jpg = cache_dir / f"post_{key}.jpg"
+                if not jpg.exists():
+                    subprocess.run([ffmpeg, "-y", "-ss", "1", "-i", video_path,
+                                    "-frames:v", "1", "-q:v", "4",
+                                    "-vf", "scale=540:-2", str(jpg)],
+                                    capture_output=True, timeout=8)
+                if not jpg.exists():
+                    return
+                img = Image.open(jpg).convert("RGB")
+                w = cv.winfo_width() or 280
+                h = int(cv.cget("height")) or 130
+                iw, ih = img.size
+                target = w / h
+                src = iw / ih
+                if src > target:
+                    nw = int(ih * target)
+                    img = img.crop(((iw - nw) // 2, 0, (iw - nw) // 2 + nw, ih))
+                else:
+                    nh = int(iw / target)
+                    img = img.crop((0, (ih - nh) // 2, iw, (ih - nh) // 2 + nh))
+                img = img.resize((w, h), Image.LANCZOS)
+                overlay = Image.new("RGBA", (w, h), (0, 0, 0, 60))
+                final = Image.alpha_composite(img.convert("RGBA"), overlay).convert("RGB")
+                photo = ImageTk.PhotoImage(final)
+
+                def _apply():
+                    if not cv.winfo_exists():
+                        return
+                    cv.delete("all")
+                    setattr(self, ref_attr, photo)
+                    cv.create_image(0, 0, anchor="nw", image=photo)
+                    cx, cy = w // 2, h // 2
+                    cv.create_oval(cx - 20, cy - 20, cx + 20, cy + 20,
+                                    outline="#ffffff88", width=2)
+                    cv.create_polygon(cx - 6, cy - 10, cx - 6, cy + 10, cx + 10, cy,
+                                       fill="#ffffff", outline="")
+                    name = Path(video_path).name
+                    cv.create_rectangle(8, h - 22, 8 + 8 + len(name) * 6, h - 6,
+                                         fill="#000000aa", outline="")
+                    cv.create_text(12, h - 14, anchor="w", text=name,
+                                    fill="#ffffff", font=("Consolas", 8, "bold"))
+                self.root.after(0, _apply)
+            except Exception:
+                pass
+
+        threading.Thread(target=_bg, daemon=True).start()
+
+    def _post_load_preview(self, video_path):
+        cv = getattr(self, "_post_preview_canvas", None)
+        if not cv:
+            return
+        if not video_path or not Path(video_path).exists():
+            self._post_draw_preview(Path(video_path).name if video_path else "—")
+            return
+        self._post_load_preview_into(cv, video_path, "_post_preview_img_ref")
 
     def _bind_hover(self, widget, bg_normal, bg_hover, fg_normal=None, fg_hover=None):
         """Smooth hover animation on any button/label."""
@@ -2080,6 +2291,16 @@ class App:
             if not children.winfo_ismapped():
                 children.pack(fill="x")
 
+        # Show top stat cards only on data-heavy tabs
+        if hasattr(self, "_top_stat_cards"):
+            keep = {"dashboard", "phones", "stats", "posting"}
+            if key in keep:
+                if not self._top_stat_cards.winfo_ismapped():
+                    self._top_stat_cards.pack(fill="x", padx=18, pady=(18, 10),
+                                               before=self.tab_container)
+            else:
+                self._top_stat_cards.pack_forget()
+
         for k, ind in self._sidebar_indicators.items():
             active = k == key
             btn = self.tab_btns[k]
@@ -2101,6 +2322,7 @@ class App:
         if key == "bank":     self._refresh_bank()
         if key == "automation": self._refresh_auto_phones()
         if key == "masspost": self._mp_refresh_phones()
+        if key == "dashboard": self._dash_redraw_chart()
 
     def _on_global_scroll(self, event):
         """Route mousewheel only to widgets that genuinely need scrolling.
@@ -2148,17 +2370,289 @@ class App:
     # ══════════════════════════════════════════════════════════════════════════
     # ONGLET TÉLÉPHONES
     # ══════════════════════════════════════════════════════════════════════════
+    # ══════════════════════════════════════════════════════════════════════════
+    # DASHBOARD TAB
+    # ══════════════════════════════════════════════════════════════════════════
+    def _views_history_path(self):
+        return BASE_DIR / "views_history.json"
+
+    def _views_history_load(self):
+        p = self._views_history_path()
+        if not p.exists():
+            return {}
+        try:
+            return json.loads(p.read_text(encoding="utf-8"))
+        except Exception:
+            return {}
+
+    def _views_history_snapshot(self):
+        """Snapshot total views (sum across all phones / all videos) for today."""
+        try:
+            total = 0
+            for d in self.data.values():
+                for v in d.get("videos", []) or []:
+                    total += int(v.get("views") or 0)
+            today = datetime.now().strftime("%Y-%m-%d")
+            hist = self._views_history_load()
+            hist[today] = total
+            # Keep last 365 days
+            keys = sorted(hist.keys())[-365:]
+            hist = {k: hist[k] for k in keys}
+            self._views_history_path().write_text(
+                json.dumps(hist, indent=2), encoding="utf-8")
+            self._dash_redraw_chart()
+        except Exception:
+            pass
+
+    def _build_dashboard_tab(self):
+        L = self.cfg.get("lang", "fr")
+        _ = lambda k: t(k, L)
+
+        f = tk.Frame(self.tab_container, bg=BG)
+        self.tabs["dashboard"] = f
+
+        self._tab_header(f, "📈", _("dash.title"), _("dash.subtitle"), ACCENT)
+
+        # Range selector
+        ctrl = tk.Frame(f, bg=BG)
+        ctrl.pack(fill="x", padx=20, pady=(4, 8))
+
+        self._dash_range = tk.StringVar(value="7d")
+        self._dash_range_btns = {}
+        for code, lbl in [("24h", _("dash.range.24h")),
+                          ("7d",  _("dash.range.7d")),
+                          ("30d", _("dash.range.30d")),
+                          ("all", _("dash.range.all"))]:
+            b = tk.Button(ctrl, text=lbl, font=("Segoe UI", 9),
+                          bg=SURFACE2, fg=TEXT2, relief="flat", cursor="hand2",
+                          padx=14, pady=6, bd=0,
+                          command=lambda c=code: self._dash_set_range(c))
+            b.pack(side="left", padx=(0, 6))
+            self._dash_range_btns[code] = b
+
+        # KPI row
+        kpi_row = tk.Frame(f, bg=BG)
+        kpi_row.pack(fill="x", padx=20, pady=(0, 10))
+        self._dash_kpis = {}
+        for k, lbl, col in [
+            ("today", _("dash.kpi.today"), ACCENT),
+            ("delta", _("dash.kpi.delta"), OK),
+            ("peak",  _("dash.kpi.peak"),  WARN),
+            ("avg",   _("dash.kpi.avg"),   TEXT2),
+        ]:
+            kc_outer, ki = self._round_card(kpi_row, radius=12, bg=CARD,
+                                             border=BORDER, border_w=1)
+            kc_outer.pack(side="left", fill="both", expand=True, padx=(0, 8))
+            kc_outer.configure(height=82)
+            kc_outer.pack_propagate(False)
+            tk.Frame(ki, height=2, bg=col).pack(fill="x")
+            kp = tk.Frame(ki, bg=CARD, padx=14, pady=10)
+            kp.pack(fill="both", expand=True)
+            tk.Label(kp, text=lbl, font=("Segoe UI", 7, "bold"),
+                     bg=CARD, fg=TEXT2).pack(anchor="w")
+            v = tk.Label(kp, text="—", font=("Segoe UI", 22, "bold"),
+                         bg=CARD, fg=col)
+            v.pack(anchor="w", pady=(2, 0))
+            self._dash_kpis[k] = v
+
+        # Chart card
+        chart_outer, chart_inner = self._round_card(f, radius=14, bg=CARD,
+                                                     border=BORDER, border_w=1)
+        chart_outer.pack(fill="both", expand=True, padx=20, pady=(0, 18))
+        tk.Frame(chart_inner, height=2, bg=ACCENT).pack(fill="x")
+
+        chart_top = tk.Frame(chart_inner, bg=CARD, padx=18, pady=(12, 6))
+        chart_top.pack(fill="x")
+        tk.Label(chart_top, text=("📊  COURBE DES VUES"
+                                  if L == "fr" else "📊  VIEWS CURVE"),
+                 font=("Consolas", 9, "bold"), bg=CARD, fg=TEXT2).pack(side="left")
+        self._dash_status = tk.Label(chart_top, text="", font=("Segoe UI", 8),
+                                       bg=CARD, fg=MUTED)
+        self._dash_status.pack(side="right")
+
+        self._dash_chart = tk.Canvas(chart_inner, bg=CARD,
+                                      highlightthickness=0)
+        self._dash_chart.pack(fill="both", expand=True, padx=18, pady=(0, 18))
+        self._dash_chart.bind("<Configure>", lambda e: self._dash_redraw_chart())
+
+        self._dash_set_range("7d")
+
+    def _dash_set_range(self, code):
+        self._dash_range.set(code)
+        for c, b in self._dash_range_btns.items():
+            if c == code:
+                b.config(bg=ACCENT, fg="#06080f", font=("Segoe UI", 9, "bold"))
+            else:
+                b.config(bg=SURFACE2, fg=TEXT2, font=("Segoe UI", 9))
+        self._dash_redraw_chart()
+
+    def _dash_redraw_chart(self):
+        cv = getattr(self, "_dash_chart", None)
+        if not cv or not cv.winfo_exists():
+            return
+        L = self.cfg.get("lang", "fr")
+        hist = self._views_history_load()
+
+        # Always include today (live)
+        try:
+            today_total = sum(
+                int(v.get("views") or 0)
+                for d in self.data.values()
+                for v in (d.get("videos") or []))
+            today = datetime.now().strftime("%Y-%m-%d")
+            hist = dict(hist)
+            hist[today] = today_total
+        except Exception:
+            pass
+
+        if not hist:
+            cv.delete("all")
+            w = cv.winfo_width() or 600
+            h = cv.winfo_height() or 240
+            cv.create_text(w//2, h//2, text=t("dash.empty", L),
+                           fill=MUTED, font=("Segoe UI", 11))
+            for k, lbl in self._dash_kpis.items():
+                lbl.config(text="—")
+            return
+
+        rng = self._dash_range.get()
+        all_keys = sorted(hist.keys())
+        if rng == "24h":
+            keys = all_keys[-2:]
+        elif rng == "7d":
+            keys = all_keys[-7:]
+        elif rng == "30d":
+            keys = all_keys[-30:]
+        else:
+            keys = all_keys
+        if not keys:
+            keys = all_keys[-1:]
+
+        values = [int(hist.get(k, 0)) for k in keys]
+
+        # KPIs
+        today_v = values[-1] if values else 0
+        prev_v  = values[-2] if len(values) > 1 else today_v
+        delta   = today_v - prev_v
+        peak    = max(values) if values else 0
+        avg     = sum(values) // max(1, len(values))
+        self._dash_kpis["today"].config(text=fmt(today_v))
+        sign = "+" if delta >= 0 else ""
+        self._dash_kpis["delta"].config(
+            text=f"{sign}{fmt(delta)}",
+            fg=OK if delta >= 0 else DANGER)
+        self._dash_kpis["peak"].config(text=fmt(peak))
+        self._dash_kpis["avg"].config(text=fmt(avg))
+
+        # Status
+        if self._dash_status:
+            self._dash_status.config(
+                text=f"{len(keys)} jour(s) · maj " + datetime.now().strftime("%H:%M:%S")
+                if L == "fr" else
+                f"{len(keys)} day(s) · updated " + datetime.now().strftime("%H:%M:%S"))
+
+        # Draw chart
+        cv.delete("all")
+        w = cv.winfo_width() or 600
+        h = cv.winfo_height() or 260
+        margin_l, margin_r = 56, 24
+        margin_t, margin_b = 18, 36
+
+        plot_w = w - margin_l - margin_r
+        plot_h = h - margin_t - margin_b
+        if plot_w < 10 or plot_h < 10:
+            return
+
+        max_v = max(values) if values else 1
+        min_v = 0
+        rng_v = max(1, max_v - min_v)
+
+        # Y-axis grid + labels
+        for i in range(5):
+            y = margin_t + i * plot_h / 4
+            cv.create_line(margin_l, y, w - margin_r, y,
+                            fill=BORDER, dash=(2, 4))
+            v_at = max_v - (i * rng_v / 4)
+            cv.create_text(margin_l - 6, y, anchor="e",
+                            text=fmt(int(v_at)),
+                            fill=TEXT2, font=("Consolas", 8))
+
+        # X labels
+        n = len(keys)
+        if n == 1:
+            xs = [margin_l + plot_w / 2]
+        else:
+            xs = [margin_l + i * plot_w / (n - 1) for i in range(n)]
+        # Show only ~6 evenly-spaced date labels
+        step = max(1, n // 6)
+        for i, k in enumerate(keys):
+            if i % step != 0 and i != n - 1:
+                continue
+            try:
+                d = datetime.strptime(k, "%Y-%m-%d")
+                lbl = d.strftime("%d/%m")
+            except Exception:
+                lbl = k
+            cv.create_text(xs[i], h - margin_b + 14, anchor="n",
+                            text=lbl, fill=TEXT2, font=("Consolas", 8))
+
+        # Build line points
+        pts = []
+        for i, v in enumerate(values):
+            x = xs[i]
+            y = margin_t + plot_h - (v - min_v) / rng_v * plot_h
+            pts.append((x, y))
+
+        # Filled area below line
+        if len(pts) >= 2:
+            poly = []
+            poly.append(pts[0][0])
+            poly.append(margin_t + plot_h)
+            for px, py in pts:
+                poly.append(px)
+                poly.append(py)
+            poly.append(pts[-1][0])
+            poly.append(margin_t + plot_h)
+            cv.create_polygon(*poly, fill="#c8f13522", outline="")
+
+        # Line
+        if len(pts) >= 2:
+            flat = []
+            for px, py in pts:
+                flat += [px, py]
+            cv.create_line(*flat, fill=ACCENT, width=2, smooth=True)
+
+        # Dots
+        for i, (px, py) in enumerate(pts):
+            r = 4 if i == len(pts) - 1 else 3
+            col = ACCENT if i < len(pts) - 1 else "#ffffff"
+            cv.create_oval(px - r, py - r, px + r, py + r,
+                            fill=col, outline=ACCENT, width=2)
+            # Value label on last point
+            if i == len(pts) - 1:
+                cv.create_text(px, py - 14, text=fmt(values[i]),
+                                fill=TEXT, font=("Segoe UI", 9, "bold"))
+
     def _build_phones_tab(self):
+        L = self.cfg.get("lang", "fr")
+        _ = lambda k: t(k, L)
         f = tk.Frame(self.tab_container, bg=BG)
         self.tabs["phones"] = f
 
-        self._tab_header(f, "📱", "Téléphones GéeLark",
-                         "Gérez vos cloud phones et comptes Instagram liés", ACCENT)
+        self._tab_header(f, "📱",
+                         "Téléphones GéeLark" if L == "fr" else "GéeLark Phones",
+                         ("Gérez vos cloud phones et comptes Instagram liés"
+                          if L == "fr"
+                          else "Manage your cloud phones and linked Instagram accounts"),
+                         ACCENT)
 
-        # ── Toolbar row 1: filters ─────────────────────────────────────────────
-        tb1 = tk.Frame(f, bg=SURFACE2, padx=12, pady=8,
-                       highlightthickness=1, highlightbackground=BORDER)
-        tb1.pack(fill="x", pady=(0, 2))
+        # ── Toolbar row 1: filters (rounded card) ──────────────────────────────
+        tb_outer, tb1 = self._round_card(f, radius=10, bg=SURFACE2,
+                                          border=BORDER, border_w=1)
+        tb_outer.pack(fill="x", padx=20, pady=(0, 6))
+        tk.Frame(tb1, height=2, bg=ACCENT).pack(fill="x")
+        tb1 = tk.Frame(tb1, bg=SURFACE2, padx=12, pady=8)
+        tb1.pack(fill="x")
 
         tk.Label(tb1, text="Groupe", font=("Segoe UI", 9),
                  bg=SURFACE2, fg=TEXT2).pack(side="left")
@@ -2236,10 +2730,16 @@ class App:
         self.tree.bind("<Button-3>",         self._phone_context_menu)
         self.tree.bind("<ButtonRelease-1>",  self._phone_dot_click)
 
-        vsb = ttk.Scrollbar(f, orient="vertical", command=self.tree.yview)
+        # Wrap tree in rounded card for consistent look
+        tree_outer, tree_inner = self._round_card(f, radius=10, bg=CARD,
+                                                    border=BORDER, border_w=1)
+        tree_outer.pack(fill="both", expand=True, padx=20, pady=(0, 18))
+
+        vsb = ttk.Scrollbar(tree_inner, orient="vertical", command=self.tree.yview)
         self.tree.configure(yscrollcommand=vsb.set)
-        self.tree.pack(side="left", fill="both", expand=True)
-        vsb.pack(side="right", fill="y")
+        self.tree.pack(in_=tree_inner, side="left", fill="both", expand=True,
+                        padx=(2, 0), pady=2)
+        vsb.pack(in_=tree_inner, side="right", fill="y")
 
     def _on_sel(self, e):
         self.sel_ids = list(self.tree.selection())
@@ -2787,15 +3287,32 @@ class App:
                             top=tier_top, bot=tier_bot, ac=accent_c):
                 """Try to load IG CDN thumbnail, fall back to gradient."""
                 img_pil = None
-                if tu and PIL_OK:
-                    try:
-                        import urllib.request
-                        with urllib.request.urlopen(tu, timeout=8) as resp:
-                            data = resp.read()
-                        from io import BytesIO
-                        img_pil = Image.open(BytesIO(data)).convert("RGB")
-                    except Exception:
-                        img_pil = None
+                if PIL_OK:
+                    candidates = []
+                    if tu:
+                        candidates.append(tu)
+                    if s:
+                        # Public CDN proxy fallbacks
+                        candidates.append(f"https://www.instagram.com/p/{s}/media/?size=l")
+                        candidates.append(f"https://www.instagram.com/p/{s}/media/?size=m")
+                    headers = {
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+                                       " AppleWebKit/537.36 (KHTML, like Gecko)"
+                                       " Chrome/120.0 Safari/537.36",
+                    }
+                    for url in candidates:
+                        try:
+                            import urllib.request
+                            req = urllib.request.Request(url, headers=headers)
+                            with urllib.request.urlopen(req, timeout=6) as resp:
+                                data = resp.read()
+                            from io import BytesIO
+                            img_pil = Image.open(BytesIO(data)).convert("RGB")
+                            if img_pil.size[0] >= 100:
+                                break
+                            img_pil = None
+                        except Exception:
+                            continue
 
                 def _apply(img=img_pil):
                     if not cv.winfo_exists():
@@ -2825,9 +3342,9 @@ class App:
                         cv._img_ref = photo
                         cv.create_image(0, 0, anchor="nw", image=photo)
                     else:
-                        # Gradient fallback
-                        for k in range(20):
-                            t = k / 19
+                        # Aesthetic gradient fallback: diagonal blend + glow + grid
+                        for k in range(40):
+                            t = k / 39
                             try:
                                 rr = int(int(top[1:3], 16)*(1-t) + int(bot[1:3], 16)*t)
                                 gg = int(int(top[3:5], 16)*(1-t) + int(bot[3:5], 16)*t)
@@ -2835,8 +3352,16 @@ class App:
                                 col = f"#{rr:02x}{gg:02x}{bb:02x}"
                             except Exception:
                                 col = top
-                            cv.create_rectangle(0, k*h/20, w, (k+1)*h/20,
+                            cv.create_rectangle(0, k*h/40, w, (k+1)*h/40,
                                                  fill=col, outline="")
+                        # Soft radial-ish glow at center
+                        for rad in range(50, 8, -8):
+                            cv.create_oval(w//2 - rad, h//2 - rad,
+                                            w//2 + rad, h//2 + rad,
+                                            outline="#ffffff14", width=1)
+                        # Subtle grid lines for "video frame" feel
+                        for gx in range(0, w, 24):
+                            cv.create_line(gx, 0, gx, h, fill="#ffffff08")
                     # Play circle overlay
                     cx, cy = w // 2, h // 2
                     cv.create_oval(cx-18, cy-18, cx+18, cy+18,
@@ -3441,15 +3966,29 @@ class App:
         src = self.video_path_var.get()
         if not src or not Path(src).exists():
             return
-        ffmpeg = self._find_ffmpeg()
-        if not ffmpeg or not PIL_OK:
+        if not PIL_OK:
             return
         seek = getattr(self, "_tl_playhead_t", 0)
+
+        # Fast path: cached frame
+        cached = self._tl_frame_for_time(seek)
+        if cached:
+            try:
+                img = Image.open(cached).convert("RGB")
+                self._cached_pil_frame = img
+                self.root.after(0, lambda: self._redraw_overlay_fast(glowing=False))
+                self.root.after(0, self._tl_update_labels)
+                return
+            except Exception:
+                pass
+
+        ffmpeg = self._find_ffmpeg()
+        if not ffmpeg:
+            return
         frame = BASE_DIR / "_seek.jpg"
         try:
             cmd = [ffmpeg, "-y", "-ss", f"{seek:.2f}", "-i", src,
                    "-frames:v", "1", "-q:v", "4"]
-            # Low-res preview during playback for speed
             if getattr(self, "_tl_playing", [False])[0]:
                 cmd += ["-vf", "scale=540:-2"]
             cmd.append(str(frame))
@@ -3491,7 +4030,7 @@ class App:
             self._tl_play_after[0] = None
 
     def _tl_play_step(self):
-        """Advance playhead by ~0.25s and update preview in background thread."""
+        """Advance playhead at ~15fps using pre-extracted frames when available."""
         if not self._tl_playing[0]:
             return
         dur = getattr(self, "_tl_duration", 0)
@@ -3501,22 +4040,38 @@ class App:
         ce = getattr(self, "_tl_cut_end", dur) or dur
         cs = getattr(self, "_tl_cut_start", 0.0)
         cur = getattr(self, "_tl_playhead_t", 0.0)
-        if cur >= ce - 0.05 or cur < cs:
+
+        frames_ready = getattr(self, "_tl_frames_ready", False)
+        step = (1.0 / self.TL_FPS) if frames_ready else 0.25
+        interval_ms = int(1000 / self.TL_FPS) if frames_ready else 0
+
+        if cur >= ce - step or cur < cs:
             cur = cs
-        cur += 0.25
+        cur += step
         if cur >= ce:
             cur = cs
         self._tl_playhead_t = cur
         self._tl_redraw()
         self._tl_update_labels()
 
-        # Extract frame async; schedule next step when done
-        def _extract_and_advance():
-            self._tl_do_seek()
-            if self._tl_playing[0]:
-                self._tl_play_after[0] = self.root.after(0, self._tl_play_step)
-
-        threading.Thread(target=_extract_and_advance, daemon=True).start()
+        if frames_ready:
+            # Fast path: load cached frame and schedule next step at fixed interval
+            frame_path = self._tl_frame_for_time(cur)
+            if frame_path and frame_path.exists():
+                try:
+                    img = Image.open(frame_path).convert("RGB")
+                    self._cached_pil_frame = img
+                    self._redraw_overlay_fast(glowing=False)
+                except Exception:
+                    pass
+            self._tl_play_after[0] = self.root.after(interval_ms, self._tl_play_step)
+        else:
+            # Slow path: spawn ffmpeg in background; schedule next step when done
+            def _extract_and_advance():
+                self._tl_do_seek()
+                if self._tl_playing[0]:
+                    self._tl_play_after[0] = self.root.after(0, self._tl_play_step)
+            threading.Thread(target=_extract_and_advance, daemon=True).start()
 
     def _tl_set_cut(self, side):
         ph = getattr(self, "_tl_playhead_t", 0)
@@ -3997,12 +4552,68 @@ class App:
                 h, mi, s = m.groups()
                 dur = int(h) * 3600 + int(mi) * 60 + float(s)
                 self._tl_duration = dur
-                # Reset cut markers if newly loaded
                 self._tl_cut_start = 0.0
                 self._tl_cut_end = dur
                 self.root.after(0, self._tl_redraw)
+                # Pre-extract frame cache for smooth playback
+                threading.Thread(target=self._tl_prefetch_frames,
+                                  args=(src,), daemon=True).start()
         except Exception as e:
             print(f"Duration: {e}")
+
+    # Frame cache for smooth playback (~15 fps target)
+    TL_FPS = 15
+
+    def _tl_prefetch_frames(self, src):
+        """Pre-extract a frame sequence for smooth playback.
+        15 fps × 540px wide JPEGs cached in BASE_DIR/_tl_frames/{key}/
+        """
+        if not PIL_OK:
+            return
+        ffmpeg = self._find_ffmpeg()
+        if not ffmpeg:
+            return
+        key = hashlib.md5(str(Path(src).resolve()).encode()).hexdigest()[:12]
+        cache_dir = BASE_DIR / "_tl_frames" / key
+        cache_dir.mkdir(parents=True, exist_ok=True)
+
+        self._tl_frame_dir = cache_dir
+        self._tl_frame_key = key
+
+        # Skip extraction if first/last frames already cached and counts match
+        existing = sorted(cache_dir.glob("f_*.jpg"))
+        dur = getattr(self, "_tl_duration", 0)
+        expected = int(dur * self.TL_FPS) if dur else 0
+        if existing and abs(len(existing) - expected) < self.TL_FPS:
+            self._tl_frames_ready = True
+            return
+
+        # Clear stale frames
+        for f in existing:
+            try: f.unlink()
+            except Exception: pass
+
+        try:
+            subprocess.run(
+                [ffmpeg, "-y", "-i", src,
+                 "-vf", f"fps={self.TL_FPS},scale=540:-2",
+                 "-q:v", "5",
+                 str(cache_dir / "f_%05d.jpg")],
+                capture_output=True, timeout=300)
+            self._tl_frames_ready = True
+        except Exception:
+            self._tl_frames_ready = False
+
+    def _tl_frame_for_time(self, t):
+        """Return path to cached frame for time t, or None if not ready."""
+        if not getattr(self, "_tl_frames_ready", False):
+            return None
+        cache_dir = getattr(self, "_tl_frame_dir", None)
+        if not cache_dir:
+            return None
+        idx = max(1, int(t * self.TL_FPS) + 1)
+        p = cache_dir / f"f_{idx:05d}.jpg"
+        return p if p.exists() else None
 
     def _tl_load_thumbnails(self, src):
         """Extract evenly-spaced thumbnails for timeline strip."""
@@ -4926,11 +5537,12 @@ class App:
     # ══════════════════════════════════════════════════════════════════════════
     def _build_posting_tab(self):
         import random as _random
+        L = self.cfg.get("lang", "fr")
+        _ = lambda k: t(k, L)
         f = tk.Frame(self.tab_container, bg=BG)
         self.tabs["posting"] = f
 
-        self._tab_header(f, "🚀", "Posting",
-                         "Publiez des Reels sur vos comptes GéeLark", ACCENT)
+        self._tab_header(f, "🚀", _("post.title"), _("post.subtitle"), ACCENT)
 
         main = tk.Frame(f, bg=BG)
         main.pack(fill="both", expand=True, padx=20, pady=0)
@@ -4943,7 +5555,7 @@ class App:
         # Video selection from bank
         vid_hdr = tk.Frame(left, bg=BG)
         vid_hdr.pack(fill="x")
-        tk.Label(vid_hdr, text="Vidéo à poster", font=("Segoe UI", 10, "bold"),
+        tk.Label(vid_hdr, text=_("post.video"), font=("Segoe UI", 10, "bold"),
                  bg=BG, fg=TEXT2).pack(side="left")
         tk.Button(vid_hdr, text="↺", font=("Segoe UI", 9), bg=SURFACE2, fg=TEXT2,
                   relief="flat", cursor="hand2", padx=6, pady=2,
@@ -4952,10 +5564,38 @@ class App:
         self.post_vid_path = [None]
         self._post_bank_entries = []
 
+        # Thumbnail banner (shows preview of selected video)
+        self._post_preview_canvas = tk.Canvas(left, bg="#000",
+                                               highlightthickness=1,
+                                               highlightbackground=BORDER,
+                                               height=130)
+        self._post_preview_canvas.pack(fill="x", pady=(4, 0))
+        self._post_preview_img_ref = None
+
+        def _draw_post_preview(text="Aucune vidéo sélectionnée"):
+            cv = self._post_preview_canvas
+            cv.delete("all")
+            w = cv.winfo_width() or 280
+            h = 130
+            # Gradient background
+            for k in range(20):
+                tt = k / 19
+                rr = int(0x0c*(1-tt) + 0x18*tt)
+                gg = int(0x0e*(1-tt) + 0x1b*tt)
+                bb = int(0x17*(1-tt) + 0x28*tt)
+                cv.create_rectangle(0, k*h/20, w, (k+1)*h/20,
+                                     fill=f"#{rr:02x}{gg:02x}{bb:02x}", outline="")
+            cv.create_text(w//2, h//2, text=text, fill=MUTED,
+                            font=("Segoe UI", 9))
+        self._post_preview_canvas.bind("<Configure>",
+            lambda e: _draw_post_preview() if not self.post_vid_path[0]
+                      else self._post_load_preview(self.post_vid_path[0]))
+        self._post_draw_preview = _draw_post_preview
+
         _bank_outer, bank_frame = self._round_card(left, radius=10, bg=SURFACE,
                                                     border=BORDER)
-        _bank_outer.pack(fill="x", pady=(4, 0))
-        _bank_outer.configure(height=160)
+        _bank_outer.pack(fill="x", pady=(6, 0))
+        _bank_outer.configure(height=140)
         _bank_outer.pack_propagate(False)
 
         self.post_bank_lb = tk.Listbox(bank_frame, bg=SURFACE, fg=TEXT,
@@ -4986,6 +5626,7 @@ class App:
             n = len(cap)
             self.post_char_lbl.config(text=f"{n} / 2200",
                                        fg=DANGER if n > 2200 else MUTED)
+            self._post_load_preview(entry["path"])
 
         self.post_bank_lb.bind("<<ListboxSelect>>", _on_bank_lb_sel)
 
@@ -5003,11 +5644,11 @@ class App:
         _post_refresh_bank()
 
         # Phone list
-        tk.Label(left, text="Comptes cibles", font=("Segoe UI", 10, "bold"),
+        tk.Label(left, text=_("post.targets"), font=("Segoe UI", 10, "bold"),
                  bg=BG, fg=TEXT2).pack(anchor="w", pady=(12, 0))
         grp_row = tk.Frame(left, bg=BG)
         grp_row.pack(fill="x", pady=(4, 0))
-        tk.Label(grp_row, text="Groupe :", font=("Segoe UI", 9),
+        tk.Label(grp_row, text=_("post.group"), font=("Segoe UI", 9),
                  bg=BG, fg=TEXT2).pack(side="left")
         self._post_grp_var = tk.StringVar(value="Tous")
         self._post_grp_cb  = ttk.Combobox(grp_row, textvariable=self._post_grp_var,
@@ -5292,8 +5933,12 @@ class App:
         # ── Header ───────────────────────────────────────────────────────────
         hdr_row = tk.Frame(f, bg=BG)
         hdr_row.pack(fill="x")
-        self._tab_header(hdr_row, "⚡", "Mass Posting",
-                         "Pool de vidéos × captions → jusqu'à 20 téléphones simultanés", ACCENT)
+        L = self.cfg.get("lang", "fr")
+        self._tab_header(hdr_row, "⚡", t("mp.title", L),
+                         ("Pool de vidéos × captions → jusqu'à 20 téléphones simultanés"
+                          if L == "fr"
+                          else "Pool of videos × captions → up to 20 phones in parallel"),
+                         ACCENT)
         # BETA badge
         beta_lbl = tk.Label(hdr_row, text=" BETA ", font=("Segoe UI", 8, "bold"),
                             bg=WARN, fg="#07080d", padx=6, pady=2)
@@ -5317,16 +5962,32 @@ class App:
         tk.Label(linner, text="📹  POOL DE VIDÉOS", font=("Segoe UI", 9, "bold"),
                  bg=SURFACE, fg=ACCENT).pack(anchor="w", pady=(0, 4))
 
+        # Thumbnail preview canvas
+        self._mp_preview_canvas = tk.Canvas(linner, bg="#000",
+                                             highlightthickness=1,
+                                             highlightbackground=BORDER, height=110)
+        self._mp_preview_canvas.pack(fill="x", pady=(0, 6))
+        self._mp_preview_img_ref = None
+
         self._mp_vid_paths = []
         vlist_frame = tk.Frame(linner, bg=SURFACE2, highlightthickness=1,
                                highlightbackground=BORDER)
         vlist_frame.pack(fill="x")
         self._mp_vid_lb = tk.Listbox(vlist_frame, bg=SURFACE2, fg=TEXT,
                                       selectbackground=HL, selectforeground=ACCENT,
-                                      relief="flat", bd=0, height=7,
+                                      relief="flat", bd=0, height=6,
                                       font=("Segoe UI", 9), activestyle="none",
                                       cursor="hand2", exportselection=False)
         self._mp_vid_lb.pack(fill="both", expand=True, padx=4, pady=4)
+
+        def _on_mp_lb_sel(_e=None):
+            sel = self._mp_vid_lb.curselection()
+            if not sel:
+                return
+            path = self._mp_vid_paths[sel[0]]
+            self._post_load_preview_into(self._mp_preview_canvas, path,
+                                          ref_attr="_mp_preview_img_ref")
+        self._mp_vid_lb.bind("<<ListboxSelect>>", _on_mp_lb_sel)
 
         vbtn_row = tk.Frame(linner, bg=SURFACE)
         vbtn_row.pack(fill="x", pady=(4, 10))
@@ -5828,8 +6489,11 @@ class App:
 
         hdr_row = tk.Frame(f, bg=BG)
         hdr_row.pack(fill="x", pady=(0, 4))
-        self._tab_header(hdr_row, "🗂", "Banque de vidéos",
-                         "Stockez et gérez vos vidéos prêtes à poster", WARN)
+        L = self.cfg.get("lang", "fr")
+        self._tab_header(hdr_row, "🗂", t("bank.title", L),
+                         ("Stockez et gérez vos vidéos prêtes à poster"
+                          if L == "fr"
+                          else "Store and manage your videos ready to post"), WARN)
         tb = tk.Frame(f, bg=BG)
         tb.pack(fill="x", pady=(0, 8))
         self._mk_btn(tb, "↺  Rafraîchir", "ghost", self._refresh_bank,
@@ -6538,8 +7202,12 @@ class App:
         f = tk.Frame(self.tab_container, bg=BG)
         self.tabs["autocomment"] = f
 
-        self._tab_header(f, "🤖", "Automatisation",
-                         "Réponses automatiques aux commentaires via Groq AI", OK)
+        L = self.cfg.get("lang", "fr")
+        self._tab_header(f, "🤖",
+                         "Automatisation" if L == "fr" else "Automation",
+                         ("Réponses automatiques aux commentaires via Groq AI"
+                          if L == "fr"
+                          else "Automatic comment replies via Groq AI"), OK)
 
         main = tk.Frame(f, bg=BG)
         main.pack(fill="both", expand=True, padx=20, pady=(0, 10))
@@ -7053,8 +7721,12 @@ class App:
         f = tk.Frame(self.tab_container, bg=BG)
         self.tabs["tools"] = f
 
-        self._tab_header(f, "🔧", "Outils IA",
-                         "Génération de contenu & stratégie Instagram via Groq", WARN)
+        L = self.cfg.get("lang", "fr")
+        self._tab_header(f, "🔧",
+                         "Outils IA" if L == "fr" else "AI Tools",
+                         ("Génération de contenu & stratégie Instagram via Groq"
+                          if L == "fr"
+                          else "Content generation & Instagram strategy via Groq"), WARN)
 
         canvas_tools = tk.Canvas(f, bg=BG, highlightthickness=0)
         sb_tools = ttk.Scrollbar(f, orient="vertical", command=canvas_tools.yview)
@@ -7253,8 +7925,12 @@ class App:
         f = tk.Frame(self.tab_container, bg=BG)
         self.tabs["settings"] = f
 
-        self._tab_header(f, "⚙", "Paramètres",
-                         "Configuration de l'application et des connexions", TEXT2)
+        L = self.cfg.get("lang", "fr")
+        self._tab_header(f, "⚙",
+                         "Paramètres" if L == "fr" else "Settings",
+                         ("Configuration de l'application et des connexions"
+                          if L == "fr"
+                          else "Application and connection configuration"), TEXT2)
 
         # Sub-tab nav
         nav = tk.Frame(f, bg=SURFACE2, highlightthickness=1, highlightbackground=BORDER)
@@ -7292,8 +7968,15 @@ class App:
             self._settings_nav_btns[name].config(
                 bg=ACCENT, fg="#06080f", font=("Segoe UI", 10, "bold"))
 
-        for tab_name in ("Profil", "Connexions", "Paramètres généraux"):
-            b = tk.Button(nav_inner, text=tab_name, font=("Segoe UI", 10),
+        # Localized labels for the 3 settings sections
+        _settings_labels = {
+            "Paramètres généraux": ("Paramètres généraux" if L == "fr" else "General settings"),
+            "Profil":              ("Profil"              if L == "fr" else "Profile"),
+            "Connexions":          ("Connexions"          if L == "fr" else "Connections"),
+        }
+        for tab_name in ("Paramètres généraux", "Profil", "Connexions"):
+            b = tk.Button(nav_inner, text=_settings_labels[tab_name],
+                          font=("Segoe UI", 10),
                           bg=SURFACE2, fg=TEXT2, relief="flat", cursor="hand2",
                           padx=16, pady=6,
                           command=lambda n=tab_name: show_settings_panel(n))
@@ -7748,7 +8431,7 @@ class App:
                      font=("Segoe UI", 10), pady=8).pack(side="left", padx=(8, 0))
 
         # Show first panel by default
-        show_settings_panel("Profil")
+        show_settings_panel("Paramètres généraux")
 
         # Logs always at bottom
         log_header = tk.Frame(panel_host_wrap, bg=BG)
@@ -8052,6 +8735,12 @@ class App:
         self.sv["active"].config(text=str(active))
         self.sv["banned"].config(text=str(banned))
         self.sv["views"].config(text=fmt(views))
+
+        # Dashboard snapshot + redraw (live)
+        try:
+            self._views_history_snapshot()
+        except Exception:
+            pass
 
     # ══════════════════════════════════════════════════════════════════════════
     # LINK / SCRAPE
