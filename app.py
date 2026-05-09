@@ -7518,6 +7518,26 @@ class App:
         self._mk_btn(br2, "📂 Déplacer", "ghost", self._bank_move_to_folder,
                      pady=3, font=("Segoe UI", 8)).pack(side="left", padx=(4, 0))
 
+        # Initially hidden — shown on card click
+        # (do NOT pack here; _on_bank_sel_card will pack it when needed)
+
+    def _bank_hide_detail(self):
+        """Hide the detail panel."""
+        try:
+            self._bank_detail_panel.pack_forget()
+            self._bank_detail_visible = False
+        except Exception:
+            pass
+
+    def _bank_show_detail(self):
+        """Show the detail panel (pack below grid frame)."""
+        try:
+            if not self._bank_detail_visible:
+                self._bank_detail_panel.pack(fill="x", side="bottom")
+                self._bank_detail_visible = True
+        except Exception:
+            pass
+
     def _on_bank_sel(self, e=None):
         # Conservé pour rétro-compatibilité ; la sélection se fait désormais via cartes.
         if self._bank_selected:
@@ -7527,20 +7547,33 @@ class App:
         """Click handler pour les cartes de la grille bank."""
         if not entry_id:
             return
+        old_id = getattr(self, "_bank_selected", None)
         self._bank_selected = entry_id
         bank = load_bank()
         entry = next((b for b in bank if b["id"] == entry_id), None)
         if not entry:
             return
-        # Mise à jour visuelle des bordures de carte
-        for eid, outer in list(self._bank_card_widgets.items()):
-            try:
-                col = ACCENT if eid == entry_id else BORDER
-                if hasattr(outer, "_set_border") and outer._set_border:
-                    outer._set_border(col)
-                outer._sel_border = col
-            except Exception:
-                pass
+        # Redraw old card (deselect) and new card (select) using canvas _picker_redraw
+        for eid in (old_id, entry_id):
+            if not eid:
+                continue
+            card = self._bank_card_widgets.get(eid)
+            if card and hasattr(card, "_picker_redraw"):
+                try:
+                    card._picker_redraw()
+                except Exception:
+                    pass
+            elif card:
+                # fallback: update highlight border color
+                try:
+                    is_sel = (eid == entry_id)
+                    col = "#4f8ef7" if is_sel else "#1e2a3a"
+                    card.config(highlightbackground=col,
+                                bg="#1a2845" if is_sel else "#161d2b")
+                except Exception:
+                    pass
+        # Show detail panel
+        self._bank_show_detail()
         # Description
         try:
             self.desc_box.delete("1.0", "end")
@@ -7681,7 +7714,7 @@ class App:
             self.export_dir_lbl.config(text=f"Export : {d}")
 
     def _bank_refresh_folder_sidebar(self):
-        """Rebuild the folder list in the left sidebar."""
+        """Rebuild the folder list in the left sidebar (Vault Pro dark style)."""
         if not hasattr(self, "_bank_folder_inner"):
             return
         for w in list(self._bank_folder_inner.winfo_children()):
@@ -7689,34 +7722,48 @@ class App:
                 w.destroy()
             except Exception:
                 pass
-        sidebar_bg = "#0d1117"
+        SB_BG    = "#0b0e18"
+        ACTIVE_BG = "#162040"
+        ACTIVE_FG = "#4f8ef7"
+        INACT_FG  = "#6b7a99"
         bank = load_bank()
         folders = sorted({e.get("folder", "") for e in bank if e.get("folder", "")})
+
         # Update "all" label highlight
         try:
             if self._bank_folder_filter is None:
-                self._bank_all_lbl.configure(bg=ACCENT, fg="#ffffff")
+                self._bank_all_lbl.configure(bg=ACTIVE_BG, fg=ACTIVE_FG)
             else:
-                self._bank_all_lbl.configure(bg=sidebar_bg, fg=TEXT2)
+                self._bank_all_lbl.configure(bg=SB_BG, fg=INACT_FG)
         except Exception:
             pass
 
         for folder in folders:
             count = sum(1 for e in bank if e.get("folder", "") == folder)
             is_sel = (self._bank_folder_filter == folder)
-            row_bg = HL if is_sel else sidebar_bg
+            row_bg = ACTIVE_BG if is_sel else SB_BG
+            row_fg = ACTIVE_FG if is_sel else INACT_FG
+
             row = tk.Frame(self._bank_folder_inner, bg=row_bg, cursor="hand2")
             row.pack(fill="x", pady=1)
+
             lbl = tk.Label(row, text=f"📁  {folder}",
-                            font=("Segoe UI", 9), bg=row_bg,
-                            fg=ACCENT if is_sel else TEXT2,
-                            anchor="w", padx=10, pady=5)
+                            font=("Segoe UI", 9), bg=row_bg, fg=row_fg,
+                            anchor="w", padx=10, pady=6)
             lbl.pack(side="left", fill="x", expand=True)
+
+            # Count badge
             badge = tk.Label(row, text=str(count),
-                              font=("Consolas", 8), bg=row_bg,
-                              fg=TEXT2 if not is_sel else ACCENT,
-                              padx=6)
+                              font=("Consolas", 8), bg=row_bg, fg=row_fg,
+                              padx=4)
             badge.pack(side="right")
+
+            # "..." context button
+            dot_btn = tk.Button(row, text="…", relief="flat", bd=0,
+                                 bg=row_bg, fg=INACT_FG,
+                                 font=("Segoe UI", 9), cursor="hand2",
+                                 padx=2)
+            dot_btn.pack(side="right")
 
             def _make_folder_click(fn):
                 def _click(_e=None):
@@ -7730,11 +7777,37 @@ class App:
                     self._bank_folder_context(e, fn)
                 return _rclick
 
-            _fc = _make_folder_click(folder)
+            def _make_hover(r, bg_h, bg_n):
+                def _enter(_e=None):
+                    try:
+                        for c in r.winfo_children():
+                            c.configure(bg=bg_h)
+                        r.configure(bg=bg_h)
+                    except Exception:
+                        pass
+                def _leave(_e=None):
+                    try:
+                        for c in r.winfo_children():
+                            c.configure(bg=bg_n)
+                        r.configure(bg=bg_n)
+                    except Exception:
+                        pass
+                return _enter, _leave
+
+            _fc  = _make_folder_click(folder)
             _frc = _make_folder_rclick(folder)
+            _hover_in, _hover_out = _make_hover(
+                row,
+                "#1c2a50" if not is_sel else ACTIVE_BG,
+                row_bg)
+
             for w in (row, lbl, badge):
                 w.bind("<Button-1>", _fc)
                 w.bind("<Button-3>", _frc)
+                w.bind("<Enter>", _hover_in)
+                w.bind("<Leave>", _hover_out)
+            dot_btn.bind("<Button-1>", _frc)
+            dot_btn.bind("<Button-3>", _frc)
 
         try:
             self._bank_folder_cv.configure(
@@ -7941,6 +8014,37 @@ class App:
         if folder_filter is not None:
             bank = [e for e in bank if e.get("folder", "") == folder_filter]
 
+        # Filter by type
+        type_filter = getattr(self, "_bank_type_filter", "all")
+        if type_filter != "all":
+            _VIDEO_EXT  = {".mp4", ".mov", ".avi", ".mkv", ".webm", ".m4v"}
+            _PHOTO_EXT  = {".jpg", ".jpeg", ".png", ".webp"}
+            _GIF_EXT    = {".gif"}
+            _AUDIO_EXT  = {".mp3", ".wav", ".aac", ".m4a", ".ogg", ".flac"}
+            def _type_of(e):
+                ext = Path(e.get("path", "")).suffix.lower()
+                if ext in _VIDEO_EXT:  return "video"
+                if ext in _PHOTO_EXT:  return "photo"
+                if ext in _GIF_EXT:    return "gif"
+                if ext in _AUDIO_EXT:  return "audio"
+                return "other"
+            bank = [e for e in bank if _type_of(e) == type_filter]
+
+        # Filter by search query
+        try:
+            search_raw = getattr(self, "_bank_search_var", None)
+            search_q = search_raw.get().strip().lower() if search_raw else ""
+            # Ignore placeholder text
+            if search_q in ("", "🔍  rechercher…"):
+                search_q = ""
+        except Exception:
+            search_q = ""
+        if search_q:
+            bank = [e for e in bank
+                    if search_q in (e.get("filename", "") or "").lower()
+                    or search_q in (e.get("display_name", "") or "").lower()
+                    or search_q in (e.get("overlay", "") or "").lower()]
+
         cols = max(1, getattr(self, "_bank_grid_cols", 3))
         for c in range(cols):
             try:
@@ -7976,101 +8080,145 @@ class App:
 
         # Restaurer la sélection visuelle
         if self._bank_selected and self._bank_selected in self._bank_card_widgets:
-            outer = self._bank_card_widgets[self._bank_selected]
+            card = self._bank_card_widgets[self._bank_selected]
             try:
-                outer._set_border(ACCENT)
+                if hasattr(card, "_picker_redraw"):
+                    card._picker_redraw()
+                elif hasattr(card, "_set_border"):
+                    card._set_border(ACCENT)
             except Exception:
                 pass
 
     def _build_bank_card(self, parent, entry, row, col):
-        """Construit une carte vidéo dans la grille."""
+        """Construit une carte Canvas Vault Pro style dans la grille."""
         eid = entry["id"]
         exists = Path(entry.get("path", "")).exists()
         name = (entry.get("display_name")
                 or entry.get("filename")
                 or Path(entry.get("path", "")).name or "—")
-        overlay = entry.get("overlay") or "—"
-        size_mb = entry.get("size_mb", 0)
-        ts = entry.get("created", "")
+
+        # Date formatting
+        ts_raw = entry.get("created", "")
+        date_str = ""
         try:
-            ts = datetime.fromisoformat(ts).strftime("%d/%m %H:%M")
+            _dt = datetime.fromisoformat(ts_raw)
+            _MONTHS = ["jan", "fév", "mar", "avr", "mai", "juin",
+                       "juil", "août", "sep", "oct", "nov", "déc"]
+            date_str = f"{_dt.day} {_MONTHS[_dt.month - 1]} {_dt.year}"
         except Exception:
-            pass
+            date_str = ts_raw[:10] if ts_raw else ""
 
-        outer, content = self._round_card(parent, radius=12, bg=CARD,
-                                            border=BORDER, hover_border=ACCENT)
-        outer.grid(row=row, column=col, sticky="nsew", padx=6, pady=6)
-        outer._sel_border = BORDER
+        CARD_BG  = "#161d2b"
+        CARD_SEL = "#1a2845"
+        ACCENT_C = "#4f8ef7"
+        TEXT2_C  = "#6b7a99"
+        TEXT_C   = "#e8eaf0"
+        MUTED_C  = "#3d4a63"
 
-        # Thumbnail (placeholder gris foncé)
-        thumb_h = 108
-        thumb_lbl = tk.Label(content, bg=SURFACE2, text="🎬",
-                             font=("Segoe UI", 18), fg=MUTED,
-                             height=5, anchor="center")
-        thumb_lbl.pack(fill="x", padx=8, pady=(8, 4))
-        try:
-            thumb_lbl.configure(height=int(thumb_h / 18))
-        except Exception:
-            pass
-        self._bank_card_thumbs[eid] = thumb_lbl
+        W, H = 160, 155
+        THUMB_H = int(H * 0.72)   # ~112px for thumbnail area
+        BOTTOM_Y = THUMB_H        # separator Y
 
-        # Bandeau titre + badge
-        title_row = tk.Frame(content, bg=CARD)
-        title_row.pack(fill="x", padx=10, pady=(0, 2))
-        max_chars = 24
-        disp = name if len(name) <= max_chars else name[:max_chars - 1] + "…"
-        title_lbl = tk.Label(title_row, text=disp,
-                              font=("Segoe UI", 10, "bold"),
-                              bg=CARD, fg=TEXT if exists else TEXT2,
-                              anchor="w")
-        title_lbl.pack(side="left", fill="x", expand=True)
-        badge = tk.Label(title_row,
-                          text="✓" if exists else "✗",
-                          font=("Segoe UI", 10, "bold"),
-                          bg=CARD, fg=OK if exists else DANGER)
-        badge.pack(side="right", padx=(4, 0))
+        is_sel = (getattr(self, "_bank_selected", None) == eid)
 
-        # Sous-titre overlay
-        ov_disp = overlay if len(overlay) <= 28 else overlay[:27] + "…"
-        ov_lbl = tk.Label(content, text=ov_disp,
-                           font=("Segoe UI", 9), bg=CARD, fg=TEXT2,
-                           anchor="w", justify="left")
-        ov_lbl.pack(fill="x", padx=10, pady=(0, 2))
+        card = tk.Canvas(parent, bg=CARD_SEL if is_sel else CARD_BG,
+                         width=W, height=H,
+                         highlightthickness=1,
+                         highlightbackground=ACCENT_C if is_sel else "#1e2a3a",
+                         cursor="hand2")
+        card.grid(row=row, column=col, padx=5, pady=5, sticky="nsew")
+        parent.grid_columnconfigure(col, weight=1, uniform="bankcol2")
 
-        # Pied : taille + date
-        meta = tk.Frame(content, bg=CARD)
-        meta.pack(fill="x", padx=10, pady=(0, 6))
-        size_lbl = tk.Label(meta, text=f"{size_mb} Mo",
-                             font=("Consolas", 8), bg=CARD, fg=MUTED)
-        size_lbl.pack(side="left")
-        date_lbl = tk.Label(meta, text=ts or "",
-                             font=("Consolas", 8), bg=CARD, fg=MUTED)
-        date_lbl.pack(side="right")
+        # Placeholder background for thumb area
+        card.create_rectangle(0, 0, W, THUMB_H,
+                               fill="#1a2035", outline="")
 
-        # Bindings clic / clic-droit / molette sur tous les widgets de la carte
+        # 🎬 emoji placeholder (shown until real thumb loads)
+        _placeholder_id = card.create_text(
+            W // 2, THUMB_H // 2, text="🎬",
+            font=("Segoe UI", 18), fill=MUTED_C, tags="placeholder")
+
+        # Date pill top-left
+        if date_str:
+            card.create_rectangle(4, 4, 4 + len(date_str) * 5 + 8, 18,
+                                   fill="#0b0e18", outline="", stipple="")
+            card.create_text(8, 11, text=date_str,
+                             font=("Consolas", 6), fill=TEXT2_C, anchor="w")
+
+        # Checkmark circle top-right
+        cx, cy, cr = W - 12, 12, 8
+        if is_sel:
+            card.create_oval(cx - cr, cy - cr, cx + cr, cy + cr,
+                              fill=ACCENT_C, outline="")
+            card.create_text(cx, cy, text="✓",
+                              font=("Segoe UI", 8, "bold"), fill="#ffffff")
+        else:
+            card.create_oval(cx - cr, cy - cr, cx + cr, cy + cr,
+                              fill="", outline=MUTED_C, width=1)
+
+        # Separator line
+        card.create_line(0, BOTTOM_Y, W, BOTTOM_Y, fill="#1e2a3a", width=1)
+
+        # Filename centered in bottom area
+        disp = name if len(name) <= 22 else name[:21] + "…"
+        card.create_text(W // 2, BOTTOM_Y + (H - BOTTOM_Y) // 2,
+                          text=disp,
+                          font=("Segoe UI", 8), fill=TEXT_C if exists else TEXT2_C,
+                          width=W - 10, anchor="center")
+
+        # Video ▶ badge bottom-right of thumb area
+        card.create_rectangle(W - 26, THUMB_H - 18, W - 2, THUMB_H - 2,
+                               fill="#0b0e18", outline="")
+        card.create_text(W - 14, THUMB_H - 10, text="▶",
+                          font=("Segoe UI", 7), fill="#ffffff")
+
+        # Missing file indicator
+        if not exists:
+            card.create_rectangle(2, THUMB_H - 16, 30, THUMB_H - 2,
+                                   fill="#3d1020", outline="")
+            card.create_text(16, THUMB_H - 9, text="✗",
+                              font=("Consolas", 7), fill=DANGER)
+
+        # ── Redraw function (used on selection change) ──────────────────────
+        def _redraw(_eid=eid, _card=card):
+            _is_sel = (getattr(self, "_bank_selected", None) == _eid)
+            try:
+                _card.config(
+                    bg=CARD_SEL if _is_sel else CARD_BG,
+                    highlightbackground=ACCENT_C if _is_sel else "#1e2a3a")
+                # Update checkmark
+                _card.delete("check_items")
+                _cx, _cy, _cr = W - 12, 12, 8
+                if _is_sel:
+                    _card.create_oval(_cx - _cr, _cy - _cr, _cx + _cr, _cy + _cr,
+                                       fill=ACCENT_C, outline="", tags="check_items")
+                    _card.create_text(_cx, _cy, text="✓",
+                                       font=("Segoe UI", 8, "bold"), fill="#ffffff",
+                                       tags="check_items")
+                else:
+                    _card.create_oval(_cx - _cr, _cy - _cr, _cx + _cr, _cy + _cr,
+                                       fill="", outline=MUTED_C, width=1,
+                                       tags="check_items")
+            except Exception:
+                pass
+
+        card._picker_redraw = _redraw
+
+        # Bindings
         def _click(_e=None, _id=eid):
             self._on_bank_sel_card(_id)
         def _rclick(e, _id=eid):
             self._bank_card_context(e, _id)
 
-        widgets = [outer, content, thumb_lbl, title_row, title_lbl, badge,
-                    ov_lbl, meta, size_lbl, date_lbl]
-        try:
-            widgets.append(outer._cv)
-        except Exception:
-            pass
-        for w in widgets:
-            try:
-                w.bind("<Button-1>", _click, add="+")
-                w.bind("<Button-3>", _rclick, add="+")
-                w.bind("<MouseWheel>", self._bank_grid_wheel, add="+")
-                w.configure(cursor="hand2")
-            except Exception:
-                pass
+        card.bind("<Button-1>", _click)
+        card.bind("<Button-3>", _rclick)
+        card.bind("<MouseWheel>", self._bank_grid_wheel)
 
-        self._bank_card_widgets[eid] = outer
+        # Store in both dicts
+        self._bank_card_widgets[eid] = card
+        self._bank_card_thumbs[eid] = card   # alias — async loader updates this
 
-        # Lance le chargement async du thumbnail
+        # Launch async thumbnail loading
         if exists and PIL_OK:
             threading.Thread(target=self._async_load_bank_thumb,
                               args=(entry,), daemon=True).start()
@@ -8139,12 +8287,27 @@ class App:
             return
 
         def _apply():
-            lbl = self._bank_card_thumbs.get(eid)
-            if not lbl:
+            card = self._bank_card_thumbs.get(eid)
+            if not card:
                 return
             try:
-                lbl.configure(image=photo, text="", height=0)
-                lbl.image = photo
+                if isinstance(card, tk.Canvas):
+                    # Canvas-based card: draw image and remove placeholder
+                    W = card.winfo_width() or 160
+                    THUMB_H = int(155 * 0.72)
+                    # Resize to fit thumb area
+                    tw, th = W, THUMB_H
+                    img_copy = photo._PhotoImage__photo  # internal PIL ref if any
+                    card.delete("placeholder")
+                    card.delete("thumb_img")
+                    card.create_image(W // 2, THUMB_H // 2,
+                                       image=photo, anchor="center",
+                                       tags="thumb_img")
+                    card._thumb_photo = photo  # prevent GC
+                else:
+                    # Legacy Label-based (fallback)
+                    card.configure(image=photo, text="", height=0)
+                    card.image = photo
                 self._bank_thumb_refs.append(photo)
             except Exception:
                 pass
