@@ -1267,7 +1267,7 @@ class App:
         self._thumb_jobs = {}
 
         # Appliquer le thème avant de construire l'UI
-        apply_theme_globals(self.cfg.get("theme", "Lime"))
+        apply_theme_globals(self.cfg.get("theme", "Bleu"))
 
         if DND_OK:
             self.root = TkinterDnD.Tk()
@@ -7137,9 +7137,16 @@ class App:
                  bg="#0b0f1a", fg="#6b7a99").pack(side="left", padx=(10, 0))
         tk.Frame(card, bg="#1a2235", height=1).pack(fill="x")
 
-        # Scrollable content
-        rscroll_cv = tk.Canvas(card, bg="#0b0f1a", highlightthickness=0)
-        rscroll_vsb = ttk.Scrollbar(card, orient="vertical", command=rscroll_cv.yview)
+        # Launch / Stop buttons — packed bottom-first so canvas can fill remaining space
+        tk.Frame(card, bg="#1a2235", height=1).pack(side="bottom", fill="x")
+        btn_row = tk.Frame(card, bg="#0b0f1a", padx=16, pady=12)
+        btn_row.pack(side="bottom", fill="x")
+
+        # Scrollable content (wrapper keeps side="left"/"right" out of card's pack queue)
+        scroll_wrap = tk.Frame(card, bg="#0b0f1a")
+        scroll_wrap.pack(fill="both", expand=True)
+        rscroll_cv = tk.Canvas(scroll_wrap, bg="#0b0f1a", highlightthickness=0)
+        rscroll_vsb = ttk.Scrollbar(scroll_wrap, orient="vertical", command=rscroll_cv.yview)
         rscroll_inner = tk.Frame(rscroll_cv, bg="#0b0f1a")
         _rwin = rscroll_cv.create_window((0, 0), window=rscroll_inner, anchor="nw")
         rscroll_inner.bind("<Configure>",
@@ -7333,11 +7340,6 @@ class App:
         for tag, col in [("ok", OK), ("warn", WARN), ("error", DANGER),
                          ("accent", ACCENT), ("info", "#6b7a99")]:
             self._mp_log_box.tag_config(tag, foreground=col)
-
-        # ── Launch / Stop buttons (bottom of card, always visible) ────────────
-        tk.Frame(card, bg="#1a2235", height=1).pack(fill="x")
-        btn_row = tk.Frame(card, bg="#0b0f1a", padx=16, pady=12)
-        btn_row.pack(fill="x")
 
         self._mp_running   = [False]
         self._mp_stop_flag = [False]
