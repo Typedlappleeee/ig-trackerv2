@@ -1,7 +1,7 @@
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 
-export type Page = 'dashboard' | 'phones' | 'bank' | 'settings'
+export type Page = 'dashboard' | 'phones' | 'stats' | 'posting' | 'bank' | 'aitools' | 'settings'
 
 interface LayoutProps {
   user: User
@@ -10,27 +10,19 @@ interface LayoutProps {
   children: React.ReactNode
 }
 
-interface NavItem {
-  id: Page
-  icon: string
-  label: string
-}
-
-const NAV: NavItem[] = [
+const NAV: { id: Page; icon: string; label: string }[] = [
   { id: 'dashboard', icon: '📊', label: 'Dashboard'     },
   { id: 'phones',    icon: '📱', label: 'Téléphones'    },
+  { id: 'stats',     icon: '📈', label: 'Stats IG'      },
+  { id: 'posting',   icon: '🚀', label: 'Posting'       },
   { id: 'bank',      icon: '🎬', label: 'Banque vidéos' },
+  { id: 'aitools',   icon: '✨', label: 'Outils IA'     },
   { id: 'settings',  icon: '⚙️', label: 'Paramètres'   },
 ]
 
 export function Layout({ user, page, onNavigate, children }: LayoutProps) {
-  async function signOut() {
-    await supabase.auth.signOut()
-  }
-
   return (
     <div className="min-h-screen bg-bg flex">
-      {/* Sidebar */}
       <aside className="w-56 flex-shrink-0 flex flex-col border-r border-border bg-surface">
         {/* Logo */}
         <div className="px-5 py-5 flex items-center gap-3">
@@ -70,7 +62,7 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
               <p className="text-xs text-text truncate">{user.email}</p>
             </div>
             <button
-              onClick={signOut}
+              onClick={() => supabase.auth.signOut()}
               className="text-text2 hover:text-danger transition-colors text-xs p-1 rounded"
               title="Se déconnecter"
             >
@@ -80,7 +72,6 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
         </div>
       </aside>
 
-      {/* Main content */}
       <main className="flex-1 overflow-auto">
         {children}
       </main>

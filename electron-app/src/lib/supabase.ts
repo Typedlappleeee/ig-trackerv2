@@ -63,9 +63,20 @@ export interface ContentItem {
 }
 
 export interface AppConfig {
-  user_id:      string
-  bearer_token: string
-  theme:        string
-  lang:         string
-  updated_at:   string
+  user_id:       string
+  bearer_token:  string
+  groq_api_key:  string
+  theme:         string
+  lang:          string
+  profile_name:  string
+  profile_niche: string
+  updated_at:    string
+}
+
+export interface ViewsHistory {
+  id:          string
+  user_id:     string
+  phone_id:    string
+  views:       number
+  recorded_at: string
 }

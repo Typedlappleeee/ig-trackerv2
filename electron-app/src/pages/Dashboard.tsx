@@ -1,163 +1,318 @@
 import { useState, useEffect } from 'react'
 import type { User } from '@supabase/supabase-js'
-import { supabase } from '@/lib/supabase'
+import { supabase, type Phone } from '@/lib/supabase'
 import { Spinner }  from '@/components/ui/Spinner'
 import { Button }   from '@/components/ui/Button'
 
-interface DashboardProps {
-  user: User
-}
+interface DashboardProps { user: User }
 
-interface KPIs {
-  phones:       number
-  phonesOnline: number
-  phonesError:  number
-  totalViews:   number
-  bankCount:    number
-}
-
-interface KpiCardProps {
-  icon:  string
-  label: string
-  value: string | number
-  color: string
-  sub?:  string
-}
-
-function KpiCard({ icon, label, value, color, sub }: KpiCardProps) {
-  return (
-    <div className="bg-card border border-border rounded-xl p-5 border-t-2" style={{ borderTopColor: color }}>
-      <div className="flex items-center gap-2 mb-3">
-        <span>{icon}</span>
-        <span className="text-xs font-semibold text-text2 uppercase tracking-wider">{label}</span>
-      </div>
-      <p className="text-3xl font-bold" style={{ color }}>
-        {typeof value === 'number' ? value.toLocaleString('fr-FR') : value}
-      </p>
-      {sub && <p className="text-xs text-text2 mt-1">{sub}</p>}
+// ── Tiny SVG line chart ───────────────────────────────────────────────────────
+function LineChart({ data, color = '#4f9eff', height = 80 }: {
+  data: { label: string; value: number }[]
+  color?: string
+  height?: number
+}) {
+  if (data.length < 2) return (
+    <div className="flex items-center justify-center text-text2 text-xs" style={{ height }}>
+      Pas assez de données
     </div>
+  )
+  const max   = Math.max(...data.map(d => d.value), 1)
+  const min   = Math.min(...data.map(d => d.value))
+  const range = max - min || 1
+  const W = 600; const H = height
+  const pts = data.map((d, i) => ({
+    x: (i / (data.length - 1)) * W,
+    y: H - ((d.value - min) / range) * (H - 10) - 5,
+  }))
+  const pathD = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')
+  const areaD = `${pathD} L${W},${H} L0,${H} Z`
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height }}>
+      <defs>
+        <linearGradient id={`grad-${color.replace('#','')}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.25" />
+          <stop offset="100%" stopColor={color} stopOpacity="0.02" />
+        </linearGradient>
+      </defs>
+      <path d={areaD} fill={`url(#grad-${color.replace('#','')})`} />
+      <path d={pathD} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      {pts.map((p, i) => (
+        <circle key={i} cx={p.x} cy={p.y} r="3" fill={color} />
+      ))}
+    </svg>
   )
 }
 
+type Range = '24h' | '7d' | '30d' | 'all'
+
+interface ViewPoint { label: string; value: number }
+
 export function Dashboard({ user }: DashboardProps) {
-  const [kpis, setKpis]       = useState<KPIs | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError]     = useState<string | null>(null)
+  const [phones, setPhones]         = useState<Phone[]>([])
+  const [selectedPhone, setSelPhone]= useState<Phone | null>(null)  // null = total
+  const [range, setRange]           = useState<Range>('30d')
+  const [chartData, setChartData]   = useState<ViewPoint[]>([])
+  const [loadingChart, setLC]       = useState(false)
+  const [loading, setLoading]       = useState(true)
 
-  useEffect(() => { loadKPIs() }, [])
+  // KPI values
+  const [kpiToday, setKpiToday]     = useState<number | null>(null)
+  const [kpiDelta, setKpiDelta]     = useState<number | null>(null)
+  const [kpiPeak, setKpiPeak]       = useState<number | null>(null)
+  const [kpiAvg, setKpiAvg]         = useState<number | null>(null)
 
-  async function loadKPIs() {
-    setLoading(true)
-    setError(null)
-    try {
-      const [phonesRes, bankRes] = await Promise.all([
-        supabase
-          .from('phones')
-          .select('status, total_views')
-          .eq('user_id', user.id),
-        supabase
-          .from('content_bank')
-          .select('id', { count: 'exact', head: true })
-          .eq('user_id', user.id),
-      ])
+  useEffect(() => {
+    supabase.from('phones').select('*').eq('user_id', user.id).order('phone_name')
+      .then(({ data }) => { setPhones(data ?? []); setLoading(false) })
+  }, [])
 
-      if (phonesRes.error) throw phonesRes.error
-      if (bankRes.error)   throw bankRes.error
+  useEffect(() => { loadChart() }, [selectedPhone, range, phones])
 
-      const phones = phonesRes.data ?? []
-      setKpis({
-        phones:       phones.length,
-        phonesOnline: phones.filter(p => p.status === 'online').length,
-        phonesError:  phones.filter(p => p.status === 'error').length,
-        totalViews:   phones.reduce((s, p) => s + (p.total_views ?? 0), 0),
-        bankCount:    bankRes.count ?? 0,
-      })
-    } catch {
-      setError('Erreur lors du chargement des données.')
+  async function loadChart() {
+    if (phones.length === 0) return
+    setLC(true)
+
+    // Build chart from views_history
+    let query = supabase.from('views_history').select('views, recorded_at, phone_id').eq('user_id', user.id)
+    if (selectedPhone) query = query.eq('phone_id', selectedPhone.id)
+
+    const cutoff = new Date()
+    if (range === '24h') cutoff.setHours(cutoff.getHours() - 24)
+    else if (range === '7d') cutoff.setDate(cutoff.getDate() - 7)
+    else if (range === '30d') cutoff.setDate(cutoff.getDate() - 30)
+
+    if (range !== 'all') query = query.gte('recorded_at', cutoff.toISOString())
+    query = query.order('recorded_at')
+
+    const { data } = await query
+    const rows = data ?? []
+
+    if (rows.length === 0) {
+      // Fallback: use current phone stats as single point
+      const pts: ViewPoint[] = phones.map(p => ({
+        label: p.phone_name,
+        value: selectedPhone ? (selectedPhone.total_views ?? 0) : (p.total_views ?? 0),
+      }))
+      if (!selectedPhone) {
+        setChartData([{
+          label: 'Total',
+          value: phones.reduce((s, p) => s + (p.total_views ?? 0), 0),
+        }])
+      } else {
+        setChartData(pts.filter(pt => pt.label === selectedPhone.phone_name))
+      }
+      setKpiToday(null); setKpiDelta(null); setKpiPeak(null); setKpiAvg(null)
+      setLC(false); return
     }
-    setLoading(false)
+
+    // Group by day
+    const byDay = new Map<string, number>()
+    for (const row of rows) {
+      const day = row.recorded_at.slice(0, 10)
+      const cur = byDay.get(day) ?? 0
+      byDay.set(day, Math.max(cur, row.views as number))
+    }
+    const sorted = [...byDay.entries()].sort(([a], [b]) => a.localeCompare(b))
+    const pts: ViewPoint[] = sorted.map(([label, value]) => ({ label, value }))
+
+    setChartData(pts)
+
+    // KPIs from chart data
+    if (pts.length >= 1) {
+      const today = pts[pts.length - 1].value
+      const yesterday = pts.length >= 2 ? pts[pts.length - 2].value : null
+      setKpiToday(today)
+      setKpiDelta(yesterday !== null ? today - yesterday : null)
+      setKpiPeak(Math.max(...pts.map(p => p.value)))
+      setKpiAvg(Math.round(pts.reduce((s, p) => s + p.value, 0) / pts.length))
+    }
+
+    setLC(false)
   }
 
+  async function recordSnapshot() {
+    // Save current views as a snapshot in views_history
+    if (phones.length === 0) return
+    const now = new Date().toISOString()
+    const rows = phones.filter(p => p.total_views).map(p => ({
+      user_id:     user.id,
+      phone_id:    p.id,
+      views:       p.total_views ?? 0,
+      recorded_at: now,
+    }))
+    if (rows.length > 0) {
+      await supabase.from('views_history').insert(rows)
+      loadChart()
+    }
+  }
+
+  const totalViews    = phones.reduce((s, p) => s + (p.total_views ?? 0), 0)
+  const activePhones  = phones.filter(p => p.status === 'online').length
+  const linkedPhones  = phones.filter(p => p.ig_username).length
+
+  const RANGES: { key: Range; label: string }[] = [
+    { key: '24h', label: '24h' },
+    { key: '7d',  label: '7j'  },
+    { key: '30d', label: '30j' },
+    { key: 'all', label: 'Tout'},
+  ]
+
   return (
-    <div className="p-8 space-y-8">
-      {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-text">Dashboard</h1>
-          <p className="text-text2 text-sm mt-1">Vue d'ensemble de ton activité IG</p>
+    <div className="flex h-full min-h-screen">
+      {/* Left sidebar: per-account selector */}
+      <aside className="w-52 flex-shrink-0 flex flex-col border-r border-border bg-surface">
+        <div className="px-4 py-4 border-b border-border">
+          <p className="text-xs font-semibold text-text2 uppercase tracking-wider">Comptes</p>
         </div>
-        <Button variant="secondary" size="sm" onClick={loadKPIs} loading={loading}>
-          ↺ Rafraîchir
-        </Button>
-      </div>
-
-      {/* KPIs */}
-      {loading ? (
-        <div className="flex justify-center py-16"><Spinner size="lg" /></div>
-      ) : error ? (
-        <div className="px-4 py-3 rounded-lg bg-danger/10 border border-danger/20 text-danger text-sm">
-          {error}
-        </div>
-      ) : kpis ? (
-        <>
-          <div className="grid grid-cols-3 gap-4">
-            <KpiCard
-              icon="📱" label="Téléphones" color="#4f9eff"
-              value={kpis.phones}
-              sub={`${kpis.phonesOnline} en ligne`}
-            />
-            <KpiCard
-              icon="👁" label="Vues totales" color="#ffaa2a"
-              value={kpis.totalViews}
-              sub="Cumul tous téléphones"
-            />
-            <KpiCard
-              icon="🎬" label="Banque vidéos" color="#00ccaa"
-              value={kpis.bankCount}
-              sub="Contenus disponibles"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <KpiCard
-              icon="✅" label="Phones en ligne" color="#00ccaa"
-              value={kpis.phonesOnline}
-              sub={kpis.phones > 0 ? `${Math.round(kpis.phonesOnline / kpis.phones * 100)}% du parc` : undefined}
-            />
-            <KpiCard
-              icon="🚫" label="Phones en erreur" color="#f03d55"
-              value={kpis.phonesError}
-              sub={kpis.phonesError > 0 ? 'Vérifier dans Téléphones' : 'Aucune erreur'}
-            />
-          </div>
-        </>
-      ) : null}
-
-      {/* Quick-start tips */}
-      <div className="bg-card border border-border rounded-xl p-5">
-        <h2 className="text-sm font-semibold text-text mb-4">Démarrage rapide</h2>
-        <div className="space-y-2 text-sm text-text2">
-          {kpis && kpis.phones > 0 && kpis.bankCount > 0 ? (
-            <p className="text-ok">
-              ✓ Tout est prêt — {kpis.phones} phone{kpis.phones > 1 ? 's' : ''}, {kpis.bankCount} vidéo{kpis.bankCount > 1 ? 's' : ''} disponible{kpis.bankCount > 1 ? 's' : ''}.
-            </p>
+        <div className="flex-1 overflow-auto py-1">
+          {loading ? (
+            <div className="flex justify-center py-8"><Spinner size="sm" /></div>
           ) : (
             <>
-              <div className="flex items-start gap-2">
-                <span className="text-accent">1.</span>
-                <span>Configure ton <span className="text-text font-medium">Bearer Token GéeLark</span> dans <span className="text-text font-medium">Paramètres</span>.</span>
-              </div>
-              <div className="flex items-start gap-2">
-                <span className="text-accent">2.</span>
-                <span>Va dans <span className="text-text font-medium">Téléphones</span> et clique sur Synchroniser GéeLark.</span>
-              </div>
-              <div className="flex items-start gap-2">
-                <span className="text-accent">3.</span>
-                <span>Ajoute tes vidéos dans la <span className="text-text font-medium">Banque vidéos</span>.</span>
-              </div>
+              {/* Total row */}
+              <button
+                onClick={() => setSelPhone(null)}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors ${
+                  selectedPhone === null ? 'bg-surface2 border-l-2 border-accent pl-[10px]' : 'hover:bg-surface2'
+                }`}
+              >
+                <div className="w-7 h-7 rounded-full bg-accent/20 text-accent flex items-center justify-center text-xs font-bold">∑</div>
+                <div className="min-w-0">
+                  <p className="text-xs font-medium text-text">Total</p>
+                  <p className="text-[10px] text-text2">{phones.length} phones</p>
+                </div>
+              </button>
+
+              {/* Per-phone rows */}
+              {phones.filter(p => p.ig_username || p.total_views).map(phone => (
+                <button
+                  key={phone.id}
+                  onClick={() => setSelPhone(phone)}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors ${
+                    selectedPhone?.id === phone.id ? 'bg-surface2 border-l-2 border-accent pl-[10px]' : 'hover:bg-surface2'
+                  }`}
+                >
+                  <div className="w-7 h-7 rounded-full bg-accent/20 text-accent flex items-center justify-center text-xs font-bold flex-shrink-0">
+                    {(phone.ig_username ?? phone.phone_name)[0].toUpperCase()}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-medium text-text truncate">
+                      {phone.ig_username ? `@${phone.ig_username}` : phone.phone_name}
+                    </p>
+                    {phone.total_views ? (
+                      <p className="text-[10px] text-text2">{phone.total_views.toLocaleString('fr-FR')} vues</p>
+                    ) : null}
+                  </div>
+                  {phone.status === 'online' && <span className="w-1.5 h-1.5 rounded-full bg-ok flex-shrink-0" />}
+                </button>
+              ))}
             </>
           )}
         </div>
+      </aside>
+
+      {/* Right: dashboard content */}
+      <div className="flex-1 overflow-auto p-8 space-y-6">
+        {/* Header */}
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-text">
+              {selectedPhone ? (selectedPhone.ig_username ? `@${selectedPhone.ig_username}` : selectedPhone.phone_name) : 'Dashboard'}
+            </h1>
+            <p className="text-text2 text-sm mt-1">Vue d'ensemble de ton activité IG</p>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="secondary" size="sm" onClick={recordSnapshot} disabled={phones.length === 0}>
+              📸 Snapshot
+            </Button>
+            <Button variant="secondary" size="sm" onClick={loadChart} loading={loadingChart}>
+              ↺ Rafraîchir
+            </Button>
+          </div>
+        </div>
+
+        {/* KPI grid */}
+        <div className="grid grid-cols-3 gap-4">
+          {[
+            { label: 'VUES TOTALES',     value: selectedPhone ? (selectedPhone.total_views ?? 0) : totalViews, color: '#4f9eff', icon: '👁' },
+            { label: 'PHONES EN LIGNE',  value: activePhones,   color: '#00ccaa', icon: '✅' },
+            { label: 'COMPTES IG LIÉS', value: linkedPhones,   color: '#a56ef5', icon: '📱' },
+          ].map(({ label, value, color, icon }) => (
+            <div key={label} className="bg-card border border-border rounded-xl p-4 border-t-2" style={{ borderTopColor: color }}>
+              <div className="flex items-center gap-2 mb-2">
+                <span>{icon}</span>
+                <span className="text-xs font-semibold text-text2">{label}</span>
+              </div>
+              <p className="text-3xl font-bold" style={{ color }}>{value.toLocaleString('fr-FR')}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Stats KPIs (from chart history) */}
+        {(kpiToday !== null || kpiPeak !== null) && (
+          <div className="grid grid-cols-4 gap-3">
+            {[
+              { label: 'VUES AUJOURD\'HUI', value: kpiToday,                   color: '#4f9eff', icon: '👁' },
+              { label: 'ÉVOLUTION 24H',     value: kpiDelta,                   color: kpiDelta !== null && kpiDelta >= 0 ? '#00ccaa' : '#f03d55', icon: kpiDelta !== null && kpiDelta >= 0 ? '📈' : '📉', prefix: kpiDelta !== null && kpiDelta > 0 ? '+' : '' },
+              { label: 'PIC MAX',           value: kpiPeak,                    color: '#ffaa2a', icon: '🏆' },
+              { label: 'MOYENNE / JOUR',    value: kpiAvg,                     color: '#5a6882', icon: '📊' },
+            ].map(({ label, value, color, icon, prefix = '' }) => value !== null && (
+              <div key={label} className="bg-card border border-border rounded-xl p-3">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <span className="text-sm">{icon}</span>
+                  <span className="text-[10px] font-semibold text-text2 uppercase tracking-wider">{label}</span>
+                </div>
+                <p className="text-xl font-bold" style={{ color }}>
+                  {prefix}{value.toLocaleString('fr-FR')}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Chart */}
+        <div className="bg-card border border-border rounded-xl p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-semibold text-text">Tendance des vues</h2>
+            <div className="flex gap-1">
+              {RANGES.map(({ key, label }) => (
+                <button key={key} onClick={() => setRange(key)}
+                  className={`px-3 py-1.5 rounded text-xs transition-all ${
+                    range === key ? 'bg-accent/20 text-accent' : 'text-text2 hover:text-text'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {loadingChart ? (
+            <div className="flex justify-center py-6"><Spinner /></div>
+          ) : (
+            <LineChart data={chartData} color="#4f9eff" height={100} />
+          )}
+
+          {chartData.length > 0 && (
+            <div className="flex justify-between mt-2 px-1">
+              <span className="text-[10px] text-text2">{chartData[0]?.label}</span>
+              <span className="text-[10px] text-text2">{chartData[chartData.length - 1]?.label}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Quick start tips */}
+        {phones.length === 0 && !loading && (
+          <div className="bg-card border border-border rounded-xl p-5 space-y-2 text-sm text-text2">
+            <h2 className="text-sm font-semibold text-text mb-3">Démarrage rapide</h2>
+            <div className="flex gap-2"><span className="text-accent">1.</span><span>Configure ton <span className="text-text font-medium">Bearer Token GéeLark</span> dans Paramètres.</span></div>
+            <div className="flex gap-2"><span className="text-accent">2.</span><span>Va dans <span className="text-text font-medium">Téléphones</span> et clique sur Sync GéeLark.</span></div>
+            <div className="flex gap-2"><span className="text-accent">3.</span><span>Ajoute tes comptes Instagram dans la colonne Instagram.</span></div>
+            <div className="flex gap-2"><span className="text-accent">4.</span><span>Utilise <span className="text-text font-medium">Stats IG</span> pour récupérer les stats de tes comptes.</span></div>
+          </div>
+        )}
       </div>
     </div>
   )

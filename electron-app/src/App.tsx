@@ -5,7 +5,10 @@ import { AuthPage }          from '@/components/auth/AuthPage'
 import { Layout, type Page } from '@/components/Layout'
 import { Dashboard }         from '@/pages/Dashboard'
 import { Phones }            from '@/pages/Phones'
+import { Stats }             from '@/pages/Stats'
+import { Posting }           from '@/pages/Posting'
 import { Bank }              from '@/pages/Bank'
+import { AiTools }           from '@/pages/AiTools'
 import { Settings }          from '@/pages/Settings'
 import { FullPageLoader }    from '@/components/ui/Spinner'
 
@@ -16,7 +19,10 @@ function AppContent({ user }: { user: User }) {
     switch (page) {
       case 'dashboard': return <Dashboard user={user} />
       case 'phones':    return <Phones    user={user} />
+      case 'stats':     return <Stats     user={user} />
+      case 'posting':   return <Posting   user={user} />
       case 'bank':      return <Bank      user={user} />
+      case 'aitools':   return <AiTools   user={user} />
       case 'settings':  return <Settings  user={user} />
     }
   })()
@@ -30,7 +36,6 @@ function AppContent({ user }: { user: User }) {
 
 export default function App() {
   const { user, loading } = useAuth()
-
   if (loading) return <FullPageLoader />
   if (!user)   return <AuthPage />
   return <AppContent user={user} />

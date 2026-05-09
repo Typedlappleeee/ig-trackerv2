@@ -1,10 +1,9 @@
-// Type declarations for the Electron contextBridge API exposed in preload.ts
-
 interface GeelarkRequestOptions {
-  method: 'GET' | 'POST'
+  method: 'GET' | 'POST' | 'PUT'
   url: string
   headers?: Record<string, string>
   body?: unknown
+  isText?: boolean
 }
 
 interface GeelarkRequestResult {
@@ -14,9 +13,19 @@ interface GeelarkRequestResult {
   error?: string
 }
 
+interface GroqRequestOptions {
+  apiKey: string
+  messages: Array<{ role: string; content: string }>
+  model?: string
+  maxTokens?: number
+}
+
 interface ElectronAPI {
   platform: string
-  geelarkRequest: (opts: GeelarkRequestOptions) => Promise<GeelarkRequestResult>
+  geelarkRequest:    (opts: GeelarkRequestOptions) => Promise<GeelarkRequestResult>
+  pickVideoFile:     () => Promise<string | null>
+  uploadVideoGeelark:(opts: { bearer: string; filePath: string }) => Promise<{ ok: boolean; token?: string; error?: string }>
+  groqRequest:       (opts: GroqRequestOptions) => Promise<{ ok: boolean; data?: unknown; error?: string }>
 }
 
 declare global {
