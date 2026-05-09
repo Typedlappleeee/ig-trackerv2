@@ -1883,150 +1883,151 @@ class App:
         self.bg_canvas = tk.Canvas(self.root, bg=BG, highlightthickness=0)
         self.bg_canvas.pack(fill="both", expand=True)
 
-        SIDEBAR_W = 210
-        PAD = 0
+        SIDEBAR_W = 225
+        SB_BG = "#0d1117"
 
-        self.sidebar = tk.Frame(self.bg_canvas, bg=SURFACE, width=SIDEBAR_W)
+        self.sidebar = tk.Frame(self.bg_canvas, bg=SB_BG, width=SIDEBAR_W)
         self.sidebar.pack_propagate(False)
         self._sidebar_win = self.bg_canvas.create_window(
             0, 0, anchor="nw", window=self.sidebar, width=SIDEBAR_W)
 
-        # Thin separator line between sidebar and content
         self._sep_win = self.bg_canvas.create_line(
-            SIDEBAR_W, 0, SIDEBAR_W, 800, fill=BORDER, width=1)
+            SIDEBAR_W, 0, SIDEBAR_W, 800, fill="#1a1f2e", width=1)
 
-        self.main_frame = tk.Frame(self.bg_canvas, bg=BG)
-        self._main_win = self.bg_canvas.create_window(
+        self.main_frame = tk.Frame(self.bg_canvas, bg="#050810")
+        self._main_win  = self.bg_canvas.create_window(
             SIDEBAR_W + 1, 0, anchor="nw", window=self.main_frame)
 
         def _on_canvas_resize(e):
             w, h = e.width, e.height
             self.bg_canvas.itemconfig(self._sidebar_win, height=h)
             self.bg_canvas.coords(self._sep_win, SIDEBAR_W, 0, SIDEBAR_W, h)
-            self.bg_canvas.itemconfig(self._main_win, width=max(0, w - SIDEBAR_W - 1), height=h)
-
+            self.bg_canvas.itemconfig(self._main_win,
+                                       width=max(0, w - SIDEBAR_W - 1), height=h)
         self.bg_canvas.bind("<Configure>", _on_canvas_resize)
 
-        # ── Sidebar: logo ──────────────────────────────────────────────────────
-        logo_frame = tk.Frame(self.sidebar, bg=SURFACE)
-        logo_frame.pack(fill="x", padx=0, pady=(0, 0))
+        L = self.cfg.get("lang", "fr")
+        _ = lambda k: t(k, L)
 
-        # Accent bar at top of sidebar
-        tk.Frame(logo_frame, height=3, bg=ACCENT).pack(fill="x")
+        # ── Logo / app header ──────────────────────────────────────────────────
+        logo_outer = tk.Frame(self.sidebar, bg=SB_BG)
+        logo_outer.pack(fill="x")
 
-        inner_logo = tk.Frame(logo_frame, bg=SURFACE)
-        inner_logo.pack(fill="x", padx=14, pady=(12, 10))
+        logo_inner = tk.Frame(logo_outer, bg="#111827",
+                              highlightthickness=0, cursor="hand2")
+        logo_inner.pack(fill="x", padx=10, pady=10)
 
-        # Logo image
-        _logo_img_ref = [None]
-        if PIL_OK:
-            try:
-                _logo_path = BASE_DIR / "logo.png"
-                if _logo_path.exists():
-                    _pil = Image.open(str(_logo_path)).resize((36, 36), Image.LANCZOS)
-                    _logo_img_ref[0] = ImageTk.PhotoImage(_pil)
-            except Exception:
-                pass
+        logo_row = tk.Frame(logo_inner, bg="#111827")
+        logo_row.pack(fill="x", padx=12, pady=10)
 
-        title_row = tk.Frame(inner_logo, bg=SURFACE)
-        title_row.pack(anchor="w")
-        if _logo_img_ref[0]:
-            lbl_img = tk.Label(title_row, image=_logo_img_ref[0], bg=SURFACE)
-            lbl_img.image = _logo_img_ref[0]
-            lbl_img.pack(side="left", padx=(0, 8))
-        tk.Label(title_row, text="IG Tracker",
-                 font=("Segoe UI", 13, "bold"), bg=SURFACE, fg=TEXT).pack(side="left")
-        email_short = (self.email[:22] + "…") if len(self.email) > 24 else self.email
-        tk.Label(inner_logo, text=email_short, font=("Segoe UI", 8),
-                 bg=SURFACE, fg=TEXT2).pack(anchor="w", pady=(3, 0))
+        # Icon circle
+        ico_cv = tk.Canvas(logo_row, bg=ACCENT, width=32, height=32,
+                           highlightthickness=0)
+        ico_cv.pack(side="left")
+        ico_cv.create_oval(0, 0, 32, 32, fill=ACCENT, outline="")
+        ico_cv.create_text(16, 16, text="📱", font=("Segoe UI", 13))
 
-        tk.Frame(self.sidebar, height=1, bg=BORDER).pack(fill="x", pady=(0, 4))
+        name_col = tk.Frame(logo_row, bg="#111827")
+        name_col.pack(side="left", padx=(10, 0))
+        tk.Label(name_col, text="IG Tracker",
+                 font=("Segoe UI", 11, "bold"), bg="#111827", fg=TEXT).pack(anchor="w")
+        # Status dot
+        dot_row = tk.Frame(name_col, bg="#111827")
+        dot_row.pack(anchor="w")
+        dot_cv = tk.Canvas(dot_row, bg="#111827", width=8, height=8,
+                           highlightthickness=0)
+        dot_cv.pack(side="left")
+        dot_cv.create_oval(0, 0, 8, 8, fill=OK, outline="")
+        tk.Label(dot_row, text="  connecté" if L == "fr" else "  connected",
+                 font=("Segoe UI", 7), bg="#111827", fg="#556070").pack(side="left")
 
-        # ── Sidebar: nav ───────────────────────────────────────────────────────
+        tk.Frame(self.sidebar, bg="#1a1f2e", height=1).pack(fill="x", pady=(0, 4))
+
+        # ── Nav ───────────────────────────────────────────────────────────────
         self.tab_btns = {}
         self._sidebar_indicators = {}
 
-        def _reg(key, icon, label, parent=self.sidebar, indent=False, badge=None, badge_col=None):
+        def _reg(key, icon, label, parent=self.sidebar,
+                 indent=False, badge=None, badge_col=None):
             row, btn, ind = self._make_sidebar_item(parent, icon, label, key,
                                                      indent=indent, badge=badge,
                                                      badge_col=badge_col)
             row.pack(fill="x")
-            self.tab_btns[key] = btn
+            self.tab_btns[key]          = btn
             self._sidebar_indicators[key] = ind
 
-        def _coming_soon(parent, icon, label):
-            """Prominent 'coming soon' row."""
-            outer = tk.Frame(parent, bg=SURFACE2,
-                             highlightthickness=1, highlightbackground=BORDER)
-            outer.pack(fill="x", padx=0, pady=1)
-            tk.Frame(outer, width=3, bg=MUTED).pack(side="left", fill="y")
-            inner = tk.Frame(outer, bg=SURFACE2)
-            inner.pack(side="left", fill="x", expand=True, padx=10, pady=8)
-            tk.Label(inner, text=f"{icon}  {label}", font=("Segoe UI", 10, "bold"),
-                     bg=SURFACE2, fg=TEXT2).pack(side="left")
-            badge = tk.Frame(inner, bg=SURFACE2)
-            badge.pack(side="right")
-            tk.Label(badge, text=t("soon.label", self.cfg.get("lang","fr")),
-                     font=("Segoe UI", 8, "bold"),
-                     bg=WARN, fg="#07080d", padx=7, pady=2).pack()
-
-        # Use translation function
-        L = self.cfg.get("lang", "fr")
-        _ = lambda k: t(k, L)
-
-        # Standalone
+        # ── Top-level items ────────────────────────────────────────────────────
         _reg("dashboard", "📈", _("tab.dashboard"))
-        tk.Frame(self.sidebar, height=1, bg=BORDER).pack(fill="x", pady=2)
-        _reg("phones", "📱", _("tab.phones"))
-        tk.Frame(self.sidebar, height=1, bg=BORDER).pack(fill="x", pady=2)
+        _reg("phones",    "📱", _("tab.phones"))
 
-        # INSTA BETA group
+        tk.Frame(self.sidebar, bg="#1a1f2e", height=1).pack(fill="x", pady=4)
+
+        # ── Instagram group ────────────────────────────────────────────────────
         grp_outer, grp_children = self._make_sidebar_group(
-            self.sidebar, "✦", _("tab.insta"), badge="BETA", col=OK)
+            self.sidebar, "✦", "Instagram", badge="BETA", col=OK)
         grp_outer.pack(fill="x")
         self._insta_group_children = grp_children
 
         _reg("stats",       "📊", _("tab.stats"),       grp_children, indent=True)
         _reg("posting",     "🚀", _("tab.posting"),     grp_children, indent=True)
         _reg("masspost",    "⚡", _("tab.masspost"),    grp_children, indent=True,
-             badge="BETA", badge_col=WARN)
+             badge="BETA", badge_col="#e0245e")
         _reg("bank",        "🗂", _("tab.bank"),        grp_children, indent=True)
         _reg("autocomment", "🤖", _("tab.autocomment"), grp_children, indent=True)
         _reg("tools",       "🔧", _("tab.tools"),       grp_children, indent=True)
 
-        tk.Frame(self.sidebar, height=1, bg=BORDER).pack(fill="x", pady=2)
+        tk.Frame(self.sidebar, bg="#1a1f2e", height=1).pack(fill="x", pady=4)
 
-        # Montage group
+        # ── Montage group ──────────────────────────────────────────────────────
         mont_outer, mont_children = self._make_sidebar_group(
             self.sidebar, "🎬", _("tab.montage"), col=WARN)
         mont_outer.pack(fill="x")
         _reg("automation", "✂", _("tab.automation"), mont_children, indent=True)
 
-        tk.Frame(self.sidebar, height=1, bg=BORDER).pack(fill="x", pady=2)
-        _reg("settings", "⚙", _("tab.settings"))
+        tk.Frame(self.sidebar, bg="#1a1f2e", height=1).pack(fill="x", pady=4)
 
-        # ── Sidebar: bottom (spacer + coming soon + refresh) ───────────────────
-        tk.Frame(self.sidebar, bg=SURFACE).pack(fill="both", expand=True)
+        # ── Coming soon ────────────────────────────────────────────────────────
+        def _soon(icon, label):
+            row = tk.Frame(self.sidebar, bg="#0d1117")
+            row.pack(fill="x")
+            tk.Label(row, text=f"{icon}  {label}",
+                     font=("Segoe UI", 9), bg="#0d1117", fg="#3a4055",
+                     padx=14, pady=7).pack(side="left")
+            tk.Label(row, text="Bientôt" if L == "fr" else "Soon",
+                     font=("Segoe UI", 7, "bold"), bg="#2a1f0a",
+                     fg=WARN, padx=5, pady=1).pack(side="right", padx=12)
 
-        # Coming soon platforms pinned to bottom
-        tk.Frame(self.sidebar, height=1, bg=BORDER).pack(fill="x")
-        _coming_soon(self.sidebar, "𝕏", "Twitter")
-        _coming_soon(self.sidebar, "🧵", "Threads")
-        tk.Frame(self.sidebar, height=1, bg=BORDER).pack(fill="x")
+        _soon("𝕏",  "Twitter / X")
+        _soon("🧵", "Threads")
+
+        # Spacer pushes bottom items down
+        tk.Frame(self.sidebar, bg=SB_BG).pack(fill="both", expand=True)
+
+        # ── Bottom section ─────────────────────────────────────────────────────
+        tk.Frame(self.sidebar, bg="#1a1f2e", height=1).pack(fill="x")
 
         # Refresh button
-        ref_frame = tk.Frame(self.sidebar, bg=SURFACE, padx=14, pady=6)
+        ref_frame = tk.Frame(self.sidebar, bg=SB_BG, padx=12, pady=8)
         ref_frame.pack(fill="x")
         self.refresh_btn = tk.Button(ref_frame, text=_("common.refresh"),
-            font=("Segoe UI", 10, "bold"), bg=ACCENT, fg="#07080d",
+            font=("Segoe UI", 9, "bold"), bg=ACCENT, fg="#07080d",
             relief="flat", cursor="hand2", activebackground=ACCENT2,
-            pady=9, bd=0, command=self._manual_refresh)
+            pady=8, bd=0, command=self._manual_refresh)
         self.refresh_btn.pack(fill="x")
         self._bind_hover(self.refresh_btn, ACCENT, ACCENT2, "#07080d", "#07080d")
 
         self.status_lbl = tk.Label(self.sidebar, text="—",
-            font=("Consolas", 8), bg=SURFACE, fg=MUTED)
-        self.status_lbl.pack(padx=16, pady=(2, 14))
+            font=("Consolas", 7), bg=SB_BG, fg="#3a4055")
+        self.status_lbl.pack(padx=14, pady=(2, 2))
+
+        tk.Frame(self.sidebar, bg="#1a1f2e", height=1).pack(fill="x")
+
+        _reg("settings", "⚙", _("tab.settings"))
+
+        # Version
+        tk.Label(self.sidebar, text="Version 1.0.0",
+                 font=("Segoe UI", 7), bg=SB_BG, fg="#2e3650").pack(
+                 anchor="w", padx=14, pady=(4, 8))
 
         # Top stat cards removed per user request
 
@@ -2035,8 +2036,8 @@ class App:
         # Global mousewheel routing
         self.root.bind_all("<MouseWheel>", self._on_global_scroll, add="+")
 
-        self.tab_container = tk.Frame(self.main_frame, bg=BG)
-        self.tab_container.pack(fill="both", expand=True, padx=18, pady=(0, 18))
+        self.tab_container = tk.Frame(self.main_frame, bg="#080b12")
+        self.tab_container.pack(fill="both", expand=True, padx=16, pady=(0, 16))
 
         self.tabs = {}
         for build_fn in (self._build_dashboard_tab,
@@ -2164,79 +2165,78 @@ class App:
         widget.bind("<Enter>", lambda e: _tick(1), add="+")
         widget.bind("<Leave>", lambda e: _tick(-1), add="+")
 
-    def _make_sidebar_item(self, parent, icon, label, key, indent=False, badge=None, badge_col=None):
-        """Returns (outer_row, button, indicator_frame). Optional badge ('BETA', 'NEW'...)."""
-        outer = tk.Frame(parent, bg=SURFACE)
-        indicator = tk.Frame(outer, width=3, bg=SURFACE)
+    def _make_sidebar_item(self, parent, icon, label, key,
+                           indent=False, badge=None, badge_col=None):
+        SB  = "#0d1117"
+        HOV = "#141d2b"
+        ACT = "#1a2640"
+
+        outer = tk.Frame(parent, bg=SB, cursor="hand2")
+        indicator = tk.Frame(outer, width=3, bg=SB)
         indicator.pack(side="left", fill="y")
-        pad = 22 if indent else 12
 
-        # Badge packed BEFORE the expanding button so it claims its space first
-        if badge:
-            bcol = badge_col or WARN
-            blbl = tk.Label(outer, text=f" {badge} ", font=("Segoe UI", 7, "bold"),
-                            bg=bcol, fg="#07080d", padx=2, pady=1,
-                            cursor="hand2")
-            blbl.pack(side="right", padx=(0, 10))
-            blbl.bind("<Button-1>", lambda e, x=key: self._show_tab(x))
-
-        btn = tk.Button(outer,
-                        text=f"  {icon}  {label}",
-                        font=("Segoe UI", 10), bg=SURFACE, fg=TEXT2,
-                        relief="flat", anchor="w", padx=pad, pady=9,
-                        cursor="hand2", activebackground=SURFACE3,
+        lpad = 28 if indent else 14
+        btn = tk.Button(outer, text=f"{icon}  {label}",
+                        font=("Segoe UI", 9), bg=SB, fg="#8b95b0",
+                        relief="flat", anchor="w", padx=lpad, pady=8,
+                        cursor="hand2", activebackground=HOV,
                         bd=0, command=lambda x=key: self._show_tab(x))
         btn.pack(side="left", fill="x", expand=True)
 
-        def _in(e):
-            if getattr(self, "_active_tab", "") != key:
-                btn.config(bg=SURFACE3, fg=TEXT)
-        def _out(e):
-            if getattr(self, "_active_tab", "") != key:
-                btn.config(bg=SURFACE, fg=TEXT2)
+        if badge:
+            bcol = badge_col or "#e0245e"   # Instagram-pink default for BETA
+            blbl = tk.Label(outer, text=badge, font=("Segoe UI", 7, "bold"),
+                            bg=bcol, fg="#ffffff", padx=5, pady=1,
+                            cursor="hand2", relief="flat")
+            blbl.pack(side="right", padx=(0, 12))
+            blbl.bind("<Button-1>", lambda e, x=key: self._show_tab(x))
 
-        btn.bind("<Enter>", _in); btn.bind("<Leave>", _out)
-        outer.bind("<Enter>", _in); outer.bind("<Leave>", _out)
+        def _hl(on):
+            if getattr(self, "_active_tab", "") != key:
+                btn.config(bg=HOV if on else SB,
+                           fg=TEXT if on else "#8b95b0")
+                outer.config(bg=HOV if on else SB)
+        btn.bind("<Enter>",  lambda e: _hl(True))
+        btn.bind("<Leave>",  lambda e: _hl(False))
+        outer.bind("<Enter>", lambda e: _hl(True))
+        outer.bind("<Leave>", lambda e: _hl(False))
         return outer, btn, indicator
 
     def _make_sidebar_group(self, parent, icon, label, badge=None, col=None):
-        """Collapsible group header. Returns (outer, children_frame)."""
+        SB   = "#0d1117"
+        HDR  = "#111827"
         accent = col or ACCENT
-        outer = tk.Frame(parent, bg=SURFACE)
-        _open = [True]
+        outer  = tk.Frame(parent, bg=SB)
+        _open  = [True]
 
-        hdr = tk.Frame(outer, bg=SURFACE3, cursor="hand2")
+        hdr = tk.Frame(outer, bg=HDR, cursor="hand2")
         hdr.pack(fill="x")
-        tk.Frame(hdr, width=3, bg=accent).pack(side="left", fill="y")
 
-        inner_h = tk.Frame(hdr, bg=SURFACE3)
-        inner_h.pack(side="left", fill="x", expand=True, padx=10, pady=8)
-        tk.Label(inner_h, text=f"{icon}  {label}", font=("Segoe UI", 9, "bold"),
-                 bg=SURFACE3, fg=TEXT).pack(side="left")
+        inner_h = tk.Frame(hdr, bg=HDR)
+        inner_h.pack(side="left", fill="x", expand=True, padx=14, pady=9)
+        tk.Label(inner_h, text=f"{icon}  {label}",
+                 font=("Segoe UI", 9, "bold"), bg=HDR, fg=TEXT2).pack(side="left")
         if badge:
-            badge_lbl = tk.Label(inner_h, text=badge, font=("Segoe UI", 7, "bold"),
-                                 bg=accent, fg="#07080d", padx=5, pady=1)
-            badge_lbl.pack(side="left", padx=(7, 0))
+            tk.Label(inner_h, text=badge, font=("Segoe UI", 7, "bold"),
+                     bg=accent, fg="#07080d", padx=5, pady=1).pack(side="left", padx=(8, 0))
 
-        arrow = tk.Label(hdr, text="▾", font=("Segoe UI", 11),
-                         bg=SURFACE3, fg=TEXT2)
-        arrow.pack(side="right", padx=10)
+        arrow = tk.Label(hdr, text="∨", font=("Segoe UI", 9),
+                         bg=HDR, fg="#555e78", cursor="hand2")
+        arrow.pack(side="right", padx=12)
 
-        children = tk.Frame(outer, bg=SURFACE)
+        children = tk.Frame(outer, bg=SB)
         children.pack(fill="x")
 
         def _toggle(e=None):
             _open[0] = not _open[0]
             if _open[0]:
                 children.pack(fill="x")
-                arrow.config(text="▾")
+                arrow.config(text="∨")
             else:
                 children.pack_forget()
-                arrow.config(text="▸")
-
-        for w in [hdr, inner_h, arrow] + inner_h.winfo_children():
+                arrow.config(text="›")
+        for w in [hdr, inner_h, arrow] + list(inner_h.winfo_children()):
             w.bind("<Button-1>", _toggle)
-
         return outer, children
 
     def _show_tab(self, key):
@@ -2248,15 +2248,21 @@ class App:
             if not children.winfo_ismapped():
                 children.pack(fill="x")
 
+        SB_BG = "#0d1117"
+        ACT   = "#1a2640"
         for k, ind in self._sidebar_indicators.items():
             active = k == key
-            btn = self.tab_btns[k]
+            btn    = self.tab_btns[k]
             if active:
                 ind.config(bg=ACCENT)
-                btn.config(bg=SURFACE3, fg=TEXT, font=("Segoe UI", 10, "bold"))
+                btn.config(bg=ACT, fg=TEXT, font=("Segoe UI", 9, "bold"))
+                try: btn.master.config(bg=ACT)
+                except Exception: pass
             else:
-                ind.config(bg=SURFACE)
-                btn.config(bg=SURFACE, fg=TEXT2, font=("Segoe UI", 10))
+                ind.config(bg=SB_BG)
+                btn.config(bg=SB_BG, fg="#8b95b0", font=("Segoe UI", 9))
+                try: btn.master.config(bg=SB_BG)
+                except Exception: pass
 
         for k, frame in self.tabs.items():
             if k == key:
