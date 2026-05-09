@@ -1,0 +1,34 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Base */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body, #root {
+  height: 100%;
+  background: #080b14;
+  color: #d4dcf0;
+  font-family: 'Inter', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Scrollbar custom */
+::-webkit-scrollbar       { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #0c0f1c; }
+::-webkit-scrollbar-thumb { background: #1a2035; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #1e2640; }
+
+/* Sélection */
+::selection {
+  background: #4f9eff33;
+  color: #d4dcf0;
+}
+
+/* Retire l'outline par défaut (on utilise focus-visible) */
+*:focus { outline: none; }
+*:focus-visible { outline: 2px solid #4f9eff; outline-offset: 2px; border-radius: 4px; }
