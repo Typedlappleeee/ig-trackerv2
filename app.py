@@ -1291,6 +1291,9 @@ class App:
         self._auto_interval = int(self.cfg.get("auto_refresh_min", 5)) * 60
         self._next_refresh   = 0   # epoch — 0 = pas encore planifié
 
+        # Afficher les téléphones en cache immédiatement (avant le retour API)
+        self.root.after(200, self._refresh_table)
+
         threading.Thread(target=self._load_phones, daemon=True).start()
         threading.Thread(target=self._scheduler, daemon=True).start()
 
