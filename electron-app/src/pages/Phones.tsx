@@ -72,7 +72,7 @@ export function Phones({ user }: PhonesProps) {
         user_id:    user.id,
         geelark_id: p.id,
         serial_no:  p.serialNo ?? null,
-        phone_name: p.name,
+        phone_name: p.name ?? p.serialName ?? p.phoneName ?? p.serialNo ?? p.id ?? 'Phone inconnu',
         group_name: p.groupName ?? null,
         status:     geelarkStatusLabel(p.status),
         remark:     p.remark ?? null,

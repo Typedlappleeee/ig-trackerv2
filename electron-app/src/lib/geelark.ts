@@ -1,13 +1,15 @@
 const BASE = 'https://openapi.geelark.com/open/v1'
 
-// Raw phone shape returned by GéeLark API
+// Raw phone shape returned by GéeLark API (some fields may be null/missing)
 export interface GeelarkPhone {
-  id:         string
-  serialNo:   string
-  name:       string
-  groupName?: string
-  status:     number  // 0=offline, 1=online, 2=error
-  remark?:    string
+  id:           string
+  serialNo?:    string | null
+  name?:        string | null
+  serialName?:  string | null
+  phoneName?:   string | null
+  groupName?:   string | null
+  status:       number  // 0=offline, 1=online, 2=error
+  remark?:      string | null
 }
 
 function authHeaders(bearer: string) {
