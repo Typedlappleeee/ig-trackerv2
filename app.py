@@ -6556,74 +6556,204 @@ class App:
     # ONGLET POSTING PERMANENT
     # ══════════════════════════════════════════════════════════════════════════
     def _build_posting_tab(self):
-        import random as _random
-        L = self.cfg.get("lang", "fr")
-        _ = lambda k: t(k, L)
         f = tk.Frame(self.tab_container, bg=BG)
         self.tabs["posting"] = f
 
-        self._tab_header(f, "🚀", _("post.title"), _("post.subtitle"), ACCENT)
+        body = tk.Frame(f, bg=BG)
+        body.pack(fill="both", expand=True, padx=16, pady=12)
 
-        main = tk.Frame(f, bg=BG)
-        main.pack(fill="both", expand=True, padx=20, pady=0)
-
-        # ── LEFT: video picker + phone selector ──────────────────────────────
-        left = tk.Frame(main, bg=BG, width=320)
+        # ─── LEFT PANEL (260px) — Account selector ───────────────────────────
+        left = tk.Frame(body, bg="#0a0d15", width=260)
         left.pack(side="left", fill="y")
         left.pack_propagate(False)
 
-        # Video selection from bank
-        vid_hdr = tk.Frame(left, bg=BG)
-        vid_hdr.pack(fill="x")
-        tk.Label(vid_hdr, text=_("post.video"), font=("Segoe UI", 10, "bold"),
-                 bg=BG, fg=TEXT2).pack(side="left")
-        tk.Button(vid_hdr, text="↺", font=("Segoe UI", 9), bg=SURFACE2, fg=TEXT2,
-                  relief="flat", cursor="hand2", padx=6, pady=2,
-                  command=lambda: self._post_refresh_bank()).pack(side="right")
+        # Header
+        hdr = tk.Frame(left, bg="#0a0d15", padx=12, pady=10)
+        hdr.pack(fill="x")
+        tk.Label(hdr, text="📱  Comptes", font=("Segoe UI", 11, "bold"), bg="#0a0d15", fg="#e8eaf0").pack(side="left")
+
+        # Group filter
+        grp_row = tk.Frame(left, bg="#0a0d15", padx=12)
+        grp_row.pack(fill="x", pady=(0, 8))
+        tk.Label(grp_row, text="Groupe", font=("Segoe UI", 8), bg="#0a0d15", fg="#6b7a99").pack(side="left")
+        self._post_grp_var = tk.StringVar(value="Tous")
+        self._post_grp_cb = ttk.Combobox(grp_row, textvariable=self._post_grp_var, state="readonly", width=12, font=("Segoe UI", 8))
+        self._post_grp_cb.pack(side="left", padx=(6, 0))
+
+        tk.Frame(left, bg="#141c2e", height=1).pack(fill="x")
+
+        # Scrollable phone list (Instagram-style)
+        ph_canvas = tk.Canvas(left, bg="#0a0d15", highlightthickness=0)
+        ph_vsb = ttk.Scrollbar(left, orient="vertical", command=ph_canvas.yview)
+        ph_inner = tk.Frame(ph_canvas, bg="#0a0d15")
+        ph_win = ph_canvas.create_window((0, 0), window=ph_inner, anchor="nw")
+        ph_inner.bind("<Configure>", lambda e: ph_canvas.configure(scrollregion=ph_canvas.bbox("all")))
+        ph_canvas.bind("<Configure>", lambda e: ph_canvas.itemconfig(ph_win, width=e.width))
+        ph_canvas.configure(yscrollcommand=ph_vsb.set)
+        ph_vsb.pack(side="right", fill="y")
+        ph_canvas.pack(side="left", fill="both", expand=True)
+
+        self._post_pvars = {}
+
+        def _populate_phones(g="Tous"):
+            for w in ph_inner.winfo_children():
+                w.destroy()
+            self._post_pvars.clear()
+            groups = set(d.get("group_name", "") for d in self.data.values() if d.get("group_name"))
+            self._post_grp_cb["values"] = ["Tous"] + sorted(groups)
+            for pid, d in sorted(self.data.items(), key=lambda x: int(x[1].get("serial_no") or 0)):
+                name = d.get("phone_name") or d.get("ig_username") or ""
+                if not name:
+                    continue
+                if g != "Tous" and d.get("group_name", "") != g:
+                    continue
+                var = tk.BooleanVar()
+                self._post_pvars[pid] = var
+                # Instagram-style account row
+                row = tk.Frame(ph_inner, bg="#0a0d15", cursor="hand2")
+                row.pack(fill="x")
+
+                # Avatar circle
+                av = tk.Canvas(row, bg="#162040", width=36, height=36, highlightthickness=0)
+                av.pack(side="left", padx=(12, 8), pady=6)
+                av.create_oval(2, 2, 34, 34, fill="#1e3060", outline="")
+                ig = d.get("ig_username", "")
+                initials = (ig[0].upper() if ig else name[0].upper()) if (ig or name) else "?"
+                av.create_text(18, 18, text=initials, font=("Segoe UI", 11, "bold"), fill=ACCENT)
+
+                # Name + handle
+                txt_col = tk.Frame(row, bg="#0a0d15")
+                txt_col.pack(side="left", fill="x", expand=True)
+                tk.Label(txt_col, text=d.get("phone_name", pid), font=("Segoe UI", 9, "bold"), bg="#0a0d15", fg="#c9d1d9", anchor="w").pack(anchor="w")
+                if ig:
+                    tk.Label(txt_col, text=f"@{ig}", font=("Segoe UI", 8), bg="#0a0d15", fg="#4f8ef7", anchor="w").pack(anchor="w")
+
+                # Checkbox (right side)
+                cb = tk.Checkbutton(row, variable=var, bg="#0a0d15", activebackground="#0a0d15",
+                                    selectcolor="#162040", fg=ACCENT, activeforeground=ACCENT, cursor="hand2")
+                cb.pack(side="right", padx=12)
+
+                # Click entire row
+                for w in [row, txt_col, av] + txt_col.winfo_children():
+                    try:
+                        w.bind("<Button-1>", lambda e, v=var: v.set(not v.get()))
+                    except Exception:
+                        pass
+
+                # Separator
+                tk.Frame(ph_inner, bg="#0d1520", height=1).pack(fill="x", padx=12)
+
+            if not self._post_pvars:
+                tk.Label(ph_inner, text="Aucun téléphone.\nAjoute un Bearer Token\ndans Paramètres.",
+                         font=("Segoe UI", 9), bg="#0a0d15", fg=MUTED, justify="center").pack(pady=30)
+
+        self._post_populate_phones = _populate_phones
+        _populate_phones()
+        self._post_grp_cb.bind("<<ComboboxSelected>>", lambda e: _populate_phones(self._post_grp_var.get()))
+
+        # Tout / Aucun
+        tk.Frame(left, bg="#141c2e", height=1).pack(fill="x")
+        sel_row = tk.Frame(left, bg="#0a0d15", padx=12, pady=8)
+        sel_row.pack(fill="x")
+        for txt, val in [("Tout", True), ("Aucun", False)]:
+            tk.Button(sel_row, text=txt, font=("Segoe UI", 8), bg="#0d1520", fg="#6b7a99",
+                      relief="flat", cursor="hand2", padx=10, pady=4,
+                      command=lambda v=val: [x.set(v) for x in self._post_pvars.values()]
+                      ).pack(side="left", padx=(0, 6))
+
+        # ─── RIGHT PANEL — Instagram "New post" form ─────────────────────────
+        right = tk.Frame(body, bg=BG)
+        right.pack(side="left", fill="both", expand=True, padx=(12, 0))
+
+        # Card container
+        card_outer, card = self._round_card(right, radius=14, bg="#0b0f1a", border="#1a2235", border_w=1)
+        card_outer.pack(fill="both", expand=True)
+
+        # ── Top bar inside card: "Nouveau post" ──────────────────────────────
+        top_bar = tk.Frame(card, bg="#0b0f1a", padx=16, pady=12)
+        top_bar.pack(fill="x")
+        tk.Frame(top_bar, bg="#1a2235", width=1).pack(side="right", fill="y", padx=(16, 0))
+        tk.Label(top_bar, text="Nouveau post", font=("Segoe UI", 12, "bold"), bg="#0b0f1a", fg="#e8eaf0").pack(side="left")
+
+        # refresh bank button
+        def _post_refresh_bank():
+            self._post_bank_entries = load_bank()
+        self._post_refresh_bank = _post_refresh_bank
+        _post_refresh_bank()
+
+        tk.Button(top_bar, text="↺", font=("Segoe UI", 10), bg="#0b0f1a", fg="#4f8ef7",
+                  relief="flat", cursor="hand2", padx=4,
+                  command=_post_refresh_bank).pack(side="right")
+
+        tk.Frame(card, bg="#1a2235", height=1).pack(fill="x")
+
+        # Scrollable content inside card
+        card_scroll_canvas = tk.Canvas(card, bg="#0b0f1a", highlightthickness=0)
+        card_vsb = ttk.Scrollbar(card, orient="vertical", command=card_scroll_canvas.yview)
+        card_inner = tk.Frame(card_scroll_canvas, bg="#0b0f1a")
+        _win = card_scroll_canvas.create_window((0, 0), window=card_inner, anchor="nw")
+        card_inner.bind("<Configure>", lambda e: card_scroll_canvas.configure(scrollregion=card_scroll_canvas.bbox("all")))
+        card_scroll_canvas.bind("<Configure>", lambda e: card_scroll_canvas.itemconfig(_win, width=e.width))
+        card_scroll_canvas.configure(yscrollcommand=card_vsb.set)
+        card_vsb.pack(side="right", fill="y")
+        card_scroll_canvas.pack(side="left", fill="both", expand=True)
+
+        # ── Video preview + pick button row ──────────────────────────────────
+        media_row = tk.Frame(card_inner, bg="#0b0f1a", padx=16, pady=14)
+        media_row.pack(fill="x")
+
+        # Portrait preview canvas (9:16 ratio — 120x213)
+        preview_wrap = tk.Frame(media_row, bg="#000000", width=120, height=213,
+                                highlightthickness=1, highlightbackground="#1a2235")
+        preview_wrap.pack(side="left")
+        preview_wrap.pack_propagate(False)
+
+        self._post_preview_canvas = tk.Canvas(preview_wrap, bg="#000000",
+                                               highlightthickness=0, width=120, height=213)
+        self._post_preview_canvas.pack(fill="both", expand=True)
+        self._post_preview_img_ref = None
 
         self.post_vid_path = [None]
         self._post_bank_entries = []
 
-        # Thumbnail banner (shows preview of selected video)
-        self._post_preview_canvas = tk.Canvas(left, bg="#000",
-                                               highlightthickness=1,
-                                               highlightbackground=BORDER,
-                                               height=130)
-        self._post_preview_canvas.pack(fill="x", pady=(4, 0))
-        self._post_preview_img_ref = None
-
-        def _draw_post_preview(text="Aucune vidéo sélectionnée"):
+        def _draw_post_preview(text="Choisir\nune vidéo"):
             cv = self._post_preview_canvas
             cv.delete("all")
-            w = cv.winfo_width() or 280
-            h = 130
-            for k in range(20):
-                tt = k / 19
-                rr = int(0x0c*(1-tt) + 0x18*tt)
-                gg = int(0x0e*(1-tt) + 0x1b*tt)
-                bb = int(0x17*(1-tt) + 0x28*tt)
-                cv.create_rectangle(0, k*h/20, w, (k+1)*h/20,
+            w, h = 120, 213
+            for k in range(30):
+                tt = k / 29
+                rr = int(0x08*(1-tt) + 0x14*tt)
+                gg = int(0x0a*(1-tt) + 0x18*tt)
+                bb = int(0x14*(1-tt) + 0x2e*tt)
+                cv.create_rectangle(0, k*h/30, w, (k+1)*h/30,
                                      fill=f"#{rr:02x}{gg:02x}{bb:02x}", outline="")
-            cv.create_text(w//2, h//2, text=text, fill=MUTED,
-                            font=("Segoe UI", 9))
+            cv.create_text(w//2, h//2-14, text="📹", font=("Segoe UI", 22), fill="#2a3d5a")
+            cv.create_text(w//2, h//2+18, text=text, fill="#3a4d66",
+                            font=("Segoe UI", 8), justify="center")
         self._post_preview_canvas.bind("<Configure>",
             lambda e: _draw_post_preview() if not self.post_vid_path[0]
                       else self._post_load_preview(self.post_vid_path[0]))
         self._post_draw_preview = _draw_post_preview
+        _draw_post_preview()
 
-        # Selected video label
-        self.post_vid_lbl = tk.Label(left, text="Aucune vidéo sélectionnée",
-                                     font=("Segoe UI", 8), bg=BG, fg=MUTED,
-                                     anchor="w", wraplength=300)
-        self.post_vid_lbl.pack(fill="x", pady=(6, 2))
+        # Right of preview: file name + pick button
+        pick_info = tk.Frame(media_row, bg="#0b0f1a", padx=14)
+        pick_info.pack(side="left", fill="both", expand=True)
+
+        tk.Label(pick_info, text="Vidéo", font=("Segoe UI", 8, "bold"),
+                 bg="#0b0f1a", fg="#6b7a99").pack(anchor="w")
+
+        self.post_vid_lbl = tk.Label(pick_info, text="Aucune vidéo sélectionnée",
+                                      font=("Segoe UI", 9), bg="#0b0f1a", fg="#6b7a99",
+                                      anchor="w", wraplength=200, justify="left")
+        self.post_vid_lbl.pack(anchor="w", pady=(2, 10))
 
         def _post_on_pick(paths):
             if not paths:
                 return
             path = paths[0]
             self.post_vid_path[0] = path
-            self.post_vid_lbl.config(text=Path(path).name, fg=TEXT)
-            # Auto-fill caption from bank entry
+            self.post_vid_lbl.config(text=Path(path).name, fg="#c9d1d9")
             bank = load_bank()
             for e in bank:
                 if e.get("path") == path:
@@ -6632,176 +6762,101 @@ class App:
                     self.post_caption_box.insert("1.0", cap)
                     n = len(cap)
                     self.post_char_lbl.config(text=f"{n} / 2200",
-                                               fg=DANGER if n > 2200 else MUTED)
+                                               fg=DANGER if n > 2200 else "#6b7a99")
                     break
             self._post_load_preview(path)
 
-        # Bank picker button
-        pick_btn = tk.Button(left,
+        pick_btn = tk.Button(pick_info,
                               text="📂  Choisir depuis la banque",
-                              font=("Segoe UI", 10, "bold"),
+                              font=("Segoe UI", 9, "bold"),
                               bg=ACCENT, fg="#ffffff",
                               relief="flat", cursor="hand2", bd=0,
-                              padx=14, pady=10,
-                              activebackground="#3d7ae5",
+                              padx=12, pady=7,
+                              activebackground=ACCENT2,
                               command=lambda: self._open_bank_picker(_post_on_pick, multi=False))
-        pick_btn.pack(fill="x", pady=(0, 4))
+        pick_btn.pack(anchor="w", fill="x")
 
-        def _post_refresh_bank():
-            self._post_bank_entries = load_bank()
+        # ── Caption area ──────────────────────────────────────────────────────
+        tk.Frame(card_inner, bg="#1a2235", height=1).pack(fill="x")
+        cap_row = tk.Frame(card_inner, bg="#0b0f1a", padx=16, pady=12)
+        cap_row.pack(fill="x")
+        tk.Label(cap_row, text="Caption", font=("Segoe UI", 8, "bold"),
+                 bg="#0b0f1a", fg="#6b7a99").pack(anchor="w", pady=(0, 4))
 
-        self._post_refresh_bank = _post_refresh_bank
-        _post_refresh_bank()
-
-        # Phone list
-        tk.Label(left, text=_("post.targets"), font=("Segoe UI", 10, "bold"),
-                 bg=BG, fg=TEXT2).pack(anchor="w", pady=(12, 0))
-        grp_row = tk.Frame(left, bg=BG)
-        grp_row.pack(fill="x", pady=(4, 0))
-        tk.Label(grp_row, text=_("post.group"), font=("Segoe UI", 9),
-                 bg=BG, fg=TEXT2).pack(side="left")
-        self._post_grp_var = tk.StringVar(value="Tous")
-        self._post_grp_cb  = ttk.Combobox(grp_row, textvariable=self._post_grp_var,
-                                           state="readonly", width=14, font=("Segoe UI", 9))
-        self._post_grp_cb.pack(side="left", padx=(4, 0))
-
-        _phone_outer, phone_frame = self._round_card(left, radius=10, bg=SURFACE,
-                                                      border=BORDER)
-        _phone_outer.pack(fill="both", expand=True, pady=(6, 0))
-        cv_p    = tk.Canvas(phone_frame, bg=SURFACE, highlightthickness=0)
-        sv_p    = ttk.Scrollbar(phone_frame, orient="vertical", command=cv_p.yview)
-        inn_p   = tk.Frame(cv_p, bg=SURFACE)
-        wid_p   = cv_p.create_window((0, 0), window=inn_p, anchor="nw")
-        inn_p.bind("<Configure>", lambda e: cv_p.configure(scrollregion=cv_p.bbox("all")))
-        cv_p.bind("<Configure>",  lambda e: cv_p.itemconfig(wid_p, width=e.width))
-        cv_p.configure(yscrollcommand=sv_p.set)
-        sv_p.pack(side="right", fill="y")
-        cv_p.pack(side="left", fill="both", expand=True)
-
-        self._post_pvars = {}
-
-        def _populate_phones(g="Tous"):
-            for w in inn_p.winfo_children():
-                w.destroy()
-            self._post_pvars.clear()
-            groups = set(d.get("group_name", "") for d in self.data.values() if d.get("group_name"))
-            self._post_grp_cb["values"] = ["Tous"] + sorted(groups)
-            for pid, d in sorted(self.data.items(),
-                                  key=lambda x: int(x[1].get("serial_no") or 0)):
-                name = d.get("phone_name") or d.get("ig_username") or ""
-                if not name:
-                    continue
-                if g != "Tous" and d.get("group_name", "") != g:
-                    continue
-                var = tk.BooleanVar()
-                self._post_pvars[pid] = var
-                row = tk.Frame(inn_p, bg=SURFACE)
-                row.pack(fill="x", padx=6, pady=2)
-                tk.Checkbutton(row, variable=var, bg=SURFACE,
-                               activebackground=SURFACE, selectcolor=SURFACE3,
-                               fg=TEXT, activeforeground=TEXT,
-                               cursor="hand2").pack(side="left")
-                ig  = d.get("ig_username", "")
-                lbl = f"{d.get('phone_name', pid)}"
-                if ig:
-                    lbl += f"  @{ig}"
-                tk.Label(row, text=lbl, font=("Segoe UI", 9), bg=SURFACE,
-                         fg=TEXT if ig else TEXT2, anchor="w",
-                         cursor="hand2").pack(side="left", padx=4)
-                row.bind("<Button-1>", lambda e, v=var: v.set(not v.get()))
-            if not self._post_pvars:
-                tk.Label(inn_p, text="Aucun téléphone.\nAjoute un Bearer Token\ndans Paramètres.",
-                         font=("Segoe UI", 9), bg=SURFACE, fg=MUTED, justify="center").pack(pady=20)
-
-        self._post_populate_phones = _populate_phones
-        _populate_phones()
-        self._post_grp_cb.bind("<<ComboboxSelected>>",
-                               lambda e: _populate_phones(self._post_grp_var.get()))
-
-        sel_row2 = tk.Frame(left, bg=BG)
-        sel_row2.pack(fill="x", pady=(4, 0))
-        tk.Button(sel_row2, text="Tout", font=("Segoe UI", 8), bg=SURFACE2, fg=TEXT2,
-                  relief="flat", cursor="hand2", padx=6, pady=2,
-                  command=lambda: [v.set(True) for v in self._post_pvars.values()]).pack(side="left")
-        tk.Button(sel_row2, text="Aucun", font=("Segoe UI", 8), bg=SURFACE2, fg=TEXT2,
-                  relief="flat", cursor="hand2", padx=6, pady=2,
-                  command=lambda: [v.set(False) for v in self._post_pvars.values()]).pack(side="left", padx=4)
-
-        # ── RIGHT: caption + options + log ──────────────────────────────────
-        right = tk.Frame(main, bg=BG)
-        right.pack(side="left", fill="both", expand=True, padx=(16, 0))
-
-        tk.Label(right, text="Caption", font=("Segoe UI", 10, "bold"),
-                 bg=BG, fg=TEXT2).pack(anchor="w")
-        tk.Label(right, text="Ctrl+A pour tout sélectionner · Ctrl+V pour coller",
-                 font=("Segoe UI", 8), bg=BG, fg=MUTED).pack(anchor="w")
-        self.post_caption_box = tk.Text(right, bg=SURFACE, fg=TEXT, font=("Segoe UI", 11),
-                                        relief="flat", height=8, wrap="word",
-                                        insertbackground=TEXT, padx=10, pady=8,
-                                        highlightthickness=1, highlightbackground=BORDER,
-                                        highlightcolor=ACCENT)
-        self.post_caption_box.pack(fill="x", pady=(4, 0))
-
-        # Char counter
-        self.post_char_lbl = tk.Label(right, text="0 / 2200",
-                                      font=("Segoe UI", 8), bg=BG, fg=MUTED, anchor="e")
-        self.post_char_lbl.pack(fill="x")
+        self.post_caption_box = tk.Text(cap_row, bg="#080c14", fg="#c9d1d9",
+                                         font=("Segoe UI", 10),
+                                         relief="flat", height=5, wrap="word",
+                                         insertbackground="#4f8ef7",
+                                         padx=12, pady=10,
+                                         highlightthickness=1,
+                                         highlightbackground="#1a2235",
+                                         highlightcolor=ACCENT)
+        self.post_caption_box.pack(fill="x")
+        self.post_char_lbl = tk.Label(cap_row, text="0 / 2200",
+                                       font=("Segoe UI", 8), bg="#0b0f1a",
+                                       fg="#6b7a99", anchor="e")
+        self.post_char_lbl.pack(fill="x", pady=(4, 0))
 
         def _update_char(*_):
             n = len(self.post_caption_box.get("1.0", "end").strip())
             self.post_char_lbl.config(text=f"{n} / 2200",
-                                       fg=DANGER if n > 2200 else MUTED)
+                                       fg=DANGER if n > 2200 else "#6b7a99")
         self.post_caption_box.bind("<KeyRelease>", _update_char)
 
-        # Schedule row
-        _sched_outer, sched_f = self._round_card(right, radius=10, bg=SURFACE,
-                                                  border=BORDER)
-        _sched_outer.pack(fill="x", pady=(10, 0))
-        sched_inner = tk.Frame(sched_f, bg=SURFACE)
-        sched_inner.pack(fill="x", padx=12, pady=8)
-        tk.Label(sched_inner, text="Délai entre comptes :",
-                 font=("Segoe UI", 9), bg=SURFACE, fg=TEXT2).pack(side="left")
-        self.post_stagger_var = tk.IntVar(value=5)
-        tk.Spinbox(sched_inner, from_=0, to=120, textvariable=self.post_stagger_var,
-                   font=("Segoe UI", 9), bg=SURFACE2, fg=TEXT, width=4,
-                   relief="flat", buttonbackground=SURFACE2).pack(side="left", padx=6)
-        tk.Label(sched_inner, text="min entre chaque compte",
-                 font=("Segoe UI", 9), bg=SURFACE, fg=MUTED).pack(side="left")
+        # ── Option rows (Instagram-style) ─────────────────────────────────────
+        def _option_row(parent, icon, label, right_widget=None):
+            tk.Frame(parent, bg="#1a2235", height=1).pack(fill="x")
+            row = tk.Frame(parent, bg="#0b0f1a", padx=16, pady=0)
+            row.pack(fill="x")
+            tk.Label(row, text=icon, font=("Segoe UI", 12), bg="#0b0f1a", fg="#6b7a99").pack(side="left", pady=12)
+            tk.Label(row, text=label, font=("Segoe UI", 10), bg="#0b0f1a", fg="#c9d1d9", padx=10).pack(side="left")
+            if right_widget:
+                right_widget(row)
 
-        # ── Progress card (replaces log) ─────────────────────────────────────
-        _prog_outer, prog_card = self._round_card(right, radius=12, bg=CARD,
-                                                   border=BORDER)
-        _prog_outer.pack(fill="x", pady=(10, 0))
-        tk.Frame(prog_card, height=2, bg=ACCENT).pack(fill="x")
-        prog_inner = tk.Frame(prog_card, bg=CARD, padx=14, pady=10)
-        prog_inner.pack(fill="both", expand=True)
+        # Delay option
+        def _delay_widget(parent):
+            tk.Label(parent, text="min", font=("Segoe UI", 9), bg="#0b0f1a", fg="#6b7a99").pack(side="right", padx=(0, 4))
+            self.post_stagger_var = tk.IntVar(value=5)
+            tk.Spinbox(parent, from_=0, to=120, textvariable=self.post_stagger_var,
+                       font=("Segoe UI", 9), bg="#0d1421", fg="#c9d1d9",
+                       width=4, relief="flat",
+                       buttonbackground="#0d1421",
+                       insertbackground="#4f8ef7").pack(side="right", padx=4)
 
-        # Step + detail labels
-        prog_top = tk.Frame(prog_inner, bg=CARD)
+        _option_row(card_inner, "📅", "Délai entre comptes", _delay_widget)
+
+        # ── Progress section ──────────────────────────────────────────────────
+        tk.Frame(card_inner, bg="#1a2235", height=1).pack(fill="x")
+        prog_wrap = tk.Frame(card_inner, bg="#0b0f1a", padx=16, pady=14)
+        prog_wrap.pack(fill="x")
+
+        prog_top = tk.Frame(prog_wrap, bg="#0b0f1a")
         prog_top.pack(fill="x")
-        self._post_step_lbl = tk.Label(prog_top, text="En attente",
-                                        font=("Segoe UI", 10, "bold"), bg=CARD, fg=TEXT)
-        self._post_step_lbl.pack(side="left")
+        tk.Label(prog_top, text="Progression", font=("Segoe UI", 9, "bold"),
+                 bg="#0b0f1a", fg="#6b7a99").pack(side="left")
         self._post_pct_lbl = tk.Label(prog_top, text="",
-                                       font=("Consolas", 10, "bold"), bg=CARD, fg=ACCENT)
+                                       font=("Consolas", 9, "bold"), bg="#0b0f1a", fg=ACCENT)
         self._post_pct_lbl.pack(side="right")
-        self._post_detail_lbl = tk.Label(prog_inner, text="Sélectionne une vidéo et des comptes",
-                                          font=("Segoe UI", 9), bg=CARD, fg=TEXT2)
-        self._post_detail_lbl.pack(anchor="w", pady=(2, 6))
 
-        # Animated progress bar (Canvas)
-        bar_bg = tk.Frame(prog_inner, bg=SURFACE3, height=8,
-                          highlightthickness=1, highlightbackground=BORDER)
-        bar_bg.pack(fill="x", pady=(0, 4))
+        self._post_step_lbl = tk.Label(prog_wrap, text="En attente",
+                                        font=("Segoe UI", 10, "bold"), bg="#0b0f1a", fg="#c9d1d9")
+        self._post_step_lbl.pack(anchor="w", pady=(4, 2))
+
+        self._post_detail_lbl = tk.Label(prog_wrap, text="Sélectionne une vidéo et des comptes",
+                                          font=("Segoe UI", 9), bg="#0b0f1a", fg="#6b7a99")
+        self._post_detail_lbl.pack(anchor="w", pady=(0, 8))
+
+        # Progress bar
+        bar_bg = tk.Frame(prog_wrap, bg="#0d1421", height=6,
+                          highlightthickness=0)
+        bar_bg.pack(fill="x", pady=(0, 6))
         bar_bg.pack_propagate(False)
-        self._post_prog_bar = tk.Canvas(bar_bg, bg=SURFACE3, height=8,
-                                         highlightthickness=0)
+        self._post_prog_bar = tk.Canvas(bar_bg, bg="#0d1421", height=6, highlightthickness=0)
         self._post_prog_bar.pack(fill="both", expand=True)
         self._post_prog_pct = [0]
         self._post_prog_target = [0]
 
         def _animate_bar():
-            """Smoothly animate bar toward target."""
             cur = self._post_prog_pct[0]
             tgt = self._post_prog_target[0]
             if cur < tgt:
@@ -6810,29 +6865,25 @@ class App:
             w = self._post_prog_bar.winfo_width() or 300
             self._post_prog_bar.delete("all")
             if cur > 0:
-                fill_w = max(8, int(w * cur / 100))
+                fill_w = max(6, int(w * cur / 100))
                 col = OK if cur >= 100 else ACCENT
-                self._post_prog_bar.create_rectangle(
-                    0, 0, fill_w, 8, fill=col, outline="")
-                # shimmer highlight
-                self._post_prog_bar.create_rectangle(
-                    0, 0, fill_w, 3, fill="#ffffff22", outline="")
+                self._post_prog_bar.create_rectangle(0, 0, fill_w, 6, fill=col, outline="")
+                self._post_prog_bar.create_rectangle(0, 0, fill_w, 2, fill="#ffffff22", outline="")
             self.root.after(30, _animate_bar)
         self.root.after(100, _animate_bar)
 
-        # Hidden log (toggle)
-        log_toggle_row = tk.Frame(prog_inner, bg=CARD)
-        log_toggle_row.pack(fill="x", pady=(4, 0))
-        self._log_visible = [False]
-        log_toggle_btn = tk.Label(log_toggle_row, text="▶  Journal détaillé",
-                                   font=("Segoe UI", 8), bg=CARD, fg=TEXT2,
+        # Log toggle
+        log_toggle_btn = tk.Label(prog_wrap, text="▶  Journal détaillé",
+                                   font=("Segoe UI", 8), bg="#0b0f1a", fg="#6b7a99",
                                    cursor="hand2")
-        log_toggle_btn.pack(side="left")
+        log_toggle_btn.pack(anchor="w", pady=(4, 0))
+        self._log_visible = [False]
 
-        self.post_log_box = tk.Text(prog_card, bg=SURFACE, fg=TEXT2,
+        self.post_log_box = tk.Text(prog_wrap, bg="#080c14", fg="#6b7a99",
                                      font=("Consolas", 8), relief="flat",
                                      state="disabled", wrap="word", height=6,
-                                     padx=8, pady=6)
+                                     padx=8, pady=6,
+                                     highlightthickness=1, highlightbackground="#1a2235")
 
         def _toggle_log(e=None):
             if self._log_visible[0]:
@@ -6840,7 +6891,7 @@ class App:
                 log_toggle_btn.config(text="▶  Journal détaillé")
                 self._log_visible[0] = False
             else:
-                self.post_log_box.pack(fill="both", expand=True, padx=8, pady=(0, 8))
+                self.post_log_box.pack(fill="both", expand=True, pady=(6, 0))
                 log_toggle_btn.config(text="▼  Journal détaillé")
                 self._log_visible[0] = True
         log_toggle_btn.bind("<Button-1>", _toggle_log)
@@ -6860,19 +6911,24 @@ class App:
         def _post_set_progress(pct, step, detail=""):
             col = OK if pct >= 100 else (DANGER if "❌" in detail else ACCENT)
             self._post_prog_target[0] = pct
-            self._post_step_lbl.config(text=step, fg=TEXT)
+            self._post_step_lbl.config(text=step, fg="#c9d1d9")
             self._post_pct_lbl.config(text=f"{pct}%", fg=col)
             if detail:
-                self._post_detail_lbl.config(text=detail, fg=TEXT2)
+                self._post_detail_lbl.config(text=detail, fg="#6b7a99")
         self._post_set_progress = _post_set_progress
 
+        # ── Share / Launch button ─────────────────────────────────────────────
+        tk.Frame(card_inner, bg="#1a2235", height=1).pack(fill="x")
+        btn_row = tk.Frame(card_inner, bg="#0b0f1a", padx=16, pady=14)
+        btn_row.pack(fill="x")
+
         self.post_launch_btn = tk.Button(
-            right, text="🚀  Lancer le posting",
-            font=("Segoe UI", 12, "bold"), bg=ACCENT, fg="#06080f",
-            relief="flat", cursor="hand2", pady=12, bd=0,
-            activebackground=ACCENT2, activeforeground="#06080f")
-        self.post_launch_btn.pack(fill="x", pady=(8, 0))
-        self._bind_hover(self.post_launch_btn, ACCENT, ACCENT2, "#06080f", "#06080f")
+            btn_row, text="🚀  Lancer le posting",
+            font=("Segoe UI", 11, "bold"), bg=ACCENT, fg="#ffffff",
+            relief="flat", cursor="hand2", pady=11, bd=0,
+            activebackground=ACCENT2, activeforeground="#ffffff")
+        self.post_launch_btn.pack(fill="x")
+        self._bind_hover(self.post_launch_btn, ACCENT, ACCENT2, "#ffffff", "#ffffff")
 
         def _do_post():
             sel = [pid for pid, v in self._post_pvars.items() if v.get()]
