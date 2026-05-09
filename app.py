@@ -8987,25 +8987,59 @@ class App:
         self._ac_running  = False
         self._ac_stop_flag = [False]
 
-        # ── ACCOUNT TABS BAR (top) ────────────────────────────────────────────
-        tabs_bar = tk.Frame(f, bg=TAB_BG, height=58)
-        tabs_bar.pack(fill="x")
-        tabs_bar.pack_propagate(False)
+        # ── TOP BAR: account dropdown ─────────────────────────────────────────
+        top_bar = tk.Frame(f, bg=TAB_BG, padx=14, pady=11)
+        top_bar.pack(fill="x")
 
-        # Thin accent line at bottom of tab bar
+        tk.Label(top_bar, text="💬  Auto Commentaire",
+                 font=("Segoe UI", 11, "bold"),
+                 bg=TAB_BG, fg=TEXT_C).pack(side="left")
+
+        tk.Label(top_bar, text="Compte :",
+                 font=("Segoe UI", 9),
+                 bg=TAB_BG, fg=TEXT2_C).pack(side="left", padx=(28, 6))
+
+        self._ac_acc_dropdown = ttk.Combobox(
+            top_bar, textvariable=self._ac_acc_var,
+            state="readonly", width=26, font=("Segoe UI", 9))
+        self._ac_acc_dropdown.pack(side="left")
+
+        def _on_dropdown_change(e=None):
+            key = self._ac_acc_var.get()
+            if key in self._ac_acc_map:
+                _, d2 = self._ac_acc_map[key]
+                ig2 = d2.get("ig_username", "")
+                try:
+                    self._ac_lhdr_lbl.config(
+                        text=f"@{ig2}" if ig2 else "Sélectionne un compte")
+                except Exception:
+                    pass
+            self._ac_media_items.clear()
+            self._ac_sel_idx[0] = None
+            self._ac_vid_lb.delete(0, "end")
+            try:
+                self._ac_content_frame.place_forget()
+                self._ac_empty_frame.place(relx=0, rely=0,
+                                           relwidth=1, relheight=1)
+            except Exception:
+                pass
+            try:
+                _ac_rebuild_visual_list()
+            except Exception:
+                pass
+
+        self._ac_acc_dropdown.bind("<<ComboboxSelected>>", _on_dropdown_change)
+
+        tk.Button(top_bar, text="⟳",
+                  font=("Segoe UI", 11), bg=TAB_BG, fg=TEXT2_C,
+                  relief="flat", bd=0, cursor="hand2", padx=6,
+                  activebackground=TAB_BG, activeforeground=TEXT_C,
+                  command=lambda: _rebuild_acct_tabs()).pack(side="left", padx=(6, 0))
+
         tk.Frame(f, bg=SEP_C, height=1).pack(fill="x")
 
-        # Scrollable tabs container
-        tabs_inner_wrap = tk.Frame(tabs_bar, bg=TAB_BG)
-        tabs_inner_wrap.pack(side="left", fill="both", expand=True, pady=0)
-        self._ac_tabs_inner = tk.Frame(tabs_inner_wrap, bg=TAB_BG)
-        self._ac_tabs_inner.pack(side="left", fill="y", padx=(8, 0))
-
-        # "+" refresh button at right
-        tk.Button(tabs_bar, text="+", font=("Segoe UI", 14),
-                  bg=TAB_BG, fg=TEXT2_C, relief="flat", bd=0, cursor="hand2",
-                  activebackground=TAB_BG,
-                  command=lambda: _rebuild_acct_tabs()).pack(side="right", padx=12)
+        # Kept for backward-compat closures; not packed
+        self._ac_tabs_inner = tk.Frame(f, bg=TAB_BG)
 
         # ── BODY (left panel + right panel) ───────────────────────────────────
         body = tk.Frame(f, bg=BG)
@@ -9183,7 +9217,7 @@ class App:
                     self._ac_vid_lb.selection_clear(0, "end")
                     self._ac_vid_lb.selection_set(_idx)
                     _ac_rebuild_visual_list()
-                    _on_vid_select()
+                    _on_vid_select(_force_idx=_idx)
 
                 for w in (row, av_cv, txt_col):
                     w.bind("<Button-1>", _row_click)
@@ -9239,7 +9273,9 @@ class App:
         self._ac_com_count_lbl.pack(side="left", padx=4)
         tk.Button(com_hdr, text="⟳", font=("Segoe UI", 10),
                   bg="#070a10", fg=TEXT2_C, relief="flat", bd=0, cursor="hand2",
-                  command=lambda: _on_vid_select()).pack(side="right", padx=14)
+                  command=lambda: _on_vid_select(
+                      _force_idx=self._ac_sel_idx[0])
+                  ).pack(side="right", padx=14)
 
         self._ac_com_box = scrolledtext.ScrolledText(
             com_area, bg="#0a0f1a", fg=TEXT_C,
@@ -9339,88 +9375,24 @@ class App:
             wrap="word", height=5)
         self._ac_log_box.pack(fill="x", padx=0, pady=0)
 
-        # ── ACCOUNT TABS BUILDER ───────────────────────────────────────────────
+        # ── ACCOUNT LIST BUILDER ──────────────────────────────────────────────
         def _rebuild_acct_tabs():
-            for w in list(self._ac_tabs_inner.winfo_children()):
-                try:
-                    w.destroy()
-                except Exception:
-                    pass
             self._ac_acc_map.clear()
-            accts = []
             for pid, d in sorted(self.data.items(),
-                                   key=lambda x: int(x[1].get("serial_no") or 0)):
+                                  key=lambda x: int(x[1].get("serial_no") or 0)):
                 ig = d.get("ig_username") or d.get("phone_name") or ""
                 if not ig:
                     continue
                 sid = d.get("ig_sessionid", "").strip()
                 label = f"{'🟢' if sid else '🔴'} @{ig}".replace("@@", "@")
                 self._ac_acc_map[label] = (pid, d)
-                accts.append((label, pid, d, ig, bool(sid)))
 
-            self._ac_acc_cb["values"] = list(self._ac_acc_map.keys())
-            if self._ac_acc_map and not self._ac_acc_var.get():
-                self._ac_acc_cb.current(0)
-
-            cur_key = self._ac_acc_var.get()
-            for i, (label, pid, d, ig, has_sid) in enumerate(accts):
-                is_act = (label == cur_key)
-                tab_col = _AVATAR_COLS[i % len(_AVATAR_COLS)]
-                tab_bg  = TAB_ACT if is_act else TAB_BG
-                tab = tk.Frame(self._ac_tabs_inner, bg=tab_bg,
-                                cursor="hand2",
-                                highlightthickness=1 if is_act else 0,
-                                highlightbackground=ACCENT_C)
-                tab.pack(side="left", padx=(0, 2), pady=4)
-
-                # Avatar circle
-                av = tk.Canvas(tab, bg=tab_bg, width=28, height=28,
-                                highlightthickness=0)
-                av.pack(side="left", padx=(8, 4), pady=8)
-                av.create_oval(0, 0, 28, 28, fill=tab_col, outline="")
-                av.create_text(14, 14, text=ig[:2].upper(),
-                                font=("Segoe UI", 8, "bold"), fill="#ffffff")
-
-                # Status dot + name
-                name_col = tk.Frame(tab, bg=tab_bg)
-                name_col.pack(side="left", pady=4, padx=(0, 8))
-                tk.Label(name_col, text=f"@{ig}",
-                          font=("Segoe UI", 8, "bold" if is_act else "normal"),
-                          bg=tab_bg,
-                          fg=TEXT_C if is_act else TEXT2_C).pack(anchor="w")
-                dot_row = tk.Frame(name_col, bg=tab_bg)
-                dot_row.pack(anchor="w")
-                dot_cv = tk.Canvas(dot_row, bg=tab_bg, width=6, height=6,
-                                    highlightthickness=0)
-                dot_cv.pack(side="left")
-                dot_cv.create_oval(0, 0, 6, 6,
-                                    fill=OK_C if has_sid else "#ef4444",
-                                    outline="")
-                tk.Label(dot_row,
-                          text="  session" if has_sid else "  no session",
-                          font=("Segoe UI", 6), bg=tab_bg,
-                          fg=OK_C if has_sid else "#ef4444").pack(side="left")
-
-                # Bottom accent bar for active tab
-                if is_act:
-                    tk.Frame(tab, bg=ACCENT_C, height=2).pack(fill="x",
-                                                                side="bottom")
-
-                def _tab_click(_e=None, lbl=label, _ig=ig):
-                    self._ac_acc_var.set(lbl)
-                    self._ac_lhdr_lbl.config(text=f"@{_ig}")
-                    self._ac_media_items.clear()
-                    self._ac_sel_idx[0] = None
-                    self._ac_vid_lb.delete(0, "end")
-                    # Show empty state
-                    self._ac_content_frame.place_forget()
-                    self._ac_empty_frame.place(relx=0, rely=0,
-                                                relwidth=1, relheight=1)
-                    _rebuild_acct_tabs()
-                    _ac_rebuild_visual_list()
-
-                for w in (tab, av, name_col, dot_row, dot_cv):
-                    w.bind("<Button-1>", _tab_click)
+            keys = list(self._ac_acc_map.keys())
+            self._ac_acc_cb["values"]       = keys
+            self._ac_acc_dropdown["values"] = keys
+            if keys and not self._ac_acc_var.get():
+                self._ac_acc_var.set(keys[0])
+                _on_dropdown_change()
 
         _rebuild_acct_tabs()
 
@@ -9604,18 +9576,38 @@ class App:
         load_vid_btn.config(command=_load_videos)
 
         # ── clic sur une vidéo → charger commentaires ─────────────────────────
-        def _on_vid_select(evt=None):
-            idx = self._ac_vid_lb.curselection()
-            if not idx or not self._ac_media_items:
+        def _on_vid_select(evt=None, _force_idx=None):
+            if _force_idx is not None:
+                raw_idx = (_force_idx,)
+            else:
+                raw_idx = self._ac_vid_lb.curselection()
+            if not raw_idx or not self._ac_media_items:
                 return
-            _, media_id, shortcode = self._ac_media_items[idx[0]]
+            item_idx = raw_idx[0]
+            if item_idx >= len(self._ac_media_items):
+                return
+            _, media_id, shortcode = self._ac_media_items[item_idx]
             key = self._ac_acc_var.get()
             if not key or key not in self._ac_acc_map:
+                _show_content()
+                self._ac_com_box.config(state="normal")
+                self._ac_com_box.delete("1.0", "end")
+                self._ac_com_box.insert("end",
+                    "⚠ Sélectionne un compte dans le menu déroulant en haut.")
+                self._ac_com_box.config(state="disabled")
                 return
             _, d = self._ac_acc_map[key]
             sid = d.get("ig_sessionid", "").strip()
             ig = d.get("ig_username", "")
             if not sid:
+                _show_content()
+                self._ac_com_box.config(state="normal")
+                self._ac_com_box.delete("1.0", "end")
+                self._ac_com_box.insert("end",
+                    f"❌ Pas de Session ID pour @{ig}.\n\n"
+                    "Ajoute-le dans l'onglet Téléphones → ⋮ → Identifiants.")
+                self._ac_com_box.config(state="disabled")
+                self._ac_com_count_lbl.config(text="No session")
                 return
 
             _show_content()
