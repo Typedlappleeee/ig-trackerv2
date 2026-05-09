@@ -1954,32 +1954,31 @@ class App:
             self.tab_btns[key]            = lbl
             self._sidebar_indicators[key] = ind
 
-        # ── Primary section ────────────────────────────────────────────────────
-        self._make_sidebar_section(self.sidebar, "Principal")
-        _reg("dashboard", "📊", _("tab.dashboard"))
-        _reg("phones",    "📱", _("tab.phones"))
+        # ── Principal section (collapsible) ───────────────────────────────────
+        princ_frame, self._expand_princ = self._make_collapsible_section(
+            self.sidebar, "Principal")
+        _reg("dashboard", "📊", _("tab.dashboard"), princ_frame)
+        _reg("phones",    "📱", _("tab.phones"),    princ_frame)
 
-        # ── Instagram section ──────────────────────────────────────────────────
-        self._make_sidebar_section(self.sidebar, "Instagram")
+        # ── Instagram section (collapsible) ───────────────────────────────────
+        insta_frame, self._expand_insta = self._make_collapsible_section(
+            self.sidebar, "Instagram")
+        self._insta_group_children = insta_frame
 
-        # Insta group container (non-collapsible, always visible)
-        grp_outer, grp_children = self._make_sidebar_group(self.sidebar, "", "")
-        grp_outer.pack(fill="x")
-        self._insta_group_children = grp_children
-
-        _reg("stats",       "📈", _("tab.stats"),       grp_children)
-        _reg("posting",     "🚀", _("tab.posting"),     grp_children)
-        _reg("masspost",    "⚡", _("tab.masspost"),    grp_children,
+        _reg("stats",       "📈", _("tab.stats"),       insta_frame)
+        _reg("posting",     "🚀", _("tab.posting"),     insta_frame)
+        _reg("masspost",    "⚡", _("tab.masspost"),    insta_frame,
              badge="BETA", badge_col="#e0245e")
-        _reg("bank",        "🗂", _("tab.bank"),        grp_children)
-        _reg("autocomment", "🤖", _("tab.autocomment"), grp_children)
-        _reg("tools",       "🔧", _("tab.tools"),       grp_children)
+        _reg("bank",        "🗂", _("tab.bank"),        insta_frame)
+        _reg("autocomment", "🤖", _("tab.autocomment"), insta_frame,
+             badge="BETA", badge_col="#e0245e")
+        _reg("tools",       "🔧", _("tab.tools"),       insta_frame,
+             badge="BETA", badge_col="#e0245e")
 
-        # ── Montage section ────────────────────────────────────────────────────
-        self._make_sidebar_section(self.sidebar, "Montage")
-        mont_outer, mont_children = self._make_sidebar_group(self.sidebar, "", "")
-        mont_outer.pack(fill="x")
-        _reg("automation", "✂", _("tab.automation"), mont_children)
+        # ── Montage section (collapsible) ─────────────────────────────────────
+        mont_frame, self._expand_mont = self._make_collapsible_section(
+            self.sidebar, "Montage")
+        _reg("automation", "✂", _("tab.automation"), mont_frame)
 
         # ── Bientôt section ────────────────────────────────────────────────────
         self._make_sidebar_section(self.sidebar, "Bientôt" if L == "fr" else "Coming soon")
@@ -2276,14 +2275,68 @@ class App:
                  bg=SB, fg="#2e3d55",
                  anchor="w", padx=16, pady=(8)).pack(fill="x")
 
+    def _make_collapsible_section(self, parent, label, initially_open=True):
+        """Collapsible sidebar section — returns (children_frame, expand_fn)."""
+        SB  = "#0b0e18"
+        HOV = "#0f1420"
+        state   = [initially_open]
+        children = tk.Frame(parent, bg=SB)
+
+        hdr = tk.Frame(parent, bg=SB, cursor="hand2")
+        hdr.pack(fill="x")
+
+        chevron = tk.Label(hdr, text="▾" if initially_open else "▸",
+                           font=("Segoe UI", 8), bg=SB, fg="#3a4d66",
+                           cursor="hand2")
+        chevron.pack(side="right", padx=(0, 12))
+
+        tk.Label(hdr, text=label.upper(),
+                 font=("Segoe UI", 7, "bold"),
+                 bg=SB, fg="#3a4d66",
+                 anchor="w", padx=16, pady=8,
+                 cursor="hand2").pack(side="left")
+
+        if initially_open:
+            children.pack(fill="x")
+
+        def _expand():
+            if not state[0]:
+                children.pack(fill="x")
+                chevron.config(text="▾")
+                state[0] = True
+
+        def _toggle(e=None):
+            if state[0]:
+                children.pack_forget()
+                chevron.config(text="▸")
+                state[0] = False
+            else:
+                _expand()
+
+        for w in hdr.winfo_children() + [hdr]:
+            w.bind("<Button-1>", _toggle)
+        hdr.bind("<Enter>", lambda e: hdr.config(bg=HOV))
+        hdr.bind("<Leave>", lambda e: hdr.config(bg=SB))
+
+        return children, _expand
+
     def _show_tab(self, key):
         self._active_tab = key
-        # Auto-expand INSTA group if needed
+        # Auto-expand collapsible sections when navigating to a tab inside them
         _insta_keys = {"stats", "posting", "masspost", "bank", "autocomment", "tools"}
-        if key in _insta_keys and hasattr(self, "_insta_group_children"):
-            children = self._insta_group_children
-            if not children.winfo_ismapped():
-                children.pack(fill="x")
+        _princ_keys = {"dashboard", "phones"}
+        _mont_keys  = {"automation"}
+        if key in _insta_keys:
+            if hasattr(self, "_expand_insta"):
+                self._expand_insta()
+            elif hasattr(self, "_insta_group_children"):
+                c = self._insta_group_children
+                if not c.winfo_ismapped():
+                    c.pack(fill="x")
+        if key in _princ_keys and hasattr(self, "_expand_princ"):
+            self._expand_princ()
+        if key in _mont_keys and hasattr(self, "_expand_mont"):
+            self._expand_mont()
 
         SB_BG = "#0b0e18"
         ACT   = "#162040"
