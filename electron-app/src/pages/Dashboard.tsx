@@ -59,6 +59,22 @@ type Range = '24h' | '7d' | '30d' | 'all'
 
 interface ViewPoint { label: string; value: number }
 
+const SCHEMA_V3_SQL = `-- Colle ce SQL dans Supabase → SQL Editor → Run
+create table if not exists public.views_history (
+  id          uuid default gen_random_uuid() primary key,
+  user_id     uuid references auth.users(id) on delete cascade not null,
+  phone_id    uuid references public.phones(id) on delete cascade not null,
+  views       bigint not null,
+  recorded_at timestamptz default now()
+);
+alter table public.views_history enable row level security;
+create policy "views_history_all" on public.views_history
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+alter table public.app_config
+  add column if not exists groq_api_key  text default '',
+  add column if not exists profile_name  text default '',
+  add column if not exists profile_niche text default '';`
+
 export function Dashboard({ user }: DashboardProps) {
   const [phones, setPhones]         = useState<Phone[]>([])
   const [selectedPhone, setSelPhone]= useState<Phone | null>(null)  // null = total
@@ -66,6 +82,8 @@ export function Dashboard({ user }: DashboardProps) {
   const [chartData, setChartData]   = useState<ViewPoint[]>([])
   const [loadingChart, setLC]       = useState(false)
   const [loading, setLoading]       = useState(true)
+  const [schemaMissing, setSchemaMissing] = useState(false)
+  const [sqlCopied, setSqlCopied]   = useState(false)
 
   // KPI values
   const [kpiToday, setKpiToday]     = useState<number | null>(null)
@@ -96,7 +114,15 @@ export function Dashboard({ user }: DashboardProps) {
     if (range !== 'all') query = query.gte('recorded_at', cutoff.toISOString())
     query = query.order('recorded_at')
 
-    const { data } = await query
+    const { data, error: qErr } = await query
+    if (qErr) {
+      // Table doesn't exist yet → show migration notice
+      if (qErr.code === '42P01' || (qErr as unknown as { status?: number }).status === 404 || qErr.message?.includes('does not exist')) {
+        setSchemaMissing(true)
+      }
+      setLC(false); return
+    }
+    setSchemaMissing(false)
     const rows = data ?? []
 
     if (rows.length === 0) {
@@ -275,6 +301,31 @@ export function Dashboard({ user }: DashboardProps) {
                 </p>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Schema migration notice */}
+        {schemaMissing && (
+          <div className="bg-warn/10 border border-warn/30 rounded-xl p-5 space-y-3">
+            <div className="flex items-start gap-3">
+              <span className="text-2xl flex-shrink-0">⚠</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-warn">Table <code>views_history</code> introuvable — migration requise</p>
+                <p className="text-xs text-text2 mt-1">
+                  Va dans <strong className="text-text">Supabase → SQL Editor</strong>, colle le code ci-dessous et clique <strong className="text-text">Run</strong>.
+                  Ensuite actualise cette page.
+                </p>
+              </div>
+              <button
+                onClick={() => { navigator.clipboard.writeText(SCHEMA_V3_SQL); setSqlCopied(true); setTimeout(() => setSqlCopied(false), 2000) }}
+                className="px-3 py-1.5 bg-warn text-black text-xs font-semibold rounded-lg hover:bg-warn/80 transition-colors flex-shrink-0"
+              >
+                {sqlCopied ? '✓ Copié !' : '📋 Copier le SQL'}
+              </button>
+            </div>
+            <pre className="text-[10px] font-mono text-text2 bg-surface rounded-lg p-3 overflow-x-auto whitespace-pre-wrap">
+              {SCHEMA_V3_SQL}
+            </pre>
           </div>
         )}
 

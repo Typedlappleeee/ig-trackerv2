@@ -12,6 +12,61 @@ export const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist')
 
 let win: BrowserWindow | null = null
 
+// ── Instagram hidden browser (persistent, reused across calls) ────────────
+let _igBrowser: BrowserWindow | null = null
+function getIgBrowser(): BrowserWindow {
+  if (!_igBrowser || _igBrowser.isDestroyed()) {
+    _igBrowser = new BrowserWindow({
+      show: false,
+      width: 1280,
+      height: 800,
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: false,   // allows executeJavaScript to read window vars
+        webSecurity: true,
+        sandbox: false,
+      },
+    })
+    _igBrowser.webContents.setUserAgent(
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+    )
+    _igBrowser.on('closed', () => { _igBrowser = null })
+  }
+  return _igBrowser
+}
+
+// Fetch Instagram profile HTML via a real browser context (bypasses API blocks)
+ipcMain.handle('fetch-instagram-html', async (_event, username: string) => {
+  const browser = getIgBrowser()
+  const url = `https://www.instagram.com/${encodeURIComponent(username)}/`
+  return new Promise<unknown>(resolve => {
+    const timer = setTimeout(() => {
+      resolve({ ok: false, error: 'timeout' })
+    }, 18000)
+    browser.webContents.once('did-finish-load', () => {
+      // Give React 2s to hydrate the page before reading the DOM
+      setTimeout(async () => {
+        clearTimeout(timer)
+        try {
+          const data = await browser.webContents.executeJavaScript(`({
+            url: location.href,
+            html: document.documentElement.innerHTML.slice(0, 120000)
+          })`)
+          resolve({ ok: true, ...(data as object) })
+        } catch (e) {
+          resolve({ ok: false, error: String(e) })
+        }
+      }, 2500)
+    })
+    browser.loadURL(url, {
+      extraHeaders: [
+        'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language: fr-FR,fr;q=0.9,en-US;q=0.8',
+      ].join('\r\n'),
+    }).catch(err => { clearTimeout(timer); resolve({ ok: false, error: String(err) }) })
+  })
+})
+
 // ── IPC: proxy HTTP requests from renderer (bypass CORS) ───────────────────
 ipcMain.handle('geelark-request', async (_event, opts: {
   method: 'GET' | 'POST' | 'PUT'

@@ -8,62 +8,93 @@ interface MontageProps { user: User }
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface TimelineClip {
-  uid:       string     // unique per-instance (not item.id — same item can appear twice)
+  uid:       string
   item:      ContentItem
-  trimStart: number     // seconds from start of original
-  trimEnd:   number     // seconds from start (0 = use full)
+  trimStart: number    // seconds from start of original
+  trimEnd:   number    // seconds (0 = use full duration)
   caption:   string
+  color:     string
+  speed:     number    // 1.0 = normal
+  fade:      boolean   // fade-in at clip start
+}
+
+interface TextOverlay {
+  uid:       string
+  text:      string
+  startTime: number
+  endTime:   number
+  position:  'top' | 'center' | 'bottom'
+  fontSize:  number
   color:     string
 }
 
-type Preset   = '9:16' | '1:1' | '16:9'
-type Tool     = 'select' | 'cut'
+interface Transition {
+  afterClipUid: string
+  type: 'cut' | 'fade' | 'dissolve' | 'wipe'
+}
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+type Preset   = '9:16' | '1:1' | '16:9'
+type Tab      = 'medias' | 'texte' | 'transitions' | 'filtres' | 'ajustement'
+type Filter   = 'none' | 'vivid' | 'warm' | 'cold' | 'bw' | 'cinema' | 'vintage' | 'fade'
+
+const FILTER_LABELS: Record<Filter, string> = {
+  none: 'Original', vivid: 'Vif', warm: 'Chaud', cold: 'Froid',
+  bw: 'Noir & Blanc', cinema: 'Cinéma', vintage: 'Vintage', fade: 'Doux',
+}
+const FILTER_CSS: Record<Filter, string> = {
+  none:    '',
+  vivid:   'saturate(1.6) contrast(1.1)',
+  warm:    'sepia(0.3) saturate(1.2)',
+  cold:    'hue-rotate(20deg) saturate(0.9)',
+  bw:      'grayscale(1)',
+  cinema:  'contrast(1.2) saturate(0.8) brightness(0.95)',
+  vintage: 'sepia(0.4) contrast(0.9) brightness(1.05)',
+  fade:    'brightness(1.1) contrast(0.85) saturate(0.85)',
+}
+
 const COLORS = ['#4f9eff','#a56ef5','#00ccaa','#ffaa2a','#ff6ec7','#2dde78','#ff5c6e','#00e5d4']
+const TRANSITIONS: { type: Transition['type']; label: string; icon: string }[] = [
+  { type: 'cut',     label: 'Coupe',    icon: '✂' },
+  { type: 'fade',    label: 'Fondu',    icon: '◑' },
+  { type: 'dissolve',label: 'Dissolution', icon: '◌' },
+  { type: 'wipe',    label: 'Balayage', icon: '→' },
+]
+
+let _ci = 0
+const nextColor = () => COLORS[_ci++ % COLORS.length]
 
 function effectiveDur(c: TimelineClip): number {
   const raw = c.item.duration ?? 30
   const end = c.trimEnd > 0 ? Math.min(c.trimEnd, raw) : raw
-  return Math.max(0.5, end - c.trimStart)
+  return Math.max(0.5, (end - c.trimStart) / c.speed)
 }
-
-function totalDur(clips: TimelineClip[]): number {
-  return clips.reduce((s, c) => s + effectiveDur(c), 0)
-}
-
+function totalDur(clips: TimelineClip[]): number { return clips.reduce((s, c) => s + effectiveDur(c), 0) }
 function fmtTime(s: number): string {
-  const m = Math.floor(s / 60)
-  const sec = Math.floor(s % 60)
+  const m = Math.floor(Math.abs(s) / 60)
+  const sec = Math.floor(Math.abs(s) % 60)
   return `${m}:${sec.toString().padStart(2, '0')}`
 }
-
 function basename(p: string) { return p.replace(/\\/g, '/').split('/').pop() ?? p }
-
-function localSrc(filePath: string | null | undefined): string | null {
-  if (!filePath) return null
-  if (filePath.startsWith('http')) return filePath
-  // Normalize windows backslashes
-  const norm = filePath.replace(/\\/g, '/')
-  return `file://${norm.startsWith('/') ? '' : '/'}${norm}`
+function localSrc(p: string | null | undefined): string | null {
+  if (!p) return null
+  if (p.startsWith('http')) return p
+  const n = p.replace(/\\/g, '/')
+  return `file://${n.startsWith('/') ? '' : '/'}${n}`
 }
 
-let _colorIdx = 0
-function nextColor() { return COLORS[_colorIdx++ % COLORS.length] }
-
-// ── Ruler component ───────────────────────────────────────────────────────────
-function TimeRuler({ totalSec, scale }: { totalSec: number; scale: number }) {
-  const width = Math.max(totalSec * scale, 400)
-  const step  = scale >= 60 ? 1 : scale >= 30 ? 2 : 5
+// ── Time ruler ────────────────────────────────────────────────────────────────
+function TimeRuler({ total, scale }: { total: number; scale: number }) {
+  const w = Math.max(total * scale + 200, 600)
+  const step = scale >= 60 ? 1 : scale >= 20 ? 2 : 5
   const ticks: number[] = []
-  for (let t = 0; t <= totalSec + step; t += step) ticks.push(t)
+  for (let t = 0; t <= total + step * 5; t += step) ticks.push(t)
   return (
-    <div className="relative bg-surface select-none flex-shrink-0" style={{ width, height: 24 }}>
+    <div className="relative select-none bg-surface flex-shrink-0" style={{ width: w, height: 22 }}>
       {ticks.map(t => (
-        <div key={t} className="absolute top-0 flex flex-col items-center" style={{ left: t * scale }}>
-          <div className="w-px bg-border" style={{ height: t % (step * 5) === 0 ? 12 : 6 }} />
+        <div key={t} className="absolute top-0 flex flex-col" style={{ left: t * scale }}>
+          <div className="w-px bg-border/60" style={{ height: t % (step * 5) === 0 ? 12 : 6 }} />
           {t % (step * 5) === 0 && (
-            <span className="text-[9px] text-text2 mt-0.5 -translate-x-1/2">{fmtTime(t)}</span>
+            <span className="text-[9px] text-text2/60 ml-0.5 -translate-x-1/2">{fmtTime(t)}</span>
           )}
         </div>
       ))}
@@ -73,8 +104,7 @@ function TimeRuler({ totalSec, scale }: { totalSec: number; scale: number }) {
 
 // ── Clip block in timeline ────────────────────────────────────────────────────
 function ClipBlock({
-  clip, scale, isSelected,
-  onSelect, onUpdate, onDelete,
+  clip, scale, isSelected, onSelect, onUpdate, onDelete,
   onDragStart, onDragOver, onDrop,
 }: {
   clip:        TimelineClip
@@ -85,40 +115,32 @@ function ClipBlock({
   onDelete:    (uid: string) => void
   onDragStart: (uid: string) => void
   onDragOver:  (e: React.DragEvent) => void
-  onDrop:      (targetUid: string) => void
+  onDrop:      (uid: string) => void
 }) {
   const dur   = effectiveDur(clip)
-  const width = Math.max(dur * scale, 40)
   const raw   = clip.item.duration ?? 30
+  const width = Math.max(dur * scale, 44)
 
-  // Trim handle drag (mouse events on window)
   function startTrimDrag(e: React.MouseEvent, side: 'start' | 'end') {
     e.stopPropagation(); e.preventDefault()
-    const startX   = e.clientX
-    const startVal = side === 'start' ? clip.trimStart : (clip.trimEnd > 0 ? clip.trimEnd : raw)
-
-    function onMove(ev: MouseEvent) {
-      const delta = (ev.clientX - startX) / scale
-      if (side === 'start') {
-        const v = Math.max(0, Math.min(startVal + delta, raw - 0.5))
-        onUpdate(clip.uid, { trimStart: Math.round(v * 10) / 10 })
-      } else {
-        const v = Math.max(clip.trimStart + 0.5, Math.min(startVal + delta, raw))
-        onUpdate(clip.uid, { trimEnd: Math.round(v * 10) / 10 })
-      }
+    const startX = e.clientX
+    const initVal = side === 'start' ? clip.trimStart : (clip.trimEnd > 0 ? clip.trimEnd : raw)
+    function onMove(mv: MouseEvent) {
+      const delta = (mv.clientX - startX) / scale
+      if (side === 'start') onUpdate(clip.uid, { trimStart: Math.max(0, Math.min(initVal + delta, raw - 0.5)) })
+      else onUpdate(clip.uid, { trimEnd: Math.max(clip.trimStart + 0.5, Math.min(initVal + delta, raw)) })
     }
-    function onUp() {
-      window.removeEventListener('mousemove', onMove)
-      window.removeEventListener('mouseup', onUp)
-    }
+    function onUp() { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp) }
     window.addEventListener('mousemove', onMove)
     window.addEventListener('mouseup', onUp)
   }
 
   return (
     <div
-      className={`relative h-14 rounded-lg overflow-visible flex-shrink-0 cursor-pointer select-none transition-shadow ${isSelected ? 'ring-2 ring-white/60 shadow-lg' : 'hover:brightness-110'}`}
-      style={{ width, backgroundColor: clip.color + (isSelected ? '' : 'cc') }}
+      className={`relative flex-shrink-0 rounded-lg overflow-visible cursor-pointer select-none h-12 group transition-shadow ${
+        isSelected ? 'ring-2 ring-white/70 shadow-xl z-10' : 'hover:brightness-110'
+      }`}
+      style={{ width, background: `linear-gradient(135deg, ${clip.color}ee, ${clip.color}88)` }}
       onClick={() => onSelect(clip.uid)}
       draggable
       onDragStart={e => { e.stopPropagation(); onDragStart(clip.uid) }}
@@ -127,37 +149,47 @@ function ClipBlock({
     >
       {/* Left trim handle */}
       <div
-        className="absolute left-0 top-0 bottom-0 w-2.5 bg-black/40 hover:bg-black/60 cursor-col-resize z-10 rounded-l-lg flex items-center justify-center"
+        className="absolute left-0 inset-y-0 w-2.5 flex items-center justify-center cursor-col-resize bg-black/30 hover:bg-black/50 z-10 rounded-l-lg"
         onMouseDown={e => startTrimDrag(e, 'start')}
-      >
-        <span className="text-white/60 text-[8px] leading-none">◀</span>
-      </div>
+      ><div className="w-0.5 h-4 bg-white/60 rounded-full" /></div>
 
-      {/* Content */}
+      {/* Label */}
       <div className="px-3 h-full flex flex-col justify-center overflow-hidden">
-        <p className="text-white text-xs font-semibold truncate leading-tight">{clip.item.title}</p>
-        <p className="text-white/70 text-[9px] leading-tight mt-0.5">
-          {clip.trimStart > 0 ? `${fmtTime(clip.trimStart)} → ` : ''}{fmtTime(clip.trimEnd > 0 ? clip.trimEnd : raw)}
-          {' · '}{fmtTime(dur)}
+        <p className="text-white text-[11px] font-semibold truncate leading-tight">{clip.item.title}</p>
+        <p className="text-white/60 text-[9px] leading-tight">
+          {clip.trimStart > 0 ? `${fmtTime(clip.trimStart)}→` : ''}{fmtTime(clip.trimEnd > 0 ? clip.trimEnd : raw)} · {fmtTime(dur)}
+          {clip.speed !== 1 ? ` · ${clip.speed}×` : ''}
         </p>
       </div>
 
       {/* Right trim handle */}
       <div
-        className="absolute right-0 top-0 bottom-0 w-2.5 bg-black/40 hover:bg-black/60 cursor-col-resize z-10 rounded-r-lg flex items-center justify-center"
+        className="absolute right-0 inset-y-0 w-2.5 flex items-center justify-center cursor-col-resize bg-black/30 hover:bg-black/50 z-10 rounded-r-lg"
         onMouseDown={e => startTrimDrag(e, 'end')}
-      >
-        <span className="text-white/60 text-[8px] leading-none">▶</span>
-      </div>
+      ><div className="w-0.5 h-4 bg-white/60 rounded-full" /></div>
 
-      {/* Delete badge */}
+      {/* Delete on hover/select */}
       {isSelected && (
         <button
-          className="absolute -top-2 -right-2 w-4 h-4 bg-danger rounded-full text-white text-[9px] flex items-center justify-center z-20 hover:bg-danger/80"
           onClick={e => { e.stopPropagation(); onDelete(clip.uid) }}
+          className="absolute -top-2 -right-2 w-4 h-4 bg-danger rounded-full text-white text-[9px] flex items-center justify-center z-20 hover:scale-110 transition-transform"
         >✕</button>
       )}
     </div>
+  )
+}
+
+// ── Transition badge between clips ───────────────────────────────────────────
+function TransitionBadge({ type, onClick }: { type: Transition['type']; onClick: () => void }) {
+  const info = TRANSITIONS.find(t => t.type === type) ?? TRANSITIONS[0]
+  return (
+    <button
+      onClick={onClick}
+      className="flex-shrink-0 w-8 h-8 rounded-full bg-surface border-2 border-border hover:border-accent flex items-center justify-center text-xs text-text2 hover:text-accent transition-all z-10 self-center"
+      title={info.label}
+    >
+      {info.icon}
+    </button>
   )
 }
 
@@ -168,73 +200,84 @@ function PropertiesPanel({
   clip:     TimelineClip | null
   onUpdate: (uid: string, p: Partial<TimelineClip>) => void
 }) {
-  if (!clip) {
-    return (
-      <div className="flex items-center justify-center h-full text-text2 text-xs p-4 text-center">
-        Sélectionne un clip sur la timeline pour voir ses propriétés
+  if (!clip) return (
+    <div className="flex items-center justify-center h-full text-xs text-text2 p-4 text-center">
+      <div className="space-y-2">
+        <p className="text-2xl">🎬</p>
+        <p>Sélectionne un clip pour éditer ses propriétés</p>
       </div>
-    )
-  }
+    </div>
+  )
   const raw = clip.item.duration ?? 30
   const end = clip.trimEnd > 0 ? clip.trimEnd : raw
 
   return (
-    <div className="p-4 space-y-4 overflow-auto h-full">
+    <div className="p-3 space-y-4 overflow-auto h-full text-xs">
       <div>
-        <p className="text-xs font-semibold text-text2 uppercase tracking-wider mb-1">Clip sélectionné</p>
-        <p className="text-sm font-medium text-text truncate">{clip.item.title}</p>
-        {clip.item.file_url && (
-          <p className="text-[10px] text-text2 font-mono truncate mt-0.5">{basename(clip.item.file_url)}</p>
-        )}
+        <p className="text-[10px] font-semibold text-text2 uppercase tracking-wider mb-1">Clip</p>
+        <p className="font-medium text-text text-sm truncate">{clip.item.title}</p>
+        {clip.item.file_url && <p className="text-[9px] text-text2 font-mono truncate mt-0.5">{basename(clip.item.file_url)}</p>}
       </div>
 
       {/* Trim */}
       <div className="space-y-2">
-        <p className="text-xs font-semibold text-text2 uppercase tracking-wider">Trim</p>
-        <div>
-          <div className="flex justify-between text-[10px] text-text2 mb-1">
-            <span>Début: <span className="text-accent">{fmtTime(clip.trimStart)}</span></span>
-            <span>Fin: <span className="text-accent">{fmtTime(end)}</span></span>
+        <p className="text-[10px] font-semibold text-text2 uppercase tracking-wider">Découpe</p>
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className="text-text2 block mb-1">Début: <span className="text-accent">{fmtTime(clip.trimStart)}</span></label>
+            <input type="range" min={0} max={end - 0.5} step={0.5} value={clip.trimStart}
+              onChange={e => onUpdate(clip.uid, { trimStart: parseFloat(e.target.value) })}
+              className="w-full accent-accent h-1.5" />
           </div>
-          {/* Trim range: start */}
-          <label className="text-[10px] text-text2 block mb-0.5">Point d'entrée</label>
-          <input type="range" min={0} max={end - 0.5} step={0.1}
-            value={clip.trimStart}
-            onChange={e => onUpdate(clip.uid, { trimStart: parseFloat(e.target.value) })}
-            className="w-full accent-accent h-1.5"
-          />
-          {/* Trim range: end */}
-          <label className="text-[10px] text-text2 block mt-2 mb-0.5">Point de sortie</label>
-          <input type="range" min={clip.trimStart + 0.5} max={raw} step={0.1}
-            value={end}
-            onChange={e => onUpdate(clip.uid, { trimEnd: parseFloat(e.target.value) })}
-            className="w-full accent-accent h-1.5"
-          />
-          <p className="text-[10px] text-text2 mt-1">Durée: <span className="text-accent font-medium">{fmtTime(effectiveDur(clip))}</span></p>
+          <div>
+            <label className="text-text2 block mb-1">Fin: <span className="text-accent">{fmtTime(end)}</span></label>
+            <input type="range" min={clip.trimStart + 0.5} max={raw} step={0.5} value={end}
+              onChange={e => onUpdate(clip.uid, { trimEnd: parseFloat(e.target.value) })}
+              className="w-full accent-accent h-1.5" />
+          </div>
         </div>
+        <p className="text-text2">Durée: <span className="text-accent font-medium">{fmtTime(effectiveDur(clip))}</span></p>
+      </div>
+
+      {/* Speed */}
+      <div className="space-y-1.5">
+        <p className="text-[10px] font-semibold text-text2 uppercase tracking-wider">Vitesse: <span className="text-accent">{clip.speed}×</span></p>
+        <input type="range" min={0.25} max={4} step={0.25} value={clip.speed}
+          onChange={e => onUpdate(clip.uid, { speed: parseFloat(e.target.value) })}
+          className="w-full accent-accent h-1.5" />
+        <div className="flex justify-between text-text2">
+          <span>0.25×</span><span>1×</span><span>4×</span>
+        </div>
+      </div>
+
+      {/* Fade */}
+      <div className="flex items-center justify-between">
+        <p className="text-[10px] font-semibold text-text2 uppercase tracking-wider">Fondu entrée</p>
+        <button
+          onClick={() => onUpdate(clip.uid, { fade: !clip.fade })}
+          className={`w-8 h-4 rounded-full transition-colors ${clip.fade ? 'bg-accent' : 'bg-surface2'}`}
+        >
+          <span className={`block w-3 h-3 bg-white rounded-full shadow transition-all mt-0.5 ${clip.fade ? 'ml-[18px]' : 'ml-0.5'}`} />
+        </button>
       </div>
 
       {/* Caption */}
       <div className="space-y-1.5">
-        <p className="text-xs font-semibold text-text2 uppercase tracking-wider">Caption (ce clip)</p>
-        <textarea
-          value={clip.caption}
-          rows={3}
+        <p className="text-[10px] font-semibold text-text2 uppercase tracking-wider">Caption</p>
+        <textarea value={clip.caption} rows={3}
           onChange={e => onUpdate(clip.uid, { caption: e.target.value })}
-          placeholder="Caption spécifique à ce clip…"
-          className="w-full bg-surface border border-border rounded px-2 py-1.5 text-xs text-text focus:outline-none focus:border-accent resize-none transition-colors"
-        />
+          placeholder="Caption pour ce clip…"
+          className="w-full bg-surface border border-border rounded px-2 py-1.5 text-[11px] text-text focus:outline-none focus:border-accent resize-none" />
       </div>
 
-      {/* Color picker */}
+      {/* Color */}
       <div className="space-y-1.5">
-        <p className="text-xs font-semibold text-text2 uppercase tracking-wider">Couleur</p>
+        <p className="text-[10px] font-semibold text-text2 uppercase tracking-wider">Couleur</p>
         <div className="flex gap-1.5 flex-wrap">
           {COLORS.map(c => (
             <button key={c} onClick={() => onUpdate(clip.uid, { color: c })}
-              className={`w-5 h-5 rounded-full transition-all ${clip.color === c ? 'ring-2 ring-white scale-125' : 'hover:scale-110'}`}
-              style={{ backgroundColor: c }}
-            />
+              className={`w-5 h-5 rounded-full transition-all ${clip.color === c ? 'ring-2 ring-white scale-110' : 'hover:scale-110'}`}
+              style={{ backgroundColor: c }} />
           ))}
         </div>
       </div>
@@ -242,412 +285,507 @@ function PropertiesPanel({
   )
 }
 
-// ── Main Montage component ────────────────────────────────────────────────────
+// ── Main component ────────────────────────────────────────────────────────────
 export function Montage({ user }: MontageProps) {
-  const [bankItems, setBankItems]     = useState<ContentItem[]>([])
-  const [bankLoading, setBankLoading] = useState(true)
-  const [bankSearch, setBankSearch]   = useState('')
+  // Bank
+  const [bankItems, setBankItems] = useState<ContentItem[]>([])
+  const [bankLoading, setLL]      = useState(true)
+  const [bankSearch, setBSearch]  = useState('')
 
-  const [clips, setClips]             = useState<TimelineClip[]>([])
-  const [selectedUid, setSelectedUid] = useState<string | null>(null)
-  const [draggingUid, setDraggingUid] = useState<string | null>(null)
+  // Project state
+  const [clips, setClips]           = useState<TimelineClip[]>([])
+  const [transitions, setTrans]     = useState<Transition[]>([])
+  const [textOverlays, setTexts]    = useState<TextOverlay[]>([])
+  const [selectedUid, setSelUid]    = useState<string | null>(null)
+  const [draggingUid, setDragUid]   = useState<string | null>(null)
+  const [globalCaption, setGCap]    = useState('')
+  const [projectName, setProjName]  = useState('Mon montage')
+  const [activeFilter, setFilter]   = useState<Filter>('none')
+  const [preset, setPreset]         = useState<Preset>('9:16')
+  const [scale, setScale]           = useState(50)
+  const [playhead, setPlayhead]     = useState(0)
+  const [activeTab, setActiveTab]   = useState<Tab>('medias')
 
-  const [scale, setScale]             = useState(60)   // px per second
-  const [playhead, setPlayhead]       = useState(0)    // seconds
-  const [tool, setTool]               = useState<Tool>('select')
+  // Export
+  const [exporting, setExporting]   = useState(false)
+  const [expResult, setExpResult]   = useState<{ ok: boolean; msg: string; command?: string } | null>(null)
 
-  const [preset, setPreset]           = useState<Preset>('9:16')
-  const [globalCaption, setGCaption]  = useState('')
-  const [projectName, setProjName]    = useState('Mon montage')
-
-  const [exporting, setExporting]     = useState(false)
-  const [exportResult, setExpResult]  = useState<{ ok: boolean; msg: string; command?: string } | null>(null)
-
-  const [dragging, setDragging]       = useState(false)   // OS drag into window
-  const timelineRef                   = useRef<HTMLDivElement>(null)
-  const videoRef                      = useRef<HTMLVideoElement>(null)
-  const dropRef                       = useRef<HTMLDivElement>(null)
+  // Refs
+  const videoRef      = useRef<HTMLVideoElement>(null)
+  const timelineRef   = useRef<HTMLDivElement>(null)
+  const dropRef       = useRef<HTMLDivElement>(null)
+  const [osDragging, setOsDrag] = useState(false)
 
   useEffect(() => {
     supabase.from('content_bank').select('*').eq('user_id', user.id).order('created_at', { ascending: false })
-      .then(({ data }) => { setBankItems(data ?? []); setBankLoading(false) })
+      .then(({ data }) => { setBankItems(data ?? []); setLL(false) })
   }, [])
 
-  // ── Clip management ────────────────────────────────────────────────────
+  // ── Clip management ────────────────────────────────────────────────────────
   function addClip(item: ContentItem) {
-    const clip: TimelineClip = {
-      uid:       `${item.id}-${Date.now()}`,
-      item,
-      trimStart: 0,
-      trimEnd:   0,
-      caption:   '',
-      color:     nextColor(),
-    }
-    setClips(prev => [...prev, clip])
-    setSelectedUid(clip.uid)
+    const c: TimelineClip = { uid: `${item.id}-${Date.now()}`, item, trimStart: 0, trimEnd: 0, caption: '', color: nextColor(), speed: 1, fade: false }
+    setClips(prev => [...prev, c])
+    setSelUid(c.uid)
   }
-
-  function updateClip(uid: string, patch: Partial<TimelineClip>) {
-    setClips(prev => prev.map(c => c.uid === uid ? { ...c, ...patch } : c))
-  }
-
+  function updateClip(uid: string, p: Partial<TimelineClip>) { setClips(prev => prev.map(c => c.uid === uid ? { ...c, ...p } : c)) }
   function deleteClip(uid: string) {
     setClips(prev => prev.filter(c => c.uid !== uid))
-    if (selectedUid === uid) setSelectedUid(null)
+    setTrans(prev => prev.filter(t => t.afterClipUid !== uid))
+    if (selectedUid === uid) setSelUid(null)
   }
-
-  // ── Drag to reorder ─────────────────────────────────────────────────────
   function handleDrop(targetUid: string) {
     if (!draggingUid || draggingUid === targetUid) return
     setClips(prev => {
-      const next    = [...prev]
-      const fromIdx = next.findIndex(c => c.uid === draggingUid)
-      const toIdx   = next.findIndex(c => c.uid === targetUid)
-      if (fromIdx < 0 || toIdx < 0) return prev
-      const [moved] = next.splice(fromIdx, 1)
-      next.splice(toIdx, 0, moved)
-      return next
+      const next = [...prev]
+      const fi = next.findIndex(c => c.uid === draggingUid)
+      const ti = next.findIndex(c => c.uid === targetUid)
+      if (fi < 0 || ti < 0) return prev
+      const [m] = next.splice(fi, 1); next.splice(ti, 0, m); return next
     })
-    setDraggingUid(null)
+    setDragUid(null)
   }
 
-  // ── Cut at playhead ──────────────────────────────────────────────────────
+  // ── Cut at playhead ────────────────────────────────────────────────────────
   const cutAtPlayhead = useCallback(() => {
     if (!selectedUid) return
     const clip = clips.find(c => c.uid === selectedUid)
     if (!clip) return
-
-    // playhead relative to this clip's start in timeline
     let offset = 0
-    for (const c of clips) {
-      if (c.uid === selectedUid) break
-      offset += effectiveDur(c)
-    }
-    const localT   = playhead - offset
-    const raw      = clip.item.duration ?? 30
+    for (const c of clips) { if (c.uid === selectedUid) break; offset += effectiveDur(c) }
+    const raw = clip.item.duration ?? 30
+    const cutPoint = clip.trimStart + (playhead - offset) * clip.speed
     const clipEnd  = clip.trimEnd > 0 ? clip.trimEnd : raw
-    const cutPoint = clip.trimStart + localT
-
     if (cutPoint <= clip.trimStart + 0.5 || cutPoint >= clipEnd - 0.5) return
-
     const a: TimelineClip = { ...clip, uid: `${clip.uid}-a`, trimEnd: cutPoint }
     const b: TimelineClip = { ...clip, uid: `${clip.uid}-b`, trimStart: cutPoint, trimEnd: clip.trimEnd }
-
-    setClips(prev => {
-      const idx = prev.findIndex(c => c.uid === selectedUid)
-      if (idx < 0) return prev
-      const next = [...prev]
-      next.splice(idx, 1, a, b)
-      return next
-    })
-    setSelectedUid(a.uid)
+    setClips(prev => { const next = [...prev]; const i = next.findIndex(c => c.uid === selectedUid); next.splice(i, 1, a, b); return next })
+    setSelUid(a.uid)
   }, [clips, selectedUid, playhead])
 
-  // ── Timeline click → move playhead ──────────────────────────────────────
+  // ── Transitions ────────────────────────────────────────────────────────────
+  function getTransition(afterUid: string): Transition['type'] {
+    return transitions.find(t => t.afterClipUid === afterUid)?.type ?? 'cut'
+  }
+  function cycleTransition(afterUid: string) {
+    const cur = getTransition(afterUid)
+    const idx = TRANSITIONS.findIndex(t => t.type === cur)
+    const next = TRANSITIONS[(idx + 1) % TRANSITIONS.length].type
+    setTrans(prev => {
+      const filtered = prev.filter(t => t.afterClipUid !== afterUid)
+      if (next === 'cut') return filtered
+      return [...filtered, { afterClipUid: afterUid, type: next }]
+    })
+  }
+
+  // ── Timeline click → playhead ──────────────────────────────────────────────
   function onTimelineClick(e: React.MouseEvent) {
     if (!timelineRef.current) return
     const rect = timelineRef.current.getBoundingClientRect()
     const x = e.clientX - rect.left + timelineRef.current.scrollLeft
-    const t = Math.max(0, x / scale)
-    setPlayhead(Math.min(t, totalDur(clips)))
-    if (videoRef.current) videoRef.current.currentTime = t
+    setPlayhead(Math.max(0, Math.min(x / scale, totalDur(clips))))
   }
 
-  // ── OS file drag into window ─────────────────────────────────────────────
-  function onOsDragOver(e: React.DragEvent) { e.preventDefault(); setDragging(true) }
-  function onOsDragLeave(e: React.DragEvent) {
-    if (!dropRef.current?.contains(e.relatedTarget as Node)) setDragging(false)
-  }
+  // ── OS drag-drop ───────────────────────────────────────────────────────────
+  function onOsDragOver(e: React.DragEvent) { e.preventDefault(); setOsDrag(true) }
+  function onOsDragLeave(e: React.DragEvent) { if (!dropRef.current?.contains(e.relatedTarget as Node)) setOsDrag(false) }
   async function onOsDrop(e: React.DragEvent) {
-    e.preventDefault(); setDragging(false)
-    const file = e.dataTransfer.files[0]
-    if (!file) return
-    const filePath = (file as File & { path?: string }).path ?? file.name
-    const title    = filePath.replace(/\\/g, '/').split('/').pop()?.replace(/\.[^.]+$/, '') ?? 'Vidéo'
-    const { data } = await supabase.from('content_bank')
-      .insert({ user_id: user.id, title, file_url: filePath, tags: [], notes: '' }).select().single()
+    e.preventDefault(); setOsDrag(false)
+    const file = e.dataTransfer.files[0]; if (!file) return
+    const fp = (file as File & { path?: string }).path ?? file.name
+    const title = fp.replace(/\\/g, '/').split('/').pop()?.replace(/\.[^.]+$/, '') ?? 'Vidéo'
+    const { data } = await supabase.from('content_bank').insert({ user_id: user.id, title, file_url: fp, tags: [], notes: '' }).select().single()
     if (data) { setBankItems(prev => [data, ...prev]); addClip(data) }
   }
 
-  // ── Export ───────────────────────────────────────────────────────────────
+  // ── Export ─────────────────────────────────────────────────────────────────
   async function handleExport() {
-    if (clips.length === 0) return
-    const hasPaths = clips.every(c => c.item.file_url && !c.item.file_url.startsWith('http'))
-    if (!hasPaths) {
-      setExpResult({ ok: false, msg: 'Certains clips n\'ont pas de fichier local. Ajoute les vidéos via glisser-déposer.' })
-      return
-    }
+    if (!clips.length) return
     setExporting(true); setExpResult(null)
-    const outPath = await window.electronAPI?.pickOutputFile?.({ defaultName: `${projectName.replace(/\s+/g, '_')}.mp4` })
-    if (!outPath) { setExporting(false); return }
-
+    const out = await window.electronAPI?.pickOutputFile?.({ defaultName: `${projectName.replace(/\s+/g, '_')}.mp4` })
+    if (!out) { setExporting(false); return }
     const res = await window.electronAPI?.runFfmpeg?.({
-      clips: clips.map(c => ({
-        filePath:  c.item.file_url!,
-        trimStart: c.trimStart,
-        trimEnd:   c.trimEnd,
-      })),
-      outputPath: outPath,
-      preset,
-      transition: 'cut',
+      clips: clips.map(c => ({ filePath: c.item.file_url!, trimStart: c.trimStart, trimEnd: c.trimEnd })),
+      outputPath: out, preset, transition: 'cut',
     })
     setExporting(false)
-    if (res?.ok) {
-      setExpResult({ ok: true, msg: `✓ Exporté : ${outPath}` })
-    } else {
-      setExpResult({ ok: false, msg: res?.error ?? 'Erreur FFmpeg', command: res?.command })
-    }
+    if (res?.ok) setExpResult({ ok: true, msg: `✓ Exporté : ${out}` })
+    else setExpResult({ ok: false, msg: res?.error ?? 'Erreur FFmpeg', command: res?.command })
   }
 
-  // ── Computed ─────────────────────────────────────────────────────────────
-  const selectedClip = clips.find(c => c.uid === selectedUid) ?? null
-  const total        = totalDur(clips)
-  const timelineW    = Math.max(total * scale, 600)
+  // ── Computed ───────────────────────────────────────────────────────────────
+  const selectedClip  = clips.find(c => c.uid === selectedUid) ?? null
+  const total         = totalDur(clips)
+  const timelineW     = Math.max(total * scale + 250, 600)
+  const previewSrc    = selectedClip?.item.file_url ? localSrc(selectedClip.item.file_url) : null
+  const filteredBank  = bankItems.filter(i => !bankSearch || i.title.toLowerCase().includes(bankSearch.toLowerCase()) || i.tags.some(t => t.toLowerCase().includes(bankSearch.toLowerCase())))
+  const PRESET_DIMS: Record<Preset, string> = { '9:16': '1080×1920', '1:1': '1080×1080', '16:9': '1920×1080' }
 
-  // For video preview: selected clip's local src
-  const previewSrc = selectedClip?.item.file_url ? localSrc(selectedClip.item.file_url) : null
-
-  const filteredBank = bankItems.filter(item => {
-    if (!bankSearch) return true
-    const q = bankSearch.toLowerCase()
-    return item.title.toLowerCase().includes(q) || item.tags.some(t => t.toLowerCase().includes(q))
-  })
-
-  const presetDims: Record<Preset, string> = { '9:16': '1080×1920', '1:1': '1080×1080', '16:9': '1920×1080' }
+  const TABS: { id: Tab; label: string; icon: string }[] = [
+    { id: 'medias',      label: 'Médias',      icon: '🎬' },
+    { id: 'texte',       label: 'Texte',        icon: '𝐓' },
+    { id: 'transitions', label: 'Transitions',  icon: '◑' },
+    { id: 'filtres',     label: 'Filtres',      icon: '🎨' },
+    { id: 'ajustement',  label: 'Ajustement',   icon: '⚙' },
+  ]
 
   return (
     <div ref={dropRef} className="flex flex-col h-screen min-h-0 bg-bg"
       onDragOver={onOsDragOver} onDragLeave={onOsDragLeave} onDrop={onOsDrop}>
 
-      {/* OS drag overlay */}
-      {dragging && (
+      {/* OS drop overlay */}
+      {osDragging && (
         <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
           <div className="border-2 border-dashed border-accent rounded-2xl px-20 py-12 bg-bg/90 backdrop-blur text-center space-y-3">
             <p className="text-5xl">🎬</p>
             <p className="text-xl font-semibold text-accent">Dépose la vidéo ici</p>
-            <p className="text-sm text-text2">Ajoutée à la banque et à la timeline</p>
           </div>
         </div>
       )}
 
-      {/* ── Top toolbar ───────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-3 px-5 py-2.5 border-b border-border bg-surface flex-shrink-0 flex-wrap">
-        {/* Project name */}
-        <input value={projectName} onChange={e => setProjName(e.target.value)}
-          className="text-sm font-semibold text-text bg-transparent focus:outline-none focus:border-b focus:border-accent w-40 truncate"
-          placeholder="Nom du montage…"
-        />
-        <div className="w-px h-5 bg-border" />
-
-        {/* Preset selector */}
-        <div className="flex items-center gap-1">
-          <span className="text-xs text-text2">Format:</span>
-          {(['9:16', '1:1', '16:9'] as Preset[]).map(p => (
-            <button key={p} onClick={() => setPreset(p)}
-              className={`px-2.5 py-1 rounded text-xs font-mono transition-all ${preset === p ? 'bg-accent text-white' : 'text-text2 hover:text-text bg-surface2'}`}>
-              {p}
-            </button>
-          ))}
-          <span className="text-[10px] text-text2 ml-1">{presetDims[preset]}</span>
-        </div>
-        <div className="w-px h-5 bg-border" />
-
-        {/* Tools */}
-        <div className="flex items-center gap-1">
-          <button onClick={() => setTool('select')}
-            className={`px-2.5 py-1 rounded text-xs transition-all ${tool === 'select' ? 'bg-accent/20 text-accent' : 'text-text2 hover:text-text'}`}
-            title="Outil sélection">
-            ↖ Sélection
-          </button>
-          <button onClick={() => { setTool('cut'); }}
-            className={`px-2.5 py-1 rounded text-xs transition-all ${tool === 'cut' ? 'bg-warn/20 text-warn' : 'text-text2 hover:text-text'}`}
-            title="Outil couper (✂ coupe le clip sélectionné à la position de la tête de lecture)">
-            ✂ Couper
-          </button>
-          <button onClick={cutAtPlayhead} disabled={!selectedUid}
-            className="px-2.5 py-1 rounded text-xs bg-surface2 text-text2 hover:text-text disabled:opacity-40 transition-all"
-            title="Couper le clip sélectionné à la position de la tête de lecture">
-            ✂ Couper ici
-          </button>
-        </div>
-        <div className="w-px h-5 bg-border" />
-
-        {/* Zoom */}
-        <div className="flex items-center gap-1.5">
-          <span className="text-[10px] text-text2">Zoom:</span>
-          <button onClick={() => setScale(s => Math.max(10, s - 10))} className="text-text2 hover:text-text text-sm px-1">−</button>
-          <span className="text-[10px] text-accent w-8 text-center">{scale}px/s</span>
-          <button onClick={() => setScale(s => Math.min(200, s + 10))} className="text-text2 hover:text-text text-sm px-1">+</button>
-        </div>
-        <div className="w-px h-5 bg-border" />
-
-        {/* Playhead display */}
-        <span className="text-xs text-text2 font-mono">
-          ▶ {fmtTime(playhead)} / {fmtTime(total)}
-        </span>
-
-        <div className="flex-1" />
-
-        {/* Export */}
-        <Button size="sm" onClick={handleExport} loading={exporting} disabled={clips.length === 0}>
-          🎬 Exporter (FFmpeg)
-        </Button>
-      </div>
-
-      {/* ── Main area ─────────────────────────────────────────────────────── */}
-      <div className="flex flex-1 min-h-0">
-
-        {/* Left: clip bank */}
-        <aside className="w-52 flex-shrink-0 flex flex-col border-r border-border bg-surface">
-          <div className="px-3 py-3 border-b border-border">
-            <p className="text-xs font-semibold text-text2 uppercase tracking-wider mb-2">Banque de clips</p>
-            <input type="text" placeholder="🔍 Rechercher…" value={bankSearch}
-              onChange={e => setBankSearch(e.target.value)}
-              className="w-full bg-surface2 border border-border rounded px-2 py-1.5 text-[11px] text-text placeholder:text-text2 focus:border-accent focus:outline-none transition-colors"
-            />
+      {/* ── TOP TOOLBAR (CapCut-style) ────────────────────────────────────── */}
+      <div className="flex-shrink-0 border-b border-border bg-surface">
+        {/* Row 1: project name + tabs */}
+        <div className="flex items-center">
+          {/* Project name */}
+          <div className="w-56 flex-shrink-0 px-4 py-2 border-r border-border">
+            <input value={projectName} onChange={e => setProjName(e.target.value)}
+              className="text-sm font-semibold text-text bg-transparent focus:outline-none w-full truncate"
+              placeholder="Nom du montage…" />
           </div>
-          <div className="flex-1 overflow-auto py-1">
-            {bankLoading ? (
-              <div className="flex justify-center py-8"><Spinner size="sm" /></div>
-            ) : filteredBank.length === 0 ? (
-              <p className="px-3 py-4 text-[11px] text-text2">
-                {bankItems.length === 0 ? 'Banque vide — glisse une vidéo ici.' : 'Aucun résultat.'}
-              </p>
-            ) : filteredBank.map(item => (
-              <button key={item.id} onClick={() => addClip(item)}
-                className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-surface2 transition-colors group"
-                title="Cliquer pour ajouter à la timeline"
-              >
-                <div className="w-9 h-7 rounded bg-surface2 flex items-center justify-center text-base flex-shrink-0">🎬</div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-[11px] font-medium text-text truncate">{item.title}</p>
-                  <p className="text-[9px] text-text2 truncate">
-                    {item.duration ? fmtTime(item.duration) : '?'}
-                    {item.file_url ? ` · ${basename(item.file_url)}` : ''}
-                  </p>
-                </div>
-                <span className="opacity-0 group-hover:opacity-100 text-accent text-sm flex-shrink-0">+</span>
+
+          {/* Tab bar */}
+          <div className="flex flex-1 overflow-x-auto">
+            {TABS.map(t => (
+              <button key={t.id} onClick={() => setActiveTab(t.id)}
+                className={`flex items-center gap-1.5 px-5 py-2.5 text-xs font-medium border-b-2 transition-all whitespace-nowrap ${
+                  activeTab === t.id
+                    ? 'border-accent text-accent'
+                    : 'border-transparent text-text2 hover:text-text'
+                }`}>
+                <span>{t.icon}</span>{t.label}
               </button>
             ))}
           </div>
-        </aside>
 
-        {/* Center: preview + timeline */}
-        <div className="flex-1 flex flex-col min-h-0 min-w-0">
+          {/* Right controls */}
+          <div className="flex items-center gap-2 px-4 border-l border-border flex-shrink-0">
+            <span className="text-[10px] text-text2">Format:</span>
+            {(['9:16','1:1','16:9'] as Preset[]).map(p => (
+              <button key={p} onClick={() => setPreset(p)}
+                className={`px-2 py-1 rounded text-[11px] font-mono transition-all ${preset === p ? 'bg-accent text-white' : 'text-text2 hover:text-text bg-surface2'}`}>
+                {p}
+              </button>
+            ))}
+            <span className="text-[9px] text-text2 ml-1">{PRESET_DIMS[preset]}</span>
+            <div className="w-px h-5 bg-border mx-1" />
+            <Button size="sm" onClick={handleExport} loading={exporting} disabled={!clips.length}>
+              Exporter
+            </Button>
+          </div>
+        </div>
+      </div>
 
-          {/* Video preview */}
-          <div className="flex-shrink-0 h-44 bg-black border-b border-border flex items-center justify-center gap-4 px-4">
-            {previewSrc ? (
-              <video
-                ref={videoRef}
-                src={previewSrc}
-                className="h-full max-w-sm rounded object-contain"
-                controls
-                onTimeUpdate={e => setPlayhead((e.target as HTMLVideoElement).currentTime)}
-              />
-            ) : (
-              <div className="text-text2 text-center space-y-1">
-                <p className="text-3xl">🎞</p>
-                <p className="text-xs">Sélectionne un clip pour prévisualiser</p>
+      {/* ── MIDDLE: left panel + preview + properties ─────────────────────── */}
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+
+        {/* Left panel — content changes per tab */}
+        <aside className="w-56 flex-shrink-0 border-r border-border bg-surface flex flex-col">
+
+          {/* Médias */}
+          {activeTab === 'medias' && (<>
+            <div className="px-3 py-2 border-b border-border space-y-2">
+              <div className="flex gap-1">
+                <button onClick={async () => {
+                  const p = await window.electronAPI?.pickVideoFile?.()
+                  if (p) {
+                    const title = p.replace(/\\/g, '/').split('/').pop()?.replace(/\.[^.]+$/, '') ?? 'Vidéo'
+                    const { data } = await supabase.from('content_bank').insert({ user_id: user.id, title, file_url: p, tags: [], notes: '' }).select().single()
+                    if (data) { setBankItems(prev => [data, ...prev]); addClip(data) }
+                  }
+                }} className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-accent/10 hover:bg-accent/20 text-accent text-xs font-semibold rounded-lg transition-colors">
+                  + Importer
+                </button>
               </div>
-            )}
-            {/* Global caption */}
-            <div className="flex-1 max-w-xs space-y-1.5">
-              <label className="text-[10px] text-text2 uppercase tracking-wider font-semibold">Caption globale</label>
-              <textarea value={globalCaption} rows={4}
-                onChange={e => setGCaption(e.target.value)}
-                placeholder="Caption pour tous les posts…"
-                className="w-full bg-surface border border-border rounded px-2 py-1.5 text-xs text-text focus:outline-none focus:border-accent resize-none transition-colors"
+              <input type="text" placeholder="🔍 Rechercher…" value={bankSearch}
+                onChange={e => setBSearch(e.target.value)}
+                className="w-full bg-surface2 border border-border rounded px-2 py-1.5 text-[11px] text-text placeholder:text-text2 focus:border-accent focus:outline-none transition-colors"
               />
             </div>
-            {/* Stats */}
-            <div className="text-xs text-text2 space-y-1 text-right flex-shrink-0">
-              <p><span className="text-text font-medium">{clips.length}</span> clips</p>
-              <p>Durée: <span className="text-accent font-medium">{fmtTime(total)}</span></p>
-              <p>Format: <span className="text-accent font-medium">{preset}</span></p>
-              {total > 0 && (
-                <div className="mt-2">
-                  <div className="h-1.5 w-24 bg-surface2 rounded-full overflow-hidden ml-auto">
-                    <div className="h-full bg-accent rounded-full" style={{ width: `${Math.min(100, (total / 90) * 100)}%` }} />
+            <div className="flex-1 overflow-auto py-1">
+              {bankLoading ? <div className="flex justify-center py-8"><Spinner size="sm" /></div>
+              : filteredBank.length === 0 ? (
+                <div className="px-3 py-6 text-center text-[11px] text-text2 space-y-2">
+                  <p className="text-2xl">🎬</p>
+                  <p>{bankItems.length === 0 ? 'Banque vide.\nGlisse des vidéos ici.' : 'Aucun résultat.'}</p>
+                </div>
+              ) : filteredBank.map(item => (
+                <button key={item.id} onClick={() => addClip(item)}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-surface2 group transition-colors">
+                  <div className="w-10 h-7 rounded bg-surface2 flex items-center justify-center text-base flex-shrink-0">🎬</div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[11px] font-medium text-text truncate">{item.title}</p>
+                    <p className="text-[9px] text-text2">{item.duration ? fmtTime(item.duration) : '?s'}</p>
                   </div>
-                  <p className="text-[9px] mt-0.5 text-right">
-                    {total > 90 ? '⚠ > 90s' : `${Math.round((total / 90) * 100)}% / 90s`}
-                  </p>
+                  <span className="opacity-0 group-hover:opacity-100 text-accent text-sm flex-shrink-0">+</span>
+                </button>
+              ))}
+            </div>
+          </>)}
+
+          {/* Texte */}
+          {activeTab === 'texte' && (
+            <div className="p-3 space-y-3 flex-1 overflow-auto">
+              <p className="text-[10px] text-text2 uppercase tracking-wider font-semibold">Ajouter un texte</p>
+              {(['top','center','bottom'] as TextOverlay['position'][]).map(pos => (
+                <button key={pos} onClick={() => setTexts(prev => [...prev, {
+                  uid: `text-${Date.now()}`, text: 'Texte ici…',
+                  startTime: playhead, endTime: Math.min(playhead + 3, total),
+                  position: pos, fontSize: 32, color: '#ffffff',
+                }])}
+                className="w-full py-3 bg-surface2 hover:bg-surface border border-border rounded-lg text-xs text-text transition-colors text-center">
+                  + {pos === 'top' ? 'Haut' : pos === 'center' ? 'Centre' : 'Bas'}
+                </button>
+              ))}
+              {textOverlays.length > 0 && (
+                <div className="space-y-2 pt-2 border-t border-border">
+                  <p className="text-[10px] text-text2 uppercase tracking-wider font-semibold">Textes ({textOverlays.length})</p>
+                  {textOverlays.map(ov => (
+                    <div key={ov.uid} className="flex items-center gap-2 bg-surface2 rounded-lg px-2 py-1.5">
+                      <input value={ov.text} onChange={e => setTexts(prev => prev.map(t => t.uid === ov.uid ? { ...t, text: e.target.value } : t))}
+                        className="flex-1 bg-transparent text-[11px] text-text focus:outline-none" />
+                      <button onClick={() => setTexts(prev => prev.filter(t => t.uid !== ov.uid))} className="text-text2 hover:text-danger text-xs">✕</button>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
-          </div>
+          )}
 
-          {/* Timeline area */}
-          <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-            {/* Ruler + clips scroll area */}
-            <div ref={timelineRef} className="flex-1 overflow-x-auto overflow-y-hidden bg-bg relative cursor-crosshair"
-              onClick={onTimelineClick}
-              style={{ minHeight: 0 }}>
-              <div style={{ width: timelineW + 40, minHeight: '100%', position: 'relative' }}>
-                {/* Ruler */}
-                <TimeRuler totalSec={total + 10} scale={scale} />
-
-                {/* Playhead */}
-                <div className="absolute top-0 bottom-0 w-px bg-red-500 z-30 pointer-events-none"
-                  style={{ left: playhead * scale }}>
-                  <div className="w-3 h-3 bg-red-500 rounded-full -translate-x-1/2 -mt-0.5" />
-                </div>
-
-                {/* Clips */}
-                <div className="flex items-center gap-1 px-2 py-3" style={{ paddingTop: 30 }}>
-                  {clips.length === 0 ? (
-                    <div className="flex items-center justify-center text-text2 text-xs" style={{ width: 500, height: 56 }}>
-                      ← Clique sur un clip dans la banque pour l'ajouter, ou glisse-dépose une vidéo ici
+          {/* Transitions */}
+          {activeTab === 'transitions' && (
+            <div className="p-3 space-y-3 flex-1 overflow-auto">
+              <p className="text-[10px] text-text2 uppercase tracking-wider font-semibold">Types de transition</p>
+              <p className="text-[10px] text-text2">Clique sur le badge ◑ entre deux clips pour changer la transition.</p>
+              <div className="space-y-2 pt-1">
+                {TRANSITIONS.map(tr => (
+                  <div key={tr.type} className="flex items-center gap-3 px-3 py-2 bg-surface2 rounded-lg">
+                    <span className="text-xl w-6 text-center">{tr.icon}</span>
+                    <div>
+                      <p className="text-xs font-medium text-text">{tr.label}</p>
+                      <p className="text-[9px] text-text2">
+                        {tr.type === 'cut' ? 'Coupe directe' :
+                         tr.type === 'fade' ? 'Fondu au noir' :
+                         tr.type === 'dissolve' ? 'Fondu enchaîné' : 'Balayage horizontal'}
+                      </p>
                     </div>
-                  ) : (
-                    clips.map(clip => (
-                      <ClipBlock
-                        key={clip.uid}
-                        clip={clip}
-                        scale={scale}
-                        isSelected={clip.uid === selectedUid}
-                        onSelect={setSelectedUid}
-                        onUpdate={updateClip}
-                        onDelete={deleteClip}
-                        onDragStart={setDraggingUid}
-                        onDragOver={e => e.preventDefault()}
-                        onDrop={handleDrop}
-                      />
-                    ))
-                  )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Filtres */}
+          {activeTab === 'filtres' && (
+            <div className="p-3 space-y-3 flex-1 overflow-auto">
+              <p className="text-[10px] text-text2 uppercase tracking-wider font-semibold">Filtre couleur</p>
+              <div className="grid grid-cols-2 gap-2">
+                {(Object.keys(FILTER_LABELS) as Filter[]).map(f => (
+                  <button key={f} onClick={() => setFilter(f)}
+                    className={`py-2 px-3 rounded-lg text-xs text-center transition-all ${activeFilter === f ? 'bg-accent text-white font-semibold' : 'bg-surface2 text-text2 hover:text-text'}`}>
+                    {FILTER_LABELS[f]}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[9px] text-text2">Filtre appliqué dans l'export FFmpeg.</p>
+            </div>
+          )}
+
+          {/* Ajustement */}
+          {activeTab === 'ajustement' && (
+            <div className="p-3 space-y-4 flex-1 overflow-auto">
+              <p className="text-[10px] text-text2 uppercase tracking-wider font-semibold">Paramètres globaux</p>
+              <div className="space-y-3">
+                <div>
+                  <p className="text-[10px] text-text2 mb-1">Caption globale</p>
+                  <textarea value={globalCaption} rows={4}
+                    onChange={e => setGCap(e.target.value)}
+                    placeholder="Caption commune à toutes les publications…"
+                    className="w-full bg-surface border border-border rounded px-2 py-1.5 text-[11px] text-text focus:outline-none focus:border-accent resize-none" />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-[10px] text-text2">Total : <span className="text-accent font-medium">{fmtTime(total)}</span></p>
+                  <div className="h-1.5 bg-surface2 rounded-full overflow-hidden">
+                    <div className="h-full bg-accent rounded-full transition-all" style={{ width: `${Math.min(100, (total / 90) * 100)}%` }} />
+                  </div>
+                  <p className="text-[9px] text-text2">{total > 90 ? '⚠ > 90s (limite Reels)' : `${Math.round((total / 90) * 100)}% de 90s`}</p>
                 </div>
               </div>
             </div>
-          </div>
+          )}
+        </aside>
+
+        {/* CENTER: video preview */}
+        <div className="flex-1 min-w-0 flex items-center justify-center bg-black/50 relative overflow-hidden">
+          {previewSrc ? (
+            <video
+              ref={videoRef}
+              src={previewSrc}
+              className="max-h-full max-w-full rounded object-contain"
+              style={{ filter: FILTER_CSS[activeFilter] || undefined }}
+              controls
+              onTimeUpdate={e => setPlayhead((e.target as HTMLVideoElement).currentTime)}
+            />
+          ) : (
+            <div className="text-center text-text2 space-y-3">
+              <p className="text-5xl">▶</p>
+              <p className="text-sm">Sélectionne un clip pour prévisualiser</p>
+              <p className="text-xs text-text2/60">ou glisse une vidéo dans l'application</p>
+            </div>
+          )}
+
+          {/* Text overlays preview */}
+          {textOverlays.filter(t => t.startTime <= playhead && t.endTime >= playhead).map(ov => (
+            <div key={ov.uid}
+              className={`absolute left-0 right-0 px-4 text-center pointer-events-none ${
+                ov.position === 'top' ? 'top-8' : ov.position === 'bottom' ? 'bottom-8' : 'top-1/2 -translate-y-1/2'
+              }`}
+              style={{ fontSize: ov.fontSize * 0.5, color: ov.color, textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}
+            >
+              {ov.text}
+            </div>
+          ))}
         </div>
 
-        {/* Right: properties */}
-        <aside className="w-56 flex-shrink-0 border-l border-border bg-surface">
-          <div className="px-4 py-3 border-b border-border">
-            <p className="text-xs font-semibold text-text2 uppercase tracking-wider">Propriétés</p>
+        {/* RIGHT: properties */}
+        <aside className="w-52 flex-shrink-0 border-l border-border bg-surface">
+          <div className="px-3 py-2 border-b border-border">
+            <p className="text-[10px] font-semibold text-text2 uppercase tracking-wider">Propriétés</p>
           </div>
-          <PropertiesPanel clip={selectedClip} onUpdate={updateClip} />
+          <div className="h-[calc(100%-33px)] overflow-auto">
+            <PropertiesPanel clip={selectedClip} onUpdate={updateClip} />
+          </div>
         </aside>
       </div>
 
-      {/* Export result banner */}
-      {exportResult && (
-        <div className={`px-5 py-3 text-sm flex items-start justify-between gap-3 flex-shrink-0 ${exportResult.ok ? 'bg-ok/10 border-t border-ok/20 text-ok' : 'bg-danger/10 border-t border-danger/20 text-danger'}`}>
-          <div className="flex-1 min-w-0">
-            <p>{exportResult.msg}</p>
-            {exportResult.command && (
-              <div className="mt-1">
-                <p className="text-[10px] text-text2 mb-1">Commande FFmpeg (copier-coller dans un terminal) :</p>
-                <code className="text-[10px] bg-surface px-2 py-1 rounded block truncate text-text2 hover:whitespace-normal cursor-pointer"
-                  onClick={() => navigator.clipboard.writeText(exportResult.command!)}
-                  title="Cliquer pour copier">
-                  {exportResult.command}
-                </code>
+      {/* ── BOTTOM: Timeline ─────────────────────────────────────────────────── */}
+      <div className="flex-shrink-0 border-t border-border bg-surface" style={{ height: 200 }}>
+        {/* Timeline toolbar */}
+        <div className="flex items-center gap-2 px-3 py-1.5 border-b border-border bg-surface2">
+          {/* Edit tools */}
+          <button onClick={cutAtPlayhead} disabled={!selectedUid} title="Couper le clip à la tête de lecture"
+            className="flex items-center gap-1 px-2 py-1 rounded text-xs text-text2 hover:text-text hover:bg-surface disabled:opacity-40 transition-all">
+            ✂ Couper
+          </button>
+          <button onClick={() => selectedUid && deleteClip(selectedUid)} disabled={!selectedUid}
+            className="flex items-center gap-1 px-2 py-1 rounded text-xs text-text2 hover:text-danger disabled:opacity-40 transition-all">
+            🗑 Suppr.
+          </button>
+          <button onClick={() => setClips([])} disabled={!clips.length}
+            className="flex items-center gap-1 px-2 py-1 rounded text-xs text-text2 hover:text-danger disabled:opacity-40 transition-all">
+            🗑 Tout vider
+          </button>
+          <div className="w-px h-5 bg-border mx-1" />
+
+          {/* Time display */}
+          <span className="text-xs text-text2 font-mono">
+            {fmtTime(playhead)} / <span className="text-accent">{fmtTime(total)}</span>
+          </span>
+          <div className="w-px h-5 bg-border mx-1" />
+
+          {/* Zoom */}
+          <div className="flex items-center gap-1.5">
+            <button onClick={() => setScale(s => Math.max(10, s - 10))} className="text-text2 hover:text-text text-base w-5 text-center">−</button>
+            <div className="w-16 h-1.5 bg-surface rounded-full relative cursor-pointer"
+              onClick={e => { const r = e.currentTarget.getBoundingClientRect(); setScale(Math.round(10 + ((e.clientX - r.left) / r.width) * 190)) }}>
+              <div className="h-full bg-accent rounded-full" style={{ width: `${((scale - 10) / 190) * 100}%` }} />
+            </div>
+            <button onClick={() => setScale(s => Math.min(200, s + 10))} className="text-text2 hover:text-text text-base w-5 text-center">+</button>
+            <span className="text-[10px] text-text2 w-10">{scale}px/s</span>
+          </div>
+        </div>
+
+        {/* Scrollable tracks */}
+        <div ref={timelineRef}
+          className="overflow-x-auto overflow-y-hidden cursor-crosshair relative"
+          style={{ height: 155 }}
+          onClick={onTimelineClick}>
+          <div style={{ width: timelineW, minHeight: '100%', position: 'relative' }}>
+            {/* Ruler */}
+            <TimeRuler total={total + 10} scale={scale} />
+
+            {/* Playhead */}
+            <div className="absolute inset-y-0 pointer-events-none z-30" style={{ left: playhead * scale }}>
+              <div className="w-0.5 h-full bg-red-500/80" />
+              <div className="w-2.5 h-2.5 bg-red-500 rounded-full -mt-0.5 -ml-1" />
+            </div>
+
+            {/* Video track */}
+            <div className="px-2 py-1">
+              <div className="text-[9px] text-text2 mb-1 uppercase tracking-wider">Vidéo</div>
+              {clips.length === 0 ? (
+                <div className="flex items-center text-[11px] text-text2/50 h-12 px-4">
+                  ← Clique sur un clip dans Médias pour l'ajouter
+                </div>
+              ) : (
+                <div className="flex items-center gap-0.5">
+                  {clips.map((clip, i) => (
+                    <div key={clip.uid} className="flex items-center gap-0.5">
+                      <ClipBlock
+                        clip={clip} scale={scale} isSelected={clip.uid === selectedUid}
+                        onSelect={setSelUid} onUpdate={updateClip} onDelete={deleteClip}
+                        onDragStart={setDragUid} onDragOver={e => e.preventDefault()} onDrop={handleDrop}
+                      />
+                      {i < clips.length - 1 && (
+                        <TransitionBadge type={getTransition(clip.uid)} onClick={() => cycleTransition(clip.uid)} />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Audio track (placeholder) */}
+            <div className="px-2 py-0.5 border-t border-border/40">
+              <div className="text-[9px] text-text2/50 mb-1 uppercase tracking-wider">Audio</div>
+              <div className="h-7 rounded bg-surface2/40 border border-dashed border-border/40 flex items-center justify-center text-[10px] text-text2/40" style={{ width: Math.max(timelineW - 20, 200) }}>
+                Glisse un fichier audio ici (à venir)
+              </div>
+            </div>
+
+            {/* Text overlay track */}
+            {textOverlays.length > 0 && (
+              <div className="px-2 py-0.5 border-t border-border/40">
+                <div className="text-[9px] text-text2/50 mb-1 uppercase tracking-wider">Texte</div>
+                <div className="relative h-6" style={{ width: timelineW - 20 }}>
+                  {textOverlays.map(ov => (
+                    <div key={ov.uid}
+                      className="absolute h-full bg-accent/30 border border-accent/50 rounded text-[9px] text-accent flex items-center px-1.5 overflow-hidden cursor-pointer hover:bg-accent/50"
+                      style={{ left: ov.startTime * scale, width: Math.max((ov.endTime - ov.startTime) * scale, 40) }}
+                      onClick={e => { e.stopPropagation() }}>
+                      𝐓 {ov.text.slice(0, 12)}
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>
-          <button onClick={() => setExpResult(null)} className="opacity-60 hover:opacity-100 flex-shrink-0">✕</button>
+        </div>
+      </div>
+
+      {/* Export result */}
+      {expResult && (
+        <div className={`flex-shrink-0 px-5 py-2.5 text-xs flex items-start gap-3 ${expResult.ok ? 'bg-ok/10 border-t border-ok/20 text-ok' : 'bg-danger/10 border-t border-danger/20 text-danger'}`}>
+          <div className="flex-1 min-w-0">
+            <p>{expResult.msg}</p>
+            {expResult.command && (
+              <code className="block mt-1 text-[10px] bg-surface px-2 py-1 rounded text-text2 truncate cursor-pointer hover:whitespace-normal"
+                onClick={() => navigator.clipboard.writeText(expResult.command!)}
+                title="Cliquer pour copier la commande">
+                {expResult.command}
+              </code>
+            )}
+          </div>
+          <button onClick={() => setExpResult(null)} className="opacity-60 hover:opacity-100">✕</button>
         </div>
       )}
     </div>

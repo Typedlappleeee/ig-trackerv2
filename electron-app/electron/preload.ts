@@ -35,6 +35,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   pickOutputFile: (opts: { defaultName: string }) =>
     ipcRenderer.invoke('pick-output-file', opts),
 
+  // Fetch Instagram profile page via hidden browser (most reliable, bypasses API blocks)
+  fetchInstagramHtml: (username: string) => ipcRenderer.invoke('fetch-instagram-html', username),
+
   // Groq AI API call (returns chat completion)
   groqRequest: (opts: {
     apiKey: string

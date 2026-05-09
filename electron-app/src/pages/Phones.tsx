@@ -267,7 +267,18 @@ export function Phones({ user }: PhonesProps) {
       done++
       if (done < linked.length) await new Promise(r => setTimeout(r, 1500))
     }
-    setRefreshProgress(''); setRefreshing(false)
+    setRefreshProgress('')
+
+    // Auto-record views_history snapshot after every stats refresh
+    const refreshed = phones.filter(p => p.ig_username && p.total_views)
+    if (refreshed.length > 0) {
+      const now = new Date().toISOString()
+      await supabase.from('views_history').insert(
+        refreshed.map(p => ({ user_id: user.id, phone_id: p.id, views: p.total_views!, recorded_at: now }))
+      )
+    }
+
+    setRefreshing(false)
   }
 
   // ── Filtered view ─────────────────────────────────────────────────────────
@@ -311,15 +322,13 @@ export function Phones({ user }: PhonesProps) {
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           <Button variant="secondary" size="sm"
-            onClick={refreshIgStats} loading={refreshing} disabled={syncing || pollingStatus}>
-            {refreshing ? refreshProgress || '…' : '📊 Stats IG'}
+            onClick={refreshIgStats} loading={refreshing} disabled={syncing}
+            title="Récupère followers, vues et posts depuis Instagram pour chaque compte lié">
+            {refreshing ? refreshProgress || '…' : '📊 Stats Instagram'}
           </Button>
           <Button size="sm"
-            onClick={() => pollStatus(false)} loading={pollingStatus} disabled={syncing || refreshing || !bearer}>
-            ↺ Refresh
-          </Button>
-          <Button size="sm"
-            onClick={syncFromGeelark} loading={syncing} disabled={!bearer || refreshing || pollingStatus}>
+            onClick={syncFromGeelark} loading={syncing} disabled={!bearer || refreshing}
+            title="Importe / met à jour les téléphones depuis ton compte GéeLark">
             🔄 Sync GéeLark
           </Button>
         </div>
@@ -352,7 +361,7 @@ export function Phones({ user }: PhonesProps) {
 
       {/* Auto-refresh controls */}
       <div className="flex items-center gap-4 px-4 py-3 bg-card border border-border rounded-xl">
-        <span className="text-xs font-medium text-text">Auto-refresh</span>
+        <span className="text-xs font-medium text-text" title="Rafraîchit automatiquement le statut online/offline des téléphones GéeLark">Auto-statut</span>
 
         {/* Toggle */}
         <button

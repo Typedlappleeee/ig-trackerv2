@@ -1,7 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { useAuth }           from '@/hooks/useAuth'
+import { supabase }          from '@/lib/supabase'
 import { AuthPage }          from '@/components/auth/AuthPage'
+import { Onboarding }        from '@/components/Onboarding'
 import { Layout, type Page } from '@/components/Layout'
 import { Dashboard }         from '@/pages/Dashboard'
 import { Phones }            from '@/pages/Phones'
@@ -14,7 +16,16 @@ import { Settings }          from '@/pages/Settings'
 import { FullPageLoader }    from '@/components/ui/Spinner'
 
 function AppContent({ user }: { user: User }) {
-  const [page, setPage] = useState<Page>('dashboard')
+  const [page, setPage]               = useState<Page>('dashboard')
+  const [onboarding, setOnboarding]   = useState<boolean | null>(null)  // null = loading
+
+  useEffect(() => {
+    supabase.from('app_config').select('bearer_token').eq('user_id', user.id).single()
+      .then(({ data }) => { setOnboarding(!data?.bearer_token) })
+  }, [user.id])
+
+  if (onboarding === null) return <FullPageLoader />
+  if (onboarding) return <Onboarding user={user} onComplete={() => setOnboarding(false)} />
 
   const content = (() => {
     switch (page) {
