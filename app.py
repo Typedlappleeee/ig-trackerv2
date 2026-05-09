@@ -4225,7 +4225,36 @@ class App:
         vs = self._collapsible(left, "VIDÉOS SOURCE", open_by_default=True)
         vtop = tk.Frame(vs, bg=CARD)
         vtop.pack(fill="x", pady=(0, 8))
-        self._mk_btn(vtop, "+ Ajouter vidéos", "primary", self._add_videos,
+        def _add_videos_choice():
+            top = tk.Toplevel(self.root)
+            top.title("Ajouter des vidéos")
+            top.resizable(False, False)
+            top.configure(bg=SURFACE)
+            top.geometry("280x120")
+            top.grab_set()
+            tk.Label(top, text="Choisir la source", font=("Segoe UI", 10, "bold"),
+                     bg=SURFACE, fg=TEXT).pack(pady=(16, 10))
+            btn_row2 = tk.Frame(top, bg=SURFACE)
+            btn_row2.pack()
+            def _from_bank():
+                top.destroy()
+                self._open_bank_picker(lambda paths: [
+                    setattr(self, '_video_paths', list(dict.fromkeys(self._video_paths + list(paths)))),
+                    self._rebuild_video_grid(),
+                    self._select_video(0) if self._video_paths else None
+                ], multi=True)
+            def _from_pc():
+                top.destroy()
+                self._add_videos()
+            tk.Button(btn_row2, text="📦  Depuis la banque", font=("Segoe UI", 9, "bold"),
+                      bg=ACCENT, fg="#ffffff", relief="flat", cursor="hand2",
+                      padx=14, pady=8, activebackground=ACCENT2,
+                      command=_from_bank).pack(side="left", padx=(0, 8))
+            tk.Button(btn_row2, text="💾  Depuis le PC", font=("Segoe UI", 9, "bold"),
+                      bg=SURFACE2, fg=TEXT, relief="flat", cursor="hand2",
+                      padx=14, pady=8, activebackground=SURFACE3,
+                      command=_from_pc).pack(side="left")
+        self._mk_btn(vtop, "+ Ajouter vidéos", "primary", _add_videos_choice,
                      pady=5).pack(side="left")
         self._mk_btn(vtop, "Vider", "danger", self._clear_videos,
                      pady=5).pack(side="left", padx=(6, 0))
@@ -7119,7 +7148,7 @@ class App:
                  font=("Segoe UI", 7), bg="#0a0d15", fg="#3a4d66").pack(anchor="w", pady=(4, 0))
 
         # ══════════════════════════════════════════════════════════════════════
-        # RIGHT PANEL — Instagram-style card
+        # RIGHT PANEL — Instagram "New post" style card
         # ══════════════════════════════════════════════════════════════════════
         right = tk.Frame(body, bg=BG)
         right.pack(side="left", fill="both", expand=True, padx=(12, 0))
@@ -7128,177 +7157,177 @@ class App:
                                              border="#1a2235", border_w=1)
         card_outer.pack(fill="both", expand=True)
 
-        # Top bar
-        top_bar = tk.Frame(card, bg="#0b0f1a", padx=16, pady=12)
+        # ── Bottom buttons packed FIRST (side=bottom) ────────────────────────
+        tk.Frame(card, bg="#1a2235", height=1).pack(side="bottom", fill="x")
+        btn_row = tk.Frame(card, bg="#0b0f1a", padx=16, pady=12)
+        btn_row.pack(side="bottom", fill="x")
+
+        # ── Top bar ──────────────────────────────────────────────────────────
+        top_bar = tk.Frame(card, bg="#0b0f1a", padx=16, pady=14)
         top_bar.pack(fill="x")
-        tk.Label(top_bar, text="Mass Posting", font=("Segoe UI", 12, "bold"),
+        tk.Label(top_bar, text="Mass Posting", font=("Segoe UI", 13, "bold"),
                  bg="#0b0f1a", fg="#e8eaf0").pack(side="left")
         tk.Label(top_bar, text="1 vidéo / téléphone", font=("Segoe UI", 8),
                  bg="#0b0f1a", fg="#6b7a99").pack(side="left", padx=(10, 0))
         tk.Frame(card, bg="#1a2235", height=1).pack(fill="x")
 
-        # Launch / Stop buttons — packed bottom-first so canvas can fill remaining space
-        tk.Frame(card, bg="#1a2235", height=1).pack(side="bottom", fill="x")
-        btn_row = tk.Frame(card, bg="#0b0f1a", padx=16, pady=12)
-        btn_row.pack(side="bottom", fill="x")
-
-        # Scrollable content (wrapper keeps side="left"/"right" out of card's pack queue)
+        # ── Single scrollable column — NO nested canvases ────────────────────
+        # scroll_wrap isolates the side=left/right from card's pack manager
         scroll_wrap = tk.Frame(card, bg="#0b0f1a")
         scroll_wrap.pack(fill="both", expand=True)
-        rscroll_cv = tk.Canvas(scroll_wrap, bg="#0b0f1a", highlightthickness=0)
-        rscroll_vsb = ttk.Scrollbar(scroll_wrap, orient="vertical", command=rscroll_cv.yview)
+        rscroll_vsb = ttk.Scrollbar(scroll_wrap, orient="vertical")
+        rscroll_cv  = tk.Canvas(scroll_wrap, bg="#0b0f1a", highlightthickness=0,
+                                yscrollcommand=rscroll_vsb.set)
+        rscroll_vsb.config(command=rscroll_cv.yview)
         rscroll_inner = tk.Frame(rscroll_cv, bg="#0b0f1a")
         _rwin = rscroll_cv.create_window((0, 0), window=rscroll_inner, anchor="nw")
         rscroll_inner.bind("<Configure>",
                            lambda e: rscroll_cv.configure(scrollregion=rscroll_cv.bbox("all")))
         rscroll_cv.bind("<Configure>",
                         lambda e: rscroll_cv.itemconfig(_rwin, width=e.width))
-        rscroll_cv.configure(yscrollcommand=rscroll_vsb.set)
         rscroll_vsb.pack(side="right", fill="y")
         rscroll_cv.pack(side="left", fill="both", expand=True)
 
-        # Helper: make a canvas+scrollbar pair inside a fixed-height wrapper
-        # so rscroll_inner only ever sees fill="x" (side="top") children
-        def _cv_section(parent, height):
-            wrap = tk.Frame(parent, bg="#0b0f1a", height=height)
-            wrap.pack(fill="x")
-            wrap.pack_propagate(False)
-            vsb = ttk.Scrollbar(wrap, orient="vertical")
-            cv  = tk.Canvas(wrap, bg="#0b0f1a", highlightthickness=0,
-                            yscrollcommand=vsb.set)
-            vsb.config(command=cv.yview)
-            inner = tk.Frame(cv, bg="#0b0f1a")
-            win   = cv.create_window((0, 0), window=inner, anchor="nw")
-            inner.bind("<Configure>", lambda e: cv.configure(scrollregion=cv.bbox("all")))
-            cv.bind("<Configure>",    lambda e: cv.itemconfig(win, width=e.width))
-            vsb.pack(side="right", fill="y")
-            cv.pack(side="left", fill="both", expand=True)
-            return inner, cv
-
-        def _section_hdr(parent, title, right_widgets_fn=None):
-            row = tk.Frame(parent, bg="#0b0f1a", padx=16, pady=(12, 6))
+        # ── Utility: Instagram-style option row ───────────────────────────────
+        def _ig_row(parent, icon, label, right_fn=None, last=False):
+            row = tk.Frame(parent, bg="#0b0f1a", padx=16, pady=12)
             row.pack(fill="x")
-            tk.Label(row, text=title, font=("Segoe UI", 10, "bold"),
-                     bg="#0b0f1a", fg="#e8eaf0").pack(side="left")
-            if right_widgets_fn:
-                right_widgets_fn(row)
-            tk.Frame(parent, bg="#1a2235", height=1).pack(fill="x")
+            tk.Label(row, text=icon, font=("Segoe UI", 12), bg="#0b0f1a", fg="#8b93a8").pack(side="left", padx=(0, 10))
+            tk.Label(row, text=label, font=("Segoe UI", 9), bg="#0b0f1a", fg="#c9d1d9").pack(side="left")
+            if right_fn:
+                right_fn(row)
+            if not last:
+                tk.Frame(parent, bg="#1a2235", height=1).pack(fill="x")
+            return row
 
         # ── Phone selector ────────────────────────────────────────────────────
-        def _ph_right(row):
-            for txt, val in [("Tout", True), ("Aucun", False)]:
-                tk.Button(row, text=txt, font=("Segoe UI", 8),
-                          bg="#0d1520", fg="#6b7a99", relief="flat", cursor="hand2",
-                          padx=10, pady=3,
-                          command=lambda v=val: [x.set(v) for x in self._mp_phone_vars.values()]
-                          ).pack(side="right", padx=(4, 0))
+        ph_hdr = tk.Frame(rscroll_inner, bg="#0b0f1a", padx=16, pady=12)
+        ph_hdr.pack(fill="x")
+        tk.Label(ph_hdr, text="📱", font=("Segoe UI", 12), bg="#0b0f1a", fg="#8b93a8").pack(side="left", padx=(0, 10))
+        tk.Label(ph_hdr, text="Téléphones cibles", font=("Segoe UI", 9, "bold"),
+                 bg="#0b0f1a", fg="#c9d1d9").pack(side="left")
+        for txt, val in [("Tout", True), ("Aucun", False)]:
+            tk.Button(ph_hdr, text=txt, font=("Segoe UI", 8), bg="#0d1520", fg="#6b7a99",
+                      relief="flat", cursor="hand2", padx=10, pady=3,
+                      command=lambda v=val: [x.set(v) for x in self._mp_phone_vars.values()]
+                      ).pack(side="right", padx=(4, 0))
+        tk.Frame(rscroll_inner, bg="#1a2235", height=1).pack(fill="x")
 
-        _section_hdr(rscroll_inner, "📱  Téléphones", _ph_right)
-
-        ph_inner, ph_cv = _cv_section(rscroll_inner, 200)
-        self._mp_phone_inner  = ph_inner
+        # Phone rows go directly here — no nested canvas
+        self._mp_phone_inner  = tk.Frame(rscroll_inner, bg="#0b0f1a")
+        self._mp_phone_inner.pack(fill="x")
         self._mp_phone_vars   = {}
-        self._mp_phone_canvas = ph_cv
+        self._mp_phone_canvas = None  # no nested canvas
 
         tk.Frame(rscroll_inner, bg="#1a2235", height=1).pack(fill="x")
 
         # ── Assignment table ──────────────────────────────────────────────────
-        def _assign_right(row):
-            self._mp_assign_count = tk.Label(row, text="",
-                                              font=("Segoe UI", 8), bg="#0b0f1a", fg="#6b7a99")
-            self._mp_assign_count.pack(side="right")
+        assign_hdr = tk.Frame(rscroll_inner, bg="#0b0f1a", padx=16, pady=12)
+        assign_hdr.pack(fill="x")
+        tk.Label(assign_hdr, text="🎯", font=("Segoe UI", 12), bg="#0b0f1a", fg="#8b93a8").pack(side="left", padx=(0, 10))
+        tk.Label(assign_hdr, text="Assignation automatique", font=("Segoe UI", 9, "bold"),
+                 bg="#0b0f1a", fg="#c9d1d9").pack(side="left")
+        self._mp_assign_count = tk.Label(assign_hdr, text="", font=("Segoe UI", 8),
+                                          bg="#0b0f1a", fg="#6b7a99")
+        self._mp_assign_count.pack(side="right")
+        tk.Frame(rscroll_inner, bg="#1a2235", height=1).pack(fill="x")
 
-        _section_hdr(rscroll_inner, "🎯  Assignation automatique", _assign_right)
-
-        assign_inner, assign_cv = _cv_section(rscroll_inner, 160)
-        self._mp_assign_inner = assign_inner
-        self._mp_assign_cv    = assign_cv
+        # Assignment rows go directly here — no nested canvas
+        self._mp_assign_inner = tk.Frame(rscroll_inner, bg="#0b0f1a")
+        self._mp_assign_inner.pack(fill="x")
+        self._mp_assign_cv    = None  # no nested canvas
 
         def _mp_rebuild_assign():
             for w in self._mp_assign_inner.winfo_children():
                 w.destroy()
             phones = [pid for pid, v in self._mp_phone_vars.items() if v.get()]
-            vids = self._mp_vid_paths
+            vids   = self._mp_vid_paths
             if not phones or not vids:
                 tk.Label(self._mp_assign_inner,
                          text="Sélectionne des téléphones et ajoute des vidéos",
-                         font=("Segoe UI", 8), bg="#0b0f1a", fg="#3a4d66").pack(padx=16, pady=12)
+                         font=("Segoe UI", 8), bg="#0b0f1a", fg="#3a4d66").pack(padx=16, pady=10)
                 self._mp_assign_count.config(text="")
                 return
             self._mp_assign_count.config(
-                text=f"{len(phones)} tél. · {len(vids)} vidéo{'s' if len(vids)!=1 else ''}")
-            hrow = tk.Frame(self._mp_assign_inner, bg="#0d1520")
+                text=f"{len(phones)} tél · {len(vids)} vidéo{'s' if len(vids)!=1 else ''}")
+            # Column header
+            hrow = tk.Frame(self._mp_assign_inner, bg="#0c111a")
             hrow.pack(fill="x")
-            for lbl, side in [("TÉLÉPHONE", "left"), ("VIDÉO", "right")]:
-                tk.Label(hrow, text=lbl, font=("Consolas", 7, "bold"),
-                         bg="#0d1520", fg="#3a4d66", anchor="w").pack(
-                         side=side, padx=16, pady=4, fill="x", expand=True)
+            tk.Label(hrow, text="TÉLÉPHONE", font=("Consolas", 7, "bold"),
+                     bg="#0c111a", fg="#3a4d66", anchor="w").pack(
+                     side="left", padx=(16, 0), pady=5, fill="x", expand=True)
+            tk.Label(hrow, text="VIDÉO ASSIGNÉE", font=("Consolas", 7, "bold"),
+                     bg="#0c111a", fg="#3a4d66", anchor="w").pack(
+                     side="left", padx=(0, 16), pady=5, fill="x", expand=True)
             for i, pid in enumerate(phones):
-                vid_path   = vids[i % len(vids)]
-                vid_name   = Path(vid_path).name
+                vid_name   = Path(vids[i % len(vids)]).name
                 phone_name = self.data.get(pid, {}).get("phone_name", pid)
                 ig         = self.data.get(pid, {}).get("ig_username", "")
-                row_bg = "#0b0f1a" if i % 2 == 0 else "#0d1520"
+                row_bg = "#0b0f1a" if i % 2 == 0 else "#0d1122"
                 drow = tk.Frame(self._mp_assign_inner, bg=row_bg)
                 drow.pack(fill="x")
                 p_cell = tk.Frame(drow, bg=row_bg)
-                p_cell.pack(side="left", fill="x", expand=True, padx=(16, 8), pady=4)
-                tk.Label(p_cell, text=phone_name[:22], font=("Segoe UI", 8, "bold"),
+                p_cell.pack(side="left", fill="x", expand=True, padx=(16, 8), pady=5)
+                tk.Label(p_cell, text=phone_name[:24], font=("Segoe UI", 8, "bold"),
                          bg=row_bg, fg="#c9d1d9", anchor="w").pack(anchor="w")
                 if ig:
                     tk.Label(p_cell, text=f"@{ig}", font=("Segoe UI", 7),
                              bg=row_bg, fg="#4f8ef7", anchor="w").pack(anchor="w")
                 v_cell = tk.Frame(drow, bg=row_bg)
-                v_cell.pack(side="left", fill="x", expand=True, padx=(0, 16), pady=4)
-                tk.Label(v_cell, text=f"▶  {vid_name[:30]}", font=("Segoe UI", 8),
-                         bg=row_bg, fg="#4f8ef7", anchor="w").pack(anchor="w")
-            self._mp_assign_cv.configure(scrollregion=self._mp_assign_cv.bbox("all"))
+                v_cell.pack(side="left", fill="x", expand=True, padx=(0, 16), pady=5)
+                tk.Label(v_cell, text=f"▶  {vid_name[:32]}", font=("Segoe UI", 8),
+                         bg=row_bg, fg=ACCENT, anchor="w").pack(anchor="w")
+            rscroll_cv.after_idle(
+                lambda: rscroll_cv.configure(scrollregion=rscroll_cv.bbox("all")))
 
         self._mp_rebuild_assign = _mp_rebuild_assign
         tk.Frame(rscroll_inner, bg="#1a2235", height=1).pack(fill="x")
 
         # ── Config ────────────────────────────────────────────────────────────
-        _section_hdr(rscroll_inner, "⚙  Configuration")
-
         self._mp_max_var     = tk.IntVar(value=20)
         self._mp_stagger_var = tk.IntVar(value=5)
         self._mp_mode_var    = tk.StringVar(value="Séquentiel")
 
-        for lbl, var, frm, to in [
-            ("Max simultanés", self._mp_max_var, 1, 50),
-            ("Écart entre lancements (min)", self._mp_stagger_var, 0, 60),
+        for lbl, icon, var, frm, to in [
+            ("Max simultanés", "⚡", self._mp_max_var, 1, 50),
+            ("Délai entre posts (min)", "⏱", self._mp_stagger_var, 0, 60),
         ]:
-            cfg_row = tk.Frame(rscroll_inner, bg="#0b0f1a", padx=16, pady=8)
-            cfg_row.pack(fill="x")
-            tk.Label(cfg_row, text=lbl, font=("Segoe UI", 9),
-                     bg="#0b0f1a", fg="#8b93a8").pack(side="left", fill="x", expand=True)
-            tk.Spinbox(cfg_row, from_=frm, to=to, textvariable=var, width=5,
-                       bg="#0d1520", fg="#c9d1d9", relief="flat", font=("Segoe UI", 9),
-                       bd=0, buttonbackground="#141c2e",
-                       highlightthickness=1, highlightbackground="#1a2235",
-                       insertbackground="#c9d1d9").pack(side="right")
-            tk.Frame(rscroll_inner, bg="#141c2e", height=1).pack(fill="x", padx=16)
+            def _make_spinbox(parent, _var=var, _frm=frm, _to=to):
+                tk.Spinbox(parent, from_=_frm, to=_to, textvariable=_var, width=5,
+                           bg="#0d1520", fg="#c9d1d9", relief="flat", font=("Segoe UI", 9),
+                           bd=0, buttonbackground="#141c2e",
+                           highlightthickness=1, highlightbackground="#1a2235",
+                           insertbackground="#c9d1d9").pack(side="right")
+            _ig_row(rscroll_inner, icon, lbl, right_fn=_make_spinbox)
 
         tk.Frame(rscroll_inner, bg="#1a2235", height=1).pack(fill="x")
 
-        # ── Progress ──────────────────────────────────────────────────────────
-        _section_hdr(rscroll_inner, "📊  Progression")
+        # ── Progress rows (direct frame, no canvas) ───────────────────────────
+        prog_hdr = tk.Frame(rscroll_inner, bg="#0b0f1a", padx=16, pady=12)
+        prog_hdr.pack(fill="x")
+        tk.Label(prog_hdr, text="📊", font=("Segoe UI", 12), bg="#0b0f1a", fg="#8b93a8").pack(side="left", padx=(0, 10))
+        tk.Label(prog_hdr, text="Progression", font=("Segoe UI", 9, "bold"),
+                 bg="#0b0f1a", fg="#c9d1d9").pack(side="left")
+        tk.Frame(rscroll_inner, bg="#1a2235", height=1).pack(fill="x")
 
-        prog_inner, _prog_cv = _cv_section(rscroll_inner, 120)
-        self._mp_prog_inner  = prog_inner
+        self._mp_prog_inner  = tk.Frame(rscroll_inner, bg="#0b0f1a")
+        self._mp_prog_inner.pack(fill="x")
         self._mp_prog_labels = {}
 
         tk.Frame(rscroll_inner, bg="#1a2235", height=1).pack(fill="x")
 
-        # ── Log ───────────────────────────────────────────────────────────────
-        def _log_right(row):
-            tk.Button(row, text="Effacer", font=("Segoe UI", 8),
-                      bg="#0d1520", fg="#6b7a99", relief="flat", cursor="hand2",
-                      padx=8, pady=2, command=self._mp_log_clear).pack(side="right")
+        # ── Log (only this needs its own scrollbar) ───────────────────────────
+        log_hdr = tk.Frame(rscroll_inner, bg="#0b0f1a", padx=16, pady=10)
+        log_hdr.pack(fill="x")
+        tk.Label(log_hdr, text="📋", font=("Segoe UI", 12), bg="#0b0f1a", fg="#8b93a8").pack(side="left", padx=(0, 10))
+        tk.Label(log_hdr, text="Log", font=("Segoe UI", 9, "bold"),
+                 bg="#0b0f1a", fg="#c9d1d9").pack(side="left")
+        tk.Button(log_hdr, text="Effacer", font=("Segoe UI", 8), bg="#0d1520", fg="#6b7a99",
+                  relief="flat", cursor="hand2", padx=8, pady=2,
+                  command=self._mp_log_clear).pack(side="right")
+        tk.Frame(rscroll_inner, bg="#1a2235", height=1).pack(fill="x")
 
-        _section_hdr(rscroll_inner, "📋  Log", _log_right)
-
-        log_wrap = tk.Frame(rscroll_inner, bg="#080c14", height=180)
+        log_wrap = tk.Frame(rscroll_inner, bg="#080c14", height=200)
         log_wrap.pack(fill="x")
         log_wrap.pack_propagate(False)
         log_vsb = ttk.Scrollbar(log_wrap, orient="vertical")
@@ -7308,13 +7337,12 @@ class App:
                                     yscrollcommand=log_vsb.set, highlightthickness=0)
         log_vsb.config(command=self._mp_log_box.yview)
         log_vsb.pack(side="right", fill="y")
-        self._mp_log_box.pack(side="left", fill="both", expand=True, padx=(12, 0), pady=6)
+        self._mp_log_box.pack(side="left", fill="both", expand=True, padx=(12, 0), pady=8)
         for tag, col in [("ok", OK), ("warn", WARN), ("error", DANGER),
-                         ("accent", "#4f8ef7"), ("info", "#6b7a99")]:
+                         ("accent", ACCENT), ("info", "#6b7a99")]:
             self._mp_log_box.tag_config(tag, foreground=col)
 
-        # bottom padding
-        tk.Frame(rscroll_inner, bg="#0b0f1a", height=12).pack(fill="x")
+        tk.Frame(rscroll_inner, bg="#0b0f1a", height=16).pack(fill="x")
 
         self._mp_running   = [False]
         self._mp_stop_flag = [False]
@@ -7429,7 +7457,6 @@ class App:
                      font=("Segoe UI", 8), bg="#0b0f1a", fg="#3a4d66",
                      justify="center").pack(pady=20)
 
-        self._mp_phone_canvas.configure(scrollregion=self._mp_phone_canvas.bbox("all"))
         try:
             self._mp_rebuild_assign()
         except Exception:
