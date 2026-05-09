@@ -1,9 +1,9 @@
 import { createClient } from '@supabase/supabase-js'
 
-// Ces variables sont injectées par Vite au moment du build
-// → elles sont intégrées dans le .exe, l'utilisateur n'a rien à configurer
-const supabaseUrl  = import.meta.env.VITE_SUPABASE_URL  as string
-const supabaseKey  = import.meta.env.VITE_SUPABASE_ANON_KEY as string
+// Credentials intégrés directement (anon key = clé publique, safe à exposer)
+// Peuvent être surchargés via .env en développement
+const supabaseUrl  = (import.meta.env.VITE_SUPABASE_URL  as string) || 'https://fvmkmkspfksscgqyvysl.supabase.co'
+const supabaseKey  = (import.meta.env.VITE_SUPABASE_ANON_KEY as string) || 'sb_publishable_hip63djbBYnu3EsSx2gA4w_0tgjweEo'
 
 export const supabase = createClient(supabaseUrl, supabaseKey, {
   auth: {

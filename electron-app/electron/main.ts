@@ -1,5 +1,6 @@
 import { app, BrowserWindow, shell } from 'electron'
 import { fileURLToPath } from 'node:url'
+import { existsSync } from 'node:fs'
 import path from 'node:path'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -20,9 +21,12 @@ function createWindow() {
     backgroundColor: '#080b14',  // Fond sombre dès l'ouverture
     show: false,                  // On attend que la page soit chargée
     webPreferences: {
-      preload: path.join(__dirname, 'preload.mjs'),
-      contextIsolation: true,     // Sécurité : isole le renderer
-      nodeIntegration: false,     // Sécurité : pas d'accès Node dans React
+      preload: (() => {
+        const p = path.join(__dirname, 'preload.mjs')
+        return existsSync(p) ? p : undefined
+      })(),
+      contextIsolation: true,
+      nodeIntegration: false,
       sandbox: false,
     },
     // Style de la fenêtre
