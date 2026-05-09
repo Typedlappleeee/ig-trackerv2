@@ -19,6 +19,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   uploadVideoGeelark: (opts: { bearer: string; filePath: string }) =>
     ipcRenderer.invoke('upload-video-geelark', opts),
 
+  // Fetch an image as base64 data URL (proxy to bypass CORS/hotlink protection)
+  fetchImage: (opts: { url: string; headers?: Record<string, string> }) =>
+    ipcRenderer.invoke('fetch-image', opts),
+
   // Groq AI API call (returns chat completion)
   groqRequest: (opts: {
     apiKey: string

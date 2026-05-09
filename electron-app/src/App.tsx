@@ -8,6 +8,7 @@ import { Phones }            from '@/pages/Phones'
 import { Stats }             from '@/pages/Stats'
 import { Posting }           from '@/pages/Posting'
 import { Bank }              from '@/pages/Bank'
+import { Montage }           from '@/pages/Montage'
 import { AiTools }           from '@/pages/AiTools'
 import { Settings }          from '@/pages/Settings'
 import { FullPageLoader }    from '@/components/ui/Spinner'
@@ -22,6 +23,7 @@ function AppContent({ user }: { user: User }) {
       case 'stats':     return <Stats     user={user} />
       case 'posting':   return <Posting   user={user} />
       case 'bank':      return <Bank      user={user} />
+      case 'montage':   return <Montage   user={user} />
       case 'aitools':   return <AiTools   user={user} />
       case 'settings':  return <Settings  user={user} />
     }

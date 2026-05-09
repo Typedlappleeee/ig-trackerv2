@@ -1,7 +1,7 @@
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 
-export type Page = 'dashboard' | 'phones' | 'stats' | 'posting' | 'bank' | 'aitools' | 'settings'
+export type Page = 'dashboard' | 'phones' | 'stats' | 'posting' | 'bank' | 'montage' | 'aitools' | 'settings'
 
 interface LayoutProps {
   user: User
@@ -16,6 +16,7 @@ const NAV: { id: Page; icon: string; label: string }[] = [
   { id: 'stats',     icon: '📈', label: 'Stats IG'      },
   { id: 'posting',   icon: '🚀', label: 'Posting'       },
   { id: 'bank',      icon: '🎬', label: 'Banque vidéos' },
+  { id: 'montage',   icon: '🎞', label: 'Montage'       },
   { id: 'aitools',   icon: '✨', label: 'Outils IA'     },
   { id: 'settings',  icon: '⚙️', label: 'Paramètres'   },
 ]

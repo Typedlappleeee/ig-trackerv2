@@ -12,15 +12,25 @@ function LineChart({ data, color = '#4f9eff', height = 80 }: {
   color?: string
   height?: number
 }) {
-  if (data.length < 2) return (
+  if (data.length === 0) return (
     <div className="flex items-center justify-center text-text2 text-xs" style={{ height }}>
-      Pas assez de données
+      Pas de données — clique sur "📸 Snapshot" pour enregistrer les vues actuelles.
     </div>
   )
+  // Single point: draw a flat line at mid-height
+  const W = 600; const H = height
+  if (data.length === 1) {
+    const y = H / 2
+    return (
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height }}>
+        <line x1="0" y1={y} x2={W} y2={y} stroke={color} strokeWidth="2" strokeDasharray="6 4" strokeOpacity="0.5" />
+        <circle cx={W / 2} cy={y} r="4" fill={color} />
+      </svg>
+    )
+  }
   const max   = Math.max(...data.map(d => d.value), 1)
   const min   = Math.min(...data.map(d => d.value))
   const range = max - min || 1
-  const W = 600; const H = height
   const pts = data.map((d, i) => ({
     x: (i / (data.length - 1)) * W,
     y: H - ((d.value - min) / range) * (H - 10) - 5,
@@ -90,18 +100,14 @@ export function Dashboard({ user }: DashboardProps) {
     const rows = data ?? []
 
     if (rows.length === 0) {
-      // Fallback: use current phone stats as single point
-      const pts: ViewPoint[] = phones.map(p => ({
-        label: p.phone_name,
-        value: selectedPhone ? (selectedPhone.total_views ?? 0) : (p.total_views ?? 0),
-      }))
+      // No history yet — show a single current-views point as flat reference line
+      const totalNow = phones.reduce((s, p) => s + (p.total_views ?? 0), 0)
+      const today = new Date().toISOString().slice(0, 10)
       if (!selectedPhone) {
-        setChartData([{
-          label: 'Total',
-          value: phones.reduce((s, p) => s + (p.total_views ?? 0), 0),
-        }])
+        setChartData(totalNow > 0 ? [{ label: today, value: totalNow }] : [])
       } else {
-        setChartData(pts.filter(pt => pt.label === selectedPhone.phone_name))
+        const v = selectedPhone.total_views ?? 0
+        setChartData(v > 0 ? [{ label: today, value: v }] : [])
       }
       setKpiToday(null); setKpiDelta(null); setKpiPeak(null); setKpiAvg(null)
       setLC(false); return

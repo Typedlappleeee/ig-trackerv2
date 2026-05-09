@@ -93,6 +93,7 @@ export function Phones({ user }: PhonesProps) {
   const [countdown, setCountdown]     = useState(0)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [autoRefresh, setAutoRefresh] = useState(true)
+  const [pollError, setPollError]     = useState<string | null>(null)
 
   // Refs to use inside intervals without stale closure
   const bearerRef      = useRef('')
@@ -153,7 +154,11 @@ export function Phones({ user }: PhonesProps) {
         )
         await Promise.allSettled(updates)
       }
-    } catch { /* silent fail — don't show error for background poll */ }
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Erreur réseau'
+      setPollError(`Refresh échoué: ${msg}`)
+      setTimeout(() => setPollError(null), 8000)
+    }
     if (!silent) setPolling(false)
   }, [user.id])
 
@@ -398,6 +403,12 @@ export function Phones({ user }: PhonesProps) {
         <div className="px-4 py-3 rounded-lg bg-danger/10 border border-danger/20 text-danger text-sm flex justify-between">
           <span>{error}</span>
           <button onClick={() => setError(null)} className="opacity-60 hover:opacity-100 ml-3">✕</button>
+        </div>
+      )}
+      {pollError && (
+        <div className="px-4 py-2 rounded-lg bg-warn/10 border border-warn/20 text-warn text-xs flex justify-between">
+          <span>⚠ {pollError}</span>
+          <button onClick={() => setPollError(null)} className="opacity-60 hover:opacity-100 ml-3">✕</button>
         </div>
       )}
 

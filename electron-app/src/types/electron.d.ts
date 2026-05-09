@@ -25,6 +25,7 @@ interface ElectronAPI {
   geelarkRequest:    (opts: GeelarkRequestOptions) => Promise<GeelarkRequestResult>
   pickVideoFile:     () => Promise<string | null>
   uploadVideoGeelark:(opts: { bearer: string; filePath: string }) => Promise<{ ok: boolean; token?: string; error?: string }>
+  fetchImage:        (opts: { url: string; headers?: Record<string, string> }) => Promise<{ ok: boolean; dataUrl?: string; error?: string }>
   groqRequest:       (opts: GroqRequestOptions) => Promise<{ ok: boolean; data?: unknown; error?: string }>
 }
 

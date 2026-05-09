@@ -86,6 +86,26 @@ ipcMain.handle('upload-video-geelark', async (_event, opts: {
   }
 })
 
+// ── IPC: fetch image as base64 data URL (bypass CORS for CDN images) ─────────
+ipcMain.handle('fetch-image', async (_event, opts: { url: string; headers?: Record<string, string> }) => {
+  try {
+    const response = await net.fetch(opts.url, {
+      method: 'GET',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        ...(opts.headers ?? {}),
+      },
+    })
+    if (!response.ok) return { ok: false, error: `HTTP ${response.status}` }
+    const buffer = await response.arrayBuffer()
+    const contentType = response.headers.get('content-type') ?? 'image/jpeg'
+    const b64 = Buffer.from(buffer).toString('base64')
+    return { ok: true, dataUrl: `data:${contentType};base64,${b64}` }
+  } catch (err: unknown) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+})
+
 // ── IPC: Groq API call (proxy to avoid CORS) ────────────────────────────────
 ipcMain.handle('groq-request', async (_event, opts: {
   apiKey: string
