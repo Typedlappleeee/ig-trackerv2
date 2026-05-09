@@ -35,6 +35,7 @@ THEMES = {
     "Cyan":    {"accent": "#00e5d4", "accent2": "#00aaa0", "ok": "#00d4aa"},
     "Rose":    {"accent": "#ff6ec7", "accent2": "#cc1a8a", "ok": "#00d4aa"},
     "Vert":    {"accent": "#2dde78", "accent2": "#1aaa55", "ok": "#00d4aa"},
+    "Pixel":   {"accent": "#55aaff", "accent2": "#3377cc", "ok": "#55ff55"},
 }
 
 # ── Palette principale ────────────────────────────────────────────────────────
@@ -1281,6 +1282,9 @@ class App:
 
         self._setup_styles()
         self._build_layout()
+        # Restore pixel background if Pixel theme was saved
+        if self.cfg.get("theme") == "Pixel":
+            self.root.after(300, self._draw_pixel_bg)
         self._show_tab("phones")
         # First launch wizard (chained: beta → wizard if first run)
         if not self.cfg.get("first_run_done"):
@@ -10690,7 +10694,27 @@ class App:
         swatches_outer = tk.Frame(app_pan, bg=CARD)
         swatches_outer.pack(fill="x")
         cols = 4
+
+        # Easter egg: 7 rapid clicks on any swatch unlocks Pixel theme
+        _egg_state = {"count": 0, "last_time": 0.0, "last_theme": None}
+
+        def _on_swatch_click(tname):
+            import time as _time
+            now = _time.time()
+            if now - _egg_state["last_time"] > 2.0 or _egg_state["last_theme"] != tname:
+                _egg_state["count"] = 0
+                _egg_state["last_theme"] = tname
+            _egg_state["count"] += 1
+            _egg_state["last_time"] = now
+            if _egg_state["count"] >= 7:
+                _egg_state["count"] = 0
+                self._unlock_pixel_theme()
+            else:
+                self._apply_theme(tname)
+
         for idx, (tname, tvals) in enumerate(THEMES.items()):
+            if tname == "Pixel":
+                continue  # hidden from normal list until unlocked
             row_f = idx // cols
             col_f = idx % cols
             if col_f == 0:
@@ -10706,7 +10730,7 @@ class App:
             swatch_btn = tk.Button(
                 swatch_frame, bg=accent_c, width=4, height=2,
                 relief="flat", cursor="hand2",
-                command=lambda n=tname: self._apply_theme(n)
+                command=lambda n=tname: _on_swatch_click(n)
             )
             swatch_btn.pack()
             tk.Label(cell, text=tname, font=("Segoe UI", 9),
@@ -11045,12 +11069,149 @@ class App:
         import threading
         threading.Thread(target=run, daemon=True).start()
 
+    def _unlock_pixel_theme(self):
+        apply_theme_globals("Pixel")
+        self.cfg["theme"] = "Pixel"
+        save_config(self.cfg)
+        if hasattr(self, '_theme_active_lbl'):
+            self._theme_active_lbl.config(text="✨ Pixel", fg=ACCENT)
+        self._draw_pixel_bg()
+        # Flash toast
+        toast = tk.Toplevel(self.root)
+        toast.overrideredirect(True)
+        toast.attributes("-topmost", True)
+        rw = self.root.winfo_width()
+        rh = self.root.winfo_height()
+        rx = self.root.winfo_rootx()
+        ry = self.root.winfo_rooty()
+        tw, th = 340, 80
+        toast.geometry(f"{tw}x{th}+{rx + rw//2 - tw//2}+{ry + rh//2 - th//2}")
+        toast.configure(bg="#0a0e1a")
+        tk.Frame(toast, bg="#55aaff", height=2).pack(fill="x")
+        tk.Label(toast, text="🎮  Thème Pixel débloqué !",
+                 font=("Segoe UI", 13, "bold"), bg="#0a0e1a", fg="#55aaff").pack(expand=True)
+        tk.Label(toast, text="Easter egg trouvé — bien joué !",
+                 font=("Segoe UI", 9), bg="#0a0e1a", fg="#6688aa").pack()
+        tk.Frame(toast, bg="#55aaff", height=2).pack(fill="x")
+        self.root.after(2800, toast.destroy)
+
+    def _draw_pixel_bg(self):
+        cv = self.bg_canvas
+        cv.delete("pixel_bg")
+        w = self.root.winfo_width() or 1400
+        h = self.root.winfo_height() or 840
+
+        # Pixel grid — 32px blocks
+        BS = 32
+
+        def r(x, y, color, tag="pixel_bg"):
+            cv.create_rectangle(x, y, x + BS, y + BS, fill=color, outline="", tags=tag)
+
+        # Sky rows
+        sky_colors = ["#0a0e2a", "#0c1230", "#0e1535", "#101838"]
+        rows_sky = h // BS + 1
+        sky_row_count = max(rows_sky - 4, rows_sky - 4)
+        for gy in range(rows_sky):
+            col = sky_colors[min(gy, len(sky_colors) - 1)]
+            for gx in range(w // BS + 1):
+                r(gx * BS, gy * BS, col)
+
+        # Wall blocks — last 4 rows from bottom area
+        wall_top_row = rows_sky - 5
+        wall_colors = ["#8b4513", "#6b3410", "#a0521a", "#7a3d0f"]
+        for gy in range(wall_top_row, wall_top_row + 3):
+            for gx in range(w // BS + 1):
+                shade = wall_colors[(gx + gy) % len(wall_colors)]
+                r(gx * BS, gy * BS, shade)
+
+        # Floor rows — last 2 rows
+        floor_top_row = wall_top_row + 3
+        floor_colors = ["#8b0000", "#6b0000", "#990000", "#770000"]
+        for gy in range(floor_top_row, rows_sky + 1):
+            for gx in range(w // BS + 1):
+                shade = floor_colors[(gx + gy) % len(floor_colors)]
+                r(gx * BS, gy * BS, shade)
+
+        # Pixel stars in sky
+        import random as _rnd
+        _rnd.seed(42)
+        for _ in range(60):
+            sx = _rnd.randint(0, w)
+            sy = _rnd.randint(0, wall_top_row * BS - BS)
+            star_size = _rnd.choice([2, 3, 4])
+            cv.create_rectangle(sx, sy, sx + star_size, sy + star_size,
+                                 fill="#aaccff", outline="", tags="pixel_bg")
+
+        # ── Blue pixel robot (centered) ────────────────────────────────────────
+        cx = w // 2
+        # Robot stands on floor
+        robot_y = floor_top_row * BS - 7 * BS  # 7 blocks tall robot
+        robot_x = cx - 3 * BS
+
+        def rb(gx, gy, color):
+            x = robot_x + gx * BS
+            y = robot_y + gy * BS
+            cv.create_rectangle(x, y, x + BS, y + BS, fill=color, outline="#000820", tags="pixel_bg")
+
+        # Head (3×2)
+        head_blue = "#2255cc"
+        for hx in range(3):
+            rb(hx, 0, head_blue)
+            rb(hx, 1, head_blue)
+        # Eyes (white + black)
+        rb(0, 1, "#ffffff")
+        rb(2, 1, "#ffffff")
+        cv.create_rectangle(robot_x + 6, robot_y + BS + 6, robot_x + 14, robot_y + BS + 14,
+                             fill="#000000", outline="", tags="pixel_bg")
+        cv.create_rectangle(robot_x + 2 * BS + 6, robot_y + BS + 6, robot_x + 2 * BS + 14, robot_y + BS + 14,
+                             fill="#000000", outline="", tags="pixel_bg")
+        # Antenna
+        rb(1, -1, "#55aaff")
+
+        # Body (3×3)
+        body_blue = "#1a3a8f"
+        for bx in range(3):
+            for by in range(3):
+                rb(bx, 2 + by, body_blue)
+        # Chest light
+        rb(1, 3, "#55aaff")
+
+        # Arms
+        arm_blue = "#2244aa"
+        rb(-1, 2, arm_blue)
+        rb(-1, 3, arm_blue)
+        rb(3, 2, arm_blue)
+        rb(3, 3, arm_blue)
+
+        # Legs
+        leg_blue = "#162d70"
+        rb(0, 5, leg_blue)
+        rb(2, 5, leg_blue)
+        rb(0, 6, leg_blue)
+        rb(2, 6, leg_blue)
+
+        # Feet
+        rb(-1 + 1, 7, "#0d1f50")
+        rb(2, 7, "#0d1f50")
+
+        # Keep pixel bg behind UI
+        cv.tag_lower("pixel_bg")
+        # Ensure sidebar and main frame stay on top
+        if hasattr(self, '_sidebar_win'):
+            cv.tag_raise(self._sidebar_win)
+        if hasattr(self, '_main_win'):
+            cv.tag_raise(self._main_win)
+
     def _apply_theme(self, theme_name):
         apply_theme_globals(theme_name)
         self.cfg["theme"] = theme_name
         save_config(self.cfg)
         if hasattr(self, '_theme_active_lbl'):
             self._theme_active_lbl.config(text=theme_name, fg=ACCENT)
+        # Clear pixel bg if switching away from Pixel theme
+        if theme_name != "Pixel" and hasattr(self, 'bg_canvas'):
+            self.bg_canvas.delete("pixel_bg")
+            self.bg_canvas.configure(bg=BG)
         messagebox.showinfo("Thème", f"Thème « {theme_name} » appliqué.\nRedémarre l'app pour voir tous les changements.")
 
     def _browse_wallpaper(self):
