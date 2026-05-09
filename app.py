@@ -35,7 +35,7 @@ THEMES = {
     "Cyan":    {"accent": "#00e5d4", "accent2": "#00aaa0", "ok": "#00d4aa"},
     "Rose":    {"accent": "#ff6ec7", "accent2": "#cc1a8a", "ok": "#00d4aa"},
     "Vert":    {"accent": "#2dde78", "accent2": "#1aaa55", "ok": "#00d4aa"},
-    "Pixel":   {"accent": "#55aaff", "accent2": "#3377cc", "ok": "#55ff55"},
+    "67":      {"accent": "#55aaff", "accent2": "#3377cc", "ok": "#55ff55"},
 }
 
 # ── Palette principale ────────────────────────────────────────────────────────
@@ -1282,8 +1282,8 @@ class App:
 
         self._setup_styles()
         self._build_layout()
-        # Restore pixel background if Pixel theme was saved
-        if self.cfg.get("theme") == "Pixel":
+        # Restore pixel decoration if 67 theme was saved
+        if self.cfg.get("theme") == "67":
             self.root.after(300, self._draw_pixel_bg)
         self._show_tab("phones")
         # First launch wizard (chained: beta → wizard if first run)
@@ -2060,7 +2060,8 @@ class App:
               tip_accent="#a56ef5", bright=True)
 
         # Spacer pushes bottom items down
-        tk.Frame(self.sidebar, bg=SB_BG).pack(fill="both", expand=True)
+        self._sidebar_spacer = tk.Frame(self.sidebar, bg=SB_BG)
+        self._sidebar_spacer.pack(fill="both", expand=True)
 
         # ── Bottom section — account info card ─────────────────────────────────
         tk.Frame(self.sidebar, bg="#141c2e", height=1).pack(fill="x")
@@ -10701,7 +10702,8 @@ class App:
         def _on_swatch_click(tname):
             import time as _time
             now = _time.time()
-            if now - _egg_state["last_time"] > 2.0 or _egg_state["last_theme"] != tname:
+            reset = now - _egg_state["last_time"] > 2.0 or _egg_state["last_theme"] != tname
+            if reset:
                 _egg_state["count"] = 0
                 _egg_state["last_theme"] = tname
             _egg_state["count"] += 1
@@ -10709,11 +10711,12 @@ class App:
             if _egg_state["count"] >= 7:
                 _egg_state["count"] = 0
                 self._unlock_pixel_theme()
-            else:
+            elif _egg_state["count"] == 1:
+                # Only apply (and show messagebox) on the first click
                 self._apply_theme(tname)
 
         for idx, (tname, tvals) in enumerate(THEMES.items()):
-            if tname == "Pixel":
+            if tname == "67":
                 continue  # hidden from normal list until unlocked
             row_f = idx // cols
             col_f = idx % cols
@@ -11070,137 +11073,173 @@ class App:
         threading.Thread(target=run, daemon=True).start()
 
     def _unlock_pixel_theme(self):
-        apply_theme_globals("Pixel")
-        self.cfg["theme"] = "Pixel"
+        apply_theme_globals("67")
+        self.cfg["theme"] = "67"
         save_config(self.cfg)
         if hasattr(self, '_theme_active_lbl'):
-            self._theme_active_lbl.config(text="✨ Pixel", fg=ACCENT)
+            self._theme_active_lbl.config(text="✨ 67", fg=ACCENT)
+        # Full-screen celebration canvas — the actual visible pixel art reveal
+        self._show_pixel_celebration()
+        # Persistent sidebar decoration
         self._draw_pixel_bg()
-        # Flash toast
-        toast = tk.Toplevel(self.root)
-        toast.overrideredirect(True)
-        toast.attributes("-topmost", True)
-        rw = self.root.winfo_width()
-        rh = self.root.winfo_height()
+
+    def _show_pixel_celebration(self):
+        rw = self.root.winfo_width() or 1400
+        rh = self.root.winfo_height() or 840
         rx = self.root.winfo_rootx()
         ry = self.root.winfo_rooty()
-        tw, th = 340, 80
-        toast.geometry(f"{tw}x{th}+{rx + rw//2 - tw//2}+{ry + rh//2 - th//2}")
-        toast.configure(bg="#0a0e1a")
-        tk.Frame(toast, bg="#55aaff", height=2).pack(fill="x")
-        tk.Label(toast, text="🎮  Thème Pixel débloqué !",
-                 font=("Segoe UI", 13, "bold"), bg="#0a0e1a", fg="#55aaff").pack(expand=True)
-        tk.Label(toast, text="Easter egg trouvé — bien joué !",
-                 font=("Segoe UI", 9), bg="#0a0e1a", fg="#6688aa").pack()
-        tk.Frame(toast, bg="#55aaff", height=2).pack(fill="x")
-        self.root.after(2800, toast.destroy)
+        cel = tk.Toplevel(self.root)
+        cel.overrideredirect(True)
+        cel.attributes("-topmost", True)
+        cel.geometry(f"{rw}x{rh}+{rx}+{ry}")
+        cv = tk.Canvas(cel, bg="#0a0e2a", highlightthickness=0)
+        cv.pack(fill="both", expand=True)
+        self._draw_pixel_scene_on_canvas(cv, rw, rh)
+        # Unlock banner at center-top
+        bw, bh = 420, 90
+        bx, by = rw // 2, 80
+        cv.create_rectangle(bx - bw // 2, by - bh // 2, bx + bw // 2, by + bh // 2,
+                             fill="#0d1530", outline="#55aaff", width=2)
+        cv.create_text(bx, by - 18, text="🎮  Thème 67 débloqué !",
+                        font=("Segoe UI", 18, "bold"), fill="#55aaff", anchor="center")
+        cv.create_text(bx, by + 16, text="Easter egg trouvé — clique n'importe où pour fermer",
+                        font=("Segoe UI", 10), fill="#7090c0", anchor="center")
+        cv.bind("<Button-1>", lambda e: cel.destroy())
+        self.root.after(5000, lambda: cel.winfo_exists() and cel.destroy())
+
+    def _draw_pixel_scene_on_canvas(self, cv, w, h):
+        BS = 20  # block size in pixels
+        cols = w // BS + 2
+        rows = h // BS + 2
+
+        sky_palette = ["#0a0e2a", "#0b1030", "#0d1235", "#0f1438"]
+        wall_palette = ["#7a3a0c", "#8b4513", "#6b3010", "#9a4c18", "#5a2808", "#a05015"]
+        floor_palette = ["#7a0000", "#8b0000", "#660000", "#990000", "#550000", "#880000"]
+
+        floor_start = rows - 3
+        wall_start = rows - 6
+
+        # Sky
+        for gy in range(wall_start):
+            col = sky_palette[min(gy // 4, len(sky_palette) - 1)]
+            for gx in range(cols):
+                cv.create_rectangle(gx * BS, gy * BS, (gx + 1) * BS, (gy + 1) * BS,
+                                     fill=col, outline="", tags="pscene")
+        # Wall (brick pattern)
+        for gy in range(wall_start, floor_start):
+            for gx in range(cols):
+                shade_idx = (gx + gy * 3) % len(wall_palette)
+                # Mortar lines every other row at offset
+                if (gy % 2 == 0 and gx % 3 == 0) or (gy % 2 == 1 and gx % 3 == 2):
+                    fill = "#3a1a06"
+                else:
+                    fill = wall_palette[shade_idx]
+                cv.create_rectangle(gx * BS, gy * BS, (gx + 1) * BS, (gy + 1) * BS,
+                                     fill=fill, outline="", tags="pscene")
+        # Floor
+        for gy in range(floor_start, rows):
+            for gx in range(cols):
+                shade_idx = (gx + gy) % len(floor_palette)
+                if gx % 4 == 0 or gy == floor_start:
+                    fill = "#440000"
+                else:
+                    fill = floor_palette[shade_idx]
+                cv.create_rectangle(gx * BS, gy * BS, (gx + 1) * BS, (gy + 1) * BS,
+                                     fill=fill, outline="", tags="pscene")
+
+        # Stars in sky
+        import random as _rnd
+        _rnd.seed(99)
+        for _ in range(80):
+            sx = _rnd.randint(0, w)
+            sy = _rnd.randint(0, wall_start * BS - BS)
+            ss = _rnd.choice([2, 3, 3, 4])
+            cv.create_rectangle(sx, sy, sx + ss, sy + ss, fill="#c0d8ff", outline="", tags="pscene")
+
+        # ── Blue pixel robot ──────────────────────────────────────────────────
+        # Robot centered, standing on floor top edge
+        robot_cx = w // 2
+        robot_bot = floor_start * BS  # bottom of robot = top of floor
+        B = BS  # one block
+        # Robot is 5 blocks wide, 9 blocks tall
+        rx0 = robot_cx - 2 * B   # left edge of 5-wide body
+        ry0 = robot_bot - 9 * B  # top of robot
+
+        def blk(gx, gy, color, outline="#000820"):
+            x = rx0 + gx * B
+            y = ry0 + gy * B
+            cv.create_rectangle(x, y, x + B, y + B, fill=color, outline=outline, tags="pscene")
+
+        HEAD = "#1e4db5"
+        BODY = "#173a8f"
+        ARM  = "#1a3a99"
+        LEG  = "#112870"
+        FOOT = "#0c1f55"
+        EYE  = "#ffffff"
+        PUPIL = "#000000"
+        CHEST = "#55aaff"
+        ANT  = "#55aaff"
+        ANT2 = "#aaddff"
+
+        # Antenna (above head)
+        blk(2, 0, ANT2)
+        blk(2, 1, ANT)
+        # Head row 2-3 (5 wide at top, 3 wide neck below)
+        for hx in range(1, 4):
+            blk(hx, 2, HEAD)
+        for hx in range(1, 4):
+            blk(hx, 3, HEAD)
+        # Eyes
+        blk(1, 3, EYE)
+        blk(3, 3, EYE)
+        cv.create_rectangle(rx0 + B + 5, ry0 + 3 * B + 5, rx0 + B + B - 5, ry0 + 3 * B + B - 5,
+                             fill=PUPIL, outline="", tags="pscene")
+        cv.create_rectangle(rx0 + 3 * B + 5, ry0 + 3 * B + 5, rx0 + 3 * B + B - 5, ry0 + 3 * B + B - 5,
+                             fill=PUPIL, outline="", tags="pscene")
+        # Neck
+        blk(2, 4, "#152f80")
+        # Body (5 wide, 3 tall: rows 5-7)
+        for bx in range(5):
+            for by_ in range(5, 8):
+                blk(bx, by_, BODY)
+        # Arms (outside the 5-wide body: col -1 and 5)
+        for ay in range(5, 8):
+            blk(-1, ay, ARM)
+            blk(5, ay, ARM)
+        # Chest glow
+        blk(2, 6, CHEST)
+        # Legs (rows 8-9 at col 1 and 3)
+        blk(1, 8, LEG)
+        blk(3, 8, LEG)
+        blk(1, 9, LEG)
+        blk(3, 9, LEG)
+        # Feet
+        blk(0, 9, FOOT)
+        blk(1, 9, FOOT)
+        blk(3, 9, FOOT)
+        blk(4, 9, FOOT)
 
     def _draw_pixel_bg(self):
-        cv = self.bg_canvas
-        cv.delete("pixel_bg")
-        w = self.root.winfo_width() or 1400
-        h = self.root.winfo_height() or 840
-
-        # Pixel grid — 32px blocks
-        BS = 32
-
-        def r(x, y, color, tag="pixel_bg"):
-            cv.create_rectangle(x, y, x + BS, y + BS, fill=color, outline="", tags=tag)
-
-        # Sky rows
-        sky_colors = ["#0a0e2a", "#0c1230", "#0e1535", "#101838"]
-        rows_sky = h // BS + 1
-        sky_row_count = max(rows_sky - 4, rows_sky - 4)
-        for gy in range(rows_sky):
-            col = sky_colors[min(gy, len(sky_colors) - 1)]
-            for gx in range(w // BS + 1):
-                r(gx * BS, gy * BS, col)
-
-        # Wall blocks — last 4 rows from bottom area
-        wall_top_row = rows_sky - 5
-        wall_colors = ["#8b4513", "#6b3410", "#a0521a", "#7a3d0f"]
-        for gy in range(wall_top_row, wall_top_row + 3):
-            for gx in range(w // BS + 1):
-                shade = wall_colors[(gx + gy) % len(wall_colors)]
-                r(gx * BS, gy * BS, shade)
-
-        # Floor rows — last 2 rows
-        floor_top_row = wall_top_row + 3
-        floor_colors = ["#8b0000", "#6b0000", "#990000", "#770000"]
-        for gy in range(floor_top_row, rows_sky + 1):
-            for gx in range(w // BS + 1):
-                shade = floor_colors[(gx + gy) % len(floor_colors)]
-                r(gx * BS, gy * BS, shade)
-
-        # Pixel stars in sky
-        import random as _rnd
-        _rnd.seed(42)
-        for _ in range(60):
-            sx = _rnd.randint(0, w)
-            sy = _rnd.randint(0, wall_top_row * BS - BS)
-            star_size = _rnd.choice([2, 3, 4])
-            cv.create_rectangle(sx, sy, sx + star_size, sy + star_size,
-                                 fill="#aaccff", outline="", tags="pixel_bg")
-
-        # ── Blue pixel robot (centered) ────────────────────────────────────────
-        cx = w // 2
-        # Robot stands on floor
-        robot_y = floor_top_row * BS - 7 * BS  # 7 blocks tall robot
-        robot_x = cx - 3 * BS
-
-        def rb(gx, gy, color):
-            x = robot_x + gx * BS
-            y = robot_y + gy * BS
-            cv.create_rectangle(x, y, x + BS, y + BS, fill=color, outline="#000820", tags="pixel_bg")
-
-        # Head (3×2)
-        head_blue = "#2255cc"
-        for hx in range(3):
-            rb(hx, 0, head_blue)
-            rb(hx, 1, head_blue)
-        # Eyes (white + black)
-        rb(0, 1, "#ffffff")
-        rb(2, 1, "#ffffff")
-        cv.create_rectangle(robot_x + 6, robot_y + BS + 6, robot_x + 14, robot_y + BS + 14,
-                             fill="#000000", outline="", tags="pixel_bg")
-        cv.create_rectangle(robot_x + 2 * BS + 6, robot_y + BS + 6, robot_x + 2 * BS + 14, robot_y + BS + 14,
-                             fill="#000000", outline="", tags="pixel_bg")
-        # Antenna
-        rb(1, -1, "#55aaff")
-
-        # Body (3×3)
-        body_blue = "#1a3a8f"
-        for bx in range(3):
-            for by in range(3):
-                rb(bx, 2 + by, body_blue)
-        # Chest light
-        rb(1, 3, "#55aaff")
-
-        # Arms
-        arm_blue = "#2244aa"
-        rb(-1, 2, arm_blue)
-        rb(-1, 3, arm_blue)
-        rb(3, 2, arm_blue)
-        rb(3, 3, arm_blue)
-
-        # Legs
-        leg_blue = "#162d70"
-        rb(0, 5, leg_blue)
-        rb(2, 5, leg_blue)
-        rb(0, 6, leg_blue)
-        rb(2, 6, leg_blue)
-
-        # Feet
-        rb(-1 + 1, 7, "#0d1f50")
-        rb(2, 7, "#0d1f50")
-
-        # Keep pixel bg behind UI
-        cv.tag_lower("pixel_bg")
-        # Ensure sidebar and main frame stay on top
-        if hasattr(self, '_sidebar_win'):
-            cv.tag_raise(self._sidebar_win)
-        if hasattr(self, '_main_win'):
-            cv.tag_raise(self._main_win)
+        # Draw mini pixel art scene in the sidebar spacer area
+        if not hasattr(self, '_sidebar_spacer'):
+            return
+        # Remove old pixel canvas if any
+        if hasattr(self, '_sidebar_pixel_cv') and self._sidebar_pixel_cv:
+            try:
+                self._sidebar_pixel_cv.destroy()
+            except Exception:
+                pass
+        spw = self._sidebar_spacer.winfo_width() or 230
+        sph = min(self._sidebar_spacer.winfo_height() or 220, 260)
+        sph = max(sph, 180)
+        pac = tk.Canvas(self._sidebar_spacer, bg="#0a0e2a", highlightthickness=0,
+                        height=sph, width=spw)
+        pac.pack(fill="both", expand=True)
+        self._sidebar_pixel_cv = pac
+        # Draw the scene scaled to sidebar width
+        self._draw_pixel_scene_on_canvas(pac, spw, sph)
+        # Change canvas bg to dark sky (visible in the 1px gap between sidebar and main)
+        self.bg_canvas.configure(bg="#0a0e2a")
 
     def _apply_theme(self, theme_name):
         apply_theme_globals(theme_name)
@@ -11208,10 +11247,16 @@ class App:
         save_config(self.cfg)
         if hasattr(self, '_theme_active_lbl'):
             self._theme_active_lbl.config(text=theme_name, fg=ACCENT)
-        # Clear pixel bg if switching away from Pixel theme
-        if theme_name != "Pixel" and hasattr(self, 'bg_canvas'):
-            self.bg_canvas.delete("pixel_bg")
-            self.bg_canvas.configure(bg=BG)
+        # Remove pixel sidebar art when switching away from 67 theme
+        if theme_name != "67":
+            if hasattr(self, '_sidebar_pixel_cv') and self._sidebar_pixel_cv:
+                try:
+                    self._sidebar_pixel_cv.destroy()
+                except Exception:
+                    pass
+                self._sidebar_pixel_cv = None
+            if hasattr(self, 'bg_canvas'):
+                self.bg_canvas.configure(bg=BG)
         messagebox.showinfo("Thème", f"Thème « {theme_name} » appliqué.\nRedémarre l'app pour voir tous les changements.")
 
     def _browse_wallpaper(self):
