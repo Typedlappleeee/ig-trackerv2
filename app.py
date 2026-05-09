@@ -3200,41 +3200,40 @@ class App:
         self.link_var = tk.StringVar()
 
         # ── Column header bar ─────────────────────────────────────────────────
+        # Same columns as original treeview, GeeLark style
         # (key, width, anchor, label, expand)
         _COLS = [
-            ("chk",    34,  "center", "",                           False),
-            ("no",     52,  "center", "#",                          False),
-            ("cat",    60,  "center", "Catégorie",                  False),
-            ("serial", 210, "w",      "N° de série / Profile ID",   True),
-            ("name",   150, "w",      "Nom",                        False),
-            ("rem",    130, "center", "Remarques",                  False),
-            ("op",     110, "center", "Opération",                  False),
+            ("no",        42,  "center", "#",          False),
+            ("name",      170, "w",      "Téléphone",  False),
+            ("group",     100, "center", "Groupe",     False),
+            ("ig",        145, "w",      "@Instagram", False),
+            ("status",    115, "center", "Statut",     False),
+            ("followers",  90, "center", "Followers",  False),
+            ("views",      75, "center", "Vues",       False),
+            ("vids",       60, "center", "Vidéos",     False),
+            ("checked",    90, "center", "Vérifié",    False),
+            ("act",        42, "center", "⋮",          False),
         ]
         self._p_cols = _COLS
 
         hdr = tk.Frame(f, bg=P_HDR, height=36)
         hdr.pack(fill="x")
         hdr.pack_propagate(False)
-        tk.Frame(hdr, bg=P_SEP, width=1).pack(side="left", fill="y", pady=0)
         for i, (key, w, anc, label, exp) in enumerate(_COLS):
-            if exp:
-                cell = tk.Label(hdr, text=label,
-                                font=("Segoe UI", 8, "bold"),
-                                bg=P_HDR,
-                                fg=P_HFGA if label else P_HFGM,
-                                anchor=anc, padx=8)
+            cell = tk.Frame(hdr, bg=P_HDR, width=w)
+            if key == "ig":
                 cell.pack(side="left", fill="both", expand=True)
             else:
-                cell = tk.Frame(hdr, bg=P_HDR, width=w)
                 cell.pack(side="left", fill="y")
                 cell.pack_propagate(False)
-                if label:
-                    tk.Label(cell, text=label,
-                             font=("Segoe UI", 8, "bold"),
-                             bg=P_HDR,
-                             fg=P_HFGA if i > 1 else P_HFGM,
-                             anchor=anc).pack(fill="both", expand=True, padx=6)
-            tk.Frame(hdr, bg=P_SEP, width=1).pack(side="left", fill="y", pady=0)
+            tk.Label(cell, text=label,
+                     font=("Segoe UI", 8, "bold"),
+                     bg=P_HDR,
+                     fg=P_HFGA if i > 0 else P_HFGM,
+                     anchor=anc).pack(fill="both", expand=True, padx=6)
+            if i < len(_COLS) - 1:
+                tk.Frame(hdr, bg=P_SEP, width=1).pack(
+                    side="left", fill="y", pady=6)
 
         # ── Scrollable rows canvas ─────────────────────────────────────────────
         rows_outer = tk.Frame(f, bg=P_ODD)
@@ -3393,11 +3392,12 @@ class App:
 
         for i, iid in enumerate(iids):
             d      = self.data.get(iid, {})
+            vals   = self.tree.item(iid, "values")
             is_sel = (iid == sel)
             base   = c["SEL"] if is_sel else (c["ODD"] if i % 2 == 0 else c["EVEN"])
 
             row = tk.Frame(self._p_rows_inner, bg=base,
-                           height=58, cursor="hand2")
+                           height=52, cursor="hand2")
             row.pack(fill="x")
             row.pack_propagate(False)
             tk.Frame(row, bg=c["SEP"], height=1).pack(side="bottom", fill="x")
@@ -3405,92 +3405,97 @@ class App:
             inner = tk.Frame(row, bg=base)
             inner.pack(fill="both", expand=True)
 
-            def _mk_sep():
+            def _mk_sep(bg=base):
                 tk.Frame(inner, bg=c["SEP"], width=1).pack(
-                    side="left", fill="y", pady=0)
+                    side="left", fill="y", pady=4)
 
-            # ── Checkbox placeholder ──────────────────────────────────────────
-            cf = tk.Frame(inner, bg=base, width=34)
-            cf.pack(side="left", fill="y"); cf.pack_propagate(False)
-            cv2 = tk.Canvas(cf, bg=base, width=14, height=14,
-                            highlightthickness=0)
-            cv2.place(relx=0.5, rely=0.5, anchor="center")
-            cv2.create_rectangle(1, 1, 13, 13,
-                                 outline="#2e3d55", fill="", width=1)
-            _mk_sep()
+            def _cell(w, expand=False, bg=base):
+                f2 = tk.Frame(inner, bg=bg, width=w)
+                if expand:
+                    f2.pack(side="left", fill="both", expand=True)
+                else:
+                    f2.pack(side="left", fill="y")
+                    f2.pack_propagate(False)
+                return f2
+
+            def _lbl(parent, text, font=("Segoe UI", 9), fg=None, anchor="center",
+                     bg=base, padx=6):
+                fg = fg or c["TEXT"]
+                tk.Label(parent, text=text, font=font, bg=bg, fg=fg,
+                         anchor=anchor, padx=padx).pack(fill="both", expand=True)
 
             # ── # ─────────────────────────────────────────────────────────────
-            nf = tk.Frame(inner, bg=base, width=52)
-            nf.pack(side="left", fill="y"); nf.pack_propagate(False)
-            tk.Label(nf, text=str(i + 1), font=("Segoe UI", 10, "bold"),
-                     bg=base, fg=c["TEXT"], anchor="center").pack(
-                         fill="both", expand=True)
+            _lbl(_cell(42), str(i + 1),
+                 font=("Segoe UI", 9), fg=c["MUTED"], anchor="center")
             _mk_sep()
 
-            # ── Category icon ─────────────────────────────────────────────────
-            catf = tk.Frame(inner, bg=base, width=60)
-            catf.pack(side="left", fill="y"); catf.pack_propagate(False)
-            tk.Label(catf, text="📱", font=("Segoe UI", 14),
-                     bg=base, fg="#4f8ef7", anchor="center").pack(
-                         fill="both", expand=True)
-            _mk_sep()
-
-            # ── Serial / Profile ID (2 lines, expands) ────────────────────────
-            serf = tk.Frame(inner, bg=base)
-            serf.pack(side="left", fill="both", expand=True, padx=(8, 0))
-            tk.Label(serf, text=str(d.get("serial_no") or "—"),
-                     font=("Segoe UI", 10, "bold"),
-                     bg=base, fg=c["SER"], anchor="w").pack(
-                         fill="x", pady=(10, 0))
-            tk.Label(serf, text=str(iid),
-                     font=("Consolas", 8),
-                     bg=base, fg=c["PID"], anchor="w").pack(
-                         fill="x", pady=(0, 10))
-            _mk_sep()
-
-            # ── Name ──────────────────────────────────────────────────────────
-            nmf = tk.Frame(inner, bg=base, width=150)
-            nmf.pack(side="left", fill="y"); nmf.pack_propagate(False)
-            # Show IG username below name if linked
-            name_txt = d.get("phone_name", "—")
-            ig_txt   = ("@" + d["ig_username"]) if d.get("ig_username") else ""
-            tk.Label(nmf, text=name_txt, font=("Segoe UI", 10),
+            # ── Téléphone (name + serial below) ──────────────────────────────
+            nmf = _cell(170)
+            name_txt   = d.get("phone_name") or (vals[1] if vals else "—")
+            serial_txt = str(d.get("serial_no") or "")
+            tk.Label(nmf, text=name_txt, font=("Segoe UI", 9, "bold"),
                      bg=base, fg=c["TEXT"], anchor="w",
-                     padx=8).pack(fill="x", pady=(10, 0))
-            if ig_txt:
-                tk.Label(nmf, text=ig_txt, font=("Segoe UI", 8),
-                         bg=base, fg="#4f8ef7", anchor="w",
-                         padx=8).pack(fill="x", pady=(0, 10))
+                     padx=6).pack(fill="x", pady=(8, 0))
+            if serial_txt:
+                tk.Label(nmf, text=serial_txt,
+                         font=("Consolas", 7),
+                         bg=base, fg=c["PID"], anchor="w",
+                         padx=6).pack(fill="x", pady=(0, 8))
             _mk_sep()
 
-            # ── Remarks (group + status) ──────────────────────────────────────
-            remf = tk.Frame(inner, bg=base, width=130)
-            remf.pack(side="left", fill="y"); remf.pack_propagate(False)
-            st = d.get("ig_status", "")
-            st_txt = {
-                "active":  "✅ Actif",
-                "banned":  "❌ Banni",
-                "private": "🔒 Privé",
-            }.get(st, d.get("group_name") or "--")
-            st_fg = (OK if st == "active" else
-                     DANGER if st == "banned" else c["MUTED"])
-            tk.Label(remf, text=st_txt, font=("Segoe UI", 9),
-                     bg=base, fg=st_fg, anchor="center").pack(
-                         fill="both", expand=True)
+            # ── Groupe ────────────────────────────────────────────────────────
+            grp_txt = d.get("group_name") or (vals[2] if vals else "—") or "—"
+            _lbl(_cell(100), grp_txt, fg=c["MUTED"], anchor="center")
             _mk_sep()
 
-            # ── Operation ────────────────────────────────────────────────────
-            opf = tk.Frame(inner, bg=base, width=110)
-            opf.pack(side="left", fill="y"); opf.pack_propagate(False)
-            op_inner = tk.Frame(opf, bg=base)
-            op_inner.place(relx=0.5, rely=0.5, anchor="center")
-            and_btn = tk.Label(op_inner, text="🤖", font=("Segoe UI", 14),
-                               bg=base, fg=c["AND"], cursor="hand2")
-            and_btn.pack(side="left", padx=(0, 8))
-            dot_btn = tk.Label(op_inner, text="⋮", font=("Segoe UI", 14, "bold"),
-                               bg=base, fg=c["MUTED"], cursor="hand2",
-                               padx=4)
-            dot_btn.pack(side="left")
+            # ── @Instagram ────────────────────────────────────────────────────
+            igf = _cell(145, expand=True)
+            ig  = d.get("ig_username", "")
+            ig_disp = ("@" + ig) if ig else "—"
+            ig_fg   = "#4f8ef7" if ig else c["MUTED"]
+            _lbl(igf, ig_disp, fg=ig_fg, anchor="w", padx=8)
+            _mk_sep()
+
+            # ── Statut ────────────────────────────────────────────────────────
+            st     = d.get("ig_status", "")
+            st_map = {
+                "active":  ("● Actif",   OK),
+                "banned":  ("● Banni",   DANGER),
+                "private": ("● Privé",   WARN),
+                "error":   ("● Erreur",  WARN),
+            }
+            st_txt2, st_fg = st_map.get(
+                st, ("— Sans IG" if not ig else "○ Non vérifié",
+                     c["MUTED"]))
+            _lbl(_cell(115), st_txt2, fg=st_fg, anchor="center")
+            _mk_sep()
+
+            # ── Followers ─────────────────────────────────────────────────────
+            fol = vals[5] if vals else "—"
+            _lbl(_cell(90), str(fol), fg=c["TEXT"], anchor="center")
+            _mk_sep()
+
+            # ── Vues ──────────────────────────────────────────────────────────
+            views_v = vals[6] if vals else "—"
+            _lbl(_cell(75), str(views_v), fg=c["TEXT"], anchor="center")
+            _mk_sep()
+
+            # ── Vidéos ────────────────────────────────────────────────────────
+            vids_v = vals[7] if vals else "—"
+            _lbl(_cell(60), str(vids_v), fg=c["TEXT"], anchor="center")
+            _mk_sep()
+
+            # ── Vérifié ───────────────────────────────────────────────────────
+            chk_v = vals[8] if vals else "—"
+            _lbl(_cell(90), str(chk_v),
+                 font=("Segoe UI", 8), fg=c["MUTED"], anchor="center")
+            _mk_sep()
+
+            # ── ⋮ menu ────────────────────────────────────────────────────────
+            opf = _cell(42)
+            dot_btn = tk.Label(opf, text="⋮", font=("Segoe UI", 13, "bold"),
+                               bg=base, fg=c["MUTED"], cursor="hand2")
+            dot_btn.pack(fill="both", expand=True)
 
             # ── Bindings ──────────────────────────────────────────────────────
             def _click(e, iid2=iid, row2=row, base2=base, idx=i):
@@ -3503,9 +3508,7 @@ class App:
                 _set_bg_all(row2, c["SEL"])
                 self.sel_ids = [iid2]
                 self.tree.selection_set(iid2)
-                n = len(self.sel_ids)
-                self.sel_lbl.config(
-                    text=f"{n} sélectionné(s)" if n else "")
+                self.sel_lbl.config(text="1 sélectionné(s)")
 
             def _dbl(e, iid2=iid):
                 d2 = self.data.get(iid2, {})
@@ -3519,11 +3522,13 @@ class App:
                 self._show_phone_menu(e.x_root, e.y_root)
                 return "break"
 
-            for wgt in [row, inner, cf, nf, catf, serf, nmf, remf, opf]:
-                wgt.bind("<Button-1>", _click)
-                wgt.bind("<Double-1>", _dbl)
+            for wgt in row.winfo_children() + [row, inner]:
+                try:
+                    wgt.bind("<Button-1>", _click)
+                    wgt.bind("<Double-1>", _dbl)
+                except Exception:
+                    pass
             dot_btn.bind("<Button-1>", _dots)
-            and_btn.bind("<Button-1>", _dots)
 
             self._p_row_frames[iid] = row
 
