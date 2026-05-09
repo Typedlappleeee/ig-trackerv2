@@ -6832,6 +6832,63 @@ class App:
                                        fg=DANGER if n > 2200 else "#6b7a99")
         self.post_caption_box.bind("<KeyRelease>", _update_char)
 
+        # ── Generate caption button ───────────────────────────────────────────
+        gen_row = tk.Frame(cap_row, bg="#0b0f1a")
+        gen_row.pack(fill="x", pady=(8, 0))
+
+        _post_gen_btn = tk.Button(gen_row, text="✨  Générer une description",
+                                   font=("Segoe UI", 8, "bold"),
+                                   bg="#0d1520", fg="#8b93a8",
+                                   relief="flat", cursor="hand2", padx=12, pady=6,
+                                   activebackground="#141c2e")
+        _post_gen_btn.pack(side="left")
+
+        _post_gen_topic = tk.Entry(gen_row, bg="#080c14", fg="#c9d1d9",
+                                    insertbackground="#4f8ef7", relief="flat",
+                                    font=("Segoe UI", 8),
+                                    highlightthickness=1, highlightbackground="#1a2235")
+        _post_gen_topic.insert(0, "sujet / niche…")
+        _post_gen_topic.config(fg="#3a4d66")
+        _post_gen_topic.pack(side="left", fill="x", expand=True, padx=(8, 0), ipady=4)
+
+        def _topic_focus_in(e):
+            if _post_gen_topic.get() == "sujet / niche…":
+                _post_gen_topic.delete(0, "end")
+                _post_gen_topic.config(fg="#c9d1d9")
+        def _topic_focus_out(e):
+            if not _post_gen_topic.get().strip():
+                _post_gen_topic.insert(0, "sujet / niche…")
+                _post_gen_topic.config(fg="#3a4d66")
+        _post_gen_topic.bind("<FocusIn>",  _topic_focus_in)
+        _post_gen_topic.bind("<FocusOut>", _topic_focus_out)
+
+        def _post_generate():
+            existing = self.post_caption_box.get("1.0", "end").strip()
+            topic = _post_gen_topic.get().strip()
+            if topic == "sujet / niche…":
+                topic = ""
+            hint = f"Sujet : {topic}." if topic else (f"Contexte : {existing[:80]}." if existing else "")
+            if not hint and not self.post_vid_path[0]:
+                _post_gen_topic.focus_set()
+                return
+            vid_hint = f" Vidéo : {Path(self.post_vid_path[0]).stem}." if self.post_vid_path[0] else ""
+            prompt = (f"Écris une légende Instagram virale pour un Reel. {hint}{vid_hint} "
+                      f"Format : accroche forte (1 ligne), corps (2-3 lignes), CTA, "
+                      f"puis 15 hashtags pertinents. Max 220 mots. Réponds uniquement avec la légende.")
+            _post_gen_btn.config(text="⏳  Génération…", state="disabled", fg="#4f8ef7")
+            def _ok(text):
+                self.post_caption_box.delete("1.0", "end")
+                self.post_caption_box.insert("1.0", text)
+                _update_char()
+                _post_gen_btn.config(text="✨  Générer une description", state="normal", fg="#8b93a8")
+            def _err(msg):
+                _post_gen_btn.config(text="❌  " + msg[:40], state="normal", fg=DANGER)
+                self.root.after(3000, lambda: _post_gen_btn.config(
+                    text="✨  Générer une description", fg="#8b93a8"))
+            self._ai_groq_call(prompt, _ok, _err, max_tokens=350)
+
+        _post_gen_btn.config(command=_post_generate)
+
         # ── Option rows (Instagram-style) ─────────────────────────────────────
         def _option_row(parent, icon, label, right_widget=None):
             tk.Frame(parent, bg="#1a2235", height=1).pack(fill="x")
@@ -7048,22 +7105,74 @@ class App:
         linner = tk.Frame(left, bg="#0a0d15", padx=12, pady=10)
         linner.pack(fill="both", expand=True)
 
-        # Selected count label
+        # Video pool state
         self._mp_vid_paths = []
         self._mp_bank_card_vars = {}
         self._mp_bank_thumb_refs = []
         self._mp_vid_lb = None
-        self._mp_sel_count_lbl = tk.Label(linner, text="Aucune vidéo sélectionnée",
+        self._mp_selected_vid = [None]  # currently previewed video path
+
+        self._mp_sel_count_lbl = tk.Label(linner, text="Aucune vidéo — clique pour prévisualiser",
                                            font=("Segoe UI", 8), bg="#0a0d15",
                                            fg="#6b7a99", anchor="w", wraplength=220)
-        self._mp_sel_count_lbl.pack(fill="x", pady=(0, 6))
+        self._mp_sel_count_lbl.pack(fill="x", pady=(0, 4))
 
-        # Scrollable list of video names
+        # ── Video preview (portrait 9:16, hidden until a video is selected) ───
+        _mp_preview_wrap = tk.Frame(linner, bg="#000000", width=108, height=192,
+                                     highlightthickness=1, highlightbackground="#1a2235")
+        _mp_preview_wrap.pack(pady=(0, 6))
+        _mp_preview_wrap.pack_propagate(False)
+        _mp_preview_cv = tk.Canvas(_mp_preview_wrap, bg="#000000",
+                                    highlightthickness=0, width=108, height=192)
+        _mp_preview_cv.pack(fill="both", expand=True)
+        self._mp_preview_img_ref = None
+
+        def _mp_draw_empty_preview(text="Clique sur\nune vidéo"):
+            _mp_preview_cv.delete("all")
+            w, h = 108, 192
+            for k in range(20):
+                tt = k / 19
+                rr = int(0x08*(1-tt)+0x12*tt)
+                gg = int(0x0a*(1-tt)+0x16*tt)
+                bb = int(0x14*(1-tt)+0x28*tt)
+                _mp_preview_cv.create_rectangle(0, k*h/20, w, (k+1)*h/20,
+                                                 fill=f"#{rr:02x}{gg:02x}{bb:02x}", outline="")
+            _mp_preview_cv.create_text(w//2, h//2-10, text="📹", font=("Segoe UI", 18), fill="#2a3d5a")
+            _mp_preview_cv.create_text(w//2, h//2+20, text=text, fill="#3a4d66",
+                                        font=("Segoe UI", 7), justify="center")
+
+        _mp_draw_empty_preview()
+
+        def _mp_load_preview(path):
+            try:
+                from PIL import Image, ImageTk
+                import subprocess, tempfile, os
+                with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
+                    tmp_path = tmp.name
+                ffmpeg = "/usr/bin/ffmpeg"
+                subprocess.run(
+                    [ffmpeg, "-y", "-i", path, "-ss", "00:00:01", "-vframes", "1",
+                     "-vf", "scale=108:192:force_original_aspect_ratio=increase,crop=108:192",
+                     tmp_path],
+                    capture_output=True, timeout=8)
+                if os.path.exists(tmp_path) and os.path.getsize(tmp_path) > 0:
+                    img = Image.open(tmp_path).resize((108, 192), Image.LANCZOS)
+                    photo = ImageTk.PhotoImage(img)
+                    self._mp_preview_img_ref = photo
+                    _mp_preview_cv.delete("all")
+                    _mp_preview_cv.create_image(0, 0, anchor="nw", image=photo)
+                    os.unlink(tmp_path)
+                else:
+                    _mp_draw_empty_preview(Path(path).stem[:12])
+            except Exception:
+                _mp_draw_empty_preview(Path(path).stem[:12])
+
+        # ── Scrollable video list ─────────────────────────────────────────────
         _mp_list_outer = tk.Frame(linner, bg="#0d1520",
                                    highlightthickness=1, highlightbackground="#141c2e")
-        _mp_list_outer.pack(fill="both", expand=True, pady=(0, 8))
+        _mp_list_outer.pack(fill="x", pady=(0, 6))
         self._mp_pool_canvas = tk.Canvas(_mp_list_outer, bg="#0d1520",
-                                          highlightthickness=0, bd=0)
+                                          highlightthickness=0, bd=0, height=100)
         _pool_sb = ttk.Scrollbar(_mp_list_outer, orient="vertical",
                                    command=self._mp_pool_canvas.yview)
         self._mp_pool_canvas.configure(yscrollcommand=_pool_sb.set)
@@ -7086,29 +7195,62 @@ class App:
         self._mp_pool_canvas.bind("<MouseWheel>", _mp_pool_wheel)
         self._mp_pool_inner.bind("<MouseWheel>", _mp_pool_wheel)
 
+        def _mp_select_video(path):
+            """Called when user clicks a video row — load preview."""
+            self._mp_selected_vid[0] = path
+            threading.Thread(target=_mp_load_preview, args=(path,), daemon=True).start()
+            # Pre-fill caption from bank if available
+            try:
+                bank = load_bank()
+                for e in bank:
+                    if e.get("path") == path:
+                        cap = e.get("description") or e.get("caption") or ""
+                        if cap and not self._mp_cap_box.get("1.0", "end").strip():
+                            self._mp_cap_box.delete("1.0", "end")
+                            self._mp_cap_box.insert("1.0", cap)
+                        break
+            except Exception:
+                pass
+
         def _mp_on_pick(paths):
             self._mp_vid_paths = list(paths)
             self._mp_bank_card_vars = {p: tk.BooleanVar(value=True) for p in paths}
             n = len(paths)
             self._mp_sel_count_lbl.config(
-                text=f"{n} vidéo{'s' if n != 1 else ''} sélectionnée{'s' if n != 1 else ''}",
+                text=f"{n} vidéo{'s' if n != 1 else ''} · clique pour prévisualiser" if n else
+                     "Aucune vidéo — clique pour prévisualiser",
                 fg=ACCENT if n else "#6b7a99")
             for w2 in list(self._mp_pool_inner.winfo_children()):
                 try:
                     w2.destroy()
                 except Exception:
                     pass
+            if not paths:
+                _mp_draw_empty_preview()
+                self._mp_selected_vid[0] = None
             for i, p in enumerate(paths):
                 nm = Path(p).name
-                short = nm[:32] + "…" if len(nm) > 32 else nm
-                vrow = tk.Frame(self._mp_pool_inner, bg="#0d1520")
-                vrow.pack(fill="x", padx=4, pady=1)
-                tk.Label(vrow, text=f"{i+1}.", font=("Consolas", 8),
-                          bg="#0d1520", fg="#3a4d66", width=3).pack(side="left")
-                tk.Label(vrow, text="▶", font=("Segoe UI", 7),
-                          bg="#0d1520", fg=ACCENT).pack(side="left", padx=(0, 4))
-                tk.Label(vrow, text=short, font=("Segoe UI", 8),
-                          bg="#0d1520", fg="#c9d1d9", anchor="w").pack(side="left", fill="x")
+                short = nm[:28] + "…" if len(nm) > 28 else nm
+                vrow = tk.Frame(self._mp_pool_inner, bg="#0d1520", cursor="hand2")
+                vrow.pack(fill="x", padx=2, pady=1)
+                num_lbl  = tk.Label(vrow, text=f"{i+1}.", font=("Consolas", 8),
+                                    bg="#0d1520", fg="#3a4d66", width=3)
+                num_lbl.pack(side="left")
+                play_lbl = tk.Label(vrow, text="▶", font=("Segoe UI", 7),
+                                    bg="#0d1520", fg=ACCENT)
+                play_lbl.pack(side="left", padx=(0, 4))
+                name_lbl = tk.Label(vrow, text=short, font=("Segoe UI", 8),
+                                    bg="#0d1520", fg="#c9d1d9", anchor="w")
+                name_lbl.pack(side="left", fill="x")
+                for w2 in [vrow, num_lbl, play_lbl, name_lbl]:
+                    w2.bind("<Button-1>", lambda e, _p=p: _mp_select_video(_p))
+                    w2.bind("<Enter>",    lambda e, r=vrow: r.config(bg="#111827") or
+                            [c.config(bg="#111827") for c in r.winfo_children()])
+                    w2.bind("<Leave>",    lambda e, r=vrow: r.config(bg="#0d1520") or
+                            [c.config(bg="#0d1520") for c in r.winfo_children()])
+            # Auto-select first video
+            if paths:
+                _mp_select_video(paths[0])
             try:
                 self._mp_rebuild_assign()
             except Exception:
@@ -7120,32 +7262,70 @@ class App:
                    font=("Segoe UI", 9, "bold"),
                    bg=ACCENT, fg="#ffffff",
                    relief="flat", cursor="hand2", bd=0,
-                   padx=12, pady=9,
+                   padx=12, pady=8,
                    activebackground=ACCENT2,
                    command=lambda: self._open_bank_picker(_mp_on_pick, multi=True)
-                   ).pack(fill="x", pady=(0, 4))
+                   ).pack(fill="x", pady=(0, 3))
 
         def _mp_clear():
             _mp_on_pick([])
         tk.Button(linner, text="✕  Vider la sélection",
                   font=("Segoe UI", 8), bg="#0d1520", fg="#6b7a99",
-                  relief="flat", cursor="hand2", padx=8, pady=4,
+                  relief="flat", cursor="hand2", padx=8, pady=3,
                   command=_mp_clear).pack(fill="x", pady=(0, 4))
 
-        # Caption
+        # ── Caption + Generate ────────────────────────────────────────────────
         tk.Frame(left, bg="#141c2e", height=1).pack(fill="x")
         cap_section = tk.Frame(left, bg="#0a0d15", padx=12, pady=10)
         cap_section.pack(fill="x")
-        tk.Label(cap_section, text="💬  Caption", font=("Segoe UI", 9, "bold"),
-                 bg="#0a0d15", fg="#e8eaf0").pack(anchor="w", pady=(0, 6))
+
+        cap_hdr = tk.Frame(cap_section, bg="#0a0d15")
+        cap_hdr.pack(fill="x", pady=(0, 6))
+        tk.Label(cap_hdr, text="💬  Caption", font=("Segoe UI", 9, "bold"),
+                 bg="#0a0d15", fg="#e8eaf0").pack(side="left")
+
         self._mp_cap_box = tk.Text(cap_section, bg="#0d1520", fg="#c9d1d9",
                                     insertbackground="#c9d1d9", relief="flat",
-                                    height=5, font=("Segoe UI", 9), wrap="word",
+                                    height=4, font=("Segoe UI", 9), wrap="word",
                                     highlightthickness=1, highlightbackground="#141c2e",
                                     highlightcolor=ACCENT)
         self._mp_cap_box.pack(fill="x")
         tk.Label(cap_section, text="Partagée entre tous les téléphones",
-                 font=("Segoe UI", 7), bg="#0a0d15", fg="#3a4d66").pack(anchor="w", pady=(4, 0))
+                 font=("Segoe UI", 7), bg="#0a0d15", fg="#3a4d66").pack(anchor="w", pady=(3, 6))
+
+        # Generate description button
+        _mp_gen_btn = tk.Button(cap_section, text="✨  Générer une description",
+                                 font=("Segoe UI", 8, "bold"),
+                                 bg="#0d1520", fg="#8b93a8",
+                                 relief="flat", cursor="hand2", padx=10, pady=5,
+                                 activebackground="#141c2e")
+        _mp_gen_btn.pack(fill="x", pady=(0, 4))
+
+        def _mp_generate_caption():
+            vid = self._mp_selected_vid[0]
+            existing = self._mp_cap_box.get("1.0", "end").strip()
+            vid_hint = f" Vidéo : {Path(vid).stem}." if vid else ""
+            ctx_hint = f" Contexte : {existing[:80]}." if existing else ""
+            if not vid and not existing:
+                _mp_gen_btn.config(text="⚠  Sélectionne une vidéo d'abord", fg=WARN)
+                self.root.after(2500, lambda: _mp_gen_btn.config(
+                    text="✨  Générer une description", fg="#8b93a8"))
+                return
+            prompt = (f"Écris une légende Instagram virale pour un Reel.{vid_hint}{ctx_hint} "
+                      f"Format : accroche forte (1 ligne), corps (2-3 lignes), CTA, "
+                      f"puis 15 hashtags pertinents. Max 220 mots. Réponds uniquement avec la légende.")
+            _mp_gen_btn.config(text="⏳  Génération…", state="disabled", fg="#4f8ef7")
+            def _ok(text):
+                self._mp_cap_box.delete("1.0", "end")
+                self._mp_cap_box.insert("1.0", text)
+                _mp_gen_btn.config(text="✨  Générer une description", state="normal", fg="#8b93a8")
+            def _err(msg):
+                _mp_gen_btn.config(text="❌  " + msg[:38], state="normal", fg=DANGER)
+                self.root.after(3000, lambda: _mp_gen_btn.config(
+                    text="✨  Générer une description", fg="#8b93a8"))
+            self._ai_groq_call(prompt, _ok, _err, max_tokens=350)
+
+        _mp_gen_btn.config(command=_mp_generate_caption)
 
         # ══════════════════════════════════════════════════════════════════════
         # RIGHT PANEL — Instagram "New post" style card
@@ -7473,6 +7653,32 @@ class App:
     def _mp_refresh_bank_pool(self):
         """No-op: pool is now managed via the bank picker modal."""
         pass
+
+    def _ai_groq_call(self, prompt, on_success, on_error, max_tokens=400):
+        """Background Groq API call. Calls on_success(text) or on_error(msg) on main thread."""
+        def run():
+            try:
+                try:
+                    from groq import Groq
+                except ImportError:
+                    subprocess.run(
+                        [sys.executable, "-m", "pip", "install", "groq", "--quiet"],
+                        capture_output=True, timeout=60)
+                    from groq import Groq
+                key = self.cfg.get("groq_api_key", "")
+                if not key:
+                    raise ValueError("Clé API Groq manquante → Paramètres > API Keys")
+                client = Groq(api_key=key)
+                resp = client.chat.completions.create(
+                    model="llama-3.3-70b-versatile",
+                    messages=[{"role": "user", "content": prompt}],
+                    max_tokens=max_tokens)
+                result = resp.choices[0].message.content.strip()
+                self.root.after(0, lambda r=result: on_success(r))
+            except Exception as ex:
+                msg = str(ex)
+                self.root.after(0, lambda m=msg: on_error(m))
+        threading.Thread(target=run, daemon=True).start()
 
     def _mp_log(self, msg, level="info"):
         colors = {"ok": OK, "warn": WARN, "error": DANGER, "accent": ACCENT, "info": TEXT2}
