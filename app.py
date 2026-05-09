@@ -2269,7 +2269,10 @@ class App:
         if key == "bank":     self._refresh_bank()
         if key == "automation": self._refresh_auto_phones()
         if key == "masspost": self._mp_refresh_phones()
-        if key == "dashboard": self._dash_redraw_chart()
+        if key == "dashboard":
+            try: self._dash_refresh_sidebar()
+            except Exception: pass
+            self._dash_redraw_chart()
 
     def _on_global_scroll(self, event):
         """Route mousewheel only to widgets that genuinely need scrolling.
@@ -2333,15 +2336,21 @@ class App:
             return {}
 
     def _views_history_snapshot(self):
-        """Snapshot total views (sum across all phones / all videos) for today."""
+        """Snapshot views per account + total for today."""
         try:
-            total = 0
-            for d in self.data.values():
-                for v in d.get("videos", []) or []:
-                    total += int(v.get("views") or 0)
             today = datetime.now().strftime("%Y-%m-%d")
-            hist = self._views_history_load()
-            hist[today] = total
+            hist  = self._views_history_load()
+            entry = hist.get(today, {})
+
+            total = 0
+            for pid, d in self.data.items():
+                acct_views = sum(int(v.get("views") or 0)
+                                 for v in (d.get("videos") or []))
+                entry[pid] = acct_views
+                total += acct_views
+            entry["__total__"] = total
+
+            hist[today] = entry
             # Keep last 365 days
             keys = sorted(hist.keys())[-365:]
             hist = {k: hist[k] for k in keys}
@@ -2351,15 +2360,60 @@ class App:
         except Exception:
             pass
 
+    def _dash_hist_for(self, hist, pid):
+        """Extract a {date: value} series for a given pid (or '__total__')."""
+        out = {}
+        for date, entry in hist.items():
+            if isinstance(entry, dict):
+                out[date] = int(entry.get(pid, 0))
+            elif pid == "__total__":
+                out[date] = int(entry)   # old flat format
+        return out
+
     def _build_dashboard_tab(self):
         L = self.cfg.get("lang", "fr")
+        self._dash_selected_pid = "__total__"   # None = all, or a phone id
 
         f = tk.Frame(self.tab_container, bg=BG)
         self.tabs["dashboard"] = f
 
-        # ── Scrollable container ───────────────────────────────────────────────
-        scroll_cv = tk.Canvas(f, bg=BG, highlightthickness=0)
-        scroll_sb = ttk.Scrollbar(f, orient="vertical", command=scroll_cv.yview)
+        # ══════════════════════════════════════════════════════════════════════
+        # LEFT SIDEBAR — account list (OnlyFans style)
+        # ══════════════════════════════════════════════════════════════════════
+        sidebar = tk.Frame(f, bg="#0e1118", width=210)
+        sidebar.pack(side="left", fill="y")
+        sidebar.pack_propagate(False)
+
+        # Sidebar header
+        sb_hdr = tk.Frame(sidebar, bg="#0e1118", padx=12, pady=10)
+        sb_hdr.pack(fill="x")
+        tk.Label(sb_hdr, text=("Comptes" if L == "fr" else "Accounts"),
+                 font=("Segoe UI", 10, "bold"), bg="#0e1118", fg=TEXT).pack(anchor="w")
+
+        # Separator
+        tk.Frame(sidebar, bg=BORDER, height=1).pack(fill="x")
+
+        # Scrollable list
+        sb_cv = tk.Canvas(sidebar, bg="#0e1118", highlightthickness=0)
+        sb_cv.pack(fill="both", expand=True)
+        self._dash_sb_inner = tk.Frame(sb_cv, bg="#0e1118")
+        _sb_win = sb_cv.create_window((0, 0), window=self._dash_sb_inner, anchor="nw")
+        self._dash_sb_inner.bind("<Configure>",
+            lambda e: sb_cv.configure(scrollregion=sb_cv.bbox("all")))
+        sb_cv.bind("<Configure>",
+            lambda e: sb_cv.itemconfig(_sb_win, width=e.width))
+        self._bind_mousewheel(self._dash_sb_inner, sb_cv)
+        self._dash_sb_canvas = sb_cv
+        self._dash_sb_rows   = {}   # pid → row frame
+
+        # ══════════════════════════════════════════════════════════════════════
+        # RIGHT — scrollable content
+        # ══════════════════════════════════════════════════════════════════════
+        right_wrap = tk.Frame(f, bg=BG)
+        right_wrap.pack(side="left", fill="both", expand=True)
+
+        scroll_cv = tk.Canvas(right_wrap, bg=BG, highlightthickness=0)
+        scroll_sb = ttk.Scrollbar(right_wrap, orient="vertical", command=scroll_cv.yview)
         scroll_cv.configure(yscrollcommand=scroll_sb.set)
         scroll_sb.pack(side="right", fill="y")
         scroll_cv.pack(side="left", fill="both", expand=True)
@@ -2373,85 +2427,78 @@ class App:
                        lambda e: scroll_cv.itemconfig(_scroll_win, width=e.width))
         self._bind_mousewheel(inner, scroll_cv)
 
-        pad = dict(padx=20, pady=(0, 16))
+        pad = dict(padx=16, pady=(0, 14))
 
-        # ══════════════════════════════════════════════════════════════════════
-        # SECTION 1 — Earnings summary style
-        # ══════════════════════════════════════════════════════════════════════
-        summ_lbl = tk.Label(inner,
-                            text=("Résumé des vues" if L == "fr" else "Views summary"),
-                            font=("Segoe UI", 11, "bold"), bg=BG, fg=TEXT)
-        summ_lbl.pack(anchor="w", padx=20, pady=(14, 8))
+        # ── Section title (dynamic) ───────────────────────────────────────────
+        self._dash_title_lbl = tk.Label(inner, text="",
+                                         font=("Segoe UI", 11, "bold"),
+                                         bg=BG, fg=TEXT, anchor="w")
+        self._dash_title_lbl.pack(fill="x", padx=16, pady=(12, 8))
 
+        # ── Summary row ───────────────────────────────────────────────────────
         summ_row = tk.Frame(inner, bg=CARD,
                             highlightthickness=1, highlightbackground=BORDER)
         summ_row.pack(fill="x", **pad)
 
-        # Left: total icon + big number
-        tot_frame = tk.Frame(summ_row, bg=CARD, padx=24, pady=20)
+        tot_frame = tk.Frame(summ_row, bg=CARD, padx=20, pady=16)
         tot_frame.pack(side="left")
-
-        icon_circle = tk.Canvas(tot_frame, bg=ACCENT, width=46, height=46,
-                                highlightthickness=0)
-        icon_circle.pack()
-        icon_circle.create_oval(0, 0, 46, 46, fill=ACCENT, outline="")
-        icon_circle.create_text(23, 23, text="👁", font=("Segoe UI", 16))
-
-        tk.Label(tot_frame, text=("Total vues" if L == "fr" else "Total views"),
-                 font=("Segoe UI", 9), bg=CARD, fg=ACCENT).pack(pady=(6, 0))
+        self._dash_icon_cv = tk.Canvas(tot_frame, bg=ACCENT, width=46, height=46,
+                                        highlightthickness=0)
+        self._dash_icon_cv.pack()
+        self._dash_icon_cv.create_oval(0, 0, 46, 46, fill=ACCENT, outline="")
+        self._dash_icon_cv.create_text(23, 23, text="👁", font=("Segoe UI", 16))
+        self._dash_icon_sublbl = tk.Label(tot_frame,
+                                           text=("Total vues" if L == "fr" else "Total views"),
+                                           font=("Segoe UI", 9), bg=CARD, fg=ACCENT)
+        self._dash_icon_sublbl.pack(pady=(4, 0))
         self._dash_total_lbl = tk.Label(tot_frame, text="—",
-                                         font=("Segoe UI", 26, "bold"),
-                                         bg=CARD, fg=TEXT)
+                                         font=("Segoe UI", 24, "bold"), bg=CARD, fg=TEXT)
         self._dash_total_lbl.pack()
 
-        # Separator
-        tk.Frame(summ_row, bg=BORDER, width=1).pack(side="left", fill="y",
-                                                      padx=(0, 0), pady=12)
+        tk.Frame(summ_row, bg=BORDER, width=1).pack(side="left", fill="y", pady=10)
 
-        # Right: 2×3 grid of stat mini-cards
         grid_frame = tk.Frame(summ_row, bg=CARD)
-        grid_frame.pack(side="left", fill="both", expand=True, padx=10, pady=10)
+        grid_frame.pack(side="left", fill="both", expand=True, padx=8, pady=8)
 
         self._dash_kpis = {}
         stat_defs = [
-            ("today",   "👁",  ("Vues aujourd'hui" if L == "fr" else "Today's views"),   ACCENT),
-            ("delta",   "📈",  ("Croissance"       if L == "fr" else "Growth"),           OK),
-            ("phones",  "📱",  ("Téléphones actifs" if L == "fr" else "Active phones"),   "#5b9cf6"),
-            ("peak",    "🏆",  ("Record journalier" if L == "fr" else "Daily peak"),      WARN),
-            ("avg",     "📊",  ("Moyenne / jour"   if L == "fr" else "Daily average"),    TEXT2),
-            ("banned",  "🚫",  ("Bannis"           if L == "fr" else "Banned"),           DANGER),
+            ("today",  "👁",  ("Vues aujourd'hui" if L == "fr" else "Today's views"), ACCENT),
+            ("delta",  "📈",  ("Croissance"       if L == "fr" else "Growth"),        OK),
+            ("extra1", "📱",  ("Téléphones actifs" if L == "fr" else "Active phones"),"#5b9cf6"),
+            ("peak",   "🏆",  ("Record journalier" if L == "fr" else "Daily peak"),   WARN),
+            ("avg",    "📊",  ("Moyenne / jour"   if L == "fr" else "Daily avg"),     TEXT2),
+            ("extra2", "🚫",  ("Bannis"           if L == "fr" else "Banned"),        DANGER),
         ]
+        self._dash_stat_defs = stat_defs
         for idx, (k, ico, lbl, col) in enumerate(stat_defs):
             r, c = divmod(idx, 3)
             cell = tk.Frame(grid_frame, bg=SURFACE2,
                             highlightthickness=1, highlightbackground=BORDER)
-            cell.grid(row=r, column=c, padx=4, pady=4, sticky="nsew")
+            cell.grid(row=r, column=c, padx=3, pady=3, sticky="nsew")
             grid_frame.columnconfigure(c, weight=1)
             top_r = tk.Frame(cell, bg=SURFACE2)
             top_r.pack(fill="x", padx=10, pady=(8, 0))
             val_lbl = tk.Label(top_r, text="—",
                                font=("Segoe UI", 18, "bold"), bg=SURFACE2, fg=col)
             val_lbl.pack(side="left")
-            # small icon circle
-            ico_cv = tk.Canvas(top_r, bg=SURFACE3, width=30, height=30,
+            ico_cv = tk.Canvas(top_r, bg=SURFACE3, width=28, height=28,
                                highlightthickness=0)
             ico_cv.pack(side="right")
-            ico_cv.create_oval(1, 1, 29, 29, fill=SURFACE3, outline=col, width=1)
-            ico_cv.create_text(15, 15, text=ico, font=("Segoe UI", 11))
-            tk.Label(cell, text=lbl, font=("Segoe UI", 8), bg=SURFACE2,
-                     fg=TEXT2).pack(anchor="w", padx=10, pady=(2, 8))
-            self._dash_kpis[k] = val_lbl
+            ico_cv.create_oval(1, 1, 27, 27, fill=SURFACE3, outline=col, width=1)
+            ico_cv.create_text(14, 14, text=ico, font=("Segoe UI", 10))
+            lbl_w = tk.Label(cell, text=lbl, font=("Segoe UI", 8),
+                             bg=SURFACE2, fg=TEXT2)
+            lbl_w.pack(anchor="w", padx=10, pady=(2, 8))
+            self._dash_kpis[k]          = val_lbl
+            self._dash_kpis[k + "_lbl"] = lbl_w   # store label widget too
 
-        # ══════════════════════════════════════════════════════════════════════
-        # SECTION 2 — Bar chart (Earnings trends style)
-        # ══════════════════════════════════════════════════════════════════════
+        # ── Trends section ────────────────────────────────────────────────────
         trend_hdr = tk.Frame(inner, bg=BG)
-        trend_hdr.pack(fill="x", padx=20, pady=(0, 6))
+        trend_hdr.pack(fill="x", padx=16, pady=(0, 6))
         tk.Label(trend_hdr,
                  text=("Tendances des vues" if L == "fr" else "Views trends"),
                  font=("Segoe UI", 11, "bold"), bg=BG, fg=TEXT).pack(side="left")
 
-        # Range buttons
         self._dash_range = tk.StringVar(value="30d")
         self._dash_range_btns = {}
         rng_frame = tk.Frame(trend_hdr, bg=BG)
@@ -2464,22 +2511,132 @@ class App:
             b.pack(side="left", padx=(0, 4))
             self._dash_range_btns[code] = b
 
-        # Chart container
         chart_frame = tk.Frame(inner, bg=CARD,
                                highlightthickness=1, highlightbackground=BORDER)
         chart_frame.pack(fill="x", **pad)
 
         self._dash_chart = tk.Canvas(chart_frame, bg=CARD,
-                                      highlightthickness=0, height=300)
-        self._dash_chart.pack(fill="both", expand=True, padx=0, pady=0)
+                                      highlightthickness=0, height=280)
+        self._dash_chart.pack(fill="both", expand=True)
         self._dash_chart.bind("<Configure>", lambda e: self._dash_redraw_chart())
         self._dash_chart.bind("<Motion>",    self._dash_on_hover)
         self._dash_chart.bind("<Leave>",     lambda e: self._dash_hide_tooltip())
-        self._dash_bar_rects = []   # list of (x1, x2, bar_top, value, key_str)
+        self._dash_bar_rects   = []
         self._dash_tooltip_ids = []
 
+        # Populate sidebar + draw chart
+        self._dash_refresh_sidebar()
         self._dash_set_range("30d")
         self.root.after(300, self._dash_redraw_chart)
+
+    def _dash_refresh_sidebar(self):
+        """Rebuild the account list in the sidebar."""
+        inner = self._dash_sb_inner
+        for w in inner.winfo_children():
+            w.destroy()
+        self._dash_sb_rows = {}
+        L = self.cfg.get("lang", "fr")
+
+        def _select(pid):
+            self._dash_selected_pid = pid
+            self._dash_refresh_sidebar()
+            self._dash_redraw_chart()
+
+        # Colour palette for avatars
+        AVATAR_COLORS = ["#3b5bdb", "#2f9e44", "#c2255c", "#e8590c",
+                         "#5c7cfa", "#0ca678", "#f76707", "#9c36b5"]
+
+        # "Tous les comptes" row
+        is_total = (self._dash_selected_pid == "__total__")
+        _all_bg = "#1e2a4a" if is_total else "#0e1118"
+        all_row = tk.Frame(inner, bg=_all_bg, cursor="hand2")
+        all_row.pack(fill="x")
+        all_row.bind("<Button-1>", lambda e: _select("__total__"))
+        # left accent bar
+        tk.Frame(all_row, bg=ACCENT if is_total else "#0e1118",
+                 width=3).pack(side="left", fill="y")
+        av = tk.Canvas(all_row, bg="#3b5bdb", width=32, height=32,
+                       highlightthickness=0)
+        av.pack(side="left", padx=(8, 8), pady=8)
+        av.create_oval(0, 0, 32, 32, fill="#3b5bdb", outline="")
+        av.create_text(16, 16, text="📊", font=("Segoe UI", 12))
+        av.bind("<Button-1>", lambda e: _select("__total__"))
+        name_lbl = tk.Label(all_row,
+                            text=("Tous les comptes" if L == "fr" else "All accounts"),
+                            font=("Segoe UI", 9, "bold" if is_total else "normal"),
+                            bg=_all_bg, fg=TEXT if is_total else TEXT2,
+                            cursor="hand2")
+        name_lbl.pack(side="left", anchor="w")
+        name_lbl.bind("<Button-1>", lambda e: _select("__total__"))
+
+        tk.Frame(inner, bg=BORDER, height=1).pack(fill="x")
+
+        # Per-phone rows
+        phones = [(pid, d) for pid, d in self.data.items() if d.get("phone_name")]
+        phones.sort(key=lambda x: x[1].get("phone_name", ""))
+
+        for i, (pid, d) in enumerate(phones):
+            name  = d.get("phone_name", pid)
+            ig    = d.get("ig_username", "") or ""
+            status = d.get("ig_status", "")
+            dot_col = OK if status == "active" else (DANGER if status == "banned" else MUTED)
+            is_sel = (self._dash_selected_pid == pid)
+            row_bg = "#1e2a4a" if is_sel else "#0e1118"
+            av_col = AVATAR_COLORS[i % len(AVATAR_COLORS)]
+            initials = (name[:2]).upper()
+
+            row = tk.Frame(inner, bg=row_bg, cursor="hand2")
+            row.pack(fill="x")
+            self._dash_sb_rows[pid] = row
+
+            def _bind_row(w, p=pid):
+                w.bind("<Button-1>", lambda e: _select(p))
+                w.bind("<Enter>",
+                       lambda e, r=row, bg=row_bg: r.config(
+                           bg="#16203a" if bg == "#0e1118" else bg))
+                w.bind("<Leave>",
+                       lambda e, r=row, bg=row_bg: r.config(bg=bg))
+
+            # Left accent bar
+            acc = tk.Frame(row, bg=ACCENT if is_sel else row_bg, width=3)
+            acc.pack(side="left", fill="y")
+            _bind_row(acc)
+
+            # Avatar circle
+            av2 = tk.Canvas(row, bg=av_col, width=32, height=32,
+                            highlightthickness=0)
+            av2.pack(side="left", padx=(8, 8), pady=8)
+            av2.create_oval(0, 0, 32, 32, fill=av_col, outline="")
+            av2.create_text(16, 16, text=initials,
+                            fill="#fff", font=("Segoe UI", 10, "bold"))
+            _bind_row(av2)
+
+            # Name + IG handle
+            txt_frame = tk.Frame(row, bg=row_bg)
+            txt_frame.pack(side="left", fill="x", expand=True)
+            n_lbl = tk.Label(txt_frame, text=name[:20],
+                             font=("Segoe UI", 9, "bold" if is_sel else "normal"),
+                             bg=row_bg, fg=TEXT if is_sel else TEXT2,
+                             cursor="hand2", anchor="w")
+            n_lbl.pack(anchor="w")
+            if ig:
+                ig_lbl = tk.Label(txt_frame, text=f"@{ig[:18]}",
+                                  font=("Segoe UI", 7), bg=row_bg,
+                                  fg=MUTED, cursor="hand2", anchor="w")
+                ig_lbl.pack(anchor="w")
+                _bind_row(ig_lbl)
+            _bind_row(txt_frame); _bind_row(n_lbl); _bind_row(row)
+
+            # Status dot
+            dot = tk.Canvas(row, bg=row_bg, width=10, height=10,
+                            highlightthickness=0)
+            dot.pack(side="right", padx=(0, 10))
+            dot.create_oval(1, 1, 9, 9, fill=dot_col, outline="")
+            _bind_row(dot)
+
+        # Trigger scrollregion update
+        self._dash_sb_canvas.configure(
+            scrollregion=self._dash_sb_canvas.bbox("all"))
 
     def _dash_on_hover(self, event):
         cv = self._dash_chart
@@ -2547,18 +2704,43 @@ class App:
         cv = getattr(self, "_dash_chart", None)
         if not cv or not cv.winfo_exists():
             return
-        L = self.cfg.get("lang", "fr")
-        hist = self._views_history_load()
+        L   = self.cfg.get("lang", "fr")
+        pid = getattr(self, "_dash_selected_pid", "__total__")
+        is_total = (pid == "__total__")
 
-        # Always include today (live)
+        raw_hist = self._views_history_load()
+
+        # Always add live today entry
         try:
-            today_total = sum(
-                int(v.get("views") or 0)
-                for d in self.data.values()
-                for v in (d.get("videos") or []))
             today = datetime.now().strftime("%Y-%m-%d")
-            hist = dict(hist)
-            hist[today] = today_total
+            raw_hist = dict(raw_hist)
+            today_entry = dict(raw_hist.get(today, {})) if isinstance(
+                raw_hist.get(today), dict) else {}
+            total_live = 0
+            for apid, d in self.data.items():
+                v = sum(int(x.get("views") or 0) for x in (d.get("videos") or []))
+                today_entry[apid] = v
+                total_live += v
+            today_entry["__total__"] = total_live
+            raw_hist[today] = today_entry
+        except Exception:
+            pass
+
+        # Extract per-pid series
+        hist = self._dash_hist_for(raw_hist, pid)
+
+        # Update dashboard title + icon sublabel
+        try:
+            if is_total:
+                self._dash_title_lbl.config(
+                    text=("Résumé des vues" if L == "fr" else "Views summary"))
+                self._dash_icon_sublbl.config(
+                    text=("Total vues" if L == "fr" else "Total views"))
+            else:
+                pname = self.data.get(pid, {}).get("phone_name", pid)
+                self._dash_title_lbl.config(text=f"📱  {pname}")
+                self._dash_icon_sublbl.config(
+                    text=("Vues du compte" if L == "fr" else "Account views"))
         except Exception:
             pass
 
@@ -2566,13 +2748,13 @@ class App:
             cv.delete("all")
             w = cv.winfo_width() or 600
             h = cv.winfo_height() or 240
-            msg = ("Aucune donnée — effectuez d'abord une actualisation"
+            msg = ("Aucune donnée — actualisez l'onglet Téléphones d'abord"
                    if L == "fr" else
-                   "No data yet — refresh your phones first")
-            cv.create_text(w//2, h//2, text=msg,
-                           fill=TEXT2, font=("Segoe UI", 11))
-            for k, lbl in self._dash_kpis.items():
-                lbl.config(text="—")
+                   "No data yet — refresh the Phones tab first")
+            cv.create_text(w//2, h//2, text=msg, fill=TEXT2, font=("Segoe UI", 11))
+            for k, v2 in self._dash_kpis.items():
+                if not k.endswith("_lbl"):
+                    v2.config(text="—")
             return
 
         rng = self._dash_range.get()
@@ -2599,23 +2781,40 @@ class App:
         total   = sum(values)
 
         self._dash_kpis["today"].config(text=fmt(today_v))
-        pct = (delta / max(1, prev_v) * 100)
+        pct  = (delta / max(1, prev_v) * 100)
         sign = "+" if pct >= 0 else ""
-        self._dash_kpis["delta"].config(
-            text=f"{sign}{pct:.1f}%",
-            fg=OK if pct >= 0 else DANGER)
+        self._dash_kpis["delta"].config(text=f"{sign}{pct:.1f}%",
+                                         fg=OK if pct >= 0 else DANGER)
         self._dash_kpis["peak"].config(text=fmt(peak))
         self._dash_kpis["avg"].config(text=fmt(avg))
         self._dash_total_lbl.config(text=fmt(total))
 
-        # phones / banned from live data
+        # extra1 / extra2 differ by mode
         try:
-            active = sum(1 for d in self.data.values()
-                        if d.get("ig_status") == "active")
-            banned = sum(1 for d in self.data.values()
-                        if d.get("ig_status") == "banned")
-            self._dash_kpis["phones"].config(text=str(active))
-            self._dash_kpis["banned"].config(text=str(banned))
+            if is_total:
+                active = sum(1 for d in self.data.values()
+                             if d.get("ig_status") == "active")
+                banned = sum(1 for d in self.data.values()
+                             if d.get("ig_status") == "banned")
+                self._dash_kpis["extra1"].config(text=str(active))
+                self._dash_kpis["extra1_lbl"].config(
+                    text=("Téléphones actifs" if L == "fr" else "Active phones"))
+                self._dash_kpis["extra2"].config(text=str(banned), fg=DANGER)
+                self._dash_kpis["extra2_lbl"].config(
+                    text=("Bannis" if L == "fr" else "Banned"))
+            else:
+                d = self.data.get(pid, {})
+                ig_status = d.get("ig_status", "—")
+                nb_vids   = len(d.get("videos") or [])
+                status_col = OK if ig_status == "active" else (
+                    DANGER if ig_status == "banned" else TEXT2)
+                self._dash_kpis["extra1"].config(text=ig_status.capitalize(),
+                                                  fg=status_col)
+                self._dash_kpis["extra1_lbl"].config(
+                    text=("Statut IG" if L == "fr" else "IG Status"))
+                self._dash_kpis["extra2"].config(text=str(nb_vids), fg=TEXT2)
+                self._dash_kpis["extra2_lbl"].config(
+                    text=("Vidéos" if L == "fr" else "Videos"))
         except Exception:
             pass
 
