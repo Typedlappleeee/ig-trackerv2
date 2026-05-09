@@ -2088,16 +2088,22 @@ class App:
         self.tab_container.pack(fill="both", expand=True, padx=18, pady=(0, 18))
 
         self.tabs = {}
-        self._build_dashboard_tab()
-        self._build_phones_tab()
-        self._build_stats_tab()
-        self._build_automation_tab()
-        self._build_posting_tab()
-        self._build_masspost_tab()
-        self._build_bank_tab()
-        self._build_autocomment_tab()
-        self._build_tools_tab()
-        self._build_settings_tab()
+        for build_fn in (self._build_dashboard_tab,
+                         self._build_phones_tab,
+                         self._build_stats_tab,
+                         self._build_automation_tab,
+                         self._build_posting_tab,
+                         self._build_masspost_tab,
+                         self._build_bank_tab,
+                         self._build_autocomment_tab,
+                         self._build_tools_tab,
+                         self._build_settings_tab):
+            try:
+                build_fn()
+            except Exception as _e:
+                import traceback
+                traceback.print_exc()
+                print(f"[BUILD ERROR] {build_fn.__name__}: {_e}")
 
     def _bind_mousewheel(self, widget, canvas):
         widget.bind("<MouseWheel>",
@@ -2290,21 +2296,6 @@ class App:
             children = self._insta_group_children
             if not children.winfo_ismapped():
                 children.pack(fill="x")
-
-        # Show top stat cards only on data-heavy tabs (hide via children, not pack/forget)
-        if hasattr(self, "_top_stat_cards"):
-            keep = {"dashboard", "phones", "stats", "posting"}
-            visible = key in keep
-            for child in self._top_stat_cards.winfo_children():
-                if visible:
-                    if not child.winfo_ismapped():
-                        try:
-                            child.pack(side="left", fill="both", expand=True,
-                                        padx=(0, 10))
-                        except Exception:
-                            pass
-                else:
-                    child.pack_forget()
 
         for k, ind in self._sidebar_indicators.items():
             active = k == key
