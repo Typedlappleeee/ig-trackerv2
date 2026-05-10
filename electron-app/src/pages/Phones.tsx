@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase, type Phone } from '@/lib/supabase'
 import { useOrg } from '@/lib/orgContext'
+import { useConnections } from '@/lib/connections'
 import { canAccessPhoneGroup } from '@/lib/permissions'
 import { fetchAllPhones, geelarkStatusLabel } from '@/lib/geelark'
 import * as poller from '@/lib/phonePoller'
@@ -367,6 +368,7 @@ function NoteCell({ phone, onSave }: { phone: Phone; onSave: (id: string, v: str
 // ────────────────────────────────────────────────────────────────────────────
 export function Phones({ user }: PhonesProps) {
   const { currentOrg, role, perms } = useOrg()
+  const conns = useConnections(user)
   const [phones, setPhones]           = useState<Phone[]>([])
   const [loading, setLoading]         = useState(true)
   const [syncing, setSyncing]         = useState(false)
@@ -383,7 +385,10 @@ export function Phones({ user }: PhonesProps) {
   const [contextMenu, setContextMenu]   = useState<{ phone: Phone; x: number; y: number } | null>(null)
   const [sessionDialog, setSessionDialog] = useState<{ phone: Phone } | null>(null)
 
-  const bearer = poller.getBearer()
+  // Use the reactive bearer from connections (org-aware), not the poller snapshot.
+  // The poller singleton is updated async in App.tsx; reading from it here causes
+  // a race: loadPhones fires with the new currentOrg but the old bearer.
+  const bearer = conns.bearer
 
   const phonesRef      = useRef<Phone[]>([])
   const lastPollMsRef  = useRef(poller.getLastPollMs() || Date.now())
@@ -435,13 +440,15 @@ export function Phones({ user }: PhonesProps) {
   }, [autoRefresh, intervalSec])
 
   useEffect(() => {
+    // Wait until connections have resolved for the current org before loading.
+    // Without this guard, switching org triggers loadPhones with bearer=null
+    // (connections still loading) then again when bearer arrives — causing a
+    // blank flash and, worse, a race where the old bearer could be read.
+    if (conns.loading) return
     loadPhones()
-  }, [currentOrg?.id, bearer])
+  }, [currentOrg?.id, bearer, conns.loading])
 
   async function loadPhones() {
-    // No bearer in the active scope = nothing to show. Phones rows might still
-    // exist in DB (cached from a previous sync) but they belong to whoever's
-    // GéeLark account WAS configured — surfacing them here is misleading.
     if (!bearer) { setPhones([]); setLoading(false); return }
     setLoading(true)
     let q = supabase.from('phones').select('*').order('phone_name')
