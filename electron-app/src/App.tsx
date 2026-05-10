@@ -13,6 +13,7 @@ import { Bank }              from '@/pages/Bank'
 import { Montage }           from '@/pages/Montage'
 import { AiTools }           from '@/pages/AiTools'
 import { Settings }          from '@/pages/Settings'
+import { MassPosting }       from '@/pages/MassPosting'
 import { FullPageLoader }    from '@/components/ui/Spinner'
 
 function AppContent({ user }: { user: User }) {
@@ -32,7 +33,8 @@ function AppContent({ user }: { user: User }) {
       case 'dashboard': return <Dashboard user={user} />
       case 'phones':    return <Phones    user={user} />
       case 'stats':     return <Stats     user={user} />
-      case 'posting':   return <Posting   user={user} />
+      case 'posting':      return <Posting      user={user} />
+      case 'massposting':  return <MassPosting  user={user} />
       case 'bank':      return <Bank      user={user} />
       case 'montage':   return <Montage   user={user} />
       case 'aitools':   return <AiTools   user={user} />

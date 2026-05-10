@@ -1,0 +1,572 @@
+import { useState, useEffect, useRef } from 'react'
+import type { User } from '@supabase/supabase-js'
+import { supabase, type Phone, type ContentItem } from '@/lib/supabase'
+import { Button }  from '@/components/ui/Button'
+import { Spinner } from '@/components/ui/Spinner'
+
+interface MassPostingProps { user: User }
+
+interface TaskLog {
+  message: string
+  level:   'info' | 'ok' | 'error' | 'warn'
+  time:    string
+}
+
+interface TaskStatus {
+  status:  'idle' | 'pending' | 'uploading' | 'posting' | 'done' | 'error'
+  taskId?: string
+  detail?: string
+}
+
+interface SelectedVideo {
+  item:      ContentItem
+  localPath: string | null
+}
+
+const GEELARK = 'https://openapi.geelark.com/open/v1'
+
+const STATUS_COLOR: Record<TaskStatus['status'], string> = {
+  idle:      'text-text2',
+  pending:   'text-text2',
+  uploading: 'text-blue-400',
+  posting:   'text-warn',
+  done:      'text-ok',
+  error:     'text-danger',
+}
+const STATUS_LABEL: Record<TaskStatus['status'], string> = {
+  idle:      '—',
+  pending:   '⏳ En attente',
+  uploading: '📤 Upload…',
+  posting:   '🎬 En cours',
+  done:      '✅ Terminé',
+  error:     '❌ Erreur',
+}
+
+async function geelark(bearer: string, path: string, body: unknown) {
+  const r = await window.electronAPI!.geelarkRequest({
+    method: 'POST', url: `${GEELARK}${path}`,
+    headers: { Authorization: `Bearer ${bearer}` }, body,
+  })
+  return r.data as Record<string, unknown>
+}
+
+export function MassPosting({ user }: MassPostingProps) {
+  const [phones, setPhones]               = useState<Phone[]>([])
+  const [bank, setBank]                   = useState<ContentItem[]>([])
+  const [selectedPhones, setSelPhones]    = useState<Set<string>>(new Set())
+  const [selectedVideos, setSelVideos]    = useState<SelectedVideo[]>([])
+  const [caption, setCaption]             = useState('')
+  const [bearer, setBearer]               = useState('')
+  const [posting, setPosting]             = useState(false)
+  const [logs, setLogs]                   = useState<TaskLog[]>([])
+  const [taskStatuses, setTaskStatuses]   = useState<Map<string, TaskStatus>>(new Map())
+  const [groupFilter, setGroupFilter]     = useState('Tous')
+  const [groups, setGroups]               = useState<string[]>(['Tous'])
+  const logEndRef                         = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    Promise.all([
+      supabase.from('app_config').select('bearer_token').eq('user_id', user.id).single(),
+      supabase.from('phones').select('*').eq('user_id', user.id).order('phone_name'),
+      supabase.from('content_bank').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
+    ]).then(([cfg, ph, bk]) => {
+      if (cfg.data?.bearer_token) setBearer(cfg.data.bearer_token)
+      const ps = ph.data ?? []
+      setPhones(ps)
+      const grps = [...new Set(ps.map(p => p.group_name).filter(Boolean) as string[])].sort()
+      setGroups(['Tous', ...grps])
+      setBank(bk.data ?? [])
+    })
+  }, [])
+
+  useEffect(() => { logEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [logs])
+
+  function log(message: string, level: TaskLog['level'] = 'info') {
+    setLogs(prev => [...prev, {
+      message, level,
+      time: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+    }])
+  }
+
+  function setPhoneStatus(phoneId: string, status: TaskStatus) {
+    setTaskStatuses(prev => new Map(prev).set(phoneId, status))
+  }
+
+  function togglePhone(id: string) {
+    setSelPhones(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function toggleVideo(item: ContentItem) {
+    setSelVideos(prev => {
+      const idx = prev.findIndex(v => v.item.id === item.id)
+      if (idx >= 0) {
+        const next = [...prev]
+        next.splice(idx, 1)
+        return next
+      }
+      return [...prev, { item, localPath: null }]
+    })
+  }
+
+  async function pickLocalFile(index: number) {
+    const path = await window.electronAPI?.pickVideoFile()
+    if (!path) return
+    // Add as a local video entry
+    setSelVideos(prev => {
+      const next = [...prev]
+      if (index < next.length) {
+        next[index] = { ...next[index], localPath: path }
+      } else {
+        // Create a placeholder ContentItem
+        const fake: ContentItem = {
+          id:            `local-${Date.now()}`,
+          user_id:       user.id,
+          title:         path.split(/[\\/]/).pop() ?? 'Vidéo locale',
+          file_url:      null,
+          thumbnail_url: null,
+          duration:      null,
+          tags:          [],
+          notes:         '',
+          used_count:    0,
+          created_at:    new Date().toISOString(),
+          updated_at:    new Date().toISOString(),
+        }
+        next.push({ item: fake, localPath: path })
+      }
+      return next
+    })
+  }
+
+  // Auto-assignment: phone[i] → video[i % selectedVideos.length]
+  const phoneList = phones.filter(p => selectedPhones.has(p.id))
+  const assignments = phoneList.map((phone, i) => ({
+    phone,
+    video: selectedVideos.length > 0 ? selectedVideos[i % selectedVideos.length] : null,
+    videoIndex: selectedVideos.length > 0 ? i % selectedVideos.length : -1,
+  }))
+
+  async function post() {
+    if (!bearer)                  { log('Token GéeLark manquant — Paramètres', 'error'); return }
+    if (phoneList.length === 0)   { log('Sélectionne au moins un téléphone', 'warn'); return }
+    if (selectedVideos.length === 0) { log('Sélectionne au moins une vidéo', 'warn'); return }
+    if (!caption.trim())          { log('La caption est obligatoire', 'warn'); return }
+
+    setPosting(true)
+    setLogs([])
+    const newStatuses = new Map<string, TaskStatus>()
+    phoneList.forEach(p => newStatuses.set(p.id, { status: 'pending' }))
+    setTaskStatuses(newStatuses)
+
+    try {
+      // ── Step 1: upload unique videos ─────────────────────────────────────
+      log(`📤 Upload de ${selectedVideos.length} vidéo(s) vers GéeLark…`)
+      const tokenMap = new Map<number, string>() // videoIndex → token
+
+      for (let vi = 0; vi < selectedVideos.length; vi++) {
+        const sv = selectedVideos[vi]
+
+        // Mark phones using this video as uploading
+        phoneList.forEach((p, i) => {
+          if (i % selectedVideos.length === vi) setPhoneStatus(p.id, { status: 'uploading' })
+        })
+
+        let token: string
+        if (sv.localPath) {
+          const up = await window.electronAPI!.uploadVideoGeelark({ bearer, filePath: sv.localPath })
+          if (!up.ok || !up.token) {
+            log(`❌ Upload local échoué (${sv.item.title}): ${up.error}`, 'error')
+            phoneList.forEach((p, i) => {
+              if (i % selectedVideos.length === vi) setPhoneStatus(p.id, { status: 'error', detail: up.error })
+            })
+            continue
+          }
+          token = up.token
+        } else if (sv.item.file_url) {
+          const d = await geelark(bearer, '/upload/getUrl', { fileType: 'video', url: sv.item.file_url })
+          if (d['code'] !== 0) {
+            log(`❌ Upload URL échoué (${sv.item.title}): ${d['msg'] ?? d['code']}`, 'error')
+            continue
+          }
+          token = (d['data'] as Record<string, unknown>)?.['token'] as string
+        } else {
+          log(`⚠️ Vidéo ${vi + 1} sans source — ignorée`, 'warn')
+          continue
+        }
+
+        tokenMap.set(vi, token)
+        log(`✅ Vidéo ${vi + 1} uploadée (${sv.item.title.slice(0, 30)}…)`, 'ok')
+      }
+
+      // ── Step 2: start phones ──────────────────────────────────────────────
+      const geelarkIds = phoneList.map(p => p.geelark_id)
+      log(`📱 Démarrage de ${phoneList.length} téléphone(s)…`)
+      const startRes = await geelark(bearer, '/phone/start', { ids: geelarkIds })
+      const started  = (startRes['data'] as Record<string, number>)?.['successAmount'] ?? 0
+      log(`  ${started} démarré(s)`, started > 0 ? 'ok' : 'warn')
+
+      log('⏳ Attente 30s (boot)…')
+      await new Promise(r => setTimeout(r, 30000))
+
+      // ── Step 3: create RPA tasks ──────────────────────────────────────────
+      log('🎬 Création des tâches de post…')
+      const taskIds: Record<string, string> = {}
+
+      for (const asgn of assignments) {
+        const token = tokenMap.get(asgn.videoIndex)
+        if (!token) {
+          log(`  ⚠️ ${asgn.phone.phone_name}: pas de token vidéo`, 'warn')
+          setPhoneStatus(asgn.phone.id, { status: 'error', detail: 'no video token' })
+          continue
+        }
+        setPhoneStatus(asgn.phone.id, { status: 'posting' })
+        const taskRes = await geelark(bearer, '/rpa/task/instagramPubReels', {
+          phoneId: asgn.phone.geelark_id,
+          videoId: token,
+          caption: caption.trim(),
+        })
+        if (taskRes['code'] === 0) {
+          const tid = (taskRes['data'] as Record<string, unknown>)?.['id'] as string
+          taskIds[asgn.phone.geelark_id] = tid
+          setPhoneStatus(asgn.phone.id, { status: 'posting', taskId: tid })
+          log(`  ✅ Tâche créée pour ${asgn.phone.phone_name}`, 'ok')
+        } else {
+          log(`  ❌ ${asgn.phone.phone_name}: ${taskRes['msg'] ?? taskRes['code']}`, 'error')
+          setPhoneStatus(asgn.phone.id, { status: 'error', detail: String(taskRes['msg'] ?? taskRes['code']) })
+        }
+      }
+
+      // ── Step 4: poll until done (max 10 min) ─────────────────────────────
+      if (Object.keys(taskIds).length > 0) {
+        log(`⏳ Suivi de ${Object.keys(taskIds).length} tâche(s)…`)
+        const pending = new Set(Object.values(taskIds))
+        const deadline = Date.now() + 10 * 60 * 1000
+        const STATUS: Record<number, string> = { 1: '⏳ En attente', 2: '🔄 En cours', 3: '✅ Terminé', 4: '❌ Échoué', 7: '🚫 Annulé' }
+
+        while (pending.size > 0 && Date.now() < deadline) {
+          await new Promise(r => setTimeout(r, 10000))
+          const qRes = await geelark(bearer, '/task/query', { ids: [...pending] })
+          const items = ((qRes['data'] as Record<string, unknown>)?.['items'] ?? []) as Array<Record<string, unknown>>
+          for (const item of items) {
+            const tid    = item['id'] as string
+            const status = item['status'] as number
+            const phone  = phoneList.find(p => taskIds[p.geelark_id] === tid)
+            const name   = phone?.phone_name ?? tid
+            if ([3, 4, 7].includes(status)) {
+              pending.delete(tid)
+              const level = status === 3 ? 'ok' : 'error'
+              const fail  = item['failDesc'] ? ` — ${item['failDesc']}` : ''
+              log(`${STATUS[status] ?? status} ${name}${fail}`, level)
+              if (phone) {
+                setPhoneStatus(phone.id, {
+                  status: status === 3 ? 'done' : 'error',
+                  detail: item['failDesc'] as string | undefined,
+                })
+              }
+            }
+          }
+        }
+        if (pending.size > 0) log(`⏳ ${pending.size} tâche(s) toujours en cours — vérifie GéeLark`, 'warn')
+      }
+
+      // ── Step 5: stop phones ──────────────────────────────────────────────
+      log('🛑 Arrêt des téléphones…')
+      await geelark(bearer, '/phone/stop', { ids: geelarkIds })
+      log('🎉 Terminé !', 'ok')
+
+    } catch (e: unknown) {
+      log(`❌ Erreur: ${e instanceof Error ? e.message : String(e)}`, 'error')
+    }
+
+    setPosting(false)
+  }
+
+  const visiblePhones = groupFilter === 'Tous'
+    ? phones
+    : phones.filter(p => p.group_name === groupFilter)
+
+  const withSessions = phones.filter(p => p.ig_sessionid).length
+
+  return (
+    <div className="flex flex-col h-full min-h-screen">
+      {/* Header */}
+      <div className="px-8 py-5 border-b border-border flex items-center justify-between flex-shrink-0">
+        <div>
+          <h1 className="text-2xl font-bold text-text">Mass Posting</h1>
+          <p className="text-text2 text-sm mt-0.5">
+            Poste un Reel sur plusieurs téléphones simultanément
+            {withSessions > 0 && (
+              <span className="ml-2 text-ok text-xs">· {withSessions} session(s) IG configurée(s)</span>
+            )}
+          </p>
+        </div>
+        <Button
+          onClick={post}
+          loading={posting}
+          disabled={!bearer || phoneList.length === 0 || selectedVideos.length === 0 || !caption.trim()}
+          size="lg"
+        >
+          🚀 Poster sur {phoneList.length || '?'} téléphone{phoneList.length !== 1 ? 's' : ''}
+        </Button>
+      </div>
+
+      {!bearer && (
+        <div className="mx-8 mt-4 px-4 py-3 rounded-lg bg-warn/10 border border-warn/20 text-warn text-sm flex-shrink-0">
+          ⚠ Token GéeLark manquant — configure-le dans Paramètres.
+        </div>
+      )}
+
+      {/* 3-column grid */}
+      <div className="flex-1 overflow-hidden flex min-h-0">
+
+        {/* ── Column 1: Videos ─────────────────────────────────────────────── */}
+        <div className="w-72 flex-shrink-0 flex flex-col border-r border-border" style={{ background: '#0a0d15' }}>
+          <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+            <p className="text-sm font-bold text-text">🎬 Vidéos</p>
+            <span className="text-xs text-text2">{selectedVideos.length} sélectionnée(s)</span>
+          </div>
+          {/* Local file button */}
+          <div className="px-3 py-2 border-b border-border">
+            <button
+              onClick={() => pickLocalFile(-1)}
+              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-text2 hover:bg-surface2 border border-dashed border-border hover:border-accent/40 transition-colors"
+            >
+              <span>💾</span>
+              <span>Ajouter depuis le PC</span>
+            </button>
+          </div>
+          <div className="flex-1 overflow-auto py-2">
+            {bank.length === 0 ? (
+              <p className="px-4 py-6 text-xs text-text2 text-center">Aucune vidéo dans la banque.</p>
+            ) : bank.map((item, bi) => {
+              const selIdx = selectedVideos.findIndex(v => v.item.id === item.id)
+              const selected = selIdx >= 0
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => toggleVideo(item)}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 text-left border-b border-border/30 transition-colors ${
+                    selected ? 'bg-accent/10' : 'hover:bg-surface2'
+                  }`}
+                >
+                  <div className="w-10 h-10 rounded bg-surface2 flex items-center justify-center text-lg flex-shrink-0 relative overflow-hidden">
+                    {item.thumbnail_url
+                      ? <img src={item.thumbnail_url} alt="" className="w-full h-full object-cover" />
+                      : '🎬'
+                    }
+                    {selected && (
+                      <div className="absolute inset-0 bg-accent/80 flex items-center justify-center text-white font-bold text-sm">
+                        {selIdx + 1}
+                      </div>
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-medium text-text truncate">{item.title}</p>
+                    {item.duration && (
+                      <p className="text-[10px] text-text2">{Math.round(item.duration)}s</p>
+                    )}
+                  </div>
+                  {selected && <span className="text-accent text-xs font-bold">#{selIdx + 1}</span>}
+                </button>
+              )
+            })}
+          </div>
+          {/* Local files added */}
+          {selectedVideos.filter(v => v.localPath).length > 0 && (
+            <div className="px-3 py-2 border-t border-border space-y-1">
+              <p className="text-[10px] text-text2 font-semibold uppercase tracking-wider">Fichiers locaux</p>
+              {selectedVideos.filter(v => v.localPath).map((sv, i) => (
+                <div key={sv.item.id} className="flex items-center gap-2 text-xs text-ok">
+                  <span>💾</span>
+                  <span className="truncate flex-1">{sv.localPath!.split(/[\\/]/).pop()}</span>
+                  <button
+                    onClick={() => setSelVideos(prev => prev.filter(v => v.item.id !== sv.item.id))}
+                    className="text-text2 hover:text-danger"
+                  >✕</button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* ── Column 2: Phones ─────────────────────────────────────────────── */}
+        <div className="w-64 flex-shrink-0 flex flex-col border-r border-border" style={{ background: '#090c14' }}>
+          <div className="px-4 py-3 border-b border-border">
+            <p className="text-sm font-bold text-text">📱 Téléphones</p>
+            <select
+              value={groupFilter}
+              onChange={e => setGroupFilter(e.target.value)}
+              className="mt-1.5 w-full bg-surface border border-border rounded px-2 py-1 text-xs text-text focus:outline-none focus:border-accent"
+            >
+              {groups.map(g => <option key={g} value={g}>{g}</option>)}
+            </select>
+          </div>
+          <div className="px-3 py-1.5 flex gap-3 border-b border-border">
+            <button onClick={() => setSelPhones(new Set(visiblePhones.map(p => p.id)))}
+              className="text-xs text-accent hover:text-text">Tout</button>
+            <button onClick={() => setSelPhones(new Set())}
+              className="text-xs text-text2 hover:text-text">Aucun</button>
+            <span className="ml-auto text-xs text-text2">{selectedPhones.size} sél.</span>
+          </div>
+          <div className="flex-1 overflow-auto">
+            {visiblePhones.map((phone, i) => {
+              const checked = selectedPhones.has(phone.id)
+              const asgn = assignments.find(a => a.phone.id === phone.id)
+              const ts = taskStatuses.get(phone.id)
+              return (
+                <button
+                  key={phone.id}
+                  onClick={() => togglePhone(phone.id)}
+                  className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left border-b border-border/40 transition-colors ${
+                    checked ? 'bg-accent/10' : 'hover:bg-surface2'
+                  }`}
+                >
+                  <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold flex-shrink-0 ${
+                    checked ? 'bg-accent text-white' : 'bg-surface2 text-text2'
+                  }`}>
+                    {phone.ig_username ? phone.ig_username[0].toUpperCase() : phone.phone_name[0].toUpperCase()}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-medium text-text truncate">{phone.phone_name}</p>
+                    {phone.ig_username && (
+                      <p className="text-[10px] text-accent truncate flex items-center gap-1">
+                        @{phone.ig_username}
+                        {phone.ig_sessionid && <span title="Session configurée">🔑</span>}
+                      </p>
+                    )}
+                    {ts && ts.status !== 'idle' && (
+                      <p className={`text-[10px] ${STATUS_COLOR[ts.status]}`}>{STATUS_LABEL[ts.status]}</p>
+                    )}
+                  </div>
+                  {asgn?.video && (
+                    <span className="text-[10px] text-text2 bg-surface px-1 py-0.5 rounded flex-shrink-0">
+                      #{(asgn.videoIndex + 1)}
+                    </span>
+                  )}
+                  <span className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${
+                    checked ? 'bg-accent border-accent' : 'border-border'
+                  }`}>
+                    {checked && <span className="text-white text-[10px]">✓</span>}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* ── Column 3: Assignments + caption ──────────────────────────────── */}
+        <div className="flex-1 overflow-auto p-6 space-y-5">
+          {/* Caption */}
+          <div className="bg-card border border-border rounded-xl p-4 space-y-2">
+            <h2 className="text-sm font-semibold text-text">📝 Caption</h2>
+            <textarea
+              value={caption}
+              onChange={e => setCaption(e.target.value)}
+              placeholder="Écris ta caption ici…&#10;&#10;#hashtag1 #hashtag2"
+              rows={5}
+              className="w-full bg-surface border border-border rounded-lg px-3 py-2.5 text-sm text-text placeholder:text-text2 focus:border-accent focus:outline-none resize-none transition-colors"
+            />
+            <p className="text-xs text-text2 text-right">{caption.length} caractères</p>
+          </div>
+
+          {/* Assignments */}
+          <div>
+            <h2 className="text-sm font-semibold text-text mb-3">
+              🗂 Assignations
+              {assignments.length > 0 && (
+                <span className="ml-2 text-text2 font-normal">{assignments.length} téléphone(s)</span>
+              )}
+            </h2>
+
+            {assignments.length === 0 ? (
+              <div className="bg-card border border-dashed border-border rounded-xl p-8 text-center text-text2">
+                <p className="text-3xl mb-2">📋</p>
+                <p className="text-sm">Sélectionne des téléphones et des vidéos pour voir les assignations</p>
+                <p className="text-xs mt-1">Chaque téléphone est automatiquement assigné à une vidéo (rotation)</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 xl:grid-cols-3 gap-3">
+                {assignments.map(({ phone, video, videoIndex }) => {
+                  const ts = taskStatuses.get(phone.id)
+                  const statusColor = ts ? STATUS_COLOR[ts.status] : ''
+                  return (
+                    <div
+                      key={phone.id}
+                      className={`bg-card border rounded-xl p-3 space-y-2 transition-colors ${
+                        ts?.status === 'done'  ? 'border-ok/40' :
+                        ts?.status === 'error' ? 'border-danger/40' :
+                        ts?.status === 'posting' ? 'border-warn/40' :
+                        'border-border'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-full bg-accent/20 text-accent flex items-center justify-center text-xs font-bold flex-shrink-0">
+                          {phone.ig_username ? phone.ig_username[0].toUpperCase() : phone.phone_name[0].toUpperCase()}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-medium text-text truncate">{phone.phone_name}</p>
+                          {phone.ig_username && (
+                            <p className="text-[10px] text-accent truncate">@{phone.ig_username}</p>
+                          )}
+                        </div>
+                        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                          phone.status === 'online' ? 'bg-ok' : 'bg-text2'
+                        }`} />
+                      </div>
+                      {video ? (
+                        <div className="flex items-center gap-2 bg-surface rounded-lg px-2 py-1.5">
+                          <span className="text-accent text-xs font-bold">#{videoIndex + 1}</span>
+                          <span className="text-xs text-text2 truncate flex-1">{video.item.title}</span>
+                        </div>
+                      ) : (
+                        <div className="bg-surface rounded-lg px-2 py-1.5">
+                          <span className="text-xs text-text2 italic">Aucune vidéo</span>
+                        </div>
+                      )}
+                      {ts && ts.status !== 'idle' && (
+                        <p className={`text-[10px] font-medium ${statusColor}`}>
+                          {STATUS_LABEL[ts.status]}
+                          {ts.detail && <span className="opacity-70"> — {ts.detail}</span>}
+                        </p>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Log panel */}
+          {logs.length > 0 && (
+            <div className="bg-card border border-border rounded-xl overflow-hidden">
+              <div className="px-4 py-2 border-b border-border flex items-center justify-between">
+                <p className="text-xs font-semibold text-text">Journal</p>
+                {!posting && (
+                  <button onClick={() => setLogs([])} className="text-xs text-text2 hover:text-text">Effacer</button>
+                )}
+              </div>
+              <div className="p-4 max-h-48 overflow-auto font-mono text-xs space-y-1">
+                {logs.map((l, i) => (
+                  <div key={i} className={`flex gap-3 ${
+                    l.level === 'ok'    ? 'text-ok'    :
+                    l.level === 'error' ? 'text-danger' :
+                    l.level === 'warn'  ? 'text-warn'   :
+                    'text-text2'
+                  }`}>
+                    <span className="text-text2 flex-shrink-0">{l.time}</span>
+                    <span>{l.message}</span>
+                  </div>
+                ))}
+                <div ref={logEndRef} />
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
