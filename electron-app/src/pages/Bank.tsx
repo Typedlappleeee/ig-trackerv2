@@ -9,7 +9,7 @@ interface BankProps { user: User }
 
 function formatDuration(s: number | null): string {
   if (!s) return ''
-  const m = Math.floor(s / 60)
+  const m   = Math.floor(s / 60)
   const sec = s % 60
   return `${m}:${sec.toString().padStart(2, '0')}`
 }
@@ -19,9 +19,61 @@ function basename(p: string): string {
 }
 
 function nameWithoutExt(p: string): string {
-  const b = basename(p)
+  const b   = basename(p)
   const dot = b.lastIndexOf('.')
   return dot > 0 ? b.slice(0, dot) : b
+}
+
+// ── Video thumbnail via <video> element (local files) ─────────────────────────
+function VideoPreview({ filePath }: { filePath: string | null }) {
+  const [ready, setReady]   = useState(false)
+  const [failed, setFailed] = useState(false)
+  const videoRef = useRef<HTMLVideoElement>(null)
+
+  useEffect(() => {
+    setReady(false)
+    setFailed(false)
+  }, [filePath])
+
+  if (!filePath) {
+    return (
+      <div className="w-full h-full flex items-center justify-center text-4xl bg-surface2">🎬</div>
+    )
+  }
+
+  const src = `file:///${filePath.replace(/\\/g, '/')}`
+
+  if (failed) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-surface2 flex-col gap-1">
+        <span className="text-3xl">🎬</span>
+        <span className="text-[10px] text-text2">{basename(filePath)}</span>
+      </div>
+    )
+  }
+
+  return (
+    <>
+      {!ready && (
+        <div className="absolute inset-0 flex items-center justify-center bg-surface2">
+          <Spinner size="sm" />
+        </div>
+      )}
+      <video
+        ref={videoRef}
+        src={src}
+        className={`w-full h-full object-cover transition-opacity ${ready ? 'opacity-100' : 'opacity-0'}`}
+        muted
+        playsInline
+        preload="metadata"
+        onLoadedMetadata={() => {
+          if (videoRef.current) videoRef.current.currentTime = 1
+        }}
+        onSeeked={() => setReady(true)}
+        onError={() => setFailed(true)}
+      />
+    </>
+  )
 }
 
 export function Bank({ user }: BankProps) {
@@ -32,6 +84,7 @@ export function Bank({ user }: BankProps) {
   const [search, setSearch]     = useState('')
   const [error, setError]       = useState<string | null>(null)
   const [dragging, setDragging] = useState(false)
+  const [view, setView]         = useState<'grid' | 'list'>('grid')
 
   // Form state
   const [title, setTitle]       = useState('')
@@ -71,22 +124,16 @@ export function Bank({ user }: BankProps) {
     if (path) fillFormFromPath(path)
   }
 
-  // ── Drag & drop handlers ─────────────────────────────────────────────────
   function onDragOver(e: React.DragEvent) {
-    e.preventDefault()
-    e.dataTransfer.dropEffect = 'copy'
-    setDragging(true)
+    e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; setDragging(true)
   }
   function onDragLeave(e: React.DragEvent) {
-    // Only clear when leaving the root drop zone
     if (!dropRef.current?.contains(e.relatedTarget as Node)) setDragging(false)
   }
   function onDrop(e: React.DragEvent) {
-    e.preventDefault()
-    setDragging(false)
+    e.preventDefault(); setDragging(false)
     const file = e.dataTransfer.files[0]
     if (!file) return
-    // Electron extends File with a .path property
     const path = (file as File & { path?: string }).path ?? file.name
     fillFormFromPath(path)
   }
@@ -100,7 +147,7 @@ export function Bank({ user }: BankProps) {
       .from('content_bank')
       .insert({ user_id: user.id, title: title.trim(), file_url: fileUrl.trim() || null, duration: durSec, tags: tagsArr, notes: notes.trim() })
       .select().single()
-    if (err) setError('Erreur lors de l\'ajout.')
+    if (err) setError("Erreur lors de l'ajout.")
     else { setItems(prev => [data, ...prev]); resetForm() }
     setAdding(false)
   }
@@ -142,10 +189,21 @@ export function Bank({ user }: BankProps) {
             {items.length} vidéo{items.length !== 1 ? 's' : ''} · Glisse-dépose une vidéo n'importe où
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="secondary" onClick={pickFile}>
-            📂 Choisir un fichier
-          </Button>
+        <div className="flex gap-2 items-center">
+          {/* Grid / List toggle */}
+          <div className="flex rounded-lg border border-border overflow-hidden">
+            <button
+              onClick={() => setView('grid')}
+              className={`px-3 py-1.5 text-xs transition-colors ${view === 'grid' ? 'bg-accent/20 text-accent' : 'text-text2 hover:text-text'}`}
+              title="Vue grille"
+            >⊞</button>
+            <button
+              onClick={() => setView('list')}
+              className={`px-3 py-1.5 text-xs transition-colors border-l border-border ${view === 'list' ? 'bg-accent/20 text-accent' : 'text-text2 hover:text-text'}`}
+              title="Vue liste"
+            >☰</button>
+          </div>
+          <Button variant="secondary" onClick={pickFile}>📂 Choisir</Button>
           <Button onClick={() => setShowForm(v => !v)}>
             {showForm ? '✕ Annuler' : '+ Ajouter'}
           </Button>
@@ -154,10 +212,8 @@ export function Bank({ user }: BankProps) {
 
       {/* Add form */}
       {showForm && (
-        <div className="bg-card border border-border rounded-xl p-5 space-y-4 animate-slide-up">
+        <div className="bg-card border border-border rounded-xl p-5 space-y-4">
           <h2 className="text-sm font-semibold text-text">Nouvelle vidéo</h2>
-
-          {/* File path display */}
           {fileUrl && (
             <div className="flex items-center gap-2 px-3 py-2 bg-surface2 rounded-lg text-xs text-text2">
               <span className="text-accent">📄</span>
@@ -165,14 +221,13 @@ export function Bank({ user }: BankProps) {
               <button onClick={() => setFileUrl('')} className="text-text2 hover:text-danger">✕</button>
             </div>
           )}
-
           <div className="grid grid-cols-2 gap-4">
             <Input label="Titre *" placeholder="Nom de la vidéo…" value={title} onChange={e => setTitle(e.target.value)} />
-            <Input label="URL ou chemin (optionnel)" placeholder="chemin/vers/fichier.mp4" value={fileUrl} onChange={e => setFileUrl(e.target.value)} />
+            <Input label="Chemin fichier (optionnel)" placeholder="C:\Videos\fichier.mp4" value={fileUrl} onChange={e => setFileUrl(e.target.value)} />
             <Input label="Durée (secondes)" type="number" placeholder="Ex: 30" value={duration} onChange={e => setDuration(e.target.value)} />
-            <Input label="Tags (séparés par virgules)" placeholder="viral, trending, danse…" value={tags} onChange={e => setTags(e.target.value)} />
+            <Input label="Tags (séparés par virgules)" placeholder="viral, trending…" value={tags} onChange={e => setTags(e.target.value)} />
           </div>
-          <Input label="Notes" placeholder="Remarques, contexte…" value={notes} onChange={e => setNotes(e.target.value)} />
+          <Input label="Notes" placeholder="Remarques…" value={notes} onChange={e => setNotes(e.target.value)} />
           <div className="flex gap-3 items-center">
             <Button onClick={addItem} loading={adding} disabled={!title.trim()}>Ajouter</Button>
             <Button variant="secondary" onClick={pickFile}>📂 Parcourir…</Button>
@@ -202,13 +257,58 @@ export function Bank({ user }: BankProps) {
         </div>
       ) : visible.length === 0 ? (
         <p className="text-center py-8 text-text2 text-sm">Aucun résultat.</p>
+      ) : view === 'grid' ? (
+        /* ── Grid view ── */
+        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {visible.map(item => (
+            <div key={item.id}
+              className="bg-card border border-border rounded-xl overflow-hidden hover:border-accent/40 transition-colors group cursor-default"
+            >
+              {/* Thumbnail zone — 9:16 ratio */}
+              <div className="relative aspect-[9/16] bg-surface2 overflow-hidden">
+                <VideoPreview filePath={item.file_url} />
+                {/* Gradient + title overlay */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
+                <div className="absolute bottom-0 left-0 right-0 p-2.5">
+                  <p className="text-xs font-semibold text-white truncate leading-tight">{item.title}</p>
+                  {item.duration && (
+                    <p className="text-[10px] text-white/70 mt-0.5">{formatDuration(item.duration)}</p>
+                  )}
+                </div>
+                {/* Delete button */}
+                <button
+                  onClick={() => deleteItem(item.id)}
+                  className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/60 text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-danger/80"
+                  title="Supprimer"
+                >✕</button>
+                {/* Used count badge */}
+                {item.used_count > 0 && (
+                  <div className="absolute top-2 left-2 bg-accent/90 rounded-full px-1.5 py-0.5 text-[10px] text-white font-semibold">
+                    {item.used_count}×
+                  </div>
+                )}
+              </div>
+              {/* Tags */}
+              {item.tags.length > 0 && (
+                <div className="px-2.5 py-2 flex flex-wrap gap-1">
+                  {item.tags.slice(0, 3).map(tag => (
+                    <span key={tag} className="text-[10px] bg-surface2 text-text2 px-1.5 py-0.5 rounded-full">#{tag}</span>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
       ) : (
-        <div className="grid grid-cols-1 gap-3 animate-fade-in">
+        /* ── List view ── */
+        <div className="space-y-3">
           {visible.map(item => (
             <div key={item.id}
               className="bg-card border border-border rounded-xl p-4 flex items-start gap-4 hover:border-accent/30 transition-colors"
             >
-              <div className="w-16 h-12 rounded-lg bg-surface2 flex items-center justify-center flex-shrink-0 text-xl">🎬</div>
+              <div className="w-16 h-12 rounded-lg bg-surface2 overflow-hidden flex-shrink-0 relative">
+                <VideoPreview filePath={item.file_url} />
+              </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-start justify-between gap-3">
                   <p className="text-sm font-semibold text-text truncate">{item.title}</p>

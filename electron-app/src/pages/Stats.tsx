@@ -28,9 +28,7 @@ async function fetchIgVideos(username: string): Promise<IgVideo[]> {
     headers: {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
       'X-IG-App-ID': '936619743392459',
-      'Referer':     `https://www.instagram.com/${clean}/`,
-      'Origin':      'https://www.instagram.com',
-      'Accept':      '*/*',
+      'Accept': '*/*',
     },
   })
   if (!result.ok) return []
@@ -58,8 +56,8 @@ async function fetchIgVideos(username: string): Promise<IgVideo[]> {
   } catch { return [] }
 }
 
-// ── Thumbnail with IPC proxy fallback ────────────────────────────────────────
-function VideoThumbnail({ src }: { src: string }) {
+// ── Thumbnail with session cookie support ────────────────────────────────────
+function VideoThumbnail({ src, sessionid }: { src: string; sessionid?: string }) {
   const [dataUrl, setDataUrl] = useState<string | null>(null)
   const [failed, setFailed]   = useState(false)
 
@@ -69,18 +67,20 @@ function VideoThumbnail({ src }: { src: string }) {
     if (!src) { setFailed(true); return }
     if (!window.electronAPI?.fetchImage) { setFailed(true); return }
     let cancelled = false
-    window.electronAPI.fetchImage({ url: src }).then(res => {
-      if (cancelled) return
-      if (res.ok && res.dataUrl) setDataUrl(res.dataUrl)
-      else setFailed(true)
-    }).catch(() => { if (!cancelled) setFailed(true) })
+    const headers: Record<string, string> = {}
+    if (sessionid) headers['Cookie'] = `sessionid=${sessionid}`
+    window.electronAPI.fetchImage({ url: src, headers: Object.keys(headers).length ? headers : undefined })
+      .then(res => {
+        if (cancelled) return
+        if (res.ok && res.dataUrl) setDataUrl(res.dataUrl)
+        else setFailed(true)
+      })
+      .catch(() => { if (!cancelled) setFailed(true) })
     return () => { cancelled = true }
-  }, [src])
+  }, [src, sessionid])
 
   if (failed || !src) {
-    return (
-      <div className="w-full h-full flex items-center justify-center text-3xl bg-surface2">🎬</div>
-    )
+    return <div className="w-full h-full flex items-center justify-center text-3xl bg-surface2">🎬</div>
   }
   if (!dataUrl) {
     return (
@@ -124,7 +124,7 @@ export function Stats({ user }: StatsProps) {
     else { setLS(true); setLL(true) }
 
     try {
-      // If session ID is available, use private API (better thumbnails, no rate limit)
+      // Session path: private API — proper thumbnails, no rate limit
       if (phone.ig_sessionid && window.electronAPI?.fetchInstagramBySession) {
         const r = await window.electronAPI.fetchInstagramBySession({
           username: phone.ig_username,
@@ -132,6 +132,7 @@ export function Stats({ user }: StatsProps) {
         })
         if (r.ok) {
           setStats({
+            username:    phone.ig_username,
             followers:   r.followers   ?? 0,
             following:   r.following   ?? 0,
             posts:       r.posts       ?? 0,
@@ -139,7 +140,7 @@ export function Stats({ user }: StatsProps) {
             bio:         r.bio         ?? '',
           })
           setLS(false)
-          const sessionVideos: IgVideo[] = (r.videos ?? []).map(v => ({
+          setVideos((r.videos ?? []).map(v => ({
             id:        v.id,
             shortcode: v.shortcode,
             url:       `https://www.instagram.com/reel/${v.shortcode}/`,
@@ -149,35 +150,26 @@ export function Stats({ user }: StatsProps) {
             thumbnail: v.thumbnail,
             timestamp: v.timestamp,
             isVideo:   true,
-          }))
-          setVideos(sessionVideos)
+          })))
           setLL(false)
           setRetrying(false)
           return
-        } else {
-          // Session failed — fall through to public API
-          console.warn('[Stats] Session fetch failed:', r.error)
         }
+        console.warn('[Stats] Session fetch failed:', r.error)
       }
 
       // Fallback: public API
-      const force = retry
-      if (force) invalidateIgCache(phone.ig_username)
-
-      const s = await fetchIgStats(phone.ig_username, { force })
+      if (retry) invalidateIgCache(phone.ig_username)
+      const s = await fetchIgStats(phone.ig_username, { force: retry })
       setStats(s); setLS(false)
-
       const v = await fetchIgVideos(phone.ig_username)
       setVideos(v); setLL(false)
-
-      if (!s && v.length === 0) {
+      if (!s && v.length === 0)
         setLoadErr('Instagram indisponible ou compte privé. Réessaie dans quelques secondes.')
-      }
     } catch {
       setLoadErr('Erreur lors du chargement. Clique sur Réessayer.')
       setLS(false); setLL(false)
     }
-
     setRetrying(false)
   }
 
@@ -189,9 +181,11 @@ export function Stats({ user }: StatsProps) {
     return 0
   })
 
+  const sessionid = selected?.ig_sessionid ?? undefined
+
   return (
     <div className="flex h-full min-h-screen">
-      {/* Left sidebar */}
+      {/* Sidebar */}
       <aside className="w-56 flex-shrink-0 flex flex-col border-r border-border bg-surface">
         <div className="px-4 py-4 border-b border-border">
           <p className="text-xs font-semibold text-text2 uppercase tracking-wider">Comptes liés</p>
@@ -217,15 +211,20 @@ export function Stats({ user }: StatsProps) {
                 <p className="text-xs font-medium text-text truncate">@{phone.ig_username}</p>
                 <p className="text-[10px] text-text2 truncate">{phone.phone_name}</p>
               </div>
-              {phone.status === 'online' && (
-                <span className="w-1.5 h-1.5 rounded-full bg-ok flex-shrink-0" />
-              )}
+              <div className="flex flex-col items-end gap-0.5 flex-shrink-0">
+                {phone.status === 'online' && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-ok" />
+                )}
+                {phone.ig_sessionid && (
+                  <span className="text-[10px] text-accent">🔑</span>
+                )}
+              </div>
             </button>
           ))}
         </div>
       </aside>
 
-      {/* Right panel */}
+      {/* Main panel */}
       <div className="flex-1 overflow-auto">
         {!selected ? (
           <div className="flex items-center justify-center h-full text-text2">
@@ -244,6 +243,9 @@ export function Stats({ user }: StatsProps) {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-3 flex-wrap">
                   <h2 className="text-xl font-bold text-text">@{selected.ig_username}</h2>
+                  {selected.ig_sessionid && (
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-ok/20 text-ok">🔑 Session active</span>
+                  )}
                   <span className={`text-xs px-2 py-0.5 rounded-full ${
                     selected.status === 'online' ? 'bg-ok/20 text-ok' : 'bg-text2/20 text-text2'
                   }`}>{selected.status}</span>
@@ -304,9 +306,9 @@ export function Stats({ user }: StatsProps) {
                 </h3>
                 <div className="flex items-center gap-1">
                   {([
-                    { key: 'recent', label: 'Récent'    },
-                    { key: 'views',  label: '+ de vues' },
-                    { key: 'likes',  label: '+ de likes'},
+                    { key: 'recent', label: 'Récent'     },
+                    { key: 'views',  label: '+ de vues'  },
+                    { key: 'likes',  label: '+ de likes' },
                   ] as const).map(({ key, label }) => (
                     <button key={key} onClick={() => setSort(key)}
                       className={`px-3 py-1.5 rounded text-xs transition-all ${
@@ -324,7 +326,11 @@ export function Stats({ user }: StatsProps) {
               ) : videos.length === 0 ? (
                 <div className="text-center py-12 text-text2 space-y-2">
                   <p className="text-3xl">🎥</p>
-                  <p className="text-sm">{loadError ? 'Chargement échoué.' : 'Aucune vidéo trouvée.'}</p>
+                  <p className="text-sm">
+                    {loadError ? 'Chargement échoué.' : selected.ig_sessionid
+                      ? 'Aucune vidéo trouvée.'
+                      : 'Aucune vidéo — ajoute un Session ID pour charger les vidéos privées.'}
+                  </p>
                 </div>
               ) : (
                 <div className="grid grid-cols-3 xl:grid-cols-4 gap-3">
@@ -336,17 +342,15 @@ export function Stats({ user }: StatsProps) {
                       rel="noreferrer"
                       className="bg-card border border-border rounded-xl overflow-hidden hover:border-accent/40 transition-colors group"
                     >
-                      {/* Fixed-height thumbnail — avoids the huge 9:16 cards */}
-                      <div className="h-36 bg-surface2 relative overflow-hidden">
-                        <VideoThumbnail src={video.thumbnail} />
-                        {video.isVideo && video.views > 0 && (
+                      <div className="h-48 bg-surface2 relative overflow-hidden">
+                        <VideoThumbnail src={video.thumbnail} sessionid={sessionid} />
+                        {video.views > 0 && (
                           <div className="absolute bottom-1.5 left-1.5 bg-black/70 rounded px-1.5 py-0.5 text-[10px] text-white flex items-center gap-1">
                             <span>👁</span>
                             <span>{video.views.toLocaleString('fr-FR')}</span>
                           </div>
                         )}
                       </div>
-                      {/* Stats row */}
                       <div className="px-2.5 py-2 flex items-center gap-2 text-[11px] text-text2">
                         {video.likes > 0 && (
                           <span className="flex items-center gap-0.5">❤ {video.likes.toLocaleString('fr-FR')}</span>
