@@ -7,7 +7,12 @@ import { OrganizationPanel } from '@/components/OrganizationPanel'
 import { useOrg } from '@/lib/orgContext'
 import { canSeeTab } from '@/lib/permissions'
 import { notifyConnectionsChanged } from '@/lib/connections'
-import { isMusicEnabled, setMusicEnabled } from '@/lib/music'
+import {
+  isMusicEnabled, setMusicEnabled,
+  getVolume, setVolume,
+  getTrack, setTrack,
+  TRACKS,
+} from '@/lib/music'
 
 // All 8 themes from Python THEMES dict (line 29-39)
 const THEMES = ['Lime', 'Bleu', 'Violet', 'Ambre', 'Rouge', 'Cyan', 'Rose', 'Vert'] as const
@@ -51,7 +56,7 @@ function ToggleRow({
   )
 }
 
-type GeneralTab = 'apparence' | 'notifications' | 'langue'
+type GeneralTab = 'apparence' | 'sons' | 'langue'
 type Panel = 'general' | 'profile' | 'connexions' | 'organization'
 interface SettingsProps { user: User; initialPanel?: Panel }
 
@@ -79,6 +84,8 @@ export function Settings({ user, initialPanel }: SettingsProps) {
   const [notifyPopup, setNotifyPopup] = useState(true)
   const [notifySound, setNotifySound] = useState(true)
   const [musicOn, setMusicOn]         = useState(isMusicEnabled)
+  const [musicVol, setMusicVol]       = useState(getVolume)
+  const [musicTrack, setMusicTrackS]  = useState(getTrack)
 
   // Langue
   const [lang, setLang] = useState<'fr' | 'en'>('fr')
@@ -321,9 +328,9 @@ export function Settings({ user, initialPanel }: SettingsProps) {
           {/* Sub-tabs */}
           <div className="flex gap-2">
             {([
-              { k: 'apparence',     l: '🎨 Apparence'    },
-              { k: 'notifications', l: '🔔 Notifications' },
-              { k: 'langue',        l: '🌐 Langue'        },
+              { k: 'apparence', l: '🎨 Apparence' },
+              { k: 'sons',      l: '🔊 Sons'       },
+              { k: 'langue',    l: '🌐 Langue'     },
             ] as const).map(t => (
               <button
                 key={t.k}
@@ -370,51 +377,114 @@ export function Settings({ user, initialPanel }: SettingsProps) {
             </section>
           )}
 
-          {genTab === 'notifications' && (
-            <section className="bg-card border border-border rounded-xl p-5 space-y-4">
-              <h2 className="text-sm font-semibold text-text">Notifications</h2>
-
-              <ToggleRow
-                checked={notifyPopup}
-                onChange={setNotifyPopup}
-                title="Popups (toasts)"
-                sub="Afficher les notifications en haut à droite"
-              />
-              <ToggleRow
-                checked={notifySound}
-                onChange={setNotifySound}
-                title="Sons d'interface"
-                sub="Carillon sur les notifications, clic sur les onglets"
-              />
-
-              {/* Divider */}
-              <div className="border-t border-border pt-3 space-y-3">
-                <p className="text-[11px] font-bold text-text2 uppercase tracking-widest">Musique d'ambiance</p>
+          {genTab === 'sons' && (
+            <div className="space-y-4">
+              {/* Interface sounds */}
+              <section className="bg-card border border-border rounded-xl p-5 space-y-3">
+                <h2 className="text-sm font-semibold text-text">Sons d'interface</h2>
                 <ToggleRow
-                  checked={musicOn}
-                  onChange={v => { setMusicOn(v); setMusicEnabled(v) }}
-                  title="Musique chill en fond 🎵"
-                  sub="Musique ambiante générée procéduralement — préférence locale, non synchronisée"
-                  accent
+                  checked={notifyPopup}
+                  onChange={setNotifyPopup}
+                  title="Popups (toasts)"
+                  sub="Afficher les notifications en haut à droite"
                 />
+                <ToggleRow
+                  checked={notifySound}
+                  onChange={setNotifySound}
+                  title="Carillons"
+                  sub="Son sur les notifications, clic sur les onglets"
+                />
+              </section>
+
+              {/* Background music */}
+              <section className="bg-card border border-border rounded-xl p-5 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-sm font-semibold text-text">Musique d'ambiance 🎵</h2>
+                    <p className="text-[11px] text-text2 mt-0.5">Générée procéduralement — préférence locale</p>
+                  </div>
+                  <ToggleRow checked={musicOn} onChange={v => { setMusicOn(v); setMusicEnabled(v) }}
+                    title="" sub="" accent />
+                </div>
+
+                {/* Live EQ bar when playing */}
                 {musicOn && (
-                  <div className="flex items-center gap-2.5 px-3 py-2.5 bg-accent/5 border border-accent/15 rounded-xl anim-slide-down">
-                    <div className="flex gap-0.5 items-end h-4">
-                      {[3,5,4,7,3,6,4,5].map((h, i) => (
-                        <div key={i} className="w-1 rounded-sm bg-accent/60"
-                          style={{
-                            height: h * 2,
-                            animation: `pulse-soft ${0.8 + i * 0.15}s ease-in-out infinite`,
-                            animationDelay: `${i * 0.1}s`,
-                          }}
+                  <div className="flex items-center gap-2.5 px-3 py-2 bg-accent/5 border border-accent/15 rounded-xl anim-slide-down">
+                    <div className="flex gap-[3px] items-end h-5">
+                      {[3,5,4,7,3,6,4,5,3,7].map((h, i) => (
+                        <div key={i} className="w-[3px] rounded-sm bg-accent/70"
+                          style={{ height: h * 2.5, animation: `pulse-soft ${0.7 + i * 0.13}s ease-in-out infinite`, animationDelay: `${i * 0.09}s` }}
                         />
                       ))}
                     </div>
-                    <p className="text-[11px] text-accent font-medium">Lecture en cours — Am7 · Fmaj7 · Cmaj7 · G7sus4</p>
+                    <p className="text-[11px] text-accent font-medium">
+                      {TRACKS[musicTrack]?.emoji} {TRACKS[musicTrack]?.name} — en lecture
+                    </p>
                   </div>
                 )}
-              </div>
-            </section>
+
+                {/* Volume slider */}
+                <div className={`space-y-1.5 ${!musicOn ? 'opacity-40 pointer-events-none' : ''}`}>
+                  <p className="text-[11px] font-semibold text-text2 uppercase tracking-widest">Volume</p>
+                  <div className="flex items-center gap-3">
+                    <span className="text-base">🔈</span>
+                    <input
+                      type="range" min={0} max={100} step={1}
+                      value={Math.round(musicVol * 100)}
+                      onChange={e => {
+                        const v = parseInt(e.target.value) / 100
+                        setMusicVol(v); setVolume(v)
+                      }}
+                      className="flex-1 h-1.5 rounded-full appearance-none bg-surface3 accent-accent cursor-pointer"
+                      style={{ accentColor: 'var(--color-accent, #4f8ef7)' }}
+                    />
+                    <span className="text-base">🔊</span>
+                    <span className="text-xs font-bold text-accent w-9 text-right tabular-nums">
+                      {Math.round(musicVol * 100)}%
+                    </span>
+                  </div>
+                </div>
+
+                {/* Track selector */}
+                <div className={`space-y-1.5 ${!musicOn ? 'opacity-40 pointer-events-none' : ''}`}>
+                  <p className="text-[11px] font-semibold text-text2 uppercase tracking-widest">Style de musique</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {TRACKS.map(t => {
+                      const active = musicTrack === t.id
+                      return (
+                        <button
+                          key={t.id}
+                          onClick={() => { setMusicTrackS(t.id); setTrack(t.id) }}
+                          className={`text-left p-3 rounded-xl border-2 transition-all ${
+                            active
+                              ? 'border-accent bg-accent/10 shadow-[0_0_12px_-3px_rgba(79,142,247,0.4)]'
+                              : 'border-border hover:border-accent/30 hover:bg-surface2'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-xl">{t.emoji}</span>
+                            {active && (
+                              <span className="flex gap-[2px] items-end h-3">
+                                {[2,4,3,5,2].map((h, i) => (
+                                  <span key={i} className="w-[2px] rounded-sm bg-accent"
+                                    style={{ height: h * 2, animation: `pulse-soft ${0.6 + i * 0.12}s ease-in-out infinite`, animationDelay: `${i * 0.08}s` }}
+                                  />
+                                ))}
+                              </span>
+                            )}
+                          </div>
+                          <p className={`text-xs font-bold ${active ? 'text-accent' : 'text-text'}`}>{t.name}</p>
+                          <p className="text-[10px] text-text2 mt-0.5 leading-tight">{t.desc}</p>
+                        </button>
+                      )
+                    })}
+                  </div>
+                  {musicOn && (
+                    <p className="text-[10px] text-text2/60 italic">Changement de piste : fondu de 3 s</p>
+                  )}
+                </div>
+              </section>
+            </div>
           )}
 
           {genTab === 'langue' && (
