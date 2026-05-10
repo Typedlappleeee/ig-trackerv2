@@ -31,6 +31,12 @@ function IgStatusBadge({ phone }: { phone: Phone }) {
       <span className="text-[11px] text-ok font-semibold">IG OK</span>
     </span>
   )
+  if (phone.ig_status === 'expired') return (
+    <span className="inline-flex items-center gap-1" title="Session Instagram expirée — re-login requis">
+      <span className="w-2 h-2 rounded-full bg-danger flex-shrink-0" />
+      <span className="text-[11px] text-danger font-semibold">Session expirée</span>
+    </span>
+  )
   if (phone.ig_status === 'error') return (
     <span className="inline-flex items-center gap-1">
       <span className="w-2 h-2 rounded-full bg-danger flex-shrink-0" />

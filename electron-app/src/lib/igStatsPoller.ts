@@ -33,6 +33,8 @@ async function refresh() {
           bio:          r.bio         ?? null,
           ig_status:    'active',
         }).eq('id', phone.id)
+      } else if (r.error === 'session_expired') {
+        await supabase.from('phones').update({ ig_status: 'expired' }).eq('id', phone.id)
       } else {
         await supabase.from('phones').update({ ig_status: 'error' }).eq('id', phone.id)
       }

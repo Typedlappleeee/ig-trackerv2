@@ -265,6 +265,18 @@ function igSessionFetch(
   })
 }
 
+// Detect IG "session is dead" responses (login_required, logout_reason, checkpoint)
+function isSessionDead(status: number, data: unknown): boolean {
+  if (status === 401) return true
+  const d = data as Record<string, unknown> | null
+  if (!d) return false
+  const msg = String(d['message'] ?? '').toLowerCase()
+  if (msg === 'login_required') return true
+  if (msg === 'checkpoint_required') return true
+  if (d['logout_reason']) return true
+  return false
+}
+
 ipcMain.handle('fetch-instagram-by-session', async (_event, opts: { username: string; sessionid: string }) => {
   try {
     // 1. Get current user ID — try multiple endpoints for reliability
@@ -272,7 +284,7 @@ ipcMain.handle('fetch-instagram-by-session', async (_event, opts: { username: st
 
     // Attempt A: /accounts/current_user/ (no ?edit=true avoids 403 on restricted accounts)
     const curR = await igSessionFetch('https://i.instagram.com/api/v1/accounts/current_user/', opts.sessionid)
-    if (curR.status === 401) return { ok: false, error: 'session_expired' }
+    if (isSessionDead(curR.status, curR.data)) return { ok: false, error: 'session_expired' }
     if (curR.status === 200 && curR.data) {
       userId = (((curR.data as Record<string, unknown>)['user']) as Record<string, unknown> | undefined)?.['pk'] as string | number | null ?? null
     }
@@ -741,8 +753,9 @@ ipcMain.handle('post-ig-comment', async (_event, opts: { mediaId: string; text: 
     }
 
     if (res.status !== 200) {
+      const dead = isSessionDead(res.status, res.data)
       const detail = res.data ? JSON.stringify(res.data).slice(0, 200) : ''
-      return { ok: false, error: `HTTP ${res.status}${detail ? ' — ' + detail : ''}` }
+      return { ok: false, sessionExpired: dead, error: `HTTP ${res.status}${detail ? ' — ' + detail : ''}` }
     }
     return { ok: true }
   } catch (err: unknown) {

@@ -44,7 +44,7 @@ interface ElectronAPI {
   runFfmpeg:         (opts: { clips: FfmpegClip[]; outputPath: string; preset: '9:16'|'1:1'|'16:9'; transition: 'cut'|'fade' }) => Promise<{ ok: boolean; outputPath?: string; command?: string; error?: string }>
   readLocalVideo:    (filePath: string) => Promise<{ ok: boolean; dataUrl?: string; error?: string }>
   fetchIgComments:   (opts: { mediaId: string; sessionid: string; maxId?: string }) => Promise<{ ok: boolean; comments?: Array<{ pk: string; text: string; username: string; timestamp: string; likeCount: number }>; hasMore?: boolean; error?: string }>
-  postIgComment:     (opts: { mediaId: string; text: string; sessionid: string }) => Promise<{ ok: boolean; error?: string }>
+  postIgComment:     (opts: { mediaId: string; text: string; sessionid: string }) => Promise<{ ok: boolean; error?: string; sessionExpired?: boolean }>
   groqRequest:       (opts: GroqRequestOptions) => Promise<{ ok: boolean; data?: unknown; error?: string }>
 }
 

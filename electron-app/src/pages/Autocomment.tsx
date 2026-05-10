@@ -92,6 +92,13 @@ export function Autocomment({ user }: AutocommentProps) {
         log(`✓ Réponse envoyée à @${comment.username}`)
       } else {
         log(`❌ Erreur envoi réponse: ${r?.error ?? 'unknown'}`)
+        // If IG killed the session, mark phone as expired so the red badge shows
+        if (r?.sessionExpired || /login_required|logout_reason|HTTP 401/.test(r?.error ?? '')) {
+          if (selectedPhone) {
+            await supabase.from('phones').update({ ig_status: 'expired' }).eq('id', selectedPhone.id)
+            log(`⚠ Session Instagram expirée — re-login requis sur le téléphone`)
+          }
+        }
       }
     } catch (e) {
       log(`❌ Erreur: ${e instanceof Error ? e.message : String(e)}`)
