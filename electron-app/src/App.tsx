@@ -1,10 +1,91 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { useAuth }           from '@/hooks/useAuth'
 import { supabase }          from '@/lib/supabase'
 import { AuthPage }          from '@/components/auth/AuthPage'
 import { Onboarding }        from '@/components/Onboarding'
 import { Layout, type Page } from '@/components/Layout'
+
+// ── Splash screen ─────────────────────────────────────────────────────────────
+const SPLASH_DURATION = 2600  // ms avant fade-out
+
+function SplashScreen({ onDone }: { onDone: () => void }) {
+  const [fading, setFading] = useState(false)
+  const doneRef = useRef(false)
+
+  useEffect(() => {
+    const t1 = setTimeout(() => setFading(true), SPLASH_DURATION)
+    const t2 = setTimeout(() => {
+      if (!doneRef.current) { doneRef.current = true; onDone() }
+    }, SPLASH_DURATION + 500)
+    return () => { clearTimeout(t1); clearTimeout(t2) }
+  }, [onDone])
+
+  return (
+    <div
+      className={fading ? 'splash-fade-out' : ''}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 9999,
+        background: 'radial-gradient(ellipse at 50% 40%, #0d1530 0%, #080b14 70%)',
+        display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center', gap: 0,
+        pointerEvents: fading ? 'none' : 'all',
+      }}
+    >
+      {/* Logo */}
+      <div
+        className="splash-logo"
+        style={{
+          width: 96, height: 96, borderRadius: 28,
+          background: 'linear-gradient(135deg, #1a2f5e 0%, #0d1a3a 100%)',
+          border: '1.5px solid #4f9eff44',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 38, fontWeight: 900, color: '#4f9eff',
+          letterSpacing: '-2px', fontFamily: 'Inter, system-ui, sans-serif',
+          marginBottom: 32,
+        }}
+      >
+        IG
+      </div>
+
+      {/* Title */}
+      <div className="splash-title" style={{ textAlign: 'center', marginBottom: 8 }}>
+        <span style={{ fontSize: 28, fontWeight: 800, color: '#d4dcf0', letterSpacing: '-0.5px' }}>
+          IG Tracker
+        </span>
+        {' '}
+        <span style={{ fontSize: 28, fontWeight: 800, color: '#4f9eff' }}>v2</span>
+      </div>
+
+      {/* Subtitle */}
+      <div className="splash-sub" style={{ color: '#5a6882', fontSize: 13, marginBottom: 56 }}>
+        Gestion de comptes Instagram
+      </div>
+
+      {/* Loading dots */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
+        {(['splash-dot-1', 'splash-dot-2', 'splash-dot-3'] as const).map(cls => (
+          <span key={cls} className={cls} style={{
+            display: 'inline-block', width: 7, height: 7,
+            borderRadius: '50%', background: '#4f9eff',
+          }} />
+        ))}
+      </div>
+
+      {/* Progress bar */}
+      <div style={{
+        position: 'absolute', bottom: 0, left: 0, right: 0,
+        height: 3, background: '#1a2035',
+      }}>
+        <div className="splash-bar" style={{
+          height: '100%',
+          background: 'linear-gradient(90deg, #4f9eff, #7eb8ff)',
+          borderRadius: 2,
+        }} />
+      </div>
+    </div>
+  )
+}
 
 // ── Beta popup (shown once per device after onboarding is complete) ───────────
 function BetaPopup({ onClose }: { onClose: () => void }) {
@@ -131,7 +212,16 @@ function AppContent({ user }: { user: User }) {
 
 export default function App() {
   const { user, loading } = useAuth()
-  if (loading) return <FullPageLoader />
-  if (!user)   return <AuthPage />
-  return <AppContent user={user} />
+  const [splashDone, setSplashDone] = useState(false)
+
+  return (
+    <>
+      {!splashDone && <SplashScreen onDone={() => setSplashDone(true)} />}
+      {splashDone && (
+        loading        ? <FullPageLoader /> :
+        !user          ? <AuthPage />       :
+        <AppContent user={user} />
+      )}
+    </>
+  )
 }

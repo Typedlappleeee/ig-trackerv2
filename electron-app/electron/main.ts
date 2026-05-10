@@ -616,7 +616,7 @@ function createWindow() {
     return { action: 'deny' }
   })
 
-  win.once('ready-to-show', () => { win?.show() })
+  win.once('ready-to-show', () => { win?.show(); win?.maximize() })
 
   if (VITE_DEV_SERVER_URL) {
     win.loadURL(VITE_DEV_SERVER_URL)
