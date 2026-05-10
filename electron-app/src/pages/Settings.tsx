@@ -7,6 +7,7 @@ import { OrganizationPanel } from '@/components/OrganizationPanel'
 import { useOrg } from '@/lib/orgContext'
 import { canSeeTab } from '@/lib/permissions'
 import { notifyConnectionsChanged } from '@/lib/connections'
+import { isMusicEnabled, setMusicEnabled } from '@/lib/music'
 
 // All 8 themes from Python THEMES dict (line 29-39)
 const THEMES = ['Lime', 'Bleu', 'Violet', 'Ambre', 'Rouge', 'Cyan', 'Rose', 'Vert'] as const
@@ -19,6 +20,35 @@ const THEME_COLORS: Record<string, string> = {
   Cyan:   '#00e5d4',
   Rose:   '#ff6ec7',
   Vert:   '#2dde78',
+}
+
+// ── Shared toggle row ────────────────────────────────────────────────────────
+function ToggleRow({
+  checked, onChange, title, sub, accent,
+}: {
+  checked: boolean
+  onChange: (v: boolean) => void
+  title: string
+  sub: string
+  accent?: boolean
+}) {
+  return (
+    <label className="flex items-center gap-3 cursor-pointer group">
+      {/* Custom toggle pill */}
+      <div
+        className={`relative flex-shrink-0 w-10 h-5 rounded-full transition-all duration-200 ${
+          checked ? (accent ? 'bg-accent' : 'bg-accent/80') : 'bg-surface3 border border-border'
+        }`}
+        onClick={() => onChange(!checked)}
+      >
+        <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${checked ? 'translate-x-5' : 'translate-x-0'}`} />
+      </div>
+      <div className="flex-1 select-none" onClick={() => onChange(!checked)}>
+        <p className={`text-sm font-medium transition-colors ${checked ? 'text-text' : 'text-text2'}`}>{title}</p>
+        <p className="text-[11px] text-text2/70 mt-0.5">{sub}</p>
+      </div>
+    </label>
+  )
 }
 
 type GeneralTab = 'apparence' | 'notifications' | 'langue'
@@ -48,6 +78,7 @@ export function Settings({ user, initialPanel }: SettingsProps) {
   // Notifications
   const [notifyPopup, setNotifyPopup] = useState(true)
   const [notifySound, setNotifySound] = useState(true)
+  const [musicOn, setMusicOn]         = useState(isMusicEnabled)
 
   // Langue
   const [lang, setLang] = useState<'fr' | 'en'>('fr')
@@ -340,22 +371,49 @@ export function Settings({ user, initialPanel }: SettingsProps) {
           )}
 
           {genTab === 'notifications' && (
-            <section className="bg-card border border-border rounded-xl p-5 space-y-3">
+            <section className="bg-card border border-border rounded-xl p-5 space-y-4">
               <h2 className="text-sm font-semibold text-text">Notifications</h2>
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input type="checkbox" checked={notifyPopup} onChange={e => setNotifyPopup(e.target.checked)} className="w-4 h-4 accent-accent" />
-                <div className="flex-1">
-                  <p className="text-sm text-text">Popups (toasts)</p>
-                  <p className="text-[11px] text-text2">Afficher les notifications en haut à droite</p>
-                </div>
-              </label>
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input type="checkbox" checked={notifySound} onChange={e => setNotifySound(e.target.checked)} className="w-4 h-4 accent-accent" />
-                <div className="flex-1">
-                  <p className="text-sm text-text">Sons</p>
-                  <p className="text-[11px] text-text2">Bip système quand un post se termine</p>
-                </div>
-              </label>
+
+              <ToggleRow
+                checked={notifyPopup}
+                onChange={setNotifyPopup}
+                title="Popups (toasts)"
+                sub="Afficher les notifications en haut à droite"
+              />
+              <ToggleRow
+                checked={notifySound}
+                onChange={setNotifySound}
+                title="Sons d'interface"
+                sub="Carillon sur les notifications, clic sur les onglets"
+              />
+
+              {/* Divider */}
+              <div className="border-t border-border pt-3 space-y-3">
+                <p className="text-[11px] font-bold text-text2 uppercase tracking-widest">Musique d'ambiance</p>
+                <ToggleRow
+                  checked={musicOn}
+                  onChange={v => { setMusicOn(v); setMusicEnabled(v) }}
+                  title="Musique chill en fond 🎵"
+                  sub="Musique ambiante générée procéduralement — préférence locale, non synchronisée"
+                  accent
+                />
+                {musicOn && (
+                  <div className="flex items-center gap-2.5 px-3 py-2.5 bg-accent/5 border border-accent/15 rounded-xl anim-slide-down">
+                    <div className="flex gap-0.5 items-end h-4">
+                      {[3,5,4,7,3,6,4,5].map((h, i) => (
+                        <div key={i} className="w-1 rounded-sm bg-accent/60"
+                          style={{
+                            height: h * 2,
+                            animation: `pulse-soft ${0.8 + i * 0.15}s ease-in-out infinite`,
+                            animationDelay: `${i * 0.1}s`,
+                          }}
+                        />
+                      ))}
+                    </div>
+                    <p className="text-[11px] text-accent font-medium">Lecture en cours — Am7 · Fmaj7 · Cmaj7 · G7sus4</p>
+                  </div>
+                )}
+              </div>
             </section>
           )}
 

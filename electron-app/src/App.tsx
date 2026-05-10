@@ -8,6 +8,7 @@ import { Layout, type Page } from '@/components/Layout'
 import { OrgProvider, useOrg } from '@/lib/orgContext'
 import { useConnections }    from '@/lib/connections'
 import { playSplash }        from '@/lib/sounds'
+import { startMusic, stopMusic, isMusicEnabled } from '@/lib/music'
 
 // ── Splash screen ─────────────────────────────────────────────────────────────
 const SPLASH_DURATION = 3400
@@ -305,6 +306,12 @@ function AppContent({ user }: { user: User }) {
       stopPoller()
     }
   }, [conns.bearer, conns.loading, user.id])
+
+  // Background music — start on login if enabled, stop cleanly on signout
+  useEffect(() => {
+    if (isMusicEnabled()) startMusic()
+    return () => stopMusic(true)
+  }, [])
 
   function dismissBeta() {
     localStorage.setItem(BETA_KEY, '1')
