@@ -149,6 +149,7 @@ const BETA_KEY = 'ig-tracker-beta-v2-seen'
 
 function AppContent({ user }: { user: User }) {
   const { currentOrg } = useOrg()
+  const conns = useConnections(user)
   const [page, setPage]                     = useState<Page>('dashboard')
   const [settingsPanel, setSettingsPanel]   = useState<string | undefined>(undefined)
   const [onboarding, setOnboarding]         = useState<boolean | null>(null)
@@ -180,9 +181,7 @@ function AppContent({ user }: { user: User }) {
   }, [currentOrg?.id, user.id, conns.bearer])
 
   // Re-initialise the GéeLark poller whenever the active bearer changes
-  // (org switch, settings save, …). The poller holds the bearer in module
-  // scope and we rebuild that scope here on every change.
-  const conns = useConnections(user)
+  // (org switch, settings save, …).
   useEffect(() => {
     if (conns.loading) return
     if (conns.bearer) {
