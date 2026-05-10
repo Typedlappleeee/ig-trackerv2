@@ -4,14 +4,9 @@ import { supabase, type Phone } from '@/lib/supabase'
 import { Button }  from '@/components/ui/Button'
 import { VideoThumbnail } from '@/pages/Bank'
 import { BankPicker } from './Bank'
+import { getPostingState, setPostingState, subscribePosting, type TaskLog } from '@/lib/postingStore'
 
 interface PostingProps { user: User }
-
-interface TaskLog {
-  message: string
-  level:   'info' | 'ok' | 'error' | 'warn'
-  time:    string
-}
 
 const GEELARK = 'https://openapi.geelark.com/open/v1'
 
@@ -25,9 +20,10 @@ async function geelark(bearer: string, path: string, body: unknown) {
 
 export function Posting({ user }: PostingProps) {
   const [phones, setPhones]            = useState<Phone[]>([])
-  const [selectedPhones, setSelPhones] = useState<Set<string>>(new Set())
-  const [filePath, setFilePath]        = useState<string | null>(null)
-  const [caption, setCaption]          = useState('')
+  const s                              = getPostingState()
+  const [selectedPhones, _setSelPhones]= useState<Set<string>>(s.selectedPhones)
+  const [filePath, _setFilePath]       = useState<string | null>(s.filePath)
+  const [caption, _setCaption]         = useState(s.caption)
   const [topic, setTopic]              = useState('')
   const [withHashtags, setWithHashtags]= useState(true)
   const [customPrompt, setCustomPrompt]= useState('')
@@ -36,13 +32,40 @@ export function Posting({ user }: PostingProps) {
   const [groqKey, setGroqKey]          = useState('')
   const [groupFilter, setGroup]        = useState('Tous')
   const [groups, setGroups]            = useState<string[]>(['Tous'])
-  const [posting, setPosting]          = useState(false)
+  const [posting, _setPosting]         = useState(s.posting)
   const [generating, setGenerating]    = useState(false)
-  const [logs, setLogs]                = useState<TaskLog[]>([])
-  const [progress, setProgress]        = useState(0)
+  const [logs, _setLogs]               = useState<TaskLog[]>(s.logs)
+  const [progress, _setProgress]       = useState(s.progress)
   const [showLogs, setShowLogs]        = useState(false)
   const [showBankPicker, setShowBankPicker] = useState(false)
   const logEndRef                      = useRef<HTMLDivElement>(null)
+
+  // Persist-aware setters — update both React state and module-level store
+  function setSelPhones(v: Set<string> | ((p: Set<string>) => Set<string>)) {
+    _setSelPhones(prev => { const next = typeof v === 'function' ? v(prev) : v; setPostingState({ selectedPhones: next }); return next })
+  }
+  function setFilePath(v: string | null)           { _setFilePath(v);  setPostingState({ filePath: v }) }
+  function setCaption(v: string)                   { _setCaption(v);   setPostingState({ caption: v }) }
+  function setPosting(v: boolean)                  { _setPosting(v);   setPostingState({ posting: v }) }
+  function setProgress(v: number)                  { _setProgress(v);  setPostingState({ progress: v }) }
+  function setLogs(v: TaskLog[] | ((p: TaskLog[]) => TaskLog[])) {
+    _setLogs(prev => {
+      const next = typeof v === 'function' ? v(prev) : v
+      setPostingState({ logs: next })
+      return next
+    })
+  }
+
+  // Re-sync from store when navigating back (e.g. if another component updated store)
+  useEffect(() => {
+    const unsub = subscribePosting(() => {
+      const st = getPostingState()
+      _setPosting(st.posting)
+      _setProgress(st.progress)
+      _setLogs(st.logs)
+    })
+    return unsub
+  }, [])
 
   useEffect(() => {
     Promise.all([

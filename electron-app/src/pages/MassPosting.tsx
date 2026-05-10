@@ -4,25 +4,13 @@ import { supabase, type Phone, type ContentItem } from '@/lib/supabase'
 import { Button }  from '@/components/ui/Button'
 import { VideoThumbnail } from '@/pages/Bank'
 import { BankPicker } from './Bank'
+import {
+  getMassPostingState, setMassPostingState, subscribeMassPosting,
+  type TaskLog, type TaskStatus, type SelectedVideo,
+} from '@/lib/massPostingStore'
 
 interface MassPostingProps { user: User }
 
-interface TaskLog {
-  message: string
-  level:   'info' | 'ok' | 'error' | 'warn'
-  time:    string
-}
-
-interface TaskStatus {
-  status:  'idle' | 'pending' | 'uploading' | 'posting' | 'done' | 'error'
-  taskId?: string
-  detail?: string
-}
-
-interface SelectedVideo {
-  item:      ContentItem
-  localPath: string | null
-}
 
 const GEELARK = 'https://openapi.geelark.com/open/v1'
 
@@ -53,25 +41,52 @@ async function geelark(bearer: string, path: string, body: unknown) {
 
 export function MassPosting({ user }: MassPostingProps) {
   const [phones, setPhones]               = useState<Phone[]>([])
-  const [selectedPhones, setSelPhones]    = useState<Set<string>>(new Set())
-  const [selectedVideos, setSelVideos]    = useState<SelectedVideo[]>([])
-  const [caption, setCaption]             = useState('')              // Python: shared _mp_cap_box
-  const [mode, setMode]                   = useState<'seq' | 'random'>('seq')  // Python: _mp_mode_var
-  const [maxWorkers, setMaxWorkers]       = useState(20)              // Python: max_simul (1-50)
-  const [staggerMin, setStaggerMin]       = useState(5)               // Python: stagger (0-60 min)
+  const ms                                = getMassPostingState()
+  const [selectedPhones, _setSelPhones]   = useState<Set<string>>(ms.selectedPhones)
+  const [selectedVideos, _setSelVideos]   = useState<SelectedVideo[]>(ms.selectedVideos)
+  const [caption, _setCaption]            = useState(ms.caption)
+  const [mode, setMode]                   = useState<'seq' | 'random'>('seq')
+  const [maxWorkers, setMaxWorkers]       = useState(20)
+  const [staggerMin, setStaggerMin]       = useState(5)
   const [bearer, setBearer]               = useState('')
   const [groqKey, setGroqKey]             = useState('')
-  const [posting, setPosting]             = useState(false)
+  const [posting, _setPosting]            = useState(ms.posting)
   const [generating, setGenerating]       = useState(false)
   const [withHashtags, setWithHashtags]   = useState(true)
   const [customPrompt, setCustomPrompt]   = useState('')
-  const [logs, setLogs]                   = useState<TaskLog[]>([])
-  const [taskStatuses, setTaskStatuses]   = useState<Map<string, TaskStatus>>(new Map())
+  const [logs, _setLogs]                  = useState<TaskLog[]>(ms.logs)
+  const [taskStatuses, _setTaskStatuses]  = useState<Map<string, TaskStatus>>(ms.taskStatuses)
   const [groupFilter, setGroupFilter]     = useState('Tous')
   const [groups, setGroups]               = useState<string[]>(['Tous'])
   const [showBankPicker, setShowBankPicker] = useState(false)
   const stopRef                           = useRef(false)
   const logEndRef                         = useRef<HTMLDivElement>(null)
+
+  // Persist-aware setters
+  function setSelPhones(v: Set<string> | ((p: Set<string>) => Set<string>)) {
+    _setSelPhones(prev => { const next = typeof v === 'function' ? v(prev) : v; setMassPostingState({ selectedPhones: next }); return next })
+  }
+  function setSelVideos(v: SelectedVideo[] | ((p: SelectedVideo[]) => SelectedVideo[])) {
+    _setSelVideos(prev => { const next = typeof v === 'function' ? v(prev) : v; setMassPostingState({ selectedVideos: next }); return next })
+  }
+  function setCaption(v: string)                                   { _setCaption(v);         setMassPostingState({ caption: v }) }
+  function setPosting(v: boolean)                                  { _setPosting(v);         setMassPostingState({ posting: v }) }
+  function setLogs(v: TaskLog[] | ((p: TaskLog[]) => TaskLog[])) {
+    _setLogs(prev => { const next = typeof v === 'function' ? v(prev) : v; setMassPostingState({ logs: next }); return next })
+  }
+  function setTaskStatuses(v: Map<string, TaskStatus> | ((p: Map<string, TaskStatus>) => Map<string, TaskStatus>)) {
+    _setTaskStatuses(prev => { const next = typeof v === 'function' ? v(prev) : v; setMassPostingState({ taskStatuses: next }); return next })
+  }
+
+  useEffect(() => {
+    const unsub = subscribeMassPosting(() => {
+      const st = getMassPostingState()
+      _setPosting(st.posting)
+      _setLogs(st.logs)
+      _setTaskStatuses(st.taskStatuses)
+    })
+    return unsub
+  }, [])
 
   useEffect(() => {
     Promise.all([
