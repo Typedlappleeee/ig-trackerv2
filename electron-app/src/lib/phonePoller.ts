@@ -67,3 +67,4 @@ export function pollNow() { poll() }
 /** Read-only getters for UI */
 export const getIntervalSec = () => _intervalSec
 export const getEnabled     = () => _enabled
+export const getBearer      = () => _bearer

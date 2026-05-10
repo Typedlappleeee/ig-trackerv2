@@ -334,6 +334,8 @@ export function Phones({ user }: PhonesProps) {
   const [sessionDialog, setSessionDialog] = useState<{ phone: Phone } | null>(null)
   const [inlineEdit, setInlineEdit]     = useState<{ phone: Phone } | null>(null)
 
+  const bearer = poller.getBearer()
+
   const phonesRef      = useRef<Phone[]>([])
   const lastPollMsRef  = useRef(Date.now())
   const countdownRef   = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -666,7 +668,7 @@ export function Phones({ user }: PhonesProps) {
         <span className="text-xs font-medium text-text">Auto-statut</span>
 
         <button
-          onClick={() => setAutoRefresh(v => { localStorage.setItem('phones-autorefresh', String(!v)); return !v })}
+          onClick={() => { const next = !autoRefresh; poller.setEnabled(next); setAutoRefresh(next) }}
           className={`relative w-8 h-4 rounded-full transition-colors ${autoRefresh ? 'bg-accent' : 'bg-surface2'}`}
         >
           <span className={`absolute top-0.5 w-3 h-3 bg-white rounded-full shadow transition-all ${autoRefresh ? 'left-[18px]' : 'left-0.5'}`} />

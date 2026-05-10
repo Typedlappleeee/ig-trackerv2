@@ -3,7 +3,6 @@ import type { User } from '@supabase/supabase-js'
 import { supabase, type ContentItem } from '@/lib/supabase'
 import { Button }  from '@/components/ui/Button'
 import { Spinner } from '@/components/ui/Spinner'
-import { VideoPreview } from '@/components/VideoPreview'
 
 interface BankProps { user: User }
 
@@ -213,7 +212,8 @@ export function Bank({ user }: BankProps) {
   }
 
   // Context menu
-  const [ctxMenu, setCtxMenu] = useState<CtxMenu | null>(null)
+  const [ctxMenu, setCtxMenu]       = useState<CtxMenu | null>(null)
+  const [playingItem, setPlayingItem] = useState<ContentItem | null>(null)
 
   // Modals
   const [renameItem, setRenameItem] = useState<ContentItem | null>(null)
@@ -536,6 +536,7 @@ export function Bank({ user }: BankProps) {
                   key={item.id}
                   item={item}
                   onContextMenu={openCtx}
+                  onPlay={setPlayingItem}
                 />
               ))}
             </div>
@@ -569,6 +570,11 @@ export function Bank({ user }: BankProps) {
             </button>
           ))}
         </div>
+      )}
+
+      {/* ── Video player ── */}
+      {playingItem && (
+        <VideoPlayerModal item={playingItem} onClose={() => setPlayingItem(null)} />
       )}
 
       {/* ── Modals ── */}
@@ -703,19 +709,88 @@ export function VideoThumbnail({ filePath }: { filePath: string }) {
   )
 }
 
+// ── Video player modal ────────────────────────────────────────────────────────
+function VideoPlayerModal({ item, onClose }: { item: ContentItem; onClose: () => void }) {
+  const videoRef = useRef<HTMLVideoElement>(null)
+
+  const localUrl = (() => {
+    if (!item.file_url) return ''
+    let n = item.file_url.replace(/\\/g, '/')
+    if (n.startsWith('file://')) n = n.slice(7)
+    if (!n.startsWith('/')) n = '/' + n
+    return 'localvideo://' + n
+  })()
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  return (
+    <div
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/90 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="relative flex flex-col items-center gap-3"
+        onClick={e => e.stopPropagation()}
+        style={{ maxHeight: '90vh', maxWidth: '90vw' }}
+      >
+        {/* Close */}
+        <button
+          onClick={onClose}
+          className="absolute -top-10 right-0 text-white/60 hover:text-white text-2xl leading-none"
+        >✕</button>
+
+        {/* Title */}
+        <p className="text-white text-sm font-semibold max-w-xs truncate">{item.title}</p>
+
+        {/* Video */}
+        <video
+          ref={videoRef}
+          src={localUrl}
+          controls
+          autoPlay
+          className="rounded-xl shadow-2xl"
+          style={{ maxHeight: '80vh', maxWidth: '80vw', aspectRatio: '9/16', background: '#000' }}
+          onError={() => {}}
+        />
+
+        {/* Meta */}
+        {item.duration && (
+          <p className="text-white/50 text-xs">{formatDuration(item.duration)}</p>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── Video card ───────────────────────────────────────────────────────────────
-function VideoCard({ item, onContextMenu }: {
+function VideoCard({ item, onContextMenu, onPlay }: {
   item: ContentItem
   onContextMenu: (e: React.MouseEvent, item: ContentItem) => void
+  onPlay: (item: ContentItem) => void
 }) {
   return (
     <div
       className="bg-card border border-border rounded-xl overflow-hidden hover:border-accent/40 transition-colors group cursor-default select-none"
       onContextMenu={e => onContextMenu(e, item)}
     >
-      <div className="relative aspect-[9/16] bg-surface2 overflow-hidden">
+      <div
+        className="relative aspect-[9/16] bg-surface2 overflow-hidden cursor-pointer"
+        onClick={() => item.file_url && onPlay(item)}
+      >
         <VideoThumbnail filePath={item.file_url} />
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
+
+        {/* Play button on hover */}
+        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+          <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
+            <span className="text-white text-xl ml-1">▶</span>
+          </div>
+        </div>
+
         {/* Date — top left */}
         <div className="absolute top-2 left-2 bg-black/60 backdrop-blur-sm rounded px-1.5 py-0.5 text-[10px] text-white font-medium">
           {new Date(item.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: '2-digit' })}
@@ -739,7 +814,7 @@ function VideoCard({ item, onContextMenu }: {
         {/* ⋮ menu button on hover */}
         <button
           className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/70 text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white/20"
-          onClick={e => onContextMenu(e, item)}
+          onClick={e => { e.stopPropagation(); onContextMenu(e, item) }}
           title="Options"
         >⋮</button>
       </div>
@@ -893,7 +968,7 @@ export function BankPicker({ user, mode, onSelect, onClose }: BankPickerProps) {
                       disabled={!item.file_url}
                     >
                       <div className="relative aspect-[9/16] bg-surface2">
-                        <VideoPreview filePath={item.file_url} />
+                        <VideoThumbnail filePath={item.file_url ?? ''} />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent pointer-events-none" />
                         {isSelected && (
                           <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-accent flex items-center justify-center">
