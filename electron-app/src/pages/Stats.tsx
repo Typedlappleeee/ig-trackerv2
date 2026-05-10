@@ -56,49 +56,19 @@ async function fetchIgVideos(username: string): Promise<IgVideo[]> {
   } catch { return [] }
 }
 
-// ── Instagram thumbnail ───────────────────────────────────────────────────────
-// Strategy: try the CDN URL directly first (webSecurity:false allows it).
-// If that fails, proxy through IPC (https.get in main process bypasses CORS).
-function VideoThumbnail({ src, sessionid }: { src: string; sessionid?: string }) {
-  const [proxiedUrl, setProxiedUrl] = useState<string | null>(null)
-  const [useProxy, setUseProxy]     = useState(false)
-  const [failed, setFailed]         = useState(false)
-
-  // Fallback: load via IPC proxy
-  useEffect(() => {
-    if (!useProxy || !src) return
-    setProxiedUrl(null)
-    let cancelled = false
-    const headers: Record<string, string> = {}
-    if (sessionid) headers['Cookie'] = `sessionid=${sessionid}`
-    window.electronAPI?.fetchImage({ url: src, headers: Object.keys(headers).length ? headers : undefined })
-      .then(res => {
-        if (cancelled) return
-        if (res.ok && res.dataUrl) setProxiedUrl(res.dataUrl)
-        else setFailed(true)
-      })
-      .catch(() => { if (!cancelled) setFailed(true) })
-    return () => { cancelled = true }
-  }, [useProxy, src, sessionid])
-
+// Thumbnail is either a pre-fetched data URI (from main process) or a CDN URL.
+// Both render fine as <img src>; the data URI case never needs a network request.
+function VideoThumbnail({ src }: { src: string; sessionid?: string }) {
+  const [failed, setFailed] = useState(false)
   if (!src || failed) {
     return <div className="w-full h-full flex items-center justify-center text-3xl bg-surface2">🎬</div>
   }
-
-  // Show spinner while proxy is loading
-  if (useProxy && !proxiedUrl) {
-    return <div className="w-full h-full flex items-center justify-center bg-surface2"><Spinner size="sm" /></div>
-  }
-
   return (
     <img
-      src={proxiedUrl ?? src}
+      src={src}
       alt=""
       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-      onError={() => {
-        if (!useProxy) setUseProxy(true)   // first failure → try IPC proxy
-        else setFailed(true)               // proxy also failed → show emoji
-      }}
+      onError={() => setFailed(true)}
     />
   )
 }

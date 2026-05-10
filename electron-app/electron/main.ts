@@ -245,13 +245,29 @@ function igSessionFetch(url: string, sessionid: string, method = 'GET', body?: s
 
 ipcMain.handle('fetch-instagram-by-session', async (_event, opts: { username: string; sessionid: string }) => {
   try {
-    // 1. Get current user info
-    const curR = await igSessionFetch('https://i.instagram.com/api/v1/accounts/current_user/?edit=true', opts.sessionid)
+    // 1. Get current user ID — try multiple endpoints for reliability
+    let userId: string | number | null = null
+
+    // Attempt A: /accounts/current_user/ (no ?edit=true avoids 403 on restricted accounts)
+    const curR = await igSessionFetch('https://i.instagram.com/api/v1/accounts/current_user/', opts.sessionid)
     if (curR.status === 401) return { ok: false, error: 'session_expired' }
-    if (curR.status !== 200 || !curR.data) return { ok: false, error: `current_user: ${curR.status}` }
-    const curUser = ((curR.data as Record<string, unknown>)['user']) as Record<string, unknown>
-    if (!curUser) return { ok: false, error: 'no user data' }
-    const userId = curUser['pk'] as string | number
+    if (curR.status === 200 && curR.data) {
+      userId = (((curR.data as Record<string, unknown>)['user']) as Record<string, unknown> | undefined)?.['pk'] as string | number | null ?? null
+    }
+
+    // Attempt B: web_profile_info by username (public-ish, works when current_user 403s)
+    if (!userId) {
+      const profR = await igSessionFetch(
+        `https://i.instagram.com/api/v1/users/web_profile_info/?username=${encodeURIComponent(opts.username)}`,
+        opts.sessionid
+      )
+      if (profR.status === 200 && profR.data) {
+        const pUser = ((((profR.data as Record<string, unknown>)['data'] as Record<string, unknown>)?.['user']) as Record<string, unknown> | undefined)
+        userId = pUser?.['id'] as string | number | null ?? null
+      }
+    }
+
+    if (!userId) return { ok: false, error: 'could_not_get_user_id' }
 
     // 2. Get user details (followers, etc.)
     const infoR = await igSessionFetch(`https://i.instagram.com/api/v1/users/${userId}/info/`, opts.sessionid)
@@ -292,9 +308,34 @@ ipcMain.handle('fetch-instagram-by-session', async (_event, opts: { username: st
       }
     }
 
+    // Pre-fetch thumbnails as base64 in the main process so renderer never
+    // needs a separate cross-origin request (CDN URLs are fresh right now).
+    await Promise.all(videos.map(v => new Promise<void>(resolve => {
+      if (!v.thumbnail) { resolve(); return }
+      const url = v.thumbnail
+      https.get(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+          'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
+          'Referer': 'https://www.instagram.com/',
+        },
+      }, (res) => {
+        const chunks: Buffer[] = []
+        res.on('data', (c: Buffer) => chunks.push(c))
+        res.on('end', () => {
+          if (res.statusCode === 200) {
+            const ct = res.headers['content-type'] ?? 'image/jpeg'
+            v.thumbnail = `data:${ct};base64,${Buffer.concat(chunks).toString('base64')}`
+          }
+          resolve()
+        })
+        res.on('error', () => resolve())
+      }).on('error', () => resolve())
+    })))
+
     return {
       ok: true,
-      username: (curUser['username'] as string) ?? opts.username,
+      username: opts.username,
       followers,
       following,
       posts,

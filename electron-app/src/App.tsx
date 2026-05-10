@@ -130,6 +130,7 @@ function BetaPopup({ onClose }: { onClose: () => void }) {
   )
 }
 import { initPoller }        from '@/lib/phonePoller'
+import { initIgStatsPoller } from '@/lib/igStatsPoller'
 import { Dashboard }         from '@/pages/Dashboard'
 import { Phones }            from '@/pages/Phones'
 import { Stats }             from '@/pages/Stats'
@@ -160,7 +161,10 @@ function AppContent({ user }: { user: User }) {
         if (hasBearer && !localStorage.getItem(BETA_KEY)) setShowBeta(true)
         // Start the global status poller as soon as we have the bearer token.
         // It runs in the background regardless of which page is active.
-        if (data?.bearer_token) initPoller(data.bearer_token)
+        if (data?.bearer_token) {
+          initPoller(data.bearer_token)
+          initIgStatsPoller(user)
+        }
       })
     supabase.from('phones').select('id', { count: 'exact', head: true }).eq('user_id', user.id)
       .then(({ count }) => setPhoneCount(count ?? 0))
