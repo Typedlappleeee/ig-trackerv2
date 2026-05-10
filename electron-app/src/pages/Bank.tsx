@@ -2,7 +2,6 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase, type ContentItem } from '@/lib/supabase'
 import { Button }  from '@/components/ui/Button'
-import { Input }   from '@/components/ui/Input'
 import { Spinner } from '@/components/ui/Spinner'
 import { VideoPreview } from '@/components/VideoPreview'
 
@@ -130,11 +129,10 @@ export function Bank({ user }: BankProps) {
   const [items, setItems]         = useState<ContentItem[]>([])
   const [loading, setLoading]     = useState(true)
   const [adding, setAdding]       = useState(false)
-  const [showForm, setShowForm]   = useState(false)
   const [search, setSearch]       = useState('')
   const [error, setError]         = useState<string | null>(null)
   const [dragging, setDragging]   = useState(false)
-  const [selectedFolder, setSelectedFolder] = useState<string | null>(null) // null = all
+  const [selectedFolder, setSelectedFolder] = useState<string | null>(null)
   const [newFolderName, setNewFolderName]   = useState('')
   const [showNewFolder, setShowNewFolder]   = useState(false)
   const [needsMigration, setNeedsMigration] = useState(false)
@@ -147,12 +145,6 @@ export function Bank({ user }: BankProps) {
   const [renameItem, setRenameItem] = useState<ContentItem | null>(null)
   const [moveItem, setMoveItem]     = useState<ContentItem | null>(null)
   const [tagsItem, setTagsItem]     = useState<ContentItem | null>(null)
-
-  // Add form state
-  const [title, setTitle]     = useState('')
-  const [fileUrl, setFileUrl] = useState('')
-  const [tags, setTags]       = useState('')
-  const [notes, setNotes]     = useState('')
 
   const dropRef = useRef<HTMLDivElement>(null)
 
@@ -175,29 +167,29 @@ export function Bank({ user }: BankProps) {
       setError('Erreur lors du chargement.')
     } else {
       setItems(data ?? [])
-      // Check if folder column exists by inspecting first row
-      if (data && data.length > 0 && !('folder' in data[0])) {
-        setNeedsMigration(true)
-      }
+      if (data && data.length > 0 && !('folder' in data[0])) setNeedsMigration(true)
     }
     setLoading(false)
   }
 
-  function resetForm() {
-    setTitle(''); setFileUrl(''); setTags(''); setNotes('')
-    setShowForm(false)
-  }
-
-  function fillFormFromPath(filePath: string) {
-    setFileUrl(filePath)
-    if (!title) setTitle(nameWithoutExt(filePath))
-    setShowForm(true)
+  // Insert a video directly from a file path — no form needed, title = filename
+  async function addFromPath(filePath: string) {
+    const title = nameWithoutExt(filePath)
+    const folder = selectedFolder ?? null
+    setAdding(true)
+    const { data, error: err } = await supabase
+      .from('content_bank')
+      .insert({ user_id: user.id, title, file_url: filePath, duration: null, tags: [], notes: '', folder })
+      .select().single()
+    if (err) setError("Erreur lors de l'ajout : " + err.message)
+    else if (data) setItems(prev => [data, ...prev])
+    setAdding(false)
   }
 
   async function pickFile() {
     if (!window.electronAPI?.pickVideoFile) return
     const p = await window.electronAPI.pickVideoFile()
-    if (p) fillFormFromPath(p)
+    if (p) addFromPath(p)
   }
 
   function onDragOver(e: React.DragEvent) {
@@ -210,31 +202,10 @@ export function Bank({ user }: BankProps) {
     e.preventDefault(); setDragging(false)
     const files = Array.from(e.dataTransfer.files)
     if (files.length === 0) return
-    const file = files[0]
-    const filePath = (file as File & { path?: string }).path ?? file.name
-    fillFormFromPath(filePath)
-  }
-
-  async function addItem() {
-    if (!title.trim()) return
-    setAdding(true); setError(null)
-    const tagsArr = tags.split(',').map(t => t.trim()).filter(Boolean)
-    const folder  = selectedFolder ?? null
-    const { data, error: err } = await supabase
-      .from('content_bank')
-      .insert({
-        user_id:   user.id,
-        title:     title.trim(),
-        file_url:  fileUrl.trim() || null,
-        duration:  null,
-        tags:      tagsArr,
-        notes:     notes.trim(),
-        folder,
-      })
-      .select().single()
-    if (err) setError("Erreur lors de l'ajout.")
-    else { setItems(prev => [data, ...prev]); resetForm() }
-    setAdding(false)
+    for (const file of files) {
+      const filePath = (file as File & { path?: string }).path ?? file.name
+      if (filePath) addFromPath(filePath)
+    }
   }
 
   async function deleteItem(id: string) {
@@ -396,22 +367,20 @@ export function Bank({ user }: BankProps) {
       <div className="flex-1 overflow-auto flex flex-col">
         {/* Header */}
         <div className="px-6 py-4 border-b border-border flex items-center gap-4 flex-shrink-0">
-          <div className="flex-1">
+          <div className="flex-1 flex items-center gap-2">
             <h2 className="text-sm font-semibold text-text">
               {selectedFolder ? `📂 ${selectedFolder}` : '🎬 Toute la banque'}
-              <span className="ml-2 text-text2 font-normal">{visible.length} vidéo{visible.length !== 1 ? 's' : ''}</span>
             </h2>
+            <span className="text-text2 text-xs">{visible.length} vidéo{visible.length !== 1 ? 's' : ''}</span>
+            {adding && <span className="text-xs text-accent animate-pulse">Ajout en cours…</span>}
           </div>
           <input
             type="text"
             placeholder="🔍 Rechercher…"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="w-48 bg-surface border border-border rounded-lg px-3 py-1.5 text-xs text-text placeholder:text-text2 focus:border-accent focus:outline-none transition-colors"
+            className="w-44 bg-surface border border-border rounded-lg px-3 py-1.5 text-xs text-text placeholder:text-text2 focus:border-accent focus:outline-none transition-colors"
           />
-          <Button onClick={() => setShowForm(v => !v)} size="sm">
-            {showForm ? '✕ Annuler' : '+ Ajouter'}
-          </Button>
         </div>
 
         {/* Migration notice */}
@@ -432,33 +401,11 @@ export function Bank({ user }: BankProps) {
           </div>
         )}
 
-        {/* Add form */}
-        {showForm && (
-          <div className="mx-6 mt-4 bg-card border border-border rounded-xl p-5 space-y-4 flex-shrink-0">
-            <h2 className="text-sm font-semibold text-text">Nouvelle vidéo</h2>
-            {fileUrl && (
-              <div className="flex items-center gap-2 px-3 py-2 bg-surface2 rounded-lg text-xs text-text2">
-                <span className="text-accent">📄</span>
-                <span className="truncate flex-1">{basename(fileUrl)}</span>
-                <button onClick={() => setFileUrl('')} className="text-text2 hover:text-danger">✕</button>
-              </div>
-            )}
-            <div className="grid grid-cols-2 gap-4">
-              <Input label="Titre *" placeholder="Nom de la vidéo…" value={title} onChange={e => setTitle(e.target.value)} />
-              <Input label="Chemin fichier (optionnel)" placeholder="C:\Videos\fichier.mp4" value={fileUrl} onChange={e => setFileUrl(e.target.value)} />
-              <Input label="Tags (séparés par virgules)" placeholder="viral, trending…" value={tags} onChange={e => setTags(e.target.value)} />
-              <Input label="Notes" placeholder="Remarques…" value={notes} onChange={e => setNotes(e.target.value)} />
-            </div>
-            <div className="flex gap-3 items-center">
-              <Button onClick={addItem} loading={adding} disabled={!title.trim()}>Ajouter</Button>
-              <Button variant="secondary" onClick={pickFile}>📂 Parcourir…</Button>
-              <Button variant="secondary" onClick={resetForm}>Annuler</Button>
-            </div>
-          </div>
-        )}
-
         {error && (
-          <div className="mx-6 mt-4 px-4 py-3 rounded-lg bg-danger/10 border border-danger/20 text-danger text-sm">{error}</div>
+          <div className="mx-6 mt-4 px-4 py-3 rounded-lg bg-danger/10 border border-danger/20 text-danger text-sm flex items-center gap-2">
+            <span>{error}</span>
+            <button onClick={() => setError(null)} className="ml-auto text-danger hover:text-text">✕</button>
+          </div>
         )}
 
         {/* Content */}
@@ -469,7 +416,7 @@ export function Bank({ user }: BankProps) {
             <div className="text-center py-20 text-text2 space-y-4">
               <p className="text-5xl">🎬</p>
               <p className="font-medium text-base">Banque vide</p>
-              <p className="text-sm">Glisse-dépose une vidéo ici ou clique sur "Ajouter une vidéo".</p>
+              <p className="text-sm">Glisse-dépose tes vidéos ici ou clique sur<br/><span className="text-accent font-medium">📂 Ajouter une vidéo</span> dans la colonne gauche.</p>
             </div>
           ) : visible.length === 0 ? (
             <p className="text-center py-8 text-text2 text-sm">Aucun résultat.</p>
