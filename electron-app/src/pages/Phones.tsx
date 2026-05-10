@@ -462,8 +462,19 @@ export function Phones({ user }: PhonesProps) {
     try {
       const items = await fetchAllPhones(bearer)
       if (items.length === 0) { setError('Aucun téléphone trouvé.'); setSyncing(false); return }
+
+      // In org mode: fetch existing phones by geelark_id so we reuse the original
+      // user_id. Without this, each member who syncs creates duplicate rows because
+      // the upsert conflict key is (user_id, geelark_id) — different user = no conflict.
+      const existingOwners = new Map<string, string>()
+      if (currentOrg) {
+        const { data: ex } = await supabase
+          .from('phones').select('geelark_id, user_id').eq('org_id', currentOrg.id)
+        for (const r of ex ?? []) existingOwners.set(r.geelark_id, r.user_id)
+      }
+
       const rows = items.map(p => ({
-        user_id:    user.id,
+        user_id:    existingOwners.get(p.id) ?? user.id,
         org_id:     currentOrg?.id ?? null,
         geelark_id: p.id,
         serial_no:  p.serialNo ?? null,
@@ -483,7 +494,7 @@ export function Phones({ user }: PhonesProps) {
       setError(e instanceof Error ? e.message : 'Erreur de synchronisation.')
     }
     setSyncing(false)
-  }, [bearer, user.id])
+  }, [bearer, user.id, currentOrg?.id])
 
   // ── Save ig_username ─────────────────────────────────────────────────────
   async function saveIgUsername(id: string, username: string) {

@@ -234,10 +234,10 @@ export function Settings({ user, initialPanel }: SettingsProps) {
       {/* Top tabs (Python: 3 tabs) */}
       <div className="flex gap-1 border-b border-border">
         {([
-          { k: 'general',      l: 'Paramètres généraux' },
-          { k: 'profile',      l: 'Profil'              },
-          { k: 'organization', l: '🏢 Organisation'      },
-          ...(canSeeConnexions ? [{ k: 'connexions' as const, l: 'Connexions' }] : []),
+          { k: 'general',      l: '⚙ Général'       },
+          { k: 'profile',      l: '👤 Profil'        },
+          ...(canSeeConnexions ? [{ k: 'connexions' as const, l: '🔌 Connexions' }] : []),
+          { k: 'organization', l: '🏢 Organisation'  },
         ] as const).map(t => (
           <button
             key={t.k}

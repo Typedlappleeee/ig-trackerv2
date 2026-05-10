@@ -44,6 +44,8 @@ export function OrganizationPanel({ user }: Props) {
   const [invLabel, setInvLabel] = useState('')
   const [invRole,  setInvRole]  = useState<Exclude<OrgRole, 'owner'>>('member')
 
+  const [orgTab, setOrgTab] = useState<'orgas' | 'membres'>('orgas')
+
   const myMembership = myOrgs.find(x => x.org.id === currentOrg?.id)?.member
   const myRole       = myMembership?.role ?? null
   const canManage    = myRole ? canManageOrg(myRole) : false
@@ -244,158 +246,190 @@ export function OrganizationPanel({ user }: Props) {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       {(msg || err) && (
         <div className={`px-4 py-2.5 rounded-lg text-sm ${err ? 'bg-danger/10 text-danger border border-danger/30' : 'bg-ok/10 text-ok border border-ok/30'}`}>
           {err ?? msg}
         </div>
       )}
 
-      {/* My display name */}
-      <section className="bg-card border border-border rounded-xl p-5 space-y-3">
-        <h2 className="text-sm font-bold text-text">👤 Mon nom dans les organisations</h2>
-        <p className="text-text2 text-xs">Visible par les autres membres de tes organisations. Si vide, ton email est affiché.</p>
-        {editingName ? (
-          <DisplayNameEditor initial={myDisplayName} onSave={saveDisplayName} onCancel={() => setEditingName(false)} busy={busy} />
-        ) : (
-          <div className="flex items-center gap-3 bg-surface rounded-lg p-3">
-            <div className="w-8 h-8 rounded-full bg-accent/20 text-accent flex items-center justify-center text-sm font-bold">
-              {(myDisplayName || user.email || '?')[0].toUpperCase()}
+      {/* Sub-tabs */}
+      <div className="flex gap-1 border-b border-border">
+        {([
+          { k: 'orgas',   l: '🏢 Organisations' },
+          { k: 'membres', l: '👥 Membres'        },
+        ] as const).map(t => (
+          <button
+            key={t.k}
+            onClick={() => setOrgTab(t.k)}
+            className={`px-4 py-2 text-sm font-semibold transition-colors -mb-px border-b-2 ${
+              orgTab === t.k ? 'border-accent text-accent bg-accent/5' : 'border-transparent text-text2 hover:text-text'
+            }`}
+          >{t.l}</button>
+        ))}
+      </div>
+
+      {/* ── Organisations tab ─────────────────────────────────────────────── */}
+      {orgTab === 'orgas' && <>
+        {/* My display name */}
+        <section className="bg-card border border-border rounded-xl p-5 space-y-3">
+          <h2 className="text-sm font-bold text-text">👤 Mon nom dans les organisations</h2>
+          <p className="text-text2 text-xs">Visible par les autres membres. Si vide, ton email est affiché.</p>
+          {editingName ? (
+            <DisplayNameEditor initial={myDisplayName} onSave={saveDisplayName} onCancel={() => setEditingName(false)} busy={busy} />
+          ) : (
+            <div className="flex items-center gap-3 bg-surface rounded-lg p-3">
+              <div className="w-8 h-8 rounded-full bg-accent/20 text-accent flex items-center justify-center text-sm font-bold">
+                {(myDisplayName || user.email || '?')[0].toUpperCase()}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-text text-sm font-medium truncate">{myDisplayName || <span className="text-text2 italic">Aucun nom — {user.email}</span>}</p>
+                {myDisplayName && <p className="text-text2 text-xs truncate">{user.email}</p>}
+              </div>
+              <Button size="sm" variant="secondary" onClick={() => setEditingName(true)}>✎ Modifier</Button>
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-text text-sm font-medium truncate">{myDisplayName || <span className="text-text2 italic">Aucun nom — {user.email}</span>}</p>
-              {myDisplayName && <p className="text-text2 text-xs truncate">{user.email}</p>}
+          )}
+        </section>
+
+        {/* My orgs */}
+        <section className="bg-card border border-border rounded-xl p-5 space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-bold text-text">🏢 Mes organisations</h2>
+            <Button size="sm" onClick={() => setCreating(v => !v)}>+ Nouvelle</Button>
+          </div>
+
+          {creating && (
+            <div className="flex gap-2 items-center bg-surface rounded-lg p-3">
+              <Input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Nom de l'organisation"
+                onKeyDown={e => { if (e.key === 'Enter') createOrg() }} />
+              <Button size="sm" onClick={createOrg} loading={busy}>Créer</Button>
+              <Button size="sm" variant="secondary" onClick={() => setCreating(false)}>Annuler</Button>
             </div>
-            <Button size="sm" variant="secondary" onClick={() => setEditingName(true)}>✎ Modifier</Button>
-          </div>
-        )}
-      </section>
+          )}
 
-      {/* My orgs */}
-      <section className="bg-card border border-border rounded-xl p-5 space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-bold text-text">🏢 Mes organisations</h2>
-          <Button size="sm" onClick={() => setCreating(v => !v)}>+ Nouvelle</Button>
-        </div>
-
-        {creating && (
-          <div className="flex gap-2 items-center bg-surface rounded-lg p-3">
-            <Input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Nom de l'organisation"
-              onKeyDown={e => { if (e.key === 'Enter') createOrg() }} />
-            <Button size="sm" onClick={createOrg} loading={busy}>Créer</Button>
-            <Button size="sm" variant="secondary" onClick={() => setCreating(false)}>Annuler</Button>
-          </div>
-        )}
-
-        {myOrgs.length === 0 ? (
-          <p className="text-text2 text-sm">Aucune organisation. Crée-en une ou rejoins-en une avec un code d'invitation.</p>
-        ) : (
-          <ul className="space-y-2">
-            {myOrgs.map(({ org, member }) => (
-              <li key={org.id} className={`flex items-center gap-3 p-3 rounded-lg border ${currentOrg?.id === org.id ? 'border-accent/40 bg-accent/5' : 'border-border bg-surface'}`}>
-                <span className="text-xl">🏢</span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-text font-medium truncate">{org.name}</p>
-                  <p className="text-text2 text-xs">{ROLE_LABELS[member.role]}</p>
-                </div>
-                {currentOrg?.id !== org.id && (
-                  <Button size="sm" variant="secondary" onClick={() => switchOrg(org.id)}>Activer</Button>
-                )}
-                {member.role === 'owner' ? (
-                  <Button size="sm" variant="danger" onClick={() => deleteOrg(org)}>Supprimer</Button>
-                ) : (
-                  <Button size="sm" variant="secondary" onClick={() => leaveOrg(org.id)}>Quitter</Button>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      {/* Join via token */}
-      <section className="bg-card border border-border rounded-xl p-5 space-y-3">
-        <h2 className="text-sm font-bold text-text">🎟 Rejoindre une organisation</h2>
-        <div className="flex gap-2">
-          <Input value={joinToken} onChange={e => setJoinToken(e.target.value)} placeholder="Colle ton code d'invitation"
-            onKeyDown={e => { if (e.key === 'Enter') acceptInvite() }} />
-          <Button onClick={acceptInvite} loading={busy} disabled={!joinToken.trim()}>Rejoindre</Button>
-        </div>
-      </section>
-
-      {/* Members management (only for admin/owner of currentOrg) */}
-      {currentOrg && canManage && (
-        <section className="bg-card border border-border rounded-xl p-5 space-y-4">
-          <h2 className="text-sm font-bold text-text">👥 Membres de "{currentOrg.name}"</h2>
-
-          <ul className="space-y-2">
-            {members.map(m => {
-              const isMe = m.user_id === user.id
-              const label = memberLabel(m)
-              return (
-                <li key={m.id} className="bg-surface rounded-lg border border-border">
-                  <div className="flex items-center gap-3 p-3">
-                    <div className="w-8 h-8 rounded-full bg-accent/20 text-accent flex items-center justify-center text-sm font-bold">
-                      {label[0].toUpperCase()}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-text text-sm font-medium truncate">
-                        {label} {isMe && <span className="text-text2">(toi)</span>}
-                      </p>
-                      <p className="text-text2 text-xs truncate">
-                        {m.email ?? m.user_id} · Rejoint {new Date(m.joined_at).toLocaleDateString('fr-FR')}
-                      </p>
-                    </div>
-                    <select
-                      value={m.role}
-                      disabled={m.role === 'owner' || isMe}
-                      onChange={e => changeRole(m, e.target.value as OrgRole)}
-                      className="bg-bg border border-border rounded px-2 py-1 text-xs text-text disabled:opacity-50"
-                    >
-                      <option value="owner" disabled>Propriétaire</option>
-                      <option value="admin">Admin</option>
-                      <option value="member">Membre</option>
-                      <option value="viewer">Lecteur</option>
-                    </select>
-                    {m.role !== 'owner' && (
-                      <>
-                        <button onClick={() => setEditing(editing === m.id ? null : m.id)} className="text-xs text-accent hover:text-accent2 px-2">
-                          {editing === m.id ? 'Fermer' : 'Permissions'}
-                        </button>
-                        {!isMe && <button onClick={() => removeMember(m)} className="text-xs text-danger hover:opacity-80 px-2">Retirer</button>}
-                      </>
-                    )}
+          {myOrgs.length === 0 ? (
+            <p className="text-text2 text-sm">Aucune organisation. Crée-en une ou rejoins-en une avec un code d'invitation.</p>
+          ) : (
+            <ul className="space-y-2">
+              {myOrgs.map(({ org, member }) => (
+                <li key={org.id} className={`flex items-center gap-3 p-3 rounded-lg border ${currentOrg?.id === org.id ? 'border-accent/40 bg-accent/5' : 'border-border bg-surface'}`}>
+                  <span className="text-xl">🏢</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-text font-medium truncate">{org.name}</p>
+                    <p className="text-text2 text-xs">{ROLE_LABELS[member.role]}</p>
                   </div>
-                  {editing === m.id && (
-                    <PermEditor
-                      member={m}
-                      availableFolders={folders}
-                      availableGroups={groups}
-                      onSave={perms => savePerms(m, perms)}
-                      onCancel={() => setEditing(null)}
-                    />
+                  {currentOrg?.id !== org.id && (
+                    <Button size="sm" variant="secondary" onClick={() => switchOrg(org.id)}>Activer</Button>
+                  )}
+                  {member.role === 'owner' ? (
+                    <Button size="sm" variant="danger" onClick={() => deleteOrg(org)}>Supprimer</Button>
+                  ) : (
+                    <Button size="sm" variant="secondary" onClick={() => leaveOrg(org.id)}>Quitter</Button>
                   )}
                 </li>
-              )
-            })}
-          </ul>
+              ))}
+            </ul>
+          )}
+        </section>
 
-          {/* Invites */}
-          <div className="border-t border-border pt-4 space-y-3">
-            <h3 className="text-xs font-bold text-text uppercase tracking-wider">Générer un code d'invitation</h3>
-            <p className="text-text2 text-xs">Chaque code est <strong className="text-text">à usage unique</strong> : une fois utilisé pour rejoindre, il devient invalide.</p>
-            <div className="flex gap-2">
-              <Input value={invLabel} onChange={e => setInvLabel(e.target.value)} placeholder="Note (ex: Pour Pierre) — optionnel" />
-              <select
-                value={invRole}
-                onChange={e => setInvRole(e.target.value as Exclude<OrgRole, 'owner'>)}
-                className="bg-bg border border-border rounded px-2 py-1 text-sm text-text"
-              >
-                <option value="admin">Admin</option>
-                <option value="member">Membre</option>
-                <option value="viewer">Lecteur</option>
-              </select>
-              <Button onClick={createInvite} loading={busy}>🎟 Générer un code</Button>
-            </div>
+        {/* Join via token */}
+        <section className="bg-card border border-border rounded-xl p-5 space-y-3">
+          <h2 className="text-sm font-bold text-text">🎟 Rejoindre une organisation</h2>
+          <div className="flex gap-2">
+            <Input value={joinToken} onChange={e => setJoinToken(e.target.value)} placeholder="Colle ton code d'invitation"
+              onKeyDown={e => { if (e.key === 'Enter') acceptInvite() }} />
+            <Button onClick={acceptInvite} loading={busy} disabled={!joinToken.trim()}>Rejoindre</Button>
+          </div>
+        </section>
+      </>}
+
+      {/* ── Membres tab ───────────────────────────────────────────────────── */}
+      {orgTab === 'membres' && (
+        !currentOrg ? (
+          <div className="bg-card border border-border rounded-xl p-8 text-center space-y-2">
+            <p className="text-2xl">🏢</p>
+            <p className="text-text font-semibold">Aucune organisation active</p>
+            <p className="text-text2 text-sm">Active une organisation dans l'onglet "Organisations" pour gérer ses membres.</p>
+          </div>
+        ) : !canManage ? (
+          <div className="bg-card border border-border rounded-xl p-8 text-center space-y-2">
+            <p className="text-2xl">🔒</p>
+            <p className="text-text font-semibold">Accès réservé aux admins</p>
+            <p className="text-text2 text-sm">Seuls les propriétaires et admins peuvent gérer les membres.</p>
+          </div>
+        ) : (
+          <section className="bg-card border border-border rounded-xl p-5 space-y-4">
+            <h2 className="text-sm font-bold text-text">👥 Membres de "{currentOrg.name}"</h2>
+
+            <ul className="space-y-2">
+              {members.map(m => {
+                const isMe = m.user_id === user.id
+                const label = memberLabel(m)
+                return (
+                  <li key={m.id} className="bg-surface rounded-lg border border-border">
+                    <div className="flex items-center gap-3 p-3">
+                      <div className="w-8 h-8 rounded-full bg-accent/20 text-accent flex items-center justify-center text-sm font-bold">
+                        {label[0].toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-text text-sm font-medium truncate">
+                          {label} {isMe && <span className="text-text2">(toi)</span>}
+                        </p>
+                        <p className="text-text2 text-xs truncate">
+                          {m.email ?? m.user_id} · Rejoint {new Date(m.joined_at).toLocaleDateString('fr-FR')}
+                        </p>
+                      </div>
+                      <select
+                        value={m.role}
+                        disabled={m.role === 'owner' || isMe}
+                        onChange={e => changeRole(m, e.target.value as OrgRole)}
+                        className="bg-bg border border-border rounded px-2 py-1 text-xs text-text disabled:opacity-50"
+                      >
+                        <option value="owner" disabled>Propriétaire</option>
+                        <option value="admin">Admin</option>
+                        <option value="member">Membre</option>
+                        <option value="viewer">Lecteur</option>
+                      </select>
+                      {m.role !== 'owner' && (
+                        <>
+                          <button onClick={() => setEditing(editing === m.id ? null : m.id)} className="text-xs text-accent hover:text-accent2 px-2">
+                            {editing === m.id ? 'Fermer' : 'Permissions'}
+                          </button>
+                          {!isMe && <button onClick={() => removeMember(m)} className="text-xs text-danger hover:opacity-80 px-2">Retirer</button>}
+                        </>
+                      )}
+                    </div>
+                    {editing === m.id && (
+                      <PermEditor
+                        member={m}
+                        availableFolders={folders}
+                        availableGroups={groups}
+                        onSave={perms => savePerms(m, perms)}
+                        onCancel={() => setEditing(null)}
+                      />
+                    )}
+                  </li>
+                )
+              })}
+            </ul>
+
+            {/* Invites */}
+            <div className="border-t border-border pt-4 space-y-3">
+              <h3 className="text-xs font-bold text-text uppercase tracking-wider">Générer un code d'invitation</h3>
+              <p className="text-text2 text-xs">Chaque code est <strong className="text-text">à usage unique</strong> : une fois utilisé, il devient invalide.</p>
+              <div className="flex gap-2">
+                <Input value={invLabel} onChange={e => setInvLabel(e.target.value)} placeholder="Note (ex: Pour Pierre) — optionnel" />
+                <select
+                  value={invRole}
+                  onChange={e => setInvRole(e.target.value as Exclude<OrgRole, 'owner'>)}
+                  className="bg-bg border border-border rounded px-2 py-1 text-sm text-text"
+                >
+                  <option value="admin">Admin</option>
+                  <option value="member">Membre</option>
+                  <option value="viewer">Lecteur</option>
+                </select>
+                <Button onClick={createInvite} loading={busy}>🎟 Générer un code</Button>
+              </div>
 
             {invites.length > 0 && (
               <ul className="space-y-1.5">
@@ -416,6 +450,7 @@ export function OrganizationPanel({ user }: Props) {
             )}
           </div>
         </section>
+        )
       )}
     </div>
   )
