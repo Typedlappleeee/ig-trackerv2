@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { useOrg }    from '@/lib/orgContext'
@@ -73,7 +73,17 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
   const [soonOpen, setSoonOpen] = useState(false)
   const [now, setNow] = useState(Date.now())
   const [orgMenuOpen, setOrgMenuOpen] = useState(false)
+  const orgTriggerRef                 = useRef<HTMLButtonElement>(null)
+  const [orgMenuPos, setOrgMenuPos]   = useState<{ left: number; bottom: number; width: number } | null>(null)
   const { myOrgs, currentOrg, role, perms, switchOrg } = useOrg()
+
+  function openOrgMenu() {
+    const rect = orgTriggerRef.current?.getBoundingClientRect()
+    if (rect) {
+      setOrgMenuPos({ left: rect.left, bottom: window.innerHeight - rect.top + 4, width: rect.width })
+      setOrgMenuOpen(true)
+    }
+  }
 
   // In solo mode, all tabs visible. In org mode, gate by role + overrides.
   const isVisibleTab = (id: Page): boolean => role ? canSeeTab(role, perms, id) : true
@@ -244,9 +254,10 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
         </div>
 
         {/* Org switcher */}
-        <div className="px-3 pb-2 relative">
+        <div className="px-3 pb-2">
           <button
-            onClick={() => setOrgMenuOpen(o => !o)}
+            ref={orgTriggerRef}
+            onClick={() => orgMenuOpen ? setOrgMenuOpen(false) : openOrgMenu()}
             className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[12px] bg-surface border border-border hover:border-accent/40 transition-colors"
           >
             <span className="text-base flex-shrink-0">{currentOrg ? '🏢' : '👤'}</span>
@@ -256,31 +267,6 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             </div>
             <span className="text-text2 text-[10px]">▾</span>
           </button>
-          {orgMenuOpen && (
-            <div className="absolute left-3 right-3 bottom-full mb-1 z-50 bg-surface border border-border rounded-lg shadow-xl overflow-hidden">
-              <button
-                onClick={() => { switchOrg(null); setOrgMenuOpen(false) }}
-                className={`w-full flex items-center gap-2 px-3 py-2 text-[12px] text-left hover:bg-surface2 ${!currentOrg ? 'bg-accent/10 text-accent' : 'text-text'}`}
-              >
-                <span>👤</span><span>Mode solo</span>
-              </button>
-              {myOrgs.map(({ org }) => (
-                <button
-                  key={org.id}
-                  onClick={() => { switchOrg(org.id); setOrgMenuOpen(false) }}
-                  className={`w-full flex items-center gap-2 px-3 py-2 text-[12px] text-left hover:bg-surface2 ${currentOrg?.id === org.id ? 'bg-accent/10 text-accent' : 'text-text'}`}
-                >
-                  <span>🏢</span><span className="truncate">{org.name}</span>
-                </button>
-              ))}
-              <button
-                onClick={() => { onNavigate('settings'); setOrgMenuOpen(false) }}
-                className="w-full px-3 py-2 text-[11px] text-text2 hover:bg-surface2 border-t border-border text-left"
-              >
-                ⚙ Gérer les organisations
-              </button>
-            </div>
-          )}
         </div>
 
         {/* User strip */}
@@ -304,6 +290,43 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
       <main className="flex-1 overflow-auto">
         {children}
       </main>
+
+      {/* Org switcher menu (fixed-position overlay so nothing can intercept clicks) */}
+      {orgMenuOpen && orgMenuPos && (
+        <>
+          <div
+            onClick={() => setOrgMenuOpen(false)}
+            className="fixed inset-0 z-[9998]"
+            style={{ background: 'transparent' }}
+          />
+          <div
+            className="fixed z-[9999] bg-surface border border-border rounded-lg shadow-2xl overflow-hidden"
+            style={{ left: orgMenuPos.left, bottom: orgMenuPos.bottom, width: orgMenuPos.width }}
+          >
+            <button
+              onClick={() => { switchOrg(null); setOrgMenuOpen(false) }}
+              className={`w-full flex items-center gap-2 px-3 py-2 text-[12px] text-left hover:bg-surface2 ${!currentOrg ? 'bg-accent/10 text-accent' : 'text-text'}`}
+            >
+              <span>👤</span><span>Mode solo</span>
+            </button>
+            {myOrgs.map(({ org }) => (
+              <button
+                key={org.id}
+                onClick={() => { switchOrg(org.id); setOrgMenuOpen(false) }}
+                className={`w-full flex items-center gap-2 px-3 py-2 text-[12px] text-left hover:bg-surface2 ${currentOrg?.id === org.id ? 'bg-accent/10 text-accent' : 'text-text'}`}
+              >
+                <span>🏢</span><span className="truncate">{org.name}</span>
+              </button>
+            ))}
+            <button
+              onClick={() => { setOrgMenuOpen(false); onNavigate('settings') }}
+              className="w-full px-3 py-2 text-[11px] text-text2 hover:bg-surface2 border-t border-border text-left"
+            >
+              ⚙ Gérer les organisations
+            </button>
+          </div>
+        </>
+      )}
     </div>
   )
 }
