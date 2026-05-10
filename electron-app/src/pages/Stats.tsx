@@ -337,7 +337,6 @@ export function Stats({ user }: StatsProps) {
                   {(() => {
                     const maxV = Math.max(...sorted.map(v => v.views), 1)
                     return sorted.map(video => {
-                      // Tier banner gradient based on views (matches Python aesthetic fallback)
                       const tier = video.views >= maxV * 0.7 ? 'high' : video.views >= maxV * 0.3 ? 'mid' : 'low'
                       const tierGradient =
                         tier === 'high' ? 'linear-gradient(135deg, #a56ef5 0%, #f03d55 100%)' :
@@ -351,46 +350,55 @@ export function Stats({ user }: StatsProps) {
                           rel="noreferrer"
                           className="bg-card border border-border rounded-xl overflow-hidden hover:border-accent transition-colors group"
                         >
-                          {/* Banner — 90px tall, gradient with thumbnail overlay */}
+                          {/* Portrait thumbnail — 9:16 like the bank */}
                           <div
-                            className="relative h-[90px] overflow-hidden"
+                            className="relative aspect-[9/16] overflow-hidden"
                             style={{ background: tierGradient }}
                           >
                             {video.thumbnail && (
-                              <div className="absolute inset-0 opacity-60">
+                              <div className="absolute inset-0">
                                 <VideoThumbnail src={video.thumbnail} sessionid={sessionid} />
                               </div>
                             )}
-                            <div className="absolute inset-0 bg-black/30" />
-                            {/* Play icon overlay */}
-                            <div className="absolute inset-0 flex items-center justify-center">
-                              <div className="w-10 h-10 rounded-full bg-white/30 backdrop-blur-sm flex items-center justify-center">
-                                <span className="text-white text-base ml-0.5">▶</span>
+                            {/* Dark gradient overlay at bottom */}
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/10 to-transparent pointer-events-none" />
+
+                            {/* Play button */}
+                            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                              <div className="w-12 h-12 rounded-full bg-white/25 backdrop-blur-sm flex items-center justify-center">
+                                <span className="text-white text-xl ml-1">▶</span>
                               </div>
                             </div>
+
                             {/* REEL chip */}
-                            <span className="absolute top-2 right-2 bg-black/60 text-white text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded">REEL</span>
-                          </div>
-                          {/* Body */}
-                          <div className="p-3 space-y-2">
-                            <div className="flex items-baseline gap-2">
-                              <span className="text-accent text-base">▶</span>
-                              <span className="text-xl font-bold text-text leading-none">{video.views.toLocaleString('fr-FR')}</span>
-                              <span className="text-[10px] text-text2">vues</span>
-                            </div>
-                            {/* Progress bar (views / max) */}
-                            <div className="h-[3px] bg-surface3 rounded-full overflow-hidden">
-                              <div className="h-full bg-accent rounded-full" style={{ width: `${(video.views / maxV) * 100}%` }} />
-                            </div>
-                            {/* Stats row */}
-                            <div className="flex items-center gap-3 text-[11px] text-text2 font-semibold">
-                              {video.likes > 0 && <span>♥ {video.likes.toLocaleString('fr-FR')}</span>}
-                              {video.comments > 0 && <span>✎ {video.comments.toLocaleString('fr-FR')}</span>}
-                              {video.timestamp && (
-                                <span className="ml-auto text-[10px] text-text2/70">
-                                  {new Date(video.timestamp).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}
-                                </span>
-                              )}
+                            <span className="absolute top-2 left-2 bg-black/60 text-white text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded">REEL</span>
+
+                            {/* Tier dot */}
+                            <span className={`absolute top-2 right-2 w-2 h-2 rounded-full ${
+                              tier === 'high' ? 'bg-[#a56ef5]' : tier === 'mid' ? 'bg-accent' : 'bg-text2/40'
+                            }`} />
+
+                            {/* Stats overlay at bottom */}
+                            <div className="absolute bottom-0 left-0 right-0 p-3 space-y-1.5">
+                              {/* Views — big */}
+                              <div className="flex items-baseline gap-1.5">
+                                <span className="text-2xl font-bold text-white leading-none">{video.views.toLocaleString('fr-FR')}</span>
+                                <span className="text-[10px] text-white/60">vues</span>
+                              </div>
+                              {/* Progress bar */}
+                              <div className="h-[2px] bg-white/20 rounded-full overflow-hidden">
+                                <div className="h-full bg-white/70 rounded-full" style={{ width: `${(video.views / maxV) * 100}%` }} />
+                              </div>
+                              {/* Likes / comments / date */}
+                              <div className="flex items-center gap-2.5 text-[10px] text-white/70 font-medium">
+                                {video.likes    > 0 && <span>♥ {video.likes.toLocaleString('fr-FR')}</span>}
+                                {video.comments > 0 && <span>✎ {video.comments.toLocaleString('fr-FR')}</span>}
+                                {video.timestamp && (
+                                  <span className="ml-auto">
+                                    {new Date(video.timestamp).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </a>
