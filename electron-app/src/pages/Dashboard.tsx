@@ -261,10 +261,6 @@ export function Dashboard({ user }: DashboardProps) {
     }
     setSchemaMissing(false)
     const rows = data ?? []
-    if (rows.length === 0) {
-      setChartData([])
-      setLC(false); return
-    }
 
     const byDay = new Map<string, number>()
     for (const row of rows) {
@@ -272,8 +268,24 @@ export function Dashboard({ user }: DashboardProps) {
       const cur = byDay.get(day) ?? 0
       byDay.set(day, Math.max(cur, row.views as number))
     }
-    const sorted = [...byDay.entries()].sort(([a], [b]) => a.localeCompare(b))
-    const pts: ViewPoint[] = sorted.map(([label, value]) => ({ label, value, date: new Date(label) }))
+
+    // Build a complete day-by-day series for fixed ranges, filling gaps with 0.
+    let pts: ViewPoint[]
+    if (range === 'all') {
+      const sorted = [...byDay.entries()].sort(([a], [b]) => a.localeCompare(b))
+      pts = sorted.map(([label, value]) => ({ label, value, date: new Date(label) }))
+    } else {
+      const days = range === '24h' ? 1 : range === '7d' ? 7 : 30
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      pts = []
+      for (let i = days - 1; i >= 0; i--) {
+        const d = new Date(today)
+        d.setDate(d.getDate() - i)
+        const label = d.toISOString().slice(0, 10)
+        pts.push({ label, value: byDay.get(label) ?? 0, date: new Date(label) })
+      }
+    }
     setChartData(pts)
     setLC(false)
   }
