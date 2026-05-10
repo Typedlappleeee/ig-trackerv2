@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import type { User } from '@supabase/supabase-js'
-import { supabase, type Phone, type ContentItem } from '@/lib/supabase'
+import { supabase, type Phone } from '@/lib/supabase'
 import { Button }  from '@/components/ui/Button'
-import { Spinner } from '@/components/ui/Spinner'
+import { VideoPreview } from '@/components/VideoPreview'
+import { BankPicker } from './Bank'
 
 interface PostingProps { user: User }
 
@@ -22,65 +23,29 @@ async function geelark(bearer: string, path: string, body: unknown) {
   return r.data as Record<string, unknown>
 }
 
-// ── Video thumbnail preview ─────────────────────────────────────────────────
-function VideoPreview({ filePath }: { filePath: string | null }) {
-  const [ready, setReady]   = useState(false)
-  const [failed, setFailed] = useState(false)
-  const videoRef            = useRef<HTMLVideoElement>(null)
-
-  useEffect(() => { setReady(false); setFailed(false) }, [filePath])
-
-  if (!filePath) return null
-  const src = `file:///${filePath.replace(/\\/g, '/')}`
-  return (
-    <div className="w-36 flex-shrink-0 aspect-[9/16] bg-surface2 rounded-xl overflow-hidden relative">
-      {!ready && (
-        <div className="absolute inset-0 flex items-center justify-center">
-          <Spinner size="sm" />
-        </div>
-      )}
-      <video
-        ref={videoRef}
-        src={src}
-        className={`w-full h-full object-cover ${ready ? 'opacity-100' : 'opacity-0'}`}
-        muted playsInline preload="metadata"
-        onLoadedMetadata={() => { if (videoRef.current) videoRef.current.currentTime = 1 }}
-        onSeeked={() => setReady(true)}
-        onError={() => setFailed(true)}
-      />
-      {failed && (
-        <div className="absolute inset-0 flex items-center justify-center text-2xl bg-surface2">🎬</div>
-      )}
-    </div>
-  )
-}
-
 export function Posting({ user }: PostingProps) {
-  const [phones, setPhones]             = useState<Phone[]>([])
-  const [bank, setBank]                 = useState<ContentItem[]>([])
-  const [selectedPhones, setSelPhones]  = useState<Set<string>>(new Set())
-  const [selectedVideo, setSelVideo]    = useState<ContentItem | null>(null)
-  const [localFilePath, setLocalPath]   = useState<string | null>(null)
-  const [bearer, setBearer]             = useState('')
-  const [groupFilter, setGroup]         = useState('Tous')
-  const [groups, setGroups]             = useState<string[]>(['Tous'])
-  const [posting, setPosting]           = useState(false)
-  const [logs, setLogs]                 = useState<TaskLog[]>([])
-  const [progress, setProgress]         = useState(0)
-  const logEndRef                       = useRef<HTMLDivElement>(null)
+  const [phones, setPhones]            = useState<Phone[]>([])
+  const [selectedPhones, setSelPhones] = useState<Set<string>>(new Set())
+  const [filePath, setFilePath]        = useState<string | null>(null)
+  const [bearer, setBearer]            = useState('')
+  const [groupFilter, setGroup]        = useState('Tous')
+  const [groups, setGroups]            = useState<string[]>(['Tous'])
+  const [posting, setPosting]          = useState(false)
+  const [logs, setLogs]                = useState<TaskLog[]>([])
+  const [progress, setProgress]        = useState(0)
+  const [showBankPicker, setShowBankPicker] = useState(false)
+  const logEndRef                      = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     Promise.all([
       supabase.from('app_config').select('bearer_token').eq('user_id', user.id).single(),
       supabase.from('phones').select('*').eq('user_id', user.id).order('phone_name'),
-      supabase.from('content_bank').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
-    ]).then(([cfg, ph, bk]) => {
+    ]).then(([cfg, ph]) => {
       if (cfg.data?.bearer_token) setBearer(cfg.data.bearer_token)
       const ps = ph.data ?? []
       setPhones(ps)
       const grps = [...new Set(ps.map(p => p.group_name).filter(Boolean) as string[])].sort()
       setGroups(['Tous', ...grps])
-      setBank(bk.data ?? [])
     })
   }, [])
 
@@ -102,17 +67,14 @@ export function Posting({ user }: PostingProps) {
   }
 
   async function pickLocalFile() {
-    const path = await window.electronAPI?.pickVideoFile()
-    if (path) { setLocalPath(path); setSelVideo(null) }
+    const p = await window.electronAPI?.pickVideoFile()
+    if (p) setFilePath(p)
   }
 
-  // The active file path (local or bank)
-  const activeFilePath = localFilePath ?? selectedVideo?.file_url ?? null
-
   async function post() {
-    if (!bearer)                          { log('Token GéeLark manquant — Paramètres', 'error'); return }
-    if (selectedPhones.size === 0)        { log('Sélectionne au moins un téléphone', 'warn'); return }
-    if (!selectedVideo && !localFilePath) { log('Sélectionne une vidéo', 'warn'); return }
+    if (!bearer)               { log('Token GéeLark manquant — Paramètres', 'error'); return }
+    if (selectedPhones.size === 0) { log('Sélectionne au moins un téléphone', 'warn'); return }
+    if (!filePath)             { log('Sélectionne une vidéo', 'warn'); return }
 
     setPosting(true); setLogs([]); setProgress(0)
     const phoneList = phones.filter(p => selectedPhones.has(p.id))
@@ -121,17 +83,9 @@ export function Posting({ user }: PostingProps) {
     try {
       log('📤 Upload de la vidéo vers GéeLark…')
       setProgress(5)
-      let videoToken: string
-
-      if (localFilePath) {
-        const up = await window.electronAPI!.uploadVideoGeelark({ bearer, filePath: localFilePath })
-        if (!up.ok || !up.token) { log(`❌ Upload échoué: ${up.error}`, 'error'); setPosting(false); return }
-        videoToken = up.token
-      } else {
-        const d = await geelark(bearer, '/upload/getUrl', { fileType: 'video', url: selectedVideo!.file_url })
-        if (d['code'] !== 0) { log(`❌ Upload URL: ${d['msg'] ?? d['code']}`, 'error'); setPosting(false); return }
-        videoToken = (d['data'] as Record<string, unknown>)?.['token'] as string
-      }
+      const up = await window.electronAPI!.uploadVideoGeelark({ bearer, filePath })
+      if (!up.ok || !up.token) { log(`❌ Upload échoué: ${up.error}`, 'error'); setPosting(false); return }
+      const videoToken = up.token
       log(`✅ Vidéo uploadée (token: ${videoToken.slice(0, 12)}…)`, 'ok')
       setProgress(20)
 
@@ -211,6 +165,7 @@ export function Posting({ user }: PostingProps) {
   }
 
   const visiblePhones = groupFilter === 'Tous' ? phones : phones.filter(p => p.group_name === groupFilter)
+  const fileName = filePath ? filePath.replace(/\\/g, '/').split('/').pop() ?? filePath : null
 
   return (
     <div className="flex h-full min-h-screen">
@@ -270,58 +225,37 @@ export function Posting({ user }: PostingProps) {
         <div className="bg-card border border-border rounded-xl p-5">
           <h2 className="text-sm font-semibold text-text mb-4">Vidéo</h2>
           <div className="flex gap-5">
-            {/* Preview */}
-            {activeFilePath && <VideoPreview filePath={activeFilePath} />}
+            {/* 9:16 preview */}
+            <div className="w-32 flex-shrink-0">
+              <div className="aspect-[9/16] rounded-xl overflow-hidden">
+                <VideoPreview filePath={filePath} />
+              </div>
+            </div>
 
-            {/* Pickers */}
-            <div className="flex-1 space-y-4">
-              <div className="flex items-center gap-3">
+            {/* Source buttons */}
+            <div className="flex-1 space-y-3">
+              <div className="flex gap-2 flex-wrap">
                 <Button variant="secondary" size="sm" onClick={pickLocalFile}>
-                  Depuis le PC
+                  💻 Depuis le PC
                 </Button>
-                {localFilePath && (
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs text-ok truncate">✓ {localFilePath.split(/[\\/]/).pop()}</p>
-                    <button onClick={() => setLocalPath(null)} className="text-[10px] text-text2 hover:text-danger">Retirer</button>
-                  </div>
+                <Button variant="secondary" size="sm" onClick={() => setShowBankPicker(true)}>
+                  🗂 Depuis la banque
+                </Button>
+                {filePath && (
+                  <Button variant="secondary" size="sm" onClick={() => setFilePath(null)}>
+                    ✕ Retirer
+                  </Button>
                 )}
               </div>
-
-              <div>
-                <p className="text-xs text-text2 mb-2">ou depuis la banque :</p>
-                {bank.length === 0 ? (
-                  <p className="text-xs text-text2">Aucune vidéo dans la banque.</p>
-                ) : (
-                  <div className="grid grid-cols-2 gap-2 max-h-56 overflow-auto">
-                    {bank.map(item => {
-                      const filePath = item.file_url
-                      const isSelected = selectedVideo?.id === item.id
-                      return (
-                        <button
-                          key={item.id}
-                          onClick={() => { setSelVideo(item); setLocalPath(null) }}
-                          className={`relative rounded-lg overflow-hidden border transition-all ${
-                            isSelected ? 'border-accent ring-1 ring-accent' : 'border-border hover:border-accent/40'
-                          }`}
-                        >
-                          <div className="aspect-[9/16] bg-surface2 relative">
-                            {filePath ? (
-                              <BankVideoThumb filePath={filePath} />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center text-2xl">🎬</div>
-                            )}
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                            <p className="absolute bottom-1.5 left-1.5 right-1.5 text-[10px] text-white truncate font-medium">{item.title}</p>
-                            {isSelected && (
-                              <div className="absolute top-1.5 right-1.5 w-5 h-5 bg-accent rounded-full flex items-center justify-center text-white text-[10px] font-bold">✓</div>
-                            )}
-                          </div>
-                        </button>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
+              {fileName && (
+                <div className="flex items-center gap-2 px-3 py-2 bg-surface2 rounded-lg">
+                  <span className="text-ok text-xs">✓</span>
+                  <span className="text-xs text-text truncate flex-1">{fileName}</span>
+                </div>
+              )}
+              {!filePath && (
+                <p className="text-xs text-text2">Aucune vidéo sélectionnée.</p>
+              )}
             </div>
           </div>
         </div>
@@ -335,13 +269,13 @@ export function Posting({ user }: PostingProps) {
         <Button
           onClick={post}
           loading={posting}
-          disabled={!bearer || selectedPhones.size === 0 || (!selectedVideo && !localFilePath)}
+          disabled={!bearer || selectedPhones.size === 0 || !filePath}
           size="lg"
         >
           Poster sur {selectedPhones.size || '?'} téléphone{selectedPhones.size !== 1 ? 's' : ''}
         </Button>
 
-        {/* Progress bar — always visible when posting */}
+        {/* Progress bar */}
         {posting && (
           <div className="space-y-2">
             <div className="flex items-center justify-between text-xs text-text2">
@@ -349,10 +283,7 @@ export function Posting({ user }: PostingProps) {
               <span>{progress}%</span>
             </div>
             <div className="w-full h-2 bg-surface2 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-accent rounded-full transition-all duration-500"
-                style={{ width: `${progress}%` }}
-              />
+              <div className="h-full bg-accent rounded-full transition-all duration-500" style={{ width: `${progress}%` }} />
             </div>
           </div>
         )}
@@ -376,26 +307,16 @@ export function Posting({ user }: PostingProps) {
           </div>
         )}
       </div>
-    </div>
-  )
-}
 
-// ── Small bank video thumbnail (no spinner, just fallback) ────────────────────
-function BankVideoThumb({ filePath }: { filePath: string }) {
-  const [ready, setReady]   = useState(false)
-  const [failed, setFailed] = useState(false)
-  const videoRef            = useRef<HTMLVideoElement>(null)
-  const src                 = `file:///${filePath.replace(/\\/g, '/')}`
-  if (failed) return <div className="w-full h-full flex items-center justify-center text-2xl bg-surface2">🎬</div>
-  return (
-    <video
-      ref={videoRef}
-      src={src}
-      className={`w-full h-full object-cover ${ready ? 'opacity-100' : 'opacity-0'}`}
-      muted playsInline preload="metadata"
-      onLoadedMetadata={() => { if (videoRef.current) videoRef.current.currentTime = 1 }}
-      onSeeked={() => setReady(true)}
-      onError={() => setFailed(true)}
-    />
+      {/* Bank picker modal */}
+      {showBankPicker && (
+        <BankPicker
+          user={user}
+          mode="single"
+          onSelect={([path]) => { if (path) setFilePath(path); setShowBankPicker(false) }}
+          onClose={() => setShowBankPicker(false)}
+        />
+      )}
+    </div>
   )
 }

@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase, type Phone, type ContentItem } from '@/lib/supabase'
 import { Button }  from '@/components/ui/Button'
-import { Spinner } from '@/components/ui/Spinner'
+import { VideoPreview } from '@/components/VideoPreview'
+import { BankPicker } from './Bank'
 
 interface MassPostingProps { user: User }
 
@@ -52,7 +53,6 @@ async function geelark(bearer: string, path: string, body: unknown) {
 
 export function MassPosting({ user }: MassPostingProps) {
   const [phones, setPhones]               = useState<Phone[]>([])
-  const [bank, setBank]                   = useState<ContentItem[]>([])
   const [selectedPhones, setSelPhones]    = useState<Set<string>>(new Set())
   const [selectedVideos, setSelVideos]    = useState<SelectedVideo[]>([])
   const [bearer, setBearer]               = useState('')
@@ -61,20 +61,19 @@ export function MassPosting({ user }: MassPostingProps) {
   const [taskStatuses, setTaskStatuses]   = useState<Map<string, TaskStatus>>(new Map())
   const [groupFilter, setGroupFilter]     = useState('Tous')
   const [groups, setGroups]               = useState<string[]>(['Tous'])
+  const [showBankPicker, setShowBankPicker] = useState(false)
   const logEndRef                         = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     Promise.all([
       supabase.from('app_config').select('bearer_token').eq('user_id', user.id).single(),
       supabase.from('phones').select('*').eq('user_id', user.id).order('phone_name'),
-      supabase.from('content_bank').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
-    ]).then(([cfg, ph, bk]) => {
+    ]).then(([cfg, ph]) => {
       if (cfg.data?.bearer_token) setBearer(cfg.data.bearer_token)
       const ps = ph.data ?? []
       setPhones(ps)
       const grps = [...new Set(ps.map(p => p.group_name).filter(Boolean) as string[])].sort()
       setGroups(['Tous', ...grps])
-      setBank(bk.data ?? [])
     })
   }, [])
 
@@ -100,45 +99,23 @@ export function MassPosting({ user }: MassPostingProps) {
     })
   }
 
-  function toggleVideo(item: ContentItem) {
-    setSelVideos(prev => {
-      const idx = prev.findIndex(v => v.item.id === item.id)
-      if (idx >= 0) {
-        const next = [...prev]
-        next.splice(idx, 1)
-        return next
-      }
-      return [...prev, { item, localPath: null }]
-    })
-  }
-
-  async function pickLocalFile(index: number) {
+  async function pickLocalFile(_index: number) {
     const path = await window.electronAPI?.pickVideoFile()
     if (!path) return
-    // Add as a local video entry
-    setSelVideos(prev => {
-      const next = [...prev]
-      if (index < next.length) {
-        next[index] = { ...next[index], localPath: path }
-      } else {
-        // Create a placeholder ContentItem
-        const fake: ContentItem = {
-          id:            `local-${Date.now()}`,
-          user_id:       user.id,
-          title:         path.split(/[\\/]/).pop() ?? 'Vidéo locale',
-          file_url:      null,
-          thumbnail_url: null,
-          duration:      null,
-          tags:          [],
-          notes:         '',
-          used_count:    0,
-          created_at:    new Date().toISOString(),
-          updated_at:    new Date().toISOString(),
-        }
-        next.push({ item: fake, localPath: path })
-      }
-      return next
-    })
+    const fake: ContentItem = {
+      id:            `local-${Date.now()}`,
+      user_id:       user.id,
+      title:         path.split(/[\\/]/).pop() ?? 'Vidéo locale',
+      file_url:      null,
+      thumbnail_url: null,
+      duration:      null,
+      tags:          [],
+      notes:         '',
+      used_count:    0,
+      created_at:    new Date().toISOString(),
+      updated_at:    new Date().toISOString(),
+    }
+    setSelVideos(prev => [...prev, { item: fake, localPath: path }])
   }
 
   // Auto-assignment: phone[i] → video[i % selectedVideos.length]
@@ -173,28 +150,21 @@ export function MassPosting({ user }: MassPostingProps) {
           if (i % selectedVideos.length === vi) setPhoneStatus(p.id, { status: 'uploading' })
         })
 
-        let token: string
-        if (sv.localPath) {
-          const up = await window.electronAPI!.uploadVideoGeelark({ bearer, filePath: sv.localPath })
-          if (!up.ok || !up.token) {
-            log(`❌ Upload local échoué (${sv.item.title}): ${up.error}`, 'error')
-            phoneList.forEach((p, i) => {
-              if (i % selectedVideos.length === vi) setPhoneStatus(p.id, { status: 'error', detail: up.error })
-            })
-            continue
-          }
-          token = up.token
-        } else if (sv.item.file_url) {
-          const d = await geelark(bearer, '/upload/getUrl', { fileType: 'video', url: sv.item.file_url })
-          if (d['code'] !== 0) {
-            log(`❌ Upload URL échoué (${sv.item.title}): ${d['msg'] ?? d['code']}`, 'error')
-            continue
-          }
-          token = (d['data'] as Record<string, unknown>)?.['token'] as string
-        } else {
+        const fileSource = sv.localPath ?? sv.item.file_url
+        if (!fileSource) {
           log(`⚠️ Vidéo ${vi + 1} sans source — ignorée`, 'warn')
           continue
         }
+        let token: string
+        const up = await window.electronAPI!.uploadVideoGeelark({ bearer, filePath: fileSource })
+        if (!up.ok || !up.token) {
+          log(`❌ Upload échoué (${sv.item.title}): ${up.error}`, 'error')
+          phoneList.forEach((p, i) => {
+            if (i % selectedVideos.length === vi) setPhoneStatus(p.id, { status: 'error', detail: up.error })
+          })
+          continue
+        }
+        token = up.token
 
         tokenMap.set(vi, token)
         log(`✅ Vidéo ${vi + 1} uploadée (${sv.item.title.slice(0, 30)}…)`, 'ok')
@@ -327,68 +297,49 @@ export function MassPosting({ user }: MassPostingProps) {
             <p className="text-sm font-bold text-text">🎬 Vidéos</p>
             <span className="text-xs text-text2">{selectedVideos.length} sélectionnée(s)</span>
           </div>
-          {/* Local file button */}
-          <div className="px-3 py-2 border-b border-border">
+          {/* Source buttons */}
+          <div className="px-3 py-2 border-b border-border flex gap-2">
             <button
               onClick={() => pickLocalFile(-1)}
-              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-text2 hover:bg-surface2 border border-dashed border-border hover:border-accent/40 transition-colors"
+              className="flex-1 flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg text-xs text-text2 hover:bg-surface2 border border-dashed border-border hover:border-accent/40 transition-colors"
             >
-              <span>💾</span>
-              <span>Ajouter depuis le PC</span>
+              <span>💻</span>
+              <span>PC</span>
+            </button>
+            <button
+              onClick={() => setShowBankPicker(true)}
+              className="flex-1 flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg text-xs text-text2 hover:bg-surface2 border border-dashed border-border hover:border-accent/40 transition-colors"
+            >
+              <span>🗂</span>
+              <span>Banque</span>
             </button>
           </div>
+          {/* Selected videos list */}
           <div className="flex-1 overflow-auto py-2">
-            {bank.length === 0 ? (
-              <p className="px-4 py-6 text-xs text-text2 text-center">Aucune vidéo dans la banque.</p>
-            ) : bank.map((item, bi) => {
-              const selIdx = selectedVideos.findIndex(v => v.item.id === item.id)
-              const selected = selIdx >= 0
+            {selectedVideos.length === 0 ? (
+              <p className="px-4 py-6 text-xs text-text2 text-center">Aucune vidéo sélectionnée.</p>
+            ) : selectedVideos.map((sv, selIdx) => {
+              const fp = sv.localPath ?? sv.item.file_url
               return (
-                <button
-                  key={item.id}
-                  onClick={() => toggleVideo(item)}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 text-left border-b border-border/30 transition-colors ${
-                    selected ? 'bg-accent/10' : 'hover:bg-surface2'
-                  }`}
+                <div
+                  key={sv.item.id}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 border-b border-border/30"
                 >
-                  <div className="w-12 flex-shrink-0 aspect-[9/16] rounded overflow-hidden bg-surface2 relative">
-                    {item.file_url
-                      ? <MassVideoThumb filePath={item.file_url} />
-                      : <div className="w-full h-full flex items-center justify-center text-lg">🎬</div>
-                    }
-                    {selected && (
-                      <div className="absolute inset-0 bg-accent/80 flex items-center justify-center text-white font-bold text-sm">
-                        {selIdx + 1}
-                      </div>
-                    )}
+                  <div className="w-10 flex-shrink-0 aspect-[9/16] rounded overflow-hidden bg-surface2">
+                    <VideoPreview filePath={fp} />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs font-medium text-text truncate">{item.title}</p>
-                    {item.duration && (
-                      <p className="text-[10px] text-text2">{Math.round(item.duration)}s</p>
-                    )}
+                    <p className="text-xs font-bold text-accent">#{selIdx + 1}</p>
+                    <p className="text-xs text-text truncate">{sv.item.title}</p>
                   </div>
-                  {selected && <span className="text-accent text-xs font-bold">#{selIdx + 1}</span>}
-                </button>
+                  <button
+                    onClick={() => setSelVideos(prev => prev.filter((_, i) => i !== selIdx))}
+                    className="text-text2 hover:text-danger text-sm flex-shrink-0"
+                  >✕</button>
+                </div>
               )
             })}
           </div>
-          {/* Local files added */}
-          {selectedVideos.filter(v => v.localPath).length > 0 && (
-            <div className="px-3 py-2 border-t border-border space-y-1">
-              <p className="text-[10px] text-text2 font-semibold uppercase tracking-wider">Fichiers locaux</p>
-              {selectedVideos.filter(v => v.localPath).map((sv, i) => (
-                <div key={sv.item.id} className="flex items-center gap-2 text-xs text-ok">
-                  <span>💾</span>
-                  <span className="truncate flex-1">{sv.localPath!.split(/[\\/]/).pop()}</span>
-                  <button
-                    onClick={() => setSelVideos(prev => prev.filter(v => v.item.id !== sv.item.id))}
-                    className="text-text2 hover:text-danger"
-                  >✕</button>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
 
         {/* ── Column 2: Phones ─────────────────────────────────────────────── */}
@@ -502,12 +453,8 @@ export function MassPosting({ user }: MassPostingProps) {
                       {video ? (
                         <div className="flex items-center gap-2">
                           {/* Video thumbnail */}
-                          <div className="w-8 flex-shrink-0 aspect-[9/16] rounded overflow-hidden bg-surface2 relative">
-                            {(video.localPath ?? video.item.file_url) ? (
-                              <MassVideoThumb filePath={(video.localPath ?? video.item.file_url)!} />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center text-sm">🎬</div>
-                            )}
+                          <div className="w-8 flex-shrink-0 aspect-[9/16] rounded overflow-hidden bg-surface2">
+                            <VideoPreview filePath={video.localPath ?? video.item.file_url} />
                           </div>
                           <div className="min-w-0 flex-1">
                             <p className="text-[10px] text-accent font-bold">#{videoIndex + 1}</p>
@@ -579,26 +526,37 @@ export function MassPosting({ user }: MassPostingProps) {
           )}
         </div>
       </div>
-    </div>
-  )
-}
 
-// ── Small video thumbnail for mass posting ────────────────────────────────────
-function MassVideoThumb({ filePath }: { filePath: string }) {
-  const [ready, setReady]   = useState(false)
-  const [failed, setFailed] = useState(false)
-  const videoRef            = useRef<HTMLVideoElement>(null)
-  const src                 = `file:///${filePath.replace(/\\/g, '/')}`
-  if (failed) return <div className="w-full h-full flex items-center justify-center text-base bg-surface2">🎬</div>
-  return (
-    <video
-      ref={videoRef}
-      src={src}
-      className={`w-full h-full object-cover ${ready ? 'opacity-100' : 'opacity-0'}`}
-      muted playsInline preload="metadata"
-      onLoadedMetadata={() => { if (videoRef.current) videoRef.current.currentTime = 1 }}
-      onSeeked={() => setReady(true)}
-      onError={() => setFailed(true)}
-    />
+      {/* Bank picker modal */}
+      {showBankPicker && (
+        <BankPicker
+          user={user}
+          mode="multi"
+          onSelect={(paths) => {
+            const newVideos: SelectedVideo[] = paths
+              .filter(p => !selectedVideos.some(sv => (sv.localPath ?? sv.item.file_url) === p))
+              .map(p => ({
+                item: {
+                  id:            `bank-${p}`,
+                  user_id:       user.id,
+                  title:         p.replace(/\\/g, '/').split('/').pop() ?? p,
+                  file_url:      p,
+                  thumbnail_url: null,
+                  duration:      null,
+                  tags:          [],
+                  notes:         '',
+                  used_count:    0,
+                  created_at:    new Date().toISOString(),
+                  updated_at:    new Date().toISOString(),
+                },
+                localPath: null,
+              }))
+            setSelVideos(prev => [...prev, ...newVideos])
+            setShowBankPicker(false)
+          }}
+          onClose={() => setShowBankPicker(false)}
+        />
+      )}
+    </div>
   )
 }

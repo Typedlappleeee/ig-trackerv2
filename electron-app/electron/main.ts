@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell, ipcMain, net, dialog, session } from 'electron'
+import { app, BrowserWindow, shell, ipcMain, net, dialog, session, protocol } from 'electron'
 import { fileURLToPath } from 'node:url'
 import { existsSync, readFileSync } from 'node:fs'
 import { execFile } from 'node:child_process'
@@ -564,4 +564,15 @@ app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) createWindow()
 })
 
-app.whenReady().then(createWindow)
+app.whenReady().then(() => {
+  // Serve local video/image files through a custom protocol so that:
+  // 1. Spaces and special characters in filenames are handled correctly
+  // 2. Byte-range requests (video seeking) work properly
+  // Usage in renderer: localfile:///C:/path/to/file.mp4  (Windows)
+  //                    localfile:///home/user/file.mp4   (Unix)
+  protocol.handle('localfile', (request) => {
+    const urlPath = request.url.slice('localfile://'.length)
+    return net.fetch(`file://${urlPath}`)
+  })
+  createWindow()
+})

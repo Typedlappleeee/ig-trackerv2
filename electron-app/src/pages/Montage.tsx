@@ -79,7 +79,9 @@ function localSrc(p: string | null | undefined): string | null {
   if (!p) return null
   if (p.startsWith('http')) return p
   const n = p.replace(/\\/g, '/')
-  return `file://${n.startsWith('/') ? '' : '/'}${n}`
+  // Use localfile:// protocol (registered in main.ts) for proper space/char encoding
+  const withSlash = n.startsWith('/') ? n : `/${n}`
+  return `localfile://${encodeURI(withSlash)}`
 }
 
 // ── Time ruler ────────────────────────────────────────────────────────────────
