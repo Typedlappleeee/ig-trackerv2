@@ -22,6 +22,8 @@ const THEME_COLORS: Record<string, string> = {
 }
 
 type GeneralTab = 'apparence' | 'notifications' | 'langue'
+type Panel = 'general' | 'profile' | 'connexions' | 'organization'
+interface SettingsProps { user: User; initialPanel?: Panel }
 
 export function Settings({ user, initialPanel }: SettingsProps) {
   const { role, perms, currentOrg } = useOrg()

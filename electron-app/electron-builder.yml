@@ -10,27 +10,17 @@ files:
   - dist
   - dist-electron
 
-# Windows
+# Windows — zip portable (pas d'installateur, pas besoin de Wine sur Linux)
 win:
   target:
-    - target: nsis      # Installateur .exe classique
+    - target: zip
       arch: x64
-  icon: public/icon.ico
-
-# Installateur Windows (avec assistant d'installation)
-nsis:
-  oneClick: false                         # Montre l'assistant d'installation
-  allowToChangeInstallationDirectory: true # L'utilisateur peut choisir le dossier
-  createDesktopShortcut: true
-  createStartMenuShortcut: true
-  shortcutName: IG Tracker
+  signAndEditExecutable: false
 
 # macOS (optionnel)
 mac:
   target: dmg
-  icon: public/icon.icns
 
 # Linux (optionnel)
 linux:
   target: AppImage
-  icon: public/icon.png

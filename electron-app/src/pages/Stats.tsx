@@ -58,7 +58,7 @@ async function fetchIgVideos(username: string): Promise<IgVideo[]> {
       }
     })
     // Pre-fetch thumbnails as data URIs through main process (bypasses CDN Referer/CORS issues)
-    if (window.electronAPI?.fetchImage) {
+    if (window.electronAPI) {
       await Promise.all(videos.map(async v => {
         if (!v.thumbnail) return
         const r = await window.electronAPI!.fetchImage({ url: v.thumbnail })

@@ -80,7 +80,7 @@ async function fetchViaBrowser(clean: string): Promise<IgStats | null> {
       if (!user) return null
       const timeline    = user['edge_owner_to_timeline_media'] as Record<string, unknown> | undefined
       const edges       = (timeline?.['edges'] as unknown[]) ?? []
-      const total_views = edges.reduce((s, e) => {
+      const total_views = edges.reduce<number>((s, e) => {
         const n = (e as Record<string, unknown>)['node'] as Record<string, unknown>
         return s + (((n['video_view_count'] as number) ?? 0))
       }, 0)
@@ -116,7 +116,7 @@ async function fetchViaApi(clean: string, base = 'https://www.instagram.com'): P
     if (!user) return null
     const timeline    = user['edge_owner_to_timeline_media'] as Record<string, unknown> | undefined
     const edges       = (timeline?.['edges'] as unknown[]) ?? []
-    const total_views = edges.reduce((s, e) => {
+    const total_views = edges.reduce<number>((s, e) => {
       const n = (e as Record<string, unknown>)['node'] as Record<string, unknown>
       return s + ((n['video_view_count'] as number) ?? 0)
     }, 0)
