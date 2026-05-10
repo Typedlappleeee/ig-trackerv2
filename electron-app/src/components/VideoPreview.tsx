@@ -6,17 +6,16 @@ function basename(p: string): string {
 }
 
 /**
- * Converts a local filesystem path to a safe `localfile://` URL.
- * The custom protocol is registered in electron/main.ts and proxies to file://.
- * Using a custom scheme avoids CSP issues when the renderer loads from http://localhost
- * in dev mode, and properly URL-encodes spaces/special characters.
+ * Converts a local filesystem path to a safe file:// URL.
+ * encodeURI handles spaces (%20) and special chars while leaving slashes/colons intact.
+ * webSecurity: false in the BrowserWindow allows file:// from any renderer origin.
  */
 export function localFileUrl(filePath: string): string {
   const normalized = filePath.replace(/\\/g, '/')
-  // Ensure path starts with / so we get localfile:///C:/... on Windows
+  // Windows: C:/path → /C:/path → file:///C:/path
+  // Unix:    /home/user/path  → file:///home/user/path
   const withSlash = normalized.startsWith('/') ? normalized : `/${normalized}`
-  // encodeURI leaves slashes and colons intact but encodes spaces → %20
-  return `localfile://${encodeURI(withSlash)}`
+  return encodeURI(`file://${withSlash}`)
 }
 
 interface VideoPreviewProps {

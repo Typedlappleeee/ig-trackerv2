@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell, ipcMain, net, dialog, session, protocol } from 'electron'
+import { app, BrowserWindow, shell, ipcMain, net, dialog, session } from 'electron'
 import { fileURLToPath } from 'node:url'
 import { existsSync, readFileSync } from 'node:fs'
 import { execFile } from 'node:child_process'
@@ -468,26 +468,34 @@ function collectImage(
   res.on('error', (e: Error) => resolve({ ok: false, error: e.message }))
 }
 
-ipcMain.handle('fetch-image', async (_event, opts: { url: string }) => {
+ipcMain.handle('fetch-image', async (_event, opts: { url: string; headers?: Record<string, string> }) => {
   return new Promise<{ ok: boolean; dataUrl?: string; error?: string }>(resolve => {
-    const req = https.get(opts.url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-        'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
-      },
-    }, (res) => {
-      // Follow one level of redirect
-      if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-        res.destroy()
-        https.get(res.headers.location, { headers: { 'User-Agent': 'Mozilla/5.0' } }, (res2) => {
-          collectImage(res2, resolve)
-        }).on('error', (e) => resolve({ ok: false, error: e.message }))
-        return
-      }
-      collectImage(res, resolve)
-    })
-    req.on('error', (e) => resolve({ ok: false, error: e.message }))
-    req.setTimeout(10000, () => { req.destroy(); resolve({ ok: false, error: 'timeout' }) })
+    const isInstagram = opts.url.includes('instagram.com') || opts.url.includes('cdninstagram.com') || opts.url.includes('fbcdn.net')
+    const baseHeaders: Record<string, string> = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+      'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
+      ...(isInstagram ? {
+        'Referer': 'https://www.instagram.com/',
+        'Origin': 'https://www.instagram.com',
+        'Sec-Fetch-Dest': 'image',
+        'Sec-Fetch-Mode': 'no-cors',
+        'Sec-Fetch-Site': 'cross-site',
+      } : {}),
+      ...(opts.headers ?? {}),
+    }
+    const fetchUrl = (url: string, hdrs: Record<string, string>, depth = 0) => {
+      const req = https.get(url, { headers: hdrs }, (res) => {
+        if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location && depth < 3) {
+          res.destroy()
+          fetchUrl(res.headers.location, hdrs, depth + 1)
+          return
+        }
+        collectImage(res, resolve)
+      })
+      req.on('error', (e) => resolve({ ok: false, error: e.message }))
+      req.setTimeout(15000, () => { req.destroy(); resolve({ ok: false, error: 'timeout' }) })
+    }
+    fetchUrl(opts.url, baseHeaders)
   })
 })
 
@@ -536,6 +544,9 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
+      // Allow file:// URLs in <video>/<img> regardless of renderer origin (dev = localhost).
+      // Safe for a local desktop app — the renderer never loads untrusted external content.
+      webSecurity: false,
     },
     titleBarStyle: 'default',
     frame: true,
@@ -564,15 +575,4 @@ app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) createWindow()
 })
 
-app.whenReady().then(() => {
-  // Serve local video/image files through a custom protocol so that:
-  // 1. Spaces and special characters in filenames are handled correctly
-  // 2. Byte-range requests (video seeking) work properly
-  // Usage in renderer: localfile:///C:/path/to/file.mp4  (Windows)
-  //                    localfile:///home/user/file.mp4   (Unix)
-  protocol.handle('localfile', (request) => {
-    const urlPath = request.url.slice('localfile://'.length)
-    return net.fetch(`file://${urlPath}`)
-  })
-  createWindow()
-})
+app.whenReady().then(createWindow)
