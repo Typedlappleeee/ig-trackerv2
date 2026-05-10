@@ -243,9 +243,10 @@ export function MassPosting({ user }: MassPostingProps) {
         }
         setPhoneStatus(asgn.phone.id, { status: 'posting' })
         const taskRes = await geelark(bearer, '/rpa/task/instagramPubReels', {
-          phoneId: asgn.phone.geelark_id,
-          videoId: token,
-          caption,
+          id:          asgn.phone.geelark_id,
+          scheduleAt:  Math.floor(Date.now() / 1000),
+          description: caption,
+          video:       [token],
         })
         if (taskRes['code'] === 0) {
           const tid = (taskRes['data'] as Record<string, unknown>)?.['id'] as string

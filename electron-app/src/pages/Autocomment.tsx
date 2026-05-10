@@ -3,8 +3,8 @@ import type { User } from '@supabase/supabase-js'
 import { supabase, type Phone } from '@/lib/supabase'
 import { Button }  from '@/components/ui/Button'
 import { Spinner } from '@/components/ui/Spinner'
-import { runIgCommentFlow } from '@/lib/geelark'
-import { getBearer }       from '@/lib/phonePoller'
+import { replyToIgCommentViaPhone } from '@/lib/geelark'
+import { getBearer }                from '@/lib/phonePoller'
 
 interface AutocommentProps { user: User }
 
@@ -67,9 +67,8 @@ export function Autocomment({ user }: AutocommentProps) {
   const [replyMode, setReplyMode] = useState<'ai' | 'manual'>('ai')
   const [manualReplies, setManualReplies] = useState<Record<string, string>>({})
   const [sendingReply, setSendingReply]   = useState<string | null>(null)
-  // Send via GéeLark cloud-phone (RPA) instead of direct IG API → undetectable
-  const [useGeelark, setUseGeelark] = useState(localStorage.getItem('autocomment-use-geelark') === 'true')
-  const [flowId, setFlowId]         = useState(localStorage.getItem('autocomment-geelark-flow-id') ?? '')
+  // Send via GéeLark cloud-phone (shell-exec) instead of direct IG API → undetectable
+  const [useGeelark, setUseGeelark] = useState(localStorage.getItem('autocomment-use-geelark') !== 'false')
 
   useEffect(() => {
     Promise.all([
@@ -86,20 +85,25 @@ export function Autocomment({ user }: AutocommentProps) {
     if (!text || !selectedPost || !selectedPhone) return
     setSendingReply(comment.pk)
     try {
-      // Path A: route through the GéeLark cloud phone (recommended — undetectable)
+      // Path A: drive the GéeLark cloud phone directly via shell exec (undetectable)
       if (useGeelark) {
-        if (!flowId) { log('❌ flowId GéeLark manquant — configure-le en bas'); setSendingReply(null); return }
         if (!selectedPhone.geelark_id) { log('❌ Téléphone sans geelark_id'); setSendingReply(null); return }
         const bearer = getBearer()
         if (!bearer) { log('❌ Bearer GéeLark non chargé'); setSendingReply(null); return }
-        const postUrl = `https://www.instagram.com/reel/${selectedPost.shortcode}/`
-        const gr = await runIgCommentFlow(bearer, selectedPhone.geelark_id, flowId, postUrl, text)
+        log(`📱 Envoi via téléphone @${comment.username}… (~15s)`)
+        const gr = await replyToIgCommentViaPhone(
+          bearer,
+          selectedPhone.geelark_id,
+          selectedPost.shortcode,
+          comment.username,
+          text,
+        )
         if (gr.ok) {
           setComments(prev => prev.map(c => c.pk === comment.pk ? { ...c, replied: text } : c))
           setManualReplies(prev => { const n = { ...prev }; delete n[comment.pk]; return n })
-          log(`✓ Tâche GéeLark lancée (id=${gr.taskId}) — vérifie sur le téléphone dans 30s`)
+          log(`✓ Réponse envoyée à @${comment.username} via téléphone`)
         } else {
-          log(`❌ GéeLark: ${gr.error ?? 'unknown'}`)
+          log(`❌ Téléphone: ${gr.error ?? 'unknown'}`)
         }
         setSendingReply(null)
         return
@@ -450,23 +454,9 @@ export function Autocomment({ user }: AutocommentProps) {
                       checked={useGeelark}
                       onChange={e => { setUseGeelark(e.target.checked); localStorage.setItem('autocomment-use-geelark', String(e.target.checked)) }}
                     />
-                    📱 Envoyer via téléphone GéeLark <span className="text-text2">(indétectable)</span>
+                    📱 Envoyer via téléphone GéeLark <span className="text-text2">(indétectable, ~15s)</span>
                   </label>
-                  {useGeelark && (
-                    <input
-                      type="text"
-                      value={flowId}
-                      onChange={e => { setFlowId(e.target.value); localStorage.setItem('autocomment-geelark-flow-id', e.target.value) }}
-                      placeholder="flowId GéeLark (cf. RPA Flows)"
-                      className="flex-1 bg-surface border border-border rounded px-2 py-1 text-[11px] text-text placeholder:text-text2 focus:outline-none focus:border-accent"
-                    />
-                  )}
                 </div>
-                {useGeelark && (
-                  <p className="text-[10px] text-text2/80">
-                    ℹ️ Crée un Custom Task Flow dans GéeLark: ouvrir IG → aller à <code>{'{postUrl}'}</code> → tap commentaire → taper <code>{'{commentText}'}</code> → envoyer. Colle son ID ci-dessus.
-                  </p>
-                )}
               </div>
             )}
             {/* Log */}

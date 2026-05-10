@@ -472,29 +472,30 @@ ipcMain.handle('upload-video-geelark', async (_event, opts: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${opts.bearer}`,
       },
-      body: JSON.stringify({ fileType: 1 }),
+      body: JSON.stringify({ fileType: 'mp4' }),
     })
     const urlData = await urlRes.json() as Record<string, unknown>
     if (urlData['code'] !== 0) {
       const msg = urlData['msg'] ?? urlData['message'] ?? `code ${urlData['code']}`
       return { ok: false, error: `GéeLark upload URL: ${msg}` }
     }
-    const uploadUrl = (urlData['data'] as Record<string, unknown>)?.['url'] as string
-    const token     = (urlData['data'] as Record<string, unknown>)?.['token'] as string
-    if (!uploadUrl || !token) return { ok: false, error: 'Réponse upload GéeLark invalide' }
+    const data = (urlData['data'] as Record<string, unknown>) ?? {}
+    const uploadUrl   = data['uploadUrl'] as string | undefined
+    const resourceUrl = data['resourceUrl'] as string | undefined
+    if (!uploadUrl || !resourceUrl) return { ok: false, error: 'Réponse upload GéeLark invalide' }
 
-    // Step 2: read file and PUT to presigned URL
+    // Step 2: read file and PUT to presigned URL — no extra headers (GéeLark doc requires this)
     const fileBytes = readFileSync(opts.filePath)
     const uploadRes = await net.fetch(uploadUrl, {
       method: 'PUT',
-      headers: { 'Content-Type': 'video/mp4' },
       body: fileBytes,
     })
     if (uploadRes.status < 200 || uploadRes.status >= 300) {
       return { ok: false, error: `Upload échoué (HTTP ${uploadRes.status})` }
     }
 
-    return { ok: true, token }
+    // Return resourceUrl as token — Posting/MassPosting will pass it as `video: [token]`
+    return { ok: true, token: resourceUrl }
   } catch (err: unknown) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) }
   }

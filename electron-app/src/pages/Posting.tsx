@@ -148,9 +148,10 @@ export function Posting({ user }: PostingProps) {
 
       for (const phone of phoneList) {
         const taskRes = await geelark(bearer, '/rpa/task/instagramPubReels', {
-          phoneId: phone.geelark_id,
-          videoId: videoToken,
-          caption,
+          id:          phone.geelark_id,
+          scheduleAt:  Math.floor(Date.now() / 1000),
+          description: caption,
+          video:       [videoToken],
         })
         if (taskRes['code'] === 0) {
           const tid = (taskRes['data'] as Record<string, unknown>)?.['id'] as string
