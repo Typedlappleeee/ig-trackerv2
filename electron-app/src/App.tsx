@@ -129,6 +129,7 @@ function BetaPopup({ onClose }: { onClose: () => void }) {
     </div>
   )
 }
+import { initPoller }        from '@/lib/phonePoller'
 import { Dashboard }         from '@/pages/Dashboard'
 import { Phones }            from '@/pages/Phones'
 import { Stats }             from '@/pages/Stats'
@@ -156,10 +157,10 @@ function AppContent({ user }: { user: User }) {
       .then(({ data }) => {
         const hasBearer = !!data?.bearer_token
         setOnboarding(!hasBearer)
-        // Show beta popup once for returning users (who have already set up)
-        if (hasBearer && !localStorage.getItem(BETA_KEY)) {
-          setShowBeta(true)
-        }
+        if (hasBearer && !localStorage.getItem(BETA_KEY)) setShowBeta(true)
+        // Start the global status poller as soon as we have the bearer token.
+        // It runs in the background regardless of which page is active.
+        if (data?.bearer_token) initPoller(data.bearer_token)
       })
     supabase.from('phones').select('id', { count: 'exact', head: true }).eq('user_id', user.id)
       .then(({ count }) => setPhoneCount(count ?? 0))

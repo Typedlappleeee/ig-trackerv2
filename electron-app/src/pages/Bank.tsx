@@ -667,52 +667,40 @@ function FolderRow({ name, count, active, onClick, onRename, onDelete }: {
   )
 }
 
-// ── Video thumbnail (generates a real frame via canvas) ──────────────────────
+// ── Video thumbnail ───────────────────────────────────────────────────────────
+// Uses the custom localvideo:// protocol (registered in main.ts with stream:true
+// and Range support) so the video element can seek without canvas CORS issues.
 export function VideoThumbnail({ filePath }: { filePath: string }) {
-  const [thumb, setThumb] = useState<string | null>(null)
-  const [failed, setFailed]   = useState(false)
-  const [loading, setLoading] = useState(true)
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const [failed, setFailed] = useState(false)
 
-  useEffect(() => {
-    if (!filePath) { setFailed(true); setLoading(false); return }
-    setThumb(null); setFailed(false); setLoading(true)
-    const toFileUrl = (p: string) => {
-      const n = p.replace(/\\/g, '/')
-      if (n.startsWith('file://')) return n
-      return `file://${n.startsWith('/') ? n : `/${n}`}`
-    }
-    let cancelled = false
-    const video = document.createElement('video')
-    video.muted = true
-    video.preload = 'metadata'
-    video.addEventListener('loadeddata', () => {
-      if (cancelled) return
-      video.currentTime = Math.min(0.5, (video.duration || 5) * 0.05)
-    }, { once: true })
-    video.addEventListener('seeked', () => {
-      if (cancelled) return
-      try {
-        const canvas = document.createElement('canvas')
-        canvas.width = video.videoWidth || 360
-        canvas.height = video.videoHeight || 640
-        canvas.getContext('2d')?.drawImage(video, 0, 0)
-        setThumb(canvas.toDataURL('image/jpeg', 0.7))
-      } catch { setFailed(true) }
-      setLoading(false)
-      video.src = ''
-    }, { once: true })
-    video.addEventListener('error', () => { if (!cancelled) { setFailed(true); setLoading(false) } }, { once: true })
-    video.src = toFileUrl(filePath)
-    return () => { cancelled = true; video.src = '' }
-  }, [filePath])
+  // Convert any local path to localvideo:// URL
+  const localUrl = (() => {
+    if (!filePath) return ''
+    let n = filePath.replace(/\\/g, '/')
+    if (n.startsWith('file://')) n = n.slice(7)
+    if (!n.startsWith('/')) n = '/' + n
+    return 'localvideo://' + n
+  })()
 
-  if (loading && !thumb && !failed) {
-    return <div className="w-full h-full flex items-center justify-center bg-surface2"><div className="w-5 h-5 border-2 border-accent/30 border-t-accent rounded-full animate-spin" /></div>
-  }
-  if (failed || !thumb) {
+  if (!localUrl || failed) {
     return <div className="w-full h-full flex items-center justify-center bg-surface2 text-4xl">🎬</div>
   }
-  return <img src={thumb} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+
+  return (
+    <video
+      ref={videoRef}
+      src={localUrl}
+      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+      muted
+      playsInline
+      preload="metadata"
+      onLoadedMetadata={() => {
+        if (videoRef.current) videoRef.current.currentTime = 0.5
+      }}
+      onError={() => setFailed(true)}
+    />
+  )
 }
 
 // ── Video card ───────────────────────────────────────────────────────────────

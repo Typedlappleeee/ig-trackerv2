@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase, type Phone } from '@/lib/supabase'
-import { fetchAllPhones, fetchPhoneStatuses, geelarkStatusLabel } from '@/lib/geelark'
+import { fetchAllPhones, geelarkStatusLabel } from '@/lib/geelark'
+import * as poller from '@/lib/phonePoller'
 import { Button }  from '@/components/ui/Button'
 import { Spinner } from '@/components/ui/Spinner'
 
@@ -322,42 +323,67 @@ export function Phones({ user }: PhonesProps) {
   const [error, setError]             = useState<string | null>(null)
   const [filter, setFilter]           = useState<'all' | 'online' | 'offline'>('all')
   const [search, setSearch]           = useState('')
-  const [bearer, setBearer]           = useState('')
-  const [intervalSec, setIntervalSec] = useState<number>(() => {
-    try { return parseInt(localStorage.getItem('phones-interval') ?? '60') || 60 } catch { return 60 }
-  })
-  const [countdown, setCountdown]     = useState(0)
+  // Interval + autoRefresh: read from the singleton (which persists in localStorage)
+  const [intervalSec, setIntervalSec] = useState(poller.getIntervalSec)
+  const [autoRefresh, setAutoRefresh] = useState(poller.getEnabled)
+  const [countdown, setCountdown]     = useState(poller.getIntervalSec())
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
-  const [autoRefresh, setAutoRefresh] = useState<boolean>(() => {
-    try { return localStorage.getItem('phones-autorefresh') !== 'false' } catch { return true }
-  })
   const [pollError, setPollError]     = useState<string | null>(null)
 
   const [contextMenu, setContextMenu]   = useState<{ phone: Phone; x: number; y: number } | null>(null)
   const [sessionDialog, setSessionDialog] = useState<{ phone: Phone } | null>(null)
   const [inlineEdit, setInlineEdit]     = useState<{ phone: Phone } | null>(null)
 
-  const bearerRef      = useRef('')
   const phonesRef      = useRef<Phone[]>([])
-  const intervalRef    = useRef<ReturnType<typeof setInterval> | null>(null)
+  const lastPollMsRef  = useRef(Date.now())
   const countdownRef   = useRef<ReturnType<typeof setInterval> | null>(null)
   const lastDbSyncRef  = useRef<Date | null>(null)
   const lastIgSyncRef  = useRef<Date | null>(null)
 
-  useEffect(() => { bearerRef.current = bearer }, [bearer])
   useEffect(() => { phonesRef.current = phones }, [phones])
 
+  // ── Subscribe to the global poller for live status updates ─────────────────
   useEffect(() => {
-    supabase
-      .from('app_config').select('bearer_token').eq('user_id', user.id).single()
-      .then(({ data }) => {
-        if (data?.bearer_token) {
-          setBearer(data.bearer_token)
-          bearerRef.current = data.bearer_token
-          // Poll status immediately on load — don't wait for the first interval tick
-          setTimeout(() => pollStatus(), 500)
-        }
+    return poller.subscribe(statusMap => {
+      const now = new Date()
+      setLastUpdated(now)
+      lastPollMsRef.current = now.getTime()
+      setCountdown(poller.getIntervalSec())
+      setPhones(prev => {
+        const next = prev.map(p => {
+          const s = statusMap.get(p.geelark_id)
+          return s !== undefined ? { ...p, status: s } : p
+        })
+        phonesRef.current = next
+        return next
       })
+      // Persist status to DB every 5 min
+      const sinceDb = lastDbSyncRef.current
+        ? (now.getTime() - lastDbSyncRef.current.getTime()) / 1000 : Infinity
+      if (sinceDb >= 300) {
+        lastDbSyncRef.current = now
+        statusMap.forEach((status, geelark_id) => {
+          supabase.from('phones').update({ status, synced_at: now.toISOString() })
+            .eq('user_id', user.id).eq('geelark_id', geelark_id).then(() => {})
+        })
+      }
+    })
+  }, [user.id])
+
+  // ── Countdown ticker (purely cosmetic — based on elapsed time) ─────────────
+  useEffect(() => {
+    if (countdownRef.current) clearInterval(countdownRef.current)
+    if (!autoRefresh) { setCountdown(0); return }
+    const sec = poller.getIntervalSec()
+    countdownRef.current = setInterval(() => {
+      const elapsed  = (Date.now() - lastPollMsRef.current) / 1000
+      const remaining = Math.max(0, sec - Math.floor(elapsed))
+      setCountdown(remaining)
+    }, 1000)
+    return () => { if (countdownRef.current) clearInterval(countdownRef.current) }
+  }, [autoRefresh, intervalSec])
+
+  useEffect(() => {
     loadPhones()
   }, [])
 
@@ -368,111 +394,53 @@ export function Phones({ user }: PhonesProps) {
     if (err) setError('Erreur lors du chargement.')
     else setPhones(data ?? [])
     setLoading(false)
+    // Trigger an immediate poll if one hasn't happened recently
+    poller.pollNow()
   }
 
-  // ── Poll GéeLark status + auto-refresh IG stats ───────────────────────────
-  const pollStatus = useCallback(async () => {
-    const tok = bearerRef.current
-    if (!tok) return
-
-    // 1. GéeLark phone status
-    try {
-      const statusMap = await fetchPhoneStatuses(tok)
-      const now = new Date()
-      setLastUpdated(now)
-      setPhones(prev => {
-        const next = prev.map(p => {
-          const s = statusMap.get(p.geelark_id)
-          return s !== undefined ? { ...p, status: s } : p
-        })
-        phonesRef.current = next
-        return next
-      })
-      const sinceDbSync = lastDbSyncRef.current
-        ? (now.getTime() - lastDbSyncRef.current.getTime()) / 1000
-        : Infinity
-      if (sinceDbSync >= 300) {
-        lastDbSyncRef.current = now
-        const updates = [...statusMap.entries()].map(([geelark_id, status]) =>
-          supabase.from('phones').update({ status, synced_at: now.toISOString() })
-            .eq('user_id', user.id).eq('geelark_id', geelark_id)
-        )
-        await Promise.allSettled(updates)
-      }
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Erreur réseau'
-      setPollError(`Refresh échoué: ${msg}`)
-      setTimeout(() => setPollError(null), 8000)
-    }
-
-    // 2. Instagram stats via session (every 5 min for phones with sessionid)
-    const sinceIg = lastIgSyncRef.current
-      ? (Date.now() - lastIgSyncRef.current.getTime()) / 1000
-      : Infinity
-    if (sinceIg >= 300 && window.electronAPI?.fetchInstagramBySession) {
+  // ── Periodic IG stats refresh (every 5 min, only when Phones is mounted) ───
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      const sinceIg = lastIgSyncRef.current
+        ? (Date.now() - lastIgSyncRef.current.getTime()) / 1000 : Infinity
+      if (sinceIg < 290) return
+      if (!window.electronAPI?.fetchInstagramBySession) return
       lastIgSyncRef.current = new Date()
       const withSession = phonesRef.current.filter(p => p.ig_username && p.ig_sessionid)
       for (const phone of withSession) {
         try {
           const r = await window.electronAPI.fetchInstagramBySession({
-            username: phone.ig_username!,
-            sessionid: phone.ig_sessionid!,
+            username: phone.ig_username!, sessionid: phone.ig_sessionid!,
           })
-          const igStatus = r.ok ? 'active' : 'error'
           if (r.ok) {
             await supabase.from('phones').update({
               followers: r.followers ?? 0, following: r.following ?? 0,
-              total_views: r.total_views ?? 0, video_count: r.posts ?? 0,
-              bio: r.bio ?? null, ig_status: igStatus,
+              total_views: r.total_views ?? 0, posts: r.posts ?? 0,
+              bio: r.bio ?? null, ig_status: 'active',
             }).eq('id', phone.id)
             setPhones(prev => prev.map(p =>
-              p.id === phone.id
-                ? { ...p, followers: r.followers ?? 0, following: r.following ?? 0,
-                    total_views: r.total_views ?? 0, video_count: r.posts ?? 0,
-                    bio: r.bio ?? null, ig_status: 'active' }
-                : p
+              p.id === phone.id ? { ...p,
+                followers: r.followers ?? 0, following: r.following ?? 0,
+                total_views: r.total_views ?? 0, posts: r.posts ?? 0,
+                bio: r.bio ?? null, ig_status: 'active' } : p
             ))
           } else {
-            await supabase.from('phones').update({ ig_status: igStatus }).eq('id', phone.id)
+            await supabase.from('phones').update({ ig_status: 'error' }).eq('id', phone.id)
             setPhones(prev => prev.map(p =>
-              p.id === phone.id ? { ...p, ig_status: igStatus } : p
+              p.id === phone.id ? { ...p, ig_status: 'error' } : p
             ))
           }
         } catch { /* silent */ }
       }
-    }
+    }, 60_000)
+    return () => clearInterval(interval)
   }, [user.id])
-
-  // ── Auto-refresh loop ───────────────────────────────────────────────────
-  const startAutoRefresh = useCallback((sec: number) => {
-    if (intervalRef.current)  clearInterval(intervalRef.current)
-    if (countdownRef.current) clearInterval(countdownRef.current)
-    setCountdown(sec)
-    countdownRef.current = setInterval(() => {
-      setCountdown(prev => prev <= 1 ? sec : prev - 1)
-    }, 1000)
-    intervalRef.current = setInterval(() => pollStatus(), sec * 1000)
-  }, [pollStatus])
-
-  useEffect(() => {
-    if (!bearer) return
-    if (autoRefresh) {
-      startAutoRefresh(intervalSec)
-    } else {
-      if (intervalRef.current)  clearInterval(intervalRef.current)
-      if (countdownRef.current) clearInterval(countdownRef.current)
-    }
-    return () => {
-      if (intervalRef.current)  clearInterval(intervalRef.current)
-      if (countdownRef.current) clearInterval(countdownRef.current)
-    }
-  }, [autoRefresh, intervalSec, bearer, startAutoRefresh])
 
   function changeInterval(sec: number) {
     setIntervalSec(sec)
+    poller.setIntervalSec(sec)
+    lastPollMsRef.current = Date.now()
     setCountdown(sec)
-    localStorage.setItem('phones-interval', String(sec))
-    if (autoRefresh) startAutoRefresh(sec)
   }
 
   // ── Full sync from GéeLark ─────────────────────────────────────────────
