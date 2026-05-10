@@ -137,6 +137,15 @@ export function Bank({ user }: BankProps) {
   const [showNewFolder, setShowNewFolder]   = useState(false)
   const [needsMigration, setNeedsMigration] = useState(false)
   const [sqlCopied, setSqlCopied]           = useState(false)
+  // Empty folders (created by user but no videos yet) — kept in localStorage for persistence
+  const [emptyFolders, setEmptyFolders] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem('bank-empty-folders') ?? '[]') } catch { return [] }
+  })
+
+  function persistEmptyFolders(next: string[]) {
+    setEmptyFolders(next)
+    localStorage.setItem('bank-empty-folders', JSON.stringify(next))
+  }
 
   // Context menu
   const [ctxMenu, setCtxMenu] = useState<CtxMenu | null>(null)
@@ -173,16 +182,27 @@ export function Bank({ user }: BankProps) {
   }
 
   // Insert a video directly from a file path — no form needed, title = filename
+  // Gracefully handles missing 'folder' column (migration not run yet).
   async function addFromPath(filePath: string) {
     const title = nameWithoutExt(filePath)
     const folder = selectedFolder ?? null
     setAdding(true)
-    const { data, error: err } = await supabase
+    const baseRow = { user_id: user.id, title, file_url: filePath, duration: null, tags: [], notes: '' }
+
+    // First try with folder column
+    let res = await supabase
       .from('content_bank')
-      .insert({ user_id: user.id, title, file_url: filePath, duration: null, tags: [], notes: '', folder })
+      .insert({ ...baseRow, folder })
       .select().single()
-    if (err) setError("Erreur lors de l'ajout : " + err.message)
-    else if (data) setItems(prev => [data, ...prev])
+
+    // If the folder column doesn't exist, retry without it and show migration banner
+    if (res.error && /folder/i.test(res.error.message) && /column|cache/i.test(res.error.message)) {
+      setNeedsMigration(true)
+      res = await supabase.from('content_bank').insert(baseRow).select().single()
+    }
+
+    if (res.error) setError("Erreur lors de l'ajout : " + res.error.message)
+    else if (res.data) setItems(prev => [res.data, ...prev])
     setAdding(false)
   }
 
@@ -233,8 +253,10 @@ export function Bank({ user }: BankProps) {
   async function createFolder() {
     const name = newFolderName.trim()
     if (!name) return
-    // Folders are virtual — they're stored as a `folder` field on content items
-    // Creating a folder just registers its name locally for the sidebar
+    // Folders persist as: 1) folder text on content items, 2) localStorage list for empty folders
+    if (!emptyFolders.includes(name)) {
+      persistEmptyFolders([...emptyFolders, name])
+    }
     setNewFolderName('')
     setShowNewFolder(false)
     setSelectedFolder(name)
@@ -242,28 +264,27 @@ export function Bank({ user }: BankProps) {
 
   async function renameFolder(oldName: string, newName: string) {
     if (!newName || newName === oldName) return
-    const { error: err } = await supabase.from('content_bank').update({ folder: newName }).eq('user_id', user.id).eq('folder', oldName)
-    if (!err) {
-      setItems(prev => prev.map(i => (i as unknown as {folder:string}).folder === oldName ? { ...i, folder: newName as unknown as string } : i))
-      if (selectedFolder === oldName) setSelectedFolder(newName)
-    }
+    // Update DB rows in this folder
+    await supabase.from('content_bank').update({ folder: newName }).eq('user_id', user.id).eq('folder', oldName)
+    setItems(prev => prev.map(i => (i as unknown as {folder:string}).folder === oldName ? { ...i, folder: newName as unknown as string } : i))
+    // Update localStorage empty folders
+    persistEmptyFolders(emptyFolders.map(f => f === oldName ? newName : f))
+    if (selectedFolder === oldName) setSelectedFolder(newName)
   }
 
   async function deleteFolder(name: string) {
     if (!confirm(`Supprimer le dossier "${name}" ? Les vidéos ne seront pas supprimées.`)) return
-    const { error: err } = await supabase.from('content_bank').update({ folder: null }).eq('user_id', user.id).eq('folder', name)
-    if (!err) {
-      setItems(prev => prev.map(i => (i as unknown as {folder:string}).folder === name ? { ...i, folder: null as unknown as string } : i))
-      if (selectedFolder === name) setSelectedFolder(null)
-    }
+    await supabase.from('content_bank').update({ folder: null }).eq('user_id', user.id).eq('folder', name)
+    setItems(prev => prev.map(i => (i as unknown as {folder:string}).folder === name ? { ...i, folder: null as unknown as string } : i))
+    persistEmptyFolders(emptyFolders.filter(f => f !== name))
+    if (selectedFolder === name) setSelectedFolder(null)
   }
 
-  // Derived data
-  const folders = [...new Set(
-    items
-      .map(i => (i as unknown as {folder?: string | null}).folder)
-      .filter((f): f is string => Boolean(f))
-  )].sort()
+  // Derived data — folders come from items + empty (newly-created) folders
+  const folders = [...new Set([
+    ...items.map(i => (i as unknown as {folder?: string | null}).folder).filter((f): f is string => Boolean(f)),
+    ...emptyFolders,
+  ])].sort()
 
   const visible = items.filter(item => {
     const folder = (item as unknown as {folder?: string | null}).folder
@@ -351,16 +372,6 @@ export function Bank({ user }: BankProps) {
             />
           ))}
         </div>
-
-        {/* Add from PC button */}
-        <div className="px-3 py-3 border-t border-border space-y-1.5">
-          <button
-            onClick={pickFile}
-            className="w-full text-xs bg-accent/10 hover:bg-accent/20 text-accent rounded-lg py-2 transition-colors font-medium"
-          >
-            📂 Ajouter une vidéo
-          </button>
-        </div>
       </aside>
 
       {/* ── Main area ── */}
@@ -381,6 +392,7 @@ export function Bank({ user }: BankProps) {
             onChange={e => setSearch(e.target.value)}
             className="w-44 bg-surface border border-border rounded-lg px-3 py-1.5 text-xs text-text placeholder:text-text2 focus:border-accent focus:outline-none transition-colors"
           />
+          <Button onClick={pickFile} size="sm">+ Ajouter un média</Button>
         </div>
 
         {/* Migration notice */}

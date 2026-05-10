@@ -1,6 +1,6 @@
-import { app, BrowserWindow, shell, ipcMain, net, dialog, session } from 'electron'
-import { fileURLToPath } from 'node:url'
-import { existsSync, readFileSync } from 'node:fs'
+import { app, BrowserWindow, shell, ipcMain, net, dialog, session, protocol } from 'electron'
+import { fileURLToPath, pathToFileURL } from 'node:url'
+import { existsSync, readFileSync, createReadStream, statSync } from 'node:fs'
 import { execFile } from 'node:child_process'
 import https from 'node:https'
 import path from 'node:path'
@@ -12,6 +12,26 @@ export const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL']
 export const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist')
 
 let win: BrowserWindow | null = null
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Custom protocol `localvideo://` for serving local video files to <video> tags.
+// MUST be registered as privileged BEFORE app.ready, with stream:true so that
+// byte-range requests (video seeking/preview) work correctly.
+// Without this, video elements would fire onError when trying to load files.
+// ─────────────────────────────────────────────────────────────────────────────
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: 'localvideo',
+    privileges: {
+      standard: true,
+      secure: true,
+      bypassCSP: true,
+      supportFetchAPI: true,
+      stream: true,
+      corsEnabled: true,
+    },
+  },
+])
 
 // ── Instagram persistent hidden browser ───────────────────────────────────────
 let _igBrowser: BrowserWindow | null = null
@@ -567,6 +587,42 @@ function createWindow() {
   }
 }
 
+// ── IPC: read a local file and return as a data URL (fallback for previews) ──
+// Used when the <video> element fails to load via localvideo:// protocol.
+// Limited to first 25 MB (enough for the first frames to render a thumbnail).
+ipcMain.handle('read-local-video', async (_event, filePath: string) => {
+  try {
+    if (!existsSync(filePath)) return { ok: false, error: 'not found' }
+    const stat = statSync(filePath)
+    const MAX = 25 * 1024 * 1024
+    const ext = path.extname(filePath).toLowerCase()
+    const mime =
+      ext === '.mp4'  ? 'video/mp4'  :
+      ext === '.mov'  ? 'video/quicktime' :
+      ext === '.webm' ? 'video/webm' :
+      ext === '.mkv'  ? 'video/x-matroska' :
+      ext === '.avi'  ? 'video/x-msvideo' :
+      'video/mp4'
+    if (stat.size > MAX) {
+      // Read only first MAX bytes — enough for the first frame thumbnail
+      return new Promise<{ ok: boolean; dataUrl?: string; error?: string }>(resolve => {
+        const chunks: Buffer[] = []
+        const stream = createReadStream(filePath, { start: 0, end: MAX - 1 })
+        stream.on('data', c => chunks.push(c as Buffer))
+        stream.on('end', () => {
+          const b64 = Buffer.concat(chunks).toString('base64')
+          resolve({ ok: true, dataUrl: `data:${mime};base64,${b64}` })
+        })
+        stream.on('error', e => resolve({ ok: false, error: e.message }))
+      })
+    }
+    const buf = readFileSync(filePath)
+    return { ok: true, dataUrl: `data:${mime};base64,${buf.toString('base64')}` }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+})
+
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') { app.quit(); win = null }
 })
@@ -575,4 +631,36 @@ app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) createWindow()
 })
 
-app.whenReady().then(createWindow)
+app.whenReady().then(() => {
+  // Register the localvideo:// protocol handler.
+  // Renderer uses URLs like: localvideo:///C:/path/to/video.mp4 (Windows)
+  //                          localvideo:///home/user/video.mp4  (Unix)
+  // The handler converts to file:// and forwards via net.fetch which preserves
+  // byte-range support (stream privilege ensures the browser can seek).
+  protocol.handle('localvideo', async (request) => {
+    try {
+      // request.url = 'localvideo:///C:/path/to/video.mp4'
+      const u = new URL(request.url)
+      // u.pathname = '/C:/path/to/video.mp4' or '/home/user/...'
+      let filePath = decodeURIComponent(u.pathname)
+      // On Windows, strip the leading slash so path is C:/...
+      if (process.platform === 'win32' && /^\/[A-Za-z]:/.test(filePath)) {
+        filePath = filePath.slice(1)
+      }
+      if (!existsSync(filePath)) {
+        return new Response('Not found', { status: 404 })
+      }
+      const fileUrl = pathToFileURL(filePath).toString()
+      // Forward Range header so video seeking works (essential for preview)
+      const fwdHeaders = new Headers()
+      const range = request.headers.get('range')
+      if (range) fwdHeaders.set('range', range)
+      return await net.fetch(fileUrl, { headers: fwdHeaders, bypassCustomProtocolHandlers: true })
+    } catch (err) {
+      console.error('[localvideo]', err)
+      return new Response(`Error: ${err}`, { status: 500 })
+    }
+  })
+
+  createWindow()
+})

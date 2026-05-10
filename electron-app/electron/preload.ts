@@ -42,6 +42,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   fetchInstagramBySession: (opts: { username: string; sessionid: string }) =>
     ipcRenderer.invoke('fetch-instagram-by-session', opts),
 
+  // Read a local video file as a data URL (fallback when localvideo:// fails)
+  readLocalVideo: (filePath: string) => ipcRenderer.invoke('read-local-video', filePath),
+
   // Groq AI API call (returns chat completion)
   groqRequest: (opts: {
     apiKey: string

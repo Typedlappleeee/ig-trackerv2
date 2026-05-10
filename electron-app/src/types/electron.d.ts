@@ -42,6 +42,7 @@ interface ElectronAPI {
     error?: string
   }>
   runFfmpeg:         (opts: { clips: FfmpegClip[]; outputPath: string; preset: '9:16'|'1:1'|'16:9'; transition: 'cut'|'fade' }) => Promise<{ ok: boolean; outputPath?: string; command?: string; error?: string }>
+  readLocalVideo:    (filePath: string) => Promise<{ ok: boolean; dataUrl?: string; error?: string }>
   groqRequest:       (opts: GroqRequestOptions) => Promise<{ ok: boolean; data?: unknown; error?: string }>
 }
 

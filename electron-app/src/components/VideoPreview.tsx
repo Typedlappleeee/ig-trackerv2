@@ -6,16 +6,17 @@ function basename(p: string): string {
 }
 
 /**
- * Converts a local filesystem path to a safe file:// URL.
- * encodeURI handles spaces (%20) and special chars while leaving slashes/colons intact.
- * webSecurity: false in the BrowserWindow allows file:// from any renderer origin.
+ * Build a `localvideo://` URL that points at a local video file.
+ * The protocol is registered in main.ts as a privileged streaming scheme — this
+ * gives <video> elements proper byte-range support so they can seek and preview.
+ *
+ * Windows path:  C:/Users/My Videos/clip.mp4 → localvideo:///C:/Users/My%20Videos/clip.mp4
+ * Unix path:     /home/user/clip.mp4         → localvideo:///home/user/clip.mp4
  */
 export function localFileUrl(filePath: string): string {
   const normalized = filePath.replace(/\\/g, '/')
-  // Windows: C:/path → /C:/path → file:///C:/path
-  // Unix:    /home/user/path  → file:///home/user/path
   const withSlash = normalized.startsWith('/') ? normalized : `/${normalized}`
-  return encodeURI(`file://${withSlash}`)
+  return `localvideo://${encodeURI(withSlash)}`
 }
 
 interface VideoPreviewProps {
@@ -24,13 +25,17 @@ interface VideoPreviewProps {
 }
 
 export function VideoPreview({ filePath, className = 'w-full h-full' }: VideoPreviewProps) {
-  const [ready, setReady]   = useState(false)
-  const [failed, setFailed] = useState(false)
+  const [ready, setReady]     = useState(false)
+  const [failed, setFailed]   = useState(false)
+  const [fallback, setFallback] = useState<string | null>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
+  const triedFallback = useRef(false)
 
   useEffect(() => {
     setReady(false)
     setFailed(false)
+    setFallback(null)
+    triedFallback.current = false
   }, [filePath])
 
   if (!filePath) {
@@ -39,7 +44,25 @@ export function VideoPreview({ filePath, className = 'w-full h-full' }: VideoPre
     )
   }
 
-  const src = localFileUrl(filePath)
+  // Try IPC fallback (read file as base64 data URL) when the localvideo:// protocol fails.
+  // This guarantees we get SOMETHING shown even if the protocol/webSecurity setup is broken.
+  async function tryIpcFallback() {
+    if (triedFallback.current || !filePath) return
+    triedFallback.current = true
+    if (!window.electronAPI?.readLocalVideo) {
+      setFailed(true)
+      return
+    }
+    const res = await window.electronAPI.readLocalVideo(filePath)
+    if (res.ok && res.dataUrl) {
+      setFallback(res.dataUrl)
+      setFailed(false)
+    } else {
+      setFailed(true)
+    }
+  }
+
+  const src = fallback ?? localFileUrl(filePath)
 
   if (failed) {
     return (
@@ -65,10 +88,10 @@ export function VideoPreview({ filePath, className = 'w-full h-full' }: VideoPre
         playsInline
         preload="metadata"
         onLoadedMetadata={() => {
-          if (videoRef.current) videoRef.current.currentTime = 1
+          if (videoRef.current) videoRef.current.currentTime = 0.5
         }}
         onSeeked={() => setReady(true)}
-        onError={() => setFailed(true)}
+        onError={tryIpcFallback}
       />
     </div>
   )

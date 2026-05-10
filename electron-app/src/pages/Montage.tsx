@@ -80,7 +80,7 @@ function localSrc(p: string | null | undefined): string | null {
   if (p.startsWith('http')) return p
   const n = p.replace(/\\/g, '/')
   const withSlash = n.startsWith('/') ? n : `/${n}`
-  return encodeURI(`file://${withSlash}`)
+  return `localvideo://${encodeURI(withSlash)}`
 }
 
 // ── Time ruler ────────────────────────────────────────────────────────────────
