@@ -244,6 +244,50 @@ html, body, #root {
   z-index: -1;
 }
 
+/* ── Flame overlay (track 67) ───────────────────────────────────────────────── */
+@keyframes flame-in  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes flame-out { from { opacity: 1; } to { opacity: 0; } }
+
+@keyframes flame-rise-a {
+  0%,100% { transform: scaleY(1)    skewX(0deg);   opacity: 0.92; }
+  20%     { transform: scaleY(1.07) skewX(1.8deg); opacity: 1;    }
+  50%     { transform: scaleY(0.94) skewX(-1.2deg);opacity: 0.82; }
+  75%     { transform: scaleY(1.04) skewX(0.6deg); opacity: 0.96; }
+}
+@keyframes flame-rise-b {
+  0%,100% { transform: scaleY(1)    skewX(0deg);   opacity: 0.78; }
+  30%     { transform: scaleY(1.10) skewX(-2.2deg);opacity: 0.95; }
+  65%     { transform: scaleY(0.90) skewX(1.8deg); opacity: 0.70; }
+}
+@keyframes flame-rise-c {
+  0%,100% { transform: scaleY(1.02) skewX(0deg);   opacity: 0.65; }
+  45%     { transform: scaleY(1.14) skewX(2.5deg);  opacity: 0.88; }
+  80%     { transform: scaleY(0.88) skewX(-1.5deg); opacity: 0.60; }
+}
+@keyframes flame-side-l {
+  0%,100% { transform: scaleX(1)    skewY(0deg);   opacity: 0.75; }
+  35%     { transform: scaleX(1.09) skewY(1.5deg); opacity: 0.92; }
+  70%     { transform: scaleX(0.93) skewY(-1deg);  opacity: 0.65; }
+}
+@keyframes flame-side-r {
+  0%,100% { transform: scaleX(1)    skewY(0deg);   opacity: 0.75; }
+  40%     { transform: scaleX(0.92) skewY(-1.8deg);opacity: 0.62; }
+  72%     { transform: scaleX(1.11) skewY(1.2deg); opacity: 0.90; }
+}
+@keyframes flame-vignette {
+  0%,100% { opacity: 0.60; }
+  50%     { opacity: 0.85; }
+}
+@keyframes ember-float {
+  0%   { transform: translate(0, 0)            scale(1);   opacity: 1;   }
+  60%  { opacity: 0.7; }
+  100% { transform: translate(var(--edx,0px), var(--edy,-160px)) scale(0.15); opacity: 0; }
+}
+@keyframes ember-glow {
+  0%,100% { box-shadow: 0 0 4px 2px #ff6600; }
+  50%     { box-shadow: 0 0 8px 4px #ffcc00; }
+}
+
 /* Smooth interactive transitions — applied globally */
 button, a, input, select, textarea {
   transition-property: color, background-color, border-color, box-shadow, opacity, transform;

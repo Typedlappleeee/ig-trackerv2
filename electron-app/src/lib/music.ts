@@ -12,6 +12,21 @@ let _chordIdx = 0
 // Track-3 file player (HTMLAudioElement — simpler, no fetch/decode)
 let _fileAudio: HTMLAudioElement | null = null
 
+// ── State observers ───────────────────────────────────────────────────────────
+type MusicStateListener = (running: boolean, trackIdx: number) => void
+const _listeners = new Set<MusicStateListener>()
+
+export function subscribeMusicState(fn: MusicStateListener): () => void {
+  _listeners.add(fn)
+  fn(_running, savedTrack())
+  return () => _listeners.delete(fn)
+}
+
+function notifyListeners() {
+  const t = savedTrack()
+  _listeners.forEach(fn => fn(_running, t))
+}
+
 const LS_ENABLED = 'ig-music-enabled'
 const LS_TRACK   = 'ig-music-track'   // '0'–'3'
 const LS_VOLUME  = 'ig-music-volume'  // '0.0'–'1.0'
@@ -332,6 +347,7 @@ export function startMusic() {
       _running = false
     }
   }
+  notifyListeners()
 }
 
 // Properly fades dyingMaster.gain to 0, then closes the AudioContext —
@@ -360,6 +376,7 @@ export function stopMusic(instant = false) {
   _running = false
   if (_timer) { clearTimeout(_timer); _timer = null }
   killCtx(instant ? 0.05 : 2.5)
+  notifyListeners()
 }
 
 /** Change volume instantly (0–1). Persisted. */
@@ -383,6 +400,7 @@ export function setTrack(idx: number) {
   _running = false
   if (_timer) { clearTimeout(_timer); _timer = null }
   killCtx(0.4)
+  notifyListeners()
   if (wasRunning) setTimeout(() => startMusic(), 600)
 }
 
