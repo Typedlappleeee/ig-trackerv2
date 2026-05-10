@@ -211,9 +211,20 @@ ipcMain.handle('fetch-instagram-html', async (_event, username: string) => {
 
 
 // ── Helper for session-authenticated IG requests via Node.js https ───────────
-function igSessionFetch(url: string, sessionid: string, method = 'GET', body?: string): Promise<{ status: number; data: unknown }> {
+// Cache csrftoken per session — Instagram requires it on POST/write actions
+const _csrfCache = new Map<string, string>()
+
+function igSessionFetch(
+  url: string,
+  sessionid: string,
+  method = 'GET',
+  body?: string,
+  extraHeaders?: Record<string, string>,
+): Promise<{ status: number; data: unknown }> {
   return new Promise((resolve, reject) => {
     const parsed = new URL(url)
+    const csrf = _csrfCache.get(sessionid)
+    const cookie = csrf ? `sessionid=${sessionid}; csrftoken=${csrf}` : `sessionid=${sessionid}`
     const reqOpts: import('node:https').RequestOptions = {
       hostname: parsed.hostname,
       path: parsed.pathname + parsed.search,
@@ -223,17 +234,24 @@ function igSessionFetch(url: string, sessionid: string, method = 'GET', body?: s
         'X-IG-App-ID': '936619743392459',
         'X-ASBD-ID': '198387',
         'Accept-Language': 'fr-FR,fr;q=0.9',
-        'Cookie': `sessionid=${sessionid}`,
+        'Cookie': cookie,
+        ...(csrf ? { 'X-CSRFToken': csrf } : {}),
+        ...(extraHeaders ?? {}),
         ...(body ? { 'Content-Type': 'application/x-www-form-urlencoded', 'Content-Length': String(Buffer.byteLength(body)) } : {}),
       },
     }
     const req = https.request(reqOpts, (res) => {
       const chunks: Buffer[] = []
+      // Auto-extract csrftoken from set-cookie so subsequent writes are authorized
+      const setCookieHeader = res.headers['set-cookie'] ?? []
+      for (const c of setCookieHeader) {
+        const m = c.match(/csrftoken=([^;]+)/)
+        if (m && m[1] && m[1] !== 'missing') _csrfCache.set(sessionid, m[1])
+      }
       res.on('data', (c: Buffer) => chunks.push(c))
       res.on('end', () => {
         try {
           const raw = Buffer.concat(chunks).toString('utf-8')
-          // Preserve large integers (Instagram IDs are 19 digits) as strings before JSON.parse
           const safe = raw.replace(/:(\s*)(\d{16,})/g, ':$1"$2"')
           resolve({ status: res.statusCode ?? 0, data: JSON.parse(safe) })
         } catch { resolve({ status: res.statusCode ?? 0, data: null }) }
@@ -678,13 +696,54 @@ ipcMain.handle('fetch-ig-comments', async (_event, opts: { mediaId: string; sess
 // ── IPC: post a comment on an Instagram media ─────────────────────────────────
 ipcMain.handle('post-ig-comment', async (_event, opts: { mediaId: string; text: string; sessionid: string }) => {
   try {
-    const res = await igSessionFetch(
+    // Ensure we have a csrftoken cached — IG requires it on POST
+    if (!_csrfCache.get(opts.sessionid)) {
+      await igSessionFetch('https://i.instagram.com/api/v1/accounts/current_user/', opts.sessionid)
+    }
+    // Extract user_id from sessionid for _uid (sessionid format: "{userid}%3A...")
+    const decoded = decodeURIComponent(opts.sessionid)
+    const uidMatch = decoded.match(/^(\d+)/)
+    const uid = uidMatch ? uidMatch[1] : ''
+
+    const body = [
+      `comment_text=${encodeURIComponent(opts.text)}`,
+      `containermodule=self_comments_v2_feed_contextual_self_profile`,
+      uid ? `_uid=${uid}` : '',
+      uid ? `_uuid=${uid}` : '',
+    ].filter(Boolean).join('&')
+
+    const tryPost = () => igSessionFetch(
       `https://i.instagram.com/api/v1/media/${opts.mediaId}/comment/`,
       opts.sessionid,
       'POST',
-      `comment_text=${encodeURIComponent(opts.text)}`
+      body,
     )
-    if (res.status !== 200) return { ok: false, error: `HTTP ${res.status}` }
+
+    let res = await tryPost()
+    console.log('[post-ig-comment] status=', res.status, 'mediaId=', opts.mediaId)
+
+    // If 403, drop cached csrftoken, refetch a fresh one, and retry once
+    if (res.status === 403) {
+      _csrfCache.delete(opts.sessionid)
+      await igSessionFetch('https://i.instagram.com/api/v1/accounts/current_user/', opts.sessionid)
+      // Also try the www. host which sometimes works when i. blocks
+      const res2 = await igSessionFetch(
+        `https://www.instagram.com/api/v1/web/comments/${opts.mediaId}/add/`,
+        opts.sessionid,
+        'POST',
+        `comment_text=${encodeURIComponent(opts.text)}`,
+        { 'X-Requested-With': 'XMLHttpRequest', 'Referer': 'https://www.instagram.com/' },
+      )
+      console.log('[post-ig-comment] retry www. status=', res2.status)
+      if (res2.status === 200) return { ok: true }
+      res = await tryPost()
+      console.log('[post-ig-comment] retry i. status=', res.status)
+    }
+
+    if (res.status !== 200) {
+      const detail = res.data ? JSON.stringify(res.data).slice(0, 200) : ''
+      return { ok: false, error: `HTTP ${res.status}${detail ? ' — ' + detail : ''}` }
+    }
     return { ok: true }
   } catch (err: unknown) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) }
