@@ -56,41 +56,50 @@ async function fetchIgVideos(username: string): Promise<IgVideo[]> {
   } catch { return [] }
 }
 
-// ── Thumbnail with session cookie support ────────────────────────────────────
+// ── Instagram thumbnail ───────────────────────────────────────────────────────
+// Strategy: try the CDN URL directly first (webSecurity:false allows it).
+// If that fails, proxy through IPC (https.get in main process bypasses CORS).
 function VideoThumbnail({ src, sessionid }: { src: string; sessionid?: string }) {
-  const [dataUrl, setDataUrl] = useState<string | null>(null)
-  const [failed, setFailed]   = useState(false)
+  const [proxiedUrl, setProxiedUrl] = useState<string | null>(null)
+  const [useProxy, setUseProxy]     = useState(false)
+  const [failed, setFailed]         = useState(false)
 
+  // Fallback: load via IPC proxy
   useEffect(() => {
-    setDataUrl(null)
-    setFailed(false)
-    if (!src) { setFailed(true); return }
-    if (!window.electronAPI?.fetchImage) { setFailed(true); return }
+    if (!useProxy || !src) return
+    setProxiedUrl(null)
     let cancelled = false
     const headers: Record<string, string> = {}
     if (sessionid) headers['Cookie'] = `sessionid=${sessionid}`
-    window.electronAPI.fetchImage({ url: src, headers: Object.keys(headers).length ? headers : undefined })
+    window.electronAPI?.fetchImage({ url: src, headers: Object.keys(headers).length ? headers : undefined })
       .then(res => {
         if (cancelled) return
-        if (res.ok && res.dataUrl) setDataUrl(res.dataUrl)
+        if (res.ok && res.dataUrl) setProxiedUrl(res.dataUrl)
         else setFailed(true)
       })
       .catch(() => { if (!cancelled) setFailed(true) })
     return () => { cancelled = true }
-  }, [src, sessionid])
+  }, [useProxy, src, sessionid])
 
-  if (failed || !src) {
+  if (!src || failed) {
     return <div className="w-full h-full flex items-center justify-center text-3xl bg-surface2">🎬</div>
   }
-  if (!dataUrl) {
-    return (
-      <div className="w-full h-full flex items-center justify-center bg-surface2">
-        <Spinner size="sm" />
-      </div>
-    )
+
+  // Show spinner while proxy is loading
+  if (useProxy && !proxiedUrl) {
+    return <div className="w-full h-full flex items-center justify-center bg-surface2"><Spinner size="sm" /></div>
   }
+
   return (
-    <img src={dataUrl} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+    <img
+      src={proxiedUrl ?? src}
+      alt=""
+      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+      onError={() => {
+        if (!useProxy) setUseProxy(true)   // first failure → try IPC proxy
+        else setFailed(true)               // proxy also failed → show emoji
+      }}
+    />
   )
 }
 

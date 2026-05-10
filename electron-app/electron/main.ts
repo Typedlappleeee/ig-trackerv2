@@ -489,35 +489,16 @@ function collectImage(
 }
 
 ipcMain.handle('fetch-image', async (_event, opts: { url: string; headers?: Record<string, string> }) => {
-  const isInstagram = opts.url.includes('instagram.com') || opts.url.includes('cdninstagram.com') || opts.url.includes('fbcdn.net')
-
-  // For Instagram CDN: use session.defaultSession.fetch() so Electron automatically
-  // attaches the browser session cookies (same mechanism as igSessionFetch).
-  // This is required because fbcdn.net URLs are signed and client-bound.
-  if (isInstagram) {
-    try {
-      const { session: electronSession } = await import('electron')
-      const hdrs: Record<string, string> = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-        'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
-        'Referer': 'https://www.instagram.com/',
-        ...(opts.headers ?? {}),
-      }
-      const res = await electronSession.defaultSession.fetch(opts.url, { headers: hdrs })
-      if (!res.ok) return { ok: false, error: `HTTP ${res.status}` }
-      const buf = Buffer.from(await res.arrayBuffer())
-      const ct = res.headers.get('content-type') ?? 'image/jpeg'
-      return { ok: true, dataUrl: `data:${ct};base64,${buf.toString('base64')}` }
-    } catch (err: unknown) {
-      return { ok: false, error: err instanceof Error ? err.message : String(err) }
-    }
-  }
-
-  // Non-Instagram: use Node.js https.get (no CORS / session issues)
+  // Use Node.js https.get for all image fetches — it sends exactly the headers we
+  // provide with no interference from Electron's session cookie store, and it follows
+  // redirects properly. Instagram CDN URLs (fbcdn.net / cdninstagram.com) are
+  // pre-signed so they don't need session cookies; the sessionid header is only
+  // needed for API calls, not for CDN image downloads.
   return new Promise<{ ok: boolean; dataUrl?: string; error?: string }>(resolve => {
     const baseHeaders: Record<string, string> = {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
       'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
+      'Referer': 'https://www.instagram.com/',
       ...(opts.headers ?? {}),
     }
     const fetchUrl = (url: string, hdrs: Record<string, string>, depth = 0) => {
