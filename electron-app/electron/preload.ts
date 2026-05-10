@@ -45,6 +45,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Read a local video file as a data URL (fallback when localvideo:// fails)
   readLocalVideo: (filePath: string) => ipcRenderer.invoke('read-local-video', filePath),
 
+  // Fetch Instagram comments for a media post
+  fetchIgComments: (opts: { mediaId: string; sessionid: string; maxId?: string }) =>
+    ipcRenderer.invoke('fetch-ig-comments', opts),
+
   // Groq AI API call (returns chat completion)
   groqRequest: (opts: {
     apiKey: string

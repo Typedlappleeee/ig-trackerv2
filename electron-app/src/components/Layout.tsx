@@ -38,7 +38,7 @@ const NAV_SECTIONS: NavSection[] = [
       { id: 'posting',     label: 'Posting',       icon: '🚀' },
       { id: 'massposting', label: 'Mass Posting',  icon: '⚡', beta: true },
       { id: 'bank',        label: 'Banque vidéos', icon: '🗂' },
-      { id: 'autocomment', label: 'Automatisation',icon: '🤖', beta: true },
+      { id: 'autocomment', label: 'Commentaires',  icon: '💬', beta: true },
       { id: 'aitools',     label: 'Outils IA',     icon: '🔧', beta: true },
     ],
   },
@@ -51,12 +51,12 @@ const NAV_SECTIONS: NavSection[] = [
   },
 ]
 
-interface SoonItem { label: string; icon: string; color?: string; tooltip?: string }
+interface SoonItem { label: string; icon: string; color?: string; tooltip: string }
 const SOON_ITEMS: SoonItem[] = [
-  { label: 'Twitter / X',   icon: '𝕏' },
-  { label: 'Threads',       icon: '🧵' },
-  { label: 'Reddit',        icon: '🟠' },
-  { label: 'Multiposting',  icon: '🌐', color: 'text-purple-400', tooltip: 'Postera sur tous les réseaux à la fois' },
+  { label: 'Twitter / X',  icon: '𝕏',  color: 'text-sky-400',    tooltip: 'Automatise tes posts et réponses sur Twitter/X' },
+  { label: 'Threads',      icon: '🧵', color: 'text-pink-400',   tooltip: 'Gère tes Threads depuis IG Tracker' },
+  { label: 'Reddit',       icon: '🟠', color: 'text-orange-400', tooltip: 'Planifie et publie sur Reddit automatiquement' },
+  { label: 'Multiposting', icon: '🌐', color: 'text-purple-400', tooltip: 'Poste sur tous les réseaux sociaux en une seule action' },
 ]
 
 export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefresh, children }: LayoutProps) {
@@ -177,14 +177,19 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             {soonOpen && (
               <div className="space-y-0.5 px-2 pb-1">
                 {SOON_ITEMS.map(item => (
-                  <div
-                    key={item.label}
-                    title={item.tooltip ?? `${item.label} — bientôt disponible`}
-                    className="w-full flex items-center gap-2.5 pl-3 pr-2 py-2 rounded-md text-[13px] text-sb-text/40 cursor-not-allowed"
-                  >
-                    <span className={`text-base w-5 text-center flex-shrink-0 ${item.color ?? 'text-sb-icon/60'}`}>{item.icon}</span>
-                    <span>{item.label}</span>
-                    <span className="ml-auto text-[8px] font-bold uppercase bg-text2/30 text-text2 px-1.5 py-0.5 rounded">SOON</span>
+                  <div key={item.label} className="group relative">
+                    <div className="w-full flex items-center gap-2.5 pl-3 pr-2 py-2 rounded-md text-[13px] text-sb-text/60 cursor-not-allowed border border-transparent hover:border-border hover:bg-sb-hover/30 transition-all">
+                      <span className={`text-base w-5 text-center flex-shrink-0 ${item.color}`}>{item.icon}</span>
+                      <span className="font-medium">{item.label}</span>
+                      <span className="ml-auto text-[8px] font-bold uppercase bg-accent/20 text-accent px-1.5 py-0.5 rounded tracking-wide">SOON</span>
+                    </div>
+                    {/* Tooltip on hover */}
+                    <div className="absolute left-full top-1/2 -translate-y-1/2 ml-2 z-50 hidden group-hover:block pointer-events-none">
+                      <div className="bg-surface border border-border rounded-lg px-3 py-2 text-[11px] text-text w-48 shadow-xl">
+                        <p className="font-semibold text-accent mb-0.5">{item.label}</p>
+                        <p className="text-text2 leading-snug">{item.tooltip}</p>
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>

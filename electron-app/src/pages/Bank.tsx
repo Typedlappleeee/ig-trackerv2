@@ -125,6 +125,66 @@ function TagsModal({ item, onSave, onClose }: {
 const MIGRATION_SQL = `-- Colle dans Supabase → SQL Editor → Run
 alter table public.content_bank add column if not exists folder text default null;`
 
+// ── Add Media modal (drag-drop zone + pick from PC) ───────────────────────────
+function AddMediaModal({ onPick, onDrop, onClose }: {
+  onPick: () => void
+  onDrop: (filePath: string) => void
+  onClose: () => void
+}) {
+  const [dragOver, setDragOver] = useState(false)
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault(); setDragOver(false)
+    const files = Array.from(e.dataTransfer.files)
+    for (const f of files) {
+      const p = (f as File & { path?: string }).path ?? f.name
+      if (p) onDrop(p)
+    }
+    onClose()
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={onClose}>
+      <div className="bg-surface border border-border rounded-2xl p-6 w-96 space-y-4 shadow-2xl" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-bold text-text">➕ Ajouter un média</h3>
+          <button onClick={onClose} className="text-text2 hover:text-text transition-colors text-lg leading-none">✕</button>
+        </div>
+
+        {/* Drag-drop zone */}
+        <div
+          onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={handleDrop}
+          className={`
+            border-2 border-dashed rounded-xl flex flex-col items-center justify-center gap-3 py-10 transition-all cursor-default
+            ${dragOver ? 'border-accent bg-accent/10' : 'border-border hover:border-accent/50 bg-surface2/40'}
+          `}
+        >
+          <span className="text-4xl">{dragOver ? '📂' : '🎬'}</span>
+          <div className="text-center">
+            <p className="text-sm font-semibold text-text">Glisse tes fichiers ici</p>
+            <p className="text-xs text-text2 mt-0.5">Vidéos, photos, GIFs, audio</p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <div className="flex-1 h-px bg-border" />
+          <span className="text-xs text-text2">ou</span>
+          <div className="flex-1 h-px bg-border" />
+        </div>
+
+        <button
+          onClick={() => { onPick(); onClose() }}
+          className="w-full bg-accent hover:bg-accent2 text-white font-semibold py-2.5 rounded-xl text-sm transition-colors"
+        >
+          📁 Choisir depuis ton PC
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export function Bank({ user }: BankProps) {
   const [items, setItems]         = useState<ContentItem[]>([])
   const [loading, setLoading]     = useState(true)
@@ -132,6 +192,7 @@ export function Bank({ user }: BankProps) {
   const [search, setSearch]       = useState('')
   const [error, setError]         = useState<string | null>(null)
   const [dragging, setDragging]   = useState(false)
+  const [showAddModal, setShowAddModal] = useState(false)
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null)
   const [newFolderName, setNewFolderName]   = useState('')
   const [showNewFolder, setShowNewFolder]   = useState(false)
@@ -392,7 +453,7 @@ export function Bank({ user }: BankProps) {
         <div className="px-6 py-3 border-b border-border bg-[#070a10] flex items-center gap-2 flex-shrink-0">
           <h2 className="text-sm font-semibold text-text mr-2">🗂 Banque de médias</h2>
           <div className="flex-1" />
-          <Button onClick={pickFile} size="sm">+ Ajouter un média</Button>
+          <Button onClick={() => setShowAddModal(true)} size="sm">+ Ajouter un média</Button>
           <Button variant="secondary" size="sm" onClick={() => alert('Téléchargement bientôt — utilise le clic droit sur une vidéo pour ouvrir son dossier.')}>⬇ Télécharger</Button>
           <Button variant="secondary" size="sm" onClick={() => alert('Réglage du dossier export à faire dans Paramètres → Profil')}>📂 Export dir</Button>
           <Button variant="secondary" size="sm" onClick={() => alert('Randomisation des métadonnées MP4 — bientôt branchée via IPC ffmpeg')} className="!bg-warn/10 !text-warn">🔀 Randomiser</Button>
@@ -509,6 +570,13 @@ export function Bank({ user }: BankProps) {
       )}
 
       {/* ── Modals ── */}
+      {showAddModal && (
+        <AddMediaModal
+          onPick={pickFile}
+          onDrop={filePath => addFromPath(filePath)}
+          onClose={() => setShowAddModal(false)}
+        />
+      )}
       {renameItem && (
         <RenameModal
           item={renameItem}

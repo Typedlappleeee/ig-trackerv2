@@ -25,28 +25,33 @@ function StatusDot({ status }: { status: string }) {
 function IgStatusBadge({ phone }: { phone: Phone }) {
   if (!phone.ig_username) return <span className="text-xs text-text2">—</span>
   if (phone.ig_status === 'active') return (
-    <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-ok/20 text-ok font-semibold">
-      <span className="w-1.5 h-1.5 rounded-full bg-ok animate-pulse" />Connecté
+    <span className="inline-flex items-center gap-1">
+      <span className="w-2 h-2 rounded-full bg-ok animate-pulse flex-shrink-0" />
+      <span className="text-[11px] text-ok font-semibold">IG OK</span>
     </span>
   )
   if (phone.ig_status === 'error') return (
-    <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-danger/20 text-danger font-semibold">
-      <span className="w-1.5 h-1.5 rounded-full bg-danger" />Erreur
+    <span className="inline-flex items-center gap-1">
+      <span className="w-2 h-2 rounded-full bg-danger flex-shrink-0" />
+      <span className="text-[11px] text-danger font-semibold">Erreur</span>
     </span>
   )
   if (phone.ig_status === 'rate_limited') return (
-    <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-warn/20 text-warn font-semibold">
-      <span className="w-1.5 h-1.5 rounded-full bg-warn" />Limité
+    <span className="inline-flex items-center gap-1">
+      <span className="w-2 h-2 rounded-full bg-warn flex-shrink-0" />
+      <span className="text-[11px] text-warn font-semibold">Limité</span>
     </span>
   )
   if (phone.ig_sessionid) return (
-    <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-accent/10 text-accent font-semibold">
-      🔑 Session
+    <span className="inline-flex items-center gap-1">
+      <span className="w-2 h-2 rounded-full bg-accent flex-shrink-0" />
+      <span className="text-[11px] text-accent font-semibold">Session</span>
     </span>
   )
   return (
-    <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-surface2 text-text2">
-      Public
+    <span className="inline-flex items-center gap-1">
+      <span className="w-2 h-2 rounded-full bg-text2/40 flex-shrink-0" />
+      <span className="text-[11px] text-text2">Public</span>
     </span>
   )
 }
@@ -734,9 +739,8 @@ export function Phones({ user }: PhonesProps) {
                   <span className="text-xs text-text2 truncate">{phone.group_name ?? '—'}</span>
                   <IgCell phone={phone} onSave={saveIgUsername} />
                   <IgStatusBadge phone={phone} />
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1.5" title={phone.status === 'online' ? 'Téléphone en ligne' : 'Téléphone hors ligne'}>
                     <StatusDot status={phone.status} />
-                    <span className="text-xs text-text2 capitalize">{phone.status}</span>
                   </div>
                   <span className="text-xs text-text">
                     {phone.followers ? phone.followers.toLocaleString('fr-FR') : '—'}

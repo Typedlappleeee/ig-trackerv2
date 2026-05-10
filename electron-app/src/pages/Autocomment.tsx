@@ -96,13 +96,28 @@ export function Autocomment({ user }: AutocommentProps) {
     }
   }
 
-  async function loadComments(_post: IgPost) {
+  async function loadComments(post: IgPost) {
+    const sessionid = selPhone?.ig_sessionid
+    if (!sessionid) {
+      log('⚠ Aucune session IG configurée pour ce téléphone — va dans Téléphones → configurer session')
+      setComments([])
+      return
+    }
     setLoadingC(true)
-    // TODO: requires a new IPC handler for /api/v1/media/{id}/comments/
-    // For now, show empty state
-    setComments([])
+    try {
+      const r = await window.electronAPI?.fetchIgComments({ mediaId: post.id, sessionid })
+      if (r?.ok && r.comments) {
+        setComments(r.comments.map(c => ({ pk: c.pk, username: c.username, text: c.text, replied: null })))
+        log(`✓ ${r.comments.length} commentaire${r.comments.length !== 1 ? 's' : ''} chargé${r.comments.length !== 1 ? 's' : ''}`)
+      } else {
+        setComments([])
+        log(`❌ Impossible de charger les commentaires : ${r?.error ?? 'erreur inconnue'}`)
+      }
+    } catch (e) {
+      setComments([])
+      log(`❌ Erreur : ${e instanceof Error ? e.message : String(e)}`)
+    }
     setLoadingC(false)
-    log('ℹ️ Lecture des commentaires non implémentée — IPC media/comments à ajouter dans main.ts')
   }
 
   function selectPost(p: IgPost) {

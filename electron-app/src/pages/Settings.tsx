@@ -150,6 +150,31 @@ export function Settings({ user }: SettingsProps) {
     setSaving(false)
   }
 
+  async function saveProfile() {
+    setSaving(true); setSaved(false); setError(null)
+    try {
+      // 1. Update Supabase Auth email if changed
+      if (profileEmail.trim() && profileEmail.trim() !== user.email) {
+        const { error: emailErr } = await supabase.auth.updateUser({ email: profileEmail.trim() })
+        if (emailErr) throw new Error('Email : ' + emailErr.message)
+      }
+      // 2. Update password if provided
+      if (newPassword) {
+        if (newPassword !== confirmPassword) throw new Error('Les mots de passe ne correspondent pas.')
+        if (newPassword.length < 8) throw new Error('Le mot de passe doit faire au moins 8 caractères.')
+        const { error: pwErr } = await supabase.auth.updateUser({ password: newPassword })
+        if (pwErr) throw new Error('Mot de passe : ' + pwErr.message)
+      }
+      // 3. Upsert profile data
+      await save()
+      setNewPassword('')
+      setConfirm('')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    }
+    setSaving(false)
+  }
+
   async function testProxy() {
     setTestingProxy(true)
     setProxyResult(null)
@@ -333,7 +358,12 @@ export function Settings({ user }: SettingsProps) {
             <Input label="Confirmer" type="password" placeholder="••••••" value={confirmPassword} onChange={e => setConfirm(e.target.value)} />
           </div>
 
-          <Button onClick={save} loading={saving} className="w-full">💾 Sauvegarder le profil</Button>
+          {profileEmail.trim() && profileEmail.trim() !== user.email && (
+            <p className="text-xs text-warn bg-warn/10 border border-warn/20 rounded-lg px-3 py-2">
+              ⚠ Un email de confirmation sera envoyé à <strong>{profileEmail.trim()}</strong> pour valider le changement.
+            </p>
+          )}
+          <Button onClick={saveProfile} loading={saving} className="w-full">💾 Sauvegarder le profil</Button>
         </section>
       )}
 

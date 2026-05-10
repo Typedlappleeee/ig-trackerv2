@@ -489,18 +489,35 @@ function collectImage(
 }
 
 ipcMain.handle('fetch-image', async (_event, opts: { url: string; headers?: Record<string, string> }) => {
+  const isInstagram = opts.url.includes('instagram.com') || opts.url.includes('cdninstagram.com') || opts.url.includes('fbcdn.net')
+
+  // For Instagram CDN: use session.defaultSession.fetch() so Electron automatically
+  // attaches the browser session cookies (same mechanism as igSessionFetch).
+  // This is required because fbcdn.net URLs are signed and client-bound.
+  if (isInstagram) {
+    try {
+      const { session: electronSession } = await import('electron')
+      const hdrs: Record<string, string> = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
+        'Referer': 'https://www.instagram.com/',
+        ...(opts.headers ?? {}),
+      }
+      const res = await electronSession.defaultSession.fetch(opts.url, { headers: hdrs })
+      if (!res.ok) return { ok: false, error: `HTTP ${res.status}` }
+      const buf = Buffer.from(await res.arrayBuffer())
+      const ct = res.headers.get('content-type') ?? 'image/jpeg'
+      return { ok: true, dataUrl: `data:${ct};base64,${buf.toString('base64')}` }
+    } catch (err: unknown) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) }
+    }
+  }
+
+  // Non-Instagram: use Node.js https.get (no CORS / session issues)
   return new Promise<{ ok: boolean; dataUrl?: string; error?: string }>(resolve => {
-    const isInstagram = opts.url.includes('instagram.com') || opts.url.includes('cdninstagram.com') || opts.url.includes('fbcdn.net')
     const baseHeaders: Record<string, string> = {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
       'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
-      ...(isInstagram ? {
-        'Referer': 'https://www.instagram.com/',
-        'Origin': 'https://www.instagram.com',
-        'Sec-Fetch-Dest': 'image',
-        'Sec-Fetch-Mode': 'no-cors',
-        'Sec-Fetch-Site': 'cross-site',
-      } : {}),
       ...(opts.headers ?? {}),
     }
     const fetchUrl = (url: string, hdrs: Record<string, string>, depth = 0) => {
@@ -541,6 +558,28 @@ ipcMain.handle('groq-request', async (_event, opts: {
     })
     const data = await response.json()
     return { ok: true, data }
+  } catch (err: unknown) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+})
+
+// ── IPC: fetch Instagram comments for a media ID ─────────────────────────────
+ipcMain.handle('fetch-ig-comments', async (_event, opts: { mediaId: string; sessionid: string; maxId?: string }) => {
+  try {
+    let url = `https://i.instagram.com/api/v1/media/${opts.mediaId}/comments/?can_support_threading=true&permalink_enabled=false`
+    if (opts.maxId) url += `&max_id=${opts.maxId}`
+    const res = await igSessionFetch(url, opts.sessionid)
+    if (res.status !== 200) return { ok: false, error: `HTTP ${res.status}` }
+    const data = res.data as Record<string, unknown>
+    const rawComments = (data['comments'] as Array<Record<string, unknown>>) ?? []
+    const comments = rawComments.map(c => ({
+      pk:        String(c['pk'] ?? ''),
+      text:      String(c['text'] ?? ''),
+      username:  String((c['user'] as Record<string, unknown>)?.['username'] ?? ''),
+      timestamp: c['created_at'] ? new Date((c['created_at'] as number) * 1000).toISOString() : '',
+      likeCount: (c['comment_like_count'] as number) ?? 0,
+    }))
+    return { ok: true, comments, hasMore: !!(data['next_max_id']) }
   } catch (err: unknown) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) }
   }
