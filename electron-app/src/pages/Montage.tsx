@@ -662,7 +662,7 @@ export function Montage({ user }: MontageProps) {
               ) : filteredBank.map(item => (
                 <button key={item.id} onClick={() => addClip(item)}
                   className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-surface2 group transition-colors">
-                  <div className="w-10 h-14 rounded overflow-hidden flex-shrink-0"><VideoThumbnail filePath={item.file_url} /></div>
+                  <div className="w-10 h-14 rounded overflow-hidden flex-shrink-0"><VideoThumbnail filePath={item.file_url} thumbnailPath={item.thumbnail_path} storagePath={item.storage_path} /></div>
                   <div className="flex-1 min-w-0">
                     <p className="text-[11px] font-medium text-text truncate">{item.title}</p>
                     <p className="text-[9px] text-text2">{item.duration ? fmtTime(item.duration) : '?s'}</p>

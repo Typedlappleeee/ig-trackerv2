@@ -771,30 +771,38 @@ function FolderRow({ name, count, active, onClick, onRename, onDelete }: {
 
 // ── Video thumbnail ───────────────────────────────────────────────────────────
 // Priority order:
-//   1. thumbnailPath (Supabase Storage) → fetch signed URL, show as <img>
-//   2. filePath (local) → use localvideo:// protocol with first-frame seek
-//   3. fallback emoji
+//   1. thumbnailPath (Supabase Storage)  → signed URL → <img>   (fast)
+//   2. storagePath  (Supabase Storage)   → signed video URL → <video> first-frame
+//      (fallback when thumbnail extraction failed at upload time)
+//   3. filePath     (legacy local)       → localvideo:// → <video> first-frame
+//   4. emoji
 import { getSignedUrl } from '@/lib/storage'
 
-export function VideoThumbnail({ filePath, thumbnailPath }: { filePath?: string | null; thumbnailPath?: string | null }) {
+export function VideoThumbnail({ filePath, thumbnailPath, storagePath }: {
+  filePath?:      string | null
+  thumbnailPath?: string | null
+  storagePath?:   string | null
+}) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const [failed, setFailed] = useState(false)
-  const [thumbUrl, setThumbUrl] = useState<string | null>(null)
+  const [thumbUrl, setThumbUrl]     = useState<string | null>(null)
+  const [videoSrc, setVideoSrc]     = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
+    setThumbUrl(null); setVideoSrc(null); setFailed(false)
     if (thumbnailPath) {
       getSignedUrl(thumbnailPath).then(u => { if (!cancelled) setThumbUrl(u) })
-    } else {
-      setThumbUrl(null)
+    } else if (storagePath) {
+      getSignedUrl(storagePath).then(u => { if (!cancelled) setVideoSrc(u) })
     }
     return () => { cancelled = true }
-  }, [thumbnailPath])
+  }, [thumbnailPath, storagePath])
 
+  // 1. JPEG thumbnail
   if (thumbnailPath) {
-    if (!thumbUrl || failed) {
-      return <div className="w-full h-full flex items-center justify-center bg-surface2 text-4xl">🎬</div>
-    }
+    if (!thumbUrl) return <div className="w-full h-full flex items-center justify-center bg-surface2 text-4xl">🎬</div>
+    if (failed)    return <div className="w-full h-full flex items-center justify-center bg-surface2 text-4xl">🎬</div>
     return (
       <img src={thumbUrl} alt=""
         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
@@ -802,7 +810,22 @@ export function VideoThumbnail({ filePath, thumbnailPath }: { filePath?: string 
     )
   }
 
-  // Legacy path: local filesystem
+  // 2. Stream video from cloud and grab first frame in the <video> element
+  if (storagePath) {
+    if (!videoSrc || failed) return <div className="w-full h-full flex items-center justify-center bg-surface2 text-4xl">🎬</div>
+    return (
+      <video
+        ref={videoRef}
+        src={videoSrc}
+        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+        muted playsInline preload="metadata" crossOrigin="anonymous"
+        onLoadedMetadata={() => { if (videoRef.current) videoRef.current.currentTime = 0.5 }}
+        onError={() => setFailed(true)}
+      />
+    )
+  }
+
+  // 3. Legacy local path
   const localUrl = (() => {
     if (!filePath) return ''
     let n = filePath.replace(/\\/g, '/')
@@ -810,22 +833,16 @@ export function VideoThumbnail({ filePath, thumbnailPath }: { filePath?: string 
     if (!n.startsWith('/')) n = '/' + n
     return 'localvideo://' + n
   })()
-
   if (!localUrl || failed) {
     return <div className="w-full h-full flex items-center justify-center bg-surface2 text-4xl">🎬</div>
   }
-
   return (
     <video
       ref={videoRef}
       src={localUrl}
       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-      muted
-      playsInline
-      preload="metadata"
-      onLoadedMetadata={() => {
-        if (videoRef.current) videoRef.current.currentTime = 0.5
-      }}
+      muted playsInline preload="metadata"
+      onLoadedMetadata={() => { if (videoRef.current) videoRef.current.currentTime = 0.5 }}
       onError={() => setFailed(true)}
     />
   )
@@ -914,7 +931,7 @@ function VideoCard({ item, onContextMenu, onPlay }: {
         className="relative aspect-[9/16] bg-surface2 overflow-hidden cursor-pointer"
         onClick={() => (item.file_url || item.storage_path) && onPlay(item)}
       >
-        <VideoThumbnail filePath={item.file_url} thumbnailPath={item.thumbnail_path} />
+        <VideoThumbnail filePath={item.file_url} thumbnailPath={item.thumbnail_path} storagePath={item.storage_path} />
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
 
         {/* Play button on hover */}
@@ -1135,7 +1152,7 @@ export function BankPicker({ user, mode, onSelect, onClose }: BankPickerProps) {
                       disabled={!item.file_url && !item.storage_path}
                     >
                       <div className="relative aspect-[9/16] bg-surface2">
-                        <VideoThumbnail filePath={item.file_url ?? ''} thumbnailPath={item.thumbnail_path} />
+                        <VideoThumbnail filePath={item.file_url ?? ''} thumbnailPath={item.thumbnail_path} storagePath={item.storage_path} />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent pointer-events-none" />
                         {isSelected && (
                           <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-accent flex items-center justify-center">

@@ -41,7 +41,9 @@ export async function generateThumbnail(videoBlob: Blob, atSeconds = 0.5): Promi
     const v = document.createElement('video')
     v.muted = true
     v.playsInline = true
-    v.preload = 'metadata'  // don't preload the entire video, just headers
+    // 'auto' is needed: 'metadata' is too lazy and seek often never resolves
+    // for short videos. We compensate elsewhere (sequential uploads + timeout).
+    v.preload = 'auto'
     const url = URL.createObjectURL(videoBlob)
     v.src = url
 
@@ -99,23 +101,31 @@ export async function uploadVideoFromBlob(
   const folder = scopeFolder(scope)
   const storagePath = `videos/${folder}/${id}.${ext}`
 
+  // Generate thumbnail FIRST while the blob is still fresh in renderer memory.
+  // (Some decoders behave poorly on a blob that's been consumed by an upload stream.)
+  onProgress?.('thumbnail')
+  const thumb = await generateThumbnail(blob).catch(err => {
+    console.warn('[storage] thumbnail generation failed:', err)
+    return null
+  })
+
   onProgress?.('uploading-video')
   const upRes = await supabase.storage.from(BUCKET).upload(storagePath, blob, {
     contentType: mime, upsert: false,
   })
   if (upRes.error) throw new Error('Upload vidéo : ' + upRes.error.message)
 
-  // Thumbnail (best-effort — may fail on exotic codecs; we just skip)
-  onProgress?.('thumbnail')
   let thumbnailPath: string | null = null
-  const thumb = await generateThumbnail(blob).catch(() => null)
   if (thumb) {
     const tPath = `thumbs/${folder}/${id}.jpg`
     onProgress?.('uploading-thumb')
     const tRes = await supabase.storage.from(BUCKET).upload(tPath, thumb, {
       contentType: 'image/jpeg', upsert: false,
     })
-    if (!tRes.error) thumbnailPath = tPath
+    if (tRes.error) console.warn('[storage] thumbnail upload failed:', tRes.error.message)
+    else thumbnailPath = tPath
+  } else {
+    console.warn('[storage] no thumbnail generated for', name)
   }
 
   return { storagePath, thumbnailPath }

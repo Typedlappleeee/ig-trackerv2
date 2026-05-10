@@ -466,7 +466,7 @@ export function MassPosting({ user }: MassPostingProps) {
                   className="w-full flex items-center gap-3 px-3 py-2.5 border-b border-border/30"
                 >
                   <div className="w-10 flex-shrink-0 aspect-[9/16] rounded overflow-hidden bg-surface2">
-                    <VideoThumbnail filePath={fp ?? ''} thumbnailPath={sv.item.thumbnail_path} />
+                    <VideoThumbnail filePath={fp ?? ''} thumbnailPath={sv.item.thumbnail_path} storagePath={sv.item.storage_path} />
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="text-xs font-bold text-accent">#{selIdx + 1}</p>
@@ -594,7 +594,7 @@ export function MassPosting({ user }: MassPostingProps) {
                         <div className="flex items-center gap-2">
                           {/* Video thumbnail */}
                           <div className="w-8 flex-shrink-0 aspect-[9/16] rounded overflow-hidden bg-surface2">
-                            <VideoThumbnail filePath={video.localPath ?? video.item.file_url ?? ''} thumbnailPath={video.item.thumbnail_path} />
+                            <VideoThumbnail filePath={video.localPath ?? video.item.file_url ?? ''} thumbnailPath={video.item.thumbnail_path} storagePath={video.item.storage_path} />
                           </div>
                           <div className="min-w-0 flex-1">
                             <p className="text-[10px] text-accent font-bold">#{videoIndex + 1}</p>
