@@ -1,6 +1,9 @@
 import type { OrgRole, PermOverrides, PageKey } from './supabase'
 
-// Default tab access per role. Owner/admin see all; member sees most; viewer sees read-only tabs.
+// Default tab access per role.
+// Note: `settings` here means "can access the Connexions sub-panel of Settings"
+// (where API keys live). The Settings page itself is always reachable so members
+// can edit their profile / see organisation info.
 const ROLE_TABS: Record<OrgRole, Record<PageKey, boolean>> = {
   owner: {
     dashboard: true, phones: true, stats: true, posting: true, massposting: true,
@@ -40,6 +43,18 @@ export function canAccessBankFolder(
   return true
 }
 
+export function canAccessPhoneGroup(
+  role: OrgRole,
+  overrides: PermOverrides | undefined,
+  group: string | null,
+): boolean {
+  if (role === 'owner' || role === 'admin') return true
+  const f = overrides?.phone_groups
+  if (!f || f.mode === 'all') return true
+  const name = group ?? '(sans groupe)'
+  return f.list.includes(name)
+}
+
 export function canWrite(role: OrgRole): boolean {
   return role !== 'viewer'
 }
@@ -55,15 +70,17 @@ export const ROLE_LABELS: Record<OrgRole, string> = {
   viewer: 'Lecteur',
 }
 
+// Tabs shown in the per-member permission editor.
+// `settings` represents the *Connexions sub-panel* (API keys), not the whole page.
 export const ALL_TABS: { key: PageKey; label: string; icon: string }[] = [
-  { key: 'dashboard',   label: 'Dashboard',     icon: '📊' },
-  { key: 'phones',      label: 'Téléphones',    icon: '📱' },
-  { key: 'stats',       label: 'Stats',         icon: '📈' },
-  { key: 'posting',     label: 'Posting',       icon: '🚀' },
-  { key: 'massposting', label: 'Mass Posting',  icon: '⚡' },
-  { key: 'bank',        label: 'Banque',        icon: '🗂' },
-  { key: 'autocomment', label: 'Commentaires',  icon: '💬' },
-  { key: 'aitools',     label: 'Outils IA',     icon: '🔧' },
-  { key: 'montage',     label: 'Montage',       icon: '✂' },
-  { key: 'settings',    label: 'Paramètres',    icon: '⚙' },
+  { key: 'dashboard',   label: 'Dashboard',                            icon: '📊' },
+  { key: 'phones',      label: 'Téléphones',                           icon: '📱' },
+  { key: 'stats',       label: 'Stats',                                icon: '📈' },
+  { key: 'posting',     label: 'Posting',                              icon: '🚀' },
+  { key: 'massposting', label: 'Mass Posting',                         icon: '⚡' },
+  { key: 'bank',        label: 'Banque',                               icon: '🗂' },
+  { key: 'autocomment', label: 'Commentaires',                         icon: '💬' },
+  { key: 'aitools',     label: 'Outils IA',                            icon: '🔧' },
+  { key: 'montage',     label: 'Montage',                              icon: '✂' },
+  { key: 'settings',    label: 'Paramètres → Connexions (clés API)',  icon: '🔑' },
 ]

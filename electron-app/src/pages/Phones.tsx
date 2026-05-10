@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase, type Phone } from '@/lib/supabase'
 import { useOrg } from '@/lib/orgContext'
+import { canAccessPhoneGroup } from '@/lib/permissions'
 import { fetchAllPhones, geelarkStatusLabel } from '@/lib/geelark'
 import * as poller from '@/lib/phonePoller'
 import { Button }  from '@/components/ui/Button'
@@ -324,7 +325,7 @@ function IgCell({ phone, onSave }: { phone: Phone; onSave: (id: string, u: strin
 
 // ────────────────────────────────────────────────────────────────────────────
 export function Phones({ user }: PhonesProps) {
-  const { currentOrg } = useOrg()
+  const { currentOrg, role, perms } = useOrg()
   const [phones, setPhones]           = useState<Phone[]>([])
   const [loading, setLoading]         = useState(true)
   const [syncing, setSyncing]         = useState(false)
@@ -540,6 +541,8 @@ export function Phones({ user }: PhonesProps) {
 
   // ── Filtered view ─────────────────────────────────────────────────────────
   const visible = phones.filter(p => {
+    // Per-member phone-group restriction (org mode only)
+    if (role && !canAccessPhoneGroup(role, perms, p.group_name)) return false
     if (filter !== 'all' && p.status !== filter) return false
     if (search) {
       const q = search.toLowerCase()

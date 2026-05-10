@@ -15,11 +15,12 @@ export const supabase = createClient(supabaseUrl, supabaseKey, {
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export interface Profile {
-  id:         string
-  email:      string
-  full_name:  string | null
-  created_at: string
-  updated_at: string
+  id:           string
+  email:        string
+  display_name: string | null
+  full_name:    string | null
+  created_at:   string
+  updated_at:   string
 }
 
 export interface UserItem {
@@ -43,6 +44,7 @@ export type PageKey =
 export interface PermOverrides {
   tabs?:         Partial<Record<PageKey, boolean>>
   bank_folders?: { mode: 'all' } | { mode: 'allow'; list: string[] } | { mode: 'deny'; list: string[] }
+  phone_groups?: { mode: 'all' } | { mode: 'allow'; list: string[] }
 }
 
 export interface Organization {

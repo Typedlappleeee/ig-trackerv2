@@ -20,6 +20,14 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   updated_at timestamptz DEFAULT now()
 );
 
+-- Display name visible to other org members (prénom / pseudo)
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS display_name text;
+
+-- Backfill profiles for users who signed up before the trigger existed
+INSERT INTO public.profiles (id, email)
+SELECT u.id, u.email FROM auth.users u
+WHERE NOT EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = u.id);
+
 CREATE TABLE IF NOT EXISTS public.user_items (
   id         uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id    uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -204,6 +212,18 @@ RETURNS boolean LANGUAGE sql SECURITY DEFINER STABLE AS $$
   );
 $$;
 
+-- True if the calling user shares at least one organisation with p_user.
+-- Used by the profiles RLS to let org members see each other's email + display_name.
+CREATE OR REPLACE FUNCTION public.shares_org_with(p_user uuid)
+RETURNS boolean LANGUAGE sql SECURITY DEFINER STABLE AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.organization_members me
+    JOIN public.organization_members other ON me.org_id = other.org_id
+    WHERE me.user_id = auth.uid() AND other.user_id = p_user
+  );
+$$;
+
 
 -- ╔══════════════════════════════════════════════════════════════╗
 -- ║  8. POLICIES                                                 ║
@@ -213,7 +233,11 @@ $$;
 DROP POLICY IF EXISTS "profiles_select" ON public.profiles;
 DROP POLICY IF EXISTS "profiles_insert" ON public.profiles;
 DROP POLICY IF EXISTS "profiles_update" ON public.profiles;
-CREATE POLICY "profiles_select" ON public.profiles FOR SELECT USING (auth.uid() = id);
+-- A user can see their own profile, AND the profiles of users sharing at least
+-- one organisation with them (so org admins/members can render names + emails).
+CREATE POLICY "profiles_select" ON public.profiles FOR SELECT USING (
+  auth.uid() = id OR public.shares_org_with(id)
+);
 CREATE POLICY "profiles_insert" ON public.profiles FOR INSERT WITH CHECK (auth.uid() = id);
 CREATE POLICY "profiles_update" ON public.profiles FOR UPDATE USING (auth.uid() = id);
 

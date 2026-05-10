@@ -4,6 +4,8 @@ import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/Button'
 import { Input }  from '@/components/ui/Input'
 import { OrganizationPanel } from '@/components/OrganizationPanel'
+import { useOrg } from '@/lib/orgContext'
+import { canSeeTab } from '@/lib/permissions'
 
 // All 8 themes from Python THEMES dict (line 29-39)
 const THEMES = ['Lime', 'Bleu', 'Violet', 'Ambre', 'Rouge', 'Cyan', 'Rose', 'Vert'] as const
@@ -21,7 +23,12 @@ const THEME_COLORS: Record<string, string> = {
 type GeneralTab = 'apparence' | 'notifications' | 'langue'
 
 export function Settings({ user, initialPanel }: SettingsProps) {
-  const [panel, setPanel]     = useState<Panel>(initialPanel ?? 'general')
+  const { role, perms } = useOrg()
+  const canSeeConnexions = role ? canSeeTab(role, perms, 'settings') : true
+  const [panel, setPanel]     = useState<Panel>(() => {
+    const p = initialPanel ?? 'general'
+    return p === 'connexions' && !canSeeConnexions ? 'general' : p
+  })
   const mountedRef             = useRef(false)
   const [genTab, setGenTab]   = useState<GeneralTab>('apparence')
   const [saving, setSaving]   = useState(false)
@@ -230,7 +237,7 @@ export function Settings({ user, initialPanel }: SettingsProps) {
           { k: 'general',      l: 'Paramètres généraux' },
           { k: 'profile',      l: 'Profil'              },
           { k: 'organization', l: '🏢 Organisation'      },
-          { k: 'connexions',   l: 'Connexions'          },
+          ...(canSeeConnexions ? [{ k: 'connexions' as const, l: 'Connexions' }] : []),
         ] as const).map(t => (
           <button
             key={t.k}
@@ -376,7 +383,7 @@ export function Settings({ user, initialPanel }: SettingsProps) {
       {panel === 'organization' && <OrganizationPanel user={user} />}
 
       {/* ── Connexions ─────────────────────────────────────────────────────── */}
-      {panel === 'connexions' && (
+      {panel === 'connexions' && canSeeConnexions && (
         <div className="space-y-5">
           <section className="bg-card border border-border rounded-xl p-5 space-y-4">
             <h2 className="text-sm font-semibold text-text">Connexions GéeLark</h2>

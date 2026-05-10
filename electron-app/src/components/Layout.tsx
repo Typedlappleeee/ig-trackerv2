@@ -240,17 +240,15 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
           >
             ↺  Rafraîchir
           </button>
-          {isVisibleTab('settings') && (
-            <button
-              onClick={() => onNavigate('settings')}
-              className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[12px] transition-colors ${
-                page === 'settings' ? 'bg-sb-active text-sb-text-act' : 'text-sb-text hover:bg-sb-hover hover:text-sb-text-act'
-              }`}
-            >
-              <span className="text-base">⚙</span>
-              <span>Paramètres</span>
-            </button>
-          )}
+          <button
+            onClick={() => onNavigate('settings')}
+            className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[12px] transition-colors ${
+              page === 'settings' ? 'bg-sb-active text-sb-text-act' : 'text-sb-text hover:bg-sb-hover hover:text-sb-text-act'
+            }`}
+          >
+            <span className="text-base">⚙</span>
+            <span>Paramètres</span>
+          </button>
         </div>
 
         {/* Org switcher */}

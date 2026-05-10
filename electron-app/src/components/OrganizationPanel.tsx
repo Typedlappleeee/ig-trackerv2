@@ -9,7 +9,8 @@ import { Input }  from '@/components/ui/Input'
 interface Props { user: User }
 
 interface MemberRow extends OrgMember {
-  email: string | null
+  email:        string | null
+  display_name: string | null
 }
 
 // Generate URL-safe random token
@@ -29,9 +30,15 @@ export function OrganizationPanel({ user }: Props) {
   const [err, setErr]           = useState<string | null>(null)
 
   // Detail view (admin / owner) for currentOrg
-  const [members, setMembers]   = useState<MemberRow[]>([])
-  const [invites, setInvites]   = useState<OrgInvite[]>([])
-  const [editing, setEditing]   = useState<string | null>(null)  // member.id being edited
+  const [members, setMembers]     = useState<MemberRow[]>([])
+  const [invites, setInvites]     = useState<OrgInvite[]>([])
+  const [editing, setEditing]     = useState<string | null>(null)  // member.id being edited
+  const [folders, setFolders]     = useState<string[]>([])
+  const [groups, setGroups]       = useState<string[]>([])
+
+  // My display name (in profiles, visible to all org members)
+  const [myDisplayName, setMyDisplayName] = useState('')
+  const [editingName, setEditingName]     = useState(false)
 
   // Invite form
   const [invLabel, setInvLabel] = useState('')
@@ -46,26 +53,72 @@ export function OrganizationPanel({ user }: Props) {
     setTimeout(() => { setMsg(null); setErr(null) }, 3500)
   }
 
+  // Load my profile (display_name)
+  useEffect(() => {
+    supabase.from('profiles').select('display_name').eq('id', user.id).maybeSingle()
+      .then(({ data }) => setMyDisplayName(data?.display_name ?? ''))
+  }, [user.id])
+
   async function loadOrgDetail(orgId: string) {
-    const [m, i] = await Promise.all([
+    const [m, i, b, p] = await Promise.all([
       supabase.from('organization_members').select('*').eq('org_id', orgId),
       supabase.from('organization_invites').select('*').eq('org_id', orgId).is('accepted_at', null).order('created_at', { ascending: false }),
+      // Distinct folders / groups for this org → used by the dropdowns in PermEditor
+      supabase.from('content_bank').select('folder').eq('org_id', orgId),
+      supabase.from('phones').select('group_name').eq('org_id', orgId),
     ])
     const memberRows = (m.data ?? []) as OrgMember[]
-    // Fetch emails via auth.users join — fallback to id substring if not allowed
-    const emails: Record<string, string> = {}
-    for (const mem of memberRows) {
-      const { data: prof } = await supabase.from('profiles').select('email').eq('id', mem.user_id).maybeSingle()
-      emails[mem.user_id] = prof?.email ?? mem.user_id.slice(0, 8)
+
+    // Fetch profile (email + display_name) for each member
+    const profiles: Record<string, { email: string | null; display_name: string | null }> = {}
+    if (memberRows.length > 0) {
+      const ids = memberRows.map(r => r.user_id)
+      const { data: profs } = await supabase
+        .from('profiles')
+        .select('id, email, display_name')
+        .in('id', ids)
+      for (const p of profs ?? []) {
+        profiles[p.id] = { email: p.email, display_name: p.display_name }
+      }
     }
-    setMembers(memberRows.map(r => ({ ...r, email: emails[r.user_id] ?? null })))
+
+    setMembers(memberRows.map(r => ({
+      ...r,
+      email:        profiles[r.user_id]?.email ?? null,
+      display_name: profiles[r.user_id]?.display_name ?? null,
+    })))
     setInvites((i.data ?? []) as OrgInvite[])
+
+    const folderSet = new Set<string>()
+    for (const row of (b.data ?? []) as { folder: string | null }[]) {
+      folderSet.add(row.folder ?? '(racine)')
+    }
+    setFolders([...folderSet].sort())
+
+    const groupSet = new Set<string>()
+    for (const row of (p.data ?? []) as { group_name: string | null }[]) {
+      groupSet.add(row.group_name ?? '(sans groupe)')
+    }
+    setGroups([...groupSet].sort())
   }
 
   useEffect(() => {
     if (currentOrg) loadOrgDetail(currentOrg.id)
-    else { setMembers([]); setInvites([]) }
+    else { setMembers([]); setInvites([]); setFolders([]); setGroups([]) }
   }, [currentOrg?.id])
+
+  async function saveDisplayName(name: string) {
+    setBusy(true)
+    const { error } = await supabase.from('profiles').upsert({
+      id: user.id, email: user.email ?? '', display_name: name.trim() || null, updated_at: new Date().toISOString(),
+    }, { onConflict: 'id' })
+    setBusy(false)
+    if (error) { flash(error.message, true); return }
+    setMyDisplayName(name.trim())
+    setEditingName(false)
+    flash('Nom mis à jour ✓')
+    if (currentOrg) await loadOrgDetail(currentOrg.id)
+  }
 
   async function createOrg() {
     if (!newName.trim()) return
@@ -113,7 +166,6 @@ export function OrganizationPanel({ user }: Props) {
     if (!currentOrg) return
     setBusy(true)
     const token = genToken()
-    // Email field is just a label/note now — the token is what matters.
     const label = invLabel.trim() || `Invitation ${new Date().toLocaleDateString('fr-FR')}`
     const { data, error } = await supabase.from('organization_invites').insert({
       org_id: currentOrg.id, email: label,
@@ -178,13 +230,17 @@ export function OrganizationPanel({ user }: Props) {
 
   async function removeMember(member: MemberRow) {
     if (member.role === 'owner') { flash('Impossible de retirer le propriétaire', true); return }
-    if (!confirm(`Retirer ${member.email ?? 'ce membre'} ?`)) return
+    if (!confirm(`Retirer ${member.email ?? member.display_name ?? 'ce membre'} ?`)) return
     setBusy(true)
     const { error } = await supabase.from('organization_members').delete().eq('id', member.id)
     setBusy(false)
     if (error) { flash(error.message, true); return }
     flash('Membre retiré')
     if (currentOrg) await loadOrgDetail(currentOrg.id)
+  }
+
+  function memberLabel(m: MemberRow): string {
+    return m.display_name?.trim() || m.email || m.user_id.slice(0, 8)
   }
 
   return (
@@ -194,6 +250,26 @@ export function OrganizationPanel({ user }: Props) {
           {err ?? msg}
         </div>
       )}
+
+      {/* My display name */}
+      <section className="bg-card border border-border rounded-xl p-5 space-y-3">
+        <h2 className="text-sm font-bold text-text">👤 Mon nom dans les organisations</h2>
+        <p className="text-text2 text-xs">Visible par les autres membres de tes organisations. Si vide, ton email est affiché.</p>
+        {editingName ? (
+          <DisplayNameEditor initial={myDisplayName} onSave={saveDisplayName} onCancel={() => setEditingName(false)} busy={busy} />
+        ) : (
+          <div className="flex items-center gap-3 bg-surface rounded-lg p-3">
+            <div className="w-8 h-8 rounded-full bg-accent/20 text-accent flex items-center justify-center text-sm font-bold">
+              {(myDisplayName || user.email || '?')[0].toUpperCase()}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-text text-sm font-medium truncate">{myDisplayName || <span className="text-text2 italic">Aucun nom — {user.email}</span>}</p>
+              {myDisplayName && <p className="text-text2 text-xs truncate">{user.email}</p>}
+            </div>
+            <Button size="sm" variant="secondary" onClick={() => setEditingName(true)}>✎ Modifier</Button>
+          </div>
+        )}
+      </section>
 
       {/* My orgs */}
       <section className="bg-card border border-border rounded-xl p-5 space-y-3">
@@ -254,15 +330,20 @@ export function OrganizationPanel({ user }: Props) {
           <ul className="space-y-2">
             {members.map(m => {
               const isMe = m.user_id === user.id
+              const label = memberLabel(m)
               return (
                 <li key={m.id} className="bg-surface rounded-lg border border-border">
                   <div className="flex items-center gap-3 p-3">
                     <div className="w-8 h-8 rounded-full bg-accent/20 text-accent flex items-center justify-center text-sm font-bold">
-                      {(m.email ?? '?')[0].toUpperCase()}
+                      {label[0].toUpperCase()}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-text text-sm font-medium truncate">{m.email ?? m.user_id} {isMe && <span className="text-text2">(toi)</span>}</p>
-                      <p className="text-text2 text-xs">Rejoint {new Date(m.joined_at).toLocaleDateString('fr-FR')}</p>
+                      <p className="text-text text-sm font-medium truncate">
+                        {label} {isMe && <span className="text-text2">(toi)</span>}
+                      </p>
+                      <p className="text-text2 text-xs truncate">
+                        {m.email ?? m.user_id} · Rejoint {new Date(m.joined_at).toLocaleDateString('fr-FR')}
+                      </p>
                     </div>
                     <select
                       value={m.role}
@@ -287,6 +368,8 @@ export function OrganizationPanel({ user }: Props) {
                   {editing === m.id && (
                     <PermEditor
                       member={m}
+                      availableFolders={folders}
+                      availableGroups={groups}
                       onSave={perms => savePerms(m, perms)}
                       onCancel={() => setEditing(null)}
                     />
@@ -338,19 +421,95 @@ export function OrganizationPanel({ user }: Props) {
   )
 }
 
+// ── Display name inline editor ──────────────────────────────────────────────
+function DisplayNameEditor({ initial, onSave, onCancel, busy }: {
+  initial: string
+  onSave: (v: string) => void
+  onCancel: () => void
+  busy: boolean
+}) {
+  const [v, setV] = useState(initial)
+  return (
+    <div className="flex gap-2 items-center bg-surface rounded-lg p-3">
+      <Input value={v} onChange={e => setV(e.target.value)} placeholder="Ton prénom / pseudo (ex: Alex)"
+        onKeyDown={e => { if (e.key === 'Enter') onSave(v) }} />
+      <Button size="sm" onClick={() => onSave(v)} loading={busy}>Enregistrer</Button>
+      <Button size="sm" variant="secondary" onClick={onCancel}>Annuler</Button>
+    </div>
+  )
+}
+
+// ── Multi-select chip dropdown ──────────────────────────────────────────────
+function MultiSelect({ options, selected, onChange, placeholder }: {
+  options: string[]
+  selected: string[]
+  onChange: (next: string[]) => void
+  placeholder: string
+}) {
+  const [open, setOpen] = useState(false)
+  function toggle(opt: string) {
+    if (selected.includes(opt)) onChange(selected.filter(x => x !== opt))
+    else onChange([...selected, opt])
+  }
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center gap-2 bg-bg border border-border rounded px-2 py-1.5 text-xs text-text text-left"
+      >
+        <span className="flex-1 truncate">
+          {selected.length === 0
+            ? <span className="text-text2">{placeholder}</span>
+            : selected.join(', ')}
+        </span>
+        <span className="text-text2">▾</span>
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-[9990]" onClick={() => setOpen(false)} />
+          <div className="absolute left-0 right-0 top-full mt-1 z-[9991] bg-surface border border-border rounded-lg shadow-2xl max-h-48 overflow-auto">
+            {options.length === 0 ? (
+              <p className="text-text2 text-xs px-3 py-2 italic">Aucun élément disponible</p>
+            ) : options.map(opt => (
+              <label key={opt} className="flex items-center gap-2 px-3 py-1.5 text-xs text-text hover:bg-surface2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={selected.includes(opt)}
+                  onChange={() => toggle(opt)}
+                  className="accent-accent"
+                />
+                <span className="flex-1 truncate">{opt}</span>
+              </label>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 // ── Per-member permission editor ────────────────────────────────────────────
 function PermEditor({
-  member, onSave, onCancel,
+  member, availableFolders, availableGroups, onSave, onCancel,
 }: {
   member: OrgMember
+  availableFolders: string[]
+  availableGroups: string[]
   onSave: (p: PermOverrides) => void
   onCancel: () => void
 }) {
   const init = member.perm_overrides ?? {}
   const [tabs, setTabs] = useState<Partial<Record<PageKey, boolean>>>(init.tabs ?? {})
+
   const [bankMode, setBankMode] = useState<'all' | 'allow' | 'deny'>(init.bank_folders?.mode ?? 'all')
-  const [bankList, setBankList] = useState<string>(
-    init.bank_folders && init.bank_folders.mode !== 'all' ? init.bank_folders.list.join(', ') : ''
+  const [bankList, setBankList] = useState<string[]>(
+    init.bank_folders && init.bank_folders.mode !== 'all' ? init.bank_folders.list : []
+  )
+
+  const [groupMode, setGroupMode] = useState<'all' | 'allow'>(init.phone_groups?.mode ?? 'all')
+  const [groupList, setGroupList] = useState<string[]>(
+    init.phone_groups && init.phone_groups.mode === 'allow' ? init.phone_groups.list : []
   )
 
   function toggle(tab: PageKey, v: boolean | undefined) {
@@ -365,26 +524,31 @@ function PermEditor({
   function save() {
     const out: PermOverrides = {}
     if (Object.keys(tabs).length > 0) out.tabs = tabs
-    if (bankMode === 'all') {
-      out.bank_folders = { mode: 'all' }
-    } else {
-      const list = bankList.split(',').map(s => s.trim()).filter(Boolean)
-      out.bank_folders = { mode: bankMode, list }
-    }
+
+    if (bankMode === 'all') out.bank_folders = { mode: 'all' }
+    else                    out.bank_folders = { mode: bankMode, list: bankList }
+
+    if (groupMode === 'all') out.phone_groups = { mode: 'all' }
+    else                     out.phone_groups = { mode: 'allow', list: groupList }
+
     onSave(out)
   }
 
   return (
-    <div className="border-t border-border p-3 space-y-3 bg-bg/50">
+    <div className="border-t border-border p-3 space-y-4 bg-bg/50">
       <div>
         <p className="text-xs font-bold text-text mb-2">Onglets accessibles</p>
+        <p className="text-[10px] text-text2 mb-2">
+          ⚙ "Paramètres → Connexions" contrôle l'accès aux clés API de l'organisation (token GéeLark, Groq, etc.).
+          Par défaut bloqué pour les membres et lecteurs.
+        </p>
         <div className="grid grid-cols-2 gap-1.5">
           {ALL_TABS.map(t => {
             const v = tabs[t.key]
             return (
               <div key={t.key} className="flex items-center gap-2 bg-surface rounded px-2 py-1.5">
                 <span className="text-base">{t.icon}</span>
-                <span className="flex-1 text-xs text-text">{t.label}</span>
+                <span className="flex-1 text-xs text-text truncate" title={t.label}>{t.label}</span>
                 <select
                   value={v === undefined ? 'default' : v ? 'allow' : 'deny'}
                   onChange={e => {
@@ -413,8 +577,31 @@ function PermEditor({
             <option value="deny">Tous sauf ces dossiers…</option>
           </select>
           {bankMode !== 'all' && (
-            <Input value={bankList} onChange={e => setBankList(e.target.value)}
-              placeholder="dossier1, dossier2, (racine)" />
+            <MultiSelect
+              options={availableFolders}
+              selected={bankList}
+              onChange={setBankList}
+              placeholder="Sélectionne les dossiers…"
+            />
+          )}
+        </div>
+      </div>
+
+      <div>
+        <p className="text-xs font-bold text-text mb-2">Groupes de téléphones (GéeLark)</p>
+        <div className="flex flex-col gap-2">
+          <select value={groupMode} onChange={e => setGroupMode(e.target.value as 'all' | 'allow')}
+            className="bg-bg border border-border rounded px-2 py-1 text-xs text-text">
+            <option value="all">Tous les groupes</option>
+            <option value="allow">Uniquement ces groupes…</option>
+          </select>
+          {groupMode === 'allow' && (
+            <MultiSelect
+              options={availableGroups}
+              selected={groupList}
+              onChange={setGroupList}
+              placeholder="Sélectionne les groupes GéeLark…"
+            />
           )}
         </div>
       </div>
