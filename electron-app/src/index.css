@@ -131,8 +131,3 @@ html, body, #root {
   border-radius: 6px;
 }
 
-/* Smooth global transitions on interactive elements */
-button, a, input, textarea, select {
-  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease, transform 150ms ease, box-shadow 150ms ease;
-}
-button:active:not(:disabled) { transform: scale(0.97); }
