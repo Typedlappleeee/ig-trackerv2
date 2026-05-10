@@ -306,6 +306,9 @@ export function Montage({ user }: MontageProps) {
   const [playhead, setPlayhead]     = useState(0)
   const [activeTab, setActiveTab]   = useState<Tab>('medias')
 
+  // Sequential playback
+  const [playingIndex, setPlayingIndex] = useState<number | null>(null)
+
   // Export
   const [exporting, setExporting]   = useState(false)
   const [expResult, setExpResult]   = useState<{ ok: boolean; msg: string; command?: string } | null>(null)
@@ -416,7 +419,43 @@ export function Montage({ user }: MontageProps) {
   const selectedClip  = clips.find(c => c.uid === selectedUid) ?? null
   const total         = totalDur(clips)
   const timelineW     = Math.max(total * scale + 250, 600)
-  const previewSrc    = selectedClip?.item.file_url ? localSrc(selectedClip.item.file_url) : null
+
+  // When playing sequentially show that clip; otherwise show selected clip
+  const previewClip   = playingIndex !== null ? (clips[playingIndex] ?? null) : selectedClip
+  const previewSrc    = previewClip?.item.file_url ? localSrc(previewClip.item.file_url) : null
+
+  function playAll() {
+    if (clips.length === 0) return
+    setPlayingIndex(0)
+  }
+  function stopAll() {
+    setPlayingIndex(null)
+    videoRef.current?.pause()
+  }
+  function onVideoLoaded() {
+    if (playingIndex === null || !videoRef.current) return
+    const clip = clips[playingIndex]
+    if (clip?.trimStart > 0) videoRef.current.currentTime = clip.trimStart
+    else videoRef.current.play()
+  }
+  function onVideoSeekedForPlay() {
+    if (playingIndex !== null) videoRef.current?.play()
+  }
+  function onVideoEnded() {
+    if (playingIndex === null) return
+    const next = playingIndex + 1
+    if (next < clips.length) setPlayingIndex(next)
+    else setPlayingIndex(null)
+  }
+  function onTimeUpdate(e: React.SyntheticEvent<HTMLVideoElement>) {
+    const v = e.target as HTMLVideoElement
+    setPlayhead(v.currentTime)
+    if (playingIndex !== null) {
+      const clip = clips[playingIndex]
+      const end  = clip?.trimEnd > 0 ? clip.trimEnd : Infinity
+      if (v.currentTime >= end) { v.pause(); onVideoEnded() }
+    }
+  }
   const filteredBank  = bankItems.filter(i => !bankSearch || i.title.toLowerCase().includes(bankSearch.toLowerCase()) || i.tags.some(t => t.toLowerCase().includes(bankSearch.toLowerCase())))
   const PRESET_DIMS: Record<Preset, string> = { '9:16': '1080×1920', '1:1': '1080×1080', '16:9': '1920×1080' }
 
@@ -625,15 +664,41 @@ export function Montage({ user }: MontageProps) {
         </aside>
 
         {/* CENTER: video preview */}
-        <div className="flex-1 min-w-0 flex items-center justify-center bg-black/50 relative overflow-hidden">
+        <div className="flex-1 min-w-0 flex flex-col items-center justify-center bg-black/50 relative overflow-hidden">
+          {/* Play all controls */}
+          {clips.length > 0 && (
+            <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2">
+              {playingIndex === null ? (
+                <button
+                  onClick={playAll}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-accent rounded-lg text-white text-xs font-semibold hover:bg-accent/80 transition-colors"
+                >
+                  ▶ Lire tout ({clips.length} clips)
+                </button>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <button onClick={stopAll} className="px-3 py-1.5 bg-surface/80 rounded-lg text-text text-xs hover:bg-surface transition-colors">
+                    ⏹ Stop
+                  </button>
+                  <span className="text-xs text-white/70 bg-black/40 px-2 py-1 rounded">
+                    Clip {playingIndex + 1}/{clips.length}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+
           {previewSrc ? (
             <video
               ref={videoRef}
               src={previewSrc}
               className="max-h-full max-w-full rounded object-contain"
               style={{ filter: FILTER_CSS[activeFilter] || undefined }}
-              controls
-              onTimeUpdate={e => setPlayhead((e.target as HTMLVideoElement).currentTime)}
+              controls={playingIndex === null}
+              onLoadedData={onVideoLoaded}
+              onSeeked={onVideoSeekedForPlay}
+              onEnded={onVideoEnded}
+              onTimeUpdate={onTimeUpdate}
             />
           ) : (
             <div className="text-center text-text2 space-y-3">

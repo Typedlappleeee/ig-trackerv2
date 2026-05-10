@@ -273,7 +273,6 @@ function IgCell({ phone, onSave }: { phone: Phone; onSave: (id: string, u: strin
       ) : (
         <span className="text-text2 italic">+ ajouter</span>
       )}
-      {phone.ig_sessionid && <span title="Session ID configurée" className="flex-shrink-0">🔑</span>}
       <span className="opacity-0 group-hover:opacity-40 text-text2 text-[10px] flex-shrink-0">✎</span>
     </button>
   )

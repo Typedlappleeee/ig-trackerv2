@@ -10,16 +10,16 @@ interface LayoutProps {
   children: React.ReactNode
 }
 
-const NAV: { id: Page; icon: string; label: string }[] = [
-  { id: 'dashboard', icon: '📊', label: 'Dashboard'     },
-  { id: 'phones',    icon: '📱', label: 'Téléphones'    },
-  { id: 'stats',     icon: '📈', label: 'Stats IG'      },
-  { id: 'posting',     icon: '🚀', label: 'Posting'       },
-  { id: 'massposting', icon: '📡', label: 'Mass Posting'  },
-  { id: 'bank',        icon: '🎬', label: 'Banque vidéos' },
-  { id: 'montage',   icon: '🎞', label: 'Montage'       },
-  { id: 'aitools',   icon: '✨', label: 'Outils IA'     },
-  { id: 'settings',  icon: '⚙️', label: 'Paramètres'   },
+const NAV: { id: Page; label: string }[] = [
+  { id: 'dashboard',   label: 'Dashboard'     },
+  { id: 'phones',      label: 'Téléphones'    },
+  { id: 'stats',       label: 'Stats IG'      },
+  { id: 'posting',     label: 'Posting'       },
+  { id: 'massposting', label: 'Mass Posting'  },
+  { id: 'bank',        label: 'Banque vidéos' },
+  { id: 'montage',     label: 'Montage'       },
+  { id: 'aitools',     label: 'Outils IA'     },
+  { id: 'settings',    label: 'Paramètres'    },
 ]
 
 export function Layout({ user, page, onNavigate, children }: LayoutProps) {
@@ -41,14 +41,13 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
               key={item.id}
               onClick={() => onNavigate(item.id)}
               className={`
-                w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-150 text-left
+                w-full flex items-center px-3 py-2.5 rounded-lg text-sm transition-all duration-150 text-left
                 ${page === item.id
                   ? 'bg-surface2 text-text border-l-2 border-accent pl-[10px]'
                   : 'text-text2 hover:bg-surface2 hover:text-text'
                 }
               `}
             >
-              <span>{item.icon}</span>
               <span>{item.label}</span>
             </button>
           ))}

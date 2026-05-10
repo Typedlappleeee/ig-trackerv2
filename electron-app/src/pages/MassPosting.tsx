@@ -55,7 +55,6 @@ export function MassPosting({ user }: MassPostingProps) {
   const [bank, setBank]                   = useState<ContentItem[]>([])
   const [selectedPhones, setSelPhones]    = useState<Set<string>>(new Set())
   const [selectedVideos, setSelVideos]    = useState<SelectedVideo[]>([])
-  const [caption, setCaption]             = useState('')
   const [bearer, setBearer]               = useState('')
   const [posting, setPosting]             = useState(false)
   const [logs, setLogs]                   = useState<TaskLog[]>([])
@@ -154,7 +153,6 @@ export function MassPosting({ user }: MassPostingProps) {
     if (!bearer)                  { log('Token GéeLark manquant — Paramètres', 'error'); return }
     if (phoneList.length === 0)   { log('Sélectionne au moins un téléphone', 'warn'); return }
     if (selectedVideos.length === 0) { log('Sélectionne au moins une vidéo', 'warn'); return }
-    if (!caption.trim())          { log('La caption est obligatoire', 'warn'); return }
 
     setPosting(true)
     setLogs([])
@@ -227,7 +225,7 @@ export function MassPosting({ user }: MassPostingProps) {
         const taskRes = await geelark(bearer, '/rpa/task/instagramPubReels', {
           phoneId: asgn.phone.geelark_id,
           videoId: token,
-          caption: caption.trim(),
+          caption: '',
         })
         if (taskRes['code'] === 0) {
           const tid = (taskRes['data'] as Record<string, unknown>)?.['id'] as string
@@ -307,7 +305,7 @@ export function MassPosting({ user }: MassPostingProps) {
         <Button
           onClick={post}
           loading={posting}
-          disabled={!bearer || phoneList.length === 0 || selectedVideos.length === 0 || !caption.trim()}
+          disabled={!bearer || phoneList.length === 0 || selectedVideos.length === 0}
           size="lg"
         >
           🚀 Poster sur {phoneList.length || '?'} téléphone{phoneList.length !== 1 ? 's' : ''}
@@ -353,10 +351,10 @@ export function MassPosting({ user }: MassPostingProps) {
                     selected ? 'bg-accent/10' : 'hover:bg-surface2'
                   }`}
                 >
-                  <div className="w-10 h-10 rounded bg-surface2 flex items-center justify-center text-lg flex-shrink-0 relative overflow-hidden">
-                    {item.thumbnail_url
-                      ? <img src={item.thumbnail_url} alt="" className="w-full h-full object-cover" />
-                      : '🎬'
+                  <div className="w-12 flex-shrink-0 aspect-[9/16] rounded overflow-hidden bg-surface2 relative">
+                    {item.file_url
+                      ? <MassVideoThumb filePath={item.file_url} />
+                      : <div className="w-full h-full flex items-center justify-center text-lg">🎬</div>
                     }
                     {selected && (
                       <div className="absolute inset-0 bg-accent/80 flex items-center justify-center text-white font-bold text-sm">
@@ -433,10 +431,7 @@ export function MassPosting({ user }: MassPostingProps) {
                   <div className="min-w-0 flex-1">
                     <p className="text-xs font-medium text-text truncate">{phone.phone_name}</p>
                     {phone.ig_username && (
-                      <p className="text-[10px] text-accent truncate flex items-center gap-1">
-                        @{phone.ig_username}
-                        {phone.ig_sessionid && <span title="Session configurée">🔑</span>}
-                      </p>
+                      <p className="text-[10px] text-accent truncate">@{phone.ig_username}</p>
                     )}
                     {ts && ts.status !== 'idle' && (
                       <p className={`text-[10px] ${STATUS_COLOR[ts.status]}`}>{STATUS_LABEL[ts.status]}</p>
@@ -458,21 +453,8 @@ export function MassPosting({ user }: MassPostingProps) {
           </div>
         </div>
 
-        {/* ── Column 3: Assignments + caption ──────────────────────────────── */}
+        {/* ── Column 3: Assignments ────────────────────────────────────────── */}
         <div className="flex-1 overflow-auto p-6 space-y-5">
-          {/* Caption */}
-          <div className="bg-card border border-border rounded-xl p-4 space-y-2">
-            <h2 className="text-sm font-semibold text-text">📝 Caption</h2>
-            <textarea
-              value={caption}
-              onChange={e => setCaption(e.target.value)}
-              placeholder="Écris ta caption ici…&#10;&#10;#hashtag1 #hashtag2"
-              rows={5}
-              className="w-full bg-surface border border-border rounded-lg px-3 py-2.5 text-sm text-text placeholder:text-text2 focus:border-accent focus:outline-none resize-none transition-colors"
-            />
-            <p className="text-xs text-text2 text-right">{caption.length} caractères</p>
-          </div>
-
           {/* Assignments */}
           <div>
             <h2 className="text-sm font-semibold text-text mb-3">
@@ -518,20 +500,50 @@ export function MassPosting({ user }: MassPostingProps) {
                         }`} />
                       </div>
                       {video ? (
-                        <div className="flex items-center gap-2 bg-surface rounded-lg px-2 py-1.5">
-                          <span className="text-accent text-xs font-bold">#{videoIndex + 1}</span>
-                          <span className="text-xs text-text2 truncate flex-1">{video.item.title}</span>
+                        <div className="flex items-center gap-2">
+                          {/* Video thumbnail */}
+                          <div className="w-8 flex-shrink-0 aspect-[9/16] rounded overflow-hidden bg-surface2 relative">
+                            {(video.localPath ?? video.item.file_url) ? (
+                              <MassVideoThumb filePath={(video.localPath ?? video.item.file_url)!} />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-sm">🎬</div>
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[10px] text-accent font-bold">#{videoIndex + 1}</p>
+                            <p className="text-[10px] text-text2 truncate">{video.item.title}</p>
+                          </div>
                         </div>
                       ) : (
                         <div className="bg-surface rounded-lg px-2 py-1.5">
                           <span className="text-xs text-text2 italic">Aucune vidéo</span>
                         </div>
                       )}
+                      {/* Per-phone progress */}
                       {ts && ts.status !== 'idle' && (
-                        <p className={`text-[10px] font-medium ${statusColor}`}>
-                          {STATUS_LABEL[ts.status]}
-                          {ts.detail && <span className="opacity-70"> — {ts.detail}</span>}
-                        </p>
+                        <div className="space-y-1">
+                          <p className={`text-[10px] font-medium ${statusColor}`}>
+                            {STATUS_LABEL[ts.status]}
+                            {ts.detail && <span className="opacity-70"> — {ts.detail}</span>}
+                          </p>
+                          {(ts.status === 'uploading' || ts.status === 'posting') && (
+                            <div className="w-full h-1 bg-surface2 rounded-full overflow-hidden">
+                              <div className={`h-full rounded-full animate-pulse ${
+                                ts.status === 'uploading' ? 'bg-blue-400 w-2/3' : 'bg-warn w-4/5'
+                              }`} />
+                            </div>
+                          )}
+                          {ts.status === 'done' && (
+                            <div className="w-full h-1 bg-ok/20 rounded-full overflow-hidden">
+                              <div className="h-full bg-ok rounded-full w-full" />
+                            </div>
+                          )}
+                          {ts.status === 'error' && (
+                            <div className="w-full h-1 bg-danger/20 rounded-full overflow-hidden">
+                              <div className="h-full bg-danger rounded-full w-full" />
+                            </div>
+                          )}
+                        </div>
                       )}
                     </div>
                   )
@@ -568,5 +580,25 @@ export function MassPosting({ user }: MassPostingProps) {
         </div>
       </div>
     </div>
+  )
+}
+
+// ── Small video thumbnail for mass posting ────────────────────────────────────
+function MassVideoThumb({ filePath }: { filePath: string }) {
+  const [ready, setReady]   = useState(false)
+  const [failed, setFailed] = useState(false)
+  const videoRef            = useRef<HTMLVideoElement>(null)
+  const src                 = `file:///${filePath.replace(/\\/g, '/')}`
+  if (failed) return <div className="w-full h-full flex items-center justify-center text-base bg-surface2">🎬</div>
+  return (
+    <video
+      ref={videoRef}
+      src={src}
+      className={`w-full h-full object-cover ${ready ? 'opacity-100' : 'opacity-0'}`}
+      muted playsInline preload="metadata"
+      onLoadedMetadata={() => { if (videoRef.current) videoRef.current.currentTime = 1 }}
+      onSeeked={() => setReady(true)}
+      onError={() => setFailed(true)}
+    />
   )
 }

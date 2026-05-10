@@ -267,13 +267,20 @@ export function Bank({ user }: BankProps) {
               {/* Thumbnail zone — 9:16 ratio */}
               <div className="relative aspect-[9/16] bg-surface2 overflow-hidden">
                 <VideoPreview filePath={item.file_url} />
-                {/* Gradient + title overlay */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
+                {/* Gradient + info overlay */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+                {/* Date badge */}
+                <div className="absolute top-2 left-2 bg-black/60 backdrop-blur-sm rounded px-1.5 py-0.5 text-[10px] text-white font-medium">
+                  {new Date(item.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: '2-digit' })}
+                </div>
+                {/* Duration badge */}
+                {item.duration && (
+                  <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-sm rounded px-1.5 py-0.5 text-[10px] text-white">
+                    {formatDuration(item.duration)}
+                  </div>
+                )}
                 <div className="absolute bottom-0 left-0 right-0 p-2.5">
                   <p className="text-xs font-semibold text-white truncate leading-tight">{item.title}</p>
-                  {item.duration && (
-                    <p className="text-[10px] text-white/70 mt-0.5">{formatDuration(item.duration)}</p>
-                  )}
                 </div>
                 {/* Delete button */}
                 <button
