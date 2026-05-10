@@ -590,7 +590,7 @@ export function MassPosting({ user }: MassPostingProps) {
                         <div className="flex items-center gap-2">
                           {/* Video thumbnail */}
                           <div className="w-8 flex-shrink-0 aspect-[9/16] rounded overflow-hidden bg-surface2">
-                            <VideoPreview filePath={video.localPath ?? video.item.file_url} />
+                            <VideoThumbnail filePath={video.localPath ?? video.item.file_url ?? ''} />
                           </div>
                           <div className="min-w-0 flex-1">
                             <p className="text-[10px] text-accent font-bold">#{videoIndex + 1}</p>
