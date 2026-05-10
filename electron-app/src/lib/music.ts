@@ -1,13 +1,17 @@
-// Procedural ambient music — Web Audio API, zero external files.
-// Four tracks: Lo-Fi, Rap FR (trap), Synthwave, UK Drill "67".
-// Volume (default 0.25) and track choice persisted in localStorage.
+// Procedural ambient music — Web Audio API.
+// Tracks 0-2: fully procedural. Track 3 "67": real MP3 (public/music/67.mp3).
+// Volume (default 0.10) and track choice persisted in localStorage.
 
-let _ctx: AudioContext | null = null
-let _master: GainNode | null  = null
+let _ctx: AudioContext | null    = null
+let _master: GainNode | null     = null
 let _running  = false
 let _timer: ReturnType<typeof setTimeout> | null = null
 let _nextTime = 0
 let _chordIdx = 0
+
+// Track-3 file player
+let _fileSource: AudioBufferSourceNode | null = null
+let _fileBuffer: AudioBuffer | null           = null   // cached decoded buffer
 
 const LS_ENABLED = 'ig-music-enabled'
 const LS_TRACK   = 'ig-music-track'   // '0'–'3'
@@ -22,8 +26,12 @@ export const TRACKS: TrackMeta[] = [
   { id: 0, name: 'Lo-Fi Chill',  emoji: '☕', desc: 'Am7 · Fmaj7 · Cmaj7 · G7 — chaleureux, cozy' },
   { id: 1, name: 'Trap Beat',    emoji: '🥁', desc: 'Am · F · C · G — 100 BPM, 808, instrumental' },
   { id: 2, name: 'Synthwave',    emoji: '🌆', desc: 'Dm7 · Bb · Fmaj7 · C7 — rétro, électronique' },
-  { id: 3, name: '67',           emoji: '🔥', desc: 'Gm · Cm · Dm · Eb — UK drill, 67 BPM, lourd' },
+  { id: 3, name: '67',           emoji: '🔥', desc: 'Gazan — 67 (Six Seven) · en boucle' },
 ]
+
+const FILE_TRACKS: Record<number, string> = {
+  3: '/music/67.mp3',
+}
 
 // ── Internal track definition ─────────────────────────────────────────────────
 
@@ -291,7 +299,7 @@ const TRACK_DATA: TrackDef[] = [
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
-export function startMusic() {
+export async function startMusic() {
   if (_running) return
   _running = true
   const c = getCtx()
@@ -299,14 +307,41 @@ export function startMusic() {
   _master.gain.cancelScheduledValues(c.currentTime)
   _master.gain.setValueAtTime(_master.gain.value, c.currentTime)
   _master.gain.linearRampToValueAtTime(savedVol(), c.currentTime + 3.0)
-  _nextTime = c.currentTime + 0.5
-  _chordIdx = 0
-  loop()
+
+  const trackIdx = savedTrack()
+  const fileSrc  = FILE_TRACKS[trackIdx]
+
+  if (fileSrc) {
+    try {
+      if (!_fileBuffer) {
+        const res = await fetch(fileSrc)
+        const ab  = await res.arrayBuffer()
+        _fileBuffer = await c.decodeAudioData(ab)
+      }
+      if (!_running || !_master) return   // stopped while loading
+      _fileSource = c.createBufferSource()
+      _fileSource.buffer = _fileBuffer
+      _fileSource.loop   = true
+      _fileSource.connect(_master)
+      _fileSource.start()
+    } catch (e) {
+      console.error('[music] file load failed', e)
+    }
+  } else {
+    _nextTime = c.currentTime + 0.5
+    _chordIdx = 0
+    loop()
+  }
 }
 
 // Kill all scheduled oscillators by closing (and nullifying) the AudioContext.
 // A new context will be created automatically by getCtx() on next startMusic().
 function killCtx(fadeSecs: number) {
+  // Stop any playing file source first
+  if (_fileSource) {
+    try { _fileSource.stop() } catch { /* already stopped */ }
+    _fileSource = null
+  }
   if (!_ctx || !_master) { _ctx = null; _master = null; return }
   const dying = _ctx
   _ctx = null; _master = null
@@ -342,7 +377,10 @@ export function getVolume(): number { return savedVol() }
 
 /** Switch track: hard-stop current (300 ms fade + context close), then restart. */
 export function setTrack(idx: number) {
+  const prev = savedTrack()
   localStorage.setItem(LS_TRACK, String(idx))
+  // Clear cached buffer when switching between different file tracks
+  if (prev !== idx) _fileBuffer = null
   const wasRunning = _running
   _running = false
   if (_timer) { clearTimeout(_timer); _timer = null }
