@@ -70,22 +70,19 @@ export async function generateThumbnail(videoBlob: Blob, atSeconds = 0.5): Promi
   })
 }
 
-// Upload a local video (by absolute path) + extracted thumbnail to Supabase Storage.
-// Returns the storage paths. Caller is responsible for inserting the content_bank row.
-export async function uploadVideoFromPath(
-  filePath: string,
+type UploadPhase = 'reading' | 'uploading-video' | 'thumbnail' | 'uploading-thumb'
+
+// Core upload: takes a Blob/File already in memory + a name (for ext detection).
+// Skips the Electron IPC roundtrip — used when we have the File object directly
+// (drag-drop). This is significantly faster for large files (no extra copies).
+export async function uploadVideoFromBlob(
+  blob: Blob,
+  name: string,
   scope: UploadScope,
-  onProgress?: (phase: 'reading' | 'uploading-video' | 'thumbnail' | 'uploading-thumb') => void,
+  onProgress?: (phase: UploadPhase) => void,
 ): Promise<UploadResult> {
-  if (!window.electronAPI?.readFileBytes) throw new Error('IPC indisponible')
-
-  onProgress?.('reading')
-  const r = await window.electronAPI.readFileBytes(filePath)
-  if (!r.ok || !r.bytes) throw new Error(r.error || 'Lecture du fichier échouée')
-
-  const ext  = extOf(filePath)
-  const mime = mimeFor(ext)
-  const blob = new Blob([r.bytes], { type: mime })
+  const ext  = extOf(name)
+  const mime = blob.type || mimeFor(ext)
   const id   = crypto.randomUUID()
   const folder = scopeFolder(scope)
   const storagePath = `videos/${folder}/${id}.${ext}`
@@ -96,7 +93,7 @@ export async function uploadVideoFromPath(
   })
   if (upRes.error) throw new Error('Upload vidéo : ' + upRes.error.message)
 
-  // Thumbnail
+  // Thumbnail (best-effort — may fail on exotic codecs; we just skip)
   onProgress?.('thumbnail')
   let thumbnailPath: string | null = null
   const thumb = await generateThumbnail(blob).catch(() => null)
@@ -110,6 +107,23 @@ export async function uploadVideoFromPath(
   }
 
   return { storagePath, thumbnailPath }
+}
+
+// Upload a local video by absolute path (for the file picker / re-upload flows).
+// Reads the bytes via Electron IPC, then delegates to uploadVideoFromBlob.
+export async function uploadVideoFromPath(
+  filePath: string,
+  scope: UploadScope,
+  onProgress?: (phase: UploadPhase) => void,
+): Promise<UploadResult> {
+  if (!window.electronAPI?.readFileBytes) throw new Error('IPC indisponible')
+
+  onProgress?.('reading')
+  const r = await window.electronAPI.readFileBytes(filePath)
+  if (!r.ok || !r.bytes) throw new Error(r.error || 'Lecture du fichier échouée')
+
+  const blob = new Blob([r.bytes], { type: mimeFor(extOf(filePath)) })
+  return uploadVideoFromBlob(blob, filePath, scope, onProgress)
 }
 
 // Generate a short-lived signed URL for a Storage path. Returns null on failure.

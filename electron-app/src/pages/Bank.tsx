@@ -3,7 +3,7 @@ import type { User } from '@supabase/supabase-js'
 import { supabase, type ContentItem } from '@/lib/supabase'
 import { useOrg } from '@/lib/orgContext'
 import { canAccessBankFolder } from '@/lib/permissions'
-import { uploadVideoFromPath, deleteStorageObjects, type UploadScope } from '@/lib/storage'
+import { uploadVideoFromPath, uploadVideoFromBlob, deleteStorageObjects, type UploadScope } from '@/lib/storage'
 import { Button }  from '@/components/ui/Button'
 import { Spinner } from '@/components/ui/Spinner'
 
@@ -254,50 +254,70 @@ export function Bank({ user }: BankProps) {
     setLoading(false)
   }
 
-  // Upload a video to Supabase Storage + insert content_bank row.
-  // Title = filename without extension. The local path is NOT stored — once uploaded,
-  // the video lives in the cloud and is fetched via signed URLs from any device.
+  // Insert a content_bank row pointing at already-uploaded Storage paths.
+  // Used by both addFromPath (file picker) and addFromFile (drag-drop).
+  async function insertBankRow(opts: { title: string; storagePath: string; thumbnailPath: string | null }) {
+    const folder = selectedFolder ?? null
+    const baseRow = {
+      user_id: user.id, org_id: currentOrg?.id ?? null, title: opts.title,
+      file_url:       null,
+      storage_path:   opts.storagePath,
+      thumbnail_path: opts.thumbnailPath,
+      duration: null, tags: [], notes: '',
+    }
+    let res = await supabase.from('content_bank').insert({ ...baseRow, folder }).select().single()
+
+    // Fallback if the storage_path columns or folder column don't exist yet
+    if (res.error && /storage_path|thumbnail_path|folder/i.test(res.error.message) && /column|cache/i.test(res.error.message)) {
+      setNeedsMigration(true)
+      res = await supabase.from('content_bank').insert({
+        user_id: user.id, org_id: currentOrg?.id ?? null, title: opts.title, file_url: null,
+        duration: null, tags: [], notes: '',
+      }).select().single()
+    }
+
+    if (res.error) {
+      setError("Erreur lors de l'ajout : " + res.error.message)
+      await deleteStorageObjects([opts.storagePath, opts.thumbnailPath])
+      return
+    }
+    if (res.data) setItems(prev => [res.data, ...prev])
+  }
+
+  function uploadProgressLabels(phase: string): string {
+    const labels: Record<string, string> = {
+      'reading':          '📂 Lecture du fichier…',
+      'uploading-video':  '☁ Upload vers Supabase…',
+      'thumbnail':        '🖼 Génération de la miniature…',
+      'uploading-thumb':  '☁ Upload de la miniature…',
+    }
+    return labels[phase] ?? ''
+  }
+
+  // Upload via Electron file picker (we only have an absolute path → must read via IPC).
   async function addFromPath(filePath: string) {
     const title = nameWithoutExt(filePath)
-    const folder = selectedFolder ?? null
     const scope: UploadScope = currentOrg ? { mode: 'org', id: currentOrg.id } : { mode: 'user', id: user.id }
 
     setAdding(true); setUploadStatus(`📤 Lecture de ${basename(filePath)}…`)
     try {
-      const { storagePath, thumbnailPath } = await uploadVideoFromPath(filePath, scope, phase => {
-        const labels: Record<string, string> = {
-          'reading':          '📂 Lecture du fichier…',
-          'uploading-video':  '☁ Upload vers Supabase…',
-          'thumbnail':        '🖼 Génération de la miniature…',
-          'uploading-thumb':  '☁ Upload de la miniature…',
-        }
-        setUploadStatus(labels[phase] ?? '')
-      })
+      const { storagePath, thumbnailPath } = await uploadVideoFromPath(filePath, scope, phase => setUploadStatus(uploadProgressLabels(phase)))
+      await insertBankRow({ title, storagePath, thumbnailPath })
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    }
+    setAdding(false); setUploadStatus(null)
+  }
 
-      const baseRow = {
-        user_id: user.id, org_id: currentOrg?.id ?? null, title,
-        file_url: null,                  // No more local paths
-        storage_path: storagePath,
-        thumbnail_path: thumbnailPath,
-        duration: null, tags: [], notes: '',
-      }
-      let res = await supabase.from('content_bank').insert({ ...baseRow, folder }).select().single()
+  // Upload via drag-drop: the File object is already in renderer memory — skip IPC.
+  async function addFromFile(file: File) {
+    const title = (file.name.match(/^(.*?)(\.[^.]+)?$/)?.[1]) ?? file.name
+    const scope: UploadScope = currentOrg ? { mode: 'org', id: currentOrg.id } : { mode: 'user', id: user.id }
 
-      // Graceful fallback if storage_path columns don't exist yet (schema_full.sql not re-run)
-      if (res.error && /storage_path|thumbnail_path|folder/i.test(res.error.message) && /column|cache/i.test(res.error.message)) {
-        setNeedsMigration(true)
-        res = await supabase.from('content_bank').insert({
-          user_id: user.id, org_id: currentOrg?.id ?? null, title, file_url: null,
-          duration: null, tags: [], notes: '',
-        }).select().single()
-      }
-
-      if (res.error) {
-        setError("Erreur lors de l'ajout : " + res.error.message)
-        // Roll back the storage upload so we don't leak orphan files
-        await deleteStorageObjects([storagePath, thumbnailPath])
-      }
-      else if (res.data) setItems(prev => [res.data, ...prev])
+    setAdding(true); setUploadStatus(`📤 ${file.name}`)
+    try {
+      const { storagePath, thumbnailPath } = await uploadVideoFromBlob(file, file.name, scope, phase => setUploadStatus(`${file.name} : ${uploadProgressLabels(phase)}`))
+      await insertBankRow({ title, storagePath, thumbnailPath })
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     }
@@ -351,10 +371,8 @@ export function Bank({ user }: BankProps) {
     e.preventDefault(); setDragging(false)
     const files = Array.from(e.dataTransfer.files)
     if (files.length === 0) return
-    for (const file of files) {
-      const filePath = (file as File & { path?: string }).path ?? file.name
-      if (filePath) addFromPath(filePath)
-    }
+    // Drag-drop gives us real File objects — upload them directly (skip Electron IPC).
+    for (const file of files) addFromFile(file)
   }
 
   async function deleteItem(id: string) {

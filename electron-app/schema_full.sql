@@ -89,6 +89,10 @@ ALTER TABLE public.content_bank ADD COLUMN IF NOT EXISTS folder text;
 ALTER TABLE public.content_bank ADD COLUMN IF NOT EXISTS storage_path   text;
 ALTER TABLE public.content_bank ADD COLUMN IF NOT EXISTS thumbnail_path text;
 
+-- file_url devient optionnel (peut être NULL pour les vidéos cloud-only).
+-- Certaines anciennes installs avaient NOT NULL — on relâche la contrainte ici.
+ALTER TABLE public.content_bank ALTER COLUMN file_url DROP NOT NULL;
+
 CREATE TABLE IF NOT EXISTS public.app_config (
   user_id       uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   bearer_token  text DEFAULT '',
