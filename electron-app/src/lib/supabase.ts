@@ -31,9 +31,54 @@ export interface UserItem {
   updated_at: string
 }
 
+export type OrgRole = 'owner' | 'admin' | 'member' | 'viewer'
+
+export type PageKey =
+  | 'dashboard' | 'phones' | 'stats' | 'posting' | 'massposting'
+  | 'bank' | 'autocomment' | 'aitools' | 'montage' | 'settings'
+
+// Per-member overrides on top of role defaults.
+// tabs: explicit per-tab allow (true) / deny (false). Missing = use role default.
+// bank_folders.mode='all' grants every folder; 'allow' restricts to list; 'deny' blocks list.
+export interface PermOverrides {
+  tabs?:         Partial<Record<PageKey, boolean>>
+  bank_folders?: { mode: 'all' } | { mode: 'allow'; list: string[] } | { mode: 'deny'; list: string[] }
+}
+
+export interface Organization {
+  id:         string
+  name:       string
+  owner_id:   string
+  created_at: string
+}
+
+export interface OrgMember {
+  id:             string
+  org_id:         string
+  user_id:        string
+  role:           OrgRole
+  perm_overrides: PermOverrides
+  invited_by:     string | null
+  joined_at:      string
+}
+
+export interface OrgInvite {
+  id:             string
+  org_id:         string
+  email:          string
+  token:          string
+  role:           Exclude<OrgRole, 'owner'>
+  perm_overrides: PermOverrides
+  invited_by:     string | null
+  expires_at:     string
+  accepted_at:    string | null
+  created_at:     string
+}
+
 export interface Phone {
   id:           string
   user_id:      string
+  org_id:       string | null
   geelark_id:   string
   serial_no:    string | null
   phone_name:   string
@@ -55,6 +100,8 @@ export interface Phone {
 export interface ContentItem {
   id:            string
   user_id:       string
+  org_id:        string | null
+  folder:        string | null
   title:         string
   file_url:      string | null
   thumbnail_url: string | null

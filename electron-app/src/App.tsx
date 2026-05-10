@@ -5,6 +5,7 @@ import { supabase }          from '@/lib/supabase'
 import { AuthPage }          from '@/components/auth/AuthPage'
 import { Onboarding }        from '@/components/Onboarding'
 import { Layout, type Page } from '@/components/Layout'
+import { OrgProvider }       from '@/lib/orgContext'
 
 // ── Splash screen ─────────────────────────────────────────────────────────────
 const SPLASH_DURATION = 2600  // ms avant fade-out
@@ -225,7 +226,7 @@ export default function App() {
       {splashDone && (
         loading        ? <FullPageLoader /> :
         !user          ? <AuthPage />       :
-        <AppContent user={user} />
+        <OrgProvider user={user}><AppContent user={user} /></OrgProvider>
       )}
     </>
   )

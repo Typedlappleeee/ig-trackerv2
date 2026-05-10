@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase, type ContentItem } from '@/lib/supabase'
+import { useOrg } from '@/lib/orgContext'
+import { canAccessBankFolder } from '@/lib/permissions'
 import { Button }  from '@/components/ui/Button'
 import { Spinner } from '@/components/ui/Spinner'
 
@@ -187,6 +189,7 @@ function AddMediaModal({ onPick, onDrop, onClose }: {
 }
 
 export function Bank({ user }: BankProps) {
+  const { currentOrg, role, perms } = useOrg()
   const [items, setItems]         = useState<ContentItem[]>([])
   const [loading, setLoading]     = useState(true)
   const [adding, setAdding]       = useState(false)
@@ -222,7 +225,7 @@ export function Bank({ user }: BankProps) {
 
   const dropRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => { loadItems() }, [])
+  useEffect(() => { loadItems() }, [currentOrg?.id])
 
   // Close context menu on outside click
   useEffect(() => {
@@ -234,13 +237,16 @@ export function Bank({ user }: BankProps) {
 
   async function loadItems() {
     setLoading(true)
-    const { data, error: err } = await supabase
-      .from('content_bank').select('*').eq('user_id', user.id)
-      .order('created_at', { ascending: false })
+    let q = supabase.from('content_bank').select('*').order('created_at', { ascending: false })
+    q = currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
+    const { data, error: err } = await q
     if (err) {
       setError('Erreur lors du chargement.')
     } else {
-      setItems(data ?? [])
+      let rows = (data ?? []) as ContentItem[]
+      // In org mode, filter out folders the member is not allowed to see
+      if (role) rows = rows.filter(i => canAccessBankFolder(role, perms, i.folder ?? null))
+      setItems(rows)
       if (data && data.length > 0 && !('folder' in data[0])) setNeedsMigration(true)
     }
     setLoading(false)
@@ -252,7 +258,7 @@ export function Bank({ user }: BankProps) {
     const title = nameWithoutExt(filePath)
     const folder = selectedFolder ?? null
     setAdding(true)
-    const baseRow = { user_id: user.id, title, file_url: filePath, duration: null, tags: [], notes: '' }
+    const baseRow = { user_id: user.id, org_id: currentOrg?.id ?? null, title, file_url: filePath, duration: null, tags: [], notes: '' }
 
     // First try with folder column
     let res = await supabase
@@ -842,6 +848,7 @@ export interface BankPickerProps {
 }
 
 export function BankPicker({ user, mode, onSelect, onClose }: BankPickerProps) {
+  const { currentOrg, role, perms } = useOrg()
   const [items, setItems]           = useState<ContentItem[]>([])
   const [loading, setLoading]       = useState(true)
   const [search, setSearch]         = useState('')
@@ -849,10 +856,15 @@ export function BankPicker({ user, mode, onSelect, onClose }: BankPickerProps) {
   const [selected, setSelected]     = useState<Set<string>>(new Set())
 
   useEffect(() => {
-    supabase.from('content_bank').select('*').eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .then(({ data }) => { setItems(data ?? []); setLoading(false) })
-  }, [])
+    let q = supabase.from('content_bank').select('*').order('created_at', { ascending: false })
+    q = currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
+    q.then(({ data }) => {
+      let rows = (data ?? []) as ContentItem[]
+      if (role) rows = rows.filter(i => canAccessBankFolder(role, perms, i.folder ?? null))
+      setItems(rows)
+      setLoading(false)
+    })
+  }, [currentOrg?.id])
 
   const folders = [...new Set(
     items.map(i => (i as unknown as {folder?: string | null}).folder).filter((f): f is string => Boolean(f))

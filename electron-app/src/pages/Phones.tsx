@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase, type Phone } from '@/lib/supabase'
+import { useOrg } from '@/lib/orgContext'
 import { fetchAllPhones, geelarkStatusLabel } from '@/lib/geelark'
 import * as poller from '@/lib/phonePoller'
 import { Button }  from '@/components/ui/Button'
@@ -323,6 +324,7 @@ function IgCell({ phone, onSave }: { phone: Phone; onSave: (id: string, u: strin
 
 // ────────────────────────────────────────────────────────────────────────────
 export function Phones({ user }: PhonesProps) {
+  const { currentOrg } = useOrg()
   const [phones, setPhones]           = useState<Phone[]>([])
   const [loading, setLoading]         = useState(true)
   const [syncing, setSyncing]         = useState(false)
@@ -393,12 +395,13 @@ export function Phones({ user }: PhonesProps) {
 
   useEffect(() => {
     loadPhones()
-  }, [])
+  }, [currentOrg?.id])
 
   async function loadPhones() {
     setLoading(true)
-    const { data, error: err } = await supabase
-      .from('phones').select('*').eq('user_id', user.id).order('phone_name')
+    let q = supabase.from('phones').select('*').order('phone_name')
+    q = currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
+    const { data, error: err } = await q
     if (err) setError('Erreur lors du chargement.')
     else setPhones(data ?? [])
     setLoading(false)
@@ -460,6 +463,7 @@ export function Phones({ user }: PhonesProps) {
       if (items.length === 0) { setError('Aucun téléphone trouvé.'); setSyncing(false); return }
       const rows = items.map(p => ({
         user_id:    user.id,
+        org_id:     currentOrg?.id ?? null,
         geelark_id: p.id,
         serial_no:  p.serialNo ?? null,
         phone_name: p.serialName ?? p.name ?? p.serialNo ?? p.id ?? 'Phone inconnu',

@@ -3,6 +3,7 @@ import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/Button'
 import { Input }  from '@/components/ui/Input'
+import { OrganizationPanel } from '@/components/OrganizationPanel'
 
 interface SettingsProps { user: User }
 
@@ -19,7 +20,7 @@ const THEME_COLORS: Record<string, string> = {
   Vert:   '#2dde78',
 }
 
-type Panel = 'general' | 'profile' | 'connexions'
+type Panel = 'general' | 'profile' | 'organization' | 'connexions'
 type GeneralTab = 'apparence' | 'notifications' | 'langue'
 
 export function Settings({ user }: SettingsProps) {
@@ -223,9 +224,10 @@ export function Settings({ user }: SettingsProps) {
       {/* Top tabs (Python: 3 tabs) */}
       <div className="flex gap-1 border-b border-border">
         {([
-          { k: 'general',    l: 'Paramètres généraux' },
-          { k: 'profile',    l: 'Profil'              },
-          { k: 'connexions', l: 'Connexions'          },
+          { k: 'general',      l: 'Paramètres généraux' },
+          { k: 'profile',      l: 'Profil'              },
+          { k: 'organization', l: '🏢 Organisation'      },
+          { k: 'connexions',   l: 'Connexions'          },
         ] as const).map(t => (
           <button
             key={t.k}
@@ -366,6 +368,9 @@ export function Settings({ user }: SettingsProps) {
           <Button onClick={saveProfile} loading={saving} className="w-full">💾 Sauvegarder le profil</Button>
         </section>
       )}
+
+      {/* ── Organisation ────────────────────────────────────────────────────── */}
+      {panel === 'organization' && <OrganizationPanel user={user} />}
 
       {/* ── Connexions ─────────────────────────────────────────────────────── */}
       {panel === 'connexions' && (
