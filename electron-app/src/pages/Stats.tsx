@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase, type Phone } from '@/lib/supabase'
+import { useOrg } from '@/lib/orgContext'
 import { fetchIgStats, invalidateIgCache } from '@/lib/instagram'
 import { Spinner } from '@/components/ui/Spinner'
 import { Button }  from '@/components/ui/Button'
@@ -87,6 +88,7 @@ function VideoThumbnail({ src }: { src: string; sessionid?: string }) {
 type SortKey = 'recent' | 'oldest' | 'views' | 'likes'
 
 export function Stats({ user }: StatsProps) {
+  const { currentOrg }          = useOrg()
   const [phones, setPhones]     = useState<Phone[]>([])
   const [selected, setSelected] = useState<Phone | null>(null)
   const [stats, setStats]       = useState<Awaited<ReturnType<typeof fetchIgStats>> | null>(null)
@@ -99,13 +101,14 @@ export function Stats({ user }: StatsProps) {
   const [retrying, setRetrying] = useState(false)
 
   useEffect(() => {
-    supabase.from('phones').select('*').eq('user_id', user.id).order('phone_name')
-      .then(({ data }) => {
+    let q = supabase.from('phones').select('*').order('phone_name')
+    q = currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
+    q.then(({ data }) => {
         const linked = (data ?? []).filter(p => p.ig_username)
         setPhones(linked)
         if (linked.length > 0) selectPhone(linked[0])
       })
-  }, [])
+  }, [currentOrg?.id, user.id])
 
   async function selectPhone(phone: Phone, retry = false) {
     setSelected(phone)

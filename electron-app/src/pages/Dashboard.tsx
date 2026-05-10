@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase, type Phone } from '@/lib/supabase'
+import { useOrg } from '@/lib/orgContext'
 import { Spinner } from '@/components/ui/Spinner'
 
 interface DashboardProps { user: User }
@@ -212,6 +213,7 @@ create policy "views_history_all" on public.views_history
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);`
 
 export function Dashboard({ user }: DashboardProps) {
+  const { currentOrg }              = useOrg()
   const [phones, setPhones]         = useState<Phone[]>([])
   const [selPhone, setSelPhone]     = useState<Phone | null>(null)
   const [range, setRange]           = useState<Range>('30d')
@@ -222,8 +224,9 @@ export function Dashboard({ user }: DashboardProps) {
   const [sqlCopied, setSqlCopied]   = useState(false)
 
   useEffect(() => {
-    supabase.from('phones').select('*').eq('user_id', user.id).order('phone_name')
-      .then(({ data }) => {
+    let q = supabase.from('phones').select('*').order('phone_name')
+    q = currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
+    q.then(({ data }) => {
         const loaded = data ?? []
         setPhones(loaded)
         setLoading(false)
@@ -236,7 +239,7 @@ export function Dashboard({ user }: DashboardProps) {
           ).then(() => {})
         }
       })
-  }, [])
+  }, [currentOrg?.id, user.id])
 
   useEffect(() => { loadChart() }, [selPhone, range, phones])
 

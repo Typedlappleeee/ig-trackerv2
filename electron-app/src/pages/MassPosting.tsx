@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase, type Phone, type ContentItem } from '@/lib/supabase'
 import { useConnections } from '@/lib/connections'
+import { useOrg } from '@/lib/orgContext'
 import { Button }  from '@/components/ui/Button'
 import { VideoThumbnail } from '@/pages/Bank'
 import { BankPicker } from './Bank'
@@ -41,6 +42,7 @@ async function geelark(bearer: string, path: string, body: unknown) {
 }
 
 export function MassPosting({ user }: MassPostingProps) {
+  const { currentOrg } = useOrg()
   const [phones, setPhones]               = useState<Phone[]>([])
   const ms                                = getMassPostingState()
   const [selectedPhones, _setSelPhones]   = useState<Set<string>>(ms.selectedPhones)
@@ -95,14 +97,15 @@ export function MassPosting({ user }: MassPostingProps) {
   useEffect(() => { if (conns.groq)   setGroqKey(conns.groq) },  [conns.groq])
 
   useEffect(() => {
-    supabase.from('phones').select('*').eq('user_id', user.id).order('phone_name')
-    .then(ph => {
+    let q = supabase.from('phones').select('*').order('phone_name')
+    q = currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
+    q.then(ph => {
       const ps = ph.data ?? []
       setPhones(ps)
       const grps = [...new Set(ps.map(p => p.group_name).filter(Boolean) as string[])].sort()
       setGroups(['Tous', ...grps])
     })
-  }, [])
+  }, [currentOrg?.id, user.id])
 
   useEffect(() => { logEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [logs])
 

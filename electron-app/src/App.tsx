@@ -5,7 +5,7 @@ import { supabase }          from '@/lib/supabase'
 import { AuthPage }          from '@/components/auth/AuthPage'
 import { Onboarding }        from '@/components/Onboarding'
 import { Layout, type Page } from '@/components/Layout'
-import { OrgProvider }       from '@/lib/orgContext'
+import { OrgProvider, useOrg } from '@/lib/orgContext'
 import { useConnections }    from '@/lib/connections'
 
 // ── Splash screen ─────────────────────────────────────────────────────────────
@@ -148,6 +148,7 @@ import { FullPageLoader }    from '@/components/ui/Spinner'
 const BETA_KEY = 'ig-tracker-beta-v2-seen'
 
 function AppContent({ user }: { user: User }) {
+  const { currentOrg } = useOrg()
   const [page, setPage]                     = useState<Page>('dashboard')
   const [settingsPanel, setSettingsPanel]   = useState<string | undefined>(undefined)
   const [onboarding, setOnboarding]         = useState<boolean | null>(null)
@@ -166,9 +167,14 @@ function AppContent({ user }: { user: User }) {
         setOnboarding(!hasBearer)
         if (hasBearer && !localStorage.getItem(BETA_KEY)) setShowBeta(true)
       })
-    supabase.from('phones').select('id', { count: 'exact', head: true }).eq('user_id', user.id)
-      .then(({ count }) => setPhoneCount(count ?? 0))
   }, [user.id])
+
+  // Sidebar phone count: org-scoped when an org is active, solo otherwise
+  useEffect(() => {
+    let q = supabase.from('phones').select('id', { count: 'exact', head: true })
+    q = currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
+    q.then(({ count }) => setPhoneCount(count ?? 0))
+  }, [currentOrg?.id, user.id])
 
   // Re-initialise the GéeLark poller whenever the active bearer changes
   // (org switch, settings save, …). The poller holds the bearer in module

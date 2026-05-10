@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase, type Phone } from '@/lib/supabase'
 import { useConnections } from '@/lib/connections'
+import { useOrg } from '@/lib/orgContext'
 import { Button }  from '@/components/ui/Button'
 import { Spinner } from '@/components/ui/Spinner'
 import { replyToIgCommentViaPhone } from '@/lib/geelark'
@@ -49,6 +50,7 @@ function IgThumbnail({ src, sessionid }: { src: string; sessionid?: string | nul
 const DEFAULT_PERSONA = "Tu es un créateur de contenu Instagram sympathique. Réponds en français, de façon courte (1-2 phrases), chaleureuse et engageante."
 
 export function Autocomment({ user }: AutocommentProps) {
+  const { currentOrg }                = useOrg()
   const [phones, setPhones]           = useState<Phone[]>([])
   const [selectedPhone, setSelected]  = useState<Phone | null>(null)
   const [posts, setPosts]             = useState<IgPost[]>([])
@@ -76,9 +78,10 @@ export function Autocomment({ user }: AutocommentProps) {
   useEffect(() => { if (conns.groq) setGroqKey(conns.groq) }, [conns.groq])
 
   useEffect(() => {
-    supabase.from('phones').select('*').eq('user_id', user.id).order('phone_name')
-      .then(ph => setPhones((ph.data ?? []).filter(p => p.ig_username)))
-  }, [user.id])
+    let q = supabase.from('phones').select('*').order('phone_name')
+    q = currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
+    q.then(ph => setPhones((ph.data ?? []).filter(p => p.ig_username)))
+  }, [currentOrg?.id, user.id])
 
   async function sendManualReply(comment: IgComment) {
     const text = manualReplies[comment.pk]?.trim()

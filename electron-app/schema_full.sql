@@ -186,6 +186,22 @@ CREATE INDEX IF NOT EXISTS idx_user_items_user_id     ON public.user_items(user_
 CREATE INDEX IF NOT EXISTS idx_phones_user_id         ON public.phones(user_id);
 CREATE INDEX IF NOT EXISTS idx_phones_geelark_id      ON public.phones(geelark_id);
 CREATE INDEX IF NOT EXISTS idx_phones_org_id          ON public.phones(org_id);
+
+-- Dédup une fois les phones d'orga : garde la ligne la plus ancienne par
+-- (org_id, geelark_id). Évite les doublons quand plusieurs membres ont sync.
+DELETE FROM public.phones a
+USING public.phones b
+WHERE a.org_id IS NOT NULL
+  AND a.org_id = b.org_id
+  AND a.geelark_id = b.geelark_id
+  AND a.id != b.id
+  AND a.created_at > b.created_at;
+
+-- Index unique partiel pour les phones d'orga : (org_id, geelark_id) doit être unique
+-- quand on est en mode orga, indépendamment du user qui a sync. Solo mode garde
+-- la contrainte UNIQUE(user_id, geelark_id) au niveau de la table.
+CREATE UNIQUE INDEX IF NOT EXISTS phones_org_geelark_uniq
+  ON public.phones(org_id, geelark_id) WHERE org_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_bank_user_id           ON public.content_bank(user_id);
 CREATE INDEX IF NOT EXISTS idx_bank_org_id            ON public.content_bank(org_id);
 CREATE INDEX IF NOT EXISTS idx_views_history_phone    ON public.views_history(phone_id);

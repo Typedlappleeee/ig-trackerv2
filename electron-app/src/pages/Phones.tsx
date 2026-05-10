@@ -463,18 +463,8 @@ export function Phones({ user }: PhonesProps) {
       const items = await fetchAllPhones(bearer)
       if (items.length === 0) { setError('Aucun téléphone trouvé.'); setSyncing(false); return }
 
-      // In org mode: fetch existing phones by geelark_id so we reuse the original
-      // user_id. Without this, each member who syncs creates duplicate rows because
-      // the upsert conflict key is (user_id, geelark_id) — different user = no conflict.
-      const existingOwners = new Map<string, string>()
-      if (currentOrg) {
-        const { data: ex } = await supabase
-          .from('phones').select('geelark_id, user_id').eq('org_id', currentOrg.id)
-        for (const r of ex ?? []) existingOwners.set(r.geelark_id, r.user_id)
-      }
-
       const rows = items.map(p => ({
-        user_id:    existingOwners.get(p.id) ?? user.id,
+        user_id:    user.id,                        // always the current authenticated user (RLS requires it)
         org_id:     currentOrg?.id ?? null,
         geelark_id: p.id,
         serial_no:  p.serialNo ?? null,
@@ -484,8 +474,12 @@ export function Phones({ user }: PhonesProps) {
         remark:     p.remark ?? null,
         synced_at:  new Date().toISOString(),
       }))
+      // Conflict target depends on mode:
+      // - Org   → (org_id, geelark_id)  [partial unique index, dedup across members]
+      // - Solo  → (user_id, geelark_id) [original UNIQUE constraint]
+      const onConflict = currentOrg ? 'org_id,geelark_id' : 'user_id,geelark_id'
       const { error: upsertErr } = await supabase
-        .from('phones').upsert(rows, { onConflict: 'user_id,geelark_id' })
+        .from('phones').upsert(rows, { onConflict })
       if (upsertErr) throw new Error(upsertErr.message)
       lastDbSyncRef.current = new Date()
       await loadPhones()

@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase, type Phone } from '@/lib/supabase'
+import { useOrg } from '@/lib/orgContext'
+import { useConnections } from '@/lib/connections'
 import { Button }  from '@/components/ui/Button'
 import { VideoThumbnail } from '@/pages/Bank'
 import { BankPicker } from './Bank'
@@ -19,6 +21,7 @@ async function geelark(bearer: string, path: string, body: unknown) {
 }
 
 export function Posting({ user }: PostingProps) {
+  const { currentOrg }                 = useOrg()
   const [phones, setPhones]            = useState<Phone[]>([])
   const s                              = getPostingState()
   const [selectedPhones, _setSelPhones]= useState<Set<string>>(s.selectedPhones)
@@ -67,19 +70,21 @@ export function Posting({ user }: PostingProps) {
     return unsub
   }, [])
 
+  // bearer + groq from active connection (org or solo)
+  const conns = useConnections(user)
+  useEffect(() => { if (conns.bearer) setBearer(conns.bearer) }, [conns.bearer])
+  useEffect(() => { if (conns.groq)   setGroqKey(conns.groq) },  [conns.groq])
+
   useEffect(() => {
-    Promise.all([
-      supabase.from('app_config').select('bearer_token, groq_api_key').eq('user_id', user.id).single(),
-      supabase.from('phones').select('*').eq('user_id', user.id).order('phone_name'),
-    ]).then(([cfg, ph]) => {
-      if (cfg.data?.bearer_token) setBearer(cfg.data.bearer_token)
-      if (cfg.data?.groq_api_key) setGroqKey(cfg.data.groq_api_key)
+    let q = supabase.from('phones').select('*').order('phone_name')
+    q = currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
+    q.then(ph => {
       const ps = ph.data ?? []
       setPhones(ps)
       const grps = [...new Set(ps.map(p => p.group_name).filter(Boolean) as string[])].sort()
       setGroups(['Tous', ...grps])
     })
-  }, [])
+  }, [currentOrg?.id, user.id])
 
   useEffect(() => { logEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [logs])
 
