@@ -82,7 +82,8 @@ function SessionDialog({
   const [testResult, setTestResult]     = useState<'idle' | 'ok' | 'fail'>('idle')
   const [detectedUser, setDetectedUser] = useState<string | null>(null)
   const [saving, setSaving]             = useState(false)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const inputRef    = useRef<HTMLInputElement>(null)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => { inputRef.current?.focus() }, [])
   useEffect(() => {
@@ -91,17 +92,19 @@ function SessionDialog({
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
 
-  async function test() {
-    if (!value.trim()) return
+  async function runTest(sessionid: string): Promise<{ ok: boolean; username?: string }> {
+    if (!sessionid.trim()) return { ok: false }
     setTesting(true); setTestResult('idle'); setDetectedUser(null)
     try {
       const r = await window.electronAPI?.fetchInstagramBySession({
-        username: phone.ig_username ?? '',
-        sessionid: value.trim(),
+        username:  phone.ig_username ?? '',
+        sessionid: sessionid.trim(),
       })
       if (r?.ok) {
         setTestResult('ok')
         if (r.username) setDetectedUser(r.username)
+        setTesting(false)
+        return { ok: true, username: r.username }
       } else {
         setTestResult('fail')
       }
@@ -109,18 +112,40 @@ function SessionDialog({
       setTestResult('fail')
     }
     setTesting(false)
+    return { ok: false }
+  }
+
+  // Auto-test 800ms after the user stops typing
+  function handleChange(v: string) {
+    setValue(v)
+    setTestResult('idle')
+    setDetectedUser(null)
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    if (v.trim().length > 10) {
+      debounceRef.current = setTimeout(() => runTest(v), 800)
+    }
   }
 
   async function save() {
+    if (!value.trim()) return
     setSaving(true)
+    // Test first if not already validated
+    let username = detectedUser ?? undefined
+    if (testResult !== 'ok') {
+      const r = await runTest(value)
+      if (!r.ok) { setSaving(false); return }  // don't save invalid session
+      username = r.username
+    }
     const { error } = await supabase
       .from('phones')
       .update({ ig_sessionid: value.trim() || null })
       .eq('id', phone.id)
-    if (!error) onSaved(phone.id, value.trim(), detectedUser ?? undefined)
+    if (!error) onSaved(phone.id, value.trim(), username)
     setSaving(false)
     onClose()
   }
+
+  const busy = testing || saving
 
   return (
     <div
@@ -146,39 +171,45 @@ function SessionDialog({
 
         <div className="space-y-2">
           <label className="text-xs font-medium text-text2">Session ID</label>
-          <input
-            ref={inputRef}
-            type="password"
-            value={value}
-            onChange={e => { setValue(e.target.value); setTestResult('idle'); setDetectedUser(null) }}
-            placeholder="Colle ton sessionid ici…"
-            className="w-full bg-surface border border-border rounded-lg px-3 py-2 text-sm text-text placeholder:text-text2 focus:border-accent focus:outline-none font-mono"
-          />
-          {testResult === 'ok' && (
-            <div className="flex items-center gap-2">
-              <p className="text-xs text-ok">✅ Session valide !</p>
-              {detectedUser && (
-                <p className="text-xs text-text2">
-                  Compte détecté : <span className="text-accent font-semibold">@{detectedUser}</span>
-                  {phone.ig_username && phone.ig_username !== detectedUser && (
-                    <span className="ml-1 text-warn">(différent de @{phone.ig_username}, sera mis à jour)</span>
-                  )}
-                </p>
+          <div className="relative">
+            <input
+              ref={inputRef}
+              type="password"
+              value={value}
+              onChange={e => handleChange(e.target.value)}
+              placeholder="Colle ton sessionid ici…"
+              className={`w-full bg-surface border rounded-lg px-3 py-2 text-sm text-text placeholder:text-text2 focus:outline-none font-mono pr-8 transition-colors ${
+                testResult === 'ok'   ? 'border-ok' :
+                testResult === 'fail' ? 'border-danger' :
+                'border-border focus:border-accent'
+              }`}
+            />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm pointer-events-none">
+              {testing          ? <span className="animate-spin inline-block text-accent">↻</span> :
+               testResult === 'ok'   ? <span className="text-ok">✓</span> :
+               testResult === 'fail' ? <span className="text-danger">✗</span> : null}
+            </span>
+          </div>
+          {testResult === 'ok' && detectedUser && (
+            <p className="text-xs text-text2">
+              Compte : <span className="text-accent font-semibold">@{detectedUser}</span>
+              {phone.ig_username && phone.ig_username !== detectedUser && (
+                <span className="ml-1 text-warn">· différent de @{phone.ig_username} — sera mis à jour</span>
               )}
-            </div>
+            </p>
           )}
-          {testResult === 'fail' && <p className="text-xs text-danger">❌ Session invalide ou expirée.</p>}
+          {testResult === 'fail' && <p className="text-xs text-danger">❌ Session invalide ou expirée — vérifie que tu as copié la bonne valeur.</p>}
+          {testResult === 'idle' && value.trim().length > 10 && !testing && (
+            <p className="text-xs text-text2">Test automatique en cours…</p>
+          )}
         </div>
 
         <div className="flex items-center gap-3 justify-end pt-2">
-          <button onClick={onClose} className="text-sm text-text2 hover:text-text px-3 py-1.5 rounded transition-colors">
+          <button onClick={onClose} disabled={busy} className="text-sm text-text2 hover:text-text px-3 py-1.5 rounded transition-colors disabled:opacity-40">
             Annuler
           </button>
-          <Button variant="secondary" size="sm" onClick={test} loading={testing} disabled={!value.trim()}>
-            🔍 Tester
-          </Button>
-          <Button size="sm" onClick={save} loading={saving} disabled={!value.trim()}>
-            💾 Sauvegarder
+          <Button size="sm" onClick={save} loading={busy} disabled={!value.trim()}>
+            {testing ? '🔍 Vérification…' : saving ? '💾 Sauvegarde…' : testResult === 'ok' ? '💾 Sauvegarder' : '🔍 Tester & Sauvegarder'}
           </Button>
         </div>
       </div>
