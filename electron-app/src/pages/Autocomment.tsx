@@ -24,6 +24,25 @@ interface IgPost {
   newCount?: number       // unanswered count
 }
 
+function IgThumbnail({ src, sessionid }: { src: string; sessionid?: string | null }) {
+  const [dataUrl, setDataUrl] = useState<string | null>(null)
+  const [failed, setFailed]   = useState(false)
+  useEffect(() => {
+    setDataUrl(null); setFailed(false)
+    if (!src || !window.electronAPI?.fetchImage) { setFailed(true); return }
+    let cancelled = false
+    const headers: Record<string, string> = {}
+    if (sessionid) headers['Cookie'] = `sessionid=${sessionid}`
+    window.electronAPI.fetchImage({ url: src, headers: Object.keys(headers).length ? headers : undefined })
+      .then(r => { if (!cancelled) { if (r.ok && r.dataUrl) setDataUrl(r.dataUrl); else setFailed(true) } })
+      .catch(() => { if (!cancelled) setFailed(true) })
+    return () => { cancelled = true }
+  }, [src, sessionid])
+  if (failed || !src) return <div className="w-11 h-11 rounded bg-surface3 flex items-center justify-center text-lg flex-shrink-0">🎥</div>
+  if (!dataUrl)       return <div className="w-11 h-11 rounded bg-surface3 flex-shrink-0 animate-pulse" />
+  return <img src={dataUrl} alt="" className="w-11 h-11 rounded object-cover flex-shrink-0" />
+}
+
 const DEFAULT_PERSONA = "Tu es un créateur de contenu Instagram sympathique. Réponds en français, de façon courte (1-2 phrases), chaleureuse et engageante."
 
 export function Autocomment({ user }: AutocommentProps) {
@@ -97,7 +116,7 @@ export function Autocomment({ user }: AutocommentProps) {
   }
 
   async function loadComments(post: IgPost) {
-    const sessionid = selPhone?.ig_sessionid
+    const sessionid = selectedPhone?.ig_sessionid
     if (!sessionid) {
       log('⚠ Aucune session IG configurée pour ce téléphone — va dans Téléphones → configurer session')
       setComments([])
@@ -229,9 +248,7 @@ export function Autocomment({ user }: AutocommentProps) {
                   selectedPost?.id === p.id ? 'bg-surface2' : 'hover:bg-surface'
                 }`}
               >
-                <div className="w-11 h-11 rounded bg-surface3 flex items-center justify-center text-lg flex-shrink-0">
-                  🎥
-                </div>
+                <IgThumbnail src={p.thumbnail} sessionid={selectedPhone?.ig_sessionid} />
                 <div className="min-w-0 flex-1">
                   <p className="text-[10px] text-text2">
                     🎥 {p.taken_at ? new Date(p.taken_at * 1000).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'}

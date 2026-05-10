@@ -484,7 +484,7 @@ export function Phones({ user }: PhonesProps) {
     if (!err) setPhones(prev => prev.filter(p => p.id !== id))
   }
 
-  // ── Session saved → also update username if detected ────────────────────
+  // ── Session saved → update username + immediately fetch IG stats ────────
   async function onSessionSaved(id: string, sessionid: string, detectedUsername?: string) {
     const updates: Partial<Phone> = { ig_sessionid: sessionid || null }
     if (detectedUsername) {
@@ -492,6 +492,27 @@ export function Phones({ user }: PhonesProps) {
       await supabase.from('phones').update({ ig_username: detectedUsername }).eq('id', id)
     }
     setPhones(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p))
+
+    // Immediately fetch IG stats now that we have a session
+    const username = detectedUsername ?? phonesRef.current.find(p => p.id === id)?.ig_username
+    if (sessionid && username && window.electronAPI?.fetchInstagramBySession) {
+      try {
+        const r = await window.electronAPI.fetchInstagramBySession({ username, sessionid })
+        if (r.ok) {
+          const statUpdates = {
+            ig_username:  r.username  ?? username,
+            followers:    r.followers  ?? 0,
+            following:    r.following  ?? 0,
+            total_views:  r.total_views ?? 0,
+            posts:        r.posts       ?? 0,
+            bio:          r.bio         ?? '',
+            ig_status:    'active',
+          }
+          await supabase.from('phones').update(statUpdates).eq('id', id)
+          setPhones(prev => prev.map(p => p.id === id ? { ...p, ...statUpdates } : p))
+        }
+      } catch { /* silent — stats will refresh on next poll */ }
+    }
   }
 
   // ── Filtered view ─────────────────────────────────────────────────────────

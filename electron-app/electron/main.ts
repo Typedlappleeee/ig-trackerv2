@@ -374,7 +374,7 @@ ipcMain.handle('upload-video-geelark', async (_event, opts: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${opts.bearer}`,
       },
-      body: JSON.stringify({ fileType: 'video' }),
+      body: JSON.stringify({ fileType: 1 }),
     })
     const urlData = await urlRes.json() as Record<string, unknown>
     if (urlData['code'] !== 0) {

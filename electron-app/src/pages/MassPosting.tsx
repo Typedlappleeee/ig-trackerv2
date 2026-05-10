@@ -63,6 +63,8 @@ export function MassPosting({ user }: MassPostingProps) {
   const [groqKey, setGroqKey]             = useState('')
   const [posting, setPosting]             = useState(false)
   const [generating, setGenerating]       = useState(false)
+  const [withHashtags, setWithHashtags]   = useState(true)
+  const [customPrompt, setCustomPrompt]   = useState('')
   const [logs, setLogs]                   = useState<TaskLog[]>([])
   const [taskStatuses, setTaskStatuses]   = useState<Map<string, TaskStatus>>(new Map())
   const [groupFilter, setGroupFilter]     = useState('Tous')
@@ -146,13 +148,19 @@ export function MassPosting({ user }: MassPostingProps) {
     if (!window.electronAPI?.groqRequest) return
     setGenerating(true)
     try {
+      const sysPrompt = withHashtags
+        ? 'Tu génères des descriptions Instagram virales en français. Hook fort + body engageant + CTA + 10-15 hashtags pertinents. Max 2200 caractères.'
+        : 'Tu génères des descriptions Instagram virales en français. Hook fort + body engageant + CTA. Sans hashtags. Max 2200 caractères.'
+      const userMsg = customPrompt.trim()
+        ? `Génère une description Instagram (${customPrompt.trim()}) générique qui marche pour beaucoup de comptes. Réponds uniquement avec la description finale, sans préambule.`
+        : 'Génère une description Instagram virale et générique qui marche pour beaucoup de comptes. Réponds uniquement avec la description finale, sans préambule.'
       const r = await window.electronAPI.groqRequest({
         apiKey: groqKey,
         model: 'llama-3.3-70b-versatile',
         maxTokens: 300,
         messages: [
-          { role: 'system', content: 'Tu génères des captions Instagram virales en français. Hook fort + body engageant + CTA + 10-15 hashtags. Max 2200 caractères.' },
-          { role: 'user',   content: `Génère une caption Instagram virale et générique qui marche pour beaucoup de comptes. Réponds uniquement avec la caption finale, sans préambule.` },
+          { role: 'system', content: sysPrompt },
+          { role: 'user',   content: userMsg },
         ],
       })
       if (r.ok && r.data) {
@@ -360,19 +368,35 @@ export function MassPosting({ user }: MassPostingProps) {
           <Button onClick={stop} variant="danger" disabled={!posting}>⏹ Arrêter</Button>
         </div>
 
-        {/* Caption shared by all */}
+        {/* Description shared by all */}
         <div className="flex items-start gap-2">
           <textarea
             value={caption}
             onChange={e => setCaption(e.target.value)}
             rows={2}
-            placeholder="Caption partagée par tous les téléphones (obligatoire)…"
+            placeholder="Description partagée par tous les téléphones (optionnel)…"
             className="flex-1 bg-bg border border-border rounded-lg px-3 py-2 text-xs text-text placeholder:text-text2 resize-none focus:outline-none focus:border-accent"
           />
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-1.5">
             <Button size="sm" variant="secondary" onClick={generateCaption} loading={generating} disabled={!groqKey}>✨ Générer</Button>
+            <input
+              type="text"
+              value={customPrompt}
+              onChange={e => setCustomPrompt(e.target.value)}
+              placeholder="Prompt IA…"
+              className="w-32 bg-bg border border-border rounded px-2 py-1 text-[11px] text-text placeholder:text-text2 focus:outline-none focus:border-accent"
+            />
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => setWithHashtags(v => !v)}
+                className={`relative w-7 h-3.5 rounded-full transition-colors flex-shrink-0 ${withHashtags ? 'bg-accent' : 'bg-surface2'}`}
+              >
+                <span className={`absolute top-0.5 w-2.5 h-2.5 bg-white rounded-full shadow transition-all ${withHashtags ? 'left-[14px]' : 'left-0.5'}`} />
+              </button>
+              <span className="text-[10px] text-text2">#</span>
+            </div>
             <span className={`text-[10px] font-mono text-right ${caption.length > 2200 ? 'text-danger' : 'text-text2'}`}>
-              {caption.length} / 2200
+              {caption.length}/2200
             </span>
           </div>
         </div>

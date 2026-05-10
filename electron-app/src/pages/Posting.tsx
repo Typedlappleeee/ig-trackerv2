@@ -29,6 +29,8 @@ export function Posting({ user }: PostingProps) {
   const [filePath, setFilePath]        = useState<string | null>(null)
   const [caption, setCaption]          = useState('')
   const [topic, setTopic]              = useState('')
+  const [withHashtags, setWithHashtags]= useState(true)
+  const [customPrompt, setCustomPrompt]= useState('')
   const [delayBetween, setDelayBetween]= useState(5)
   const [bearer, setBearer]            = useState('')
   const [groqKey, setGroqKey]          = useState('')
@@ -84,13 +86,17 @@ export function Posting({ user }: PostingProps) {
     setGenerating(true)
     try {
       const subject = topic.trim() || 'créateur de contenu Instagram lifestyle'
+      const systemContent = withHashtags
+        ? 'Tu génères des descriptions Instagram virales en français. Hook fort + body engageant + CTA + 10-15 hashtags pertinents. Max 2200 caractères.'
+        : 'Tu génères des descriptions Instagram virales en français. Hook fort + body engageant + CTA. Sans hashtags. Max 2200 caractères.'
+      const userContent = `Génère une description Instagram${customPrompt.trim() ? ` (${customPrompt.trim()})` : ''} pour : ${subject}. Réponds uniquement avec la description finale, sans préambule.`
       const r = await window.electronAPI.groqRequest({
         apiKey: groqKey,
         model: 'llama-3.3-70b-versatile',
         maxTokens: 300,
         messages: [
-          { role: 'system', content: 'Tu génères des captions Instagram virales en français. Hook fort + body engageant + CTA + 10-15 hashtags pertinents. Max 2200 caractères.' },
-          { role: 'user',   content: `Génère une caption Instagram virale pour : ${subject}. Réponds uniquement avec la caption finale, sans préambule.` },
+          { role: 'system', content: systemContent },
+          { role: 'user',   content: userContent },
         ],
       })
       if (r.ok && r.data) {
@@ -289,10 +295,10 @@ export function Posting({ user }: PostingProps) {
             </div>
           </div>
 
-          {/* Caption */}
+          {/* Description */}
           <div className="px-5 py-4 border-b border-border">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-[10px] uppercase tracking-wider text-text2 font-semibold">Caption</p>
+              <p className="text-[10px] uppercase tracking-wider text-text2 font-semibold">Description</p>
               <span className={`text-[10px] font-mono ${caption.length > 2200 ? 'text-danger' : 'text-text2'}`}>
                 {caption.length} / 2200
               </span>
@@ -301,13 +307,13 @@ export function Posting({ user }: PostingProps) {
               value={caption}
               onChange={e => setCaption(e.target.value)}
               rows={5}
-              placeholder="Écris ta caption Instagram… (hashtags, mentions, etc.)"
+              placeholder="Écris ta description Instagram…"
               className="w-full bg-[#080c14] border border-border rounded-lg px-3 py-2 text-sm text-text placeholder:text-text2 resize-y focus:outline-none focus:border-accent"
             />
-            {/* Generate caption row */}
+            {/* Generate description row */}
             <div className="flex gap-2 mt-3">
               <Button variant="secondary" size="sm" onClick={generateCaption} loading={generating} disabled={!groqKey}>
-                ✨ Générer une description
+                ✨ Générer
               </Button>
               <input
                 type="text"
@@ -317,6 +323,13 @@ export function Posting({ user }: PostingProps) {
                 className="flex-1 bg-[#080c14] border border-border rounded-lg px-3 py-1.5 text-xs text-text placeholder:text-text2 focus:outline-none focus:border-accent"
               />
             </div>
+            <input
+              type="text"
+              value={customPrompt}
+              onChange={e => setCustomPrompt(e.target.value)}
+              placeholder="Prompt IA (optionnel)"
+              className="mt-2 w-full bg-[#080c14] border border-border rounded-lg px-3 py-1.5 text-xs text-text placeholder:text-text2 focus:outline-none focus:border-accent"
+            />
           </div>
 
           {/* Options */}
@@ -332,6 +345,16 @@ export function Posting({ user }: PostingProps) {
               className="w-20 bg-[#080c14] border border-border rounded px-2 py-1 text-xs text-text focus:outline-none focus:border-accent"
             />
             <span className="text-xs text-text2">min</span>
+          </div>
+          <div className="px-5 py-3 border-b border-border flex items-center gap-3">
+            <span className="text-base">#️⃣</span>
+            <span className="flex-1 text-sm text-text">Avec hashtags</span>
+            <button
+              onClick={() => setWithHashtags(v => !v)}
+              className={`relative w-10 h-5 rounded-full transition-colors ${withHashtags ? 'bg-accent' : 'bg-surface3'}`}
+            >
+              <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${withHashtags ? 'translate-x-5' : 'translate-x-0.5'}`} />
+            </button>
           </div>
 
           {/* Progress + Logs */}
@@ -376,7 +399,7 @@ export function Posting({ user }: PostingProps) {
             <Button
               onClick={post}
               loading={posting}
-              disabled={!bearer || selectedPhones.size === 0 || !filePath || !caption.trim()}
+              disabled={!bearer || selectedPhones.size === 0 || !filePath}
               size="lg"
               className="w-full !text-base !font-bold"
             >
@@ -398,9 +421,6 @@ export function Posting({ user }: PostingProps) {
         )}
         {!filePath && bearer && selectedPhones.size > 0 && (
           <p className="text-xs text-text2">⚠ Sélectionne une vidéo</p>
-        )}
-        {filePath && !caption.trim() && (
-          <p className="text-xs text-text2">⚠ La caption est obligatoire pour GéeLark</p>
         )}
 
       </div>

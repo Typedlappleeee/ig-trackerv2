@@ -134,7 +134,9 @@ function AddMediaModal({ onPick, onDrop, onClose }: {
   const [dragOver, setDragOver] = useState(false)
 
   function handleDrop(e: React.DragEvent) {
-    e.preventDefault(); setDragOver(false)
+    e.preventDefault()
+    e.stopPropagation()
+    setDragOver(false)
     const files = Array.from(e.dataTransfer.files)
     for (const f of files) {
       const p = (f as File & { path?: string }).path ?? f.name
@@ -454,9 +456,7 @@ export function Bank({ user }: BankProps) {
           <h2 className="text-sm font-semibold text-text mr-2">🗂 Banque de médias</h2>
           <div className="flex-1" />
           <Button onClick={() => setShowAddModal(true)} size="sm">+ Ajouter un média</Button>
-          <Button variant="secondary" size="sm" onClick={() => alert('Téléchargement bientôt — utilise le clic droit sur une vidéo pour ouvrir son dossier.')}>⬇ Télécharger</Button>
           <Button variant="secondary" size="sm" onClick={() => alert('Réglage du dossier export à faire dans Paramètres → Profil')}>📂 Export dir</Button>
-          <Button variant="secondary" size="sm" onClick={() => alert('Randomisation des métadonnées MP4 — bientôt branchée via IPC ffmpeg')} className="!bg-warn/10 !text-warn">🔀 Randomiser</Button>
           <Button variant="secondary" size="sm" onClick={loadItems}>↺ Rafraîchir</Button>
         </div>
 
@@ -554,6 +554,8 @@ export function Bank({ user }: BankProps) {
             { label: '✏️ Renommer',          action: () => { setRenameItem(ctxMenu.item); setCtxMenu(null) } },
             { label: '📂 Déplacer vers…',    action: () => { setMoveItem(ctxMenu.item); setCtxMenu(null) } },
             { label: '🏷 Modifier les tags', action: () => { setTagsItem(ctxMenu.item); setCtxMenu(null) } },
+            { label: '⬇ Télécharger (bientôt)', action: () => setCtxMenu(null) },
+            { label: '🔀 Randomiser (bientôt)', action: () => setCtxMenu(null) },
             { label: '🗑 Supprimer',         action: () => deleteItem(ctxMenu.item.id), danger: true },
           ].map(({ label, action, danger }) => (
             <button
@@ -665,6 +667,54 @@ function FolderRow({ name, count, active, onClick, onRename, onDelete }: {
   )
 }
 
+// ── Video thumbnail (generates a real frame via canvas) ──────────────────────
+export function VideoThumbnail({ filePath }: { filePath: string }) {
+  const [thumb, setThumb] = useState<string | null>(null)
+  const [failed, setFailed]   = useState(false)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (!filePath) { setFailed(true); setLoading(false); return }
+    setThumb(null); setFailed(false); setLoading(true)
+    const toFileUrl = (p: string) => {
+      const n = p.replace(/\\/g, '/')
+      if (n.startsWith('file://')) return n
+      return `file://${n.startsWith('/') ? n : `/${n}`}`
+    }
+    let cancelled = false
+    const video = document.createElement('video')
+    video.muted = true
+    video.preload = 'metadata'
+    video.addEventListener('loadeddata', () => {
+      if (cancelled) return
+      video.currentTime = Math.min(0.5, (video.duration || 5) * 0.05)
+    }, { once: true })
+    video.addEventListener('seeked', () => {
+      if (cancelled) return
+      try {
+        const canvas = document.createElement('canvas')
+        canvas.width = video.videoWidth || 360
+        canvas.height = video.videoHeight || 640
+        canvas.getContext('2d')?.drawImage(video, 0, 0)
+        setThumb(canvas.toDataURL('image/jpeg', 0.7))
+      } catch { setFailed(true) }
+      setLoading(false)
+      video.src = ''
+    }, { once: true })
+    video.addEventListener('error', () => { if (!cancelled) { setFailed(true); setLoading(false) } }, { once: true })
+    video.src = toFileUrl(filePath)
+    return () => { cancelled = true; video.src = '' }
+  }, [filePath])
+
+  if (loading && !thumb && !failed) {
+    return <div className="w-full h-full flex items-center justify-center bg-surface2"><div className="w-5 h-5 border-2 border-accent/30 border-t-accent rounded-full animate-spin" /></div>
+  }
+  if (failed || !thumb) {
+    return <div className="w-full h-full flex items-center justify-center bg-surface2 text-4xl">🎬</div>
+  }
+  return <img src={thumb} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+}
+
 // ── Video card ───────────────────────────────────────────────────────────────
 function VideoCard({ item, onContextMenu }: {
   item: ContentItem
@@ -676,7 +726,7 @@ function VideoCard({ item, onContextMenu }: {
       onContextMenu={e => onContextMenu(e, item)}
     >
       <div className="relative aspect-[9/16] bg-surface2 overflow-hidden">
-        <VideoPreview filePath={item.file_url} />
+        <VideoThumbnail filePath={item.file_url} />
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
         {/* Date — top left */}
         <div className="absolute top-2 left-2 bg-black/60 backdrop-blur-sm rounded px-1.5 py-0.5 text-[10px] text-white font-medium">

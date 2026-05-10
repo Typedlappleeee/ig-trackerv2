@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase, type ContentItem } from '@/lib/supabase'
+import { VideoThumbnail } from './Bank'
 import { Spinner } from '@/components/ui/Spinner'
 import { Button }  from '@/components/ui/Button'
 
@@ -23,7 +24,9 @@ interface TextOverlay {
   text:      string
   startTime: number
   endTime:   number
-  position:  'top' | 'center' | 'bottom'
+  position:  'top' | 'center' | 'bottom'  // kept for compat, unused when x/y set
+  x:         number   // 0-100 (% from left)
+  y:         number   // 0-100 (% from top)
   fontSize:  number
   color:     string
 }
@@ -282,6 +285,72 @@ function PropertiesPanel({
           ))}
         </div>
       </div>
+    </div>
+  )
+}
+
+// ── Draggable text overlay with center snap ───────────────────────────────────
+const SNAP_ZONE = 5  // % distance from center to trigger snap
+
+function DraggableText({ overlay, onMove }: {
+  overlay: TextOverlay
+  onMove:  (uid: string, x: number, y: number) => void
+}) {
+  const ref     = useRef<HTMLDivElement>(null)
+  const dragging = useRef(false)
+  const start    = useRef({ mx: 0, my: 0, ox: 0, oy: 0 })
+  const [snapping, setSnapping] = useState(false)
+
+  function onMouseDown(e: React.MouseEvent) {
+    e.preventDefault()
+    dragging.current = true
+    start.current = { mx: e.clientX, my: e.clientY, ox: overlay.x, oy: overlay.y }
+
+    function onMove_(ev: MouseEvent) {
+      if (!dragging.current || !ref.current) return
+      const parent = ref.current.parentElement!
+      const rect   = parent.getBoundingClientRect()
+      const dx = ((ev.clientX - start.current.mx) / rect.width)  * 100
+      const dy = ((ev.clientY - start.current.my) / rect.height) * 100
+      let nx = Math.max(0, Math.min(100, start.current.ox + dx))
+      let ny = Math.max(0, Math.min(100, start.current.oy + dy))
+      const snap = Math.abs(nx - 50) < SNAP_ZONE || Math.abs(ny - 50) < SNAP_ZONE
+      if (Math.abs(nx - 50) < SNAP_ZONE) nx = 50
+      if (Math.abs(ny - 50) < SNAP_ZONE) ny = 50
+      setSnapping(snap)
+      onMove(overlay.uid, nx, ny)
+    }
+    function onUp() {
+      dragging.current = false
+      setSnapping(false)
+      window.removeEventListener('mousemove', onMove_)
+      window.removeEventListener('mouseup', onUp)
+    }
+    window.addEventListener('mousemove', onMove_)
+    window.addEventListener('mouseup', onUp)
+  }
+
+  return (
+    <div
+      ref={ref}
+      onMouseDown={onMouseDown}
+      className="absolute select-none cursor-grab active:cursor-grabbing"
+      style={{
+        left:      `${overlay.x}%`,
+        top:       `${overlay.y}%`,
+        transform: 'translate(-50%, -50%)',
+        fontSize:  overlay.fontSize * 0.5,
+        color:     overlay.color,
+        textShadow: '0 2px 8px rgba(0,0,0,0.9)',
+        padding:   '4px 8px',
+        borderRadius: 6,
+        border:    snapping ? '1px dashed rgba(79,158,255,0.8)' : '1px solid transparent',
+        boxShadow: snapping ? '0 0 0 2px rgba(79,158,255,0.4)' : 'none',
+        transition: 'box-shadow 0.1s, border-color 0.1s',
+        whiteSpace: 'nowrap',
+      }}
+    >
+      {overlay.text}
     </div>
   )
 }
@@ -561,7 +630,7 @@ export function Montage({ user }: MontageProps) {
               ) : filteredBank.map(item => (
                 <button key={item.id} onClick={() => addClip(item)}
                   className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-surface2 group transition-colors">
-                  <div className="w-10 h-7 rounded bg-surface2 flex items-center justify-center text-base flex-shrink-0">🎬</div>
+                  <div className="w-10 h-14 rounded overflow-hidden flex-shrink-0"><VideoThumbnail filePath={item.file_url} /></div>
                   <div className="flex-1 min-w-0">
                     <p className="text-[11px] font-medium text-text truncate">{item.title}</p>
                     <p className="text-[9px] text-text2">{item.duration ? fmtTime(item.duration) : '?s'}</p>
@@ -576,14 +645,18 @@ export function Montage({ user }: MontageProps) {
           {activeTab === 'texte' && (
             <div className="p-3 space-y-3 flex-1 overflow-auto">
               <p className="text-[10px] text-text2 uppercase tracking-wider font-semibold">Ajouter un texte</p>
-              {(['top','center','bottom'] as TextOverlay['position'][]).map(pos => (
+              {([
+                { pos: 'top',    label: 'Haut',   x: 50, y: 10 },
+                { pos: 'center', label: 'Centre', x: 50, y: 50 },
+                { pos: 'bottom', label: 'Bas',    x: 50, y: 85 },
+              ] as { pos: TextOverlay['position']; label: string; x: number; y: number }[]).map(({ pos, label, x, y }) => (
                 <button key={pos} onClick={() => setTexts(prev => [...prev, {
                   uid: `text-${Date.now()}`, text: 'Texte ici…',
                   startTime: playhead, endTime: Math.min(playhead + 3, total),
-                  position: pos, fontSize: 32, color: '#ffffff',
+                  position: pos, x, y, fontSize: 32, color: '#ffffff',
                 }])}
                 className="w-full py-3 bg-surface2 hover:bg-surface border border-border rounded-lg text-xs text-text transition-colors text-center">
-                  + {pos === 'top' ? 'Haut' : pos === 'center' ? 'Centre' : 'Bas'}
+                  + {label}
                 </button>
               ))}
               {textOverlays.length > 0 && (
@@ -709,16 +782,13 @@ export function Montage({ user }: MontageProps) {
             </div>
           )}
 
-          {/* Text overlays preview */}
+          {/* Text overlays — draggable with center snap */}
           {textOverlays.filter(t => t.startTime <= playhead && t.endTime >= playhead).map(ov => (
-            <div key={ov.uid}
-              className={`absolute left-0 right-0 px-4 text-center pointer-events-none ${
-                ov.position === 'top' ? 'top-8' : ov.position === 'bottom' ? 'bottom-8' : 'top-1/2 -translate-y-1/2'
-              }`}
-              style={{ fontSize: ov.fontSize * 0.5, color: ov.color, textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}
-            >
-              {ov.text}
-            </div>
+            <DraggableText
+              key={ov.uid}
+              overlay={ov}
+              onMove={(uid, x, y) => setTexts(prev => prev.map(t => t.uid === uid ? { ...t, x, y } : t))}
+            />
           ))}
         </div>
 
