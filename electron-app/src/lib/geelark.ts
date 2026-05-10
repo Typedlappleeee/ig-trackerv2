@@ -62,3 +62,47 @@ export async function fetchPhoneStatuses(bearer: string): Promise<Map<string, st
   const phones = await fetchAllPhones(bearer)
   return new Map(phones.map(p => [p.id, geelarkStatusLabel(p.status)]))
 }
+
+// ── Custom RPA flow ──────────────────────────────────────────────────────────
+export interface RpaFlow { id: string; title?: string; remark?: string }
+
+// List the user's custom RPA flows so they can pick "IG comment" in settings
+export async function listRpaFlows(bearer: string): Promise<RpaFlow[]> {
+  const items: RpaFlow[] = []
+  let page = 1
+  while (true) {
+    const d = await geelarkFetch('POST', '/task/rpa/flow/list', { page, pageSize: 50 }, bearer)
+    if (d['code'] !== 0) throw new Error(`GéeLark: ${d['msg'] ?? d['message'] ?? d['code']}`)
+    const batch = ((d['data'] as Record<string, unknown>)?.['items'] ?? []) as RpaFlow[]
+    const total = ((d['data'] as Record<string, unknown>)?.['total'] ?? 0) as number
+    items.push(...batch)
+    if (items.length >= total || batch.length === 0) break
+    page++
+  }
+  return items
+}
+
+// Trigger a custom flow with parameters. The flow itself (built in GéeLark UI)
+// must accept "postUrl" and "commentText" string params and perform the comment.
+export async function runIgCommentFlow(
+  bearer: string,
+  phoneId: string,
+  flowId: string,
+  postUrl: string,
+  commentText: string,
+): Promise<{ ok: boolean; taskId?: string; error?: string }> {
+  try {
+    const d = await geelarkFetch('POST', '/task/rpa/add', {
+      id:         phoneId,
+      flowId,
+      scheduleAt: Math.floor(Date.now() / 1000),
+      name:       'IG comment',
+      paramMap:   { postUrl, commentText },
+    }, bearer)
+    if (d['code'] !== 0) return { ok: false, error: String(d['msg'] ?? d['message'] ?? `code ${d['code']}`) }
+    const tid = ((d['data'] as Record<string, unknown>)?.['id']) as string | undefined
+    return { ok: true, taskId: tid }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) }
+  }
+}
