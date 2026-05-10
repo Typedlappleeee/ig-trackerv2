@@ -231,8 +231,12 @@ function igSessionFetch(url: string, sessionid: string, method = 'GET', body?: s
       const chunks: Buffer[] = []
       res.on('data', (c: Buffer) => chunks.push(c))
       res.on('end', () => {
-        try { resolve({ status: res.statusCode ?? 0, data: JSON.parse(Buffer.concat(chunks).toString('utf-8')) }) }
-        catch { resolve({ status: res.statusCode ?? 0, data: null }) }
+        try {
+          const raw = Buffer.concat(chunks).toString('utf-8')
+          // Preserve large integers (Instagram IDs are 19 digits) as strings before JSON.parse
+          const safe = raw.replace(/:(\s*)(\d{16,})/g, ':$1"$2"')
+          resolve({ status: res.statusCode ?? 0, data: JSON.parse(safe) })
+        } catch { resolve({ status: res.statusCode ?? 0, data: null }) }
       })
       res.on('error', reject)
     })
@@ -313,24 +317,33 @@ ipcMain.handle('fetch-instagram-by-session', async (_event, opts: { username: st
     await Promise.all(videos.map(v => new Promise<void>(resolve => {
       if (!v.thumbnail) { resolve(); return }
       const url = v.thumbnail
-      https.get(url, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-          'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
-          'Referer': 'https://www.instagram.com/',
-        },
-      }, (res) => {
-        const chunks: Buffer[] = []
-        res.on('data', (c: Buffer) => chunks.push(c))
-        res.on('end', () => {
-          if (res.statusCode === 200) {
-            const ct = res.headers['content-type'] ?? 'image/jpeg'
-            v.thumbnail = `data:${ct};base64,${Buffer.concat(chunks).toString('base64')}`
+      const fetchThumb = (thumbUrl: string, depth: number) => {
+        https.get(thumbUrl, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+            'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
+            'Referer': 'https://www.instagram.com/',
+            'Cookie': `sessionid=${opts.sessionid}`,
+          },
+        }, (res) => {
+          if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location && depth < 3) {
+            res.destroy()
+            fetchThumb(res.headers.location, depth + 1)
+            return
           }
-          resolve()
-        })
-        res.on('error', () => resolve())
-      }).on('error', () => resolve())
+          const chunks2: Buffer[] = []
+          res.on('data', (c: Buffer) => chunks2.push(c))
+          res.on('end', () => {
+            if (res.statusCode === 200) {
+              const ct = res.headers['content-type'] ?? 'image/jpeg'
+              v.thumbnail = `data:${ct};base64,${Buffer.concat(chunks2).toString('base64')}`
+            }
+            resolve()
+          })
+          res.on('error', () => resolve())
+        }).on('error', () => resolve())
+      }
+      fetchThumb(url, 0)
     })))
 
     return {
@@ -602,6 +615,22 @@ ipcMain.handle('fetch-ig-comments', async (_event, opts: { mediaId: string; sess
       likeCount: (c['comment_like_count'] as number) ?? 0,
     }))
     return { ok: true, comments, hasMore: !!(data['next_max_id']) }
+  } catch (err: unknown) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+})
+
+// ── IPC: post a comment on an Instagram media ─────────────────────────────────
+ipcMain.handle('post-ig-comment', async (_event, opts: { mediaId: string; text: string; sessionid: string }) => {
+  try {
+    const res = await igSessionFetch(
+      `https://i.instagram.com/api/v1/media/${opts.mediaId}/comment/`,
+      opts.sessionid,
+      'POST',
+      `comment_text=${encodeURIComponent(opts.text)}`
+    )
+    if (res.status !== 200) return { ok: false, error: `HTTP ${res.status}` }
+    return { ok: true }
   } catch (err: unknown) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) }
   }

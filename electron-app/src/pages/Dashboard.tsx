@@ -25,8 +25,8 @@ function fmt(n: number): string {
 // ─────────────────────────────────────────────────────────────────────────────
 // Bar chart with hover tooltip — mirrors _dash_redraw_chart in Python
 // ─────────────────────────────────────────────────────────────────────────────
-function BarChart({ data, height = 280 }: { data: ViewPoint[]; height?: number }) {
-  const [hover, setHover] = useState<{ idx: number; x: number; y: number } | null>(null)
+function LineChart({ data, height = 280 }: { data: ViewPoint[]; height?: number }) {
+  const [hover, setHover] = useState<{ idx: number } | null>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
   const [w, setW] = useState(900)
 
@@ -45,81 +45,151 @@ function BarChart({ data, height = 280 }: { data: ViewPoint[]; height?: number }
     )
   }
 
-  const ml = 56, mr = 20, mt = 20, mb = 44
+  const ml = 56, mr = 20, mt = 24, mb = 44
   const plotW = Math.max(w - ml - mr, 100)
   const plotH = height - mt - mb
   const max = Math.max(...data.map(d => d.value), 1)
-  const gap = 0.18
-  const slotW = plotW / data.length
-  const barW = slotW * (1 - gap)
+  const labelStep = Math.max(1, Math.ceil(data.length / 10))
 
-  const today = data[data.length - 1]
-  const labelStep = Math.max(1, Math.ceil(data.length / 14))
+  const pts = data.map((d, i) => ({
+    x: ml + (data.length > 1 ? (i / (data.length - 1)) : 0.5) * plotW,
+    y: mt + plotH - (d.value / max) * plotH,
+  }))
+
+  // Catmull-Rom → cubic bezier smooth path
+  function smoothPath(points: { x: number; y: number }[]): string {
+    if (points.length === 1) return `M${points[0].x},${points[0].y}`
+    let d = `M${points[0].x},${points[0].y}`
+    for (let i = 0; i < points.length - 1; i++) {
+      const p0 = points[Math.max(i - 1, 0)]
+      const p1 = points[i]
+      const p2 = points[i + 1]
+      const p3 = points[Math.min(i + 2, points.length - 1)]
+      const cp1x = p1.x + (p2.x - p0.x) / 6
+      const cp1y = p1.y + (p2.y - p0.y) / 6
+      const cp2x = p2.x - (p3.x - p1.x) / 6
+      const cp2y = p2.y - (p3.y - p1.y) / 6
+      d += ` C${cp1x.toFixed(1)},${cp1y.toFixed(1)} ${cp2x.toFixed(1)},${cp2y.toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}`
+    }
+    return d
+  }
+
+  const linePath = smoothPath(pts)
+  const last = pts[pts.length - 1]
+  const first = pts[0]
+  const areaPath = `${linePath} L${last.x},${mt + plotH} L${first.x},${mt + plotH} Z`
+  const hoverPt = hover !== null ? pts[hover.idx] : null
 
   return (
-    <div ref={wrapRef} className="relative" style={{ height }}>
+    <div ref={wrapRef} className="relative select-none" style={{ height }}>
       <svg width={w} height={height} className="block">
-        {/* Grid lines */}
+        <defs>
+          <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#4f8ef7" stopOpacity="0.28" />
+            <stop offset="100%" stopColor="#4f8ef7" stopOpacity="0.02" />
+          </linearGradient>
+          <filter id="glowLine">
+            <feGaussianBlur stdDeviation="2" result="blur" />
+            <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+          </filter>
+        </defs>
+
+        {/* Grid */}
         {[0, 1, 2, 3, 4].map(i => {
           const y = mt + (plotH * i) / 4
-          const v = max * (1 - i / 4)
           return (
             <g key={i}>
-              <line x1={ml} y1={y} x2={ml + plotW} y2={y} stroke="#2a2f44" strokeDasharray="3 4" />
-              <text x={ml - 8} y={y + 4} textAnchor="end" fill="#5a6882" fontSize="10" fontFamily="Segoe UI">
-                {fmt(Math.round(v))}
+              <line x1={ml} y1={y} x2={ml + plotW} y2={y} stroke="#1e2438" strokeDasharray="4 5" />
+              <text x={ml - 8} y={y + 4} textAnchor="end" fill="#5a6882" fontSize="10" fontFamily="Segoe UI,system-ui,sans-serif">
+                {fmt(Math.round(max * (1 - i / 4)))}
               </text>
             </g>
           )
         })}
-        {/* Bars */}
-        {data.map((d, i) => {
-          const isToday = i === data.length - 1
-          const h = (d.value / max) * plotH
-          const x = ml + i * slotW + (slotW - barW) / 2
-          const y = mt + plotH - h
-          return (
-            <g
-              key={i}
-              onMouseEnter={() => setHover({ idx: i, x: x + barW / 2, y })}
-              onMouseLeave={() => setHover(null)}
-              style={{ cursor: 'pointer' }}
-            >
-              <rect x={x} y={y} width={barW} height={h} fill={isToday ? '#4f8ef7' : '#5b7fd4'} rx={2} />
-              <rect x={x} y={y} width={barW} height={2} fill={isToday ? '#d4f96a' : '#8aabef'} />
-            </g>
-          )
+
+        {/* Area */}
+        <path d={areaPath} fill="url(#areaGrad)" />
+
+        {/* Glow copy of line */}
+        <path d={linePath} fill="none" stroke="#4f8ef7" strokeWidth="5" strokeOpacity="0.15" strokeLinecap="round" />
+
+        {/* Main line */}
+        <path d={linePath} fill="none" stroke="#4f8ef7" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+
+        {/* Dots — always for ≤14 pts, only hovered otherwise */}
+        {pts.map((p, i) => {
+          const isLast = i === pts.length - 1
+          const isHov  = hover?.idx === i
+          const show   = data.length <= 14 || isHov || isLast
+          return show ? (
+            <circle key={i} cx={p.x} cy={p.y}
+              r={isHov ? 6 : isLast ? 4 : 3}
+              fill={isLast ? '#d4f96a' : '#4f8ef7'}
+              stroke="#0d1120" strokeWidth="2"
+            />
+          ) : null
         })}
-        {/* X-axis labels */}
+
+        {/* Invisible hover strips */}
+        {pts.map((p, i) => (
+          <rect key={i}
+            x={i === 0 ? ml : (p.x + pts[i - 1].x) / 2}
+            y={mt}
+            width={i === 0
+              ? pts.length > 1 ? (pts[1].x - p.x) / 2 : plotW
+              : i === pts.length - 1
+                ? p.x - (p.x + pts[i - 1].x) / 2
+                : (pts[i + 1].x - pts[i - 1].x) / 2}
+            height={plotH}
+            fill="transparent"
+            style={{ cursor: 'crosshair' }}
+            onMouseEnter={() => setHover({ idx: i })}
+            onMouseLeave={() => setHover(null)}
+          />
+        ))}
+
+        {/* Vertical cursor */}
+        {hoverPt && (
+          <line x1={hoverPt.x} y1={mt} x2={hoverPt.x} y2={mt + plotH}
+            stroke="#4f8ef7" strokeWidth="1" strokeDasharray="4 3" opacity="0.5"
+          />
+        )}
+
+        {/* X labels */}
         {data.map((d, i) => {
           if (i % labelStep !== 0 && i !== data.length - 1) return null
-          const x = ml + i * slotW + slotW / 2
           return (
-            <text key={i} x={x} y={mt + plotH + 18} textAnchor="middle" fill="#5a6882" fontSize="10" fontFamily="Segoe UI">
+            <text key={i} x={pts[i].x} y={mt + plotH + 18}
+              textAnchor="middle" fill="#5a6882" fontSize="10" fontFamily="Segoe UI,system-ui,sans-serif">
               {d.date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
             </text>
           )
         })}
       </svg>
+
       {/* Tooltip */}
-      {hover && (() => {
+      {hover !== null && hoverPt && (() => {
         const d = data[hover.idx]
         const prev = hover.idx > 0 ? data[hover.idx - 1].value : null
-        const variation = prev !== null && prev > 0 ? ((d.value - prev) / prev) * 100 : null
+        const delta = prev !== null ? d.value - prev : null
+        const pct   = prev && prev > 0 ? ((d.value - prev) / prev) * 100 : null
         return (
           <div
-            className="absolute pointer-events-none bg-[#1a1f2e] border border-accent rounded-lg px-3 py-2 text-[11px] text-text shadow-xl"
+            className="absolute pointer-events-none bg-[#131827] border border-accent/50 rounded-xl px-3 py-2.5 shadow-2xl"
             style={{
-              left: Math.min(Math.max(hover.x - 80, 4), w - 168),
-              top: Math.max(hover.y - 70, 4),
-              width: 160,
+              left: Math.min(Math.max(hoverPt.x - 80, ml), w - 172),
+              top: Math.max(hoverPt.y - 80, 4),
+              width: 164,
             }}
           >
-            <p className="font-bold mb-0.5">{d.date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
-            <p className="text-text2">Vues : <span className="text-text font-semibold">{fmt(d.value)}</span></p>
-            {variation !== null && (
-              <p className={variation >= 0 ? 'text-ok' : 'text-danger'}>
-                Variation : {variation >= 0 ? '+' : ''}{variation.toFixed(2)}%
+            <p className="text-[11px] font-bold text-text mb-1">
+              {d.date.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })}
+            </p>
+            <p className="text-text2 text-[11px]">Vues : <span className="text-accent font-semibold">{fmt(d.value)}</span></p>
+            {delta !== null && (
+              <p className={`text-[11px] font-semibold mt-0.5 ${delta >= 0 ? 'text-ok' : 'text-danger'}`}>
+                {delta >= 0 ? '▲' : '▼'} {fmt(Math.abs(delta))}
+                {pct !== null && <span className="font-normal text-text2"> ({pct >= 0 ? '+' : ''}{pct.toFixed(1)}%)</span>}
               </p>
             )}
           </div>
@@ -389,7 +459,7 @@ export function Dashboard({ user }: DashboardProps) {
           {loadingChart ? (
             <div className="flex justify-center py-12"><Spinner /></div>
           ) : (
-            <BarChart data={chartData} height={280} />
+            <LineChart data={chartData} height={280} />
           )}
         </div>
 

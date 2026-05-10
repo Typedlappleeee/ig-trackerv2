@@ -62,6 +62,9 @@ export function Autocomment({ user }: AutocommentProps) {
   const [running, setRunning]     = useState(false)
   const [logs, setLogs]           = useState<string[]>([])
   const stopRef                   = useRef(false)
+  const [replyMode, setReplyMode] = useState<'ai' | 'manual'>('ai')
+  const [manualReplies, setManualReplies] = useState<Record<string, string>>({})
+  const [sendingReply, setSendingReply]   = useState<string | null>(null)
 
   useEffect(() => {
     Promise.all([
@@ -72,6 +75,29 @@ export function Autocomment({ user }: AutocommentProps) {
       if (cfg.data?.groq_api_key) setGroqKey(cfg.data.groq_api_key)
     })
   }, [])
+
+  async function sendManualReply(comment: IgComment) {
+    const text = manualReplies[comment.pk]?.trim()
+    if (!text || !selectedPost || !selectedPhone?.ig_sessionid) return
+    setSendingReply(comment.pk)
+    try {
+      const r = await window.electronAPI?.postIgComment({
+        mediaId: selectedPost.id,
+        text,
+        sessionid: selectedPhone.ig_sessionid,
+      })
+      if (r?.ok) {
+        setComments(prev => prev.map(c => c.pk === comment.pk ? { ...c, replied: text } : c))
+        setManualReplies(prev => { const n = { ...prev }; delete n[comment.pk]; return n })
+        log(`✓ Réponse envoyée à @${comment.username}`)
+      } else {
+        log(`❌ Erreur envoi réponse: ${r?.error ?? 'unknown'}`)
+      }
+    } catch (e) {
+      log(`❌ Erreur: ${e instanceof Error ? e.message : String(e)}`)
+    }
+    setSendingReply(null)
+  }
 
   function log(msg: string) {
     const time = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
@@ -283,13 +309,35 @@ export function Autocomment({ user }: AutocommentProps) {
                 ) : comments.length === 0 ? (
                   <p className="text-text2 text-sm text-center py-10">Aucun commentaire chargé.</p>
                 ) : comments.map(c => (
-                  <div key={c.pk} className="bg-card border border-border rounded-lg p-3 space-y-1">
-                    <p className="text-xs font-semibold text-accent">@{c.username}</p>
+                  <div key={c.pk} className="bg-card border border-border rounded-lg p-3 space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <p className="text-xs font-semibold text-accent">@{c.username}</p>
+                      {c.replied && <span className="text-[10px] text-ok bg-ok/10 px-1.5 py-0.5 rounded">✓ Répondu</span>}
+                    </div>
                     <p className="text-sm text-text">{c.text}</p>
                     {c.replied && (
-                      <p className="text-xs text-ok flex items-start gap-1.5 mt-1">
-                        <span>✓</span><span className="flex-1">{c.replied}</span>
+                      <p className="text-xs text-ok/80 flex items-start gap-1.5 border-l-2 border-ok/30 pl-2">
+                        <span className="flex-1">{c.replied}</span>
                       </p>
+                    )}
+                    {replyMode === 'manual' && !c.replied && (
+                      <div className="flex gap-2 pt-1">
+                        <input
+                          type="text"
+                          value={manualReplies[c.pk] ?? ''}
+                          onChange={e => setManualReplies(prev => ({ ...prev, [c.pk]: e.target.value }))}
+                          onKeyDown={e => { if (e.key === 'Enter') sendManualReply(c) }}
+                          placeholder="Écrire une réponse…"
+                          className="flex-1 bg-bg border border-border rounded px-2 py-1 text-xs text-text placeholder:text-text2 focus:outline-none focus:border-accent"
+                        />
+                        <button
+                          onClick={() => sendManualReply(c)}
+                          disabled={!manualReplies[c.pk]?.trim() || sendingReply === c.pk}
+                          className="px-3 py-1 bg-accent hover:bg-accent/80 disabled:opacity-40 text-white text-xs rounded transition-colors"
+                        >
+                          {sendingReply === c.pk ? '…' : '↑'}
+                        </button>
+                      </div>
                     )}
                   </div>
                 ))}
@@ -299,6 +347,21 @@ export function Autocomment({ user }: AutocommentProps) {
 
           {/* Config bar */}
           <div className="border-t border-border bg-[#070a10] p-4 space-y-3">
+            {/* Mode toggle */}
+            <div className="flex items-center gap-2 pb-1">
+              <span className="text-[10px] uppercase tracking-wider text-text2 font-semibold">Mode réponse</span>
+              <div className="flex rounded-lg overflow-hidden border border-border ml-2">
+                <button
+                  onClick={() => setReplyMode('ai')}
+                  className={`px-3 py-1 text-xs transition-colors ${replyMode === 'ai' ? 'bg-accent text-white' : 'text-text2 hover:text-text'}`}
+                >🤖 IA Auto</button>
+                <button
+                  onClick={() => setReplyMode('manual')}
+                  className={`px-3 py-1 text-xs transition-colors ${replyMode === 'manual' ? 'bg-accent text-white' : 'text-text2 hover:text-text'}`}
+                >✍️ Manuel</button>
+              </div>
+            </div>
+            {replyMode === 'ai' && (<>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-[10px] uppercase tracking-wider text-text2 font-semibold block mb-1">Clé Groq API</label>
@@ -331,6 +394,7 @@ export function Autocomment({ user }: AutocommentProps) {
                 className="w-full bg-bg border border-border rounded px-3 py-2 text-xs text-text resize-none focus:outline-none focus:border-accent"
               />
             </div>
+            </>)}
             <div className="flex gap-2">
               {!running ? (
                 <Button size="sm" onClick={start} className="flex-1 !bg-ok hover:!bg-ok/80 !text-bg">▶ Démarrer</Button>

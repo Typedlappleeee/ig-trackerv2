@@ -68,3 +68,4 @@ export function pollNow() { poll() }
 export const getIntervalSec = () => _intervalSec
 export const getEnabled     = () => _enabled
 export const getBearer      = () => _bearer
+export const getLastPollMs  = () => _lastPoll

@@ -49,6 +49,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   fetchIgComments: (opts: { mediaId: string; sessionid: string; maxId?: string }) =>
     ipcRenderer.invoke('fetch-ig-comments', opts),
 
+  // Post a comment reply on an Instagram media
+  postIgComment: (opts: { mediaId: string; text: string; sessionid: string }) =>
+    ipcRenderer.invoke('post-ig-comment', opts),
+
   // Groq AI API call (returns chat completion)
   groqRequest: (opts: {
     apiKey: string

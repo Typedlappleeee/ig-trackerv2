@@ -337,7 +337,7 @@ export function Phones({ user }: PhonesProps) {
   const bearer = poller.getBearer()
 
   const phonesRef      = useRef<Phone[]>([])
-  const lastPollMsRef  = useRef(Date.now())
+  const lastPollMsRef  = useRef(poller.getLastPollMs() || Date.now())
   const countdownRef   = useRef<ReturnType<typeof setInterval> | null>(null)
   const lastDbSyncRef  = useRef<Date | null>(null)
   const lastIgSyncRef  = useRef<Date | null>(null)
