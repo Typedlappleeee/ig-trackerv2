@@ -12,7 +12,7 @@ let _chordIdx = 0
 const LS_ENABLED = 'ig-music-enabled'
 const LS_TRACK   = 'ig-music-track'   // '0'–'3'
 const LS_VOLUME  = 'ig-music-volume'  // '0.0'–'1.0'
-const DEFAULT_VOL = 0.25
+const DEFAULT_VOL = 0.10              // 10 % par défaut
 
 // ── Track metadata (shown in Settings) ───────────────────────────────────────
 
@@ -20,7 +20,7 @@ export interface TrackMeta { id: number; name: string; emoji: string; desc: stri
 
 export const TRACKS: TrackMeta[] = [
   { id: 0, name: 'Lo-Fi Chill',  emoji: '☕', desc: 'Am7 · Fmaj7 · Cmaj7 · G7 — chaleureux, cozy' },
-  { id: 1, name: 'Rap Français', emoji: '🎤', desc: 'Am · F · C · G — trap 100 BPM, 808, dark' },
+  { id: 1, name: 'Trap Beat',    emoji: '🥁', desc: 'Am · F · C · G — 100 BPM, 808, instrumental' },
   { id: 2, name: 'Synthwave',    emoji: '🌆', desc: 'Dm7 · Bb · Fmaj7 · C7 — rétro, électronique' },
   { id: 3, name: '67',           emoji: '🔥', desc: 'Gm · Cm · Dm · Eb — UK drill, 67 BPM, lourd' },
 ]
@@ -304,14 +304,27 @@ export function startMusic() {
   loop()
 }
 
+// Kill all scheduled oscillators by closing (and nullifying) the AudioContext.
+// A new context will be created automatically by getCtx() on next startMusic().
+function killCtx(fadeSecs: number) {
+  if (!_ctx || !_master) { _ctx = null; _master = null; return }
+  const dying = _ctx
+  _ctx = null; _master = null
+  // Fade out, then hard-close — terminates every pending oscillator
+  try {
+    dying.destination.channelCount  // still open?
+    const g = dying.createGain()
+    g.connect(dying.destination)
+    g.gain.setValueAtTime(savedVol(), dying.currentTime)
+    g.gain.linearRampToValueAtTime(0, dying.currentTime + fadeSecs)
+  } catch { /* already closed */ }
+  setTimeout(() => dying.close().catch(() => {}), Math.ceil((fadeSecs + 0.15) * 1000))
+}
+
 export function stopMusic(instant = false) {
   _running = false
   if (_timer) { clearTimeout(_timer); _timer = null }
-  if (!_ctx || !_master) return
-  const fade = instant ? 0.15 : 3.0
-  _master.gain.cancelScheduledValues(_ctx.currentTime)
-  _master.gain.setValueAtTime(_master.gain.value, _ctx.currentTime)
-  _master.gain.linearRampToValueAtTime(0, _ctx.currentTime + fade)
+  killCtx(instant ? 0.05 : 2.5)
 }
 
 /** Change volume instantly (0–1). Persisted. */
@@ -327,12 +340,14 @@ export function setVolume(v: number) {
 
 export function getVolume(): number { return savedVol() }
 
-/** Switch track with crossfade. Persisted. */
+/** Switch track: hard-stop current (300 ms fade + context close), then restart. */
 export function setTrack(idx: number) {
   localStorage.setItem(LS_TRACK, String(idx))
-  if (!_running) return
-  stopMusic()
-  setTimeout(() => startMusic(), 3100)
+  const wasRunning = _running
+  _running = false
+  if (_timer) { clearTimeout(_timer); _timer = null }
+  killCtx(0.3)                               // fast fade, then ctx is destroyed
+  if (wasRunning) setTimeout(() => startMusic(), 550)  // fresh ctx, new track
 }
 
 export function getTrack(): number { return savedTrack() }
