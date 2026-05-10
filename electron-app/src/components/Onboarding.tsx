@@ -85,12 +85,14 @@ export function Onboarding({ user, onComplete }: OnboardingProps) {
   async function finish() {
     if (!bearer.trim()) return
     setSaving(true); setSaveErr(null)
+    const now = new Date().toISOString()
     const { error } = await supabase.from('app_config').upsert({
       user_id:      user.id,
       bearer_token: bearer.trim(),
       groq_api_key: groqKey.trim(),
       theme:        'Bleu',
-      updated_at:   new Date().toISOString(),
+      onboarded_at: now,
+      updated_at:   now,
     }, { onConflict: 'user_id' })
     setSaving(false)
     if (error) {
@@ -106,6 +108,32 @@ export function Onboarding({ user, onComplete }: OnboardingProps) {
     onComplete()
   }
 
+  // Skip the wizard entirely: still mark the account as onboarded so we never
+  // re-prompt. The user can configure their keys later in Settings → Connexions.
+  async function skip() {
+    setSaving(true); setSaveErr(null)
+    const now = new Date().toISOString()
+    const { error } = await supabase.from('app_config').upsert({
+      user_id:      user.id,
+      onboarded_at: now,
+      updated_at:   now,
+    }, { onConflict: 'user_id' })
+    setSaving(false)
+    if (error) {
+      // Tolerate the column being missing on legacy schemas — fall back to a
+      // light-touch upsert so the user can still pass the wizard.
+      if (/onboarded_at/i.test(error.message)) {
+        await supabase.from('app_config').upsert({
+          user_id: user.id, theme: 'Bleu', updated_at: now,
+        }, { onConflict: 'user_id' })
+      } else {
+        setSaveErr(`Impossible de sauvegarder : ${error.message}.`)
+        return
+      }
+    }
+    onComplete()
+  }
+
   // ── Helpers ───────────────────────────────────────────────────────────────
   function StateIcon({ s }: { s: TestState }) {
     if (s === 'testing') return <span className="animate-spin text-accent">↻</span>
@@ -117,7 +145,17 @@ export function Onboarding({ user, onComplete }: OnboardingProps) {
   const stepLabels = ['GéeLark', 'Groq IA', 'Terminé']
 
   return (
-    <div className="min-h-screen bg-bg flex items-center justify-center p-6">
+    <div className="min-h-screen bg-bg flex items-center justify-center p-6 relative">
+      {/* Skip link — top right, always visible */}
+      <button
+        onClick={skip}
+        disabled={saving}
+        className="absolute top-4 right-6 text-xs text-text2 hover:text-text underline underline-offset-2"
+        title="Passer cette configuration. Tu pourras la faire plus tard dans Paramètres → Connexions."
+      >
+        Ignorer pour l'instant →
+      </button>
+
       <div className="w-full max-w-lg space-y-6">
 
         {/* Logo + title */}

@@ -157,15 +157,17 @@ function AppContent({ user }: { user: User }) {
   const [lastRefresh, setLastRefresh]       = useState<Date | null>(null)
   const [refreshTick, setRefreshTick]       = useState(0)
 
-  // Onboarding gate: existence of *any* bearer (solo or org) means setup is done.
-  // We still check app_config here because in solo mode that's where it lives.
+  // Onboarding gate: only shown once per account, never again — even if the
+  // user skipped without entering a bearer. We mark completion via
+  // app_config.onboarded_at and fall back to bearer presence for legacy users
+  // who finished onboarding before this column existed.
   useEffect(() => {
-    supabase.from('app_config').select('bearer_token').eq('user_id', user.id).maybeSingle()
+    supabase.from('app_config').select('bearer_token, onboarded_at').eq('user_id', user.id).maybeSingle()
       .then(({ data, error }) => {
         if (error) console.error('[app_config] read error:', error)
-        const hasBearer = !!data?.bearer_token
-        setOnboarding(!hasBearer)
-        if (hasBearer && !localStorage.getItem(BETA_KEY)) setShowBeta(true)
+        const finished = !!(data && (data.onboarded_at || data.bearer_token))
+        setOnboarding(!finished)
+        if (finished && !localStorage.getItem(BETA_KEY)) setShowBeta(true)
       })
   }, [user.id])
 

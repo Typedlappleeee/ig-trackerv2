@@ -112,6 +112,8 @@ ALTER TABLE public.app_config ADD COLUMN IF NOT EXISTS ig_sessionid  text;
 ALTER TABLE public.app_config ADD COLUMN IF NOT EXISTS push_port     integer DEFAULT 8765;
 ALTER TABLE public.app_config ADD COLUMN IF NOT EXISTS notify_popup  boolean DEFAULT true;
 ALTER TABLE public.app_config ADD COLUMN IF NOT EXISTS notify_sound  boolean DEFAULT true;
+-- Marqueur "onboarding terminé" — peut être set sans bearer (skip).
+ALTER TABLE public.app_config ADD COLUMN IF NOT EXISTS onboarded_at  timestamptz;
 
 
 -- ╔══════════════════════════════════════════════════════════════╗
