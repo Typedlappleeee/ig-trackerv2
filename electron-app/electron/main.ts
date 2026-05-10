@@ -614,34 +614,62 @@ ipcMain.handle('groq-request', async (_event, opts: {
 
 // ── IPC: fetch Instagram comments for a media ID ─────────────────────────────
 ipcMain.handle('fetch-ig-comments', async (_event, opts: { mediaId: string; sessionid: string; maxId?: string }) => {
+  const extractComments = (data: Record<string, unknown>): Array<Record<string, unknown>> => {
+    const candidates: unknown[] = [data['comments'], data['preview_comments']]
+    // Threading: data.comments may have { node: {...} } structure
+    for (const c of candidates) {
+      if (Array.isArray(c) && c.length > 0) {
+        // Unwrap edge.node if present
+        return c.map((item) => {
+          const obj = item as Record<string, unknown>
+          if (obj['node'] && typeof obj['node'] === 'object') return obj['node'] as Record<string, unknown>
+          return obj
+        })
+      }
+    }
+    return []
+  }
+  const mapComments = (raw: Array<Record<string, unknown>>) => raw.map(c => ({
+    pk:        String(c['pk'] ?? c['id'] ?? ''),
+    text:      String(c['text'] ?? ''),
+    username:  String((c['user'] as Record<string, unknown>)?.['username'] ?? (c['owner'] as Record<string, unknown>)?.['username'] ?? ''),
+    timestamp: c['created_at'] ? new Date((c['created_at'] as number) * 1000).toISOString() : '',
+    likeCount: (c['comment_like_count'] as number) ?? 0,
+  }))
+
   try {
+    // ── Attempt 1: i.instagram private API, threading mode ────────────────────
     let url = `https://i.instagram.com/api/v1/media/${opts.mediaId}/comments/?can_support_threading=true&permalink_enabled=false`
     if (opts.maxId) url += `&max_id=${opts.maxId}`
     let res = await igSessionFetch(url, opts.sessionid)
-    console.log('[fetch-ig-comments] mediaId=', opts.mediaId, 'status=', res.status)
-    // Fallback: try the simpler endpoint without query params (some accounts/media reject the threading variant)
-    if (res.status !== 200) {
+    console.log('[fetch-ig-comments] A i.instagram threading status=', res.status, 'mediaId=', opts.mediaId)
+    let raw = res.status === 200 && res.data ? extractComments(res.data as Record<string, unknown>) : []
+
+    // ── Attempt 2: i.instagram private API, simple variant ────────────────────
+    if (raw.length === 0) {
       const url2 = `https://i.instagram.com/api/v1/media/${opts.mediaId}/comments/${opts.maxId ? `?max_id=${opts.maxId}` : ''}`
       const res2 = await igSessionFetch(url2, opts.sessionid)
-      console.log('[fetch-ig-comments] fallback status=', res2.status)
+      console.log('[fetch-ig-comments] B i.instagram simple status=', res2.status, 'keys=', res2.data ? Object.keys(res2.data as object).slice(0, 12) : null)
+      if (res2.status === 200 && res2.data) raw = extractComments(res2.data as Record<string, unknown>)
       if (res2.status === 200) res = res2
-      else return { ok: false, error: `HTTP ${res.status} / fallback HTTP ${res2.status}` }
     }
-    const data = res.data as Record<string, unknown>
-    // Comments may be under "comments" or, in threading mode, under "preview_comments" / "caption_is_edited"+items
-    let rawComments = (data['comments'] as Array<Record<string, unknown>>) ?? []
-    if (rawComments.length === 0 && Array.isArray(data['preview_comments'])) {
-      rawComments = data['preview_comments'] as Array<Record<string, unknown>>
+
+    // ── Attempt 3: www.instagram private API ──────────────────────────────────
+    if (raw.length === 0) {
+      const url3 = `https://www.instagram.com/api/v1/media/${opts.mediaId}/comments/${opts.maxId ? `?max_id=${opts.maxId}` : ''}`
+      const res3 = await igSessionFetch(url3, opts.sessionid)
+      console.log('[fetch-ig-comments] C www.instagram status=', res3.status, 'keys=', res3.data ? Object.keys(res3.data as object).slice(0, 12) : null)
+      if (res3.status === 200 && res3.data) raw = extractComments(res3.data as Record<string, unknown>)
+      if (res3.status === 200) res = res3
     }
-    console.log('[fetch-ig-comments] raw count=', rawComments.length, 'top-level keys=', Object.keys(data).slice(0, 12))
-    const comments = rawComments.map(c => ({
-      pk:        String(c['pk'] ?? ''),
-      text:      String(c['text'] ?? ''),
-      username:  String((c['user'] as Record<string, unknown>)?.['username'] ?? ''),
-      timestamp: c['created_at'] ? new Date((c['created_at'] as number) * 1000).toISOString() : '',
-      likeCount: (c['comment_like_count'] as number) ?? 0,
-    }))
-    return { ok: true, comments, hasMore: !!(data['next_max_id']) }
+
+    if (raw.length === 0 && res.status === 200) {
+      // Log a preview of the response so we can see what IG is actually returning
+      const preview = JSON.stringify(res.data).slice(0, 400)
+      console.log('[fetch-ig-comments] no comments extracted. preview=', preview)
+    }
+
+    return { ok: true, comments: mapComments(raw), hasMore: !!(((res.data ?? {}) as Record<string, unknown>)['next_max_id']) }
   } catch (err: unknown) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) }
   }
