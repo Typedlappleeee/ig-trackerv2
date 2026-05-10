@@ -176,34 +176,40 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
 
   return (
     <div className="min-h-screen bg-bg flex">
-      <aside className="w-[230px] flex-shrink-0 flex flex-col border-r border-border bg-sb-bg">
+      <aside className="w-[230px] flex-shrink-0 flex flex-col border-r border-border/60 bg-sb-bg">
         {/* Logo */}
-        <div className="px-4 py-4 flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center text-base font-bold bg-accent text-white shadow-lg shadow-accent/20">
+        <div className="px-4 py-4 flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center text-base font-bold bg-gradient-to-br from-accent to-accent2 text-white shadow-lg shadow-accent/30 flex-shrink-0">
             📱
           </div>
           <div className="flex-1 min-w-0">
-            <p className="font-bold text-[13px] text-text leading-tight">IG Tracker</p>
-            <p className="text-[10px] text-ok flex items-center gap-1 leading-tight">
-              <span className="w-1.5 h-1.5 rounded-full bg-ok inline-block" />
+            <p className="font-bold text-[13px] text-text leading-tight tracking-tight">IG Tracker</p>
+            <p className="text-[10px] text-ok flex items-center gap-1.5 leading-tight mt-0.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-ok inline-block anim-pulse" />
               actif
             </p>
           </div>
         </div>
 
+        {/* Divider */}
+        <div className="mx-3 h-px bg-gradient-to-r from-transparent via-border/60 to-transparent mb-1" />
+
         {/* Nav sections */}
-        <nav className="flex-1 overflow-auto pt-1">
+        <nav className="flex-1 overflow-auto pt-1 pb-2">
           {NAV_SECTIONS.map(section => {
             const visibleItems = section.items.filter(it => isVisibleTab(it.id))
             if (visibleItems.length === 0) return null
             const isOpen = openSections[section.title]
             return (
-              <div key={section.title} className="mb-0.5">
+              <div key={section.title} className="mb-1">
                 <button
                   onClick={() => toggleSection(section.title)}
-                  className="w-full flex items-center gap-1.5 px-4 py-1.5 text-[10px] font-bold text-sb-section uppercase tracking-widest hover:text-text2 transition-colors"
+                  className="w-full flex items-center gap-1.5 px-4 py-1.5 text-[9px] font-bold text-sb-section/70 uppercase tracking-[0.12em] hover:text-sb-section transition-colors"
                 >
-                  <span className="w-3 inline-block transition-transform" style={{ transform: isOpen ? 'rotate(0deg)' : 'rotate(-90deg)' }}>▾</span>
+                  <span
+                    className="w-3 inline-block transition-transform duration-200"
+                    style={{ transform: isOpen ? 'rotate(0deg)' : 'rotate(-90deg)' }}
+                  >▾</span>
                   <span className="flex-1 text-left">{section.title}</span>
                 </button>
                 {isOpen && (
@@ -215,18 +221,25 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
                           key={item.id}
                           onClick={() => onNavigate(item.id)}
                           className={`
-                            relative w-full flex items-center gap-2.5 pl-3 pr-2 py-2 rounded-md text-[13px] transition-all duration-150 text-left
-                            ${active ? 'bg-sb-active text-sb-text-act' : 'text-sb-text hover:bg-sb-hover hover:text-sb-text-act'}
+                            relative w-full flex items-center gap-2.5 pl-3 pr-2 py-2 rounded-lg text-[13px] text-left
+                            transition-all duration-150
+                            active:scale-[0.98]
+                            ${active
+                              ? 'bg-accent/12 text-sb-text-act shadow-[inset_0_0_0_1px_rgba(79,142,247,0.15)]'
+                              : 'text-sb-text hover:bg-sb-hover/80 hover:text-sb-text-act'}
                           `}
                         >
-                          {/* Left accent indicator */}
-                          {active && <span className="absolute left-0 top-1.5 bottom-1.5 w-[3px] bg-accent rounded-r" />}
-                          <span className={`text-base w-5 text-center flex-shrink-0 ${active ? 'text-accent' : 'text-sb-icon'}`}>
+                          {/* Active left bar */}
+                          <span className={`
+                            absolute left-0 top-2 bottom-2 w-[3px] rounded-r-full transition-all duration-200
+                            ${active ? 'bg-accent opacity-100' : 'opacity-0'}
+                          `} />
+                          <span className={`text-base w-5 text-center flex-shrink-0 transition-transform duration-150 ${active ? 'text-accent scale-110' : 'text-sb-icon'}`}>
                             {item.icon}
                           </span>
-                          <span className={active ? 'font-semibold' : 'font-medium'}>{item.label}</span>
+                          <span className={`flex-1 ${active ? 'font-semibold' : 'font-medium'}`}>{item.label}</span>
                           {item.beta && (
-                            <span className="ml-auto text-[8px] font-bold uppercase bg-[#e0245e]/90 text-white px-1.5 py-0.5 rounded">BETA</span>
+                            <span className="text-[8px] font-bold uppercase bg-[#e0245e] text-white px-1.5 py-0.5 rounded-md tracking-wide">BETA</span>
                           )}
                         </button>
                       )
@@ -336,38 +349,51 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
         </button>
       </aside>
 
-      <main className="flex-1 overflow-auto relative">
-        {/* Overlay during org switch to prevent stale-scope content flash */}
+      <main className="flex-1 overflow-auto relative bg-bg">
+        {/* Org-switch loading overlay */}
         {orgLoading && (
-          <div className="absolute inset-0 z-50 bg-bg/80 backdrop-blur-sm flex items-center justify-center">
-            <div className="flex flex-col items-center gap-3 text-text2">
-              <svg className="animate-spin w-6 h-6 text-accent" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
-              </svg>
-              <span className="text-xs">Chargement du contexte…</span>
+          <div className="absolute inset-0 z-50 bg-bg/85 backdrop-blur-sm flex items-center justify-center">
+            <div className="flex flex-col items-center gap-4 anim-scale-in">
+              <div className="w-12 h-12 rounded-2xl bg-accent/10 border border-accent/20 flex items-center justify-center">
+                <svg className="animate-spin w-5 h-5 text-accent" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-20" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3"/>
+                  <path className="opacity-80" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                </svg>
+              </div>
+              <p className="text-xs text-text2 font-medium tracking-wide">Chargement du contexte…</p>
             </div>
           </div>
         )}
+
+        {/* Permission denied screen */}
         {!orgLoading && !isVisibleTab(page) ? (
-          <div className="flex flex-col items-center justify-center h-full min-h-[60vh] gap-5 text-center px-8">
-            <div className="w-16 h-16 rounded-2xl bg-danger/10 border border-danger/20 flex items-center justify-center text-3xl">🔒</div>
-            <div className="space-y-2">
-              <h2 className="text-xl font-bold text-text">Accès refusé</h2>
-              <p className="text-text2 text-sm max-w-xs">
-                Vous n'avez pas la permission d'accéder à cet onglet dans l'organisation <strong className="text-text">"{currentOrg?.name}"</strong>.
+          <div className="flex flex-col items-center justify-center h-full min-h-[60vh] gap-6 text-center px-8 anim-scale-in">
+            <div className="relative">
+              <div className="w-20 h-20 rounded-3xl bg-danger/8 border border-danger/15 flex items-center justify-center">
+                <span className="text-4xl">🔒</span>
+              </div>
+              <div className="absolute -inset-3 rounded-[32px] bg-danger/5 -z-10" />
+            </div>
+            <div className="space-y-2.5 max-w-sm">
+              <h2 className="text-2xl font-bold text-text">Accès refusé</h2>
+              <p className="text-text2 text-sm leading-relaxed">
+                Vous n'avez pas la permission d'accéder à cet onglet dans l'organisation{' '}
+                <strong className="text-text font-semibold">"{currentOrg?.name}"</strong>.
               </p>
-              <p className="text-text2/60 text-xs">Contactez un administrateur pour modifier vos droits.</p>
+              <p className="text-text2/50 text-xs">Contactez un administrateur pour modifier vos droits d'accès.</p>
             </div>
             <button
               onClick={() => onNavigate('dashboard')}
-              className="px-5 py-2 bg-accent hover:bg-accent2 text-white text-sm font-semibold rounded-xl transition-colors"
+              className="px-6 py-2.5 bg-accent hover:bg-accent2 active:scale-95 text-white text-sm font-semibold rounded-xl transition-all shadow-[0_2px_12px_-3px_rgba(79,142,247,0.5)]"
             >
               Retour au Dashboard
             </button>
           </div>
         ) : (
-          children
+          /* key forces re-mount (and re-animation) on every page change */
+          <div key={page} className="anim-page h-full">
+            {children}
+          </div>
         )}
       </main>
 
@@ -380,7 +406,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             style={{ background: 'transparent' }}
           />
           <div
-            className="fixed z-[9999] bg-surface border border-border rounded-lg shadow-2xl overflow-hidden"
+            className="fixed z-[9999] bg-surface border border-border rounded-xl shadow-2xl overflow-hidden anim-slide-down"
             style={{ left: orgMenuPos.left, bottom: orgMenuPos.bottom, width: orgMenuPos.width }}
           >
             <button
@@ -417,7 +443,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             style={{ background: 'transparent' }}
           />
           <div
-            className="fixed z-[9999] bg-surface border border-border rounded-lg shadow-2xl overflow-hidden"
+            className="fixed z-[9999] bg-surface border border-border rounded-xl shadow-2xl overflow-hidden anim-slide-down"
             style={{ left: userMenuPos.left, bottom: userMenuPos.bottom, width: Math.max(userMenuPos.width, 240) }}
           >
             {/* Current account */}
