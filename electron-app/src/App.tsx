@@ -147,12 +147,13 @@ import { FullPageLoader }    from '@/components/ui/Spinner'
 const BETA_KEY = 'ig-tracker-beta-v2-seen'
 
 function AppContent({ user }: { user: User }) {
-  const [page, setPage]               = useState<Page>('dashboard')
-  const [onboarding, setOnboarding]   = useState<boolean | null>(null)
-  const [showBeta, setShowBeta]       = useState(false)
-  const [phoneCount, setPhoneCount]   = useState(0)
-  const [lastRefresh, setLastRefresh] = useState<Date | null>(null)
-  const [refreshTick, setRefreshTick] = useState(0)
+  const [page, setPage]                     = useState<Page>('dashboard')
+  const [settingsPanel, setSettingsPanel]   = useState<string | undefined>(undefined)
+  const [onboarding, setOnboarding]         = useState<boolean | null>(null)
+  const [showBeta, setShowBeta]             = useState(false)
+  const [phoneCount, setPhoneCount]         = useState(0)
+  const [lastRefresh, setLastRefresh]       = useState<Date | null>(null)
+  const [refreshTick, setRefreshTick]       = useState(0)
 
   useEffect(() => {
     supabase.from('app_config').select('bearer_token').eq('user_id', user.id).single()
@@ -176,6 +177,11 @@ function AppContent({ user }: { user: User }) {
     setShowBeta(false)
   }
 
+  function handleNavigate(p: Page, tab?: string) {
+    setPage(p)
+    setSettingsPanel(tab)
+  }
+
   function handleRefresh() {
     setLastRefresh(new Date())
     setRefreshTick(t => t + 1)
@@ -195,7 +201,7 @@ function AppContent({ user }: { user: User }) {
       case 'autocomment':  return <Autocomment user={user} />
       case 'montage':      return <Montage     user={user} />
       case 'aitools':      return <AiTools     user={user} />
-      case 'settings':     return <Settings    user={user} />
+      case 'settings':     return <Settings    user={user} initialPanel={settingsPanel as any} />
     }
   })()
 
@@ -205,7 +211,7 @@ function AppContent({ user }: { user: User }) {
       <Layout
         user={user}
         page={page}
-        onNavigate={setPage}
+        onNavigate={handleNavigate}
         onRefresh={handleRefresh}
         phoneCount={phoneCount}
         lastRefresh={lastRefresh}

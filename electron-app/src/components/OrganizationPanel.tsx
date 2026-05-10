@@ -70,18 +70,20 @@ export function OrganizationPanel({ user }: Props) {
   async function createOrg() {
     if (!newName.trim()) return
     setBusy(true)
-    const { data, error } = await supabase
-      .from('organizations')
-      .insert({ name: newName.trim(), owner_id: user.id })
-      .select()
-      .single()
+    const { data, error } = await supabase.rpc('create_org', { p_name: newName.trim() })
     setBusy(false)
-    if (error) { flash(error.message, true); return }
+    if (error) {
+      const msg = /not_authenticated/.test(error.message) ? 'Non authentifié — reconnecte-toi'
+                : /name_required/.test(error.message)     ? 'Le nom est requis'
+                : error.message
+      flash(msg, true)
+      return
+    }
     flash('Organisation créée ✓')
     setNewName('')
     setCreating(false)
     await refresh()
-    if (data) switchOrg(data.id)
+    if (data) switchOrg(data as string)
   }
 
   async function deleteOrg(org: Organization) {

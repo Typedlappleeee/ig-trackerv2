@@ -1,11 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/Button'
 import { Input }  from '@/components/ui/Input'
 import { OrganizationPanel } from '@/components/OrganizationPanel'
-
-interface SettingsProps { user: User }
 
 // All 8 themes from Python THEMES dict (line 29-39)
 const THEMES = ['Lime', 'Bleu', 'Violet', 'Ambre', 'Rouge', 'Cyan', 'Rose', 'Vert'] as const
@@ -20,11 +18,11 @@ const THEME_COLORS: Record<string, string> = {
   Vert:   '#2dde78',
 }
 
-type Panel = 'general' | 'profile' | 'organization' | 'connexions'
 type GeneralTab = 'apparence' | 'notifications' | 'langue'
 
-export function Settings({ user }: SettingsProps) {
-  const [panel, setPanel]     = useState<Panel>('general')
+export function Settings({ user, initialPanel }: SettingsProps) {
+  const [panel, setPanel]     = useState<Panel>(initialPanel ?? 'general')
+  const mountedRef             = useRef(false)
   const [genTab, setGenTab]   = useState<GeneralTab>('apparence')
   const [saving, setSaving]   = useState(false)
   const [saved, setSaved]     = useState(false)
@@ -66,6 +64,11 @@ export function Settings({ user }: SettingsProps) {
   const [groqKey, setGroqKey] = useState('')
   const [igSession, setIgSession] = useState('')
   const [showIgSession, setShowIgSession] = useState(false)
+
+  useEffect(() => {
+    if (!mountedRef.current) { mountedRef.current = true; return }
+    if (initialPanel) setPanel(initialPanel)
+  }, [initialPanel])
 
   useEffect(() => {
     supabase.from('app_config').select('*').eq('user_id', user.id).single()

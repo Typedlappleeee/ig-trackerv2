@@ -13,7 +13,7 @@ export type Page =
 interface LayoutProps {
   user:      User
   page:      Page
-  onNavigate:(page: Page) => void
+  onNavigate:(page: Page, settingsTab?: string) => void
   onRefresh?:() => void          // optional global refresh (called by sidebar ↺ button)
   phoneCount?: number
   lastRefresh?: Date | null
@@ -319,7 +319,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
               </button>
             ))}
             <button
-              onClick={() => { setOrgMenuOpen(false); onNavigate('settings') }}
+              onClick={() => { setOrgMenuOpen(false); onNavigate('settings', 'organization') }}
               className="w-full px-3 py-2 text-[11px] text-text2 hover:bg-surface2 border-t border-border text-left"
             >
               ⚙ Gérer les organisations
