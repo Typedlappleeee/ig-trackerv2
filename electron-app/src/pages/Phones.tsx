@@ -229,10 +229,10 @@ function SessionDialog({
 
 // ── Context menu ─────────────────────────────────────────────────────────────
 function ContextMenu({
-  phone, x, y, onClose, onSession, onUnlink, onDelete,
+  phone, x, y, onClose, onSession, onUnlink, onDelete, canDelete,
 }: {
   phone: Phone; x: number; y: number; onClose: () => void
-  onSession: () => void; onUnlink: () => void; onDelete: () => void
+  onSession: () => void; onUnlink: () => void; onDelete: () => void; canDelete: boolean
 }) {
   const menuRef = useRef<HTMLDivElement>(null)
 
@@ -273,8 +273,7 @@ function ContextMenu({
       </div>
       {item('🔑', 'Session ID', onSession)}
       {phone.ig_username && item('✂️', 'Délier Instagram', onUnlink)}
-      <div className="border-t border-border my-1" />
-      {item('🗑', 'Supprimer', onDelete, true)}
+      {canDelete && <><div className="border-t border-border my-1" />{item('🗑', 'Supprimer', onDelete, true)}</>}
     </div>
   )
 }
@@ -582,8 +581,11 @@ export function Phones({ user }: PhonesProps) {
       setPhones(prev => prev.map(p => p.id === id ? { ...p, ig_username: null, ig_sessionid: null, ig_status: null } : p))
   }
 
-  // ── Delete phone ─────────────────────────────────────────────────────────
+  // ── Delete phone — owner/admin only in org mode ──────────────────────────
+  const canDelete = !currentOrg || role === 'owner' || role === 'admin'
+
   async function deletePhone(id: string) {
+    if (!canDelete) return
     if (!confirm('Supprimer ce téléphone ?')) return
     const { error: err } = await supabase.from('phones').delete().eq('id', id)
     if (!err) setPhones(prev => prev.filter(p => p.id !== id))
@@ -664,6 +666,7 @@ export function Phones({ user }: PhonesProps) {
           onSession={() => setSessionDialog({ phone: contextMenu.phone })}
           onUnlink={() => unlinkIg(contextMenu.phone.id)}
           onDelete={() => deletePhone(contextMenu.phone.id)}
+          canDelete={canDelete}
         />
       )}
 
