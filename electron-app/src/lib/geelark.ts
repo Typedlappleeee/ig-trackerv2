@@ -51,9 +51,10 @@ export async function fetchAllPhones(bearer: string): Promise<GeelarkPhone[]> {
   return items
 }
 
-// GéeLark: 0=stopped, 1=running. 2=starting, 3=stopping → transitional states shown as offline.
+// GéeLark: 0=stopped, 1=running, 2=starting, 3=stopping
+// Treat 1 and 2 as online (phone is up or booting)
 export function geelarkStatusLabel(status: number): string {
-  return status === 1 ? 'online' : 'offline'
+  return (status === 1 || status === 2) ? 'online' : 'offline'
 }
 
 // Lightweight: fetch only the status of all phones (same endpoint, minimal processing)

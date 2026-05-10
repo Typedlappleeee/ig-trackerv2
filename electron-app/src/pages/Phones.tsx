@@ -292,10 +292,14 @@ export function Phones({ user }: PhonesProps) {
   const [filter, setFilter]           = useState<'all' | 'online' | 'offline'>('all')
   const [search, setSearch]           = useState('')
   const [bearer, setBearer]           = useState('')
-  const [intervalSec, setIntervalSec] = useState(60)
+  const [intervalSec, setIntervalSec] = useState<number>(() => {
+    try { return parseInt(localStorage.getItem('phones-interval') ?? '60') || 60 } catch { return 60 }
+  })
   const [countdown, setCountdown]     = useState(0)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
-  const [autoRefresh, setAutoRefresh] = useState(true)
+  const [autoRefresh, setAutoRefresh] = useState<boolean>(() => {
+    try { return localStorage.getItem('phones-autorefresh') !== 'false' } catch { return true }
+  })
   const [pollError, setPollError]     = useState<string | null>(null)
 
   const [contextMenu, setContextMenu]   = useState<{ phone: Phone; x: number; y: number } | null>(null)
@@ -315,7 +319,14 @@ export function Phones({ user }: PhonesProps) {
   useEffect(() => {
     supabase
       .from('app_config').select('bearer_token').eq('user_id', user.id).single()
-      .then(({ data }) => { if (data?.bearer_token) setBearer(data.bearer_token) })
+      .then(({ data }) => {
+        if (data?.bearer_token) {
+          setBearer(data.bearer_token)
+          bearerRef.current = data.bearer_token
+          // Poll status immediately on load — don't wait for the first interval tick
+          setTimeout(() => pollStatus(), 500)
+        }
+      })
     loadPhones()
   }, [])
 
@@ -429,6 +440,7 @@ export function Phones({ user }: PhonesProps) {
   function changeInterval(sec: number) {
     setIntervalSec(sec)
     setCountdown(sec)
+    localStorage.setItem('phones-interval', String(sec))
     if (autoRefresh) startAutoRefresh(sec)
   }
 
@@ -655,7 +667,7 @@ export function Phones({ user }: PhonesProps) {
         <span className="text-xs font-medium text-text">Auto-statut</span>
 
         <button
-          onClick={() => setAutoRefresh(v => !v)}
+          onClick={() => setAutoRefresh(v => { localStorage.setItem('phones-autorefresh', String(!v)); return !v })}
           className={`relative w-8 h-4 rounded-full transition-colors ${autoRefresh ? 'bg-accent' : 'bg-surface2'}`}
         >
           <span className={`absolute top-0.5 w-3 h-3 bg-white rounded-full shadow transition-all ${autoRefresh ? 'left-[18px]' : 'left-0.5'}`} />
