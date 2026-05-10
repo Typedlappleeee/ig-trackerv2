@@ -228,10 +228,10 @@ function SessionDialog({
 
 // ── Context menu ─────────────────────────────────────────────────────────────
 function ContextMenu({
-  phone, x, y, onClose, onLinkIg, onSession, onUnlink, onDelete,
+  phone, x, y, onClose, onSession, onUnlink, onDelete,
 }: {
   phone: Phone; x: number; y: number; onClose: () => void
-  onLinkIg: () => void; onSession: () => void; onUnlink: () => void; onDelete: () => void
+  onSession: () => void; onUnlink: () => void; onDelete: () => void
 }) {
   const menuRef = useRef<HTMLDivElement>(null)
 
@@ -270,7 +270,6 @@ function ContextMenu({
         <p className="text-xs font-semibold text-text truncate">{phone.phone_name}</p>
         {phone.ig_username && <p className="text-[10px] text-accent">@{phone.ig_username}</p>}
       </div>
-      {item('🔗', 'Lier Instagram', onLinkIg)}
       {item('🔑', 'Session ID', onSession)}
       {phone.ig_username && item('✂️', 'Délier Instagram', onUnlink)}
       <div className="border-t border-border my-1" />
@@ -323,6 +322,48 @@ function IgCell({ phone, onSave }: { phone: Phone; onSave: (id: string, u: strin
   )
 }
 
+// ── Inline note (remark) edit ─────────────────────────────────────────────────
+function NoteCell({ phone, onSave }: { phone: Phone; onSave: (id: string, v: string) => Promise<void> }) {
+  const [editing, setEditing] = useState(false)
+  const [value, setValue]     = useState(phone.remark ?? '')
+  const [saving, setSaving]   = useState(false)
+  const ref                   = useRef<HTMLInputElement>(null)
+
+  useEffect(() => { if (editing) ref.current?.focus() }, [editing])
+  useEffect(() => { setValue(phone.remark ?? '') }, [phone.remark])
+
+  async function save() {
+    setSaving(true)
+    await onSave(phone.id, value)
+    setSaving(false)
+    setEditing(false)
+  }
+  function onKey(e: React.KeyboardEvent) {
+    if (e.key === 'Enter')  save()
+    if (e.key === 'Escape') { setValue(phone.remark ?? ''); setEditing(false) }
+  }
+
+  if (editing) return (
+    <input
+      ref={ref} value={value} onChange={e => setValue(e.target.value)}
+      onKeyDown={onKey} onBlur={save} disabled={saving}
+      className="w-full bg-surface border border-accent rounded px-1 py-0.5 text-xs text-text focus:outline-none"
+      placeholder="Note…"
+    />
+  )
+
+  return (
+    <button onClick={() => setEditing(true)} className="text-xs text-left group flex items-center gap-1.5 min-w-0 w-full" title="Cliquer pour éditer">
+      {phone.remark ? (
+        <span className="text-text2 truncate">{phone.remark}</span>
+      ) : (
+        <span className="text-text2/40 italic">+ note</span>
+      )}
+      <span className="opacity-0 group-hover:opacity-40 text-text2 text-[10px] flex-shrink-0">✎</span>
+    </button>
+  )
+}
+
 // ────────────────────────────────────────────────────────────────────────────
 export function Phones({ user }: PhonesProps) {
   const { currentOrg, role, perms } = useOrg()
@@ -341,7 +382,6 @@ export function Phones({ user }: PhonesProps) {
 
   const [contextMenu, setContextMenu]   = useState<{ phone: Phone; x: number; y: number } | null>(null)
   const [sessionDialog, setSessionDialog] = useState<{ phone: Phone } | null>(null)
-  const [inlineEdit, setInlineEdit]     = useState<{ phone: Phone } | null>(null)
 
   const bearer = poller.getBearer()
 
@@ -502,6 +542,12 @@ export function Phones({ user }: PhonesProps) {
       setPhones(prev => prev.map(p => p.id === id ? { ...p, ig_username: username || null } : p))
   }
 
+  async function saveRemark(id: string, remark: string) {
+    const val = remark.trim() || null
+    setPhones(prev => prev.map(p => p.id === id ? { ...p, remark: val } : p))
+    await supabase.from('phones').update({ remark: val }).eq('id', id)
+  }
+
   // ── Unlink Instagram ─────────────────────────────────────────────────────
   async function unlinkIg(id: string) {
     const { error: err } = await supabase
@@ -572,45 +618,6 @@ export function Phones({ user }: PhonesProps) {
     views:   phones.reduce((s, p) => s + (p.total_views ?? 0), 0),
   }
 
-  // ── Inline link dialog ────────────────────────────────────────────────────
-  function InlineLinkDialog({ phone, onClose }: { phone: Phone; onClose: () => void }) {
-    const [value, setValue] = useState(phone.ig_username ?? '')
-    const [saving, setSaving] = useState(false)
-    const ref = useRef<HTMLInputElement>(null)
-    useEffect(() => { ref.current?.focus() }, [])
-    async function save() {
-      setSaving(true)
-      await saveIgUsername(phone.id, value.replace(/^@/, '').trim())
-      setSaving(false)
-      onClose()
-    }
-    return (
-      <div
-        className="fixed inset-0 z-50 flex items-center justify-center"
-        style={{ background: 'rgba(0,0,0,0.6)' }}
-        onClick={e => { if (e.target === e.currentTarget) onClose() }}
-      >
-        <div className="bg-card border border-border rounded-xl p-5 w-80 shadow-2xl space-y-4">
-          <h2 className="text-base font-bold text-text">Lier Instagram</h2>
-          <p className="text-xs text-text2">{phone.phone_name}</p>
-          <div className="flex items-center gap-2">
-            <span className="text-text2 text-sm">@</span>
-            <input
-              ref={ref} value={value} onChange={e => setValue(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') onClose() }}
-              placeholder="username"
-              className="flex-1 bg-surface border border-border rounded px-3 py-2 text-sm text-text focus:border-accent focus:outline-none"
-            />
-          </div>
-          <div className="flex justify-end gap-2">
-            <button onClick={onClose} className="text-sm text-text2 hover:text-text px-3 py-1.5">Annuler</button>
-            <Button size="sm" onClick={save} loading={saving}>Lier</Button>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="p-8 space-y-6" onClick={() => setContextMenu(null)}>
@@ -623,16 +630,11 @@ export function Phones({ user }: PhonesProps) {
           onSaved={onSessionSaved}
         />
       )}
-      {inlineEdit && (
-        <InlineLinkDialog phone={inlineEdit.phone} onClose={() => setInlineEdit(null)} />
-      )}
-
       {/* Context menu */}
       {contextMenu && (
         <ContextMenu
           phone={contextMenu.phone} x={contextMenu.x} y={contextMenu.y}
           onClose={() => setContextMenu(null)}
-          onLinkIg={() => setInlineEdit({ phone: contextMenu.phone })}
           onSession={() => setSessionDialog({ phone: contextMenu.phone })}
           onUnlink={() => unlinkIg(contextMenu.phone.id)}
           onDelete={() => deletePhone(contextMenu.phone.id)}
@@ -768,8 +770,8 @@ export function Phones({ user }: PhonesProps) {
       ) : (
         <div className="bg-card border border-border rounded-xl overflow-hidden">
           {/* Header */}
-          <div className="grid grid-cols-[28px_1fr_100px_160px_120px_80px_90px_70px_36px] px-4 py-2 border-b border-border bg-surface">
-            {['#', 'Téléphone', 'Groupe', 'Instagram', 'Status IG', 'En ligne', 'Followers', 'Vues', ''].map(h => (
+          <div className="grid grid-cols-[28px_1fr_100px_150px_120px_80px_90px_70px_110px_36px] px-4 py-2 border-b border-border bg-surface">
+            {['#', 'Téléphone', 'Groupe', 'Instagram', 'Status IG', 'En ligne', 'Followers', 'Vues', 'Note', ''].map(h => (
               <span key={h} className="text-xs font-semibold text-text2 uppercase tracking-wider">{h}</span>
             ))}
           </div>
@@ -779,7 +781,7 @@ export function Phones({ user }: PhonesProps) {
             <div className="divide-y divide-border">
               {visible.map((phone, i) => (
                 <div key={phone.id}
-                  className="grid grid-cols-[28px_1fr_100px_160px_120px_80px_90px_70px_36px] px-4 py-3 hover:bg-surface/50 transition-colors items-center cursor-default"
+                  className="grid grid-cols-[28px_1fr_100px_150px_120px_80px_90px_70px_110px_36px] px-4 py-3 hover:bg-surface/50 transition-colors items-center cursor-default"
                   onContextMenu={e => {
                     e.preventDefault(); e.stopPropagation()
                     setContextMenu({ phone, x: e.clientX, y: e.clientY })
@@ -804,6 +806,7 @@ export function Phones({ user }: PhonesProps) {
                   <span className="text-xs text-text">
                     {phone.total_views ? phone.total_views.toLocaleString('fr-FR') : '—'}
                   </span>
+                  <NoteCell phone={phone} onSave={saveRemark} />
                   {/* ⋮ button */}
                   <button
                     onClick={e => { e.stopPropagation(); setContextMenu({ phone, x: e.clientX, y: e.clientY }) }}

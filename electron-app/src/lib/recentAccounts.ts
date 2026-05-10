@@ -62,16 +62,11 @@ export function forgetAccount(user_id: string): void {
 // Restore a stored account. If the refresh token is still valid, this signs
 // the user in without prompting for a password. Returns true on success.
 export async function switchToAccount(a: RecentAccount): Promise<{ ok: boolean; error?: string }> {
-  const { error } = await supabase.auth.setSession({
-    access_token:  '',
-    refresh_token: a.refresh_token,
-  })
-  if (error) {
-    // Refresh token rejected (probably expired). Forget it so the UI doesn't
-    // keep offering a dead entry.
+  const { data, error } = await supabase.auth.refreshSession({ refresh_token: a.refresh_token })
+  if (error || !data.session) {
     forgetAccount(a.user_id)
-    return { ok: false, error: error.message }
+    return { ok: false, error: error?.message ?? 'Session expirée' }
   }
-  upsertAccount({ ...a, last_used_at: new Date().toISOString() })
+  upsertAccount({ ...a, refresh_token: data.session.refresh_token, last_used_at: new Date().toISOString() })
   return { ok: true }
 }

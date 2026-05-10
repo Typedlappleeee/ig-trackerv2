@@ -51,9 +51,7 @@ export function Settings({ user, initialPanel }: SettingsProps) {
   const [lang, setLang] = useState<'fr' | 'en'>('fr')
 
   // Profil
-  const [profileName, setProfileName]   = useState('')
-  const [profileEmail, setProfileEmail] = useState('')
-  const [profileNiche, setProfileNiche] = useState('')
+  const [profileEmail, setProfileEmail] = useState(user.email ?? '')
   const [exportDir, setExportDir]       = useState('')
   const [newPassword, setNewPassword]   = useState('')
   const [confirmPassword, setConfirm]   = useState('')
@@ -64,15 +62,8 @@ export function Settings({ user, initialPanel }: SettingsProps) {
   const [testingProxy, setTestingProxy] = useState(false)
   const [proxyResult, setProxyResult] = useState<{ ok: boolean; msg: string } | null>(null)
 
-  // Push server
-  const [pushPort, setPushPort] = useState(8765)
-  const [pushRunning, setPushRunning] = useState(false)
-  const [pushUrl, setPushUrl] = useState('')
-
   // API keys
   const [groqKey, setGroqKey] = useState('')
-  const [igSession, setIgSession] = useState('')
-  const [showIgSession, setShowIgSession] = useState(false)
 
   useEffect(() => {
     if (!mountedRef.current) { mountedRef.current = true; return }
@@ -86,15 +77,10 @@ export function Settings({ user, initialPanel }: SettingsProps) {
           setBearer(data.bearer_token ?? '')
           setGroqKey(data.groq_api_key ?? '')
           setTheme(data.theme ?? 'Bleu')
-          setProfileName(data.profile_name ?? '')
-          setProfileNiche(data.profile_niche ?? '')
-          // The following fields are read from optional columns; they may not exist in older schemas
           const d = data as Record<string, unknown>
           setProfileEmail((d.profile_email as string) ?? user.email ?? '')
           setExportDir((d.export_dir as string) ?? '')
           setProxy((d.proxy as string) ?? '')
-          setIgSession((d.ig_sessionid as string) ?? '')
-          setPushPort((d.push_port as number) ?? 8765)
           setNotifyPopup((d.notify_popup as boolean) ?? true)
           setNotifySound((d.notify_sound as boolean) ?? true)
           setLang((d.lang as 'fr' | 'en') ?? 'fr')
@@ -111,13 +97,11 @@ export function Settings({ user, initialPanel }: SettingsProps) {
     supabase.from('org_config').select('*').eq('org_id', currentOrg.id).maybeSingle()
       .then(({ data }) => {
         if (!data) {
-          // No org config yet — clear the connection fields so the form starts empty
-          setBearer(''); setGroqKey(''); setProxy(''); setIgSession('')
+          setBearer(''); setGroqKey(''); setProxy('')
         } else {
           setBearer(data.bearer_token ?? '')
           setGroqKey(data.groq_api_key ?? '')
           setProxy(data.proxy ?? '')
-          setIgSession(data.ig_sessionid ?? '')
         }
       })
   }, [currentOrg?.id])
@@ -147,13 +131,10 @@ export function Settings({ user, initialPanel }: SettingsProps) {
     const payload: Record<string, unknown> = {
       user_id:       user.id,
       theme,
-      profile_name:  profileName.trim(),
-      profile_niche: profileNiche.trim(),
       updated_at:    new Date().toISOString(),
     }
     if (profileEmail) payload.profile_email = profileEmail.trim()
     if (exportDir)   payload.export_dir = exportDir.trim()
-    payload.push_port    = pushPort
     payload.notify_popup = notifyPopup
     payload.notify_sound = notifySound
     payload.lang         = lang
@@ -163,19 +144,16 @@ export function Settings({ user, initialPanel }: SettingsProps) {
     if (!currentOrg) {
       payload.bearer_token = bearer.trim()
       payload.groq_api_key = groqKey.trim()
-      if (proxy)     payload.proxy        = proxy.trim()
-      if (igSession) payload.ig_sessionid = igSession.trim()
+      if (proxy) payload.proxy = proxy.trim()
     }
 
     let { error: err } = await supabase.from('app_config').upsert(payload, { onConflict: 'user_id' })
 
     if (err && /column|schema cache/i.test(err.message)) {
       const safe: Record<string, unknown> = {
-        user_id:       payload.user_id,
-        theme:         payload.theme,
-        profile_name:  payload.profile_name,
-        profile_niche: payload.profile_niche,
-        updated_at:    payload.updated_at,
+        user_id:    payload.user_id,
+        theme:      payload.theme,
+        updated_at: payload.updated_at,
       }
       if (!currentOrg) {
         safe.bearer_token = bearer.trim()
@@ -202,24 +180,22 @@ export function Settings({ user, initialPanel }: SettingsProps) {
         setSaving(false); return
       }
       const { error: err } = await supabase.from('org_config').upsert({
-        org_id:        currentOrg.id,
-        bearer_token:  bearer.trim(),
-        groq_api_key:  groqKey.trim(),
-        proxy:         proxy.trim()    || null,
-        ig_sessionid:  igSession.trim() || null,
-        updated_at:    new Date().toISOString(),
+        org_id:       currentOrg.id,
+        bearer_token: bearer.trim(),
+        groq_api_key: groqKey.trim(),
+        proxy:        proxy.trim() || null,
+        updated_at:   new Date().toISOString(),
       }, { onConflict: 'org_id' })
       if (err) { setError('Erreur: ' + err.message); setSaving(false); return }
     } else {
       // Solo mode: explicitly write empty strings so deletions take effect
       // (we don't want a removed token to silently keep its old value).
       const payload: Record<string, unknown> = {
-        user_id:       user.id,
-        bearer_token:  bearer.trim(),
-        groq_api_key:  groqKey.trim(),
-        proxy:         proxy.trim()     || null,
-        ig_sessionid:  igSession.trim() || null,
-        updated_at:    new Date().toISOString(),
+        user_id:      user.id,
+        bearer_token: bearer.trim(),
+        groq_api_key: groqKey.trim(),
+        proxy:        proxy.trim() || null,
+        updated_at:   new Date().toISOString(),
       }
       const { error: err } = await supabase.from('app_config').upsert(payload, { onConflict: 'user_id' })
       if (err) { setError('Erreur: ' + err.message); setSaving(false); return }
@@ -274,17 +250,6 @@ export function Settings({ user, initialPanel }: SettingsProps) {
       setProxyResult({ ok: false, msg: e instanceof Error ? e.message : String(e) })
     }
     setTestingProxy(false)
-  }
-
-  function togglePush() {
-    if (pushRunning) {
-      setPushRunning(false)
-      setPushUrl('')
-    } else {
-      // Push server is a TODO IPC handler — for now show a placeholder URL
-      setPushRunning(true)
-      setPushUrl(`http://localhost:${pushPort}/push?u=USERNAME&f=FOLLOWERS&fw=FOLLOWING&p=POSTS`)
-    }
   }
 
   if (loading) return (
@@ -423,11 +388,7 @@ export function Settings({ user, initialPanel }: SettingsProps) {
       {panel === 'profile' && (
         <section className="bg-card border border-border rounded-xl p-5 space-y-4">
           <h2 className="text-sm font-semibold text-text">Mon Profil</h2>
-          <div className="grid grid-cols-2 gap-4">
-            <Input label="Pseudo / Nom" placeholder="ex: Alex" value={profileName} onChange={e => setProfileName(e.target.value)} />
-            <Input label="Email" type="email" placeholder="contact@example.com" value={profileEmail} onChange={e => setProfileEmail(e.target.value)} />
-          </div>
-          <Input label="Niche principale" placeholder="ex: Fitness, Crypto, Lifestyle…" hint="Utilisée pour la génération de contenu IA" value={profileNiche} onChange={e => setProfileNiche(e.target.value)} />
+          <Input label="Email" type="email" placeholder="contact@example.com" value={profileEmail} onChange={e => setProfileEmail(e.target.value)} />
           <div className="flex gap-2 items-end">
             <Input label="Dossier export vidéo" placeholder="C:\Users\...\Videos" value={exportDir} onChange={e => setExportDir(e.target.value)} className="flex-1" />
             <Button variant="secondary" size="sm" onClick={() => alert('Sélection du dossier — IPC à brancher')}>📂</Button>
@@ -500,30 +461,6 @@ export function Settings({ user, initialPanel }: SettingsProps) {
             )}
           </section>
 
-          {/* Push server */}
-          <section className="bg-card border border-border rounded-xl p-5 space-y-4">
-            <div>
-              <h2 className="text-sm font-semibold text-text">📲 Serveur Push (GéeLark → App)</h2>
-              <p className="text-[11px] text-text2 mt-0.5">Reçoit les mises à jour en push depuis tes téléphones.</p>
-            </div>
-            <div className="flex gap-2 items-end">
-              <Input label="Port" type="number" value={String(pushPort)} onChange={e => setPushPort(parseInt(e.target.value) || 8765)} className="w-32" />
-              <span className="text-xs text-text2 mb-3">{pushRunning ? '▶ Serveur actif' : '⏹ Serveur arrêté'}</span>
-              <div className="flex-1" />
-              {pushRunning ? (
-                <Button variant="danger" onClick={togglePush}>⏹ Arrêter</Button>
-              ) : (
-                <Button onClick={togglePush}>▶ Démarrer</Button>
-              )}
-            </div>
-            {pushUrl && (
-              <div className="flex items-center gap-2 px-3 py-2 bg-bg rounded-lg border border-border">
-                <code className="flex-1 text-[10px] font-mono text-text2 truncate">{pushUrl}</code>
-                <button onClick={() => navigator.clipboard.writeText(pushUrl)} className="text-text2 hover:text-accent text-xs">📋</button>
-              </div>
-            )}
-          </section>
-
           {/* API Keys */}
           <section className="bg-card border border-border rounded-xl p-5 space-y-4">
             <h2 className="text-sm font-semibold text-text">🔑 Clés API</h2>
@@ -535,27 +472,6 @@ export function Settings({ user, initialPanel }: SettingsProps) {
               value={groqKey}
               onChange={e => setGroqKey(e.target.value)}
             />
-            <div>
-              <label className="text-[11px] uppercase tracking-wider font-semibold text-text2 block mb-1">Instagram Session ID</label>
-              <div className="flex gap-2">
-                <input
-                  type={showIgSession ? 'text' : 'password'}
-                  value={igSession}
-                  onChange={e => setIgSession(e.target.value)}
-                  placeholder="longstr%3A..."
-                  className="flex-1 bg-bg border border-border rounded-lg px-3 py-2 text-sm text-text placeholder:text-text2 focus:border-accent focus:outline-none"
-                />
-                <button
-                  onClick={() => setShowIgSession(v => !v)}
-                  className="px-3 bg-surface2 border border-border rounded-lg text-text2 hover:text-text"
-                  title="Afficher/Masquer"
-                >{showIgSession ? '🙈' : '👁'}</button>
-              </div>
-              <p className="text-[11px] text-text2 mt-1">
-                Ouvre Instagram dans Chrome → F12 → Application → Cookies → sessionid
-              </p>
-              {igSession && <p className="text-xs text-ok mt-1">✅ Session ID configurée</p>}
-            </div>
             <Button onClick={saveConnexions} loading={saving} disabled={!!currentOrg && !canEditOrgConnexions} className="w-full">💾 Sauvegarder les clés API</Button>
           </section>
         </div>
