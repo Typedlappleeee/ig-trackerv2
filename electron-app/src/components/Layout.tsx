@@ -349,7 +349,26 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             </div>
           </div>
         )}
-        {children}
+        {!orgLoading && !isVisibleTab(page) ? (
+          <div className="flex flex-col items-center justify-center h-full min-h-[60vh] gap-5 text-center px-8">
+            <div className="w-16 h-16 rounded-2xl bg-danger/10 border border-danger/20 flex items-center justify-center text-3xl">🔒</div>
+            <div className="space-y-2">
+              <h2 className="text-xl font-bold text-text">Accès refusé</h2>
+              <p className="text-text2 text-sm max-w-xs">
+                Vous n'avez pas la permission d'accéder à cet onglet dans l'organisation <strong className="text-text">"{currentOrg?.name}"</strong>.
+              </p>
+              <p className="text-text2/60 text-xs">Contactez un administrateur pour modifier vos droits.</p>
+            </div>
+            <button
+              onClick={() => onNavigate('dashboard')}
+              className="px-5 py-2 bg-accent hover:bg-accent2 text-white text-sm font-semibold rounded-xl transition-colors"
+            >
+              Retour au Dashboard
+            </button>
+          </div>
+        ) : (
+          children
+        )}
       </main>
 
       {/* Org switcher menu (fixed-position overlay so nothing can intercept clicks) */}
