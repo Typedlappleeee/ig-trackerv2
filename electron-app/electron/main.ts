@@ -439,7 +439,20 @@ ipcMain.handle('geelark-request', async (_event, opts: {
       } as RequestInit)
     }
 
-    const data = opts.isText ? await response.text() : await response.json()
+    let data: unknown
+    if (opts.isText) {
+      data = await response.text()
+    } else {
+      // Parse manually with large-int protection — GéeLark task IDs are 19-digit
+      // numbers that lose precision via JSON.parse, breaking task polling.
+      const raw = await response.text()
+      try {
+        const safe = raw.replace(/:(\s*)(\d{16,})/g, ':$1"$2"')
+        data = JSON.parse(safe)
+      } catch {
+        data = null
+      }
+    }
     return { ok: true, status: response.status, data }
   } catch (err: unknown) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) }
