@@ -288,6 +288,21 @@ html, body, #root {
   50%     { box-shadow: 0 0 8px 4px #ffcc00; }
 }
 
+/* 67 corner bot animations */
+@keyframes bot-bob {
+  0%,100% { transform: translateY(0) scaleY(1); }
+  30%     { transform: translateY(-4px) scaleY(1.04); }
+  70%     { transform: translateY(-2px) scaleY(1.02); }
+}
+@keyframes bot-wander-r {
+  0%,20%,80%,100% { transform: translateX(0); }
+  45%,55%         { transform: translateX(26px); }
+}
+@keyframes bot-wander-l {
+  0%,20%,80%,100% { transform: translateX(0); }
+  45%,55%         { transform: translateX(-26px); }
+}
+
 /* Smooth interactive transitions — applied globally */
 button, a, input, select, textarea {
   transition-property: color, background-color, border-color, box-shadow, opacity, transform;
