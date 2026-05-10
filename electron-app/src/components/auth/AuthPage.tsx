@@ -63,19 +63,22 @@ export function AuthPage() {
 
   return (
     <div className="min-h-screen bg-bg flex items-center justify-center p-4">
-      <div className="w-full max-w-sm animate-slide-up">
+      <div className="w-full max-w-sm anim-slide-up">
 
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-accent/10 mb-4">
-            <span className="text-2xl font-bold text-accent">IG</span>
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-accent/10 border border-accent/20 mb-4 anim-bounce-in anim-glow relative overflow-hidden"
+            style={{ animationDelay: '0.05s' }}
+          >
+            <div className="absolute inset-0 bg-gradient-to-br from-accent/20 to-transparent pointer-events-none" />
+            <span className="text-2xl font-black text-accent anim-float">IG</span>
           </div>
-          <h1 className="text-2xl font-bold text-text">IG Tracker</h1>
-          <p className="text-text2 text-sm mt-1">Dashboard professionnel</p>
+          <h1 className="text-2xl font-bold text-text anim-page" style={{ animationDelay: '0.15s' }}>IG Tracker</h1>
+          <p className="text-text2 text-sm mt-1 anim-page" style={{ animationDelay: '0.22s' }}>Dashboard professionnel</p>
         </div>
 
         {/* Card */}
-        <div className="bg-card border border-border rounded-2xl p-6">
+        <div className="bg-card border border-border rounded-2xl p-6 anim-scale-in shadow-[0_24px_64px_-16px_rgba(0,0,0,0.5)]" style={{ animationDelay: '0.1s' }}>
 
           {/* Onglets */}
           <div className="flex bg-surface2 rounded-xl p-1 mb-6">
@@ -84,10 +87,10 @@ export function AuthPage() {
                 key={t}
                 onClick={() => switchTab(t)}
                 className={`
-                  flex-1 py-2 text-sm font-medium rounded-lg transition-all duration-150
+                  flex-1 py-2 text-sm font-medium rounded-lg transition-all duration-200
                   ${tab === t
-                    ? 'bg-surface3 text-text shadow-sm'
-                    : 'text-text2 hover:text-text'
+                    ? 'bg-accent text-white shadow-[0_2px_8px_-2px_rgba(79,142,247,0.5)]'
+                    : 'text-text2 hover:text-text hover:bg-surface3/50'
                   }
                 `}
               >
@@ -98,64 +101,72 @@ export function AuthPage() {
 
           {/* Formulaire */}
           <form onSubmit={handleSubmit} className="space-y-4">
-            <Input
-              label="Email"
-              type="email"
-              placeholder="ton@email.com"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              required
-              autoComplete="email"
-            />
-
-            <Input
-              label="Mot de passe"
-              type="password"
-              placeholder="••••••••"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              required
-              autoComplete={tab === 'login' ? 'current-password' : 'new-password'}
-              hint={tab === 'register' ? '6 caractères minimum' : undefined}
-            />
-
-            {tab === 'register' && (
+            <div className="anim-page" style={{ animationDelay: '0.18s' }}>
               <Input
-                label="Confirmer le mot de passe"
+                label="Email"
+                type="email"
+                placeholder="ton@email.com"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                required
+                autoComplete="email"
+              />
+            </div>
+
+            <div className="anim-page" style={{ animationDelay: '0.24s' }}>
+              <Input
+                label="Mot de passe"
                 type="password"
                 placeholder="••••••••"
-                value={confirm}
-                onChange={e => setConfirm(e.target.value)}
+                value={password}
+                onChange={e => setPassword(e.target.value)}
                 required
-                autoComplete="new-password"
+                autoComplete={tab === 'login' ? 'current-password' : 'new-password'}
+                hint={tab === 'register' ? '6 caractères minimum' : undefined}
               />
+            </div>
+
+            {tab === 'register' && (
+              <div className="anim-slide-down">
+                <Input
+                  label="Confirmer le mot de passe"
+                  type="password"
+                  placeholder="••••••••"
+                  value={confirm}
+                  onChange={e => setConfirm(e.target.value)}
+                  required
+                  autoComplete="new-password"
+                />
+              </div>
             )}
 
             {/* Messages */}
             {error && (
-              <div className="px-4 py-3 rounded-lg bg-danger/10 border border-danger/20 text-danger text-sm">
-                {error}
+              <div className="px-4 py-3 rounded-xl bg-danger/10 border border-danger/30 text-danger text-sm anim-slide-down flex items-start gap-2">
+                <span className="flex-shrink-0 mt-0.5">⚠</span><span>{error}</span>
               </div>
             )}
             {success && (
-              <div className="px-4 py-3 rounded-lg bg-ok/10 border border-ok/20 text-ok text-sm">
-                {success}
+              <div className="px-4 py-3 rounded-xl bg-ok/10 border border-ok/30 text-ok text-sm anim-slide-down flex items-start gap-2">
+                <span className="flex-shrink-0 mt-0.5">✓</span><span>{success}</span>
               </div>
             )}
 
-            <Button
-              type="submit"
-              fullWidth
-              size="lg"
-              loading={loading}
-              className="mt-2"
-            >
-              {tab === 'login' ? 'Se connecter' : 'Créer mon compte'}
-            </Button>
+            <div className="anim-page" style={{ animationDelay: '0.3s' }}>
+              <Button
+                type="submit"
+                fullWidth
+                size="lg"
+                loading={loading}
+                className="mt-2"
+              >
+                {tab === 'login' ? 'Se connecter' : 'Créer mon compte'}
+              </Button>
+            </div>
           </form>
         </div>
 
-        <p className="text-center text-text2 text-xs mt-6">
+        <p className="text-center text-text2 text-xs mt-6 anim-page" style={{ animationDelay: '0.35s' }}>
           Tes données sont synchronisées et sécurisées.
         </p>
       </div>

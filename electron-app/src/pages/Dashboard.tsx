@@ -328,11 +328,11 @@ export function Dashboard({ user }: DashboardProps) {
   return (
     <div className="flex h-full min-h-screen">
       {/* Left sidebar: per-account selector — Python: 210px wide */}
-      <aside className="w-[210px] flex-shrink-0 flex flex-col border-r border-border bg-[#0e1118]">
+      <aside className="w-[210px] flex-shrink-0 flex flex-col border-r border-border bg-[#0e1118] anim-slide-l">
         <div className="px-4 py-3 border-b border-border">
           <p className="text-xs font-bold text-text2 uppercase tracking-wider">Comptes</p>
         </div>
-        <div className="flex-1 overflow-auto py-1">
+        <div className="flex-1 overflow-auto py-1 anim-stagger">
           {loading ? (
             <div className="flex justify-center py-8"><Spinner size="sm" /></div>
           ) : (
@@ -340,13 +340,16 @@ export function Dashboard({ user }: DashboardProps) {
               {/* Total row */}
               <button
                 onClick={() => setSelPhone(null)}
-                className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-colors ${
-                  selPhone === null ? 'bg-[#1e2a4a]' : 'hover:bg-surface2'
+                className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-all rounded-lg mx-1 my-0.5 ${
+                  selPhone === null
+                    ? 'bg-accent/15 border border-accent/20'
+                    : 'hover:bg-surface2 border border-transparent'
                 }`}
+                style={{ width: 'calc(100% - 8px)' }}
               >
-                <div className="w-8 h-8 rounded-full bg-accent/20 text-accent flex items-center justify-center text-xs font-bold flex-shrink-0">📊</div>
+                <div className={`w-8 h-8 rounded-full bg-accent/20 text-accent flex items-center justify-center text-xs font-bold flex-shrink-0 transition-transform ${selPhone === null ? 'scale-110' : ''}`}>📊</div>
                 <div className="min-w-0 flex-1">
-                  <p className={`text-xs ${selPhone === null ? 'font-bold text-text' : 'text-text'}`}>Tous les comptes</p>
+                  <p className={`text-xs ${selPhone === null ? 'font-bold text-accent' : 'text-text'}`}>Tous les comptes</p>
                 </div>
               </button>
 
@@ -363,25 +366,32 @@ export function Dashboard({ user }: DashboardProps) {
                   <button
                     key={phone.id}
                     onClick={() => setSelPhone(phone)}
-                    className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors ${
-                      active ? 'bg-[#1e2a4a]' : 'hover:bg-surface2'
+                    className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition-all rounded-lg mx-1 my-0.5 ${
+                      active
+                        ? 'bg-accent/15 border border-accent/20'
+                        : 'hover:bg-surface2 border border-transparent'
                     }`}
+                    style={{ width: 'calc(100% - 8px)' }}
                   >
                     <div
-                      className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0"
+                      className={`w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0 transition-transform ${active ? 'scale-110 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.5)]' : ''}`}
                       style={{ background: avatarColor(phone.ig_username ?? phone.phone_name) }}
                     >
                       {initials}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className={`text-xs truncate ${active ? 'font-bold text-text' : 'text-text'}`}>
+                      <p className={`text-xs truncate ${active ? 'font-bold text-accent' : 'text-text'}`}>
                         {phone.phone_name.length > 20 ? phone.phone_name.slice(0, 20) + '…' : phone.phone_name}
                       </p>
                       {phone.ig_username && (
                         <p className="text-[10px] text-text2 truncate">@{phone.ig_username.length > 18 ? phone.ig_username.slice(0, 18) + '…' : phone.ig_username}</p>
                       )}
                     </div>
-                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: dotColor }} />
+                    <span className="relative w-2 h-2 rounded-full flex-shrink-0" style={{ background: dotColor }}>
+                      {phone.ig_status === 'active' && (
+                        <span className="absolute inset-0 rounded-full animate-ping opacity-50" style={{ background: dotColor }} />
+                      )}
+                    </span>
                   </button>
                 )
               })}
@@ -398,18 +408,20 @@ export function Dashboard({ user }: DashboardProps) {
         </h1>
 
         {/* Summary card with views + 6-cell KPI grid (Python layout) */}
-        <div className="bg-card border border-border rounded-xl p-5 flex gap-5">
+        <div className="bg-card border border-border rounded-xl p-5 flex gap-5 anim-page card-lift" style={{ animationDelay: '0.04s' }}>
           {/* Left: total views */}
           <div className="flex items-center gap-4 pr-5 border-r border-border">
-            <div className="w-[46px] h-[46px] rounded-full bg-accent/20 text-accent flex items-center justify-center text-xl">👁</div>
+            <div className="w-[46px] h-[46px] rounded-full bg-accent/20 text-accent flex items-center justify-center text-xl anim-float">👁</div>
             <div>
               <p className="text-[10px] font-semibold text-text2 uppercase tracking-wider">{selPhone ? 'Vues du compte' : 'Total vues'}</p>
-              <p className="text-[24px] font-bold text-text leading-none mt-1">{kpis.totalNow.toLocaleString('fr-FR')}</p>
+              <p className="text-[24px] font-bold text-text leading-none mt-1 anim-number-pop" key={kpis.totalNow}>
+                {kpis.totalNow.toLocaleString('fr-FR')}
+              </p>
             </div>
           </div>
 
           {/* Right: 3x2 KPI grid */}
-          <div className="flex-1 grid grid-cols-3 gap-2">
+          <div className="flex-1 grid grid-cols-3 gap-2 anim-stagger">
             {[
               { label: "Vues aujourd'hui", value: kpis.today,    icon: '👁',  color: '#4f8ef7' },
               { label: 'Croissance',        value: kpis.delta,    icon: kpis.delta !== null && kpis.delta >= 0 ? '📈' : '📉', color: kpis.delta !== null && kpis.delta >= 0 ? '#00ccaa' : '#f03d55', sign: true },
@@ -422,12 +434,12 @@ export function Dashboard({ user }: DashboardProps) {
                 ? { label: 'Vidéos',         value: kpis.videos,   icon: '🎥', color: '#a56ef5' }
                 : { label: 'Bannis',         value: kpis.banned,   icon: '🚫', color: '#f03d55' },
             ].map((kpi, i) => (
-              <div key={i} className="bg-surface2 border border-border rounded-lg p-3">
+              <div key={i} className="bg-surface2 border border-border rounded-lg p-3 card-lift">
                 <div className="flex items-center gap-1.5 mb-1.5">
                   <span className="text-sm">{kpi.icon}</span>
                   <span className="text-[9px] font-semibold text-text2 uppercase tracking-wider">{kpi.label}</span>
                 </div>
-                <p className="text-base font-bold" style={{ color: kpi.color }}>
+                <p className="text-base font-bold anim-number-pop" style={{ color: kpi.color }} key={String(kpi.value)}>
                   {(() => {
                     if ('isText' in kpi && kpi.isText) return kpi.value as string
                     const v = kpi.value
@@ -465,16 +477,18 @@ export function Dashboard({ user }: DashboardProps) {
         )}
 
         {/* Chart card with range pills */}
-        <div className="bg-card border border-border rounded-xl p-5">
+        <div className="bg-card border border-border rounded-xl p-5 anim-page card-lift" style={{ animationDelay: '0.08s' }}>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-semibold text-text">Tendances des vues</h2>
-            <div className="flex gap-1">
+            <div className="flex gap-1 bg-surface2 p-1 rounded-lg">
               {RANGES.map(({ key, label }) => (
                 <button
                   key={key}
                   onClick={() => setRange(key)}
                   className={`px-3 py-1 rounded-md text-xs font-semibold transition-all ${
-                    range === key ? 'bg-[#3d5a99] text-white' : 'bg-surface2 text-text2 hover:text-text'
+                    range === key
+                      ? 'bg-accent text-white shadow-[0_1px_6px_-1px_rgba(79,142,247,0.5)]'
+                      : 'text-text2 hover:text-text hover:bg-surface3/50'
                   }`}
                 >{label}</button>
               ))}

@@ -121,18 +121,56 @@ html, body, #root {
   0%   { opacity: 0; transform: translateY(6px); }
   100% { opacity: 1; transform: translateY(0); }
 }
+@keyframes bounce-in {
+  0%   { opacity: 0; transform: scale(0.5) translateY(8px); }
+  55%  { opacity: 1; transform: scale(1.1) translateY(-4px); }
+  80%  { transform: scale(0.97) translateY(1px); }
+  100% { transform: scale(1) translateY(0); }
+}
+@keyframes slide-up {
+  0%   { opacity: 0; transform: translateY(28px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+@keyframes number-pop {
+  0%   { opacity: 0; transform: translateY(10px) scale(0.88); }
+  65%  { transform: translateY(-2px) scale(1.04); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes pulse-ring {
+  0%   { box-shadow: 0 0 0 0 currentColor; opacity: 0.8; }
+  70%  { box-shadow: 0 0 0 5px transparent; opacity: 0; }
+  100% { box-shadow: 0 0 0 0 transparent; opacity: 0; }
+}
+@keyframes border-glow {
+  0%, 100% { border-color: rgba(79,142,247,0.15); }
+  50%       { border-color: rgba(79,142,247,0.4); box-shadow: 0 0 18px -4px rgba(79,142,247,0.3); }
+}
 
 /* ── Utility classes ────────────────────────────────────────────────────────── */
-.anim-page      { animation: page-fade-in   0.32s cubic-bezier(.22,1,.36,1) both; }
-.anim-slide-r   { animation: slide-in-right 0.28s cubic-bezier(.22,1,.36,1) both; }
-.anim-slide-l   { animation: slide-in-left  0.28s cubic-bezier(.22,1,.36,1) both; }
-.anim-scale-in  { animation: scale-in       0.22s cubic-bezier(.22,1,.36,1) both; }
-.anim-slide-down{ animation: slide-down     0.22s cubic-bezier(.22,1,.36,1) both; }
-.anim-pulse     { animation: pulse-soft 1.6s ease-in-out infinite; }
-.anim-float     { animation: float 3s ease-in-out infinite; }
-.anim-glow      { animation: glow-accent 2.5s ease-in-out infinite; }
-.anim-toast-in  { animation: toast-in  0.3s  cubic-bezier(.22,1,.36,1) both; }
-.anim-toast-out { animation: toast-out 0.22s ease-in forwards; }
+.anim-page       { animation: page-fade-in   0.32s cubic-bezier(.22,1,.36,1) both; }
+.anim-slide-r    { animation: slide-in-right 0.28s cubic-bezier(.22,1,.36,1) both; }
+.anim-slide-l    { animation: slide-in-left  0.28s cubic-bezier(.22,1,.36,1) both; }
+.anim-scale-in   { animation: scale-in       0.22s cubic-bezier(.22,1,.36,1) both; }
+.anim-slide-down { animation: slide-down     0.22s cubic-bezier(.22,1,.36,1) both; }
+.anim-pulse      { animation: pulse-soft 1.6s ease-in-out infinite; }
+.anim-float      { animation: float 3s ease-in-out infinite; }
+.anim-glow       { animation: glow-accent 2.5s ease-in-out infinite; }
+.anim-toast-in   { animation: toast-in  0.3s  cubic-bezier(.22,1,.36,1) both; }
+.anim-toast-out  { animation: toast-out 0.22s ease-in forwards; }
+.anim-bounce-in  { animation: bounce-in  0.55s cubic-bezier(.22,1,.36,1) both; }
+.anim-slide-up   { animation: slide-up   0.45s cubic-bezier(.22,1,.36,1) both; }
+.anim-number-pop { animation: number-pop 0.4s  cubic-bezier(.22,1,.36,1) both; }
+.anim-border-glow{ animation: border-glow 2.8s ease-in-out infinite; }
+
+/* Pulsing status dot */
+.dot-pulse::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  animation: pulse-ring 1.8s ease-out infinite;
+  color: inherit;
+}
 
 /* Stagger helpers — apply .anim-stagger on parent, children get .anim-page */
 .anim-stagger > * { animation: page-fade-in 0.32s cubic-bezier(.22,1,.36,1) both; }

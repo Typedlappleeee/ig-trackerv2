@@ -184,41 +184,49 @@ export function Stats({ user }: StatsProps) {
   return (
     <div className="flex h-full min-h-screen">
       {/* Sidebar */}
-      <aside className="w-56 flex-shrink-0 flex flex-col border-r border-border bg-surface">
+      <aside className="w-56 flex-shrink-0 flex flex-col border-r border-border bg-surface anim-slide-l">
         <div className="px-4 py-4 border-b border-border">
           <p className="text-xs font-semibold text-text2 uppercase tracking-wider">Comptes liés</p>
           <p className="text-xs text-text2 mt-0.5">{phones.length} compte{phones.length !== 1 ? 's' : ''}</p>
         </div>
-        <div className="flex-1 overflow-auto py-2">
+        <div className="flex-1 overflow-auto py-2 anim-stagger">
           {phones.length === 0 ? (
             <p className="px-4 py-4 text-xs text-text2">
               Aucun compte lié.<br />Va dans Téléphones → colonne Instagram.
             </p>
-          ) : phones.map(phone => (
-            <button
-              key={phone.id}
-              onClick={() => selectPhone(phone)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors ${
-                selected?.id === phone.id ? 'bg-surface2 border-l-2 border-accent pl-[10px]' : 'hover:bg-surface2'
-              }`}
-            >
-              <div className="w-8 h-8 rounded-full bg-accent/20 text-accent flex items-center justify-center text-xs font-bold flex-shrink-0">
-                {phone.ig_username?.[0].toUpperCase()}
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-xs font-medium text-text truncate">@{phone.ig_username}</p>
-                <p className="text-[10px] text-text2 truncate">{phone.phone_name}</p>
-              </div>
-              <div className="flex flex-col items-end gap-0.5 flex-shrink-0">
-                {phone.status === 'online' && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-ok" />
-                )}
-                {phone.ig_sessionid && (
-                  <span className="text-[10px] text-accent">🔑</span>
-                )}
-              </div>
-            </button>
-          ))}
+          ) : phones.map(phone => {
+            const isSelected = selected?.id === phone.id
+            return (
+              <button
+                key={phone.id}
+                onClick={() => selectPhone(phone)}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-all rounded-lg mx-1 my-0.5 ${
+                  isSelected
+                    ? 'bg-accent/12 border border-accent/25'
+                    : 'hover:bg-surface2 border border-transparent'
+                }`}
+                style={{ width: 'calc(100% - 8px)' }}
+              >
+                <div className={`w-8 h-8 rounded-full bg-accent/20 text-accent flex items-center justify-center text-xs font-bold flex-shrink-0 transition-transform ${isSelected ? 'scale-110' : ''}`}>
+                  {phone.ig_username?.[0].toUpperCase()}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className={`text-xs font-medium truncate ${isSelected ? 'text-accent font-bold' : 'text-text'}`}>@{phone.ig_username}</p>
+                  <p className="text-[10px] text-text2 truncate">{phone.phone_name}</p>
+                </div>
+                <div className="flex flex-col items-end gap-0.5 flex-shrink-0">
+                  {phone.status === 'online' && (
+                    <span className="relative w-1.5 h-1.5 rounded-full bg-ok flex-shrink-0">
+                      <span className="absolute inset-0 rounded-full bg-ok animate-ping opacity-60" />
+                    </span>
+                  )}
+                  {phone.ig_sessionid && (
+                    <span className="text-[10px] text-accent">🔑</span>
+                  )}
+                </div>
+              </button>
+            )
+          })}
         </div>
       </aside>
 
@@ -234,7 +242,7 @@ export function Stats({ user }: StatsProps) {
         ) : (
           <div className="p-8 space-y-6">
             {/* Profile header */}
-            <div className="bg-card border border-border rounded-xl p-5 flex items-start gap-5">
+            <div className="bg-card border border-border rounded-xl p-5 flex items-start gap-5 anim-page card-lift">
               <div className="w-14 h-14 rounded-full bg-accent/20 text-accent flex items-center justify-center text-xl font-bold flex-shrink-0">
                 {selected.ig_username?.[0].toUpperCase()}
               </div>
@@ -274,19 +282,19 @@ export function Stats({ user }: StatsProps) {
             {loadingStats ? (
               <div className="flex justify-center py-8"><Spinner size="lg" /></div>
             ) : stats ? (
-              <div className="grid grid-cols-4 gap-4">
+              <div className="grid grid-cols-4 gap-4 anim-stagger">
                 {([
                   { label: 'FOLLOWERS',  value: stats.followers,   color: '#4f9eff', icon: '👥' },
                   { label: 'FOLLOWING',  value: stats.following,   color: '#5a6882', icon: '➡' },
                   { label: 'POSTS',      value: stats.posts,       color: '#00ccaa', icon: '📸' },
                   { label: 'VUES TOTAL', value: stats.total_views, color: '#ffaa2a', icon: '👁' },
                 ] as const).map(({ label, value, color, icon }) => (
-                  <div key={label} className="bg-card border border-border rounded-xl p-4 border-t-2" style={{ borderTopColor: color }}>
+                  <div key={label} className="bg-card border border-border rounded-xl p-4 border-t-2 card-lift" style={{ borderTopColor: color }}>
                     <div className="flex items-center gap-2 mb-2">
                       <span>{icon}</span>
                       <span className="text-xs font-semibold text-text2">{label}</span>
                     </div>
-                    <p className="text-2xl font-bold" style={{ color }}>{value.toLocaleString('fr-FR')}</p>
+                    <p className="text-2xl font-bold anim-number-pop" style={{ color }} key={value}>{value.toLocaleString('fr-FR')}</p>
                   </div>
                 ))}
               </div>
@@ -302,15 +310,17 @@ export function Stats({ user }: StatsProps) {
                 <h3 className="text-sm font-semibold text-text">
                   Vidéos {videos.length > 0 && `(${videos.length})`}
                 </h3>
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1 bg-surface2 p-1 rounded-lg">
                   {([
                     { key: 'recent', label: 'Récent'     },
                     { key: 'views',  label: '+ de vues'  },
                     { key: 'likes',  label: '+ de likes' },
                   ] as const).map(({ key, label }) => (
                     <button key={key} onClick={() => setSort(key)}
-                      className={`px-3 py-1.5 rounded text-xs transition-all ${
-                        sort === key ? 'bg-accent/20 text-accent' : 'text-text2 hover:text-text'
+                      className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                        sort === key
+                          ? 'bg-accent text-white shadow-[0_1px_6px_-1px_rgba(79,142,247,0.5)]'
+                          : 'text-text2 hover:text-text hover:bg-surface3/50'
                       }`}
                     >
                       {label}
@@ -334,7 +344,7 @@ export function Stats({ user }: StatsProps) {
                 <div className="grid grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
                   {(() => {
                     const maxV = Math.max(...sorted.map(v => v.views), 1)
-                    return sorted.map(video => {
+                    return sorted.map((video, idx) => {
                       const tier = video.views >= maxV * 0.7 ? 'high' : video.views >= maxV * 0.3 ? 'mid' : 'low'
                       const tierGradient =
                         tier === 'high' ? 'linear-gradient(135deg, #a56ef5 0%, #f03d55 100%)' :
@@ -345,7 +355,8 @@ export function Stats({ user }: StatsProps) {
                           key={video.id}
                           type="button"
                           onClick={() => setPlayingVideo(video)}
-                          className="text-left bg-card border border-border rounded-xl overflow-hidden hover:border-accent transition-colors group"
+                          className="text-left bg-card border border-border rounded-xl overflow-hidden hover:border-accent/60 transition-all group anim-page card-lift"
+                          style={{ animationDelay: `${Math.min(idx * 0.04, 0.4)}s` }}
                         >
                           {/* Portrait thumbnail — 9:16 like the bank */}
                           <div
@@ -448,11 +459,11 @@ function IgVideoPlayerModal({ video, onClose }: { video: IgVideo; onClose: () =>
 
   return (
     <div
-      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/90 backdrop-blur-sm"
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/85 backdrop-blur-md anim-page"
       onClick={onClose}
     >
       <div
-        className="relative flex flex-col items-center gap-3"
+        className="relative flex flex-col items-center gap-3 anim-scale-in"
         onClick={e => e.stopPropagation()}
         style={{ maxHeight: '90vh', maxWidth: '90vw' }}
       >
