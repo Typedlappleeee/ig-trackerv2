@@ -85,6 +85,10 @@ CREATE TABLE IF NOT EXISTS public.content_bank (
 -- Colonne folder utilisée par l'app pour organiser la banque
 ALTER TABLE public.content_bank ADD COLUMN IF NOT EXISTS folder text;
 
+-- Cloud storage paths (Supabase Storage). file_url reste pour les chemins locaux legacy.
+ALTER TABLE public.content_bank ADD COLUMN IF NOT EXISTS storage_path   text;
+ALTER TABLE public.content_bank ADD COLUMN IF NOT EXISTS thumbnail_path text;
+
 CREATE TABLE IF NOT EXISTS public.app_config (
   user_id       uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   bearer_token  text DEFAULT '',
@@ -415,7 +419,62 @@ CREATE TRIGGER trg_add_owner_member
 
 
 -- ╔══════════════════════════════════════════════════════════════╗
--- ║  10. Reload PostgREST schema cache                           ║
+-- ║  10. STORAGE — bucket "content" (vidéos + thumbnails)        ║
+-- ╚══════════════════════════════════════════════════════════════╝
+-- Arborescence :
+--   videos/users/{user_id}/{uuid}.{ext}    ← solo mode
+--   videos/orgs/{org_id}/{uuid}.{ext}      ← org mode
+--   thumbs/users/{user_id}/{uuid}.jpg
+--   thumbs/orgs/{org_id}/{uuid}.jpg
+
+-- Bucket privé, 50 MB max par fichier (compatible free tier Supabase)
+INSERT INTO storage.buckets (id, name, public, file_size_limit)
+VALUES ('content', 'content', false, 52428800)
+ON CONFLICT (id) DO UPDATE SET file_size_limit = 52428800, public = false;
+
+-- RLS policies sur storage.objects
+DROP POLICY IF EXISTS "content_select" ON storage.objects;
+DROP POLICY IF EXISTS "content_insert" ON storage.objects;
+DROP POLICY IF EXISTS "content_update" ON storage.objects;
+DROP POLICY IF EXISTS "content_delete" ON storage.objects;
+
+-- foldername(name) split le path en segments. Pour 'videos/users/abc-123/file.mp4'
+-- ça retourne ['videos', 'users', 'abc-123']. Donc [2] = scope, [3] = id.
+CREATE POLICY "content_select" ON storage.objects FOR SELECT USING (
+  bucket_id = 'content' AND (
+    ((storage.foldername(name))[2] = 'users' AND (storage.foldername(name))[3]::uuid = auth.uid())
+    OR
+    ((storage.foldername(name))[2] = 'orgs'  AND public.is_org_member((storage.foldername(name))[3]::uuid))
+  )
+);
+
+CREATE POLICY "content_insert" ON storage.objects FOR INSERT WITH CHECK (
+  bucket_id = 'content' AND (
+    ((storage.foldername(name))[2] = 'users' AND (storage.foldername(name))[3]::uuid = auth.uid())
+    OR
+    ((storage.foldername(name))[2] = 'orgs'  AND public.is_org_member((storage.foldername(name))[3]::uuid))
+  )
+);
+
+CREATE POLICY "content_update" ON storage.objects FOR UPDATE USING (
+  bucket_id = 'content' AND (
+    ((storage.foldername(name))[2] = 'users' AND (storage.foldername(name))[3]::uuid = auth.uid())
+    OR
+    ((storage.foldername(name))[2] = 'orgs'  AND public.is_org_admin((storage.foldername(name))[3]::uuid))
+  )
+);
+
+CREATE POLICY "content_delete" ON storage.objects FOR DELETE USING (
+  bucket_id = 'content' AND (
+    ((storage.foldername(name))[2] = 'users' AND (storage.foldername(name))[3]::uuid = auth.uid())
+    OR
+    ((storage.foldername(name))[2] = 'orgs'  AND public.is_org_admin((storage.foldername(name))[3]::uuid))
+  )
+);
+
+
+-- ╔══════════════════════════════════════════════════════════════╗
+-- ║  11. Reload PostgREST schema cache                           ║
 -- ╚══════════════════════════════════════════════════════════════╝
 
 NOTIFY pgrst, 'reload schema';

@@ -1,6 +1,7 @@
 import { app, BrowserWindow, shell, ipcMain, net, dialog, session, protocol } from 'electron'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { existsSync, readFileSync, createReadStream, statSync } from 'node:fs'
+import { existsSync, readFileSync, createReadStream, statSync, writeFileSync, mkdirSync } from 'node:fs'
+import os from 'node:os'
 import { execFile } from 'node:child_process'
 import https from 'node:https'
 import path from 'node:path'
@@ -859,6 +860,34 @@ ipcMain.handle('read-local-video', async (_event, filePath: string) => {
     }
     const buf = readFileSync(filePath)
     return { ok: true, dataUrl: `data:${mime};base64,${buf.toString('base64')}` }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+})
+
+// ── IPC: read full file bytes (for cloud upload) ─────────────────────────────
+ipcMain.handle('read-file-bytes', async (_event, filePath: string) => {
+  try {
+    if (!existsSync(filePath)) return { ok: false, error: 'not found' }
+    const buf = readFileSync(filePath)
+    // Return a transferable ArrayBuffer (fast — no base64)
+    return { ok: true, bytes: buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength), size: buf.byteLength }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+})
+
+// ── IPC: write bytes to temp dir, return absolute path ──────────────────────
+// Used to materialise a cloud-stored video to disk so GéeLark / ffmpeg can read it.
+ipcMain.handle('write-temp-file', async (_event, opts: { name: string; bytes: ArrayBuffer }) => {
+  try {
+    const dir = path.join(os.tmpdir(), 'ig-tracker-cache')
+    mkdirSync(dir, { recursive: true })
+    // Sanitise the name: strip directory separators, keep extension
+    const safeName = opts.name.replace(/[\\/]/g, '_').slice(-200)
+    const out = path.join(dir, `${Date.now()}-${safeName}`)
+    writeFileSync(out, Buffer.from(opts.bytes))
+    return { ok: true, path: out }
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) }
   }

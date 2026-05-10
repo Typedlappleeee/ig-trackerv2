@@ -128,15 +128,19 @@ export function MassPosting({ user }: MassPostingProps) {
     const path = await window.electronAPI?.pickVideoFile()
     if (!path) return
     const fake: ContentItem = {
-      id:            `local-${Date.now()}`,
-      user_id:       user.id,
-      title:         path.split(/[\\/]/).pop() ?? 'Vidéo locale',
-      file_url:      null,
-      thumbnail_url: null,
-      duration:      null,
-      tags:          [],
-      notes:         '',
-      used_count:    0,
+      id:             `local-${Date.now()}`,
+      user_id:        user.id,
+      org_id:         null,
+      folder:         null,
+      title:          path.split(/[\\/]/).pop() ?? 'Vidéo locale',
+      file_url:       null,
+      storage_path:   null,
+      thumbnail_path: null,
+      thumbnail_url:  null,
+      duration:       null,
+      tags:           [],
+      notes:          '',
+      used_count:     0,
       created_at:    new Date().toISOString(),
       updated_at:    new Date().toISOString(),
     }
@@ -462,7 +466,7 @@ export function MassPosting({ user }: MassPostingProps) {
                   className="w-full flex items-center gap-3 px-3 py-2.5 border-b border-border/30"
                 >
                   <div className="w-10 flex-shrink-0 aspect-[9/16] rounded overflow-hidden bg-surface2">
-                    <VideoThumbnail filePath={fp ?? ''} />
+                    <VideoThumbnail filePath={fp ?? ''} thumbnailPath={sv.item.thumbnail_path} />
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="text-xs font-bold text-accent">#{selIdx + 1}</p>
@@ -590,7 +594,7 @@ export function MassPosting({ user }: MassPostingProps) {
                         <div className="flex items-center gap-2">
                           {/* Video thumbnail */}
                           <div className="w-8 flex-shrink-0 aspect-[9/16] rounded overflow-hidden bg-surface2">
-                            <VideoThumbnail filePath={video.localPath ?? video.item.file_url ?? ''} />
+                            <VideoThumbnail filePath={video.localPath ?? video.item.file_url ?? ''} thumbnailPath={video.item.thumbnail_path} />
                           </div>
                           <div className="min-w-0 flex-1">
                             <p className="text-[10px] text-accent font-bold">#{videoIndex + 1}</p>
@@ -673,17 +677,21 @@ export function MassPosting({ user }: MassPostingProps) {
               .filter(p => !selectedVideos.some(sv => (sv.localPath ?? sv.item.file_url) === p))
               .map(p => ({
                 item: {
-                  id:            `bank-${p}`,
-                  user_id:       user.id,
-                  title:         p.replace(/\\/g, '/').split('/').pop() ?? p,
-                  file_url:      p,
-                  thumbnail_url: null,
-                  duration:      null,
-                  tags:          [],
-                  notes:         '',
-                  used_count:    0,
-                  created_at:    new Date().toISOString(),
-                  updated_at:    new Date().toISOString(),
+                  id:             `bank-${p}`,
+                  user_id:        user.id,
+                  org_id:         null,
+                  folder:         null,
+                  title:          p.replace(/\\/g, '/').split('/').pop() ?? p,
+                  file_url:       p,
+                  storage_path:   null,
+                  thumbnail_path: null,
+                  thumbnail_url:  null,
+                  duration:       null,
+                  tags:           [],
+                  notes:          '',
+                  used_count:     0,
+                  created_at:     new Date().toISOString(),
+                  updated_at:     new Date().toISOString(),
                 },
                 localPath: null,
               }))

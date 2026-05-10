@@ -45,6 +45,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Read a local video file as a data URL (fallback when localvideo:// fails)
   readLocalVideo: (filePath: string) => ipcRenderer.invoke('read-local-video', filePath),
 
+  // Read full file bytes (used to upload to Supabase Storage)
+  readFileBytes: (filePath: string) => ipcRenderer.invoke('read-file-bytes', filePath),
+
+  // Materialise bytes (e.g. a downloaded cloud video) to a temp file, return its path
+  writeTempFile: (opts: { name: string; bytes: ArrayBuffer }) =>
+    ipcRenderer.invoke('write-temp-file', opts),
+
   // Fetch Instagram comments for a media post
   fetchIgComments: (opts: { mediaId: string; sessionid: string; maxId?: string }) =>
     ipcRenderer.invoke('fetch-ig-comments', opts),

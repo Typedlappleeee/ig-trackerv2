@@ -4,6 +4,8 @@ import { supabase, type ContentItem } from '@/lib/supabase'
 import { VideoThumbnail } from './Bank'
 import { Spinner } from '@/components/ui/Spinner'
 import { Button }  from '@/components/ui/Button'
+import { useOrg } from '@/lib/orgContext'
+import { uploadVideoFromPath, type UploadScope } from '@/lib/storage'
 
 interface MontageProps { user: User }
 
@@ -357,6 +359,7 @@ function DraggableText({ overlay, onMove }: {
 
 // ── Main component ────────────────────────────────────────────────────────────
 export function Montage({ user }: MontageProps) {
+  const { currentOrg } = useOrg()
   // Bank
   const [bankItems, setBankItems] = useState<ContentItem[]>([])
   const [bankLoading, setLL]      = useState(true)
@@ -466,8 +469,18 @@ export function Montage({ user }: MontageProps) {
     const file = e.dataTransfer.files[0]; if (!file) return
     const fp = (file as File & { path?: string }).path ?? file.name
     const title = fp.replace(/\\/g, '/').split('/').pop()?.replace(/\.[^.]+$/, '') ?? 'Vidéo'
-    const { data } = await supabase.from('content_bank').insert({ user_id: user.id, title, file_url: fp, tags: [], notes: '' }).select().single()
-    if (data) { setBankItems(prev => [data, ...prev]); addClip(data) }
+    const scope: UploadScope = currentOrg ? { mode: 'org', id: currentOrg.id } : { mode: 'user', id: user.id }
+    try {
+      const { storagePath, thumbnailPath } = await uploadVideoFromPath(fp, scope)
+      const { data } = await supabase.from('content_bank').insert({
+        user_id: user.id, org_id: currentOrg?.id ?? null, title,
+        file_url: null, storage_path: storagePath, thumbnail_path: thumbnailPath,
+        tags: [], notes: '',
+      }).select().single()
+      if (data) { setBankItems(prev => [data, ...prev]); addClip(data) }
+    } catch (err) {
+      console.error('[Montage] upload failed', err)
+    }
   }
 
   // ── Export ─────────────────────────────────────────────────────────────────
@@ -476,13 +489,23 @@ export function Montage({ user }: MontageProps) {
     setExporting(true); setExpResult(null)
     const out = await window.electronAPI?.pickOutputFile?.({ defaultName: `${projectName.replace(/\s+/g, '_')}.mp4` })
     if (!out) { setExporting(false); return }
-    const res = await window.electronAPI?.runFfmpeg?.({
-      clips: clips.map(c => ({ filePath: c.item.file_url!, trimStart: c.trimStart, trimEnd: c.trimEnd })),
-      outputPath: out, preset, transition: 'cut',
-    })
-    setExporting(false)
-    if (res?.ok) setExpResult({ ok: true, msg: `✓ Exporté : ${out}` })
-    else setExpResult({ ok: false, msg: res?.error ?? 'Erreur FFmpeg', command: res?.command })
+    try {
+      const { resolveContentToLocalPath } = await import('@/lib/storage')
+      const ffmpegClips = await Promise.all(clips.map(async c => ({
+        filePath: await resolveContentToLocalPath(c.item),
+        trimStart: c.trimStart,
+        trimEnd:   c.trimEnd,
+      })))
+      const res = await window.electronAPI?.runFfmpeg?.({
+        clips: ffmpegClips, outputPath: out, preset, transition: 'cut',
+      })
+      setExporting(false)
+      if (res?.ok) setExpResult({ ok: true, msg: `✓ Exporté : ${out}` })
+      else setExpResult({ ok: false, msg: res?.error ?? 'Erreur FFmpeg', command: res?.command })
+    } catch (e) {
+      setExporting(false)
+      setExpResult({ ok: false, msg: e instanceof Error ? e.message : String(e) })
+    }
   }
 
   // ── Computed ───────────────────────────────────────────────────────────────
@@ -606,10 +629,19 @@ export function Montage({ user }: MontageProps) {
               <div className="flex gap-1">
                 <button onClick={async () => {
                   const p = await window.electronAPI?.pickVideoFile?.()
-                  if (p) {
-                    const title = p.replace(/\\/g, '/').split('/').pop()?.replace(/\.[^.]+$/, '') ?? 'Vidéo'
-                    const { data } = await supabase.from('content_bank').insert({ user_id: user.id, title, file_url: p, tags: [], notes: '' }).select().single()
+                  if (!p) return
+                  const title = p.replace(/\\/g, '/').split('/').pop()?.replace(/\.[^.]+$/, '') ?? 'Vidéo'
+                  const scope: UploadScope = currentOrg ? { mode: 'org', id: currentOrg.id } : { mode: 'user', id: user.id }
+                  try {
+                    const { storagePath, thumbnailPath } = await uploadVideoFromPath(p, scope)
+                    const { data } = await supabase.from('content_bank').insert({
+                      user_id: user.id, org_id: currentOrg?.id ?? null, title,
+                      file_url: null, storage_path: storagePath, thumbnail_path: thumbnailPath,
+                      tags: [], notes: '',
+                    }).select().single()
                     if (data) { setBankItems(prev => [data, ...prev]); addClip(data) }
+                  } catch (err) {
+                    console.error('[Montage] upload failed', err)
                   }
                 }} className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-accent/10 hover:bg-accent/20 text-accent text-xs font-semibold rounded-lg transition-colors">
                   + Importer

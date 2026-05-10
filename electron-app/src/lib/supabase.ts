@@ -100,19 +100,21 @@ export interface Phone {
 }
 
 export interface ContentItem {
-  id:            string
-  user_id:       string
-  org_id:        string | null
-  folder:        string | null
-  title:         string
-  file_url:      string | null
-  thumbnail_url: string | null
-  duration:      number | null
-  tags:          string[]
-  notes:         string
-  used_count:    number
-  created_at:    string
-  updated_at:    string
+  id:             string
+  user_id:        string
+  org_id:         string | null
+  folder:         string | null
+  title:          string
+  file_url:       string | null   // Legacy local filesystem path (still set for non-migrated rows)
+  storage_path:   string | null   // Supabase Storage path inside the "content" bucket (e.g. videos/users/<id>/<uuid>.mp4)
+  thumbnail_path: string | null   // Same scheme, in thumbs/ folder
+  thumbnail_url:  string | null
+  duration:       number | null
+  tags:           string[]
+  notes:          string
+  used_count:     number
+  created_at:     string
+  updated_at:     string
 }
 
 export interface AppConfig {

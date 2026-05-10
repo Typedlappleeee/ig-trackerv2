@@ -3,6 +3,7 @@ import type { User } from '@supabase/supabase-js'
 import { supabase, type ContentItem } from '@/lib/supabase'
 import { useOrg } from '@/lib/orgContext'
 import { canAccessBankFolder } from '@/lib/permissions'
+import { uploadVideoFromPath, deleteStorageObjects, type UploadScope } from '@/lib/storage'
 import { Button }  from '@/components/ui/Button'
 import { Spinner } from '@/components/ui/Spinner'
 
@@ -193,6 +194,7 @@ export function Bank({ user }: BankProps) {
   const [items, setItems]         = useState<ContentItem[]>([])
   const [loading, setLoading]     = useState(true)
   const [adding, setAdding]       = useState(false)
+  const [uploadStatus, setUploadStatus] = useState<string | null>(null)
   const [search, setSearch]       = useState('')
   const [error, setError]         = useState<string | null>(null)
   const [dragging, setDragging]   = useState(false)
@@ -252,29 +254,85 @@ export function Bank({ user }: BankProps) {
     setLoading(false)
   }
 
-  // Insert a video directly from a file path — no form needed, title = filename
-  // Gracefully handles missing 'folder' column (migration not run yet).
+  // Upload a video to Supabase Storage + insert content_bank row.
+  // Title = filename without extension. The local path is NOT stored — once uploaded,
+  // the video lives in the cloud and is fetched via signed URLs from any device.
   async function addFromPath(filePath: string) {
     const title = nameWithoutExt(filePath)
     const folder = selectedFolder ?? null
-    setAdding(true)
-    const baseRow = { user_id: user.id, org_id: currentOrg?.id ?? null, title, file_url: filePath, duration: null, tags: [], notes: '' }
+    const scope: UploadScope = currentOrg ? { mode: 'org', id: currentOrg.id } : { mode: 'user', id: user.id }
 
-    // First try with folder column
-    let res = await supabase
-      .from('content_bank')
-      .insert({ ...baseRow, folder })
-      .select().single()
+    setAdding(true); setUploadStatus(`📤 Lecture de ${basename(filePath)}…`)
+    try {
+      const { storagePath, thumbnailPath } = await uploadVideoFromPath(filePath, scope, phase => {
+        const labels: Record<string, string> = {
+          'reading':          '📂 Lecture du fichier…',
+          'uploading-video':  '☁ Upload vers Supabase…',
+          'thumbnail':        '🖼 Génération de la miniature…',
+          'uploading-thumb':  '☁ Upload de la miniature…',
+        }
+        setUploadStatus(labels[phase] ?? '')
+      })
 
-    // If the folder column doesn't exist, retry without it and show migration banner
-    if (res.error && /folder/i.test(res.error.message) && /column|cache/i.test(res.error.message)) {
-      setNeedsMigration(true)
-      res = await supabase.from('content_bank').insert(baseRow).select().single()
+      const baseRow = {
+        user_id: user.id, org_id: currentOrg?.id ?? null, title,
+        file_url: null,                  // No more local paths
+        storage_path: storagePath,
+        thumbnail_path: thumbnailPath,
+        duration: null, tags: [], notes: '',
+      }
+      let res = await supabase.from('content_bank').insert({ ...baseRow, folder }).select().single()
+
+      // Graceful fallback if storage_path columns don't exist yet (schema_full.sql not re-run)
+      if (res.error && /storage_path|thumbnail_path|folder/i.test(res.error.message) && /column|cache/i.test(res.error.message)) {
+        setNeedsMigration(true)
+        res = await supabase.from('content_bank').insert({
+          user_id: user.id, org_id: currentOrg?.id ?? null, title, file_url: null,
+          duration: null, tags: [], notes: '',
+        }).select().single()
+      }
+
+      if (res.error) {
+        setError("Erreur lors de l'ajout : " + res.error.message)
+        // Roll back the storage upload so we don't leak orphan files
+        await deleteStorageObjects([storagePath, thumbnailPath])
+      }
+      else if (res.data) setItems(prev => [res.data, ...prev])
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
     }
+    setAdding(false); setUploadStatus(null)
+  }
 
-    if (res.error) setError("Erreur lors de l'ajout : " + res.error.message)
-    else if (res.data) setItems(prev => [res.data, ...prev])
-    setAdding(false)
+  // Migrate a legacy item (file_url is a local path) to cloud storage.
+  // Reads the local file, uploads it, updates the row to clear file_url and set storage_path.
+  async function reuploadItem(item: ContentItem) {
+    if (!item.file_url) return
+    const scope: UploadScope = currentOrg ? { mode: 'org', id: currentOrg.id } : { mode: 'user', id: user.id }
+    setUploadStatus(`📤 Migration de ${item.title}…`)
+    try {
+      const { storagePath, thumbnailPath } = await uploadVideoFromPath(item.file_url, scope, phase => {
+        const labels: Record<string, string> = {
+          'reading':          '📂 Lecture du fichier local…',
+          'uploading-video':  '☁ Upload vers Supabase…',
+          'thumbnail':        '🖼 Miniature…',
+          'uploading-thumb':  '☁ Upload miniature…',
+        }
+        setUploadStatus(`${item.title} : ${labels[phase] ?? ''}`)
+      })
+      const { error: err } = await supabase.from('content_bank').update({
+        storage_path: storagePath, thumbnail_path: thumbnailPath, file_url: null,
+      }).eq('id', item.id)
+      if (err) {
+        setError('Migration échouée : ' + err.message)
+        await deleteStorageObjects([storagePath, thumbnailPath])
+      } else {
+        setItems(prev => prev.map(i => i.id === item.id ? { ...i, storage_path: storagePath, thumbnail_path: thumbnailPath, file_url: null } : i))
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    }
+    setUploadStatus(null)
   }
 
   async function pickFile() {
@@ -300,8 +358,13 @@ export function Bank({ user }: BankProps) {
   }
 
   async function deleteItem(id: string) {
+    const item = items.find(i => i.id === id)
     const { error: err } = await supabase.from('content_bank').delete().eq('id', id)
-    if (!err) setItems(prev => prev.filter(i => i.id !== id))
+    if (!err) {
+      setItems(prev => prev.filter(i => i.id !== id))
+      // Best-effort cleanup of the Storage objects (not blocking)
+      if (item) deleteStorageObjects([item.storage_path, item.thumbnail_path])
+    }
     setCtxMenu(null)
   }
 
@@ -523,6 +586,13 @@ export function Bank({ user }: BankProps) {
           </div>
         )}
 
+        {uploadStatus && (
+          <div className="mx-6 mt-4 px-4 py-3 rounded-lg bg-accent/10 border border-accent/30 text-accent text-sm flex items-center gap-2">
+            <span className="animate-spin">↻</span>
+            <span>{uploadStatus}</span>
+          </div>
+        )}
+
         {/* Content */}
         <div className="flex-1 p-6">
           {loading ? (
@@ -561,8 +631,9 @@ export function Bank({ user }: BankProps) {
             { label: '✏️ Renommer',          action: () => { setRenameItem(ctxMenu.item); setCtxMenu(null) } },
             { label: '📂 Déplacer vers…',    action: () => { setMoveItem(ctxMenu.item); setCtxMenu(null) } },
             { label: '🏷 Modifier les tags', action: () => { setTagsItem(ctxMenu.item); setCtxMenu(null) } },
-            { label: '⬇ Télécharger (bientôt)', action: () => setCtxMenu(null) },
-            { label: '🔀 Randomiser (bientôt)', action: () => setCtxMenu(null) },
+            ...(ctxMenu.item.file_url && !ctxMenu.item.storage_path ? [
+              { label: '☁ Uploader vers le cloud', action: () => { reuploadItem(ctxMenu.item); setCtxMenu(null) } },
+            ] : []),
             { label: '🗑 Supprimer',         action: () => deleteItem(ctxMenu.item.id), danger: true },
           ].map(({ label, action, danger }) => (
             <button
@@ -680,13 +751,39 @@ function FolderRow({ name, count, active, onClick, onRename, onDelete }: {
 }
 
 // ── Video thumbnail ───────────────────────────────────────────────────────────
-// Uses the custom localvideo:// protocol (registered in main.ts with stream:true
-// and Range support) so the video element can seek without canvas CORS issues.
-export function VideoThumbnail({ filePath }: { filePath: string }) {
+// Priority order:
+//   1. thumbnailPath (Supabase Storage) → fetch signed URL, show as <img>
+//   2. filePath (local) → use localvideo:// protocol with first-frame seek
+//   3. fallback emoji
+import { getSignedUrl } from '@/lib/storage'
+
+export function VideoThumbnail({ filePath, thumbnailPath }: { filePath?: string | null; thumbnailPath?: string | null }) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const [failed, setFailed] = useState(false)
+  const [thumbUrl, setThumbUrl] = useState<string | null>(null)
 
-  // Convert any local path to localvideo:// URL
+  useEffect(() => {
+    let cancelled = false
+    if (thumbnailPath) {
+      getSignedUrl(thumbnailPath).then(u => { if (!cancelled) setThumbUrl(u) })
+    } else {
+      setThumbUrl(null)
+    }
+    return () => { cancelled = true }
+  }, [thumbnailPath])
+
+  if (thumbnailPath) {
+    if (!thumbUrl || failed) {
+      return <div className="w-full h-full flex items-center justify-center bg-surface2 text-4xl">🎬</div>
+    }
+    return (
+      <img src={thumbUrl} alt=""
+        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+        onError={() => setFailed(true)} />
+    )
+  }
+
+  // Legacy path: local filesystem
   const localUrl = (() => {
     if (!filePath) return ''
     let n = filePath.replace(/\\/g, '/')
@@ -718,14 +815,25 @@ export function VideoThumbnail({ filePath }: { filePath: string }) {
 // ── Video player modal ────────────────────────────────────────────────────────
 function VideoPlayerModal({ item, onClose }: { item: ContentItem; onClose: () => void }) {
   const videoRef = useRef<HTMLVideoElement>(null)
+  const [cloudUrl, setCloudUrl] = useState<string | null>(null)
 
-  const localUrl = (() => {
-    if (!item.file_url) return ''
-    let n = item.file_url.replace(/\\/g, '/')
-    if (n.startsWith('file://')) n = n.slice(7)
-    if (!n.startsWith('/')) n = '/' + n
-    return 'localvideo://' + n
-  })()
+  useEffect(() => {
+    let cancelled = false
+    if (item.storage_path) {
+      getSignedUrl(item.storage_path).then(u => { if (!cancelled) setCloudUrl(u) })
+    }
+    return () => { cancelled = true }
+  }, [item.storage_path])
+
+  const localUrl = item.storage_path
+    ? cloudUrl ?? ''
+    : (() => {
+        if (!item.file_url) return ''
+        let n = item.file_url.replace(/\\/g, '/')
+        if (n.startsWith('file://')) n = n.slice(7)
+        if (!n.startsWith('/')) n = '/' + n
+        return 'localvideo://' + n
+      })()
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) { if (e.key === 'Escape') onClose() }
@@ -785,9 +893,9 @@ function VideoCard({ item, onContextMenu, onPlay }: {
     >
       <div
         className="relative aspect-[9/16] bg-surface2 overflow-hidden cursor-pointer"
-        onClick={() => item.file_url && onPlay(item)}
+        onClick={() => (item.file_url || item.storage_path) && onPlay(item)}
       >
-        <VideoThumbnail filePath={item.file_url} />
+        <VideoThumbnail filePath={item.file_url} thumbnailPath={item.thumbnail_path} />
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
 
         {/* Play button on hover */}
@@ -853,7 +961,9 @@ export function BankPicker({ user, mode, onSelect, onClose }: BankPickerProps) {
   const [loading, setLoading]       = useState(true)
   const [search, setSearch]         = useState('')
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null)
+  // Selection is tracked by item.id so cloud-stored items work even though their file_url is null.
   const [selected, setSelected]     = useState<Set<string>>(new Set())
+  const [resolving, setResolving]   = useState<string | null>(null)
 
   useEffect(() => {
     let q = supabase.from('content_bank').select('*').order('created_at', { ascending: false })
@@ -878,22 +988,43 @@ export function BankPicker({ user, mode, onSelect, onClose }: BankPickerProps) {
     return item.title.toLowerCase().includes(q) || item.tags.some(t => t.toLowerCase().includes(q))
   })
 
-  function toggle(item: ContentItem) {
-    if (!item.file_url) return
+  // Download cloud-stored items to temp; legacy items return file_url as-is.
+  async function resolvePaths(its: ContentItem[]): Promise<string[]> {
+    const out: string[] = []
+    for (let i = 0; i < its.length; i++) {
+      const it = its[i]
+      setResolving(`${i + 1}/${its.length} — ${it.title}`)
+      try {
+        const { resolveContentToLocalPath } = await import('@/lib/storage')
+        out.push(await resolveContentToLocalPath(it))
+      } catch (e) {
+        console.error('[BankPicker] resolve failed', it.id, e)
+      }
+    }
+    return out
+  }
+
+  async function toggle(item: ContentItem) {
+    if (!item.file_url && !item.storage_path) return
     if (mode === 'single') {
-      onSelect([item.file_url])
+      const paths = await resolvePaths([item])
+      setResolving(null)
+      if (paths.length > 0) onSelect(paths)
       return
     }
     setSelected(prev => {
       const next = new Set(prev)
-      if (next.has(item.file_url!)) next.delete(item.file_url!)
-      else next.add(item.file_url!)
+      if (next.has(item.id)) next.delete(item.id)
+      else next.add(item.id)
       return next
     })
   }
 
-  function confirm() {
-    onSelect([...selected])
+  async function confirm() {
+    const its = items.filter(i => selected.has(i.id))
+    const paths = await resolvePaths(its)
+    setResolving(null)
+    onSelect(paths)
   }
 
   return (
@@ -920,12 +1051,17 @@ export function BankPicker({ user, mode, onSelect, onClose }: BankPickerProps) {
             className="w-44 bg-bg border border-border rounded-lg px-3 py-1.5 text-xs text-text placeholder:text-text2 focus:border-accent focus:outline-none"
           />
           {mode === 'multi' && selected.size > 0 && (
-            <Button size="sm" onClick={confirm}>
-              Confirmer ({selected.size})
+            <Button size="sm" onClick={confirm} disabled={!!resolving}>
+              {resolving ? 'Téléchargement…' : `Confirmer (${selected.size})`}
             </Button>
           )}
           <button onClick={onClose} className="text-text2 hover:text-text transition-colors text-xl leading-none">✕</button>
         </div>
+        {resolving && (
+          <div className="px-5 py-2 bg-accent/10 border-b border-accent/30 text-accent text-xs flex items-center gap-2">
+            <span className="animate-spin">↻</span><span>📥 Téléchargement depuis le cloud : {resolving}</span>
+          </div>
+        )}
 
         <div className="flex flex-1 overflow-hidden">
           {/* Sidebar */}
@@ -969,18 +1105,18 @@ export function BankPicker({ user, mode, onSelect, onClose }: BankPickerProps) {
             ) : (
               <div className="grid grid-cols-3 xl:grid-cols-4 gap-3">
                 {visible.map(item => {
-                  const isSelected = item.file_url ? selected.has(item.file_url) : false
+                  const isSelected = selected.has(item.id)
                   return (
                     <button
                       key={item.id}
                       onClick={() => toggle(item)}
                       className={`text-left rounded-xl overflow-hidden border-2 transition-all ${
                         isSelected ? 'border-accent ring-2 ring-accent/30' : 'border-border hover:border-accent/40'
-                      } ${!item.file_url ? 'opacity-50 cursor-not-allowed' : ''}`}
-                      disabled={!item.file_url}
+                      } ${!item.file_url && !item.storage_path ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      disabled={!item.file_url && !item.storage_path}
                     >
                       <div className="relative aspect-[9/16] bg-surface2">
-                        <VideoThumbnail filePath={item.file_url ?? ''} />
+                        <VideoThumbnail filePath={item.file_url ?? ''} thumbnailPath={item.thumbnail_path} />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent pointer-events-none" />
                         {isSelected && (
                           <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-accent flex items-center justify-center">
