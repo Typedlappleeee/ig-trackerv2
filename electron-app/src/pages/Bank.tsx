@@ -269,31 +269,31 @@ export function Bank({ user }: BankProps) {
                 <VideoPreview filePath={item.file_url} />
                 {/* Gradient + info overlay */}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
-                {/* Date badge */}
+                {/* Date badge — top left */}
                 <div className="absolute top-2 left-2 bg-black/60 backdrop-blur-sm rounded px-1.5 py-0.5 text-[10px] text-white font-medium">
                   {new Date(item.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: '2-digit' })}
                 </div>
-                {/* Duration badge */}
+                {/* Duration badge — top right (hidden on hover to show delete) */}
                 {item.duration && (
-                  <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-sm rounded px-1.5 py-0.5 text-[10px] text-white">
+                  <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-sm rounded px-1.5 py-0.5 text-[10px] text-white group-hover:opacity-0 transition-opacity">
                     {formatDuration(item.duration)}
+                  </div>
+                )}
+                {/* Delete button — top right on hover */}
+                <button
+                  onClick={() => deleteItem(item.id)}
+                  className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/70 text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-danger/80"
+                  title="Supprimer"
+                >✕</button>
+                {/* Used count badge — bottom right */}
+                {item.used_count > 0 && (
+                  <div className="absolute bottom-8 right-2 bg-accent/90 rounded-full px-1.5 py-0.5 text-[10px] text-white font-semibold">
+                    {item.used_count}×
                   </div>
                 )}
                 <div className="absolute bottom-0 left-0 right-0 p-2.5">
                   <p className="text-xs font-semibold text-white truncate leading-tight">{item.title}</p>
                 </div>
-                {/* Delete button */}
-                <button
-                  onClick={() => deleteItem(item.id)}
-                  className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/60 text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-danger/80"
-                  title="Supprimer"
-                >✕</button>
-                {/* Used count badge */}
-                {item.used_count > 0 && (
-                  <div className="absolute top-2 left-2 bg-accent/90 rounded-full px-1.5 py-0.5 text-[10px] text-white font-semibold">
-                    {item.used_count}×
-                  </div>
-                )}
               </div>
               {/* Tags */}
               {item.tags.length > 0 && (

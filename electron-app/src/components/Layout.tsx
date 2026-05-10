@@ -10,16 +10,39 @@ interface LayoutProps {
   children: React.ReactNode
 }
 
-const NAV: { id: Page; label: string }[] = [
-  { id: 'dashboard',   label: 'Dashboard'     },
-  { id: 'phones',      label: 'Téléphones'    },
-  { id: 'stats',       label: 'Stats IG'      },
-  { id: 'posting',     label: 'Posting'       },
-  { id: 'massposting', label: 'Mass Posting'  },
-  { id: 'bank',        label: 'Banque vidéos' },
-  { id: 'montage',     label: 'Montage'       },
-  { id: 'aitools',     label: 'Outils IA'     },
-  { id: 'settings',    label: 'Paramètres'    },
+interface NavItem { id: Page; label: string; icon: string }
+interface NavSection { title: string; items: NavItem[] }
+
+const NAV_SECTIONS: NavSection[] = [
+  {
+    title: 'Principal',
+    items: [
+      { id: 'dashboard',   label: 'Dashboard',    icon: '📊' },
+      { id: 'phones',      label: 'Téléphones',   icon: '📱' },
+    ],
+  },
+  {
+    title: 'Instagram',
+    items: [
+      { id: 'stats',       label: 'Stats IG',     icon: '📈' },
+      { id: 'posting',     label: 'Posting',      icon: '🚀' },
+      { id: 'massposting', label: 'Mass Posting',  icon: '⚡' },
+      { id: 'bank',        label: 'Banque vidéos', icon: '🗂' },
+    ],
+  },
+  {
+    title: 'Création',
+    items: [
+      { id: 'montage',     label: 'Montage',      icon: '✂️' },
+      { id: 'aitools',     label: 'Outils IA',    icon: '🤖' },
+    ],
+  },
+  {
+    title: 'Général',
+    items: [
+      { id: 'settings',    label: 'Paramètres',   icon: '⚙️' },
+    ],
+  },
 ]
 
 export function Layout({ user, page, onNavigate, children }: LayoutProps) {
@@ -27,35 +50,48 @@ export function Layout({ user, page, onNavigate, children }: LayoutProps) {
     <div className="min-h-screen bg-bg flex">
       <aside className="w-56 flex-shrink-0 flex flex-col border-r border-border bg-surface">
         {/* Logo */}
-        <div className="px-5 py-5 flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold bg-accent/10 text-accent">
+        <div className="px-4 py-4 flex items-center gap-2.5 border-b border-border">
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold bg-accent/15 text-accent border border-accent/20">
             IG
           </div>
-          <span className="font-semibold text-sm text-text">IG Tracker</span>
+          <div>
+            <p className="font-bold text-sm text-text leading-none">IG Tracker</p>
+            <p className="text-[10px] text-text2 leading-none mt-0.5">v2.0</p>
+          </div>
         </div>
 
-        {/* Nav */}
-        <nav className="flex-1 px-2 py-2 space-y-0.5">
-          {NAV.map(item => (
-            <button
-              key={item.id}
-              onClick={() => onNavigate(item.id)}
-              className={`
-                w-full flex items-center px-3 py-2.5 rounded-lg text-sm transition-all duration-150 text-left
-                ${page === item.id
-                  ? 'bg-surface2 text-text border-l-2 border-accent pl-[10px]'
-                  : 'text-text2 hover:bg-surface2 hover:text-text'
-                }
-              `}
-            >
-              <span>{item.label}</span>
-            </button>
+        {/* Nav sections */}
+        <nav className="flex-1 overflow-auto py-2">
+          {NAV_SECTIONS.map(section => (
+            <div key={section.title} className="mb-1">
+              <p className="px-4 py-1.5 text-[10px] font-semibold text-text2 uppercase tracking-widest">
+                {section.title}
+              </p>
+              <div className="space-y-0.5 px-2">
+                {section.items.map(item => (
+                  <button
+                    key={item.id}
+                    onClick={() => onNavigate(item.id)}
+                    className={`
+                      w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all duration-150 text-left
+                      ${page === item.id
+                        ? 'bg-accent/10 text-accent border border-accent/20'
+                        : 'text-text2 hover:bg-surface2 hover:text-text border border-transparent'
+                      }
+                    `}
+                  >
+                    <span className="text-base w-5 text-center flex-shrink-0">{item.icon}</span>
+                    <span className="font-medium">{item.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
           ))}
         </nav>
 
         {/* User footer */}
         <div className="px-3 py-3 border-t border-border">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-full bg-accent/20 text-accent flex items-center justify-center text-xs font-bold flex-shrink-0">
               {user.email?.[0].toUpperCase()}
             </div>

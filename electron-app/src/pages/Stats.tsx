@@ -333,7 +333,7 @@ export function Stats({ user }: StatsProps) {
                   </p>
                 </div>
               ) : (
-                <div className="grid grid-cols-3 xl:grid-cols-4 gap-3">
+                <div className="grid grid-cols-3 xl:grid-cols-5 2xl:grid-cols-6 gap-3">
                   {sorted.map(video => (
                     <a
                       key={video.id}
@@ -342,7 +342,7 @@ export function Stats({ user }: StatsProps) {
                       rel="noreferrer"
                       className="bg-card border border-border rounded-xl overflow-hidden hover:border-accent/40 transition-colors group"
                     >
-                      <div className="h-48 bg-surface2 relative overflow-hidden">
+                      <div className="aspect-[9/16] bg-surface2 relative overflow-hidden">
                         <VideoThumbnail src={video.thumbnail} sessionid={sessionid} />
                         {video.views > 0 && (
                           <div className="absolute bottom-1.5 left-1.5 bg-black/70 rounded px-1.5 py-0.5 text-[10px] text-white flex items-center gap-1">
@@ -350,18 +350,18 @@ export function Stats({ user }: StatsProps) {
                             <span>{video.views.toLocaleString('fr-FR')}</span>
                           </div>
                         )}
+                        {video.timestamp && (
+                          <div className="absolute top-1.5 left-1.5 bg-black/60 rounded px-1.5 py-0.5 text-[9px] text-white">
+                            {new Date(video.timestamp).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}
+                          </div>
+                        )}
                       </div>
-                      <div className="px-2.5 py-2 flex items-center gap-2 text-[11px] text-text2">
+                      <div className="px-2 py-1.5 flex items-center gap-2 text-[10px] text-text2">
                         {video.likes > 0 && (
                           <span className="flex items-center gap-0.5">❤ {video.likes.toLocaleString('fr-FR')}</span>
                         )}
                         {video.comments > 0 && (
                           <span className="flex items-center gap-0.5">💬 {video.comments.toLocaleString('fr-FR')}</span>
-                        )}
-                        {video.timestamp && (
-                          <span className="ml-auto">
-                            {new Date(video.timestamp).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}
-                          </span>
                         )}
                       </div>
                     </a>

@@ -193,8 +193,10 @@ export function Dashboard({ user }: DashboardProps) {
   }
 
   const totalViews    = phones.reduce((s, p) => s + (p.total_views ?? 0), 0)
+  const totalFollowers = phones.reduce((s, p) => s + (p.followers ?? 0), 0)
   const activePhones  = phones.filter(p => p.status === 'online').length
   const linkedPhones  = phones.filter(p => p.ig_username).length
+  const activeIg      = phones.filter(p => p.ig_status === 'active').length
 
   const RANGES: { key: Range; label: string }[] = [
     { key: '24h', label: '24h' },
@@ -230,28 +232,38 @@ export function Dashboard({ user }: DashboardProps) {
               </button>
 
               {/* Per-phone rows */}
-              {phones.filter(p => p.ig_username || p.total_views).map(phone => (
-                <button
-                  key={phone.id}
-                  onClick={() => setSelPhone(phone)}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors ${
-                    selectedPhone?.id === phone.id ? 'bg-surface2 border-l-2 border-accent pl-[10px]' : 'hover:bg-surface2'
-                  }`}
-                >
-                  <div className="w-7 h-7 rounded-full bg-accent/20 text-accent flex items-center justify-center text-xs font-bold flex-shrink-0">
-                    {(phone.ig_username ?? phone.phone_name)[0].toUpperCase()}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-medium text-text truncate">
-                      {phone.ig_username ? `@${phone.ig_username}` : phone.phone_name}
-                    </p>
-                    {phone.total_views ? (
-                      <p className="text-[10px] text-text2">{phone.total_views.toLocaleString('fr-FR')} vues</p>
-                    ) : null}
-                  </div>
-                  {phone.status === 'online' && <span className="w-1.5 h-1.5 rounded-full bg-ok flex-shrink-0" />}
-                </button>
-              ))}
+              {phones.filter(p => p.ig_username || p.total_views).map(phone => {
+                const igDot = phone.ig_status === 'active' ? 'bg-ok'
+                  : phone.ig_status === 'error' ? 'bg-danger'
+                  : phone.ig_status === 'rate_limited' ? 'bg-warn'
+                  : phone.ig_sessionid ? 'bg-accent'
+                  : 'bg-text2'
+                return (
+                  <button
+                    key={phone.id}
+                    onClick={() => setSelPhone(phone)}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-colors ${
+                      selectedPhone?.id === phone.id ? 'bg-surface2 border-l-2 border-accent pl-[10px]' : 'hover:bg-surface2'
+                    }`}
+                  >
+                    <div className="w-7 h-7 rounded-full bg-accent/20 text-accent flex items-center justify-center text-xs font-bold flex-shrink-0 relative">
+                      {(phone.ig_username ?? phone.phone_name)[0].toUpperCase()}
+                      {phone.ig_username && (
+                        <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-surface ${igDot} ${phone.ig_status === 'active' ? 'animate-pulse' : ''}`} />
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-medium text-text truncate">
+                        {phone.ig_username ? `@${phone.ig_username}` : phone.phone_name}
+                      </p>
+                      <p className="text-[10px] text-text2">
+                        {phone.followers ? `${phone.followers.toLocaleString('fr-FR')} abonn.` : phone.total_views ? `${phone.total_views.toLocaleString('fr-FR')} vues` : 'Aucune donnée'}
+                      </p>
+                    </div>
+                    {phone.status === 'online' && <span className="w-1.5 h-1.5 rounded-full bg-ok flex-shrink-0" />}
+                  </button>
+                )
+              })}
             </>
           )}
         </div>
@@ -278,18 +290,19 @@ export function Dashboard({ user }: DashboardProps) {
         </div>
 
         {/* KPI grid */}
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-4 gap-3">
           {[
-            { label: 'VUES TOTALES',     value: selectedPhone ? (selectedPhone.total_views ?? 0) : totalViews, color: '#4f9eff', icon: '👁' },
-            { label: 'PHONES EN LIGNE',  value: activePhones,   color: '#00ccaa', icon: '✅' },
-            { label: 'COMPTES IG LIÉS', value: linkedPhones,   color: '#a56ef5', icon: '📱' },
+            { label: 'Vues totales',     value: selectedPhone ? (selectedPhone.total_views ?? 0) : totalViews,         color: '#4f9eff', icon: '👁' },
+            { label: 'Abonnés total',    value: selectedPhone ? (selectedPhone.followers ?? 0)   : totalFollowers,      color: '#c8f03c', icon: '👥' },
+            { label: 'Phones en ligne',  value: activePhones,   color: '#00ccaa', icon: '📱' },
+            { label: 'IG actifs',        value: activeIg,       color: '#a56ef5', icon: '✅' },
           ].map(({ label, value, color, icon }) => (
-            <div key={label} className="bg-card border border-border rounded-xl p-4 border-t-2" style={{ borderTopColor: color }}>
-              <div className="flex items-center gap-2 mb-2">
-                <span>{icon}</span>
-                <span className="text-xs font-semibold text-text2">{label}</span>
+            <div key={label} className="bg-card border border-border rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-base">{icon}</span>
+                <span className="text-xs text-text2 font-medium">{label}</span>
               </div>
-              <p className="text-3xl font-bold" style={{ color }}>{value.toLocaleString('fr-FR')}</p>
+              <p className="text-2xl font-bold" style={{ color }}>{value.toLocaleString('fr-FR')}</p>
             </div>
           ))}
         </div>
