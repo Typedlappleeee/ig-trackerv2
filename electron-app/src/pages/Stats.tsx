@@ -124,7 +124,43 @@ export function Stats({ user }: StatsProps) {
     else { setLS(true); setLL(true) }
 
     try {
-      // Force-bypass cache only when user explicitly clicks Refresh/Réessayer
+      // If session ID is available, use private API (better thumbnails, no rate limit)
+      if (phone.ig_sessionid && window.electronAPI?.fetchInstagramBySession) {
+        const r = await window.electronAPI.fetchInstagramBySession({
+          username: phone.ig_username,
+          sessionid: phone.ig_sessionid,
+        })
+        if (r.ok) {
+          setStats({
+            followers:   r.followers   ?? 0,
+            following:   r.following   ?? 0,
+            posts:       r.posts       ?? 0,
+            total_views: r.total_views ?? 0,
+            bio:         r.bio         ?? '',
+          })
+          setLS(false)
+          const sessionVideos: IgVideo[] = (r.videos ?? []).map(v => ({
+            id:        v.id,
+            shortcode: v.shortcode,
+            url:       `https://www.instagram.com/reel/${v.shortcode}/`,
+            views:     v.views,
+            likes:     v.likes,
+            comments:  v.comments,
+            thumbnail: v.thumbnail,
+            timestamp: v.timestamp,
+            isVideo:   true,
+          }))
+          setVideos(sessionVideos)
+          setLL(false)
+          setRetrying(false)
+          return
+        } else {
+          // Session failed — fall through to public API
+          console.warn('[Stats] Session fetch failed:', r.error)
+        }
+      }
+
+      // Fallback: public API
       const force = retry
       if (force) invalidateIgCache(phone.ig_username)
 

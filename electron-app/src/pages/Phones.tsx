@@ -15,6 +15,204 @@ const INTERVALS = [
   { label: '5 min', value: 300 },
 ]
 
+// ── Status dot ──────────────────────────────────────────────────────────────
+function StatusDot({ status }: { status: string }) {
+  return (
+    <span className={`inline-block w-2 h-2 rounded-full ${status === 'online' ? 'bg-ok' : 'bg-text2'}`} />
+  )
+}
+
+// ── IG Status badge ─────────────────────────────────────────────────────────
+function IgStatusBadge({ phone }: { phone: Phone }) {
+  if (!phone.ig_username) return null
+  if (phone.ig_status === 'active')       return <span title="Session active">✅</span>
+  if (phone.ig_status === 'error')        return <span title="Session en erreur">❌</span>
+  if (phone.ig_status === 'rate_limited') return <span title="Rate limited">⚠️</span>
+  if (phone.ig_sessionid)                 return <span title="Session configurée">🔑</span>
+  return null
+}
+
+// ── Countdown display ────────────────────────────────────────────────────────
+function Countdown({ secondsLeft }: { secondsLeft: number }) {
+  const m = Math.floor(secondsLeft / 60)
+  const s = secondsLeft % 60
+  return (
+    <span className="text-xs text-text2 tabular-nums">
+      ↻ {m > 0 ? `${m}m ` : ''}{s.toString().padStart(2, '0')}s
+    </span>
+  )
+}
+
+// ── Session ID dialog ────────────────────────────────────────────────────────
+function SessionDialog({
+  phone,
+  onClose,
+  onSaved,
+}: {
+  phone: Phone
+  onClose: () => void
+  onSaved: (id: string, sessionid: string) => void
+}) {
+  const [value, setValue]   = useState(phone.ig_sessionid ?? '')
+  const [testing, setTesting] = useState(false)
+  const [testResult, setTestResult] = useState<'idle' | 'ok' | 'fail'>('idle')
+  const [saving, setSaving] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => { inputRef.current?.focus() }, [])
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  async function test() {
+    if (!value.trim()) return
+    setTesting(true); setTestResult('idle')
+    try {
+      const r = await window.electronAPI?.fetchInstagramBySession({
+        username: phone.ig_username ?? '',
+        sessionid: value.trim(),
+      })
+      setTestResult(r?.ok ? 'ok' : 'fail')
+    } catch {
+      setTestResult('fail')
+    }
+    setTesting(false)
+  }
+
+  async function save() {
+    setSaving(true)
+    const { error } = await supabase
+      .from('phones')
+      .update({ ig_sessionid: value.trim() || null })
+      .eq('id', phone.id)
+    if (!error) onSaved(phone.id, value.trim())
+    setSaving(false)
+    onClose()
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ background: 'rgba(0,0,0,0.7)' }}
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div className="bg-card border border-border rounded-xl p-6 w-[480px] shadow-2xl space-y-4">
+        <div>
+          <h2 className="text-lg font-bold text-text">Session ID Instagram</h2>
+          {phone.ig_username && (
+            <p className="text-sm text-accent mt-0.5">@{phone.ig_username}</p>
+          )}
+        </div>
+
+        <div className="bg-surface border border-border rounded-lg px-4 py-3 text-xs text-text2 space-y-1">
+          <p className="font-semibold text-text">Comment trouver ton Session ID :</p>
+          <p>1. Ouvre <span className="text-accent">instagram.com</span> dans Chrome</p>
+          <p>2. Appuie sur <span className="text-accent">F12</span> (DevTools)</p>
+          <p>3. Va dans <span className="text-accent">Application → Cookies → instagram.com</span></p>
+          <p>4. Trouve le cookie <span className="text-accent font-mono">sessionid</span> et copie sa valeur</p>
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-xs font-medium text-text2">Session ID</label>
+          <input
+            ref={inputRef}
+            type="password"
+            value={value}
+            onChange={e => { setValue(e.target.value); setTestResult('idle') }}
+            placeholder="Colle ton sessionid ici…"
+            className="w-full bg-surface border border-border rounded-lg px-3 py-2 text-sm text-text placeholder:text-text2 focus:border-accent focus:outline-none font-mono"
+          />
+          {testResult === 'ok'   && <p className="text-xs text-ok">✅ Session valide !</p>}
+          {testResult === 'fail' && <p className="text-xs text-danger">❌ Session invalide ou expirée.</p>}
+        </div>
+
+        <div className="flex items-center gap-3 justify-end pt-2">
+          <button onClick={onClose} className="text-sm text-text2 hover:text-text px-3 py-1.5 rounded transition-colors">
+            Annuler
+          </button>
+          <Button variant="secondary" size="sm" onClick={test} loading={testing} disabled={!value.trim()}>
+            🔍 Tester
+          </Button>
+          <Button size="sm" onClick={save} loading={saving} disabled={!value.trim()}>
+            💾 Sauvegarder
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Context menu ─────────────────────────────────────────────────────────────
+function ContextMenu({
+  phone,
+  x, y,
+  onClose,
+  onLinkIg,
+  onSession,
+  onUnlink,
+  onDelete,
+}: {
+  phone: Phone
+  x: number; y: number
+  onClose: () => void
+  onLinkIg: () => void
+  onSession: () => void
+  onUnlink: () => void
+  onDelete: () => void
+}) {
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function onClick(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) onClose()
+    }
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') onClose() }
+    window.addEventListener('mousedown', onClick)
+    window.addEventListener('keydown', onKey)
+    return () => { window.removeEventListener('mousedown', onClick); window.removeEventListener('keydown', onKey) }
+  }, [onClose])
+
+  // Adjust position to stay in viewport
+  const left = Math.min(x, window.innerWidth - 200)
+  const top  = Math.min(y, window.innerHeight - 220)
+
+  const item = (icon: string, label: string, onClick: () => void, danger = false) => (
+    <button
+      onClick={() => { onClick(); onClose() }}
+      className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left rounded transition-colors ${
+        danger ? 'hover:bg-danger/10 text-danger' : 'hover:bg-surface2 text-text'
+      }`}
+    >
+      <span>{icon}</span>
+      <span>{label}</span>
+    </button>
+  )
+
+  return (
+    <div
+      ref={menuRef}
+      className="fixed z-50 bg-card border border-border rounded-xl shadow-2xl py-1 w-52"
+      style={{ left, top }}
+    >
+      <div className="px-3 py-1.5 border-b border-border mb-1">
+        <p className="text-xs font-semibold text-text truncate">{phone.phone_name}</p>
+        {phone.ig_username && <p className="text-[10px] text-accent">@{phone.ig_username}</p>}
+      </div>
+      {item('🔗', 'Lier Instagram', onLinkIg)}
+      {item('🔑', 'Session ID', onSession)}
+      {phone.ig_username && item('✂️', 'Délier Instagram', onUnlink)}
+      <div className="border-t border-border my-1" />
+      {item('ℹ️', 'Stats (voir Stats IG)', () => {
+        alert(`Va dans Stats IG pour voir les détails de @${phone.ig_username ?? phone.phone_name}`)
+      })}
+      {item('🗑', 'Supprimer', onDelete, true)}
+    </div>
+  )
+}
+
 // ── Inline Instagram username edit ─────────────────────────────────────────────
 function IgCell({ phone, onSave }: { phone: Phone; onSave: (id: string, u: string) => Promise<void> }) {
   const [editing, setEditing] = useState(false)
@@ -23,7 +221,6 @@ function IgCell({ phone, onSave }: { phone: Phone; onSave: (id: string, u: strin
   const ref                   = useRef<HTMLInputElement>(null)
 
   useEffect(() => { if (editing) ref.current?.focus() }, [editing])
-  // Keep local state in sync when parent updates phone
   useEffect(() => { setValue(phone.ig_username ?? '') }, [phone.ig_username])
 
   async function save() {
@@ -49,31 +246,14 @@ function IgCell({ phone, onSave }: { phone: Phone; onSave: (id: string, u: strin
   )
 
   return (
-    <button onClick={() => setEditing(true)} className="text-xs text-left group flex items-center gap-1" title="Cliquer pour éditer">
+    <button onClick={() => setEditing(true)} className="text-xs text-left group flex items-center gap-1.5" title="Cliquer pour éditer">
       {phone.ig_username
         ? <span className="text-accent">@{phone.ig_username}</span>
         : <span className="text-text2 italic">+ ajouter</span>
       }
+      <IgStatusBadge phone={phone} />
       <span className="opacity-0 group-hover:opacity-40 text-text2 text-[10px]">✎</span>
     </button>
-  )
-}
-
-// ── Status dot ──────────────────────────────────────────────────────────────
-function StatusDot({ status }: { status: string }) {
-  return (
-    <span className={`inline-block w-2 h-2 rounded-full ${status === 'online' ? 'bg-ok' : 'bg-text2'}`} />
-  )
-}
-
-// ── Countdown display ────────────────────────────────────────────────────────
-function Countdown({ secondsLeft }: { secondsLeft: number }) {
-  const m = Math.floor(secondsLeft / 60)
-  const s = secondsLeft % 60
-  return (
-    <span className="text-xs text-text2 tabular-nums">
-      ↻ {m > 0 ? `${m}m ` : ''}{s.toString().padStart(2, '0')}s
-    </span>
   )
 }
 
@@ -94,6 +274,11 @@ export function Phones({ user }: PhonesProps) {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [autoRefresh, setAutoRefresh] = useState(true)
   const [pollError, setPollError]     = useState<string | null>(null)
+
+  // Context menu + session dialog state
+  const [contextMenu, setContextMenu] = useState<{ phone: Phone; x: number; y: number } | null>(null)
+  const [sessionDialog, setSessionDialog] = useState<{ phone: Phone } | null>(null)
+  const [inlineEdit, setInlineEdit]   = useState<{ phone: Phone } | null>(null)
 
   // Refs to use inside intervals without stale closure
   const bearerRef      = useRef('')
@@ -123,7 +308,6 @@ export function Phones({ user }: PhonesProps) {
   }
 
   // ── Poll GéeLark for status only ─────────────────────────────────────────
-  // Only updates status in local state. Writes to Supabase at most every 5 min.
   const pollStatus = useCallback(async (silent = true) => {
     const tok = bearerRef.current
     if (!tok) return
@@ -142,7 +326,6 @@ export function Phones({ user }: PhonesProps) {
         return next
       })
 
-      // Write status to Supabase at most every 5 minutes
       const sinceDbSync = lastDbSyncRef.current
         ? (now.getTime() - lastDbSyncRef.current.getTime()) / 1000
         : Infinity
@@ -164,21 +347,18 @@ export function Phones({ user }: PhonesProps) {
 
   // ── Start / restart auto-refresh loop ───────────────────────────────────
   const startAutoRefresh = useCallback((sec: number) => {
-    // Clear existing timers
     if (intervalRef.current)  clearInterval(intervalRef.current)
     if (countdownRef.current) clearInterval(countdownRef.current)
 
     setCountdown(sec)
 
-    // Countdown tick every second
     countdownRef.current = setInterval(() => {
       setCountdown(prev => {
-        if (prev <= 1) return sec  // reset (poll will fire)
+        if (prev <= 1) return sec
         return prev - 1
       })
     }, 1000)
 
-    // Main poll interval
     intervalRef.current = setInterval(() => {
       pollStatus(true)
     }, sec * 1000)
@@ -242,6 +422,28 @@ export function Phones({ user }: PhonesProps) {
       setPhones(prev => prev.map(p => p.id === id ? { ...p, ig_username: username || null } : p))
   }
 
+  // ── Unlink Instagram ─────────────────────────────────────────────────────
+  async function unlinkIg(id: string) {
+    const { error: err } = await supabase
+      .from('phones').update({ ig_username: null, ig_sessionid: null, ig_status: null }).eq('id', id)
+    if (!err)
+      setPhones(prev => prev.map(p => p.id === id ? { ...p, ig_username: null, ig_sessionid: null, ig_status: null } : p))
+  }
+
+  // ── Delete phone ─────────────────────────────────────────────────────────
+  async function deletePhone(id: string) {
+    if (!confirm('Supprimer ce téléphone ?')) return
+    const { error: err } = await supabase.from('phones').delete().eq('id', id)
+    if (!err) setPhones(prev => prev.filter(p => p.id !== id))
+  }
+
+  // ── Session saved callback ────────────────────────────────────────────────
+  function onSessionSaved(id: string, sessionid: string) {
+    setPhones(prev => prev.map(p =>
+      p.id === id ? { ...p, ig_sessionid: sessionid || null } : p
+    ))
+  }
+
   // ── Refresh Instagram stats ───────────────────────────────────────────────
   async function refreshIgStats() {
     const linked = phones.filter(p => p.ig_username)
@@ -253,17 +455,52 @@ export function Phones({ user }: PhonesProps) {
     let done = 0
     for (const phone of linked) {
       setRefreshProgress(`@${phone.ig_username} (${done + 1}/${linked.length})`)
-      const stats = await fetchIgStats(phone.ig_username!)
-      if (stats) {
-        await supabase.from('phones').update({
-          followers: stats.followers, total_views: stats.total_views, video_count: stats.posts,
-        }).eq('id', phone.id)
-        setPhones(prev => prev.map(p =>
-          p.id === phone.id
-            ? { ...p, followers: stats.followers, total_views: stats.total_views, video_count: stats.posts }
-            : p
-        ))
+
+      // Use session if available
+      if (phone.ig_sessionid && window.electronAPI?.fetchInstagramBySession) {
+        const r = await window.electronAPI.fetchInstagramBySession({
+          username: phone.ig_username!,
+          sessionid: phone.ig_sessionid,
+        })
+        if (r.ok) {
+          const igStatus = 'active'
+          await supabase.from('phones').update({
+            followers:   r.followers ?? 0,
+            following:   r.following ?? 0,
+            total_views: r.total_views ?? 0,
+            video_count: r.posts ?? 0,
+            bio:         r.bio ?? null,
+            ig_status:   igStatus,
+          }).eq('id', phone.id)
+          setPhones(prev => prev.map(p =>
+            p.id === phone.id
+              ? { ...p, followers: r.followers ?? 0, following: r.following ?? 0,
+                  total_views: r.total_views ?? 0, video_count: r.posts ?? 0,
+                  bio: r.bio ?? null, ig_status: igStatus }
+              : p
+          ))
+        } else {
+          const igStatus = r.error === 'session_expired' ? 'error' : 'error'
+          await supabase.from('phones').update({ ig_status: igStatus }).eq('id', phone.id)
+          setPhones(prev => prev.map(p =>
+            p.id === phone.id ? { ...p, ig_status: igStatus } : p
+          ))
+        }
+      } else {
+        // Fallback to public API
+        const stats = await fetchIgStats(phone.ig_username!)
+        if (stats) {
+          await supabase.from('phones').update({
+            followers: stats.followers, total_views: stats.total_views, video_count: stats.posts,
+          }).eq('id', phone.id)
+          setPhones(prev => prev.map(p =>
+            p.id === phone.id
+              ? { ...p, followers: stats.followers, total_views: stats.total_views, video_count: stats.posts }
+              : p
+          ))
+        }
       }
+
       done++
       if (done < linked.length) await new Promise(r => setTimeout(r, 1500))
     }
@@ -303,9 +540,76 @@ export function Phones({ user }: PhonesProps) {
     views:   phones.reduce((s, p) => s + (p.total_views ?? 0), 0),
   }
 
+  // ── Inline link dialog ────────────────────────────────────────────────────
+  function InlineLinkDialog({ phone, onClose }: { phone: Phone; onClose: () => void }) {
+    const [value, setValue] = useState(phone.ig_username ?? '')
+    const [saving, setSaving] = useState(false)
+    const ref = useRef<HTMLInputElement>(null)
+    useEffect(() => { ref.current?.focus() }, [])
+    async function save() {
+      setSaving(true)
+      await saveIgUsername(phone.id, value.replace(/^@/, '').trim())
+      setSaving(false)
+      onClose()
+    }
+    return (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center"
+        style={{ background: 'rgba(0,0,0,0.6)' }}
+        onClick={e => { if (e.target === e.currentTarget) onClose() }}
+      >
+        <div className="bg-card border border-border rounded-xl p-5 w-80 shadow-2xl space-y-4">
+          <h2 className="text-base font-bold text-text">Lier Instagram</h2>
+          <p className="text-xs text-text2">{phone.phone_name}</p>
+          <div className="flex items-center gap-2">
+            <span className="text-text2 text-sm">@</span>
+            <input
+              ref={ref}
+              value={value}
+              onChange={e => setValue(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') onClose() }}
+              placeholder="username"
+              className="flex-1 bg-surface border border-border rounded px-3 py-2 text-sm text-text focus:border-accent focus:outline-none"
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <button onClick={onClose} className="text-sm text-text2 hover:text-text px-3 py-1.5">Annuler</button>
+            <Button size="sm" onClick={save} loading={saving}>Lier</Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="p-8 space-y-6">
+    <div className="p-8 space-y-6" onClick={() => setContextMenu(null)}>
+
+      {/* Modals */}
+      {sessionDialog && (
+        <SessionDialog
+          phone={sessionDialog.phone}
+          onClose={() => setSessionDialog(null)}
+          onSaved={onSessionSaved}
+        />
+      )}
+      {inlineEdit && (
+        <InlineLinkDialog phone={inlineEdit.phone} onClose={() => setInlineEdit(null)} />
+      )}
+
+      {/* Context menu */}
+      {contextMenu && (
+        <ContextMenu
+          phone={contextMenu.phone}
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onClose={() => setContextMenu(null)}
+          onLinkIg={() => setInlineEdit({ phone: contextMenu.phone })}
+          onSession={() => setSessionDialog({ phone: contextMenu.phone })}
+          onUnlink={() => unlinkIg(contextMenu.phone.id)}
+          onDelete={() => deletePhone(contextMenu.phone.id)}
+        />
+      )}
 
       {/* Header */}
       <div className="flex items-start justify-between gap-3">
@@ -363,7 +667,6 @@ export function Phones({ user }: PhonesProps) {
       <div className="flex items-center gap-4 px-4 py-3 bg-card border border-border rounded-xl">
         <span className="text-xs font-medium text-text" title="Rafraîchit automatiquement le statut online/offline des téléphones GéeLark">Auto-statut</span>
 
-        {/* Toggle */}
         <button
           onClick={() => setAutoRefresh(v => !v)}
           className={`relative w-8 h-4 rounded-full transition-colors ${autoRefresh ? 'bg-accent' : 'bg-surface2'}`}
@@ -371,7 +674,6 @@ export function Phones({ user }: PhonesProps) {
           <span className={`absolute top-0.5 w-3 h-3 bg-white rounded-full shadow transition-all ${autoRefresh ? 'left-[18px]' : 'left-0.5'}`} />
         </button>
 
-        {/* Interval selector */}
         <div className="flex items-center gap-1">
           {INTERVALS.map(({ label, value }) => (
             <button key={value}
@@ -386,14 +688,12 @@ export function Phones({ user }: PhonesProps) {
           ))}
         </div>
 
-        {/* Countdown */}
         {autoRefresh && bearer && (
           <div className="ml-auto">
             <Countdown secondsLeft={countdown} />
           </div>
         )}
 
-        {/* Live indicator */}
         {autoRefresh && bearer && (
           <span className="flex items-center gap-1.5 text-xs text-ok">
             <span className="w-1.5 h-1.5 rounded-full bg-ok animate-pulse" />
@@ -449,8 +749,8 @@ export function Phones({ user }: PhonesProps) {
         </div>
       ) : (
         <div className="bg-card border border-border rounded-xl overflow-hidden">
-          <div className="grid grid-cols-[36px_1fr_120px_150px_90px_90px_70px_70px] px-4 py-2 border-b border-border bg-surface">
-            {['#', 'Téléphone', 'Groupe', 'Instagram', 'Statut', 'Followers', 'Vues', 'Vidéos'].map(h => (
+          <div className="grid grid-cols-[36px_1fr_120px_180px_60px_90px_90px_70px_70px] px-4 py-2 border-b border-border bg-surface">
+            {['#', 'Téléphone', 'Groupe', 'Instagram', 'Session', 'Statut', 'Followers', 'Vues', 'Vidéos'].map(h => (
               <span key={h} className="text-xs font-semibold text-text2 uppercase tracking-wider">{h}</span>
             ))}
           </div>
@@ -460,7 +760,12 @@ export function Phones({ user }: PhonesProps) {
             <div className="divide-y divide-border">
               {visible.map((phone, i) => (
                 <div key={phone.id}
-                  className="grid grid-cols-[36px_1fr_120px_150px_90px_90px_70px_70px] px-4 py-3 hover:bg-surface/50 transition-colors items-center"
+                  className="grid grid-cols-[36px_1fr_120px_180px_60px_90px_90px_70px_70px] px-4 py-3 hover:bg-surface/50 transition-colors items-center cursor-default"
+                  onContextMenu={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    setContextMenu({ phone, x: e.clientX, y: e.clientY })
+                  }}
                 >
                   <span className="text-xs text-text2">{i + 1}</span>
                   <div className="min-w-0">
@@ -471,6 +776,28 @@ export function Phones({ user }: PhonesProps) {
                   </div>
                   <span className="text-xs text-text2 truncate">{phone.group_name ?? '—'}</span>
                   <IgCell phone={phone} onSave={saveIgUsername} />
+                  {/* Session column */}
+                  <div className="flex items-center justify-center">
+                    {phone.ig_sessionid ? (
+                      <button
+                        title="Session ID configurée — clic pour modifier"
+                        onClick={() => setSessionDialog({ phone })}
+                        className="text-base hover:scale-110 transition-transform"
+                      >
+                        🔑
+                      </button>
+                    ) : phone.ig_username ? (
+                      <button
+                        title="Ajouter un Session ID"
+                        onClick={() => setSessionDialog({ phone })}
+                        className="text-xs text-text2 hover:text-accent transition-colors"
+                      >
+                        +
+                      </button>
+                    ) : (
+                      <span className="text-xs text-text2">—</span>
+                    )}
+                  </div>
                   <div className="flex items-center gap-1.5">
                     <StatusDot status={phone.status} />
                     <span className="text-xs text-text2 capitalize">{phone.status}</span>
@@ -494,6 +821,7 @@ export function Phones({ user }: PhonesProps) {
           {visible.length} téléphone{visible.length > 1 ? 's' : ''}
           {phones.length !== visible.length && ` sur ${phones.length}`}
           {counts.views > 0 && ` · ${counts.views.toLocaleString('fr-FR')} vues`}
+          {' · '}Clic droit sur une ligne pour plus d'options
         </p>
       )}
     </div>

@@ -30,6 +30,17 @@ interface ElectronAPI {
   uploadVideoGeelark:(opts: { bearer: string; filePath: string }) => Promise<{ ok: boolean; token?: string; error?: string }>
   fetchImage:        (opts: { url: string; headers?: Record<string, string> }) => Promise<{ ok: boolean; dataUrl?: string; error?: string }>
   fetchInstagramHtml:(username: string) => Promise<{ ok: boolean; url?: string; html?: string; apiJson?: unknown; error?: string }>
+  fetchInstagramBySession: (opts: { username: string; sessionid: string }) => Promise<{
+    ok: boolean
+    username?: string
+    followers?: number
+    following?: number
+    posts?: number
+    bio?: string
+    total_views?: number
+    videos?: Array<{ id: string; shortcode: string; views: number; likes: number; comments: number; thumbnail: string; timestamp: string }>
+    error?: string
+  }>
   runFfmpeg:         (opts: { clips: FfmpegClip[]; outputPath: string; preset: '9:16'|'1:1'|'16:9'; transition: 'cut'|'fade' }) => Promise<{ ok: boolean; outputPath?: string; command?: string; error?: string }>
   groqRequest:       (opts: GroqRequestOptions) => Promise<{ ok: boolean; data?: unknown; error?: string }>
 }

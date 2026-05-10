@@ -190,6 +190,103 @@ ipcMain.handle('fetch-instagram-html', async (_event, username: string) => {
 })
 
 
+// ── Helper for session-authenticated IG requests via Node.js https ───────────
+function igSessionFetch(url: string, sessionid: string, method = 'GET', body?: string): Promise<{ status: number; data: unknown }> {
+  return new Promise((resolve, reject) => {
+    const parsed = new URL(url)
+    const reqOpts: import('node:https').RequestOptions = {
+      hostname: parsed.hostname,
+      path: parsed.pathname + parsed.search,
+      method,
+      headers: {
+        'User-Agent': 'Instagram 269.0.0.18.75 Android (28/9; 240dpi; 1080x1920; samsung; SM-G960F; starlte; qcom; en_US; 314665256)',
+        'X-IG-App-ID': '936619743392459',
+        'X-ASBD-ID': '198387',
+        'Accept-Language': 'fr-FR,fr;q=0.9',
+        'Cookie': `sessionid=${sessionid}`,
+        ...(body ? { 'Content-Type': 'application/x-www-form-urlencoded', 'Content-Length': String(Buffer.byteLength(body)) } : {}),
+      },
+    }
+    const req = https.request(reqOpts, (res) => {
+      const chunks: Buffer[] = []
+      res.on('data', (c: Buffer) => chunks.push(c))
+      res.on('end', () => {
+        try { resolve({ status: res.statusCode ?? 0, data: JSON.parse(Buffer.concat(chunks).toString('utf-8')) }) }
+        catch { resolve({ status: res.statusCode ?? 0, data: null }) }
+      })
+      res.on('error', reject)
+    })
+    req.on('error', reject)
+    req.setTimeout(15000, () => { req.destroy(new Error('timeout')) })
+    if (body) req.write(body)
+    req.end()
+  })
+}
+
+ipcMain.handle('fetch-instagram-by-session', async (_event, opts: { username: string; sessionid: string }) => {
+  try {
+    // 1. Get current user info
+    const curR = await igSessionFetch('https://i.instagram.com/api/v1/accounts/current_user/?edit=true', opts.sessionid)
+    if (curR.status === 401) return { ok: false, error: 'session_expired' }
+    if (curR.status !== 200 || !curR.data) return { ok: false, error: `current_user: ${curR.status}` }
+    const curUser = ((curR.data as Record<string, unknown>)['user']) as Record<string, unknown>
+    if (!curUser) return { ok: false, error: 'no user data' }
+    const userId = curUser['pk'] as string | number
+
+    // 2. Get user details (followers, etc.)
+    const infoR = await igSessionFetch(`https://i.instagram.com/api/v1/users/${userId}/info/`, opts.sessionid)
+    let followers = 0, following = 0, posts = 0, bio = ''
+    if (infoR.status === 200 && infoR.data) {
+      const u = ((infoR.data as Record<string, unknown>)['user']) as Record<string, unknown> | undefined
+      if (u) {
+        followers = (u['follower_count'] as number) ?? 0
+        following = (u['following_count'] as number) ?? 0
+        posts     = (u['media_count'] as number) ?? 0
+        bio       = (u['biography'] as string) ?? ''
+      }
+    }
+
+    // 3. Get reels/clips with thumbnails and view counts
+    const clipsR = await igSessionFetch(
+      'https://i.instagram.com/api/v1/clips/user/',
+      opts.sessionid,
+      'POST',
+      `target_user_id=${userId}&page_size=20&include_feed_video=true`
+    )
+    const videos: Array<{ id: string; shortcode: string; views: number; likes: number; comments: number; thumbnail: string; timestamp: string }> = []
+    if (clipsR.status === 200 && clipsR.data) {
+      const items = ((clipsR.data as Record<string, unknown>)['items'] as unknown[]) ?? []
+      for (const item of items) {
+        const media = ((item as Record<string, unknown>)['media']) as Record<string, unknown> | undefined
+        if (!media) continue
+        const candidates = (((media['image_versions2'] as Record<string, unknown>)?.['candidates']) as Array<Record<string, unknown>>) ?? []
+        videos.push({
+          id:        String(media['pk'] ?? ''),
+          shortcode: (media['code'] as string) ?? '',
+          views:     (media['play_count'] as number) ?? (media['view_count'] as number) ?? 0,
+          likes:     (media['like_count'] as number) ?? 0,
+          comments:  (media['comment_count'] as number) ?? 0,
+          thumbnail: (candidates[0]?.['url'] as string) ?? '',
+          timestamp: media['taken_at'] ? new Date((media['taken_at'] as number) * 1000).toISOString() : '',
+        })
+      }
+    }
+
+    return {
+      ok: true,
+      username: (curUser['username'] as string) ?? opts.username,
+      followers,
+      following,
+      posts,
+      bio,
+      total_views: videos.reduce((s, v) => s + v.views, 0),
+      videos,
+    }
+  } catch (err: unknown) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+})
+
 // ── IPC: proxy HTTP requests from renderer (bypass CORS) ───────────────────
 // For instagram.com: use session.defaultSession.fetch() which automatically sends
 // session cookies (set by the hidden browser). net.fetch does NOT forward session

@@ -38,6 +38,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Fetch Instagram profile page via hidden browser (most reliable, bypasses API blocks)
   fetchInstagramHtml: (username: string) => ipcRenderer.invoke('fetch-instagram-html', username),
 
+  // Fetch Instagram data using a session ID (private API — no rate limit)
+  fetchInstagramBySession: (opts: { username: string; sessionid: string }) =>
+    ipcRenderer.invoke('fetch-instagram-by-session', opts),
+
   // Groq AI API call (returns chat completion)
   groqRequest: (opts: {
     apiKey: string

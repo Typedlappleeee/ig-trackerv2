@@ -32,20 +32,24 @@ export interface UserItem {
 }
 
 export interface Phone {
-  id:          string
-  user_id:     string
-  geelark_id:  string
-  serial_no:   string | null
-  phone_name:  string
-  group_name:  string | null
-  status:      string
-  ig_username: string | null
-  followers:   number
-  total_views: number
-  video_count: number
-  remark:      string | null
-  synced_at:   string
-  created_at:  string
+  id:           string
+  user_id:      string
+  geelark_id:   string
+  serial_no:    string | null
+  phone_name:   string
+  group_name:   string | null
+  status:       string
+  ig_username:  string | null
+  ig_sessionid: string | null
+  ig_status:    string | null  // 'active'|'error'|'rate_limited'|'unknown'
+  followers:    number
+  following:    number
+  total_views:  number
+  video_count:  number
+  bio:          string | null
+  remark:       string | null
+  synced_at:    string
+  created_at:   string
 }
 
 export interface ContentItem {
