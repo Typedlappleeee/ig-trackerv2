@@ -34,18 +34,30 @@ function scopeFolder(scope: UploadScope): string {
 }
 
 // Generate a thumbnail JPEG from a video Blob using a hidden <video> + canvas.
-// Returns null if extraction fails (e.g. unsupported codec in Chromium).
+// Returns null if extraction fails (e.g. unsupported codec) or times out.
+// Hard timeout = 8s so a hung decoder doesn't block the upload pipeline forever.
 export async function generateThumbnail(videoBlob: Blob, atSeconds = 0.5): Promise<Blob | null> {
   return new Promise(resolve => {
     const v = document.createElement('video')
     v.muted = true
     v.playsInline = true
-    v.preload = 'auto'
+    v.preload = 'metadata'  // don't preload the entire video, just headers
     const url = URL.createObjectURL(videoBlob)
     v.src = url
 
-    const cleanup = () => URL.revokeObjectURL(url)
-    const fail   = () => { cleanup(); resolve(null) }
+    let done = false
+    const cleanup = () => {
+      try { v.removeAttribute('src'); v.load() } catch { /* noop */ }
+      URL.revokeObjectURL(url)
+    }
+    const finish = (out: Blob | null) => {
+      if (done) return
+      done = true
+      clearTimeout(timeoutId)
+      cleanup()
+      resolve(out)
+    }
+    const timeoutId = setTimeout(() => finish(null), 8000)
 
     v.onloadedmetadata = () => { v.currentTime = Math.min(atSeconds, Math.max(0, (v.duration || 1) - 0.1)) }
     v.onseeked = () => {
@@ -53,20 +65,20 @@ export async function generateThumbnail(videoBlob: Blob, atSeconds = 0.5): Promi
         const c = document.createElement('canvas')
         const w = v.videoWidth || 720
         const h = v.videoHeight || 1280
-        // Cap thumbnail dimensions so the JPEG stays small
-        const maxSide = 720
+        // Smaller target = less RAM and faster encode
+        const maxSide = 480
         const ratio = Math.min(1, maxSide / Math.max(w, h))
         c.width  = Math.round(w * ratio)
         c.height = Math.round(h * ratio)
         const ctx = c.getContext('2d')
-        if (!ctx) return fail()
+        if (!ctx) return finish(null)
         ctx.drawImage(v, 0, 0, c.width, c.height)
-        c.toBlob(b => { cleanup(); resolve(b) }, 'image/jpeg', 0.82)
+        c.toBlob(b => finish(b), 'image/jpeg', 0.78)
       } catch {
-        fail()
+        finish(null)
       }
     }
-    v.onerror = fail
+    v.onerror = () => finish(null)
   })
 }
 

@@ -367,12 +367,13 @@ export function Bank({ user }: BankProps) {
   function onDragLeave(e: React.DragEvent) {
     if (!dropRef.current?.contains(e.relatedTarget as Node)) setDragging(false)
   }
-  function onDrop(e: React.DragEvent) {
+  async function onDrop(e: React.DragEvent) {
     e.preventDefault(); setDragging(false)
     const files = Array.from(e.dataTransfer.files)
     if (files.length === 0) return
-    // Drag-drop gives us real File objects — upload them directly (skip Electron IPC).
-    for (const file of files) addFromFile(file)
+    // Process sequentially — concurrent thumbnail generation on N large videos
+    // can saturate RAM/CPU and freeze the renderer.
+    for (const file of files) await addFromFile(file)
   }
 
   async function deleteItem(id: string) {
