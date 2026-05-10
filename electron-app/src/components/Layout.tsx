@@ -3,6 +3,7 @@ import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { useOrg }    from '@/lib/orgContext'
 import { canSeeTab } from '@/lib/permissions'
+import { getRecentAccounts, switchToAccount, forgetAccount, type RecentAccount } from '@/lib/recentAccounts'
 
 export type Page =
   | 'dashboard' | 'phones'
@@ -75,6 +76,11 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
   const [orgMenuOpen, setOrgMenuOpen] = useState(false)
   const orgTriggerRef                 = useRef<HTMLButtonElement>(null)
   const [orgMenuPos, setOrgMenuPos]   = useState<{ left: number; bottom: number; width: number } | null>(null)
+  const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const userTriggerRef                  = useRef<HTMLButtonElement>(null)
+  const [userMenuPos, setUserMenuPos]   = useState<{ left: number; bottom: number; width: number } | null>(null)
+  const [recentAccounts, setRecentAccounts] = useState<RecentAccount[]>([])
+  const [switchErr, setSwitchErr]           = useState<string | null>(null)
   const { myOrgs, currentOrg, role, perms, switchOrg } = useOrg()
 
   function openOrgMenu() {
@@ -83,6 +89,39 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
       setOrgMenuPos({ left: rect.left, bottom: window.innerHeight - rect.top + 4, width: rect.width })
       setOrgMenuOpen(true)
     }
+  }
+
+  function openUserMenu() {
+    const rect = userTriggerRef.current?.getBoundingClientRect()
+    if (rect) {
+      setUserMenuPos({ left: rect.left, bottom: window.innerHeight - rect.top + 4, width: rect.width })
+      setRecentAccounts(getRecentAccounts().filter(a => a.user_id !== user.id))
+      setSwitchErr(null)
+      setUserMenuOpen(true)
+    }
+  }
+
+  async function handleSwitch(a: RecentAccount) {
+    setSwitchErr(null)
+    const r = await switchToAccount(a)
+    if (!r.ok) {
+      setSwitchErr(r.error ?? 'Session expirée — reconnecte-toi avec ton mot de passe.')
+      setRecentAccounts(getRecentAccounts().filter(x => x.user_id !== user.id))
+      return
+    }
+    setUserMenuOpen(false)
+    // useAuth's onAuthStateChange will swap the user automatically.
+  }
+
+  function handleForget(a: RecentAccount, e: React.MouseEvent) {
+    e.stopPropagation()
+    forgetAccount(a.user_id)
+    setRecentAccounts(getRecentAccounts().filter(x => x.user_id !== user.id))
+  }
+
+  async function handleAddAccount() {
+    setUserMenuOpen(false)
+    await supabase.auth.signOut()  // this drops the AuthPage so the user can sign into another account
   }
 
   // In solo mode, all tabs visible. In org mode, gate by role + overrides.
@@ -267,22 +306,20 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
           </button>
         </div>
 
-        {/* User strip */}
-        <div className="px-3 py-2 border-t border-border flex items-center gap-2">
+        {/* User strip — click to open the account switcher */}
+        <button
+          ref={userTriggerRef}
+          onClick={() => userMenuOpen ? setUserMenuOpen(false) : openUserMenu()}
+          className="w-full px-3 py-2 border-t border-border flex items-center gap-2 hover:bg-sb-hover/40 transition-colors text-left"
+        >
           <div className="w-6 h-6 rounded-full bg-accent/20 text-accent flex items-center justify-center text-[10px] font-bold flex-shrink-0">
             {user.email?.[0].toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-[10px] text-text2 truncate">{user.email}</p>
           </div>
-          <button
-            onClick={() => supabase.auth.signOut()}
-            className="text-text2 hover:text-danger transition-colors text-xs p-1 rounded"
-            title="Se déconnecter"
-          >
-            ↩
-          </button>
-        </div>
+          <span className="text-text2 text-[10px]">▾</span>
+        </button>
       </aside>
 
       <main className="flex-1 overflow-auto">
@@ -321,6 +358,69 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
               className="w-full px-3 py-2 text-[11px] text-text2 hover:bg-surface2 border-t border-border text-left"
             >
               ⚙ Gérer les organisations
+            </button>
+          </div>
+        </>
+      )}
+
+      {/* User account switcher menu */}
+      {userMenuOpen && userMenuPos && (
+        <>
+          <div
+            onClick={() => setUserMenuOpen(false)}
+            className="fixed inset-0 z-[9998]"
+            style={{ background: 'transparent' }}
+          />
+          <div
+            className="fixed z-[9999] bg-surface border border-border rounded-lg shadow-2xl overflow-hidden"
+            style={{ left: userMenuPos.left, bottom: userMenuPos.bottom, width: Math.max(userMenuPos.width, 240) }}
+          >
+            {/* Current account */}
+            <div className="px-3 py-2 border-b border-border bg-accent/5">
+              <p className="text-[10px] uppercase tracking-wider text-text2">Compte actif</p>
+              <p className="text-[12px] text-text truncate">{user.email}</p>
+            </div>
+
+            {/* Recent accounts */}
+            {recentAccounts.length > 0 && (
+              <>
+                <p className="px-3 pt-2 text-[10px] uppercase tracking-wider text-text2">Récents</p>
+                {recentAccounts.map(a => (
+                  <button
+                    key={a.user_id}
+                    onClick={() => handleSwitch(a)}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-surface2 group"
+                  >
+                    <div className="w-5 h-5 rounded-full bg-text2/20 text-text2 flex items-center justify-center text-[9px] font-bold flex-shrink-0">
+                      {a.email[0].toUpperCase()}
+                    </div>
+                    <span className="flex-1 text-[12px] text-text truncate">{a.email}</span>
+                    <span
+                      onClick={e => handleForget(a, e)}
+                      className="text-text2 hover:text-danger text-[10px] opacity-0 group-hover:opacity-100"
+                      title="Oublier ce compte sur cet appareil"
+                    >✕</span>
+                  </button>
+                ))}
+              </>
+            )}
+
+            {switchErr && (
+              <p className="px-3 py-2 text-[10px] text-danger bg-danger/10 border-t border-danger/30">{switchErr}</p>
+            )}
+
+            {/* Actions */}
+            <button
+              onClick={handleAddAccount}
+              className="w-full px-3 py-2 text-[12px] text-text hover:bg-surface2 border-t border-border text-left"
+            >
+              ＋ Ajouter un compte
+            </button>
+            <button
+              onClick={() => { setUserMenuOpen(false); supabase.auth.signOut() }}
+              className="w-full px-3 py-2 text-[12px] text-danger hover:bg-danger/10 border-t border-border text-left"
+            >
+              ↩ Se déconnecter
             </button>
           </div>
         </>

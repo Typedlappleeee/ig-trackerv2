@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
+import { rememberCurrentAccount } from '@/lib/recentAccounts'
 
 interface AuthState {
   user:    User | null
@@ -19,9 +20,13 @@ export function useAuth(): AuthState {
     })
 
     // 2. Écoute les changements d'état (connexion, déconnexion, refresh token)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user ?? null)
       setLoading(false)
+      // Remember signed-in users so the sidebar can offer a quick switch later.
+      if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session) {
+        rememberCurrentAccount()
+      }
     })
 
     // Nettoyage quand le composant est démonté

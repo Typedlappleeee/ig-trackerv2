@@ -171,12 +171,13 @@ function AppContent({ user }: { user: User }) {
       })
   }, [user.id])
 
-  // Sidebar phone count: org-scoped when an org is active, solo otherwise
+  // Sidebar phone count: 0 when no bearer in scope, org-scoped or solo-scoped otherwise.
   useEffect(() => {
+    if (!conns.bearer) { setPhoneCount(0); return }
     let q = supabase.from('phones').select('id', { count: 'exact', head: true })
     q = currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
     q.then(({ count }) => setPhoneCount(count ?? 0))
-  }, [currentOrg?.id, user.id])
+  }, [currentOrg?.id, user.id, conns.bearer])
 
   // Re-initialise the GéeLark poller whenever the active bearer changes
   // (org switch, settings save, …). The poller holds the bearer in module

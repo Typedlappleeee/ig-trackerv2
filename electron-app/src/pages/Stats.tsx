@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase, type Phone } from '@/lib/supabase'
 import { useOrg } from '@/lib/orgContext'
+import { useConnections } from '@/lib/connections'
 import { fetchIgStats, invalidateIgCache } from '@/lib/instagram'
 import { Spinner } from '@/components/ui/Spinner'
 import { Button }  from '@/components/ui/Button'
@@ -89,6 +90,7 @@ type SortKey = 'recent' | 'oldest' | 'views' | 'likes'
 
 export function Stats({ user }: StatsProps) {
   const { currentOrg }          = useOrg()
+  const conns                   = useConnections(user)
   const [phones, setPhones]     = useState<Phone[]>([])
   const [selected, setSelected] = useState<Phone | null>(null)
   const [stats, setStats]       = useState<Awaited<ReturnType<typeof fetchIgStats>> | null>(null)
@@ -101,6 +103,7 @@ export function Stats({ user }: StatsProps) {
   const [retrying, setRetrying] = useState(false)
 
   useEffect(() => {
+    if (!conns.bearer) { setPhones([]); return }
     let q = supabase.from('phones').select('*').order('phone_name')
     q = currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
     q.then(({ data }) => {
@@ -108,7 +111,7 @@ export function Stats({ user }: StatsProps) {
         setPhones(linked)
         if (linked.length > 0) selectPhone(linked[0])
       })
-  }, [currentOrg?.id, user.id])
+  }, [currentOrg?.id, user.id, conns.bearer])
 
   async function selectPhone(phone: Phone, retry = false) {
     setSelected(phone)

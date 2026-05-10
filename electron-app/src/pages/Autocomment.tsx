@@ -78,10 +78,11 @@ export function Autocomment({ user }: AutocommentProps) {
   useEffect(() => { if (conns.groq) setGroqKey(conns.groq) }, [conns.groq])
 
   useEffect(() => {
+    if (!conns.bearer) { setPhones([]); return }
     let q = supabase.from('phones').select('*').order('phone_name')
     q = currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
     q.then(ph => setPhones((ph.data ?? []).filter(p => p.ig_username)))
-  }, [currentOrg?.id, user.id])
+  }, [currentOrg?.id, user.id, conns.bearer])
 
   async function sendManualReply(comment: IgComment) {
     const text = manualReplies[comment.pk]?.trim()

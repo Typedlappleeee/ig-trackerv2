@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase, type Phone } from '@/lib/supabase'
 import { useOrg } from '@/lib/orgContext'
+import { useConnections } from '@/lib/connections'
 import { Spinner } from '@/components/ui/Spinner'
 
 interface DashboardProps { user: User }
@@ -214,6 +215,7 @@ create policy "views_history_all" on public.views_history
 
 export function Dashboard({ user }: DashboardProps) {
   const { currentOrg }              = useOrg()
+  const conns                       = useConnections(user)
   const [phones, setPhones]         = useState<Phone[]>([])
   const [selPhone, setSelPhone]     = useState<Phone | null>(null)
   const [range, setRange]           = useState<Range>('30d')
@@ -224,6 +226,7 @@ export function Dashboard({ user }: DashboardProps) {
   const [sqlCopied, setSqlCopied]   = useState(false)
 
   useEffect(() => {
+    if (!conns.bearer) { setPhones([]); setLoading(false); return }
     let q = supabase.from('phones').select('*').order('phone_name')
     q = currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
     q.then(({ data }) => {
@@ -239,7 +242,7 @@ export function Dashboard({ user }: DashboardProps) {
           ).then(() => {})
         }
       })
-  }, [currentOrg?.id, user.id])
+  }, [currentOrg?.id, user.id, conns.bearer])
 
   useEffect(() => { loadChart() }, [selPhone, range, phones])
 

@@ -97,6 +97,7 @@ export function MassPosting({ user }: MassPostingProps) {
   useEffect(() => { if (conns.groq)   setGroqKey(conns.groq) },  [conns.groq])
 
   useEffect(() => {
+    if (!conns.bearer) { setPhones([]); setGroups(['Tous']); return }
     let q = supabase.from('phones').select('*').order('phone_name')
     q = currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
     q.then(ph => {
@@ -105,7 +106,7 @@ export function MassPosting({ user }: MassPostingProps) {
       const grps = [...new Set(ps.map(p => p.group_name).filter(Boolean) as string[])].sort()
       setGroups(['Tous', ...grps])
     })
-  }, [currentOrg?.id, user.id])
+  }, [currentOrg?.id, user.id, conns.bearer])
 
   useEffect(() => { logEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [logs])
 

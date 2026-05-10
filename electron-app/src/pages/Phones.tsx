@@ -396,9 +396,13 @@ export function Phones({ user }: PhonesProps) {
 
   useEffect(() => {
     loadPhones()
-  }, [currentOrg?.id])
+  }, [currentOrg?.id, bearer])
 
   async function loadPhones() {
+    // No bearer in the active scope = nothing to show. Phones rows might still
+    // exist in DB (cached from a previous sync) but they belong to whoever's
+    // GéeLark account WAS configured — surfacing them here is misleading.
+    if (!bearer) { setPhones([]); setLoading(false); return }
     setLoading(true)
     let q = supabase.from('phones').select('*').order('phone_name')
     q = currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
