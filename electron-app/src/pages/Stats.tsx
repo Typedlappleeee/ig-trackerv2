@@ -37,7 +37,7 @@ async function fetchIgVideos(username: string): Promise<IgVideo[]> {
     const user     = (data?.['data'] as Record<string, unknown>)?.['user'] as Record<string, unknown>
     const timeline = user?.['edge_owner_to_timeline_media'] as Record<string, unknown>
     const edges    = (timeline?.['edges'] as unknown[]) ?? []
-    return edges.map((e: unknown) => {
+    const videos: IgVideo[] = edges.map((e: unknown) => {
       const node = (e as Record<string, unknown>)['node'] as Record<string, unknown>
       return {
         id:        node['id'] as string,
@@ -53,6 +53,15 @@ async function fetchIgVideos(username: string): Promise<IgVideo[]> {
         isVideo: (node['is_video'] as boolean) ?? false,
       }
     })
+    // Pre-fetch thumbnails as data URIs through main process (bypasses CDN Referer/CORS issues)
+    if (window.electronAPI?.fetchImage) {
+      await Promise.all(videos.map(async v => {
+        if (!v.thumbnail) return
+        const r = await window.electronAPI!.fetchImage({ url: v.thumbnail })
+        if (r.ok && r.dataUrl) v.thumbnail = r.dataUrl
+      }))
+    }
+    return videos
   } catch { return [] }
 }
 

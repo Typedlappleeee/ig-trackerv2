@@ -342,52 +342,53 @@ ipcMain.handle('fetch-instagram-by-session', async (_event, opts: { username: st
       }
     }
 
-    // Pre-fetch thumbnails as base64 in the main process so renderer never
-    // needs a separate cross-origin request (CDN URLs are fresh right now).
+    // Pre-fetch thumbnails as base64 via Electron's net.fetch (Chromium stack)
+    // — handles IG CDN TLS, redirects, and pre-signed URLs more reliably than node https.
     let thumbOk = 0, thumbFail = 0
-    await Promise.all(videos.map(v => new Promise<void>(resolve => {
-      if (!v.thumbnail) { thumbFail++; resolve(); return }
-      const originalUrl = v.thumbnail
-      const fetchThumb = (thumbUrl: string, depth: number, withCookie: boolean) => {
-        const headers: Record<string, string> = {
+    await Promise.all(videos.map(async v => {
+      if (!v.thumbnail) { thumbFail++; return }
+      const url = v.thumbnail
+      // Strategy: try multiple header sets — CDN sometimes 403s on missing/wrong Referer,
+      // sometimes on missing Origin. Walk through fallbacks until one returns 200.
+      const headerSets: Array<Record<string, string>> = [
+        // 1. Browser-like, with Referer = instagram.com
+        {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-          'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
-        }
-        if (withCookie) headers['Cookie'] = `sessionid=${opts.sessionid}`
-        const req = https.get(thumbUrl, { headers, timeout: 8000 }, (res) => {
-          if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location && depth < 4) {
-            res.destroy()
-            fetchThumb(res.headers.location, depth + 1, withCookie)
-            return
-          }
-          const chunks2: Buffer[] = []
-          res.on('data', (c: Buffer) => chunks2.push(c))
-          res.on('end', () => {
-            if (res.statusCode === 200 && chunks2.length > 0) {
-              const ct = res.headers['content-type'] ?? 'image/jpeg'
-              v.thumbnail = `data:${ct};base64,${Buffer.concat(chunks2).toString('base64')}`
+          'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9',
+          'Referer': 'https://www.instagram.com/',
+          'sec-fetch-dest': 'image',
+          'sec-fetch-mode': 'no-cors',
+          'sec-fetch-site': 'cross-site',
+        },
+        // 2. No Referer (CDN sometimes wants none)
+        {
+          'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+          'Accept': 'image/*,*/*;q=0.8',
+        },
+        // 3. Mobile IG app UA
+        {
+          'User-Agent': 'Instagram 312.0.0.32.116 Android (33/13; 420dpi; 1080x2206; samsung; SM-S911B; dm3q; qcom; en_US; 558678421)',
+          'Accept': 'image/*',
+        },
+      ]
+      for (const headers of headerSets) {
+        try {
+          const res = await net.fetch(url, { method: 'GET', headers, redirect: 'follow' })
+          if (res.ok) {
+            const buf = Buffer.from(await res.arrayBuffer())
+            if (buf.length > 0) {
+              const ct = res.headers.get('content-type') ?? 'image/jpeg'
+              v.thumbnail = `data:${ct};base64,${buf.toString('base64')}`
               thumbOk++
-              resolve()
-            } else if (withCookie) {
-              // Retry once without cookie (IG CDN sometimes 403s when cookie present)
-              fetchThumb(originalUrl, 0, false)
-            } else {
-              console.log('[thumb] failed', res.statusCode, originalUrl.slice(0, 80))
-              thumbFail++
-              resolve()
+              return
             }
-          })
-          res.on('error', () => { thumbFail++; resolve() })
-        })
-        req.on('timeout', () => { req.destroy(); thumbFail++; resolve() })
-        req.on('error', () => {
-          if (withCookie) fetchThumb(originalUrl, 0, false)
-          else { thumbFail++; resolve() }
-        })
+          }
+        } catch (e) { /* try next header set */ }
       }
-      // Start without cookie — IG CDN URLs are pre-signed and adding sessionid often causes 403
-      fetchThumb(originalUrl, 0, false)
-    })))
+      console.log('[thumb] all retries failed:', url.slice(0, 100))
+      thumbFail++
+    }))
     console.log(`[fetch-instagram-by-session] thumbnails: ${thumbOk} ok, ${thumbFail} failed of ${videos.length}`)
 
     return {
@@ -601,32 +602,41 @@ function collectImage(
 }
 
 ipcMain.handle('fetch-image', async (_event, opts: { url: string; headers?: Record<string, string> }) => {
-  // Use Node.js https.get for all image fetches — it sends exactly the headers we
-  // provide with no interference from Electron's session cookie store, and it follows
-  // redirects properly. Instagram CDN URLs (fbcdn.net / cdninstagram.com) are
-  // pre-signed so they don't need session cookies; the sessionid header is only
-  // needed for API calls, not for CDN image downloads.
-  return new Promise<{ ok: boolean; dataUrl?: string; error?: string }>(resolve => {
-    const baseHeaders: Record<string, string> = {
+  // Multi-strategy image fetch via Electron's net.fetch (Chromium TLS + redirect handling).
+  // IG CDN can 403 randomly based on Referer/UA — we walk through fallbacks until one works.
+  const headerSets: Array<Record<string, string>> = [
+    {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-      'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
+      'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+      'Accept-Language': 'en-US,en;q=0.9',
       'Referer': 'https://www.instagram.com/',
-      ...(opts.headers ?? {}),
-    }
-    const fetchUrl = (url: string, hdrs: Record<string, string>, depth = 0) => {
-      const req = https.get(url, { headers: hdrs }, (res) => {
-        if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location && depth < 3) {
-          res.destroy()
-          fetchUrl(res.headers.location, hdrs, depth + 1)
-          return
+      'sec-fetch-dest': 'image',
+      'sec-fetch-mode': 'no-cors',
+      'sec-fetch-site': 'cross-site',
+    },
+    {
+      'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+      'Accept': 'image/*,*/*;q=0.8',
+    },
+    {
+      'User-Agent': 'Instagram 312.0.0.32.116 Android (33/13; 420dpi; 1080x2206; samsung; SM-S911B; dm3q; qcom; en_US; 558678421)',
+      'Accept': 'image/*',
+    },
+  ]
+  for (const headers of headerSets) {
+    try {
+      const merged = { ...headers, ...(opts.headers ?? {}) }
+      const res = await net.fetch(opts.url, { method: 'GET', headers: merged, redirect: 'follow' })
+      if (res.ok) {
+        const buf = Buffer.from(await res.arrayBuffer())
+        if (buf.length > 0) {
+          const ct = res.headers.get('content-type') ?? 'image/jpeg'
+          return { ok: true, dataUrl: `data:${ct};base64,${buf.toString('base64')}` }
         }
-        collectImage(res, resolve)
-      })
-      req.on('error', (e) => resolve({ ok: false, error: e.message }))
-      req.setTimeout(15000, () => { req.destroy(); resolve({ ok: false, error: 'timeout' }) })
-    }
-    fetchUrl(opts.url, baseHeaders)
-  })
+      }
+    } catch { /* try next */ }
+  }
+  return { ok: false, error: 'all_strategies_failed' }
 })
 
 // ── IPC: Groq API call (proxy to avoid CORS) ────────────────────────────────

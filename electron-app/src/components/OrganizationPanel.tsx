@@ -34,7 +34,7 @@ export function OrganizationPanel({ user }: Props) {
   const [editing, setEditing]   = useState<string | null>(null)  // member.id being edited
 
   // Invite form
-  const [invEmail, setInvEmail] = useState('')
+  const [invLabel, setInvLabel] = useState('')
   const [invRole,  setInvRole]  = useState<Exclude<OrgRole, 'owner'>>('member')
 
   const myMembership = myOrgs.find(x => x.org.id === currentOrg?.id)?.member
@@ -108,17 +108,22 @@ export function OrganizationPanel({ user }: Props) {
   }
 
   async function createInvite() {
-    if (!currentOrg || !invEmail.trim()) return
+    if (!currentOrg) return
     setBusy(true)
     const token = genToken()
-    const { error } = await supabase.from('organization_invites').insert({
-      org_id: currentOrg.id, email: invEmail.trim().toLowerCase(),
+    // Email field is just a label/note now — the token is what matters.
+    const label = invLabel.trim() || `Invitation ${new Date().toLocaleDateString('fr-FR')}`
+    const { data, error } = await supabase.from('organization_invites').insert({
+      org_id: currentOrg.id, email: label,
       token, role: invRole, invited_by: user.id,
-    })
+    }).select().single()
     setBusy(false)
     if (error) { flash(error.message, true); return }
-    setInvEmail('')
-    flash('Invitation créée — copie le code ci-dessous')
+    setInvLabel('')
+    if (data) {
+      navigator.clipboard.writeText(data.token).catch(() => {})
+      flash('Code généré et copié ✓ — partage-le, il ne marche qu\'une fois')
+    }
     await loadOrgDetail(currentOrg.id)
   }
 
@@ -130,26 +135,23 @@ export function OrganizationPanel({ user }: Props) {
   }
 
   async function acceptInvite() {
-    if (!joinToken.trim()) return
+    const token = joinToken.trim()
+    if (!token) return
     setBusy(true)
-    const { data: inv, error } = await supabase
-      .from('organization_invites').select('*')
-      .eq('token', joinToken.trim()).is('accepted_at', null).maybeSingle()
-    if (error || !inv) { setBusy(false); flash('Code d\'invitation invalide ou expiré', true); return }
-    if (new Date(inv.expires_at).getTime() < Date.now()) {
-      setBusy(false); flash('Invitation expirée', true); return
-    }
-    const { error: e2 } = await supabase.from('organization_members').insert({
-      org_id: inv.org_id, user_id: user.id, role: inv.role, perm_overrides: inv.perm_overrides ?? {},
-      invited_by: inv.invited_by,
-    })
-    if (e2) { setBusy(false); flash(e2.message, true); return }
-    await supabase.from('organization_invites').update({ accepted_at: new Date().toISOString() }).eq('id', inv.id)
+    const { data, error } = await supabase.rpc('accept_org_invite', { p_token: token })
     setBusy(false)
+    if (error) {
+      const msg = /invite_not_found/.test(error.message)     ? 'Code d\'invitation invalide'
+                : /invite_already_used/.test(error.message)  ? 'Ce code a déjà été utilisé'
+                : /invite_expired/.test(error.message)       ? 'Code expiré'
+                : error.message
+      flash(msg, true)
+      return
+    }
     setJoinToken('')
     flash('Bienvenue dans l\'organisation ✓')
     await refresh()
-    switchOrg(inv.org_id)
+    if (data) switchOrg(data as string)
   }
 
   async function changeRole(member: MemberRow, newRole: OrgRole) {
@@ -294,9 +296,10 @@ export function OrganizationPanel({ user }: Props) {
 
           {/* Invites */}
           <div className="border-t border-border pt-4 space-y-3">
-            <h3 className="text-xs font-bold text-text uppercase tracking-wider">Inviter un nouveau membre</h3>
+            <h3 className="text-xs font-bold text-text uppercase tracking-wider">Générer un code d'invitation</h3>
+            <p className="text-text2 text-xs">Chaque code est <strong className="text-text">à usage unique</strong> : une fois utilisé pour rejoindre, il devient invalide.</p>
             <div className="flex gap-2">
-              <Input value={invEmail} onChange={e => setInvEmail(e.target.value)} placeholder="email@exemple.com" />
+              <Input value={invLabel} onChange={e => setInvLabel(e.target.value)} placeholder="Note (ex: Pour Pierre) — optionnel" />
               <select
                 value={invRole}
                 onChange={e => setInvRole(e.target.value as Exclude<OrgRole, 'owner'>)}
@@ -306,11 +309,12 @@ export function OrganizationPanel({ user }: Props) {
                 <option value="member">Membre</option>
                 <option value="viewer">Lecteur</option>
               </select>
-              <Button onClick={createInvite} loading={busy} disabled={!invEmail.trim()}>Inviter</Button>
+              <Button onClick={createInvite} loading={busy}>🎟 Générer un code</Button>
             </div>
 
             {invites.length > 0 && (
               <ul className="space-y-1.5">
+                <p className="text-[10px] text-text2 uppercase tracking-wider">Codes en attente</p>
                 {invites.map(inv => (
                   <li key={inv.id} className="flex items-center gap-2 bg-surface px-3 py-2 rounded-lg text-xs">
                     <span className="flex-1 truncate text-text">{inv.email}</span>
@@ -318,9 +322,9 @@ export function OrganizationPanel({ user }: Props) {
                     <code
                       onClick={() => { navigator.clipboard.writeText(inv.token); flash('Code copié ✓') }}
                       className="bg-bg px-2 py-1 rounded font-mono text-[10px] cursor-pointer hover:text-accent"
-                      title="Cliquer pour copier"
+                      title="Cliquer pour copier le code complet"
                     >{inv.token.slice(0, 12)}…</code>
-                    <button onClick={() => revokeInvite(inv)} className="text-danger hover:opacity-70">✕</button>
+                    <button onClick={() => revokeInvite(inv)} className="text-danger hover:opacity-70" title="Révoquer ce code">✕</button>
                   </li>
                 ))}
               </ul>

@@ -108,6 +108,35 @@ CREATE POLICY "oi_update" ON public.organization_invites FOR UPDATE USING (
 );
 CREATE POLICY "oi_delete" ON public.organization_invites FOR DELETE USING (public.is_org_admin(org_id));
 
+-- ── RPC: accept an invite by token (single-use) ──────────────────────────────
+-- Anyone authenticated can call this — token IS the auth.
+-- Validates not expired/used, inserts member, marks invite consumed. Returns org_id.
+CREATE OR REPLACE FUNCTION public.accept_org_invite(p_token text)
+RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  v_invite public.organization_invites%ROWTYPE;
+  v_uid    uuid := auth.uid();
+BEGIN
+  IF v_uid IS NULL THEN RAISE EXCEPTION 'not_authenticated'; END IF;
+
+  SELECT * INTO v_invite FROM public.organization_invites
+  WHERE token = p_token FOR UPDATE;
+
+  IF NOT FOUND                       THEN RAISE EXCEPTION 'invite_not_found';     END IF;
+  IF v_invite.accepted_at IS NOT NULL THEN RAISE EXCEPTION 'invite_already_used';  END IF;
+  IF v_invite.expires_at < now()      THEN RAISE EXCEPTION 'invite_expired';       END IF;
+
+  -- Idempotent membership insert (in case user is somehow already a member)
+  INSERT INTO public.organization_members (org_id, user_id, role, perm_overrides, invited_by)
+  VALUES (v_invite.org_id, v_uid, v_invite.role, v_invite.perm_overrides, v_invite.invited_by)
+  ON CONFLICT (org_id, user_id) DO NOTHING;
+
+  UPDATE public.organization_invites SET accepted_at = now() WHERE id = v_invite.id;
+  RETURN v_invite.org_id;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.accept_org_invite(text) TO authenticated;
+
 -- Auto-create owner membership when org is created
 CREATE OR REPLACE FUNCTION public.add_owner_as_member()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER AS $$
