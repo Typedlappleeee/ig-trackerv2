@@ -7,83 +7,195 @@ import { Onboarding }        from '@/components/Onboarding'
 import { Layout, type Page } from '@/components/Layout'
 import { OrgProvider, useOrg } from '@/lib/orgContext'
 import { useConnections }    from '@/lib/connections'
+import { playSplash }        from '@/lib/sounds'
 
 // ── Splash screen ─────────────────────────────────────────────────────────────
-const SPLASH_DURATION = 2600  // ms avant fade-out
+const SPLASH_DURATION = 3400
+
+// Static particles so positions don't change on re-render
+const PARTICLES = [
+  { x: 38, y: 58, s: 2.5, d: 0.1, dur: 2.8 },
+  { x: 62, y: 55, s: 2,   d: 0.4, dur: 3.1 },
+  { x: 48, y: 60, s: 1.5, d: 0.7, dur: 2.5 },
+  { x: 55, y: 57, s: 3,   d: 0.2, dur: 3.4 },
+  { x: 42, y: 56, s: 1.5, d: 1.0, dur: 2.9 },
+  { x: 52, y: 59, s: 2,   d: 0.6, dur: 3.2 },
+  { x: 46, y: 54, s: 1,   d: 1.3, dur: 2.7 },
+  { x: 58, y: 61, s: 2.5, d: 0.3, dur: 3.0 },
+  { x: 44, y: 53, s: 1,   d: 0.9, dur: 2.6 },
+  { x: 56, y: 62, s: 2,   d: 1.2, dur: 3.3 },
+  { x: 40, y: 57, s: 1.5, d: 0.5, dur: 2.4 },
+  { x: 60, y: 58, s: 1,   d: 1.5, dur: 3.5 },
+]
+
+const STATUS_MSGS = [
+  'Initialisation des modules…',
+  'Connexion à la base de données…',
+  'Chargement de l\'interface…',
+  'Tout est prêt ✓',
+]
 
 function SplashScreen({ onDone }: { onDone: () => void }) {
-  const [fading, setFading] = useState(false)
-  const doneRef = useRef(false)
+  const [fading, setFading]       = useState(false)
+  const [typed, setTyped]         = useState('')
+  const [statusIdx, setStatusIdx] = useState(0)
+  const doneRef                   = useRef(false)
+  const fullText                  = 'Gestion de comptes Instagram'
 
+  // Play jingle once on mount
+  useEffect(() => { playSplash() }, [])
+
+  // Fade-out timing
   useEffect(() => {
     const t1 = setTimeout(() => setFading(true), SPLASH_DURATION)
     const t2 = setTimeout(() => {
       if (!doneRef.current) { doneRef.current = true; onDone() }
-    }, SPLASH_DURATION + 500)
+    }, SPLASH_DURATION + 560)
     return () => { clearTimeout(t1); clearTimeout(t2) }
   }, [onDone])
+
+  // Typewriter effect (starts at 850ms)
+  useEffect(() => {
+    if (typed.length >= fullText.length) return
+    const delay = typed.length === 0 ? 850 : 45
+    const t = setTimeout(() => setTyped(fullText.slice(0, typed.length + 1)), delay)
+    return () => clearTimeout(t)
+  }, [typed])
+
+  // Status message cycle
+  useEffect(() => {
+    const intervals = [700, 1500, 2400]
+    const timers = intervals.map((ms, i) => setTimeout(() => setStatusIdx(i + 1), ms))
+    return () => timers.forEach(clearTimeout)
+  }, [])
 
   return (
     <div
       className={fading ? 'splash-fade-out' : ''}
       style={{
         position: 'fixed', inset: 0, zIndex: 9999,
-        background: 'radial-gradient(ellipse at 50% 40%, #0d1530 0%, #080b14 70%)',
+        background: 'radial-gradient(ellipse at 50% 35%, #0e1a3a 0%, #080b14 68%)',
         display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'center', gap: 0,
+        alignItems: 'center', justifyContent: 'center',
         pointerEvents: fading ? 'none' : 'all',
+        overflow: 'hidden',
       }}
     >
-      {/* Logo */}
-      <div
-        className="splash-logo"
-        style={{
-          width: 96, height: 96, borderRadius: 28,
-          background: 'linear-gradient(135deg, #1a2f5e 0%, #0d1a3a 100%)',
-          border: '1.5px solid #4f9eff44',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 38, fontWeight: 900, color: '#4f9eff',
-          letterSpacing: '-2px', fontFamily: 'Inter, system-ui, sans-serif',
-          marginBottom: 32,
-        }}
-      >
-        IG
+      {/* ── Grid overlay ── */}
+      <div style={{
+        position: 'absolute', inset: 0, opacity: 0.04,
+        backgroundImage: 'linear-gradient(#4f9eff 1px, transparent 1px), linear-gradient(90deg, #4f9eff 1px, transparent 1px)',
+        backgroundSize: '60px 60px',
+        pointerEvents: 'none',
+      }} />
+
+      {/* ── Floating particles ── */}
+      {PARTICLES.map((p, i) => (
+        <div key={i} className="splash-particle" style={{
+          position: 'absolute',
+          left:    `${p.x}%`,
+          top:     `${p.y}%`,
+          width:    p.s,
+          height:   p.s,
+          borderRadius: '50%',
+          background: '#4f9eff',
+          boxShadow: `0 0 ${p.s * 3}px #4f9effaa`,
+          animationDelay: `${p.d}s`,
+          animationDuration: `${p.dur}s`,
+          animationIterationCount: 'infinite',
+        }} />
+      ))}
+
+      {/* ── Logo with spinning border + glow rings ── */}
+      <div className="splash-logo" style={{ position: 'relative', marginBottom: 36 }}>
+        {/* Radar rings */}
+        {(['splash-ring-1', 'splash-ring-2', 'splash-ring-3'] as const).map(cls => (
+          <div key={cls} className={cls} style={{
+            position: 'absolute',
+            inset: -4,
+            borderRadius: 36,
+            border: '1.5px solid #4f9eff',
+            pointerEvents: 'none',
+          }} />
+        ))}
+
+        {/* Spinning border wrapper */}
+        <div className="splash-border" style={{
+          width: 108, height: 108, borderRadius: 32, padding: 2.5,
+          background: `conic-gradient(from var(--splash-angle, 0deg), transparent 0%, #4f9eff 35%, #7eb8ff 50%, transparent 65%)`,
+        }}>
+          {/* Logo inner */}
+          <div style={{
+            width: '100%', height: '100%', borderRadius: 30,
+            background: 'linear-gradient(135deg, #1a2f5e 0%, #0a1428 100%)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 38, fontWeight: 900,
+            color: '#4f9eff', letterSpacing: '-2px',
+            fontFamily: 'Inter, system-ui, sans-serif',
+            position: 'relative', overflow: 'hidden',
+          }}>
+            {/* Shimmer sweep over text */}
+            <div style={{
+              position: 'absolute', inset: 0,
+              background: 'linear-gradient(105deg, transparent 30%, #ffffff22 50%, transparent 70%)',
+              backgroundSize: '200% 100%',
+              animation: 'splash-shimmer 2.4s ease-in-out 0.9s infinite',
+            }} />
+            IG
+          </div>
+        </div>
       </div>
 
-      {/* Title */}
-      <div className="splash-title" style={{ textAlign: 'center', marginBottom: 8 }}>
-        <span style={{ fontSize: 28, fontWeight: 800, color: '#d4dcf0', letterSpacing: '-0.5px' }}>
+      {/* ── Title ── */}
+      <div className="splash-title" style={{ textAlign: 'center', marginBottom: 6 }}>
+        <span style={{ fontSize: 30, fontWeight: 800, color: '#d4dcf0', letterSpacing: '-0.5px' }}>
           IG Tracker
         </span>
         {' '}
-        <span style={{ fontSize: 28, fontWeight: 800, color: '#4f9eff' }}>v2</span>
+        <span style={{ fontSize: 30, fontWeight: 800,
+          background: 'linear-gradient(135deg, #4f9eff, #7eb8ff)',
+          WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+        }}>v2</span>
       </div>
 
-      {/* Subtitle */}
-      <div className="splash-sub" style={{ color: '#5a6882', fontSize: 13, marginBottom: 56 }}>
-        Gestion de comptes Instagram
+      {/* ── Typewriter subtitle ── */}
+      <div className="splash-sub" style={{
+        color: '#5a6882', fontSize: 13, marginBottom: 52,
+        fontFamily: 'monospace', letterSpacing: '0.02em', minHeight: 18,
+      }}>
+        {typed}<span className="splash-cursor" style={{ color: '#4f9eff', marginLeft: 1 }}>|</span>
       </div>
 
-      {/* Loading dots */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
-        {(['splash-dot-1', 'splash-dot-2', 'splash-dot-3'] as const).map(cls => (
-          <span key={cls} className={cls} style={{
-            display: 'inline-block', width: 7, height: 7,
-            borderRadius: '50%', background: '#4f9eff',
-          }} />
-        ))}
+      {/* ── Status text ── */}
+      <div style={{
+        position: 'absolute', bottom: 44,
+        fontSize: 10, color: '#3a4a66', letterSpacing: '0.08em',
+        fontFamily: 'monospace', textTransform: 'uppercase',
+        transition: 'opacity 0.4s',
+        opacity: fading ? 0 : 1,
+      }}>
+        {STATUS_MSGS[statusIdx]}
       </div>
 
-      {/* Progress bar */}
+      {/* ── Progress bar ── */}
       <div style={{
         position: 'absolute', bottom: 0, left: 0, right: 0,
-        height: 3, background: '#1a2035',
+        height: 3, background: '#0f1628',
       }}>
         <div className="splash-bar" style={{
           height: '100%',
-          background: 'linear-gradient(90deg, #4f9eff, #7eb8ff)',
+          background: 'linear-gradient(90deg, #4f9eff, #7eb8ff, #4f9eff)',
+          backgroundSize: '200% 100%',
           borderRadius: 2,
-        }} />
+          position: 'relative', overflow: 'hidden',
+        }}>
+          {/* Shimmer on bar */}
+          <div className="splash-bar-shimmer" style={{
+            position: 'absolute', inset: 0,
+            background: 'linear-gradient(90deg, transparent, #ffffff40, transparent)',
+            width: '25%',
+          }} />
+        </div>
       </div>
     </div>
   )

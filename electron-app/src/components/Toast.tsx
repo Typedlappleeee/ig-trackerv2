@@ -1,4 +1,5 @@
 import { useState, useCallback, createContext, useContext } from 'react'
+import { playToast as sfxToast } from '@/lib/sounds'
 
 type ToastKind = 'ok' | 'error' | 'warn' | 'info'
 
@@ -88,10 +89,12 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([])
 
   const show = useCallback((opts: { title: string; body?: string; kind?: ToastKind; duration?: number }) => {
-    const id  = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
-    const dur = opts.duration ?? 4000
-    const item: ToastItem = { id, title: opts.title, body: opts.body, kind: opts.kind ?? 'ok', duration: dur }
+    const id   = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
+    const dur  = opts.duration ?? 4000
+    const kind = opts.kind ?? 'ok'
+    const item: ToastItem = { id, title: opts.title, body: opts.body, kind, duration: dur }
     setToasts(prev => [...prev, item])
+    sfxToast(kind)
     if (dur > 0) setTimeout(() => dismiss(id), dur + 300)
   }, [])
 

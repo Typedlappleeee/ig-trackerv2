@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { useOrg }    from '@/lib/orgContext'
 import { canSeeTab } from '@/lib/permissions'
 import { useToast }  from '@/components/Toast'
+import { playNav }   from '@/lib/sounds'
 import { getRecentAccounts, switchToAccount, forgetAccount, type RecentAccount } from '@/lib/recentAccounts'
 
 export type Page =
@@ -219,7 +220,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
                       return (
                         <button
                           key={item.id}
-                          onClick={() => onNavigate(item.id)}
+                          onClick={() => { playNav(); onNavigate(item.id) }}
                           className={`
                             relative w-full flex items-center gap-2.5 pl-3 pr-2 py-2 rounded-lg text-[13px] text-left
                             transition-all duration-150
@@ -307,7 +308,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             ↺  Rafraîchir
           </button>
           <button
-            onClick={() => onNavigate('settings')}
+            onClick={() => { playNav(); onNavigate('settings') }}
             className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[12px] transition-colors ${
               page === 'settings' ? 'bg-sb-active text-sb-text-act' : 'text-sb-text hover:bg-sb-hover hover:text-sb-text-act'
             }`}
