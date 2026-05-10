@@ -314,37 +314,51 @@ ipcMain.handle('fetch-instagram-by-session', async (_event, opts: { username: st
 
     // Pre-fetch thumbnails as base64 in the main process so renderer never
     // needs a separate cross-origin request (CDN URLs are fresh right now).
+    let thumbOk = 0, thumbFail = 0
     await Promise.all(videos.map(v => new Promise<void>(resolve => {
-      if (!v.thumbnail) { resolve(); return }
-      const url = v.thumbnail
-      const fetchThumb = (thumbUrl: string, depth: number) => {
-        https.get(thumbUrl, {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-            'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
-            'Referer': 'https://www.instagram.com/',
-            'Cookie': `sessionid=${opts.sessionid}`,
-          },
-        }, (res) => {
-          if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location && depth < 3) {
+      if (!v.thumbnail) { thumbFail++; resolve(); return }
+      const originalUrl = v.thumbnail
+      const fetchThumb = (thumbUrl: string, depth: number, withCookie: boolean) => {
+        const headers: Record<string, string> = {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+          'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
+        }
+        if (withCookie) headers['Cookie'] = `sessionid=${opts.sessionid}`
+        const req = https.get(thumbUrl, { headers, timeout: 8000 }, (res) => {
+          if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location && depth < 4) {
             res.destroy()
-            fetchThumb(res.headers.location, depth + 1)
+            fetchThumb(res.headers.location, depth + 1, withCookie)
             return
           }
           const chunks2: Buffer[] = []
           res.on('data', (c: Buffer) => chunks2.push(c))
           res.on('end', () => {
-            if (res.statusCode === 200) {
+            if (res.statusCode === 200 && chunks2.length > 0) {
               const ct = res.headers['content-type'] ?? 'image/jpeg'
               v.thumbnail = `data:${ct};base64,${Buffer.concat(chunks2).toString('base64')}`
+              thumbOk++
+              resolve()
+            } else if (withCookie) {
+              // Retry once without cookie (IG CDN sometimes 403s when cookie present)
+              fetchThumb(originalUrl, 0, false)
+            } else {
+              console.log('[thumb] failed', res.statusCode, originalUrl.slice(0, 80))
+              thumbFail++
+              resolve()
             }
-            resolve()
           })
-          res.on('error', () => resolve())
-        }).on('error', () => resolve())
+          res.on('error', () => { thumbFail++; resolve() })
+        })
+        req.on('timeout', () => { req.destroy(); thumbFail++; resolve() })
+        req.on('error', () => {
+          if (withCookie) fetchThumb(originalUrl, 0, false)
+          else { thumbFail++; resolve() }
+        })
       }
-      fetchThumb(url, 0)
+      // Start without cookie — IG CDN URLs are pre-signed and adding sessionid often causes 403
+      fetchThumb(originalUrl, 0, false)
     })))
+    console.log(`[fetch-instagram-by-session] thumbnails: ${thumbOk} ok, ${thumbFail} failed of ${videos.length}`)
 
     return {
       ok: true,
@@ -603,10 +617,23 @@ ipcMain.handle('fetch-ig-comments', async (_event, opts: { mediaId: string; sess
   try {
     let url = `https://i.instagram.com/api/v1/media/${opts.mediaId}/comments/?can_support_threading=true&permalink_enabled=false`
     if (opts.maxId) url += `&max_id=${opts.maxId}`
-    const res = await igSessionFetch(url, opts.sessionid)
-    if (res.status !== 200) return { ok: false, error: `HTTP ${res.status}` }
+    let res = await igSessionFetch(url, opts.sessionid)
+    console.log('[fetch-ig-comments] mediaId=', opts.mediaId, 'status=', res.status)
+    // Fallback: try the simpler endpoint without query params (some accounts/media reject the threading variant)
+    if (res.status !== 200) {
+      const url2 = `https://i.instagram.com/api/v1/media/${opts.mediaId}/comments/${opts.maxId ? `?max_id=${opts.maxId}` : ''}`
+      const res2 = await igSessionFetch(url2, opts.sessionid)
+      console.log('[fetch-ig-comments] fallback status=', res2.status)
+      if (res2.status === 200) res = res2
+      else return { ok: false, error: `HTTP ${res.status} / fallback HTTP ${res2.status}` }
+    }
     const data = res.data as Record<string, unknown>
-    const rawComments = (data['comments'] as Array<Record<string, unknown>>) ?? []
+    // Comments may be under "comments" or, in threading mode, under "preview_comments" / "caption_is_edited"+items
+    let rawComments = (data['comments'] as Array<Record<string, unknown>>) ?? []
+    if (rawComments.length === 0 && Array.isArray(data['preview_comments'])) {
+      rawComments = data['preview_comments'] as Array<Record<string, unknown>>
+    }
+    console.log('[fetch-ig-comments] raw count=', rawComments.length, 'top-level keys=', Object.keys(data).slice(0, 12))
     const comments = rawComments.map(c => ({
       pk:        String(c['pk'] ?? ''),
       text:      String(c['text'] ?? ''),

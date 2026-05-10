@@ -395,14 +395,21 @@ export function Autocomment({ user }: AutocommentProps) {
               />
             </div>
             </>)}
-            <div className="flex gap-2">
-              {!running ? (
-                <Button size="sm" onClick={start} className="flex-1 !bg-ok hover:!bg-ok/80 !text-bg">▶ Démarrer</Button>
-              ) : (
-                <Button size="sm" onClick={stop} variant="danger" className="flex-1">■ Arrêter</Button>
-              )}
-              <Button size="sm" variant="secondary" onClick={() => setLogs([])}>🗑</Button>
-            </div>
+            {replyMode === 'ai' ? (
+              <div className="flex gap-2">
+                {!running ? (
+                  <Button size="sm" onClick={start} className="flex-1 !bg-ok hover:!bg-ok/80 !text-bg">▶ Démarrer</Button>
+                ) : (
+                  <Button size="sm" onClick={stop} variant="danger" className="flex-1">■ Arrêter</Button>
+                )}
+                <Button size="sm" variant="secondary" onClick={() => setLogs([])}>🗑</Button>
+              </div>
+            ) : (
+              <div className="flex gap-2 items-center">
+                <p className="text-[10px] text-text2 flex-1">✍️ Mode manuel — écris ta réponse sous chaque commentaire puis clique sur ↑ Envoyer.</p>
+                <Button size="sm" variant="secondary" onClick={() => setLogs([])}>🗑</Button>
+              </div>
+            )}
             {/* Log */}
             <div className="bg-bg border border-border rounded p-2 max-h-24 overflow-auto font-mono text-[10px] text-text2 space-y-0.5">
               {logs.length === 0 ? <p className="text-text2/50">Aucun log</p> : logs.map((l, i) => <p key={i}>{l}</p>)}

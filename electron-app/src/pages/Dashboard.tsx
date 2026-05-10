@@ -263,8 +263,12 @@ export function Dashboard({ user }: DashboardProps) {
     const rows = data ?? []
 
     const byDay = new Map<string, number>()
+    const dayKey = (iso: string) => {
+      const d = new Date(iso)
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    }
     for (const row of rows) {
-      const day = row.recorded_at.slice(0, 10)
+      const day = dayKey(row.recorded_at)
       const cur = byDay.get(day) ?? 0
       byDay.set(day, Math.max(cur, row.views as number))
     }
@@ -279,11 +283,13 @@ export function Dashboard({ user }: DashboardProps) {
       const today = new Date()
       today.setHours(0, 0, 0, 0)
       pts = []
+      const fmt = (d: Date) =>
+        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
       for (let i = days - 1; i >= 0; i--) {
         const d = new Date(today)
         d.setDate(d.getDate() - i)
-        const label = d.toISOString().slice(0, 10)
-        pts.push({ label, value: byDay.get(label) ?? 0, date: new Date(label) })
+        const label = fmt(d)
+        pts.push({ label, value: byDay.get(label) ?? 0, date: new Date(d) })
       }
     }
     setChartData(pts)
