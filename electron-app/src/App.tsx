@@ -156,8 +156,9 @@ function AppContent({ user }: { user: User }) {
   const [refreshTick, setRefreshTick]       = useState(0)
 
   useEffect(() => {
-    supabase.from('app_config').select('bearer_token').eq('user_id', user.id).single()
-      .then(({ data }) => {
+    supabase.from('app_config').select('bearer_token').eq('user_id', user.id).maybeSingle()
+      .then(({ data, error }) => {
+        if (error) console.error('[app_config] read error:', error)
         const hasBearer = !!data?.bearer_token
         setOnboarding(!hasBearer)
         if (hasBearer && !localStorage.getItem(BETA_KEY)) setShowBeta(true)

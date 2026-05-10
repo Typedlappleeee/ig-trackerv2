@@ -27,6 +27,7 @@ export function Onboarding({ user, onComplete }: OnboardingProps) {
   const [groqState, setGState]  = useState<TestState>('idle')
   const [groqMsg, setGMsg]      = useState('')
   const [saving, setSaving]     = useState(false)
+  const [saveErr, setSaveErr]   = useState<string | null>(null)
 
   // ── Step 1: test GéeLark bearer ──────────────────────────────────────────
   async function testBearer() {
@@ -83,8 +84,8 @@ export function Onboarding({ user, onComplete }: OnboardingProps) {
   // ── Save and finish ──────────────────────────────────────────────────────
   async function finish() {
     if (!bearer.trim()) return
-    setSaving(true)
-    await supabase.from('app_config').upsert({
+    setSaving(true); setSaveErr(null)
+    const { error } = await supabase.from('app_config').upsert({
       user_id:      user.id,
       bearer_token: bearer.trim(),
       groq_api_key: groqKey.trim(),
@@ -92,6 +93,16 @@ export function Onboarding({ user, onComplete }: OnboardingProps) {
       updated_at:   new Date().toISOString(),
     }, { onConflict: 'user_id' })
     setSaving(false)
+    if (error) {
+      setSaveErr(`Impossible de sauvegarder : ${error.message}. Vérifie ta connexion et réessaie.`)
+      return
+    }
+    // Verify it actually persisted before moving on (so the next login won't show onboarding again)
+    const { data: check } = await supabase.from('app_config').select('bearer_token').eq('user_id', user.id).maybeSingle()
+    if (!check?.bearer_token) {
+      setSaveErr('La sauvegarde semble ne pas être persistée (RLS ?). Reconnecte-toi puis réessaie.')
+      return
+    }
     onComplete()
   }
 
@@ -282,6 +293,11 @@ export function Onboarding({ user, onComplete }: OnboardingProps) {
               Tu peux modifier ces clés à tout moment dans <strong className="text-text">Paramètres → Connexions</strong>.
             </p>
 
+            {saveErr && (
+              <p className="text-xs text-danger bg-danger/10 border border-danger/30 rounded-lg px-3 py-2 text-left">
+                ✗ {saveErr}
+              </p>
+            )}
             <Button className="w-full" onClick={finish} loading={saving}>
               🚀 Entrer dans IG Tracker
             </Button>
