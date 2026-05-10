@@ -333,39 +333,70 @@ export function Stats({ user }: StatsProps) {
                   </p>
                 </div>
               ) : (
-                <div className="grid grid-cols-3 xl:grid-cols-5 2xl:grid-cols-6 gap-3">
-                  {sorted.map(video => (
-                    <a
-                      key={video.id}
-                      href={video.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="bg-card border border-border rounded-xl overflow-hidden hover:border-accent/40 transition-colors group"
-                    >
-                      <div className="aspect-[9/16] bg-surface2 relative overflow-hidden">
-                        <VideoThumbnail src={video.thumbnail} sessionid={sessionid} />
-                        {video.views > 0 && (
-                          <div className="absolute bottom-1.5 left-1.5 bg-black/70 rounded px-1.5 py-0.5 text-[10px] text-white flex items-center gap-1">
-                            <span>👁</span>
-                            <span>{video.views.toLocaleString('fr-FR')}</span>
+                <div className="grid grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
+                  {(() => {
+                    const maxV = Math.max(...sorted.map(v => v.views), 1)
+                    return sorted.map(video => {
+                      // Tier banner gradient based on views (matches Python aesthetic fallback)
+                      const tier = video.views >= maxV * 0.7 ? 'high' : video.views >= maxV * 0.3 ? 'mid' : 'low'
+                      const tierGradient =
+                        tier === 'high' ? 'linear-gradient(135deg, #a56ef5 0%, #f03d55 100%)' :
+                        tier === 'mid'  ? 'linear-gradient(135deg, #4f8ef7 0%, #a56ef5 100%)' :
+                                          'linear-gradient(135deg, #2a3050 0%, #1a2035 100%)'
+                      return (
+                        <a
+                          key={video.id}
+                          href={video.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="bg-card border border-border rounded-xl overflow-hidden hover:border-accent transition-colors group"
+                        >
+                          {/* Banner — 90px tall, gradient with thumbnail overlay */}
+                          <div
+                            className="relative h-[90px] overflow-hidden"
+                            style={{ background: tierGradient }}
+                          >
+                            {video.thumbnail && (
+                              <div className="absolute inset-0 opacity-60">
+                                <VideoThumbnail src={video.thumbnail} sessionid={sessionid} />
+                              </div>
+                            )}
+                            <div className="absolute inset-0 bg-black/30" />
+                            {/* Play icon overlay */}
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <div className="w-10 h-10 rounded-full bg-white/30 backdrop-blur-sm flex items-center justify-center">
+                                <span className="text-white text-base ml-0.5">▶</span>
+                              </div>
+                            </div>
+                            {/* REEL chip */}
+                            <span className="absolute top-2 right-2 bg-black/60 text-white text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded">REEL</span>
                           </div>
-                        )}
-                        {video.timestamp && (
-                          <div className="absolute top-1.5 left-1.5 bg-black/60 rounded px-1.5 py-0.5 text-[9px] text-white">
-                            {new Date(video.timestamp).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}
+                          {/* Body */}
+                          <div className="p-3 space-y-2">
+                            <div className="flex items-baseline gap-2">
+                              <span className="text-accent text-base">▶</span>
+                              <span className="text-xl font-bold text-text leading-none">{video.views.toLocaleString('fr-FR')}</span>
+                              <span className="text-[10px] text-text2">vues</span>
+                            </div>
+                            {/* Progress bar (views / max) */}
+                            <div className="h-[3px] bg-surface3 rounded-full overflow-hidden">
+                              <div className="h-full bg-accent rounded-full" style={{ width: `${(video.views / maxV) * 100}%` }} />
+                            </div>
+                            {/* Stats row */}
+                            <div className="flex items-center gap-3 text-[11px] text-text2 font-semibold">
+                              {video.likes > 0 && <span>♥ {video.likes.toLocaleString('fr-FR')}</span>}
+                              {video.comments > 0 && <span>✎ {video.comments.toLocaleString('fr-FR')}</span>}
+                              {video.timestamp && (
+                                <span className="ml-auto text-[10px] text-text2/70">
+                                  {new Date(video.timestamp).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}
+                                </span>
+                              )}
+                            </div>
                           </div>
-                        )}
-                      </div>
-                      <div className="px-2 py-1.5 flex items-center gap-2 text-[10px] text-text2">
-                        {video.likes > 0 && (
-                          <span className="flex items-center gap-0.5">❤ {video.likes.toLocaleString('fr-FR')}</span>
-                        )}
-                        {video.comments > 0 && (
-                          <span className="flex items-center gap-0.5">💬 {video.comments.toLocaleString('fr-FR')}</span>
-                        )}
-                      </div>
-                    </a>
-                  ))}
+                        </a>
+                      )
+                    })
+                  })()}
                 </div>
               )}
             </div>
