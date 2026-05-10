@@ -55,21 +55,29 @@ export function MassPosting({ user }: MassPostingProps) {
   const [phones, setPhones]               = useState<Phone[]>([])
   const [selectedPhones, setSelPhones]    = useState<Set<string>>(new Set())
   const [selectedVideos, setSelVideos]    = useState<SelectedVideo[]>([])
+  const [caption, setCaption]             = useState('')              // Python: shared _mp_cap_box
+  const [mode, setMode]                   = useState<'seq' | 'random'>('seq')  // Python: _mp_mode_var
+  const [maxWorkers, setMaxWorkers]       = useState(20)              // Python: max_simul (1-50)
+  const [staggerMin, setStaggerMin]       = useState(5)               // Python: stagger (0-60 min)
   const [bearer, setBearer]               = useState('')
+  const [groqKey, setGroqKey]             = useState('')
   const [posting, setPosting]             = useState(false)
+  const [generating, setGenerating]       = useState(false)
   const [logs, setLogs]                   = useState<TaskLog[]>([])
   const [taskStatuses, setTaskStatuses]   = useState<Map<string, TaskStatus>>(new Map())
   const [groupFilter, setGroupFilter]     = useState('Tous')
   const [groups, setGroups]               = useState<string[]>(['Tous'])
   const [showBankPicker, setShowBankPicker] = useState(false)
+  const stopRef                           = useRef(false)
   const logEndRef                         = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     Promise.all([
-      supabase.from('app_config').select('bearer_token').eq('user_id', user.id).single(),
+      supabase.from('app_config').select('bearer_token, groq_api_key').eq('user_id', user.id).single(),
       supabase.from('phones').select('*').eq('user_id', user.id).order('phone_name'),
     ]).then(([cfg, ph]) => {
       if (cfg.data?.bearer_token) setBearer(cfg.data.bearer_token)
+      if (cfg.data?.groq_api_key) setGroqKey(cfg.data.groq_api_key)
       const ps = ph.data ?? []
       setPhones(ps)
       const grps = [...new Set(ps.map(p => p.group_name).filter(Boolean) as string[])].sort()
@@ -118,13 +126,46 @@ export function MassPosting({ user }: MassPostingProps) {
     setSelVideos(prev => [...prev, { item: fake, localPath: path }])
   }
 
-  // Auto-assignment: phone[i] → video[i % selectedVideos.length]
+  // Auto-assignment: round-robin (seq) or random (random) — Python _mp_mode_var
   const phoneList = phones.filter(p => selectedPhones.has(p.id))
-  const assignments = phoneList.map((phone, i) => ({
-    phone,
-    video: selectedVideos.length > 0 ? selectedVideos[i % selectedVideos.length] : null,
-    videoIndex: selectedVideos.length > 0 ? i % selectedVideos.length : -1,
-  }))
+  const assignments = phoneList.map((phone, i) => {
+    if (selectedVideos.length === 0) return { phone, video: null, videoIndex: -1 }
+    const idx = mode === 'random'
+      ? Math.floor(Math.random() * selectedVideos.length)  // Note: stable per render — recomputed when phoneList/videos change
+      : i % selectedVideos.length
+    return { phone, video: selectedVideos[idx], videoIndex: idx }
+  })
+
+  function stop() {
+    stopRef.current = true
+    log('🛑 Arrêt demandé — patientez la fin du cycle en cours…', 'warn')
+  }
+
+  async function generateCaption() {
+    if (!groqKey) { log('❌ Clé Groq manquante — Paramètres', 'error'); return }
+    if (!window.electronAPI?.groqRequest) return
+    setGenerating(true)
+    try {
+      const r = await window.electronAPI.groqRequest({
+        apiKey: groqKey,
+        model: 'llama-3.3-70b-versatile',
+        maxTokens: 300,
+        messages: [
+          { role: 'system', content: 'Tu génères des captions Instagram virales en français. Hook fort + body engageant + CTA + 10-15 hashtags. Max 2200 caractères.' },
+          { role: 'user',   content: `Génère une caption Instagram virale et générique qui marche pour beaucoup de comptes. Réponds uniquement avec la caption finale, sans préambule.` },
+        ],
+      })
+      if (r.ok && r.data) {
+        const choice = (r.data as { choices?: Array<{ message?: { content?: string } }> }).choices?.[0]?.message?.content
+        if (choice) setCaption(choice.trim())
+      } else {
+        log(`❌ Génération échouée: ${r.error}`, 'error')
+      }
+    } catch (e) {
+      log(`❌ ${e instanceof Error ? e.message : String(e)}`, 'error')
+    }
+    setGenerating(false)
+  }
 
   async function post() {
     if (!bearer)                  { log('Token GéeLark manquant — Paramètres', 'error'); return }
@@ -133,6 +174,7 @@ export function MassPosting({ user }: MassPostingProps) {
 
     setPosting(true)
     setLogs([])
+    stopRef.current = false
     const newStatuses = new Map<string, TaskStatus>()
     phoneList.forEach(p => newStatuses.set(p.id, { status: 'pending' }))
     setTaskStatuses(newStatuses)
@@ -195,7 +237,7 @@ export function MassPosting({ user }: MassPostingProps) {
         const taskRes = await geelark(bearer, '/rpa/task/instagramPubReels', {
           phoneId: asgn.phone.geelark_id,
           videoId: token,
-          caption: '',
+          caption,
         })
         if (taskRes['code'] === 0) {
           const tid = (taskRes['data'] as Record<string, unknown>)?.['id'] as string
@@ -262,24 +304,78 @@ export function MassPosting({ user }: MassPostingProps) {
   return (
     <div className="flex flex-col h-full min-h-screen">
       {/* Header */}
-      <div className="px-8 py-5 border-b border-border flex items-center justify-between flex-shrink-0">
-        <div>
-          <h1 className="text-2xl font-bold text-text">Mass Posting</h1>
-          <p className="text-text2 text-sm mt-0.5">
-            Poste un Reel sur plusieurs téléphones simultanément
-            {withSessions > 0 && (
-              <span className="ml-2 text-ok text-xs">· {withSessions} session(s) IG configurée(s)</span>
-            )}
-          </p>
+      <div className="px-6 py-3 border-b border-border bg-[#070a10] flex flex-col gap-3 flex-shrink-0">
+        <div className="flex items-center gap-4">
+          <div>
+            <h1 className="text-lg font-bold text-text">⚡ Mass Posting</h1>
+            <p className="text-text2 text-[11px] mt-0.5">
+              1 vidéo / téléphone — {phoneList.length} cible{phoneList.length !== 1 ? 's' : ''}, {selectedVideos.length} vidéo{selectedVideos.length !== 1 ? 's' : ''}
+              {withSessions > 0 && <span className="ml-2 text-ok">· {withSessions} session(s) IG</span>}
+            </p>
+          </div>
+          <div className="flex-1" />
+          {/* Mode toggle */}
+          <div className="flex bg-surface rounded-lg p-1 text-xs">
+            {([
+              { k: 'seq',    l: 'Séquentiel' },
+              { k: 'random', l: 'Aléatoire'  },
+            ] as const).map(m => (
+              <button
+                key={m.k}
+                onClick={() => setMode(m.k)}
+                className={`px-3 py-1 rounded-md font-medium transition-colors ${
+                  mode === m.k ? 'bg-accent text-white' : 'text-text2 hover:text-text'
+                }`}
+              >{m.l}</button>
+            ))}
+          </div>
+          {/* Workers + delay */}
+          <div className="flex items-center gap-1.5 text-xs text-text2">
+            <span>⚡</span>
+            <input
+              type="number" min={1} max={50}
+              value={maxWorkers}
+              onChange={e => setMaxWorkers(parseInt(e.target.value) || 20)}
+              className="w-12 bg-bg border border-border rounded px-1.5 py-0.5 text-text text-center focus:outline-none focus:border-accent"
+            />
+            <span>simultanés</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-xs text-text2">
+            <span>⏱</span>
+            <input
+              type="number" min={0} max={60}
+              value={staggerMin}
+              onChange={e => setStaggerMin(parseInt(e.target.value) || 0)}
+              className="w-12 bg-bg border border-border rounded px-1.5 py-0.5 text-text text-center focus:outline-none focus:border-accent"
+            />
+            <span>min délai</span>
+          </div>
+          <Button
+            onClick={post}
+            loading={posting}
+            disabled={!bearer || phoneList.length === 0 || selectedVideos.length === 0}
+          >
+            ⚡ Lancer le Mass Posting
+          </Button>
+          <Button onClick={stop} variant="danger" disabled={!posting}>⏹ Arrêter</Button>
         </div>
-        <Button
-          onClick={post}
-          loading={posting}
-          disabled={!bearer || phoneList.length === 0 || selectedVideos.length === 0}
-          size="lg"
-        >
-          🚀 Poster sur {phoneList.length || '?'} téléphone{phoneList.length !== 1 ? 's' : ''}
-        </Button>
+
+        {/* Caption shared by all */}
+        <div className="flex items-start gap-2">
+          <textarea
+            value={caption}
+            onChange={e => setCaption(e.target.value)}
+            rows={2}
+            placeholder="Caption partagée par tous les téléphones (obligatoire)…"
+            className="flex-1 bg-bg border border-border rounded-lg px-3 py-2 text-xs text-text placeholder:text-text2 resize-none focus:outline-none focus:border-accent"
+          />
+          <div className="flex flex-col gap-1">
+            <Button size="sm" variant="secondary" onClick={generateCaption} loading={generating} disabled={!groqKey}>✨ Générer</Button>
+            <span className={`text-[10px] font-mono text-right ${caption.length > 2200 ? 'text-danger' : 'text-text2'}`}>
+              {caption.length} / 2200
+            </span>
+          </div>
+        </div>
       </div>
 
       {!bearer && (
