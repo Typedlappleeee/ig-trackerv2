@@ -518,13 +518,32 @@ export function Phones({ user }: PhonesProps) {
         remark:     p.remark ?? null,
         synced_at:  new Date().toISOString(),
       }))
-      // Conflict target depends on mode:
-      // - Org   → (org_id, geelark_id)  [partial unique index, dedup across members]
-      // - Solo  → (user_id, geelark_id) [original UNIQUE constraint]
-      const onConflict = currentOrg ? 'org_id,geelark_id' : 'user_id,geelark_id'
-      const { error: upsertErr } = await supabase
-        .from('phones').upsert(rows, { onConflict })
-      if (upsertErr) throw new Error(upsertErr.message)
+      // Conflict strategy:
+      // - Solo → use the real UNIQUE(user_id, geelark_id) constraint
+      // - Org  → PostgREST can't use partial indexes, so do it manually:
+      //          fetch existing rows, then batch-update + insert new ones
+      if (currentOrg) {
+        const { data: existing } = await supabase
+          .from('phones').select('id,geelark_id').eq('org_id', currentOrg.id)
+        const existingMap = new Map((existing ?? []).map((p: { id: string; geelark_id: string }) => [p.geelark_id, p.id]))
+
+        const toInsert = rows.filter(r => !existingMap.has(r.geelark_id))
+        const toUpdate = rows.filter(r =>  existingMap.has(r.geelark_id))
+
+        if (toInsert.length > 0) {
+          const { error } = await supabase.from('phones').insert(toInsert)
+          if (error) throw new Error(error.message)
+        }
+        for (const row of toUpdate) {
+          const id = existingMap.get(row.geelark_id)!
+          const { error } = await supabase.from('phones').update(row).eq('id', id)
+          if (error) throw new Error(error.message)
+        }
+      } else {
+        const { error: upsertErr } = await supabase
+          .from('phones').upsert(rows, { onConflict: 'user_id,geelark_id' })
+        if (upsertErr) throw new Error(upsertErr.message)
+      }
       lastDbSyncRef.current = new Date()
       await loadPhones()
       setLastUpdated(new Date())
