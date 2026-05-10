@@ -137,6 +137,8 @@ export function Bank({ user }: BankProps) {
   const [showNewFolder, setShowNewFolder]   = useState(false)
   const [needsMigration, setNeedsMigration] = useState(false)
   const [sqlCopied, setSqlCopied]           = useState(false)
+  // Type filter (Python: Tous/Vidéo/Photo/GIF/Audio)
+  const [typeFilter, setTypeFilter] = useState<'all' | 'video' | 'photo' | 'gif' | 'audio'>('all')
   // Empty folders (created by user but no videos yet) — kept in localStorage for persistence
   const [emptyFolders, setEmptyFolders] = useState<string[]>(() => {
     try { return JSON.parse(localStorage.getItem('bank-empty-folders') ?? '[]') } catch { return [] }
@@ -286,10 +288,20 @@ export function Bank({ user }: BankProps) {
     ...emptyFolders,
   ])].sort()
 
+  function inferType(filePath: string | null): 'video' | 'photo' | 'gif' | 'audio' {
+    if (!filePath) return 'video'
+    const ext = filePath.toLowerCase().split('.').pop() ?? ''
+    if (['gif'].includes(ext)) return 'gif'
+    if (['jpg','jpeg','png','webp','heic','bmp'].includes(ext)) return 'photo'
+    if (['mp3','wav','m4a','aac','flac','ogg'].includes(ext)) return 'audio'
+    return 'video'
+  }
+
   const visible = items.filter(item => {
     const folder = (item as unknown as {folder?: string | null}).folder
     const folderMatch = selectedFolder === null ? true : folder === selectedFolder
     if (!folderMatch) return false
+    if (typeFilter !== 'all' && inferType(item.file_url) !== typeFilter) return false
     if (!search) return true
     const q = search.toLowerCase()
     return item.title.toLowerCase().includes(q) || item.notes.toLowerCase().includes(q) || item.tags.some(t => t.toLowerCase().includes(q))
@@ -376,23 +388,47 @@ export function Bank({ user }: BankProps) {
 
       {/* ── Main area ── */}
       <div className="flex-1 overflow-auto flex flex-col">
-        {/* Header */}
-        <div className="px-6 py-4 border-b border-border flex items-center gap-4 flex-shrink-0">
-          <div className="flex-1 flex items-center gap-2">
-            <h2 className="text-sm font-semibold text-text">
-              {selectedFolder ? `📂 ${selectedFolder}` : '🎬 Toute la banque'}
-            </h2>
-            <span className="text-text2 text-xs">{visible.length} vidéo{visible.length !== 1 ? 's' : ''}</span>
-            {adding && <span className="text-xs text-accent animate-pulse">Ajout en cours…</span>}
-          </div>
+        {/* Header (Python: top bar at #070a10) */}
+        <div className="px-6 py-3 border-b border-border bg-[#070a10] flex items-center gap-2 flex-shrink-0">
+          <h2 className="text-sm font-semibold text-text mr-2">🗂 Banque de médias</h2>
+          <div className="flex-1" />
+          <Button onClick={pickFile} size="sm">+ Ajouter un média</Button>
+          <Button variant="secondary" size="sm" onClick={() => alert('Téléchargement bientôt — utilise le clic droit sur une vidéo pour ouvrir son dossier.')}>⬇ Télécharger</Button>
+          <Button variant="secondary" size="sm" onClick={() => alert('Réglage du dossier export à faire dans Paramètres → Profil')}>📂 Export dir</Button>
+          <Button variant="secondary" size="sm" onClick={() => alert('Randomisation des métadonnées MP4 — bientôt branchée via IPC ffmpeg')} className="!bg-warn/10 !text-warn">🔀 Randomiser</Button>
+          <Button variant="secondary" size="sm" onClick={loadItems}>↺ Rafraîchir</Button>
+        </div>
+
+        {/* Filter bar */}
+        <div className="px-6 py-3 border-b border-border bg-[#070a10] flex items-center gap-3 flex-shrink-0">
           <input
             type="text"
-            placeholder="🔍 Rechercher…"
+            placeholder="🔍  Rechercher…"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="w-44 bg-surface border border-border rounded-lg px-3 py-1.5 text-xs text-text placeholder:text-text2 focus:border-accent focus:outline-none transition-colors"
+            className="flex-1 max-w-sm bg-surface border border-border rounded-lg px-3 py-1.5 text-xs text-text placeholder:text-text2 focus:border-accent focus:outline-none transition-colors"
           />
-          <Button onClick={pickFile} size="sm">+ Ajouter un média</Button>
+          {/* Type pills */}
+          <div className="flex gap-1">
+            {([
+              { k: 'all',   l: 'Tous'  },
+              { k: 'video', l: 'Vidéo' },
+              { k: 'photo', l: 'Photo' },
+              { k: 'gif',   l: 'GIF'   },
+              { k: 'audio', l: 'Audio' },
+            ] as const).map(t => (
+              <button
+                key={t.k}
+                onClick={() => setTypeFilter(t.k)}
+                className={`px-3 py-1 rounded-full text-[11px] font-semibold transition-colors ${
+                  typeFilter === t.k ? 'bg-accent text-white' : 'bg-surface text-text2 hover:text-text'
+                }`}
+              >{t.l}</button>
+            ))}
+          </div>
+          <div className="flex-1" />
+          <span className="text-text2 text-xs">{visible.length} média{visible.length !== 1 ? 's' : ''}</span>
+          {adding && <span className="text-xs text-accent animate-pulse">Ajout…</span>}
         </div>
 
         {/* Migration notice */}
