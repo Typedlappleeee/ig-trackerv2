@@ -9,9 +9,8 @@ let _timer: ReturnType<typeof setTimeout> | null = null
 let _nextTime = 0
 let _chordIdx = 0
 
-// Track-3 file player
-let _fileSource: AudioBufferSourceNode | null = null
-let _fileBuffer: AudioBuffer | null           = null   // cached decoded buffer
+// Track-3 file player (HTMLAudioElement — simpler, no fetch/decode)
+let _fileAudio: HTMLAudioElement | null = null
 
 const LS_ENABLED = 'ig-music-enabled'
 const LS_TRACK   = 'ig-music-track'   // '0'–'3'
@@ -299,60 +298,61 @@ const TRACK_DATA: TrackDef[] = [
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
-export async function startMusic() {
+export function startMusic() {
   if (_running) return
   _running = true
-  const c = getCtx()
-  if (!_master) return
-  _master.gain.cancelScheduledValues(c.currentTime)
-  _master.gain.setValueAtTime(_master.gain.value, c.currentTime)
-  _master.gain.linearRampToValueAtTime(savedVol(), c.currentTime + 3.0)
 
   const trackIdx = savedTrack()
   const fileSrc  = FILE_TRACKS[trackIdx]
 
   if (fileSrc) {
+    // File track: use HTMLAudioElement — no fetch/decode, reliable
     try {
-      if (!_fileBuffer) {
-        const res = await fetch(fileSrc)
-        const ab  = await res.arrayBuffer()
-        _fileBuffer = await c.decodeAudioData(ab)
-      }
-      if (!_running || !_master) return   // stopped while loading
-      _fileSource = c.createBufferSource()
-      _fileSource.buffer = _fileBuffer
-      _fileSource.loop   = true
-      _fileSource.connect(_master)
-      _fileSource.start()
+      _fileAudio = new Audio(fileSrc)
+      _fileAudio.loop   = true
+      _fileAudio.volume = savedVol()
+      _fileAudio.play().catch(e => console.error('[music] play failed', e))
     } catch (e) {
-      console.error('[music] file load failed', e)
+      console.error('[music] file audio start failed', e)
+      _running = false
     }
   } else {
-    _nextTime = c.currentTime + 0.5
-    _chordIdx = 0
-    loop()
+    // Procedural track via Web Audio
+    try {
+      const c = getCtx()
+      if (!_master) { _running = false; return }
+      _master.gain.cancelScheduledValues(c.currentTime)
+      _master.gain.setValueAtTime(_master.gain.value, c.currentTime)
+      _master.gain.linearRampToValueAtTime(savedVol(), c.currentTime + 3.0)
+      _nextTime = c.currentTime + 0.5
+      _chordIdx = 0
+      loop()
+    } catch (e) {
+      console.error('[music] web audio start failed', e)
+      _running = false
+    }
   }
 }
 
-// Kill all scheduled oscillators by closing (and nullifying) the AudioContext.
-// A new context will be created automatically by getCtx() on next startMusic().
+// Properly fades dyingMaster.gain to 0, then closes the AudioContext —
+// killing every pending oscillator. New context created by getCtx() on restart.
 function killCtx(fadeSecs: number) {
-  // Stop any playing file source first
-  if (_fileSource) {
-    try { _fileSource.stop() } catch { /* already stopped */ }
-    _fileSource = null
+  // Stop file audio element first
+  if (_fileAudio) {
+    _fileAudio.pause()
+    _fileAudio.src = ''
+    _fileAudio = null
   }
   if (!_ctx || !_master) { _ctx = null; _master = null; return }
-  const dying = _ctx
+  const dying       = _ctx
+  const dyingMaster = _master   // keep reference — we null the public vars below
   _ctx = null; _master = null
-  // Fade out, then hard-close — terminates every pending oscillator
+  // Fade the ACTUAL master gain so oscillators smoothly stop
   try {
-    dying.destination.channelCount  // still open?
-    const g = dying.createGain()
-    g.connect(dying.destination)
-    g.gain.setValueAtTime(savedVol(), dying.currentTime)
-    g.gain.linearRampToValueAtTime(0, dying.currentTime + fadeSecs)
-  } catch { /* already closed */ }
+    dyingMaster.gain.cancelScheduledValues(dying.currentTime)
+    dyingMaster.gain.setValueAtTime(dyingMaster.gain.value, dying.currentTime)
+    dyingMaster.gain.linearRampToValueAtTime(0, dying.currentTime + Math.max(fadeSecs, 0.02))
+  } catch { /* context already closed */ }
   setTimeout(() => dying.close().catch(() => {}), Math.ceil((fadeSecs + 0.15) * 1000))
 }
 
@@ -371,21 +371,19 @@ export function setVolume(v: number) {
     _master.gain.setValueAtTime(_master.gain.value, _ctx.currentTime)
     _master.gain.linearRampToValueAtTime(clamped, _ctx.currentTime + 0.08)
   }
+  if (_fileAudio) _fileAudio.volume = clamped
 }
 
 export function getVolume(): number { return savedVol() }
 
-/** Switch track: hard-stop current (300 ms fade + context close), then restart. */
+/** Switch track: fade out (400 ms), close old context, restart with new track. */
 export function setTrack(idx: number) {
-  const prev = savedTrack()
   localStorage.setItem(LS_TRACK, String(idx))
-  // Clear cached buffer when switching between different file tracks
-  if (prev !== idx) _fileBuffer = null
   const wasRunning = _running
   _running = false
   if (_timer) { clearTimeout(_timer); _timer = null }
-  killCtx(0.3)                               // fast fade, then ctx is destroyed
-  if (wasRunning) setTimeout(() => startMusic(), 550)  // fresh ctx, new track
+  killCtx(0.4)
+  if (wasRunning) setTimeout(() => startMusic(), 600)
 }
 
 export function getTrack(): number { return savedTrack() }
