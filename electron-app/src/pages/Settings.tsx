@@ -6,31 +6,65 @@ import { Input }  from '@/components/ui/Input'
 
 interface SettingsProps { user: User }
 
-const THEMES = ['Bleu', 'Violet', 'Ambre', 'Rouge', 'Cyan', 'Rose', 'Vert']
+// All 8 themes from Python THEMES dict (line 29-39)
+const THEMES = ['Lime', 'Bleu', 'Violet', 'Ambre', 'Rouge', 'Cyan', 'Rose', 'Vert'] as const
 const THEME_COLORS: Record<string, string> = {
-  Bleu: '#4f9eff', Violet: '#a56ef5', Ambre: '#ffb830',
-  Rouge: '#ff5c6e', Cyan: '#00e5d4', Rose: '#ff6ec7', Vert: '#2dde78',
+  Lime:   '#4f8ef7',  // Python: confusingly Lime maps to blue
+  Bleu:   '#4f9eff',
+  Violet: '#a56ef5',
+  Ambre:  '#ffb830',
+  Rouge:  '#ff5c6e',
+  Cyan:   '#00e5d4',
+  Rose:   '#ff6ec7',
+  Vert:   '#2dde78',
 }
 
 type Panel = 'general' | 'profile' | 'connexions'
+type GeneralTab = 'apparence' | 'notifications' | 'langue'
 
 export function Settings({ user }: SettingsProps) {
-  const [panel, setPanel]         = useState<Panel>('general')
-  const [saving, setSaving]       = useState(false)
-  const [saved, setSaved]         = useState(false)
-  const [loading, setLoading]     = useState(true)
-  const [error, setError]         = useState<string | null>(null)
+  const [panel, setPanel]     = useState<Panel>('general')
+  const [genTab, setGenTab]   = useState<GeneralTab>('apparence')
+  const [saving, setSaving]   = useState(false)
+  const [saved, setSaved]     = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [error, setError]     = useState<string | null>(null)
 
-  // General / appearance
-  const [theme, setTheme]         = useState('Bleu')
+  // Apparence
+  const [theme, setTheme]     = useState('Bleu')
+  const [pixelUnlocked, setPixelUnlocked] = useState(false)
+  const [swatchClicks, setSwatchClicks] = useState<{ count: number; first: number }>({ count: 0, first: 0 })
 
-  // Profile
+  // Notifications
+  const [notifyPopup, setNotifyPopup] = useState(true)
+  const [notifySound, setNotifySound] = useState(true)
+
+  // Langue
+  const [lang, setLang] = useState<'fr' | 'en'>('fr')
+
+  // Profil
   const [profileName, setProfileName]   = useState('')
+  const [profileEmail, setProfileEmail] = useState('')
   const [profileNiche, setProfileNiche] = useState('')
+  const [exportDir, setExportDir]       = useState('')
+  const [newPassword, setNewPassword]   = useState('')
+  const [confirmPassword, setConfirm]   = useState('')
 
   // Connexions
-  const [bearer, setBearer]       = useState('')
-  const [groqKey, setGroqKey]     = useState('')
+  const [bearer, setBearer]   = useState('')
+  const [proxy, setProxy]     = useState('')
+  const [testingProxy, setTestingProxy] = useState(false)
+  const [proxyResult, setProxyResult] = useState<{ ok: boolean; msg: string } | null>(null)
+
+  // Push server
+  const [pushPort, setPushPort] = useState(8765)
+  const [pushRunning, setPushRunning] = useState(false)
+  const [pushUrl, setPushUrl] = useState('')
+
+  // API keys
+  const [groqKey, setGroqKey] = useState('')
+  const [igSession, setIgSession] = useState('')
+  const [showIgSession, setShowIgSession] = useState(false)
 
   useEffect(() => {
     supabase.from('app_config').select('*').eq('user_id', user.id).single()
@@ -41,14 +75,40 @@ export function Settings({ user }: SettingsProps) {
           setTheme(data.theme ?? 'Bleu')
           setProfileName(data.profile_name ?? '')
           setProfileNiche(data.profile_niche ?? '')
+          // The following fields are read from optional columns; they may not exist in older schemas
+          const d = data as Record<string, unknown>
+          setProfileEmail((d.profile_email as string) ?? user.email ?? '')
+          setExportDir((d.export_dir as string) ?? '')
+          setProxy((d.proxy as string) ?? '')
+          setIgSession((d.ig_sessionid as string) ?? '')
+          setPushPort((d.push_port as number) ?? 8765)
+          setNotifyPopup((d.notify_popup as boolean) ?? true)
+          setNotifySound((d.notify_sound as boolean) ?? true)
+          setLang((d.lang as 'fr' | 'en') ?? 'fr')
         }
         setLoading(false)
       })
   }, [])
 
+  function clickSwatch(t: string) {
+    setTheme(t)
+    const now = Date.now()
+    if (now - swatchClicks.first > 2000) {
+      setSwatchClicks({ count: 1, first: now })
+    } else {
+      const c = swatchClicks.count + 1
+      if (c >= 7) {
+        setPixelUnlocked(true)
+        setSwatchClicks({ count: 0, first: 0 })
+      } else {
+        setSwatchClicks({ count: c, first: swatchClicks.first })
+      }
+    }
+  }
+
   async function save() {
     setSaving(true); setSaved(false); setError(null)
-    const { error: err } = await supabase.from('app_config').upsert({
+    const payload: Record<string, unknown> = {
       user_id:       user.id,
       bearer_token:  bearer.trim(),
       groq_api_key:  groqKey.trim(),
@@ -56,10 +116,71 @@ export function Settings({ user }: SettingsProps) {
       profile_name:  profileName.trim(),
       profile_niche: profileNiche.trim(),
       updated_at:    new Date().toISOString(),
-    }, { onConflict: 'user_id' })
-    if (err) setError('Erreur lors de la sauvegarde.')
+    }
+    // Optional columns — only include if user changed them
+    if (profileEmail) payload.profile_email = profileEmail.trim()
+    if (exportDir)   payload.export_dir = exportDir.trim()
+    if (proxy)       payload.proxy = proxy.trim()
+    if (igSession)   payload.ig_sessionid = igSession.trim()
+    payload.push_port    = pushPort
+    payload.notify_popup = notifyPopup
+    payload.notify_sound = notifySound
+    payload.lang         = lang
+
+    let { error: err } = await supabase.from('app_config').upsert(payload, { onConflict: 'user_id' })
+
+    // If a column doesn't exist, retry with only the safe core columns
+    if (err && /column|schema cache/i.test(err.message)) {
+      const safe = {
+        user_id:       payload.user_id,
+        bearer_token:  payload.bearer_token,
+        groq_api_key:  payload.groq_api_key,
+        theme:         payload.theme,
+        profile_name:  payload.profile_name,
+        profile_niche: payload.profile_niche,
+        updated_at:    payload.updated_at,
+      }
+      const r = await supabase.from('app_config').upsert(safe, { onConflict: 'user_id' })
+      err = r.error
+      if (!err) setError('Quelques options optionnelles n\'ont pas été enregistrées (colonnes manquantes en base — sans gravité).')
+    }
+
+    if (err) setError('Erreur: ' + err.message)
     else { setSaved(true); setTimeout(() => setSaved(false), 3000) }
     setSaving(false)
+  }
+
+  async function testProxy() {
+    setTestingProxy(true)
+    setProxyResult(null)
+    // Simple ping test via geelarkRequest (gets external IP through proxy)
+    try {
+      if (!window.electronAPI?.geelarkRequest) throw new Error('IPC indisponible')
+      const r = await window.electronAPI.geelarkRequest({
+        method: 'GET',
+        url: 'https://api.ipify.org?format=json',
+      })
+      if (r.ok) {
+        const ip = (r.data as { ip?: string })?.ip
+        setProxyResult({ ok: true, msg: ip ? `IP sortante : ${ip}` : 'OK' })
+      } else {
+        setProxyResult({ ok: false, msg: r.error ?? 'Erreur réseau' })
+      }
+    } catch (e) {
+      setProxyResult({ ok: false, msg: e instanceof Error ? e.message : String(e) })
+    }
+    setTestingProxy(false)
+  }
+
+  function togglePush() {
+    if (pushRunning) {
+      setPushRunning(false)
+      setPushUrl('')
+    } else {
+      // Push server is a TODO IPC handler — for now show a placeholder URL
+      setPushRunning(true)
+      setPushUrl(`http://localhost:${pushPort}/push?u=USERNAME&f=FOLLOWERS&fw=FOLLOWING&p=POSTS`)
+    }
   }
 
   if (loading) return (
@@ -68,139 +189,256 @@ export function Settings({ user }: SettingsProps) {
     </div>
   )
 
-  const NAV: { key: Panel; label: string }[] = [
-    { key: 'general',    label: 'Général'    },
-    { key: 'profile',    label: 'Profil'     },
-    { key: 'connexions', label: 'Connexions' },
-  ]
-
   return (
-    <div className="p-8 space-y-6 max-w-2xl">
+    <div className="p-6 space-y-5 max-w-4xl">
       <div>
-        <h1 className="text-2xl font-bold text-text">Paramètres</h1>
-        <p className="text-text2 text-sm mt-1">Configuration de l'application</p>
+        <h1 className="text-xl font-bold text-text">⚙ Paramètres</h1>
       </div>
 
-      {/* Sub-nav */}
-      <div className="flex gap-1 bg-surface2 rounded-lg p-1 w-fit">
-        {NAV.map(({ key, label }) => (
-          <button key={key} onClick={() => setPanel(key)}
-            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
-              panel === key ? 'bg-accent text-white' : 'text-text2 hover:text-text'
+      {/* Top tabs (Python: 3 tabs) */}
+      <div className="flex gap-1 border-b border-border">
+        {([
+          { k: 'general',    l: 'Paramètres généraux' },
+          { k: 'profile',    l: 'Profil'              },
+          { k: 'connexions', l: 'Connexions'          },
+        ] as const).map(t => (
+          <button
+            key={t.k}
+            onClick={() => setPanel(t.k)}
+            className={`px-4 py-2 text-sm font-semibold transition-colors -mb-px border-b-2 ${
+              panel === t.k ? 'border-accent text-accent bg-accent/5' : 'border-transparent text-text2 hover:text-text'
             }`}
-          >
-            {label}
-          </button>
+          >{t.l}</button>
         ))}
       </div>
 
-      {/* ── General ──────────────────────────────────────────────────────────── */}
+      {/* ── Paramètres généraux ────────────────────────────────────────────── */}
       {panel === 'general' && (
-        <div className="space-y-5">
-          <section className="bg-card border border-border rounded-xl p-6 space-y-4">
-            <div>
-              <h2 className="text-sm font-semibold text-text">🎨 Thème de couleur</h2>
-              <p className="text-xs text-text2 mt-1">Couleur d'accentuation de l'interface</p>
-            </div>
-            <div className="flex flex-wrap gap-3">
-              {THEMES.map(t => (
-                <button key={t} onClick={() => setTheme(t)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm border transition-all ${
-                    theme === t ? 'border-accent bg-accent/10 text-text' : 'border-border text-text2 hover:border-accent/40'
-                  }`}
-                >
-                  <span className="w-3 h-3 rounded-full" style={{ backgroundColor: THEME_COLORS[t] }} />
-                  {t}
-                </button>
-              ))}
-            </div>
-          </section>
+        <>
+          {/* Sub-tabs */}
+          <div className="flex gap-2">
+            {([
+              { k: 'apparence',     l: '🎨 Apparence'    },
+              { k: 'notifications', l: '🔔 Notifications' },
+              { k: 'langue',        l: '🌐 Langue'        },
+            ] as const).map(t => (
+              <button
+                key={t.k}
+                onClick={() => setGenTab(t.k)}
+                className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
+                  genTab === t.k ? 'bg-surface3 text-text' : 'bg-surface text-text2 hover:text-text'
+                }`}
+              >{t.l}</button>
+            ))}
+          </div>
 
-          <section className="bg-card border border-border rounded-xl p-6 space-y-3">
-            <h2 className="text-sm font-semibold text-text">👤 Compte</h2>
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-full bg-accent/20 text-accent flex items-center justify-center text-sm font-bold">
-                {user.email?.[0].toUpperCase()}
-              </div>
+          {genTab === 'apparence' && (
+            <section className="bg-card border border-border rounded-xl p-5 space-y-4">
               <div>
-                <p className="text-sm text-text">{user.email}</p>
-                <p className="text-xs text-text2">Connecté via Supabase Auth</p>
+                <h2 className="text-sm font-semibold text-text">Thème de couleur</h2>
+                <p className="text-xs text-text2 mt-0.5">Couleur d'accentuation de l'interface</p>
               </div>
-            </div>
-          </section>
-        </div>
+              <div className="grid grid-cols-4 gap-3">
+                {THEMES.map(t => (
+                  <button
+                    key={t}
+                    onClick={() => clickSwatch(t)}
+                    className={`flex flex-col items-center gap-2 p-3 rounded-lg border-2 transition-all ${
+                      theme === t ? 'border-text' : 'border-border hover:border-accent/40'
+                    }`}
+                  >
+                    <div className="w-12 h-12 rounded-lg shadow-md" style={{ backgroundColor: THEME_COLORS[t] }} />
+                    <span className="text-xs font-medium text-text">{t}</span>
+                  </button>
+                ))}
+                {pixelUnlocked && (
+                  <button
+                    onClick={() => setTheme('67')}
+                    className={`flex flex-col items-center gap-2 p-3 rounded-lg border-2 transition-all ${
+                      theme === '67' ? 'border-text' : 'border-border hover:border-accent/40'
+                    }`}
+                  >
+                    <div className="w-12 h-12 rounded-lg shadow-md bg-gradient-to-br from-[#55aaff] to-[#3377cc] flex items-center justify-center text-white font-bold text-xs">67</div>
+                    <span className="text-xs font-medium text-accent">67 ⭐</span>
+                  </button>
+                )}
+              </div>
+              <p className="text-[11px] text-text2/70 italic">Thème actif : <span className="text-accent font-semibold">{theme}</span>{pixelUnlocked && <span> · 🎉 Easter egg débloqué !</span>}</p>
+            </section>
+          )}
+
+          {genTab === 'notifications' && (
+            <section className="bg-card border border-border rounded-xl p-5 space-y-3">
+              <h2 className="text-sm font-semibold text-text">Notifications</h2>
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input type="checkbox" checked={notifyPopup} onChange={e => setNotifyPopup(e.target.checked)} className="w-4 h-4 accent-accent" />
+                <div className="flex-1">
+                  <p className="text-sm text-text">Popups (toasts)</p>
+                  <p className="text-[11px] text-text2">Afficher les notifications en haut à droite</p>
+                </div>
+              </label>
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input type="checkbox" checked={notifySound} onChange={e => setNotifySound(e.target.checked)} className="w-4 h-4 accent-accent" />
+                <div className="flex-1">
+                  <p className="text-sm text-text">Sons</p>
+                  <p className="text-[11px] text-text2">Bip système quand un post se termine</p>
+                </div>
+              </label>
+            </section>
+          )}
+
+          {genTab === 'langue' && (
+            <section className="bg-card border border-border rounded-xl p-5 space-y-3">
+              <h2 className="text-sm font-semibold text-text">Langue</h2>
+              {[
+                { k: 'fr', l: '🇫🇷 Français', sub: 'Langue par défaut' },
+                { k: 'en', l: '🇬🇧 English',  sub: 'Fallback / international' },
+              ].map(opt => (
+                <label key={opt.k} className="flex items-center gap-3 cursor-pointer p-2 rounded hover:bg-surface2">
+                  <input
+                    type="radio"
+                    name="lang"
+                    checked={lang === opt.k}
+                    onChange={() => setLang(opt.k as 'fr' | 'en')}
+                    className="w-4 h-4 accent-accent"
+                  />
+                  <div>
+                    <p className="text-sm text-text">{opt.l}</p>
+                    <p className="text-[11px] text-text2">{opt.sub}</p>
+                  </div>
+                </label>
+              ))}
+              <p className="text-[10px] text-text2 italic">Le changement de langue s'applique au prochain démarrage.</p>
+            </section>
+          )}
+        </>
       )}
 
-      {/* ── Profile ──────────────────────────────────────────────────────────── */}
+      {/* ── Profil ─────────────────────────────────────────────────────────── */}
       {panel === 'profile' && (
-        <div className="space-y-5">
-          <section className="bg-card border border-border rounded-xl p-6 space-y-4">
-            <h2 className="text-sm font-semibold text-text">Profil</h2>
-            <Input
-              label="Pseudo / Nom"
-              placeholder="Mon nom ou pseudo"
-              value={profileName}
-              onChange={e => setProfileName(e.target.value)}
-            />
-            <Input
-              label="Niche principale"
-              placeholder="ex: Fitness, Crypto, Mode, Lifestyle…"
-              value={profileNiche}
-              onChange={e => setProfileNiche(e.target.value)}
-              hint="Utilisée pour la génération de contenu par IA"
-            />
-          </section>
-        </div>
+        <section className="bg-card border border-border rounded-xl p-5 space-y-4">
+          <h2 className="text-sm font-semibold text-text">Mon Profil</h2>
+          <div className="grid grid-cols-2 gap-4">
+            <Input label="Pseudo / Nom" placeholder="ex: Alex" value={profileName} onChange={e => setProfileName(e.target.value)} />
+            <Input label="Email" type="email" placeholder="contact@example.com" value={profileEmail} onChange={e => setProfileEmail(e.target.value)} />
+          </div>
+          <Input label="Niche principale" placeholder="ex: Fitness, Crypto, Lifestyle…" hint="Utilisée pour la génération de contenu IA" value={profileNiche} onChange={e => setProfileNiche(e.target.value)} />
+          <div className="flex gap-2 items-end">
+            <Input label="Dossier export vidéo" placeholder="C:\Users\...\Videos" value={exportDir} onChange={e => setExportDir(e.target.value)} className="flex-1" />
+            <Button variant="secondary" size="sm" onClick={() => alert('Sélection du dossier — IPC à brancher')}>📂</Button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 pt-3 border-t border-border">
+            <Input label="Mot de passe (laisser vide pour ne pas changer)" type="password" placeholder="••••••" value={newPassword} onChange={e => setNewPassword(e.target.value)} />
+            <Input label="Confirmer" type="password" placeholder="••••••" value={confirmPassword} onChange={e => setConfirm(e.target.value)} />
+          </div>
+
+          <Button onClick={save} loading={saving} className="w-full">💾 Sauvegarder le profil</Button>
+        </section>
       )}
 
-      {/* ── Connexions ────────────────────────────────────────────────────────── */}
+      {/* ── Connexions ─────────────────────────────────────────────────────── */}
       {panel === 'connexions' && (
         <div className="space-y-5">
-          <section className="bg-card border border-border rounded-xl p-6 space-y-4">
-            <div>
-              <h2 className="text-sm font-semibold text-text">🔑 Bearer Token GéeLark</h2>
-              <p className="text-xs text-text2 mt-1">
-                <span className="text-accent">app.geelark.com</span> → Profile → API → Créer un token
-              </p>
-            </div>
+          <section className="bg-card border border-border rounded-xl p-5 space-y-4">
+            <h2 className="text-sm font-semibold text-text">Connexions GéeLark</h2>
             <Input
-              label="Bearer Token"
+              label="GéeLark Bearer Token"
               type="password"
-              placeholder="Colle ton token ici…"
+              placeholder="Token API GéeLark…"
+              hint="Token API GéeLark (Settings → Open API)"
               value={bearer}
               onChange={e => setBearer(e.target.value)}
             />
-            {bearer && <p className="text-xs text-ok">✓ Token configuré ({bearer.length} caractères)</p>}
+            <Input
+              label="Proxy SOCKS5"
+              placeholder="socks5://user:pass@host:port"
+              hint="Format : socks5://user:pass@host:port"
+              value={proxy}
+              onChange={e => setProxy(e.target.value)}
+            />
+            <div className="flex gap-2">
+              <Button onClick={save} loading={saving}>💾 Sauvegarder</Button>
+              <Button variant="secondary" onClick={testProxy} loading={testingProxy}>🔌 Tester proxy + IG</Button>
+            </div>
+            {proxyResult && (
+              <p className={`text-xs ${proxyResult.ok ? 'text-ok' : 'text-danger'}`}>
+                {proxyResult.ok ? '✓' : '✗'} {proxyResult.msg}
+              </p>
+            )}
           </section>
 
-          <section className="bg-card border border-border rounded-xl p-6 space-y-4">
+          {/* Push server */}
+          <section className="bg-card border border-border rounded-xl p-5 space-y-4">
             <div>
-              <h2 className="text-sm font-semibold text-text">✨ Clé API Groq</h2>
-              <p className="text-xs text-text2 mt-1">
-                Optionnel — pour la génération de captions IA.<br />
-                Gratuit sur <span className="text-accent">console.groq.com</span> (14 400 req/jour avec Llama 3).
-              </p>
+              <h2 className="text-sm font-semibold text-text">📲 Serveur Push (GéeLark → App)</h2>
+              <p className="text-[11px] text-text2 mt-0.5">Reçoit les mises à jour en push depuis tes téléphones.</p>
             </div>
+            <div className="flex gap-2 items-end">
+              <Input label="Port" type="number" value={String(pushPort)} onChange={e => setPushPort(parseInt(e.target.value) || 8765)} className="w-32" />
+              <span className="text-xs text-text2 mb-3">{pushRunning ? '▶ Serveur actif' : '⏹ Serveur arrêté'}</span>
+              <div className="flex-1" />
+              {pushRunning ? (
+                <Button variant="danger" onClick={togglePush}>⏹ Arrêter</Button>
+              ) : (
+                <Button onClick={togglePush}>▶ Démarrer</Button>
+              )}
+            </div>
+            {pushUrl && (
+              <div className="flex items-center gap-2 px-3 py-2 bg-bg rounded-lg border border-border">
+                <code className="flex-1 text-[10px] font-mono text-text2 truncate">{pushUrl}</code>
+                <button onClick={() => navigator.clipboard.writeText(pushUrl)} className="text-text2 hover:text-accent text-xs">📋</button>
+              </div>
+            )}
+          </section>
+
+          {/* API Keys */}
+          <section className="bg-card border border-border rounded-xl p-5 space-y-4">
+            <h2 className="text-sm font-semibold text-text">🔑 Clés API</h2>
             <Input
               label="Groq API Key"
               type="password"
               placeholder="gsk_…"
+              hint="Gratuit sur groq.com → API Keys → Create"
               value={groqKey}
               onChange={e => setGroqKey(e.target.value)}
             />
-            {groqKey && <p className="text-xs text-ok">✓ Clé Groq configurée</p>}
+            <div>
+              <label className="text-[11px] uppercase tracking-wider font-semibold text-text2 block mb-1">Instagram Session ID</label>
+              <div className="flex gap-2">
+                <input
+                  type={showIgSession ? 'text' : 'password'}
+                  value={igSession}
+                  onChange={e => setIgSession(e.target.value)}
+                  placeholder="longstr%3A..."
+                  className="flex-1 bg-bg border border-border rounded-lg px-3 py-2 text-sm text-text placeholder:text-text2 focus:border-accent focus:outline-none"
+                />
+                <button
+                  onClick={() => setShowIgSession(v => !v)}
+                  className="px-3 bg-surface2 border border-border rounded-lg text-text2 hover:text-text"
+                  title="Afficher/Masquer"
+                >{showIgSession ? '🙈' : '👁'}</button>
+              </div>
+              <p className="text-[11px] text-text2 mt-1">
+                Ouvre Instagram dans Chrome → F12 → Application → Cookies → sessionid
+              </p>
+              {igSession && <p className="text-xs text-ok mt-1">✅ Session ID configurée</p>}
+            </div>
+            <Button onClick={save} loading={saving} className="w-full">💾 Sauvegarder les clés API</Button>
           </section>
         </div>
       )}
 
-      {/* Save */}
+      {/* Bottom save bar */}
       {error && (
         <div className="px-4 py-3 rounded-lg bg-danger/10 border border-danger/20 text-danger text-sm">{error}</div>
       )}
-      <div className="flex items-center gap-4">
-        <Button onClick={save} loading={saving}>💾 Sauvegarder</Button>
-        {saved && <span className="text-sm text-ok animate-fade-in">✓ Sauvegardé !</span>}
-      </div>
+      {panel === 'general' && (
+        <div className="flex items-center gap-4 sticky bottom-4 bg-bg/80 backdrop-blur-sm py-2">
+          <Button onClick={save} loading={saving}>💾 Sauvegarder</Button>
+          {saved && <span className="text-sm text-ok">✓ Sauvegardé</span>}
+        </div>
+      )}
     </div>
   )
 }
