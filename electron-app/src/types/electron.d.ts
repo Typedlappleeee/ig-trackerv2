@@ -38,9 +38,10 @@ interface ElectronAPI {
     posts?: number
     bio?: string
     total_views?: number
-    videos?: Array<{ id: string; shortcode: string; views: number; likes: number; comments: number; thumbnail: string; timestamp: string }>
+    videos?: Array<{ id: string; shortcode: string; views: number; likes: number; comments: number; thumbnail: string; video_url: string; timestamp: string }>
     error?: string
   }>
+  fetchIgVideo:      (opts: { url: string }) => Promise<{ ok: boolean; path?: string; size?: number; error?: string }>
   runFfmpeg:         (opts: { clips: FfmpegClip[]; outputPath: string; preset: '9:16'|'1:1'|'16:9'; transition: 'cut'|'fade' }) => Promise<{ ok: boolean; outputPath?: string; command?: string; error?: string }>
   readLocalVideo:    (filePath: string) => Promise<{ ok: boolean; dataUrl?: string; error?: string }>
   readFileBytes:     (filePath: string) => Promise<{ ok: boolean; bytes?: ArrayBuffer; size?: number; error?: string }>

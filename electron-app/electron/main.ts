@@ -324,13 +324,15 @@ ipcMain.handle('fetch-instagram-by-session', async (_event, opts: { username: st
       'POST',
       `target_user_id=${userId}&page_size=20&include_feed_video=true`
     )
-    const videos: Array<{ id: string; shortcode: string; views: number; likes: number; comments: number; thumbnail: string; timestamp: string }> = []
+    const videos: Array<{ id: string; shortcode: string; views: number; likes: number; comments: number; thumbnail: string; video_url: string; timestamp: string }> = []
     if (clipsR.status === 200 && clipsR.data) {
       const items = ((clipsR.data as Record<string, unknown>)['items'] as unknown[]) ?? []
       for (const item of items) {
         const media = ((item as Record<string, unknown>)['media']) as Record<string, unknown> | undefined
         if (!media) continue
         const candidates = (((media['image_versions2'] as Record<string, unknown>)?.['candidates']) as Array<Record<string, unknown>>) ?? []
+        // video_versions is sorted high → low quality. Take the first (best).
+        const vVersions = (media['video_versions'] as Array<Record<string, unknown>> | undefined) ?? []
         videos.push({
           id:        String(media['pk'] ?? ''),
           shortcode: (media['code'] as string) ?? '',
@@ -338,6 +340,7 @@ ipcMain.handle('fetch-instagram-by-session', async (_event, opts: { username: st
           likes:     (media['like_count'] as number) ?? 0,
           comments:  (media['comment_count'] as number) ?? 0,
           thumbnail: (candidates[0]?.['url'] as string) ?? '',
+          video_url: (vVersions[0]?.['url'] as string) ?? '',
           timestamp: media['taken_at'] ? new Date((media['taken_at'] as number) * 1000).toISOString() : '',
         })
       }
@@ -863,6 +866,37 @@ ipcMain.handle('read-local-video', async (_event, filePath: string) => {
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) }
   }
+})
+
+// ── IPC: download an Instagram video to temp and return its local path ──────
+// IG CDN URLs need browser-like headers (Referer, UA) and may need fallbacks,
+// same pattern as the thumbnail pre-fetch above.
+ipcMain.handle('fetch-ig-video', async (_event, opts: { url: string }) => {
+  if (!opts.url) return { ok: false, error: 'no url' }
+  const headerSets: Array<Record<string, string>> = [
+    {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+      'Accept': 'video/mp4,video/*;q=0.9,*/*;q=0.8',
+      'Accept-Language': 'en-US,en;q=0.9',
+      'Referer': 'https://www.instagram.com/',
+    },
+    { 'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Version/17.0 Mobile/15E148 Safari/604.1', 'Accept': 'video/*' },
+    { 'User-Agent': 'Instagram 312.0.0.32.116 Android', 'Accept': 'video/*' },
+  ]
+  for (const headers of headerSets) {
+    try {
+      const res = await net.fetch(opts.url, { method: 'GET', headers, redirect: 'follow' })
+      if (!res.ok) continue
+      const buf = Buffer.from(await res.arrayBuffer())
+      if (buf.length === 0) continue
+      const dir = path.join(os.tmpdir(), 'ig-tracker-cache')
+      mkdirSync(dir, { recursive: true })
+      const out = path.join(dir, `ig-${Date.now()}.mp4`)
+      writeFileSync(out, buf)
+      return { ok: true, path: out, size: buf.length }
+    } catch { /* try next */ }
+  }
+  return { ok: false, error: 'all retries failed' }
 })
 
 // ── IPC: read full file bytes (for cloud upload) ─────────────────────────────

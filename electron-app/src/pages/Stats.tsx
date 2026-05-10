@@ -11,6 +11,7 @@ interface IgVideo {
   id:        string
   shortcode: string
   url:       string
+  video_url: string         // Direct CDN URL to the .mp4 (only set via session API)
   views:     number
   likes:     number
   comments:  number
@@ -43,6 +44,7 @@ async function fetchIgVideos(username: string): Promise<IgVideo[]> {
         id:        node['id'] as string,
         shortcode: node['shortcode'] as string,
         url:       `https://www.instagram.com/reel/${node['shortcode']}/`,
+        video_url: (node['video_url'] as string) ?? '',
         views:     (node['video_view_count'] as number) ?? 0,
         likes:     ((node['edge_liked_by'] as Record<string, number>)?.count) ?? 0,
         comments:  ((node['edge_media_to_comment'] as Record<string, number>)?.count) ?? 0,
@@ -93,6 +95,7 @@ export function Stats({ user }: StatsProps) {
   const [loadingList, setLL]    = useState(false)
   const [loadError, setLoadErr] = useState<string | null>(null)
   const [sort, setSort]         = useState<SortKey>('recent')
+  const [playingVideo, setPlayingVideo] = useState<IgVideo | null>(null)
   const [retrying, setRetrying] = useState(false)
 
   useEffect(() => {
@@ -132,6 +135,7 @@ export function Stats({ user }: StatsProps) {
             id:        v.id,
             shortcode: v.shortcode,
             url:       `https://www.instagram.com/reel/${v.shortcode}/`,
+            video_url: v.video_url ?? '',
             views:     v.views,
             likes:     v.likes,
             comments:  v.comments,
@@ -331,12 +335,11 @@ export function Stats({ user }: StatsProps) {
                         tier === 'mid'  ? 'linear-gradient(135deg, #4f8ef7 0%, #a56ef5 100%)' :
                                           'linear-gradient(135deg, #2a3050 0%, #1a2035 100%)'
                       return (
-                        <a
+                        <button
                           key={video.id}
-                          href={video.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="bg-card border border-border rounded-xl overflow-hidden hover:border-accent transition-colors group"
+                          type="button"
+                          onClick={() => setPlayingVideo(video)}
+                          className="text-left bg-card border border-border rounded-xl overflow-hidden hover:border-accent transition-colors group"
                         >
                           {/* Portrait thumbnail — 9:16 like the bank */}
                           <div
@@ -389,7 +392,7 @@ export function Stats({ user }: StatsProps) {
                               </div>
                             </div>
                           </div>
-                        </a>
+                        </button>
                       )
                     })
                   })()}
@@ -398,6 +401,84 @@ export function Stats({ user }: StatsProps) {
             </div>
           </div>
         )}
+      </div>
+
+      {playingVideo && <IgVideoPlayerModal video={playingVideo} onClose={() => setPlayingVideo(null)} />}
+    </div>
+  )
+}
+
+// ── IG video player modal ────────────────────────────────────────────────────
+// Downloads the IG CDN video via IPC (with Referer headers) to a temp file,
+// then plays it via the localvideo:// protocol.
+function IgVideoPlayerModal({ video, onClose }: { video: IgVideo; onClose: () => void }) {
+  const [localPath, setLocalPath] = useState<string | null>(null)
+  const [err, setErr] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    if (!video.video_url) { setErr('Aucune URL vidéo disponible.'); return }
+    if (!window.electronAPI?.fetchIgVideo) { setErr('IPC indisponible.'); return }
+    window.electronAPI.fetchIgVideo({ url: video.video_url }).then(r => {
+      if (cancelled) return
+      if (r.ok && r.path) setLocalPath(r.path)
+      else setErr(r.error ?? 'Téléchargement échoué')
+    })
+    return () => { cancelled = true }
+  }, [video.video_url])
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  const localUrl = (() => {
+    if (!localPath) return ''
+    let n = localPath.replace(/\\/g, '/')
+    if (!n.startsWith('/')) n = '/' + n
+    return 'localvideo://' + n
+  })()
+
+  return (
+    <div
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/90 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="relative flex flex-col items-center gap-3"
+        onClick={e => e.stopPropagation()}
+        style={{ maxHeight: '90vh', maxWidth: '90vw' }}
+      >
+        <button
+          onClick={onClose}
+          className="absolute -top-10 right-0 text-white/60 hover:text-white text-2xl leading-none"
+        >✕</button>
+
+        <div className="flex items-center gap-3 text-white text-xs">
+          <span>{video.views.toLocaleString('fr-FR')} vues</span>
+          {video.likes    > 0 && <span>♥ {video.likes.toLocaleString('fr-FR')}</span>}
+          {video.comments > 0 && <span>✎ {video.comments.toLocaleString('fr-FR')}</span>}
+          <a href={video.url} target="_blank" rel="noreferrer" className="text-accent hover:underline">↗ Voir sur Instagram</a>
+        </div>
+
+        <div
+          className="rounded-xl shadow-2xl bg-black flex items-center justify-center"
+          style={{ height: '80vh', aspectRatio: '9/16', maxWidth: '80vw' }}
+        >
+          {err ? (
+            <p className="text-danger text-sm px-4 text-center">{err}</p>
+          ) : !localUrl ? (
+            <p className="text-text2 text-sm">📥 Téléchargement de la vidéo…</p>
+          ) : (
+            <video
+              src={localUrl}
+              controls autoPlay
+              className="rounded-xl"
+              style={{ height: '100%', maxWidth: '100%' }}
+            />
+          )}
+        </div>
       </div>
     </div>
   )

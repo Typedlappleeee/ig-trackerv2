@@ -48,6 +48,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Read full file bytes (used to upload to Supabase Storage)
   readFileBytes: (filePath: string) => ipcRenderer.invoke('read-file-bytes', filePath),
 
+  // Download an Instagram video CDN URL to temp dir with proper Referer headers
+  fetchIgVideo: (opts: { url: string }) => ipcRenderer.invoke('fetch-ig-video', opts),
+
   // Materialise bytes (e.g. a downloaded cloud video) to a temp file, return its path
   writeTempFile: (opts: { name: string; bytes: ArrayBuffer }) =>
     ipcRenderer.invoke('write-temp-file', opts),
