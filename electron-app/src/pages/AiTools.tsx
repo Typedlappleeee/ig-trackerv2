@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
+import { useConnections } from '@/lib/connections'
 import { Button } from '@/components/ui/Button'
 
 interface AiToolsProps { user: User }
@@ -68,18 +69,18 @@ export function AiTools({ user }: AiToolsProps) {
   const [planResult, setPlanResult]   = useState('')
   const [planLoading, setPlanLoading] = useState(false)
 
+  // Groq key comes from the active connection (org or solo).
+  const conns = useConnections(user)
   useEffect(() => {
-    supabase.from('app_config').select('groq_api_key, profile_niche').eq('user_id', user.id).single()
-      .then(({ data }) => {
-        if (data?.groq_api_key) {
-          setGroqKey(data.groq_api_key)
-          setHasKey(true)
-        }
-        if (data?.profile_niche) {
-          setPlanNiche(data.profile_niche)
-        }
-      })
-  }, [])
+    if (conns.groq) { setGroqKey(conns.groq); setHasKey(true) }
+    else            { setHasKey(false) }
+  }, [conns.groq])
+
+  // profile_niche stays user-level
+  useEffect(() => {
+    supabase.from('app_config').select('profile_niche').eq('user_id', user.id).maybeSingle()
+      .then(({ data }) => { if (data?.profile_niche) setPlanNiche(data.profile_niche) })
+  }, [user.id])
 
   async function runStrat() {
     if (!stratHandle.trim()) return

@@ -149,6 +149,17 @@ CREATE TABLE IF NOT EXISTS public.organization_members (
   UNIQUE (org_id, user_id)
 );
 
+-- Connexions partagées au niveau organisation (token GéeLark, Groq, proxy, sessionid IG).
+-- Quand l'utilisateur travaille dans une orga, l'app lit ces valeurs au lieu de app_config.
+CREATE TABLE IF NOT EXISTS public.org_config (
+  org_id        uuid PRIMARY KEY REFERENCES public.organizations(id) ON DELETE CASCADE,
+  bearer_token  text DEFAULT '',
+  groq_api_key  text DEFAULT '',
+  ig_sessionid  text,
+  proxy         text,
+  updated_at    timestamptz NOT NULL DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS public.organization_invites (
   id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   org_id         uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
@@ -198,6 +209,7 @@ ALTER TABLE public.views_history         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.organizations         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.organization_members  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.organization_invites  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.org_config            ENABLE ROW LEVEL SECURITY;
 
 
 -- ╔══════════════════════════════════════════════════════════════╗
@@ -328,6 +340,18 @@ CREATE POLICY "om_update" ON public.organization_members FOR UPDATE USING (publi
 CREATE POLICY "om_delete" ON public.organization_members FOR DELETE USING (
   user_id = auth.uid() OR public.is_org_admin(org_id)
 );
+
+-- org_config (connexions partagées par orga)
+DROP POLICY IF EXISTS "oc_select" ON public.org_config;
+DROP POLICY IF EXISTS "oc_insert" ON public.org_config;
+DROP POLICY IF EXISTS "oc_update" ON public.org_config;
+DROP POLICY IF EXISTS "oc_delete" ON public.org_config;
+-- Tous les membres lisent (l'app a besoin des clés pour fonctionner)
+CREATE POLICY "oc_select" ON public.org_config FOR SELECT USING (public.is_org_member(org_id));
+-- Seuls owner/admin écrivent
+CREATE POLICY "oc_insert" ON public.org_config FOR INSERT WITH CHECK (public.is_org_admin(org_id));
+CREATE POLICY "oc_update" ON public.org_config FOR UPDATE USING (public.is_org_admin(org_id));
+CREATE POLICY "oc_delete" ON public.org_config FOR DELETE USING (public.is_org_admin(org_id));
 
 -- organization_invites
 DROP POLICY IF EXISTS "oi_select" ON public.organization_invites;

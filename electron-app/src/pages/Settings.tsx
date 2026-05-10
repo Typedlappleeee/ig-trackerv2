@@ -23,8 +23,9 @@ const THEME_COLORS: Record<string, string> = {
 type GeneralTab = 'apparence' | 'notifications' | 'langue'
 
 export function Settings({ user, initialPanel }: SettingsProps) {
-  const { role, perms } = useOrg()
+  const { role, perms, currentOrg } = useOrg()
   const canSeeConnexions = role ? canSeeTab(role, perms, 'settings') : true
+  const canEditOrgConnexions = role === 'owner' || role === 'admin'
   const [panel, setPanel]     = useState<Panel>(() => {
     const p = initialPanel ?? 'general'
     return p === 'connexions' && !canSeeConnexions ? 'general' : p
@@ -101,6 +102,25 @@ export function Settings({ user, initialPanel }: SettingsProps) {
       })
   }, [])
 
+  // When the active org changes, override the connection fields with that org's
+  // shared config (bearer / groq / proxy / ig_sessionid). User-level fields
+  // (theme, lang, profile…) are unaffected.
+  useEffect(() => {
+    if (!currentOrg) return
+    supabase.from('org_config').select('*').eq('org_id', currentOrg.id).maybeSingle()
+      .then(({ data }) => {
+        if (!data) {
+          // No org config yet — clear the connection fields so the form starts empty
+          setBearer(''); setGroqKey(''); setProxy(''); setIgSession('')
+        } else {
+          setBearer(data.bearer_token ?? '')
+          setGroqKey(data.groq_api_key ?? '')
+          setProxy(data.proxy ?? '')
+          setIgSession(data.ig_sessionid ?? '')
+        }
+      })
+  }, [currentOrg?.id])
+
   function clickSwatch(t: string) {
     setTheme(t)
     const now = Date.now()
@@ -117,47 +137,90 @@ export function Settings({ user, initialPanel }: SettingsProps) {
     }
   }
 
+  // Save user-level fields (theme, lang, profile, push_port, notifications)
+  // to app_config. In org mode, the connection fields (bearer/groq/proxy/
+  // ig_sessionid) are ALSO saved to app_config so solo mode keeps a fallback,
+  // but they're additionally written to the org's org_config row by saveConnexions.
   async function save() {
     setSaving(true); setSaved(false); setError(null)
     const payload: Record<string, unknown> = {
       user_id:       user.id,
-      bearer_token:  bearer.trim(),
-      groq_api_key:  groqKey.trim(),
       theme,
       profile_name:  profileName.trim(),
       profile_niche: profileNiche.trim(),
       updated_at:    new Date().toISOString(),
     }
-    // Optional columns — only include if user changed them
     if (profileEmail) payload.profile_email = profileEmail.trim()
     if (exportDir)   payload.export_dir = exportDir.trim()
-    if (proxy)       payload.proxy = proxy.trim()
-    if (igSession)   payload.ig_sessionid = igSession.trim()
     payload.push_port    = pushPort
     payload.notify_popup = notifyPopup
     payload.notify_sound = notifySound
     payload.lang         = lang
+    // Solo mode: connection fields go to app_config too (they ARE user-scoped here).
+    // Org mode: don't touch app_config's connection fields — saveConnexions writes
+    // to org_config instead.
+    if (!currentOrg) {
+      payload.bearer_token = bearer.trim()
+      payload.groq_api_key = groqKey.trim()
+      if (proxy)     payload.proxy        = proxy.trim()
+      if (igSession) payload.ig_sessionid = igSession.trim()
+    }
 
     let { error: err } = await supabase.from('app_config').upsert(payload, { onConflict: 'user_id' })
 
-    // If a column doesn't exist, retry with only the safe core columns
     if (err && /column|schema cache/i.test(err.message)) {
-      const safe = {
+      const safe: Record<string, unknown> = {
         user_id:       payload.user_id,
-        bearer_token:  payload.bearer_token,
-        groq_api_key:  payload.groq_api_key,
         theme:         payload.theme,
         profile_name:  payload.profile_name,
         profile_niche: payload.profile_niche,
         updated_at:    payload.updated_at,
+      }
+      if (!currentOrg) {
+        safe.bearer_token = bearer.trim()
+        safe.groq_api_key = groqKey.trim()
       }
       const r = await supabase.from('app_config').upsert(safe, { onConflict: 'user_id' })
       err = r.error
       if (!err) setError('Quelques options optionnelles n\'ont pas été enregistrées (colonnes manquantes en base — sans gravité).')
     }
 
-    if (err) setError('Erreur: ' + err.message)
-    else { setSaved(true); setTimeout(() => setSaved(false), 3000) }
+    if (err) { setError('Erreur: ' + err.message); setSaving(false); return }
+    setSaved(true); setTimeout(() => setSaved(false), 3000)
+    setSaving(false)
+  }
+
+  // Save connexions (bearer/groq/proxy/ig_sessionid). Routes to org_config when
+  // an org is active, app_config otherwise. Admin-only when org is active.
+  async function saveConnexions() {
+    setSaving(true); setSaved(false); setError(null)
+    if (currentOrg) {
+      if (!canEditOrgConnexions) {
+        setError("Seuls les owner/admin de l'organisation peuvent modifier ces clés.")
+        setSaving(false); return
+      }
+      const { error: err } = await supabase.from('org_config').upsert({
+        org_id:        currentOrg.id,
+        bearer_token:  bearer.trim(),
+        groq_api_key:  groqKey.trim(),
+        proxy:         proxy.trim()    || null,
+        ig_sessionid:  igSession.trim() || null,
+        updated_at:    new Date().toISOString(),
+      }, { onConflict: 'org_id' })
+      if (err) { setError('Erreur: ' + err.message); setSaving(false); return }
+    } else {
+      const payload: Record<string, unknown> = {
+        user_id:       user.id,
+        bearer_token:  bearer.trim(),
+        groq_api_key:  groqKey.trim(),
+        updated_at:    new Date().toISOString(),
+      }
+      if (proxy)     payload.proxy        = proxy.trim()
+      if (igSession) payload.ig_sessionid = igSession.trim()
+      const { error: err } = await supabase.from('app_config').upsert(payload, { onConflict: 'user_id' })
+      if (err) { setError('Erreur: ' + err.message); setSaving(false); return }
+    }
+    setSaved(true); setTimeout(() => setSaved(false), 3000)
     setSaving(false)
   }
 
@@ -385,6 +448,25 @@ export function Settings({ user, initialPanel }: SettingsProps) {
       {/* ── Connexions ─────────────────────────────────────────────────────── */}
       {panel === 'connexions' && canSeeConnexions && (
         <div className="space-y-5">
+          <div className={`px-4 py-2.5 rounded-lg text-xs flex items-center gap-2 ${
+            currentOrg ? 'bg-accent/10 border border-accent/30 text-accent' : 'bg-surface2 border border-border text-text2'
+          }`}>
+            {currentOrg ? (
+              <>
+                <span>🏢</span>
+                <span>
+                  Tu modifies les clés <strong>partagées</strong> de l'organisation <strong>"{currentOrg.name}"</strong>.
+                  Elles sont utilisées par tous les membres.
+                  {!canEditOrgConnexions && <span className="text-warn"> · Lecture seule (admin requis)</span>}
+                </span>
+              </>
+            ) : (
+              <>
+                <span>👤</span>
+                <span>Tu modifies <strong>tes</strong> clés personnelles (mode solo). Bascule sur une organisation pour gérer ses clés partagées.</span>
+              </>
+            )}
+          </div>
           <section className="bg-card border border-border rounded-xl p-5 space-y-4">
             <h2 className="text-sm font-semibold text-text">Connexions GéeLark</h2>
             <Input
@@ -403,7 +485,7 @@ export function Settings({ user, initialPanel }: SettingsProps) {
               onChange={e => setProxy(e.target.value)}
             />
             <div className="flex gap-2">
-              <Button onClick={save} loading={saving}>💾 Sauvegarder</Button>
+              <Button onClick={saveConnexions} loading={saving} disabled={!!currentOrg && !canEditOrgConnexions}>💾 Sauvegarder</Button>
               <Button variant="secondary" onClick={testProxy} loading={testingProxy}>🔌 Tester proxy + IG</Button>
             </div>
             {proxyResult && (
@@ -469,7 +551,7 @@ export function Settings({ user, initialPanel }: SettingsProps) {
               </p>
               {igSession && <p className="text-xs text-ok mt-1">✅ Session ID configurée</p>}
             </div>
-            <Button onClick={save} loading={saving} className="w-full">💾 Sauvegarder les clés API</Button>
+            <Button onClick={saveConnexions} loading={saving} disabled={!!currentOrg && !canEditOrgConnexions} className="w-full">💾 Sauvegarder les clés API</Button>
           </section>
         </div>
       )}

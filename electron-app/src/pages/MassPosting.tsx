@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase, type Phone, type ContentItem } from '@/lib/supabase'
+import { useConnections } from '@/lib/connections'
 import { Button }  from '@/components/ui/Button'
 import { VideoThumbnail } from '@/pages/Bank'
 import { BankPicker } from './Bank'
@@ -88,13 +89,14 @@ export function MassPosting({ user }: MassPostingProps) {
     return unsub
   }, [])
 
+  // Pull the active connection (org_config when an org is active, app_config otherwise)
+  const conns = useConnections(user)
+  useEffect(() => { if (conns.bearer) setBearer(conns.bearer) }, [conns.bearer])
+  useEffect(() => { if (conns.groq)   setGroqKey(conns.groq) },  [conns.groq])
+
   useEffect(() => {
-    Promise.all([
-      supabase.from('app_config').select('bearer_token, groq_api_key').eq('user_id', user.id).single(),
-      supabase.from('phones').select('*').eq('user_id', user.id).order('phone_name'),
-    ]).then(([cfg, ph]) => {
-      if (cfg.data?.bearer_token) setBearer(cfg.data.bearer_token)
-      if (cfg.data?.groq_api_key) setGroqKey(cfg.data.groq_api_key)
+    supabase.from('phones').select('*').eq('user_id', user.id).order('phone_name')
+    .then(ph => {
       const ps = ph.data ?? []
       setPhones(ps)
       const grps = [...new Set(ps.map(p => p.group_name).filter(Boolean) as string[])].sort()

@@ -117,6 +117,16 @@ export interface ContentItem {
   updated_at:     string
 }
 
+// Connexions partagées par organisation (lues à la place de AppConfig en mode orga).
+export interface OrgConfig {
+  org_id:        string
+  bearer_token:  string
+  groq_api_key:  string
+  ig_sessionid:  string | null
+  proxy:         string | null
+  updated_at:    string
+}
+
 export interface AppConfig {
   user_id:       string
   bearer_token:  string

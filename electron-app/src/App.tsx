@@ -6,6 +6,7 @@ import { AuthPage }          from '@/components/auth/AuthPage'
 import { Onboarding }        from '@/components/Onboarding'
 import { Layout, type Page } from '@/components/Layout'
 import { OrgProvider }       from '@/lib/orgContext'
+import { useConnections }    from '@/lib/connections'
 
 // ── Splash screen ─────────────────────────────────────────────────────────────
 const SPLASH_DURATION = 2600  // ms avant fade-out
@@ -155,6 +156,8 @@ function AppContent({ user }: { user: User }) {
   const [lastRefresh, setLastRefresh]       = useState<Date | null>(null)
   const [refreshTick, setRefreshTick]       = useState(0)
 
+  // Onboarding gate: existence of *any* bearer (solo or org) means setup is done.
+  // We still check app_config here because in solo mode that's where it lives.
   useEffect(() => {
     supabase.from('app_config').select('bearer_token').eq('user_id', user.id).maybeSingle()
       .then(({ data, error }) => {
@@ -162,16 +165,22 @@ function AppContent({ user }: { user: User }) {
         const hasBearer = !!data?.bearer_token
         setOnboarding(!hasBearer)
         if (hasBearer && !localStorage.getItem(BETA_KEY)) setShowBeta(true)
-        // Start the global status poller as soon as we have the bearer token.
-        // It runs in the background regardless of which page is active.
-        if (data?.bearer_token) {
-          initPoller(data.bearer_token)
-          initIgStatsPoller(user)
-        }
       })
     supabase.from('phones').select('id', { count: 'exact', head: true }).eq('user_id', user.id)
       .then(({ count }) => setPhoneCount(count ?? 0))
   }, [user.id])
+
+  // Re-initialise the GéeLark poller whenever the active bearer changes
+  // (org switch, settings save, …). The poller holds the bearer in module
+  // scope and we rebuild that scope here on every change.
+  const conns = useConnections(user)
+  useEffect(() => {
+    if (conns.loading) return
+    if (conns.bearer) {
+      initPoller(conns.bearer)
+      initIgStatsPoller(user)
+    }
+  }, [conns.bearer, conns.loading, user.id])
 
   function dismissBeta() {
     localStorage.setItem(BETA_KEY, '1')

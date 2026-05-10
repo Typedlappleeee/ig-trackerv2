@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase, type Phone } from '@/lib/supabase'
+import { useConnections } from '@/lib/connections'
 import { Button }  from '@/components/ui/Button'
 import { Spinner } from '@/components/ui/Spinner'
 import { replyToIgCommentViaPhone } from '@/lib/geelark'
@@ -70,15 +71,14 @@ export function Autocomment({ user }: AutocommentProps) {
   // Send via GéeLark cloud-phone (shell-exec) instead of direct IG API → undetectable
   const [useGeelark, setUseGeelark] = useState(localStorage.getItem('autocomment-use-geelark') !== 'false')
 
+  // Groq key from active connection (org or solo)
+  const conns = useConnections(user)
+  useEffect(() => { if (conns.groq) setGroqKey(conns.groq) }, [conns.groq])
+
   useEffect(() => {
-    Promise.all([
-      supabase.from('phones').select('*').eq('user_id', user.id).order('phone_name'),
-      supabase.from('app_config').select('groq_api_key').eq('user_id', user.id).single(),
-    ]).then(([ph, cfg]) => {
-      setPhones((ph.data ?? []).filter(p => p.ig_username))
-      if (cfg.data?.groq_api_key) setGroqKey(cfg.data.groq_api_key)
-    })
-  }, [])
+    supabase.from('phones').select('*').eq('user_id', user.id).order('phone_name')
+      .then(ph => setPhones((ph.data ?? []).filter(p => p.ig_username)))
+  }, [user.id])
 
   async function sendManualReply(comment: IgComment) {
     const text = manualReplies[comment.pk]?.trim()
