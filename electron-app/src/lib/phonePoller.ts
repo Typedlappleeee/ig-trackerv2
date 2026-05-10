@@ -32,6 +32,12 @@ function restart() {
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
+/** Call when there is no usable bearer (deleted token, switched to an org with no config, …). */
+export function stopPoller() {
+  _bearer = ''
+  if (_timer) { clearInterval(_timer); _timer = null }
+}
+
 /** Call once when the bearer token is known (from app_config). */
 export function initPoller(bearer: string) {
   _bearer = bearer

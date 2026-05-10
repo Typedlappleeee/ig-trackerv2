@@ -20,11 +20,26 @@ const EMPTY: ActiveConnections = {
   source: 'user', loading: true,
 }
 
-// Re-fetches whenever the active org switches. Returns empty strings (not null)
-// so consumers can safely string-compare without optional chaining everywhere.
+// Pub-sub so Settings can force a re-fetch after save without prop-drilling.
+const listeners = new Set<() => void>()
+export function notifyConnectionsChanged() {
+  for (const l of listeners) l()
+}
+
+// Re-fetches whenever the active org switches OR notifyConnectionsChanged()
+// is called. Returns empty strings (not null) so consumers can safely
+// string-compare without optional chaining everywhere.
 export function useConnections(user: User): ActiveConnections {
   const { currentOrg } = useOrg()
   const [conns, setConns] = useState<ActiveConnections>(EMPTY)
+  const [tick, setTick]   = useState(0)
+
+  // Subscribe to external invalidation events
+  useEffect(() => {
+    const cb = () => setTick(t => t + 1)
+    listeners.add(cb)
+    return () => { listeners.delete(cb) }
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -61,7 +76,7 @@ export function useConnections(user: User): ActiveConnections {
     }
 
     return () => { cancelled = true }
-  }, [currentOrg?.id, user.id])
+  }, [currentOrg?.id, user.id, tick])
 
   return conns
 }

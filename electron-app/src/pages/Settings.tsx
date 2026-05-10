@@ -6,6 +6,7 @@ import { Input }  from '@/components/ui/Input'
 import { OrganizationPanel } from '@/components/OrganizationPanel'
 import { useOrg } from '@/lib/orgContext'
 import { canSeeTab } from '@/lib/permissions'
+import { notifyConnectionsChanged } from '@/lib/connections'
 
 // All 8 themes from Python THEMES dict (line 29-39)
 const THEMES = ['Lime', 'Bleu', 'Violet', 'Ambre', 'Rouge', 'Cyan', 'Rose', 'Vert'] as const
@@ -186,6 +187,7 @@ export function Settings({ user, initialPanel }: SettingsProps) {
     }
 
     if (err) { setError('Erreur: ' + err.message); setSaving(false); return }
+    if (!currentOrg) notifyConnectionsChanged()  // solo mode also writes connection fields here
     setSaved(true); setTimeout(() => setSaved(false), 3000)
     setSaving(false)
   }
@@ -209,17 +211,20 @@ export function Settings({ user, initialPanel }: SettingsProps) {
       }, { onConflict: 'org_id' })
       if (err) { setError('Erreur: ' + err.message); setSaving(false); return }
     } else {
+      // Solo mode: explicitly write empty strings so deletions take effect
+      // (we don't want a removed token to silently keep its old value).
       const payload: Record<string, unknown> = {
         user_id:       user.id,
         bearer_token:  bearer.trim(),
         groq_api_key:  groqKey.trim(),
+        proxy:         proxy.trim()     || null,
+        ig_sessionid:  igSession.trim() || null,
         updated_at:    new Date().toISOString(),
       }
-      if (proxy)     payload.proxy        = proxy.trim()
-      if (igSession) payload.ig_sessionid = igSession.trim()
       const { error: err } = await supabase.from('app_config').upsert(payload, { onConflict: 'user_id' })
       if (err) { setError('Erreur: ' + err.message); setSaving(false); return }
     }
+    notifyConnectionsChanged()    // wake up useConnections everywhere
     setSaved(true); setTimeout(() => setSaved(false), 3000)
     setSaving(false)
   }

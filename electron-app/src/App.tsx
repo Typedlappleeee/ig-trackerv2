@@ -131,7 +131,7 @@ function BetaPopup({ onClose }: { onClose: () => void }) {
     </div>
   )
 }
-import { initPoller }        from '@/lib/phonePoller'
+import { initPoller, stopPoller } from '@/lib/phonePoller'
 import { initIgStatsPoller } from '@/lib/igStatsPoller'
 import { Dashboard }         from '@/pages/Dashboard'
 import { Phones }            from '@/pages/Phones'
@@ -179,6 +179,10 @@ function AppContent({ user }: { user: User }) {
     if (conns.bearer) {
       initPoller(conns.bearer)
       initIgStatsPoller(user)
+    } else {
+      // No bearer in the active scope (deleted token, fresh org with no config, …)
+      // Stop polling so we don't keep hitting GéeLark with a stale credential.
+      stopPoller()
     }
   }, [conns.bearer, conns.loading, user.id])
 
