@@ -3,6 +3,7 @@ import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { useOrg }    from '@/lib/orgContext'
 import { canSeeTab } from '@/lib/permissions'
+import { useToast }  from '@/components/Toast'
 import { getRecentAccounts, switchToAccount, forgetAccount, type RecentAccount } from '@/lib/recentAccounts'
 
 export type Page =
@@ -63,6 +64,7 @@ const SOON_ITEMS: SoonItem[] = [
 ]
 
 export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefresh, children }: LayoutProps) {
+  const toast = useToast()
   const [openSections, setOpenSections] = useState<Record<string, boolean>>(() => {
     try {
       const saved = JSON.parse(localStorage.getItem('sidebar-sections') ?? '{}')
@@ -81,7 +83,19 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
   const [userMenuPos, setUserMenuPos]   = useState<{ left: number; bottom: number; width: number } | null>(null)
   const [recentAccounts, setRecentAccounts] = useState<RecentAccount[]>([])
   const [switchErr, setSwitchErr]           = useState<string | null>(null)
-  const { myOrgs, currentOrg, role, perms, switchOrg } = useOrg()
+  const { myOrgs, currentOrg, role, perms, switchOrg, loading: orgLoading } = useOrg()
+
+  function handleSwitchOrg(orgId: string | null, orgName?: string) {
+    if (orgId === (currentOrg?.id ?? null)) { setOrgMenuOpen(false); return }
+    switchOrg(orgId)
+    setOrgMenuOpen(false)
+    onNavigate('dashboard')
+    toast.show({
+      title: orgId ? `Passé à "${orgName}"` : 'Repassé en mode solo',
+      kind:  'info',
+      duration: 3500,
+    })
+  }
 
   function openOrgMenu() {
     const rect = orgTriggerRef.current?.getBoundingClientRect()
@@ -322,7 +336,19 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
         </button>
       </aside>
 
-      <main className="flex-1 overflow-auto">
+      <main className="flex-1 overflow-auto relative">
+        {/* Overlay during org switch to prevent stale-scope content flash */}
+        {orgLoading && (
+          <div className="absolute inset-0 z-50 bg-bg/80 backdrop-blur-sm flex items-center justify-center">
+            <div className="flex flex-col items-center gap-3 text-text2">
+              <svg className="animate-spin w-6 h-6 text-accent" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+              </svg>
+              <span className="text-xs">Chargement du contexte…</span>
+            </div>
+          </div>
+        )}
         {children}
       </main>
 
@@ -339,7 +365,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             style={{ left: orgMenuPos.left, bottom: orgMenuPos.bottom, width: orgMenuPos.width }}
           >
             <button
-              onClick={() => { switchOrg(null); setOrgMenuOpen(false) }}
+              onClick={() => handleSwitchOrg(null)}
               className={`w-full flex items-center gap-2 px-3 py-2 text-[12px] text-left hover:bg-surface2 ${!currentOrg ? 'bg-accent/10 text-accent' : 'text-text'}`}
             >
               <span>👤</span><span>Mode solo</span>
@@ -347,7 +373,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             {myOrgs.map(({ org }) => (
               <button
                 key={org.id}
-                onClick={() => { switchOrg(org.id); setOrgMenuOpen(false) }}
+                onClick={() => handleSwitchOrg(org.id, org.name)}
                 className={`w-full flex items-center gap-2 px-3 py-2 text-[12px] text-left hover:bg-surface2 ${currentOrg?.id === org.id ? 'bg-accent/10 text-accent' : 'text-text'}`}
               >
                 <span>🏢</span><span className="truncate">{org.name}</span>
