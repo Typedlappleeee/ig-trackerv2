@@ -93,24 +93,47 @@ async function shellExec(bearer: string, phoneId: string, cmd: string): Promise<
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
 
+// Ensure the cloud phone is running. Starts it if needed and polls until ready.
+async function ensurePhoneRunning(bearer: string, phoneId: string, log?: (m: string) => void): Promise<boolean> {
+  // Status: 0=stopped, 1=running, 2=starting, 3=stopping
+  const phones = await fetchAllPhones(bearer)
+  const p = phones.find(x => x.id === phoneId)
+  if (!p) throw new Error(`phone ${phoneId} not found`)
+  if (p.status === 1) return true
+
+  log?.('📱 Démarrage du téléphone…')
+  await geelarkFetch('POST', '/phone/start', { ids: [phoneId] }, bearer)
+
+  // Poll for up to 90s until phone reports running
+  for (let i = 0; i < 45; i++) {
+    await sleep(2000)
+    const list = await fetchAllPhones(bearer)
+    const cur  = list.find(x => x.id === phoneId)
+    if (cur?.status === 1) {
+      log?.('✅ Téléphone démarré, attente boot Android (8s)…')
+      await sleep(8000)
+      return true
+    }
+  }
+  return false
+}
+
 // Reply to an Instagram comment by driving the cloud phone via shell commands.
-// 1. Opens the post via deep link
-// 2. Dumps UI to find the comment box
-// 3. Types reply text (with @mention so the original commenter is notified)
-// 4. Taps Send
-//
-// This is robust to phone resolution because we read uiautomator XML to get
-// real element bounds — no hard-coded coordinates.
+// Auto-starts the phone if needed.
 export async function replyToIgCommentViaPhone(
   bearer: string,
   phoneId: string,
   shortcode: string,
   username: string,
   replyText: string,
+  log?: (m: string) => void,
 ): Promise<{ ok: boolean; error?: string }> {
   try {
+    const ready = await ensurePhoneRunning(bearer, phoneId, log)
+    if (!ready) return { ok: false, error: 'phone_failed_to_start' }
+
     const url = `https://www.instagram.com/p/${shortcode}/`
-    // 1. Open the IG post via deep link
+    log?.('🔗 Ouverture du post…')
     await shellExec(bearer, phoneId,
       `am start -a android.intent.action.VIEW -d "${url}" -p com.instagram.android`)
     await sleep(7000)

@@ -90,13 +90,14 @@ export function Autocomment({ user }: AutocommentProps) {
         if (!selectedPhone.geelark_id) { log('❌ Téléphone sans geelark_id'); setSendingReply(null); return }
         const bearer = getBearer()
         if (!bearer) { log('❌ Bearer GéeLark non chargé'); setSendingReply(null); return }
-        log(`📱 Envoi via téléphone @${comment.username}… (~15s)`)
+        log(`📱 Envoi via téléphone @${comment.username}…`)
         const gr = await replyToIgCommentViaPhone(
           bearer,
           selectedPhone.geelark_id,
           selectedPost.shortcode,
           comment.username,
           text,
+          (m: string) => log(`  ${m}`),
         )
         if (gr.ok) {
           setComments(prev => prev.map(c => c.pk === comment.pk ? { ...c, replied: text } : c))

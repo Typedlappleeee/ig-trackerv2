@@ -209,7 +209,9 @@ function AppContent({ user }: { user: User }) {
         phoneCount={phoneCount}
         lastRefresh={lastRefresh}
       >
-        {content}
+        <div key={page} className="anim-page h-full">
+          {content}
+        </div>
       </Layout>
     </>
   )
