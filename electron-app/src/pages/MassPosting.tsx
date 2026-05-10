@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase, type Phone, type ContentItem } from '@/lib/supabase'
 import { Button }  from '@/components/ui/Button'
-import { VideoPreview } from '@/components/VideoPreview'
+import { VideoThumbnail } from '@/pages/Bank'
 import { BankPicker } from './Bank'
 
 interface MassPostingProps { user: User }
@@ -446,7 +446,7 @@ export function MassPosting({ user }: MassPostingProps) {
                   className="w-full flex items-center gap-3 px-3 py-2.5 border-b border-border/30"
                 >
                   <div className="w-10 flex-shrink-0 aspect-[9/16] rounded overflow-hidden bg-surface2">
-                    <VideoPreview filePath={fp} />
+                    <VideoThumbnail filePath={fp ?? ''} />
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="text-xs font-bold text-accent">#{selIdx + 1}</p>

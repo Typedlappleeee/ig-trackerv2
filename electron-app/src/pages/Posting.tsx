@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase, type Phone } from '@/lib/supabase'
 import { Button }  from '@/components/ui/Button'
-import { VideoPreview } from '@/components/VideoPreview'
+import { VideoThumbnail } from '@/pages/Bank'
 import { BankPicker } from './Bank'
 
 interface PostingProps { user: User }
@@ -275,7 +275,7 @@ export function Posting({ user }: PostingProps) {
             <div className="w-[120px] flex-shrink-0">
               <div className="w-[120px] h-[213px] rounded-xl overflow-hidden bg-gradient-to-br from-surface3 to-surface2 flex items-center justify-center">
                 {filePath ? (
-                  <VideoPreview filePath={filePath} />
+                  <VideoThumbnail filePath={filePath} />
                 ) : (
                   <div className="text-center text-text2 text-xs">📹<br/>Choisir<br/>une vidéo</div>
                 )}
