@@ -10,6 +10,34 @@ interface RemixProps { user: User }
 type Step = 1 | 2 | 3 | 4
 type BlendMode = 'screen' | 'multiply'
 type Preset = '9:16' | '1:1' | '16:9'
+type OverlayMode = 'blend' | 'ai'
+
+interface TextOverlayUI {
+  id:        number
+  text:      string
+  position:  string
+  x:         string
+  y:         string
+  fontSize:  number
+  fontColor: string
+  bold:      boolean
+  shadow:    boolean
+  startTime: number
+  endTime:   number
+}
+
+const POS_MAP: Record<string, { x: string; y: string }> = {
+  'top-left':      { x: 'w*0.03',          y: 'h*0.04'            },
+  'top-center':    { x: '(w-text_w)/2',    y: 'h*0.04'            },
+  'top-right':     { x: 'w*0.97-text_w',   y: 'h*0.04'            },
+  'middle-left':   { x: 'w*0.03',          y: '(h-text_h)/2'      },
+  'middle-center': { x: '(w-text_w)/2',    y: '(h-text_h)/2'      },
+  'middle-right':  { x: 'w*0.97-text_w',   y: '(h-text_h)/2'      },
+  'bottom-left':   { x: 'w*0.03',          y: 'h*0.88'            },
+  'bottom-center': { x: '(w-text_w)/2',    y: 'h*0.88'            },
+  'bottom-right':  { x: 'w*0.97-text_w',   y: 'h*0.88'            },
+}
+const SIZE_MAP: Record<string, number> = { small: 28, medium: 42, large: 60, xlarge: 80 }
 
 function fmtTime(s: number): string {
   if (!isFinite(s) || s < 0) return '0:00'
@@ -241,6 +269,13 @@ export function Remix({ user }: RemixProps) {
   const [blendMode,     setBlendMode]     = useState<BlendMode>('screen')
   const [preset,        setPreset]        = useState<Preset>('9:16')
 
+  // AI mode
+  const [overlayMode,    setOverlayMode]   = useState<OverlayMode>('blend')
+  const [anthropicKey,   setAnthropicKey]  = useState(() => localStorage.getItem('sf_anthropic_key') ?? '')
+  const [analyzing,      setAnalyzing]     = useState(false)
+  const [analyzeStep,    setAnalyzeStep]   = useState<{ ok: boolean; text: string } | null>(null)
+  const [detectedOverlays, setDetectedOverlays] = useState<TextOverlayUI[]>([])
+
   // Step 4
   const [generating,     setGenerating]    = useState(false)
   const [result,         setResult]        = useState<{ ok: boolean; outputPath?: string; error?: string; command?: string } | null>(null)
@@ -279,6 +314,78 @@ export function Remix({ user }: RemixProps) {
     }
   }
 
+  async function analyzeWithAI() {
+    if (!originalPath || !anthropicKey.trim()) return
+    setAnalyzing(true)
+    setAnalyzeStep({ ok: true, text: 'Extraction des frames vidéo…' })
+    setDetectedOverlays([])
+
+    try {
+      const framesResult = await window.electronAPI!.extractFrames!({ filePath: originalPath, endTime: splitTime })
+      if (!framesResult.ok || !framesResult.frames?.length) {
+        throw new Error(framesResult.error ?? 'Impossible d\'extraire les frames')
+      }
+
+      setAnalyzeStep({ ok: true, text: `${framesResult.frames.length} frames extraites — Analyse Claude Vision…` })
+
+      // Build multi-image message
+      const imageBlocks = framesResult.frames.flatMap((f, i) => [
+        { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: f.data } },
+        { type: 'text', text: `[Frame ${i} — t=${f.timestamp}s]` },
+      ])
+
+      const interval = splitTime / (framesResult.frames.length || 1)
+      const prompt = `These are ${framesResult.frames.length} video frames from a ${splitTime.toFixed(1)}-second clip, sampled at regular intervals.\n\nIdentify ALL burned-in text overlays (captions, subtitles, titles, text graphics). For each unique text element return a JSON array:\n[\n  {\n    "text": "exact text",\n    "position": "top-center",\n    "fontSize": "medium",\n    "fontColor": "white",\n    "bold": true,\n    "startFrame": 0,\n    "endFrame": 3\n  }\n]\nposition: top-left | top-center | top-right | middle-center | bottom-left | bottom-center | bottom-right\nfontSize: small | medium | large | xlarge\nDo NOT include background scene text. Return ONLY the JSON array.`
+
+      const result = await window.electronAPI!.anthropicVisionRequest!({
+        apiKey: anthropicKey.trim(),
+        model: 'claude-haiku-4-5-20251001',
+        messages: [{ role: 'user', content: [...imageBlocks, { type: 'text', text: prompt }] }],
+        maxTokens: 2000,
+      })
+
+      if (!result.ok) throw new Error(result.error ?? 'Erreur API Anthropic')
+
+      const rawText = (result.data as { content: Array<{ type: string; text: string }> })?.content?.[0]?.text ?? '[]'
+      let parsed: Array<{ text: string; position: string; fontSize: string; fontColor: string; bold?: boolean; startFrame: number; endFrame: number }> = []
+      try {
+        const m = rawText.match(/\[[\s\S]*\]/)
+        if (m) parsed = JSON.parse(m[0])
+      } catch { throw new Error('Réponse IA invalide — réessaie') }
+
+      const overlays: TextOverlayUI[] = parsed.map((item, idx) => {
+        const pos = POS_MAP[item.position] ?? POS_MAP['bottom-center']
+        return {
+          id:        idx,
+          text:      item.text,
+          position:  item.position,
+          x:         pos.x,
+          y:         pos.y,
+          fontSize:  SIZE_MAP[item.fontSize] ?? 42,
+          fontColor: item.fontColor ?? 'white',
+          bold:      item.bold ?? false,
+          shadow:    true,
+          startTime: Math.round(item.startFrame * interval * 10) / 10,
+          endTime:   Math.min(splitTime, Math.round((item.endFrame + 1) * interval * 10) / 10),
+        }
+      })
+
+      setDetectedOverlays(overlays)
+      if (overlays.length > 0) {
+        setAnalyzeStep({ ok: true, text: `✓ ${overlays.length} élément(s) détecté(s)` })
+        playSuccess()
+      } else {
+        setAnalyzeStep({ ok: false, text: 'Aucun texte détecté dans cette phase — essaie le mode Blend' })
+        playError()
+      }
+    } catch (err: unknown) {
+      setAnalyzeStep({ ok: false, text: err instanceof Error ? err.message : String(err) })
+      playError()
+    } finally {
+      setAnalyzing(false)
+    }
+  }
+
   async function generate() {
     if (!originalPath || !newPhase1Path) return
     const outputPath = await window.electronAPI?.pickOutputFile?.({ defaultName: 'remix_output.mp4' })
@@ -286,17 +393,34 @@ export function Remix({ user }: RemixProps) {
 
     setGenerating(true)
     setResult(null)
-    playSuccess()
 
-    const r = await window.electronAPI!.runFfmpegRemix!({
-      originalPath,
-      newPhase1Path,
-      splitTime,
-      outputPath,
-      textBlend: textOverlay ? textBlend : 0,
-      blendMode,
-      preset,
-    })
+    let r: { ok: boolean; outputPath?: string; error?: string; command?: string }
+
+    if (overlayMode === 'ai' && detectedOverlays.length > 0) {
+      r = await window.electronAPI!.runFfmpegRemixAI!({
+        newPhase1Path,
+        originalPath,
+        splitTime,
+        outputPath,
+        preset,
+        textOverlays: detectedOverlays.map(o => ({
+          text: o.text, x: o.x, y: o.y,
+          fontSize: o.fontSize, fontColor: o.fontColor,
+          startTime: o.startTime, endTime: o.endTime,
+          bold: o.bold, shadow: o.shadow,
+        })),
+      })
+    } else {
+      r = await window.electronAPI!.runFfmpegRemix!({
+        originalPath,
+        newPhase1Path,
+        splitTime,
+        outputPath,
+        textBlend: textOverlay ? textBlend : 0,
+        blendMode,
+        preset,
+      })
+    }
 
     setGenerating(false)
     setResult(r)
@@ -426,13 +550,12 @@ export function Remix({ user }: RemixProps) {
   function renderStep2() {
     return (
       <div className="grid grid-cols-[1fr_1fr] gap-6 items-start">
-        {/* Left: new phase 1 */}
+        {/* Left: new phase 1 + overlay config */}
         <div className="space-y-4">
           <div>
             <h2 className="text-base font-black text-white mb-1">Nouvelle Phase 1</h2>
             <p className="text-xs" style={{ color: 'rgba(196,181,253,0.5)' }}>
               Cette vidéo remplacera la Phase 1 originale.
-              Les textes/sous-titres de l'original seront appliqués par dessus.
             </p>
           </div>
 
@@ -456,75 +579,183 @@ export function Remix({ user }: RemixProps) {
             </div>
           )}
 
-          {/* Text overlay settings */}
+          {/* Overlay mode tabs */}
           <div className="rounded-2xl overflow-hidden"
             style={{ background: 'rgba(8,5,20,0.7)', border: '1px solid rgba(139,92,246,0.15)' }}>
-            <div className="px-4 py-3 flex items-center justify-between"
-              style={{ borderBottom: textOverlay ? '1px solid rgba(139,92,246,0.1)' : undefined }}>
-              <div>
-                <p className="text-sm font-semibold text-white">Superposition de texte</p>
-                <p className="text-[11px]" style={{ color: 'rgba(196,181,253,0.45)' }}>
-                  Blend la Phase 1 originale sur la nouvelle — le texte blanc ressort, le fond original transparaît légèrement
-                </p>
-              </div>
-              <button
-                onClick={() => setTextOverlay(v => !v)}
-                className="relative w-10 h-5 rounded-full transition-colors flex-shrink-0"
-                style={{ background: textOverlay ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.1)' }}
-              >
-                <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${textOverlay ? 'translate-x-5' : 'translate-x-0.5'}`} />
-              </button>
+
+            {/* Tab bar */}
+            <div className="flex" style={{ borderBottom: '1px solid rgba(139,92,246,0.12)' }}>
+              {([['blend', '🎞 Blend vidéo'], ['ai', '✨ Détection IA']] as [OverlayMode, string][]).map(([m, label]) => (
+                <button
+                  key={m}
+                  onClick={() => setOverlayMode(m)}
+                  className="flex-1 py-2.5 text-xs font-bold transition-all"
+                  style={overlayMode === m
+                    ? { background: 'linear-gradient(130deg,#7c3aed20,#ec489914)', color: '#c4b5fd', borderBottom: '2px solid #8b5cf6' }
+                    : { color: 'rgba(196,181,253,0.35)' }
+                  }
+                >
+                  {label}
+                </button>
+              ))}
             </div>
 
-            {textOverlay && (
-              <div className="px-4 py-4 space-y-4">
-                {/* Blend mode */}
-                <div>
-                  <p className="text-[10px] uppercase tracking-wider font-bold mb-2" style={{ color: 'rgba(196,181,253,0.45)' }}>
-                    Mode de fusion
-                  </p>
-                  <div className="flex gap-2">
-                    {(['screen', 'multiply'] as BlendMode[]).map(m => (
-                      <button
-                        key={m}
-                        onClick={() => setBlendMode(m)}
-                        className="flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all"
-                        style={blendMode === m
-                          ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff' }
-                          : { background: 'rgba(139,92,246,0.08)', color: 'rgba(196,181,253,0.5)', border: '1px solid rgba(139,92,246,0.15)' }
-                        }
-                      >
-                        {m === 'screen' ? '☀ Screen' : '✦ Multiply'}
-                      </button>
-                    ))}
+            {/* Blend mode panel */}
+            {overlayMode === 'blend' && (
+              <div className="p-4 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-white">Superposition de texte</p>
+                    <p className="text-[11px]" style={{ color: 'rgba(196,181,253,0.45)' }}>
+                      Fusionne la Phase 1 originale sur la nouvelle pour faire ressortir le texte
+                    </p>
                   </div>
-                  <p className="text-[10px] mt-1.5" style={{ color: 'rgba(196,181,253,0.35)' }}>
-                    {blendMode === 'screen'
-                      ? 'Idéal pour texte blanc sur fond sombre (Instagram, TikTok)'
-                      : 'Idéal pour texte sombre sur fond clair'}
+                  <button
+                    onClick={() => setTextOverlay(v => !v)}
+                    className="relative w-10 h-5 rounded-full transition-colors flex-shrink-0"
+                    style={{ background: textOverlay ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.1)' }}
+                  >
+                    <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${textOverlay ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                  </button>
+                </div>
+
+                {textOverlay && (
+                  <div className="space-y-4">
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wider font-bold mb-2" style={{ color: 'rgba(196,181,253,0.45)' }}>
+                        Mode de fusion
+                      </p>
+                      <div className="flex gap-2">
+                        {(['screen', 'multiply'] as BlendMode[]).map(m => (
+                          <button
+                            key={m}
+                            onClick={() => setBlendMode(m)}
+                            className="flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all"
+                            style={blendMode === m
+                              ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff' }
+                              : { background: 'rgba(139,92,246,0.08)', color: 'rgba(196,181,253,0.5)', border: '1px solid rgba(139,92,246,0.15)' }
+                            }
+                          >
+                            {m === 'screen' ? '☀ Screen' : '✦ Multiply'}
+                          </button>
+                        ))}
+                      </div>
+                      <p className="text-[10px] mt-1.5" style={{ color: 'rgba(196,181,253,0.35)' }}>
+                        {blendMode === 'screen' ? 'Idéal pour texte blanc sur fond sombre' : 'Idéal pour texte sombre sur fond clair'}
+                      </p>
+                    </div>
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-[10px] uppercase tracking-wider font-bold" style={{ color: 'rgba(196,181,253,0.45)' }}>
+                          Intensité
+                        </p>
+                        <span className="text-xs font-mono font-bold" style={{ color: '#a78bfa' }}>
+                          {Math.round(textBlend * 100)}%
+                        </span>
+                      </div>
+                      <input
+                        type="range" min={0.1} max={1} step={0.05}
+                        value={textBlend}
+                        onChange={e => setTextBlend(parseFloat(e.target.value))}
+                        className="w-full accent-purple-500 cursor-pointer"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* AI mode panel */}
+            {overlayMode === 'ai' && (
+              <div className="p-4 space-y-4">
+                <div>
+                  <p className="text-sm font-semibold text-white mb-1">Détection IA des textes</p>
+                  <p className="text-[11px]" style={{ color: 'rgba(196,181,253,0.45)' }}>
+                    Claude Vision analyse la Phase 1 originale, détecte les textes et les réapplique proprement sur ta nouvelle vidéo via FFmpeg.
                   </p>
                 </div>
 
-                {/* Opacity */}
+                {/* API key input */}
                 <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-[10px] uppercase tracking-wider font-bold" style={{ color: 'rgba(196,181,253,0.45)' }}>
-                      Intensité du texte
-                    </p>
-                    <span className="text-xs font-mono font-bold" style={{ color: '#a78bfa' }}>
-                      {Math.round(textBlend * 100)}%
-                    </span>
-                  </div>
+                  <label className="text-[10px] uppercase tracking-wider font-bold block mb-1.5" style={{ color: 'rgba(196,181,253,0.45)' }}>
+                    Clé API Anthropic
+                  </label>
                   <input
-                    type="range" min={0.1} max={1} step={0.05}
-                    value={textBlend}
-                    onChange={e => setTextBlend(parseFloat(e.target.value))}
-                    className="w-full accent-purple-500 cursor-pointer"
+                    type="password"
+                    placeholder="sk-ant-…"
+                    value={anthropicKey}
+                    onChange={e => {
+                      setAnthropicKey(e.target.value)
+                      localStorage.setItem('sf_anthropic_key', e.target.value)
+                    }}
+                    className="w-full rounded-lg px-3 py-2 text-xs font-mono outline-none"
+                    style={{
+                      background: 'rgba(139,92,246,0.08)',
+                      border: '1px solid rgba(139,92,246,0.2)',
+                      color: '#c4b5fd',
+                    }}
                   />
-                  <div className="flex justify-between text-[9px] mt-1" style={{ color: 'rgba(196,181,253,0.3)' }}>
-                    <span>Subtil</span><span>Intense</span>
-                  </div>
+                  <p className="text-[10px] mt-1" style={{ color: 'rgba(196,181,253,0.3)' }}>
+                    console.anthropic.com — modèle Haiku (économique)
+                  </p>
                 </div>
+
+                {/* Analyse button */}
+                <button
+                  onClick={analyzeWithAI}
+                  disabled={analyzing || !originalPath || !anthropicKey.trim()}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all disabled:opacity-40"
+                  style={{
+                    background: 'linear-gradient(130deg,#7c3aed,#ec4899)',
+                    color: '#fff',
+                    boxShadow: '0 2px 16px -4px rgba(124,58,237,0.5)',
+                  }}
+                >
+                  {analyzing ? <><Spinner size="sm" /> Analyse en cours…</> : <>✨ Analyser la Phase 1</>}
+                </button>
+
+                {analyzeStep && (
+                  <div
+                    className="rounded-lg px-3 py-2 text-xs flex items-start gap-2"
+                    style={analyzeStep.ok
+                      ? { background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.2)', color: '#34d399' }
+                      : { background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)', color: '#fbbf24' }
+                    }
+                  >
+                    <span>{analyzeStep.ok ? '✓' : '⚠'}</span>
+                    <span>{analyzeStep.text}</span>
+                  </div>
+                )}
+
+                {/* Detected overlays list */}
+                {detectedOverlays.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-[10px] uppercase tracking-wider font-bold" style={{ color: 'rgba(196,181,253,0.45)' }}>
+                      Textes détectés ({detectedOverlays.length})
+                    </p>
+                    {detectedOverlays.map(ov => (
+                      <div
+                        key={ov.id}
+                        className="rounded-xl px-3 py-2.5 flex items-start gap-3"
+                        style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.15)' }}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-semibold text-white truncate">"{ov.text}"</p>
+                          <p className="text-[10px] mt-0.5" style={{ color: 'rgba(196,181,253,0.45)' }}>
+                            {ov.position} · {ov.fontColor} · {ov.fontSize}px · {fmtTime(ov.startTime)}→{fmtTime(ov.endTime)}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => setDetectedOverlays(prev => prev.filter(o => o.id !== ov.id))}
+                          className="text-[11px] px-1.5 py-0.5 rounded flex-shrink-0"
+                          style={{ color: 'rgba(239,68,68,0.6)', background: 'rgba(239,68,68,0.08)' }}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -593,11 +824,18 @@ export function Remix({ user }: RemixProps) {
                   {newPhase1Path?.split(/[\\/]/).pop()}
                 </span>
               </div>
-              {textOverlay ? (
+              {overlayMode === 'ai' ? (
                 <div className="flex gap-2">
                   <span className="opacity-50">Texte</span>
                   <span style={{ color: '#a78bfa' }}>
-                    {blendMode === 'screen' ? 'Screen' : 'Multiply'} · {Math.round(textBlend * 100)}% intensité
+                    IA · {detectedOverlays.length} élément(s)
+                  </span>
+                </div>
+              ) : textOverlay ? (
+                <div className="flex gap-2">
+                  <span className="opacity-50">Texte</span>
+                  <span style={{ color: '#a78bfa' }}>
+                    Blend {blendMode === 'screen' ? 'Screen' : 'Multiply'} · {Math.round(textBlend * 100)}%
                   </span>
                 </div>
               ) : (
@@ -676,7 +914,10 @@ export function Remix({ user }: RemixProps) {
               style={{ background: 'rgba(8,5,20,0.6)', border: '1px solid rgba(139,92,246,0.1)', color: 'rgba(196,181,253,0.4)', textAlign: 'left' }}>
               <div>• Split Phase 1 : {fmtTime(splitTime)}</div>
               <div>• Nouvelle Phase 1 : {newPhase1Path?.split(/[\\/]/).pop()}</div>
-              {textOverlay && <div>• Overlay texte ({blendMode}, {Math.round(textBlend * 100)}%)</div>}
+              {overlayMode === 'ai' && detectedOverlays.length > 0
+                ? <div>• Texte IA : {detectedOverlays.length} élément(s) détecté(s)</div>
+                : textOverlay && <div>• Blend texte ({blendMode}, {Math.round(textBlend * 100)}%)</div>
+              }
               <div>• Concat Phase 2 : {fmtTime(Math.max(0, originalDur - splitTime))}</div>
             </div>
           </div>

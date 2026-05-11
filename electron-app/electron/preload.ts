@@ -86,4 +86,31 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Detect the scene-change timestamp(s) in a video (for auto-split point).
   detectSceneChange: (opts: { filePath: string; threshold?: number }) =>
     ipcRenderer.invoke('detect-scene-change', opts),
+
+  // Extract video frames as base64 JPEGs (for AI text analysis)
+  extractFrames: (opts: { filePath: string; endTime: number; fps?: number }) =>
+    ipcRenderer.invoke('extract-frames', opts),
+
+  // Anthropic Claude API with vision support (bypasses CORS)
+  anthropicVisionRequest: (opts: {
+    apiKey: string
+    model?: string
+    messages: unknown[]
+    maxTokens?: number
+  }) => ipcRenderer.invoke('anthropic-vision-request', opts),
+
+  // FFmpeg remix with AI-detected drawtext overlays
+  runFfmpegRemixAI: (opts: {
+    newPhase1Path: string
+    originalPath:  string
+    splitTime:     number
+    outputPath:    string
+    preset:        '9:16' | '1:1' | '16:9'
+    textOverlays:  Array<{
+      text: string; x: string; y: string
+      fontSize: number; fontColor: string
+      startTime: number; endTime: number
+      bold?: boolean; shadow?: boolean
+    }>
+  }) => ipcRenderer.invoke('run-ffmpeg-remix-ai', opts),
 })

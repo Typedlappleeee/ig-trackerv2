@@ -22,6 +22,18 @@ interface GroqRequestOptions {
 
 interface FfmpegClip { filePath: string; trimStart: number; trimEnd: number }
 
+interface AiTextOverlay {
+  text:      string
+  x:         string
+  y:         string
+  fontSize:  number
+  fontColor: string
+  startTime: number
+  endTime:   number
+  bold?:     boolean
+  shadow?:   boolean
+}
+
 interface ElectronAPI {
   platform: string
   geelarkRequest:    (opts: GeelarkRequestOptions) => Promise<GeelarkRequestResult>
@@ -60,6 +72,16 @@ interface ElectronAPI {
   }) => Promise<{ ok: boolean; outputPath?: string; error?: string; command?: string }>
   detectSceneChange: (opts: { filePath: string; threshold?: number }) =>
     Promise<{ ok: boolean; times: number[]; splitTime?: number; duration: number; error?: string }>
+  extractFrames: (opts: { filePath: string; endTime: number; fps?: number }) =>
+    Promise<{ ok: boolean; frames?: Array<{ index: number; timestamp: number; data: string }>; count?: number; error?: string }>
+  anthropicVisionRequest: (opts: {
+    apiKey: string; model?: string; messages: unknown[]; maxTokens?: number
+  }) => Promise<{ ok: boolean; data?: unknown; error?: string }>
+  runFfmpegRemixAI: (opts: {
+    newPhase1Path: string; originalPath: string; splitTime: number
+    outputPath: string; preset: '9:16' | '1:1' | '16:9'
+    textOverlays: AiTextOverlay[]
+  }) => Promise<{ ok: boolean; outputPath?: string; error?: string; command?: string }>
 }
 
 declare global {

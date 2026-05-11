@@ -1,6 +1,6 @@
 import { app, BrowserWindow, shell, ipcMain, net, dialog, session, protocol } from 'electron'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { existsSync, readFileSync, createReadStream, statSync, writeFileSync, mkdirSync } from 'node:fs'
+import { existsSync, readFileSync, createReadStream, statSync, writeFileSync, mkdirSync, readdirSync, rmSync } from 'node:fs'
 import os from 'node:os'
 import { execFile } from 'node:child_process'
 import https from 'node:https'
@@ -574,56 +574,63 @@ ipcMain.handle('run-ffmpeg', async (_event, opts: {
 })
 
 // ── IPC: detect scene change via FFmpeg scene filter ─────────────────────────
-// Runs FFmpeg scene detection and returns timestamps of significant scene changes.
-// A "2-phase" video will typically have exactly 1 major scene change.
 ipcMain.handle('detect-scene-change', async (_event, opts: {
-  filePath:   string
-  threshold?: number  // 0–1, default 0.30 (30% frame difference = major cut)
+  filePath: string; threshold?: number
 }) => {
   const ffmpegBin = process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg'
-  const thr = opts.threshold ?? 0.30
+  const nullSink  = process.platform === 'win32' ? 'NUL' : '/dev/null'
 
-  // Run FFmpeg with scene detection filter; output goes to null sink.
-  // All useful info comes out on stderr.
-  const args = [
-    '-hide_banner',
-    '-i', opts.filePath,
-    '-filter:v', `select='gt(scene,${thr})',metadata=mode=print:key=lavfi.scene_score`,
-    '-an',
-    '-f', 'null', '-',
-  ]
+  // Helper: run one detection pass at a given threshold.
+  // Key fix: use backslash-escaped comma (\,) so FFmpeg doesn't treat the comma
+  // inside gt() as a filter separator. Also use showinfo which reliably outputs
+  // pts_time to stderr regardless of the null muxer on stdout.
+  function tryDetect(thr: number): Promise<{ ok: boolean; times: number[]; duration: number }> {
+    const args = [
+      '-hide_banner',
+      '-i', opts.filePath,
+      '-vf', `select=gt(scene\\,${thr}),showinfo`,
+      '-vsync', '0',
+      '-f', 'null', nullSink,
+    ]
+    return new Promise(res => {
+      execFile(ffmpegBin, args, { maxBuffer: 20 * 1024 * 1024 }, (_err, stdout, stderr) => {
+        const raw = (stdout ?? '') + (stderr ?? '')
 
-  return new Promise(resolve => {
-    execFile(ffmpegBin, args, { maxBuffer: 20 * 1024 * 1024 }, (_err, stdout, stderr) => {
-      const raw = stdout + stderr
+        const durM = raw.match(/Duration:\s*(\d+):(\d+):(\d+\.?\d*)/)
+        const duration = durM
+          ? parseInt(durM[1]) * 3600 + parseInt(durM[2]) * 60 + parseFloat(durM[3])
+          : 0
 
-      // Extract video duration
-      const durM = raw.match(/Duration:\s*(\d+):(\d+):(\d+\.?\d*)/)
-      const duration = durM
-        ? parseInt(durM[1]) * 3600 + parseInt(durM[2]) * 60 + parseFloat(durM[3])
-        : 0
-
-      // Extract all scene-change timestamps ("pts_time:X.XXX")
-      const times: number[] = []
-      for (const m of raw.matchAll(/pts_time:(\d+\.?\d*)/g)) {
-        const t = parseFloat(m[1])
-        if (t > 0) times.push(t)
-      }
-
-      if (times.length === 0) {
-        // Nothing found — try once more with lower threshold and report
-        resolve({ ok: false, times: [], duration, error: 'Aucun changement de scène détecté. Essaie d\'ajuster le seuil ou positionne le curseur manuellement.' })
-        return
-      }
-
-      // For a 2-phase video, take the most significant cut:
-      // prefer the one closest to the centre (avoids false positives at edges)
-      const mid = duration / 2
-      const best = times.reduce((a, b) => Math.abs(b - mid) < Math.abs(a - mid) ? b : a)
-
-      resolve({ ok: true, times, splitTime: best, duration })
+        // showinfo lines look like: "n:  1 pts: 123 pts_time:4.100 ..."
+        // Filter out t <= 0.3 to skip the very first few frames which sometimes appear
+        const times: number[] = []
+        for (const m of raw.matchAll(/pts_time:(\d+\.?\d*)/g)) {
+          const t = parseFloat(m[1])
+          if (t > 0.3) times.push(t)
+        }
+        res({ ok: times.length > 0, times, duration })
+      })
     })
-  })
+  }
+
+  // Try progressively lower thresholds until something is found
+  const thresholds = [opts.threshold ?? 0.20, 0.12, 0.06, 0.03]
+  let duration = 0
+
+  for (const thr of thresholds) {
+    const r = await tryDetect(thr)
+    if (r.duration > 0) duration = r.duration
+    if (r.ok) {
+      const mid  = r.duration / 2
+      const best = r.times.reduce((a, b) => Math.abs(b - mid) < Math.abs(a - mid) ? b : a)
+      return { ok: true, times: r.times, splitTime: best, duration: r.duration }
+    }
+  }
+
+  return {
+    ok: false, times: [], duration,
+    error: 'Aucun changement de scène détecté — positionne le curseur manuellement.',
+  }
 })
 
 // ── IPC: run FFmpeg remix (split + blend + concat) ───────────────────────────
@@ -683,6 +690,165 @@ ipcMain.handle('run-ffmpeg-remix', async (_event, opts: {
     execFile(ffmpegBin, args, { maxBuffer: 200 * 1024 * 1024 }, (err) => {
       if (err) resolve({ ok: false, error: err.message, command })
       else     resolve({ ok: true,  outputPath: opts.outputPath, command })
+    })
+  })
+})
+
+// ── IPC: extract video frames as base64 JPEGs (for AI text analysis) ────────
+ipcMain.handle('extract-frames', async (_event, opts: {
+  filePath: string
+  endTime:  number
+  fps?:     number
+}) => {
+  const ffmpegBin = process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg'
+  const tmpDir    = path.join(os.tmpdir(), `sf-frames-${Date.now()}`)
+
+  try {
+    mkdirSync(tmpDir, { recursive: true })
+
+    // Target max 8 frames regardless of video length
+    const targetCount = Math.min(8, Math.max(1, Math.ceil(opts.endTime)))
+    const fps         = targetCount / opts.endTime
+    const framePattern = path.join(tmpDir, 'frame_%04d.jpg')
+
+    await new Promise<void>((resolve, reject) => {
+      execFile(ffmpegBin, [
+        '-i', opts.filePath,
+        '-t', String(opts.endTime),
+        '-vf', `fps=${fps.toFixed(4)},scale=640:-2`,
+        '-q:v', '5',
+        '-y', framePattern,
+      ], { maxBuffer: 200 * 1024 * 1024 }, err => { if (err) reject(err); else resolve() })
+    })
+
+    const files    = readdirSync(tmpDir).filter(f => f.endsWith('.jpg')).sort()
+    const interval = opts.endTime / (files.length || 1)
+    const frames   = files.map((f, i) => ({
+      index:     i,
+      timestamp: Math.round(i * interval * 10) / 10,
+      data:      readFileSync(path.join(tmpDir, f)).toString('base64'),
+    }))
+
+    try { rmSync(tmpDir, { recursive: true }) } catch { /* ignore */ }
+    return { ok: true, frames, count: frames.length }
+  } catch (err: unknown) {
+    try { rmSync(tmpDir, { recursive: true }) } catch { /* ignore */ }
+    return { ok: false, frames: [], error: err instanceof Error ? err.message : String(err) }
+  }
+})
+
+// ── IPC: Anthropic API with vision support ───────────────────────────────────
+ipcMain.handle('anthropic-vision-request', async (_event, opts: {
+  apiKey:     string
+  model?:     string
+  messages:   unknown[]
+  maxTokens?: number
+}) => {
+  try {
+    const response = await net.fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type':      'application/json',
+        'x-api-key':         opts.apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model:      opts.model ?? 'claude-haiku-4-5-20251001',
+        max_tokens: opts.maxTokens ?? 2000,
+        messages:   opts.messages,
+      }),
+    })
+    const data = await response.json()
+    if (!response.ok) return { ok: false, error: JSON.stringify(data) }
+    return { ok: true, data }
+  } catch (err: unknown) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+})
+
+// ── IPC: FFmpeg remix with AI-detected drawtext overlays ─────────────────────
+ipcMain.handle('run-ffmpeg-remix-ai', async (_event, opts: {
+  newPhase1Path: string
+  originalPath:  string
+  splitTime:     number
+  outputPath:    string
+  preset:        '9:16' | '1:1' | '16:9'
+  textOverlays:  Array<{
+    text:      string
+    x:         string
+    y:         string
+    fontSize:  number
+    fontColor: string
+    startTime: number
+    endTime:   number
+    bold?:     boolean
+    shadow?:   boolean
+  }>
+}) => {
+  const ffmpegBin = process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg'
+  const W = opts.preset === '16:9' ? 1920 : 1080
+  const H = opts.preset === '9:16' ? 1920 : 1080
+  const scl  = `scale=${W}:${H}:force_original_aspect_ratio=decrease,pad=${W}:${H}:-1:-1:color=black,setsar=1`
+  const afmt = 'aformat=sample_rates=44100:channel_layouts=stereo'
+
+  // Find a font file so drawtext works cross-platform
+  function findFont(): string | null {
+    const candidates = process.platform === 'win32'
+      ? ['C:\\Windows\\Fonts\\arial.ttf', 'C:\\Windows\\Fonts\\segoeui.ttf']
+      : process.platform === 'darwin'
+        ? ['/System/Library/Fonts/Helvetica.ttc', '/Library/Fonts/Arial.ttf', '/System/Library/Fonts/Supplemental/Arial.ttf']
+        : ['/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', '/usr/share/fonts/truetype/ubuntu/Ubuntu-R.ttf', '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf']
+    return candidates.find(f => existsSync(f)) ?? null
+  }
+
+  // Escape text for FFmpeg drawtext filter
+  function escText(t: string): string {
+    return t.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/:/g, '\\:').replace(/\[/g, '\\[').replace(/\]/g, '\\]')
+  }
+
+  const fontFile = findFont()
+
+  // Build drawtext chain (comma-separated, applied after scale)
+  const drawtextChain = opts.textOverlays.map(ov => {
+    const parts: string[] = [`text='${escText(ov.text)}'`]
+    if (fontFile) parts.push(`fontfile='${fontFile}'`)
+    parts.push(
+      `x=${ov.x}`, `y=${ov.y}`,
+      `fontsize=${ov.fontSize}`,
+      `fontcolor=${ov.fontColor}`,
+      `enable='between(t,${ov.startTime},${ov.endTime})'`,
+    )
+    if (ov.bold)        parts.push(`fontstyle=Bold`)
+    if (ov.shadow !== false) parts.push(`shadowx=2:shadowy=2:shadowcolor=black@0.75`)
+    return `drawtext=${parts.join(':')}`
+  }).join(',')
+
+  const vfPhase1 = opts.textOverlays.length > 0 ? `${scl},${drawtextChain}` : scl
+
+  const filterComplex = [
+    `[0:v]trim=duration=${opts.splitTime},setpts=PTS-STARTPTS,${vfPhase1}[v_p1]`,
+    `[0:a]atrim=duration=${opts.splitTime},asetpts=PTS-STARTPTS,${afmt}[a_p1]`,
+    `[1:v]trim=start=${opts.splitTime},setpts=PTS-STARTPTS,${scl}[v_p2]`,
+    `[1:a]atrim=start=${opts.splitTime},asetpts=PTS-STARTPTS,${afmt}[a_p2]`,
+    `[v_p1][a_p1][v_p2][a_p2]concat=n=2:v=1:a=1[vout][aout]`,
+  ].join(';')
+
+  const args = [
+    '-i', opts.newPhase1Path,
+    '-i', opts.originalPath,
+    '-filter_complex', filterComplex,
+    '-map', '[vout]', '-map', '[aout]',
+    '-c:v', 'libx264', '-preset', 'fast', '-crf', '23',
+    '-c:a', 'aac', '-b:a', '128k',
+    '-movflags', '+faststart',
+    '-y', opts.outputPath,
+  ]
+  const command = `ffmpeg ${args.map(a => a.includes(' ') ? `"${a}"` : a).join(' ')}`
+
+  return new Promise(resolve => {
+    execFile(ffmpegBin, args, { maxBuffer: 200 * 1024 * 1024 }, err => {
+      if (err) resolve({ ok: false, error: err.message, command })
+      else     resolve({ ok: true, outputPath: opts.outputPath, command })
     })
   })
 })
