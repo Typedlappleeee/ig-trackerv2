@@ -264,7 +264,7 @@ export function Remix({ user }: RemixProps) {
   // Step 2
   const [newPhase1Path, setNewPhase1Path] = useState<string | null>(null)
   const [showBankNew,   setShowBankNew]   = useState(false)
-  const [textOverlay,   setTextOverlay]   = useState(true)
+  const [textOverlay,   setTextOverlay]   = useState(false)
   const [textBlend,     setTextBlend]     = useState(0.35)
   const [blendMode,     setBlendMode]     = useState<BlendMode>('screen')
   const [preset,        setPreset]        = useState<Preset>('9:16')
@@ -309,9 +309,9 @@ export function Remix({ user }: RemixProps) {
     const r = await window.electronAPI!.detectSceneChange!({ filePath: originalPath, threshold: 0.28 })
     setDetecting(false)
     if (r.ok && r.splitTime != null) {
-      setSplitTime(Math.round(r.splitTime * 10) / 10)
-      const allTimes = r.times.map(t => fmtTime(t)).join(', ')
-      setDetectMsg({ ok: true, text: `Coupure détectée à ${fmtTime(r.splitTime)}${r.times.length > 1 ? ` (autres : ${allTimes})` : ''}` })
+      const t = Math.min(originalDur - 0.1, Math.round((r.splitTime + 0.5) * 10) / 10)
+      setSplitTime(t)
+      setDetectMsg({ ok: true, text: `Coupure détectée à ${fmtTime(r.splitTime)} → ajustée à ${fmtTime(t)} (+0.5s)` })
       playSuccess()
     } else {
       setDetectMsg({ ok: false, text: r.error ?? 'Aucune coupure détectée — ajuste manuellement.' })
@@ -354,9 +354,10 @@ export function Remix({ user }: RemixProps) {
       try { const m = rawText.match(/\{[\s\S]*\}/); if (m) parsed = JSON.parse(m[0]) } catch { throw new Error('Réponse IA invalide') }
 
       if (parsed.splitTime != null && parsed.splitTime > 0 && parsed.splitTime < originalDur) {
-        const t = Math.round(parsed.splitTime * 10) / 10
+        const raw = parsed.splitTime
+        const t = Math.min(originalDur - 0.1, Math.round((raw + 0.5) * 10) / 10)
         setSplitTime(t)
-        setAiDetectMsg({ ok: true, text: `IA : coupure à ${fmtTime(t)}${parsed.description ? ` — ${parsed.description}` : ''}` })
+        setAiDetectMsg({ ok: true, text: `IA : coupure à ${fmtTime(raw)} → ajustée à ${fmtTime(t)} (+0.5s)${parsed.description ? ` — ${parsed.description}` : ''}` })
         playSuccess()
       } else {
         throw new Error('Aucune coupure trouvée par l\'IA')
