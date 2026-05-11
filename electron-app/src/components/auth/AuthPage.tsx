@@ -2,6 +2,7 @@ import { useState, FormEvent } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/Button'
 import { Input }  from '@/components/ui/Input'
+import { ScaleFlowBadge } from '@/components/ui/ScaleFlowLogo'
 
 type Tab = 'login' | 'register'
 
@@ -67,13 +68,10 @@ export function AuthPage() {
 
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-accent/10 border border-accent/20 mb-4 anim-bounce-in anim-glow relative overflow-hidden"
-            style={{ animationDelay: '0.05s' }}
-          >
-            <div className="absolute inset-0 bg-gradient-to-br from-accent/20 to-transparent pointer-events-none" />
-            <span className="text-2xl font-black text-accent anim-float">IG</span>
+          <div className="mb-4 anim-bounce-in" style={{ animationDelay: '0.05s' }}>
+            <ScaleFlowBadge size={64} />
           </div>
-          <h1 className="text-2xl font-bold text-text anim-page" style={{ animationDelay: '0.15s' }}>IG Tracker</h1>
+          <h1 className="text-2xl font-bold text-text anim-page" style={{ animationDelay: '0.15s' }}>ScaleFlow</h1>
           <p className="text-text2 text-sm mt-1 anim-page" style={{ animationDelay: '0.22s' }}>Dashboard professionnel</p>
         </div>
 

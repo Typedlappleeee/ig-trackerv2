@@ -9,6 +9,7 @@ import { OrgProvider, useOrg } from '@/lib/orgContext'
 import { useConnections }    from '@/lib/connections'
 import { playSplash }        from '@/lib/sounds'
 import { startMusic, stopMusic, isMusicEnabled, subscribeMusicState } from '@/lib/music'
+import { ScaleFlowIcon }     from '@/components/ui/ScaleFlowLogo'
 
 // ── Static ember positions ────────────────────────────────────────────────────
 const EMBERS = [
@@ -363,56 +364,30 @@ function SplashScreen({ onDone }: { onDone: () => void }) {
         }} />
       ))}
 
-      {/* ── Logo with spinning border + glow rings ── */}
+      {/* ── Logo ── */}
       <div className="splash-logo" style={{ position: 'relative', marginBottom: 36 }}>
         {/* Radar rings */}
         {(['splash-ring-1', 'splash-ring-2', 'splash-ring-3'] as const).map(cls => (
           <div key={cls} className={cls} style={{
             position: 'absolute',
             inset: -4,
-            borderRadius: 36,
-            border: '1.5px solid #4f9eff',
+            borderRadius: '50%',
+            border: '1.5px solid rgba(124,58,237,0.6)',
             pointerEvents: 'none',
           }} />
         ))}
-
-        {/* Spinning border wrapper */}
-        <div className="splash-border" style={{
-          width: 108, height: 108, borderRadius: 32, padding: 2.5,
-          background: `conic-gradient(from var(--splash-angle, 0deg), transparent 0%, #4f9eff 35%, #7eb8ff 50%, transparent 65%)`,
-        }}>
-          {/* Logo inner */}
-          <div style={{
-            width: '100%', height: '100%', borderRadius: 30,
-            background: 'linear-gradient(135deg, #1a2f5e 0%, #0a1428 100%)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 38, fontWeight: 900,
-            color: '#4f9eff', letterSpacing: '-2px',
-            fontFamily: 'Inter, system-ui, sans-serif',
-            position: 'relative', overflow: 'hidden',
-          }}>
-            {/* Shimmer sweep over text */}
-            <div style={{
-              position: 'absolute', inset: 0,
-              background: 'linear-gradient(105deg, transparent 30%, #ffffff22 50%, transparent 70%)',
-              backgroundSize: '200% 100%',
-              animation: 'splash-shimmer 2.4s ease-in-out 0.9s infinite',
-            }} />
-            IG
-          </div>
-        </div>
+        <ScaleFlowIcon size={108} />
       </div>
 
       {/* ── Title ── */}
       <div className="splash-title" style={{ textAlign: 'center', marginBottom: 6 }}>
-        <span style={{ fontSize: 30, fontWeight: 800, color: '#d4dcf0', letterSpacing: '-0.5px' }}>
-          IG Tracker
+        <span style={{ fontSize: 30, fontWeight: 800, color: '#ffffff', letterSpacing: '-0.5px' }}>
+          Scale
         </span>
-        {' '}
         <span style={{ fontSize: 30, fontWeight: 800,
-          background: 'linear-gradient(135deg, #4f9eff, #7eb8ff)',
+          background: 'linear-gradient(135deg, #7C3AED, #EC4899)',
           WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-        }}>v2</span>
+        }}>Flow</span>
       </div>
 
       {/* ── Typewriter subtitle ── */}
@@ -467,7 +442,7 @@ function BetaPopup({ onClose }: { onClose: () => void }) {
           <div className="inline-flex items-center gap-2 bg-[#e0245e]/10 border border-[#e0245e]/30 rounded-full px-4 py-1.5 text-[#e0245e] text-xs font-bold uppercase tracking-widest mb-3">
             🔴 BÊTA
           </div>
-          <h2 className="text-2xl font-bold text-text">IG Tracker <span className="text-accent">v2.0</span></h2>
+          <h2 className="text-2xl font-bold text-text">ScaleFlow <span className="text-accent">v2.0</span></h2>
           <p className="text-text2 text-sm">Bienvenue dans la nouvelle version de l'application !</p>
         </div>
 
@@ -514,7 +489,7 @@ import { Settings }          from '@/pages/Settings'
 import { MassPosting }       from '@/pages/MassPosting'
 import { FullPageLoader }    from '@/components/ui/Spinner'
 
-const BETA_KEY = 'ig-tracker-beta-v2-seen'
+const BETA_KEY = 'scaleflow-beta-v2-seen'
 
 function AppContent({ user }: { user: User }) {
   const { currentOrg } = useOrg()

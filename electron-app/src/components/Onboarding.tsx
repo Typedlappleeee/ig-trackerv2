@@ -3,6 +3,7 @@ import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/Button'
 import { Input }  from '@/components/ui/Input'
+import { ScaleFlowBadge } from '@/components/ui/ScaleFlowLogo'
 
 interface OnboardingProps {
   user:       User
@@ -163,7 +164,7 @@ export function Onboarding({ user, onComplete }: OnboardingProps) {
           <div className="w-14 h-14 rounded-2xl bg-accent/20 text-accent flex items-center justify-center text-2xl font-bold mx-auto">
             IG
           </div>
-          <h1 className="text-2xl font-bold text-text">Configuration d'IG Tracker</h1>
+          <h1 className="text-2xl font-bold text-text">Configuration de ScaleFlow</h1>
           <p className="text-sm text-text2">Connecte tes services pour démarrer. Prend ~2 minutes.</p>
         </div>
 
@@ -337,7 +338,7 @@ export function Onboarding({ user, onComplete }: OnboardingProps) {
               </p>
             )}
             <Button className="w-full" onClick={finish} loading={saving}>
-              🚀 Entrer dans IG Tracker
+              🚀 Entrer dans ScaleFlow
             </Button>
           </div>
         )}

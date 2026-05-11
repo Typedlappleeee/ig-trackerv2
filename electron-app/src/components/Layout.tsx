@@ -6,6 +6,7 @@ import { canSeeTab } from '@/lib/permissions'
 import { useToast }  from '@/components/Toast'
 import { playNav }   from '@/lib/sounds'
 import { getRecentAccounts, switchToAccount, forgetAccount, type RecentAccount } from '@/lib/recentAccounts'
+import { ScaleFlowMark } from '@/components/ui/ScaleFlowLogo'
 
 export type Page =
   | 'dashboard' | 'phones'
@@ -59,7 +60,7 @@ const NAV_SECTIONS: NavSection[] = [
 interface SoonItem { label: string; icon: string; color?: string; tooltip: string }
 const SOON_ITEMS: SoonItem[] = [
   { label: 'Twitter / X',  icon: '𝕏',  color: 'text-sky-400',    tooltip: 'Automatise tes posts et réponses sur Twitter/X' },
-  { label: 'Threads',      icon: '🧵', color: 'text-pink-400',   tooltip: 'Gère tes Threads depuis IG Tracker' },
+  { label: 'Threads',      icon: '🧵', color: 'text-pink-400',   tooltip: 'Gère tes Threads depuis ScaleFlow' },
   { label: 'Reddit',       icon: '🟠', color: 'text-orange-400', tooltip: 'Planifie et publie sur Reddit automatiquement' },
   { label: 'Multiposting', icon: '🌐', color: 'text-purple-400', tooltip: 'Poste sur tous les réseaux sociaux en une seule action' },
 ]
@@ -180,16 +181,11 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
       <aside className="w-[230px] flex-shrink-0 flex flex-col border-r border-border/60 bg-sb-bg">
         {/* Logo */}
         <div className="px-4 py-4 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center text-base font-bold bg-gradient-to-br from-accent to-accent2 text-white shadow-lg shadow-accent/30 flex-shrink-0">
-            📱
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="font-bold text-[13px] text-text leading-tight tracking-tight">IG Tracker</p>
-            <p className="text-[10px] text-ok flex items-center gap-1.5 leading-tight mt-0.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-ok inline-block anim-pulse" />
-              actif
-            </p>
-          </div>
+          <ScaleFlowMark iconSize={32} />
+          <p className="text-[10px] text-ok flex items-center gap-1.5 leading-tight mt-0.5 ml-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-ok inline-block anim-pulse" />
+            actif
+          </p>
         </div>
 
         {/* Divider */}
@@ -286,7 +282,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
         {/* Footer card */}
         <div className="mx-3 mb-2 p-3 rounded-xl bg-sb-card border border-border space-y-1.5">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold text-text">IG Tracker Pro</span>
+            <span className="text-[11px] font-semibold text-text">ScaleFlow Pro</span>
             <span className="text-[9px] text-text2 bg-surface2 px-1.5 py-0.5 rounded">v2.0.0</span>
           </div>
           <div className="flex items-center gap-1.5 text-[10px] text-text2">
