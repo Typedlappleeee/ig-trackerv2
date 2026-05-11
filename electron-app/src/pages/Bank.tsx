@@ -883,34 +883,35 @@ function VideoPlayerModal({ item, onClose }: { item: ContentItem; onClose: () =>
       onClick={onClose}
     >
       <div
-        className="relative flex flex-col items-center gap-3"
+        className="relative rounded-xl overflow-hidden shadow-2xl"
         onClick={e => e.stopPropagation()}
-        style={{ maxHeight: '90vh', maxWidth: '90vw' }}
+        style={{ height: '94vh', aspectRatio: '9/16', maxWidth: '94vw', background: '#000' }}
       >
-        {/* Close */}
+        {/* Close button — overlaid top-right */}
         <button
           onClick={onClose}
-          className="absolute -top-10 right-0 text-white/60 hover:text-white text-2xl leading-none"
+          className="absolute top-3 right-3 z-20 w-8 h-8 rounded-full flex items-center justify-center text-white/70 hover:text-white transition-colors"
+          style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(8px)' }}
         >✕</button>
 
-        {/* Title */}
-        <p className="text-white text-sm font-semibold max-w-xs truncate">{item.title}</p>
+        {/* Title + duration overlay — top-left */}
+        <div
+          className="absolute top-3 left-3 z-20 flex items-center gap-2 text-white text-[11px] font-medium rounded-lg px-2.5 py-1.5 max-w-[60%]"
+          style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(8px)' }}
+        >
+          <span className="truncate">{item.title}</span>
+          {item.duration && <span className="opacity-60 flex-shrink-0">· {formatDuration(item.duration)}</span>}
+        </div>
 
-        {/* Video */}
+        {/* Video fills the container */}
         <video
           ref={videoRef}
-          src={localUrl}
+          src={localUrl || undefined}
           controls
           autoPlay
-          className="rounded-xl shadow-2xl"
-          style={{ maxHeight: '80vh', maxWidth: '80vw', aspectRatio: '9/16', background: '#000' }}
+          style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
           onError={() => {}}
         />
-
-        {/* Meta */}
-        {item.duration && (
-          <p className="text-white/50 text-xs">{formatDuration(item.duration)}</p>
-        )}
       </div>
     </div>
   )

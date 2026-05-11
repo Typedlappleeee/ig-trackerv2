@@ -648,9 +648,8 @@ export function Phones({ user }: PhonesProps) {
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="p-8 space-y-6" onClick={() => setContextMenu(null)}>
-
-      {/* Modals */}
+    <>
+      {/* Portals — rendered outside the scrollable div so they never cause reflow */}
       {sessionDialog && (
         <SessionDialog
           phone={sessionDialog.phone}
@@ -658,7 +657,6 @@ export function Phones({ user }: PhonesProps) {
           onSaved={onSessionSaved}
         />
       )}
-      {/* Context menu */}
       {contextMenu && (
         <ContextMenu
           phone={contextMenu.phone} x={contextMenu.x} y={contextMenu.y}
@@ -669,6 +667,8 @@ export function Phones({ user }: PhonesProps) {
           canDelete={canDelete}
         />
       )}
+
+    <div className="p-8 space-y-6" onClick={() => setContextMenu(null)}>
 
       {/* Header */}
       <div className="flex items-start justify-between gap-3">
@@ -860,5 +860,6 @@ export function Phones({ user }: PhonesProps) {
         </p>
       )}
     </div>
+    </>
   )
 }

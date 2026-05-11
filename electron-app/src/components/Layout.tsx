@@ -208,7 +208,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
           <div className="flex-1 min-w-0">
             <p className="font-black text-[13px] leading-tight tracking-tight">
               <span style={{ color: '#f0eeff' }}>Scale</span>
-              <span style={{ background: 'linear-gradient(130deg,#8b5cf6,#ec4899)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Flow</span>
+              <span className="sf-logo-shimmer">Flow</span>
             </p>
             <p className="text-[10px] text-ok flex items-center gap-1.5 leading-tight mt-0.5">
               <span className="w-1.5 h-1.5 rounded-full bg-ok inline-block anim-pulse" />

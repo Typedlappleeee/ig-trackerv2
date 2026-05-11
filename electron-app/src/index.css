@@ -386,6 +386,21 @@ button, a, input, select, textarea {
 .sf-title      { animation: sf-word-l 0.54s cubic-bezier(.22,1,.36,1) 0.82s both,
                              sf-title-glow 3s ease-in-out 1.5s infinite; }
 
+/* ── ScaleFlow logo title shimmer ───────────────────────────────────────────── */
+@keyframes sf-shimmer {
+  0%   { background-position: 200% center; }
+  100% { background-position: -200% center; }
+}
+.sf-logo-shimmer {
+  background: linear-gradient(130deg, #a78bfa 0%, #f472b6 30%, #c4b5fd 50%, #f472b6 70%, #a78bfa 100%);
+  background-size: 300% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  animation: sf-shimmer 3s linear infinite;
+}
+
 /* ── ScaleFlow UI Utilities ─────────────────────────────────────────────────── */
 
 /* Primary gradient button */

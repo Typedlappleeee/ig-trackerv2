@@ -459,43 +459,49 @@ function IgVideoPlayerModal({ video, onClose }: { video: IgVideo; onClose: () =>
 
   return (
     <div
-      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/85 backdrop-blur-md anim-page"
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/90 backdrop-blur-md anim-page"
       onClick={onClose}
     >
+      {/* Container sized to fit a 9:16 portrait video — takes 94% of viewport height */}
       <div
-        className="relative flex flex-col items-center gap-3 anim-scale-in"
+        className="relative rounded-xl shadow-2xl overflow-hidden anim-scale-in"
         onClick={e => e.stopPropagation()}
-        style={{ maxHeight: '90vh', maxWidth: '90vw' }}
+        style={{ height: '94vh', aspectRatio: '9/16', maxWidth: '94vw', background: '#000' }}
       >
+        {/* Close button — overlaid top-right */}
         <button
           onClick={onClose}
-          className="absolute -top-10 right-0 text-white/60 hover:text-white text-2xl leading-none"
+          className="absolute top-3 right-3 z-20 w-8 h-8 rounded-full flex items-center justify-center text-white/70 hover:text-white transition-colors"
+          style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(8px)' }}
         >✕</button>
 
-        <div className="flex items-center gap-3 text-white text-xs">
-          <span>{video.views.toLocaleString('fr-FR')} vues</span>
+        {/* Stats overlay — top-left */}
+        <div
+          className="absolute top-3 left-3 z-20 flex items-center gap-2 text-white text-[11px] font-medium rounded-lg px-2.5 py-1.5"
+          style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(8px)' }}
+        >
+          <span>👁 {video.views.toLocaleString('fr-FR')}</span>
           {video.likes    > 0 && <span>♥ {video.likes.toLocaleString('fr-FR')}</span>}
           {video.comments > 0 && <span>✎ {video.comments.toLocaleString('fr-FR')}</span>}
-          <a href={video.url} target="_blank" rel="noreferrer" className="text-accent hover:underline">↗ Voir sur Instagram</a>
+          <a href={video.url} target="_blank" rel="noreferrer" className="ml-1 opacity-60 hover:opacity-100">↗</a>
         </div>
 
-        <div
-          className="rounded-xl shadow-2xl bg-black flex items-center justify-center"
-          style={{ height: '80vh', aspectRatio: '9/16', maxWidth: '80vw' }}
-        >
-          {err ? (
+        {/* Video — fills the entire container */}
+        {err ? (
+          <div className="w-full h-full flex items-center justify-center">
             <p className="text-danger text-sm px-4 text-center">{err}</p>
-          ) : !localUrl ? (
+          </div>
+        ) : !localUrl ? (
+          <div className="w-full h-full flex items-center justify-center">
             <p className="text-text2 text-sm">📥 Téléchargement de la vidéo…</p>
-          ) : (
-            <video
-              src={localUrl}
-              controls autoPlay
-              className="rounded-xl"
-              style={{ height: '100%', maxWidth: '100%' }}
-            />
-          )}
-        </div>
+          </div>
+        ) : (
+          <video
+            src={localUrl}
+            controls autoPlay
+            style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
+          />
+        )}
       </div>
     </div>
   )
