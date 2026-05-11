@@ -712,16 +712,19 @@ ipcMain.handle('run-ffmpeg-remix', async (_event, opts: {
 
   let filterComplex: string
   if (opts.textBlend > 0) {
-    // With text blend — original audio for both phases, original video blended on top of new video
+    // lumakey: make dark/background pixels transparent, keep only bright text pixels.
+    // threshold=0 = key out black; tolerance = how much darkness to remove (user-adjustable).
+    // overlay then pastes only those text pixels onto the new video — no background bleed.
+    const lkTol = Math.min(0.5, Math.max(0.1, opts.textBlend))
     filterComplex = [
       `[1:v]split=2[ov_a][ov_b]`,
       `[1:a]asplit=2[ao1][ao2]`,
       `[0:v]trim=duration=${opts.splitTime},setpts=PTS-STARTPTS,${scl}[v_new]`,
-      `[ov_a]trim=end=${opts.splitTime},setpts=PTS-STARTPTS,${scl}[v_orig_p1]`,
+      `[ov_a]trim=end=${opts.splitTime},setpts=PTS-STARTPTS,${scl},lumakey=threshold=0:tolerance=${lkTol}:softness=0.05[text_key]`,
+      `[v_new][text_key]overlay=format=auto[v_blended]`,
       `[ov_b]trim=start=${opts.splitTime},setpts=PTS-STARTPTS,${scl}[v_p2]`,
       `[ao1]atrim=end=${opts.splitTime},asetpts=PTS-STARTPTS,${afmt}[a_p1]`,
       `[ao2]atrim=start=${opts.splitTime},asetpts=PTS-STARTPTS,${afmt}[a_p2]`,
-      `[v_new][v_orig_p1]blend=all_mode=${opts.blendMode}:all_opacity=${opts.textBlend}[v_blended]`,
       `[v_blended][a_p1][v_p2][a_p2]concat=n=2:v=1:a=1[vout][aout]`,
     ].join(';')
   } else {

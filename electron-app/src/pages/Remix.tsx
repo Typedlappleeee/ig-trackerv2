@@ -264,13 +264,13 @@ export function Remix({ user }: RemixProps) {
   // Step 2
   const [newPhase1Path, setNewPhase1Path] = useState<string | null>(null)
   const [showBankNew,   setShowBankNew]   = useState(false)
-  const [textOverlay,   setTextOverlay]   = useState(false)
+  const [textOverlay,   setTextOverlay]   = useState(true)
   const [textBlend,     setTextBlend]     = useState(0.35)
   const [blendMode,     setBlendMode]     = useState<BlendMode>('screen')
   const [preset,        setPreset]        = useState<Preset>('9:16')
 
   // AI mode
-  const [overlayMode,    setOverlayMode]   = useState<OverlayMode>('ai')
+  const [overlayMode,    setOverlayMode]   = useState<OverlayMode>('blend')
   const [anthropicKey,   setAnthropicKey]  = useState(() => localStorage.getItem('sf_anthropic_key') ?? '')
   const [showKeyInput,   setShowKeyInput]  = useState(false)
   const [analyzing,      setAnalyzing]     = useState(false)
@@ -676,7 +676,7 @@ export function Remix({ user }: RemixProps) {
 
             {/* Tab bar */}
             <div className="flex" style={{ borderBottom: '1px solid rgba(139,92,246,0.12)' }}>
-              {([['blend', '🎞 Blend vidéo'], ['ai', '✨ Détection IA']] as [OverlayMode, string][]).map(([m, label]) => (
+              {([['blend', '📋 Copie texte'], ['ai', '✨ IA avancée']] as [OverlayMode, string][]).map(([m, label]) => (
                 <button
                   key={m}
                   onClick={() => setOverlayMode(m)}
@@ -691,14 +691,14 @@ export function Remix({ user }: RemixProps) {
               ))}
             </div>
 
-            {/* Blend mode panel */}
+            {/* Copy text panel (lumakey) */}
             {overlayMode === 'blend' && (
               <div className="p-4 space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-semibold text-white">Superposition de texte</p>
+                    <p className="text-sm font-semibold text-white">Copie du texte original</p>
                     <p className="text-[11px]" style={{ color: 'rgba(196,181,253,0.45)' }}>
-                      Fusionne la Phase 1 originale sur la nouvelle pour faire ressortir le texte
+                      Extrait uniquement les pixels de texte (blanc/clair) de la Phase 1 originale et les colle sur la nouvelle vidéo — fond transparent
                     </p>
                   </div>
                   <button
@@ -711,45 +711,23 @@ export function Remix({ user }: RemixProps) {
                 </div>
 
                 {textOverlay && (
-                  <div className="space-y-4">
-                    <div>
-                      <p className="text-[10px] uppercase tracking-wider font-bold mb-2" style={{ color: 'rgba(196,181,253,0.45)' }}>
-                        Mode de fusion
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-[10px] uppercase tracking-wider font-bold" style={{ color: 'rgba(196,181,253,0.45)' }}>
+                        Sensibilité
                       </p>
-                      <div className="flex gap-2">
-                        {(['screen', 'multiply'] as BlendMode[]).map(m => (
-                          <button
-                            key={m}
-                            onClick={() => setBlendMode(m)}
-                            className="flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all"
-                            style={blendMode === m
-                              ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff' }
-                              : { background: 'rgba(139,92,246,0.08)', color: 'rgba(196,181,253,0.5)', border: '1px solid rgba(139,92,246,0.15)' }
-                            }
-                          >
-                            {m === 'screen' ? '☀ Screen' : '✦ Multiply'}
-                          </button>
-                        ))}
-                      </div>
-                      <p className="text-[10px] mt-1.5" style={{ color: 'rgba(196,181,253,0.35)' }}>
-                        {blendMode === 'screen' ? 'Idéal pour texte blanc sur fond sombre' : 'Idéal pour texte sombre sur fond clair'}
-                      </p>
+                      <span className="text-xs font-mono font-bold" style={{ color: '#a78bfa' }}>
+                        {Math.round(textBlend * 100)}%
+                      </span>
                     </div>
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <p className="text-[10px] uppercase tracking-wider font-bold" style={{ color: 'rgba(196,181,253,0.45)' }}>
-                          Intensité
-                        </p>
-                        <span className="text-xs font-mono font-bold" style={{ color: '#a78bfa' }}>
-                          {Math.round(textBlend * 100)}%
-                        </span>
-                      </div>
-                      <input
-                        type="range" min={0.1} max={1} step={0.05}
-                        value={textBlend}
-                        onChange={e => setTextBlend(parseFloat(e.target.value))}
-                        className="w-full accent-purple-500 cursor-pointer"
-                      />
+                    <input
+                      type="range" min={0.1} max={0.5} step={0.05}
+                      value={textBlend}
+                      onChange={e => setTextBlend(parseFloat(e.target.value))}
+                      className="w-full accent-purple-500 cursor-pointer"
+                    />
+                    <div className="flex justify-between text-[9px] mt-1" style={{ color: 'rgba(196,181,253,0.3)' }}>
+                      <span>Texte très blanc seulement</span><span>Plus de texte extrait</span>
                     </div>
                   </div>
                 )}
@@ -915,19 +893,15 @@ export function Remix({ user }: RemixProps) {
                   {newPhase1Path?.split(/[\\/]/).pop()}
                 </span>
               </div>
-              {overlayMode === 'ai' ? (
+              {overlayMode === 'ai' && detectedOverlays.length > 0 ? (
                 <div className="flex gap-2">
                   <span className="opacity-50">Texte</span>
-                  <span style={{ color: '#a78bfa' }}>
-                    IA · {detectedOverlays.length} élément(s)
-                  </span>
+                  <span style={{ color: '#a78bfa' }}>IA · {detectedOverlays.length} élément(s)</span>
                 </div>
-              ) : textOverlay ? (
+              ) : overlayMode === 'blend' && textOverlay ? (
                 <div className="flex gap-2">
                   <span className="opacity-50">Texte</span>
-                  <span style={{ color: '#a78bfa' }}>
-                    Blend {blendMode === 'screen' ? 'Screen' : 'Multiply'} · {Math.round(textBlend * 100)}%
-                  </span>
+                  <span style={{ color: '#a78bfa' }}>Copie lumakey · sensibilité {Math.round(textBlend * 100)}%</span>
                 </div>
               ) : (
                 <div className="flex gap-2">
