@@ -23,11 +23,41 @@ export function useToast() {
   return ctx
 }
 
-const KIND: Record<ToastKind, { bar: string; glow: string; icon: string; label: string }> = {
-  ok:    { bar: 'bg-ok',     glow: 'shadow-[0_0_16px_-4px_rgba(0,204,170,0.4)]',     icon: '✓', label: 'text-ok'     },
-  error: { bar: 'bg-danger', glow: 'shadow-[0_0_16px_-4px_rgba(240,61,85,0.4)]',     icon: '✕', label: 'text-danger' },
-  warn:  { bar: 'bg-warn',   glow: 'shadow-[0_0_16px_-4px_rgba(255,170,42,0.4)]',    icon: '!', label: 'text-warn'   },
-  info:  { bar: 'bg-accent', glow: 'shadow-[0_0_16px_-4px_rgba(79,142,247,0.35)]',   icon: 'i', label: 'text-accent' },
+const KIND: Record<ToastKind, {
+  border: string; glow: string; icon: string; iconBg: string; iconColor: string; barColor: string
+}> = {
+  ok: {
+    border:    'rgba(52,211,153,0.3)',
+    glow:      '0 0 24px -6px rgba(52,211,153,0.35)',
+    icon:      '✓',
+    iconBg:    'rgba(52,211,153,0.12)',
+    iconColor: '#34d399',
+    barColor:  '#34d399',
+  },
+  error: {
+    border:    'rgba(240,61,85,0.3)',
+    glow:      '0 0 24px -6px rgba(240,61,85,0.35)',
+    icon:      '✕',
+    iconBg:    'rgba(240,61,85,0.12)',
+    iconColor: '#f87171',
+    barColor:  '#f87171',
+  },
+  warn: {
+    border:    'rgba(251,191,36,0.3)',
+    glow:      '0 0 24px -6px rgba(251,191,36,0.3)',
+    icon:      '!',
+    iconBg:    'rgba(251,191,36,0.1)',
+    iconColor: '#fbbf24',
+    barColor:  '#fbbf24',
+  },
+  info: {
+    border:    'rgba(139,92,246,0.35)',
+    glow:      '0 0 24px -6px rgba(139,92,246,0.4)',
+    icon:      'i',
+    iconBg:    'rgba(139,92,246,0.12)',
+    iconColor: '#a78bfa',
+    barColor:  'linear-gradient(90deg, #7c3aed, #ec4899)',
+  },
 }
 
 function ToastCard({ toast, onDismiss }: { toast: ToastItem; onDismiss: (id: string) => void }) {
@@ -42,44 +72,65 @@ function ToastCard({ toast, onDismiss }: { toast: ToastItem; onDismiss: (id: str
   return (
     <div
       onClick={dismiss}
-      className={`
-        pointer-events-auto cursor-pointer
-        min-w-[300px] max-w-[360px]
-        bg-[#0d1120] border border-white/[0.07]
-        rounded-2xl overflow-hidden
-        ${c.glow}
-        ${exiting ? 'anim-toast-out' : 'anim-toast-in'}
-      `}
+      className={`pointer-events-auto cursor-pointer min-w-[300px] max-w-[360px] rounded-2xl overflow-hidden relative ${exiting ? 'anim-toast-out' : 'anim-toast-in'}`}
+      style={{
+        background: 'rgba(8,5,20,0.92)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+        border: `1px solid ${c.border}`,
+        boxShadow: `${c.glow}, 0 16px 48px -12px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.04)`,
+      }}
     >
-      {/* Progress bar */}
-      <div className="h-[2px] bg-surface2 relative overflow-hidden">
+      {/* Colored left accent bar */}
+      <div
+        className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-2xl"
+        style={{ background: c.barColor }}
+      />
+
+      {/* Top progress bar */}
+      <div className="h-[2px] relative overflow-hidden" style={{ background: 'rgba(255,255,255,0.04)' }}>
         <div
-          className={`absolute inset-y-0 left-0 ${c.bar} rounded-full`}
+          className="absolute inset-y-0 left-0 rounded-full"
           style={{
+            background: c.barColor,
             animation: `toast-bar ${toast.duration}ms linear forwards`,
           }}
         />
       </div>
 
-      <div className="px-4 py-3 flex items-start gap-3">
+      <div className="pl-5 pr-4 py-3 flex items-start gap-3">
         {/* Icon badge */}
-        <div className={`w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 text-xs font-bold mt-0.5 ${c.label} bg-current/10`}
-          style={{ backgroundColor: 'rgba(var(--icon-bg, 0,0,0), 0.1)' }}
+        <div
+          className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5"
+          style={{ background: c.iconBg }}
         >
-          <span className={`${c.label} text-[13px] font-black leading-none`}>{c.icon}</span>
+          <span className="text-[13px] font-black leading-none" style={{ color: c.iconColor }}>
+            {c.icon}
+          </span>
         </div>
 
         {/* Text */}
         <div className="flex-1 min-w-0 py-0.5">
-          <p className="text-[13px] font-semibold text-text leading-snug">{toast.title}</p>
-          {toast.body && <p className="text-[11px] text-text2 mt-0.5 leading-snug">{toast.body}</p>}
+          <p className="text-[13px] font-semibold leading-snug" style={{ color: '#e2d9f3' }}>
+            {toast.title}
+          </p>
+          {toast.body && (
+            <p className="text-[11px] mt-0.5 leading-snug" style={{ color: 'rgba(196,181,253,0.5)' }}>
+              {toast.body}
+            </p>
+          )}
         </div>
 
         {/* Close */}
         <button
           onClick={e => { e.stopPropagation(); dismiss() }}
-          className="text-text2/40 hover:text-text2 text-xs mt-0.5 flex-shrink-0 transition-colors"
-        >✕</button>
+          className="text-xs mt-0.5 flex-shrink-0 transition-colors"
+          style={{ color: 'rgba(196,181,253,0.3)' }}
+          onMouseEnter={e => (e.currentTarget.style.color = 'rgba(196,181,253,0.7)')}
+          onMouseLeave={e => (e.currentTarget.style.color = 'rgba(196,181,253,0.3)')}
+        >
+          ✕
+        </button>
       </div>
     </div>
   )

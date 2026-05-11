@@ -10,12 +10,31 @@ interface OnboardingProps {
 }
 
 type Step = 1 | 2 | 3
-
 type TestState = 'idle' | 'testing' | 'ok' | 'fail'
 
 function openExternal(url: string) {
-  // works in Electron via shell.openExternal or target="_blank" on anchor
   window.open(url, '_blank')
+}
+
+function SFLogoMark() {
+  return (
+    <svg width="32" height="32" viewBox="0 0 100 100" fill="none">
+      <defs>
+        <linearGradient id="ob-sf-grad" x1="50" y1="97" x2="85" y2="3" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#3b82f6"/>
+          <stop offset="42%" stopColor="#8b5cf6"/>
+          <stop offset="100%" stopColor="#f472b6"/>
+        </linearGradient>
+      </defs>
+      <path
+        d="M 66 22 C 76 8 60 3 42 3 C 20 3 12 18 12 32 C 12 46 26 52 46 55 C 66 58 82 65 82 79 C 82 93 68 97 50 97 C 32 97 18 89 16 76"
+        stroke="url(#ob-sf-grad)" strokeWidth="13" strokeLinecap="round" fill="none"
+      />
+      <line x1="66" y1="22" x2="85" y2="5" stroke="#f472b6" strokeWidth="9" strokeLinecap="round"/>
+      <line x1="73" y1="4" x2="86" y2="4" stroke="#f472b6" strokeWidth="7" strokeLinecap="round"/>
+      <line x1="86" y1="4" x2="86" y2="18" stroke="#f472b6" strokeWidth="7" strokeLinecap="round"/>
+    </svg>
+  )
 }
 
 export function Onboarding({ user, onComplete }: OnboardingProps) {
@@ -29,7 +48,6 @@ export function Onboarding({ user, onComplete }: OnboardingProps) {
   const [saving, setSaving]     = useState(false)
   const [saveErr, setSaveErr]   = useState<string | null>(null)
 
-  // ── Step 1: test GéeLark bearer ──────────────────────────────────────────
   async function testBearer() {
     if (!bearer.trim()) return
     setBState('testing'); setBMsg('')
@@ -55,7 +73,6 @@ export function Onboarding({ user, onComplete }: OnboardingProps) {
     }
   }
 
-  // ── Step 2: test Groq key ────────────────────────────────────────────────
   async function testGroq() {
     if (!groqKey.trim()) return
     setGState('testing'); setGMsg('')
@@ -81,7 +98,6 @@ export function Onboarding({ user, onComplete }: OnboardingProps) {
     }
   }
 
-  // ── Save and finish ──────────────────────────────────────────────────────
   async function finish() {
     if (!bearer.trim()) return
     setSaving(true); setSaveErr(null)
@@ -99,7 +115,6 @@ export function Onboarding({ user, onComplete }: OnboardingProps) {
       setSaveErr(`Impossible de sauvegarder : ${error.message}. Vérifie ta connexion et réessaie.`)
       return
     }
-    // Verify it actually persisted before moving on (so the next login won't show onboarding again)
     const { data: check } = await supabase.from('app_config').select('bearer_token').eq('user_id', user.id).maybeSingle()
     if (!check?.bearer_token) {
       setSaveErr('La sauvegarde semble ne pas être persistée (RLS ?). Reconnecte-toi puis réessaie.')
@@ -108,8 +123,6 @@ export function Onboarding({ user, onComplete }: OnboardingProps) {
     onComplete()
   }
 
-  // Skip the wizard entirely: still mark the account as onboarded so we never
-  // re-prompt. The user can configure their keys later in Settings → Connexions.
   async function skip() {
     setSaving(true); setSaveErr(null)
     const now = new Date().toISOString()
@@ -120,8 +133,6 @@ export function Onboarding({ user, onComplete }: OnboardingProps) {
     }, { onConflict: 'user_id' })
     setSaving(false)
     if (error) {
-      // Tolerate the column being missing on legacy schemas — fall back to a
-      // light-touch upsert so the user can still pass the wizard.
       if (/onboarded_at/i.test(error.message)) {
         await supabase.from('app_config').upsert({
           user_id: user.id, theme: 'Bleu', updated_at: now,
@@ -134,9 +145,8 @@ export function Onboarding({ user, onComplete }: OnboardingProps) {
     onComplete()
   }
 
-  // ── Helpers ───────────────────────────────────────────────────────────────
   function StateIcon({ s }: { s: TestState }) {
-    if (s === 'testing') return <span className="animate-spin text-accent">↻</span>
+    if (s === 'testing') return <span className="animate-spin" style={{ color: '#a78bfa' }}>↻</span>
     if (s === 'ok')      return <span className="text-ok">✓</span>
     if (s === 'fail')    return <span className="text-danger">✗</span>
     return null
@@ -144,73 +154,94 @@ export function Onboarding({ user, onComplete }: OnboardingProps) {
 
   const stepLabels = ['GéeLark', 'Groq IA', 'Terminé']
 
+  const sfAccent = { color: '#a78bfa' }
+  const sfUnderline = { color: '#c4b5fd', textDecoration: 'underline', textUnderlineOffset: '2px' }
+
   return (
-    <div className="min-h-screen bg-bg flex items-center justify-center p-6 relative">
-      {/* Skip link — top right, always visible */}
+    <div
+      className="min-h-screen flex items-center justify-center p-6 relative overflow-hidden"
+      style={{ background: '#05030f' }}
+    >
+      {/* Aurora */}
+      <div className="sf-aurora absolute" style={{ width: 600, height: 600, top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
+      {/* Grid */}
+      <div className="absolute inset-0 pointer-events-none opacity-[0.025]"
+        style={{ backgroundImage: 'linear-gradient(rgba(139,92,246,1) 1px, transparent 1px), linear-gradient(90deg, rgba(139,92,246,1) 1px, transparent 1px)', backgroundSize: '48px 48px' }}
+      />
+
+      {/* Skip */}
       <button
         onClick={skip}
         disabled={saving}
-        className="absolute top-4 right-6 text-xs text-text2 hover:text-text underline underline-offset-2"
-        title="Passer cette configuration. Tu pourras la faire plus tard dans Paramètres → Connexions."
+        className="absolute top-4 right-6 text-xs hover:text-white underline underline-offset-2 transition-colors"
+        style={{ color: 'rgba(196,181,253,0.45)' }}
       >
         Ignorer pour l'instant →
       </button>
 
-      <div className="w-full max-w-lg space-y-6">
+      <div className="w-full max-w-lg space-y-6 relative z-10">
 
         {/* Logo + title */}
-        <div className="text-center space-y-2">
-          <div className="w-14 h-14 rounded-2xl bg-accent/20 text-accent flex items-center justify-center text-2xl font-bold mx-auto">
-            IG
+        <div className="text-center space-y-3">
+          <div
+            className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto"
+            style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)', boxShadow: '0 0 32px rgba(139,92,246,0.12)' }}
+          >
+            <SFLogoMark />
           </div>
-          <h1 className="text-2xl font-bold text-text">Configuration d'IG Tracker</h1>
-          <p className="text-sm text-text2">Connecte tes services pour démarrer. Prend ~2 minutes.</p>
+          <div>
+            <h1 className="text-2xl font-bold">
+              <span className="text-white">Configuration de </span>
+              <span className="sf-text-gradient">ScaleFlow</span>
+            </h1>
+            <p className="text-sm mt-1" style={{ color: 'rgba(196,181,253,0.5)' }}>Connecte tes services pour démarrer. Prend ~2 minutes.</p>
+          </div>
         </div>
 
         {/* Step indicator */}
         <div className="flex items-center gap-2 justify-center">
           {stepLabels.map((label, i) => {
             const n = (i + 1) as Step
-            const done = step > n
+            const done   = step > n
             const active = step === n
             return (
               <div key={label} className="flex items-center gap-2">
-                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
-                  active ? 'bg-accent text-white' :
-                  done   ? 'bg-ok/20 text-ok' :
-                           'bg-surface2 text-text2'
-                }`}>
+                <div
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold transition-all"
+                  style={
+                    active ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff' } :
+                    done   ? { background: 'rgba(52,211,153,0.15)', color: '#34d399' } :
+                             { background: 'rgba(139,92,246,0.08)', color: 'rgba(196,181,253,0.45)' }
+                  }
+                >
                   <span className="w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold border-2 border-current">
                     {done ? '✓' : n}
                   </span>
                   {label}
                 </div>
-                {i < 2 && <span className="text-border text-xs">──</span>}
+                {i < 2 && <span className="text-[10px]" style={{ color: 'rgba(139,92,246,0.3)' }}>──</span>}
               </div>
             )
           })}
         </div>
 
-        {/* ── STEP 1: GéeLark ────────────────────────────────────────────── */}
+        {/* ── STEP 1: GéeLark ─────────────────────────────────────────────── */}
         {step === 1 && (
-          <div className="bg-card border border-border rounded-2xl p-6 space-y-5">
+          <div className="glass-card rounded-2xl p-6 space-y-5">
             <div>
               <h2 className="text-lg font-bold text-text flex items-center gap-2">
                 <span className="text-2xl">📱</span> Token GéeLark
               </h2>
-              <p className="text-sm text-text2 mt-1">
-                Requis pour piloter tes cloud phones (démarrer, arrêter, poster).
-              </p>
+              <p className="text-sm text-text2 mt-1">Requis pour piloter tes cloud phones (démarrer, arrêter, poster).</p>
             </div>
 
-            {/* Instructions */}
-            <div className="bg-surface2 rounded-xl p-4 space-y-2 text-sm">
-              <p className="font-semibold text-text text-xs uppercase tracking-wider text-text2">Comment obtenir ton token :</p>
-              <div className="space-y-1.5 text-text2 text-xs">
-                <div className="flex gap-2"><span className="text-accent font-bold">1.</span><span>Connecte-toi sur <button onClick={() => openExternal('https://app.geelark.com')} className="text-accent underline underline-offset-2 hover:no-underline">app.geelark.com</button></span></div>
-                <div className="flex gap-2"><span className="text-accent font-bold">2.</span><span>En haut à droite → <strong className="text-text">ton avatar</strong> → <strong className="text-text">API</strong></span></div>
-                <div className="flex gap-2"><span className="text-accent font-bold">3.</span><span>Section <strong className="text-text">API Key</strong> (⚠ pas l'App ID — c'est différent)</span></div>
-                <div className="flex gap-2"><span className="text-accent font-bold">4.</span><span>Clique <strong className="text-text">Créer un token</strong> ou copie la clé existante</span></div>
+            <div className="rounded-xl p-4 space-y-2 text-sm" style={{ background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.1)' }}>
+              <p className="font-semibold text-xs uppercase tracking-wider" style={{ color: 'rgba(196,181,253,0.5)' }}>Comment obtenir ton token :</p>
+              <div className="space-y-1.5 text-xs" style={{ color: 'rgba(196,181,253,0.6)' }}>
+                <div className="flex gap-2"><span style={sfAccent} className="font-bold">1.</span><span>Connecte-toi sur <button onClick={() => openExternal('https://app.geelark.com')} style={sfUnderline}>app.geelark.com</button></span></div>
+                <div className="flex gap-2"><span style={sfAccent} className="font-bold">2.</span><span>En haut à droite → <strong className="text-text">ton avatar</strong> → <strong className="text-text">API</strong></span></div>
+                <div className="flex gap-2"><span style={sfAccent} className="font-bold">3.</span><span>Section <strong className="text-text">API Key</strong> (⚠ pas l'App ID — c'est différent)</span></div>
+                <div className="flex gap-2"><span style={sfAccent} className="font-bold">4.</span><span>Clique <strong className="text-text">Créer un token</strong> ou copie la clé existante</span></div>
               </div>
             </div>
 
@@ -236,19 +267,15 @@ export function Onboarding({ user, onComplete }: OnboardingProps) {
               )}
             </div>
 
-            <Button
-              className="w-full"
-              disabled={!bearer.trim()}
-              onClick={() => setStep(2)}
-            >
+            <Button className="w-full" disabled={!bearer.trim()} onClick={() => setStep(2)}>
               Suivant →
             </Button>
           </div>
         )}
 
-        {/* ── STEP 2: Groq ───────────────────────────────────────────────── */}
+        {/* ── STEP 2: Groq ────────────────────────────────────────────────── */}
         {step === 2 && (
-          <div className="bg-card border border-border rounded-2xl p-6 space-y-5">
+          <div className="glass-card rounded-2xl p-6 space-y-5">
             <div>
               <h2 className="text-lg font-bold text-text flex items-center gap-2">
                 <span className="text-2xl">✨</span> Clé API Groq <span className="text-xs text-text2 font-normal ml-1">(optionnel)</span>
@@ -259,12 +286,12 @@ export function Onboarding({ user, onComplete }: OnboardingProps) {
               </p>
             </div>
 
-            <div className="bg-surface2 rounded-xl p-4 space-y-2 text-sm">
-              <p className="font-semibold text-text text-xs uppercase tracking-wider text-text2">Comment obtenir ta clé :</p>
-              <div className="space-y-1.5 text-text2 text-xs">
-                <div className="flex gap-2"><span className="text-accent font-bold">1.</span><span>Créé un compte sur <button onClick={() => openExternal('https://console.groq.com')} className="text-accent underline underline-offset-2 hover:no-underline">console.groq.com</button></span></div>
-                <div className="flex gap-2"><span className="text-accent font-bold">2.</span><span>Menu gauche → <strong className="text-text">API Keys</strong> → <strong className="text-text">Create API Key</strong></span></div>
-                <div className="flex gap-2"><span className="text-accent font-bold">3.</span><span>Copie la clé qui commence par <code className="bg-surface px-1 rounded">gsk_</code></span></div>
+            <div className="rounded-xl p-4 space-y-2 text-sm" style={{ background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.1)' }}>
+              <p className="font-semibold text-xs uppercase tracking-wider" style={{ color: 'rgba(196,181,253,0.5)' }}>Comment obtenir ta clé :</p>
+              <div className="space-y-1.5 text-xs" style={{ color: 'rgba(196,181,253,0.6)' }}>
+                <div className="flex gap-2"><span style={sfAccent} className="font-bold">1.</span><span>Créé un compte sur <button onClick={() => openExternal('https://console.groq.com')} style={sfUnderline}>console.groq.com</button></span></div>
+                <div className="flex gap-2"><span style={sfAccent} className="font-bold">2.</span><span>Menu gauche → <strong className="text-text">API Keys</strong> → <strong className="text-text">Create API Key</strong></span></div>
+                <div className="flex gap-2"><span style={sfAccent} className="font-bold">3.</span><span>Copie la clé qui commence par <code className="bg-surface px-1 rounded">gsk_</code></span></div>
               </div>
             </div>
 
@@ -298,26 +325,27 @@ export function Onboarding({ user, onComplete }: OnboardingProps) {
           </div>
         )}
 
-        {/* ── STEP 3: Done ───────────────────────────────────────────────── */}
+        {/* ── STEP 3: Done ────────────────────────────────────────────────── */}
         {step === 3 && (
-          <div className="bg-card border border-border rounded-2xl p-6 space-y-5 text-center">
+          <div className="glass-card rounded-2xl p-6 space-y-5 text-center">
             <div className="space-y-2">
               <div className="text-5xl">🎉</div>
               <h2 className="text-xl font-bold text-text">Tout est prêt !</h2>
-              <p className="text-sm text-text2">
-                Voici ce que tu peux faire maintenant :
-              </p>
+              <p className="text-sm text-text2">Voici ce que tu peux faire maintenant :</p>
             </div>
 
-            <div className="text-left space-y-2.5">
+            <div className="text-left space-y-2">
               {[
                 { icon: '📱', title: 'Téléphones', desc: 'Synchronise tes cloud phones GéeLark et vois leur statut en temps réel' },
                 { icon: '📈', title: 'Stats IG',   desc: 'Consulte les stats Instagram de chaque compte (followers, vues, vidéos)' },
                 { icon: '🚀', title: 'Posting',    desc: 'Poste des Reels automatiquement sur tes phones via GéeLark' },
                 { icon: '✨', title: 'Outils IA',  desc: 'Génère captions, hashtags, hooks et bios avec Groq Llama 3.3' },
-                { icon: '🎞', title: 'Montage',    desc: 'Assemble et découpe tes vidéos avec l\'éditeur de montage' },
+                { icon: '🎞', title: 'Montage',    desc: "Assemble et découpe tes vidéos avec l'éditeur de montage" },
               ].map(({ icon, title, desc }) => (
-                <div key={title} className="flex items-start gap-3 px-4 py-3 bg-surface2 rounded-xl">
+                <div key={title}
+                  className="flex items-start gap-3 px-4 py-3 rounded-xl transition-colors"
+                  style={{ background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.1)' }}
+                >
                   <span className="text-xl flex-shrink-0">{icon}</span>
                   <div>
                     <p className="text-sm font-semibold text-text">{title}</p>
@@ -337,7 +365,7 @@ export function Onboarding({ user, onComplete }: OnboardingProps) {
               </p>
             )}
             <Button className="w-full" onClick={finish} loading={saving}>
-              🚀 Entrer dans IG Tracker
+              Entrer dans ScaleFlow →
             </Button>
           </div>
         )}

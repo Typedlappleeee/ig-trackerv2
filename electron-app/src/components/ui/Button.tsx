@@ -10,12 +10,7 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variants = {
-  primary: `
-    bg-accent hover:bg-accent2 active:bg-accent2 text-white border-transparent
-    shadow-[0_2px_12px_-3px_rgba(79,142,247,0.45)]
-    hover:shadow-[0_4px_16px_-3px_rgba(79,142,247,0.6)]
-    active:shadow-[0_1px_6px_-2px_rgba(79,142,247,0.35)]
-  `,
+  primary: `btn-sf-primary`,
   secondary: `
     bg-surface2 hover:bg-surface3 active:bg-surface2 text-text border-border
     hover:border-accent/20

@@ -300,6 +300,18 @@ function SplashScreen({ onDone }: { onDone: () => void }) {
         animation: 'sf-scan 5s linear 0.6s infinite',
       }} />
 
+      {/* ── Light beams radiating from logo center ── */}
+      {[0, 45, 90, 135, 180, 225, 270, 315].map((angle, i) => (
+        <div key={i} className="sf-beam" style={{
+          height: 240,
+          transform: `rotate(${angle}deg)`,
+          opacity: 0,
+          ['--beam-dur' as string]: `${2.0 + (i % 3) * 0.4}s`,
+          ['--beam-delay' as string]: `${0.72 + i * 0.08}s`,
+          background: `linear-gradient(to bottom, ${i % 2 === 0 ? '#8b5cf6' : '#ec4899'}88, transparent)`,
+        }} />
+      ))}
+
       {/* ── Logo area: rings + particles + logo ── */}
       <div style={{ position: 'relative', width: 120, height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 44 }}>
 

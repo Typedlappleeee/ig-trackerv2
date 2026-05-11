@@ -87,8 +87,12 @@ function LineChart({ data, height = 280 }: { data: ViewPoint[]; height?: number 
       <svg width={w} height={height} className="block">
         <defs>
           <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#4f8ef7" stopOpacity="0.28" />
-            <stop offset="100%" stopColor="#4f8ef7" stopOpacity="0.02" />
+            <stop offset="0%" stopColor="#8b5cf6" stopOpacity="0.3" />
+            <stop offset="100%" stopColor="#ec4899" stopOpacity="0.02" />
+          </linearGradient>
+          <linearGradient id="lineGrad" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor="#8b5cf6" />
+            <stop offset="100%" stopColor="#ec4899" />
           </linearGradient>
           <filter id="glowLine">
             <feGaussianBlur stdDeviation="2" result="blur" />
@@ -113,10 +117,10 @@ function LineChart({ data, height = 280 }: { data: ViewPoint[]; height?: number 
         <path d={areaPath} fill="url(#areaGrad)" />
 
         {/* Glow copy of line */}
-        <path d={linePath} fill="none" stroke="#4f8ef7" strokeWidth="5" strokeOpacity="0.15" strokeLinecap="round" />
+        <path d={linePath} fill="none" stroke="#8b5cf6" strokeWidth="5" strokeOpacity="0.18" strokeLinecap="round" />
 
         {/* Main line */}
-        <path d={linePath} fill="none" stroke="#4f8ef7" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+        <path d={linePath} fill="none" stroke="url(#lineGrad)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
 
         {/* Dots — always for ≤14 pts, only hovered otherwise */}
         {pts.map((p, i) => {
@@ -126,7 +130,7 @@ function LineChart({ data, height = 280 }: { data: ViewPoint[]; height?: number 
           return show ? (
             <circle key={i} cx={p.x} cy={p.y}
               r={isHov ? 6 : isLast ? 4 : 3}
-              fill={isLast ? '#d4f96a' : '#4f8ef7'}
+              fill={isLast ? '#f472b6' : '#8b5cf6'}
               stroke="#0d1120" strokeWidth="2"
             />
           ) : null
@@ -153,7 +157,7 @@ function LineChart({ data, height = 280 }: { data: ViewPoint[]; height?: number 
         {/* Vertical cursor */}
         {hoverPt && (
           <line x1={hoverPt.x} y1={mt} x2={hoverPt.x} y2={mt + plotH}
-            stroke="#4f8ef7" strokeWidth="1" strokeDasharray="4 3" opacity="0.5"
+            stroke="#8b5cf6" strokeWidth="1" strokeDasharray="4 3" opacity="0.5"
           />
         )}
 
@@ -177,7 +181,8 @@ function LineChart({ data, height = 280 }: { data: ViewPoint[]; height?: number 
         const pct   = prev && prev > 0 ? ((d.value - prev) / prev) * 100 : null
         return (
           <div
-            className="absolute pointer-events-none bg-[#131827] border border-accent/50 rounded-xl px-3 py-2.5 shadow-2xl"
+            className="absolute pointer-events-none rounded-xl px-3 py-2.5 shadow-2xl"
+            style={{ background: 'rgba(8,5,20,0.92)', border: '1px solid rgba(139,92,246,0.4)', backdropFilter: 'blur(16px)' }}
             style={{
               left: Math.min(Math.max(hoverPt.x - 80, ml), w - 172),
               top: Math.max(hoverPt.y - 80, 4),
@@ -187,7 +192,7 @@ function LineChart({ data, height = 280 }: { data: ViewPoint[]; height?: number 
             <p className="text-[11px] font-bold text-text mb-1">
               {d.date.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })}
             </p>
-            <p className="text-text2 text-[11px]">Vues : <span className="text-accent font-semibold">{fmt(d.value)}</span></p>
+            <p className="text-text2 text-[11px]">Vues : <span className="font-semibold" style={{ color: '#a78bfa' }}>{fmt(d.value)}</span></p>
             {delta !== null && (
               <p className={`text-[11px] font-semibold mt-0.5 ${delta >= 0 ? 'text-ok' : 'text-danger'}`}>
                 {delta >= 0 ? '▲' : '▼'} {fmt(Math.abs(delta))}
@@ -342,14 +347,14 @@ export function Dashboard({ user }: DashboardProps) {
                 onClick={() => setSelPhone(null)}
                 className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-all rounded-lg mx-1 my-0.5 ${
                   selPhone === null
-                    ? 'bg-accent/15 border border-accent/20'
+                    ? 'border'
                     : 'hover:bg-surface2 border border-transparent'
                 }`}
-                style={{ width: 'calc(100% - 8px)' }}
+                style={selPhone === null ? { background: 'rgba(139,92,246,0.12)', borderColor: 'rgba(139,92,246,0.25)', width: 'calc(100% - 8px)' } : { width: 'calc(100% - 8px)' }}
               >
-                <div className={`w-8 h-8 rounded-full bg-accent/20 text-accent flex items-center justify-center text-xs font-bold flex-shrink-0 transition-transform ${selPhone === null ? 'scale-110' : ''}`}>📊</div>
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 transition-transform ${selPhone === null ? 'scale-110' : ''}`} style={{ background: 'rgba(139,92,246,0.2)', color: '#a78bfa' }}>📊</div>
                 <div className="min-w-0 flex-1">
-                  <p className={`text-xs ${selPhone === null ? 'font-bold text-accent' : 'text-text'}`}>Tous les comptes</p>
+                  <p className={`text-xs ${selPhone === null ? 'font-bold' : 'text-text'}`} style={selPhone === null ? { color: '#c4b5fd' } : {}}>Tous les comptes</p>
                 </div>
               </button>
 
@@ -367,11 +372,9 @@ export function Dashboard({ user }: DashboardProps) {
                     key={phone.id}
                     onClick={() => setSelPhone(phone)}
                     className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition-all rounded-lg mx-1 my-0.5 ${
-                      active
-                        ? 'bg-accent/15 border border-accent/20'
-                        : 'hover:bg-surface2 border border-transparent'
+                      active ? 'border' : 'hover:bg-surface2 border border-transparent'
                     }`}
-                    style={{ width: 'calc(100% - 8px)' }}
+                    style={active ? { background: 'rgba(139,92,246,0.12)', borderColor: 'rgba(139,92,246,0.25)', width: 'calc(100% - 8px)' } : { width: 'calc(100% - 8px)' }}
                   >
                     <div
                       className={`w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0 transition-transform ${active ? 'scale-110 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.5)]' : ''}`}
@@ -380,7 +383,7 @@ export function Dashboard({ user }: DashboardProps) {
                       {initials}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className={`text-xs truncate ${active ? 'font-bold text-accent' : 'text-text'}`}>
+                      <p className={`text-xs truncate ${active ? 'font-bold' : 'text-text'}`} style={active ? { color: '#c4b5fd' } : {}}>
                         {phone.phone_name.length > 20 ? phone.phone_name.slice(0, 20) + '…' : phone.phone_name}
                       </p>
                       {phone.ig_username && (
@@ -411,7 +414,7 @@ export function Dashboard({ user }: DashboardProps) {
         <div className="bg-card border border-border rounded-xl p-5 flex gap-5 anim-page card-lift" style={{ animationDelay: '0.04s' }}>
           {/* Left: total views */}
           <div className="flex items-center gap-4 pr-5 border-r border-border">
-            <div className="w-[46px] h-[46px] rounded-full bg-accent/20 text-accent flex items-center justify-center text-xl anim-float">👁</div>
+            <div className="w-[46px] h-[46px] rounded-full flex items-center justify-center text-xl anim-float" style={{ background: 'rgba(139,92,246,0.15)', color: '#a78bfa' }}>👁</div>
             <div>
               <p className="text-[10px] font-semibold text-text2 uppercase tracking-wider">{selPhone ? 'Vues du compte' : 'Total vues'}</p>
               <p className="text-[24px] font-bold text-text leading-none mt-1 anim-number-pop" key={kpis.totalNow}>
@@ -423,7 +426,7 @@ export function Dashboard({ user }: DashboardProps) {
           {/* Right: 3x2 KPI grid */}
           <div className="flex-1 grid grid-cols-3 gap-2 anim-stagger">
             {[
-              { label: "Vues aujourd'hui", value: kpis.today,    icon: '👁',  color: '#4f8ef7' },
+              { label: "Vues aujourd'hui", value: kpis.today,    icon: '👁',  color: '#a78bfa' },
               { label: 'Croissance',        value: kpis.delta,    icon: kpis.delta !== null && kpis.delta >= 0 ? '📈' : '📉', color: kpis.delta !== null && kpis.delta >= 0 ? '#00ccaa' : '#f03d55', sign: true },
               selPhone
                 ? { label: 'Statut IG',     value: selPhone.ig_status === 'active' ? 'Actif' : selPhone.ig_status === 'error' ? 'Banni' : selPhone.ig_status ?? '—', icon: '✅', color: '#00ccaa', isText: true }
@@ -486,10 +489,9 @@ export function Dashboard({ user }: DashboardProps) {
                   key={key}
                   onClick={() => setRange(key)}
                   className={`px-3 py-1 rounded-md text-xs font-semibold transition-all ${
-                    range === key
-                      ? 'bg-accent text-white shadow-[0_1px_6px_-1px_rgba(79,142,247,0.5)]'
-                      : 'text-text2 hover:text-text hover:bg-surface3/50'
+                    range === key ? 'text-white' : 'text-text2 hover:text-text hover:bg-surface3/50'
                   }`}
+                  style={range === key ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', boxShadow: '0 1px 8px -2px rgba(124,58,237,0.5)' } : {}}
                 >{label}</button>
               ))}
             </div>
@@ -505,10 +507,10 @@ export function Dashboard({ user }: DashboardProps) {
         {phones.length === 0 && !loading && (
           <div className="bg-card border border-border rounded-xl p-5 space-y-2 text-sm text-text2">
             <h2 className="text-sm font-semibold text-text mb-3">Démarrage rapide</h2>
-            <div className="flex gap-2"><span className="text-accent">1.</span><span>Configure ton <span className="text-text font-medium">Bearer Token GéeLark</span> dans Paramètres.</span></div>
-            <div className="flex gap-2"><span className="text-accent">2.</span><span>Va dans <span className="text-text font-medium">Téléphones</span> et clique sur Sync GéeLark.</span></div>
-            <div className="flex gap-2"><span className="text-accent">3.</span><span>Ajoute tes comptes Instagram via le menu clic droit.</span></div>
-            <div className="flex gap-2"><span className="text-accent">4.</span><span>Utilise <span className="text-text font-medium">Stats</span> pour voir tes performances.</span></div>
+            <div className="flex gap-2"><span style={{ color: '#a78bfa' }}>1.</span><span>Configure ton <span className="text-text font-medium">Bearer Token GéeLark</span> dans Paramètres.</span></div>
+            <div className="flex gap-2"><span style={{ color: '#a78bfa' }}>2.</span><span>Va dans <span className="text-text font-medium">Téléphones</span> et clique sur Sync GéeLark.</span></div>
+            <div className="flex gap-2"><span style={{ color: '#a78bfa' }}>3.</span><span>Ajoute tes comptes Instagram via le menu clic droit.</span></div>
+            <div className="flex gap-2"><span style={{ color: '#a78bfa' }}>4.</span><span>Utilise <span className="text-text font-medium">Stats</span> pour voir tes performances.</span></div>
           </div>
         )}
       </div>

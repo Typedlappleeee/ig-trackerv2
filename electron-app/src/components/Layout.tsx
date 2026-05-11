@@ -248,24 +248,17 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
                           onClick={() => { playNav(); onNavigate(item.id) }}
                           className={`
                             relative w-full flex items-center gap-2.5 pl-3 pr-2 py-2 rounded-lg text-[13px] text-left
-                            transition-all duration-150
-                            active:scale-[0.98]
-                            ${active
-                              ? 'bg-accent/12 text-sb-text-act shadow-[inset_0_0_0_1px_rgba(79,142,247,0.15)]'
-                              : 'text-sb-text hover:bg-sb-hover/80 hover:text-sb-text-act'}
+                            transition-all duration-150 active:scale-[0.98]
+                            ${active ? 'sf-nav-active' : 'text-sb-text hover:bg-sb-hover/80 hover:text-sb-text-act'}
                           `}
                         >
-                          {/* Active left bar */}
-                          <span className={`
-                            absolute left-0 top-2 bottom-2 w-[3px] rounded-r-full transition-all duration-200
-                            ${active ? 'bg-accent opacity-100' : 'opacity-0'}
-                          `} />
-                          <span className={`text-base w-5 text-center flex-shrink-0 transition-transform duration-150 ${active ? 'text-accent scale-110' : 'text-sb-icon'}`}>
+                          <span className={`text-base w-5 text-center flex-shrink-0 transition-transform duration-150 ${active ? 'scale-110' : 'text-sb-icon'}`}>
                             {item.icon}
                           </span>
                           <span className={`flex-1 ${active ? 'font-semibold' : 'font-medium'}`}>{item.label}</span>
                           {item.beta && (
-                            <span className="text-[8px] font-bold uppercase bg-[#e0245e] text-white px-1.5 py-0.5 rounded-md tracking-wide">BETA</span>
+                            <span className="text-[8px] font-bold uppercase px-1.5 py-0.5 rounded-md tracking-wide"
+                              style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff' }}>BETA</span>
                           )}
                         </button>
                       )
@@ -292,7 +285,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
                     <div className="w-full flex items-center gap-2.5 pl-3 pr-2 py-2 rounded-md text-[13px] text-sb-text/60 cursor-not-allowed border border-transparent hover:border-border hover:bg-sb-hover/30 transition-all">
                       <span className={`text-base w-5 text-center flex-shrink-0 ${item.color}`}>{item.icon}</span>
                       <span className="font-medium">{item.label}</span>
-                      <span className="ml-auto text-[8px] font-bold uppercase bg-accent/20 text-accent px-1.5 py-0.5 rounded tracking-wide">SOON</span>
+                      <span className="ml-auto text-[8px] font-bold uppercase px-1.5 py-0.5 rounded tracking-wide" style={{ background: 'rgba(139,92,246,0.15)', color: '#a78bfa' }}>SOON</span>
                     </div>
                     {/* Tooltip on hover */}
                     <div className="absolute left-full top-1/2 -translate-y-1/2 ml-2 z-50 hidden group-hover:block pointer-events-none">
@@ -328,14 +321,15 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
           <button
             onClick={onRefresh}
             disabled={!onRefresh}
-            className="w-full text-[12px] font-semibold bg-accent hover:bg-accent2 text-white rounded-lg py-2 transition-colors disabled:opacity-50"
+            className="w-full text-[12px] font-semibold rounded-lg py-2 transition-opacity disabled:opacity-50"
+            style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff', boxShadow: '0 2px 14px -4px rgba(124,58,237,0.45)' }}
           >
             ↺  Rafraîchir
           </button>
           <button
             onClick={() => { playNav(); onNavigate('settings') }}
             className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[12px] transition-colors ${
-              page === 'settings' ? 'bg-sb-active text-sb-text-act' : 'text-sb-text hover:bg-sb-hover hover:text-sb-text-act'
+              page === 'settings' ? 'sf-nav-active' : 'text-sb-text hover:bg-sb-hover hover:text-sb-text-act'
             }`}
           >
             <span className="text-base">⚙</span>
@@ -365,7 +359,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
           onClick={() => userMenuOpen ? setUserMenuOpen(false) : openUserMenu()}
           className="w-full px-3 py-2 border-t border-border flex items-center gap-2 hover:bg-sb-hover/40 transition-colors text-left"
         >
-          <div className="w-6 h-6 rounded-full bg-accent/20 text-accent flex items-center justify-center text-[10px] font-bold flex-shrink-0">
+          <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0" style={{ background: 'rgba(139,92,246,0.2)', color: '#a78bfa' }}>
             {user.email?.[0].toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">
@@ -410,7 +404,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             </div>
             <button
               onClick={() => onNavigate('dashboard')}
-              className="px-6 py-2.5 bg-accent hover:bg-accent2 active:scale-95 text-white text-sm font-semibold rounded-xl transition-all shadow-[0_2px_12px_-3px_rgba(79,142,247,0.5)]"
+              className="px-6 py-2.5 active:scale-95 text-white text-sm font-semibold rounded-xl transition-all btn-sf-primary"
             >
               Retour au Dashboard
             </button>

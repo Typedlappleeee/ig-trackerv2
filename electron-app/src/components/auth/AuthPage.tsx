@@ -5,6 +5,27 @@ import { Input }  from '@/components/ui/Input'
 
 type Tab = 'login' | 'register'
 
+function SFLogoMark() {
+  return (
+    <svg width="38" height="38" viewBox="0 0 100 100" fill="none">
+      <defs>
+        <linearGradient id="auth-sf-grad" x1="50" y1="97" x2="85" y2="3" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#3b82f6"/>
+          <stop offset="42%" stopColor="#8b5cf6"/>
+          <stop offset="100%" stopColor="#f472b6"/>
+        </linearGradient>
+      </defs>
+      <path
+        d="M 66 22 C 76 8 60 3 42 3 C 20 3 12 18 12 32 C 12 46 26 52 46 55 C 66 58 82 65 82 79 C 82 93 68 97 50 97 C 32 97 18 89 16 76"
+        stroke="url(#auth-sf-grad)" strokeWidth="13" strokeLinecap="round" fill="none"
+      />
+      <line x1="66" y1="22" x2="85" y2="5" stroke="#f472b6" strokeWidth="9" strokeLinecap="round"/>
+      <line x1="73" y1="4" x2="86" y2="4" stroke="#f472b6" strokeWidth="7" strokeLinecap="round"/>
+      <line x1="86" y1="4" x2="86" y2="18" stroke="#f472b6" strokeWidth="7" strokeLinecap="round"/>
+    </svg>
+  )
+}
+
 export function AuthPage() {
   const [tab, setTab]           = useState<Tab>('login')
   const [email, setEmail]       = useState('')
@@ -23,28 +44,18 @@ export function AuthPage() {
 
     try {
       if (tab === 'login') {
-        // ── Connexion ───────────────────────────────────────────────────────
         const { error } = await supabase.auth.signInWithPassword({ email, password })
         if (error) throw error
-        // Si OK → useAuth() détecte la nouvelle session et App.tsx bascule sur Dashboard
-
       } else {
-        // ── Inscription ────────────────────────────────────────────────────
-        if (password !== confirm) {
-          throw new Error('Les mots de passe ne correspondent pas.')
-        }
-        if (password.length < 6) {
-          throw new Error('Le mot de passe doit faire au moins 6 caractères.')
-        }
+        if (password !== confirm) throw new Error('Les mots de passe ne correspondent pas.')
+        if (password.length < 6) throw new Error('Le mot de passe doit faire au moins 6 caractères.')
 
         const { data, error } = await supabase.auth.signUp({ email, password })
         if (error) throw error
 
-        // Si email de confirmation activé dans Supabase
         if (data.user && !data.session) {
           setSuccess('Compte créé ! Vérifie ta boîte mail pour confirmer ton adresse.')
         }
-        // Si confirmation désactivée → connexion auto → App bascule sur Dashboard
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Une erreur est survenue.'
@@ -62,44 +73,78 @@ export function AuthPage() {
   }
 
   return (
-    <div className="min-h-screen bg-bg flex items-center justify-center p-4">
-      <div className="w-full max-w-sm anim-slide-up">
+    <div
+      className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden"
+      style={{ background: '#05030f' }}
+    >
+      {/* Aurora background */}
+      <div
+        className="sf-aurora absolute"
+        style={{ width: 700, height: 700, top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }}
+      />
+      {/* Grid overlay */}
+      <div
+        className="absolute inset-0 pointer-events-none opacity-[0.03]"
+        style={{
+          backgroundImage: 'linear-gradient(rgba(139,92,246,1) 1px, transparent 1px), linear-gradient(90deg, rgba(139,92,246,1) 1px, transparent 1px)',
+          backgroundSize: '48px 48px',
+        }}
+      />
+
+      <div className="w-full max-w-sm relative z-10 anim-slide-up">
 
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-accent/10 border border-accent/20 mb-4 anim-bounce-in anim-glow relative overflow-hidden"
-            style={{ animationDelay: '0.05s' }}
+          <div
+            className="inline-flex items-center justify-center w-20 h-20 rounded-2xl mb-5 relative"
+            style={{
+              background: 'rgba(139,92,246,0.08)',
+              border: '1px solid rgba(139,92,246,0.2)',
+              boxShadow: '0 0 40px rgba(139,92,246,0.15), inset 0 1px 0 rgba(255,255,255,0.06)',
+            }}
           >
-            <div className="absolute inset-0 bg-gradient-to-br from-accent/20 to-transparent pointer-events-none" />
-            <span className="text-2xl font-black text-accent anim-float">IG</span>
+            <SFLogoMark />
           </div>
-          <h1 className="text-2xl font-bold text-text anim-page" style={{ animationDelay: '0.15s' }}>IG Tracker</h1>
-          <p className="text-text2 text-sm mt-1 anim-page" style={{ animationDelay: '0.22s' }}>Dashboard professionnel</p>
+          <h1 className="text-3xl font-bold mb-1">
+            <span className="text-white">Scale</span>
+            <span className="sf-text-gradient">Flow</span>
+          </h1>
+          <p className="text-sm" style={{ color: 'rgba(196,181,253,0.55)' }}>
+            Automation & Analytics Platform
+          </p>
         </div>
 
         {/* Card */}
-        <div className="bg-card border border-border rounded-2xl p-6 anim-scale-in shadow-[0_24px_64px_-16px_rgba(0,0,0,0.5)]" style={{ animationDelay: '0.1s' }}>
-
-          {/* Onglets */}
-          <div className="flex bg-surface2 rounded-xl p-1 mb-6">
+        <div
+          className="glass-card rounded-2xl p-6 anim-scale-in"
+          style={{ animationDelay: '0.1s' }}
+        >
+          {/* Tabs */}
+          <div
+            className="flex rounded-xl p-1 mb-6"
+            style={{ background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.12)' }}
+          >
             {(['login', 'register'] as Tab[]).map(t => (
               <button
                 key={t}
                 onClick={() => switchTab(t)}
-                className={`
-                  flex-1 py-2 text-sm font-medium rounded-lg transition-all duration-200
-                  ${tab === t
-                    ? 'bg-accent text-white shadow-[0_2px_8px_-2px_rgba(79,142,247,0.5)]'
-                    : 'text-text2 hover:text-text hover:bg-surface3/50'
-                  }
-                `}
+                className="flex-1 py-2 text-sm font-medium rounded-lg transition-all duration-200"
+                style={
+                  tab === t
+                    ? {
+                        background: 'linear-gradient(130deg, #7c3aed, #ec4899)',
+                        color: '#fff',
+                        boxShadow: '0 2px 12px -2px rgba(124,58,237,0.5)',
+                      }
+                    : { color: 'rgba(196,181,253,0.6)' }
+                }
               >
                 {t === 'login' ? 'Se connecter' : 'Créer un compte'}
               </button>
             ))}
           </div>
 
-          {/* Formulaire */}
+          {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="anim-page" style={{ animationDelay: '0.18s' }}>
               <Input
@@ -140,15 +185,30 @@ export function AuthPage() {
               </div>
             )}
 
-            {/* Messages */}
             {error && (
-              <div className="px-4 py-3 rounded-xl bg-danger/10 border border-danger/30 text-danger text-sm anim-slide-down flex items-start gap-2">
-                <span className="flex-shrink-0 mt-0.5">⚠</span><span>{error}</span>
+              <div
+                className="px-4 py-3 rounded-xl text-sm anim-slide-down flex items-start gap-2"
+                style={{
+                  background: 'rgba(240,61,85,0.08)',
+                  border: '1px solid rgba(240,61,85,0.25)',
+                  color: '#f87171',
+                }}
+              >
+                <span className="flex-shrink-0 mt-0.5">⚠</span>
+                <span>{error}</span>
               </div>
             )}
             {success && (
-              <div className="px-4 py-3 rounded-xl bg-ok/10 border border-ok/30 text-ok text-sm anim-slide-down flex items-start gap-2">
-                <span className="flex-shrink-0 mt-0.5">✓</span><span>{success}</span>
+              <div
+                className="px-4 py-3 rounded-xl text-sm anim-slide-down flex items-start gap-2"
+                style={{
+                  background: 'rgba(52,211,153,0.08)',
+                  border: '1px solid rgba(52,211,153,0.25)',
+                  color: '#34d399',
+                }}
+              >
+                <span className="flex-shrink-0 mt-0.5">✓</span>
+                <span>{success}</span>
               </div>
             )}
 
@@ -166,7 +226,7 @@ export function AuthPage() {
           </form>
         </div>
 
-        <p className="text-center text-text2 text-xs mt-6 anim-page" style={{ animationDelay: '0.35s' }}>
+        <p className="text-center text-xs mt-6 anim-page" style={{ animationDelay: '0.35s', color: 'rgba(139,92,246,0.45)' }}>
           Tes données sont synchronisées et sécurisées.
         </p>
       </div>
@@ -174,7 +234,6 @@ export function AuthPage() {
   )
 }
 
-// Traduit les erreurs Supabase en français
 function friendlyError(raw: string): string {
   const r = raw.toLowerCase()
   if (r.includes('invalid login') || r.includes('invalid credentials'))

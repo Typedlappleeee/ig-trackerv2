@@ -16,16 +16,16 @@ html, body, #root {
 /* ── Scrollbar ──────────────────────────────────────────────────────────────── */
 ::-webkit-scrollbar       { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #1e2640; border-radius: 99px; }
-::-webkit-scrollbar-thumb:hover { background: #2a3450; }
+::-webkit-scrollbar-thumb { background: rgba(139,92,246,0.3); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(139,92,246,0.55); }
 
 /* ── Selection ──────────────────────────────────────────────────────────────── */
-::selection { background: #4f9eff33; color: #d4dcf0; }
+::selection { background: rgba(139,92,246,0.25); color: #e8d5ff; }
 
 /* ── Focus ──────────────────────────────────────────────────────────────────── */
 *:focus { outline: none; }
 *:focus-visible {
-  outline: 2px solid #4f9eff;
+  outline: 2px solid #8b5cf6;
   outline-offset: 2px;
   border-radius: 4px;
 }
@@ -385,3 +385,103 @@ button, a, input, select, textarea {
 .sf-fade-out   { animation: splash-out 0.6s ease-out forwards; }
 .sf-title      { animation: sf-word-l 0.54s cubic-bezier(.22,1,.36,1) 0.82s both,
                              sf-title-glow 3s ease-in-out 1.5s infinite; }
+
+/* ── ScaleFlow UI Utilities ─────────────────────────────────────────────────── */
+
+/* Primary gradient button */
+.btn-sf-primary {
+  background: linear-gradient(130deg, #7c3aed 0%, #ec4899 100%);
+  box-shadow: 0 2px 20px -3px rgba(124,58,237,0.55), inset 0 1px 0 rgba(255,255,255,0.12);
+  border-color: transparent !important;
+  color: #fff !important;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  transition: opacity 0.18s, box-shadow 0.18s, transform 0.12s;
+}
+.btn-sf-primary:hover:not(:disabled) {
+  opacity: 0.92;
+  box-shadow: 0 4px 28px -4px rgba(124,58,237,0.7), inset 0 1px 0 rgba(255,255,255,0.15);
+  transform: translateY(-1px);
+}
+.btn-sf-primary:active:not(:disabled) {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+/* Glass card */
+.glass-card {
+  background: rgba(8,5,20,0.88);
+  backdrop-filter: blur(28px) saturate(1.4);
+  -webkit-backdrop-filter: blur(28px) saturate(1.4);
+  border: 1px solid rgba(139,92,246,0.16);
+  box-shadow: 0 24px 64px -16px rgba(0,0,0,0.6),
+              inset 0 1px 0 rgba(255,255,255,0.04),
+              0 0 0 1px rgba(0,0,0,0.3);
+}
+
+/* Gradient text utility */
+.sf-text-gradient {
+  background: linear-gradient(130deg, #a78bfa 0%, #f472b6 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+/* Aurora background blob */
+@keyframes sf-aurora {
+  0%   { transform: scale(1)    rotate(0deg);   opacity: 0.55; }
+  33%  { transform: scale(1.12) rotate(8deg);   opacity: 0.75; }
+  66%  { transform: scale(0.94) rotate(-6deg);  opacity: 0.6;  }
+  100% { transform: scale(1)    rotate(0deg);   opacity: 0.55; }
+}
+.sf-aurora {
+  background: radial-gradient(ellipse at 50% 50%, rgba(124,58,237,0.22) 0%, rgba(236,72,153,0.1) 45%, transparent 70%);
+  animation: sf-aurora 8s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* Light beam */
+@keyframes sf-beam-fade {
+  0%   { opacity: 0; }
+  20%  { opacity: 1; }
+  80%  { opacity: 0.7; }
+  100% { opacity: 0; }
+}
+.sf-beam {
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 2px;
+  transform-origin: 0 0;
+  background: linear-gradient(to bottom, rgba(139,92,246,0.8), transparent);
+  border-radius: 99px;
+  pointer-events: none;
+  animation: sf-beam-fade var(--beam-dur, 2.4s) ease-out var(--beam-delay, 0s) both;
+}
+
+/* Active nav item */
+.sf-nav-active {
+  background: linear-gradient(90deg, rgba(139,92,246,0.16) 0%, rgba(139,92,246,0.04) 100%) !important;
+  box-shadow: inset 3px 0 0 #8b5cf6;
+  color: #c4b5fd !important;
+}
+.sf-nav-active svg { color: #a78bfa !important; }
+
+/* Section divider */
+.sf-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(139,92,246,0.25), transparent);
+}
+
+/* Input field ScaleFlow style */
+.sf-input {
+  background: rgba(139,92,246,0.05);
+  border: 1px solid rgba(139,92,246,0.2);
+  color: #e2d9f3;
+  transition: border-color 0.18s, box-shadow 0.18s;
+}
+.sf-input:focus {
+  border-color: rgba(139,92,246,0.5);
+  box-shadow: 0 0 0 3px rgba(139,92,246,0.12);
+  outline: none;
+}
