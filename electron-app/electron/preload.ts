@@ -82,4 +82,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     blendMode:     'screen' | 'multiply'
     preset:        '9:16' | '1:1' | '16:9'
   }) => ipcRenderer.invoke('run-ffmpeg-remix', opts),
+
+  // Detect the scene-change timestamp(s) in a video (for auto-split point).
+  detectSceneChange: (opts: { filePath: string; threshold?: number }) =>
+    ipcRenderer.invoke('detect-scene-change', opts),
 })

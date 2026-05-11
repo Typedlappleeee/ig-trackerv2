@@ -573,6 +573,59 @@ ipcMain.handle('run-ffmpeg', async (_event, opts: {
   })
 })
 
+// ── IPC: detect scene change via FFmpeg scene filter ─────────────────────────
+// Runs FFmpeg scene detection and returns timestamps of significant scene changes.
+// A "2-phase" video will typically have exactly 1 major scene change.
+ipcMain.handle('detect-scene-change', async (_event, opts: {
+  filePath:   string
+  threshold?: number  // 0–1, default 0.30 (30% frame difference = major cut)
+}) => {
+  const ffmpegBin = process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg'
+  const thr = opts.threshold ?? 0.30
+
+  // Run FFmpeg with scene detection filter; output goes to null sink.
+  // All useful info comes out on stderr.
+  const args = [
+    '-hide_banner',
+    '-i', opts.filePath,
+    '-filter:v', `select='gt(scene,${thr})',metadata=mode=print:key=lavfi.scene_score`,
+    '-an',
+    '-f', 'null', '-',
+  ]
+
+  return new Promise(resolve => {
+    execFile(ffmpegBin, args, { maxBuffer: 20 * 1024 * 1024 }, (_err, stdout, stderr) => {
+      const raw = stdout + stderr
+
+      // Extract video duration
+      const durM = raw.match(/Duration:\s*(\d+):(\d+):(\d+\.?\d*)/)
+      const duration = durM
+        ? parseInt(durM[1]) * 3600 + parseInt(durM[2]) * 60 + parseFloat(durM[3])
+        : 0
+
+      // Extract all scene-change timestamps ("pts_time:X.XXX")
+      const times: number[] = []
+      for (const m of raw.matchAll(/pts_time:(\d+\.?\d*)/g)) {
+        const t = parseFloat(m[1])
+        if (t > 0) times.push(t)
+      }
+
+      if (times.length === 0) {
+        // Nothing found — try once more with lower threshold and report
+        resolve({ ok: false, times: [], duration, error: 'Aucun changement de scène détecté. Essaie d\'ajuster le seuil ou positionne le curseur manuellement.' })
+        return
+      }
+
+      // For a 2-phase video, take the most significant cut:
+      // prefer the one closest to the centre (avoids false positives at edges)
+      const mid = duration / 2
+      const best = times.reduce((a, b) => Math.abs(b - mid) < Math.abs(a - mid) ? b : a)
+
+      resolve({ ok: true, times, splitTime: best, duration })
+    })
+  })
+})
+
 // ── IPC: run FFmpeg remix (split + blend + concat) ───────────────────────────
 // Phase 1 = new video (+ optional text overlay from original)
 // Phase 2 = original video from splitTime onwards

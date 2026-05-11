@@ -242,9 +242,11 @@ export function Remix({ user }: RemixProps) {
   const [preset,        setPreset]        = useState<Preset>('9:16')
 
   // Step 4
-  const [generating,  setGenerating]  = useState(false)
-  const [result,      setResult]      = useState<{ ok: boolean; outputPath?: string; error?: string; command?: string } | null>(null)
-  const [showCommand, setShowCommand] = useState(false)
+  const [generating,     setGenerating]    = useState(false)
+  const [result,         setResult]        = useState<{ ok: boolean; outputPath?: string; error?: string; command?: string } | null>(null)
+  const [showCommand,    setShowCommand]   = useState(false)
+  const [detecting,      setDetecting]     = useState(false)
+  const [detectMsg,      setDetectMsg]     = useState<{ ok: boolean; text: string } | null>(null)
 
   const handleOrigDur = useCallback((d: number) => {
     setOriginalDur(d)
@@ -253,12 +255,28 @@ export function Remix({ user }: RemixProps) {
 
   async function pickOrigFromPC() {
     const p = await window.electronAPI?.pickVideoFile?.()
-    if (p) { setOriginalPath(p); playWhoosh() }
+    if (p) { setOriginalPath(p); setDetectMsg(null); playWhoosh() }
   }
 
   async function pickNewFromPC() {
     const p = await window.electronAPI?.pickVideoFile?.()
     if (p) { setNewPhase1Path(p); playWhoosh() }
+  }
+
+  async function autoDetectSplit() {
+    if (!originalPath) return
+    setDetecting(true); setDetectMsg(null)
+    const r = await window.electronAPI!.detectSceneChange!({ filePath: originalPath, threshold: 0.28 })
+    setDetecting(false)
+    if (r.ok && r.splitTime != null) {
+      setSplitTime(Math.round(r.splitTime * 10) / 10)
+      const allTimes = r.times.map(t => fmtTime(t)).join(', ')
+      setDetectMsg({ ok: true, text: `Coupure détectée à ${fmtTime(r.splitTime)}${r.times.length > 1 ? ` (autres : ${allTimes})` : ''}` })
+      playSuccess()
+    } else {
+      setDetectMsg({ ok: false, text: r.error ?? 'Aucune coupure détectée — ajuste manuellement.' })
+      playError()
+    }
   }
 
   async function generate() {
@@ -324,11 +342,46 @@ export function Remix({ user }: RemixProps) {
             </div>
           )}
 
+          {/* Auto-detect button */}
+          {originalPath && (
+            <div className="space-y-2">
+              <button
+                onClick={autoDetectSplit}
+                disabled={detecting || !originalDur}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all disabled:opacity-50"
+                style={{
+                  background: 'linear-gradient(130deg,#7c3aed,#ec4899)',
+                  color: '#fff',
+                  boxShadow: '0 2px 16px -4px rgba(124,58,237,0.5)',
+                }}
+              >
+                {detecting ? (
+                  <><Spinner size="sm" /> Analyse en cours…</>
+                ) : (
+                  <>✨ Détecter automatiquement la coupure</>
+                )}
+              </button>
+
+              {detectMsg && (
+                <div
+                  className="rounded-lg px-3 py-2 text-xs flex items-start gap-2"
+                  style={detectMsg.ok
+                    ? { background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.2)', color: '#34d399' }
+                    : { background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)', color: '#fbbf24' }
+                  }
+                >
+                  <span>{detectMsg.ok ? '✓' : '⚠'}</span>
+                  <span>{detectMsg.text}</span>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Split scrubber */}
           {originalDur > 0 && (
             <div className="space-y-3">
               <p className="text-xs font-semibold" style={{ color: 'rgba(196,181,253,0.6)' }}>
-                Point de séparation — glisse pour définir où la Phase 1 se termine
+                Ajuste manuellement si nécessaire
               </p>
               <SplitScrubber
                 duration={originalDur}
@@ -409,9 +462,9 @@ export function Remix({ user }: RemixProps) {
             <div className="px-4 py-3 flex items-center justify-between"
               style={{ borderBottom: textOverlay ? '1px solid rgba(139,92,246,0.1)' : undefined }}>
               <div>
-                <p className="text-sm font-semibold text-white">Conservation du texte</p>
+                <p className="text-sm font-semibold text-white">Superposition de texte</p>
                 <p className="text-[11px]" style={{ color: 'rgba(196,181,253,0.45)' }}>
-                  Superpose les éléments textuels de la Phase 1 originale
+                  Blend la Phase 1 originale sur la nouvelle — le texte blanc ressort, le fond original transparaît légèrement
                 </p>
               </div>
               <button

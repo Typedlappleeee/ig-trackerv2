@@ -58,6 +58,8 @@ interface ElectronAPI {
     blendMode:     'screen' | 'multiply'
     preset:        '9:16' | '1:1' | '16:9'
   }) => Promise<{ ok: boolean; outputPath?: string; error?: string; command?: string }>
+  detectSceneChange: (opts: { filePath: string; threshold?: number }) =>
+    Promise<{ ok: boolean; times: number[]; splitTime?: number; duration: number; error?: string }>
 }
 
 declare global {
