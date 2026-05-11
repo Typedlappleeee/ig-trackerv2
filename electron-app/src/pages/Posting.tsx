@@ -7,7 +7,7 @@ import { Button }  from '@/components/ui/Button'
 import { VideoThumbnail } from '@/pages/Bank'
 import { BankPicker } from './Bank'
 import { getPostingState, setPostingState, subscribePosting, type TaskLog } from '@/lib/postingStore'
-import { playSuccess, playTick, playWhoosh, playError } from '@/lib/sounds'
+import { playSuccess } from '@/lib/sounds'
 
 interface PostingProps { user: User }
 
@@ -336,7 +336,7 @@ export function Posting({ user }: PostingProps) {
               <p className="text-[10px] uppercase tracking-wider text-text2 font-semibold">Vidéo</p>
               <p className="text-sm text-text truncate">{fileName ?? 'Aucune vidéo sélectionnée'}</p>
               <div className="flex gap-2 flex-wrap pt-2">
-                <Button size="sm" onClick={() => { setShowBankPicker(true); playWhoosh() }}>📂 Choisir depuis la banque</Button>
+                <Button size="sm" onClick={() => setShowBankPicker(true)}>📂 Choisir depuis la banque</Button>
                 <Button variant="secondary" size="sm" onClick={pickLocalFile}>💾 Depuis le PC</Button>
                 {filePath && (
                   <Button variant="secondary" size="sm" onClick={() => setFilePath(null)}>✕ Retirer</Button>

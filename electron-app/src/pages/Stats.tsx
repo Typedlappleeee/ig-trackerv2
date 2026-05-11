@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import type { User } from '@supabase/supabase-js'
 import { supabase, type Phone } from '@/lib/supabase'
 import { useOrg } from '@/lib/orgContext'
@@ -569,8 +570,9 @@ export function Stats({ user }: StatsProps) {
         )}
       </div>
 
-      {playingVideo && (
-        <IgVideoPlayerModal video={playingVideo} onClose={() => setPlayingVideo(null)} />
+      {playingVideo && createPortal(
+        <IgVideoPlayerModal video={playingVideo} onClose={() => setPlayingVideo(null)} />,
+        document.body
       )}
     </div>
   )

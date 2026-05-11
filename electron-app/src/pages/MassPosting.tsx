@@ -10,7 +10,7 @@ import {
   getMassPostingState, setMassPostingState, subscribeMassPosting,
   type TaskLog, type TaskStatus, type SelectedVideo,
 } from '@/lib/massPostingStore'
-import { playSuccess, playWhoosh } from '@/lib/sounds'
+import { playSuccess } from '@/lib/sounds'
 
 interface MassPostingProps { user: User }
 
@@ -470,7 +470,7 @@ export function MassPosting({ user }: MassPostingProps) {
               <span>PC</span>
             </button>
             <button
-              onClick={() => { setShowBankPicker(true); playWhoosh() }}
+              onClick={() => setShowBankPicker(true)}
               className="flex-1 flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg text-xs text-text2 hover:bg-surface2 border border-dashed border-border hover:border-accent/40 transition-colors"
             >
               <span>🗂</span>
