@@ -10,12 +10,19 @@ files:
   - dist
   - dist-electron
 
-# Windows — zip portable (pas d'installateur, pas besoin de Wine sur Linux)
+# Windows — portable .exe (1 seul fichier, pas d'installation)
 win:
   target:
-    - target: zip
+    - target: portable
       arch: x64
   signAndEditExecutable: false
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: false
+
+portable:
+  artifactName: IGTracker-portable.exe
 
 # macOS (optionnel)
 mac:
