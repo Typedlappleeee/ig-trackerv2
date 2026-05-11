@@ -210,10 +210,89 @@ function SplashScreen({ onDone }: { onDone: () => void }) {
   const [typed, setTyped]         = useState('')
   const [statusIdx, setStatusIdx] = useState(0)
   const doneRef                   = useRef(false)
+  const canvasRef                 = useRef<HTMLCanvasElement>(null)
   const fullText                  = 'Gestion de comptes Instagram'
 
   // Play jingle once on mount
   useEffect(() => { playSplash() }, [])
+
+  // Canvas starfield — twinkling stars + shooting stars
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')!
+    canvas.width  = window.innerWidth
+    canvas.height = window.innerHeight
+
+    type Star    = { x: number; y: number; r: number; phase: number; speed: number }
+    type Shooter = { x: number; y: number; len: number; spd: number; alpha: number; angle: number }
+
+    const stars: Star[] = Array.from({ length: 200 }, () => ({
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height,
+      r: Math.random() * 1.4 + 0.12,
+      phase: Math.random() * Math.PI * 2,
+      speed: Math.random() * 0.007 + 0.003,
+    }))
+
+    const shooters: Shooter[] = []
+    let frame = 0
+    let rafId = 0
+
+    const spawnShooter = () => {
+      shooters.push({
+        x:     Math.random() * canvas.width  * 0.72,
+        y:     Math.random() * canvas.height * 0.42,
+        len:   Math.random() * 130 + 80,
+        spd:   Math.random() * 6   + 5,
+        alpha: 1,
+        angle: Math.PI / 5 + (Math.random() - 0.5) * 0.4,
+      })
+    }
+
+    const draw = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height)
+      const t = frame * 0.016
+
+      for (const s of stars) {
+        const a = 0.18 + 0.55 * (0.5 + 0.5 * Math.sin(t * s.speed * 60 + s.phase))
+        ctx.beginPath()
+        ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2)
+        ctx.fillStyle = `rgba(180,210,255,${a})`
+        ctx.fill()
+      }
+
+      for (let i = shooters.length - 1; i >= 0; i--) {
+        const ss = shooters[i]
+        ss.x    += Math.cos(ss.angle) * ss.spd
+        ss.y    += Math.sin(ss.angle) * ss.spd
+        ss.alpha -= 0.016
+        const x0 = ss.x - Math.cos(ss.angle) * ss.len
+        const y0 = ss.y - Math.sin(ss.angle) * ss.len
+        const g  = ctx.createLinearGradient(x0, y0, ss.x, ss.y)
+        g.addColorStop(0,   'rgba(79,158,255,0)')
+        g.addColorStop(0.6, `rgba(126,184,255,${ss.alpha * 0.5})`)
+        g.addColorStop(1,   `rgba(255,255,255,${ss.alpha})`)
+        ctx.beginPath()
+        ctx.moveTo(x0, y0)
+        ctx.lineTo(ss.x, ss.y)
+        ctx.strokeStyle = g
+        ctx.lineWidth   = 1.6
+        ctx.stroke()
+        if (ss.alpha <= 0) shooters.splice(i, 1)
+      }
+
+      frame++
+      if (frame % 260 === 0 && Math.random() > 0.3) spawnShooter()
+      rafId = requestAnimationFrame(draw)
+    }
+
+    spawnShooter()
+    const t1 = setTimeout(spawnShooter, 900)
+    const t2 = setTimeout(spawnShooter, 2000)
+    draw()
+    return () => { cancelAnimationFrame(rafId); clearTimeout(t1); clearTimeout(t2) }
+  }, [])
 
   // Fade-out timing
   useEffect(() => {
@@ -251,6 +330,14 @@ function SplashScreen({ onDone }: { onDone: () => void }) {
         overflow: 'hidden',
       }}
     >
+      {/* ── Starfield canvas ── */}
+      <canvas ref={canvasRef} style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }} />
+
+      {/* ── Nebula corner glows ── */}
+      <div style={{ position: 'absolute', top: '-10%', left: '-8%',  width: 420, height: 420, borderRadius: '50%', background: 'radial-gradient(circle, rgba(79,158,255,0.07) 0%, transparent 70%)', pointerEvents: 'none' }} />
+      <div style={{ position: 'absolute', bottom: '-12%', right: '-10%', width: 480, height: 480, borderRadius: '50%', background: 'radial-gradient(circle, rgba(126,80,255,0.06) 0%, transparent 70%)', pointerEvents: 'none' }} />
+      <div style={{ position: 'absolute', top: '30%', right: '-5%', width: 300, height: 300, borderRadius: '50%', background: 'radial-gradient(circle, rgba(79,158,255,0.04) 0%, transparent 70%)', pointerEvents: 'none' }} />
+
       {/* ── Grid overlay ── */}
       <div style={{
         position: 'absolute', inset: 0, opacity: 0.04,
