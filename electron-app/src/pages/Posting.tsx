@@ -7,6 +7,7 @@ import { Button }  from '@/components/ui/Button'
 import { VideoThumbnail } from '@/pages/Bank'
 import { BankPicker } from './Bank'
 import { getPostingState, setPostingState, subscribePosting, type TaskLog } from '@/lib/postingStore'
+import { playSuccess, playTick, playWhoosh, playError } from '@/lib/sounds'
 
 interface PostingProps { user: User }
 
@@ -145,6 +146,7 @@ export function Posting({ user }: PostingProps) {
     if (selectedPhones.size === 0) { log('Sélectionne au moins un téléphone', 'warn'); return }
     if (!filePath)             { log('Sélectionne une vidéo', 'warn'); return }
 
+    playSuccess()
     setPosting(true); setLogs([]); setProgress(0)
     const phoneList = phones.filter(p => selectedPhones.has(p.id))
     const total     = phoneList.length
@@ -334,7 +336,7 @@ export function Posting({ user }: PostingProps) {
               <p className="text-[10px] uppercase tracking-wider text-text2 font-semibold">Vidéo</p>
               <p className="text-sm text-text truncate">{fileName ?? 'Aucune vidéo sélectionnée'}</p>
               <div className="flex gap-2 flex-wrap pt-2">
-                <Button size="sm" onClick={() => setShowBankPicker(true)}>📂 Choisir depuis la banque</Button>
+                <Button size="sm" onClick={() => { setShowBankPicker(true); playWhoosh() }}>📂 Choisir depuis la banque</Button>
                 <Button variant="secondary" size="sm" onClick={pickLocalFile}>💾 Depuis le PC</Button>
                 {filePath && (
                   <Button variant="secondary" size="sm" onClick={() => setFilePath(null)}>✕ Retirer</Button>

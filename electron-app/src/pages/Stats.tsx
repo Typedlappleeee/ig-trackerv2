@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase, type Phone } from '@/lib/supabase'
 import { useOrg } from '@/lib/orgContext'
@@ -6,6 +6,7 @@ import { useConnections } from '@/lib/connections'
 import { fetchIgStats, invalidateIgCache } from '@/lib/instagram'
 import { Spinner } from '@/components/ui/Spinner'
 import { Button }  from '@/components/ui/Button'
+import { playNav } from '@/lib/sounds'
 
 interface StatsProps { user: User }
 
@@ -13,13 +14,30 @@ interface IgVideo {
   id:        string
   shortcode: string
   url:       string
-  video_url: string         // Direct CDN URL to the .mp4 (only set via session API)
+  video_url: string
   views:     number
   likes:     number
   comments:  number
   thumbnail: string
   timestamp: string
   isVideo:   boolean
+}
+
+// Procedural sound for opening a video
+function playVideoOpen() {
+  try {
+    const ac = (window as unknown as { _sfAC?: AudioContext })._sfAC ??
+      (() => { const a = new AudioContext(); (window as unknown as { _sfAC?: AudioContext })._sfAC = a; return a })()
+    if (ac.state === 'suspended') ac.resume()
+    const t = ac.currentTime
+    const osc = ac.createOscillator(); const env = ac.createGain()
+    osc.type = 'sine'; osc.frequency.setValueAtTime(523, t)
+    osc.frequency.exponentialRampToValueAtTime(783, t + 0.14)
+    env.gain.setValueAtTime(0, t); env.gain.linearRampToValueAtTime(0.07, t + 0.01)
+    env.gain.exponentialRampToValueAtTime(0.0001, t + 0.28)
+    osc.connect(env); env.connect(ac.destination)
+    osc.start(t); osc.stop(t + 0.35)
+  } catch { /* */ }
 }
 
 async function fetchIgVideos(username: string): Promise<IgVideo[]> {
@@ -57,7 +75,6 @@ async function fetchIgVideos(username: string): Promise<IgVideo[]> {
         isVideo: (node['is_video'] as boolean) ?? false,
       }
     })
-    // Pre-fetch thumbnails as data URIs through main process (bypasses CDN Referer/CORS issues)
     if (window.electronAPI) {
       await Promise.all(videos.map(async v => {
         if (!v.thumbnail) return
@@ -69,24 +86,51 @@ async function fetchIgVideos(username: string): Promise<IgVideo[]> {
   } catch { return [] }
 }
 
-// Thumbnail is either a pre-fetched data URI (from main process) or a CDN URL.
-// Both render fine as <img src>; the data URI case never needs a network request.
-function VideoThumbnail({ src }: { src: string; sessionid?: string }) {
+function VideoThumbnail({ src }: { src: string }) {
   const [failed, setFailed] = useState(false)
   if (!src || failed) {
-    return <div className="w-full h-full flex items-center justify-center text-3xl bg-surface2">🎬</div>
+    return <div className="w-full h-full flex items-center justify-center text-4xl" style={{ background: 'rgba(139,92,246,0.08)' }}>🎬</div>
   }
   return (
     <img
-      src={src}
-      alt=""
-      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+      src={src} alt=""
+      className="w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-500"
       onError={() => setFailed(true)}
     />
   )
 }
 
-type SortKey = 'recent' | 'oldest' | 'views' | 'likes'
+function fmt(n: number): string {
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'M'
+  if (n >= 1_000)     return (n / 1_000).toFixed(1).replace(/\.0$/, '') + 'K'
+  return n.toLocaleString('fr-FR')
+}
+
+type SortKey = 'recent' | 'views' | 'likes'
+
+// ── Animated counter ──────────────────────────────────────────────────────────
+function AnimatedNumber({ value, color }: { value: number; color: string }) {
+  const [displayed, setDisplayed] = useState(0)
+  const rafRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    const start = 0
+    const end   = value
+    const dur   = 900
+    const t0    = performance.now()
+
+    function tick(now: number) {
+      const progress = Math.min((now - t0) / dur, 1)
+      const eased = 1 - Math.pow(1 - progress, 3)
+      setDisplayed(Math.round(start + (end - start) * eased))
+      if (progress < 1) rafRef.current = requestAnimationFrame(tick)
+    }
+    rafRef.current = requestAnimationFrame(tick)
+    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current) }
+  }, [value])
+
+  return <span style={{ color }}>{fmt(displayed)}</span>
+}
 
 export function Stats({ user }: StatsProps) {
   const { currentOrg }          = useOrg()
@@ -107,13 +151,14 @@ export function Stats({ user }: StatsProps) {
     let q = supabase.from('phones').select('*').order('phone_name')
     q = currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
     q.then(({ data }) => {
-        const linked = (data ?? []).filter(p => p.ig_username)
-        setPhones(linked)
-        if (linked.length > 0) selectPhone(linked[0])
-      })
+      const linked = (data ?? []).filter(p => p.ig_username)
+      setPhones(linked)
+      if (linked.length > 0) selectPhone(linked[0])
+    })
   }, [currentOrg?.id, user.id, conns.bearer])
 
   async function selectPhone(phone: Phone, retry = false) {
+    playNav()
     setSelected(phone)
     setStats(null); setVideos([]); setLoadErr(null)
     if (!phone.ig_username) return
@@ -121,7 +166,6 @@ export function Stats({ user }: StatsProps) {
     else { setLS(true); setLL(true) }
 
     try {
-      // Session path: private API — proper thumbnails, no rate limit
       if (phone.ig_sessionid && window.electronAPI?.fetchInstagramBySession) {
         const r = await window.electronAPI.fetchInstagramBySession({
           username: phone.ig_username,
@@ -156,7 +200,6 @@ export function Stats({ user }: StatsProps) {
         console.warn('[Stats] Session fetch failed:', r.error)
       }
 
-      // Fallback: public API
       if (retry) invalidateIgCache(phone.ig_username)
       const s = await fetchIgStats(phone.ig_username, { force: retry })
       setStats(s); setLS(false)
@@ -173,55 +216,85 @@ export function Stats({ user }: StatsProps) {
 
   const sorted = [...videos].sort((a, b) => {
     if (sort === 'recent') return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-    if (sort === 'oldest') return new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
     if (sort === 'views')  return b.views - a.views
     if (sort === 'likes')  return b.likes - a.likes
     return 0
   })
 
-  const sessionid = selected?.ig_sessionid ?? undefined
-
   return (
-    <div className="flex h-full min-h-screen">
-      {/* Sidebar */}
-      <aside className="w-56 flex-shrink-0 flex flex-col border-r border-border bg-surface anim-slide-l">
-        <div className="px-4 py-4 border-b border-border">
-          <p className="text-xs font-semibold text-text2 uppercase tracking-wider">Comptes liés</p>
-          <p className="text-xs text-text2 mt-0.5">{phones.length} compte{phones.length !== 1 ? 's' : ''}</p>
+    <div className="flex h-full" style={{ background: '#06040f' }}>
+
+      {/* ── Sidebar ───────────────────────────────────────────────────────── */}
+      <aside
+        className="w-60 flex-shrink-0 flex flex-col anim-slide-l"
+        style={{ borderRight: '1px solid rgba(139,92,246,0.12)', background: '#08050f' }}
+      >
+        <div className="px-4 py-4" style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
+          <p className="text-[11px] font-bold uppercase tracking-[0.14em]" style={{ color: 'rgba(196,181,253,0.4)' }}>
+            Comptes Instagram
+          </p>
+          <p className="text-[11px] mt-0.5" style={{ color: 'rgba(196,181,253,0.3)' }}>
+            {phones.length} compte{phones.length !== 1 ? 's' : ''} liés
+          </p>
         </div>
-        <div className="flex-1 overflow-auto py-2 anim-stagger">
+
+        <div className="flex-1 overflow-auto py-2">
           {phones.length === 0 ? (
-            <p className="px-4 py-4 text-xs text-text2">
-              Aucun compte lié.<br />Va dans Téléphones → colonne Instagram.
-            </p>
+            <div className="px-4 py-6 text-center space-y-2">
+              <p className="text-2xl">📱</p>
+              <p className="text-xs" style={{ color: 'rgba(196,181,253,0.35)' }}>
+                Aucun compte lié.<br/>Va dans Téléphones → colonne Instagram.
+              </p>
+            </div>
           ) : phones.map(phone => {
             const isSelected = selected?.id === phone.id
+            const initial = (phone.ig_username ?? phone.phone_name)[0].toUpperCase()
             return (
               <button
                 key={phone.id}
                 onClick={() => selectPhone(phone)}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-all rounded-lg mx-1 my-0.5 ${
-                  isSelected
-                    ? 'bg-accent/12 border border-accent/25'
-                    : 'hover:bg-surface2 border border-transparent'
-                }`}
-                style={{ width: 'calc(100% - 8px)' }}
+                className="w-full flex items-center gap-3 px-3 py-2.5 text-left transition-all duration-150 active:scale-[0.98]"
+                style={isSelected ? {
+                  background: 'rgba(139,92,246,0.12)',
+                  boxShadow: 'inset 3px 0 0 #8b5cf6',
+                } : undefined}
               >
-                <div className={`w-8 h-8 rounded-full bg-accent/20 text-accent flex items-center justify-center text-xs font-bold flex-shrink-0 transition-transform ${isSelected ? 'scale-110' : ''}`}>
-                  {phone.ig_username?.[0].toUpperCase()}
+                {/* Gradient avatar */}
+                <div
+                  className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0 transition-transform duration-150"
+                  style={{
+                    background: isSelected
+                      ? 'linear-gradient(135deg, #7c3aed, #ec4899)'
+                      : 'rgba(139,92,246,0.18)',
+                    color: isSelected ? '#fff' : '#a78bfa',
+                    transform: isSelected ? 'scale(1.08)' : undefined,
+                    boxShadow: isSelected ? '0 2px 12px rgba(124,58,237,0.5)' : undefined,
+                  }}
+                >
+                  {initial}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className={`text-xs font-medium truncate ${isSelected ? 'text-accent font-bold' : 'text-text'}`}>@{phone.ig_username}</p>
-                  <p className="text-[10px] text-text2 truncate">{phone.phone_name}</p>
+                  <p
+                    className="text-[12px] font-semibold truncate"
+                    style={{ color: isSelected ? '#c4b5fd' : '#d4dcf0' }}
+                  >
+                    @{phone.ig_username}
+                  </p>
+                  <p className="text-[10px] truncate" style={{ color: 'rgba(196,181,253,0.35)' }}>
+                    {phone.phone_name}
+                  </p>
                 </div>
-                <div className="flex flex-col items-end gap-0.5 flex-shrink-0">
+                <div className="flex flex-col items-end gap-1 flex-shrink-0">
                   {phone.status === 'online' && (
-                    <span className="relative w-1.5 h-1.5 rounded-full bg-ok flex-shrink-0">
+                    <span className="relative w-1.5 h-1.5 rounded-full bg-ok">
                       <span className="absolute inset-0 rounded-full bg-ok animate-ping opacity-60" />
                     </span>
                   )}
                   {phone.ig_sessionid && (
-                    <span className="text-[10px] text-accent">🔑</span>
+                    <span className="text-[9px] font-bold px-1 py-0.5 rounded"
+                      style={{ background: 'rgba(139,92,246,0.15)', color: '#a78bfa' }}>
+                      🔑
+                    </span>
                   )}
                 </div>
               </button>
@@ -230,34 +303,64 @@ export function Stats({ user }: StatsProps) {
         </div>
       </aside>
 
-      {/* Main panel */}
+      {/* ── Main panel ───────────────────────────────────────────────────── */}
       <div className="flex-1 overflow-auto">
         {!selected ? (
           <div className="flex items-center justify-center h-full text-text2">
             <div className="text-center space-y-3">
-              <p className="text-4xl">📈</p>
-              <p className="font-medium">Sélectionne un compte</p>
+              <div className="text-5xl opacity-40">📈</div>
+              <p className="font-medium" style={{ color: 'rgba(196,181,253,0.4)' }}>Sélectionne un compte</p>
             </div>
           </div>
         ) : (
-          <div className="p-8 space-y-6">
-            {/* Profile header */}
-            <div className="bg-card border border-border rounded-xl p-5 flex items-start gap-5 anim-page card-lift">
-              <div className="w-14 h-14 rounded-full bg-accent/20 text-accent flex items-center justify-center text-xl font-bold flex-shrink-0">
+          <div className="p-6 space-y-5">
+
+            {/* ── Profile header ──────────────────────────────────────── */}
+            <div
+              className="rounded-2xl p-5 flex items-start gap-5 anim-page"
+              style={{
+                background: 'rgba(139,92,246,0.05)',
+                border: '1px solid rgba(139,92,246,0.15)',
+                boxShadow: '0 8px 32px -8px rgba(0,0,0,0.4)',
+              }}
+            >
+              {/* Big gradient avatar */}
+              <div
+                className="w-16 h-16 rounded-2xl flex items-center justify-center text-2xl font-black text-white flex-shrink-0"
+                style={{
+                  background: 'linear-gradient(135deg, #7c3aed 0%, #ec4899 100%)',
+                  boxShadow: '0 4px 20px rgba(124,58,237,0.5)',
+                  letterSpacing: '-0.5px',
+                }}
+              >
                 {selected.ig_username?.[0].toUpperCase()}
               </div>
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-3 flex-wrap">
-                  <h2 className="text-xl font-bold text-text">@{selected.ig_username}</h2>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 className="text-xl font-bold text-white">@{selected.ig_username}</h2>
                   {selected.ig_sessionid && (
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-ok/20 text-ok">🔑 Session active</span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                      style={{ background: 'rgba(52,211,153,0.12)', color: '#34d399', border: '1px solid rgba(52,211,153,0.25)' }}>
+                      🔑 Session
+                    </span>
                   )}
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${
-                    selected.status === 'online' ? 'bg-ok/20 text-ok' : 'bg-text2/20 text-text2'
-                  }`}>{selected.status}</span>
+                  <span
+                    className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                    style={selected.status === 'online'
+                      ? { background: 'rgba(52,211,153,0.12)', color: '#34d399', border: '1px solid rgba(52,211,153,0.25)' }
+                      : { background: 'rgba(255,255,255,0.05)', color: 'rgba(196,181,253,0.4)' }}
+                  >
+                    {selected.status}
+                  </span>
                 </div>
-                <p className="text-sm text-text2 mt-0.5">{selected.phone_name} · {selected.group_name ?? 'Sans groupe'}</p>
-                {stats?.bio && <p className="text-xs text-text2 mt-1.5 max-w-md line-clamp-2">{stats.bio}</p>}
+                <p className="text-xs mt-0.5" style={{ color: 'rgba(196,181,253,0.5)' }}>
+                  {selected.phone_name} · {selected.group_name ?? 'Sans groupe'}
+                </p>
+                {stats?.bio && (
+                  <p className="text-xs mt-2 max-w-md line-clamp-2" style={{ color: 'rgba(196,181,253,0.6)' }}>
+                    {stats.bio}
+                  </p>
+                )}
               </div>
               <div className="flex gap-2 flex-shrink-0">
                 {loadError && (
@@ -273,55 +376,82 @@ export function Stats({ user }: StatsProps) {
 
             {/* Error banner */}
             {loadError && (
-              <div className="px-4 py-3 rounded-lg bg-warn/10 border border-warn/20 text-warn text-sm">
-                ⚠ {loadError}
+              <div className="px-4 py-3 rounded-xl text-sm flex items-center gap-2"
+                style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)', color: '#fbbf24' }}>
+                <span>⚠</span><span>{loadError}</span>
               </div>
             )}
 
-            {/* KPI cards */}
+            {/* ── KPI cards ───────────────────────────────────────────── */}
             {loadingStats ? (
-              <div className="flex justify-center py-8"><Spinner size="lg" /></div>
+              <div className="grid grid-cols-4 gap-4">
+                {[0,1,2,3].map(i => (
+                  <div key={i} className="rounded-2xl h-24 animate-pulse"
+                    style={{ background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.1)' }} />
+                ))}
+              </div>
             ) : stats ? (
               <div className="grid grid-cols-4 gap-4 anim-stagger">
                 {([
-                  { label: 'FOLLOWERS',  value: stats.followers,   color: '#4f9eff', icon: '👥' },
-                  { label: 'FOLLOWING',  value: stats.following,   color: '#5a6882', icon: '➡' },
-                  { label: 'POSTS',      value: stats.posts,       color: '#00ccaa', icon: '📸' },
-                  { label: 'VUES TOTAL', value: stats.total_views, color: '#ffaa2a', icon: '👁' },
-                ] as const).map(({ label, value, color, icon }) => (
-                  <div key={label} className="bg-card border border-border rounded-xl p-4 border-t-2 card-lift" style={{ borderTopColor: color }}>
-                    <div className="flex items-center gap-2 mb-2">
-                      <span>{icon}</span>
-                      <span className="text-xs font-semibold text-text2">{label}</span>
+                  { label: 'Followers',    value: stats.followers,   gradient: 'linear-gradient(135deg,#7c3aed,#a78bfa)', glow: '#8b5cf6', icon: '👥' },
+                  { label: 'Abonnements',  value: stats.following,   gradient: 'linear-gradient(135deg,#1e3a5f,#3b82f6)', glow: '#3b82f6', icon: '➡' },
+                  { label: 'Posts',        value: stats.posts,       gradient: 'linear-gradient(135deg,#065f46,#34d399)', glow: '#34d399', icon: '📸' },
+                  { label: 'Vues totales', value: stats.total_views, gradient: 'linear-gradient(135deg,#78350f,#f59e0b)', glow: '#f59e0b', icon: '👁'  },
+                ] as const).map(({ label, value, gradient, glow, icon }) => (
+                  <div
+                    key={label}
+                    className="rounded-2xl p-4 relative overflow-hidden transition-transform duration-200 hover:-translate-y-0.5"
+                    style={{
+                      background: 'rgba(8,5,20,0.8)',
+                      border: '1px solid rgba(255,255,255,0.06)',
+                      boxShadow: `0 4px 24px -8px ${glow}44`,
+                    }}
+                  >
+                    {/* Gradient top bar */}
+                    <div className="absolute top-0 left-4 right-4 h-[2px] rounded-b-full" style={{ background: gradient }} />
+                    <div className="flex items-center gap-1.5 mb-2 mt-1">
+                      <span className="text-sm">{icon}</span>
+                      <span className="text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: 'rgba(196,181,253,0.45)' }}>{label}</span>
                     </div>
-                    <p className="text-2xl font-bold anim-number-pop" style={{ color }} key={value}>{value.toLocaleString('fr-FR')}</p>
+                    <p className="text-[26px] font-black leading-none">
+                      <AnimatedNumber value={value} color={glow} />
+                    </p>
                   </div>
                 ))}
               </div>
             ) : !loadError ? (
-              <div className="text-center py-8 text-text2 text-sm">
+              <div className="text-center py-8 text-sm" style={{ color: 'rgba(196,181,253,0.4)' }}>
                 Impossible de charger les stats — compte privé ou Instagram indisponible.
               </div>
             ) : null}
 
-            {/* Videos */}
+            {/* ── Videos section ──────────────────────────────────────── */}
             <div>
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-semibold text-text">
-                  Vidéos {videos.length > 0 && `(${videos.length})`}
+                <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                  <span>🎬</span>
+                  <span>Vidéos</span>
+                  {videos.length > 0 && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                      style={{ background: 'rgba(139,92,246,0.15)', color: '#a78bfa' }}>
+                      {videos.length}
+                    </span>
+                  )}
                 </h3>
-                <div className="flex items-center gap-1 bg-surface2 p-1 rounded-lg">
+                <div className="flex items-center gap-1 p-1 rounded-xl"
+                  style={{ background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.1)' }}>
                   {([
-                    { key: 'recent', label: 'Récent'     },
-                    { key: 'views',  label: '+ de vues'  },
-                    { key: 'likes',  label: '+ de likes' },
+                    { key: 'recent', label: 'Récent'    },
+                    { key: 'views',  label: '+ de vues' },
+                    { key: 'likes',  label: '+ likes'   },
                   ] as const).map(({ key, label }) => (
-                    <button key={key} onClick={() => setSort(key)}
-                      className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                        sort === key
-                          ? 'bg-accent text-white shadow-[0_1px_6px_-1px_rgba(79,142,247,0.5)]'
-                          : 'text-text2 hover:text-text hover:bg-surface3/50'
-                      }`}
+                    <button
+                      key={key}
+                      onClick={() => { setSort(key); playNav() }}
+                      className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150"
+                      style={sort === key
+                        ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff', boxShadow: '0 1px 8px -2px rgba(124,58,237,0.5)' }
+                        : { color: 'rgba(196,181,253,0.5)' }}
                     >
                       {label}
                     </button>
@@ -330,14 +460,22 @@ export function Stats({ user }: StatsProps) {
               </div>
 
               {loadingList ? (
-                <div className="flex justify-center py-8"><Spinner size="lg" /></div>
+                /* Skeleton loader */
+                <div className="grid grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
+                  {[...Array(6)].map((_, i) => (
+                    <div key={i} className="rounded-xl overflow-hidden animate-pulse"
+                      style={{ aspectRatio: '9/16', background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.08)' }}>
+                      <div className="w-full h-full" style={{ background: `linear-gradient(135deg, rgba(139,92,246,0.06) 0%, rgba(236,72,153,0.04) 100%)` }} />
+                    </div>
+                  ))}
+                </div>
               ) : videos.length === 0 ? (
-                <div className="text-center py-12 text-text2 space-y-2">
-                  <p className="text-3xl">🎥</p>
-                  <p className="text-sm">
+                <div className="text-center py-16 space-y-3">
+                  <div className="text-5xl opacity-30">🎥</div>
+                  <p className="text-sm" style={{ color: 'rgba(196,181,253,0.4)' }}>
                     {loadError ? 'Chargement échoué.' : selected.ig_sessionid
                       ? 'Aucune vidéo trouvée.'
-                      : 'Aucune vidéo — ajoute un Session ID pour charger les vidéos privées.'}
+                      : 'Ajoute un Session ID pour charger les vidéos privées.'}
                   </p>
                 </div>
               ) : (
@@ -346,61 +484,72 @@ export function Stats({ user }: StatsProps) {
                     const maxV = Math.max(...sorted.map(v => v.views), 1)
                     return sorted.map((video, idx) => {
                       const tier = video.views >= maxV * 0.7 ? 'high' : video.views >= maxV * 0.3 ? 'mid' : 'low'
-                      const tierGradient =
-                        tier === 'high' ? 'linear-gradient(135deg, #a56ef5 0%, #f03d55 100%)' :
-                        tier === 'mid'  ? 'linear-gradient(135deg, #4f8ef7 0%, #a56ef5 100%)' :
-                                          'linear-gradient(135deg, #2a3050 0%, #1a2035 100%)'
+                      const tierGrad =
+                        tier === 'high' ? 'linear-gradient(135deg,#6d28d9,#db2777)' :
+                        tier === 'mid'  ? 'linear-gradient(135deg,#1e40af,#7c3aed)' :
+                                          'linear-gradient(135deg,#0f172a,#1e1b4b)'
                       return (
                         <button
                           key={video.id}
                           type="button"
-                          onClick={() => setPlayingVideo(video)}
-                          className="text-left bg-card border border-border rounded-xl overflow-hidden hover:border-accent/60 transition-all group anim-page card-lift"
-                          style={{ animationDelay: `${Math.min(idx * 0.04, 0.4)}s` }}
+                          onClick={() => { setPlayingVideo(video); playVideoOpen() }}
+                          className="text-left rounded-xl overflow-hidden group transition-all duration-200 hover:-translate-y-1 hover:scale-[1.02]"
+                          style={{
+                            border: tier === 'high'
+                              ? '1px solid rgba(139,92,246,0.4)'
+                              : '1px solid rgba(139,92,246,0.1)',
+                            boxShadow: tier === 'high'
+                              ? '0 4px 24px -8px rgba(124,58,237,0.4)'
+                              : '0 2px 12px -6px rgba(0,0,0,0.5)',
+                            animationDelay: `${Math.min(idx * 0.04, 0.4)}s`,
+                          }}
                         >
-                          {/* Portrait thumbnail — 9:16 like the bank */}
-                          <div
-                            className="relative aspect-[9/16] overflow-hidden"
-                            style={{ background: tierGradient }}
-                          >
+                          <div className="relative" style={{ aspectRatio: '9/16', background: tierGrad }}>
                             {video.thumbnail && (
                               <div className="absolute inset-0">
-                                <VideoThumbnail src={video.thumbnail} sessionid={sessionid} />
+                                <VideoThumbnail src={video.thumbnail} />
                               </div>
                             )}
-                            {/* Dark gradient overlay at bottom */}
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/10 to-transparent pointer-events-none" />
+                            {/* Dark gradient overlay */}
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/15 to-transparent pointer-events-none" />
 
-                            {/* Play button */}
-                            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                              <div className="w-12 h-12 rounded-full bg-white/25 backdrop-blur-sm flex items-center justify-center">
+                            {/* Play button on hover */}
+                            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none">
+                              <div
+                                className="w-14 h-14 rounded-full flex items-center justify-center"
+                                style={{ background: 'rgba(139,92,246,0.85)', boxShadow: '0 0 24px rgba(139,92,246,0.6)', backdropFilter: 'blur(8px)' }}
+                              >
                                 <span className="text-white text-xl ml-1">▶</span>
                               </div>
                             </div>
 
-                            {/* REEL chip */}
-                            <span className="absolute top-2 left-2 bg-black/60 text-white text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded">REEL</span>
-
-                            {/* Tier dot */}
-                            <span className={`absolute top-2 right-2 w-2 h-2 rounded-full ${
-                              tier === 'high' ? 'bg-[#a56ef5]' : tier === 'mid' ? 'bg-accent' : 'bg-text2/40'
-                            }`} />
+                            {/* Top badges */}
+                            <div className="absolute top-2 left-2 right-2 flex items-start justify-between pointer-events-none">
+                              <span className="text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded"
+                                style={{ background: 'rgba(0,0,0,0.65)', color: '#fff', backdropFilter: 'blur(4px)' }}>
+                                REEL
+                              </span>
+                              {tier === 'high' && (
+                                <span className="text-[8px] font-black px-1.5 py-0.5 rounded"
+                                  style={{ background: 'rgba(139,92,246,0.7)', color: '#fff' }}>
+                                  🔥 TOP
+                                </span>
+                              )}
+                            </div>
 
                             {/* Stats overlay at bottom */}
                             <div className="absolute bottom-0 left-0 right-0 p-3 space-y-1.5">
-                              {/* Views — big */}
                               <div className="flex items-baseline gap-1.5">
-                                <span className="text-2xl font-bold text-white leading-none">{video.views.toLocaleString('fr-FR')}</span>
-                                <span className="text-[10px] text-white/60">vues</span>
+                                <span className="text-[22px] font-black text-white leading-none">{fmt(video.views)}</span>
+                                <span className="text-[10px] text-white/50">vues</span>
                               </div>
-                              {/* Progress bar */}
-                              <div className="h-[2px] bg-white/20 rounded-full overflow-hidden">
-                                <div className="h-full bg-white/70 rounded-full" style={{ width: `${(video.views / maxV) * 100}%` }} />
+                              <div className="h-[2px] rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.12)' }}>
+                                <div className="h-full rounded-full transition-all duration-700"
+                                  style={{ width: `${(video.views / maxV) * 100}%`, background: tier === 'high' ? '#a78bfa' : 'rgba(255,255,255,0.5)' }} />
                               </div>
-                              {/* Likes / comments / date */}
-                              <div className="flex items-center gap-2.5 text-[10px] text-white/70 font-medium">
-                                {video.likes    > 0 && <span>♥ {video.likes.toLocaleString('fr-FR')}</span>}
-                                {video.comments > 0 && <span>✎ {video.comments.toLocaleString('fr-FR')}</span>}
+                              <div className="flex items-center gap-2 text-[10px] text-white/60 font-medium">
+                                {video.likes    > 0 && <span>♥ {fmt(video.likes)}</span>}
+                                {video.comments > 0 && <span>✎ {fmt(video.comments)}</span>}
                                 {video.timestamp && (
                                   <span className="ml-auto">
                                     {new Date(video.timestamp).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}
@@ -420,24 +569,27 @@ export function Stats({ user }: StatsProps) {
         )}
       </div>
 
-      {playingVideo && <IgVideoPlayerModal video={playingVideo} onClose={() => setPlayingVideo(null)} />}
+      {playingVideo && (
+        <IgVideoPlayerModal video={playingVideo} onClose={() => setPlayingVideo(null)} />
+      )}
     </div>
   )
 }
 
 // ── IG video player modal ────────────────────────────────────────────────────
-// Downloads the IG CDN video via IPC (with Referer headers) to a temp file,
-// then plays it via the localvideo:// protocol.
 function IgVideoPlayerModal({ video, onClose }: { video: IgVideo; onClose: () => void }) {
   const [localPath, setLocalPath] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     let cancelled = false
-    if (!video.video_url) { setErr('Aucune URL vidéo disponible.'); return }
-    if (!window.electronAPI?.fetchIgVideo) { setErr('IPC indisponible.'); return }
+    setLoading(true); setErr(null)
+    if (!video.video_url) { setErr('Aucune URL vidéo disponible.'); setLoading(false); return }
+    if (!window.electronAPI?.fetchIgVideo) { setErr('IPC indisponible.'); setLoading(false); return }
     window.electronAPI.fetchIgVideo({ url: video.video_url }).then(r => {
       if (cancelled) return
+      setLoading(false)
       if (r.ok && r.path) setLocalPath(r.path)
       else setErr(r.error ?? 'Téléchargement échoué')
     })
@@ -459,49 +611,74 @@ function IgVideoPlayerModal({ video, onClose }: { video: IgVideo; onClose: () =>
 
   return (
     <div
-      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/90 backdrop-blur-md anim-page"
+      className="fixed inset-0 z-[200] flex items-center justify-center anim-page"
+      style={{ background: 'rgba(0,0,0,0.92)', backdropFilter: 'blur(20px)' }}
       onClick={onClose}
     >
-      {/* Container sized to fit a 9:16 portrait video — takes 94% of viewport height */}
+      {/* Video container — natural size, capped at viewport */}
       <div
-        className="relative rounded-xl shadow-2xl overflow-hidden anim-scale-in"
+        className="relative anim-scale-in"
         onClick={e => e.stopPropagation()}
-        style={{ height: '94vh', aspectRatio: '9/16', maxWidth: '94vw', background: '#000' }}
       >
-        {/* Close button — overlaid top-right */}
+        {/* Close — absolute top-right corner of video */}
         <button
           onClick={onClose}
-          className="absolute top-3 right-3 z-20 w-8 h-8 rounded-full flex items-center justify-center text-white/70 hover:text-white transition-colors"
-          style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(8px)' }}
+          className="absolute -top-10 right-0 z-20 w-8 h-8 rounded-full flex items-center justify-center text-white/60 hover:text-white transition-colors"
+          style={{ background: 'rgba(0,0,0,0.4)' }}
         >✕</button>
 
-        {/* Stats overlay — top-left */}
-        <div
-          className="absolute top-3 left-3 z-20 flex items-center gap-2 text-white text-[11px] font-medium rounded-lg px-2.5 py-1.5"
-          style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(8px)' }}
-        >
-          <span>👁 {video.views.toLocaleString('fr-FR')}</span>
-          {video.likes    > 0 && <span>♥ {video.likes.toLocaleString('fr-FR')}</span>}
-          {video.comments > 0 && <span>✎ {video.comments.toLocaleString('fr-FR')}</span>}
-          <a href={video.url} target="_blank" rel="noreferrer" className="ml-1 opacity-60 hover:opacity-100">↗</a>
+        {/* Stats bar above video */}
+        <div className="flex items-center gap-3 text-white text-xs mb-2 px-1">
+          <span className="font-semibold" style={{ color: '#c4b5fd' }}>👁 {video.views.toLocaleString('fr-FR')}</span>
+          {video.likes    > 0 && <span style={{ color: '#f9a8d4' }}>♥ {video.likes.toLocaleString('fr-FR')}</span>}
+          {video.comments > 0 && <span style={{ color: 'rgba(196,181,253,0.6)' }}>✎ {video.comments.toLocaleString('fr-FR')}</span>}
+          <a href={video.url} target="_blank" rel="noreferrer"
+            className="ml-auto transition-colors"
+            style={{ color: 'rgba(139,92,246,0.7)' }}
+            onMouseEnter={e => (e.currentTarget.style.color = '#a78bfa')}
+            onMouseLeave={e => (e.currentTarget.style.color = 'rgba(139,92,246,0.7)')}
+          >
+            ↗ Instagram
+          </a>
         </div>
 
-        {/* Video — fills the entire container */}
-        {err ? (
-          <div className="w-full h-full flex items-center justify-center">
-            <p className="text-danger text-sm px-4 text-center">{err}</p>
-          </div>
-        ) : !localUrl ? (
-          <div className="w-full h-full flex items-center justify-center">
-            <p className="text-text2 text-sm">📥 Téléchargement de la vidéo…</p>
-          </div>
-        ) : (
-          <video
-            src={localUrl}
-            controls autoPlay
-            style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
-          />
-        )}
+        {/* Video — let the element itself size naturally, capped at viewport */}
+        <div
+          className="rounded-xl overflow-hidden shadow-2xl flex items-center justify-center"
+          style={{
+            background: '#000',
+            boxShadow: '0 0 60px rgba(139,92,246,0.2)',
+            /* Portrait cap: 9/16 * 88vh ≈ 49.5vh wide, or 92vw, whichever is smaller */
+            maxWidth: 'min(49.5vh, 92vw)',
+            minWidth: 200,
+          }}
+        >
+          {err ? (
+            <div className="flex flex-col items-center gap-3 p-8 text-center">
+              <span className="text-4xl opacity-40">🎥</span>
+              <p className="text-sm" style={{ color: '#f87171' }}>{err}</p>
+            </div>
+          ) : loading ? (
+            <div className="flex flex-col items-center gap-3 p-12">
+              <Spinner size="lg" />
+              <p className="text-xs" style={{ color: 'rgba(196,181,253,0.5)' }}>Téléchargement…</p>
+            </div>
+          ) : (
+            /* video height is unconstrained — browser fits it; maxHeight prevents overflow */
+            <video
+              src={localUrl}
+              controls
+              autoPlay
+              style={{
+                display: 'block',
+                maxHeight: '88vh',
+                maxWidth: '100%',
+                width: 'auto',
+                height: 'auto',
+              }}
+            />
+          )}
+        </div>
       </div>
     </div>
   )

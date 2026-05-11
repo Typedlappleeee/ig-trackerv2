@@ -10,6 +10,7 @@ import {
   getMassPostingState, setMassPostingState, subscribeMassPosting,
   type TaskLog, type TaskStatus, type SelectedVideo,
 } from '@/lib/massPostingStore'
+import { playSuccess, playWhoosh } from '@/lib/sounds'
 
 interface MassPostingProps { user: User }
 
@@ -205,6 +206,7 @@ export function MassPosting({ user }: MassPostingProps) {
     if (phoneList.length === 0)   { log('Sélectionne au moins un téléphone', 'warn'); return }
     if (selectedVideos.length === 0) { log('Sélectionne au moins une vidéo', 'warn'); return }
 
+    playSuccess()
     setPosting(true)
     setLogs([])
     stopRef.current = false
@@ -468,7 +470,7 @@ export function MassPosting({ user }: MassPostingProps) {
               <span>PC</span>
             </button>
             <button
-              onClick={() => setShowBankPicker(true)}
+              onClick={() => { setShowBankPicker(true); playWhoosh() }}
               className="flex-1 flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg text-xs text-text2 hover:bg-surface2 border border-dashed border-border hover:border-accent/40 transition-colors"
             >
               <span>🗂</span>

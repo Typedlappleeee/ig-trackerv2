@@ -86,3 +86,51 @@ export function playSplash() {
     note(ac, 523.25, t0 + 0.82, 1.3, 0.02, 'triangle', 2)
   } catch { /* audio not available */ }
 }
+
+/** Short tick for button toggle / selection */
+export function playTick() {
+  try {
+    const ac = ctx()
+    const t  = ac.currentTime
+    note(ac, 880, t, 0.055, 0.03, 'sine')
+  } catch { /* */ }
+}
+
+/** Success chime — task launched / action confirmed */
+export function playSuccess() {
+  try {
+    const ac = ctx()
+    const t  = ac.currentTime
+    note(ac, 523.25, t,        0.15, 0.07, 'sine')
+    note(ac, 783.99, t + 0.10, 0.22, 0.08, 'sine')
+    note(ac, 1046.5, t + 0.20, 0.30, 0.06, 'sine')
+  } catch { /* */ }
+}
+
+/** Subtle whoosh when opening a panel / modal */
+export function playWhoosh() {
+  try {
+    const ac = ctx()
+    const t  = ac.currentTime
+    const osc = ac.createOscillator()
+    const env = ac.createGain()
+    osc.type = 'sawtooth'
+    osc.frequency.setValueAtTime(120, t)
+    osc.frequency.exponentialRampToValueAtTime(480, t + 0.18)
+    env.gain.setValueAtTime(0, t)
+    env.gain.linearRampToValueAtTime(0.04, t + 0.04)
+    env.gain.exponentialRampToValueAtTime(0.0001, t + 0.22)
+    osc.connect(env); env.connect(ac.destination)
+    osc.start(t); osc.stop(t + 0.25)
+  } catch { /* */ }
+}
+
+/** Soft error buzz */
+export function playError() {
+  try {
+    const ac = ctx()
+    const t  = ac.currentTime
+    note(ac, 220, t,        0.12, 0.07, 'sawtooth')
+    note(ac, 180, t + 0.08, 0.16, 0.06, 'sawtooth')
+  } catch { /* */ }
+}
