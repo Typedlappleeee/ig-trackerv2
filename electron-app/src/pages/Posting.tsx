@@ -240,55 +240,73 @@ export function Posting({ user }: PostingProps) {
   return (
     <div className="flex h-full min-h-screen">
       {/* Left: phone selector */}
-      <aside className="w-60 flex-shrink-0 flex flex-col border-r border-border" style={{ background: '#0a0d15' }}>
-        <div className="px-4 py-4 border-b border-border">
-          <p className="text-sm font-bold text-text">Comptes</p>
+      <aside className="w-60 flex-shrink-0 flex flex-col border-r border-border" style={{ background: '#07090f' }}>
+        <div className="px-4 py-3 border-b border-border">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-bold text-text uppercase tracking-wider">Comptes</p>
+            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full text-white"
+              style={{ background: selectedPhones.size > 0 ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : '#1a2035' }}>
+              {selectedPhones.size}
+            </span>
+          </div>
           <select value={groupFilter} onChange={e => setGroup(e.target.value)}
-            className="mt-2 w-full bg-surface border border-border rounded px-2 py-1.5 text-xs text-text focus:outline-none focus:border-accent">
+            className="w-full bg-[#0c0e1a] border border-border rounded-lg px-2 py-1.5 text-xs text-text focus:outline-none focus:border-[#8b5cf6]/60">
             {groups.map(g => <option key={g} value={g}>{g}</option>)}
           </select>
         </div>
-        <div className="px-4 py-2 flex gap-3 border-b border-border">
+        <div className="px-3 py-2 flex gap-3 border-b border-border">
           <button onClick={() => setSelPhones(new Set(visiblePhones.map(p => p.id)))}
-            className="text-xs text-accent hover:text-text">Tout</button>
+            className="text-[11px] font-semibold text-[#8b5cf6] hover:text-text transition-colors">Tout</button>
           <button onClick={() => setSelPhones(new Set())}
-            className="text-xs text-text2 hover:text-text">Aucun</button>
-          <span className="ml-auto text-xs text-text2">{selectedPhones.size} sél.</span>
+            className="text-[11px] text-text2 hover:text-text transition-colors">Aucun</button>
+          <span className="ml-auto text-[11px] text-text2">{visiblePhones.length} tel.</span>
         </div>
         <div className="flex-1 overflow-auto">
           {visiblePhones.map(phone => {
             const checked = selectedPhones.has(phone.id)
             return (
               <button key={phone.id} onClick={() => togglePhone(phone.id)}
-                className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors border-b border-border/50 ${
-                  checked ? 'bg-accent/10' : 'hover:bg-surface2'
+                className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-all border-b border-border/30 ${
+                  checked ? 'bg-[#8b5cf6]/8' : 'hover:bg-[#0f1122]'
                 }`}
               >
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
-                  checked ? 'bg-accent text-white' : 'bg-surface2 text-text2'
-                }`}>
+                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-black flex-shrink-0 transition-all ${
+                  checked
+                    ? 'text-white'
+                    : 'bg-[#111428] text-text2'
+                }`}
+                  style={checked ? { background: 'linear-gradient(135deg,#7c3aed,#ec4899)' } : undefined}
+                >
                   {phone.ig_username ? phone.ig_username[0].toUpperCase() : phone.phone_name[0].toUpperCase()}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs font-medium text-text truncate">{phone.phone_name}</p>
-                  {phone.ig_username && <p className="text-[10px] text-accent truncate">@{phone.ig_username}</p>}
+                  <p className="text-[11px] font-semibold text-text truncate">{phone.phone_name}</p>
+                  {phone.ig_username && <p className="text-[10px] text-[#8b5cf6]/80 truncate">@{phone.ig_username}</p>}
                 </div>
-                <span className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${
-                  checked ? 'bg-accent border-accent' : 'border-border'
-                }`}>
-                  {checked && <span className="text-white text-[10px]">✓</span>}
-                </span>
+                <div className={`w-3.5 h-3.5 rounded-sm border flex items-center justify-center flex-shrink-0 transition-all ${
+                  checked ? 'border-transparent' : 'border-border'
+                }`}
+                  style={checked ? { background: 'linear-gradient(135deg,#7c3aed,#ec4899)' } : undefined}
+                >
+                  {checked && <span className="text-white text-[8px] font-bold leading-none">✓</span>}
+                </div>
               </button>
             )
           })}
         </div>
       </aside>
 
-      {/* Right: form — Instagram-style card matching Python _build_posting_tab */}
+      {/* Right: form */}
       <div className="flex-1 overflow-auto p-6 space-y-4">
-        <div>
-          <h1 className="text-xl font-bold text-text">Nouveau post</h1>
-          <p className="text-text2 text-xs mt-0.5">Poste un Reel sur tes téléphones GéeLark</p>
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
+            style={{ background: 'linear-gradient(135deg,#7c3aed22,#ec489922)', border: '1px solid rgba(139,92,246,0.2)' }}>
+            <span className="text-base">🚀</span>
+          </div>
+          <div>
+            <h1 className="text-lg font-black text-text tracking-tight">Nouveau post</h1>
+            <p className="text-text2 text-[11px]">Poste un Reel sur tes téléphones GéeLark</p>
+          </div>
         </div>
 
         {/* Main posting card — rounded 14, #0b0f1a bg */}
@@ -426,17 +444,23 @@ export function Posting({ user }: PostingProps) {
 
           {/* Launch button */}
           <div className="px-5 py-4">
-            <Button
+            <button
               onClick={post}
-              loading={posting}
-              disabled={!bearer || selectedPhones.size === 0 || !filePath}
-              size="lg"
-              className="w-full !text-base !font-bold"
+              disabled={posting || !bearer || selectedPhones.size === 0 || !filePath}
+              className="w-full py-3.5 rounded-xl text-sm font-black text-white transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{
+                background: posting || !bearer || selectedPhones.size === 0 || !filePath
+                  ? '#1a2035'
+                  : 'linear-gradient(130deg,#7c3aed,#ec4899)',
+                boxShadow: posting || !bearer || selectedPhones.size === 0 || !filePath
+                  ? 'none'
+                  : '0 4px 24px -4px rgba(124,58,237,0.5)',
+              }}
             >
               {posting
-                ? `🚀 Lancer (${selectedPhones.size} en cours)`
-                : `🚀 Lancer le posting`}
-            </Button>
+                ? `⏳ En cours (${selectedPhones.size} téléphones)…`
+                : `⚡ Lancer le posting — ${selectedPhones.size} compte${selectedPhones.size !== 1 ? 's' : ''}`}
+            </button>
           </div>
         </div>
 

@@ -7,6 +7,27 @@ import { useToast }  from '@/components/Toast'
 import { playNav }   from '@/lib/sounds'
 import { getRecentAccounts, switchToAccount, forgetAccount, type RecentAccount } from '@/lib/recentAccounts'
 
+function SFLogo({ size = 28 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 100 100" fill="none">
+      <defs>
+        <linearGradient id="sf-sb" x1="30" y1="97" x2="85" y2="3" gradientUnits="userSpaceOnUse">
+          <stop offset="0%"   stopColor="#3b82f6"/>
+          <stop offset="50%"  stopColor="#8b5cf6"/>
+          <stop offset="100%" stopColor="#f472b6"/>
+        </linearGradient>
+      </defs>
+      <path
+        d="M 66 22 C 76 8 60 3 42 3 C 20 3 12 18 12 32 C 12 46 26 52 46 55 C 66 58 82 65 82 79 C 82 93 68 97 50 97 C 32 97 18 89 16 76"
+        stroke="url(#sf-sb)" strokeWidth="13" strokeLinecap="round" fill="none"
+      />
+      <line x1="66" y1="22" x2="84" y2="5" stroke="#f472b6" strokeWidth="9" strokeLinecap="round"/>
+      <line x1="73" y1="4" x2="85" y2="4" stroke="#f472b6" strokeWidth="7" strokeLinecap="round"/>
+      <line x1="85" y1="4" x2="85" y2="17" stroke="#f472b6" strokeWidth="7" strokeLinecap="round"/>
+    </svg>
+  )
+}
+
 export type Page =
   | 'dashboard' | 'phones'
   | 'stats' | 'posting' | 'massposting' | 'bank' | 'autocomment' | 'aitools'
@@ -180,11 +201,15 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
       <aside className="w-[230px] flex-shrink-0 flex flex-col border-r border-border/60 bg-sb-bg">
         {/* Logo */}
         <div className="px-4 py-4 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center text-base font-bold bg-gradient-to-br from-accent to-accent2 text-white shadow-lg shadow-accent/30 flex-shrink-0">
-            📱
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden"
+            style={{ background: 'linear-gradient(145deg,#0f0620,#1a0d35)', border: '1px solid rgba(139,92,246,0.2)' }}>
+            <SFLogo size={26} />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="font-bold text-[13px] text-text leading-tight tracking-tight">IG Tracker</p>
+            <p className="font-black text-[13px] leading-tight tracking-tight">
+              <span style={{ color: '#f0eeff' }}>Scale</span>
+              <span style={{ background: 'linear-gradient(130deg,#8b5cf6,#ec4899)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Flow</span>
+            </p>
             <p className="text-[10px] text-ok flex items-center gap-1.5 leading-tight mt-0.5">
               <span className="w-1.5 h-1.5 rounded-full bg-ok inline-block anim-pulse" />
               actif
@@ -286,7 +311,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
         {/* Footer card */}
         <div className="mx-3 mb-2 p-3 rounded-xl bg-sb-card border border-border space-y-1.5">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold text-text">IG Tracker Pro</span>
+            <span className="text-[11px] font-black" style={{ background: 'linear-gradient(130deg,#8b5cf6,#ec4899)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' }}>ScaleFlow</span>
             <span className="text-[9px] text-text2 bg-surface2 px-1.5 py-0.5 rounded">v2.0.0</span>
           </div>
           <div className="flex items-center gap-1.5 text-[10px] text-text2">

@@ -10,6 +10,44 @@ import { useConnections }    from '@/lib/connections'
 import { playSplash }        from '@/lib/sounds'
 import { startMusic, stopMusic, isMusicEnabled, subscribeMusicState } from '@/lib/music'
 
+// ── ScaleFlow logo SVG ────────────────────────────────────────────────────────
+function ScaleFlowLogoSVG({ size = 96, draw = false }: { size?: number; draw?: boolean }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="sf-logo-grad" x1="50" y1="97" x2="85" y2="3" gradientUnits="userSpaceOnUse">
+          <stop offset="0%"   stopColor="#3b82f6"/>
+          <stop offset="42%"  stopColor="#8b5cf6"/>
+          <stop offset="100%" stopColor="#f472b6"/>
+        </linearGradient>
+      </defs>
+      {/* S body */}
+      <path
+        pathLength="1"
+        d="M 66 22 C 76 8 60 3 42 3 C 20 3 12 18 12 32 C 12 46 26 52 46 55 C 66 58 82 65 82 79 C 82 93 68 97 50 97 C 32 97 18 89 16 76"
+        stroke="url(#sf-logo-grad)"
+        strokeWidth="13" strokeLinecap="round" fill="none"
+        className={draw ? 'sf-draw-path' : undefined}
+      />
+      {/* Arrow stem */}
+      <line x1="66" y1="22" x2="85" y2="5"
+        stroke="#f472b6" strokeWidth="9" strokeLinecap="round"
+        className={draw ? 'sf-arrow' : undefined}
+      />
+      {/* Arrow head horizontal */}
+      <line x1="73" y1="4" x2="86" y2="4"
+        stroke="#f472b6" strokeWidth="7" strokeLinecap="round"
+        className={draw ? 'sf-arrow' : undefined}
+      />
+      {/* Arrow head vertical */}
+      <line x1="86" y1="4" x2="86" y2="18"
+        stroke="#f472b6" strokeWidth="7" strokeLinecap="round"
+        className={draw ? 'sf-arrow' : undefined}
+      />
+    </svg>
+  )
+}
+
 // ── Static ember positions ────────────────────────────────────────────────────
 const EMBERS = [
   { x: 10, dx: -12, dy:-110, dur:3.2, delay:0.0, size:2.5 },
@@ -180,169 +218,158 @@ function FlameOverlay() {
 }
 
 // ── Splash screen ─────────────────────────────────────────────────────────────
-const SPLASH_DURATION = 3400
+const SPLASH_DURATION = 3600
 
-// Static particles so positions don't change on re-render
-const PARTICLES = [
-  { x: 38, y: 58, s: 2.5, d: 0.1, dur: 2.8 },
-  { x: 62, y: 55, s: 2,   d: 0.4, dur: 3.1 },
-  { x: 48, y: 60, s: 1.5, d: 0.7, dur: 2.5 },
-  { x: 55, y: 57, s: 3,   d: 0.2, dur: 3.4 },
-  { x: 42, y: 56, s: 1.5, d: 1.0, dur: 2.9 },
-  { x: 52, y: 59, s: 2,   d: 0.6, dur: 3.2 },
-  { x: 46, y: 54, s: 1,   d: 1.3, dur: 2.7 },
-  { x: 58, y: 61, s: 2.5, d: 0.3, dur: 3.0 },
-  { x: 44, y: 53, s: 1,   d: 0.9, dur: 2.6 },
-  { x: 56, y: 62, s: 2,   d: 1.2, dur: 3.3 },
-  { x: 40, y: 57, s: 1.5, d: 0.5, dur: 2.4 },
-  { x: 60, y: 58, s: 1,   d: 1.5, dur: 3.5 },
+// Pre-computed burst particles (angle → px/py offset in px)
+const SF_PARTICLES = [
+  { px: 90,  py: 0,   size: 4, dur: '0.92s', delay: '0.74s', col: '#ec4899' },
+  { px: 70,  py: 28,  size: 2, dur: '0.76s', delay: '0.79s', col: '#8b5cf6' },
+  { px: 78,  py: 78,  size: 3, dur: '1.02s', delay: '0.71s', col: '#3b82f6' },
+  { px: 30,  py: 74,  size: 2, dur: '0.82s', delay: '0.82s', col: '#ec4899' },
+  { px: 0,   py: 95,  size: 4, dur: '0.88s', delay: '0.75s', col: '#8b5cf6' },
+  { px: -37, py: 88,  size: 2, dur: '0.93s', delay: '0.84s', col: '#3b82f6' },
+  { px: -70, py: 70,  size: 3, dur: '0.79s', delay: '0.73s', col: '#ec4899' },
+  { px: -76, py: 31,  size: 2, dur: '0.90s', delay: '0.86s', col: '#8b5cf6' },
+  { px: -95, py: 0,   size: 4, dur: '0.84s', delay: '0.77s', col: '#3b82f6' },
+  { px: -67, py: -27, size: 2, dur: '0.97s', delay: '0.88s', col: '#ec4899' },
+  { px: -75, py: -75, size: 3, dur: '0.77s', delay: '0.72s', col: '#8b5cf6' },
+  { px: -29, py: -72, size: 2, dur: '0.91s', delay: '0.80s', col: '#3b82f6' },
+  { px: 0,   py: -92, size: 4, dur: '0.85s', delay: '0.78s', col: '#ec4899' },
+  { px: 37,  py: -65, size: 2, dur: '0.89s', delay: '0.83s', col: '#8b5cf6' },
+  { px: 82,  py: -82, size: 3, dur: '0.94s', delay: '0.70s', col: '#3b82f6' },
+  { px: 74,  py: -30, size: 2, dur: '0.87s', delay: '0.76s', col: '#ec4899' },
 ]
 
 const STATUS_MSGS = [
   'Initialisation des modules…',
-  'Connexion à la base de données…',
+  'Connexion sécurisée…',
   'Chargement de l\'interface…',
-  'Tout est prêt ✓',
+  'ScaleFlow est prêt ✓',
 ]
 
 function SplashScreen({ onDone }: { onDone: () => void }) {
   const [fading, setFading]       = useState(false)
-  const [typed, setTyped]         = useState('')
   const [statusIdx, setStatusIdx] = useState(0)
   const doneRef                   = useRef(false)
-  const fullText                  = 'Gestion de comptes Instagram'
 
-  // Play jingle once on mount
   useEffect(() => { playSplash() }, [])
 
-  // Fade-out timing
   useEffect(() => {
     const t1 = setTimeout(() => setFading(true), SPLASH_DURATION)
     const t2 = setTimeout(() => {
       if (!doneRef.current) { doneRef.current = true; onDone() }
-    }, SPLASH_DURATION + 560)
+    }, SPLASH_DURATION + 620)
     return () => { clearTimeout(t1); clearTimeout(t2) }
   }, [onDone])
 
-  // Typewriter effect (starts at 850ms)
   useEffect(() => {
-    if (typed.length >= fullText.length) return
-    const delay = typed.length === 0 ? 850 : 45
-    const t = setTimeout(() => setTyped(fullText.slice(0, typed.length + 1)), delay)
-    return () => clearTimeout(t)
-  }, [typed])
-
-  // Status message cycle
-  useEffect(() => {
-    const intervals = [700, 1500, 2400]
-    const timers = intervals.map((ms, i) => setTimeout(() => setStatusIdx(i + 1), ms))
+    const timers = [800, 1700, 2600].map((ms, i) => setTimeout(() => setStatusIdx(i + 1), ms))
     return () => timers.forEach(clearTimeout)
   }, [])
 
   return (
     <div
-      className={fading ? 'splash-fade-out' : ''}
+      className={fading ? 'sf-fade-out' : ''}
       style={{
         position: 'fixed', inset: 0, zIndex: 9999,
-        background: 'radial-gradient(ellipse at 50% 35%, #0e1a3a 0%, #080b14 68%)',
+        background: '#030307',
         display: 'flex', flexDirection: 'column',
         alignItems: 'center', justifyContent: 'center',
         pointerEvents: fading ? 'none' : 'all',
         overflow: 'hidden',
       }}
     >
-      {/* ── Grid overlay ── */}
+      {/* ── Deep purple radial glow ── */}
       <div style={{
-        position: 'absolute', inset: 0, opacity: 0.04,
-        backgroundImage: 'linear-gradient(#4f9eff 1px, transparent 1px), linear-gradient(90deg, #4f9eff 1px, transparent 1px)',
-        backgroundSize: '60px 60px',
-        pointerEvents: 'none',
+        position: 'absolute', inset: 0, pointerEvents: 'none',
+        background: 'radial-gradient(ellipse 65% 55% at 50% 44%, #1e0b3a55 0%, #2d1b6920 40%, transparent 70%)',
+        animation: 'sf-bg-breathe 3s ease-in-out 1s infinite',
       }} />
 
-      {/* ── Floating particles ── */}
-      {PARTICLES.map((p, i) => (
-        <div key={i} className="splash-particle" style={{
-          position: 'absolute',
-          left:    `${p.x}%`,
-          top:     `${p.y}%`,
-          width:    p.s,
-          height:   p.s,
-          borderRadius: '50%',
-          background: '#4f9eff',
-          boxShadow: `0 0 ${p.s * 3}px #4f9effaa`,
-          animationDelay: `${p.d}s`,
-          animationDuration: `${p.dur}s`,
-          animationIterationCount: 'infinite',
-        }} />
-      ))}
+      {/* ── Subtle purple grid ── */}
+      <div style={{
+        position: 'absolute', inset: 0, pointerEvents: 'none', opacity: 0.03,
+        backgroundImage: 'linear-gradient(#8b5cf6 1px, transparent 1px), linear-gradient(90deg, #8b5cf6 1px, transparent 1px)',
+        backgroundSize: '80px 80px',
+      }} />
 
-      {/* ── Logo with spinning border + glow rings ── */}
-      <div className="splash-logo" style={{ position: 'relative', marginBottom: 36 }}>
-        {/* Radar rings */}
-        {(['splash-ring-1', 'splash-ring-2', 'splash-ring-3'] as const).map(cls => (
+      {/* ── Horizontal scan line ── */}
+      <div style={{
+        position: 'absolute', left: 0, right: 0, height: 1.5, pointerEvents: 'none',
+        background: 'linear-gradient(90deg, transparent 0%, #8b5cf622 15%, #8b5cf699 50%, #8b5cf622 85%, transparent 100%)',
+        animation: 'sf-scan 5s linear 0.6s infinite',
+      }} />
+
+      {/* ── Logo area: rings + particles + logo ── */}
+      <div style={{ position: 'relative', width: 120, height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 44 }}>
+
+        {/* Expanding rings burst */}
+        {(['sf-ring-1', 'sf-ring-2', 'sf-ring-3'] as const).map(cls => (
           <div key={cls} className={cls} style={{
-            position: 'absolute',
-            inset: -4,
-            borderRadius: 36,
-            border: '1.5px solid #4f9eff',
-            pointerEvents: 'none',
+            position: 'absolute', inset: 0, borderRadius: '50%',
+            border: '1.5px solid #8b5cf6', pointerEvents: 'none',
           }} />
         ))}
 
-        {/* Spinning border wrapper */}
-        <div className="splash-border" style={{
-          width: 108, height: 108, borderRadius: 32, padding: 2.5,
-          background: `conic-gradient(from var(--splash-angle, 0deg), transparent 0%, #4f9eff 35%, #7eb8ff 50%, transparent 65%)`,
-        }}>
-          {/* Logo inner */}
-          <div style={{
-            width: '100%', height: '100%', borderRadius: 30,
-            background: 'linear-gradient(135deg, #1a2f5e 0%, #0a1428 100%)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 38, fontWeight: 900,
-            color: '#4f9eff', letterSpacing: '-2px',
-            fontFamily: 'Inter, system-ui, sans-serif',
-            position: 'relative', overflow: 'hidden',
-          }}>
-            {/* Shimmer sweep over text */}
-            <div style={{
-              position: 'absolute', inset: 0,
-              background: 'linear-gradient(105deg, transparent 30%, #ffffff22 50%, transparent 70%)',
-              backgroundSize: '200% 100%',
-              animation: 'splash-shimmer 2.4s ease-in-out 0.9s infinite',
-            }} />
-            IG
-          </div>
+        {/* Burst particles */}
+        {SF_PARTICLES.map((p, i) => (
+          <div
+            key={i}
+            className="sf-particle"
+            style={{
+              position: 'absolute',
+              top: '50%', left: '50%',
+              width: p.size, height: p.size, borderRadius: '50%',
+              background: p.col,
+              boxShadow: `0 0 ${p.size * 3}px ${p.size}px ${p.col}88`,
+              marginLeft: -p.size / 2, marginTop: -p.size / 2,
+              ['--px' as string]: `${p.px}px`,
+              ['--py' as string]: `${p.py}px`,
+              ['--dur' as string]: p.dur,
+              ['--delay' as string]: p.delay,
+              pointerEvents: 'none',
+            }}
+          />
+        ))}
+
+        {/* ScaleFlow S logo */}
+        <div className="sf-logo-anim">
+          <ScaleFlowLogoSVG size={110} draw />
         </div>
       </div>
 
-      {/* ── Title ── */}
-      <div className="splash-title" style={{ textAlign: 'center', marginBottom: 6 }}>
-        <span style={{ fontSize: 30, fontWeight: 800, color: '#d4dcf0', letterSpacing: '-0.5px' }}>
-          IG Tracker
-        </span>
-        {' '}
-        <span style={{ fontSize: 30, fontWeight: 800,
-          background: 'linear-gradient(135deg, #4f9eff, #7eb8ff)',
+      {/* ── ScaleFlow title ── */}
+      <div style={{ display: 'flex', alignItems: 'baseline', marginBottom: 14 }}>
+        <span className="sf-word-left" style={{
+          fontSize: 42, fontWeight: 900, color: '#f0eeff',
+          letterSpacing: '-1.5px', fontFamily: 'Inter, system-ui, sans-serif',
+          lineHeight: 1,
+        }}>Scale</span>
+        <span className="sf-word-right" style={{
+          fontSize: 42, fontWeight: 900, letterSpacing: '-1.5px',
+          fontFamily: 'Inter, system-ui, sans-serif', lineHeight: 1,
+          background: 'linear-gradient(130deg, #8b5cf6 30%, #ec4899 100%)',
           WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-        }}>v2</span>
+        }}>Flow</span>
       </div>
 
-      {/* ── Typewriter subtitle ── */}
-      <div className="splash-sub" style={{
-        color: '#5a6882', fontSize: 13, marginBottom: 52,
-        fontFamily: 'monospace', letterSpacing: '0.02em', minHeight: 18,
+      {/* ── Tagline ── */}
+      <div className="sf-tagline" style={{
+        fontSize: 11, color: '#4a3f7a', letterSpacing: '0.22em',
+        textTransform: 'uppercase', fontFamily: 'Inter, system-ui, sans-serif',
+        marginBottom: 64,
       }}>
-        {typed}<span className="splash-cursor" style={{ color: '#4f9eff', marginLeft: 1 }}>|</span>
+        Automatise ta croissance
       </div>
 
       {/* ── Status text ── */}
-      <div style={{
-        position: 'absolute', bottom: 44,
-        fontSize: 10, color: '#3a4a66', letterSpacing: '0.08em',
+      <div key={statusIdx} style={{
+        position: 'absolute', bottom: 42,
+        fontSize: 10, color: '#2a1f48', letterSpacing: '0.12em',
         fontFamily: 'monospace', textTransform: 'uppercase',
         transition: 'opacity 0.4s',
         opacity: fading ? 0 : 1,
+        animation: 'sf-arrow-in 0.4s ease-out',
       }}>
         {STATUS_MSGS[statusIdx]}
       </div>
@@ -350,64 +377,55 @@ function SplashScreen({ onDone }: { onDone: () => void }) {
       {/* ── Progress bar ── */}
       <div style={{
         position: 'absolute', bottom: 0, left: 0, right: 0,
-        height: 3, background: '#0f1628',
+        height: 2, background: '#0d0a1a',
       }}>
-        <div className="splash-bar" style={{
+        <div className="sf-bar" style={{
           height: '100%',
-          background: 'linear-gradient(90deg, #4f9eff, #7eb8ff, #4f9eff)',
-          backgroundSize: '200% 100%',
+          background: 'linear-gradient(90deg, #3b82f6, #8b5cf6, #ec4899)',
           borderRadius: 2,
-          position: 'relative', overflow: 'hidden',
-        }}>
-          {/* Shimmer on bar */}
-          <div className="splash-bar-shimmer" style={{
-            position: 'absolute', inset: 0,
-            background: 'linear-gradient(90deg, transparent, #ffffff40, transparent)',
-            width: '25%',
-          }} />
-        </div>
+        }} />
       </div>
     </div>
   )
 }
 
-// ── Beta popup (shown once per device after onboarding is complete) ───────────
+// ── Welcome popup (shown once per device after onboarding) ───────────────────
 function BetaPopup({ onClose }: { onClose: () => void }) {
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm">
-      <div className="bg-[#0d1120] border border-accent/30 rounded-2xl p-8 w-full max-w-md shadow-2xl text-center space-y-5">
-        <div className="space-y-1">
-          <div className="inline-flex items-center gap-2 bg-[#e0245e]/10 border border-[#e0245e]/30 rounded-full px-4 py-1.5 text-[#e0245e] text-xs font-bold uppercase tracking-widest mb-3">
-            🔴 BÊTA
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md">
+      <div className="bg-[#080610] border border-[#8b5cf6]/20 rounded-2xl p-8 w-full max-w-md shadow-2xl shadow-[#8b5cf6]/10 text-center space-y-5 anim-scale-in">
+        {/* Logo + title */}
+        <div className="flex flex-col items-center gap-3">
+          <ScaleFlowLogoSVG size={56} />
+          <div>
+            <h2 className="text-2xl font-black text-white tracking-tight">
+              Scale<span style={{ background: 'linear-gradient(130deg,#8b5cf6,#ec4899)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' }}>Flow</span>
+            </h2>
+            <p className="text-[#4a3f7a] text-xs uppercase tracking-widest mt-0.5">Automatise ta croissance</p>
           </div>
-          <h2 className="text-2xl font-bold text-text">IG Tracker <span className="text-accent">v2.0</span></h2>
-          <p className="text-text2 text-sm">Bienvenue dans la nouvelle version de l'application !</p>
         </div>
 
-        <div className="text-left space-y-2.5">
+        <div className="text-left space-y-2">
           {[
-            { icon: '⚡', text: 'Interface entièrement redessinée en React + Electron' },
-            { icon: '✨', text: 'Génération de captions IA via Groq Llama 3.3' },
-            { icon: '🤖', text: 'Mass Posting et automatisation de commentaires' },
-            { icon: '📊', text: 'Dashboard avec historique de vues' },
+            { icon: '⚡', text: 'Interface redessinée, rapide et professionnelle' },
+            { icon: '✨', text: 'Captions IA via Groq Llama 3.3 70B' },
+            { icon: '🚀', text: 'Posting & Mass Posting automatisés sur GéeLark' },
+            { icon: '📊', text: 'Dashboard, Stats et historique de vues' },
           ].map(({ icon, text }) => (
-            <div key={text} className="flex items-start gap-3 bg-surface2/50 rounded-xl px-4 py-2.5">
-              <span className="text-lg flex-shrink-0">{icon}</span>
+            <div key={text} className="flex items-center gap-3 rounded-xl px-4 py-2.5"
+              style={{ background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.1)' }}>
+              <span className="text-base flex-shrink-0">{icon}</span>
               <span className="text-sm text-text2">{text}</span>
             </div>
           ))}
         </div>
 
-        <div className="bg-warn/10 border border-warn/20 rounded-xl px-4 py-3 text-left">
-          <p className="text-warn text-xs font-semibold mb-0.5">⚠ Version bêta</p>
-          <p className="text-text2 text-xs">Certaines fonctionnalités sont encore en développement. Les bugs peuvent être signalés via Paramètres.</p>
-        </div>
-
         <button
           onClick={onClose}
-          className="w-full bg-accent hover:bg-accent2 text-white font-bold py-3 rounded-xl transition-colors text-sm"
+          style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)', border: 'none' }}
+          className="w-full text-white font-bold py-3 rounded-xl text-sm hover:opacity-90 active:scale-[0.98] transition-all shadow-lg shadow-[#7c3aed]/30"
         >
-          🚀 Entrer dans l'application
+          Entrer dans ScaleFlow →
         </button>
       </div>
     </div>
@@ -427,7 +445,7 @@ import { Settings }          from '@/pages/Settings'
 import { MassPosting }       from '@/pages/MassPosting'
 import { FullPageLoader }    from '@/components/ui/Spinner'
 
-const BETA_KEY = 'ig-tracker-beta-v2-seen'
+const BETA_KEY = 'scaleflow-v1-seen'
 
 function AppContent({ user }: { user: User }) {
   const { currentOrg } = useOrg()

@@ -338,84 +338,99 @@ export function MassPosting({ user }: MassPostingProps) {
   return (
     <div className="flex flex-col h-full min-h-screen">
       {/* Header */}
-      <div className="px-6 py-3 border-b border-border bg-[#070a10] flex flex-col gap-3 flex-shrink-0">
-        <div className="flex items-center gap-4">
+      <div className="px-6 py-4 border-b border-border flex flex-col gap-3 flex-shrink-0" style={{ background: '#06080e' }}>
+        <div className="flex items-center gap-3">
+          {/* Title block */}
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+            style={{ background: 'linear-gradient(135deg,#7c3aed22,#ec489922)', border: '1px solid rgba(139,92,246,0.2)' }}>
+            <span className="text-base">⚡</span>
+          </div>
           <div>
-            <h1 className="text-lg font-bold text-text">⚡ Mass Posting</h1>
-            <p className="text-text2 text-[11px] mt-0.5">
-              1 vidéo / téléphone — {phoneList.length} cible{phoneList.length !== 1 ? 's' : ''}, {selectedVideos.length} vidéo{selectedVideos.length !== 1 ? 's' : ''}
-              {withSessions > 0 && <span className="ml-2 text-ok">· {withSessions} session(s) IG</span>}
+            <h1 className="text-lg font-black text-text tracking-tight">Mass Posting</h1>
+            <p className="text-text2 text-[11px]">
+              {phoneList.length} cible{phoneList.length !== 1 ? 's' : ''} · {selectedVideos.length} vidéo{selectedVideos.length !== 1 ? 's' : ''}
+              {withSessions > 0 && <span className="ml-2 text-ok">· {withSessions} session IG</span>}
             </p>
           </div>
           <div className="flex-1" />
+
           {/* Mode toggle */}
-          <div className="flex bg-surface rounded-lg p-1 text-xs">
-            {([
-              { k: 'seq',    l: 'Séquentiel' },
-              { k: 'random', l: 'Aléatoire'  },
-            ] as const).map(m => (
-              <button
-                key={m.k}
-                onClick={() => setMode(m.k)}
-                className={`px-3 py-1 rounded-md font-medium transition-colors ${
-                  mode === m.k ? 'bg-accent text-white' : 'text-text2 hover:text-text'
-                }`}
+          <div className="flex rounded-lg p-0.5 text-xs" style={{ background: '#0d0f1c', border: '1px solid #1a2035' }}>
+            {([{ k: 'seq', l: 'Séquentiel' }, { k: 'random', l: 'Aléatoire' }] as const).map(m => (
+              <button key={m.k} onClick={() => setMode(m.k)}
+                className="px-3 py-1.5 rounded-md font-semibold transition-all text-[11px]"
+                style={mode === m.k
+                  ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: 'white' }
+                  : { color: '#5a6882' }}
               >{m.l}</button>
             ))}
           </div>
-          {/* Workers + delay */}
-          <div className="flex items-center gap-1.5 text-xs text-text2">
-            <span>⚡</span>
-            <input
-              type="number" min={1} max={50}
-              value={maxWorkers}
+
+          {/* Workers */}
+          <div className="flex items-center gap-1.5 text-xs text-text2 bg-[#0d0f1c] border border-border rounded-lg px-2.5 py-1.5">
+            <span className="text-text2">⚡</span>
+            <input type="number" min={1} max={50} value={maxWorkers}
               onChange={e => setMaxWorkers(parseInt(e.target.value) || 20)}
-              className="w-12 bg-bg border border-border rounded px-1.5 py-0.5 text-text text-center focus:outline-none focus:border-accent"
+              className="w-9 bg-transparent text-text text-center focus:outline-none text-[11px]"
             />
-            <span>simultanés</span>
+            <span className="text-[10px]">simult.</span>
           </div>
-          <div className="flex items-center gap-1.5 text-xs text-text2">
+
+          {/* Stagger */}
+          <div className="flex items-center gap-1.5 text-xs text-text2 bg-[#0d0f1c] border border-border rounded-lg px-2.5 py-1.5">
             <span>⏱</span>
-            <input
-              type="number" min={0} max={60}
-              value={staggerMin}
+            <input type="number" min={0} max={60} value={staggerMin}
               onChange={e => setStaggerMin(parseInt(e.target.value) || 0)}
-              className="w-12 bg-bg border border-border rounded px-1.5 py-0.5 text-text text-center focus:outline-none focus:border-accent"
+              className="w-9 bg-transparent text-text text-center focus:outline-none text-[11px]"
             />
-            <span>min délai</span>
+            <span className="text-[10px]">min</span>
           </div>
-          <Button
+
+          {/* Action buttons */}
+          <button
             onClick={post}
-            loading={posting}
-            disabled={!bearer || phoneList.length === 0 || selectedVideos.length === 0}
+            disabled={posting || !bearer || phoneList.length === 0 || selectedVideos.length === 0}
+            className="px-4 py-2 rounded-xl text-xs font-black text-white transition-all active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed"
+            style={{
+              background: posting || !bearer || phoneList.length === 0 || selectedVideos.length === 0
+                ? '#1a2035'
+                : 'linear-gradient(130deg,#7c3aed,#ec4899)',
+              boxShadow: posting || !bearer || phoneList.length === 0 || selectedVideos.length === 0
+                ? 'none'
+                : '0 4px 20px -4px rgba(124,58,237,0.5)',
+            }}
           >
-            ⚡ Lancer le Mass Posting
-          </Button>
-          <Button onClick={stop} variant="danger" disabled={!posting}>⏹ Arrêter</Button>
+            {posting ? '⏳ En cours…' : '⚡ Lancer'}
+          </button>
+          <button
+            onClick={stop}
+            disabled={!posting}
+            className="px-3 py-2 rounded-xl text-xs font-semibold text-danger border border-danger/30 hover:bg-danger/10 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            ⏹ Stopper
+          </button>
         </div>
 
-        {/* Description shared by all */}
+        {/* Description row */}
         <div className="flex items-start gap-2">
           <textarea
             value={caption}
             onChange={e => setCaption(e.target.value)}
             rows={2}
             placeholder="Description partagée par tous les téléphones (optionnel)…"
-            className="flex-1 bg-bg border border-border rounded-lg px-3 py-2 text-xs text-text placeholder:text-text2 resize-none focus:outline-none focus:border-accent"
+            className="flex-1 bg-[#0a0c15] border border-border rounded-xl px-3 py-2 text-xs text-text placeholder:text-text2 resize-none focus:outline-none focus:border-[#8b5cf6]/50"
           />
           <div className="flex flex-col gap-1.5">
             <Button size="sm" variant="secondary" onClick={generateCaption} loading={generating} disabled={!groqKey}>✨ Générer</Button>
-            <input
-              type="text"
-              value={customPrompt}
-              onChange={e => setCustomPrompt(e.target.value)}
+            <input type="text" value={customPrompt} onChange={e => setCustomPrompt(e.target.value)}
               placeholder="Prompt IA…"
-              className="w-32 bg-bg border border-border rounded px-2 py-1 text-[11px] text-text placeholder:text-text2 focus:outline-none focus:border-accent"
+              className="w-32 bg-[#0a0c15] border border-border rounded-lg px-2 py-1 text-[11px] text-text placeholder:text-text2 focus:outline-none focus:border-[#8b5cf6]/50"
             />
             <div className="flex items-center gap-1.5">
               <button
                 onClick={() => setWithHashtags(v => !v)}
-                className={`relative w-7 h-3.5 rounded-full transition-colors flex-shrink-0 ${withHashtags ? 'bg-accent' : 'bg-surface2'}`}
+                className="relative w-7 h-3.5 rounded-full transition-all flex-shrink-0"
+                style={{ background: withHashtags ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : '#1a2035' }}
               >
                 <span className={`absolute top-0.5 w-2.5 h-2.5 bg-white rounded-full shadow transition-all ${withHashtags ? 'left-[14px]' : 'left-0.5'}`} />
               </button>

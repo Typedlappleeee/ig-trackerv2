@@ -309,3 +309,79 @@ button, a, input, select, textarea {
   transition-duration: 150ms;
   transition-timing-function: cubic-bezier(.22,1,.36,1);
 }
+
+/* ── ScaleFlow Splash Animations ─────────────────────────────────────────────── */
+@keyframes sf-logo-in {
+  0%   { opacity: 0; transform: scale(0.25) rotate(-10deg); filter: blur(24px); }
+  62%  { opacity: 1; transform: scale(1.08) rotate(1.5deg); filter: blur(0); }
+  100% { opacity: 1; transform: scale(1) rotate(0deg); }
+}
+@keyframes sf-glow {
+  0%, 100% { filter: drop-shadow(0 0 22px #7c3aed99) drop-shadow(0 0 55px #7c3aed1a); }
+  50%       { filter: drop-shadow(0 0 40px #a855f7ee) drop-shadow(0 0 90px #7c3aed40); }
+}
+@keyframes sf-draw {
+  0%   { stroke-dashoffset: 1; }
+  100% { stroke-dashoffset: 0; }
+}
+@keyframes sf-arrow-in {
+  0%   { opacity: 0; }
+  100% { opacity: 1; }
+}
+@keyframes sf-word-l {
+  0%   { opacity: 0; transform: translateX(-60px); filter: blur(10px); }
+  100% { opacity: 1; transform: translateX(0); filter: blur(0); }
+}
+@keyframes sf-word-r {
+  0%   { opacity: 0; transform: translateX(60px); filter: blur(10px); }
+  100% { opacity: 1; transform: translateX(0); filter: blur(0); }
+}
+@keyframes sf-tagline {
+  0%   { opacity: 0; transform: translateY(16px); letter-spacing: 0.35em; }
+  100% { opacity: 1; transform: translateY(0); letter-spacing: 0.22em; }
+}
+@keyframes sf-ring-pop {
+  0%   { transform: scale(0.7); opacity: 0.9; }
+  100% { transform: scale(5);   opacity: 0; }
+}
+@keyframes sf-particle {
+  0%   { opacity: 1; transform: translate(0,0) scale(1); }
+  60%  { opacity: 0.6; }
+  100% { opacity: 0; transform: translate(var(--px,0px),var(--py,0px)) scale(0.05); }
+}
+@keyframes sf-bar {
+  0%   { width: 0%;   opacity: 1; }
+  86%  { width: 100%; opacity: 1; }
+  100% { width: 100%; opacity: 0; }
+}
+@keyframes sf-scan {
+  0%   { transform: translateY(-4px); opacity: 0; }
+  8%   { opacity: 1; }
+  92%  { opacity: 1; }
+  100% { transform: translateY(100vh); opacity: 0; }
+}
+@keyframes sf-bg-breathe {
+  0%, 100% { opacity: 0.6; }
+  50%       { opacity: 1; }
+}
+@keyframes sf-title-glow {
+  0%, 100% { text-shadow: 0 0 30px #8b5cf622; }
+  50%       { text-shadow: 0 0 60px #8b5cf644, 0 0 120px #ec489922; }
+}
+
+.sf-logo-anim  { animation: sf-logo-in 0.72s cubic-bezier(.22,1,.36,1) 0.1s both,
+                             sf-glow 2.6s ease-in-out 0.82s infinite; }
+.sf-draw-path  { stroke-dasharray: 1; stroke-dashoffset: 1;
+                 animation: sf-draw 0.82s cubic-bezier(0.4,0,0.2,1) 0.15s forwards; }
+.sf-arrow      { opacity: 0; animation: sf-arrow-in 0.3s ease-out 0.78s forwards; }
+.sf-word-left  { animation: sf-word-l 0.54s cubic-bezier(.22,1,.36,1) 0.82s both; }
+.sf-word-right { animation: sf-word-r 0.54s cubic-bezier(.22,1,.36,1) 0.90s both; }
+.sf-tagline    { animation: sf-tagline 0.58s ease-out 1.28s both; }
+.sf-ring-1     { animation: sf-ring-pop 1.6s ease-out 0.76s both; }
+.sf-ring-2     { animation: sf-ring-pop 1.6s ease-out 1.05s both; }
+.sf-ring-3     { animation: sf-ring-pop 1.6s ease-out 1.34s both; }
+.sf-particle   { animation: sf-particle var(--dur,0.9s) ease-out var(--delay,0.75s) both; }
+.sf-bar        { animation: sf-bar 3.2s ease-in-out 0.28s both; }
+.sf-fade-out   { animation: splash-out 0.6s ease-out forwards; }
+.sf-title      { animation: sf-word-l 0.54s cubic-bezier(.22,1,.36,1) 0.82s both,
+                             sf-title-glow 3s ease-in-out 1.5s infinite; }
