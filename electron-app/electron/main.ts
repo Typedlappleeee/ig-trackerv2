@@ -573,130 +573,87 @@ ipcMain.handle('run-ffmpeg', async (_event, opts: {
   })
 })
 
-// ── IPC: detect scene change via raw pixel color comparison ──────────────────
-// Primary method: pipe tiny 32×32 RGB frames from FFmpeg at 2fps, compute the
-// Euclidean distance in color-space between consecutive frames.  The biggest
-// jump = scene change.  This works for brightness, color-shift, and hard-cuts
-// where FFmpeg's built-in scene filter often fails.
+// ── IPC: detect scene change via BMP frame color comparison ──────────────────
+// FFmpeg writes tiny 32×32 BMP frames at 2fps to a temp dir.
+// Node.js reads raw BGR pixels directly from each BMP buffer (no library),
+// computes Euclidean RGB distance between consecutive frames.
+// The biggest jump = scene change. Always returns a result.
 ipcMain.handle('detect-scene-change', async (_event, opts: {
   filePath: string; threshold?: number
 }) => {
   const ffmpegBin = process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg'
-  const nullSink  = process.platform === 'win32' ? 'NUL' : '/dev/null'
-  const W = 32, H = 32, FPS = 2
-  const frameBytes = W * H * 3  // rgb24
+  const FPS = 2
+  const tmpDir = path.join(os.tmpdir(), `sf-det-${Date.now()}`)
 
-  // ── Primary: raw RGB pixel stream ────────────────────────────────────────────
-  function detectByPixels(): Promise<{ ok: boolean; times: number[]; duration: number }> {
-    return new Promise(res => {
-      const chunks: Buffer[] = []
-      let stderrBuf = ''
+  try { mkdirSync(tmpDir, { recursive: true }) } catch { /* ignore */ }
 
-      const proc = spawn(ffmpegBin, [
-        '-hide_banner', '-i', opts.filePath,
-        '-vf', `fps=${FPS},scale=${W}:${H},format=rgb24`,
-        '-f', 'rawvideo', '-pix_fmt', 'rgb24', 'pipe:1',
-      ])
+  return new Promise(resolve => {
+    execFile(ffmpegBin, [
+      '-hide_banner', '-i', opts.filePath,
+      '-vf', `fps=${FPS},scale=32:32`,
+      '-vcodec', 'bmp',
+      '-y', path.join(tmpDir, 'f_%06d.bmp'),
+    ], { maxBuffer: 10 * 1024 * 1024 }, (_err, _stdout, stderr) => {
 
-      proc.stdout.on('data', (c: Buffer) => chunks.push(c))
-      proc.stderr.on('data', (d: Buffer) => { stderrBuf += d.toString() })
-      proc.on('error', () => res({ ok: false, times: [], duration: 0 }))
+      const durM = (stderr ?? '').match(/Duration:\s*(\d+):(\d+):(\d+\.?\d*)/)
+      const duration = durM
+        ? parseInt(durM[1]) * 3600 + parseInt(durM[2]) * 60 + parseFloat(durM[3])
+        : 0
 
-      proc.on('close', () => {
-        const durM = stderrBuf.match(/Duration:\s*(\d+):(\d+):(\d+\.?\d*)/)
-        const duration = durM ? parseInt(durM[1])*3600 + parseInt(durM[2])*60 + parseFloat(durM[3]) : 0
+      let files: string[] = []
+      try { files = readdirSync(tmpDir).filter(f => f.endsWith('.bmp')).sort() } catch { /* ignore */ }
 
-        const raw   = Buffer.concat(chunks)
-        const total = Math.floor(raw.length / frameBytes)
-        if (total < 3) { res({ ok: false, times: [], duration }); return }
+      if (files.length < 2) {
+        try { rmSync(tmpDir, { recursive: true }) } catch { /* ignore */ }
+        return resolve({ ok: false, times: [], duration, error: 'Impossible de lire les frames vidéo.' })
+      }
 
-        // Average RGB per frame
-        const avgs: [number, number, number][] = []
-        for (let i = 0; i < total; i++) {
-          let r = 0, g = 0, b = 0
-          const off = i * frameBytes
-          for (let p = 0; p < W * H; p++) {
-            r += raw[off + p * 3]
-            g += raw[off + p * 3 + 1]
-            b += raw[off + p * 3 + 2]
+      // Read average BGR color from each BMP (raw pixels after header)
+      const avgs: [number, number, number][] = files.map(f => {
+        try {
+          const buf = readFileSync(path.join(tmpDir, f))
+          const off = buf.length > 14 ? buf.readUInt32LE(10) : 54  // pixel data offset from BMP header
+          let r = 0, g = 0, b = 0, n = 0
+          for (let i = off; i + 2 < buf.length; i += 3) {
+            b += buf[i]; g += buf[i + 1]; r += buf[i + 2]; n++  // BMP stores BGR
           }
-          const n = W * H
-          avgs.push([r / n, g / n, b / n])
-        }
-
-        // Euclidean color distance between consecutive frames
-        const diffs = avgs.slice(1).map(([r2, g2, b2], i) => {
-          const [r1, g1, b1] = avgs[i]
-          return {
-            time: (i + 1) / FPS,
-            dist: Math.sqrt((r2-r1)**2 + (g2-g1)**2 + (b2-b1)**2),
-          }
-        })
-
-        // Skip first 0.5s (opening noise); adaptive threshold = 40% of max jump
-        const valid   = diffs.filter(d => d.time > 0.5)
-        if (!valid.length) { res({ ok: false, times: [], duration }); return }
-
-        const maxDist = Math.max(...valid.map(d => d.dist))
-        const cutoff  = Math.max(10, maxDist * 0.4)   // adaptive
-
-        const candidates = valid
-          .filter(d => d.dist >= cutoff)
-          .sort((a, b) => b.dist - a.dist)
-
-        const times = (candidates.length > 0 ? candidates : [valid.reduce((a, b) => b.dist > a.dist ? b : a)])
-          .map(d => d.time)
-
-        res({ ok: true, times, duration })
+          return n > 0 ? [r / n, g / n, b / n] as [number, number, number] : [0, 0, 0]
+        } catch { return [0, 0, 0] as [number, number, number] }
       })
-    })
-  }
 
-  // ── Fallback: FFmpeg showinfo scene filter ───────────────────────────────────
-  function tryDetectFFmpeg(thr: number): Promise<{ ok: boolean; times: number[]; duration: number }> {
-    return new Promise(res => {
-      execFile(ffmpegBin, [
-        '-hide_banner', '-i', opts.filePath,
-        '-vf', `select=gt(scene\\,${thr}),showinfo`,
-        '-vsync', '0', '-f', 'null', nullSink,
-      ], { maxBuffer: 20 * 1024 * 1024 }, (_err, stdout, stderr) => {
-        const raw  = (stdout ?? '') + (stderr ?? '')
-        const durM = raw.match(/Duration:\s*(\d+):(\d+):(\d+\.?\d*)/)
-        const duration = durM ? parseInt(durM[1])*3600 + parseInt(durM[2])*60 + parseFloat(durM[3]) : 0
-        const times: number[] = []
-        for (const m of raw.matchAll(/pts_time:(\d+\.?\d*)/g)) {
-          const t = parseFloat(m[1])
-          if (t > 0.3) times.push(t)
+      try { rmSync(tmpDir, { recursive: true }) } catch { /* ignore */ }
+
+      // Euclidean RGB distance between consecutive frames
+      const diffs = avgs.slice(1).map(([r2, g2, b2], i) => {
+        const [r1, g1, b1] = avgs[i]
+        return {
+          time: Math.round((i + 1) / FPS * 10) / 10,
+          dist: Math.sqrt((r2 - r1) ** 2 + (g2 - g1) ** 2 + (b2 - b1) ** 2),
         }
-        res({ ok: times.length > 0, times, duration })
       })
-    })
-  }
 
-  // Run pixel comparison first (primary)
-  const px = await detectByPixels()
-  if (px.ok && px.times.length > 0) {
-    const mid  = px.duration / 2
-    const best = px.times.reduce((a, b) => Math.abs(b - mid) < Math.abs(a - mid) ? b : a)
-    return { ok: true, times: px.times, splitTime: best, duration: px.duration }
-  }
+      console.log('[scene-detect] diffs:', diffs.map(d => `t=${d.time}s Δ=${d.dist.toFixed(1)}`).join(' | '))
 
-  // Fallback: FFmpeg scene filter with progressive thresholds
-  let duration = px.duration
-  for (const thr of [opts.threshold ?? 0.20, 0.12, 0.06, 0.03]) {
-    const r = await tryDetectFFmpeg(thr)
-    if (r.duration > 0) duration = r.duration
-    if (r.ok) {
+      const valid = diffs.filter(d => d.time > 0.4)
+      if (!valid.length) {
+        return resolve({ ok: false, times: [], duration, error: 'Vidéo trop courte — positionne le curseur manuellement.' })
+      }
+
+      // Adaptive cutoff = 35% of max jump; always return at least the biggest jump
+      const sorted  = [...valid].sort((a, b) => b.dist - a.dist)
+      const maxDist = sorted[0].dist
+      const cutoff  = Math.max(4, maxDist * 0.35)
+      const above   = sorted.filter(d => d.dist >= cutoff)
+      const picked  = above.length > 0 ? above : [sorted[0]]
+      const times   = picked.map(d => d.time)
+
       const mid  = duration / 2
-      const best = r.times.reduce((a, b) => Math.abs(b - mid) < Math.abs(a - mid) ? b : a)
-      return { ok: true, times: r.times, splitTime: best, duration }
-    }
-  }
+      const best = times.reduce((a, b) => Math.abs(b - mid) < Math.abs(a - mid) ? b : a)
 
-  return {
-    ok: false, times: [], duration,
-    error: 'Aucun changement de scène détecté — positionne le curseur manuellement.',
-  }
+      console.log('[scene-detect] result: times=', times, 'best=', best, 'maxDist=', maxDist.toFixed(1))
+      resolve({ ok: true, times, splitTime: best, duration })
+    })
+  })
 })
 
 // ── IPC: run FFmpeg remix (split + blend + concat) ───────────────────────────
