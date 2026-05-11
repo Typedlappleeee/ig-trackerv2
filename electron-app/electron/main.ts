@@ -2,7 +2,7 @@ import { app, BrowserWindow, shell, ipcMain, net, dialog, session, protocol } fr
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { existsSync, readFileSync, createReadStream, statSync, writeFileSync, mkdirSync, readdirSync, rmSync } from 'node:fs'
 import os from 'node:os'
-import { execFile } from 'node:child_process'
+import { execFile, spawn } from 'node:child_process'
 import https from 'node:https'
 import path from 'node:path'
 
@@ -573,36 +573,96 @@ ipcMain.handle('run-ffmpeg', async (_event, opts: {
   })
 })
 
-// ── IPC: detect scene change via FFmpeg scene filter ─────────────────────────
+// ── IPC: detect scene change via raw pixel color comparison ──────────────────
+// Primary method: pipe tiny 32×32 RGB frames from FFmpeg at 2fps, compute the
+// Euclidean distance in color-space between consecutive frames.  The biggest
+// jump = scene change.  This works for brightness, color-shift, and hard-cuts
+// where FFmpeg's built-in scene filter often fails.
 ipcMain.handle('detect-scene-change', async (_event, opts: {
   filePath: string; threshold?: number
 }) => {
   const ffmpegBin = process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg'
   const nullSink  = process.platform === 'win32' ? 'NUL' : '/dev/null'
+  const W = 32, H = 32, FPS = 2
+  const frameBytes = W * H * 3  // rgb24
 
-  // Helper: run one detection pass at a given threshold.
-  // Key fix: use backslash-escaped comma (\,) so FFmpeg doesn't treat the comma
-  // inside gt() as a filter separator. Also use showinfo which reliably outputs
-  // pts_time to stderr regardless of the null muxer on stdout.
-  function tryDetect(thr: number): Promise<{ ok: boolean; times: number[]; duration: number }> {
-    const args = [
-      '-hide_banner',
-      '-i', opts.filePath,
-      '-vf', `select=gt(scene\\,${thr}),showinfo`,
-      '-vsync', '0',
-      '-f', 'null', nullSink,
-    ]
+  // ── Primary: raw RGB pixel stream ────────────────────────────────────────────
+  function detectByPixels(): Promise<{ ok: boolean; times: number[]; duration: number }> {
     return new Promise(res => {
-      execFile(ffmpegBin, args, { maxBuffer: 20 * 1024 * 1024 }, (_err, stdout, stderr) => {
-        const raw = (stdout ?? '') + (stderr ?? '')
+      const chunks: Buffer[] = []
+      let stderrBuf = ''
 
+      const proc = spawn(ffmpegBin, [
+        '-hide_banner', '-i', opts.filePath,
+        '-vf', `fps=${FPS},scale=${W}:${H},format=rgb24`,
+        '-f', 'rawvideo', '-pix_fmt', 'rgb24', 'pipe:1',
+      ])
+
+      proc.stdout.on('data', (c: Buffer) => chunks.push(c))
+      proc.stderr.on('data', (d: Buffer) => { stderrBuf += d.toString() })
+      proc.on('error', () => res({ ok: false, times: [], duration: 0 }))
+
+      proc.on('close', () => {
+        const durM = stderrBuf.match(/Duration:\s*(\d+):(\d+):(\d+\.?\d*)/)
+        const duration = durM ? parseInt(durM[1])*3600 + parseInt(durM[2])*60 + parseFloat(durM[3]) : 0
+
+        const raw   = Buffer.concat(chunks)
+        const total = Math.floor(raw.length / frameBytes)
+        if (total < 3) { res({ ok: false, times: [], duration }); return }
+
+        // Average RGB per frame
+        const avgs: [number, number, number][] = []
+        for (let i = 0; i < total; i++) {
+          let r = 0, g = 0, b = 0
+          const off = i * frameBytes
+          for (let p = 0; p < W * H; p++) {
+            r += raw[off + p * 3]
+            g += raw[off + p * 3 + 1]
+            b += raw[off + p * 3 + 2]
+          }
+          const n = W * H
+          avgs.push([r / n, g / n, b / n])
+        }
+
+        // Euclidean color distance between consecutive frames
+        const diffs = avgs.slice(1).map(([r2, g2, b2], i) => {
+          const [r1, g1, b1] = avgs[i]
+          return {
+            time: (i + 1) / FPS,
+            dist: Math.sqrt((r2-r1)**2 + (g2-g1)**2 + (b2-b1)**2),
+          }
+        })
+
+        // Skip first 0.5s (opening noise); adaptive threshold = 40% of max jump
+        const valid   = diffs.filter(d => d.time > 0.5)
+        if (!valid.length) { res({ ok: false, times: [], duration }); return }
+
+        const maxDist = Math.max(...valid.map(d => d.dist))
+        const cutoff  = Math.max(10, maxDist * 0.4)   // adaptive
+
+        const candidates = valid
+          .filter(d => d.dist >= cutoff)
+          .sort((a, b) => b.dist - a.dist)
+
+        const times = (candidates.length > 0 ? candidates : [valid.reduce((a, b) => b.dist > a.dist ? b : a)])
+          .map(d => d.time)
+
+        res({ ok: true, times, duration })
+      })
+    })
+  }
+
+  // ── Fallback: FFmpeg showinfo scene filter ───────────────────────────────────
+  function tryDetectFFmpeg(thr: number): Promise<{ ok: boolean; times: number[]; duration: number }> {
+    return new Promise(res => {
+      execFile(ffmpegBin, [
+        '-hide_banner', '-i', opts.filePath,
+        '-vf', `select=gt(scene\\,${thr}),showinfo`,
+        '-vsync', '0', '-f', 'null', nullSink,
+      ], { maxBuffer: 20 * 1024 * 1024 }, (_err, stdout, stderr) => {
+        const raw  = (stdout ?? '') + (stderr ?? '')
         const durM = raw.match(/Duration:\s*(\d+):(\d+):(\d+\.?\d*)/)
-        const duration = durM
-          ? parseInt(durM[1]) * 3600 + parseInt(durM[2]) * 60 + parseFloat(durM[3])
-          : 0
-
-        // showinfo lines look like: "n:  1 pts: 123 pts_time:4.100 ..."
-        // Filter out t <= 0.3 to skip the very first few frames which sometimes appear
+        const duration = durM ? parseInt(durM[1])*3600 + parseInt(durM[2])*60 + parseFloat(durM[3]) : 0
         const times: number[] = []
         for (const m of raw.matchAll(/pts_time:(\d+\.?\d*)/g)) {
           const t = parseFloat(m[1])
@@ -613,17 +673,23 @@ ipcMain.handle('detect-scene-change', async (_event, opts: {
     })
   }
 
-  // Try progressively lower thresholds until something is found
-  const thresholds = [opts.threshold ?? 0.20, 0.12, 0.06, 0.03]
-  let duration = 0
+  // Run pixel comparison first (primary)
+  const px = await detectByPixels()
+  if (px.ok && px.times.length > 0) {
+    const mid  = px.duration / 2
+    const best = px.times.reduce((a, b) => Math.abs(b - mid) < Math.abs(a - mid) ? b : a)
+    return { ok: true, times: px.times, splitTime: best, duration: px.duration }
+  }
 
-  for (const thr of thresholds) {
-    const r = await tryDetect(thr)
+  // Fallback: FFmpeg scene filter with progressive thresholds
+  let duration = px.duration
+  for (const thr of [opts.threshold ?? 0.20, 0.12, 0.06, 0.03]) {
+    const r = await tryDetectFFmpeg(thr)
     if (r.duration > 0) duration = r.duration
     if (r.ok) {
-      const mid  = r.duration / 2
+      const mid  = duration / 2
       const best = r.times.reduce((a, b) => Math.abs(b - mid) < Math.abs(a - mid) ? b : a)
-      return { ok: true, times: r.times, splitTime: best, duration: r.duration }
+      return { ok: true, times: r.times, splitTime: best, duration }
     }
   }
 
