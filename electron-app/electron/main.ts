@@ -9,6 +9,24 @@ import path from 'node:path'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 process.env.APP_ROOT = path.join(__dirname, '..')
+
+// ── FFmpeg binary resolution ──────────────────────────────────────────────────
+// In dev: use ffmpeg-static (bundled npm binary).
+// In prod (packaged): binary is copied to resources/ via extraResources.
+// Falls back to system PATH as last resort.
+function getFfmpegBin(): string {
+  const ext = process.platform === 'win32' ? '.exe' : ''
+  if (app.isPackaged) {
+    return path.join(process.resourcesPath, `ffmpeg${ext}`)
+  }
+  try {
+    // ffmpeg-static returns the absolute path to its bundled binary
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const staticPath = (require('ffmpeg-static') as string).replace('app.asar', 'app.asar.unpacked')
+    if (staticPath && existsSync(staticPath)) return staticPath
+  } catch { /* ignore */ }
+  return `ffmpeg${ext}`
+}
 export const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL']
 export const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist')
 
@@ -529,7 +547,7 @@ ipcMain.handle('run-ffmpeg', async (_event, opts: {
   transition: 'cut' | 'fade'
 }) => {
   // Detect ffmpeg binary
-  const ffmpegBin = process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg'
+  const ffmpegBin = getFfmpegBin()
 
   const scale = opts.preset === '9:16'  ? 'scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:-1:-1:color=black'
               : opts.preset === '1:1'   ? 'scale=1080:1080:force_original_aspect_ratio=decrease,pad=1080:1080:-1:-1:color=black'
@@ -580,7 +598,7 @@ ipcMain.handle('run-ffmpeg', async (_event, opts: {
 ipcMain.handle('detect-scene-change', async (_event, opts: {
   filePath: string; threshold?: number
 }) => {
-  const ffmpegBin = process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg'
+  const ffmpegBin = getFfmpegBin()
   const FPS = 2, W = 32, H = 32
   const frameSize = W * H * 3   // rgb24 = 3 bytes per pixel = 3072 bytes/frame
   const tmpDir  = path.join(os.tmpdir(), `sf-det-${Date.now()}`)
@@ -674,7 +692,7 @@ ipcMain.handle('run-ffmpeg-remix', async (_event, opts: {
   blendMode:     'screen' | 'multiply'
   preset:        '9:16' | '1:1' | '16:9'
 }) => {
-  const ffmpegBin = process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg'
+  const ffmpegBin = getFfmpegBin()
   const W = opts.preset === '16:9' ? 1920 : 1080
   const H = opts.preset === '9:16' ? 1920 : 1080
   const scl = `scale=${W}:${H}:force_original_aspect_ratio=decrease,pad=${W}:${H}:-1:-1:color=black,setsar=1`
@@ -729,7 +747,7 @@ ipcMain.handle('extract-frames', async (_event, opts: {
   endTime:  number
   fps?:     number
 }) => {
-  const ffmpegBin = process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg'
+  const ffmpegBin = getFfmpegBin()
   const tmpDir    = path.join(os.tmpdir(), `sf-frames-${Date.now()}`)
 
   try {
@@ -814,7 +832,7 @@ ipcMain.handle('run-ffmpeg-remix-ai', async (_event, opts: {
     shadow?:   boolean
   }>
 }) => {
-  const ffmpegBin = process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg'
+  const ffmpegBin = getFfmpegBin()
   const W = opts.preset === '16:9' ? 1920 : 1080
   const H = opts.preset === '9:16' ? 1920 : 1080
   const scl  = `scale=${W}:${H}:force_original_aspect_ratio=decrease,pad=${W}:${H}:-1:-1:color=black,setsar=1`
