@@ -13,19 +13,38 @@ function SFLogo({ size = 28 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 100 100" fill="none">
       <defs>
-        <linearGradient id="sf-sb" x1="30" y1="97" x2="85" y2="3" gradientUnits="userSpaceOnUse">
-          <stop offset="0%"   stopColor="#3b82f6"/>
-          <stop offset="50%"  stopColor="#8b5cf6"/>
+        <linearGradient id="sfl-main" x1="10" y1="98" x2="82" y2="2" gradientUnits="userSpaceOnUse">
+          <stop offset="0%"   stopColor="#1d4ed8"/>
+          <stop offset="28%"  stopColor="#3b5af0"/>
+          <stop offset="58%"  stopColor="#7c3aed"/>
+          <stop offset="100%" stopColor="#a855f7"/>
+        </linearGradient>
+        <linearGradient id="sfl-depth" x1="10" y1="98" x2="82" y2="2" gradientUnits="userSpaceOnUse">
+          <stop offset="0%"   stopColor="#0c1f6e"/>
+          <stop offset="55%"  stopColor="#2e1065"/>
+          <stop offset="100%" stopColor="#3b0764"/>
+        </linearGradient>
+        <linearGradient id="sfl-arr" x1="66" y1="24" x2="90" y2="1" gradientUnits="userSpaceOnUse">
+          <stop offset="0%"   stopColor="#db2777"/>
           <stop offset="100%" stopColor="#f472b6"/>
         </linearGradient>
       </defs>
+      {/* Depth/3D shadow layer */}
       <path
         d="M 66 22 C 76 8 60 3 42 3 C 20 3 12 18 12 32 C 12 46 26 52 46 55 C 66 58 82 65 82 79 C 82 93 68 97 50 97 C 32 97 18 89 16 76"
-        stroke="url(#sf-sb)" strokeWidth="13" strokeLinecap="round" fill="none"
+        stroke="url(#sfl-depth)" strokeWidth="18" strokeLinecap="round" fill="none"
+        transform="translate(2.5,4.5)" opacity="0.65"
       />
-      <line x1="66" y1="22" x2="84" y2="5" stroke="#f472b6" strokeWidth="9" strokeLinecap="round"/>
-      <line x1="73" y1="4" x2="85" y2="4" stroke="#f472b6" strokeWidth="7" strokeLinecap="round"/>
-      <line x1="85" y1="4" x2="85" y2="17" stroke="#f472b6" strokeWidth="7" strokeLinecap="round"/>
+      {/* Main S ribbon */}
+      <path
+        d="M 66 22 C 76 8 60 3 42 3 C 20 3 12 18 12 32 C 12 46 26 52 46 55 C 66 58 82 65 82 79 C 82 93 68 97 50 97 C 32 97 18 89 16 76"
+        stroke="url(#sfl-main)" strokeWidth="16" strokeLinecap="round" fill="none"
+      />
+      {/* Arrow diagonal */}
+      <line x1="66" y1="22" x2="88" y2="2" stroke="url(#sfl-arr)" strokeWidth="11" strokeLinecap="round"/>
+      {/* Arrow L-head */}
+      <line x1="77" y1="1" x2="90" y2="1" stroke="#f472b6" strokeWidth="9" strokeLinecap="round"/>
+      <line x1="90" y1="1" x2="90" y2="15" stroke="#f472b6" strokeWidth="9" strokeLinecap="round"/>
     </svg>
   )
 }

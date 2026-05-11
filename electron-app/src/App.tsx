@@ -15,33 +15,48 @@ function ScaleFlowLogoSVG({ size = 96, draw = false }: { size?: number; draw?: b
   return (
     <svg width={size} height={size} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <linearGradient id="sf-logo-grad" x1="50" y1="97" x2="85" y2="3" gradientUnits="userSpaceOnUse">
-          <stop offset="0%"   stopColor="#3b82f6"/>
-          <stop offset="42%"  stopColor="#8b5cf6"/>
+        <linearGradient id="sp-main" x1="10" y1="98" x2="82" y2="2" gradientUnits="userSpaceOnUse">
+          <stop offset="0%"   stopColor="#1d4ed8"/>
+          <stop offset="28%"  stopColor="#3b5af0"/>
+          <stop offset="58%"  stopColor="#7c3aed"/>
+          <stop offset="100%" stopColor="#a855f7"/>
+        </linearGradient>
+        <linearGradient id="sp-depth" x1="10" y1="98" x2="82" y2="2" gradientUnits="userSpaceOnUse">
+          <stop offset="0%"   stopColor="#0c1f6e"/>
+          <stop offset="55%"  stopColor="#2e1065"/>
+          <stop offset="100%" stopColor="#3b0764"/>
+        </linearGradient>
+        <linearGradient id="sp-arr" x1="66" y1="24" x2="90" y2="1" gradientUnits="userSpaceOnUse">
+          <stop offset="0%"   stopColor="#db2777"/>
           <stop offset="100%" stopColor="#f472b6"/>
         </linearGradient>
       </defs>
-      {/* S body */}
+      {/* Depth/3D shadow layer */}
+      <path
+        d="M 66 22 C 76 8 60 3 42 3 C 20 3 12 18 12 32 C 12 46 26 52 46 55 C 66 58 82 65 82 79 C 82 93 68 97 50 97 C 32 97 18 89 16 76"
+        stroke="url(#sp-depth)" strokeWidth="18" strokeLinecap="round" fill="none"
+        transform="translate(2.5,4.5)" opacity="0.65"
+      />
+      {/* Main S ribbon */}
       <path
         pathLength="1"
         d="M 66 22 C 76 8 60 3 42 3 C 20 3 12 18 12 32 C 12 46 26 52 46 55 C 66 58 82 65 82 79 C 82 93 68 97 50 97 C 32 97 18 89 16 76"
-        stroke="url(#sf-logo-grad)"
-        strokeWidth="13" strokeLinecap="round" fill="none"
+        stroke="url(#sp-main)" strokeWidth="16" strokeLinecap="round" fill="none"
         className={draw ? 'sf-draw-path' : undefined}
       />
-      {/* Arrow stem */}
-      <line x1="66" y1="22" x2="85" y2="5"
+      {/* Arrow diagonal */}
+      <line x1="66" y1="22" x2="88" y2="2"
+        stroke="url(#sp-arr)" strokeWidth="11" strokeLinecap="round"
+        className={draw ? 'sf-arrow' : undefined}
+      />
+      {/* Arrow L-head horizontal */}
+      <line x1="77" y1="1" x2="90" y2="1"
         stroke="#f472b6" strokeWidth="9" strokeLinecap="round"
         className={draw ? 'sf-arrow' : undefined}
       />
-      {/* Arrow head horizontal */}
-      <line x1="73" y1="4" x2="86" y2="4"
-        stroke="#f472b6" strokeWidth="7" strokeLinecap="round"
-        className={draw ? 'sf-arrow' : undefined}
-      />
-      {/* Arrow head vertical */}
-      <line x1="86" y1="4" x2="86" y2="18"
-        stroke="#f472b6" strokeWidth="7" strokeLinecap="round"
+      {/* Arrow L-head vertical */}
+      <line x1="90" y1="1" x2="90" y2="15"
+        stroke="#f472b6" strokeWidth="9" strokeLinecap="round"
         className={draw ? 'sf-arrow' : undefined}
       />
     </svg>
