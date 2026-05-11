@@ -270,7 +270,7 @@ export function Remix({ user }: RemixProps) {
   const [preset,        setPreset]        = useState<Preset>('9:16')
 
   // AI mode
-  const [overlayMode,    setOverlayMode]   = useState<OverlayMode>('blend')
+  const [overlayMode,    setOverlayMode]   = useState<OverlayMode>('ai')
   const [anthropicKey,   setAnthropicKey]  = useState(() => localStorage.getItem('sf_anthropic_key') ?? '')
   const [showKeyInput,   setShowKeyInput]  = useState(false)
   const [analyzing,      setAnalyzing]     = useState(false)
@@ -646,7 +646,7 @@ export function Remix({ user }: RemixProps) {
           <div>
             <h2 className="text-base font-black text-white mb-1">Nouvelle Phase 1</h2>
             <p className="text-xs" style={{ color: 'rgba(196,181,253,0.5)' }}>
-              Cette vidéo remplacera la Phase 1 originale.
+              Cette vidéo remplacera la Phase 1 originale — son de la vidéo originale conservé, texte réappliqué par l'IA.
             </p>
           </div>
 

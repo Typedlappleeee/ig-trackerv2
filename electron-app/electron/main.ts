@@ -712,24 +712,26 @@ ipcMain.handle('run-ffmpeg-remix', async (_event, opts: {
 
   let filterComplex: string
   if (opts.textBlend > 0) {
-    // With text overlay — split original video, blend phase 1 text on new video
+    // With text blend — original audio for both phases, original video blended on top of new video
     filterComplex = [
       `[1:v]split=2[ov_a][ov_b]`,
+      `[1:a]asplit=2[ao1][ao2]`,
       `[0:v]trim=duration=${opts.splitTime},setpts=PTS-STARTPTS,${scl}[v_new]`,
-      `[0:a]atrim=duration=${opts.splitTime},asetpts=PTS-STARTPTS,${afmt}[a_p1]`,
       `[ov_a]trim=end=${opts.splitTime},setpts=PTS-STARTPTS,${scl}[v_orig_p1]`,
       `[ov_b]trim=start=${opts.splitTime},setpts=PTS-STARTPTS,${scl}[v_p2]`,
-      `[1:a]atrim=start=${opts.splitTime},asetpts=PTS-STARTPTS,${afmt}[a_p2]`,
+      `[ao1]atrim=end=${opts.splitTime},asetpts=PTS-STARTPTS,${afmt}[a_p1]`,
+      `[ao2]atrim=start=${opts.splitTime},asetpts=PTS-STARTPTS,${afmt}[a_p2]`,
       `[v_new][v_orig_p1]blend=all_mode=${opts.blendMode}:all_opacity=${opts.textBlend}[v_blended]`,
       `[v_blended][a_p1][v_p2][a_p2]concat=n=2:v=1:a=1[vout][aout]`,
     ].join(';')
   } else {
-    // No text overlay — simple swap phase 1 then concat phase 2
+    // No blend — new video visuals for phase 1, original audio throughout
     filterComplex = [
       `[0:v]trim=duration=${opts.splitTime},setpts=PTS-STARTPTS,${scl}[v_p1]`,
-      `[0:a]atrim=duration=${opts.splitTime},asetpts=PTS-STARTPTS,${afmt}[a_p1]`,
       `[1:v]trim=start=${opts.splitTime},setpts=PTS-STARTPTS,${scl}[v_p2]`,
-      `[1:a]atrim=start=${opts.splitTime},asetpts=PTS-STARTPTS,${afmt}[a_p2]`,
+      `[1:a]asplit=2[ao1][ao2]`,
+      `[ao1]atrim=end=${opts.splitTime},asetpts=PTS-STARTPTS,${afmt}[a_p1]`,
+      `[ao2]atrim=start=${opts.splitTime},asetpts=PTS-STARTPTS,${afmt}[a_p2]`,
       `[v_p1][a_p1][v_p2][a_p2]concat=n=2:v=1:a=1[vout][aout]`,
     ].join(';')
   }
@@ -884,11 +886,13 @@ ipcMain.handle('run-ffmpeg-remix-ai', async (_event, opts: {
 
   const vfPhase1 = opts.textOverlays.length > 0 ? `${scl},${drawtextChain}` : scl
 
+  // Always use original audio (input 1) — new video visuals only, no new-video sound
   const filterComplex = [
     `[0:v]trim=duration=${opts.splitTime},setpts=PTS-STARTPTS,${vfPhase1}[v_p1]`,
-    `[0:a]atrim=duration=${opts.splitTime},asetpts=PTS-STARTPTS,${afmt}[a_p1]`,
     `[1:v]trim=start=${opts.splitTime},setpts=PTS-STARTPTS,${scl}[v_p2]`,
-    `[1:a]atrim=start=${opts.splitTime},asetpts=PTS-STARTPTS,${afmt}[a_p2]`,
+    `[1:a]asplit=2[ao1][ao2]`,
+    `[ao1]atrim=end=${opts.splitTime},asetpts=PTS-STARTPTS,${afmt}[a_p1]`,
+    `[ao2]atrim=start=${opts.splitTime},asetpts=PTS-STARTPTS,${afmt}[a_p2]`,
     `[v_p1][a_p1][v_p2][a_p2]concat=n=2:v=1:a=1[vout][aout]`,
   ].join(';')
 
