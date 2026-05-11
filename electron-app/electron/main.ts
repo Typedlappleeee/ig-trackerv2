@@ -856,12 +856,18 @@ ipcMain.handle('run-ffmpeg-remix-ai', async (_event, opts: {
   const afmt = 'aformat=sample_rates=44100:channel_layouts=stereo'
 
   // Find a font file so drawtext works cross-platform
-  function findFont(): string | null {
+  function findFont(bold = false): string | null {
     const candidates = process.platform === 'win32'
-      ? ['C:\\Windows\\Fonts\\arial.ttf', 'C:\\Windows\\Fonts\\segoeui.ttf']
+      ? bold
+        ? ['C:\\Windows\\Fonts\\arialbd.ttf', 'C:\\Windows\\Fonts\\Arial Bold.ttf', 'C:\\Windows\\Fonts\\arial.ttf', 'C:\\Windows\\Fonts\\segoeui.ttf']
+        : ['C:\\Windows\\Fonts\\arial.ttf', 'C:\\Windows\\Fonts\\segoeui.ttf']
       : process.platform === 'darwin'
-        ? ['/System/Library/Fonts/Helvetica.ttc', '/Library/Fonts/Arial.ttf', '/System/Library/Fonts/Supplemental/Arial.ttf']
-        : ['/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', '/usr/share/fonts/truetype/ubuntu/Ubuntu-R.ttf', '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf']
+        ? bold
+          ? ['/Library/Fonts/Arial Bold.ttf', '/System/Library/Fonts/Supplemental/Arial Bold.ttf', '/System/Library/Fonts/Helvetica.ttc', '/Library/Fonts/Arial.ttf']
+          : ['/System/Library/Fonts/Helvetica.ttc', '/Library/Fonts/Arial.ttf', '/System/Library/Fonts/Supplemental/Arial.ttf']
+        : bold
+          ? ['/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', '/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf', '/usr/share/fonts/truetype/ubuntu/Ubuntu-B.ttf']
+          : ['/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', '/usr/share/fonts/truetype/ubuntu/Ubuntu-R.ttf', '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf']
     return candidates.find(f => existsSync(f)) ?? null
   }
 
@@ -870,10 +876,9 @@ ipcMain.handle('run-ffmpeg-remix-ai', async (_event, opts: {
     return t.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/:/g, '\\:').replace(/\[/g, '\\[').replace(/\]/g, '\\]')
   }
 
-  const fontFile = findFont()
-
   // Build drawtext chain (comma-separated, applied after scale)
   const drawtextChain = opts.textOverlays.map(ov => {
+    const fontFile = findFont(ov.bold)
     const parts: string[] = [`text='${escText(ov.text)}'`]
     if (fontFile) parts.push(`fontfile='${fontFile}'`)
     parts.push(
@@ -882,7 +887,6 @@ ipcMain.handle('run-ffmpeg-remix-ai', async (_event, opts: {
       `fontcolor=${ov.fontColor}`,
       `enable='between(t,${ov.startTime},${ov.endTime})'`,
     )
-    if (ov.bold)        parts.push(`fontstyle=Bold`)
     if (ov.shadow !== false) parts.push(`shadowx=2:shadowy=2:shadowcolor=black@0.75`)
     return `drawtext=${parts.join(':')}`
   }).join(',')
