@@ -11,21 +11,33 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 process.env.APP_ROOT = path.join(__dirname, '..')
 
 // ── FFmpeg binary resolution ──────────────────────────────────────────────────
-// In dev: use ffmpeg-static (bundled npm binary).
-// In prod (packaged): binary is copied to resources/ via extraResources.
-// Falls back to system PATH as last resort.
+// Prod (packaged): binary copied to resources/ via extraResources in electron-builder.yml
+// Dev: resolve from node_modules/ffmpeg-static using APP_ROOT (set below)
+// Falls back to system PATH only if nothing else is found.
 function getFfmpegBin(): string {
   const ext = process.platform === 'win32' ? '.exe' : ''
+  const bin = `ffmpeg${ext}`
+
   if (app.isPackaged) {
-    return path.join(process.resourcesPath, `ffmpeg${ext}`)
+    return path.join(process.resourcesPath, bin)
   }
-  try {
-    // ffmpeg-static returns the absolute path to its bundled binary
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const staticPath = (require('ffmpeg-static') as string).replace('app.asar', 'app.asar.unpacked')
-    if (staticPath && existsSync(staticPath)) return staticPath
-  } catch { /* ignore */ }
-  return `ffmpeg${ext}`
+
+  // Dev: APP_ROOT = electron-app/ directory (set right after this function)
+  // node_modules lives there, and ffmpeg-static puts its binary inside it.
+  const appRoot = process.env.APP_ROOT ?? path.join(__dirname, '..')
+  const candidates = [
+    path.join(appRoot, 'node_modules', 'ffmpeg-static', bin),
+    path.join(appRoot, '..', 'node_modules', 'ffmpeg-static', bin),
+    path.join(__dirname, '..', 'node_modules', 'ffmpeg-static', bin),
+  ]
+  for (const p of candidates) {
+    if (existsSync(p)) {
+      console.log('[ffmpeg] using:', p)
+      return p
+    }
+  }
+  console.warn('[ffmpeg] binary not found in node_modules, falling back to PATH')
+  return bin
 }
 export const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL']
 export const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist')
