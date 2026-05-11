@@ -37,7 +37,7 @@ export type OrgRole = 'owner' | 'admin' | 'member' | 'viewer'
 
 export type PageKey =
   | 'dashboard' | 'phones' | 'stats' | 'posting' | 'massposting'
-  | 'bank' | 'autocomment' | 'aitools' | 'montage' | 'settings'
+  | 'bank' | 'autocomment' | 'aitools' | 'montage' | 'remix' | 'settings'
 
 // Per-member overrides on top of role defaults.
 // tabs: explicit per-tab allow (true) / deny (false). Missing = use role default.

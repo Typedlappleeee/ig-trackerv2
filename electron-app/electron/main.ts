@@ -573,6 +573,67 @@ ipcMain.handle('run-ffmpeg', async (_event, opts: {
   })
 })
 
+// ── IPC: run FFmpeg remix (split + blend + concat) ───────────────────────────
+// Phase 1 = new video (+ optional text overlay from original)
+// Phase 2 = original video from splitTime onwards
+ipcMain.handle('run-ffmpeg-remix', async (_event, opts: {
+  originalPath:  string
+  newPhase1Path: string
+  splitTime:     number   // seconds — where phase 1 ends in original
+  outputPath:    string
+  textBlend:     number   // 0 = no overlay; 0.1–1.0 = screen blend opacity
+  blendMode:     'screen' | 'multiply'
+  preset:        '9:16' | '1:1' | '16:9'
+}) => {
+  const ffmpegBin = process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg'
+  const W = opts.preset === '16:9' ? 1920 : 1080
+  const H = opts.preset === '9:16' ? 1920 : 1080
+  const scl = `scale=${W}:${H}:force_original_aspect_ratio=decrease,pad=${W}:${H}:-1:-1:color=black,setsar=1`
+  const afmt = 'aformat=sample_rates=44100:channel_layouts=stereo'
+
+  let filterComplex: string
+  if (opts.textBlend > 0) {
+    // With text overlay — split original video, blend phase 1 text on new video
+    filterComplex = [
+      `[1:v]split=2[ov_a][ov_b]`,
+      `[0:v]trim=duration=${opts.splitTime},setpts=PTS-STARTPTS,${scl}[v_new]`,
+      `[0:a]atrim=duration=${opts.splitTime},asetpts=PTS-STARTPTS,${afmt}[a_p1]`,
+      `[ov_a]trim=end=${opts.splitTime},setpts=PTS-STARTPTS,${scl}[v_orig_p1]`,
+      `[ov_b]trim=start=${opts.splitTime},setpts=PTS-STARTPTS,${scl}[v_p2]`,
+      `[1:a]atrim=start=${opts.splitTime},asetpts=PTS-STARTPTS,${afmt}[a_p2]`,
+      `[v_new][v_orig_p1]blend=all_mode=${opts.blendMode}:all_opacity=${opts.textBlend}[v_blended]`,
+      `[v_blended][a_p1][v_p2][a_p2]concat=n=2:v=1:a=1[vout][aout]`,
+    ].join(';')
+  } else {
+    // No text overlay — simple swap phase 1 then concat phase 2
+    filterComplex = [
+      `[0:v]trim=duration=${opts.splitTime},setpts=PTS-STARTPTS,${scl}[v_p1]`,
+      `[0:a]atrim=duration=${opts.splitTime},asetpts=PTS-STARTPTS,${afmt}[a_p1]`,
+      `[1:v]trim=start=${opts.splitTime},setpts=PTS-STARTPTS,${scl}[v_p2]`,
+      `[1:a]atrim=start=${opts.splitTime},asetpts=PTS-STARTPTS,${afmt}[a_p2]`,
+      `[v_p1][a_p1][v_p2][a_p2]concat=n=2:v=1:a=1[vout][aout]`,
+    ].join(';')
+  }
+
+  const args = [
+    '-i', opts.newPhase1Path,
+    '-i', opts.originalPath,
+    '-filter_complex', filterComplex,
+    '-map', '[vout]', '-map', '[aout]',
+    '-c:v', 'libx264', '-preset', 'fast', '-crf', '23',
+    '-c:a', 'aac', '-b:a', '128k',
+    '-movflags', '+faststart',
+    '-y', opts.outputPath,
+  ]
+  const command = `ffmpeg ${args.map(a => a.includes(' ') ? `"${a}"` : a).join(' ')}`
+  return new Promise(resolve => {
+    execFile(ffmpegBin, args, { maxBuffer: 200 * 1024 * 1024 }, (err) => {
+      if (err) resolve({ ok: false, error: err.message, command })
+      else     resolve({ ok: true,  outputPath: opts.outputPath, command })
+    })
+  })
+})
+
 // ── IPC: pick output file path ───────────────────────────────────────────────
 ipcMain.handle('pick-output-file', async (_event, opts: { defaultName: string }) => {
   if (!win) return null

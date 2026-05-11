@@ -466,6 +466,7 @@ import { Stats }             from '@/pages/Stats'
 import { Posting }           from '@/pages/Posting'
 import { Bank }              from '@/pages/Bank'
 import { Montage }           from '@/pages/Montage'
+import { Remix }             from '@/pages/Remix'
 import { AiTools }           from '@/pages/AiTools'
 import { Autocomment }       from '@/pages/Autocomment'
 import { Settings }          from '@/pages/Settings'
@@ -555,6 +556,7 @@ function AppContent({ user }: { user: User }) {
       case 'bank':         return <Bank        user={user} />
       case 'autocomment':  return <Autocomment user={user} />
       case 'montage':      return <Montage     user={user} />
+      case 'remix':        return <Remix       user={user} />
       case 'aitools':      return <AiTools     user={user} />
       case 'settings':     return <Settings    user={user} initialPanel={settingsPanel as any} />
     }

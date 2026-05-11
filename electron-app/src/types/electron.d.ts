@@ -49,6 +49,15 @@ interface ElectronAPI {
   fetchIgComments:   (opts: { mediaId: string; sessionid: string; maxId?: string }) => Promise<{ ok: boolean; comments?: Array<{ pk: string; text: string; username: string; timestamp: string; likeCount: number }>; hasMore?: boolean; error?: string }>
   postIgComment:     (opts: { mediaId: string; text: string; sessionid: string }) => Promise<{ ok: boolean; error?: string; sessionExpired?: boolean }>
   groqRequest:       (opts: GroqRequestOptions) => Promise<{ ok: boolean; data?: unknown; error?: string }>
+  runFfmpegRemix:    (opts: {
+    originalPath:  string
+    newPhase1Path: string
+    splitTime:     number
+    outputPath:    string
+    textBlend:     number
+    blendMode:     'screen' | 'multiply'
+    preset:        '9:16' | '1:1' | '16:9'
+  }) => Promise<{ ok: boolean; outputPath?: string; error?: string; command?: string }>
 }
 
 declare global {

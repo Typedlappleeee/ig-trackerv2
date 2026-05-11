@@ -70,4 +70,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
     model?: string
     maxTokens?: number
   }) => ipcRenderer.invoke('groq-request', opts),
+
+  // Run FFmpeg remix — split original at splitTime, swap phase 1 with new video,
+  // optionally blend original text overlay, keep phase 2 intact.
+  runFfmpegRemix: (opts: {
+    originalPath:  string
+    newPhase1Path: string
+    splitTime:     number
+    outputPath:    string
+    textBlend:     number
+    blendMode:     'screen' | 'multiply'
+    preset:        '9:16' | '1:1' | '16:9'
+  }) => ipcRenderer.invoke('run-ffmpeg-remix', opts),
 })

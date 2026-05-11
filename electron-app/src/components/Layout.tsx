@@ -52,7 +52,7 @@ function SFLogo({ size = 28 }: { size?: number }) {
 export type Page =
   | 'dashboard' | 'phones'
   | 'stats' | 'posting' | 'massposting' | 'bank' | 'autocomment' | 'aitools'
-  | 'montage'
+  | 'montage' | 'remix'
   | 'settings'
 
 interface LayoutProps {
@@ -93,7 +93,8 @@ const NAV_SECTIONS: NavSection[] = [
     title: 'Montage',
     defaultOpen: true,
     items: [
-      { id: 'montage',     label: 'Montage vidéo', icon: '✂' },
+      { id: 'montage', label: 'Montage vidéo', icon: '✂' },
+      { id: 'remix',   label: 'Remix vidéo',   icon: '🔀', beta: true },
     ],
   },
 ]
