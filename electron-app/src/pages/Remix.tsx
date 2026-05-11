@@ -4,6 +4,9 @@ import { Button } from '@/components/ui/Button'
 import { Spinner } from '@/components/ui/Spinner'
 import { BankPicker } from './Bank'
 import { playSuccess, playWhoosh, playError } from '@/lib/sounds'
+import { supabase } from '@/lib/supabase'
+import { uploadVideoFromPath, type UploadScope } from '@/lib/storage'
+import { useOrg } from '@/lib/orgContext'
 
 interface RemixProps { user: User }
 
@@ -24,18 +27,11 @@ interface TextOverlayUI {
   endTime:   number
 }
 
-const POS_MAP: Record<string, { x: string; y: string }> = {
-  'top-left':      { x: 'w*0.03',       y: 'h*0.04'       },
-  'top-center':    { x: '(w-text_w)/2', y: 'h*0.04'       },
-  'top-right':     { x: 'w*0.97-text_w',y: 'h*0.04'       },
-  'middle-left':   { x: 'w*0.03',       y: '(h-text_h)/2' },
-  'middle-center': { x: '(w-text_w)/2', y: '(h-text_h)/2' },
-  'middle-right':  { x: 'w*0.97-text_w',y: '(h-text_h)/2' },
-  'bottom-left':   { x: 'w*0.03',       y: 'h*0.88'       },
-  'bottom-center': { x: '(w-text_w)/2', y: 'h*0.88'       },
-  'bottom-right':  { x: 'w*0.97-text_w',y: 'h*0.88'       },
+function xAlignToExpr(align: string): string {
+  if (align === 'right') return 'w*0.96-text_w'
+  if (align === 'left')  return 'w*0.04'
+  return '(w-text_w)/2'
 }
-const SIZE_MAP: Record<string, number> = { small: 28, medium: 42, large: 60, xlarge: 80 }
 
 function fmtTime(s: number): string {
   if (!isFinite(s) || s < 0) return '0:00'
@@ -164,6 +160,7 @@ function VideoCard({ label, filePath, accent = '#8b5cf6', badge, onDurationLoad 
 
 // ── Main ───────────────────────────────────────────────────────────────────────
 export function Remix({ user }: RemixProps) {
+  const { currentOrg } = useOrg()
   const [step, setStep] = useState<Step>(1)
 
   // Step 1 — original video
@@ -188,9 +185,11 @@ export function Remix({ user }: RemixProps) {
   const [detectedOverlays, setDetectedOverlays]  = useState<TextOverlayUI[]>([])
 
   // Step 4 — generation
-  const [generating,  setGenerating]  = useState(false)
-  const [result,      setResult]      = useState<{ ok: boolean; outputPath?: string; error?: string; command?: string } | null>(null)
-  const [showCommand, setShowCommand] = useState(false)
+  const [generating,    setGenerating]    = useState(false)
+  const [result,        setResult]        = useState<{ ok: boolean; outputPath?: string; error?: string; command?: string } | null>(null)
+  const [showCommand,   setShowCommand]   = useState(false)
+  const [bankUploading, setBankUploading] = useState(false)
+  const [bankDone,      setBankDone]      = useState(false)
 
   const handleOrigDur = useCallback((d: number) => {
     setOriginalDur(d)
@@ -267,7 +266,20 @@ export function Remix({ user }: RemixProps) {
         { type: 'text', text: `[Frame ${i} — t=${f.timestamp}s]` },
       ])
       const interval = splitTime / (fr.frames.length || 1)
-      const prompt = `These are ${fr.frames.length} frames from a ${splitTime.toFixed(1)}s video clip.\nIdentify ALL burned-in text overlays (captions, subtitles, titles). Return a JSON array:\n[{"text":"exact text","position":"bottom-center","fontSize":"medium","fontColor":"white","bold":false,"startFrame":0,"endFrame":3}]\nposition: top-left|top-center|top-right|middle-center|bottom-left|bottom-center|bottom-right\nfontSize: small|medium|large|xlarge\nReturn ONLY the JSON array.`
+      const prompt = `These are ${fr.frames.length} frames from a ${splitTime.toFixed(1)}s video clip (vertical 9:16 format).
+Identify ALL burned-in text overlays (titles, captions, subtitles). For each text overlay return:
+- text: the exact string
+- xAlign: "left" | "center" | "right"  (horizontal alignment of the text block)
+- yPercent: 0-100  (distance from the TOP of the frame to the TOP of the text, as a % of frame height)
+- fontSizePx: estimated font size in pixels assuming the video is 1920px tall
+- fontColor: CSS color name or hex (e.g. "white", "#ffffff", "yellow")
+- bold: true if the text appears bold
+- startFrame: first frame index where this text is visible
+- endFrame: last frame index where this text is visible
+
+Return ONLY a valid JSON array, no explanation:
+[{"text":"...","xAlign":"center","yPercent":85,"fontSizePx":55,"fontColor":"white","bold":false,"startFrame":0,"endFrame":5}]
+If no text overlays exist return [].`
       const res = await window.electronAPI!.anthropicVisionRequest!({
         apiKey: anthropicKey.trim(), model: 'claude-haiku-4-5-20251001',
         messages: [{ role: 'user', content: [...imageBlocks, { type: 'text', text: prompt }] }],
@@ -275,20 +287,21 @@ export function Remix({ user }: RemixProps) {
       })
       if (!res.ok) throw new Error(res.error ?? 'Erreur API Anthropic')
       const txt = (res.data as { content: Array<{ type: string; text: string }> })?.content?.[0]?.text ?? '[]'
-      let parsed: Array<{ text: string; position: string; fontSize: string; fontColor: string; bold?: boolean; startFrame: number; endFrame: number }> = []
+      let parsed: Array<{ text: string; xAlign: string; yPercent: number; fontSizePx: number; fontColor: string; bold?: boolean; startFrame: number; endFrame: number }> = []
       try { const m = txt.match(/\[[\s\S]*\]/); if (m) parsed = JSON.parse(m[0]) } catch { throw new Error('Réponse IA invalide') }
-      const overlays: TextOverlayUI[] = parsed.map((item, idx) => {
-        const pos = POS_MAP[item.position] ?? POS_MAP['bottom-center']
-        return {
-          id: idx, text: item.text, position: item.position,
-          x: pos.x, y: pos.y,
-          fontSize: SIZE_MAP[item.fontSize] ?? 42,
-          fontColor: item.fontColor ?? 'white',
-          bold: item.bold ?? false, shadow: true,
-          startTime: Math.round(item.startFrame * interval * 10) / 10,
-          endTime: Math.min(splitTime, Math.round((item.endFrame + 1) * interval * 10) / 10),
-        }
-      })
+      const overlays: TextOverlayUI[] = parsed.map((item, idx) => ({
+        id: idx,
+        text: item.text,
+        position: item.xAlign ?? 'center',
+        x: xAlignToExpr(item.xAlign ?? 'center'),
+        y: `h*${Math.max(0.01, Math.min(0.97, (item.yPercent ?? 85) / 100)).toFixed(3)}`,
+        fontSize: Math.round(Math.max(16, Math.min(200, item.fontSizePx ?? 42))),
+        fontColor: item.fontColor ?? 'white',
+        bold: item.bold ?? false,
+        shadow: true,
+        startTime: Math.round((item.startFrame ?? 0) * interval * 10) / 10,
+        endTime: Math.min(splitTime, Math.round(((item.endFrame ?? fr.frames!.length - 1) + 1) * interval * 10) / 10),
+      }))
       setDetectedOverlays(overlays)
       if (overlays.length > 0) {
         setAnalyzeStep({ ok: true, text: `✓ ${overlays.length} texte(s) détecté(s)` })
@@ -303,10 +316,30 @@ export function Remix({ user }: RemixProps) {
     } finally { setAnalyzing(false) }
   }
 
+  async function uploadToBank() {
+    if (!result?.outputPath) return
+    setBankUploading(true)
+    try {
+      const scope: UploadScope = currentOrg ? { mode: 'org', id: currentOrg.id } : { mode: 'user', id: user.id }
+      const { storagePath, thumbnailPath } = await uploadVideoFromPath(result.outputPath, scope)
+      await supabase.from('content_bank').insert({
+        user_id: user.id, org_id: currentOrg?.id ?? null,
+        title: 'Remix — ' + new Date().toLocaleDateString('fr-FR'),
+        file_url: null, storage_path: storagePath, thumbnail_path: thumbnailPath,
+        tags: [], notes: '',
+      })
+      setBankDone(true)
+      playSuccess()
+    } catch {
+      playError()
+    } finally { setBankUploading(false) }
+  }
+
   async function generate() {
     if (!originalPath || !newPhase1Path) return
     const outputPath = await window.electronAPI?.pickOutputFile?.({ defaultName: 'remix_output.mp4' })
     if (!outputPath) return
+    setBankDone(false)
     setGenerating(true); setResult(null)
     const r = await window.electronAPI!.runFfmpegRemixAI!({
       newPhase1Path, originalPath, splitTime, outputPath, preset,
@@ -604,8 +637,24 @@ export function Remix({ user }: RemixProps) {
                 </div>
               </div>
               <div className="rounded-xl px-4 py-3" style={{ background: 'rgba(52,211,153,0.06)', border: '1px solid rgba(52,211,153,0.2)' }}>
-                <p className="text-[10px] uppercase tracking-wider font-bold mb-1" style={{ color: '#34d399' }}>Fichier</p>
+                <p className="text-[10px] uppercase tracking-wider font-bold mb-1" style={{ color: '#34d399' }}>Fichier local</p>
                 <p className="text-xs font-mono text-white/80 break-all">{result.outputPath}</p>
+              </div>
+              {/* Bank upload */}
+              <div className="rounded-xl px-4 py-3" style={{ background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.18)' }}>
+                <p className="text-[10px] uppercase tracking-wider font-bold mb-2" style={{ color: '#a78bfa' }}>Exporter vers la banque</p>
+                {bankDone ? (
+                  <p className="text-sm font-semibold" style={{ color: '#34d399' }}>✓ Ajouté à la banque !</p>
+                ) : (
+                  <button
+                    onClick={uploadToBank}
+                    disabled={bankUploading}
+                    className="flex items-center gap-2 py-2 px-4 rounded-lg text-sm font-semibold transition-all disabled:opacity-50"
+                    style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff' }}
+                  >
+                    {bankUploading ? <><Spinner size="sm" /> Upload…</> : <>☁ Ajouter à la banque</>}
+                  </button>
+                )}
               </div>
               <div className="flex gap-3">
                 <Button variant="secondary" onClick={() => { setStep(1); setResult(null); setOriginalPath(null); setNewPhase1Path(null); setOriginalDur(0); setSplitTime(0); setDetectedOverlays([]) }}>
