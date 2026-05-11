@@ -272,9 +272,14 @@ export function Remix({ user }: RemixProps) {
   // AI mode
   const [overlayMode,    setOverlayMode]   = useState<OverlayMode>('blend')
   const [anthropicKey,   setAnthropicKey]  = useState(() => localStorage.getItem('sf_anthropic_key') ?? '')
+  const [showKeyInput,   setShowKeyInput]  = useState(false)
   const [analyzing,      setAnalyzing]     = useState(false)
   const [analyzeStep,    setAnalyzeStep]   = useState<{ ok: boolean; text: string } | null>(null)
   const [detectedOverlays, setDetectedOverlays] = useState<TextOverlayUI[]>([])
+
+  // AI scene detection (Step 1)
+  const [aiDetecting,   setAiDetecting]  = useState(false)
+  const [aiDetectMsg,   setAiDetectMsg]  = useState<{ ok: boolean; text: string } | null>(null)
 
   // Step 4
   const [generating,     setGenerating]    = useState(false)
@@ -311,6 +316,56 @@ export function Remix({ user }: RemixProps) {
     } else {
       setDetectMsg({ ok: false, text: r.error ?? 'Aucune coupure détectée — ajuste manuellement.' })
       playError()
+    }
+  }
+
+  async function aiDetectSplit() {
+    if (!originalPath || !anthropicKey.trim()) { setShowKeyInput(true); return }
+    setAiDetecting(true)
+    setAiDetectMsg({ ok: true, text: 'Extraction des frames…' })
+
+    try {
+      const framesResult = await window.electronAPI!.extractFrames!({
+        filePath: originalPath,
+        endTime: originalDur || 60,
+      })
+      if (!framesResult.ok || !framesResult.frames?.length)
+        throw new Error(framesResult.error ?? 'Impossible d\'extraire les frames')
+
+      setAiDetectMsg({ ok: true, text: `${framesResult.frames.length} frames — analyse IA…` })
+
+      const imageBlocks = framesResult.frames.flatMap((f, i) => [
+        { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: f.data } },
+        { type: 'text', text: `[Frame ${i} — t=${f.timestamp}s]` },
+      ])
+
+      const prompt = `These are ${framesResult.frames.length} frames from a ${originalDur.toFixed(1)}s video sampled at regular intervals.\n\nThis video has TWO phases separated by a clear scene change (different setting, lighting, or visual style).\n\nFind the frame where the scene change occurs and return ONLY this JSON:\n{\n  "splitFrame": 3,\n  "splitTime": 8.5,\n  "description": "brief description"\n}\nsplitFrame = index of the FIRST frame of the new scene\nsplitTime = estimated timestamp in seconds`
+
+      const result = await window.electronAPI!.anthropicVisionRequest!({
+        apiKey: anthropicKey.trim(),
+        model: 'claude-haiku-4-5-20251001',
+        messages: [{ role: 'user', content: [...imageBlocks, { type: 'text', text: prompt }] }],
+        maxTokens: 300,
+      })
+      if (!result.ok) throw new Error(result.error ?? 'Erreur API Anthropic')
+
+      const rawText = (result.data as { content: Array<{ type: string; text: string }> })?.content?.[0]?.text ?? '{}'
+      let parsed: { splitFrame?: number; splitTime?: number; description?: string } = {}
+      try { const m = rawText.match(/\{[\s\S]*\}/); if (m) parsed = JSON.parse(m[0]) } catch { throw new Error('Réponse IA invalide') }
+
+      if (parsed.splitTime != null && parsed.splitTime > 0 && parsed.splitTime < originalDur) {
+        const t = Math.round(parsed.splitTime * 10) / 10
+        setSplitTime(t)
+        setAiDetectMsg({ ok: true, text: `IA : coupure à ${fmtTime(t)}${parsed.description ? ` — ${parsed.description}` : ''}` })
+        playSuccess()
+      } else {
+        throw new Error('Aucune coupure trouvée par l\'IA')
+      }
+    } catch (err: unknown) {
+      setAiDetectMsg({ ok: false, text: err instanceof Error ? err.message : String(err) })
+      playError()
+    } finally {
+      setAiDetecting(false)
     }
   }
 
@@ -466,36 +521,71 @@ export function Remix({ user }: RemixProps) {
             </div>
           )}
 
-          {/* Auto-detect button */}
+          {/* Auto-detect buttons */}
           {originalPath && (
             <div className="space-y-2">
-              <button
-                onClick={autoDetectSplit}
-                disabled={detecting || !originalDur}
-                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all disabled:opacity-50"
-                style={{
-                  background: 'linear-gradient(130deg,#7c3aed,#ec4899)',
-                  color: '#fff',
-                  boxShadow: '0 2px 16px -4px rgba(124,58,237,0.5)',
-                }}
-              >
-                {detecting ? (
-                  <><Spinner size="sm" /> Analyse en cours…</>
-                ) : (
-                  <>✨ Détecter automatiquement la coupure</>
-                )}
-              </button>
+              <div className="flex gap-2">
+                {/* FFmpeg detection */}
+                <button
+                  onClick={autoDetectSplit}
+                  disabled={detecting || aiDetecting || !originalDur}
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all disabled:opacity-50"
+                  style={{
+                    background: 'rgba(139,92,246,0.12)',
+                    border: '1px solid rgba(139,92,246,0.25)',
+                    color: '#c4b5fd',
+                  }}
+                >
+                  {detecting ? <><Spinner size="sm" /> Analyse…</> : <>⚡ FFmpeg</>}
+                </button>
 
-              {detectMsg && (
+                {/* AI detection */}
+                <button
+                  onClick={aiDetectSplit}
+                  disabled={detecting || aiDetecting || !originalDur}
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all disabled:opacity-50"
+                  style={{
+                    background: 'linear-gradient(130deg,#7c3aed,#ec4899)',
+                    color: '#fff',
+                    boxShadow: '0 2px 16px -4px rgba(124,58,237,0.4)',
+                  }}
+                >
+                  {aiDetecting ? <><Spinner size="sm" /> IA…</> : <>✨ Claude IA</>}
+                </button>
+              </div>
+
+              {/* Inline key input if not set */}
+              {(showKeyInput || (!anthropicKey && (detecting === false || aiDetecting === false))) && (
+                <div className="flex gap-2 items-center">
+                  <input
+                    type="password"
+                    placeholder="Clé Anthropic sk-ant-… (pour IA)"
+                    value={anthropicKey}
+                    onChange={e => {
+                      setAnthropicKey(e.target.value)
+                      localStorage.setItem('sf_anthropic_key', e.target.value)
+                      if (e.target.value) setShowKeyInput(false)
+                    }}
+                    className="flex-1 rounded-lg px-3 py-1.5 text-xs font-mono outline-none"
+                    style={{
+                      background: 'rgba(139,92,246,0.08)',
+                      border: '1px solid rgba(139,92,246,0.2)',
+                      color: '#c4b5fd',
+                    }}
+                  />
+                </div>
+              )}
+
+              {(detectMsg || aiDetectMsg) && (
                 <div
                   className="rounded-lg px-3 py-2 text-xs flex items-start gap-2"
-                  style={detectMsg.ok
+                  style={(detectMsg ?? aiDetectMsg)!.ok
                     ? { background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.2)', color: '#34d399' }
                     : { background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)', color: '#fbbf24' }
                   }
                 >
-                  <span>{detectMsg.ok ? '✓' : '⚠'}</span>
-                  <span>{detectMsg.text}</span>
+                  <span>{(detectMsg ?? aiDetectMsg)!.ok ? '✓' : '⚠'}</span>
+                  <span>{(detectMsg ?? aiDetectMsg)!.text}</span>
                 </div>
               )}
             </div>
