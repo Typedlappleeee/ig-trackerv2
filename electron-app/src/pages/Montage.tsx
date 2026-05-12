@@ -6,6 +6,7 @@ import { Spinner } from '@/components/ui/Spinner'
 import { Button }  from '@/components/ui/Button'
 import { useOrg } from '@/lib/orgContext'
 import { uploadVideoFromPath, type UploadScope } from '@/lib/storage'
+import { useConnections } from '@/lib/connections'
 
 interface MontageProps { user: User }
 
@@ -361,6 +362,12 @@ function DraggableText({ overlay, onMove }: {
 // ── Main component ────────────────────────────────────────────────────────────
 export function Montage({ user }: MontageProps) {
   const { currentOrg } = useOrg()
+  const conns = useConnections(user)
+
+  // AI caption generation state
+  const [aiCapLoading, setAiCapLoading] = useState(false)
+  const [aiCapError, setAiCapError]     = useState<string | null>(null)
+
   // Bank
   const [bankItems, setBankItems] = useState<ContentItem[]>([])
   const [bankLoading, setLL]      = useState(true)
@@ -534,6 +541,63 @@ export function Montage({ user }: MontageProps) {
     } catch (e) {
       setExporting(false)
       setExpResult({ ok: false, msg: e instanceof Error ? e.message : String(e) })
+    }
+  }
+
+  // ── AI Caption generation ──────────────────────────────────────────────────
+  async function generateAiCaption(clip: TimelineClip) {
+    if (!conns.anthropic) { setAiCapError('Clé API Anthropic manquante (Settings → Connexions)'); return }
+    setAiCapLoading(true); setAiCapError(null)
+    try {
+      const { resolveContentToLocalPath } = await import('@/lib/storage')
+      const filePath = await resolveContentToLocalPath(clip.item)
+      const fr = await window.electronAPI!.extractFrames!({ filePath, endTime: 5, fps: 0.5 })
+      if (!fr.ok || !fr.frames?.length) throw new Error('Impossible d\'extraire une frame de la vidéo')
+
+      const images = fr.frames.slice(0, 4).map(f => ({
+        type: 'image' as const,
+        source: { type: 'base64' as const, media_type: 'image/jpeg' as const, data: f.data },
+      }))
+
+      const res = await window.electronAPI!.anthropicVisionRequest!({
+        apiKey: conns.anthropic,
+        model: 'claude-haiku-4-5-20251001',
+        maxTokens: 120,
+        messages: [{
+          role: 'user',
+          content: [
+            ...images,
+            {
+              type: 'text',
+              text: `Tu es un expert en contenu viral Instagram Reels.
+Regarde ces frames de la vidéo et génère UNE SEULE caption courte (5-12 mots max) à superposer directement sur la vidéo.
+
+RÈGLES ABSOLUES :
+- Style "POV:" quand c'est pertinent (ex: "POV: tu découvres un endroit secret", "POV: quand la vie te surprend")
+- Sinon une phrase accrocheuse, mystérieuse ou émotionnelle
+- PAS de hashtags, PAS de guillemets, PAS d'explication
+- Minuscules possibles, peut commencer par une minuscule
+- EN FRANÇAIS
+
+Réponds UNIQUEMENT avec la caption, rien d'autre.`,
+            },
+          ],
+        }],
+      })
+
+      if (!res.ok) throw new Error(res.error ?? 'Erreur Anthropic')
+      const raw = res.data as { content?: Array<{ type: string; text?: string }> }
+      const text = raw?.content?.find(b => b.type === 'text')?.text?.trim() ?? ''
+      if (!text) throw new Error('Réponse vide')
+
+      // Apply to auto-caption mode
+      setAutoCaptionEnabled(true)
+      setAutoCaptionText(text)
+      setAutoCaptionPos('bottom')
+    } catch (e) {
+      setAiCapError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setAiCapLoading(false)
     }
   }
 
@@ -727,14 +791,29 @@ export function Montage({ user }: MontageProps) {
 
                 {autoCaptionEnabled && (
                   <div className="px-3 pb-3 space-y-2.5 border-t border-border">
+                    {/* AI generate button */}
+                    <button
+                      onClick={() => { if (selectedClip) generateAiCaption(selectedClip) }}
+                      disabled={!selectedClip || aiCapLoading || !conns.anthropic}
+                      className="mt-2.5 w-full flex items-center justify-center gap-1.5 py-2 rounded-lg text-[11px] font-semibold transition-all bg-gradient-to-r from-violet-600 to-accent text-white hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      {aiCapLoading ? <><Spinner size="sm" /><span>Analyse…</span></> : <><span>✨</span><span>Générer avec l'IA</span></>}
+                    </button>
+                    {!conns.anthropic && !conns.loading && (
+                      <p className="text-[9px] text-amber-400/80">Clé Anthropic requise (Settings → Connexions)</p>
+                    )}
+                    {!selectedClip && conns.anthropic && (
+                      <p className="text-[9px] text-text2/60">Sélectionne un clip dans la timeline d'abord.</p>
+                    )}
+                    {aiCapError && <p className="text-[9px] text-danger">{aiCapError}</p>}
+
                     {/* Text input */}
                     <textarea
                       value={autoCaptionText}
                       onChange={e => setAutoCaptionText(e.target.value)}
                       rows={3}
-                      placeholder="Tape ta caption ici…"
-                      className="mt-2.5 w-full bg-surface border border-border rounded-lg px-2.5 py-2 text-[11px] text-text focus:outline-none focus:border-accent resize-none placeholder:text-text2/60"
-                      autoFocus
+                      placeholder="ou tape ta caption ici…"
+                      className="w-full bg-surface border border-border rounded-lg px-2.5 py-2 text-[11px] text-text focus:outline-none focus:border-accent resize-none placeholder:text-text2/60"
                     />
 
                     {/* Position */}
