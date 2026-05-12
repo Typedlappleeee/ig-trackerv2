@@ -194,3 +194,268 @@ export async function replyToIgCommentViaPhone(
     return { ok: false, error: e instanceof Error ? e.message : String(e) }
   }
 }
+
+// ── Warmup helpers ───────────────────────────────────────────────────────────
+
+export interface WarmupConfig {
+  profileName?:    string
+  bio?:            string
+  profilePicUrl?:  string
+  browseMinutes:   number
+  likePosts:       boolean
+  watchReels:      boolean
+  followSuggested: boolean
+}
+
+// Parse bounds string "[x1,y1][x2,y2]" → center point
+function parseBoundsCenter(bounds: string): [number, number] | null {
+  const m = bounds.match(/\[(\d+),(\d+)\]\[(\d+),(\d+)\]/)
+  if (!m) return null
+  return [Math.floor((+m[1] + +m[3]) / 2), Math.floor((+m[2] + +m[4]) / 2)]
+}
+
+// Find element center by matching text/content-desc in UIAutomator XML
+function findByText(xml: string, ...texts: string[]): [number, number] | null {
+  for (const text of texts) {
+    const escaped = text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const re = new RegExp(`(?:text|content-desc)="${escaped}"[^>]*bounds="(\\[[^\\]]+\\]\\[[^\\]]+\\])"`)
+    const m = xml.match(re)
+    if (m) return parseBoundsCenter(m[1])
+  }
+  return null
+}
+
+function findByResourceId(xml: string, ...ids: string[]): [number, number] | null {
+  for (const id of ids) {
+    const escaped = id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const re = new RegExp(`resource-id="[^"]*${escaped}[^"]*"[^>]*bounds="(\\[[^\\]]+\\]\\[[^\\]]+\\])"`)
+    const m = xml.match(re)
+    if (m) return parseBoundsCenter(m[1])
+  }
+  return null
+}
+
+async function dumpXml(bearer: string, phoneId: string): Promise<string> {
+  const f = '/sdcard/sf_dump.xml'
+  const { output } = await shellExec(bearer, phoneId, `uiautomator dump ${f} && cat ${f}`)
+  return output
+}
+
+async function tapText(bearer: string, phoneId: string, xml: string, ...texts: string[]): Promise<boolean> {
+  const pt = findByText(xml, ...texts)
+  if (!pt) return false
+  await shellExec(bearer, phoneId, `input tap ${pt[0]} ${pt[1]}`)
+  return true
+}
+
+// ── Profile update (name + bio + optional pic) ───────────────────────────────
+async function updateInstagramProfile(
+  bearer: string,
+  phoneId: string,
+  config: Pick<WarmupConfig, 'profileName' | 'bio' | 'profilePicUrl'>,
+  log: (m: string) => void,
+) {
+  log('📲 Ouverture d\'Instagram…')
+  await shellExec(bearer, phoneId, 'am start -n com.instagram.android/.activity.MainTabActivity')
+  await sleep(5000)
+
+  // Navigate to profile tab
+  log('👤 Navigation vers le profil…')
+  let xml = await dumpXml(bearer, phoneId)
+  let profileTab = findByText(xml, 'Profile', 'Profil') ?? findByResourceId(xml, 'tab_avatar', 'profile_tab')
+  if (!profileTab) {
+    // Fallback: tap bottom-right of screen (profile tab position)
+    await shellExec(bearer, phoneId, 'input tap 1000 1900')
+  } else {
+    await shellExec(bearer, phoneId, `input tap ${profileTab[0]} ${profileTab[1]}`)
+  }
+  await sleep(3000)
+
+  // Tap Edit Profile
+  log('✏️ Ouverture de l\'édition du profil…')
+  xml = await dumpXml(bearer, phoneId)
+  const editBtn = findByText(xml, 'Edit profile', 'Modifier le profil', 'Edit Profile', 'Modifier') ??
+                  findByResourceId(xml, 'edit_profile_button', 'button_edit_profile')
+  if (!editBtn) { log('⚠️ Bouton Edit Profile non trouvé'); return }
+  await shellExec(bearer, phoneId, `input tap ${editBtn[0]} ${editBtn[1]}`)
+  await sleep(3000)
+
+  xml = await dumpXml(bearer, phoneId)
+
+  // Profile picture
+  if (config.profilePicUrl?.trim()) {
+    log('🖼 Téléchargement de la photo de profil…')
+    await shellExec(bearer, phoneId,
+      `curl -s -L -o /sdcard/sf_pfp.jpg "${config.profilePicUrl.trim()}"`)
+    await sleep(2000)
+    const changePhoto = findByText(xml, 'Change profile photo', 'Changer la photo de profil', 'Edit picture', 'Modifier la photo') ??
+                        findByResourceId(xml, 'change_avatar', 'profile_photo_change_btn')
+    if (changePhoto) {
+      await shellExec(bearer, phoneId, `input tap ${changePhoto[0]} ${changePhoto[1]}`)
+      await sleep(2000)
+      const xml2 = await dumpXml(bearer, phoneId)
+      const gallery = findByText(xml2, 'Choose from library', 'Choisir dans la bibliothèque', 'Gallery', 'Galerie', 'New profile photo')
+      if (gallery) {
+        await shellExec(bearer, phoneId, `input tap ${gallery[0]} ${gallery[1]}`)
+        await sleep(3000)
+        // Use content provider intent to pick the downloaded image
+        await shellExec(bearer, phoneId,
+          'am start -a android.intent.action.VIEW -d "file:///sdcard/sf_pfp.jpg" -t image/jpeg')
+        await sleep(2000)
+      }
+    }
+    xml = await dumpXml(bearer, phoneId)
+  }
+
+  // Set name
+  if (config.profileName?.trim()) {
+    log(`📝 Mise à jour du nom : "${config.profileName}"`)
+    const nameField = findByResourceId(xml, 'full_name', 'name_field') ??
+                      findByText(xml, 'Name', 'Nom')
+    if (nameField) {
+      await shellExec(bearer, phoneId, `input tap ${nameField[0]} ${nameField[1]}`)
+      await sleep(500)
+      await shellExec(bearer, phoneId, 'input keyevent 123') // KEYCODE_MOVE_END
+      await shellExec(bearer, phoneId, 'input keyevent --longpress 67') // long DEL
+      await sleep(200)
+      await shellExec(bearer, phoneId, 'input keyevent 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28') // DEL x50
+      const nameEscaped = config.profileName.trim().replace(/ /g, '%s')
+      await shellExec(bearer, phoneId, `input text "${nameEscaped}"`)
+      await sleep(400)
+    }
+  }
+
+  // Set bio
+  if (config.bio?.trim()) {
+    log(`📝 Mise à jour de la bio…`)
+    xml = await dumpXml(bearer, phoneId)
+    const bioField = findByResourceId(xml, 'biography', 'bio_field', 'biography_field') ??
+                     findByText(xml, 'Bio', 'Biography')
+    if (bioField) {
+      await shellExec(bearer, phoneId, `input tap ${bioField[0]} ${bioField[1]}`)
+      await sleep(500)
+      await shellExec(bearer, phoneId, 'input keyevent 123')
+      await shellExec(bearer, phoneId, 'input keyevent 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28')
+      const bioEscaped = config.bio.trim().replace(/\n/g, ' ').replace(/ /g, '%s')
+      await shellExec(bearer, phoneId, `input text "${bioEscaped}"`)
+      await sleep(400)
+    }
+  }
+
+  // Save
+  log('💾 Sauvegarde du profil…')
+  xml = await dumpXml(bearer, phoneId)
+  const saveBtn = findByText(xml, 'Done', 'Terminé', 'Save', 'Sauvegarder', 'Submit') ??
+                  findByResourceId(xml, 'action_done', 'save_button', 'done_button')
+  if (saveBtn) {
+    await shellExec(bearer, phoneId, `input tap ${saveBtn[0]} ${saveBtn[1]}`)
+    await sleep(3000)
+    log('✅ Profil mis à jour')
+  }
+}
+
+// ── Warmup actions (browse / like / reels / follow) ──────────────────────────
+async function runWarmupActions(
+  bearer: string,
+  phoneId: string,
+  config: Pick<WarmupConfig, 'browseMinutes' | 'likePosts' | 'watchReels' | 'followSuggested'>,
+  log: (m: string) => void,
+  abortSignal: { abort: boolean },
+) {
+  const endTime = Date.now() + config.browseMinutes * 60 * 1000
+  let likeCount = 0
+  let followCount = 0
+
+  // Go to home feed
+  log('📱 Ouverture du fil d\'actualité…')
+  await shellExec(bearer, phoneId, 'am start -n com.instagram.android/.activity.MainTabActivity')
+  await sleep(4000)
+
+  while (Date.now() < endTime && !abortSignal.abort) {
+    // Scroll the feed
+    const swipeY1 = 1400 + Math.floor(Math.random() * 200)
+    const swipeY2 = 400  + Math.floor(Math.random() * 200)
+    const swipeDuration = 600 + Math.floor(Math.random() * 400)
+    await shellExec(bearer, phoneId, `input swipe 540 ${swipeY1} 540 ${swipeY2} ${swipeDuration}`)
+    await sleep(1500 + Math.floor(Math.random() * 2000))
+
+    if (abortSignal.abort) break
+
+    // Randomly like posts
+    if (config.likePosts && Math.random() < 0.35) {
+      const xml = await dumpXml(bearer, phoneId)
+      const likeBtn = findByResourceId(xml, 'row_feed_button_like') ??
+                      findByText(xml, 'Like', "J'aime")
+      if (likeBtn) {
+        await shellExec(bearer, phoneId, `input tap ${likeBtn[0]} ${likeBtn[1]}`)
+        likeCount++
+        log(`❤️ Like (${likeCount})`)
+        await sleep(800 + Math.floor(Math.random() * 500))
+      }
+    }
+
+    // Randomly follow suggested accounts
+    if (config.followSuggested && Math.random() < 0.1 && followCount < 3) {
+      const xml = await dumpXml(bearer, phoneId)
+      const followBtn = findByText(xml, 'Follow', 'Suivre', 'S\'abonner')
+      if (followBtn) {
+        await shellExec(bearer, phoneId, `input tap ${followBtn[0]} ${followBtn[1]}`)
+        followCount++
+        log(`➕ Follow (${followCount})`)
+        await sleep(1000)
+      }
+    }
+
+    // Occasionally watch reels
+    if (config.watchReels && Math.random() < 0.2 && !abortSignal.abort) {
+      log('🎬 Ouverture des Reels…')
+      const xml = await dumpXml(bearer, phoneId)
+      const reelsTab = findByText(xml, 'Reels', 'Réels') ??
+                       findByResourceId(xml, 'clips_tab', 'reels_tab')
+      if (reelsTab) {
+        await shellExec(bearer, phoneId, `input tap ${reelsTab[0]} ${reelsTab[1]}`)
+        await sleep(3000)
+        // Watch 3–5 reels by swiping up
+        const reelCount = 3 + Math.floor(Math.random() * 3)
+        for (let r = 0; r < reelCount && !abortSignal.abort; r++) {
+          await sleep(4000 + Math.floor(Math.random() * 4000))
+          await shellExec(bearer, phoneId, 'input swipe 540 1400 540 400 500')
+        }
+        // Go back to feed
+        await shellExec(bearer, phoneId, 'am start -n com.instagram.android/.activity.MainTabActivity')
+        await sleep(3000)
+      }
+    }
+  }
+
+  log(`✅ Warmup terminé — ${likeCount} likes, ${followCount} follows`)
+}
+
+// ── Main entry point ─────────────────────────────────────────────────────────
+export async function warmupAccount(
+  bearer: string,
+  phoneId: string,
+  config: WarmupConfig,
+  log: (m: string) => void,
+  abortSignal: { abort: boolean },
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const ready = await ensurePhoneRunning(bearer, phoneId, log)
+    if (!ready) return { ok: false, error: 'Le téléphone n\'a pas pu démarrer dans le délai imparti' }
+
+    const hasProfileUpdate = config.profileName || config.bio || config.profilePicUrl
+    if (hasProfileUpdate) {
+      await updateInstagramProfile(bearer, phoneId, config, log)
+    }
+
+    if (abortSignal.abort) return { ok: true }
+
+    if (config.browseMinutes > 0) {
+      await runWarmupActions(bearer, phoneId, config, log, abortSignal)
+    }
+
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) }
+  }
+}

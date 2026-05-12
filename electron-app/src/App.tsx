@@ -471,6 +471,7 @@ import { AiTools }           from '@/pages/AiTools'
 import { Autocomment }       from '@/pages/Autocomment'
 import { Settings }          from '@/pages/Settings'
 import { MassPosting }       from '@/pages/MassPosting'
+import { Warmup }            from '@/pages/Warmup'
 import { FullPageLoader }    from '@/components/ui/Spinner'
 
 const BETA_KEY = 'scaleflow-v1-seen'
@@ -555,6 +556,7 @@ function AppContent({ user }: { user: User }) {
       case 'massposting':  return <MassPosting user={user} />
       case 'bank':         return <Bank        user={user} />
       case 'autocomment':  return <Autocomment user={user} />
+      case 'warmup':       return <Warmup      user={user} />
       case 'montage':      return <Montage     user={user} />
       case 'remix':        return <Remix       user={user} />
       case 'aitools':      return <AiTools     user={user} />

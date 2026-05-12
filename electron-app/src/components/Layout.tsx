@@ -51,7 +51,7 @@ function SFLogo({ size = 28 }: { size?: number }) {
 
 export type Page =
   | 'dashboard' | 'phones'
-  | 'stats' | 'posting' | 'massposting' | 'bank' | 'autocomment' | 'aitools'
+  | 'stats' | 'posting' | 'massposting' | 'bank' | 'autocomment' | 'aitools' | 'warmup'
   | 'montage' | 'remix'
   | 'settings'
 
@@ -86,6 +86,7 @@ const NAV_SECTIONS: NavSection[] = [
       { id: 'massposting', label: 'Mass Posting',  icon: '⚡', beta: true },
       { id: 'bank',        label: 'Banque vidéos', icon: '🗂' },
       { id: 'autocomment', label: 'Commentaires',  icon: '💬', beta: true },
+      { id: 'warmup',      label: 'Warmup Compte', icon: '🔥', beta: true },
       { id: 'aitools',     label: 'Outils IA',     icon: '🔧', beta: true },
     ],
   },
