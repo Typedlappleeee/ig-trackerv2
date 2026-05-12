@@ -396,11 +396,11 @@ DROP POLICY IF EXISTS "oi_insert" ON public.organization_invites;
 DROP POLICY IF EXISTS "oi_update" ON public.organization_invites;
 DROP POLICY IF EXISTS "oi_delete" ON public.organization_invites;
 CREATE POLICY "oi_select" ON public.organization_invites FOR SELECT USING (
-  public.is_org_admin(org_id) OR email = (SELECT email FROM auth.users WHERE id = auth.uid())
+  public.is_org_admin(org_id) OR email = auth.email()
 );
 CREATE POLICY "oi_insert" ON public.organization_invites FOR INSERT WITH CHECK (public.is_org_admin(org_id));
 CREATE POLICY "oi_update" ON public.organization_invites FOR UPDATE USING (
-  public.is_org_admin(org_id) OR email = (SELECT email FROM auth.users WHERE id = auth.uid())
+  public.is_org_admin(org_id) OR email = auth.email()
 );
 CREATE POLICY "oi_delete" ON public.organization_invites FOR DELETE USING (public.is_org_admin(org_id));
 
