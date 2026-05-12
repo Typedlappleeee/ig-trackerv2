@@ -216,9 +216,9 @@ export function Remix({ user }: RemixProps) {
     const r = await window.electronAPI!.detectSceneChange!({ filePath: originalPath })
     setDetecting(false)
     if (r.ok && r.splitTime != null) {
-      const t = Math.min(originalDur - 0.1, Math.round((r.splitTime + 0.5) * 10) / 10)
+      const t = Math.min(originalDur - 0.1, Math.round((r.splitTime + 0.1) * 10) / 10)
       setSplitTime(t)
-      setDetectMsg({ ok: true, text: `Coupure détectée à ${fmtTime(r.splitTime)} → ${fmtTime(t)} (+0.5s)` })
+      setDetectMsg({ ok: true, text: `Coupure détectée à ${fmtTime(r.splitTime)} → ${fmtTime(t)} (+0.1s)` })
       playSuccess()
     } else {
       setDetectMsg({ ok: false, text: r.error ?? 'Aucune coupure détectée' })
@@ -248,7 +248,7 @@ export function Remix({ user }: RemixProps) {
       let parsed: { splitTime?: number; description?: string } = {}
       try { const m = txt.match(/\{[\s\S]*\}/); if (m) parsed = JSON.parse(m[0]) } catch { throw new Error('Réponse IA invalide') }
       if (parsed.splitTime != null && parsed.splitTime > 0 && parsed.splitTime < originalDur) {
-        const t = Math.min(originalDur - 0.1, Math.round((parsed.splitTime + 0.5) * 10) / 10)
+        const t = Math.min(originalDur - 0.1, Math.round((parsed.splitTime + 0.1) * 10) / 10)
         setSplitTime(t)
         setAiDetectMsg({ ok: true, text: `IA : ${fmtTime(parsed.splitTime)} → ${fmtTime(t)}${parsed.description ? ` — ${parsed.description}` : ''}` })
         playSuccess()

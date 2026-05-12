@@ -164,7 +164,7 @@ export function MassRemix({ user }: MassRemixProps) {
       updateJob(job.id, { status: 'detecting' })
       const det = await window.electronAPI!.detectSceneChange!({ filePath: job.originalPath })
       const splitTime = det.ok && det.splitTime != null
-        ? Math.min((det.duration ?? 60) - 0.1, Math.round((det.splitTime + 0.5) * 10) / 10)
+        ? Math.min((det.duration ?? 60) - 0.1, Math.round((det.splitTime + 0.1) * 10) / 10)
         : Math.round((det.duration ?? 60) * 0.5 * 10) / 10
       updateJob(job.id, { splitTime })
 
