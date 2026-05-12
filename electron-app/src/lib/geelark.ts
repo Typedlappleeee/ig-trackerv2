@@ -311,165 +311,202 @@ async function updateInstagramProfile(
   config: Pick<WarmupConfig, 'profileName' | 'bio' | 'profilePicUrl'>,
   log: (m: string) => void,
 ) {
-  // ── 1. Wake & unlock screen ────────────────────────────────────────────────
+  // ── Wake + unlock ──────────────────────────────────────────────────────────
   log('📱 Réveil de l\'écran…')
-  await shellExec(bearer, phoneId, 'input keyevent 224')          // KEYCODE_WAKEUP
+  await shellExec(bearer, phoneId, 'input keyevent 224')
   await sleep(800)
-  await shellExec(bearer, phoneId, 'input swipe 540 1700 540 800 400') // swipe to unlock
+  await shellExec(bearer, phoneId, 'input swipe 540 1700 540 800 400')
   await sleep(1500)
 
-  // ── 2. Download profile picture first (before opening IG) ─────────────────
+  // ── Detect screen size ─────────────────────────────────────────────────────
+  const { output: sizeOut } = await shellExec(bearer, phoneId, 'wm size')
+  const sm = sizeOut.match(/(\d+)x(\d+)/)
+  const sw = sm ? parseInt(sm[1]) : 1080
+  const sh = sm ? parseInt(sm[2]) : 2340
+  const cx = Math.floor(sw / 2)
+  log(`📐 Écran: ${sw}x${sh}`)
+
+  // ── Download profile picture ───────────────────────────────────────────────
   if (config.profilePicUrl?.trim()) {
-    log('🖼 Téléchargement de la photo de profil…')
-    const dlResult = await shellExec(bearer, phoneId,
-      `curl -s -L --max-time 30 -o /sdcard/DCIM/Camera/sf_pfp.jpg "${config.profilePicUrl.trim()}" && echo OK`)
-    log(`   curl: ${dlResult.output.trim() || 'aucune sortie'}`)
+    log('🖼 Téléchargement PDP…')
+    const dl = await shellExec(bearer, phoneId,
+      `curl -s -L --max-time 30 -o /sdcard/DCIM/Camera/sf_pfp.jpg "${config.profilePicUrl.trim()}" && echo DONE`)
+    log(`   curl → ${dl.output.trim() || 'no output'}`)
     await shellExec(bearer, phoneId,
       'am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file:///sdcard/DCIM/Camera/sf_pfp.jpg')
     await sleep(2000)
   }
 
-  // ── 3. Open Edit Profile via deep link (most direct route) ─────────────────
-  log('🔗 Ouverture Edit Profile…')
+  // ── Open Instagram fresh ───────────────────────────────────────────────────
+  log('📲 Lancement Instagram…')
+  await shellExec(bearer, phoneId, 'am force-stop com.instagram.android')
+  await sleep(1200)
   await shellExec(bearer, phoneId,
-    'am start -a android.intent.action.VIEW -d "https://www.instagram.com/accounts/edit/" -p com.instagram.android')
-  await sleep(7000)
+    'am start -n com.instagram.android/.activity.MainTabActivity')
+  await sleep(8000)
 
+  // ── Tap profile tab (rightmost icon in bottom nav) ─────────────────────────
   let xml = await dumpXml(bearer, phoneId)
-  log(`📋 XML reçu : ${xml.length} chars`)
+  log(`📋 Home XML: ${xml.length} chars`)
 
-  const onEditScreen =
-    /biography|full_name|edit.*profile|modifier.*profil/i.test(xml)
+  const profilePt =
+    findByText(xml, 'Profile', 'Profil') ??
+    findByResourceId(xml, 'profile_tab', 'tab_avatar', 'navigation_profile',
+      'ig_bottom_bar_profile', 'tabIcon5', 'tab_icon_profile')
+  if (profilePt) {
+    log(`👤 Profile tab à ${profilePt}`)
+    await shellExec(bearer, phoneId, `input tap ${profilePt[0]} ${profilePt[1]}`)
+  } else {
+    // rightmost bottom-nav icon: ~92% of width, ~97% of height
+    const tx = Math.floor(sw * 0.92)
+    const ty = Math.floor(sh * 0.965)
+    log(`👤 Profile tab non trouvé → coordonnée (${tx},${ty})`)
+    await shellExec(bearer, phoneId, `input tap ${tx} ${ty}`)
+  }
+  await sleep(4000)
 
-  if (!onEditScreen) {
-    // ── 4. Fallback: navigate manually ──────────────────────────────────────
-    log('↩️ Deep link raté — navigation manuelle…')
-    await shellExec(bearer, phoneId, 'am force-stop com.instagram.android')
-    await sleep(1000)
-    await shellExec(bearer, phoneId,
-      'am start -n com.instagram.android/.activity.MainTabActivity')
-    await sleep(7000)
+  // ── Tap Edit Profile button ────────────────────────────────────────────────
+  xml = await dumpXml(bearer, phoneId)
+  log(`📋 Profile XML: ${xml.length} chars — aperçu: ${xml.substring(0, 200)}`)
 
-    xml = await dumpXml(bearer, phoneId)
-    log(`📋 XML home : ${xml.length} chars, aperçu: ${xml.substring(0, 300)}`)
+  const editPt =
+    findByText(xml, 'Edit profile', 'Modifier le profil', 'Edit Profile') ??
+    findByResourceId(xml, 'edit_profile_button', 'button_edit_profile',
+      'profile_header_edit_btn', 'edit_profile')
+  if (editPt) {
+    log(`✏️ Edit Profile à ${editPt}`)
+    await shellExec(bearer, phoneId, `input tap ${editPt[0]} ${editPt[1]}`)
+  } else {
+    // Edit profile is usually a button just below follower counts, ~22% from top
+    const ex = cx
+    const ey = Math.floor(sh * 0.22)
+    log(`✏️ Edit Profile non trouvé → coordonnée (${ex},${ey})`)
+    await shellExec(bearer, phoneId, `input tap ${ex} ${ey}`)
+  }
+  await sleep(5000)
 
-    // Tap profile tab — try by text, by resource-id, then coordinate fallback
-    const profilePt =
-      findByText(xml, 'Profile', 'Profil') ??
-      findByResourceId(xml, 'profile_tab', 'tab_avatar', 'ig_bottom_bar_profile', 'navigation_profile')
-    if (profilePt) {
-      log(`👤 Profile tab trouvé à ${profilePt}`)
-      await shellExec(bearer, phoneId, `input tap ${profilePt[0]} ${profilePt[1]}`)
+  xml = await dumpXml(bearer, phoneId)
+  log(`📋 Edit screen XML: ${xml.length} chars — aperçu: ${xml.substring(0, 300)}`)
+
+  // ── Profile picture ────────────────────────────────────────────────────────
+  if (config.profilePicUrl?.trim()) {
+    log('🖼 Tap Change photo…')
+    const cppPt =
+      findByText(xml, 'Change profile photo', 'Changer la photo de profil',
+        'Edit picture', 'Change photo', 'Modifier la photo') ??
+      findByResourceId(xml, 'change_avatar', 'change_photo_btn',
+        'profile_photo_change_btn', 'change_profile_photo')
+    if (cppPt) {
+      log(`   trouvé à ${cppPt}`)
+      await shellExec(bearer, phoneId, `input tap ${cppPt[0]} ${cppPt[1]}`)
     } else {
-      log('👤 Profile tab non trouvé — tap coordonnée (1010, 1870)')
-      await shellExec(bearer, phoneId, 'input tap 1010 1870')
+      // Profile picture sits near top-center; "Change photo" text is just below it
+      const ppx = cx
+      const ppy = Math.floor(sh * 0.13)
+      log(`   non trouvé → tap (${ppx},${ppy})`)
+      await shellExec(bearer, phoneId, `input tap ${ppx} ${ppy}`)
+    }
+    await sleep(2500)
+
+    // Bottom sheet — pick Gallery
+    const xml2 = await dumpXml(bearer, phoneId)
+    log(`📋 Bottom sheet: ${xml2.length} chars`)
+    const galPt =
+      findByText(xml2, 'Choose from library', 'Choisir dans la bibliothèque',
+        'Gallery', 'Galerie', 'Photo library', 'Choose from Gallery') ??
+      findByResourceId(xml2, 'gallery_option', 'choose_library', 'library_option')
+    if (galPt) {
+      log(`   Galerie à ${galPt}`)
+      await shellExec(bearer, phoneId, `input tap ${galPt[0]} ${galPt[1]}`)
+    } else {
+      // Bottom sheet items start around 50-60% of screen height
+      const gx = cx
+      const gy = Math.floor(sh * 0.55)
+      log(`   Galerie non trouvée → tap (${gx},${gy})`)
+      await shellExec(bearer, phoneId, `input tap ${gx} ${gy}`)
     }
     await sleep(4000)
 
-    xml = await dumpXml(bearer, phoneId)
-    log(`📋 XML profil : aperçu: ${xml.substring(0, 300)}`)
+    // Select first (most recent) photo — top-left of grid
+    log('📷 Sélection première photo…')
+    const pix = Math.floor(sw * 0.17)
+    const piy = Math.floor(sh * 0.28)
+    await shellExec(bearer, phoneId, `input tap ${pix} ${piy}`)
+    await sleep(2500)
 
-    const editPt =
-      findByText(xml, 'Edit profile', 'Modifier le profil', 'Edit Profile') ??
-      findByResourceId(xml, 'edit_profile_button', 'button_edit_profile', 'edit_profile', 'profile_header_edit_btn')
-    if (!editPt) {
-      log('❌ Bouton Edit Profile introuvable. Contenu XML:\n' + xml.substring(0, 800))
-      return
-    }
-    log(`✏️ Edit Profile trouvé à ${editPt}`)
-    await shellExec(bearer, phoneId, `input tap ${editPt[0]} ${editPt[1]}`)
-    await sleep(5000)
-    xml = await dumpXml(bearer, phoneId)
-    log(`📋 XML edit screen : ${xml.length} chars`)
-  }
-
-  // ── 5. Profile picture ────────────────────────────────────────────────────
-  if (config.profilePicUrl?.trim()) {
-    const changePhotoPt =
-      findByText(xml, 'Change profile photo', 'Changer la photo de profil', 'Edit picture', 'Change photo', 'Modifier la photo') ??
-      findByResourceId(xml, 'change_avatar', 'profile_photo_change_btn', 'change_photo_btn')
-    if (changePhotoPt) {
-      log('🖼 Tap Change photo…')
-      await shellExec(bearer, phoneId, `input tap ${changePhotoPt[0]} ${changePhotoPt[1]}`)
-      await sleep(2500)
-      const xml2 = await dumpXml(bearer, phoneId)
-      const galleryPt =
-        findByText(xml2, 'Choose from library', 'Choisir dans la bibliothèque', 'Gallery', 'Galerie', 'Photo library', 'Choose from Gallery', 'New profile photo') ??
-        findByResourceId(xml2, 'choose_from_library', 'gallery_option')
-      if (galleryPt) {
-        await shellExec(bearer, phoneId, `input tap ${galleryPt[0]} ${galleryPt[1]}`)
-        await sleep(3500)
-        const xml3 = await dumpXml(bearer, phoneId)
-        // Most recent photo is top-left of the gallery grid
-        const firstPhoto =
-          findByResourceId(xml3, 'gallery_item', 'photo_grid_item', 'image_grid_item') ??
-          findByResourceId(xml3, 'thumbnail_image')
-        if (firstPhoto) {
-          await shellExec(bearer, phoneId, `input tap ${firstPhoto[0]} ${firstPhoto[1]}`)
-        } else {
-          log('📷 Tap première photo galerie (coordonnée 180,650)')
-          await shellExec(bearer, phoneId, 'input tap 180 650')
-        }
-        await sleep(2500)
-        // Confirm crop / Next
-        const xml4 = await dumpXml(bearer, phoneId)
-        const nextPt = findByText(xml4, 'Next', 'Suivant', 'Done', 'Terminé', 'OK', 'Confirm') ??
-                       findByResourceId(xml4, 'next_button', 'done_button', 'action_next')
-        if (nextPt) {
-          await shellExec(bearer, phoneId, `input tap ${nextPt[0]} ${nextPt[1]}`)
-          await sleep(3000)
-        }
-      } else {
-        log('⚠️ Option galerie non trouvée')
-      }
-      xml = await dumpXml(bearer, phoneId)
+    // Confirm / Next
+    const xml3 = await dumpXml(bearer, phoneId)
+    const nextPt =
+      findByText(xml3, 'Next', 'Suivant', 'Done', 'Terminé', 'OK') ??
+      findByResourceId(xml3, 'action_next', 'next_button', 'done_button')
+    if (nextPt) {
+      log(`   Next à ${nextPt}`)
+      await shellExec(bearer, phoneId, `input tap ${nextPt[0]} ${nextPt[1]}`)
     } else {
-      log('⚠️ Bouton Change photo non trouvé')
+      const nx = Math.floor(sw * 0.9)
+      const ny = Math.floor(sh * 0.06)
+      log(`   Next non trouvé → tap (${nx},${ny})`)
+      await shellExec(bearer, phoneId, `input tap ${nx} ${ny}`)
     }
+    await sleep(4000)
+
+    // Re-dump after picture change
+    xml = await dumpXml(bearer, phoneId)
+    log(`📋 Après PDP: ${xml.length} chars`)
   }
 
-  // ── 6. Set name ───────────────────────────────────────────────────────────
+  // ── Set name ───────────────────────────────────────────────────────────────
   if (config.profileName?.trim()) {
     log(`📝 Nom → "${config.profileName}"`)
     const namePt =
-      findByResourceId(xml, 'full_name', 'name_field', 'name') ??
+      findByResourceId(xml, 'full_name') ??
       findByText(xml, 'Name', 'Nom', 'Full name', 'Nom complet')
     if (namePt) {
+      log(`   champ à ${namePt}`)
       await clearAndType(bearer, phoneId, namePt, config.profileName.trim(), log)
     } else {
-      log('⚠️ Champ Nom non trouvé — XML contenu: ' + xml.substring(0, 500))
+      // Name field is typically ~22-25% from top in Edit Profile scroll view
+      const ny = Math.floor(sh * 0.23)
+      log(`   non trouvé → tap (${cx},${ny})`)
+      await clearAndType(bearer, phoneId, [cx, ny], config.profileName.trim(), log)
     }
   }
 
-  // ── 7. Set bio ────────────────────────────────────────────────────────────
+  // ── Set bio ────────────────────────────────────────────────────────────────
   if (config.bio?.trim()) {
     log('📝 Bio…')
     xml = await dumpXml(bearer, phoneId)
     const bioPt =
-      findByResourceId(xml, 'biography', 'bio', 'bio_field', 'biography_field') ??
+      findByResourceId(xml, 'biography') ??
       findByText(xml, 'Bio', 'Biography', 'Biographie')
     if (bioPt) {
+      log(`   champ à ${bioPt}`)
       await clearAndType(bearer, phoneId, bioPt, config.bio.trim(), log)
     } else {
-      log('⚠️ Champ Bio non trouvé')
+      const by = Math.floor(sh * 0.40)
+      log(`   non trouvé → tap (${cx},${by})`)
+      await clearAndType(bearer, phoneId, [cx, by], config.bio.trim(), log)
     }
   }
 
-  // ── 8. Dismiss keyboard then save ─────────────────────────────────────────
-  await shellExec(bearer, phoneId, 'input keyevent 4')  // BACK dismisses keyboard
-  await sleep(600)
+  // ── Dismiss keyboard then Save ─────────────────────────────────────────────
+  await shellExec(bearer, phoneId, 'input keyevent 4')
+  await sleep(800)
 
   log('💾 Sauvegarde…')
   xml = await dumpXml(bearer, phoneId)
   const savePt =
-    findByText(xml, 'Done', 'Terminé', 'Save', 'Sauvegarder', 'Submit', 'Confirm') ??
+    findByText(xml, 'Done', 'Terminé', 'Save', 'Sauvegarder') ??
     findByResourceId(xml, 'action_done', 'save_button', 'done_button', 'submit_button')
   if (savePt) {
+    log(`   Save à ${savePt}`)
     await shellExec(bearer, phoneId, `input tap ${savePt[0]} ${savePt[1]}`)
   } else {
-    // Action bar "Done" is usually top-right ~(1030, 115) on 1080px screen
-    log('⚠️ Bouton Save non trouvé — tap top-right (1030, 115)')
-    await shellExec(bearer, phoneId, 'input tap 1030 115')
+    // Toolbar Done is top-right: ~93% width, ~6% height
+    const sx = Math.floor(sw * 0.93)
+    const sy = Math.floor(sh * 0.06)
+    log(`   Save non trouvé → tap top-right (${sx},${sy})`)
+    await shellExec(bearer, phoneId, `input tap ${sx} ${sy}`)
   }
   await sleep(3000)
   log('✅ Profil sauvegardé !')
