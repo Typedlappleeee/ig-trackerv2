@@ -223,7 +223,7 @@ export function Settings({ user, initialPanel }: SettingsProps) {
         setError("Seuls les owner/admin de l'organisation peuvent modifier ces clés.")
         setSaving(false); return
       }
-      const { error: err } = await supabase.from('org_config').upsert({
+      let { error: err } = await supabase.from('org_config').upsert({
         org_id:            currentOrg.id,
         bearer_token:      bearer.trim(),
         groq_api_key:      groqKey.trim(),
@@ -231,10 +231,17 @@ export function Settings({ user, initialPanel }: SettingsProps) {
         proxy:             proxy.trim() || null,
         updated_at:        new Date().toISOString(),
       }, { onConflict: 'org_id' })
+      if (err && /anthropic|column|schema cache/i.test(err.message)) {
+        // Column doesn't exist yet — retry without it
+        const r = await supabase.from('org_config').upsert({
+          org_id: currentOrg.id, bearer_token: bearer.trim(),
+          groq_api_key: groqKey.trim(), proxy: proxy.trim() || null,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'org_id' })
+        err = r.error
+      }
       if (err) { setError('Erreur: ' + err.message); setSaving(false); return }
     } else {
-      // Solo mode: explicitly write empty strings so deletions take effect
-      // (we don't want a removed token to silently keep its old value).
       const payload: Record<string, unknown> = {
         user_id:           user.id,
         bearer_token:      bearer.trim(),
@@ -243,7 +250,16 @@ export function Settings({ user, initialPanel }: SettingsProps) {
         proxy:             proxy.trim() || null,
         updated_at:        new Date().toISOString(),
       }
-      const { error: err } = await supabase.from('app_config').upsert(payload, { onConflict: 'user_id' })
+      let { error: err } = await supabase.from('app_config').upsert(payload, { onConflict: 'user_id' })
+      if (err && /anthropic|column|schema cache/i.test(err.message)) {
+        // Column doesn't exist yet — retry without it
+        const { user_id, bearer_token, groq_api_key, proxy: p, updated_at } = payload as Record<string, string>
+        const r = await supabase.from('app_config').upsert(
+          { user_id, bearer_token, groq_api_key, proxy: p || null, updated_at },
+          { onConflict: 'user_id' }
+        )
+        err = r.error
+      }
       if (err) { setError('Erreur: ' + err.message); setSaving(false); return }
     }
     notifyConnectionsChanged()    // wake up useConnections everywhere

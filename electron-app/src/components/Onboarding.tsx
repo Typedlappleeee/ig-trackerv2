@@ -118,7 +118,7 @@ export function Onboarding({ user, onComplete }: OnboardingProps) {
     if (!bearer.trim()) return
     setSaving(true); setSaveErr(null)
     const now = new Date().toISOString()
-    const { error } = await supabase.from('app_config').upsert({
+    let { error } = await supabase.from('app_config').upsert({
       user_id:           user.id,
       bearer_token:      bearer.trim(),
       groq_api_key:      groqKey.trim(),
@@ -127,6 +127,17 @@ export function Onboarding({ user, onComplete }: OnboardingProps) {
       onboarded_at:      now,
       updated_at:        now,
     }, { onConflict: 'user_id' })
+    if (error && /anthropic|column|schema cache/i.test(error.message)) {
+      const r = await supabase.from('app_config').upsert({
+        user_id:      user.id,
+        bearer_token: bearer.trim(),
+        groq_api_key: groqKey.trim(),
+        theme:        'Bleu',
+        onboarded_at: now,
+        updated_at:   now,
+      }, { onConflict: 'user_id' })
+      error = r.error
+    }
     setSaving(false)
     if (error) {
       setSaveErr(`Impossible de sauvegarder : ${error.message}. Vérifie ta connexion et réessaie.`)
