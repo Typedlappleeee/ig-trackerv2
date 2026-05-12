@@ -29,11 +29,6 @@ interface TextOverlayUI {
   endTime:   number
 }
 
-function xAlignToExpr(align: string): string {
-  if (align === 'right') return 'w*0.96-text_w'
-  if (align === 'left')  return 'w*0.04'
-  return '(w-text_w)/2'
-}
 
 function fmtTime(s: number): string {
   if (!isFinite(s) || s < 0) return '0:00'
@@ -271,19 +266,22 @@ export function Remix({ user }: RemixProps) {
         { type: 'text', text: `[Frame ${i} — t=${f.timestamp}s]` },
       ])
       const interval = splitTime / (fr.frames.length || 1)
-      const prompt = `These are ${fr.frames.length} frames from a ${splitTime.toFixed(1)}s video clip (vertical 9:16 format).
-Identify ALL burned-in text overlays (titles, captions, subtitles). For each text overlay return:
+      const prompt = `These are ${fr.frames.length} frames from a ${splitTime.toFixed(1)}s video clip (vertical 9:16 format, output resolution 1080×1920).
+Identify ALL burned-in text overlays (titles, captions, subtitles, watermarks). For each return:
 - text: the exact string
-- xAlign: "left" | "center" | "right"  (horizontal alignment of the text block)
-- yPercent: 0-100  (distance from the TOP of the frame to the TOP of the text, as a % of frame height)
-- fontSizePx: estimated font size in pixels assuming the video is 1920px tall
-- fontColor: CSS color name or hex (e.g. "white", "#ffffff", "yellow")
-- bold: true if the text appears bold
+- xPercent: 0-100 — horizontal center of the text block as % of frame width
+- yPercent: 0-100 — vertical center of the text block as % of frame height
+- fontSizePx: exact font size in pixels at 1080px wide × 1920px tall resolution
+- fontColor: CSS hex color (e.g. "#ffffff", "#ffff00")
+- bold: true if the text appears bold or heavy weight
 - startFrame: first frame index where this text is visible
 - endFrame: last frame index where this text is visible
 
+IMPORTANT: xPercent and yPercent must be the CENTER of the text, not the corner.
+Match the original position as precisely as possible.
+
 Return ONLY a valid JSON array, no explanation:
-[{"text":"...","xAlign":"center","yPercent":85,"fontSizePx":55,"fontColor":"white","bold":false,"startFrame":0,"endFrame":5}]
+[{"text":"...","xPercent":50,"yPercent":85,"fontSizePx":72,"fontColor":"#ffffff","bold":true,"startFrame":0,"endFrame":5}]
 If no text overlays exist return [].`
       const res = await window.electronAPI!.anthropicVisionRequest!({
         apiKey: anthropicKey.trim(), model: 'claude-haiku-4-5-20251001',
@@ -292,21 +290,26 @@ If no text overlays exist return [].`
       })
       if (!res.ok) throw new Error(res.error ?? 'Erreur API Anthropic')
       const txt = (res.data as { content: Array<{ type: string; text: string }> })?.content?.[0]?.text ?? '[]'
-      let parsed: Array<{ text: string; xAlign: string; yPercent: number; fontSizePx: number; fontColor: string; bold?: boolean; startFrame: number; endFrame: number }> = []
+      let parsed: Array<{ text: string; xPercent: number; yPercent: number; fontSizePx: number; fontColor: string; bold?: boolean; startFrame: number; endFrame: number }> = []
       try { const m = txt.match(/\[[\s\S]*\]/); if (m) parsed = JSON.parse(m[0]) } catch { throw new Error('Réponse IA invalide') }
-      const overlays: TextOverlayUI[] = parsed.map((item, idx) => ({
-        id: idx,
-        text: item.text,
-        position: item.xAlign ?? 'center',
-        x: xAlignToExpr(item.xAlign ?? 'center'),
-        y: `h*${Math.max(0.01, Math.min(0.97, (item.yPercent ?? 85) / 100)).toFixed(3)}`,
-        fontSize: Math.round(Math.max(16, Math.min(400, (item.fontSizePx ?? 42) * 2))),
-        fontColor: item.fontColor ?? 'white',
-        bold: true,
-        shadow: true,
-        startTime: Math.round((item.startFrame ?? 0) * interval * 10) / 10,
-        endTime: Math.min(splitTime, Math.round(((item.endFrame ?? fr.frames!.length - 1) + 1) * interval * 10) / 10),
-      }))
+      const overlays: TextOverlayUI[] = parsed.map((item, idx) => {
+        // Center the text at xPercent/yPercent by subtracting half text dimensions
+        const xExpr = `w*${(Math.max(1, Math.min(99, item.xPercent ?? 50)) / 100).toFixed(3)}-text_w/2`
+        const yExpr = `h*${(Math.max(1, Math.min(97, item.yPercent ?? 85)) / 100).toFixed(3)}-text_h/2`
+        return {
+          id: idx,
+          text: item.text,
+          position: 'center',
+          x: xExpr,
+          y: yExpr,
+          fontSize: Math.round(Math.max(16, Math.min(400, item.fontSizePx ?? 72))),
+          fontColor: item.fontColor ?? '#ffffff',
+          bold: item.bold ?? true,
+          shadow: true,
+          startTime: Math.round((item.startFrame ?? 0) * interval * 10) / 10,
+          endTime: Math.min(splitTime, Math.round(((item.endFrame ?? fr.frames!.length - 1) + 1) * interval * 10) / 10),
+        }
+      })
       setDetectedOverlays(overlays)
       if (overlays.length > 0) {
         setAnalyzeStep({ ok: true, text: `✓ ${overlays.length} texte(s) détecté(s)` })
