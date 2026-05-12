@@ -1,0 +1,43 @@
+appId: com.igtracker.app
+productName: IG Tracker
+copyright: Copyright © 2025
+
+directories:
+  output: release
+  buildResources: public
+
+files:
+  - dist
+  - dist-electron
+
+# Bundle ffmpeg-static binary so users don't need FFmpeg installed
+extraResources:
+  - from: "node_modules/ffmpeg-static/ffmpeg.exe"
+    to: "ffmpeg.exe"
+  - from: "node_modules/ffmpeg-static/ffmpeg"
+    to: "ffmpeg"
+
+asarUnpack:
+  - "node_modules/ffmpeg-static/**"
+
+# Windows — portable .exe (1 seul fichier, pas d'installation)
+win:
+  target:
+    - target: portable
+      arch: x64
+  signAndEditExecutable: false
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: false
+
+portable:
+  artifactName: IGTracker-portable.exe
+
+# macOS (optionnel)
+mac:
+  target: dmg
+
+# Linux (optionnel)
+linux:
+  target: AppImage

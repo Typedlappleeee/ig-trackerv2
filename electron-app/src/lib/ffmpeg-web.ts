@@ -1,0 +1,395 @@
+// ── ffmpeg.wasm wrappers ─────────────────────────────────────────────────────
+// Mirrors the Electron IPC handlers for FFmpeg operations.
+// Uses @ffmpeg/ffmpeg v0.12 which runs entirely in the browser via WebAssembly.
+
+import { FFmpeg } from '@ffmpeg/ffmpeg'
+import { fetchFile, toBlobURL } from '@ffmpeg/util'
+
+let _ffmpeg: FFmpeg | null = null
+let _loading: Promise<FFmpeg> | null = null
+
+// Singleton FFmpeg instance — loaded once, reused across calls.
+async function getFFmpeg(): Promise<FFmpeg> {
+  if (_ffmpeg) return _ffmpeg
+  if (_loading) return _loading
+
+  _loading = (async () => {
+    const ff = new FFmpeg()
+
+    // Load from jsDelivr CDN (includes all filters: drawtext, lumakey, etc.)
+    const baseURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm'
+    await ff.load({
+      coreURL:   await toBlobURL(`${baseURL}/ffmpeg-core.js`,   'text/javascript'),
+      wasmURL:   await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+    })
+
+    _ffmpeg = ff
+    return ff
+  })()
+
+  return _loading
+}
+
+// Write a file into ffmpeg's virtual FS from a blob URL or any URL.
+async function writeInput(ff: FFmpeg, name: string, url: string): Promise<void> {
+  const data = await fetchFile(url)
+  await ff.writeFile(name, data)
+}
+
+// Read output from ffmpeg's virtual FS and return a blob URL for download.
+async function readOutput(ff: FFmpeg, name: string, mimeType = 'video/mp4'): Promise<string> {
+  const data = await ff.readFile(name) as Uint8Array
+  const blob = new Blob([data], { type: mimeType })
+  return URL.createObjectURL(blob)
+}
+
+// Trigger a file download in the browser.
+export function downloadBlob(url: string, filename: string) {
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+}
+
+// ── readVideoMetadata ────────────────────────────────────────────────────────
+export async function readVideoMetadataWeb(filePath: string): Promise<{
+  ok: boolean; duration?: number; width?: number; height?: number; error?: string
+}> {
+  try {
+    const ff = await getFFmpeg()
+    await writeInput(ff, 'probe.mp4', filePath)
+
+    const logs: string[] = []
+    ff.on('log', ({ message }) => logs.push(message))
+
+    // Run with invalid output to force ffmpeg to print metadata and exit
+    await ff.exec(['-i', 'probe.mp4', '-f', 'null', '-']).catch(() => {})
+
+    ff.on('log', () => {})  // remove listener
+    await ff.deleteFile('probe.mp4').catch(() => {})
+
+    const combined = logs.join('\n')
+
+    const durM  = combined.match(/Duration:\s*(\d+):(\d+):(\d+\.?\d*)/)
+    const dimM  = combined.match(/,\s*(\d{2,5})x(\d{2,5})/)
+    const duration = durM
+      ? parseInt(durM[1]) * 3600 + parseInt(durM[2]) * 60 + parseFloat(durM[3])
+      : undefined
+
+    return { ok: true, duration, width: dimM ? parseInt(dimM[1]) : undefined, height: dimM ? parseInt(dimM[2]) : undefined }
+  } catch (err) {
+    return { ok: false, error: String(err) }
+  }
+}
+
+// ── runFfmpeg (Montage concat) ────────────────────────────────────────────────
+export async function runFfmpegWeb(opts: {
+  clips:      Array<{ filePath: string; trimStart: number; trimEnd: number }>
+  outputPath: string
+  preset:     '9:16' | '1:1' | '16:9'
+  transition: 'cut' | 'fade'
+}): Promise<{ ok: boolean; outputPath?: string; command?: string; error?: string }> {
+  try {
+    const ff = await getFFmpeg()
+
+    const scale = opts.preset === '9:16'  ? 'scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:-1:-1:color=black'
+                : opts.preset === '1:1'   ? 'scale=1080:1080:force_original_aspect_ratio=decrease,pad=1080:1080:-1:-1:color=black'
+                :                           'scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:-1:-1:color=black'
+
+    // Write input files
+    for (let i = 0; i < opts.clips.length; i++) {
+      await writeInput(ff, `in${i}.mp4`, opts.clips[i].filePath)
+    }
+
+    const inputs: string[] = []
+    const filterParts: string[] = []
+    const n = opts.clips.length
+
+    opts.clips.forEach((c, i) => {
+      const end = c.trimEnd > 0 ? c.trimEnd : 999999
+      inputs.push('-ss', String(c.trimStart), '-to', String(end), '-i', `in${i}.mp4`)
+      filterParts.push(`[${i}:v]${scale},setsar=1[v${i}];[${i}:a]aformat=sample_rates=44100:channel_layouts=stereo[a${i}]`)
+    })
+
+    const concatIn = opts.clips.map((_, i) => `[v${i}][a${i}]`).join('')
+    filterParts.push(`${concatIn}concat=n=${n}:v=1:a=1[vout][aout]`)
+
+    const args = [
+      ...inputs,
+      '-filter_complex', filterParts.join(';'),
+      '-map', '[vout]', '-map', '[aout]',
+      '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23',
+      '-c:a', 'aac', '-b:a', '128k',
+      '-movflags', '+faststart',
+      '-y', 'output.mp4',
+    ]
+
+    await ff.exec(args)
+
+    const url = await readOutput(ff, 'output.mp4')
+    for (let i = 0; i < n; i++) await ff.deleteFile(`in${i}.mp4`).catch(() => {})
+    await ff.deleteFile('output.mp4').catch(() => {})
+
+    return { ok: true, outputPath: url }
+  } catch (err) {
+    return { ok: false, error: String(err) }
+  }
+}
+
+// ── detectSceneChange ─────────────────────────────────────────────────────────
+export async function detectSceneChangeWeb(opts: {
+  filePath: string; threshold?: number
+}): Promise<{ ok: boolean; splitTime?: number; duration?: number; error?: string }> {
+  try {
+    const ff = await getFFmpeg()
+    await writeInput(ff, 'detect.mp4', opts.filePath)
+
+    const FPS = 2, W = 32, H = 32
+    const frameSize = W * H * 3
+
+    await ff.exec([
+      '-hide_banner', '-i', 'detect.mp4',
+      '-vf', `fps=${FPS},scale=${W}:${H}`,
+      '-f', 'rawvideo', '-pix_fmt', 'rgb24',
+      '-y', 'frames.rgb',
+    ])
+
+    const logs: string[] = []
+    const logHandler = ({ message }: { message: string }) => logs.push(message)
+    ff.on('log', logHandler)
+    await ff.exec(['-hide_banner', '-i', 'detect.mp4', '-f', 'null', '-']).catch(() => {})
+    ff.off('log', logHandler)
+
+    const combined = logs.join('\n')
+    const durM = combined.match(/Duration:\s*(\d+):(\d+):(\d+\.?\d*)/)
+    const duration = durM
+      ? parseInt(durM[1]) * 3600 + parseInt(durM[2]) * 60 + parseFloat(durM[3])
+      : 0
+
+    const raw = await ff.readFile('frames.rgb') as Uint8Array
+    await ff.deleteFile('detect.mp4').catch(() => {})
+    await ff.deleteFile('frames.rgb').catch(() => {})
+
+    const nFrames = Math.floor(raw.length / frameSize)
+    if (nFrames < 2) return { ok: true, splitTime: duration / 2, duration }
+
+    const threshold = opts.threshold ?? 0.4
+    let maxDiff = 0, maxIdx = 0
+
+    for (let i = 1; i < nFrames; i++) {
+      const a = raw.subarray((i - 1) * frameSize, i * frameSize)
+      const b = raw.subarray(i * frameSize, (i + 1) * frameSize)
+      let diff = 0
+      for (let j = 0; j < frameSize; j++) diff += Math.abs(a[j] - b[j])
+      diff /= frameSize * 255
+      if (diff > maxDiff) { maxDiff = diff; maxIdx = i }
+    }
+
+    if (maxDiff < threshold) return { ok: true, splitTime: duration / 2, duration }
+    const splitTime = Math.round((maxIdx / FPS) * 10) / 10
+    return { ok: true, splitTime, duration }
+  } catch (err) {
+    return { ok: false, error: String(err) }
+  }
+}
+
+// ── runFfmpegRemix ────────────────────────────────────────────────────────────
+export async function runFfmpegRemixWeb(opts: {
+  originalPath:  string
+  newPhase1Path: string
+  splitTime:     number
+  outputPath:    string
+  textBlend:     number
+  blendMode:     'screen' | 'multiply'
+  preset:        '9:16' | '1:1' | '16:9'
+}): Promise<{ ok: boolean; outputPath?: string; command?: string; error?: string }> {
+  try {
+    const ff = await getFFmpeg()
+    await writeInput(ff, 'orig.mp4', opts.originalPath)
+    await writeInput(ff, 'new1.mp4', opts.newPhase1Path)
+
+    const W = opts.preset === '16:9' ? 1920 : 1080
+    const H = opts.preset === '9:16' ? 1920 : 1080
+    const scl  = `scale=${W}:${H}:force_original_aspect_ratio=decrease,pad=${W}:${H}:-1:-1:color=black,setsar=1`
+    const afmt = 'aformat=sample_rates=44100:channel_layouts=stereo'
+
+    let filterComplex: string
+    if (opts.textBlend > 0) {
+      const lkTol = Math.min(0.5, Math.max(0.1, opts.textBlend))
+      filterComplex = [
+        `[1:v]split=2[ov_a][ov_b]`,
+        `[1:a]asplit=2[ao1][ao2]`,
+        `[0:v]trim=duration=${opts.splitTime},setpts=PTS-STARTPTS,${scl}[v_new]`,
+        `[ov_a]trim=end=${opts.splitTime},setpts=PTS-STARTPTS,${scl},lumakey=threshold=0:tolerance=${lkTol}:softness=0.05[text_key]`,
+        `[v_new][text_key]overlay=format=auto[v_blended]`,
+        `[ov_b]trim=start=${opts.splitTime},setpts=PTS-STARTPTS,${scl}[v_p2]`,
+        `[ao1]atrim=end=${opts.splitTime},asetpts=PTS-STARTPTS,${afmt}[a_p1]`,
+        `[ao2]atrim=start=${opts.splitTime},asetpts=PTS-STARTPTS,${afmt}[a_p2]`,
+        `[v_blended][a_p1][v_p2][a_p2]concat=n=2:v=1:a=1[vout][aout]`,
+      ].join(';')
+    } else {
+      filterComplex = [
+        `[0:v]trim=duration=${opts.splitTime},setpts=PTS-STARTPTS,${scl}[v_p1]`,
+        `[1:v]trim=start=${opts.splitTime},setpts=PTS-STARTPTS,${scl}[v_p2]`,
+        `[1:a]asplit=2[ao1][ao2]`,
+        `[ao1]atrim=end=${opts.splitTime},asetpts=PTS-STARTPTS,${afmt}[a_p1]`,
+        `[ao2]atrim=start=${opts.splitTime},asetpts=PTS-STARTPTS,${afmt}[a_p2]`,
+        `[v_p1][a_p1][v_p2][a_p2]concat=n=2:v=1:a=1[vout][aout]`,
+      ].join(';')
+    }
+
+    await ff.exec([
+      '-i', 'new1.mp4', '-i', 'orig.mp4',
+      '-filter_complex', filterComplex,
+      '-map', '[vout]', '-map', '[aout]',
+      '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23',
+      '-c:a', 'aac', '-b:a', '128k',
+      '-movflags', '+faststart', '-y', 'remix_out.mp4',
+    ])
+
+    const url = await readOutput(ff, 'remix_out.mp4')
+    await ff.deleteFile('orig.mp4').catch(() => {})
+    await ff.deleteFile('new1.mp4').catch(() => {})
+    await ff.deleteFile('remix_out.mp4').catch(() => {})
+
+    return { ok: true, outputPath: url }
+  } catch (err) {
+    return { ok: false, error: String(err) }
+  }
+}
+
+// ── runFfmpegRemixAI (drawtext overlays) ────────────────────────────────────
+export async function runFfmpegRemixAIWeb(opts: {
+  newPhase1Path: string
+  originalPath:  string
+  splitTime:     number
+  outputPath:    string
+  preset:        '9:16' | '1:1' | '16:9'
+  textOverlays:  Array<{
+    text: string; x: string; y: string; fontSize: number; fontColor: string
+    startTime: number; endTime: number; bold?: boolean; shadow?: boolean
+  }>
+}): Promise<{ ok: boolean; outputPath?: string; error?: string }> {
+  try {
+    const ff = await getFFmpeg()
+    await writeInput(ff, 'ai_orig.mp4', opts.originalPath)
+    await writeInput(ff, 'ai_new1.mp4', opts.newPhase1Path)
+
+    const W = opts.preset === '16:9' ? 1920 : 1080
+    const H = opts.preset === '9:16' ? 1920 : 1080
+    const scl  = `scale=${W}:${H}:force_original_aspect_ratio=decrease,pad=${W}:${H}:-1:-1:color=black,setsar=1`
+    const afmt = 'aformat=sample_rates=44100:channel_layouts=stereo'
+
+    const drawFilters = opts.textOverlays.map(ov => {
+      const escaped = ov.text.replace(/'/g, "’").replace(/:/g, '\\:').replace(/\\/g, '\\\\')
+      const shadow  = ov.shadow !== false ? ':shadowx=2:shadowy=2:shadowcolor=black@1.0' : ''
+      const bold    = ov.bold ? ':font=Arial Bold' : ':font=Arial'
+      return `drawtext=text='${escaped}'${bold}:fontsize=${ov.fontSize}:fontcolor=${ov.fontColor}:x=${ov.x}:y=${ov.y}${shadow}:enable='between(t,${ov.startTime},${ov.endTime})'`
+    }).join(',')
+
+    const filterComplex = [
+      `[0:v]trim=duration=${opts.splitTime},setpts=PTS-STARTPTS,${scl}${drawFilters ? ',' + drawFilters : ''}[v_p1]`,
+      `[1:v]trim=start=${opts.splitTime},setpts=PTS-STARTPTS,${scl}[v_p2]`,
+      `[1:a]asplit=2[ao1][ao2]`,
+      `[ao1]atrim=end=${opts.splitTime},asetpts=PTS-STARTPTS,${afmt}[a_p1]`,
+      `[ao2]atrim=start=${opts.splitTime},asetpts=PTS-STARTPTS,${afmt}[a_p2]`,
+      `[v_p1][a_p1][v_p2][a_p2]concat=n=2:v=1:a=1[vout][aout]`,
+    ].join(';')
+
+    await ff.exec([
+      '-i', 'ai_new1.mp4', '-i', 'ai_orig.mp4',
+      '-filter_complex', filterComplex,
+      '-map', '[vout]', '-map', '[aout]',
+      '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23',
+      '-c:a', 'aac', '-b:a', '128k',
+      '-movflags', '+faststart', '-y', 'ai_out.mp4',
+    ])
+
+    const url = await readOutput(ff, 'ai_out.mp4')
+    await ff.deleteFile('ai_orig.mp4').catch(() => {})
+    await ff.deleteFile('ai_new1.mp4').catch(() => {})
+    await ff.deleteFile('ai_out.mp4').catch(() => {})
+
+    return { ok: true, outputPath: url }
+  } catch (err) {
+    return { ok: false, error: String(err) }
+  }
+}
+
+// ── runFfmpegMetadata (strip/set metadata tags) ──────────────────────────────
+export async function runFfmpegMetadataWeb(opts: {
+  inputPath:  string
+  outputPath: string
+  metadata:   Record<string, string>
+}): Promise<{ ok: boolean; outputPath?: string; error?: string }> {
+  try {
+    const ff = await getFFmpeg()
+    await writeInput(ff, 'meta_in.mp4', opts.inputPath)
+
+    const args = ['-hide_banner', '-i', 'meta_in.mp4', '-map_metadata', '-1']
+    for (const [k, v] of Object.entries(opts.metadata)) {
+      if (v) args.push('-metadata', `${k}=${v}`)
+    }
+    args.push('-c', 'copy', '-movflags', '+faststart', '-y', 'meta_out.mp4')
+
+    await ff.exec(args)
+
+    const url = await readOutput(ff, 'meta_out.mp4')
+    await ff.deleteFile('meta_in.mp4').catch(() => {})
+    await ff.deleteFile('meta_out.mp4').catch(() => {})
+
+    return { ok: true, outputPath: url }
+  } catch (err) {
+    return { ok: false, error: String(err) }
+  }
+}
+
+// ── extractFrames (for AI vision analysis) ───────────────────────────────────
+export async function extractFramesWeb(opts: {
+  filePath: string; endTime: number; fps?: number
+}): Promise<{
+  ok: boolean
+  frames?: Array<{ index: number; timestamp: number; data: string }>
+  count?: number
+  error?: string
+}> {
+  try {
+    const ff = await getFFmpeg()
+    await writeInput(ff, 'frames_in.mp4', opts.filePath)
+
+    const targetCount = Math.min(8, Math.max(1, Math.ceil(opts.endTime)))
+    const fps         = targetCount / opts.endTime
+
+    await ff.exec([
+      '-i', 'frames_in.mp4',
+      '-t', String(opts.endTime),
+      '-vf', `fps=${fps.toFixed(4)},scale=640:-2`,
+      '-q:v', '5',
+      '-y', 'frame_%04d.jpg',
+    ])
+
+    await ff.deleteFile('frames_in.mp4').catch(() => {})
+
+    const frames: Array<{ index: number; timestamp: number; data: string }> = []
+    const interval = opts.endTime / targetCount
+
+    for (let i = 1; i <= targetCount; i++) {
+      const name = `frame_${String(i).padStart(4, '0')}.jpg`
+      try {
+        const data = await ff.readFile(name) as Uint8Array
+        let binary = ''
+        data.forEach(b => { binary += String.fromCharCode(b) })
+        frames.push({
+          index:     i - 1,
+          timestamp: Math.round((i - 1) * interval * 10) / 10,
+          data:      btoa(binary),
+        })
+        await ff.deleteFile(name).catch(() => {})
+      } catch { break }
+    }
+
+    return { ok: true, frames, count: frames.length }
+  } catch (err) {
+    return { ok: false, error: String(err) }
+  }
+}
