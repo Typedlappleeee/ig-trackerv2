@@ -82,20 +82,40 @@ export async function listRpaFlows(bearer: string): Promise<RpaFlow[]> {
   return items
 }
 
+const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms))
+
+// Like sleep but rejects immediately if the AbortSignal fires.
+function sleepOrAbort(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    if (signal?.aborted) { reject(new Error('Annulé')); return }
+    const timer = setTimeout(resolve, ms)
+    signal?.addEventListener('abort', () => { clearTimeout(timer); reject(new Error('Annulé')) }, { once: true })
+  })
+}
+
 // ── Direct phone shell (Android adb-style commands) ─────────────────────────
-// Lets us run `am start`, `input tap`, `input text`, `uiautomator dump` etc.
-// Retries up to 6 times when GéeLark reports the phone shell isn't ready yet.
-async function shellExec(bearer: string, phoneId: string, cmd: string): Promise<{ output: string; status: number }> {
-  const NOT_READY = /not running|not started|unavailable|not ready|phone.*start/i
-  for (let attempt = 0; attempt < 6; attempt++) {
+// Retries up to maxRetries times when GéeLark reports the phone shell isn't ready.
+// Pass maxRetries:2 for quick one-shot operations (e.g. extraction).
+async function shellExec(
+  bearer: string,
+  phoneId: string,
+  cmd: string,
+  opts?: { maxRetries?: number; signal?: AbortSignal },
+): Promise<{ output: string; status: number }> {
+  const maxRetries = opts?.maxRetries ?? 6
+  const signal     = opts?.signal
+  const NOT_READY  = /not running|not started|unavailable|not ready|phone.*start/i
+
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    if (signal?.aborted) throw new Error('Annulé')
     const d = await geelarkFetch('POST', '/shell/execute', { id: phoneId, cmd }, bearer)
     if (d['code'] === 0) {
       const data = (d['data'] as Record<string, unknown>) ?? {}
       return { output: String(data['output'] ?? ''), status: Number(data['status'] ?? -1) }
     }
     const msg = String(d['msg'] ?? d['message'] ?? d['code'] ?? '')
-    if (NOT_READY.test(msg) && attempt < 5) {
-      await sleep(5000 + attempt * 2000)
+    if (NOT_READY.test(msg) && attempt < maxRetries - 1) {
+      await sleepOrAbort(4000 + attempt * 2000, signal)
       continue
     }
     throw new Error(`GéeLark shell: ${msg}`)
@@ -103,35 +123,52 @@ async function shellExec(bearer: string, phoneId: string, cmd: string): Promise<
   throw new Error('GéeLark shell: téléphone non prêt après plusieurs tentatives')
 }
 
-const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
-
 // Ensure the cloud phone is running. Starts it if needed and polls until ready.
-async function ensurePhoneRunning(bearer: string, phoneId: string, log?: (m: string) => void): Promise<boolean> {
+async function ensurePhoneRunning(
+  bearer: string,
+  phoneId: string,
+  log?: (m: string) => void,
+  signal?: AbortSignal,
+): Promise<boolean> {
   // Status: 0=stopped, 1=running, 2=starting, 3=stopping
+  const STATUS_LABELS: Record<number, string> = { 0: 'arrêté', 1: 'en cours', 2: 'démarrage', 3: 'arrêt en cours' }
+  log?.('🔎 Vérification du statut du téléphone…')
   const phones = await fetchAllPhones(bearer)
   const p = phones.find(x => x.id === phoneId)
   if (!p) throw new Error(`phone ${phoneId} not found`)
+
+  const statusLabel = STATUS_LABELS[p.status] ?? `statut=${p.status}`
+  log?.(`📱 Statut actuel: ${statusLabel}`)
+
   if (p.status === 1) {
-    // Phone is already running but shell daemon may need a moment to accept connections
-    log?.('📱 Téléphone déjà démarré, stabilisation (5s)…')
-    await sleep(5000)
+    log?.('📱 Téléphone déjà démarré — stabilisation shell (5s)…')
+    await sleepOrAbort(5000, signal)
     return true
   }
 
-  log?.('📱 Démarrage du téléphone…')
+  if (p.status === 3) {
+    log?.('⏳ Téléphone en cours d\'arrêt — attente (8s)…')
+    await sleepOrAbort(8000, signal)
+  }
+
+  log?.('📱 Démarrage du téléphone GéeLark…')
   await geelarkFetch('POST', '/phone/start', { ids: [phoneId] }, bearer)
 
   // Poll for up to 120s until phone reports running
   for (let i = 0; i < 60; i++) {
-    await sleep(2000)
+    if (signal?.aborted) throw new Error('Annulé')
+    await sleepOrAbort(2000, signal)
     const list = await fetchAllPhones(bearer)
     const cur  = list.find(x => x.id === phoneId)
+    const curLabel = STATUS_LABELS[cur?.status ?? -1] ?? `statut=${cur?.status}`
+    if (i % 5 === 0) log?.(`⏳ Attente boot… (${i * 2}s) — ${curLabel}`)
     if (cur?.status === 1) {
-      log?.('✅ Téléphone démarré, attente boot Android (15s)…')
-      await sleep(15000)
+      log?.('✅ Téléphone démarré — attente boot Android (15s)…')
+      await sleepOrAbort(15000, signal)
       return true
     }
   }
+  log?.('❌ Timeout: téléphone non démarré après 120s')
   return false
 }
 
@@ -619,85 +656,123 @@ export async function warmupAccount(
 }
 
 // ── Extract Instagram sessionid from GéeLark phone shell ─────────────────────
-// Tries multiple methods with fallbacks. Returns null if not found or no root.
+// Accepts an external AbortSignal for cancellation. Times out after 3 minutes.
 export async function extractInstagramSessionId(
   bearer: string,
   geelarkId: string,
   log: (m: string) => void,
+  externalSignal?: AbortSignal,
 ): Promise<string | null> {
-  // Ensure phone is running before trying shell
-  await ensurePhoneRunning(bearer, geelarkId)
+  // Internal 3-minute timeout + external cancel merged into one signal
+  const timeoutCtrl = new AbortController()
+  const timeoutId   = setTimeout(() => timeoutCtrl.abort(), 3 * 60 * 1000)
 
-  const tmp = '/sdcard/sf_ig_cookies.db'
+  // Merge external signal with internal timeout
+  const signal = timeoutCtrl.signal
+  externalSignal?.addEventListener('abort', () => timeoutCtrl.abort(), { once: true })
 
-  // Possible cookie DB paths (varies by Android version / WebView version)
-  const cookiePaths = [
-    '/data/data/com.instagram.android/app_webview/Default/Cookies',
-    '/data/data/com.instagram.android/app_webview/Cookies',
-    '/data/data/com.instagram.android/app_chrome/Default/Cookies',
-    '/data/data/com.instagram.android/databases/webview_cookies.db',
-  ]
+  // Shell options: only 2 retries (phone should already be up) with short delays
+  const sh = (cmd: string) => shellExec(bearer, geelarkId, cmd, { maxRetries: 2, signal })
 
-  // ── Method 1: SQLite cookie DB ────────────────────────────────────────────
-  for (const path of cookiePaths) {
-    log(`🔍 Tentative: ${path}`)
-    const cp = await shellExec(bearer, geelarkId,
-      `cp "${path}" "${tmp}" 2>/dev/null && echo OK || echo FAIL`)
-    if (!cp.output.includes('OK')) continue
+  try {
+    // ── Step 1: ensure phone is running ──────────────────────────────────────
+    const running = await ensurePhoneRunning(bearer, geelarkId, log, signal)
+    if (!running) {
+      log('❌ Impossible de démarrer le téléphone — abandon')
+      return null
+    }
+    if (signal.aborted) throw new Error('Annulé')
 
-    log('📋 Fichier copié — extraction du sessionid…')
+    const tmp = '/sdcard/sf_ig_cookies.db'
 
-    // Try sqlite3 (cleanest)
-    const sql = await shellExec(bearer, geelarkId,
-      `sqlite3 "${tmp}" "SELECT value FROM cookies WHERE name='sessionid' LIMIT 1;" 2>/dev/null`)
-    const v1 = sql.output.trim()
-    if (v1.length > 20) {
-      await shellExec(bearer, geelarkId, `rm -f "${tmp}"`)
-      log(`✅ sessionid extrait via sqlite3`)
-      return v1
+    // Possible cookie DB paths (varies by Android/WebView version)
+    const cookiePaths = [
+      '/data/data/com.instagram.android/app_webview/Default/Cookies',
+      '/data/data/com.instagram.android/app_webview/Cookies',
+      '/data/data/com.instagram.android/app_chrome/Default/Cookies',
+      '/data/data/com.instagram.android/databases/webview_cookies.db',
+    ]
+
+    // ── Step 2: SQLite cookie DB ──────────────────────────────────────────────
+    log('─── Méthode 1 : base SQLite WebView ───')
+    for (const path of cookiePaths) {
+      if (signal.aborted) throw new Error('Annulé')
+      log(`  📂 Test chemin: ${path.split('/').pop()}`)
+      const cp = await sh(`cp "${path}" "${tmp}" 2>/dev/null && echo OK || echo FAIL`)
+      log(`     → cp: ${cp.output.trim()}`)
+      if (!cp.output.includes('OK')) continue
+
+      log('  📋 Fichier trouvé — lecture sqlite3…')
+      const sql = await sh(
+        `sqlite3 "${tmp}" "SELECT value FROM cookies WHERE name='sessionid' LIMIT 1;" 2>/dev/null`)
+      const v1 = sql.output.trim()
+      log(`     → sqlite3 output (${v1.length} chars): ${v1.slice(0, 30) || '(vide)'}`)
+      if (v1.length > 20) {
+        await sh(`rm -f "${tmp}"`)
+        log('✅ sessionid extrait via sqlite3 !')
+        return v1
+      }
+
+      log('  📋 sqlite3 vide — essai strings+awk…')
+      const str = await sh(
+        `strings -n 8 "${tmp}" | awk 'prev=="sessionid"{print;exit}{prev=$0}' 2>/dev/null`)
+      const v2 = str.output.trim()
+      log(`     → strings/awk output (${v2.length} chars): ${v2.slice(0, 30) || '(vide)'}`)
+      if (v2.length > 20) {
+        await sh(`rm -f "${tmp}"`)
+        log('✅ sessionid extrait via strings/awk !')
+        return v2
+      }
+
+      log('  📋 strings/awk vide — essai grep pattern…')
+      const grep = await sh(
+        `cat "${tmp}" | strings | grep -E "^[0-9]{8,15}%3A[A-Za-z0-9_%-]{20,}$" | head -1 2>/dev/null`)
+      const v3 = grep.output.trim()
+      log(`     → grep output (${v3.length} chars): ${v3.slice(0, 30) || '(vide)'}`)
+      if (v3.length > 20) {
+        await sh(`rm -f "${tmp}"`)
+        log('✅ sessionid extrait via grep pattern !')
+        return v3
+      }
+
+      await sh(`rm -f "${tmp}"`)
+      log(`  ⚠️ Fichier copié mais sessionid non trouvé (path: ${path.split('/').slice(-3).join('/')})`)
     }
 
-    // Fallback: strings + awk (no sqlite3)
-    const str = await shellExec(bearer, geelarkId,
-      `strings -n 8 "${tmp}" | awk 'prev=="sessionid"{print;exit}{prev=$0}' 2>/dev/null`)
-    const v2 = str.output.trim()
-    if (v2.length > 20) {
-      await shellExec(bearer, geelarkId, `rm -f "${tmp}"`)
-      log(`✅ sessionid extrait via strings/awk`)
-      return v2
+    // ── Step 3: shared_prefs XML ──────────────────────────────────────────────
+    if (signal.aborted) throw new Error('Annulé')
+    log('─── Méthode 2 : shared_prefs XML ───')
+    const prefs = await sh(
+      `grep -rh "sessionid" /data/data/com.instagram.android/shared_prefs/ 2>/dev/null | grep -oE "[0-9]{8,15}%3A[A-Za-z0-9_%.-]{20,}" | head -1`)
+    const v4 = prefs.output.trim()
+    log(`  → shared_prefs output (${v4.length} chars): ${v4.slice(0, 30) || '(vide)'}`)
+    if (v4.length > 20) {
+      log('✅ sessionid extrait via shared_prefs !')
+      return v4
     }
 
-    // Fallback: grep binary pattern (sessionid is followed by the value in SQLite pages)
-    const grep = await shellExec(bearer, geelarkId,
-      `cat "${tmp}" | strings | grep -E "^[0-9]{8,15}%3A[A-Za-z0-9_%-]{20,}$" | head -1 2>/dev/null`)
-    const v3 = grep.output.trim()
-    if (v3.length > 20) {
-      await shellExec(bearer, geelarkId, `rm -f "${tmp}"`)
-      log(`✅ sessionid extrait via grep pattern`)
-      return v3
+    // ── Step 4: diagnostic find ───────────────────────────────────────────────
+    if (signal.aborted) throw new Error('Annulé')
+    log('─── Diagnostic : fichiers disponibles ───')
+    const bin = await sh(
+      `find /data/data/com.instagram.android -name "*.db" -o -name "Cookies" 2>/dev/null | head -20`)
+    const files = bin.output.trim()
+    if (files) {
+      log('  Fichiers trouvés:')
+      files.split('\n').forEach(f => log(`    ${f}`))
+    } else {
+      log('  ⚠️ Aucun fichier accessible — le shell manque probablement de droits root')
     }
 
-    await shellExec(bearer, geelarkId, `rm -f "${tmp}"`)
-    log(`⚠️ Fichier trouvé mais sessionid non parsé depuis ${path}`)
+    log('❌ sessionid non trouvé après toutes les méthodes')
+    return null
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    if (msg === 'Annulé' || signal.aborted) {
+      log('🛑 Extraction annulée')
+    }
+    throw e
+  } finally {
+    clearTimeout(timeoutId)
   }
-
-  // ── Method 2: shared_prefs XML ───────────────────────────────────────────
-  log('🔍 Tentative shared_prefs…')
-  const prefs = await shellExec(bearer, geelarkId,
-    `grep -rh "sessionid" /data/data/com.instagram.android/shared_prefs/ 2>/dev/null | grep -oE "[0-9]{8,15}%3A[A-Za-z0-9_%.-]{20,}" | head -1`)
-  const v4 = prefs.output.trim()
-  if (v4.length > 20) {
-    log(`✅ sessionid extrait via shared_prefs`)
-    return v4
-  }
-
-  // ── Method 3: /data/data direct grep (binary) ────────────────────────────
-  log('🔍 Tentative grep binaire…')
-  const bin = await shellExec(bearer, geelarkId,
-    `find /data/data/com.instagram.android -name "*.db" -o -name "Cookies" 2>/dev/null | head -10`)
-  log(`Fichiers trouvés: ${bin.output.trim() || 'aucun'}`)
-
-  // If we got here, likely no root or IG doesn't use WebView cookies
-  log('❌ sessionid non trouvé — le shell n\'a probablement pas accès à /data/data (pas root)')
-  return null
 }

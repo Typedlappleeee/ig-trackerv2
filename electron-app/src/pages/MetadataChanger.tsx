@@ -7,6 +7,7 @@ import { playSuccess, playError, playWhoosh } from '@/lib/sounds'
 import { supabase } from '@/lib/supabase'
 import { uploadVideoFromPath, type UploadScope } from '@/lib/storage'
 import { useOrg } from '@/lib/orgContext'
+import { logActivity } from '@/lib/activityLog'
 
 interface MetadataChangerProps { user: User; onBack: () => void }
 
@@ -170,6 +171,7 @@ export function MetadataChanger({ user, onBack }: MetadataChangerProps) {
         title, file_url: null, storage_path: storagePath, thumbnail_path: thumbnailPath,
         tags: [], notes: '',
       })
+      logActivity({ orgId: currentOrg?.id ?? null, userId: user.id, userEmail: user.email ?? '', action: 'bank_add', details: { title, source: 'metadata_changer' } })
 
       // Delete original from bank if requested
       if (deleteOriginal && bankItemId && bankStoragePath) {

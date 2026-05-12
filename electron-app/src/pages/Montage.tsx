@@ -6,6 +6,7 @@ import { Spinner } from '@/components/ui/Spinner'
 import { Button }  from '@/components/ui/Button'
 import { useOrg } from '@/lib/orgContext'
 import { uploadVideoFromPath, type UploadScope } from '@/lib/storage'
+import { logActivity } from '@/lib/activityLog'
 import { useConnections } from '@/lib/connections'
 
 interface MontageProps { user: User }
@@ -513,7 +514,10 @@ export function Montage({ user }: MontageProps) {
         file_url: null, storage_path: storagePath, thumbnail_path: thumbnailPath,
         tags: [], notes: '',
       }).select().single()
-      if (data) { setBankItems(prev => [data, ...prev]); addClip(data) }
+      if (data) {
+        setBankItems(prev => [data, ...prev]); addClip(data)
+        logActivity({ orgId: currentOrg?.id ?? null, userId: user.id, userEmail: user.email ?? '', action: 'bank_add', details: { title, source: 'montage_drop' } })
+      }
     } catch (err) {
       console.error('[Montage] upload failed', err)
     }
@@ -732,7 +736,10 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
                       file_url: null, storage_path: storagePath, thumbnail_path: thumbnailPath,
                       tags: [], notes: '',
                     }).select().single()
-                    if (data) { setBankItems(prev => [data, ...prev]); addClip(data) }
+                    if (data) {
+                      setBankItems(prev => [data, ...prev]); addClip(data)
+                      logActivity({ orgId: currentOrg?.id ?? null, userId: user.id, userEmail: user.email ?? '', action: 'bank_add', details: { title, source: 'montage_import' } })
+                    }
                   } catch (err) {
                     console.error('[Montage] upload failed', err)
                   }

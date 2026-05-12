@@ -7,6 +7,7 @@ import { playSuccess, playWhoosh, playError } from '@/lib/sounds'
 import { supabase } from '@/lib/supabase'
 import { uploadVideoFromPath, type UploadScope } from '@/lib/storage'
 import { useOrg } from '@/lib/orgContext'
+import { logActivity } from '@/lib/activityLog'
 import { MassRemix } from './MassRemix'
 import { useConnections } from '@/lib/connections'
 
@@ -330,12 +331,13 @@ If no text overlays exist return [].`
     try {
       const scope: UploadScope = currentOrg ? { mode: 'org', id: currentOrg.id } : { mode: 'user', id: user.id }
       const { storagePath, thumbnailPath } = await uploadVideoFromPath(result.outputPath, scope)
+      const title = 'Remix — ' + new Date().toLocaleDateString('fr-FR')
       await supabase.from('content_bank').insert({
         user_id: user.id, org_id: currentOrg?.id ?? null,
-        title: 'Remix — ' + new Date().toLocaleDateString('fr-FR'),
-        file_url: null, storage_path: storagePath, thumbnail_path: thumbnailPath,
+        title, file_url: null, storage_path: storagePath, thumbnail_path: thumbnailPath,
         tags: [], notes: '',
       })
+      logActivity({ orgId: currentOrg?.id ?? null, userId: user.id, userEmail: user.email ?? '', action: 'bank_add', details: { title, source: 'remix' } })
       setBankDone(true)
       playSuccess()
     } catch {

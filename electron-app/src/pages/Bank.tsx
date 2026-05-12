@@ -4,6 +4,7 @@ import { supabase, type ContentItem } from '@/lib/supabase'
 import { useOrg } from '@/lib/orgContext'
 import { canAccessBankFolder } from '@/lib/permissions'
 import { uploadVideoFromPath, uploadVideoFromBlob, deleteStorageObjects, type UploadScope } from '@/lib/storage'
+import { logActivity } from '@/lib/activityLog'
 import { Button }  from '@/components/ui/Button'
 import { Spinner } from '@/components/ui/Spinner'
 
@@ -304,6 +305,7 @@ export function Bank({ user }: BankProps) {
     try {
       const { storagePath, thumbnailPath } = await uploadVideoFromPath(filePath, scope, phase => setUploadStatus(uploadProgressLabels(phase)))
       await insertBankRow({ title, storagePath, thumbnailPath })
+      logActivity({ orgId: currentOrg?.id ?? null, userId: user.id, userEmail: user.email ?? '', action: 'bank_add', details: { title, source: 'file_picker', folder: selectedFolder } })
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     }
@@ -319,6 +321,7 @@ export function Bank({ user }: BankProps) {
     try {
       const { storagePath, thumbnailPath } = await uploadVideoFromBlob(file, file.name, scope, phase => setUploadStatus(`${file.name} : ${uploadProgressLabels(phase)}`))
       await insertBankRow({ title, storagePath, thumbnailPath })
+      logActivity({ orgId: currentOrg?.id ?? null, userId: user.id, userEmail: user.email ?? '', action: 'bank_add', details: { title, source: 'drag_drop', folder: selectedFolder } })
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     }
@@ -382,8 +385,10 @@ export function Bank({ user }: BankProps) {
     const { error: err } = await supabase.from('content_bank').delete().eq('id', id)
     if (!err) {
       setItems(prev => prev.filter(i => i.id !== id))
-      // Best-effort cleanup of the Storage objects (not blocking)
-      if (item) deleteStorageObjects([item.storage_path, item.thumbnail_path])
+      if (item) {
+        deleteStorageObjects([item.storage_path, item.thumbnail_path])
+        logActivity({ orgId: currentOrg?.id ?? null, userId: user.id, userEmail: user.email ?? '', action: 'bank_delete', details: { title: item.title, folder: item.folder } })
+      }
     }
     setCtxMenu(null)
   }

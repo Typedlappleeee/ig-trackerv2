@@ -97,8 +97,10 @@ function SessionDialog({
   const [extracting, setExtracting]     = useState(false)
   const [extractLogs, setExtractLogs]   = useState<string[]>([])
   const [extractError, setExtractError] = useState<string | null>(null)
-  const inputRef    = useRef<HTMLInputElement>(null)
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const inputRef      = useRef<HTMLInputElement>(null)
+  const debounceRef   = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const abortCtrlRef  = useRef<AbortController | null>(null)
+  const logsEndRef    = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => { inputRef.current?.focus() }, [])
   useEffect(() => {
@@ -135,25 +137,40 @@ function SessionDialog({
       setExtractError('Téléphone non lié à GéeLark ou token manquant')
       return
     }
+    const ctrl = new AbortController()
+    abortCtrlRef.current = ctrl
     setExtracting(true); setExtractLogs([]); setExtractError(null)
     const logs: string[] = []
+    const addLog = (msg: string) => {
+      logs.push(msg)
+      setExtractLogs([...logs])
+      // Auto-scroll after state update
+      setTimeout(() => logsEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 30)
+    }
     try {
       const sessionid = await extractInstagramSessionId(
         bearer,
         phone.geelark_id,
-        msg => { logs.push(msg); setExtractLogs([...logs]) },
+        addLog,
+        ctrl.signal,
       )
       if (sessionid) {
         setValue(sessionid)
         handleChange(sessionid)
         setExtractError(null)
-      } else {
+      } else if (!ctrl.signal.aborted) {
         setExtractError('sessionid non trouvé — voir les logs ci-dessus')
       }
     } catch (e) {
-      setExtractError(e instanceof Error ? e.message : String(e))
+      const msg = e instanceof Error ? e.message : String(e)
+      if (msg !== 'Annulé') setExtractError(msg)
     }
+    abortCtrlRef.current = null
     setExtracting(false)
+  }
+
+  function cancelExtract() {
+    abortCtrlRef.current?.abort()
   }
 
   // Auto-test 800ms after the user stops typing
@@ -208,17 +225,25 @@ function SessionDialog({
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs font-semibold text-text">🤖 Extraction automatique</p>
-                <p className="text-[10px] text-text2">Récupère le sessionid directement depuis le téléphone GéeLark</p>
+                <p className="text-[10px] text-text2">Récupère le sessionid directement depuis le téléphone GéeLark (max 3 min)</p>
               </div>
-              <Button size="sm" onClick={extractFromPhone} loading={extracting} disabled={extracting}>
-                {extracting ? 'Extraction…' : '⚡ Extraire'}
-              </Button>
+              <div className="flex gap-2">
+                {extracting && (
+                  <Button size="sm" variant="secondary" onClick={cancelExtract}>
+                    🛑 Annuler
+                  </Button>
+                )}
+                <Button size="sm" onClick={extractFromPhone} loading={extracting} disabled={extracting}>
+                  {extracting ? 'Extraction…' : '⚡ Extraire'}
+                </Button>
+              </div>
             </div>
             {extractLogs.length > 0 && (
-              <div className="bg-bg rounded p-2 max-h-28 overflow-auto space-y-0.5">
+              <div className="bg-bg rounded p-2 max-h-40 overflow-auto space-y-0.5">
                 {extractLogs.map((l, i) => (
-                  <p key={i} className="text-[10px] font-mono text-text2">{l}</p>
+                  <p key={i} className={`text-[10px] font-mono ${l.startsWith('✅') ? 'text-ok' : l.startsWith('❌') || l.startsWith('🛑') ? 'text-danger' : l.startsWith('⚠️') ? 'text-warn' : 'text-text2'}`}>{l}</p>
                 ))}
+                <div ref={logsEndRef} />
               </div>
             )}
             {extractError && <p className="text-[11px] text-danger">{extractError}</p>}
