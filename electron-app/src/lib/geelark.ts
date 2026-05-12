@@ -84,11 +84,23 @@ export async function listRpaFlows(bearer: string): Promise<RpaFlow[]> {
 
 // ── Direct phone shell (Android adb-style commands) ─────────────────────────
 // Lets us run `am start`, `input tap`, `input text`, `uiautomator dump` etc.
+// Retries up to 6 times when GéeLark reports the phone shell isn't ready yet.
 async function shellExec(bearer: string, phoneId: string, cmd: string): Promise<{ output: string; status: number }> {
-  const d = await geelarkFetch('POST', '/shell/execute', { id: phoneId, cmd }, bearer)
-  if (d['code'] !== 0) throw new Error(`GéeLark shell: ${d['msg'] ?? d['code']}`)
-  const data = (d['data'] as Record<string, unknown>) ?? {}
-  return { output: String(data['output'] ?? ''), status: Number(data['status'] ?? -1) }
+  const NOT_READY = /not running|not started|unavailable|not ready|phone.*start/i
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const d = await geelarkFetch('POST', '/shell/execute', { id: phoneId, cmd }, bearer)
+    if (d['code'] === 0) {
+      const data = (d['data'] as Record<string, unknown>) ?? {}
+      return { output: String(data['output'] ?? ''), status: Number(data['status'] ?? -1) }
+    }
+    const msg = String(d['msg'] ?? d['message'] ?? d['code'] ?? '')
+    if (NOT_READY.test(msg) && attempt < 5) {
+      await sleep(5000 + attempt * 2000)
+      continue
+    }
+    throw new Error(`GéeLark shell: ${msg}`)
+  }
+  throw new Error('GéeLark shell: téléphone non prêt après plusieurs tentatives')
 }
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
@@ -99,19 +111,24 @@ async function ensurePhoneRunning(bearer: string, phoneId: string, log?: (m: str
   const phones = await fetchAllPhones(bearer)
   const p = phones.find(x => x.id === phoneId)
   if (!p) throw new Error(`phone ${phoneId} not found`)
-  if (p.status === 1) return true
+  if (p.status === 1) {
+    // Phone is already running but shell daemon may need a moment to accept connections
+    log?.('📱 Téléphone déjà démarré, stabilisation (5s)…')
+    await sleep(5000)
+    return true
+  }
 
   log?.('📱 Démarrage du téléphone…')
   await geelarkFetch('POST', '/phone/start', { ids: [phoneId] }, bearer)
 
-  // Poll for up to 90s until phone reports running
-  for (let i = 0; i < 45; i++) {
+  // Poll for up to 120s until phone reports running
+  for (let i = 0; i < 60; i++) {
     await sleep(2000)
     const list = await fetchAllPhones(bearer)
     const cur  = list.find(x => x.id === phoneId)
     if (cur?.status === 1) {
-      log?.('✅ Téléphone démarré, attente boot Android (8s)…')
-      await sleep(8000)
+      log?.('✅ Téléphone démarré, attente boot Android (15s)…')
+      await sleep(15000)
       return true
     }
   }
