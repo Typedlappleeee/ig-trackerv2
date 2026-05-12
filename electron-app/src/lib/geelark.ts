@@ -258,11 +258,50 @@ async function dumpXml(bearer: string, phoneId: string): Promise<string> {
   return output
 }
 
-async function tapText(bearer: string, phoneId: string, xml: string, ...texts: string[]): Promise<boolean> {
-  const pt = findByText(xml, ...texts)
-  if (!pt) return false
-  await shellExec(bearer, phoneId, `input tap ${pt[0]} ${pt[1]}`)
-  return true
+// Tap the field, triple-tap to select all existing text, delete it, then type new text.
+// Handles spaces and common special characters safely for Android `input text`.
+async function clearAndType(
+  bearer: string,
+  phoneId: string,
+  point: [number, number],
+  text: string,
+  log: (m: string) => void,
+) {
+  await shellExec(bearer, phoneId, `input tap ${point[0]} ${point[1]}`)
+  await sleep(600)
+  // Triple-tap selects all text in most Android text fields
+  await shellExec(bearer, phoneId, `input tap ${point[0]} ${point[1]}`)
+  await sleep(120)
+  await shellExec(bearer, phoneId, `input tap ${point[0]} ${point[1]}`)
+  await sleep(300)
+  // Delete the selection (or clear char by char if no selection)
+  await shellExec(bearer, phoneId, 'input keyevent 67')  // DEL
+  await sleep(100)
+  // Belt-and-suspenders: MOVE_END then 150 individual DEL keycodes
+  await shellExec(bearer, phoneId, 'input keyevent 123') // KEYCODE_MOVE_END
+  for (let i = 0; i < 15; i++) {
+    await shellExec(bearer, phoneId, 'input keyevent 67 67 67 67 67 67 67 67 67 67')
+    await sleep(50)
+  }
+  await sleep(200)
+  // Escape for Android shell: spaces → %s, dangerous shell chars escaped
+  const escaped = text
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g,  '\\"')
+    .replace(/'/g,  "\\'")
+    .replace(/&/g,  '\\&')
+    .replace(/</g,  '\\<')
+    .replace(/>/g,  '\\>')
+    .replace(/\|/g, '\\|')
+    .replace(/;/g,  '\\;')
+    .replace(/`/g,  '\\`')
+    .replace(/\$/g, '\\$')
+    .replace(/!/g,  '\\!')
+    .replace(/\n/g, '%s')
+    .replace(/ /g,  '%s')
+  await shellExec(bearer, phoneId, `input text "${escaped}"`)
+  await sleep(400)
+  log(`   ✏️ "${text.substring(0, 40)}${text.length > 40 ? '…' : ''}"`)
 }
 
 // ── Profile update (name + bio + optional pic) ───────────────────────────────
@@ -272,103 +311,168 @@ async function updateInstagramProfile(
   config: Pick<WarmupConfig, 'profileName' | 'bio' | 'profilePicUrl'>,
   log: (m: string) => void,
 ) {
-  log('📲 Ouverture d\'Instagram…')
-  await shellExec(bearer, phoneId, 'am start -n com.instagram.android/.activity.MainTabActivity')
-  await sleep(5000)
+  // ── 1. Wake & unlock screen ────────────────────────────────────────────────
+  log('📱 Réveil de l\'écran…')
+  await shellExec(bearer, phoneId, 'input keyevent 224')          // KEYCODE_WAKEUP
+  await sleep(800)
+  await shellExec(bearer, phoneId, 'input swipe 540 1700 540 800 400') // swipe to unlock
+  await sleep(1500)
 
-  // Navigate to profile tab
-  log('👤 Navigation vers le profil…')
-  let xml = await dumpXml(bearer, phoneId)
-  let profileTab = findByText(xml, 'Profile', 'Profil') ?? findByResourceId(xml, 'tab_avatar', 'profile_tab')
-  if (!profileTab) {
-    // Fallback: tap bottom-right of screen (profile tab position)
-    await shellExec(bearer, phoneId, 'input tap 1000 1900')
-  } else {
-    await shellExec(bearer, phoneId, `input tap ${profileTab[0]} ${profileTab[1]}`)
-  }
-  await sleep(3000)
-
-  // Tap Edit Profile
-  log('✏️ Ouverture de l\'édition du profil…')
-  xml = await dumpXml(bearer, phoneId)
-  const editBtn = findByText(xml, 'Edit profile', 'Modifier le profil', 'Edit Profile', 'Modifier') ??
-                  findByResourceId(xml, 'edit_profile_button', 'button_edit_profile')
-  if (!editBtn) { log('⚠️ Bouton Edit Profile non trouvé'); return }
-  await shellExec(bearer, phoneId, `input tap ${editBtn[0]} ${editBtn[1]}`)
-  await sleep(3000)
-
-  xml = await dumpXml(bearer, phoneId)
-
-  // Profile picture
+  // ── 2. Download profile picture first (before opening IG) ─────────────────
   if (config.profilePicUrl?.trim()) {
     log('🖼 Téléchargement de la photo de profil…')
+    const dlResult = await shellExec(bearer, phoneId,
+      `curl -s -L --max-time 30 -o /sdcard/DCIM/Camera/sf_pfp.jpg "${config.profilePicUrl.trim()}" && echo OK`)
+    log(`   curl: ${dlResult.output.trim() || 'aucune sortie'}`)
     await shellExec(bearer, phoneId,
-      `curl -s -L -o /sdcard/sf_pfp.jpg "${config.profilePicUrl.trim()}"`)
+      'am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file:///sdcard/DCIM/Camera/sf_pfp.jpg')
     await sleep(2000)
-    const changePhoto = findByText(xml, 'Change profile photo', 'Changer la photo de profil', 'Edit picture', 'Modifier la photo') ??
-                        findByResourceId(xml, 'change_avatar', 'profile_photo_change_btn')
-    if (changePhoto) {
-      await shellExec(bearer, phoneId, `input tap ${changePhoto[0]} ${changePhoto[1]}`)
-      await sleep(2000)
+  }
+
+  // ── 3. Open Edit Profile via deep link (most direct route) ─────────────────
+  log('🔗 Ouverture Edit Profile…')
+  await shellExec(bearer, phoneId,
+    'am start -a android.intent.action.VIEW -d "https://www.instagram.com/accounts/edit/" -p com.instagram.android')
+  await sleep(7000)
+
+  let xml = await dumpXml(bearer, phoneId)
+  log(`📋 XML reçu : ${xml.length} chars`)
+
+  const onEditScreen =
+    /biography|full_name|edit.*profile|modifier.*profil/i.test(xml)
+
+  if (!onEditScreen) {
+    // ── 4. Fallback: navigate manually ──────────────────────────────────────
+    log('↩️ Deep link raté — navigation manuelle…')
+    await shellExec(bearer, phoneId, 'am force-stop com.instagram.android')
+    await sleep(1000)
+    await shellExec(bearer, phoneId,
+      'am start -n com.instagram.android/.activity.MainTabActivity')
+    await sleep(7000)
+
+    xml = await dumpXml(bearer, phoneId)
+    log(`📋 XML home : ${xml.length} chars, aperçu: ${xml.substring(0, 300)}`)
+
+    // Tap profile tab — try by text, by resource-id, then coordinate fallback
+    const profilePt =
+      findByText(xml, 'Profile', 'Profil') ??
+      findByResourceId(xml, 'profile_tab', 'tab_avatar', 'ig_bottom_bar_profile', 'navigation_profile')
+    if (profilePt) {
+      log(`👤 Profile tab trouvé à ${profilePt}`)
+      await shellExec(bearer, phoneId, `input tap ${profilePt[0]} ${profilePt[1]}`)
+    } else {
+      log('👤 Profile tab non trouvé — tap coordonnée (1010, 1870)')
+      await shellExec(bearer, phoneId, 'input tap 1010 1870')
+    }
+    await sleep(4000)
+
+    xml = await dumpXml(bearer, phoneId)
+    log(`📋 XML profil : aperçu: ${xml.substring(0, 300)}`)
+
+    const editPt =
+      findByText(xml, 'Edit profile', 'Modifier le profil', 'Edit Profile') ??
+      findByResourceId(xml, 'edit_profile_button', 'button_edit_profile', 'edit_profile', 'profile_header_edit_btn')
+    if (!editPt) {
+      log('❌ Bouton Edit Profile introuvable. Contenu XML:\n' + xml.substring(0, 800))
+      return
+    }
+    log(`✏️ Edit Profile trouvé à ${editPt}`)
+    await shellExec(bearer, phoneId, `input tap ${editPt[0]} ${editPt[1]}`)
+    await sleep(5000)
+    xml = await dumpXml(bearer, phoneId)
+    log(`📋 XML edit screen : ${xml.length} chars`)
+  }
+
+  // ── 5. Profile picture ────────────────────────────────────────────────────
+  if (config.profilePicUrl?.trim()) {
+    const changePhotoPt =
+      findByText(xml, 'Change profile photo', 'Changer la photo de profil', 'Edit picture', 'Change photo', 'Modifier la photo') ??
+      findByResourceId(xml, 'change_avatar', 'profile_photo_change_btn', 'change_photo_btn')
+    if (changePhotoPt) {
+      log('🖼 Tap Change photo…')
+      await shellExec(bearer, phoneId, `input tap ${changePhotoPt[0]} ${changePhotoPt[1]}`)
+      await sleep(2500)
       const xml2 = await dumpXml(bearer, phoneId)
-      const gallery = findByText(xml2, 'Choose from library', 'Choisir dans la bibliothèque', 'Gallery', 'Galerie', 'New profile photo')
-      if (gallery) {
-        await shellExec(bearer, phoneId, `input tap ${gallery[0]} ${gallery[1]}`)
-        await sleep(3000)
-        // Use content provider intent to pick the downloaded image
-        await shellExec(bearer, phoneId,
-          'am start -a android.intent.action.VIEW -d "file:///sdcard/sf_pfp.jpg" -t image/jpeg')
-        await sleep(2000)
+      const galleryPt =
+        findByText(xml2, 'Choose from library', 'Choisir dans la bibliothèque', 'Gallery', 'Galerie', 'Photo library', 'Choose from Gallery', 'New profile photo') ??
+        findByResourceId(xml2, 'choose_from_library', 'gallery_option')
+      if (galleryPt) {
+        await shellExec(bearer, phoneId, `input tap ${galleryPt[0]} ${galleryPt[1]}`)
+        await sleep(3500)
+        const xml3 = await dumpXml(bearer, phoneId)
+        // Most recent photo is top-left of the gallery grid
+        const firstPhoto =
+          findByResourceId(xml3, 'gallery_item', 'photo_grid_item', 'image_grid_item') ??
+          findByResourceId(xml3, 'thumbnail_image')
+        if (firstPhoto) {
+          await shellExec(bearer, phoneId, `input tap ${firstPhoto[0]} ${firstPhoto[1]}`)
+        } else {
+          log('📷 Tap première photo galerie (coordonnée 180,650)')
+          await shellExec(bearer, phoneId, 'input tap 180 650')
+        }
+        await sleep(2500)
+        // Confirm crop / Next
+        const xml4 = await dumpXml(bearer, phoneId)
+        const nextPt = findByText(xml4, 'Next', 'Suivant', 'Done', 'Terminé', 'OK', 'Confirm') ??
+                       findByResourceId(xml4, 'next_button', 'done_button', 'action_next')
+        if (nextPt) {
+          await shellExec(bearer, phoneId, `input tap ${nextPt[0]} ${nextPt[1]}`)
+          await sleep(3000)
+        }
+      } else {
+        log('⚠️ Option galerie non trouvée')
       }
+      xml = await dumpXml(bearer, phoneId)
+    } else {
+      log('⚠️ Bouton Change photo non trouvé')
     }
-    xml = await dumpXml(bearer, phoneId)
   }
 
-  // Set name
+  // ── 6. Set name ───────────────────────────────────────────────────────────
   if (config.profileName?.trim()) {
-    log(`📝 Mise à jour du nom : "${config.profileName}"`)
-    const nameField = findByResourceId(xml, 'full_name', 'name_field') ??
-                      findByText(xml, 'Name', 'Nom')
-    if (nameField) {
-      await shellExec(bearer, phoneId, `input tap ${nameField[0]} ${nameField[1]}`)
-      await sleep(500)
-      await shellExec(bearer, phoneId, 'input keyevent 123') // KEYCODE_MOVE_END
-      await shellExec(bearer, phoneId, 'input keyevent --longpress 67') // long DEL
-      await sleep(200)
-      await shellExec(bearer, phoneId, 'input keyevent 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28') // DEL x50
-      const nameEscaped = config.profileName.trim().replace(/ /g, '%s')
-      await shellExec(bearer, phoneId, `input text "${nameEscaped}"`)
-      await sleep(400)
+    log(`📝 Nom → "${config.profileName}"`)
+    const namePt =
+      findByResourceId(xml, 'full_name', 'name_field', 'name') ??
+      findByText(xml, 'Name', 'Nom', 'Full name', 'Nom complet')
+    if (namePt) {
+      await clearAndType(bearer, phoneId, namePt, config.profileName.trim(), log)
+    } else {
+      log('⚠️ Champ Nom non trouvé — XML contenu: ' + xml.substring(0, 500))
     }
   }
 
-  // Set bio
+  // ── 7. Set bio ────────────────────────────────────────────────────────────
   if (config.bio?.trim()) {
-    log(`📝 Mise à jour de la bio…`)
+    log('📝 Bio…')
     xml = await dumpXml(bearer, phoneId)
-    const bioField = findByResourceId(xml, 'biography', 'bio_field', 'biography_field') ??
-                     findByText(xml, 'Bio', 'Biography')
-    if (bioField) {
-      await shellExec(bearer, phoneId, `input tap ${bioField[0]} ${bioField[1]}`)
-      await sleep(500)
-      await shellExec(bearer, phoneId, 'input keyevent 123')
-      await shellExec(bearer, phoneId, 'input keyevent 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28 28')
-      const bioEscaped = config.bio.trim().replace(/\n/g, ' ').replace(/ /g, '%s')
-      await shellExec(bearer, phoneId, `input text "${bioEscaped}"`)
-      await sleep(400)
+    const bioPt =
+      findByResourceId(xml, 'biography', 'bio', 'bio_field', 'biography_field') ??
+      findByText(xml, 'Bio', 'Biography', 'Biographie')
+    if (bioPt) {
+      await clearAndType(bearer, phoneId, bioPt, config.bio.trim(), log)
+    } else {
+      log('⚠️ Champ Bio non trouvé')
     }
   }
 
-  // Save
-  log('💾 Sauvegarde du profil…')
+  // ── 8. Dismiss keyboard then save ─────────────────────────────────────────
+  await shellExec(bearer, phoneId, 'input keyevent 4')  // BACK dismisses keyboard
+  await sleep(600)
+
+  log('💾 Sauvegarde…')
   xml = await dumpXml(bearer, phoneId)
-  const saveBtn = findByText(xml, 'Done', 'Terminé', 'Save', 'Sauvegarder', 'Submit') ??
-                  findByResourceId(xml, 'action_done', 'save_button', 'done_button')
-  if (saveBtn) {
-    await shellExec(bearer, phoneId, `input tap ${saveBtn[0]} ${saveBtn[1]}`)
-    await sleep(3000)
-    log('✅ Profil mis à jour')
+  const savePt =
+    findByText(xml, 'Done', 'Terminé', 'Save', 'Sauvegarder', 'Submit', 'Confirm') ??
+    findByResourceId(xml, 'action_done', 'save_button', 'done_button', 'submit_button')
+  if (savePt) {
+    await shellExec(bearer, phoneId, `input tap ${savePt[0]} ${savePt[1]}`)
+  } else {
+    // Action bar "Done" is usually top-right ~(1030, 115) on 1080px screen
+    log('⚠️ Bouton Save non trouvé — tap top-right (1030, 115)')
+    await shellExec(bearer, phoneId, 'input tap 1030 115')
   }
+  await sleep(3000)
+  log('✅ Profil sauvegardé !')
 }
 
 // ── Warmup actions (browse / like / reels / follow) ──────────────────────────
