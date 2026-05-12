@@ -4,10 +4,18 @@ import { supabase } from '@/lib/supabase'
 import { useConnections } from '@/lib/connections'
 import { Button } from '@/components/ui/Button'
 import { MetadataChanger } from './MetadataChanger'
+import { VisionTools, type VisionToolId } from './VisionTools'
 
 interface AiToolsProps { user: User }
 
-async function groqCall(apiKey: string, prompt: string, maxTokens = 500): Promise<string> {
+type GroqToolId =
+  | 'strat' | 'caption' | 'plan'
+  | 'script' | 'hooks' | 'bio' | 'replies' | 'translate' | 'competitor'
+
+type ActiveTool = 'hub' | 'metadata' | GroqToolId | VisionToolId
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+async function groqCall(apiKey: string, prompt: string, maxTokens = 600): Promise<string> {
   const result = await window.electronAPI?.groqRequest({
     apiKey,
     messages: [{ role: 'user', content: prompt }],
@@ -22,117 +30,543 @@ async function groqCall(apiKey: string, prompt: string, maxTokens = 500): Promis
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false)
-  function copy() {
-    navigator.clipboard.writeText(text).then(() => {
-      setCopied(true); setTimeout(() => setCopied(false), 2000)
-    })
-  }
   return (
-    <button onClick={copy} className="text-xs text-text2 hover:text-accent transition-colors px-2 py-1 rounded">
+    <button onClick={() => { navigator.clipboard.writeText(text).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000) }) }}
+      className="text-xs px-3 py-1.5 rounded-lg transition-all"
+      style={{ background: copied ? 'rgba(52,211,153,0.12)' : 'rgba(139,92,246,0.08)', color: copied ? '#34d399' : '#a78bfa', border: `1px solid ${copied ? 'rgba(52,211,153,0.25)' : 'rgba(139,92,246,0.2)'}` }}>
       {copied ? '✓ Copié' : '📋 Copier'}
     </button>
   )
 }
 
-// Card helper matching Python `card()` (CARD bg, 1px BORDER, 2px top accent WARN)
-function ToolCard({ title, children }: { title: string; children: React.ReactNode }) {
+function ResultBox({ value, rows = 8 }: { value: string; rows?: number }) {
   return (
-    <div className="bg-card border border-border rounded-xl overflow-hidden">
-      <div className="h-[2px] bg-warn" />
-      <div className="p-5 space-y-3">
-        <h2 className="text-sm font-bold text-text">{title}</h2>
+    <textarea rows={rows} value={value} readOnly
+      className="w-full rounded-xl px-3 py-2 text-xs font-mono text-white/80 resize-none focus:outline-none"
+      style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(139,92,246,0.15)' }} />
+  )
+}
+
+function FieldInput({ placeholder, value, onChange, textarea, rows }: {
+  placeholder: string; value: string; onChange: (v: string) => void; textarea?: boolean; rows?: number
+}) {
+  const cls = "w-full rounded-xl px-3 py-2 text-sm text-white placeholder-white/20 focus:outline-none focus:border-accent/60"
+  const style = { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(139,92,246,0.18)' }
+  return textarea
+    ? <textarea rows={rows ?? 4} placeholder={placeholder} value={value} onChange={e => onChange(e.target.value)} className={cls} style={style} />
+    : <input type="text" placeholder={placeholder} value={value} onChange={e => onChange(e.target.value)} className={cls} style={style} />
+}
+
+function SelectInput({ value, onChange, options }: { value: string; onChange: (v: string) => void; options: string[] }) {
+  return (
+    <select value={value} onChange={e => onChange(e.target.value)}
+      className="w-full rounded-xl px-3 py-2 text-sm text-white focus:outline-none"
+      style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(139,92,246,0.18)' }}>
+      {options.map(o => <option key={o} value={o}>{o}</option>)}
+    </select>
+  )
+}
+
+function ToolShell({ title, icon, children, onBack, error }: {
+  title: string; icon: string; children: React.ReactNode; onBack: () => void; error?: string | null
+}) {
+  return (
+    <div className="flex flex-col h-full" style={{ background: '#06040f' }}>
+      <div className="flex-shrink-0 px-6 py-4 flex items-center gap-3"
+        style={{ borderBottom: '1px solid rgba(139,92,246,0.12)', background: 'rgba(8,5,20,0.6)' }}>
+        <button onClick={onBack} className="text-xs px-3 py-1.5 rounded-lg flex-shrink-0"
+          style={{ background: 'rgba(139,92,246,0.1)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.2)' }}>
+          ← Retour
+        </button>
+        <span className="text-lg">{icon}</span>
+        <p className="text-sm font-black text-white">{title}</p>
+      </div>
+      <div className="flex-1 overflow-auto p-6 max-w-2xl space-y-4">
+        {error && <p className="text-xs text-danger bg-danger/10 border border-danger/20 rounded-xl px-4 py-3">{error}</p>}
         {children}
       </div>
     </div>
   )
 }
 
-const TONES = ['Engageant', 'Humoristique', 'Informatif', 'Mystérieux', 'Inspirant', 'Provocateur'] as const
+// ── Groq tool pages ───────────────────────────────────────────────────────────
 
+function StratConcurrente({ groqKey, onBack }: { groqKey: string; onBack: () => void }) {
+  const [handle, setHandle] = useState('')
+  const [result, setResult] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function run() {
+    setLoading(true); setError(null); setResult('')
+    try {
+      const text = await groqCall(groqKey,
+        `Expert Instagram growth hacking. Analyse la stratégie pour la niche/compte : ${handle.trim()}. Recommandations structurées : 1) Type de contenu à créer, 2) Fréquence idéale, 3) Heures de publication optimales, 4) Stratégie hashtags, 5) Idées Reels viraux, 6) Tactiques d'engagement. Bullet points clairs.`,
+        700)
+      setResult(text)
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
+    setLoading(false)
+  }
+
+  return (
+    <ToolShell title="Stratégie Concurrente" icon="🔍" onBack={onBack} error={error}>
+      <p className="text-xs" style={{ color: 'rgba(196,181,253,0.5)' }}>Entre un pseudo concurrent ou une niche pour obtenir une stratégie complète.</p>
+      <FieldInput placeholder="@concurrent ou niche (ex: fitness, crypto)" value={handle} onChange={setHandle} />
+      <div className="flex gap-2">
+        <Button onClick={run} loading={loading} disabled={!handle.trim()}>🔍 Analyser</Button>
+        {result && <CopyButton text={result} />}
+      </div>
+      {result && <ResultBox value={result} rows={12} />}
+    </ToolShell>
+  )
+}
+
+function CaptionsVirales({ groqKey, onBack }: { groqKey: string; onBack: () => void }) {
+  const TONES = ['Engageant', 'Humoristique', 'Informatif', 'Mystérieux', 'Inspirant', 'Provocateur']
+  const [subject, setSubject] = useState('')
+  const [tone, setTone] = useState('Engageant')
+  const [result, setResult] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function run() {
+    setLoading(true); setError(null); setResult('')
+    try {
+      const text = await groqCall(groqKey,
+        `Génère une caption Instagram virale en français pour : ${subject.trim()}. Ton : ${tone}. Structure : Hook accrocheur (première ligne), body engageant (2-4 lignes), CTA clair, puis 15 hashtags pertinents. Maximum 250 mots.`,
+        500)
+      setResult(text)
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
+    setLoading(false)
+  }
+
+  return (
+    <ToolShell title="Captions Virales" icon="💬" onBack={onBack} error={error}>
+      <p className="text-xs" style={{ color: 'rgba(196,181,253,0.5)' }}>Génère une caption complète avec hook, corps, CTA et hashtags.</p>
+      <div className="grid grid-cols-2 gap-3">
+        <FieldInput placeholder="Sujet du post" value={subject} onChange={setSubject} />
+        <SelectInput value={tone} onChange={setTone} options={TONES} />
+      </div>
+      <div className="flex gap-2">
+        <Button onClick={run} loading={loading} disabled={!subject.trim()}>✨ Générer</Button>
+        {result && <CopyButton text={result} />}
+      </div>
+      {result && <ResultBox value={result} rows={10} />}
+    </ToolShell>
+  )
+}
+
+function Planificateur({ groqKey, onBack, userId }: { groqKey: string; onBack: () => void; userId: string }) {
+  const [niche, setNiche] = useState('')
+  const [result, setResult] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    supabase.from('app_config').select('profile_niche').eq('user_id', userId).maybeSingle()
+      .then(({ data }) => { if (data?.profile_niche) setNiche(data.profile_niche) })
+  }, [userId])
+
+  async function run() {
+    setLoading(true); setError(null); setResult('')
+    try {
+      const text = await groqCall(groqKey,
+        `Crée un calendrier éditorial Instagram pour 7 jours sur la niche : ${niche.trim()}. Pour chaque jour : Heure optimale / Type de contenu (Reel/Carousel/Story) / Idée précise / Titre accrocheur / 5 hashtags pertinents. Format structuré jour par jour.`,
+        900)
+      setResult(text)
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
+    setLoading(false)
+  }
+
+  return (
+    <ToolShell title="Planificateur 7 Jours" icon="📅" onBack={onBack} error={error}>
+      <p className="text-xs" style={{ color: 'rgba(196,181,253,0.5)' }}>Calendrier éditorial complet sur 7 jours pour ta niche.</p>
+      <FieldInput placeholder="Niche (fitness, crypto, lifestyle…)" value={niche} onChange={setNiche} />
+      <div className="flex gap-2">
+        <Button onClick={run} loading={loading} disabled={!niche.trim()}>📅 Planifier</Button>
+        {result && <CopyButton text={result} />}
+      </div>
+      {result && <ResultBox value={result} rows={14} />}
+    </ToolShell>
+  )
+}
+
+function ScriptReel({ groqKey, onBack }: { groqKey: string; onBack: () => void }) {
+  const [subject, setSubject] = useState('')
+  const [duration, setDuration] = useState('30s')
+  const [tone, setTone] = useState('Engageant')
+  const TONES = ['Engageant', 'Humoristique', 'Informatif', 'Inspirant', 'Provocateur', 'Éducatif']
+  const [result, setResult] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function run() {
+    setLoading(true); setError(null); setResult('')
+    try {
+      const text = await groqCall(groqKey,
+        `Tu es expert en création de contenu Instagram viral. Génère un script Reel complet en français.
+Sujet : ${subject.trim()}
+Durée cible : ${duration}
+Ton : ${tone}
+
+Structure obligatoire :
+🎣 HOOK (0-3s) : phrase choc ou question qui arrête le scroll
+📖 CORPS (corps principal) : développement en étapes claires, chaque point sur une nouvelle ligne
+🚀 CTA (dernières secondes) : appel à l'action précis (follow, like, commentaire)
+
+Format le script comme si c'était prêt à lire face caméra. Inclus les indications de timing. Maximum ${duration === '15s' ? '80' : duration === '30s' ? '150' : '280'} mots.`,
+        600)
+      setResult(text)
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
+    setLoading(false)
+  }
+
+  return (
+    <ToolShell title="Script Reel Complet" icon="🎬" onBack={onBack} error={error}>
+      <p className="text-xs" style={{ color: 'rgba(196,181,253,0.5)' }}>Génère un script complet prêt à lire face caméra — hook, corps, CTA avec timings.</p>
+      <FieldInput placeholder="Sujet de ta vidéo" value={subject} onChange={setSubject} />
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <p className="text-[10px] uppercase tracking-wider font-bold mb-2" style={{ color: 'rgba(196,181,253,0.4)' }}>Durée</p>
+          <div className="flex gap-2">
+            {['15s', '30s', '60s'].map(d => (
+              <button key={d} onClick={() => setDuration(d)} className="flex-1 py-1.5 rounded-lg text-xs font-bold"
+                style={duration === d
+                  ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff' }
+                  : { background: 'rgba(139,92,246,0.06)', color: 'rgba(196,181,253,0.5)', border: '1px solid rgba(139,92,246,0.12)' }
+                }>{d}</button>
+            ))}
+          </div>
+        </div>
+        <div>
+          <p className="text-[10px] uppercase tracking-wider font-bold mb-2" style={{ color: 'rgba(196,181,253,0.4)' }}>Ton</p>
+          <SelectInput value={tone} onChange={setTone} options={TONES} />
+        </div>
+      </div>
+      <div className="flex gap-2">
+        <Button onClick={run} loading={loading} disabled={!subject.trim()}>🎬 Générer le script</Button>
+        {result && <CopyButton text={result} />}
+      </div>
+      {result && <ResultBox value={result} rows={14} />}
+    </ToolShell>
+  )
+}
+
+function HooksAB({ groqKey, onBack }: { groqKey: string; onBack: () => void }) {
+  const [subject, setSubject] = useState('')
+  const [result, setResult] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function run() {
+    setLoading(true); setError(null); setResult('')
+    try {
+      const text = await groqCall(groqKey,
+        `Tu es expert en copywriting Instagram. Pour le sujet : "${subject.trim()}", génère exactement 3 hooks d'accroche radicalement différents pour un Reel.
+
+HOOK A — Style CURIOSITÉ : crée une tension, donne envie de savoir la suite
+HOOK B — Style CHOC/CONTRADICTION : affirmation surprenante ou contre-intuitive
+HOOK C — Style QUESTION DIRECTE : question personnelle qui touche le viewer
+
+Chaque hook doit faire maximum 2 lignes. Format :
+
+🔵 HOOK A (Curiosité)
+[texte du hook]
+
+🔴 HOOK B (Choc)
+[texte du hook]
+
+🟢 HOOK C (Question)
+[texte du hook]
+
+💡 Lequel choisir : [conseil rapide]`,
+        400)
+      setResult(text)
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
+    setLoading(false)
+  }
+
+  return (
+    <ToolShell title="3 Hooks A/B/C" icon="🪝" onBack={onBack} error={error}>
+      <p className="text-xs" style={{ color: 'rgba(196,181,253,0.5)' }}>Génère 3 hooks radicalement différents pour tester lequel performe le mieux.</p>
+      <FieldInput placeholder="Sujet de ta vidéo" value={subject} onChange={setSubject} />
+      <div className="flex gap-2">
+        <Button onClick={run} loading={loading} disabled={!subject.trim()}>🪝 Générer les hooks</Button>
+        {result && <CopyButton text={result} />}
+      </div>
+      {result && <ResultBox value={result} rows={12} />}
+    </ToolShell>
+  )
+}
+
+function BioOptimizer({ groqKey, onBack }: { groqKey: string; onBack: () => void }) {
+  const [bio, setBio] = useState('')
+  const [niche, setNiche] = useState('')
+  const [goal, setGoal] = useState('Followers')
+  const [result, setResult] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function run() {
+    setLoading(true); setError(null); setResult('')
+    try {
+      const text = await groqCall(groqKey,
+        `Tu es expert en optimisation de profil Instagram. Optimise cette bio pour maximiser : ${goal}.
+Niche : ${niche.trim() || 'non précisée'}
+Bio actuelle : "${bio.trim()}"
+
+Réponds avec :
+✅ BIO OPTIMISÉE :
+[nouvelle bio max 150 caractères, avec emojis stratégiques et mots-clés SEO]
+
+📊 AMÉLIORATIONS APPORTÉES :
+[liste des changements et pourquoi]
+
+💡 BONUS — Suggestions pour le nom de profil et le lien en bio :
+[recommandations]`,
+        500)
+      setResult(text)
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
+    setLoading(false)
+  }
+
+  return (
+    <ToolShell title="Bio Optimizer" icon="👤" onBack={onBack} error={error}>
+      <p className="text-xs" style={{ color: 'rgba(196,181,253,0.5)' }}>Réécrit ta bio Instagram pour maximiser les conversions selon ton objectif.</p>
+      <FieldInput placeholder="Ta bio actuelle (colle-la ici)" value={bio} onChange={setBio} textarea rows={3} />
+      <div className="grid grid-cols-2 gap-3">
+        <FieldInput placeholder="Niche / domaine" value={niche} onChange={setNiche} />
+        <SelectInput value={goal} onChange={setGoal} options={['Followers', 'Ventes', 'Trafic lien bio', 'DMs', 'Notoriété']} />
+      </div>
+      <div className="flex gap-2">
+        <Button onClick={run} loading={loading} disabled={!bio.trim()}>👤 Optimiser la bio</Button>
+        {result && <CopyButton text={result} />}
+      </div>
+      {result && <ResultBox value={result} rows={10} />}
+    </ToolShell>
+  )
+}
+
+function CommentReplies({ groqKey, onBack }: { groqKey: string; onBack: () => void }) {
+  const [comments, setComments] = useState('')
+  const [tone, setTone] = useState('Sympathique')
+  const [result, setResult] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function run() {
+    setLoading(true); setError(null); setResult('')
+    const lines = comments.trim().split('\n').filter(l => l.trim()).slice(0, 20)
+    try {
+      const text = await groqCall(groqKey,
+        `Tu gères un compte Instagram. Génère une réponse personnalisée pour chaque commentaire ci-dessous. Ton de marque : ${tone}. Chaque réponse doit être courte (1-2 lignes max), naturelle, engageante et avec 1 emoji.
+
+${lines.map((c, i) => `Commentaire ${i + 1}: ${c}`).join('\n')}
+
+Format de réponse :
+Commentaire 1 → [réponse]
+Commentaire 2 → [réponse]
+...`,
+        600)
+      setResult(text)
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
+    setLoading(false)
+  }
+
+  return (
+    <ToolShell title="Réponses Commentaires" icon="💬" onBack={onBack} error={error}>
+      <p className="text-xs" style={{ color: 'rgba(196,181,253,0.5)' }}>Colle jusqu'à 20 commentaires (un par ligne), l'IA génère une réponse personnalisée pour chacun.</p>
+      <FieldInput placeholder={"Commentaire 1\nCommentaire 2\nCommentaire 3…"} value={comments} onChange={setComments} textarea rows={5} />
+      <SelectInput value={tone} onChange={setTone} options={['Sympathique', 'Professionnel', 'Humoristique', 'Motivant', 'Mystérieux']} />
+      <div className="flex gap-2">
+        <Button onClick={run} loading={loading} disabled={!comments.trim()}>💬 Générer les réponses</Button>
+        {result && <CopyButton text={result} />}
+      </div>
+      {result && <ResultBox value={result} rows={10} />}
+    </ToolShell>
+  )
+}
+
+function ContentTranslator({ groqKey, onBack }: { groqKey: string; onBack: () => void }) {
+  const [caption, setCaption] = useState('')
+  const [langs, setLangs] = useState<string[]>(['Anglais (US)', 'Espagnol'])
+  const LANG_OPTIONS = ['Anglais (US)', 'Espagnol', 'Portugais (BR)', 'Allemand', 'Italien', 'Arabe']
+  const [result, setResult] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  function toggleLang(l: string) {
+    setLangs(prev => prev.includes(l) ? prev.filter(x => x !== l) : [...prev, l])
+  }
+
+  async function run() {
+    if (!langs.length) return
+    setLoading(true); setError(null); setResult('')
+    try {
+      const text = await groqCall(groqKey,
+        `Tu es expert en marketing Instagram international. Adapte cette caption (pas juste une traduction — adapte le ton, les expressions, la culture) pour chaque marché demandé. Inclus des hashtags locaux pertinents pour chaque langue.
+
+Caption originale (français) :
+"${caption.trim()}"
+
+Marchés cibles : ${langs.join(', ')}
+
+Pour chaque langue, format :
+🌍 [LANGUE]
+[caption adaptée]
+[hashtags locaux]
+`,
+        800)
+      setResult(text)
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
+    setLoading(false)
+  }
+
+  return (
+    <ToolShell title="Traducteur Multi-Marché" icon="🌍" onBack={onBack} error={error}>
+      <p className="text-xs" style={{ color: 'rgba(196,181,253,0.5)' }}>Adapte ta caption pour plusieurs marchés avec hashtags locaux — pas juste une traduction.</p>
+      <FieldInput placeholder="Colle ta caption française ici…" value={caption} onChange={setCaption} textarea rows={4} />
+      <div>
+        <p className="text-[10px] uppercase tracking-wider font-bold mb-2" style={{ color: 'rgba(196,181,253,0.4)' }}>Langues cibles</p>
+        <div className="flex flex-wrap gap-2">
+          {LANG_OPTIONS.map(l => (
+            <button key={l} onClick={() => toggleLang(l)}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+              style={langs.includes(l)
+                ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff' }
+                : { background: 'rgba(139,92,246,0.06)', color: 'rgba(196,181,253,0.5)', border: '1px solid rgba(139,92,246,0.12)' }
+              }>{l}</button>
+          ))}
+        </div>
+      </div>
+      <div className="flex gap-2">
+        <Button onClick={run} loading={loading} disabled={!caption.trim() || !langs.length}>🌍 Traduire & adapter</Button>
+        {result && <CopyButton text={result} />}
+      </div>
+      {result && <ResultBox value={result} rows={14} />}
+    </ToolShell>
+  )
+}
+
+function CompetitorAnalysis({ groqKey, onBack }: { groqKey: string; onBack: () => void }) {
+  const [handle, setHandle] = useState('')
+  const [niche, setNiche] = useState('')
+  const [result, setResult] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function run() {
+    setLoading(true); setError(null); setResult('')
+    try {
+      const text = await groqCall(groqKey,
+        `Tu es un expert en espionnage concurrentiel Instagram. Analyse en profondeur le compte/niche : "${handle.trim()}"${niche.trim() ? ` (niche: ${niche.trim()})` : ''}.
+
+Produis une analyse complète :
+
+🕵️ POSITIONNEMENT
+[comment ils se positionnent, leur proposition de valeur unique]
+
+📹 STRATÉGIE CONTENU
+[types de vidéos, formats, fréquence, longueur, style]
+
+🪝 FORMULES DE HOOKS
+[les patterns de hooks qu'ils utilisent le plus]
+
+📊 POINTS FORTS À COPIER
+[ce qu'ils font bien et que tu peux répliquer]
+
+💥 GAPS & OPPORTUNITÉS
+[ce qu'ils ne font pas et que tu peux exploiter pour les dépasser]
+
+🎯 PLAN D'ACTION
+[3 actions concrètes à mettre en place cette semaine]`,
+        800)
+      setResult(text)
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
+    setLoading(false)
+  }
+
+  return (
+    <ToolShell title="Analyse Concurrent" icon="🕵️" onBack={onBack} error={error}>
+      <p className="text-xs" style={{ color: 'rgba(196,181,253,0.5)' }}>Analyse complète d'un concurrent — ce qu'il fait bien, les gaps à exploiter et un plan d'action.</p>
+      <div className="grid grid-cols-2 gap-3">
+        <FieldInput placeholder="@concurrent ou compte" value={handle} onChange={setHandle} />
+        <FieldInput placeholder="Niche (optionnel)" value={niche} onChange={setNiche} />
+      </div>
+      <div className="flex gap-2">
+        <Button onClick={run} loading={loading} disabled={!handle.trim()}>🕵️ Analyser</Button>
+        {result && <CopyButton text={result} />}
+      </div>
+      {result && <ResultBox value={result} rows={14} />}
+    </ToolShell>
+  )
+}
+
+// ── Hub ───────────────────────────────────────────────────────────────────────
+const GROQ_TOOLS: { id: GroqToolId; icon: string; title: string; desc: string; tags: string[] }[] = [
+  { id: 'script',     icon: '🎬', title: 'Script Reel',          desc: 'Script complet prêt à lire — hook, corps, CTA avec timings.',       tags: ['Script', 'Hook', 'CTA'] },
+  { id: 'hooks',      icon: '🪝', title: '3 Hooks A/B/C',        desc: '3 hooks radicalement différents pour tester le meilleur.',          tags: ['A/B Test', 'Hook', 'Copywriting'] },
+  { id: 'caption',    icon: '💬', title: 'Captions Virales',      desc: 'Caption complète : hook, corps, CTA et 15 hashtags.',               tags: ['Caption', 'Hashtags'] },
+  { id: 'bio',        icon: '👤', title: 'Bio Optimizer',         desc: 'Réécrit ta bio pour maximiser follows, ventes ou trafic.',          tags: ['Bio', 'Profil', 'SEO'] },
+  { id: 'replies',    icon: '💬', title: 'Réponses Commentaires', desc: 'Réponses personnalisées pour 20 commentaires en un clic.',          tags: ['Engagement', 'Commentaires'] },
+  { id: 'translate',  icon: '🌍', title: 'Traducteur Multi-Marché',desc: 'Adapte ta caption pour EN/ES/PT/DE/IT avec hashtags locaux.',       tags: ['International', 'Traduction'] },
+  { id: 'competitor', icon: '🕵️', title: 'Analyse Concurrent',   desc: 'Gaps, formules de hooks, plan d\'action pour dépasser un compte.',  tags: ['Concurrent', 'Stratégie'] },
+  { id: 'strat',      icon: '🔍', title: 'Stratégie Niche',       desc: 'Fréquence, heures, hashtags et idées Reels pour une niche.',        tags: ['Niche', 'Planning'] },
+  { id: 'plan',       icon: '📅', title: 'Planificateur 7 Jours', desc: 'Calendrier éditorial complet sur 7 jours avec heures et idées.',    tags: ['Calendrier', 'Contenu'] },
+]
+
+const VISION_TOOLS_META: { id: VisionToolId; icon: string; title: string; desc: string; tags: string[]; needsAnthopic: boolean }[] = [
+  { id: 'vision-score',     icon: '🔥', title: 'Score Viral',          desc: 'Note 1-10 sur 5 critères : hook, rétention, texte, thumbnail, dynamisme.', tags: ['Vidéo', 'Score', 'Claude'], needsAnthopic: true },
+  { id: 'vision-structure', icon: '🧬', title: 'Structure Virale',      desc: 'Décompose la timeline d\'une vidéo : hook, valeur, CTA, transitions.',      tags: ['Vidéo', 'Timeline', 'Claude'], needsAnthopic: true },
+  { id: 'vision-thumb',     icon: '🖼', title: 'Audit Thumbnail',       desc: 'Score contraste, lisibilité, émotion, couleurs + corrections prioritaires.', tags: ['Image', 'CTR', 'Claude'], needsAnthopic: true },
+]
+
+function ToolCard({ icon, title, desc, tags, locked, onClick }: {
+  icon: string; title: string; desc: string; tags: string[]; locked?: boolean; onClick: () => void
+}) {
+  return (
+    <button onClick={onClick}
+      className="rounded-2xl p-4 text-left space-y-3 transition-all hover:scale-[1.02] group"
+      style={{ background: 'rgba(8,5,20,0.7)', border: '1px solid rgba(139,92,246,0.18)', opacity: locked ? 0.5 : 1 }}>
+      <div className="flex items-start justify-between">
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
+          style={{ background: 'linear-gradient(135deg,#7c3aed18,#ec489918)', border: '1px solid rgba(139,92,246,0.2)' }}>
+          {icon}
+        </div>
+        {locked && <span className="text-[9px] px-1.5 py-0.5 rounded font-black"
+          style={{ background: 'rgba(251,191,36,0.1)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.2)' }}>
+          Clé Anthropic requise
+        </span>}
+      </div>
+      <div>
+        <p className="text-xs font-black text-white group-hover:text-purple-300 transition-colors">{title}</p>
+        <p className="text-[10px] mt-1 leading-relaxed" style={{ color: 'rgba(196,181,253,0.5)' }}>{desc}</p>
+      </div>
+      <div className="flex flex-wrap gap-1">
+        {tags.map(t => (
+          <span key={t} className="text-[9px] px-1.5 py-0.5 rounded-full font-bold"
+            style={{ background: 'rgba(139,92,246,0.08)', color: 'rgba(196,181,253,0.5)' }}>{t}</span>
+        ))}
+      </div>
+    </button>
+  )
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
 export function AiTools({ user }: AiToolsProps) {
-  const [activeTool, setActiveTool] = useState<'hub' | 'metadata' | 'groq'>('hub')
-  const [groqKey, setGroqKey] = useState('')
-  const [hasKey, setHasKey]   = useState(false)
-  const [error, setError]     = useState<string | null>(null)
-
-  // 1. Stratégie Concurrente
-  const [stratHandle, setStratHandle] = useState('')
-  const [stratResult, setStratResult] = useState('')
-  const [stratLoading, setStratLoading] = useState(false)
-
-  // 2. Légendes & Captions Virales
-  const [capSubject, setCapSubject] = useState('')
-  const [capTone, setCapTone]       = useState<typeof TONES[number]>('Engageant')
-  const [capResult, setCapResult]   = useState('')
-  const [capLoading, setCapLoading] = useState(false)
-
-  // 3. Planificateur de Contenu
-  const [planNiche, setPlanNiche]     = useState('')
-  const [planResult, setPlanResult]   = useState('')
-  const [planLoading, setPlanLoading] = useState(false)
-
-  // Groq key comes from the active connection (org or solo).
+  const [active, setActive] = useState<ActiveTool>('hub')
   const conns = useConnections(user)
-  useEffect(() => {
-    if (conns.groq) { setGroqKey(conns.groq); setHasKey(true) }
-    else            { setHasKey(false) }
-  }, [conns.groq])
-
-  // profile_niche stays user-level
-  useEffect(() => {
-    supabase.from('app_config').select('profile_niche').eq('user_id', user.id).maybeSingle()
-      .then(({ data }) => { if (data?.profile_niche) setPlanNiche(data.profile_niche) })
-  }, [user.id])
-
-  async function runStrat() {
-    if (!stratHandle.trim()) return
-    setStratLoading(true); setError(null); setStratResult('')
-    try {
-      const text = await groqCall(groqKey,
-        `Expert Instagram growth hacking. Analyse la stratégie pour la niche/compte : ${stratHandle.trim()}. Recommandations sur : 1) Type de contenu, 2) Fréquence, 3) Heures de publication, 4) Stratégie hashtags, 5) Idées Reels viraux, 6) Engagement tactics. Liste structurée avec bullet points.`,
-        600,
-      )
-      setStratResult(text)
-    } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
-    setStratLoading(false)
-  }
-
-  async function runCap() {
-    if (!capSubject.trim()) return
-    setCapLoading(true); setError(null); setCapResult('')
-    try {
-      const text = await groqCall(groqKey,
-        `Génère une caption Instagram virale en français pour : ${capSubject.trim()}. Ton : ${capTone}. Structure : Hook accrocheur en première ligne, body engageant (2-4 lignes), CTA clair, puis 15 hashtags pertinents max. Maximum 250 mots.`,
-        500,
-      )
-      setCapResult(text)
-    } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
-    setCapLoading(false)
-  }
-
-  async function runPlan() {
-    if (!planNiche.trim()) return
-    setPlanLoading(true); setError(null); setPlanResult('')
-    try {
-      const text = await groqCall(groqKey,
-        `Crée un calendrier éditorial Instagram pour 7 jours sur la niche : ${planNiche.trim()}. Pour chaque jour, donne : Heure optimale de publication / Type de contenu (Reel/Carousel/Story) / Idée précise / Titre accrocheur / 5 hashtags pertinents. Format clair, structuré jour par jour.`,
-        800,
-      )
-      setPlanResult(text)
-    } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
-    setPlanLoading(false)
-  }
 
   if (conns.loading) {
     return (
-      <div className="p-8 max-w-2xl flex items-center gap-3">
+      <div className="p-8 flex items-center gap-3">
         <div className="animate-spin w-5 h-5 rounded-full border-2 border-accent border-t-transparent" />
         <span className="text-sm text-text2">Chargement des connexions…</span>
       </div>
     )
   }
 
-  if (!hasKey) {
+  if (!conns.groq) {
     return (
       <div className="p-8 max-w-2xl">
         <h1 className="text-xl font-bold text-text mb-4">🔧 Outils IA</h1>
@@ -145,175 +579,77 @@ export function AiTools({ user }: AiToolsProps) {
     )
   }
 
-  // Route to sub-tools
-  if (activeTool === 'metadata') return <MetadataChanger user={user} onBack={() => setActiveTool('hub')} />
-  if (activeTool === 'groq') return (
-    <div className="flex flex-col h-full" style={{ background: '#06040f' }}>
-      <div className="flex-shrink-0 px-6 py-4 flex items-center gap-3"
-        style={{ borderBottom: '1px solid rgba(139,92,246,0.12)', background: 'rgba(8,5,20,0.6)' }}>
-        <button onClick={() => setActiveTool('hub')} className="text-xs px-3 py-1.5 rounded-lg"
-          style={{ background: 'rgba(139,92,246,0.1)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.2)' }}>
-          ← Retour
-        </button>
-        <p className="text-sm font-black text-white">Outils Groq IA</p>
-      </div>
-      <div className="flex-1 overflow-auto p-6 max-w-3xl">
-        {groqContent()}
-      </div>
-    </div>
-  )
+  // Route — metadata
+  if (active === 'metadata') return <MetadataChanger user={user} onBack={() => setActive('hub')} />
+
+  // Route — vision tools
+  if (active === 'vision-score' || active === 'vision-structure' || active === 'vision-thumb') {
+    return <VisionTools user={user} tool={active} anthropicKey={conns.anthropic} onBack={() => setActive('hub')} />
+  }
+
+  // Route — groq tools
+  const back = () => setActive('hub')
+  if (active === 'strat')      return <StratConcurrente  groqKey={conns.groq} onBack={back} />
+  if (active === 'caption')    return <CaptionsVirales   groqKey={conns.groq} onBack={back} />
+  if (active === 'plan')       return <Planificateur     groqKey={conns.groq} onBack={back} userId={user.id} />
+  if (active === 'script')     return <ScriptReel        groqKey={conns.groq} onBack={back} />
+  if (active === 'hooks')      return <HooksAB           groqKey={conns.groq} onBack={back} />
+  if (active === 'bio')        return <BioOptimizer      groqKey={conns.groq} onBack={back} />
+  if (active === 'replies')    return <CommentReplies    groqKey={conns.groq} onBack={back} />
+  if (active === 'translate')  return <ContentTranslator groqKey={conns.groq} onBack={back} />
+  if (active === 'competitor') return <CompetitorAnalysis groqKey={conns.groq} onBack={back} />
 
   // Hub
   return (
     <div className="flex flex-col h-full" style={{ background: '#06040f' }}>
-      {/* Header */}
       <div className="flex-shrink-0 px-6 py-4" style={{ borderBottom: '1px solid rgba(139,92,246,0.12)', background: 'rgba(8,5,20,0.6)' }}>
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center text-lg" style={{ background: 'linear-gradient(135deg,#7c3aed22,#ec489922)', border: '1px solid rgba(139,92,246,0.25)' }}>🔧</div>
+          <div className="w-8 h-8 rounded-xl flex items-center justify-center text-lg"
+            style={{ background: 'linear-gradient(135deg,#7c3aed22,#ec489922)', border: '1px solid rgba(139,92,246,0.25)' }}>🔧</div>
           <div>
             <h1 className="text-sm font-black text-white">Outils IA</h1>
-            <p className="text-[10px]" style={{ color: 'rgba(196,181,253,0.4)' }}>Vidéo · Contenu · Automatisation</p>
+            <p className="text-[10px]" style={{ color: 'rgba(196,181,253,0.4)' }}>
+              {GROQ_TOOLS.length + VISION_TOOLS_META.length + 1} outils · Groq · Claude Vision · FFmpeg
+            </p>
           </div>
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto p-6">
-        <div className="grid grid-cols-2 gap-4 max-w-2xl">
-          {/* Tool 1 — Metadata Changer */}
-          <button onClick={() => setActiveTool('metadata')}
-            className="rounded-2xl p-5 text-left space-y-3 transition-all hover:scale-[1.02] group"
-            style={{ background: 'rgba(8,5,20,0.7)', border: '1px solid rgba(139,92,246,0.18)' }}>
-            <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl"
-              style={{ background: 'linear-gradient(135deg,#7c3aed22,#ec489922)', border: '1px solid rgba(139,92,246,0.25)' }}>🏷</div>
-            <div>
-              <p className="text-sm font-black text-white group-hover:text-purple-300 transition-colors">Changeur de Métadonnées</p>
-              <p className="text-[11px] mt-1" style={{ color: 'rgba(196,181,253,0.5)' }}>
-                Supprime toutes les métadonnées d'une vidéo et injecte un timestamp aléatoire. Sans ré-encodage, instantané.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {['🎬 Vidéo', '⚡ Rapide', '🔒 Copie stream'].map(t => (
-                <span key={t} className="text-[9px] px-2 py-0.5 rounded-full font-bold"
-                  style={{ background: 'rgba(139,92,246,0.1)', color: 'rgba(196,181,253,0.6)' }}>{t}</span>
-              ))}
-            </div>
-          </button>
+      <div className="flex-1 overflow-auto p-6 space-y-6">
 
-          {/* Tool 2 — Groq AI content */}
-          <button onClick={() => setActiveTool('groq')}
-            className="rounded-2xl p-5 text-left space-y-3 transition-all hover:scale-[1.02] group"
-            style={{ background: 'rgba(8,5,20,0.7)', border: '1px solid rgba(139,92,246,0.18)' }}>
-            <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl"
-              style={{ background: 'linear-gradient(135deg,#7c3aed22,#ec489922)', border: '1px solid rgba(139,92,246,0.25)' }}>✨</div>
-            <div>
-              <p className="text-sm font-black text-white group-hover:text-purple-300 transition-colors">Contenu IA (Groq)</p>
-              <p className="text-[11px] mt-1" style={{ color: 'rgba(196,181,253,0.5)' }}>
-                Génère stratégies, captions virales et plannings de contenu via Llama 3.3 70B.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {['📝 Captions', '📅 Planning', '🔍 Stratégie'].map(t => (
-                <span key={t} className="text-[9px] px-2 py-0.5 rounded-full font-bold"
-                  style={{ background: 'rgba(139,92,246,0.1)', color: 'rgba(196,181,253,0.6)' }}>{t}</span>
-              ))}
-            </div>
-          </button>
+        {/* Vidéo */}
+        <div>
+          <p className="text-[10px] uppercase tracking-widest font-black mb-3" style={{ color: 'rgba(196,181,253,0.3)' }}>Vidéo</p>
+          <div className="grid grid-cols-3 gap-3">
+            <ToolCard icon="🏷" title="Changeur de Métadonnées"
+              desc="Supprime toutes les métadonnées et injecte un timestamp aléatoire." tags={['FFmpeg', 'Instant', 'Stream copy']}
+              onClick={() => setActive('metadata')} />
+          </div>
+        </div>
+
+        {/* Groq IA */}
+        <div>
+          <p className="text-[10px] uppercase tracking-widest font-black mb-3" style={{ color: 'rgba(196,181,253,0.3)' }}>Groq IA — Texte & Stratégie</p>
+          <div className="grid grid-cols-3 gap-3">
+            {GROQ_TOOLS.map(t => (
+              <ToolCard key={t.id} {...t} onClick={() => setActive(t.id)} />
+            ))}
+          </div>
+        </div>
+
+        {/* Vision IA */}
+        <div>
+          <p className="text-[10px] uppercase tracking-widest font-black mb-3" style={{ color: 'rgba(196,181,253,0.3)' }}>
+            Claude Vision — Analyse Vidéo & Image
+            {!conns.anthropic && <span className="ml-2 text-warn/70 normal-case">⚠ Clé Anthropic manquante</span>}
+          </p>
+          <div className="grid grid-cols-3 gap-3">
+            {VISION_TOOLS_META.map(t => (
+              <ToolCard key={t.id} {...t} locked={!conns.anthropic} onClick={() => setActive(t.id)} />
+            ))}
+          </div>
         </div>
       </div>
     </div>
   )
-
-  // eslint-disable-next-line no-unreachable
-  function groqContent() { return (
-    <div className="space-y-5">
-      <div>
-        <h1 className="text-xl font-bold text-text">✨ Outils Groq IA</h1>
-        <p className="text-text2 text-xs mt-0.5">Génération de contenu via Groq Llama 3.3 70B</p>
-      </div>
-
-      {error && (
-        <div className="px-4 py-3 rounded-lg bg-danger/10 border border-danger/20 text-danger text-sm">
-          {error}
-        </div>
-      )}
-
-      {/* 1. Stratégie Concurrente */}
-      <ToolCard title="🔍 Stratégie Concurrente">
-        <p className="text-xs text-text2 mb-2">Analyse la stratégie Instagram d'un compte ou d'une niche</p>
-        <input
-          type="text"
-          placeholder="Pseudo concurrent ou niche"
-          value={stratHandle}
-          onChange={e => setStratHandle(e.target.value)}
-          className="w-full bg-bg border border-border rounded-lg px-3 py-2 text-sm text-text placeholder:text-text2 focus:border-accent focus:outline-none"
-        />
-        <textarea
-          rows={8}
-          value={stratResult}
-          readOnly
-          placeholder="Le résultat apparaîtra ici…"
-          className="w-full bg-surface2 border border-border rounded-lg px-3 py-2 text-xs font-mono text-text resize-none focus:outline-none"
-        />
-        <div className="flex items-center gap-2">
-          <Button onClick={runStrat} loading={stratLoading} disabled={!stratHandle.trim()}>🔍 Analyser</Button>
-          {stratResult && <CopyButton text={stratResult} />}
-        </div>
-      </ToolCard>
-
-      {/* 2. Légendes & Captions Virales */}
-      <ToolCard title="💬 Légendes & Captions Virales">
-        <p className="text-xs text-text2 mb-2">Crée des captions Instagram qui convertissent</p>
-        <div className="grid grid-cols-2 gap-3">
-          <input
-            type="text"
-            placeholder="Sujet du post"
-            value={capSubject}
-            onChange={e => setCapSubject(e.target.value)}
-            className="bg-bg border border-border rounded-lg px-3 py-2 text-sm text-text placeholder:text-text2 focus:border-accent focus:outline-none"
-          />
-          <select
-            value={capTone}
-            onChange={e => setCapTone(e.target.value as typeof TONES[number])}
-            className="bg-bg border border-border rounded-lg px-3 py-2 text-sm text-text focus:border-accent focus:outline-none"
-          >
-            {TONES.map(t => <option key={t} value={t}>{t}</option>)}
-          </select>
-        </div>
-        <textarea
-          rows={6}
-          value={capResult}
-          readOnly
-          placeholder="Caption générée apparaîtra ici…"
-          className="w-full bg-surface2 border border-border rounded-lg px-3 py-2 text-xs font-mono text-text resize-none focus:outline-none"
-        />
-        <div className="flex items-center gap-2">
-          <Button onClick={runCap} loading={capLoading} disabled={!capSubject.trim()}>✨ Générer</Button>
-          {capResult && <CopyButton text={capResult} />}
-        </div>
-      </ToolCard>
-
-      {/* 3. Planificateur de Contenu */}
-      <ToolCard title="📅 Planificateur de Contenu">
-        <p className="text-xs text-text2 mb-2">Calendrier éditorial 7 jours pour ta niche</p>
-        <input
-          type="text"
-          placeholder="Niche (fitness, crypto, lifestyle…)"
-          value={planNiche}
-          onChange={e => setPlanNiche(e.target.value)}
-          className="w-full bg-bg border border-border rounded-lg px-3 py-2 text-sm text-text placeholder:text-text2 focus:border-accent focus:outline-none"
-        />
-        <textarea
-          rows={10}
-          value={planResult}
-          readOnly
-          placeholder="Calendrier 7 jours apparaîtra ici…"
-          className="w-full bg-surface2 border border-border rounded-lg px-3 py-2 text-xs font-mono text-text resize-none focus:outline-none"
-        />
-        <div className="flex items-center gap-2">
-          <Button onClick={runPlan} loading={planLoading} disabled={!planNiche.trim()}>📅 Planifier</Button>
-          {planResult && <CopyButton text={planResult} />}
-        </div>
-      </ToolCard>
-    </div>
-  ) }
 }

@@ -935,6 +935,17 @@ ipcMain.handle('pick-output-file', async (_event, opts: { defaultName: string })
   return result.canceled ? null : result.filePath
 })
 
+// ── IPC: pick any file (image/video/any) ─────────────────────────────────────
+ipcMain.handle('pick-any-file', async (_event, opts: { filters?: Array<{ name: string; extensions: string[] }> }) => {
+  if (!win) return null
+  const result = await dialog.showOpenDialog(win, {
+    title: 'Choisir un fichier',
+    properties: ['openFile'],
+    filters: opts?.filters ?? [{ name: 'Tous les fichiers', extensions: ['*'] }],
+  })
+  return result.canceled ? null : result.filePaths[0]
+})
+
 // ── IPC: pick output folder ───────────────────────────────────────────────────
 ipcMain.handle('pick-output-folder', async () => {
   if (!win) return null

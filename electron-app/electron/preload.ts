@@ -35,6 +35,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   pickOutputFile: (opts: { defaultName: string }) =>
     ipcRenderer.invoke('pick-output-file', opts),
 
+  // Open native file picker (any file type)
+  pickAnyFile: (opts?: { filters?: Array<{ name: string; extensions: string[] }> }) =>
+    ipcRenderer.invoke('pick-any-file', opts ?? {}),
+
   // Open native folder picker
   pickOutputFolder: () => ipcRenderer.invoke('pick-output-folder'),
 
