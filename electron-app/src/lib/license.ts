@@ -72,17 +72,26 @@ export async function checkLicense(userId: string, orgId?: string | null): Promi
 
 export async function activateKey(key: string, userId: string): Promise<{ success: boolean; error?: string }> {
   const normalized = key.toUpperCase().replace(/\s/g, '')
-  const { data, error } = await supabase
+
+  // Step 1: verify key exists and is unclaimed (needs lk_unactivated_select policy)
+  const { data: existing, error: selectErr } = await supabase
     .from('license_keys')
-    .update({ user_id: userId, activated_at: new Date().toISOString() })
+    .select('id')
     .eq('key', normalized)
     .is('user_id', null)
     .eq('is_active', true)
-    .select()
     .maybeSingle()
 
-  if (error) return { success: false, error: error.message }
-  if (!data)  return { success: false, error: 'Clé invalide ou déjà utilisée.' }
+  if (selectErr) return { success: false, error: selectErr.message }
+  if (!existing) return { success: false, error: 'Clé invalide ou déjà utilisée.' }
+
+  // Step 2: claim it
+  const { error: updateErr } = await supabase
+    .from('license_keys')
+    .update({ user_id: userId, activated_at: new Date().toISOString() })
+    .eq('id', existing.id)
+
+  if (updateErr) return { success: false, error: updateErr.message }
   return { success: true }
 }
 
