@@ -182,8 +182,8 @@ function LineChart({ data, height = 280 }: { data: ViewPoint[]; height?: number 
         return (
           <div
             className="absolute pointer-events-none rounded-xl px-3 py-2.5 shadow-2xl"
-            style={{ background: 'rgba(8,5,20,0.92)', border: '1px solid rgba(139,92,246,0.4)', backdropFilter: 'blur(16px)' }}
             style={{
+              background: 'rgba(8,5,20,0.92)', border: '1px solid rgba(139,92,246,0.4)', backdropFilter: 'blur(16px)',
               left: Math.min(Math.max(hoverPt.x - 80, ml), w - 172),
               top: Math.max(hoverPt.y - 80, 4),
               width: 164,
