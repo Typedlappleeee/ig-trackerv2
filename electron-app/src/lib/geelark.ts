@@ -617,3 +617,87 @@ export async function warmupAccount(
     return { ok: false, error: e instanceof Error ? e.message : String(e) }
   }
 }
+
+// ── Extract Instagram sessionid from GéeLark phone shell ─────────────────────
+// Tries multiple methods with fallbacks. Returns null if not found or no root.
+export async function extractInstagramSessionId(
+  bearer: string,
+  geelarkId: string,
+  log: (m: string) => void,
+): Promise<string | null> {
+  // Ensure phone is running before trying shell
+  await ensurePhoneRunning(bearer, geelarkId)
+
+  const tmp = '/sdcard/sf_ig_cookies.db'
+
+  // Possible cookie DB paths (varies by Android version / WebView version)
+  const cookiePaths = [
+    '/data/data/com.instagram.android/app_webview/Default/Cookies',
+    '/data/data/com.instagram.android/app_webview/Cookies',
+    '/data/data/com.instagram.android/app_chrome/Default/Cookies',
+    '/data/data/com.instagram.android/databases/webview_cookies.db',
+  ]
+
+  // ── Method 1: SQLite cookie DB ────────────────────────────────────────────
+  for (const path of cookiePaths) {
+    log(`🔍 Tentative: ${path}`)
+    const cp = await shellExec(bearer, geelarkId,
+      `cp "${path}" "${tmp}" 2>/dev/null && echo OK || echo FAIL`)
+    if (!cp.output.includes('OK')) continue
+
+    log('📋 Fichier copié — extraction du sessionid…')
+
+    // Try sqlite3 (cleanest)
+    const sql = await shellExec(bearer, geelarkId,
+      `sqlite3 "${tmp}" "SELECT value FROM cookies WHERE name='sessionid' LIMIT 1;" 2>/dev/null`)
+    const v1 = sql.output.trim()
+    if (v1.length > 20) {
+      await shellExec(bearer, geelarkId, `rm -f "${tmp}"`)
+      log(`✅ sessionid extrait via sqlite3`)
+      return v1
+    }
+
+    // Fallback: strings + awk (no sqlite3)
+    const str = await shellExec(bearer, geelarkId,
+      `strings -n 8 "${tmp}" | awk 'prev=="sessionid"{print;exit}{prev=$0}' 2>/dev/null`)
+    const v2 = str.output.trim()
+    if (v2.length > 20) {
+      await shellExec(bearer, geelarkId, `rm -f "${tmp}"`)
+      log(`✅ sessionid extrait via strings/awk`)
+      return v2
+    }
+
+    // Fallback: grep binary pattern (sessionid is followed by the value in SQLite pages)
+    const grep = await shellExec(bearer, geelarkId,
+      `cat "${tmp}" | strings | grep -E "^[0-9]{8,15}%3A[A-Za-z0-9_%-]{20,}$" | head -1 2>/dev/null`)
+    const v3 = grep.output.trim()
+    if (v3.length > 20) {
+      await shellExec(bearer, geelarkId, `rm -f "${tmp}"`)
+      log(`✅ sessionid extrait via grep pattern`)
+      return v3
+    }
+
+    await shellExec(bearer, geelarkId, `rm -f "${tmp}"`)
+    log(`⚠️ Fichier trouvé mais sessionid non parsé depuis ${path}`)
+  }
+
+  // ── Method 2: shared_prefs XML ───────────────────────────────────────────
+  log('🔍 Tentative shared_prefs…')
+  const prefs = await shellExec(bearer, geelarkId,
+    `grep -rh "sessionid" /data/data/com.instagram.android/shared_prefs/ 2>/dev/null | grep -oE "[0-9]{8,15}%3A[A-Za-z0-9_%.-]{20,}" | head -1`)
+  const v4 = prefs.output.trim()
+  if (v4.length > 20) {
+    log(`✅ sessionid extrait via shared_prefs`)
+    return v4
+  }
+
+  // ── Method 3: /data/data direct grep (binary) ────────────────────────────
+  log('🔍 Tentative grep binaire…')
+  const bin = await shellExec(bearer, geelarkId,
+    `find /data/data/com.instagram.android -name "*.db" -o -name "Cookies" 2>/dev/null | head -10`)
+  log(`Fichiers trouvés: ${bin.output.trim() || 'aucun'}`)
+
+  // If we got here, likely no root or IG doesn't use WebView cookies
+  log('❌ sessionid non trouvé — le shell n\'a probablement pas accès à /data/data (pas root)')
+  return null
+}

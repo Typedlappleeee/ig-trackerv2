@@ -4,7 +4,7 @@ import { supabase, type Phone } from '@/lib/supabase'
 import { useOrg } from '@/lib/orgContext'
 import { useConnections } from '@/lib/connections'
 import { canAccessPhoneGroup } from '@/lib/permissions'
-import { fetchAllPhones, geelarkStatusLabel } from '@/lib/geelark'
+import { fetchAllPhones, geelarkStatusLabel, extractInstagramSessionId } from '@/lib/geelark'
 import * as poller from '@/lib/phonePoller'
 import { Button }  from '@/components/ui/Button'
 import { Spinner } from '@/components/ui/Spinner'
@@ -80,10 +80,12 @@ function Countdown({ secondsLeft }: { secondsLeft: number }) {
 // ── Session ID dialog ────────────────────────────────────────────────────────
 function SessionDialog({
   phone,
+  bearer,
   onClose,
   onSaved,
 }: {
   phone: Phone
+  bearer: string
   onClose: () => void
   onSaved: (id: string, sessionid: string, detectedUsername?: string) => void
 }) {
@@ -92,6 +94,9 @@ function SessionDialog({
   const [testResult, setTestResult]     = useState<'idle' | 'ok' | 'fail'>('idle')
   const [detectedUser, setDetectedUser] = useState<string | null>(null)
   const [saving, setSaving]             = useState(false)
+  const [extracting, setExtracting]     = useState(false)
+  const [extractLogs, setExtractLogs]   = useState<string[]>([])
+  const [extractError, setExtractError] = useState<string | null>(null)
   const inputRef    = useRef<HTMLInputElement>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -123,6 +128,32 @@ function SessionDialog({
     }
     setTesting(false)
     return { ok: false }
+  }
+
+  async function extractFromPhone() {
+    if (!bearer || !phone.geelark_id) {
+      setExtractError('Téléphone non lié à GéeLark ou token manquant')
+      return
+    }
+    setExtracting(true); setExtractLogs([]); setExtractError(null)
+    const logs: string[] = []
+    try {
+      const sessionid = await extractInstagramSessionId(
+        bearer,
+        phone.geelark_id,
+        msg => { logs.push(msg); setExtractLogs([...logs]) },
+      )
+      if (sessionid) {
+        setValue(sessionid)
+        handleChange(sessionid)
+        setExtractError(null)
+      } else {
+        setExtractError('sessionid non trouvé — voir les logs ci-dessus')
+      }
+    } catch (e) {
+      setExtractError(e instanceof Error ? e.message : String(e))
+    }
+    setExtracting(false)
   }
 
   // Auto-test 800ms after the user stops typing
@@ -171,8 +202,31 @@ function SessionDialog({
           )}
         </div>
 
+        {/* Auto-extract via GéeLark shell */}
+        {phone.geelark_id && bearer && (
+          <div className="bg-surface border border-border rounded-lg p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-semibold text-text">🤖 Extraction automatique</p>
+                <p className="text-[10px] text-text2">Récupère le sessionid directement depuis le téléphone GéeLark</p>
+              </div>
+              <Button size="sm" onClick={extractFromPhone} loading={extracting} disabled={extracting}>
+                {extracting ? 'Extraction…' : '⚡ Extraire'}
+              </Button>
+            </div>
+            {extractLogs.length > 0 && (
+              <div className="bg-bg rounded p-2 max-h-28 overflow-auto space-y-0.5">
+                {extractLogs.map((l, i) => (
+                  <p key={i} className="text-[10px] font-mono text-text2">{l}</p>
+                ))}
+              </div>
+            )}
+            {extractError && <p className="text-[11px] text-danger">{extractError}</p>}
+          </div>
+        )}
+
         <div className="bg-surface border border-border rounded-lg px-4 py-3 text-xs text-text2 space-y-1">
-          <p className="font-semibold text-text">Comment trouver ton Session ID :</p>
+          <p className="font-semibold text-text">Ou manuellement :</p>
           <p>1. Ouvre <span className="text-accent">instagram.com</span> dans Chrome</p>
           <p>2. Appuie sur <span className="text-accent">F12</span> (DevTools)</p>
           <p>3. Va dans <span className="text-accent">Application → Cookies → instagram.com</span></p>
@@ -653,6 +707,7 @@ export function Phones({ user }: PhonesProps) {
       {sessionDialog && (
         <SessionDialog
           phone={sessionDialog.phone}
+          bearer={bearer}
           onClose={() => setSessionDialog(null)}
           onSaved={onSessionSaved}
         />
