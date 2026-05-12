@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { supabase } from '@/lib/supabase'
 import { activateKey } from '@/lib/license'
 
 interface Props {
@@ -6,28 +7,58 @@ interface Props {
   onActivated: () => void
 }
 
-export function LicenseGate({ userId, onActivated }: Props) {
-  const [key, setKey]       = useState('')
-  const [error, setError]   = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
+type Tab = 'license' | 'org'
 
-  async function handleSubmit(e: React.FormEvent) {
+export function LicenseGate({ userId, onActivated }: Props) {
+  const [tab, setTab]         = useState<Tab>('license')
+
+  // License key
+  const [key, setKey]         = useState('')
+  const [keyErr, setKeyErr]   = useState<string | null>(null)
+  const [keyLoading, setKeyLoading] = useState(false)
+
+  // Org invite
+  const [code, setCode]       = useState('')
+  const [orgErr, setOrgErr]   = useState<string | null>(null)
+  const [orgLoading, setOrgLoading] = useState(false)
+  const [orgSuccess, setOrgSuccess] = useState(false)
+
+  async function handleLicense(e: React.FormEvent) {
     e.preventDefault()
     if (!key.trim()) return
-    setLoading(true)
-    setError(null)
+    setKeyLoading(true)
+    setKeyErr(null)
     const res = await activateKey(key, userId)
-    setLoading(false)
+    setKeyLoading(false)
     if (res.success) {
       onActivated()
     } else {
-      setError(res.error ?? 'Erreur inconnue')
+      setKeyErr(res.error ?? 'Erreur inconnue')
+    }
+  }
+
+  async function handleOrgJoin(e: React.FormEvent) {
+    e.preventDefault()
+    if (!code.trim()) return
+    setOrgLoading(true)
+    setOrgErr(null)
+    const { error } = await supabase.rpc('accept_org_invite', { p_token: code.trim() })
+    setOrgLoading(false)
+    if (error) {
+      const msg = /invite_not_found/.test(error.message)    ? 'Code invalide ou expiré'
+                : /invite_already_used/.test(error.message) ? 'Ce code a déjà été utilisé'
+                : /invite_expired/.test(error.message)      ? 'Code expiré'
+                : error.message
+      setOrgErr(msg)
+    } else {
+      setOrgSuccess(true)
+      // Re-check license — org owner may unlock access
+      setTimeout(() => onActivated(), 1500)
     }
   }
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#030307]">
-      {/* Background glow */}
       <div style={{
         position: 'absolute', inset: 0, pointerEvents: 'none',
         background: 'radial-gradient(ellipse 60% 50% at 50% 45%, #1e0b3a44 0%, transparent 70%)',
@@ -57,44 +88,94 @@ export function LicenseGate({ userId, onActivated }: Props) {
           <h1 className="text-2xl font-black text-white tracking-tight">
             Scale<span style={{ background: 'linear-gradient(130deg,#8b5cf6,#ec4899)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Flow</span>
           </h1>
-          <p className="text-[11px] text-[#4a3f7a] uppercase tracking-widest mt-1">Accès sous licence</p>
+          <p className="text-[11px] text-[#4a3f7a] uppercase tracking-widest mt-1">Accès requis</p>
         </div>
 
         {/* Card */}
-        <div className="rounded-2xl p-6 space-y-5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(139,92,246,0.15)' }}>
-          <div className="text-center space-y-1">
-            <p className="text-sm font-semibold text-white">Clé de licence requise</p>
-            <p className="text-xs text-[#6b5fa0]">Entre ta clé pour activer ton compte.<br/>Les membres d'une organisation n'en ont pas besoin.</p>
+        <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(139,92,246,0.15)' }}>
+          {/* Tabs */}
+          <div className="flex border-b border-[#1a1230]">
+            {([['license', '🔑 Clé de licence'], ['org', '🏢 Rejoindre une orga']] as [Tab, string][]).map(([t, label]) => (
+              <button
+                key={t}
+                onClick={() => setTab(t)}
+                className={`flex-1 py-3 text-xs font-semibold transition-colors ${
+                  tab === t
+                    ? 'text-white border-b-2 border-[#8b5cf6] bg-[#0d0a1a]'
+                    : 'text-[#4a3f7a] hover:text-[#8b5cf6]'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-3">
-            <input
-              value={key}
-              onChange={e => setKey(e.target.value)}
-              placeholder="XXXX-XXXX-XXXX-XXXX"
-              className="w-full bg-[#0d0a1a] border border-[#2a1f48] rounded-xl px-4 py-3 text-white text-sm font-mono tracking-widest placeholder:text-[#3a2f58] focus:outline-none focus:border-[#8b5cf6] transition-colors text-center uppercase"
-              spellCheck={false}
-              autoComplete="off"
-            />
-
-            {error && (
-              <p className="text-xs text-red-400 text-center">{error}</p>
+          <div className="p-6 space-y-4">
+            {tab === 'license' ? (
+              <>
+                <p className="text-xs text-[#6b5fa0] text-center">
+                  Entre ta clé pour activer ton accès solo.
+                </p>
+                <form onSubmit={handleLicense} className="space-y-3">
+                  <input
+                    value={key}
+                    onChange={e => setKey(e.target.value)}
+                    placeholder="XXXX-XXXX-XXXX-XXXX"
+                    className="w-full bg-[#0d0a1a] border border-[#2a1f48] rounded-xl px-4 py-3 text-white text-sm font-mono tracking-widest placeholder:text-[#3a2f58] focus:outline-none focus:border-[#8b5cf6] transition-colors text-center uppercase"
+                    spellCheck={false}
+                    autoComplete="off"
+                  />
+                  {keyErr && <p className="text-xs text-red-400 text-center">{keyErr}</p>}
+                  <button
+                    type="submit"
+                    disabled={keyLoading || !key.trim()}
+                    className="w-full py-3 rounded-xl text-sm font-bold text-white transition-all disabled:opacity-40"
+                    style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)' }}
+                  >
+                    {keyLoading ? 'Vérification…' : 'Activer →'}
+                  </button>
+                </form>
+              </>
+            ) : (
+              <>
+                <p className="text-xs text-[#6b5fa0] text-center">
+                  Si tu as un code d'invitation, entre-le ici.<br/>
+                  Tant que l'owner de l'orga a un abonnement actif, tu as accès.
+                </p>
+                {orgSuccess ? (
+                  <div className="text-center py-4">
+                    <p className="text-green-400 font-semibold text-sm">✓ Organisation rejointe !</p>
+                    <p className="text-xs text-[#6b5fa0] mt-1">Connexion en cours…</p>
+                  </div>
+                ) : (
+                  <form onSubmit={handleOrgJoin} className="space-y-3">
+                    <input
+                      value={code}
+                      onChange={e => setCode(e.target.value)}
+                      placeholder="Code d'invitation"
+                      className="w-full bg-[#0d0a1a] border border-[#2a1f48] rounded-xl px-4 py-3 text-white text-sm font-mono placeholder:text-[#3a2f58] focus:outline-none focus:border-[#8b5cf6] transition-colors text-center"
+                      spellCheck={false}
+                      autoComplete="off"
+                    />
+                    {orgErr && <p className="text-xs text-red-400 text-center">{orgErr}</p>}
+                    <button
+                      type="submit"
+                      disabled={orgLoading || !code.trim()}
+                      className="w-full py-3 rounded-xl text-sm font-bold text-white transition-all disabled:opacity-40"
+                      style={{ background: 'linear-gradient(130deg,#1d4ed8,#7c3aed)' }}
+                    >
+                      {orgLoading ? 'Vérification…' : 'Rejoindre →'}
+                    </button>
+                  </form>
+                )}
+              </>
             )}
-
-            <button
-              type="submit"
-              disabled={loading || !key.trim()}
-              className="w-full py-3 rounded-xl text-sm font-bold text-white transition-all disabled:opacity-40"
-              style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)' }}
-            >
-              {loading ? 'Vérification…' : 'Activer la licence →'}
-            </button>
-          </form>
-
-          <p className="text-[10px] text-[#3a2f58] text-center">
-            Tu rejoins une organisation ? Demande à l'owner de t'inviter — aucune clé requise.
-          </p>
+          </div>
         </div>
+
+        <p className="text-[10px] text-[#2a1f48] text-center mt-4">
+          ScaleFlow — Accès restreint aux comptes autorisés
+        </p>
       </div>
     </div>
   )

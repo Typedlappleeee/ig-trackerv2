@@ -393,8 +393,8 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
                 page === 'licences' ? 'sf-nav-active' : 'text-sb-text hover:bg-sb-hover hover:text-sb-text-act'
               }`}
             >
-              <span className="text-base">🔑</span>
-              <span>Licences</span>
+              <span className="text-base">🛡</span>
+              <span>Admin</span>
             </button>
           )}
         </div>

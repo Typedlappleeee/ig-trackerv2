@@ -142,7 +142,7 @@ export function Licences({ user: _user }: Props) {
   return (
     <div className="p-6 space-y-6 max-w-5xl mx-auto">
       <div>
-        <h1 className="text-xl font-bold text-text">Licences</h1>
+        <h1 className="text-xl font-bold text-text">🛡 Admin — Licences</h1>
         <p className="text-xs text-text2 mt-0.5">Gère les clés d'accès à ScaleFlow</p>
       </div>
 
