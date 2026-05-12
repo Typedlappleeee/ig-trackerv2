@@ -38,9 +38,10 @@ interface Transition {
   type: 'cut' | 'fade' | 'dissolve' | 'wipe'
 }
 
-type Preset   = '9:16' | '1:1' | '16:9'
-type Tab      = 'medias' | 'texte' | 'transitions' | 'filtres' | 'ajustement'
-type Filter   = 'none' | 'vivid' | 'warm' | 'cold' | 'bw' | 'cinema' | 'vintage' | 'fade'
+type Preset        = '9:16' | '1:1' | '16:9'
+type Tab           = 'medias' | 'texte' | 'transitions' | 'filtres' | 'ajustement'
+type Filter        = 'none' | 'vivid' | 'warm' | 'cold' | 'bw' | 'cinema' | 'vintage' | 'fade'
+type AutoCaptionPos = 'top' | 'center' | 'bottom'
 
 const FILTER_LABELS: Record<Filter, string> = {
   none: 'Original', vivid: 'Vif', warm: 'Chaud', cold: 'Froid',
@@ -382,6 +383,13 @@ export function Montage({ user }: MontageProps) {
   // Sequential playback
   const [playingIndex, setPlayingIndex] = useState<number | null>(null)
 
+  // Auto-caption mode
+  const [autoCaptionEnabled, setAutoCaptionEnabled] = useState(false)
+  const [autoCaptionText, setAutoCaptionText]       = useState('')
+  const [autoCaptionPos, setAutoCaptionPos]         = useState<AutoCaptionPos>('bottom')
+  const [autoCaptionSize, setAutoCaptionSize]       = useState(36)
+  const [autoCaptionColor, setAutoCaptionColor]     = useState('#ffffff')
+
   // Export
   const [exporting, setExporting]   = useState(false)
   const [expResult, setExpResult]   = useState<{ ok: boolean; msg: string; command?: string } | null>(null)
@@ -396,6 +404,27 @@ export function Montage({ user }: MontageProps) {
     supabase.from('content_bank').select('*').eq('user_id', user.id).order('created_at', { ascending: false })
       .then(({ data }) => { setBankItems(data ?? []); setLL(false) })
   }, [])
+
+  // Sync auto-caption overlay → textOverlays
+  useEffect(() => {
+    const yMap: Record<AutoCaptionPos, number> = { top: 10, center: 50, bottom: 88 }
+    setTexts(prev => {
+      const rest = prev.filter(t => t.uid !== '__auto_caption__')
+      if (!autoCaptionEnabled || !autoCaptionText.trim()) return rest
+      const dur = totalDur(clips)
+      return [...rest, {
+        uid:       '__auto_caption__',
+        text:      autoCaptionText,
+        startTime: 0,
+        endTime:   Math.max(dur, 1),
+        position:  autoCaptionPos,
+        x:         50,
+        y:         yMap[autoCaptionPos],
+        fontSize:  autoCaptionSize,
+        color:     autoCaptionColor,
+      }]
+    })
+  }, [autoCaptionEnabled, autoCaptionText, autoCaptionPos, autoCaptionSize, autoCaptionColor, clips])
 
   // ── Clip management ────────────────────────────────────────────────────────
   function addClip(item: ContentItem) {
@@ -676,7 +705,85 @@ export function Montage({ user }: MontageProps) {
           {/* Texte */}
           {activeTab === 'texte' && (
             <div className="p-3 space-y-3 flex-1 overflow-auto">
-              <p className="text-[10px] text-text2 uppercase tracking-wider font-semibold">Ajouter un texte</p>
+
+              {/* ── Auto Caption ─────────────────────────────────────────── */}
+              <div className="rounded-xl border border-border bg-surface2 overflow-hidden">
+                {/* Header / toggle */}
+                <button
+                  onClick={() => setAutoCaptionEnabled(v => !v)}
+                  className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-surface transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">⚡</span>
+                    <div className="text-left">
+                      <p className="text-xs font-semibold text-text">Mode Auto</p>
+                      <p className="text-[9px] text-text2">Caption directement sur la vidéo</p>
+                    </div>
+                  </div>
+                  <div className={`w-9 h-5 rounded-full transition-colors flex-shrink-0 ${autoCaptionEnabled ? 'bg-accent' : 'bg-surface'}`}>
+                    <span className={`block w-4 h-4 bg-white rounded-full shadow transition-all mt-0.5 ${autoCaptionEnabled ? 'ml-4.5' : 'ml-0.5'}`} style={{ marginLeft: autoCaptionEnabled ? '18px' : '2px' }} />
+                  </div>
+                </button>
+
+                {autoCaptionEnabled && (
+                  <div className="px-3 pb-3 space-y-2.5 border-t border-border">
+                    {/* Text input */}
+                    <textarea
+                      value={autoCaptionText}
+                      onChange={e => setAutoCaptionText(e.target.value)}
+                      rows={3}
+                      placeholder="Tape ta caption ici…"
+                      className="mt-2.5 w-full bg-surface border border-border rounded-lg px-2.5 py-2 text-[11px] text-text focus:outline-none focus:border-accent resize-none placeholder:text-text2/60"
+                      autoFocus
+                    />
+
+                    {/* Position */}
+                    <div>
+                      <p className="text-[9px] text-text2 uppercase tracking-wider mb-1.5">Position</p>
+                      <div className="grid grid-cols-3 gap-1">
+                        {(['top','center','bottom'] as AutoCaptionPos[]).map(p => (
+                          <button key={p} onClick={() => setAutoCaptionPos(p)}
+                            className={`py-1.5 rounded text-[10px] font-medium transition-all ${autoCaptionPos === p ? 'bg-accent text-white' : 'bg-surface text-text2 hover:text-text'}`}>
+                            {p === 'top' ? 'Haut' : p === 'center' ? 'Centre' : 'Bas'}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Font size */}
+                    <div>
+                      <p className="text-[9px] text-text2 uppercase tracking-wider mb-1">Taille: <span className="text-accent">{autoCaptionSize}px</span></p>
+                      <input type="range" min={16} max={80} step={2} value={autoCaptionSize}
+                        onChange={e => setAutoCaptionSize(+e.target.value)}
+                        className="w-full accent-accent h-1.5" />
+                    </div>
+
+                    {/* Color */}
+                    <div>
+                      <p className="text-[9px] text-text2 uppercase tracking-wider mb-1.5">Couleur</p>
+                      <div className="flex gap-1.5 flex-wrap items-center">
+                        {['#ffffff','#000000','#ffff00','#ff5c6e','#4f9eff','#2dde78','#ff6ec7','#ffaa2a'].map(c => (
+                          <button key={c} onClick={() => setAutoCaptionColor(c)}
+                            className={`w-5 h-5 rounded-full transition-all ${autoCaptionColor === c ? 'ring-2 ring-white scale-110' : 'hover:scale-110'}`}
+                            style={{ backgroundColor: c, border: c === '#ffffff' ? '1px solid rgba(255,255,255,0.3)' : undefined }} />
+                        ))}
+                        <input type="color" value={autoCaptionColor} onChange={e => setAutoCaptionColor(e.target.value)}
+                          className="w-5 h-5 rounded cursor-pointer bg-transparent border-0 p-0" title="Couleur personnalisée" />
+                      </div>
+                    </div>
+
+                    {!autoCaptionText.trim() && (
+                      <p className="text-[9px] text-text2/60 italic">Entre du texte pour voir l'aperçu sur la vidéo.</p>
+                    )}
+                    {autoCaptionText.trim() && (
+                      <p className="text-[9px] text-ok/80">✓ Texte affiché sur toute la durée de la vidéo</p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* ── Manuel ───────────────────────────────────────────────── */}
+              <p className="text-[10px] text-text2 uppercase tracking-wider font-semibold pt-1">Manuel</p>
               {([
                 { pos: 'top',    label: 'Haut',   x: 50, y: 10 },
                 { pos: 'center', label: 'Centre', x: 50, y: 50 },
@@ -687,14 +794,18 @@ export function Montage({ user }: MontageProps) {
                   startTime: playhead, endTime: Math.min(playhead + 3, total),
                   position: pos, x, y, fontSize: 32, color: '#ffffff',
                 }])}
-                className="w-full py-3 bg-surface2 hover:bg-surface border border-border rounded-lg text-xs text-text transition-colors text-center">
+                className="w-full py-2.5 bg-surface2 hover:bg-surface border border-border rounded-lg text-xs text-text transition-colors text-center">
                   + {label}
                 </button>
               ))}
-              {textOverlays.length > 0 && (
+
+              {/* List of manual overlays (exclude auto-caption) */}
+              {textOverlays.filter(t => t.uid !== '__auto_caption__').length > 0 && (
                 <div className="space-y-2 pt-2 border-t border-border">
-                  <p className="text-[10px] text-text2 uppercase tracking-wider font-semibold">Textes ({textOverlays.length})</p>
-                  {textOverlays.map(ov => (
+                  <p className="text-[10px] text-text2 uppercase tracking-wider font-semibold">
+                    Textes manuels ({textOverlays.filter(t => t.uid !== '__auto_caption__').length})
+                  </p>
+                  {textOverlays.filter(t => t.uid !== '__auto_caption__').map(ov => (
                     <div key={ov.uid} className="flex items-center gap-2 bg-surface2 rounded-lg px-2 py-1.5">
                       <input value={ov.text} onChange={e => setTexts(prev => prev.map(t => t.uid === ov.uid ? { ...t, text: e.target.value } : t))}
                         className="flex-1 bg-transparent text-[11px] text-text focus:outline-none" />
