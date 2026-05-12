@@ -302,7 +302,7 @@ If no text overlays exist return [].`
         y: `h*${Math.max(0.01, Math.min(0.97, (item.yPercent ?? 85) / 100)).toFixed(3)}`,
         fontSize: Math.round(Math.max(16, Math.min(200, item.fontSizePx ?? 42))),
         fontColor: item.fontColor ?? 'white',
-        bold: item.bold ?? false,
+        bold: true,
         shadow: true,
         startTime: Math.round((item.startFrame ?? 0) * interval * 10) / 10,
         endTime: Math.min(splitTime, Math.round(((item.endFrame ?? fr.frames!.length - 1) + 1) * interval * 10) / 10),

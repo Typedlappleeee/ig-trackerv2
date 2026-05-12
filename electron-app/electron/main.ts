@@ -887,7 +887,7 @@ ipcMain.handle('run-ffmpeg-remix-ai', async (_event, opts: {
       `fontcolor=${ov.fontColor}`,
       `enable='between(t,${ov.startTime},${ov.endTime})'`,
     )
-    parts.push(`borderw=3:bordercolor=black@0.9`)
+    parts.push(`borderw=1:bordercolor=black@0.9`)
     if (ov.shadow !== false) parts.push(`shadowx=3:shadowy=3:shadowcolor=black@0.85`)
     return `drawtext=${parts.join(':')}`
   }).join(',')
