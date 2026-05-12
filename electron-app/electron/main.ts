@@ -887,8 +887,8 @@ ipcMain.handle('run-ffmpeg-remix-ai', async (_event, opts: {
       `fontcolor=${ov.fontColor}`,
       `enable='between(t,${ov.startTime},${ov.endTime})'`,
     )
-    parts.push(`borderw=1:bordercolor=black@0.9`)
-    if (ov.shadow !== false) parts.push(`shadowx=3:shadowy=3:shadowcolor=black@0.85`)
+    // No hard outline — rely on double shadow for legibility (cleaner Instagram style)
+    if (ov.shadow !== false) parts.push(`shadowx=2:shadowy=2:shadowcolor=black@1.0`)
     return `drawtext=${parts.join(':')}`
   }).join(',')
 
