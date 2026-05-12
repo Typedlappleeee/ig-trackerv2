@@ -300,7 +300,7 @@ If no text overlays exist return [].`
         position: item.xAlign ?? 'center',
         x: xAlignToExpr(item.xAlign ?? 'center'),
         y: `h*${Math.max(0.01, Math.min(0.97, (item.yPercent ?? 85) / 100)).toFixed(3)}`,
-        fontSize: Math.round(Math.max(16, Math.min(260, (item.fontSizePx ?? 42) * 1.3))),
+        fontSize: Math.round(Math.max(16, Math.min(400, (item.fontSizePx ?? 42) * 2))),
         fontColor: item.fontColor ?? 'white',
         bold: true,
         shadow: true,
