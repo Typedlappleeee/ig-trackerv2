@@ -21,10 +21,13 @@ export function Warmup({ user }: WarmupProps) {
   const bearer = conns.bearer
 
   // Phones
-  const [phones,      setPhones]     = useState<GeelarkPhone[]>([])
-  const [selected,    setSelected]   = useState<Set<string>>(new Set())
+  const [phones,        setPhones]        = useState<GeelarkPhone[]>([])
+  const [selected,      setSelected]      = useState<Set<string>>(new Set())
   const [loadingPhones, setLoadingPhones] = useState(false)
   const [phonesError,   setPhonesError]   = useState<string | null>(null)
+  const [phoneSearch,   setPhoneSearch]   = useState('')
+  const [groupFilter,   setGroupFilter]   = useState('Tous')
+  const [groups,        setGroups]        = useState<string[]>(['Tous'])
 
   // Profile config
   const [profileName,    setProfileName]    = useState('')
@@ -58,9 +61,22 @@ export function Warmup({ user }: WarmupProps) {
     try {
       const list = await fetchAllPhones(bearer)
       setPhones(list)
+      const grps = [...new Set(list.map(p => p.group?.name ?? p.groupName).filter(Boolean) as string[])].sort()
+      setGroups(['Tous', ...grps])
     } catch (e) { setPhonesError(e instanceof Error ? e.message : String(e)) }
     setLoadingPhones(false)
   }
+
+  const visiblePhones = phones.filter(p => {
+    const grp = p.group?.name ?? p.groupName ?? null
+    if (groupFilter !== 'Tous' && grp !== groupFilter) return false
+    if (phoneSearch) {
+      const q    = phoneSearch.toLowerCase()
+      const name = (p.serialName ?? p.name ?? p.serialNo ?? '').toLowerCase()
+      return name.includes(q)
+    }
+    return true
+  })
 
   useEffect(() => {
     if (bearer && !conns.loading) loadPhones()
@@ -75,7 +91,7 @@ export function Warmup({ user }: WarmupProps) {
   }
 
   function selectAll() {
-    setSelected(new Set(phones.map(p => p.id)))
+    setSelected(new Set(visiblePhones.map(p => p.id)))
   }
 
   function updateJob(id: string, patch: Partial<PhoneJob>) {
@@ -311,6 +327,28 @@ export function Warmup({ user }: WarmupProps) {
                 </div>
               </div>
 
+              {/* Search + group filter */}
+              {phones.length > 0 && (
+                <div className="px-4 py-2.5 flex gap-2 border-b" style={{ borderColor: 'rgba(139,92,246,0.1)' }}>
+                  <input
+                    type="text" placeholder="🔍 Rechercher…" value={phoneSearch}
+                    onChange={e => setPhoneSearch(e.target.value)}
+                    className="flex-1 min-w-0 bg-transparent border rounded px-2 py-1 text-xs text-white placeholder:text-text2 focus:outline-none"
+                    style={{ borderColor: 'rgba(139,92,246,0.25)' }}
+                  />
+                  {groups.length > 1 && (
+                    <select value={groupFilter} onChange={e => setGroupFilter(e.target.value)}
+                      className="bg-transparent border rounded px-2 py-1 text-xs text-white focus:outline-none"
+                      style={{ borderColor: 'rgba(139,92,246,0.25)' }}>
+                      {groups.map(g => <option key={g} value={g} style={{ background: '#0c0e1a' }}>{g}</option>)}
+                    </select>
+                  )}
+                  <span className="text-[10px] self-center flex-shrink-0" style={{ color: 'rgba(196,181,253,0.4)' }}>
+                    {visiblePhones.length}/{phones.length}
+                  </span>
+                </div>
+              )}
+
               {phonesError && (
                 <p className="px-5 py-3 text-xs text-danger">{phonesError}</p>
               )}
@@ -329,7 +367,7 @@ export function Warmup({ user }: WarmupProps) {
               )}
 
               <div className="divide-y divide-purple-900/20">
-                {phones.map(phone => {
+                {visiblePhones.map(phone => {
                   const online = isOnline(phone)
                   const sel = selected.has(phone.id)
                   return (

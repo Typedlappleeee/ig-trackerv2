@@ -62,6 +62,7 @@ export function MassPosting({ user }: MassPostingProps) {
   const [taskStatuses, _setTaskStatuses]  = useState<Map<string, TaskStatus>>(ms.taskStatuses)
   const [groupFilter, setGroupFilter]     = useState('Tous')
   const [groups, setGroups]               = useState<string[]>(['Tous'])
+  const [phoneSearch, setPhoneSearch]     = useState('')
   const [showBankPicker, setShowBankPicker] = useState(false)
   const stopRef                           = useRef(false)
   const logEndRef                         = useRef<HTMLDivElement>(null)
@@ -331,9 +332,14 @@ export function MassPosting({ user }: MassPostingProps) {
     setPosting(false)
   }
 
-  const visiblePhones = groupFilter === 'Tous'
-    ? phones
-    : phones.filter(p => p.group_name === groupFilter)
+  const visiblePhones = phones.filter(p => {
+    if (groupFilter !== 'Tous' && p.group_name !== groupFilter) return false
+    if (phoneSearch) {
+      const q = phoneSearch.toLowerCase()
+      return p.phone_name?.toLowerCase().includes(q) || p.ig_username?.toLowerCase().includes(q)
+    }
+    return true
+  })
 
   const withSessions = phones.filter(p => p.ig_sessionid).length
 
@@ -516,6 +522,11 @@ export function MassPosting({ user }: MassPostingProps) {
             >
               {groups.map(g => <option key={g} value={g}>{g}</option>)}
             </select>
+            <input
+              type="text" placeholder="🔍 Rechercher…" value={phoneSearch}
+              onChange={e => setPhoneSearch(e.target.value)}
+              className="mt-1.5 w-full bg-surface border border-border rounded px-2 py-1 text-xs text-text placeholder:text-text2 focus:outline-none focus:border-accent"
+            />
           </div>
           <div className="px-3 py-1.5 flex gap-3 border-b border-border">
             <button onClick={() => setSelPhones(new Set(visiblePhones.map(p => p.id)))}

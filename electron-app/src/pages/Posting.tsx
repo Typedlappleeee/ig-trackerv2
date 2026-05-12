@@ -36,6 +36,7 @@ export function Posting({ user }: PostingProps) {
   const [groqKey, setGroqKey]          = useState('')
   const [groupFilter, setGroup]        = useState('Tous')
   const [groups, setGroups]            = useState<string[]>(['Tous'])
+  const [phoneSearch, setPhoneSearch]  = useState('')
   const [posting, _setPosting]         = useState(s.posting)
   const [generating, setGenerating]    = useState(false)
   const [logs, _setLogs]               = useState<TaskLog[]>(s.logs)
@@ -236,7 +237,14 @@ export function Posting({ user }: PostingProps) {
     setPosting(false)
   }
 
-  const visiblePhones = groupFilter === 'Tous' ? phones : phones.filter(p => p.group_name === groupFilter)
+  const visiblePhones = phones.filter(p => {
+    if (groupFilter !== 'Tous' && p.group_name !== groupFilter) return false
+    if (phoneSearch) {
+      const q = phoneSearch.toLowerCase()
+      return p.phone_name?.toLowerCase().includes(q) || p.ig_username?.toLowerCase().includes(q)
+    }
+    return true
+  })
   const fileName = filePath ? filePath.replace(/\\/g, '/').split('/').pop() ?? filePath : null
 
   return (
@@ -255,6 +263,11 @@ export function Posting({ user }: PostingProps) {
             className="w-full bg-[#0c0e1a] border border-border rounded-lg px-2 py-1.5 text-xs text-text focus:outline-none focus:border-[#8b5cf6]/60">
             {groups.map(g => <option key={g} value={g}>{g}</option>)}
           </select>
+          <input
+            type="text" placeholder="🔍 Rechercher…" value={phoneSearch}
+            onChange={e => setPhoneSearch(e.target.value)}
+            className="w-full bg-[#0c0e1a] border border-border rounded-lg px-2 py-1.5 text-xs text-text placeholder:text-text2 focus:outline-none focus:border-[#8b5cf6]/60 mt-1.5"
+          />
         </div>
         <div className="px-3 py-2 flex gap-3 border-b border-border">
           <button onClick={() => setSelPhones(new Set(visiblePhones.map(p => p.id)))}
