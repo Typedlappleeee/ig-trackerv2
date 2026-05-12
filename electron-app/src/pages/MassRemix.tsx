@@ -111,6 +111,11 @@ export function MassRemix({ user }: MassRemixProps) {
   const [currentStep, setCurrentStep] = useState<MassJob['status']>('pending')
   const abortRef = useRef(false)
 
+  // Abort generation when component unmounts (user navigates away)
+  useEffect(() => {
+    return () => { abortRef.current = true }
+  }, [])
+
   // Keep currentStep in sync with the active job
   useEffect(() => {
     if (!running || jobs.length === 0) return
@@ -330,7 +335,7 @@ Return ONLY a JSON array. If none, return [].`
                 ))}
               </div>
 
-              <button onClick={() => { abortRef.current = true }}
+              <button onClick={() => { abortRef.current = true; setRunning(false) }}
                 className="w-full py-2 rounded-xl text-xs font-semibold"
                 style={{ background: 'rgba(239,68,68,0.08)', color: '#f87171', border: '1px solid rgba(239,68,68,0.2)' }}>
                 ✕ Annuler la génération
@@ -365,7 +370,7 @@ Return ONLY a JSON array. If none, return [].`
                   </div>
                 ))}
               </div>
-              <Button onClick={() => setJobs([])} className="w-full">Fermer</Button>
+              <Button onClick={() => { setJobs([]); setRunning(false) }} className="w-full">Fermer</Button>
             </div>
           </div>
         </div>

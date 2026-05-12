@@ -123,6 +123,15 @@ export function AiTools({ user }: AiToolsProps) {
     setPlanLoading(false)
   }
 
+  if (conns.loading) {
+    return (
+      <div className="p-8 max-w-2xl flex items-center gap-3">
+        <div className="animate-spin w-5 h-5 rounded-full border-2 border-accent border-t-transparent" />
+        <span className="text-sm text-text2">Chargement des connexions…</span>
+      </div>
+    )
+  }
+
   if (!hasKey) {
     return (
       <div className="p-8 max-w-2xl">
