@@ -935,6 +935,16 @@ ipcMain.handle('pick-output-file', async (_event, opts: { defaultName: string })
   return result.canceled ? null : result.filePath
 })
 
+// ── IPC: pick output folder ───────────────────────────────────────────────────
+ipcMain.handle('pick-output-folder', async () => {
+  if (!win) return null
+  const result = await dialog.showOpenDialog(win, {
+    title: 'Choisir le dossier de sortie',
+    properties: ['openDirectory', 'createDirectory'],
+  })
+  return result.canceled ? null : result.filePaths[0]
+})
+
 // ── IPC: fetch image as base64 data URL ──────────────────────────────────────
 // Uses Node.js https.get directly — bypasses Electron's network service entirely,
 // avoiding the cross-origin Referer restriction that blocked CDN thumbnail loading.

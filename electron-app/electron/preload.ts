@@ -35,6 +35,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   pickOutputFile: (opts: { defaultName: string }) =>
     ipcRenderer.invoke('pick-output-file', opts),
 
+  // Open native folder picker
+  pickOutputFolder: () => ipcRenderer.invoke('pick-output-folder'),
+
   // Fetch Instagram profile page via hidden browser (most reliable, bypasses API blocks)
   fetchInstagramHtml: (username: string) => ipcRenderer.invoke('fetch-instagram-html', username),
 

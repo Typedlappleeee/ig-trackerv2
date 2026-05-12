@@ -7,6 +7,7 @@ import { playSuccess, playWhoosh, playError } from '@/lib/sounds'
 import { supabase } from '@/lib/supabase'
 import { uploadVideoFromPath, type UploadScope } from '@/lib/storage'
 import { useOrg } from '@/lib/orgContext'
+import { MassRemix } from './MassRemix'
 
 interface RemixProps { user: User }
 
@@ -161,6 +162,7 @@ function VideoCard({ label, filePath, accent = '#8b5cf6', badge, onDurationLoad 
 // ── Main ───────────────────────────────────────────────────────────────────────
 export function Remix({ user }: RemixProps) {
   const { currentOrg } = useOrg()
+  const [mode, setMode] = useState<'solo' | 'masse'>('solo')
   const [step, setStep] = useState<Step>(1)
 
   // Step 1 — original video
@@ -722,31 +724,48 @@ If no text overlays exist return [].`
         <div className="flex-shrink-0 px-6 py-4" style={{ borderBottom: '1px solid rgba(139,92,246,0.12)', background: 'rgba(8,5,20,0.6)' }}>
           <div className="flex items-center gap-3 mb-4">
             <div className="w-9 h-9 rounded-xl flex items-center justify-center text-xl" style={{ background: 'linear-gradient(135deg,#7c3aed22,#ec489922)', border: '1px solid rgba(139,92,246,0.25)' }}>🔀</div>
-            <div>
+            <div className="flex-1">
               <h1 className="text-lg font-black text-white tracking-tight">Remix Vidéo</h1>
               <p className="text-[11px]" style={{ color: 'rgba(196,181,253,0.4)' }}>Remplace la Phase 1 · Son + texte de l'original · Phase 2 inchangée</p>
             </div>
+            {/* Mode toggle */}
+            <div className="flex rounded-xl overflow-hidden" style={{ border: '1px solid rgba(139,92,246,0.2)' }}>
+              {(['solo', 'masse'] as const).map(m => (
+                <button key={m} onClick={() => setMode(m)}
+                  className="px-4 py-1.5 text-xs font-bold transition-all"
+                  style={mode === m
+                    ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff' }
+                    : { background: 'rgba(8,5,20,0.6)', color: 'rgba(196,181,253,0.5)' }
+                  }>
+                  {m === 'solo' ? '🎬 Solo' : '⚡ Masse'}
+                </button>
+              ))}
+            </div>
           </div>
-          <div className="flex items-center gap-2">
+          {mode === 'solo' && <div className="flex items-center gap-2">
             {STEPS.map((s, i) => (
               <div key={i} className="flex items-center gap-2">
                 <StepDot n={i + 1} current={step} label={s.label} />
                 {i < STEPS.length - 1 && <div className="w-8 h-px" style={{ background: 'rgba(139,92,246,0.2)' }} />}
               </div>
             ))}
-          </div>
+          </div>}
         </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-auto p-6">
-          {step === 1 && renderStep1()}
-          {step === 2 && renderStep2()}
-          {step === 3 && renderStep3()}
-          {step === 4 && renderStep4()}
-        </div>
+        {mode === 'masse' ? (
+          <MassRemix user={user} />
+        ) : (
+          <>
+            {/* Content */}
+            <div className="flex-1 overflow-auto p-6">
+              {step === 1 && renderStep1()}
+              {step === 2 && renderStep2()}
+              {step === 3 && renderStep3()}
+              {step === 4 && renderStep4()}
+            </div>
 
-        {/* Footer */}
-        <div className="flex-shrink-0 px-6 py-4 flex items-center justify-between" style={{ borderTop: '1px solid rgba(139,92,246,0.1)', background: 'rgba(6,4,15,0.8)' }}>
+            {/* Footer */}
+            <div className="flex-shrink-0 px-6 py-4 flex items-center justify-between" style={{ borderTop: '1px solid rgba(139,92,246,0.1)', background: 'rgba(6,4,15,0.8)' }}>
           <Button variant="secondary" onClick={() => setStep(s => Math.max(1, s - 1) as Step)} disabled={step === 1}>← Retour</Button>
           <div className="flex items-center gap-2">
             {[1,2,3,4].map(n => (
@@ -763,6 +782,8 @@ If no text overlays exist return [].`
             </Button>
           ) : <div style={{ width: 80 }} />}
         </div>
+          </>
+        )}
       </div>
     </>
   )

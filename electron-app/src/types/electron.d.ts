@@ -39,6 +39,7 @@ interface ElectronAPI {
   geelarkRequest:    (opts: GeelarkRequestOptions) => Promise<GeelarkRequestResult>
   pickVideoFile:     () => Promise<string | null>
   pickOutputFile:    (opts: { defaultName: string }) => Promise<string | null>
+  pickOutputFolder:  () => Promise<string | null>
   uploadVideoGeelark:(opts: { bearer: string; filePath: string }) => Promise<{ ok: boolean; token?: string; error?: string }>
   fetchImage:        (opts: { url: string; headers?: Record<string, string> }) => Promise<{ ok: boolean; dataUrl?: string; error?: string }>
   fetchInstagramHtml:(username: string) => Promise<{ ok: boolean; url?: string; html?: string; apiJson?: unknown; error?: string }>
