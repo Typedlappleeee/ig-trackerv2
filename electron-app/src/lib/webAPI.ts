@@ -239,7 +239,7 @@ export function buildWebAPI() {
         const putRes = await fetch(uploadUrl, {
           method: 'PUT',
           headers: { 'Content-Type': 'video/mp4' },
-          body: bytes,
+          body: bytes.buffer as ArrayBuffer,
         })
         if (!putRes.ok) return { ok: false, error: `S3 PUT failed: ${putRes.status}` }
 

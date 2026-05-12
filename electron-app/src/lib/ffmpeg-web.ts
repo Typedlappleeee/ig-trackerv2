@@ -39,7 +39,7 @@ async function writeInput(ff: FFmpeg, name: string, url: string): Promise<void> 
 // Read output from ffmpeg's virtual FS and return a blob URL for download.
 async function readOutput(ff: FFmpeg, name: string, mimeType = 'video/mp4'): Promise<string> {
   const data = await ff.readFile(name) as Uint8Array
-  const blob = new Blob([data], { type: mimeType })
+  const blob = new Blob([data.buffer as ArrayBuffer], { type: mimeType })
   return URL.createObjectURL(blob)
 }
 

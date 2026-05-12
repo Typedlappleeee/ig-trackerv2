@@ -9,6 +9,8 @@ import { OrgProvider, useOrg } from '@/lib/orgContext'
 import { useConnections }    from '@/lib/connections'
 import { playSplash }        from '@/lib/sounds'
 import { startMusic, stopMusic, isMusicEnabled, subscribeMusicState } from '@/lib/music'
+import { checkLicense, LicenseContext, type LicenseStatus } from '@/lib/license'
+import { LicenseGate } from '@/components/LicenseGate'
 
 // ── ScaleFlow logo SVG ────────────────────────────────────────────────────────
 function ScaleFlowLogoSVG({ size = 96, draw = false }: { size?: number; draw?: boolean }) {
@@ -472,6 +474,7 @@ import { Autocomment }       from '@/pages/Autocomment'
 import { Settings }          from '@/pages/Settings'
 import { MassPosting }       from '@/pages/MassPosting'
 import { Warmup }            from '@/pages/Warmup'
+import { Licences }          from '@/pages/Licences'
 import { FullPageLoader }    from '@/components/ui/Spinner'
 
 const BETA_KEY = 'scaleflow-v1-seen'
@@ -486,6 +489,7 @@ function AppContent({ user }: { user: User }) {
   const [phoneCount, setPhoneCount]         = useState(0)
   const [lastRefresh, setLastRefresh]       = useState<Date | null>(null)
   const [refreshTick, setRefreshTick]       = useState(0)
+  const [license, setLicense]               = useState<LicenseStatus | null>(null)
 
   // Onboarding gate: only shown once per account, never again — even if the
   // user skipped without entering a bearer. We mark completion via
@@ -500,6 +504,11 @@ function AppContent({ user }: { user: User }) {
         if (finished && !localStorage.getItem(BETA_KEY)) setShowBeta(true)
       })
   }, [user.id])
+
+  // License check — re-run whenever the org changes
+  useEffect(() => {
+    checkLicense(user.id, currentOrg?.id ?? null).then(setLicense)
+  }, [user.id, currentOrg?.id])
 
   // Sidebar phone count: 0 when no bearer in scope, org-scoped or solo-scoped otherwise.
   useEffect(() => {
@@ -547,6 +556,17 @@ function AppContent({ user }: { user: User }) {
   if (onboarding === null) return <FullPageLoader />
   if (onboarding) return <Onboarding user={user} onComplete={() => setOnboarding(false)} />
 
+  // License check — show gate if not yet resolved or invalid
+  if (license === null) return <FullPageLoader />
+  if (!license.valid) {
+    return (
+      <LicenseGate
+        userId={user.id}
+        onActivated={() => checkLicense(user.id, currentOrg?.id ?? null).then(setLicense)}
+      />
+    )
+  }
+
   const content = (() => {
     switch (page) {
       case 'dashboard':    return <Dashboard   user={user} key={refreshTick} />
@@ -561,11 +581,12 @@ function AppContent({ user }: { user: User }) {
       case 'remix':        return <Remix       user={user} />
       case 'aitools':      return <AiTools     user={user} />
       case 'settings':     return <Settings    user={user} initialPanel={settingsPanel as any} />
+      case 'licences':     return <Licences    user={user} />
     }
   })()
 
   return (
-    <>
+    <LicenseContext.Provider value={license}>
       {showBeta && <BetaPopup onClose={dismissBeta} />}
       <Layout
         user={user}
@@ -577,7 +598,7 @@ function AppContent({ user }: { user: User }) {
       >
         {content}
       </Layout>
-    </>
+    </LicenseContext.Provider>
   )
 }
 

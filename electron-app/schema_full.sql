@@ -549,7 +549,61 @@ CREATE POLICY "content_delete" ON storage.objects FOR DELETE USING (
 
 
 -- ╔══════════════════════════════════════════════════════════════╗
--- ║  12. Reload PostgREST schema cache                           ║
+-- ║  12. LICENSE KEYS                                            ║
+-- ╚══════════════════════════════════════════════════════════════╝
+
+-- Super admin flag on profiles
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_super_admin boolean DEFAULT false;
+
+CREATE TABLE IF NOT EXISTS public.license_keys (
+  id           uuid        DEFAULT gen_random_uuid() PRIMARY KEY,
+  key          text        UNIQUE NOT NULL,
+  user_id      uuid        REFERENCES auth.users(id) ON DELETE SET NULL,
+  created_by   uuid        REFERENCES auth.users(id) ON DELETE SET NULL,
+  created_at   timestamptz DEFAULT now(),
+  activated_at timestamptz,
+  expires_at   timestamptz,   -- NULL = lifetime
+  is_active    boolean     DEFAULT true,
+  plan         text        DEFAULT 'standard',
+  notes        text
+);
+
+CREATE INDEX IF NOT EXISTS idx_license_keys_user ON public.license_keys(user_id);
+
+ALTER TABLE public.license_keys ENABLE ROW LEVEL SECURITY;
+
+-- Super admin sees / manages everything
+DROP POLICY IF EXISTS "lk_super_admin" ON public.license_keys;
+CREATE POLICY "lk_super_admin" ON public.license_keys FOR ALL
+  USING (EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND is_super_admin = true));
+
+-- User can see their own activated key
+DROP POLICY IF EXISTS "lk_owner_select" ON public.license_keys;
+CREATE POLICY "lk_owner_select" ON public.license_keys FOR SELECT
+  USING (user_id = auth.uid());
+
+-- Org members can read the owner's key to validate org access
+DROP POLICY IF EXISTS "lk_org_owner_select" ON public.license_keys;
+CREATE POLICY "lk_org_owner_select" ON public.license_keys FOR SELECT
+  USING (
+    user_id IS NOT NULL AND
+    EXISTS (
+      SELECT 1 FROM public.organization_members om
+      JOIN public.organizations o ON o.id = om.org_id
+      WHERE om.user_id = auth.uid()
+        AND o.owner_id = license_keys.user_id
+    )
+  );
+
+-- Any authenticated user can activate an unclaimed key
+DROP POLICY IF EXISTS "lk_activate" ON public.license_keys;
+CREATE POLICY "lk_activate" ON public.license_keys FOR UPDATE
+  USING (user_id IS NULL AND is_active = true)
+  WITH CHECK (user_id = auth.uid());
+
+
+-- ╔══════════════════════════════════════════════════════════════╗
+-- ║  13. Reload PostgREST schema cache                           ║
 -- ╚══════════════════════════════════════════════════════════════╝
 
 NOTIFY pgrst, 'reload schema';
