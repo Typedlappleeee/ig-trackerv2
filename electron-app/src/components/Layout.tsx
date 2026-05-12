@@ -8,6 +8,7 @@ import { playNav }   from '@/lib/sounds'
 import { getRecentAccounts, switchToAccount, forgetAccount, type RecentAccount } from '@/lib/recentAccounts'
 import { subscribePosting, getPostingState } from '@/lib/postingStore'
 import { subscribeMassPosting, getMassPostingState } from '@/lib/massPostingStore'
+import { useLicense } from '@/lib/license'
 
 function SFLogo({ size = 28 }: { size?: number }) {
   return (
@@ -53,7 +54,7 @@ export type Page =
   | 'dashboard' | 'phones'
   | 'stats' | 'posting' | 'massposting' | 'bank' | 'autocomment' | 'aitools' | 'warmup'
   | 'montage' | 'remix'
-  | 'settings'
+  | 'settings' | 'licences'
 
 interface LayoutProps {
   user:      User
@@ -129,6 +130,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
   const [recentAccounts, setRecentAccounts] = useState<RecentAccount[]>([])
   const [switchErr, setSwitchErr]           = useState<string | null>(null)
   const { myOrgs, currentOrg, role, perms, switchOrg, loading: orgLoading } = useOrg()
+  const license = useLicense()
 
   const [activeTask, setActiveTask] = useState<{ kind: 'single' | 'mass'; progress: number; done: number; total: number } | null>(null)
   useEffect(() => {
@@ -206,7 +208,11 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
   }
 
   // In solo mode, all tabs visible. In org mode, gate by role + overrides.
-  const isVisibleTab = (id: Page): boolean => role ? canSeeTab(role, perms, id) : true
+  // 'licences' is super-admin only — never in PageKey, always visible when shown.
+  const isVisibleTab = (id: Page): boolean => {
+    if (id === 'licences') return license.isSuperAdmin
+    return role ? canSeeTab(role, perms, id as import('@/lib/supabase').PageKey) : true
+  }
 
   // tick every 10s for "last refresh" relative timer
   useEffect(() => {
@@ -380,6 +386,17 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             <span className="text-base">⚙</span>
             <span>Paramètres</span>
           </button>
+          {license.isSuperAdmin && (
+            <button
+              onClick={() => { playNav(); onNavigate('licences') }}
+              className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[12px] transition-colors ${
+                page === 'licences' ? 'sf-nav-active' : 'text-sb-text hover:bg-sb-hover hover:text-sb-text-act'
+              }`}
+            >
+              <span className="text-base">🛡</span>
+              <span>Admin</span>
+            </button>
+          )}
         </div>
 
         {/* Org switcher */}
@@ -397,6 +414,29 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             <span className="text-text2 text-[10px]">▾</span>
           </button>
         </div>
+
+        {/* License badge */}
+        {license.source === 'own' && (
+          <div className="px-3 pb-1">
+            <div className="flex items-center justify-between px-3 py-1.5 rounded-lg" style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.15)' }}>
+              <span className="text-[10px] text-[#7c5cbf]">Licence</span>
+              <span className={`text-[10px] font-semibold ${
+                license.daysLeft === null ? 'text-purple-400' :
+                license.daysLeft <= 7    ? 'text-orange-400' :
+                'text-green-400'
+              }`}>
+                {license.daysLeft === null ? '∞ à vie' : `${license.daysLeft}j restants`}
+              </span>
+            </div>
+          </div>
+        )}
+        {license.source === 'org_owner' && (
+          <div className="px-3 pb-1">
+            <div className="flex items-center justify-center px-3 py-1.5 rounded-lg" style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.15)' }}>
+              <span className="text-[10px] text-blue-400">Via organisation 🏢</span>
+            </div>
+          </div>
+        )}
 
         {/* User strip — click to open the account switcher */}
         <button
