@@ -52,8 +52,8 @@ export function LicenseGate({ userId, onActivated }: Props) {
       setOrgErr(msg)
     } else {
       setOrgSuccess(true)
-      // Re-check license — org owner may unlock access
-      setTimeout(() => onActivated(), 1500)
+      // Reload the page so the org context refreshes properly before license re-check
+      setTimeout(() => window.location.reload(), 1500)
     }
   }
 
@@ -145,7 +145,7 @@ export function LicenseGate({ userId, onActivated }: Props) {
                 {orgSuccess ? (
                   <div className="text-center py-4">
                     <p className="text-green-400 font-semibold text-sm">✓ Organisation rejointe !</p>
-                    <p className="text-xs text-[#6b5fa0] mt-1">Connexion en cours…</p>
+                    <p className="text-xs text-[#6b5fa0] mt-1">Chargement en cours…</p>
                   </div>
                 ) : (
                   <form onSubmit={handleOrgJoin} className="space-y-3">
