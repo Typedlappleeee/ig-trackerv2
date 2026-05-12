@@ -1,10 +1,10 @@
 -- ================================================================
--- IG Tracker v2 — Schéma complet (v1 → v6 consolidé)
+-- IG Tracker v2 — Schéma complet (v1 → v7 consolidé)
 -- ================================================================
 -- 1 SEULE query à lancer dans Supabase → SQL Editor → New Query → Run.
 -- Idempotent : safe à relancer plusieurs fois sans rien casser.
 -- Remplace schema.sql, schema_v2.sql, schema_v3.sql, schema_v4.sql,
---          schema_v5.sql et schema_v6.sql.
+--          schema_v5.sql, schema_v6.sql et schema_v7.sql.
 -- ================================================================
 
 
@@ -90,7 +90,6 @@ ALTER TABLE public.content_bank ADD COLUMN IF NOT EXISTS storage_path   text;
 ALTER TABLE public.content_bank ADD COLUMN IF NOT EXISTS thumbnail_path text;
 
 -- file_url devient optionnel (peut être NULL pour les vidéos cloud-only).
--- Certaines anciennes installs avaient NOT NULL — on relâche la contrainte ici.
 ALTER TABLE public.content_bank ALTER COLUMN file_url DROP NOT NULL;
 
 CREATE TABLE IF NOT EXISTS public.app_config (
@@ -101,19 +100,20 @@ CREATE TABLE IF NOT EXISTS public.app_config (
   updated_at    timestamptz DEFAULT now()
 );
 
--- Colonnes additionnelles utilisées par Settings (v3 + ajouts)
-ALTER TABLE public.app_config ADD COLUMN IF NOT EXISTS groq_api_key  text DEFAULT '';
-ALTER TABLE public.app_config ADD COLUMN IF NOT EXISTS profile_name  text DEFAULT '';
-ALTER TABLE public.app_config ADD COLUMN IF NOT EXISTS profile_niche text DEFAULT '';
-ALTER TABLE public.app_config ADD COLUMN IF NOT EXISTS profile_email text;
-ALTER TABLE public.app_config ADD COLUMN IF NOT EXISTS export_dir    text;
-ALTER TABLE public.app_config ADD COLUMN IF NOT EXISTS proxy         text;
-ALTER TABLE public.app_config ADD COLUMN IF NOT EXISTS ig_sessionid  text;
-ALTER TABLE public.app_config ADD COLUMN IF NOT EXISTS push_port     integer DEFAULT 8765;
-ALTER TABLE public.app_config ADD COLUMN IF NOT EXISTS notify_popup  boolean DEFAULT true;
-ALTER TABLE public.app_config ADD COLUMN IF NOT EXISTS notify_sound  boolean DEFAULT true;
--- Marqueur "onboarding terminé" — peut être set sans bearer (skip).
-ALTER TABLE public.app_config ADD COLUMN IF NOT EXISTS onboarded_at  timestamptz;
+-- Colonnes additionnelles utilisées par Settings
+ALTER TABLE public.app_config ADD COLUMN IF NOT EXISTS groq_api_key      text DEFAULT '';
+ALTER TABLE public.app_config ADD COLUMN IF NOT EXISTS anthropic_api_key text DEFAULT '';
+ALTER TABLE public.app_config ADD COLUMN IF NOT EXISTS profile_name      text DEFAULT '';
+ALTER TABLE public.app_config ADD COLUMN IF NOT EXISTS profile_niche     text DEFAULT '';
+ALTER TABLE public.app_config ADD COLUMN IF NOT EXISTS profile_email     text;
+ALTER TABLE public.app_config ADD COLUMN IF NOT EXISTS export_dir        text;
+ALTER TABLE public.app_config ADD COLUMN IF NOT EXISTS proxy             text;
+ALTER TABLE public.app_config ADD COLUMN IF NOT EXISTS ig_sessionid      text;
+ALTER TABLE public.app_config ADD COLUMN IF NOT EXISTS push_port         integer DEFAULT 8765;
+ALTER TABLE public.app_config ADD COLUMN IF NOT EXISTS notify_popup      boolean DEFAULT true;
+ALTER TABLE public.app_config ADD COLUMN IF NOT EXISTS notify_sound      boolean DEFAULT true;
+-- Marqueur "onboarding terminé"
+ALTER TABLE public.app_config ADD COLUMN IF NOT EXISTS onboarded_at      timestamptz;
 
 
 -- ╔══════════════════════════════════════════════════════════════╗
@@ -151,7 +151,7 @@ CREATE TABLE IF NOT EXISTS public.organization_members (
   UNIQUE (org_id, user_id)
 );
 
--- Connexions partagées au niveau organisation (token GéeLark, Groq, proxy, sessionid IG).
+-- Connexions partagées au niveau organisation (token GéeLark, Groq, Anthropic, proxy, sessionid IG).
 -- Quand l'utilisateur travaille dans une orga, l'app lit ces valeurs au lieu de app_config.
 CREATE TABLE IF NOT EXISTS public.org_config (
   org_id        uuid PRIMARY KEY REFERENCES public.organizations(id) ON DELETE CASCADE,
@@ -161,6 +161,9 @@ CREATE TABLE IF NOT EXISTS public.org_config (
   proxy         text,
   updated_at    timestamptz NOT NULL DEFAULT now()
 );
+
+-- Clé Anthropic au niveau orga (partagée entre tous les membres)
+ALTER TABLE public.org_config ADD COLUMN IF NOT EXISTS anthropic_api_key text DEFAULT '';
 
 CREATE TABLE IF NOT EXISTS public.organization_invites (
   id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -181,7 +184,22 @@ ALTER TABLE public.content_bank ADD COLUMN IF NOT EXISTS org_id uuid REFERENCES 
 
 
 -- ╔══════════════════════════════════════════════════════════════╗
--- ║  5. INDEX                                                    ║
+-- ║  5. ACTIVITY LOGS (admin-only, org-scoped)                   ║
+-- ╚══════════════════════════════════════════════════════════════╝
+
+CREATE TABLE IF NOT EXISTS public.activity_logs (
+  id         uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  org_id     uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
+  user_id    uuid NOT NULL,
+  user_email text,
+  action     text NOT NULL,
+  details    jsonb DEFAULT '{}',
+  created_at timestamptz DEFAULT now()
+);
+
+
+-- ╔══════════════════════════════════════════════════════════════╗
+-- ║  6. INDEX                                                    ║
 -- ╚══════════════════════════════════════════════════════════════╝
 
 CREATE INDEX IF NOT EXISTS idx_user_items_user_id     ON public.user_items(user_id);
@@ -212,10 +230,11 @@ CREATE INDEX IF NOT EXISTS idx_org_members_user       ON public.organization_mem
 CREATE INDEX IF NOT EXISTS idx_org_members_org        ON public.organization_members(org_id);
 CREATE INDEX IF NOT EXISTS idx_org_invites_token      ON public.organization_invites(token);
 CREATE INDEX IF NOT EXISTS idx_org_invites_email      ON public.organization_invites(email);
+CREATE INDEX IF NOT EXISTS idx_activity_logs_org      ON public.activity_logs(org_id, created_at DESC);
 
 
 -- ╔══════════════════════════════════════════════════════════════╗
--- ║  6. RLS — Activer sur toutes les tables                      ║
+-- ║  7. RLS — Activer sur toutes les tables                      ║
 -- ╚══════════════════════════════════════════════════════════════╝
 
 ALTER TABLE public.profiles              ENABLE ROW LEVEL SECURITY;
@@ -228,10 +247,11 @@ ALTER TABLE public.organizations         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.organization_members  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.organization_invites  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.org_config            ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.activity_logs         ENABLE ROW LEVEL SECURITY;
 
 
 -- ╔══════════════════════════════════════════════════════════════╗
--- ║  7. HELPERS pour les RLS d'organisation                      ║
+-- ║  8. HELPERS pour les RLS d'organisation                      ║
 -- ╚══════════════════════════════════════════════════════════════╝
 
 CREATE OR REPLACE FUNCTION public.is_org_member(p_org uuid)
@@ -264,15 +284,14 @@ $$;
 
 
 -- ╔══════════════════════════════════════════════════════════════╗
--- ║  8. POLICIES                                                 ║
+-- ║  9. POLICIES                                                 ║
 -- ╚══════════════════════════════════════════════════════════════╝
 
 -- profiles
 DROP POLICY IF EXISTS "profiles_select" ON public.profiles;
 DROP POLICY IF EXISTS "profiles_insert" ON public.profiles;
 DROP POLICY IF EXISTS "profiles_update" ON public.profiles;
--- A user can see their own profile, AND the profiles of users sharing at least
--- one organisation with them (so org admins/members can render names + emails).
+-- Un user voit son propre profil + les profils des membres de ses orgas.
 CREATE POLICY "profiles_select" ON public.profiles FOR SELECT USING (
   auth.uid() = id OR public.shares_org_with(id)
 );
@@ -385,9 +404,19 @@ CREATE POLICY "oi_update" ON public.organization_invites FOR UPDATE USING (
 );
 CREATE POLICY "oi_delete" ON public.organization_invites FOR DELETE USING (public.is_org_admin(org_id));
 
+-- activity_logs
+-- Tous les membres peuvent insérer (logguer leurs actions)
+-- Seuls les admins/owner peuvent lire
+DROP POLICY IF EXISTS "al_select" ON public.activity_logs;
+DROP POLICY IF EXISTS "al_insert" ON public.activity_logs;
+CREATE POLICY "al_select" ON public.activity_logs FOR SELECT USING (public.is_org_admin(org_id));
+CREATE POLICY "al_insert" ON public.activity_logs FOR INSERT WITH CHECK (
+  user_id = auth.uid() AND public.is_org_member(org_id)
+);
+
 
 -- ╔══════════════════════════════════════════════════════════════╗
--- ║  9. RPCs + TRIGGERS                                          ║
+-- ║  10. RPCs + TRIGGERS                                         ║
 -- ╚══════════════════════════════════════════════════════════════╝
 
 -- Crée le profil automatiquement à l'inscription
@@ -465,7 +494,7 @@ CREATE TRIGGER trg_add_owner_member
 
 
 -- ╔══════════════════════════════════════════════════════════════╗
--- ║  10. STORAGE — bucket "content" (vidéos + thumbnails)        ║
+-- ║  11. STORAGE — bucket "content" (vidéos + thumbnails)        ║
 -- ╚══════════════════════════════════════════════════════════════╝
 -- Arborescence :
 --   videos/users/{user_id}/{uuid}.{ext}    ← solo mode
@@ -520,7 +549,7 @@ CREATE POLICY "content_delete" ON storage.objects FOR DELETE USING (
 
 
 -- ╔══════════════════════════════════════════════════════════════╗
--- ║  11. Reload PostgREST schema cache                           ║
+-- ║  12. Reload PostgREST schema cache                           ║
 -- ╚══════════════════════════════════════════════════════════════╝
 
 NOTIFY pgrst, 'reload schema';
