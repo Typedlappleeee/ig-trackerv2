@@ -9,6 +9,7 @@ import { useOrg } from './orgContext'
 export interface ActiveConnections {
   bearer:       string
   groq:         string
+  anthropic:    string
   proxy:        string
   ig_sessionid: string
   source:       'user' | 'org'
@@ -16,7 +17,7 @@ export interface ActiveConnections {
 }
 
 const EMPTY: ActiveConnections = {
-  bearer: '', groq: '', proxy: '', ig_sessionid: '',
+  bearer: '', groq: '', anthropic: '', proxy: '', ig_sessionid: '',
   source: 'user', loading: true,
 }
 
@@ -46,13 +47,14 @@ export function useConnections(user: User): ActiveConnections {
     setConns(c => ({ ...c, loading: true }))
 
     if (currentOrg) {
-      supabase.from('org_config').select('bearer_token, groq_api_key, proxy, ig_sessionid')
+      supabase.from('org_config').select('bearer_token, groq_api_key, anthropic_api_key, proxy, ig_sessionid')
         .eq('org_id', currentOrg.id).maybeSingle()
         .then(({ data }) => {
           if (cancelled) return
           setConns({
             bearer:       data?.bearer_token ?? '',
             groq:         data?.groq_api_key ?? '',
+            anthropic:    data?.anthropic_api_key ?? '',
             proxy:        data?.proxy ?? '',
             ig_sessionid: data?.ig_sessionid ?? '',
             source:       'org',
@@ -60,13 +62,14 @@ export function useConnections(user: User): ActiveConnections {
           })
         })
     } else {
-      supabase.from('app_config').select('bearer_token, groq_api_key, proxy, ig_sessionid')
+      supabase.from('app_config').select('bearer_token, groq_api_key, anthropic_api_key, proxy, ig_sessionid')
         .eq('user_id', user.id).maybeSingle()
         .then(({ data }) => {
           if (cancelled) return
           setConns({
             bearer:       data?.bearer_token ?? '',
             groq:         data?.groq_api_key ?? '',
+            anthropic:    data?.anthropic_api_key ?? '',
             proxy:        data?.proxy ?? '',
             ig_sessionid: data?.ig_sessionid ?? '',
             source:       'user',

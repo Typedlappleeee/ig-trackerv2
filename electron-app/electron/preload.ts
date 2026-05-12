@@ -116,4 +116,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
       bold?: boolean; shadow?: boolean
     }>
   }) => ipcRenderer.invoke('run-ffmpeg-remix-ai', opts),
+
+  // Read video metadata (title, encoder, creation_time, etc.)
+  readVideoMetadata: (opts: { filePath: string }) =>
+    ipcRenderer.invoke('read-video-metadata', opts),
+
+  // Rewrite video metadata (strip all, optionally set new values)
+  runFfmpegMetadata: (opts: { inputPath: string; outputPath: string; metadata: Record<string, string> }) =>
+    ipcRenderer.invoke('run-ffmpeg-metadata', opts),
 })

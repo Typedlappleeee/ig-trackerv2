@@ -9,7 +9,7 @@ interface OnboardingProps {
   onComplete: () => void
 }
 
-type Step = 1 | 2 | 3
+type Step = 1 | 2 | 3 | 4
 type TestState = 'idle' | 'testing' | 'ok' | 'fail'
 
 function openExternal(url: string) {
@@ -53,15 +53,16 @@ function SFLogoMark() {
 }
 
 export function Onboarding({ user, onComplete }: OnboardingProps) {
-  const [step, setStep]         = useState<Step>(1)
-  const [bearer, setBearer]     = useState('')
-  const [groqKey, setGroqKey]   = useState('')
-  const [bearerState, setBState]= useState<TestState>('idle')
-  const [bearerMsg, setBMsg]    = useState('')
-  const [groqState, setGState]  = useState<TestState>('idle')
-  const [groqMsg, setGMsg]      = useState('')
-  const [saving, setSaving]     = useState(false)
-  const [saveErr, setSaveErr]   = useState<string | null>(null)
+  const [step, setStep]              = useState<Step>(1)
+  const [bearer, setBearer]          = useState('')
+  const [groqKey, setGroqKey]        = useState('')
+  const [anthropicKey, setAnthropicKey] = useState('')
+  const [bearerState, setBState]     = useState<TestState>('idle')
+  const [bearerMsg, setBMsg]         = useState('')
+  const [groqState, setGState]       = useState<TestState>('idle')
+  const [groqMsg, setGMsg]           = useState('')
+  const [saving, setSaving]          = useState(false)
+  const [saveErr, setSaveErr]        = useState<string | null>(null)
 
   async function testBearer() {
     if (!bearer.trim()) return
@@ -118,12 +119,13 @@ export function Onboarding({ user, onComplete }: OnboardingProps) {
     setSaving(true); setSaveErr(null)
     const now = new Date().toISOString()
     const { error } = await supabase.from('app_config').upsert({
-      user_id:      user.id,
-      bearer_token: bearer.trim(),
-      groq_api_key: groqKey.trim(),
-      theme:        'Bleu',
-      onboarded_at: now,
-      updated_at:   now,
+      user_id:           user.id,
+      bearer_token:      bearer.trim(),
+      groq_api_key:      groqKey.trim(),
+      anthropic_api_key: anthropicKey.trim(),
+      theme:             'Bleu',
+      onboarded_at:      now,
+      updated_at:        now,
     }, { onConflict: 'user_id' })
     setSaving(false)
     if (error) {
@@ -167,7 +169,7 @@ export function Onboarding({ user, onComplete }: OnboardingProps) {
     return null
   }
 
-  const stepLabels = ['GéeLark', 'Groq IA', 'Terminé']
+  const stepLabels = ['GéeLark', 'Groq IA', 'Anthropic', 'Terminé']
 
   const sfAccent = { color: '#a78bfa' }
   const sfUnderline = { color: '#c4b5fd', textDecoration: 'underline', textUnderlineOffset: '2px' }
@@ -340,8 +342,46 @@ export function Onboarding({ user, onComplete }: OnboardingProps) {
           </div>
         )}
 
-        {/* ── STEP 3: Done ────────────────────────────────────────────────── */}
+        {/* ── STEP 3: Anthropic ───────────────────────────────────────────── */}
         {step === 3 && (
+          <div className="glass-card rounded-2xl p-6 space-y-5">
+            <div>
+              <h2 className="text-lg font-bold text-text flex items-center gap-2">
+                <span className="text-2xl">🔀</span> Clé API Anthropic <span className="text-xs text-text2 font-normal ml-1">(optionnel)</span>
+              </h2>
+              <p className="text-sm text-text2 mt-1">
+                Pour le <strong className="text-text">Remix Vidéo</strong> — Claude Vision détecte les textes de ta vidéo originale et les recopie sur la nouvelle vidéo.
+              </p>
+            </div>
+
+            <div className="rounded-xl p-4 space-y-2 text-sm" style={{ background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.1)' }}>
+              <p className="font-semibold text-xs uppercase tracking-wider" style={{ color: 'rgba(196,181,253,0.5)' }}>Comment obtenir ta clé :</p>
+              <div className="space-y-1.5 text-xs" style={{ color: 'rgba(196,181,253,0.6)' }}>
+                <div className="flex gap-2"><span style={sfAccent} className="font-bold">1.</span><span>Créé un compte sur <button onClick={() => openExternal('https://console.anthropic.com')} style={sfUnderline}>console.anthropic.com</button></span></div>
+                <div className="flex gap-2"><span style={sfAccent} className="font-bold">2.</span><span>Menu gauche → <strong className="text-text">API Keys</strong> → <strong className="text-text">Create Key</strong></span></div>
+                <div className="flex gap-2"><span style={sfAccent} className="font-bold">3.</span><span>Copie la clé qui commence par <code className="bg-surface px-1 rounded">sk-ant-</code></span></div>
+              </div>
+            </div>
+
+            <Input
+              label="Anthropic API Key"
+              type="password"
+              placeholder="sk-ant-…"
+              value={anthropicKey}
+              onChange={e => setAnthropicKey(e.target.value)}
+            />
+
+            <div className="flex gap-3">
+              <Button variant="secondary" onClick={() => setStep(2)}>← Retour</Button>
+              <Button className="flex-1" onClick={() => setStep(4)}>
+                {anthropicKey.trim() ? 'Suivant →' : 'Passer cette étape →'}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* ── STEP 4: Done ────────────────────────────────────────────────── */}
+        {step === 4 && (
           <div className="glass-card rounded-2xl p-6 space-y-5 text-center">
             <div className="space-y-2">
               <div className="text-5xl">🎉</div>
@@ -379,9 +419,12 @@ export function Onboarding({ user, onComplete }: OnboardingProps) {
                 ✗ {saveErr}
               </p>
             )}
-            <Button className="w-full" onClick={finish} loading={saving}>
-              Entrer dans ScaleFlow →
-            </Button>
+            <div className="flex gap-3">
+              <Button variant="secondary" onClick={() => setStep(3)}>← Retour</Button>
+              <Button className="flex-1" onClick={finish} loading={saving}>
+                Entrer dans ScaleFlow →
+              </Button>
+            </div>
           </div>
         )}
       </div>

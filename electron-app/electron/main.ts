@@ -945,6 +945,55 @@ ipcMain.handle('pick-output-folder', async () => {
   return result.canceled ? null : result.filePaths[0]
 })
 
+// ── IPC: read video metadata ─────────────────────────────────────────────────
+ipcMain.handle('read-video-metadata', async (_event, opts: { filePath: string }) => {
+  const ffmpegBin = getFfmpegBin()
+  return new Promise<{ ok: boolean; metadata?: Record<string, string>; duration?: number; error?: string }>(resolve => {
+    // Run ffmpeg -i to get metadata from stderr (ffmpeg exits with error code 1 when no output is specified)
+    execFile(ffmpegBin, ['-hide_banner', '-i', opts.filePath], { encoding: 'utf8' }, (_err, _stdout, stderr) => {
+      // stderr contains the metadata even on error exit
+      const combined = stderr || ''
+      const meta: Record<string, string> = {}
+      // Parse the Metadata block
+      const metaBlock = combined.match(/Metadata:\s*([\s\S]*?)(?=\n\s*(Duration|Stream|Input|$))/m)
+      if (metaBlock) {
+        for (const line of metaBlock[1].split('\n')) {
+          const m = line.match(/^\s+(\w[\w\s]*?)\s*:\s*(.+)$/)
+          if (m) meta[m[1].trim()] = m[2].trim()
+        }
+      }
+      // Parse duration
+      const durMatch = combined.match(/Duration:\s*(\d+):(\d+):([\d.]+)/)
+      const duration = durMatch
+        ? parseInt(durMatch[1]) * 3600 + parseInt(durMatch[2]) * 60 + parseFloat(durMatch[3])
+        : undefined
+      resolve({ ok: true, metadata: meta, duration })
+    })
+  })
+})
+
+// ── IPC: rewrite video metadata via FFmpeg ────────────────────────────────────
+ipcMain.handle('run-ffmpeg-metadata', async (_event, opts: {
+  inputPath:  string
+  outputPath: string
+  metadata:   Record<string, string>  // key/value pairs to set; empty value = remove
+}) => {
+  const ffmpegBin = getFfmpegBin()
+  const args: string[] = ['-hide_banner', '-i', opts.inputPath, '-map_metadata', '-1']
+  for (const [k, v] of Object.entries(opts.metadata)) {
+    if (v) { args.push('-metadata', `${k}=${v}`) }
+  }
+  // Copy all streams without re-encoding
+  args.push('-c', 'copy', '-movflags', '+faststart', '-y', opts.outputPath)
+  return new Promise<{ ok: boolean; outputPath?: string; command?: string; error?: string }>(resolve => {
+    const command = [ffmpegBin, ...args].join(' ')
+    execFile(ffmpegBin, args, { encoding: 'utf8' }, (err, _stdout, stderr) => {
+      if (err) resolve({ ok: false, command, error: stderr.split('\n').filter(Boolean).pop() ?? err.message })
+      else     resolve({ ok: true, outputPath: opts.outputPath, command })
+    })
+  })
+})
+
 // ── IPC: fetch image as base64 data URL ──────────────────────────────────────
 // Uses Node.js https.get directly — bypasses Electron's network service entirely,
 // avoiding the cross-origin Referer restriction that blocked CDN thumbnail loading.

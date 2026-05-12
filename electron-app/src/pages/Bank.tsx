@@ -206,14 +206,15 @@ export function Bank({ user }: BankProps) {
   const [sqlCopied, setSqlCopied]           = useState(false)
   // Type filter (Python: Tous/Vidéo/Photo/GIF/Audio)
   const [typeFilter, setTypeFilter] = useState<'all' | 'video' | 'photo' | 'gif' | 'audio'>('all')
-  // Empty folders (created by user but no videos yet) — kept in localStorage for persistence
+  // Empty folders — scoped per user so accounts don't bleed into each other
+  const folderKey = `bank-empty-folders-${user.id}`
   const [emptyFolders, setEmptyFolders] = useState<string[]>(() => {
-    try { return JSON.parse(localStorage.getItem('bank-empty-folders') ?? '[]') } catch { return [] }
+    try { return JSON.parse(localStorage.getItem(`bank-empty-folders-${user.id}`) ?? '[]') } catch { return [] }
   })
 
   function persistEmptyFolders(next: string[]) {
     setEmptyFolders(next)
-    localStorage.setItem('bank-empty-folders', JSON.stringify(next))
+    localStorage.setItem(folderKey, JSON.stringify(next))
   }
 
   // Context menu

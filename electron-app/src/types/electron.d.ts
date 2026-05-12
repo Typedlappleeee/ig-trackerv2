@@ -83,6 +83,10 @@ interface ElectronAPI {
     outputPath: string; preset: '9:16' | '1:1' | '16:9'
     textOverlays: AiTextOverlay[]
   }) => Promise<{ ok: boolean; outputPath?: string; error?: string; command?: string }>
+  readVideoMetadata: (opts: { filePath: string }) =>
+    Promise<{ ok: boolean; metadata?: Record<string, string>; duration?: number; error?: string }>
+  runFfmpegMetadata: (opts: { inputPath: string; outputPath: string; metadata: Record<string, string> }) =>
+    Promise<{ ok: boolean; outputPath?: string; command?: string; error?: string }>
 }
 
 declare global {

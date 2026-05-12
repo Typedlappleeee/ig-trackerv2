@@ -3,6 +3,7 @@ import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { useConnections } from '@/lib/connections'
 import { Button } from '@/components/ui/Button'
+import { MetadataChanger } from './MetadataChanger'
 
 interface AiToolsProps { user: User }
 
@@ -49,6 +50,7 @@ function ToolCard({ title, children }: { title: string; children: React.ReactNod
 const TONES = ['Engageant', 'Humoristique', 'Informatif', 'Mystérieux', 'Inspirant', 'Provocateur'] as const
 
 export function AiTools({ user }: AiToolsProps) {
+  const [activeTool, setActiveTool] = useState<'hub' | 'metadata' | 'groq'>('hub')
   const [groqKey, setGroqKey] = useState('')
   const [hasKey, setHasKey]   = useState(false)
   const [error, setError]     = useState<string | null>(null)
@@ -134,10 +136,89 @@ export function AiTools({ user }: AiToolsProps) {
     )
   }
 
+  // Route to sub-tools
+  if (activeTool === 'metadata') return <MetadataChanger user={user} onBack={() => setActiveTool('hub')} />
+  if (activeTool === 'groq') return (
+    <div className="flex flex-col h-full" style={{ background: '#06040f' }}>
+      <div className="flex-shrink-0 px-6 py-4 flex items-center gap-3"
+        style={{ borderBottom: '1px solid rgba(139,92,246,0.12)', background: 'rgba(8,5,20,0.6)' }}>
+        <button onClick={() => setActiveTool('hub')} className="text-xs px-3 py-1.5 rounded-lg"
+          style={{ background: 'rgba(139,92,246,0.1)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.2)' }}>
+          ← Retour
+        </button>
+        <p className="text-sm font-black text-white">Outils Groq IA</p>
+      </div>
+      <div className="flex-1 overflow-auto p-6 max-w-3xl">
+        {groqContent()}
+      </div>
+    </div>
+  )
+
+  // Hub
   return (
-    <div className="p-6 space-y-5 max-w-3xl">
+    <div className="flex flex-col h-full" style={{ background: '#06040f' }}>
+      {/* Header */}
+      <div className="flex-shrink-0 px-6 py-4" style={{ borderBottom: '1px solid rgba(139,92,246,0.12)', background: 'rgba(8,5,20,0.6)' }}>
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-xl flex items-center justify-center text-lg" style={{ background: 'linear-gradient(135deg,#7c3aed22,#ec489922)', border: '1px solid rgba(139,92,246,0.25)' }}>🔧</div>
+          <div>
+            <h1 className="text-sm font-black text-white">Outils IA</h1>
+            <p className="text-[10px]" style={{ color: 'rgba(196,181,253,0.4)' }}>Vidéo · Contenu · Automatisation</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-auto p-6">
+        <div className="grid grid-cols-2 gap-4 max-w-2xl">
+          {/* Tool 1 — Metadata Changer */}
+          <button onClick={() => setActiveTool('metadata')}
+            className="rounded-2xl p-5 text-left space-y-3 transition-all hover:scale-[1.02] group"
+            style={{ background: 'rgba(8,5,20,0.7)', border: '1px solid rgba(139,92,246,0.18)' }}>
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl"
+              style={{ background: 'linear-gradient(135deg,#7c3aed22,#ec489922)', border: '1px solid rgba(139,92,246,0.25)' }}>🏷</div>
+            <div>
+              <p className="text-sm font-black text-white group-hover:text-purple-300 transition-colors">Changeur de Métadonnées</p>
+              <p className="text-[11px] mt-1" style={{ color: 'rgba(196,181,253,0.5)' }}>
+                Supprime toutes les métadonnées d'une vidéo et injecte un timestamp aléatoire. Sans ré-encodage, instantané.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {['🎬 Vidéo', '⚡ Rapide', '🔒 Copie stream'].map(t => (
+                <span key={t} className="text-[9px] px-2 py-0.5 rounded-full font-bold"
+                  style={{ background: 'rgba(139,92,246,0.1)', color: 'rgba(196,181,253,0.6)' }}>{t}</span>
+              ))}
+            </div>
+          </button>
+
+          {/* Tool 2 — Groq AI content */}
+          <button onClick={() => setActiveTool('groq')}
+            className="rounded-2xl p-5 text-left space-y-3 transition-all hover:scale-[1.02] group"
+            style={{ background: 'rgba(8,5,20,0.7)', border: '1px solid rgba(139,92,246,0.18)' }}>
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl"
+              style={{ background: 'linear-gradient(135deg,#7c3aed22,#ec489922)', border: '1px solid rgba(139,92,246,0.25)' }}>✨</div>
+            <div>
+              <p className="text-sm font-black text-white group-hover:text-purple-300 transition-colors">Contenu IA (Groq)</p>
+              <p className="text-[11px] mt-1" style={{ color: 'rgba(196,181,253,0.5)' }}>
+                Génère stratégies, captions virales et plannings de contenu via Llama 3.3 70B.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {['📝 Captions', '📅 Planning', '🔍 Stratégie'].map(t => (
+                <span key={t} className="text-[9px] px-2 py-0.5 rounded-full font-bold"
+                  style={{ background: 'rgba(139,92,246,0.1)', color: 'rgba(196,181,253,0.6)' }}>{t}</span>
+              ))}
+            </div>
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+
+  // eslint-disable-next-line no-unreachable
+  function groqContent() { return (
+    <div className="space-y-5">
       <div>
-        <h1 className="text-xl font-bold text-text">🔧 Outils IA</h1>
+        <h1 className="text-xl font-bold text-text">✨ Outils Groq IA</h1>
         <p className="text-text2 text-xs mt-0.5">Génération de contenu via Groq Llama 3.3 70B</p>
       </div>
 
@@ -225,5 +306,5 @@ export function AiTools({ user }: AiToolsProps) {
         </div>
       </ToolCard>
     </div>
-  )
+  ) }
 }

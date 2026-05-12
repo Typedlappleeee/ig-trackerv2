@@ -8,6 +8,7 @@ import { supabase } from '@/lib/supabase'
 import { uploadVideoFromPath, type UploadScope } from '@/lib/storage'
 import { useOrg } from '@/lib/orgContext'
 import { MassRemix } from './MassRemix'
+import { useConnections } from '@/lib/connections'
 
 interface RemixProps { user: User }
 
@@ -162,6 +163,7 @@ function VideoCard({ label, filePath, accent = '#8b5cf6', badge, onDurationLoad 
 // ── Main ───────────────────────────────────────────────────────────────────────
 export function Remix({ user }: RemixProps) {
   const { currentOrg } = useOrg()
+  const conns = useConnections(user)
   const [mode, setMode] = useState<'solo' | 'masse'>('solo')
   const [step, setStep] = useState<Step>(1)
 
@@ -181,7 +183,8 @@ export function Remix({ user }: RemixProps) {
   const [preset,        setPreset]        = useState<Preset>('9:16')
 
   // AI text analysis
-  const [anthropicKey,     setAnthropicKey]     = useState(() => localStorage.getItem('sf_anthropic_key') ?? '')
+  // anthropic key: from DB (connections) with localStorage fallback
+  const anthropicKey = conns.anthropic || localStorage.getItem('sf_anthropic_key') || ''
   const [analyzing,        setAnalyzing]         = useState(false)
   const [analyzeStep,      setAnalyzeStep]       = useState<{ ok: boolean; text: string } | null>(null)
   const [detectedOverlays, setDetectedOverlays]  = useState<TextOverlayUI[]>([])
@@ -382,19 +385,20 @@ If no text overlays exist return [].`
             </div>
           )}
 
-          {/* Clé Anthropic */}
-          <div>
-            <label className="text-[10px] uppercase tracking-wider font-bold block mb-1.5" style={{ color: 'rgba(196,181,253,0.4)' }}>
-              Clé API Anthropic (pour détection IA)
-            </label>
-            <input
-              type="password" placeholder="sk-ant-…"
-              value={anthropicKey}
-              onChange={e => { setAnthropicKey(e.target.value); localStorage.setItem('sf_anthropic_key', e.target.value) }}
-              className="w-full rounded-lg px-3 py-2 text-xs font-mono outline-none"
-              style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.18)', color: '#c4b5fd' }}
-            />
-          </div>
+          {/* Clé Anthropic — info */}
+          {!anthropicKey && (
+            <div className="rounded-xl px-3 py-2.5 flex items-center gap-2 text-xs"
+              style={{ background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.2)', color: '#fbbf24' }}>
+              <span>⚠</span>
+              <span>Clé Anthropic manquante — configure-la dans <strong>Paramètres → Connexions</strong> pour activer la détection IA</span>
+            </div>
+          )}
+          {anthropicKey && (
+            <div className="rounded-xl px-3 py-2 text-[10px] flex items-center gap-2"
+              style={{ background: 'rgba(52,211,153,0.06)', border: '1px solid rgba(52,211,153,0.15)', color: '#34d399' }}>
+              ✓ Clé Anthropic configurée
+            </div>
+          )}
 
           {/* Détection coupure */}
           {originalPath && (
@@ -495,9 +499,9 @@ If no text overlays exist return [].`
                 {analyzing ? <><Spinner size="sm" /> Analyse…</> : <>✨ Analyser le texte de la Phase 1</>}
               </button>
 
-              {!anthropicKey.trim() && (
+              {!anthropicKey && (
                 <p className="text-[10px] text-center" style={{ color: 'rgba(251,191,36,0.7)' }}>
-                  ⚠ Entre ta clé Anthropic en Step 1
+                  ⚠ Configure ta clé Anthropic dans Paramètres → Connexions
                 </p>
               )}
 
@@ -720,29 +724,34 @@ If no text overlays exist return [].`
       )}
 
       <div className="flex flex-col h-full" style={{ background: '#06040f' }}>
+        {/* Mode tabs — prominent */}
+        <div className="flex-shrink-0 flex" style={{ borderBottom: '2px solid rgba(139,92,246,0.15)' }}>
+          {(['solo', 'masse'] as const).map(m => (
+            <button key={m} onClick={() => setMode(m)}
+              className="flex-1 py-3.5 flex items-center justify-center gap-2.5 text-sm font-black tracking-wide transition-all relative"
+              style={mode === m
+                ? { background: 'linear-gradient(180deg,rgba(124,58,237,0.18),rgba(124,58,237,0.06))', color: '#c4b5fd', borderBottom: '2px solid #8b5cf6', marginBottom: -2 }
+                : { background: 'transparent', color: 'rgba(196,181,253,0.3)' }
+              }>
+              <span className="text-base">{m === 'solo' ? '🎬' : '⚡'}</span>
+              <span>{m === 'solo' ? 'Solo' : 'Masse'}</span>
+              {m === 'masse' && <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full" style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff' }}>BATCH</span>}
+            </button>
+          ))}
+        </div>
+
         {/* Header */}
-        <div className="flex-shrink-0 px-6 py-4" style={{ borderBottom: '1px solid rgba(139,92,246,0.12)', background: 'rgba(8,5,20,0.6)' }}>
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center text-xl" style={{ background: 'linear-gradient(135deg,#7c3aed22,#ec489922)', border: '1px solid rgba(139,92,246,0.25)' }}>🔀</div>
-            <div className="flex-1">
-              <h1 className="text-lg font-black text-white tracking-tight">Remix Vidéo</h1>
-              <p className="text-[11px]" style={{ color: 'rgba(196,181,253,0.4)' }}>Remplace la Phase 1 · Son + texte de l'original · Phase 2 inchangée</p>
-            </div>
-            {/* Mode toggle */}
-            <div className="flex rounded-xl overflow-hidden" style={{ border: '1px solid rgba(139,92,246,0.2)' }}>
-              {(['solo', 'masse'] as const).map(m => (
-                <button key={m} onClick={() => setMode(m)}
-                  className="px-4 py-1.5 text-xs font-bold transition-all"
-                  style={mode === m
-                    ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff' }
-                    : { background: 'rgba(8,5,20,0.6)', color: 'rgba(196,181,253,0.5)' }
-                  }>
-                  {m === 'solo' ? '🎬 Solo' : '⚡ Masse'}
-                </button>
-              ))}
+        <div className="flex-shrink-0 px-6 py-3" style={{ borderBottom: '1px solid rgba(139,92,246,0.1)', background: 'rgba(8,5,20,0.5)' }}>
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center text-lg flex-shrink-0" style={{ background: 'linear-gradient(135deg,#7c3aed22,#ec489922)', border: '1px solid rgba(139,92,246,0.25)' }}>🔀</div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-black text-white">Remix Vidéo{mode === 'masse' ? ' — Mode Masse' : ''}</p>
+              <p className="text-[10px]" style={{ color: 'rgba(196,181,253,0.35)' }}>
+                {mode === 'solo' ? "Remplace la Phase 1 · Son + texte de l'original" : 'Génère plusieurs remixes en une seule fois'}
+              </p>
             </div>
           </div>
-          {mode === 'solo' && <div className="flex items-center gap-2">
+          {mode === 'solo' && <div className="flex items-center gap-2 mt-3">
             {STEPS.map((s, i) => (
               <div key={i} className="flex items-center gap-2">
                 <StepDot n={i + 1} current={step} label={s.label} />

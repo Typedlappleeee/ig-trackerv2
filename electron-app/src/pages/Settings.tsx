@@ -103,7 +103,8 @@ export function Settings({ user, initialPanel }: SettingsProps) {
   const [proxyResult, setProxyResult] = useState<{ ok: boolean; msg: string } | null>(null)
 
   // API keys
-  const [groqKey, setGroqKey] = useState('')
+  const [groqKey,      setGroqKey]      = useState('')
+  const [anthropicKey, setAnthropicKey] = useState('')
 
   useEffect(() => {
     if (!mountedRef.current) { mountedRef.current = true; return }
@@ -116,6 +117,7 @@ export function Settings({ user, initialPanel }: SettingsProps) {
         if (data) {
           setBearer(data.bearer_token ?? '')
           setGroqKey(data.groq_api_key ?? '')
+          setAnthropicKey((data as Record<string,unknown>).anthropic_api_key as string ?? '')
           setTheme(data.theme ?? 'Bleu')
           const d = data as Record<string, unknown>
           setProfileEmail((d.profile_email as string) ?? user.email ?? '')
@@ -137,10 +139,11 @@ export function Settings({ user, initialPanel }: SettingsProps) {
     supabase.from('org_config').select('*').eq('org_id', currentOrg.id).maybeSingle()
       .then(({ data }) => {
         if (!data) {
-          setBearer(''); setGroqKey(''); setProxy('')
+          setBearer(''); setGroqKey(''); setAnthropicKey(''); setProxy('')
         } else {
           setBearer(data.bearer_token ?? '')
           setGroqKey(data.groq_api_key ?? '')
+          setAnthropicKey((data as Record<string,unknown>).anthropic_api_key as string ?? '')
           setProxy(data.proxy ?? '')
         }
       })
@@ -182,8 +185,9 @@ export function Settings({ user, initialPanel }: SettingsProps) {
     // Org mode: don't touch app_config's connection fields — saveConnexions writes
     // to org_config instead.
     if (!currentOrg) {
-      payload.bearer_token = bearer.trim()
-      payload.groq_api_key = groqKey.trim()
+      payload.bearer_token     = bearer.trim()
+      payload.groq_api_key     = groqKey.trim()
+      payload.anthropic_api_key = anthropicKey.trim()
       if (proxy) payload.proxy = proxy.trim()
     }
 
@@ -220,22 +224,24 @@ export function Settings({ user, initialPanel }: SettingsProps) {
         setSaving(false); return
       }
       const { error: err } = await supabase.from('org_config').upsert({
-        org_id:       currentOrg.id,
-        bearer_token: bearer.trim(),
-        groq_api_key: groqKey.trim(),
-        proxy:        proxy.trim() || null,
-        updated_at:   new Date().toISOString(),
+        org_id:            currentOrg.id,
+        bearer_token:      bearer.trim(),
+        groq_api_key:      groqKey.trim(),
+        anthropic_api_key: anthropicKey.trim(),
+        proxy:             proxy.trim() || null,
+        updated_at:        new Date().toISOString(),
       }, { onConflict: 'org_id' })
       if (err) { setError('Erreur: ' + err.message); setSaving(false); return }
     } else {
       // Solo mode: explicitly write empty strings so deletions take effect
       // (we don't want a removed token to silently keep its old value).
       const payload: Record<string, unknown> = {
-        user_id:      user.id,
-        bearer_token: bearer.trim(),
-        groq_api_key: groqKey.trim(),
-        proxy:        proxy.trim() || null,
-        updated_at:   new Date().toISOString(),
+        user_id:           user.id,
+        bearer_token:      bearer.trim(),
+        groq_api_key:      groqKey.trim(),
+        anthropic_api_key: anthropicKey.trim(),
+        proxy:             proxy.trim() || null,
+        updated_at:        new Date().toISOString(),
       }
       const { error: err } = await supabase.from('app_config').upsert(payload, { onConflict: 'user_id' })
       if (err) { setError('Erreur: ' + err.message); setSaving(false); return }
@@ -601,6 +607,14 @@ export function Settings({ user, initialPanel }: SettingsProps) {
               hint="Gratuit sur groq.com → API Keys → Create"
               value={groqKey}
               onChange={e => setGroqKey(e.target.value)}
+            />
+            <Input
+              label="Anthropic API Key (Remix Vidéo — détection texte IA)"
+              type="password"
+              placeholder="sk-ant-…"
+              hint="console.anthropic.com → API Keys — utilisée pour Claude Vision dans Remix"
+              value={anthropicKey}
+              onChange={e => setAnthropicKey(e.target.value)}
             />
             <Button onClick={saveConnexions} loading={saving} disabled={!!currentOrg && !canEditOrgConnexions} className="w-full">💾 Sauvegarder les clés API</Button>
           </section>

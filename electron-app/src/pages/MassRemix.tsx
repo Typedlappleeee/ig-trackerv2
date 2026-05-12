@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { Button } from '@/components/ui/Button'
 import { Spinner } from '@/components/ui/Spinner'
@@ -7,6 +7,7 @@ import { playSuccess, playError } from '@/lib/sounds'
 import { supabase } from '@/lib/supabase'
 import { uploadVideoFromPath, type UploadScope } from '@/lib/storage'
 import { useOrg } from '@/lib/orgContext'
+import { useConnections } from '@/lib/connections'
 
 interface MassRemixProps { user: User }
 
@@ -89,21 +90,33 @@ function VideoListPanel({
 
 export function MassRemix({ user }: MassRemixProps) {
   const { currentOrg } = useOrg()
+  const conns = useConnections(user)
 
-  const [originals,   setOriginals]   = useState<string[]>([])
-  const [secondaries, setSecondaries] = useState<string[]>([])
-  const [preset,      setPreset]      = useState<Preset>('9:16')
-  const [aiEnabled,   setAiEnabled]   = useState(false)
-  const [anthropicKey, setAnthropicKey] = useState(() => localStorage.getItem('sf_anthropic_key') ?? '')
-  const [exportMode,  setExportMode]  = useState<ExportMode>('bank')
+  const [originals,    setOriginals]    = useState<string[]>([])
+  const [secondaries,  setSecondaries]  = useState<string[]>([])
+  const [preset,       setPreset]       = useState<Preset>('9:16')
+  const [aiEnabled,    setAiEnabled]    = useState(false)
+  const [exportMode,   setExportMode]   = useState<ExportMode>('bank')
   const [outputFolder, setOutputFolder] = useState<string | null>(null)
 
   const [showBankOrig, setShowBankOrig] = useState(false)
   const [showBankSec,  setShowBankSec]  = useState(false)
 
-  const [jobs,    setJobs]    = useState<MassJob[]>([])
-  const [running, setRunning] = useState(false)
+  // anthropic key from DB (connections), fallback to localStorage
+  const anthropicKey = conns.anthropic || localStorage.getItem('sf_anthropic_key') || ''
+
+  const [jobs,        setJobs]        = useState<MassJob[]>([])
+  const [running,     setRunning]     = useState(false)
+  const [currentIdx,  setCurrentIdx]  = useState(0)
+  const [currentStep, setCurrentStep] = useState<MassJob['status']>('pending')
   const abortRef = useRef(false)
+
+  // Keep currentStep in sync with the active job
+  useEffect(() => {
+    if (!running || jobs.length === 0) return
+    const active = jobs.find(j => j.status !== 'done' && j.status !== 'error' && j.status !== 'pending')
+    if (active) setCurrentStep(active.status)
+  }, [jobs, running])
 
   function updateJob(id: number, patch: Partial<MassJob>) {
     setJobs(prev => prev.map(j => j.id === id ? { ...j, ...patch } : j))
@@ -131,14 +144,18 @@ export function MassRemix({ user }: MassRemixProps) {
     }))
     setJobs(pairs)
     setRunning(true)
+    setCurrentIdx(0)
+    setCurrentStep('detecting')
     abortRef.current = false
 
     const scope: UploadScope = currentOrg ? { mode: 'org', id: currentOrg.id } : { mode: 'user', id: user.id }
 
     for (const job of pairs) {
       if (abortRef.current) break
+      setCurrentIdx(job.id)
 
       // 1. Detect split
+      setCurrentStep('detecting')
       updateJob(job.id, { status: 'detecting' })
       const det = await window.electronAPI!.detectSceneChange!({ filePath: job.originalPath })
       const splitTime = det.ok && det.splitTime != null
@@ -151,6 +168,7 @@ export function MassRemix({ user }: MassRemixProps) {
       let textOverlays: Overlay[] = []
 
       if (aiEnabled && anthropicKey.trim()) {
+        setCurrentStep('analyzing')
         updateJob(job.id, { status: 'analyzing' })
         try {
           const fr = await window.electronAPI!.extractFrames!({ filePath: job.originalPath, endTime: splitTime })
@@ -194,6 +212,7 @@ Return ONLY a JSON array. If none, return [].`
       }
 
       // 3. Generate
+      setCurrentStep('generating')
       updateJob(job.id, { status: 'generating' })
       const outName = `remix_${String(job.id + 1).padStart(3, '0')}.mp4`
       let outputPath: string
@@ -218,6 +237,7 @@ Return ONLY a JSON array. If none, return [].`
 
       // 4. Upload to bank if needed
       if (exportMode === 'bank') {
+        setCurrentStep('uploading')
         updateJob(job.id, { status: 'uploading' })
         try {
           const up = await uploadVideoFromPath(gen.outputPath ?? outputPath, scope)
@@ -242,9 +262,115 @@ Return ONLY a JSON array. If none, return [].`
   const doneCount  = jobs.filter(j => j.status === 'done').length
   const errorCount = jobs.filter(j => j.status === 'error').length
   const canLaunch  = originals.length > 0 && secondaries.length > 0 && !running
+  const progress   = jobs.length > 0 ? Math.round((doneCount + errorCount) / jobs.length * 100) : 0
+
+  const STEP_LABEL: Record<string, string> = {
+    detecting:  '🔍 Détection scène…',
+    analyzing:  '✨ Analyse texte IA…',
+    generating: '⚙ Génération FFmpeg…',
+    uploading:  '☁ Upload banque…',
+  }
 
   return (
     <>
+      {/* ── Progress modal ── */}
+      {running && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-6" style={{ background: 'rgba(3,1,8,0.92)', backdropFilter: 'blur(8px)' }}>
+          <div className="w-full max-w-md rounded-2xl overflow-hidden" style={{ background: 'rgba(12,8,28,0.98)', border: '1px solid rgba(139,92,246,0.3)', boxShadow: '0 0 60px rgba(124,58,237,0.25)' }}>
+            {/* Header */}
+            <div className="px-6 py-4" style={{ borderBottom: '1px solid rgba(139,92,246,0.15)', background: 'linear-gradient(135deg,rgba(124,58,237,0.12),rgba(236,72,153,0.06))' }}>
+              <div className="flex items-center gap-3">
+                <div className="relative w-10 h-10 flex-shrink-0">
+                  <div className="absolute inset-0 rounded-full animate-ping opacity-30" style={{ background: 'linear-gradient(135deg,#7c3aed,#ec4899)' }} />
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.3)' }}>
+                    <Spinner size="sm" />
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm font-black text-white">Génération en cours…</p>
+                  <p className="text-[11px]" style={{ color: 'rgba(196,181,253,0.5)' }}>
+                    Vidéo {currentIdx + 1} / {jobs.length} — {STEP_LABEL[currentStep] ?? currentStep}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Progress bar */}
+            <div className="px-6 py-4 space-y-3">
+              <div className="flex items-center justify-between text-xs mb-1">
+                <span style={{ color: 'rgba(196,181,253,0.5)' }}>{doneCount} terminée(s)</span>
+                <span className="font-bold" style={{ color: '#a78bfa' }}>{progress}%</span>
+                <span style={{ color: 'rgba(196,181,253,0.5)' }}>{jobs.length} total</span>
+              </div>
+              <div className="h-2.5 rounded-full overflow-hidden" style={{ background: 'rgba(139,92,246,0.12)' }}>
+                <div className="h-full rounded-full transition-all duration-500"
+                  style={{ width: `${progress}%`, background: 'linear-gradient(90deg,#7c3aed,#ec4899)' }} />
+              </div>
+
+              {/* Current file */}
+              <div className="rounded-xl px-4 py-3 space-y-1" style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.15)' }}>
+                <p className="text-[10px] uppercase tracking-wider font-bold" style={{ color: '#a78bfa' }}>En cours</p>
+                <p className="text-xs font-mono text-white/80 truncate">{fileName(jobs[currentIdx]?.originalPath ?? '')}</p>
+                <p className="text-[10px]" style={{ color: 'rgba(196,181,253,0.4)' }}>→ {fileName(jobs[currentIdx]?.secondaryPath ?? '')}</p>
+              </div>
+
+              {/* Job list (last 5) */}
+              <div className="space-y-1 max-h-40 overflow-auto">
+                {jobs.map(job => (
+                  <div key={job.id} className="flex items-center gap-2 px-3 py-1.5 rounded-lg"
+                    style={{ background: job.status === 'done' ? 'rgba(52,211,153,0.06)' : job.status === 'error' ? 'rgba(239,68,68,0.06)' : 'transparent' }}>
+                    <span className="w-5 text-[10px] font-bold flex-shrink-0 text-center"
+                      style={{ color: 'rgba(196,181,253,0.35)' }}>#{job.id + 1}</span>
+                    <span className="flex-1 text-[10px] font-mono truncate" style={{ color: 'rgba(196,181,253,0.6)' }}>{fileName(job.originalPath)}</span>
+                    <span className="text-[10px] font-semibold flex-shrink-0"
+                      style={{ color: job.status === 'done' ? '#34d399' : job.status === 'error' ? '#f87171' : '#a78bfa' }}>
+                      {STATUS_LABEL[job.status]}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              <button onClick={() => { abortRef.current = true }}
+                className="w-full py-2 rounded-xl text-xs font-semibold"
+                style={{ background: 'rgba(239,68,68,0.08)', color: '#f87171', border: '1px solid rgba(239,68,68,0.2)' }}>
+                ✕ Annuler la génération
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Done summary modal ── */}
+      {!running && jobs.length > 0 && (doneCount + errorCount) === jobs.length && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-6" style={{ background: 'rgba(3,1,8,0.88)', backdropFilter: 'blur(6px)' }}>
+          <div className="w-full max-w-md rounded-2xl overflow-hidden" style={{ background: 'rgba(12,8,28,0.98)', border: `1px solid ${errorCount === 0 ? 'rgba(52,211,153,0.3)' : 'rgba(251,191,36,0.3)'}` }}>
+            <div className="px-6 py-5 space-y-4">
+              <div className="text-center space-y-2">
+                <div className="text-4xl">{errorCount === 0 ? '✅' : '⚠️'}</div>
+                <p className="text-lg font-black text-white">
+                  {errorCount === 0 ? 'Tous les remixes générés !' : `${doneCount} / ${jobs.length} terminés`}
+                </p>
+                {errorCount > 0 && <p className="text-sm" style={{ color: '#fbbf24' }}>{errorCount} erreur(s)</p>}
+              </div>
+              {/* Results list */}
+              <div className="space-y-1 max-h-52 overflow-auto">
+                {jobs.map(job => (
+                  <div key={job.id} className="flex items-center gap-2 px-3 py-2 rounded-lg"
+                    style={{ background: job.status === 'done' ? 'rgba(52,211,153,0.06)' : 'rgba(239,68,68,0.06)', border: `1px solid ${job.status === 'done' ? 'rgba(52,211,153,0.15)' : 'rgba(239,68,68,0.15)'}` }}>
+                    <span className="text-sm">{job.status === 'done' ? '✅' : '❌'}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[11px] font-mono truncate text-white/70">{fileName(job.originalPath)}</p>
+                      {job.error && <p className="text-[9px]" style={{ color: '#f87171' }}>{job.error}</p>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <Button onClick={() => setJobs([])} className="w-full">Fermer</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showBankOrig && (
         <BankPicker user={user} mode="multi"
           onSelect={paths => { setShowBankOrig(false); setOriginals(prev => [...prev, ...paths]) }}
@@ -355,14 +481,10 @@ Return ONLY a JSON array. If none, return [].`
               <p className="text-[10px] mt-0.5" style={{ color: 'rgba(196,181,253,0.4)' }}>
                 Analyse chaque vidéo originale et recopie le texte. Plus lent mais plus précis.
               </p>
-              {aiEnabled && (
-                <input
-                  type="password" placeholder="sk-ant-…"
-                  value={anthropicKey}
-                  onChange={e => { setAnthropicKey(e.target.value); localStorage.setItem('sf_anthropic_key', e.target.value) }}
-                  className="mt-2 w-full rounded-lg px-3 py-1.5 text-xs font-mono outline-none"
-                  style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.18)', color: '#c4b5fd' }}
-                />
+              {aiEnabled && !anthropicKey && (
+                <p className="mt-1.5 text-[10px]" style={{ color: '#fbbf24' }}>
+                  ⚠ Configure ta clé Anthropic dans Paramètres → Connexions
+                </p>
               )}
             </div>
           </div>
@@ -370,64 +492,15 @@ Return ONLY a JSON array. If none, return [].`
 
         {/* Launch */}
         <div className="flex items-center gap-4">
-          <Button
-            onClick={launch}
-            disabled={!canLaunch}
-            size="lg"
-          >
-            {running ? <><Spinner size="sm" /> Génération…</> : `⚡ Lancer ${originals.length || ''} remix`}
+          <Button onClick={launch} disabled={!canLaunch} size="lg">
+            ⚡ Lancer {originals.length > 0 ? `${originals.length} remix` : 'la génération'}
           </Button>
-          {running && (
-            <button onClick={() => { abortRef.current = true }}
-              className="text-xs px-3 py-2 rounded-lg"
-              style={{ background: 'rgba(239,68,68,0.1)', color: '#f87171', border: '1px solid rgba(239,68,68,0.2)' }}>
-              ✕ Annuler
-            </button>
-          )}
-          {!running && jobs.length > 0 && (
-            <p className="text-sm" style={{ color: doneCount === jobs.length ? '#34d399' : errorCount > 0 ? '#f87171' : 'rgba(196,181,253,0.5)' }}>
-              {doneCount}/{jobs.length} terminé(s){errorCount > 0 ? ` · ${errorCount} erreur(s)` : ''}
+          {!canLaunch && originals.length === 0 && (
+            <p className="text-xs" style={{ color: 'rgba(196,181,253,0.35)' }}>
+              Ajoute des vidéos originales et secondaires pour commencer
             </p>
           )}
         </div>
-
-        {/* Job list */}
-        {jobs.length > 0 && (
-          <div className="space-y-2">
-            <p className="text-[10px] uppercase tracking-wider font-bold" style={{ color: 'rgba(196,181,253,0.3)' }}>File de génération</p>
-            {jobs.map(job => (
-              <div key={job.id} className="rounded-xl px-4 py-2.5 flex items-center gap-3"
-                style={{
-                  background: job.status === 'done' ? 'rgba(52,211,153,0.06)'
-                    : job.status === 'error' ? 'rgba(239,68,68,0.06)'
-                    : job.status === 'pending' ? 'rgba(8,5,20,0.5)'
-                    : 'rgba(139,92,246,0.06)',
-                  border: job.status === 'done' ? '1px solid rgba(52,211,153,0.2)'
-                    : job.status === 'error' ? '1px solid rgba(239,68,68,0.2)'
-                    : job.status === 'pending' ? '1px solid rgba(255,255,255,0.05)'
-                    : '1px solid rgba(139,92,246,0.2)',
-                }}>
-                <span className="text-[10px] font-black w-7 text-center flex-shrink-0"
-                  style={{ color: 'rgba(196,181,253,0.4)' }}>#{job.id + 1}</span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-mono truncate text-white/70">{fileName(job.originalPath)}</p>
-                  <p className="text-[9px] truncate" style={{ color: 'rgba(196,181,253,0.4)' }}>
-                    → {fileName(job.secondaryPath)}
-                    {job.splitTime != null && ` · cut ${job.splitTime}s`}
-                  </p>
-                  {job.error && <p className="text-[9px] mt-0.5" style={{ color: '#f87171' }}>{job.error}</p>}
-                </div>
-                <div className="flex items-center gap-1.5 flex-shrink-0">
-                  {(job.status === 'detecting' || job.status === 'analyzing' || job.status === 'generating' || job.status === 'uploading') && <Spinner size="sm" />}
-                  <span className="text-[10px] font-semibold"
-                    style={{ color: job.status === 'done' ? '#34d399' : job.status === 'error' ? '#f87171' : 'rgba(196,181,253,0.6)' }}>
-                    {STATUS_LABEL[job.status]}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
     </>
   )
