@@ -149,6 +149,7 @@ export function OrganizationPanel({ user }: Props) {
     if (error) {
       const msg = /not_authenticated/.test(error.message) ? 'Non authentifié — reconnecte-toi'
                 : /name_required/.test(error.message)     ? 'Le nom est requis'
+                : /org_limit_reached/.test(error.message) ? 'Tu ne peux créer qu\'une seule organisation'
                 : error.message
       flash(msg, true)
       return
@@ -315,7 +316,9 @@ export function OrganizationPanel({ user }: Props) {
         <section className="bg-card border border-border rounded-xl p-5 space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-bold text-text">🏢 Mes organisations</h2>
-            <Button size="sm" onClick={() => setCreating(v => !v)}>+ Nouvelle</Button>
+            {!myOrgs.some(({ member }) => member.role === 'owner') && (
+              <Button size="sm" onClick={() => setCreating(v => !v)}>+ Nouvelle</Button>
+            )}
           </div>
 
           {creating && (

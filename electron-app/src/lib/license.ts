@@ -38,7 +38,7 @@ export async function checkLicense(userId: string, orgId?: string | null): Promi
       }
     }
 
-    // Check org owner's key
+    // Check org owner's key (or super admin status)
     if (orgId) {
       const { data: org } = await supabase
         .from('organizations')
@@ -47,6 +47,18 @@ export async function checkLicense(userId: string, orgId?: string | null): Promi
         .maybeSingle()
 
       if (org?.owner_id && org.owner_id !== userId) {
+        // Owner is super admin → all members get access
+        const { data: ownerProfile } = await supabase
+          .from('profiles')
+          .select('is_super_admin')
+          .eq('id', org.owner_id)
+          .maybeSingle()
+
+        if (ownerProfile?.is_super_admin) {
+          return { valid: true, expiresAt: null, daysLeft: null, source: 'org_owner', isSuperAdmin: false }
+        }
+
+        // Owner has an active license key → all members get access
         const { data: ownerKey, error: ownerErr } = await supabase
           .from('license_keys')
           .select('expires_at')
