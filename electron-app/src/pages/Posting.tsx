@@ -279,7 +279,7 @@ export function Posting({ user }: PostingProps) {
                 }`}
                   style={checked ? { background: 'linear-gradient(135deg,#7c3aed,#ec4899)' } : undefined}
                 >
-                  {phone.ig_username ? phone.ig_username[0].toUpperCase() : phone.phone_name[0].toUpperCase()}
+                  {phone.ig_username?.[0]?.toUpperCase() ?? phone.phone_name?.[0]?.toUpperCase() ?? '?'}
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-[11px] font-semibold text-text truncate">{phone.phone_name}</p>

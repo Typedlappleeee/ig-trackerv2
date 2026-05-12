@@ -540,7 +540,7 @@ export function MassPosting({ user }: MassPostingProps) {
                   <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold flex-shrink-0 ${
                     checked ? 'bg-accent text-white' : 'bg-surface2 text-text2'
                   }`}>
-                    {phone.ig_username ? phone.ig_username[0].toUpperCase() : phone.phone_name[0].toUpperCase()}
+                    {phone.ig_username?.[0]?.toUpperCase() ?? phone.phone_name?.[0]?.toUpperCase() ?? '?'}
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="text-xs font-medium text-text truncate">{phone.phone_name}</p>
@@ -601,7 +601,7 @@ export function MassPosting({ user }: MassPostingProps) {
                     >
                       <div className="flex items-center gap-2">
                         <div className="w-7 h-7 rounded-full bg-accent/20 text-accent flex items-center justify-center text-xs font-bold flex-shrink-0">
-                          {phone.ig_username ? phone.ig_username[0].toUpperCase() : phone.phone_name[0].toUpperCase()}
+                          {phone.ig_username?.[0]?.toUpperCase() ?? phone.phone_name?.[0]?.toUpperCase() ?? '?'}
                         </div>
                         <div className="min-w-0 flex-1">
                           <p className="text-xs font-medium text-text truncate">{phone.phone_name}</p>
