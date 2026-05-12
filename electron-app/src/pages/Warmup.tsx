@@ -2,8 +2,11 @@ import { useState, useEffect, useRef } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { Button } from '@/components/ui/Button'
 import { useConnections } from '@/lib/connections'
+import { useOrg } from '@/lib/orgContext'
 import { fetchAllPhones, warmupAccount, type GeelarkPhone, type WarmupConfig } from '@/lib/geelark'
 import { supabase } from '@/lib/supabase'
+import { canAccessPhoneGroup } from '@/lib/permissions'
+import { logActivity } from '@/lib/activityLog'
 
 interface WarmupProps { user: User }
 
@@ -19,6 +22,7 @@ function fileName(p: string) { return p.split(/[\\/]/).pop() ?? p }
 export function Warmup({ user }: WarmupProps) {
   const conns = useConnections(user)
   const bearer = conns.bearer
+  const { currentOrg, role, perms } = useOrg()
 
   // Phones
   const [phones,        setPhones]        = useState<GeelarkPhone[]>([])
@@ -69,6 +73,7 @@ export function Warmup({ user }: WarmupProps) {
 
   const visiblePhones = phones.filter(p => {
     const grp = p.group?.name ?? p.groupName ?? null
+    if (role && !canAccessPhoneGroup(role, perms, grp)) return false
     if (groupFilter !== 'Tous' && grp !== groupFilter) return false
     if (phoneSearch) {
       const q    = phoneSearch.toLowerCase()
@@ -105,6 +110,11 @@ export function Warmup({ user }: WarmupProps) {
   async function launch() {
     if (!selected.size || !bearer) return
     const targetPhones = phones.filter(p => selected.has(p.id))
+    logActivity({
+      orgId: currentOrg?.id ?? null, userId: user.id, userEmail: user.email ?? '',
+      action: 'warmup_launched',
+      details: { phones: targetPhones.map(p => p.serialName ?? p.name ?? p.id), count: targetPhones.length },
+    })
 
     const config: WarmupConfig = {
       profileName:    profileName.trim() || undefined,

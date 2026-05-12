@@ -44,7 +44,26 @@ export function OrganizationPanel({ user }: Props) {
   const [invLabel, setInvLabel] = useState('')
   const [invRole,  setInvRole]  = useState<Exclude<OrgRole, 'owner'>>('member')
 
-  const [orgTab, setOrgTab] = useState<'orgas' | 'membres'>('orgas')
+  const [orgTab, setOrgTab] = useState<'orgas' | 'membres' | 'logs'>('orgas')
+
+  // Activity logs (admin/owner only)
+  interface ActivityLog { id: string; user_email: string | null; action: string; details: Record<string, unknown>; created_at: string }
+  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([])
+  const [logsLoading, setLogsLoading]   = useState(false)
+
+  async function loadLogs() {
+    if (!currentOrg) return
+    setLogsLoading(true)
+    const { data } = await supabase.from('activity_logs')
+      .select('id,user_email,action,details,created_at')
+      .eq('org_id', currentOrg.id)
+      .order('created_at', { ascending: false })
+      .limit(200)
+    setActivityLogs((data ?? []) as ActivityLog[])
+    setLogsLoading(false)
+  }
+
+  useEffect(() => { if (orgTab === 'logs' && canManage) loadLogs() }, [orgTab, currentOrg?.id])
 
   const myMembership = myOrgs.find(x => x.org.id === currentOrg?.id)?.member
   const myRole       = myMembership?.role ?? null
@@ -258,10 +277,11 @@ export function OrganizationPanel({ user }: Props) {
         {([
           { k: 'orgas',   l: '🏢 Organisations' },
           { k: 'membres', l: '👥 Membres'        },
+          ...(canManage ? [{ k: 'logs', l: '📋 Logs activité' }] : []),
         ] as const).map(t => (
           <button
             key={t.k}
-            onClick={() => setOrgTab(t.k)}
+            onClick={() => setOrgTab(t.k as typeof orgTab)}
             className={`px-4 py-2 text-sm font-semibold transition-colors -mb-px border-b-2 ${
               orgTab === t.k ? 'border-accent text-accent bg-accent/5' : 'border-transparent text-text2 hover:text-text'
             }`}
@@ -451,6 +471,65 @@ export function OrganizationPanel({ user }: Props) {
           </div>
         </section>
         )
+      )}
+      {/* ── Logs tab ──────────────────────────────────────────────────────── */}
+      {orgTab === 'logs' && canManage && (
+        <section className="bg-card border border-border rounded-xl overflow-hidden">
+          <div className="px-5 py-3 border-b border-border flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-bold text-text">📋 Logs d'activité</h2>
+              <p className="text-xs text-text2 mt-0.5">Actions récentes des membres (200 dernières)</p>
+            </div>
+            <button onClick={loadLogs} className="text-xs text-accent hover:opacity-70 transition-opacity">⟳ Rafraîchir</button>
+          </div>
+          {logsLoading ? (
+            <div className="px-5 py-6 text-center text-xs text-text2">Chargement…</div>
+          ) : activityLogs.length === 0 ? (
+            <div className="px-5 py-6 text-center text-xs text-text2">Aucune activité enregistrée pour cette organisation.</div>
+          ) : (
+            <div className="divide-y divide-border max-h-[600px] overflow-auto">
+              {activityLogs.map(log => {
+                const d = new Date(log.created_at)
+                const label: Record<string, string> = {
+                  posting_launched:      '📤 Posting lancé',
+                  mass_posting_launched: '⚡ Mass Posting lancé',
+                  warmup_launched:       '🔥 Warmup lancé',
+                }
+                return (
+                  <div key={log.id} className="px-5 py-3 hover:bg-surface/50 transition-colors">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs font-semibold text-text">{label[log.action] ?? log.action}</span>
+                          <span className="text-[10px] text-accent font-mono">{log.user_email ?? '—'}</span>
+                        </div>
+                        {log.details && Object.keys(log.details).length > 0 && (
+                          <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5">
+                            {typeof log.details.count === 'number' && (
+                              <span className="text-[10px] text-text2">{log.details.count} téléphone(s)</span>
+                            )}
+                            {Array.isArray(log.details.phones) && (
+                              <span className="text-[10px] text-text2 truncate max-w-xs">
+                                {(log.details.phones as string[]).slice(0, 5).join(', ')}
+                                {(log.details.phones as string[]).length > 5 ? ` +${(log.details.phones as string[]).length - 5}` : ''}
+                              </span>
+                            )}
+                            {typeof log.details.file === 'string' && (
+                              <span className="text-[10px] text-text2 font-mono">📎 {log.details.file}</span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      <span className="text-[10px] text-text2 flex-shrink-0 tabular-nums">
+                        {d.toLocaleDateString('fr-FR')} {d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </section>
       )}
     </div>
   )

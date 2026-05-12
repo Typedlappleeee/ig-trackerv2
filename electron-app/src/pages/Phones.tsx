@@ -582,10 +582,18 @@ export function Phones({ user }: PhonesProps) {
       // - Solo → use the real UNIQUE(user_id, geelark_id) constraint
       // - Org  → PostgREST can't use partial indexes, so do it manually:
       //          fetch existing rows, then batch-update + insert new ones
+      const currentGeelarkIds = new Set(rows.map(r => r.geelark_id))
+
       if (currentOrg) {
         const { data: existing } = await supabase
           .from('phones').select('id,geelark_id').eq('org_id', currentOrg.id)
         const existingMap = new Map((existing ?? []).map((p: { id: string; geelark_id: string }) => [p.geelark_id, p.id]))
+
+        // Delete phones removed from GéeLark
+        const toDelete = (existing ?? []).filter((p: { geelark_id: string }) => !currentGeelarkIds.has(p.geelark_id))
+        if (toDelete.length > 0) {
+          await supabase.from('phones').delete().in('id', toDelete.map((p: { id: string }) => p.id))
+        }
 
         const toInsert = rows.filter(r => !existingMap.has(r.geelark_id))
         const toUpdate = rows.filter(r =>  existingMap.has(r.geelark_id))
@@ -600,6 +608,13 @@ export function Phones({ user }: PhonesProps) {
           if (error) throw new Error(error.message)
         }
       } else {
+        // Delete phones removed from GéeLark (solo mode)
+        await supabase.from('phones')
+          .delete()
+          .eq('user_id', user.id)
+          .is('org_id', null)
+          .not('geelark_id', 'in', `(${[...currentGeelarkIds].join(',')})`)
+
         const { error: upsertErr } = await supabase
           .from('phones').upsert(rows, { onConflict: 'user_id,geelark_id' })
         if (upsertErr) throw new Error(upsertErr.message)

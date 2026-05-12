@@ -3,6 +3,8 @@ import type { User } from '@supabase/supabase-js'
 import { supabase, type Phone, type ContentItem } from '@/lib/supabase'
 import { useConnections } from '@/lib/connections'
 import { useOrg } from '@/lib/orgContext'
+import { canAccessPhoneGroup } from '@/lib/permissions'
+import { logActivity } from '@/lib/activityLog'
 import { Button }  from '@/components/ui/Button'
 import { VideoThumbnail } from '@/pages/Bank'
 import { BankPicker } from './Bank'
@@ -43,7 +45,7 @@ async function geelark(bearer: string, path: string, body: unknown) {
 }
 
 export function MassPosting({ user }: MassPostingProps) {
-  const { currentOrg } = useOrg()
+  const { currentOrg, role, perms } = useOrg()
   const [phones, setPhones]               = useState<Phone[]>([])
   const ms                                = getMassPostingState()
   const [selectedPhones, _setSelPhones]   = useState<Set<string>>(ms.selectedPhones)
@@ -215,6 +217,12 @@ export function MassPosting({ user }: MassPostingProps) {
     phoneList.forEach(p => newStatuses.set(p.id, { status: 'pending' }))
     setTaskStatuses(newStatuses)
 
+    logActivity({
+      orgId: currentOrg?.id ?? null, userId: user.id, userEmail: user.email ?? '',
+      action: 'mass_posting_launched',
+      details: { phones: phoneList.map(p => p.ig_username ?? p.phone_name), count: phoneList.length, videos: selectedVideos.length },
+    })
+
     try {
       // ── Step 1: upload unique videos ─────────────────────────────────────
       log(`📤 Upload de ${selectedVideos.length} vidéo(s) vers GéeLark…`)
@@ -333,6 +341,7 @@ export function MassPosting({ user }: MassPostingProps) {
   }
 
   const visiblePhones = phones.filter(p => {
+    if (role && !canAccessPhoneGroup(role, perms, p.group_name)) return false
     if (groupFilter !== 'Tous' && p.group_name !== groupFilter) return false
     if (phoneSearch) {
       const q = phoneSearch.toLowerCase()

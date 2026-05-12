@@ -3,6 +3,8 @@ import type { User } from '@supabase/supabase-js'
 import { supabase, type Phone } from '@/lib/supabase'
 import { useOrg } from '@/lib/orgContext'
 import { useConnections } from '@/lib/connections'
+import { canAccessPhoneGroup } from '@/lib/permissions'
+import { logActivity } from '@/lib/activityLog'
 import { Button }  from '@/components/ui/Button'
 import { VideoThumbnail } from '@/pages/Bank'
 import { BankPicker } from './Bank'
@@ -22,7 +24,7 @@ async function geelark(bearer: string, path: string, body: unknown) {
 }
 
 export function Posting({ user }: PostingProps) {
-  const { currentOrg }                 = useOrg()
+  const { currentOrg, role, perms }    = useOrg()
   const [phones, setPhones]            = useState<Phone[]>([])
   const s                              = getPostingState()
   const [selectedPhones, _setSelPhones]= useState<Set<string>>(s.selectedPhones)
@@ -152,6 +154,12 @@ export function Posting({ user }: PostingProps) {
     const phoneList = phones.filter(p => selectedPhones.has(p.id))
     const total     = phoneList.length
 
+    logActivity({
+      orgId: currentOrg?.id ?? null, userId: user.id, userEmail: user.email ?? '',
+      action: 'posting_launched',
+      details: { phones: phoneList.map(p => p.ig_username ?? p.phone_name), count: total, file: filePath?.split(/[\\/]/).pop() },
+    })
+
     try {
       log('📤 Upload de la vidéo vers GéeLark…')
       setProgress(5)
@@ -238,6 +246,7 @@ export function Posting({ user }: PostingProps) {
   }
 
   const visiblePhones = phones.filter(p => {
+    if (role && !canAccessPhoneGroup(role, perms, p.group_name)) return false
     if (groupFilter !== 'Tous' && p.group_name !== groupFilter) return false
     if (phoneSearch) {
       const q = phoneSearch.toLowerCase()
