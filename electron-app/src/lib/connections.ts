@@ -46,36 +46,58 @@ export function useConnections(user: User): ActiveConnections {
     let cancelled = false
     setConns(c => ({ ...c, loading: true }))
 
-    if (currentOrg) {
-      supabase.from('org_config').select('bearer_token, groq_api_key, anthropic_api_key, proxy, ig_sessionid')
-        .eq('org_id', currentOrg.id).maybeSingle()
-        .then(({ data }) => {
-          if (cancelled) return
-          setConns({
-            bearer:       data?.bearer_token ?? '',
-            groq:         data?.groq_api_key ?? '',
-            anthropic:    data?.anthropic_api_key ?? '',
-            proxy:        data?.proxy ?? '',
-            ig_sessionid: data?.ig_sessionid ?? '',
-            source:       'org',
-            loading:      false,
-          })
-        })
-    } else {
-      supabase.from('app_config').select('bearer_token, groq_api_key, anthropic_api_key, proxy, ig_sessionid')
+    async function fetchOrg() {
+      let { data, error } = await supabase
+        .from('org_config')
+        .select('bearer_token, groq_api_key, anthropic_api_key, proxy, ig_sessionid')
+        .eq('org_id', currentOrg!.id).maybeSingle()
+      if (error && /anthropic|column|schema cache/i.test(error.message)) {
+        const r = await supabase
+          .from('org_config')
+          .select('bearer_token, groq_api_key, proxy, ig_sessionid')
+          .eq('org_id', currentOrg!.id).maybeSingle()
+        data = r.data as typeof data
+      }
+      if (cancelled) return
+      setConns({
+        bearer:       (data as Record<string,string> | null)?.bearer_token ?? '',
+        groq:         (data as Record<string,string> | null)?.groq_api_key ?? '',
+        anthropic:    (data as Record<string,string> | null)?.anthropic_api_key ?? '',
+        proxy:        (data as Record<string,string> | null)?.proxy ?? '',
+        ig_sessionid: (data as Record<string,string> | null)?.ig_sessionid ?? '',
+        source:       'org',
+        loading:      false,
+      })
+    }
+
+    async function fetchUser() {
+      let { data, error } = await supabase
+        .from('app_config')
+        .select('bearer_token, groq_api_key, anthropic_api_key, proxy, ig_sessionid')
         .eq('user_id', user.id).maybeSingle()
-        .then(({ data }) => {
-          if (cancelled) return
-          setConns({
-            bearer:       data?.bearer_token ?? '',
-            groq:         data?.groq_api_key ?? '',
-            anthropic:    data?.anthropic_api_key ?? '',
-            proxy:        data?.proxy ?? '',
-            ig_sessionid: data?.ig_sessionid ?? '',
-            source:       'user',
-            loading:      false,
-          })
-        })
+      if (error && /anthropic|column|schema cache/i.test(error.message)) {
+        const r = await supabase
+          .from('app_config')
+          .select('bearer_token, groq_api_key, proxy, ig_sessionid')
+          .eq('user_id', user.id).maybeSingle()
+        data = r.data as typeof data
+      }
+      if (cancelled) return
+      setConns({
+        bearer:       (data as Record<string,string> | null)?.bearer_token ?? '',
+        groq:         (data as Record<string,string> | null)?.groq_api_key ?? '',
+        anthropic:    (data as Record<string,string> | null)?.anthropic_api_key ?? '',
+        proxy:        (data as Record<string,string> | null)?.proxy ?? '',
+        ig_sessionid: (data as Record<string,string> | null)?.ig_sessionid ?? '',
+        source:       'user',
+        loading:      false,
+      })
+    }
+
+    if (currentOrg) {
+      fetchOrg()
+    } else {
+      fetchUser()
     }
 
     return () => { cancelled = true }
