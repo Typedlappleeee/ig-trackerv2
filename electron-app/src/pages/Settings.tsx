@@ -89,244 +89,185 @@ export function Settings({ user, initialPanel }: SettingsProps) {
   const [musicVol, setMusicVol]       = useState(getVolume)
   const [musicTrack, setMusicTrackS]  = useState(getTrack)
 
-  // Langue
-  const [lang, setLang] = useState<'fr' | 'en'>('fr')
-
   // Profil
   const [profileEmail, setProfileEmail] = useState(user.email ?? '')
-  const [exportDir, setExportDir]       = useState('')
-  const [newPassword, setNewPassword]   = useState('')
-  const [confirmPassword, setConfirm]   = useState('')
+  const [profileName, setProfileName]   = useState('')
+  const [displayName, setDisplayName]   = useState('')
 
   // Connexions
-  const [bearer, setBearer]   = useState('')
-  const [proxy, setProxy]     = useState('')
-  const [testingProxy, setTestingProxy] = useState(false)
-  const [proxyResult, setProxyResult] = useState<{ ok: boolean; msg: string } | null>(null)
-
-  // API keys
-  const [groqKey,      setGroqKey]      = useState('')
+  const [bearer, setBearer]         = useState('')
+  const [groqKey, setGroqKey]       = useState('')
   const [anthropicKey, setAnthropicKey] = useState('')
+  const [proxyUrl, setProxyUrl]     = useState('')
+  const [igSession, setIgSession]   = useState('')
 
   useEffect(() => {
-    if (!mountedRef.current) { mountedRef.current = true; return }
     if (initialPanel) setPanel(initialPanel)
   }, [initialPanel])
 
+  // Load saved values
   useEffect(() => {
-    supabase.from('app_config').select('*').eq('user_id', user.id).single()
-      .then(({ data }) => {
-        if (data) {
-          setBearer(data.bearer_token ?? '')
-          setGroqKey(data.groq_api_key ?? '')
-          setAnthropicKey((data as Record<string,unknown>).anthropic_api_key as string ?? '')
-          setTheme(data.theme ?? 'Bleu')
-          const d = data as Record<string, unknown>
+    if (mountedRef.current) return
+    mountedRef.current = true
+
+    const storedTheme = localStorage.getItem('theme') || 'Bleu'
+    setTheme(storedTheme)
+    applyTheme(storedTheme)
+    setPixelUnlocked(localStorage.getItem('pixel-unlocked') === '1')
+
+    const storedNotifyPopup = localStorage.getItem('notify-popup')
+    const storedNotifySound = localStorage.getItem('notify-sound')
+    if (storedNotifyPopup !== null) setNotifyPopup(storedNotifyPopup === '1')
+    if (storedNotifySound !== null) setNotifySound(storedNotifySound === '1')
+
+    async function loadAll() {
+      setLoading(true)
+      try {
+        const [configRes, profileRes] = await Promise.all([
+          (async () => {
+            let q = supabase.from(currentOrg ? 'org_config' : 'app_config').select('*')
+            if (currentOrg) q = (q as any).eq('org_id', currentOrg.id)
+            else            q = (q as any).eq('user_id', user.id)
+            return q.maybeSingle()
+          })(),
+          supabase.from('profiles').select('full_name, display_name, email').eq('id', user.id).maybeSingle(),
+        ])
+
+        const d = configRes.data as any
+        if (d) {
+          setBearer(d.bearer_token       ?? '')
+          setGroqKey(d.groq_api_key      ?? '')
+          setAnthropicKey(d.anthropic_api_key ?? '')
+          setProxyUrl(d.proxy_url        ?? '')
+          setIgSession(d.ig_sessionid    ?? '')
           setProfileEmail((d.profile_email as string) ?? user.email ?? '')
-          setExportDir((d.export_dir as string) ?? '')
-          setProxy((d.proxy as string) ?? '')
-          setNotifyPopup((d.notify_popup as boolean) ?? true)
-          setNotifySound((d.notify_sound as boolean) ?? true)
-          setLang((d.lang as 'fr' | 'en') ?? 'fr')
         }
+        if (profileRes.data) {
+          setProfileName(profileRes.data.full_name    ?? '')
+          setDisplayName(profileRes.data.display_name ?? '')
+        }
+      } finally {
         setLoading(false)
-      })
+      }
+    }
+    loadAll()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // When the active org changes, override the connection fields with that org's
-  // shared config (bearer / groq / proxy / ig_sessionid). User-level fields
-  // (theme, lang, profile…) are unaffected.
-  useEffect(() => {
-    if (!currentOrg) return
-    supabase.from('org_config').select('*').eq('org_id', currentOrg.id).maybeSingle()
-      .then(({ data }) => {
-        if (!data) {
-          setBearer(''); setGroqKey(''); setAnthropicKey(''); setProxy('')
-        } else {
-          setBearer(data.bearer_token ?? '')
-          setGroqKey(data.groq_api_key ?? '')
-          setAnthropicKey((data as Record<string,unknown>).anthropic_api_key as string ?? '')
-          setProxy(data.proxy ?? '')
-        }
-      })
-  }, [currentOrg?.id])
+  function applyTheme(t: string) {
+    const color = THEME_COLORS[t] ?? '#4f9eff'
+    document.documentElement.style.setProperty('--color-accent', color)
+    document.documentElement.style.setProperty('--color-accent-hover', color + 'cc')
+  }
 
-  function clickSwatch(t: string) {
+  function handleTheme(t: string) {
     setTheme(t)
+    localStorage.setItem('theme', t)
+    applyTheme(t)
+  }
+
+  function handleSwatchClick() {
     const now = Date.now()
-    if (now - swatchClicks.first > 2000) {
-      setSwatchClicks({ count: 1, first: now })
-    } else {
-      const c = swatchClicks.count + 1
-      if (c >= 7) {
+    setSwatchClicks(prev => {
+      const reset = now - prev.first > 4000
+      const next  = { count: reset ? 1 : prev.count + 1, first: reset ? now : prev.first }
+      if (next.count >= 7) {
+        localStorage.setItem('pixel-unlocked', '1')
         setPixelUnlocked(true)
-        setSwatchClicks({ count: 0, first: 0 })
-      } else {
-        setSwatchClicks({ count: c, first: swatchClicks.first })
       }
-    }
+      return next
+    })
   }
 
-  // Save user-level fields (theme, lang, profile, push_port, notifications)
-  // to app_config. In org mode, the connection fields (bearer/groq/proxy/
-  // ig_sessionid) are ALSO saved to app_config so solo mode keeps a fallback,
-  // but they're additionally written to the org's org_config row by saveConnexions.
   async function save() {
-    setSaving(true); setSaved(false); setError(null)
-    const payload: Record<string, unknown> = {
-      user_id:       user.id,
-      theme,
-      updated_at:    new Date().toISOString(),
+    setSaving(true)
+    setError(null)
+    try {
+      localStorage.setItem('notify-popup', notifyPopup ? '1' : '0')
+      localStorage.setItem('notify-sound', notifySound ? '1' : '0')
+      const { error: e } = await supabase.from('app_config').upsert({
+        user_id: user.id,
+        theme,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'user_id' })
+      if (e) throw e
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2000)
+    } catch (e: any) {
+      setError(e.message ?? 'Erreur inconnue')
+    } finally {
+      setSaving(false)
     }
-    if (profileEmail) payload.profile_email = profileEmail.trim()
-    if (exportDir)   payload.export_dir = exportDir.trim()
-    payload.notify_popup = notifyPopup
-    payload.notify_sound = notifySound
-    payload.lang         = lang
-    // Solo mode: connection fields go to app_config too (they ARE user-scoped here).
-    // Org mode: don't touch app_config's connection fields — saveConnexions writes
-    // to org_config instead.
-    if (!currentOrg) {
-      payload.bearer_token     = bearer.trim()
-      payload.groq_api_key     = groqKey.trim()
-      payload.anthropic_api_key = anthropicKey.trim()
-      if (proxy) payload.proxy = proxy.trim()
-    }
-
-    let { error: err } = await supabase.from('app_config').upsert(payload, { onConflict: 'user_id' })
-
-    if (err && /column|schema cache/i.test(err.message)) {
-      const safe: Record<string, unknown> = {
-        user_id:    payload.user_id,
-        theme:      payload.theme,
-        updated_at: payload.updated_at,
-      }
-      if (!currentOrg) {
-        safe.bearer_token = bearer.trim()
-        safe.groq_api_key = groqKey.trim()
-      }
-      const r = await supabase.from('app_config').upsert(safe, { onConflict: 'user_id' })
-      err = r.error
-      if (!err) setError('Quelques options optionnelles n\'ont pas été enregistrées (colonnes manquantes en base — sans gravité).')
-    }
-
-    if (err) { setError('Erreur: ' + err.message); setSaving(false); return }
-    if (!currentOrg) notifyConnectionsChanged()  // solo mode also writes connection fields here
-    setSaved(true); setTimeout(() => setSaved(false), 3000)
-    setSaving(false)
   }
 
-  // Save connexions (bearer/groq/proxy/ig_sessionid). Routes to org_config when
-  // an org is active, app_config otherwise. Admin-only when org is active.
+  // but they're additionally written to the org's org_config row by saveConnexions.
   async function saveConnexions() {
-    setSaving(true); setSaved(false); setError(null)
-    if (currentOrg) {
+    setSaving(true)
+    setError(null)
+    try {
       if (!canEditOrgConnexions) {
-        setError("Seuls les owner/admin de l'organisation peuvent modifier ces clés.")
-        setSaving(false); return
+        throw new Error('Seuls les admins peuvent modifier les connexions.')
       }
-      let { error: err } = await supabase.from('org_config').upsert({
-        org_id:            currentOrg.id,
-        bearer_token:      bearer.trim(),
-        groq_api_key:      groqKey.trim(),
-        anthropic_api_key: anthropicKey.trim(),
-        proxy:             proxy.trim() || null,
-        updated_at:        new Date().toISOString(),
-      }, { onConflict: 'org_id' })
-      if (err && /anthropic|column|schema cache/i.test(err.message)) {
-        // Column doesn't exist yet — retry without it
-        const r = await supabase.from('org_config').upsert({
-          org_id: currentOrg.id, bearer_token: bearer.trim(),
-          groq_api_key: groqKey.trim(), proxy: proxy.trim() || null,
-          updated_at: new Date().toISOString(),
+
+      if (currentOrg) {
+        const { error: e } = await supabase.from('org_config').upsert({
+          org_id:        currentOrg.id,
+          bearer_token:  bearer,
+          groq_api_key:  groqKey,
+          anthropic_api_key: anthropicKey,
+          proxy_url:     proxyUrl,
+          ig_sessionid:  igSession,
+          updated_at:    new Date().toISOString(),
         }, { onConflict: 'org_id' })
-        err = r.error
+        if (e) throw e
+      } else {
+        const { error: e } = await supabase.from('app_config').upsert({
+          user_id:       user.id,
+          bearer_token:  bearer,
+          groq_api_key:  groqKey,
+          anthropic_api_key: anthropicKey,
+          proxy_url:     proxyUrl,
+          ig_sessionid:  igSession,
+          updated_at:    new Date().toISOString(),
+        }, { onConflict: 'user_id' })
+        if (e) throw e
       }
-      if (err) { setError('Erreur: ' + err.message); setSaving(false); return }
-    } else {
-      const payload: Record<string, unknown> = {
-        user_id:           user.id,
-        bearer_token:      bearer.trim(),
-        groq_api_key:      groqKey.trim(),
-        anthropic_api_key: anthropicKey.trim(),
-        proxy:             proxy.trim() || null,
-        updated_at:        new Date().toISOString(),
-      }
-      let { error: err } = await supabase.from('app_config').upsert(payload, { onConflict: 'user_id' })
-      if (err && /anthropic|column|schema cache/i.test(err.message)) {
-        // Column doesn't exist yet — retry without it
-        const { user_id, bearer_token, groq_api_key, proxy: p, updated_at } = payload as Record<string, string>
-        const r = await supabase.from('app_config').upsert(
-          { user_id, bearer_token, groq_api_key, proxy: p || null, updated_at },
-          { onConflict: 'user_id' }
-        )
-        err = r.error
-      }
-      if (err) { setError('Erreur: ' + err.message); setSaving(false); return }
+
+      notifyConnectionsChanged()
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2000)
+    } catch (e: any) {
+      setError(e.message ?? 'Erreur inconnue')
+    } finally {
+      setSaving(false)
     }
-    notifyConnectionsChanged()    // wake up useConnections everywhere
-    setSaved(true); setTimeout(() => setSaved(false), 3000)
-    setSaving(false)
   }
 
   async function saveProfile() {
-    setSaving(true); setSaved(false); setError(null)
+    setSaving(true)
+    setError(null)
     try {
-      // 1. Update Supabase Auth email if changed
-      if (profileEmail.trim() && profileEmail.trim() !== user.email) {
-        const { error: emailErr } = await supabase.auth.updateUser({ email: profileEmail.trim() })
-        if (emailErr) throw new Error('Email : ' + emailErr.message)
-      }
-      // 2. Update password if provided
-      if (newPassword) {
-        if (newPassword !== confirmPassword) throw new Error('Les mots de passe ne correspondent pas.')
-        if (newPassword.length < 8) throw new Error('Le mot de passe doit faire au moins 8 caractères.')
-        const { error: pwErr } = await supabase.auth.updateUser({ password: newPassword })
-        if (pwErr) throw new Error('Mot de passe : ' + pwErr.message)
-      }
-      // 3. Upsert profile data
-      await save()
-      setNewPassword('')
-      setConfirm('')
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      const { error: e } = await supabase.from('profiles').upsert({
+        id:           user.id,
+        email:        user.email ?? '',
+        full_name:    profileName,
+        display_name: displayName,
+        updated_at:   new Date().toISOString(),
+      }, { onConflict: 'id' })
+      if (e) throw e
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2000)
+    } catch (e: any) {
+      setError(e.message ?? 'Erreur inconnue')
+    } finally {
+      setSaving(false)
     }
-    setSaving(false)
   }
 
-  async function testProxy() {
-    setTestingProxy(true)
-    setProxyResult(null)
-    // Simple ping test via geelarkRequest (gets external IP through proxy)
-    try {
-      if (!window.electronAPI?.geelarkRequest) throw new Error('IPC indisponible')
-      const r = await window.electronAPI.geelarkRequest({
-        method: 'GET',
-        url: 'https://api.ipify.org?format=json',
-      })
-      if (r.ok) {
-        const ip = (r.data as { ip?: string })?.ip
-        setProxyResult({ ok: true, msg: ip ? `IP sortante : ${ip}` : 'OK' })
-      } else {
-        setProxyResult({ ok: false, msg: r.error ?? 'Erreur réseau' })
-      }
-    } catch (e) {
-      setProxyResult({ ok: false, msg: e instanceof Error ? e.message : String(e) })
-    }
-    setTestingProxy(false)
-  }
-
-  if (loading) return (
-    <div className="p-8 space-y-4">
-      {[1,2,3].map(i => <div key={i} className="h-12 bg-surface2 rounded-xl animate-pulse" />)}
-    </div>
-  )
+  if (loading) return <div className="p-8 text-text2 text-sm">Chargement…</div>
 
   return (
-    <div className="p-6 space-y-5 max-w-4xl">
-      <div>
-        <h1 className="text-xl font-bold text-text">⚙ Paramètres</h1>
-      </div>
+    <div className="p-6 space-y-5 max-w-xl">
 
       {/* Top tabs (Python: 3 tabs) */}
       <div className="flex gap-1 border-b border-border">
@@ -340,225 +281,133 @@ export function Settings({ user, initialPanel }: SettingsProps) {
           <button
             key={t.k}
             onClick={() => setPanel(t.k)}
-            className={`px-4 py-2 text-sm font-semibold transition-colors -mb-px border-b-2 ${
+            className={`px-3 py-2 text-xs font-semibold border-b-2 transition-colors ${
               panel === t.k ? 'border-accent text-accent bg-accent/5' : 'border-transparent text-text2 hover:text-text'
             }`}
-          >{t.l}</button>
+          >
+            {t.l}
+          </button>
         ))}
       </div>
 
-      {/* ── Paramètres généraux ────────────────────────────────────────────── */}
       {panel === 'general' && (
-        <>
+        <section className="space-y-6">
+
           {/* Sub-tabs */}
           <div className="flex gap-2">
-            {([
-              { k: 'apparence', l: '🎨 Apparence' },
-              { k: 'sons',      l: '🔊 Sons'       },
-              { k: 'langue',    l: '🌐 Langue'     },
-            ] as const).map(t => (
+            {(['apparence', 'sons', 'langue'] as GeneralTab[]).map(t => (
               <button
-                key={t.k}
-                onClick={() => setGenTab(t.k)}
-                className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
-                  genTab === t.k ? 'bg-surface3 text-text' : 'bg-surface text-text2 hover:text-text'
+                key={t}
+                onClick={() => setGenTab(t)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium capitalize transition-all ${
+                  genTab === t ? 'bg-accent text-white' : 'bg-surface2 text-text2 hover:text-text'
                 }`}
-              >{t.l}</button>
+              >
+                {t}
+              </button>
             ))}
           </div>
 
           {genTab === 'apparence' && (
-            <section className="bg-card border border-border rounded-xl p-5 space-y-4">
-              <div>
-                <h2 className="text-sm font-semibold text-text">Thème de couleur</h2>
-                <p className="text-xs text-text2 mt-0.5">Couleur d'accentuation de l'interface</p>
-              </div>
-              <div className="grid grid-cols-4 gap-3">
+            <div className="space-y-4">
+              <h2 className="text-sm font-semibold text-text">Thème de couleur</h2>
+              <div className="flex flex-wrap gap-3">
                 {THEMES.map(t => (
                   <button
                     key={t}
-                    onClick={() => clickSwatch(t)}
-                    className={`flex flex-col items-center gap-2 p-3 rounded-lg border-2 transition-all ${
-                      theme === t ? 'border-text' : 'border-border hover:border-accent/40'
+                    onClick={() => { handleTheme(t); handleSwatchClick() }}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium border transition-all ${
+                      theme === t
+                        ? 'border-accent bg-accent/10 text-accent'
+                        : 'border-border bg-surface2 text-text2 hover:border-accent/40'
                     }`}
                   >
-                    <div className="w-12 h-12 rounded-lg shadow-md" style={{ backgroundColor: THEME_COLORS[t] }} />
-                    <span className="text-xs font-medium text-text">{t}</span>
+                    <span
+                      className="w-3 h-3 rounded-full"
+                      style={{ background: THEME_COLORS[t] }}
+                    />
+                    {t}
                   </button>
                 ))}
-                {pixelUnlocked && (
-                  <button
-                    onClick={() => setTheme('67')}
-                    className={`flex flex-col items-center gap-2 p-3 rounded-lg border-2 transition-all ${
-                      theme === '67' ? 'border-text' : 'border-border hover:border-accent/40'
-                    }`}
-                  >
-                    <div className="w-12 h-12 rounded-lg shadow-md bg-gradient-to-br from-[#55aaff] to-[#3377cc] flex items-center justify-center text-white font-bold text-xs">67</div>
-                    <span className="text-xs font-medium text-accent">67 ⭐</span>
-                  </button>
-                )}
               </div>
-              <p className="text-[11px] text-text2/70 italic">Thème actif : <span className="text-accent font-semibold">{theme}</span>{pixelUnlocked && <span> · 🎉 Easter egg débloqué !</span>}</p>
-            </section>
+              {pixelUnlocked && (
+                <div className="mt-2 px-3 py-2 rounded-lg bg-surface2 border border-border text-xs text-text2">
+                  🎮 Mode Pixel débloqué
+                </div>
+              )}
+            </div>
           )}
 
           {genTab === 'sons' && (
-            <div className="space-y-4">
-              {/* Interface sounds */}
-              <section className="bg-card border border-border rounded-xl p-5 space-y-3">
-                <h2 className="text-sm font-semibold text-text">Sons d'interface</h2>
-                <ToggleRow
-                  checked={notifyPopup}
-                  onChange={setNotifyPopup}
-                  title="Popups (toasts)"
-                  sub="Afficher les notifications en haut à droite"
-                />
-                <ToggleRow
-                  checked={notifySound}
-                  onChange={setNotifySound}
-                  title="Carillons"
-                  sub="Son sur les notifications, clic sur les onglets"
-                />
-              </section>
-
-              {/* Background music */}
-              <section className="bg-card border border-border rounded-xl p-5 space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-sm font-semibold text-text">Musique d'ambiance 🎵</h2>
-                    <p className="text-[11px] text-text2 mt-0.5">Générée procéduralement — préférence locale</p>
-                  </div>
-                  <ToggleRow checked={musicOn} onChange={v => { setMusicOn(v); setMusicEnabled(v) }}
-                    title="" sub="" accent />
-                </div>
-
-                {/* Live EQ bar when playing */}
-                {musicOn && (
-                  <div className="flex items-center gap-2.5 px-3 py-2 bg-accent/5 border border-accent/15 rounded-xl anim-slide-down">
-                    <div className="flex gap-[3px] items-end h-5">
-                      {[3,5,4,7,3,6,4,5,3,7].map((h, i) => (
-                        <div key={i} className="w-[3px] rounded-sm bg-accent/70"
-                          style={{ height: h * 2.5, animation: `pulse-soft ${0.7 + i * 0.13}s ease-in-out infinite`, animationDelay: `${i * 0.09}s` }}
-                        />
-                      ))}
-                    </div>
-                    <p className="text-[11px] text-accent font-medium">
-                      {TRACKS[musicTrack]?.emoji} {TRACKS[musicTrack]?.name} — en lecture
-                    </p>
-                  </div>
-                )}
-
-                {/* Volume slider */}
-                <div className={`space-y-1.5 ${!musicOn ? 'opacity-40 pointer-events-none' : ''}`}>
-                  <p className="text-[11px] font-semibold text-text2 uppercase tracking-widest">Volume</p>
-                  <div className="flex items-center gap-3">
-                    <span className="text-base">🔈</span>
-                    <input
-                      type="range" min={0} max={100} step={1}
-                      value={Math.round(musicVol * 100)}
-                      onChange={e => {
-                        const v = parseInt(e.target.value) / 100
-                        setMusicVol(v); setVolume(v)
-                      }}
-                      className="flex-1 h-1.5 rounded-full appearance-none bg-surface3 accent-accent cursor-pointer"
-                      style={{ accentColor: 'var(--color-accent, #4f8ef7)' }}
-                    />
-                    <span className="text-base">🔊</span>
-                    <span className="text-xs font-bold text-accent w-9 text-right tabular-nums">
-                      {Math.round(musicVol * 100)}%
-                    </span>
-                  </div>
-                </div>
-
-                {/* Track selector */}
-                <div className={`space-y-1.5 ${!musicOn ? 'opacity-40 pointer-events-none' : ''}`}>
-                  <p className="text-[11px] font-semibold text-text2 uppercase tracking-widest">Style de musique</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    {TRACKS.map(t => {
-                      const active = musicTrack === t.id
-                      return (
+            <div className="space-y-5">
+              <h2 className="text-sm font-semibold text-text">Sons & Musique</h2>
+              <ToggleRow
+                checked={notifyPopup}
+                onChange={v => setNotifyPopup(v)}
+                title="Notifications popup"
+                sub="Affiche une notification en haut à droite lors d'actions importantes"
+              />
+              <ToggleRow
+                checked={notifySound}
+                onChange={v => setNotifySound(v)}
+                title="Sons de navigation"
+                sub="Joue un son lors des changements de page"
+              />
+              <ToggleRow
+                checked={musicOn}
+                onChange={v => { setMusicOn(v); setMusicEnabled(v) }}
+                title="Musique d'ambiance"
+                sub="Joue une musique en fond lors de l'utilisation de l'app"
+                accent
+              />
+              {musicOn && (
+                <>
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-text">Track</p>
+                    <div className="flex flex-wrap gap-2">
+                      {TRACKS.map((tr, i) => (
                         <button
-                          key={t.id}
-                          onClick={() => { setMusicTrackS(t.id); setTrack(t.id) }}
-                          className={`text-left p-3 rounded-xl border-2 transition-all ${
-                            active
-                              ? 'border-accent bg-accent/10 shadow-[0_0_12px_-3px_rgba(79,142,247,0.4)]'
-                              : 'border-border hover:border-accent/30 hover:bg-surface2'
+                          key={i}
+                          onClick={() => { setMusicTrackS(i); setTrack(i) }}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                            musicTrack === i ? 'bg-accent text-white' : 'bg-surface2 text-text2 hover:text-text'
                           }`}
                         >
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="text-xl">{t.emoji}</span>
-                            {active && (
-                              <span className="flex gap-[2px] items-end h-3">
-                                {[2,4,3,5,2].map((h, i) => (
-                                  <span key={i} className="w-[2px] rounded-sm bg-accent"
-                                    style={{ height: h * 2, animation: `pulse-soft ${0.6 + i * 0.12}s ease-in-out infinite`, animationDelay: `${i * 0.08}s` }}
-                                  />
-                                ))}
-                              </span>
-                            )}
-                          </div>
-                          <p className={`text-xs font-bold ${active ? 'text-accent' : 'text-text'}`}>{t.name}</p>
-                          <p className="text-[10px] text-text2 mt-0.5 leading-tight">{t.desc}</p>
+                          {tr.name}
                         </button>
-                      )
-                    })}
+                      ))}
+                    </div>
                   </div>
-                  {musicOn && (
-                    <p className="text-[10px] text-text2/60 italic">Changement de piste : fondu de 3 s</p>
-                  )}
-                </div>
-              </section>
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-text">Volume — {Math.round(musicVol * 100)}%</p>
+                    <input
+                      type="range" min={0} max={1} step={0.05}
+                      value={musicVol}
+                      onChange={e => { const v = parseFloat(e.target.value); setMusicVol(v); setVolume(v) }}
+                      className="w-full accent-accent"
+                    />
+                  </div>
+                </>
+              )}
             </div>
           )}
 
           {genTab === 'langue' && (
-            <section className="bg-card border border-border rounded-xl p-5 space-y-3">
+            <div className="space-y-4">
               <h2 className="text-sm font-semibold text-text">Langue</h2>
-              {[
-                { k: 'fr', l: '🇫🇷 Français', sub: 'Langue par défaut' },
-                { k: 'en', l: '🇬🇧 English',  sub: 'Fallback / international' },
-              ].map(opt => (
-                <label key={opt.k} className="flex items-center gap-3 cursor-pointer p-2 rounded hover:bg-surface2">
-                  <input
-                    type="radio"
-                    name="lang"
-                    checked={lang === opt.k}
-                    onChange={() => setLang(opt.k as 'fr' | 'en')}
-                    className="w-4 h-4 accent-accent"
-                  />
-                  <div>
-                    <p className="text-sm text-text">{opt.l}</p>
-                    <p className="text-[11px] text-text2">{opt.sub}</p>
-                  </div>
-                </label>
-              ))}
-              <p className="text-[10px] text-text2 italic">Le changement de langue s'applique au prochain démarrage.</p>
-            </section>
+              <p className="text-xs text-text2">Seul le français est disponible pour l'instant.</p>
+            </div>
           )}
-        </>
+        </section>
       )}
 
       {/* ── Profil ─────────────────────────────────────────────────────────── */}
       {panel === 'profile' && (
-        <section className="bg-card border border-border rounded-xl p-5 space-y-4">
+        <section className="space-y-4">
           <h2 className="text-sm font-semibold text-text">Mon Profil</h2>
           <Input label="Email" type="email" placeholder="contact@example.com" value={profileEmail} onChange={e => setProfileEmail(e.target.value)} />
-          <div className="flex gap-2 items-end">
-            <Input label="Dossier export vidéo" placeholder="C:\Users\...\Videos" value={exportDir} onChange={e => setExportDir(e.target.value)} className="flex-1" />
-            <Button variant="secondary" size="sm" onClick={() => alert('Sélection du dossier — IPC à brancher')}>📂</Button>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4 pt-3 border-t border-border">
-            <Input label="Mot de passe (laisser vide pour ne pas changer)" type="password" placeholder="••••••" value={newPassword} onChange={e => setNewPassword(e.target.value)} />
-            <Input label="Confirmer" type="password" placeholder="••••••" value={confirmPassword} onChange={e => setConfirm(e.target.value)} />
-          </div>
-
-          {profileEmail.trim() && profileEmail.trim() !== user.email && (
-            <p className="text-xs text-warn bg-warn/10 border border-warn/20 rounded-lg px-3 py-2">
-              ⚠ Un email de confirmation sera envoyé à <strong>{profileEmail.trim()}</strong> pour valider le changement.
-            </p>
-          )}
+          <Input label="Nom complet" placeholder="Jean Dupont" value={profileName} onChange={e => setProfileName(e.target.value)} />
+          <Input label="Pseudo (visible par l'équipe)" placeholder="@jean" value={displayName} onChange={e => setDisplayName(e.target.value)} />
           <Button onClick={saveProfile} loading={saving} className="w-full">💾 Sauvegarder le profil</Button>
         </section>
       )}
@@ -572,71 +421,26 @@ export function Settings({ user, initialPanel }: SettingsProps) {
           <div className={`px-4 py-2.5 rounded-lg text-xs flex items-center gap-2 ${
             currentOrg ? 'bg-accent/10 border border-accent/30 text-accent' : 'bg-surface2 border border-border text-text2'
           }`}>
-            {currentOrg ? (
-              <>
-                <span>🏢</span>
-                <span>
-                  Tu modifies les clés <strong>partagées</strong> de l'organisation <strong>"{currentOrg.name}"</strong>.
-                  Elles sont utilisées par tous les membres.
-                  {!canEditOrgConnexions && <span className="text-warn"> · Lecture seule (admin requis)</span>}
-                </span>
-              </>
-            ) : (
-              <>
-                <span>👤</span>
-                <span>Tu modifies <strong>tes</strong> clés personnelles (mode solo). Bascule sur une organisation pour gérer ses clés partagées.</span>
-              </>
-            )}
+            {currentOrg
+              ? <><span>🏢</span><span>Mode organisation — <strong>{currentOrg.name}</strong>{!canEditOrgConnexions && <span className="text-warn"> · Lecture seule (admin requis)</span>}</span></>
+              : <><span>👤</span><span>Mode solo — ces clés sont privées à votre compte</span></>
+            }
           </div>
-          <section className="bg-card border border-border rounded-xl p-5 space-y-4">
-            <h2 className="text-sm font-semibold text-text">Connexions GéeLark</h2>
-            <Input
-              label="GéeLark Bearer Token"
-              type="password"
-              placeholder="Token API GéeLark…"
-              hint="Token API GéeLark (Settings → Open API)"
-              value={bearer}
-              onChange={e => setBearer(e.target.value)}
-            />
-            <Input
-              label="Proxy SOCKS5"
-              placeholder="socks5://user:pass@host:port"
-              hint="Format : socks5://user:pass@host:port"
-              value={proxy}
-              onChange={e => setProxy(e.target.value)}
-            />
-            <div className="flex gap-2">
-              <Button onClick={saveConnexions} loading={saving} disabled={!!currentOrg && !canEditOrgConnexions}>💾 Sauvegarder</Button>
-              <Button variant="secondary" onClick={testProxy} loading={testingProxy}>🔌 Tester proxy + IG</Button>
-            </div>
-            {proxyResult && (
-              <p className={`text-xs ${proxyResult.ok ? 'text-ok' : 'text-danger'}`}>
-                {proxyResult.ok ? '✓' : '✗'} {proxyResult.msg}
-              </p>
-            )}
-          </section>
 
-          {/* API Keys */}
-          <section className="bg-card border border-border rounded-xl p-5 space-y-4">
-            <h2 className="text-sm font-semibold text-text">🔑 Clés API</h2>
-            <Input
-              label="Groq API Key"
-              type="password"
-              placeholder="gsk_…"
-              hint="Gratuit sur groq.com → API Keys → Create"
-              value={groqKey}
-              onChange={e => setGroqKey(e.target.value)}
-            />
-            <Input
-              label="Anthropic API Key (Remix Vidéo — détection texte IA)"
-              type="password"
-              placeholder="sk-ant-…"
-              hint="console.anthropic.com → API Keys — utilisée pour Claude Vision dans Remix"
-              value={anthropicKey}
-              onChange={e => setAnthropicKey(e.target.value)}
-            />
+          <div className="space-y-4">
+            <h2 className="text-sm font-semibold text-text">Connexions GéeLark</h2>
+            <Input label="Bearer Token GéeLark" type="password" placeholder="Bearer …" value={bearer} onChange={e => setBearer(e.target.value)} disabled={!!currentOrg && !canEditOrgConnexions} />
+            <Input label="URL Proxy (optionnel)" placeholder="http://…" value={proxyUrl} onChange={e => setProxyUrl(e.target.value)} disabled={!!currentOrg && !canEditOrgConnexions} />
+            <Input label="Session ID Instagram" type="password" placeholder="sessionid=…" value={igSession} onChange={e => setIgSession(e.target.value)} disabled={!!currentOrg && !canEditOrgConnexions} />
+            <Button onClick={saveConnexions} loading={saving} disabled={!!currentOrg && !canEditOrgConnexions}>💾 Sauvegarder</Button>
+          </div>
+
+          <div className="space-y-4 pt-4 border-t border-border">
+            <h2 className="text-sm font-semibold text-text">Clés API</h2>
+            <Input label="Groq API Key" type="password" placeholder="gsk_…" value={groqKey} onChange={e => setGroqKey(e.target.value)} disabled={!!currentOrg && !canEditOrgConnexions} />
+            <Input label="Anthropic API Key" type="password" placeholder="sk-ant-…" value={anthropicKey} onChange={e => setAnthropicKey(e.target.value)} disabled={!!currentOrg && !canEditOrgConnexions} />
             <Button onClick={saveConnexions} loading={saving} disabled={!!currentOrg && !canEditOrgConnexions} className="w-full">💾 Sauvegarder les clés API</Button>
-          </section>
+          </div>
         </div>
       )}
 
@@ -698,6 +502,7 @@ function AdminPanel({ user: _user }: { user: User }) {
   const [plan, setPlan]       = useState('standard')
   const [notes, setNotes]     = useState('')
   const [creating, setCreating] = useState(false)
+  const [createErr, setCreateErr] = useState<string | null>(null)
   const [search, setSearch]   = useState('')
   const [copied, setCopied]   = useState<string | null>(null)
 
@@ -720,9 +525,12 @@ function AdminPanel({ user: _user }: { user: User }) {
 
   async function create() {
     setCreating(true)
+    setCreateErr(null)
     const expires_at = duration !== null ? new Date(Date.now() + duration * 86_400_000).toISOString() : null
-    await supabase.from('license_keys').insert({ key: newKey, expires_at, plan, notes: notes || null })
-    setNewKey(genKey()); setNotes(''); setCreating(false); load()
+    const { error } = await supabase.from('license_keys').insert({ key: newKey, expires_at, plan, notes: notes || null })
+    setCreating(false)
+    if (error) { setCreateErr(error.message); return }
+    setNewKey(genKey()); setNotes(''); load()
   }
 
   async function revoke(id: string) {
@@ -794,6 +602,7 @@ function AdminPanel({ user: _user }: { user: User }) {
           ))}
         </div>
         <Input value={notes} onChange={e => setNotes(e.target.value)} placeholder="Notes (ex: Discord @pseudo)" />
+        {createErr && <p className="text-xs text-red-400 text-center">{createErr}</p>}
         <Button onClick={create} loading={creating} className="w-full">+ Créer la clé</Button>
       </div>
 
