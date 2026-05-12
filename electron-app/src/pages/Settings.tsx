@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/Button'
@@ -7,6 +7,7 @@ import { OrganizationPanel } from '@/components/OrganizationPanel'
 import { useOrg } from '@/lib/orgContext'
 import { canSeeTab } from '@/lib/permissions'
 import { notifyConnectionsChanged } from '@/lib/connections'
+import { useLicense } from '@/lib/license'
 import {
   isMusicEnabled, setMusicEnabled,
   getVolume, setVolume,
@@ -57,11 +58,12 @@ function ToggleRow({
 }
 
 type GeneralTab = 'apparence' | 'sons' | 'langue'
-type Panel = 'general' | 'profile' | 'connexions' | 'organization'
+type Panel = 'general' | 'profile' | 'connexions' | 'organization' | 'admin'
 interface SettingsProps { user: User; initialPanel?: Panel }
 
 export function Settings({ user, initialPanel }: SettingsProps) {
   const { role, perms, currentOrg } = useOrg()
+  const license = useLicense()
   const canSeeConnexions = role ? canSeeTab(role, perms, 'settings') : true
   const canEditOrgConnexions = role === 'owner' || role === 'admin'
   const [panel, setPanel]     = useState<Panel>(() => {
@@ -333,6 +335,7 @@ export function Settings({ user, initialPanel }: SettingsProps) {
           { k: 'profile',      l: '👤 Profil'        },
           ...(canSeeConnexions ? [{ k: 'connexions' as const, l: '🔌 Connexions' }] : []),
           { k: 'organization', l: '🏢 Organisation'  },
+          ...(license.isSuperAdmin ? [{ k: 'admin' as const, l: '🛡 Admin' }] : []),
         ] as const).map(t => (
           <button
             key={t.k}
@@ -637,6 +640,9 @@ export function Settings({ user, initialPanel }: SettingsProps) {
         </div>
       )}
 
+      {/* ── Admin ───────────────────────────────────────────────────────────── */}
+      {panel === 'admin' && license.isSuperAdmin && <AdminPanel user={user} />}
+
       {/* Bottom save bar */}
       {error && (
         <div className="px-4 py-3 rounded-lg bg-danger/10 border border-danger/20 text-danger text-sm">{error}</div>
@@ -647,6 +653,178 @@ export function Settings({ user, initialPanel }: SettingsProps) {
           {saved && <span className="text-sm text-ok">✓ Sauvegardé</span>}
         </div>
       )}
+    </div>
+  )
+}
+
+// ── Admin panel (super admin only) ───────────────────────────────────────────
+interface LicenseKey {
+  id: string; key: string; user_id: string | null; created_at: string
+  activated_at: string | null; expires_at: string | null
+  is_active: boolean; plan: string; notes: string | null; user_email?: string
+}
+
+const DURATIONS = [
+  { label: '7j',   days: 7 },
+  { label: '30j',  days: 30 },
+  { label: '90j',  days: 90 },
+  { label: '1 an', days: 365 },
+  { label: '∞ vie', days: null },
+]
+
+function genKey() {
+  const c = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+  const s = () => Array.from({ length: 4 }, () => c[Math.floor(Math.random() * c.length)]).join('')
+  return `${s()}-${s()}-${s()}-${s()}`
+}
+
+function daysLeft(exp: string | null) {
+  if (!exp) return '∞ vie'
+  const d = Math.ceil((new Date(exp).getTime() - Date.now()) / 86_400_000)
+  return d < 0 ? 'Expiré' : d === 0 ? "Expire auj." : `${d}j`
+}
+
+function daysColor(exp: string | null) {
+  if (!exp) return 'text-purple-400'
+  const d = Math.ceil((new Date(exp).getTime() - Date.now()) / 86_400_000)
+  return d < 0 ? 'text-red-400' : d <= 7 ? 'text-orange-400' : 'text-green-400'
+}
+
+function AdminPanel({ user: _user }: { user: User }) {
+  const [keys, setKeys]       = useState<LicenseKey[]>([])
+  const [loading, setLoading] = useState(true)
+  const [newKey, setNewKey]   = useState(genKey)
+  const [duration, setDuration] = useState<number | null>(30)
+  const [plan, setPlan]       = useState('standard')
+  const [notes, setNotes]     = useState('')
+  const [creating, setCreating] = useState(false)
+  const [search, setSearch]   = useState('')
+  const [copied, setCopied]   = useState<string | null>(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    const { data } = await supabase.from('license_keys').select('*').order('created_at', { ascending: false })
+    if (data) {
+      const ids = [...new Set(data.filter(k => k.user_id).map(k => k.user_id!))]
+      let emailMap: Record<string, string> = {}
+      if (ids.length) {
+        const { data: profiles } = await supabase.from('profiles').select('id, email').in('id', ids)
+        profiles?.forEach(p => { emailMap[p.id] = p.email })
+      }
+      setKeys(data.map(k => ({ ...k, user_email: k.user_id ? emailMap[k.user_id] : undefined })))
+    }
+    setLoading(false)
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  async function create() {
+    setCreating(true)
+    const expires_at = duration !== null ? new Date(Date.now() + duration * 86_400_000).toISOString() : null
+    await supabase.from('license_keys').insert({ key: newKey, expires_at, plan, notes: notes || null })
+    setNewKey(genKey()); setNotes(''); setCreating(false); load()
+  }
+
+  async function revoke(id: string) {
+    await supabase.from('license_keys').update({ is_active: false }).eq('id', id); load()
+  }
+  async function del(id: string) {
+    await supabase.from('license_keys').delete().eq('id', id); load()
+  }
+  function copy(k: string) {
+    navigator.clipboard.writeText(k); setCopied(k); setTimeout(() => setCopied(null), 1500)
+  }
+
+  const stats = {
+    total:   keys.length,
+    dispo:   keys.filter(k => k.is_active && !k.user_id).length,
+    actives: keys.filter(k => k.is_active && !!k.user_id).length,
+    expirées: keys.filter(k => !!k.expires_at && new Date(k.expires_at) < new Date()).length,
+  }
+
+  const filtered = keys.filter(k => {
+    const q = search.toLowerCase()
+    return !q || k.key.toLowerCase().includes(q) || (k.user_email ?? '').toLowerCase().includes(q)
+  })
+
+  return (
+    <div className="space-y-5">
+      {/* Stats */}
+      <div className="grid grid-cols-4 gap-2">
+        {[
+          ['Total', stats.total, 'text-text'],
+          ['Dispo', stats.dispo, 'text-green-400'],
+          ['Actives', stats.actives, 'text-blue-400'],
+          ['Expirées', stats.expirées, 'text-red-400'],
+        ].map(([l, v, c]) => (
+          <div key={l as string} className="rounded-xl p-3 text-center" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(139,92,246,0.12)' }}>
+            <p className={`text-xl font-black ${c}`}>{v}</p>
+            <p className="text-[10px] text-text2 mt-0.5">{l}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Créer */}
+      <div className="rounded-xl p-4 space-y-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(139,92,246,0.15)' }}>
+        <p className="text-xs font-semibold text-text uppercase tracking-wider">Créer une clé</p>
+        <div className="flex gap-2">
+          <input
+            value={newKey}
+            onChange={e => setNewKey(e.target.value.toUpperCase())}
+            className="flex-1 bg-[#0d0a1a] border border-border rounded-lg px-3 py-2 text-sm font-mono tracking-widest text-text focus:outline-none focus:border-accent"
+          />
+          <button onClick={() => setNewKey(genKey())} className="px-3 py-2 rounded-lg text-text2 hover:text-text text-sm" style={{ background: 'rgba(255,255,255,0.05)' }}>↺</button>
+        </div>
+        <div className="flex flex-wrap gap-1">
+          {DURATIONS.map(d => (
+            <button key={d.label} onClick={() => setDuration(d.days)}
+              className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${duration === d.days ? 'text-white' : 'text-text2 hover:text-text'}`}
+              style={duration === d.days ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)' } : { background: 'rgba(255,255,255,0.05)' }}>
+              {d.label}
+            </button>
+          ))}
+        </div>
+        <div className="flex gap-2">
+          {['standard', 'pro', 'lifetime'].map(p => (
+            <button key={p} onClick={() => setPlan(p)}
+              className={`px-3 py-1 rounded-lg text-xs capitalize transition-all ${plan === p ? 'text-white' : 'text-text2'}`}
+              style={plan === p ? { background: 'rgba(139,92,246,0.3)', border: '1px solid rgba(139,92,246,0.5)' } : { background: 'rgba(255,255,255,0.05)' }}>
+              {p}
+            </button>
+          ))}
+        </div>
+        <Input value={notes} onChange={e => setNotes(e.target.value)} placeholder="Notes (ex: Discord @pseudo)" />
+        <Button onClick={create} loading={creating} className="w-full">+ Créer la clé</Button>
+      </div>
+
+      {/* Liste */}
+      <div className="space-y-2">
+        <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher clé ou email…" />
+        {loading ? <p className="text-text2 text-sm text-center py-6">Chargement…</p> : filtered.length === 0 ? (
+          <p className="text-text2 text-sm text-center py-6">Aucune clé</p>
+        ) : filtered.map(k => (
+          <div key={k.id} className={`rounded-xl px-3 py-2.5 flex flex-wrap items-center gap-2 ${!k.is_active ? 'opacity-50' : ''}`}
+            style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(139,92,246,0.1)' }}>
+            <button onClick={() => copy(k.key)} className="font-mono text-xs text-text tracking-widest hover:text-accent transition-colors">
+              {k.key} <span className="text-[10px] text-text2">{copied === k.key ? '✓' : '⎘'}</span>
+            </button>
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full capitalize" style={{ background: 'rgba(139,92,246,0.15)', color: '#a78bfa' }}>{k.plan}</span>
+            {!k.is_active
+              ? <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-500/10 text-red-400">Révoquée</span>
+              : k.user_id
+                ? <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400">Activée</span>
+                : <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-green-500/10 text-green-400">Dispo</span>
+            }
+            <span className={`text-[11px] font-semibold ml-auto ${daysColor(k.expires_at)}`}>{daysLeft(k.expires_at)}</span>
+            {k.user_email && <span className="text-[10px] text-text2 truncate max-w-[140px]">{k.user_email}</span>}
+            {k.notes && <span className="text-[10px] text-text2 italic truncate max-w-[100px]">{k.notes}</span>}
+            <div className="flex gap-1">
+              {k.is_active && <button onClick={() => revoke(k.id)} className="text-[10px] px-2 py-0.5 rounded text-orange-400 hover:bg-orange-400/10">Révoquer</button>}
+              <button onClick={() => del(k.id)} className="text-[10px] px-2 py-0.5 rounded text-red-400 hover:bg-red-400/10">Suppr.</button>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
