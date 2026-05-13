@@ -69,7 +69,7 @@ export function buildWebAPI() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(opts),
       })
-      return r.json()
+      try { return await r.json() } catch { return { ok: false, error: `Erreur serveur (HTTP ${r.status})` } }
     },
 
     // ── Instagram HTML profile (web fallback) ──────────────────────────────
@@ -79,7 +79,7 @@ export function buildWebAPI() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: `https://www.instagram.com/${username}/`, isText: true }),
       })
-      return r.json()
+      try { return await r.json() } catch { return { ok: false, error: `Erreur serveur (HTTP ${r.status})` } }
     },
 
     // ── IG comments ────────────────────────────────────────────────────────
@@ -97,7 +97,7 @@ export function buildWebAPI() {
           },
         }),
       })
-      return r.json()
+      try { return await r.json() } catch { return { ok: false, error: `Erreur serveur (HTTP ${r.status})` } }
     },
 
     // ── Post IG comment ────────────────────────────────────────────────────
@@ -116,7 +116,7 @@ export function buildWebAPI() {
           body: `comment_text=${encodeURIComponent(opts.text)}`,
         }),
       })
-      return r.json()
+      try { return await r.json() } catch { return { ok: false, error: `Erreur serveur (HTTP ${r.status})` } }
     },
 
     // ── Groq ───────────────────────────────────────────────────────────────
@@ -129,7 +129,7 @@ export function buildWebAPI() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(opts),
       })
-      return r.json()
+      try { return await r.json() } catch { return { ok: false, error: `Erreur serveur (HTTP ${r.status})` } }
     },
 
     // ── Anthropic Vision ───────────────────────────────────────────────────
@@ -141,7 +141,7 @@ export function buildWebAPI() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(opts),
       })
-      return r.json()
+      try { return await r.json() } catch { return { ok: false, error: `Erreur serveur (HTTP ${r.status})` } }
     },
 
     // ── Fetch image as base64 data URL ──────────────────────────────────────
@@ -151,7 +151,7 @@ export function buildWebAPI() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: opts.url, headers: opts.headers }),
       })
-      return r.json()
+      try { return await r.json() } catch { return { ok: false, error: `Erreur serveur (HTTP ${r.status})` } }
     },
 
     // ── Fetch IG video URL ─────────────────────────────────────────────────
@@ -161,7 +161,7 @@ export function buildWebAPI() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: opts.url }),
       })
-      return r.json()
+      try { return await r.json() } catch { return { ok: false, error: `Erreur serveur (HTTP ${r.status})` } }
     },
 
     // ── File pickers ───────────────────────────────────────────────────────

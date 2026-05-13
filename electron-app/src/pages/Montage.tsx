@@ -86,7 +86,7 @@ function fmtTime(s: number): string {
 function basename(p: string) { return p.replace(/\\/g, '/').split('/').pop() ?? p }
 function localSrc(p: string | null | undefined): string | null {
   if (!p) return null
-  if (p.startsWith('http')) return p
+  if (p.startsWith('http') || p.startsWith('blob:') || p.startsWith('data:')) return p
   const n = p.replace(/\\/g, '/')
   const withSlash = n.startsWith('/') ? n : `/${n}`
   return `localvideo://${encodeURI(withSlash)}`

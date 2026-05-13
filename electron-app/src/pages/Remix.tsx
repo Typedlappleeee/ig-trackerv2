@@ -42,6 +42,7 @@ function fmtTime(s: number): string {
 }
 
 function localVideoUrl(filePath: string): string {
+  if (filePath.startsWith('blob:') || filePath.startsWith('http') || filePath.startsWith('data:')) return filePath
   let n = filePath.replace(/\\/g, '/')
   if (!n.startsWith('/')) n = '/' + n
   return 'localvideo://' + n
