@@ -13,10 +13,10 @@ export const CREDIT_COSTS = {
 } as const
 
 export const CREDIT_PACKS = [
-  { credits: 100,  price: 2,   label: '100 crédits',  bonus: '' },
-  { credits: 500,  price: 8,   label: '500 crédits',  bonus: '+25 bonus' },
-  { credits: 1500, price: 20,  label: '1 500 crédits', bonus: '+150 bonus' },
-  { credits: 5000, price: 55,  label: '5 000 crédits', bonus: '+500 bonus' },
+  { credits: 100,  price: 4.99,  label: '100 crédits',   bonus: '' },
+  { credits: 500,  price: 19.99, label: '500 crédits',   bonus: '+25 bonus' },
+  { credits: 1500, price: 49.99, label: '1 500 crédits', bonus: '+150 bonus' },
+  { credits: 5000, price: 149.99, label: '5 000 crédits', bonus: '+500 bonus' },
 ]
 
 export interface CreditState {

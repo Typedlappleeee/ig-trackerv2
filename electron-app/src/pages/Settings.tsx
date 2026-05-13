@@ -813,10 +813,10 @@ function SubscriptionPanel() {
         <p className="text-xs font-black text-text uppercase tracking-wider mb-4">Acheter des crédits</p>
         <div className="grid grid-cols-2 gap-3">
           {[
-            { credits: 100,  price: 2,  label: '100 crédits',   bonus: '' },
-            { credits: 500,  price: 8,  label: '500 crédits',   bonus: '+ 25 bonus' },
-            { credits: 1500, price: 20, label: '1 500 crédits', bonus: '+ 150 bonus' },
-            { credits: 5000, price: 55, label: '5 000 crédits', bonus: '+ 500 bonus' },
+            { credits: 100,  price: 4.99,   label: '100 crédits',   bonus: '' },
+            { credits: 500,  price: 19.99,  label: '500 crédits',   bonus: '+ 25 bonus' },
+            { credits: 1500, price: 49.99,  label: '1 500 crédits', bonus: '+ 150 bonus' },
+            { credits: 5000, price: 149.99, label: '5 000 crédits', bonus: '+ 500 bonus' },
           ].map(pack => (
             <a
               key={pack.credits}
@@ -834,7 +834,7 @@ function SubscriptionPanel() {
           ))}
         </div>
         <p className="text-[10px] text-text2/50 mt-3 text-center">
-          Les crédits sont ajoutés par code après paiement. 1€ = 50 crédits.
+          Les crédits sont ajoutés par code après paiement.
         </p>
       </div>
 

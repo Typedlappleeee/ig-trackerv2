@@ -91,7 +91,7 @@ export async function activateKey(key: string, userId: string): Promise<{ succes
   // Step 1: verify key exists and is unclaimed (needs lk_unactivated_select policy)
   const { data: existing, error: selectErr } = await supabase
     .from('license_keys')
-    .select('id')
+    .select('id, plan')
     .eq('key', normalized)
     .is('user_id', null)
     .eq('is_active', true)
@@ -107,6 +107,13 @@ export async function activateKey(key: string, userId: string): Promise<{ succes
     .eq('id', existing.id)
 
   if (updateErr) return { success: false, error: updateErr.message }
+
+  // Step 3: grant monthly credits for the plan (best-effort; ignore errors)
+  try {
+    const { maybeGrantMonthlyCredits } = await import('./credits')
+    await maybeGrantMonthlyCredits(userId, (existing as { plan?: string }).plan ?? 'standard')
+  } catch { /* ignore */ }
+
   return { success: true }
 }
 

@@ -85,6 +85,7 @@ export function Licences({ user: _user }: Props) {
   const [ccGenCode, setCcGenCode]       = useState(generateCreditCode)
   const [ccAmount, setCcAmount]         = useState(500)
   const [ccNotes, setCcNotes]           = useState('')
+  const [ccCreateErr, setCcCreateErr]   = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -125,13 +126,17 @@ export function Licences({ user: _user }: Props) {
 
   async function createCreditCode() {
     setCcCreating(true)
+    setCcCreateErr(null)
     const { error } = await supabase.from('credit_codes').insert({
       code: ccGenCode,
       amount: ccAmount,
       notes: ccNotes || null,
+      created_by: _user.id,
     })
     setCcCreating(false)
-    if (!error) {
+    if (error) {
+      setCcCreateErr(error.message)
+    } else {
       setCcGenCode(generateCreditCode())
       setCcNotes('')
       loadCreditCodes()
@@ -397,6 +402,9 @@ export function Licences({ user: _user }: Props) {
           <Button onClick={createCreditCode} disabled={ccCreating || !ccGenCode.trim() || ccAmount < 1}>
             {ccCreating ? 'Création…' : '+ Créer le code'}
           </Button>
+          {ccCreateErr && (
+            <p className="text-xs text-red-400 mt-2">Erreur : {ccCreateErr}</p>
+          )}
         </div>
 
         {/* Code list */}
