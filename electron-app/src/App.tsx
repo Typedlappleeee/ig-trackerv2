@@ -578,6 +578,7 @@ function AppContent({ user }: { user: User }) {
     return (
       <LicenseGate
         userId={user.id}
+        email={user.email ?? null}
         onActivated={() => checkLicense(user.id, currentOrg?.id ?? null).then(setLicense)}
       />
     )
