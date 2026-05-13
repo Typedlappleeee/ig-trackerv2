@@ -52,7 +52,7 @@ export function buildWebAPI() {
     }) {
       let r: Response
       try {
-        r = await fetch('/api/geelark', {
+        r = await fetch('/api/gx', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(opts),
@@ -226,7 +226,7 @@ export function buildWebAPI() {
     async uploadVideoGeelark(opts: { bearer: string; filePath: string }) {
       try {
         // Step 1: get presigned upload URL via our proxy
-        const urlRes = await fetch('/api/geelark', {
+        const urlRes = await fetch('/api/gx', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
