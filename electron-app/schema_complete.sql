@@ -649,6 +649,9 @@ CREATE TABLE IF NOT EXISTS public.credit_codes (
 
 ALTER TABLE public.user_credits ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "users_read_own_credits" ON public.user_credits;
+DROP POLICY IF EXISTS "superadmin_all_credits" ON public.user_credits;
+
 CREATE POLICY "users_read_own_credits" ON public.user_credits
   FOR SELECT USING (user_id = auth.uid());
 
@@ -658,6 +661,10 @@ CREATE POLICY "superadmin_all_credits" ON public.user_credits
   );
 
 ALTER TABLE public.credit_codes ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "superadmin_manage_credit_codes" ON public.credit_codes;
+DROP POLICY IF EXISTS "anyone_read_active_codes"       ON public.credit_codes;
+DROP POLICY IF EXISTS "users_claim_codes"              ON public.credit_codes;
 
 CREATE POLICY "superadmin_manage_credit_codes" ON public.credit_codes
   FOR ALL USING (
