@@ -7,6 +7,7 @@ export interface LicenseStatus {
   daysLeft: number | null  // null = lifetime
   source: 'own' | 'org_owner' | 'none'
   isSuperAdmin: boolean
+  plan: 'standard' | 'pro' | 'lifetime' | null
 }
 
 export async function checkLicense(userId: string, orgId?: string | null): Promise<LicenseStatus> {
@@ -19,13 +20,13 @@ export async function checkLicense(userId: string, orgId?: string | null): Promi
       .maybeSingle()
 
     if (profile?.is_super_admin) {
-      return { valid: true, expiresAt: null, daysLeft: null, source: 'own', isSuperAdmin: true }
+      return { valid: true, expiresAt: null, daysLeft: null, source: 'own', isSuperAdmin: true, plan: 'pro' }
     }
 
     // Check own active key (table may not exist yet → silently skip)
     const { data: ownKey, error: ownErr } = await supabase
       .from('license_keys')
-      .select('expires_at')
+      .select('expires_at, plan')
       .eq('user_id', userId)
       .eq('is_active', true)
       .maybeSingle()
@@ -34,7 +35,8 @@ export async function checkLicense(userId: string, orgId?: string | null): Promi
       const expiresAt = ownKey.expires_at ? new Date(ownKey.expires_at) : null
       if (!expiresAt || expiresAt > new Date()) {
         const daysLeft = expiresAt ? Math.ceil((expiresAt.getTime() - Date.now()) / 86_400_000) : null
-        return { valid: true, expiresAt, daysLeft, source: 'own', isSuperAdmin: false }
+        const plan = (ownKey.plan as LicenseStatus['plan']) ?? 'standard'
+        return { valid: true, expiresAt, daysLeft, source: 'own', isSuperAdmin: false, plan }
       }
     }
 
@@ -55,13 +57,13 @@ export async function checkLicense(userId: string, orgId?: string | null): Promi
           .maybeSingle()
 
         if (ownerProfile?.is_super_admin) {
-          return { valid: true, expiresAt: null, daysLeft: null, source: 'org_owner', isSuperAdmin: false }
+          return { valid: true, expiresAt: null, daysLeft: null, source: 'org_owner', isSuperAdmin: false, plan: 'pro' }
         }
 
         // Owner has an active license key → all members get access
         const { data: ownerKey, error: ownerErr } = await supabase
           .from('license_keys')
-          .select('expires_at')
+          .select('expires_at, plan')
           .eq('user_id', org.owner_id)
           .eq('is_active', true)
           .maybeSingle()
@@ -70,7 +72,8 @@ export async function checkLicense(userId: string, orgId?: string | null): Promi
           const expiresAt = ownerKey.expires_at ? new Date(ownerKey.expires_at) : null
           if (!expiresAt || expiresAt > new Date()) {
             const daysLeft = expiresAt ? Math.ceil((expiresAt.getTime() - Date.now()) / 86_400_000) : null
-            return { valid: true, expiresAt, daysLeft, source: 'org_owner', isSuperAdmin: false }
+            const plan = (ownerKey.plan as LicenseStatus['plan']) ?? 'standard'
+            return { valid: true, expiresAt, daysLeft, source: 'org_owner', isSuperAdmin: false, plan }
           }
         }
       }
@@ -79,7 +82,7 @@ export async function checkLicense(userId: string, orgId?: string | null): Promi
     // Network error or schema not applied yet — fail open to avoid blocking the user
   }
 
-  return { valid: false, expiresAt: null, daysLeft: null, source: 'none', isSuperAdmin: false }
+  return { valid: false, expiresAt: null, daysLeft: null, source: 'none', isSuperAdmin: false, plan: null }
 }
 
 export async function activateKey(key: string, userId: string): Promise<{ success: boolean; error?: string }> {
@@ -109,7 +112,7 @@ export async function activateKey(key: string, userId: string): Promise<{ succes
 
 // React context so any component can read the license status
 export const LicenseContext = createContext<LicenseStatus>({
-  valid: false, expiresAt: null, daysLeft: null, source: 'none', isSuperAdmin: false,
+  valid: false, expiresAt: null, daysLeft: null, source: 'none', isSuperAdmin: false, plan: null,
 })
 
 export function useLicense() {

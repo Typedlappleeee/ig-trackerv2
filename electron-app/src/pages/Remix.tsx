@@ -6,6 +6,7 @@ import { BankPicker } from './Bank'
 import { playSuccess, playWhoosh, playError } from '@/lib/sounds'
 import { supabase } from '@/lib/supabase'
 import { uploadVideoFromPath, type UploadScope } from '@/lib/storage'
+import { checkAndDeductCredits, CREDIT_COSTS } from '@/lib/credits'
 import { useOrg } from '@/lib/orgContext'
 import { logActivity } from '@/lib/activityLog'
 import { MassRemix } from './MassRemix'
@@ -20,8 +21,10 @@ interface TextOverlayUI {
   id:        number
   text:      string
   position:  string
-  x:         string
-  y:         string
+  x:         string   // FFmpeg expression for rendering
+  y:         string   // FFmpeg expression for rendering
+  xPercent:  number   // 0-100 for CSS preview positioning
+  yPercent:  number   // 0-100 for CSS preview positioning
   fontSize:  number
   fontColor: string
   bold:      boolean
@@ -39,6 +42,7 @@ function fmtTime(s: number): string {
 }
 
 function localVideoUrl(filePath: string): string {
+  if (filePath.startsWith('blob:') || filePath.startsWith('http') || filePath.startsWith('data:')) return filePath
   let n = filePath.replace(/\\/g, '/')
   if (!n.startsWith('/')) n = '/' + n
   return 'localvideo://' + n
@@ -128,8 +132,13 @@ function SplitScrubber({ duration, splitTime, onChange }: { duration: number; sp
 }
 
 // ── Video card ─────────────────────────────────────────────────────────────────
-function VideoCard({ label, filePath, accent = '#8b5cf6', badge, onDurationLoad }: {
-  label: string; filePath: string | null; accent?: string; badge?: string; onDurationLoad?: (d: number) => void
+function VideoCard({ label, filePath, accent = '#8b5cf6', badge, onDurationLoad, overlays }: {
+  label: string
+  filePath: string | null
+  accent?: string
+  badge?: string
+  onDurationLoad?: (d: number) => void
+  overlays?: Array<{ text: string; xPercent: number; yPercent: number; fontSize: number; fontColor: string; bold?: boolean }>
 }) {
   const videoRef = useRef<HTMLVideoElement>(null)
   useEffect(() => {
@@ -141,7 +150,7 @@ function VideoCard({ label, filePath, accent = '#8b5cf6', badge, onDurationLoad 
         <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: accent }}>{label}</span>
         {badge && <span className="text-[9px] font-black px-2 py-0.5 rounded-full" style={{ background: `${accent}22`, color: accent }}>{badge}</span>}
       </div>
-      <div className="relative" style={{ aspectRatio: '9/16', background: '#000' }}>
+      <div className="relative" style={{ aspectRatio: '9/16', background: '#000', containerType: 'inline-size' } as React.CSSProperties}>
         {filePath ? (
           <video ref={videoRef} className="w-full h-full object-contain" controls
             onLoadedMetadata={() => { if (videoRef.current && onDurationLoad) onDurationLoad(videoRef.current.duration) }} />
@@ -151,6 +160,26 @@ function VideoCard({ label, filePath, accent = '#8b5cf6', badge, onDurationLoad 
             <p className="text-xs text-center px-4" style={{ color: 'rgba(196,181,253,0.35)' }}>Aucune vidéo sélectionnée</p>
           </div>
         )}
+        {overlays?.map((ov, i) => (
+          <div
+            key={i}
+            className="absolute pointer-events-none"
+            style={{
+              left: `${ov.xPercent}%`,
+              top: `${ov.yPercent}%`,
+              transform: 'translate(-50%, -50%)',
+              fontSize: `calc(${(ov.fontSize / 10.8).toFixed(2)} * 1cqw)`,
+              color: ov.fontColor,
+              fontWeight: ov.bold ? '900' : 'normal',
+              textShadow: '0 0 8px rgba(0,0,0,1), 1px 1px 0 rgba(0,0,0,0.9), -1px -1px 0 rgba(0,0,0,0.9)',
+              whiteSpace: 'nowrap',
+              zIndex: 10,
+              lineHeight: 1.1,
+            }}
+          >
+            {ov.text}
+          </div>
+        ))}
       </div>
     </div>
   )
@@ -267,23 +296,7 @@ export function Remix({ user }: RemixProps) {
         { type: 'text', text: `[Frame ${i} — t=${f.timestamp}s]` },
       ])
       const interval = splitTime / (fr.frames.length || 1)
-      const prompt = `These are ${fr.frames.length} frames from a ${splitTime.toFixed(1)}s video clip (vertical 9:16 format, output resolution 1080×1920).
-Identify ALL burned-in text overlays (titles, captions, subtitles, watermarks). For each return:
-- text: the exact string
-- xPercent: 0-100 — horizontal center of the text block as % of frame width
-- yPercent: 0-100 — vertical center of the text block as % of frame height
-- fontSizePx: exact font size in pixels at 1080px wide × 1920px tall resolution
-- fontColor: CSS hex color (e.g. "#ffffff", "#ffff00")
-- bold: true if the text appears bold or heavy weight
-- startFrame: first frame index where this text is visible
-- endFrame: last frame index where this text is visible
-
-IMPORTANT: xPercent and yPercent must be the CENTER of the text, not the corner.
-Match the original position as precisely as possible.
-
-Return ONLY a valid JSON array, no explanation:
-[{"text":"...","xPercent":50,"yPercent":85,"fontSizePx":72,"fontColor":"#ffffff","bold":true,"startFrame":0,"endFrame":5}]
-If no text overlays exist return [].`
+      const prompt = `These are ${fr.frames.length} frames from a ${splitTime.toFixed(1)}s video clip (vertical 9:16 format, output resolution 1080×1920).\nIdentify ALL burned-in text overlays (titles, captions, subtitles, watermarks). For each return:\n- text: the exact string\n- xPercent: 0-100 — horizontal center of the text block as % of frame width\n- yPercent: 0-100 — vertical center of the text block as % of frame height\n- fontSizePx: exact font size in pixels at 1080px wide × 1920px tall resolution\n- fontColor: CSS hex color (e.g. "#ffffff", "#ffff00")\n- bold: true if the text appears bold or heavy weight\n- startFrame: first frame index where this text is visible\n- endFrame: last frame index where this text is visible\n\nIMPORTANT: xPercent and yPercent must be the CENTER of the text, not the corner.\nMatch the original position as precisely as possible.\n\nReturn ONLY a valid JSON array, no explanation:\n[{"text":"...","xPercent":50,"yPercent":85,"fontSizePx":72,"fontColor":"#ffffff","bold":true,"startFrame":0,"endFrame":5}]\nIf no text overlays exist return [].`
       const res = await window.electronAPI!.anthropicVisionRequest!({
         apiKey: anthropicKey.trim(), model: 'claude-haiku-4-5-20251001',
         messages: [{ role: 'user', content: [...imageBlocks, { type: 'text', text: prompt }] }],
@@ -303,6 +316,8 @@ If no text overlays exist return [].`
           position: 'center',
           x: xExpr,
           y: yExpr,
+          xPercent: Math.max(1, Math.min(99, item.xPercent ?? 50)),
+          yPercent: Math.max(1, Math.min(97, item.yPercent ?? 85)),
           fontSize: Math.round(Math.max(16, Math.min(400, item.fontSizePx ?? 72))),
           fontColor: item.fontColor ?? '#ffffff',
           bold: item.bold ?? true,
@@ -347,6 +362,13 @@ If no text overlays exist return [].`
 
   async function generate() {
     if (!originalPath || !newPhase1Path) return
+
+    const creditRes = await checkAndDeductCredits(user.id, CREDIT_COSTS.remix)
+    if (!creditRes.ok) {
+      setResult({ ok: false, error: `Crédits insuffisants (solde : ${creditRes.balance ?? 0})` })
+      return
+    }
+
     const outputPath = await window.electronAPI?.pickOutputFile?.({ defaultName: 'remix_output.mp4' })
     if (!outputPath) return
     setBankDone(false)
@@ -561,7 +583,12 @@ If no text overlays exist return [].`
         </div>
 
         <div className="space-y-4">
-          <VideoCard label="Référence (Phase 1 originale)" filePath={originalPath} accent="#8b5cf6" />
+          <VideoCard
+            label="Référence (Phase 1 originale)"
+            filePath={originalPath}
+            accent="#8b5cf6"
+            overlays={detectedOverlays.length > 0 ? detectedOverlays : undefined}
+          />
           <VideoCard label="Nouvelle Phase 1" filePath={newPhase1Path} accent="#ec4899" />
         </div>
       </div>

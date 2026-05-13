@@ -5,12 +5,13 @@ import { ToastProvider } from './components/Toast'
 import './index.css'
 
 // When running in a browser (Vercel/web), window.electronAPI doesn't exist.
-// Inject a polyfill that routes all calls through Vercel API routes + ffmpeg.wasm.
+// Inject the polyfill synchronously so it's ready before any component renders.
+import { buildWebAPI } from './lib/webAPI'
 if (!window.electronAPI) {
-  import('./lib/webAPI').then(({ buildWebAPI }) => {
-    // @ts-expect-error – patching the global
-    window.electronAPI = buildWebAPI()
-  })
+  // @ts-expect-error – patching the global
+  window.electronAPI = buildWebAPI()
+  // @ts-expect-error
+  window.__IS_WEB = true
 }
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

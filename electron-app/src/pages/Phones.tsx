@@ -8,6 +8,7 @@ import { fetchAllPhones, geelarkStatusLabel, extractInstagramSessionId } from '@
 import * as poller from '@/lib/phonePoller'
 import { Button }  from '@/components/ui/Button'
 import { Spinner } from '@/components/ui/Spinner'
+import { useLicense } from '@/lib/license'
 
 interface PhonesProps { user: User }
 
@@ -444,9 +445,12 @@ function NoteCell({ phone, onSave }: { phone: Phone; onSave: (id: string, v: str
 }
 
 // ────────────────────────────────────────────────────────────────────────────
+const STANDARD_PHONE_LIMIT = 100
+
 export function Phones({ user }: PhonesProps) {
   const { currentOrg, role, perms } = useOrg()
   const conns = useConnections(user)
+  const license = useLicense()
   const [phones, setPhones]           = useState<Phone[]>([])
   const [loading, setLoading]         = useState(true)
   const [syncing, setSyncing]         = useState(false)
@@ -533,7 +537,10 @@ export function Phones({ user }: PhonesProps) {
     q = currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
     const { data, error: err } = await q
     if (err) setError('Erreur lors du chargement.')
-    else setPhones(data ?? [])
+    else {
+      const all = data ?? []
+      setPhones(isPro ? all : all.slice(0, STANDARD_PHONE_LIMIT))
+    }
     setLoading(false)
     // Trigger an immediate poll if one hasn't happened recently
     poller.pollNow()
@@ -716,6 +723,9 @@ export function Phones({ user }: PhonesProps) {
     }
   }
 
+  const isPro = license.plan === 'pro' || license.plan === 'lifetime' || license.isSuperAdmin
+  const phoneLimit = isPro ? Infinity : STANDARD_PHONE_LIMIT
+
   // ── Filtered view ─────────────────────────────────────────────────────────
   const visible = phones.filter(p => {
     // Per-member phone-group restriction (org mode only)
@@ -881,6 +891,15 @@ export function Phones({ user }: PhonesProps) {
           </button>
         ))}
       </div>
+
+      {/* Phone limit banner for standard plan */}
+      {!isPro && phones.length >= STANDARD_PHONE_LIMIT && (
+        <div className="flex items-center gap-3 px-4 py-3 rounded-xl mb-2"
+          style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.25)', color: '#fbbf24' }}>
+          <span>⚠</span>
+          <span className="text-xs">Plan Standard : limite de {STANDARD_PHONE_LIMIT} téléphones atteinte. Passe au plan Pro pour un accès illimité.</span>
+        </div>
+      )}
 
       {/* Table */}
       {loading ? (

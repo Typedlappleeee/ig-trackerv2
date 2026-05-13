@@ -174,13 +174,19 @@ export async function downloadToTemp(path: string): Promise<string> {
   return r.path
 }
 
-// Resolve a content_bank item to a local file path that exists on disk now.
-// - If storage_path is set: download from cloud to temp dir.
-// - If only file_url is set (legacy): return as-is (user is on the original PC).
-// Throws if neither works.
+// Resolve a content_bank item to a playable URL.
+// On web: returns a signed Supabase URL directly (avoids full download).
+// On Electron: downloads to a local temp file and returns the path.
 export async function resolveContentToLocalPath(item: Pick<ContentItem, 'storage_path' | 'file_url'>): Promise<string> {
-  if (item.storage_path) return downloadToTemp(item.storage_path)
-  if (item.file_url)     return item.file_url
+  if (item.storage_path) {
+    if ((window as any).__IS_WEB) {
+      const url = await getSignedUrl(item.storage_path)
+      if (!url) throw new Error('URL signée indisponible')
+      return url
+    }
+    return downloadToTemp(item.storage_path)
+  }
+  if (item.file_url) return item.file_url
   throw new Error('Aucune source vidéo disponible')
 }
 

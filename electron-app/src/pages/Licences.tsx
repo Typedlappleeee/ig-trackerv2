@@ -47,6 +47,23 @@ function daysLeftColor(expiresAt: string | null): string {
   return 'text-green-400'
 }
 
+interface CreditCode {
+  id: string
+  code: string
+  amount: number
+  used_by: string | null
+  used_at: string | null
+  is_active: boolean
+  notes: string | null
+  created_at: string
+}
+
+function generateCreditCode(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+  const seg = () => Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
+  return `CR-${seg()}-${seg()}`
+}
+
 interface Props { user: User }
 
 export function Licences({ user: _user }: Props) {
@@ -60,6 +77,14 @@ export function Licences({ user: _user }: Props) {
   const [search, setSearch]   = useState('')
   const [filter, setFilter]   = useState<'all' | 'active' | 'used' | 'expired'>('all')
   const [copied, setCopied]   = useState<string | null>(null)
+
+  // Credit codes
+  const [creditCodes, setCreditCodes]   = useState<CreditCode[]>([])
+  const [ccLoading, setCcLoading]       = useState(true)
+  const [ccCreating, setCcCreating]     = useState(false)
+  const [ccGenCode, setCcGenCode]       = useState(generateCreditCode)
+  const [ccAmount, setCcAmount]         = useState(500)
+  const [ccNotes, setCcNotes]           = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -85,6 +110,38 @@ export function Licences({ user: _user }: Props) {
   }, [])
 
   useEffect(() => { load() }, [load])
+
+  const loadCreditCodes = useCallback(async () => {
+    setCcLoading(true)
+    const { data } = await supabase
+      .from('credit_codes')
+      .select('*')
+      .order('created_at', { ascending: false })
+    setCreditCodes(data ?? [])
+    setCcLoading(false)
+  }, [])
+
+  useEffect(() => { loadCreditCodes() }, [loadCreditCodes])
+
+  async function createCreditCode() {
+    setCcCreating(true)
+    const { error } = await supabase.from('credit_codes').insert({
+      code: ccGenCode,
+      amount: ccAmount,
+      notes: ccNotes || null,
+    })
+    setCcCreating(false)
+    if (!error) {
+      setCcGenCode(generateCreditCode())
+      setCcNotes('')
+      loadCreditCodes()
+    }
+  }
+
+  async function revokeCreditCode(id: string) {
+    await supabase.from('credit_codes').update({ is_active: false }).eq('id', id)
+    loadCreditCodes()
+  }
 
   async function createKey() {
     setCreating(true)
@@ -306,6 +363,82 @@ export function Licences({ user: _user }: Props) {
             ))}
           </div>
         )}
+      </div>
+
+      {/* ── Credit Codes ──────────────────────────────────────────────────── */}
+      <div className="space-y-4 pt-4 border-t border-border">
+        <div>
+          <h2 className="text-base font-bold text-text">💎 Codes crédit</h2>
+          <p className="text-xs text-text2 mt-0.5">Génère des codes que les utilisateurs peuvent échanger contre des crédits</p>
+        </div>
+
+        {/* Create form */}
+        <div className="rounded-2xl p-5 space-y-4" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(139,92,246,0.18)' }}>
+          <p className="text-xs font-black text-text uppercase tracking-wider">Nouveau code</p>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="space-y-1">
+              <p className="text-[10px] text-text2 uppercase tracking-wider">Code</p>
+              <Input value={ccGenCode} onChange={e => setCcGenCode(e.target.value.toUpperCase())}
+                className="font-mono text-sm" />
+              <button onClick={() => setCcGenCode(generateCreditCode())}
+                className="text-[10px] text-accent hover:underline">↺ Régénérer</button>
+            </div>
+            <div className="space-y-1">
+              <p className="text-[10px] text-text2 uppercase tracking-wider">Montant (crédits)</p>
+              <Input type="number" value={ccAmount} onChange={e => setCcAmount(Number(e.target.value))}
+                min={1} className="text-sm" />
+            </div>
+            <div className="space-y-1">
+              <p className="text-[10px] text-text2 uppercase tracking-wider">Notes</p>
+              <Input value={ccNotes} onChange={e => setCcNotes(e.target.value)}
+                placeholder="Optionnel…" className="text-sm" />
+            </div>
+          </div>
+          <Button onClick={createCreditCode} disabled={ccCreating || !ccGenCode.trim() || ccAmount < 1}>
+            {ccCreating ? 'Création…' : '+ Créer le code'}
+          </Button>
+        </div>
+
+        {/* Code list */}
+        <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+          {ccLoading ? (
+            <div className="p-8 text-center text-text2 text-sm">Chargement…</div>
+          ) : creditCodes.length === 0 ? (
+            <div className="p-8 text-center text-text2 text-sm">Aucun code créé.</div>
+          ) : (
+            <div className="divide-y divide-border">
+              {creditCodes.map(c => (
+                <div key={c.id} className="flex items-center gap-3 px-4 py-3">
+                  <code className="flex-1 font-mono text-xs text-text">{c.code}</code>
+                  <span className="text-xs font-bold" style={{ color: '#a78bfa' }}>+{c.amount} crédits</span>
+                  {c.used_by ? (
+                    <span className="text-[10px] text-text2">Utilisé</span>
+                  ) : c.is_active ? (
+                    <span className="text-[10px] text-green-400">Disponible</span>
+                  ) : (
+                    <span className="text-[10px] text-red-400">Révoqué</span>
+                  )}
+                  {c.notes && <span className="text-[10px] text-text2 italic">{c.notes}</span>}
+                  <button
+                    onClick={() => { navigator.clipboard.writeText(c.code); setCopied(c.code); setTimeout(() => setCopied(null), 1500) }}
+                    className="text-[10px] px-2 py-1 rounded-lg transition-colors"
+                    style={{ color: copied === c.code ? '#34d399' : '#a78bfa', background: 'rgba(139,92,246,0.1)' }}
+                  >
+                    {copied === c.code ? '✓' : 'Copier'}
+                  </button>
+                  {c.is_active && !c.used_by && (
+                    <button
+                      onClick={() => revokeCreditCode(c.id)}
+                      className="text-[10px] px-2 py-1 rounded-lg text-orange-400 hover:bg-orange-400/10 transition-colors"
+                    >
+                      Révoquer
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )

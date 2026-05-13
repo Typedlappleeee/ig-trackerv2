@@ -8,6 +8,7 @@ import { useOrg } from '@/lib/orgContext'
 import { canSeeTab } from '@/lib/permissions'
 import { notifyConnectionsChanged } from '@/lib/connections'
 import { useLicense } from '@/lib/license'
+import { useCredits } from '@/lib/credits'
 import {
   isMusicEnabled, setMusicEnabled,
   getVolume, setVolume,
@@ -646,8 +647,14 @@ function AdminPanel({ user: _user }: { user: User }) {
 // ── Subscription panel ───────────────────────────────────────────────────────
 function SubscriptionPanel() {
   const license = useLicense()
+  const { balance: creditBalance, refresh: refreshCredits } = useCredits()
   const [licenseKey, setLicenseKey] = useState<string | null>(null)
-  const [copied, setCopied] = useState(false)
+  const [copied, setCopied]         = useState(false)
+
+  // Credit code redemption
+  const [creditCode, setCreditCode]       = useState('')
+  const [codeLoading, setCodeLoading]     = useState(false)
+  const [codeResult, setCodeResult]       = useState<{ ok: boolean; text: string } | null>(null)
 
   useEffect(() => {
     supabase.from('license_keys')
@@ -664,6 +671,24 @@ function SubscriptionPanel() {
     setTimeout(() => setCopied(false), 1500)
   }
 
+  async function handleRedeemCode(e: React.FormEvent) {
+    e.preventDefault()
+    if (!creditCode.trim()) return
+    setCodeLoading(true); setCodeResult(null)
+    const { redeemCreditCode } = await import('@/lib/credits')
+    const userId = (await supabase.auth.getUser()).data.user?.id
+    if (!userId) { setCodeLoading(false); setCodeResult({ ok: false, text: 'Non connecté' }); return }
+    const res = await redeemCreditCode(creditCode.trim(), userId)
+    setCodeLoading(false)
+    if (res.ok) {
+      setCodeResult({ ok: true, text: `✓ +${res.amount} crédits ajoutés ! Nouveau solde : ${res.balance}` })
+      setCreditCode('')
+      refreshCredits()
+    } else {
+      setCodeResult({ ok: false, text: res.error ?? 'Code invalide' })
+    }
+  }
+
   const statusColor = license.daysLeft === null ? '#34d399'
     : license.daysLeft <= 1  ? '#f87171'
     : license.daysLeft <= 7  ? '#fb923c'
@@ -675,6 +700,10 @@ function SubscriptionPanel() {
     : license.daysLeft <= 0 ? 'Expiré'
     : `Actif — ${license.daysLeft}j restants`
 
+  const planLabel = license.plan === 'pro' ? 'Pro' : license.plan === 'lifetime' ? 'À vie' : license.plan === 'standard' ? 'Standard' : '—'
+  const planCredits = license.plan === 'pro' || license.plan === 'lifetime' ? 5500 : license.plan === 'standard' ? 2000 : 0
+  const maxPhones   = license.plan === 'pro' || license.plan === 'lifetime' ? '∞' : '100'
+
   return (
     <div className="space-y-6">
       {/* Current status */}
@@ -685,6 +714,13 @@ function SubscriptionPanel() {
           <span className="text-sm text-text2">Statut</span>
           <span className="text-sm font-bold" style={{ color: statusColor }}>{statusLabel}</span>
         </div>
+
+        {license.plan && (
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-text2">Plan</span>
+            <span className="text-sm font-bold" style={{ color: '#a78bfa' }}>{planLabel}</span>
+          </div>
+        )}
 
         {license.expiresAt && (
           <div className="flex items-center justify-between">
@@ -714,9 +750,97 @@ function SubscriptionPanel() {
         )}
       </div>
 
-      {/* Pricing */}
+      {/* Credits */}
+      <div className="rounded-2xl p-5 space-y-4" style={{ background: 'rgba(139,92,246,0.04)', border: '1px solid rgba(139,92,246,0.2)' }}>
+        <p className="text-xs font-black text-text uppercase tracking-wider">💎 Crédits</p>
+
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-text2">Solde actuel</span>
+          <span className="text-2xl font-black" style={{ color: creditBalance < 10 ? '#f87171' : '#a78bfa' }}>
+            {creditBalance.toLocaleString('fr-FR')}
+          </span>
+        </div>
+
+        {planCredits > 0 && (
+          <div className="flex items-center justify-between text-xs text-text2">
+            <span>Crédits mensuels inclus (plan {planLabel})</span>
+            <span className="font-semibold text-text">{planCredits.toLocaleString('fr-FR')} / mois</span>
+          </div>
+        )}
+
+        <div className="rounded-xl p-3 space-y-1" style={{ background: 'rgba(0,0,0,0.2)' }}>
+          <p className="text-[10px] font-bold uppercase tracking-wider text-text2 mb-2">Coût des opérations</p>
+          <div className="flex justify-between text-xs"><span className="text-text2">✂ Montage vidéo</span><span className="text-text font-semibold">1 crédit</span></div>
+          <div className="flex justify-between text-xs"><span className="text-text2">🔀 Remix vidéo</span><span className="text-text font-semibold">2 crédits</span></div>
+        </div>
+
+        <div className="rounded-xl p-3" style={{ background: 'rgba(0,0,0,0.2)' }}>
+          <p className="text-[10px] font-bold uppercase tracking-wider text-text2 mb-2">Téléphones GéeLark</p>
+          <div className="flex justify-between text-xs">
+            <span className="text-text2">Maximum autorisé</span>
+            <span className="font-semibold" style={{ color: maxPhones === '∞' ? '#34d399' : '#a78bfa' }}>{maxPhones}</span>
+          </div>
+        </div>
+
+        {/* Redeem code */}
+        <div className="space-y-2 pt-2 border-t border-border/40">
+          <p className="text-xs font-semibold text-text2">Activer un code crédit</p>
+          <form onSubmit={handleRedeemCode} className="flex gap-2">
+            <input
+              value={creditCode}
+              onChange={e => { setCreditCode(e.target.value); setCodeResult(null) }}
+              placeholder="CODE-XXXX"
+              className="flex-1 bg-surface2 border border-border rounded-lg px-3 py-2 text-sm font-mono text-text placeholder:text-text2/40 focus:outline-none focus:border-accent/50 uppercase"
+              spellCheck={false}
+            />
+            <button
+              type="submit"
+              disabled={codeLoading || !creditCode.trim()}
+              className="px-4 py-2 rounded-lg text-xs font-bold text-white transition-all disabled:opacity-40"
+              style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)' }}
+            >
+              {codeLoading ? '…' : 'Activer'}
+            </button>
+          </form>
+          {codeResult && (
+            <p className="text-xs" style={{ color: codeResult.ok ? '#34d399' : '#f87171' }}>{codeResult.text}</p>
+          )}
+        </div>
+      </div>
+
+      {/* Credit packs */}
       <div>
-        <p className="text-xs font-black text-text uppercase tracking-wider mb-4">Acheter / Renouveler</p>
+        <p className="text-xs font-black text-text uppercase tracking-wider mb-4">Acheter des crédits</p>
+        <div className="grid grid-cols-2 gap-3">
+          {[
+            { credits: 100,  price: 2,  label: '100 crédits',   bonus: '' },
+            { credits: 500,  price: 8,  label: '500 crédits',   bonus: '+ 25 bonus' },
+            { credits: 1500, price: 20, label: '1 500 crédits', bonus: '+ 150 bonus' },
+            { credits: 5000, price: 55, label: '5 000 crédits', bonus: '+ 500 bonus' },
+          ].map(pack => (
+            <a
+              key={pack.credits}
+              href={`mailto:contact@scaleflow.app?subject=Achat%20crédits%20ScaleFlow%20—%20${pack.credits}&body=Bonjour%2C%20je%20souhaite%20acheter%20le%20pack%20${pack.credits}%20crédits%20(${pack.price}€).`}
+              className="rounded-xl p-4 flex flex-col gap-2 transition-all hover:scale-[1.02]"
+              style={{ background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.18)', textDecoration: 'none' }}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black text-text">{pack.label}</span>
+                <span className="text-xs font-black" style={{ color: '#a78bfa' }}>{pack.price}€</span>
+              </div>
+              {pack.bonus && <span className="text-[10px] text-green-400">{pack.bonus}</span>}
+              <div className="text-[10px] text-text2">{(pack.price / pack.credits * 100).toFixed(1)}c / crédit</div>
+            </a>
+          ))}
+        </div>
+        <p className="text-[10px] text-text2/50 mt-3 text-center">
+          Les crédits sont ajoutés par code après paiement. 1€ = 50 crédits.
+        </p>
+      </div>
+
+      {/* Plan pricing */}
+      <div>
+        <p className="text-xs font-black text-text uppercase tracking-wider mb-4">Abonnements</p>
         <div className="grid grid-cols-2 gap-4">
 
           {/* Standard */}
@@ -729,7 +853,7 @@ function SubscriptionPanel() {
               </div>
             </div>
             <ul className="space-y-1.5 flex-1">
-              {['1 compte utilisateur', 'Toutes les fonctionnalités', 'Mises à jour incluses', 'Support standard'].map(f => (
+              {['2 000 crédits / mois', 'Max 100 téléphones', 'Toutes les fonctionnalités', 'Support standard'].map(f => (
                 <li key={f} className="flex items-center gap-2 text-xs text-text2">
                   <span style={{ color: '#a78bfa' }}>✓</span>{f}
                 </li>
@@ -757,7 +881,7 @@ function SubscriptionPanel() {
               </div>
             </div>
             <ul className="space-y-1.5 flex-1">
-              {['Membres illimités (org)', 'Toutes fonctionnalités Standard', 'Accès prioritaire aux bêtas', 'Support prioritaire 24/7'].map(f => (
+              {['5 500 crédits / mois', 'Téléphones illimités', 'Membres illimités (org)', 'Support prioritaire 24/7'].map(f => (
                 <li key={f} className="flex items-center gap-2 text-xs text-text2">
                   <span style={{ color: '#f472b6' }}>✓</span>{f}
                 </li>
