@@ -119,9 +119,11 @@ module.exports = async (req, res) => {
 
         // Fetch the subscription to get price + period_end
         const sub = await stripeGET(`/subscriptions/${session.subscription}`, stripeKey)
-        const priceId = sub.items.data[0]?.price?.id
+        const item = sub.items.data[0]
+        const priceId = item?.price?.id
         const plan    = PLAN_BY_PRICE[priceId] || 'standard'
-        const expires = new Date(sub.current_period_end * 1000).toISOString()
+        const periodEnd = sub.current_period_end || item?.current_period_end
+        const expires = periodEnd ? new Date(periodEnd * 1000).toISOString() : null
 
         const { error: provErr } = await supabase.rpc('provision_stripe_subscription', {
           p_user_id:         userId,
@@ -150,7 +152,8 @@ module.exports = async (req, res) => {
         if (invoice.billing_reason === 'subscription_create') break
 
         const sub = await stripeGET(`/subscriptions/${subId}`, stripeKey)
-        const expires = new Date(sub.current_period_end * 1000).toISOString()
+        const periodEnd = sub.current_period_end || sub.items.data[0]?.current_period_end
+        const expires = periodEnd ? new Date(periodEnd * 1000).toISOString() : null
 
         // Just push expires_at + status forward; user_id/plan already set
         await supabase
@@ -169,12 +172,14 @@ module.exports = async (req, res) => {
       // ── Subscription updated (plan change, pause, past_due, etc) ─────────
       case 'customer.subscription.updated': {
         const sub = event.data.object
-        const priceId = sub.items.data[0]?.price?.id
+        const item = sub.items.data[0]
+        const priceId = item?.price?.id
         const plan    = PLAN_BY_PRICE[priceId] || null
+        const periodEnd = sub.current_period_end || item?.current_period_end
         const update  = {
           is_active:     (sub.status === 'active' || sub.status === 'trialing'),
           stripe_status: sub.status,
-          expires_at:    new Date(sub.current_period_end * 1000).toISOString(),
+          expires_at:    periodEnd ? new Date(periodEnd * 1000).toISOString() : null,
         }
         if (plan) update.plan = plan
         await supabase
