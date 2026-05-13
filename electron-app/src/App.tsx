@@ -522,6 +522,18 @@ function AppContent({ user }: { user: User }) {
     })
   }, [user.id, currentOrg?.id])
 
+  // Poll the license every 3s while it's invalid, so an incoming Stripe webhook
+  // auto-unblocks the user without needing a manual refresh.
+  useEffect(() => {
+    if (license && license.valid) return
+    const id = setInterval(() => {
+      checkLicense(user.id, currentOrg?.id ?? null).then(l => {
+        if (l.valid) setLicense(l)
+      })
+    }, 3000)
+    return () => clearInterval(id)
+  }, [license?.valid, user.id, currentOrg?.id])
+
   function refreshCredits() {
     fetchBalance(user.id).then(b => setCreditBalance(b))
   }
