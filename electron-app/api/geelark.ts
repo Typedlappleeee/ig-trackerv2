@@ -3,7 +3,6 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 // Proxy GéeLark API calls from the browser (bypasses CORS).
 // Also applies large-integer protection (GéeLark task IDs are 19-digit numbers
 // that JSON.parse() loses precision on — we stringify them before parsing).
-export const maxDuration = 30   // allow up to 30s (Vercel Pro/hobby max)
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
@@ -31,10 +30,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const { Referer: _r, referer: _r2, Origin: _o, origin: _o2, ...safeHeaders } = headers
 
+    // Hard timeout under Vercel's 10s function limit so we return a real error
+    // instead of letting Vercel kill the function with FUNCTION_INVOCATION_FAILED.
     const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), 25000)
-
-    let response: Response
+    const timer = setTimeout(() => controller.abort(), 9000)
+    let response: globalThis.Response
     try {
       response = await fetch(url, {
         method,
@@ -42,9 +42,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         body: body !== undefined && body !== null ? JSON.stringify(body) : undefined,
         signal: controller.signal,
       })
-    } finally {
+    } catch (fetchErr) {
       clearTimeout(timer)
+      const msg = fetchErr instanceof Error ? fetchErr.message : String(fetchErr)
+      const isAbort = msg.toLowerCase().includes('abort')
+      return res.status(200).json({
+        ok: false,
+        error: isAbort
+          ? 'GéeLark inaccessible depuis le serveur web (timeout). Utilise la version desktop pour la sync.'
+          : `GéeLark inaccessible : ${msg}`,
+      })
     }
+    clearTimeout(timer)
 
     if (isText) {
       const text = await response.text()
