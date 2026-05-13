@@ -152,7 +152,10 @@ export async function uploadVideoFromPath(
 export async function getSignedUrl(path: string | null | undefined): Promise<string | null> {
   if (!path) return null
   const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, SIGNED_URL_TTL)
-  if (error || !data) return null
+  if (error || !data) {
+    console.warn('[storage] getSignedUrl failed for', path, error?.message)
+    return null
+  }
   return data.signedUrl
 }
 
