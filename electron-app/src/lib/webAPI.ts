@@ -50,15 +50,23 @@ export function buildWebAPI() {
       method: string; url: string; headers?: Record<string, string>
       body?: unknown; isText?: boolean
     }) {
-      const r = await fetch('/api/geelark', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(opts),
-      })
+      let r: Response
       try {
-        return await r.json()
+        r = await fetch('/api/geelark', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(opts),
+        })
+      } catch (fetchErr) {
+        return { ok: false, error: `Réseau : ${fetchErr instanceof Error ? fetchErr.message : String(fetchErr)}` }
+      }
+      const text = await r.text().catch(() => '')
+      if (!text) return { ok: false, error: `Erreur serveur (HTTP ${r.status}) — réponse vide` }
+      try {
+        return JSON.parse(text)
       } catch {
-        return { ok: false, error: `Erreur serveur (HTTP ${r.status})` }
+        // Vercel returned an HTML error page — show status + first 120 chars
+        return { ok: false, error: `Erreur serveur (HTTP ${r.status}) : ${text.replace(/<[^>]+>/g, '').trim().slice(0, 120)}` }
       }
     },
 
