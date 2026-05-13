@@ -5,14 +5,27 @@ import { useOrg } from '@/lib/orgContext'
 
 interface Props {
   userId: string
+  email?: string | null
   onActivated: () => void
 }
 
-type Tab = 'license' | 'org'
+type Tab = 'subscribe' | 'license' | 'org'
 
-export function LicenseGate({ userId, onActivated }: Props) {
+const STRIPE_LINKS = {
+  standard: 'https://buy.stripe.com/test_aFa3cu2Lw00LdymdHT5EY00',
+  pro:      'https://buy.stripe.com/test_eVq7sK4TEaFp9i6cDP5EY01',
+}
+
+export function LicenseGate({ userId, email, onActivated }: Props) {
   const { myOrgs, switchOrg } = useOrg()
-  const [tab, setTab]         = useState<Tab>('license')
+  const [tab, setTab]         = useState<Tab>('subscribe')
+
+  function openStripe(plan: 'standard' | 'pro') {
+    const url = new URL(STRIPE_LINKS[plan])
+    url.searchParams.set('client_reference_id', userId)
+    if (email) url.searchParams.set('prefilled_email', email)
+    window.location.href = url.toString()
+  }
 
   // License key
   const [key, setKey]         = useState('')
@@ -98,11 +111,11 @@ export function LicenseGate({ userId, onActivated }: Props) {
         <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(139,92,246,0.15)' }}>
           {/* Tabs */}
           <div className="flex border-b border-[#1a1230]">
-            {([['license', '🔑 Clé de licence'], ['org', '🏢 Rejoindre une orga']] as [Tab, string][]).map(([t, label]) => (
+            {([['subscribe', '💎 S\'abonner'], ['license', '🔑 Clé'], ['org', '🏢 Orga']] as [Tab, string][]).map(([t, label]) => (
               <button
                 key={t}
                 onClick={() => setTab(t)}
-                className={`flex-1 py-3 text-xs font-semibold transition-colors ${
+                className={`flex-1 py-3 text-[11px] font-semibold transition-colors ${
                   tab === t
                     ? 'text-white border-b-2 border-[#8b5cf6] bg-[#0d0a1a]'
                     : 'text-[#4a3f7a] hover:text-[#8b5cf6]'
@@ -114,7 +127,42 @@ export function LicenseGate({ userId, onActivated }: Props) {
           </div>
 
           <div className="p-6 space-y-4">
-            {tab === 'license' ? (
+            {tab === 'subscribe' ? (
+              <>
+                <p className="text-xs text-[#6b5fa0] text-center">
+                  Choisis ton plan. Activation & crédits automatiques après paiement.
+                </p>
+
+                <button
+                  onClick={() => openStripe('standard')}
+                  className="w-full text-left rounded-xl p-4 transition-all hover:scale-[1.02]"
+                  style={{ background: 'rgba(59,130,246,0.10)', border: '1px solid rgba(59,130,246,0.30)' }}
+                >
+                  <div className="flex items-baseline justify-between">
+                    <div className="text-white text-sm font-bold">Standard</div>
+                    <div className="text-white text-sm"><span className="text-lg font-black">29,99€</span><span className="text-[10px] text-[#6b5fa0]">/mois</span></div>
+                  </div>
+                  <div className="text-[11px] text-[#6b5fa0] mt-1">2 000 crédits / mois</div>
+                </button>
+
+                <button
+                  onClick={() => openStripe('pro')}
+                  className="w-full text-left rounded-xl p-4 transition-all hover:scale-[1.02] relative overflow-hidden"
+                  style={{ background: 'linear-gradient(130deg,rgba(124,58,237,0.18),rgba(236,72,153,0.18))', border: '1px solid rgba(168,85,247,0.45)' }}
+                >
+                  <div className="absolute top-2 right-2 text-[9px] font-bold text-white px-2 py-0.5 rounded-full" style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)' }}>POPULAIRE</div>
+                  <div className="flex items-baseline justify-between">
+                    <div className="text-white text-sm font-bold">Pro</div>
+                    <div className="text-white text-sm"><span className="text-lg font-black">79,99€</span><span className="text-[10px] text-[#6b5fa0]">/mois</span></div>
+                  </div>
+                  <div className="text-[11px] text-[#6b5fa0] mt-1">5 500 crédits / mois</div>
+                </button>
+
+                <p className="text-[10px] text-[#4a3f7a] text-center pt-2">
+                  Paiement sécurisé via Stripe — annulable à tout moment
+                </p>
+              </>
+            ) : tab === 'license' ? (
               <>
                 <p className="text-xs text-[#6b5fa0] text-center">
                   Entre ta clé pour activer ton accès solo.
