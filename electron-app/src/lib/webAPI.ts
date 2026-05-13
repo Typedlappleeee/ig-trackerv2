@@ -55,7 +55,11 @@ export function buildWebAPI() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(opts),
       })
-      return r.json()
+      try {
+        return await r.json()
+      } catch {
+        return { ok: false, error: `Erreur serveur (HTTP ${r.status})` }
+      }
     },
 
     // ── Instagram session check ────────────────────────────────────────────
