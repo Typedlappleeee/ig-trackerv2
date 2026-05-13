@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase, type ContentItem } from '@/lib/supabase'
+import { checkAndDeductCredits, CREDIT_COSTS } from '@/lib/credits'
 import { VideoThumbnail } from './Bank'
 import { Spinner } from '@/components/ui/Spinner'
 import { Button }  from '@/components/ui/Button'
@@ -527,6 +528,14 @@ export function Montage({ user }: MontageProps) {
   async function handleExport() {
     if (!clips.length) return
     setExporting(true); setExpResult(null)
+
+    const creditRes = await checkAndDeductCredits(user.id, CREDIT_COSTS.montage)
+    if (!creditRes.ok) {
+      setExporting(false)
+      setExpResult({ ok: false, msg: `Crédits insuffisants (solde : ${creditRes.balance ?? 0})` })
+      return
+    }
+
     const out = await window.electronAPI?.pickOutputFile?.({ defaultName: `${projectName.replace(/\s+/g, '_')}.mp4` })
     if (!out) { setExporting(false); return }
     try {

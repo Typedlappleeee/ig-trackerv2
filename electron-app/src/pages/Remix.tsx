@@ -6,6 +6,7 @@ import { BankPicker } from './Bank'
 import { playSuccess, playWhoosh, playError } from '@/lib/sounds'
 import { supabase } from '@/lib/supabase'
 import { uploadVideoFromPath, type UploadScope } from '@/lib/storage'
+import { checkAndDeductCredits, CREDIT_COSTS } from '@/lib/credits'
 import { useOrg } from '@/lib/orgContext'
 import { logActivity } from '@/lib/activityLog'
 import { MassRemix } from './MassRemix'
@@ -360,6 +361,13 @@ export function Remix({ user }: RemixProps) {
 
   async function generate() {
     if (!originalPath || !newPhase1Path) return
+
+    const creditRes = await checkAndDeductCredits(user.id, CREDIT_COSTS.remix)
+    if (!creditRes.ok) {
+      setResult({ ok: false, error: `Crédits insuffisants (solde : ${creditRes.balance ?? 0})` })
+      return
+    }
+
     const outputPath = await window.electronAPI?.pickOutputFile?.({ defaultName: 'remix_output.mp4' })
     if (!outputPath) return
     setBankDone(false)

@@ -9,6 +9,7 @@ import { getRecentAccounts, switchToAccount, forgetAccount, type RecentAccount }
 import { subscribePosting, getPostingState } from '@/lib/postingStore'
 import { subscribeMassPosting, getMassPostingState } from '@/lib/massPostingStore'
 import { useLicense } from '@/lib/license'
+import { useCredits } from '@/lib/credits'
 
 function SFLogo({ size = 28 }: { size?: number }) {
   return (
@@ -131,6 +132,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
   const [switchErr, setSwitchErr]           = useState<string | null>(null)
   const { myOrgs, currentOrg, role, perms, switchOrg, loading: orgLoading } = useOrg()
   const license = useLicense()
+  const credits = useCredits()
 
   const [activeTask, setActiveTask] = useState<{ kind: 'single' | 'mass'; progress: number; done: number; total: number } | null>(null)
   useEffect(() => {
@@ -362,6 +364,17 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             <span>📱</span>
             <span>{phoneCount ?? 0} téléphone{(phoneCount ?? 0) !== 1 ? 's' : ''}</span>
           </div>
+          {!credits.loading && (
+            <div className="flex items-center justify-between text-[10px]">
+              <div className="flex items-center gap-1.5 text-text2">
+                <span>💎</span>
+                <span>Crédits</span>
+              </div>
+              <span className="font-bold" style={{ color: credits.balance < 10 ? '#f87171' : '#a78bfa' }}>
+                {credits.balance.toLocaleString('fr-FR')}
+              </span>
+            </div>
+          )}
           {lastRefreshLabel && (
             <div className="text-[9px] text-text2/70">{lastRefreshLabel}</div>
           )}
@@ -483,8 +496,8 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
           </div>
         )}
 
-        {/* Permission denied screen */}
-        {!orgLoading && !isVisibleTab(page) ? (
+        {/* Permission denied screen — settings always accessible */}
+        {!orgLoading && !isVisibleTab(page) && page !== 'settings' ? (
           <div className="flex flex-col items-center justify-center h-full min-h-[60vh] gap-6 text-center px-8 anim-scale-in">
             <div className="relative">
               <div className="w-20 h-20 rounded-3xl bg-danger/8 border border-danger/15 flex items-center justify-center">

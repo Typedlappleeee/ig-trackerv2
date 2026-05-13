@@ -11,6 +11,7 @@ import { playSplash }        from '@/lib/sounds'
 import { startMusic, stopMusic, isMusicEnabled, subscribeMusicState } from '@/lib/music'
 import { checkLicense, LicenseContext, type LicenseStatus } from '@/lib/license'
 import { LicenseGate } from '@/components/LicenseGate'
+import { CreditContext, fetchBalance, maybeGrantMonthlyCredits } from '@/lib/credits'
 
 // ── ScaleFlow logo SVG ────────────────────────────────────────────────────────
 function ScaleFlowLogoSVG({ size = 96, draw = false }: { size?: number; draw?: boolean }) {
@@ -490,6 +491,8 @@ function AppContent({ user }: { user: User }) {
   const [lastRefresh, setLastRefresh]       = useState<Date | null>(null)
   const [refreshTick, setRefreshTick]       = useState(0)
   const [license, setLicense]               = useState<LicenseStatus | null>(null)
+  const [creditBalance, setCreditBalance]   = useState(0)
+  const [creditLoading, setCreditLoading]   = useState(true)
 
   // Onboarding gate: only shown once per account, never again — even if the
   // user skipped without entering a bearer. We mark completion via
@@ -507,8 +510,21 @@ function AppContent({ user }: { user: User }) {
 
   // License check — re-run whenever the org changes
   useEffect(() => {
-    checkLicense(user.id, currentOrg?.id ?? null).then(setLicense)
+    checkLicense(user.id, currentOrg?.id ?? null).then(l => {
+      setLicense(l)
+      if (l.valid && l.plan) {
+        maybeGrantMonthlyCredits(user.id, l.plan)
+          .then(() => fetchBalance(user.id).then(b => { setCreditBalance(b); setCreditLoading(false) }))
+          .catch(() => { fetchBalance(user.id).then(b => { setCreditBalance(b); setCreditLoading(false) }) })
+      } else {
+        fetchBalance(user.id).then(b => { setCreditBalance(b); setCreditLoading(false) })
+      }
+    })
   }, [user.id, currentOrg?.id])
+
+  function refreshCredits() {
+    fetchBalance(user.id).then(b => setCreditBalance(b))
+  }
 
   // Sidebar phone count: 0 when no bearer in scope, org-scoped or solo-scoped otherwise.
   useEffect(() => {
@@ -587,6 +603,7 @@ function AppContent({ user }: { user: User }) {
 
   return (
     <LicenseContext.Provider value={license}>
+    <CreditContext.Provider value={{ balance: creditBalance, loading: creditLoading, refresh: refreshCredits }}>
       {showBeta && <BetaPopup onClose={dismissBeta} />}
       <Layout
         user={user}
@@ -598,6 +615,7 @@ function AppContent({ user }: { user: User }) {
       >
         {content}
       </Layout>
+    </CreditContext.Provider>
     </LicenseContext.Provider>
   )
 }
