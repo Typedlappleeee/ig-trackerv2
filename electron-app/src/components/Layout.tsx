@@ -455,6 +455,19 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
       </aside>
 
       <main className="flex-1 overflow-auto relative bg-bg">
+        {/* 24h subscription expiry warning badge */}
+        {license.source === 'own' && license.daysLeft !== null && license.daysLeft <= 1 && (
+          <div
+            className="fixed top-3 right-4 z-[9997] flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold animate-pulse"
+            style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.5)', color: '#f87171', boxShadow: '0 0 16px rgba(239,68,68,0.25)' }}
+          >
+            <span>🔴</span>
+            <span>
+              {license.daysLeft === 0 ? 'Abonnement expiré !' : 'Abonnement expire dans moins de 24h !'}
+            </span>
+          </div>
+        )}
+
         {/* Org-switch loading overlay */}
         {orgLoading && (
           <div className="absolute inset-0 z-50 bg-bg/85 backdrop-blur-sm flex items-center justify-center">

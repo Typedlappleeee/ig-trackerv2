@@ -174,6 +174,20 @@ export function Warmup({ user }: WarmupProps) {
     )
   }
 
+  if (!window.electronAPI?.geelarkRequest) {
+    return (
+      <div className="p-8 max-w-lg">
+        <div className="rounded-xl p-5 space-y-2" style={{ background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.25)' }}>
+          <p className="font-semibold" style={{ color: '#fbbf24' }}>⚠ Application desktop requise</p>
+          <p className="text-sm text-text2">
+            Le Warmup utilise GéeLark via l'IPC Electron.
+            Cette fonctionnalité n'est disponible que dans l'application desktop <strong className="text-text">ScaleFlow</strong>, pas dans le navigateur web.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   if (!bearer) {
     return (
       <div className="p-8 max-w-lg">
