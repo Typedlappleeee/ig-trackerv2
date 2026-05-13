@@ -5,13 +5,13 @@ import { VideoThumbnail } from './Bank'
 import { Spinner } from '@/components/ui/Spinner'
 import { Button }  from '@/components/ui/Button'
 import { useOrg } from '@/lib/orgContext'
-import { uploadVideoFromPath, type UploadScope } from '@/lib/storage'
+import { uploadVideoFromPath, getSignedUrl, type UploadScope } from '@/lib/storage'
 import { logActivity } from '@/lib/activityLog'
 import { useConnections } from '@/lib/connections'
 
 interface MontageProps { user: User }
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+// ── Types ─────────────────────────────────────────────────────────────────────────────
 interface TimelineClip {
   uid:       string
   item:      ContentItem
@@ -91,7 +91,7 @@ function localSrc(p: string | null | undefined): string | null {
   return `localvideo://${encodeURI(withSlash)}`
 }
 
-// ── Time ruler ────────────────────────────────────────────────────────────────
+// ── Time ruler ──────────────────────────────────────────────────────────────────────────────
 function TimeRuler({ total, scale }: { total: number; scale: number }) {
   const w = Math.max(total * scale + 200, 600)
   const step = scale >= 60 ? 1 : scale >= 20 ? 2 : 5
@@ -111,7 +111,7 @@ function TimeRuler({ total, scale }: { total: number; scale: number }) {
   )
 }
 
-// ── Clip block in timeline ────────────────────────────────────────────────────
+// ── Clip block in timeline ──────────────────────────────────────────────────────────────────────────
 function ClipBlock({
   clip, scale, isSelected, onSelect, onUpdate, onDelete,
   onDragStart, onDragOver, onDrop,
@@ -188,7 +188,7 @@ function ClipBlock({
   )
 }
 
-// ── Transition badge between clips ───────────────────────────────────────────
+// ── Transition badge between clips ───────────────────────────────────────────────────────────────────────
 function TransitionBadge({ type, onClick }: { type: Transition['type']; onClick: () => void }) {
   const info = TRANSITIONS.find(t => t.type === type) ?? TRANSITIONS[0]
   return (
@@ -202,7 +202,7 @@ function TransitionBadge({ type, onClick }: { type: Transition['type']; onClick:
   )
 }
 
-// ── Properties panel ──────────────────────────────────────────────────────────
+// ── Properties panel ───────────────────────────────────────────────────────────────────────────────
 function PropertiesPanel({
   clip, onUpdate,
 }: {
@@ -294,7 +294,7 @@ function PropertiesPanel({
   )
 }
 
-// ── Draggable text overlay with center snap ───────────────────────────────────
+// ── Draggable text overlay with center snap ───────────────────────────────────────────────────
 const SNAP_ZONE = 5  // % distance from center to trigger snap
 
 function DraggableText({ overlay, onMove }: {
@@ -360,7 +360,7 @@ function DraggableText({ overlay, onMove }: {
   )
 }
 
-// ── Main component ────────────────────────────────────────────────────────────
+// ── Main component ────────────────────────────────────────────────────────────────────────────
 export function Montage({ user }: MontageProps) {
   const { currentOrg } = useOrg()
   const conns = useConnections(user)
@@ -434,7 +434,7 @@ export function Montage({ user }: MontageProps) {
     })
   }, [autoCaptionEnabled, autoCaptionText, autoCaptionPos, autoCaptionSize, autoCaptionColor, clips])
 
-  // ── Clip management ────────────────────────────────────────────────────────
+  // ── Clip management ────────────────────────────────────────────────────────────────────
   function addClip(item: ContentItem) {
     const c: TimelineClip = { uid: `${item.id}-${Date.now()}`, item, trimStart: 0, trimEnd: 0, caption: '', color: nextColor(), speed: 1, fade: false }
     setClips(prev => [...prev, c])
@@ -458,7 +458,7 @@ export function Montage({ user }: MontageProps) {
     setDragUid(null)
   }
 
-  // ── Cut at playhead ────────────────────────────────────────────────────────
+  // ── Cut at playhead ────────────────────────────────────────────────────────────────────────────
   const cutAtPlayhead = useCallback(() => {
     if (!selectedUid) return
     const clip = clips.find(c => c.uid === selectedUid)
@@ -475,7 +475,7 @@ export function Montage({ user }: MontageProps) {
     setSelUid(a.uid)
   }, [clips, selectedUid, playhead])
 
-  // ── Transitions ────────────────────────────────────────────────────────────
+  // ── Transitions ────────────────────────────────────────────────────────────────────────────
   function getTransition(afterUid: string): Transition['type'] {
     return transitions.find(t => t.afterClipUid === afterUid)?.type ?? 'cut'
   }
@@ -490,7 +490,7 @@ export function Montage({ user }: MontageProps) {
     })
   }
 
-  // ── Timeline click → playhead ──────────────────────────────────────────────
+  // ── Timeline click → playhead ───────────────────────────────────────────────────────────────
   function onTimelineClick(e: React.MouseEvent) {
     if (!timelineRef.current) return
     const rect = timelineRef.current.getBoundingClientRect()
@@ -498,7 +498,7 @@ export function Montage({ user }: MontageProps) {
     setPlayhead(Math.max(0, Math.min(x / scale, totalDur(clips))))
   }
 
-  // ── OS drag-drop ───────────────────────────────────────────────────────────
+  // ── OS drag-drop ─────────────────────────────────────────────────────────────────────────────
   function onOsDragOver(e: React.DragEvent) { e.preventDefault(); setOsDrag(true) }
   function onOsDragLeave(e: React.DragEvent) { if (!dropRef.current?.contains(e.relatedTarget as Node)) setOsDrag(false) }
   async function onOsDrop(e: React.DragEvent) {
@@ -523,7 +523,7 @@ export function Montage({ user }: MontageProps) {
     }
   }
 
-  // ── Export ─────────────────────────────────────────────────────────────────
+  // ── Export ───────────────────────────────────────────────────────────────────────────────
   async function handleExport() {
     if (!clips.length) return
     setExporting(true); setExpResult(null)
@@ -548,7 +548,7 @@ export function Montage({ user }: MontageProps) {
     }
   }
 
-  // ── AI Caption generation ──────────────────────────────────────────────────
+  // ── AI Caption generation ────────────────────────────────────────────────────────────────
   async function generateAiCaption(clip: TimelineClip) {
     if (!conns.anthropic) { setAiCapError('Clé API Anthropic manquante (Settings → Connexions)'); return }
     setAiCapLoading(true); setAiCapError(null)
@@ -605,14 +605,24 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
     }
   }
 
-  // ── Computed ───────────────────────────────────────────────────────────────
+  // ── Computed ─────────────────────────────────────────────────────────────────────────────
   const selectedClip  = clips.find(c => c.uid === selectedUid) ?? null
   const total         = totalDur(clips)
   const timelineW     = Math.max(total * scale + 250, 600)
 
   // When playing sequentially show that clip; otherwise show selected clip
-  const previewClip   = playingIndex !== null ? (clips[playingIndex] ?? null) : selectedClip
-  const previewSrc    = previewClip?.item.file_url ? localSrc(previewClip.item.file_url) : null
+  const previewClip = playingIndex !== null ? (clips[playingIndex] ?? null) : selectedClip
+  const [previewSrc, setPreviewSrc] = useState<string | null>(null)
+  useEffect(() => {
+    const item = previewClip?.item
+    if (!item) { setPreviewSrc(null); return }
+    if (item.file_url) { setPreviewSrc(localSrc(item.file_url)); return }
+    if (item.storage_path) {
+      getSignedUrl(item.storage_path).then(url => setPreviewSrc(url))
+    } else {
+      setPreviewSrc(null)
+    }
+  }, [previewClip?.item.file_url, previewClip?.item.storage_path])
 
   function playAll() {
     if (clips.length === 0) return
@@ -671,7 +681,7 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
         </div>
       )}
 
-      {/* ── TOP TOOLBAR (CapCut-style) ────────────────────────────────────── */}
+      {/* ── TOP TOOLBAR (CapCut-style) ─────────────────────────────────────────────────────────────────── */}
       <div className="flex-shrink-0 border-b border-border bg-surface">
         {/* Row 1: project name + tabs */}
         <div className="flex items-center">
@@ -714,7 +724,7 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
         </div>
       </div>
 
-      {/* ── MIDDLE: left panel + preview + properties ─────────────────────── */}
+      {/* ── MIDDLE: left panel + preview + properties ───────────────────────────────────────────────────────────── */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
 
         {/* Left panel — content changes per tab */}
@@ -777,7 +787,7 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
           {activeTab === 'texte' && (
             <div className="p-3 space-y-3 flex-1 overflow-auto">
 
-              {/* ── Auto Caption ─────────────────────────────────────────── */}
+              {/* ── Auto Caption ──────────────────────────────────────────────────── */}
               <div className="rounded-xl border border-border bg-surface2 overflow-hidden">
                 {/* Header / toggle */}
                 <button
@@ -868,7 +878,7 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
                 )}
               </div>
 
-              {/* ── Manuel ───────────────────────────────────────────────── */}
+              {/* ── Manuel ────────────────────────────────────────────────────────────────────── */}
               <p className="text-[10px] text-text2 uppercase tracking-wider font-semibold pt-1">Manuel</p>
               {([
                 { pos: 'top',    label: 'Haut',   x: 50, y: 10 },
@@ -917,7 +927,7 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
                       <p className="text-[9px] text-text2">
                         {tr.type === 'cut' ? 'Coupe directe' :
                          tr.type === 'fade' ? 'Fondu au noir' :
-                         tr.type === 'dissolve' ? 'Fondu enchaîné' : 'Balayage horizontal'}
+                         tr.type === 'dissolve' ? 'Fondu enchâîné' : 'Balayage horizontal'}
                       </p>
                     </div>
                   </div>
@@ -1032,7 +1042,7 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
         </aside>
       </div>
 
-      {/* ── BOTTOM: Timeline ─────────────────────────────────────────────────── */}
+      {/* ── BOTTOM: Timeline ─────────────────────────────────────────────────────────────────────────────────── */}
       <div className="flex-shrink-0 border-t border-border bg-surface" style={{ height: 200 }}>
         {/* Timeline toolbar */}
         <div className="flex items-center gap-2 px-3 py-1.5 border-b border-border bg-surface2">
