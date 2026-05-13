@@ -3,6 +3,8 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 // Proxy GéeLark API calls from the browser (bypasses CORS).
 // Also applies large-integer protection (GéeLark task IDs are 19-digit numbers
 // that JSON.parse() loses precision on — we stringify them before parsing).
+export const maxDuration = 30   // allow up to 30s (Vercel Pro/hobby max)
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'Method not allowed' })
@@ -28,11 +30,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const { Referer: _r, referer: _r2, Origin: _o, origin: _o2, ...safeHeaders } = headers
-    const response = await fetch(url, {
-      method,
-      headers: { 'Content-Type': 'application/json', ...safeHeaders },
-      body: body !== undefined && body !== null ? JSON.stringify(body) : undefined,
-    })
+
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 25000)
+
+    let response: Response
+    try {
+      response = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json', ...safeHeaders },
+        body: body !== undefined && body !== null ? JSON.stringify(body) : undefined,
+        signal: controller.signal,
+      })
+    } finally {
+      clearTimeout(timer)
+    }
 
     if (isText) {
       const text = await response.text()
@@ -48,6 +60,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     return res.status(200).json({ ok: true, status: response.status, data })
   } catch (err) {
-    return res.status(200).json({ ok: false, error: err instanceof Error ? err.message : String(err) })
+    const msg = err instanceof Error ? err.message : String(err)
+    return res.status(200).json({ ok: false, error: msg })
   }
 }
