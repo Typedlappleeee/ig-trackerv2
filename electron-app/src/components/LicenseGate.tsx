@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { activateKey } from '@/lib/license'
+import { useOrg } from '@/lib/orgContext'
 
 interface Props {
   userId: string
@@ -10,6 +11,7 @@ interface Props {
 type Tab = 'license' | 'org'
 
 export function LicenseGate({ userId, onActivated }: Props) {
+  const { myOrgs, switchOrg } = useOrg()
   const [tab, setTab]         = useState<Tab>('license')
 
   // License key
@@ -42,7 +44,7 @@ export function LicenseGate({ userId, onActivated }: Props) {
     if (!code.trim()) return
     setOrgLoading(true)
     setOrgErr(null)
-    const { error } = await supabase.rpc('accept_org_invite', { p_token: code.trim() })
+    const { data, error } = await supabase.rpc('accept_org_invite', { p_token: code.trim() })
     setOrgLoading(false)
     if (error) {
       const msg = /invite_not_found/.test(error.message)    ? 'Code invalide ou expiré'
@@ -52,7 +54,8 @@ export function LicenseGate({ userId, onActivated }: Props) {
       setOrgErr(msg)
     } else {
       setOrgSuccess(true)
-      // Reload the page so the org context refreshes properly before license re-check
+      // Persist the newly joined org so orgContext restores it after reload
+      if (data) localStorage.setItem('ig-tracker-current-org', data as string)
       setTimeout(() => window.location.reload(), 1500)
     }
   }
@@ -138,6 +141,30 @@ export function LicenseGate({ userId, onActivated }: Props) {
               </>
             ) : (
               <>
+                {/* Already a member — switch directly */}
+                {myOrgs.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-[10px] text-[#4a3f7a] uppercase tracking-widest text-center">Tes organisations</p>
+                    {myOrgs.map(({ org }) => (
+                      <button
+                        key={org.id}
+                        onClick={() => switchOrg(org.id)}
+                        className="w-full py-2.5 px-4 rounded-xl text-sm font-semibold text-white transition-all flex items-center gap-2"
+                        style={{ background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.25)' }}
+                      >
+                        <span>🏢</span>
+                        <span className="flex-1 text-left truncate">{org.name}</span>
+                        <span className="text-[11px] text-blue-400">Rejoindre →</span>
+                      </button>
+                    ))}
+                    <div className="flex items-center gap-2 py-1">
+                      <div className="flex-1 h-px" style={{ background: 'rgba(74,63,122,0.4)' }} />
+                      <span className="text-[10px] text-[#3a2f58]">ou code d'invitation</span>
+                      <div className="flex-1 h-px" style={{ background: 'rgba(74,63,122,0.4)' }} />
+                    </div>
+                  </div>
+                )}
+
                 <p className="text-xs text-[#6b5fa0] text-center">
                   Si tu as un code d'invitation, entre-le ici.<br/>
                   Tant que l'owner de l'orga a un abonnement actif, tu as accès.

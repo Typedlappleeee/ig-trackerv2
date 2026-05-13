@@ -58,7 +58,7 @@ function ToggleRow({
 }
 
 type GeneralTab = 'apparence' | 'sons' | 'langue'
-type Panel = 'general' | 'profile' | 'connexions' | 'organization' | 'admin'
+type Panel = 'general' | 'profile' | 'connexions' | 'organization' | 'admin' | 'abonnement'
 interface SettingsProps { user: User; initialPanel?: Panel }
 
 export function Settings({ user, initialPanel }: SettingsProps) {
@@ -138,7 +138,7 @@ export function Settings({ user, initialPanel }: SettingsProps) {
           setBearer(d.bearer_token       ?? '')
           setGroqKey(d.groq_api_key      ?? '')
           setAnthropicKey(d.anthropic_api_key ?? '')
-          setProxyUrl(d.proxy_url        ?? '')
+          setProxyUrl(d.proxy            ?? '')
           setIgSession(d.ig_sessionid    ?? '')
           setProfileEmail((d.profile_email as string) ?? user.email ?? '')
         }
@@ -215,7 +215,7 @@ export function Settings({ user, initialPanel }: SettingsProps) {
           bearer_token:  bearer,
           groq_api_key:  groqKey,
           anthropic_api_key: anthropicKey,
-          proxy_url:     proxyUrl,
+          proxy:         proxyUrl,
           ig_sessionid:  igSession,
           updated_at:    new Date().toISOString(),
         }, { onConflict: 'org_id' })
@@ -226,7 +226,7 @@ export function Settings({ user, initialPanel }: SettingsProps) {
           bearer_token:  bearer,
           groq_api_key:  groqKey,
           anthropic_api_key: anthropicKey,
-          proxy_url:     proxyUrl,
+          proxy:         proxyUrl,
           ig_sessionid:  igSession,
           updated_at:    new Date().toISOString(),
         }, { onConflict: 'user_id' })
@@ -277,6 +277,7 @@ export function Settings({ user, initialPanel }: SettingsProps) {
           ...(canSeeConnexions ? [{ k: 'connexions' as const, l: '🔌 Connexions' }] : []),
           { k: 'organization', l: '🏢 Organisation'  },
           ...(license.isSuperAdmin ? [{ k: 'admin' as const, l: '🛡 Admin' }] : []),
+          { k: 'abonnement' as const, l: '💳 Abonnement' },
         ] as const).map(t => (
           <button
             key={t.k}
@@ -447,6 +448,9 @@ export function Settings({ user, initialPanel }: SettingsProps) {
       {/* ── Admin ───────────────────────────────────────────────────────────── */}
       {panel === 'admin' && license.isSuperAdmin && <AdminPanel user={user} />}
 
+      {/* ── Abonnement ──────────────────────────────────────────────────────── */}
+      {panel === 'abonnement' && <SubscriptionPanel />}
+
       {/* Bottom save bar */}
       {error && (
         <div className="px-4 py-3 rounded-lg bg-danger/10 border border-danger/20 text-danger text-sm">{error}</div>
@@ -502,7 +506,6 @@ function AdminPanel({ user: _user }: { user: User }) {
   const [plan, setPlan]       = useState('standard')
   const [notes, setNotes]     = useState('')
   const [creating, setCreating] = useState(false)
-  const [createErr, setCreateErr] = useState<string | null>(null)
   const [search, setSearch]   = useState('')
   const [copied, setCopied]   = useState<string | null>(null)
 
@@ -522,6 +525,8 @@ function AdminPanel({ user: _user }: { user: User }) {
   }, [])
 
   useEffect(() => { load() }, [load])
+
+  const [createErr, setCreateErr] = useState<string | null>(null)
 
   async function create() {
     setCreating(true)
@@ -633,6 +638,143 @@ function AdminPanel({ user: _user }: { user: User }) {
             </div>
           </div>
         ))}
+      </div>
+    </div>
+  )
+}
+
+// ── Subscription panel ───────────────────────────────────────────────────────
+function SubscriptionPanel() {
+  const license = useLicense()
+  const [licenseKey, setLicenseKey] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
+
+  useEffect(() => {
+    supabase.from('license_keys')
+      .select('key, plan, expires_at')
+      .eq('is_active', true)
+      .maybeSingle()
+      .then(({ data }) => { if (data) setLicenseKey(data.key) })
+  }, [])
+
+  function copy() {
+    if (!licenseKey) return
+    navigator.clipboard.writeText(licenseKey)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }
+
+  const statusColor = license.daysLeft === null ? '#34d399'
+    : license.daysLeft <= 1  ? '#f87171'
+    : license.daysLeft <= 7  ? '#fb923c'
+    : '#34d399'
+
+  const statusLabel = !license.valid ? 'Inactif'
+    : license.source === 'org_owner' ? 'Via organisation'
+    : license.daysLeft === null ? 'Actif — à vie'
+    : license.daysLeft <= 0 ? 'Expiré'
+    : `Actif — ${license.daysLeft}j restants`
+
+  return (
+    <div className="space-y-6">
+      {/* Current status */}
+      <div className="rounded-2xl p-5 space-y-4" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(139,92,246,0.18)' }}>
+        <p className="text-xs font-black text-text uppercase tracking-wider">Mon abonnement actuel</p>
+
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-text2">Statut</span>
+          <span className="text-sm font-bold" style={{ color: statusColor }}>{statusLabel}</span>
+        </div>
+
+        {license.expiresAt && (
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-text2">Expiration</span>
+            <span className="text-sm font-semibold text-text">
+              {license.expiresAt.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
+            </span>
+          </div>
+        )}
+
+        {licenseKey && (
+          <div className="space-y-1.5">
+            <p className="text-xs text-text2">Clé de licence</p>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 bg-surface2 border border-border rounded-lg px-3 py-2 text-sm font-mono tracking-widest text-text2 truncate">
+                {licenseKey}
+              </code>
+              <button
+                onClick={copy}
+                className="px-3 py-2 rounded-lg text-xs font-semibold transition-all flex-shrink-0"
+                style={{ background: copied ? 'rgba(52,211,153,0.12)' : 'rgba(139,92,246,0.1)', color: copied ? '#34d399' : '#a78bfa', border: `1px solid ${copied ? 'rgba(52,211,153,0.25)' : 'rgba(139,92,246,0.2)'}` }}
+              >
+                {copied ? '✓ Copié' : 'Copier'}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Pricing */}
+      <div>
+        <p className="text-xs font-black text-text uppercase tracking-wider mb-4">Acheter / Renouveler</p>
+        <div className="grid grid-cols-2 gap-4">
+
+          {/* Standard */}
+          <div className="rounded-2xl p-5 space-y-4 flex flex-col" style={{ background: 'rgba(139,92,246,0.05)', border: '1px solid rgba(139,92,246,0.25)' }}>
+            <div>
+              <p className="text-xs font-black uppercase tracking-wider" style={{ color: '#a78bfa' }}>Standard</p>
+              <div className="flex items-baseline gap-1 mt-2">
+                <span className="text-3xl font-black text-white">$49.99</span>
+                <span className="text-xs text-text2">/ mois</span>
+              </div>
+            </div>
+            <ul className="space-y-1.5 flex-1">
+              {['1 compte utilisateur', 'Toutes les fonctionnalités', 'Mises à jour incluses', 'Support standard'].map(f => (
+                <li key={f} className="flex items-center gap-2 text-xs text-text2">
+                  <span style={{ color: '#a78bfa' }}>✓</span>{f}
+                </li>
+              ))}
+            </ul>
+            <a
+              href="mailto:contact@scaleflow.app?subject=Achat%20ScaleFlow%20Standard"
+              className="block w-full py-2.5 rounded-xl text-sm font-bold text-center text-white transition-all"
+              style={{ background: 'linear-gradient(130deg,#7c3aed,#8b5cf6)' }}
+            >
+              Acheter →
+            </a>
+          </div>
+
+          {/* Pro */}
+          <div className="rounded-2xl p-5 space-y-4 flex flex-col relative overflow-hidden" style={{ background: 'linear-gradient(145deg,rgba(236,72,153,0.08),rgba(124,58,237,0.08))', border: '1px solid rgba(236,72,153,0.35)' }}>
+            <div className="absolute top-3 right-3 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider" style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff' }}>
+              Populaire
+            </div>
+            <div>
+              <p className="text-xs font-black uppercase tracking-wider" style={{ color: '#f472b6' }}>Pro</p>
+              <div className="flex items-baseline gap-1 mt-2">
+                <span className="text-3xl font-black text-white">$99.99</span>
+                <span className="text-xs text-text2">/ mois</span>
+              </div>
+            </div>
+            <ul className="space-y-1.5 flex-1">
+              {['Membres illimités (org)', 'Toutes fonctionnalités Standard', 'Accès prioritaire aux bêtas', 'Support prioritaire 24/7'].map(f => (
+                <li key={f} className="flex items-center gap-2 text-xs text-text2">
+                  <span style={{ color: '#f472b6' }}>✓</span>{f}
+                </li>
+              ))}
+            </ul>
+            <a
+              href="mailto:contact@scaleflow.app?subject=Achat%20ScaleFlow%20Pro"
+              className="block w-full py-2.5 rounded-xl text-sm font-bold text-center text-white transition-all"
+              style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)', boxShadow: '0 2px 20px -4px rgba(236,72,153,0.4)' }}
+            >
+              Acheter →
+            </a>
+          </div>
+        </div>
+        <p className="text-[10px] text-text2/50 mt-3 text-center">
+          Après achat, tu recevras une clé de licence par email à activer dans l'app.
+        </p>
       </div>
     </div>
   )
