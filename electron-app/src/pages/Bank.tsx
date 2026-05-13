@@ -831,9 +831,12 @@ export function VideoThumbnail({ filePath, thumbnailPath, storagePath }: {
     )
   }
 
-  // 3. Legacy local path
+  // 3. Legacy local path (or web blob:/https: URL passed directly)
   const localUrl = (() => {
     if (!filePath) return ''
+    if (filePath.startsWith('http') || filePath.startsWith('blob:') || filePath.startsWith('data:')) {
+      return filePath
+    }
     let n = filePath.replace(/\\/g, '/')
     if (n.startsWith('file://')) n = n.slice(7)
     if (!n.startsWith('/')) n = '/' + n
@@ -871,6 +874,9 @@ function VideoPlayerModal({ item, onClose }: { item: ContentItem; onClose: () =>
     ? cloudUrl ?? ''
     : (() => {
         if (!item.file_url) return ''
+        if (item.file_url.startsWith('http') || item.file_url.startsWith('blob:') || item.file_url.startsWith('data:')) {
+          return item.file_url
+        }
         let n = item.file_url.replace(/\\/g, '/')
         if (n.startsWith('file://')) n = n.slice(7)
         if (!n.startsWith('/')) n = '/' + n
