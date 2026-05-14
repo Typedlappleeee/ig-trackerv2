@@ -67,6 +67,8 @@ export function MassPosting({ user }: MassPostingProps) {
   const [phoneSearch, setPhoneSearch]     = useState('')
   const [showBankPicker, setShowBankPicker] = useState(false)
   const stopRef                           = useRef(false)
+  const activePhonesRef                   = useRef<string[]>([])
+  const activeTasksRef                    = useRef<string[]>([])
   const logEndRef                         = useRef<HTMLDivElement>(null)
 
   // Persist-aware setters
@@ -167,9 +169,29 @@ export function MassPosting({ user }: MassPostingProps) {
     return { phone, video: selectedVideos[idx], videoIndex: idx }
   })
 
-  function stop() {
+  async function stop() {
     stopRef.current = true
-    log('🛑 Arrêt demandé — patientez la fin du cycle en cours…', 'warn')
+    log('🛑 Arrêt demandé — annulation des tâches et extinction des téléphones…', 'warn')
+    const tasks = activeTasksRef.current
+    const phones = activePhonesRef.current
+    try {
+      if (tasks.length > 0) {
+        await geelark(bearer, '/rpa/task/cancel', { ids: tasks })
+        log(`  ${tasks.length} tâche(s) annulée(s)`, 'warn')
+      }
+    } catch (e) {
+      log(`  ⚠️ annulation tâches: ${e instanceof Error ? e.message : String(e)}`, 'warn')
+    }
+    try {
+      if (phones.length > 0) {
+        await geelark(bearer, '/phone/stop', { ids: phones })
+        log(`  ${phones.length} téléphone(s) éteint(s)`, 'warn')
+      }
+    } catch (e) {
+      log(`  ⚠️ extinction téléphones: ${e instanceof Error ? e.message : String(e)}`, 'warn')
+    }
+    activeTasksRef.current = []
+    activePhonesRef.current = []
   }
 
   async function generateCaption() {
@@ -267,6 +289,7 @@ export function MassPosting({ user }: MassPostingProps) {
 
       // ── Step 2: start phones ──────────────────────────────────────────────
       const geelarkIds = phoneList.map(p => p.geelark_id)
+      activePhonesRef.current = geelarkIds
       log(`📱 Démarrage de ${phoneList.length} téléphone(s)…`)
       const startRes = await geelark(bearer, '/phone/start', { ids: geelarkIds })
       const started  = (startRes['data'] as Record<string, number>)?.['successAmount'] ?? 0
@@ -296,6 +319,7 @@ export function MassPosting({ user }: MassPostingProps) {
         if (taskRes['code'] === 0) {
           const tid = (taskRes['data'] as Record<string, unknown>)?.['id'] as string
           taskIds[asgn.phone.geelark_id] = tid
+          activeTasksRef.current = [...activeTasksRef.current, tid]
           setPhoneStatus(asgn.phone.id, { status: 'posting', taskId: tid })
           log(`  ✅ Tâche créée pour ${asgn.phone.phone_name}`, 'ok')
         } else {
@@ -313,7 +337,9 @@ export function MassPosting({ user }: MassPostingProps) {
 
         let pollCount = 0
         while (pending.size > 0 && Date.now() < deadline) {
+          if (stopRef.current) { log('⏹ Polling interrompu (stop)', 'warn'); break }
           await new Promise(r => setTimeout(r, 10000))
+          if (stopRef.current) { log('⏹ Polling interrompu (stop)', 'warn'); break }
           const qRes = await geelark(bearer, '/task/query', { ids: [...pending] })
           pollCount++
 
@@ -366,6 +392,8 @@ export function MassPosting({ user }: MassPostingProps) {
       log(`❌ Erreur: ${e instanceof Error ? e.message : String(e)}`, 'error')
     }
 
+    activePhonesRef.current = []
+    activeTasksRef.current = []
     setPosting(false)
   }
 
