@@ -7,6 +7,8 @@ import { Input }  from '@/components/ui/Input'
 interface OnboardingProps {
   user:       User
   onComplete: () => void
+  // If set, save credentials to org_config (org-scoped) instead of app_config (user-scoped).
+  orgId?:     string | null
 }
 
 type Step = 1 | 2 | 3 | 4
@@ -52,7 +54,7 @@ function SFLogoMark() {
   )
 }
 
-export function Onboarding({ user, onComplete }: OnboardingProps) {
+export function Onboarding({ user, onComplete, orgId }: OnboardingProps) {
   const [step, setStep]              = useState<Step>(1)
   const [bearer, setBearer]          = useState('')
   const [groqKey, setGroqKey]        = useState('')
@@ -118,34 +120,55 @@ export function Onboarding({ user, onComplete }: OnboardingProps) {
     if (!bearer.trim()) return
     setSaving(true); setSaveErr(null)
     const now = new Date().toISOString()
-    let { error } = await supabase.from('app_config').upsert({
-      user_id:           user.id,
-      bearer_token:      bearer.trim(),
-      groq_api_key:      groqKey.trim(),
-      anthropic_api_key: anthropicKey.trim(),
-      theme:             'Bleu',
-      onboarded_at:      now,
-      updated_at:        now,
-    }, { onConflict: 'user_id' })
-    if (error && /anthropic|column|schema cache/i.test(error.message)) {
+    let error: { message: string } | null = null
+    if (orgId) {
+      const r = await supabase.from('org_config').upsert({
+        org_id:            orgId,
+        bearer_token:      bearer.trim(),
+        groq_api_key:      groqKey.trim(),
+        anthropic_api_key: anthropicKey.trim(),
+        updated_at:        now,
+      }, { onConflict: 'org_id' })
+      error = r.error
+      if (error && /anthropic|column|schema cache/i.test(error.message)) {
+        const r2 = await supabase.from('org_config').upsert({
+          org_id:       orgId,
+          bearer_token: bearer.trim(),
+          groq_api_key: groqKey.trim(),
+          updated_at:   now,
+        }, { onConflict: 'org_id' })
+        error = r2.error
+      }
+      // Mark user-level onboarding done too, so we don't re-prompt globally.
+      await supabase.from('app_config').upsert({
+        user_id: user.id, onboarded_at: now, theme: 'Bleu', updated_at: now,
+      }, { onConflict: 'user_id' })
+    } else {
       const r = await supabase.from('app_config').upsert({
-        user_id:      user.id,
-        bearer_token: bearer.trim(),
-        groq_api_key: groqKey.trim(),
-        theme:        'Bleu',
-        onboarded_at: now,
-        updated_at:   now,
+        user_id:           user.id,
+        bearer_token:      bearer.trim(),
+        groq_api_key:      groqKey.trim(),
+        anthropic_api_key: anthropicKey.trim(),
+        theme:             'Bleu',
+        onboarded_at:      now,
+        updated_at:        now,
       }, { onConflict: 'user_id' })
       error = r.error
+      if (error && /anthropic|column|schema cache/i.test(error.message)) {
+        const r2 = await supabase.from('app_config').upsert({
+          user_id:      user.id,
+          bearer_token: bearer.trim(),
+          groq_api_key: groqKey.trim(),
+          theme:        'Bleu',
+          onboarded_at: now,
+          updated_at:   now,
+        }, { onConflict: 'user_id' })
+        error = r2.error
+      }
     }
     setSaving(false)
     if (error) {
       setSaveErr(`Impossible de sauvegarder : ${error.message}. Vérifie ta connexion et réessaie.`)
-      return
-    }
-    const { data: check } = await supabase.from('app_config').select('bearer_token').eq('user_id', user.id).maybeSingle()
-    if (!check?.bearer_token) {
-      setSaveErr('La sauvegarde semble ne pas être persistée (RLS ?). Reconnecte-toi puis réessaie.')
       return
     }
     onComplete()
@@ -201,8 +224,12 @@ export function Onboarding({ user, onComplete }: OnboardingProps) {
       <button
         onClick={skip}
         disabled={saving}
-        className="absolute top-4 right-6 text-xs hover:text-white underline underline-offset-2 transition-colors"
-        style={{ color: 'rgba(196,181,253,0.45)' }}
+        className="absolute top-5 right-6 px-4 py-2 rounded-lg text-sm font-medium text-white transition-all hover:scale-105 disabled:opacity-40"
+        style={{
+          background: 'rgba(139,92,246,0.15)',
+          border: '1px solid rgba(139,92,246,0.4)',
+          boxShadow: '0 0 16px rgba(139,92,246,0.15)',
+        }}
       >
         Ignorer pour l'instant →
       </button>

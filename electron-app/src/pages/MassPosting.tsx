@@ -54,8 +54,6 @@ export function MassPosting({ user }: MassPostingProps) {
   const [selectedVideos, _setSelVideos]   = useState<SelectedVideo[]>(ms.selectedVideos)
   const [caption, _setCaption]            = useState(ms.caption)
   const [mode, setMode]                   = useState<'seq' | 'random'>('seq')
-  const [maxWorkers, setMaxWorkers]       = useState(20)
-  const [staggerMin, setStaggerMin]       = useState(5)
   const [bearer, setBearer]               = useState('')
   const [groqKey, setGroqKey]             = useState('')
   const [posting, _setPosting]            = useState(ms.posting)
@@ -69,6 +67,8 @@ export function MassPosting({ user }: MassPostingProps) {
   const [phoneSearch, setPhoneSearch]     = useState('')
   const [showBankPicker, setShowBankPicker] = useState(false)
   const stopRef                           = useRef(false)
+  const activePhonesRef                   = useRef<string[]>([])
+  const activeTasksRef                    = useRef<string[]>([])
   const logEndRef                         = useRef<HTMLDivElement>(null)
 
   // Persist-aware setters
@@ -169,9 +169,29 @@ export function MassPosting({ user }: MassPostingProps) {
     return { phone, video: selectedVideos[idx], videoIndex: idx }
   })
 
-  function stop() {
+  async function stop() {
     stopRef.current = true
-    log('🛑 Arrêt demandé — patientez la fin du cycle en cours…', 'warn')
+    log('🛑 Arrêt demandé — annulation des tâches et extinction des téléphones…', 'warn')
+    const tasks = activeTasksRef.current
+    const phones = activePhonesRef.current
+    try {
+      if (tasks.length > 0) {
+        await geelark(bearer, '/rpa/task/cancel', { ids: tasks })
+        log(`  ${tasks.length} tâche(s) annulée(s)`, 'warn')
+      }
+    } catch (e) {
+      log(`  ⚠️ annulation tâches: ${e instanceof Error ? e.message : String(e)}`, 'warn')
+    }
+    try {
+      if (phones.length > 0) {
+        await geelark(bearer, '/phone/stop', { ids: phones })
+        log(`  ${phones.length} téléphone(s) éteint(s)`, 'warn')
+      }
+    } catch (e) {
+      log(`  ⚠️ extinction téléphones: ${e instanceof Error ? e.message : String(e)}`, 'warn')
+    }
+    activeTasksRef.current = []
+    activePhonesRef.current = []
   }
 
   async function generateCaption() {
@@ -269,6 +289,7 @@ export function MassPosting({ user }: MassPostingProps) {
 
       // ── Step 2: start phones ──────────────────────────────────────────────
       const geelarkIds = phoneList.map(p => p.geelark_id)
+      activePhonesRef.current = geelarkIds
       log(`📱 Démarrage de ${phoneList.length} téléphone(s)…`)
       const startRes = await geelark(bearer, '/phone/start', { ids: geelarkIds })
       const started  = (startRes['data'] as Record<string, number>)?.['successAmount'] ?? 0
@@ -298,6 +319,7 @@ export function MassPosting({ user }: MassPostingProps) {
         if (taskRes['code'] === 0) {
           const tid = (taskRes['data'] as Record<string, unknown>)?.['id'] as string
           taskIds[asgn.phone.geelark_id] = tid
+          activeTasksRef.current = [...activeTasksRef.current, tid]
           setPhoneStatus(asgn.phone.id, { status: 'posting', taskId: tid })
           log(`  ✅ Tâche créée pour ${asgn.phone.phone_name}`, 'ok')
         } else {
@@ -310,12 +332,14 @@ export function MassPosting({ user }: MassPostingProps) {
       if (Object.keys(taskIds).length > 0) {
         log(`⏳ Suivi de ${Object.keys(taskIds).length} tâche(s)…`)
         const pending = new Set(Object.values(taskIds))
-        const deadline = Date.now() + 10 * 60 * 1000
+        const deadline = Date.now() + 8 * 60 * 1000
         const STATUS: Record<number, string> = { 1: '⏳ En attente', 2: '🔄 En cours', 3: '✅ Terminé', 4: '❌ Échoué', 7: '🚫 Annulé' }
 
         let pollCount = 0
         while (pending.size > 0 && Date.now() < deadline) {
+          if (stopRef.current) { log('⏹ Polling interrompu (stop)', 'warn'); break }
           await new Promise(r => setTimeout(r, 10000))
+          if (stopRef.current) { log('⏹ Polling interrompu (stop)', 'warn'); break }
           const qRes = await geelark(bearer, '/task/query', { ids: [...pending] })
           pollCount++
 
@@ -345,6 +369,12 @@ export function MassPosting({ user }: MassPostingProps) {
                   status: status === 3 ? 'done' : 'error',
                   detail: item['failDesc'] as string | undefined,
                 })
+                // Power off this phone immediately now that its task is finished
+                geelark(bearer, '/phone/stop', { ids: [phone.geelark_id] })
+                  .then(() => log(`  💤 ${phone.phone_name} éteint`, 'ok'))
+                  .catch(e => log(`  ⚠️ extinction ${phone.phone_name}: ${e instanceof Error ? e.message : String(e)}`, 'warn'))
+                activePhonesRef.current = activePhonesRef.current.filter(id => id !== phone.geelark_id)
+                activeTasksRef.current  = activeTasksRef.current.filter(id => id !== tid)
               }
             }
           }
@@ -359,15 +389,20 @@ export function MassPosting({ user }: MassPostingProps) {
         }
       }
 
-      // ── Step 5: stop phones ──────────────────────────────────────────────
-      log('🛑 Arrêt des téléphones…')
-      await geelark(bearer, '/phone/stop', { ids: geelarkIds })
+      // ── Step 5: stop any phones still running (timeout / no-response) ────
+      const remaining = activePhonesRef.current
+      if (remaining.length > 0) {
+        log(`🛑 Arrêt des ${remaining.length} téléphone(s) restant(s)…`)
+        await geelark(bearer, '/phone/stop', { ids: remaining })
+      }
       log('🎉 Terminé !', 'ok')
 
     } catch (e: unknown) {
       log(`❌ Erreur: ${e instanceof Error ? e.message : String(e)}`, 'error')
     }
 
+    activePhonesRef.current = []
+    activeTasksRef.current = []
     setPosting(false)
   }
 
@@ -412,26 +447,6 @@ export function MassPosting({ user }: MassPostingProps) {
                   : { color: '#5a6882' }}
               >{m.l}</button>
             ))}
-          </div>
-
-          {/* Workers */}
-          <div className="flex items-center gap-1.5 text-xs text-text2 bg-[#0d0f1c] border border-border rounded-lg px-2.5 py-1.5">
-            <span className="text-text2">⚡</span>
-            <input type="number" min={1} max={50} value={maxWorkers}
-              onChange={e => setMaxWorkers(parseInt(e.target.value) || 20)}
-              className="w-9 bg-transparent text-text text-center focus:outline-none text-[11px]"
-            />
-            <span className="text-[10px]">simult.</span>
-          </div>
-
-          {/* Stagger */}
-          <div className="flex items-center gap-1.5 text-xs text-text2 bg-[#0d0f1c] border border-border rounded-lg px-2.5 py-1.5">
-            <span>⏱</span>
-            <input type="number" min={0} max={60} value={staggerMin}
-              onChange={e => setStaggerMin(parseInt(e.target.value) || 0)}
-              className="w-9 bg-transparent text-text text-center focus:outline-none text-[11px]"
-            />
-            <span className="text-[10px]">min</span>
           </div>
 
           {/* Action buttons */}

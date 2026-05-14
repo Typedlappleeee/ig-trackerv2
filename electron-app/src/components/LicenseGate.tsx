@@ -112,11 +112,39 @@ export function LicenseGate({ userId, email, onActivated, initialStep = 'gate' }
                 : error.message
       setOrgErr(msg)
     } else {
+      // Verify the org has an active license before letting the user in.
+      const orgId = data as string | null
+      if (orgId) {
+        const { data: org } = await supabase
+          .from('organizations').select('owner_id').eq('id', orgId).maybeSingle()
+        const { data: ownerKey } = await supabase
+          .from('license_keys').select('expires_at')
+          .eq('user_id', org?.owner_id ?? '').eq('is_active', true).maybeSingle()
+        const expired = ownerKey?.expires_at ? new Date(ownerKey.expires_at) < new Date() : false
+        if (!ownerKey || expired) {
+          setOrgErr("Cette organisation n'a pas d'abonnement actif.")
+          return
+        }
+        localStorage.setItem('ig-tracker-current-org', orgId)
+      }
       setOrgSuccess(true)
-      if (data) localStorage.setItem('ig-tracker-current-org', data as string)
       setTimeout(() => window.location.reload(), 1500)
     }
   }
+
+  async function signOut() {
+    await supabase.auth.signOut()
+  }
+
+  const SignOutButton = () => (
+    <button
+      onClick={signOut}
+      className="fixed bottom-5 right-6 z-[10000] px-3 py-1.5 rounded-lg text-xs text-[#a89bd4] hover:text-white transition-colors"
+      style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(139,92,246,0.2)' }}
+    >
+      Se déconnecter →
+    </button>
+  )
 
   // ── Create org step (after activation) ──────────────────────────────────
   if (step === 'create_org') {
@@ -162,6 +190,7 @@ export function LicenseGate({ userId, email, onActivated, initialStep = 'gate' }
           </div>
           <p className="text-[10px] text-[#2a1f48] text-center mt-4">ScaleFlow — Accès restreint aux comptes autorisés</p>
         </div>
+        <SignOutButton />
       </div>
     )
   }
@@ -235,7 +264,7 @@ export function LicenseGate({ userId, email, onActivated, initialStep = 'gate' }
                   {myOrgs.map(({ org }) => (
                     <button
                       key={org.id}
-                      onClick={() => switchOrg(org.id)}
+                      onClick={() => { switchOrg(org.id); window.location.reload() }}
                       className="w-full py-2.5 px-4 rounded-xl text-sm font-semibold text-white transition-all flex items-center gap-2"
                       style={{ background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.25)' }}
                     >
@@ -405,6 +434,7 @@ export function LicenseGate({ userId, email, onActivated, initialStep = 'gate' }
           ScaleFlow — Accès restreint aux comptes autorisés
         </p>
       </div>
+      <SignOutButton />
     </div>
   )
 }

@@ -1154,6 +1154,24 @@ export function BankPicker({ user, mode, onSelect, onClose }: BankPickerProps) {
             onChange={e => setSearch(e.target.value)}
             className="w-44 bg-bg border border-border rounded-lg px-3 py-1.5 text-xs text-text placeholder:text-text2 focus:border-accent focus:outline-none"
           />
+          {mode === 'multi' && visible.length > 0 && (
+            <button
+              onClick={() => {
+                setSelected(prev => {
+                  const allSelected = visible.every(v => prev.has(v.id))
+                  const next = new Set(prev)
+                  if (allSelected) visible.forEach(v => next.delete(v.id))
+                  else             visible.forEach(v => { if (v.file_url || v.storage_path) next.add(v.id) })
+                  return next
+                })
+              }}
+              className="px-2.5 py-1.5 rounded-lg text-[11px] font-medium text-text2 hover:text-text transition-colors"
+              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}
+              title={selectedFolder ? `Sélectionner tout le dossier "${selectedFolder}"` : 'Sélectionner tout'}
+            >
+              {visible.every(v => selected.has(v.id)) ? '☐ Désélectionner' : '☑ Tout sélectionner'}
+            </button>
+          )}
           {mode === 'multi' && selected.size > 0 && (
             <Button size="sm" onClick={confirm} disabled={!!resolving}>
               {resolving ? 'Téléchargement…' : `Confirmer (${selected.size})`}

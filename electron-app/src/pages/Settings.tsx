@@ -719,7 +719,7 @@ function SubscriptionPanel() {
 
   const planLabel = license.plan === 'pro' ? 'Pro' : license.plan === 'lifetime' ? 'À vie' : license.plan === 'standard' ? 'Standard' : '—'
   const planCredits = license.plan === 'pro' || license.plan === 'lifetime' ? 5500 : license.plan === 'standard' ? 2000 : 0
-  const maxPhones   = license.plan === 'pro' || license.plan === 'lifetime' ? '∞' : '100'
+  const maxPhones   = '∞'
 
   return (
     <div className="space-y-6">
@@ -866,7 +866,7 @@ function SubscriptionPanel() {
               </div>
             </div>
             <ul className="space-y-1.5 flex-1">
-              {['2 000 crédits / mois', 'Max 100 téléphones', 'Toutes les fonctionnalités', 'Support standard'].map(f => (
+              {['2 000 crédits / mois', 'Téléphones illimités', 'Toutes les fonctionnalités', 'Support standard'].map(f => (
                 <li key={f} className="flex items-center gap-2 text-xs text-text2">
                   <span style={{ color: '#a78bfa' }}>✓</span>{f}
                 </li>

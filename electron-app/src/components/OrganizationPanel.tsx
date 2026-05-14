@@ -5,6 +5,7 @@ import { useOrg } from '@/lib/orgContext'
 import { ROLE_LABELS, ALL_TABS, canManageOrg } from '@/lib/permissions'
 import { Button } from '@/components/ui/Button'
 import { Input }  from '@/components/ui/Input'
+import { Onboarding } from '@/components/Onboarding'
 
 interface Props { user: User }
 
@@ -28,6 +29,8 @@ export function OrganizationPanel({ user }: Props) {
   const [busy, setBusy]         = useState(false)
   const [msg, setMsg]           = useState<string | null>(null)
   const [err, setErr]           = useState<string | null>(null)
+  // Set to the new org's id right after createOrg succeeds; triggers the API setup wizard.
+  const [setupForOrg, setSetupForOrg] = useState<string | null>(null)
 
   // Detail view (admin / owner) for currentOrg
   const [members, setMembers]     = useState<MemberRow[]>([])
@@ -158,7 +161,10 @@ export function OrganizationPanel({ user }: Props) {
     setNewName('')
     setCreating(false)
     await refresh()
-    if (data) switchOrg(data as string)
+    if (data) {
+      switchOrg(data as string)
+      setSetupForOrg(data as string)
+    }
   }
 
   async function deleteOrg(org: Organization) {
@@ -225,9 +231,23 @@ export function OrganizationPanel({ user }: Props) {
       return
     }
     setJoinToken('')
+    const orgId = data as string | null
+    if (orgId) {
+      const { data: org } = await supabase
+        .from('organizations').select('owner_id').eq('id', orgId).maybeSingle()
+      const { data: ownerKey } = await supabase
+        .from('license_keys').select('expires_at')
+        .eq('user_id', org?.owner_id ?? '').eq('is_active', true).maybeSingle()
+      const expired = ownerKey?.expires_at ? new Date(ownerKey.expires_at) < new Date() : false
+      if (!ownerKey || expired) {
+        flash("Cette organisation n'a pas d'abonnement actif.", true)
+        await refresh()
+        return
+      }
+    }
     flash('Bienvenue dans l\'organisation ✓')
     await refresh()
-    if (data) switchOrg(data as string)
+    if (orgId) switchOrg(orgId)
   }
 
   async function changeRole(member: MemberRow, newRole: OrgRole) {
@@ -263,6 +283,16 @@ export function OrganizationPanel({ user }: Props) {
 
   function memberLabel(m: MemberRow): string {
     return m.display_name?.trim() || m.email || m.user_id.slice(0, 8)
+  }
+
+  if (setupForOrg) {
+    return (
+      <Onboarding
+        user={user}
+        orgId={setupForOrg}
+        onComplete={() => setSetupForOrg(null)}
+      />
+    )
   }
 
   return (
@@ -342,7 +372,7 @@ export function OrganizationPanel({ user }: Props) {
                     <p className="text-text2 text-xs">{ROLE_LABELS[member.role]}</p>
                   </div>
                   {currentOrg?.id !== org.id && (
-                    <Button size="sm" variant="secondary" onClick={() => switchOrg(org.id)}>Activer</Button>
+                    <Button size="sm" variant="secondary" onClick={() => { switchOrg(org.id); window.location.reload() }}>Activer</Button>
                   )}
                   {member.role === 'owner' ? (
                     <Button size="sm" variant="danger" onClick={() => deleteOrg(org)}>Supprimer</Button>

@@ -214,6 +214,8 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
   // 'licences' is super-admin only — never in PageKey, always visible when shown.
   const isVisibleTab = (id: Page): boolean => {
     if (id === 'licences') return license.isSuperAdmin
+    // Support is always visible — not part of the per-role permission matrix.
+    if (id === 'support') return true
     return role ? canSeeTab(role, perms, id as import('@/lib/supabase').PageKey) : true
   }
 
