@@ -48,16 +48,17 @@ export function OrgProvider({ user, children }: { user: User; children: ReactNod
       }))
     setMyOrgs(list)
     // Validate persisted choice; if stale, clear it
-    const stored = localStorage.getItem(LS_KEY)
-    if (stored && !list.some(x => x.org.id === stored)) {
+    let effective = localStorage.getItem(LS_KEY)
+    if (effective && !list.some(x => x.org.id === effective)) {
       localStorage.removeItem(LS_KEY)
-      setCurrentId(null)
+      effective = null
     }
-    // Auto-select first org if nothing is selected (removes need for solo mode)
-    if (!stored && list.length > 0) {
-      localStorage.setItem(LS_KEY, list[0].org.id)
-      setCurrentId(list[0].org.id)
+    // Auto-select first org if nothing valid is selected (removes need for solo mode)
+    if (!effective && list.length > 0) {
+      effective = list[0].org.id
+      localStorage.setItem(LS_KEY, effective)
     }
+    setCurrentId(effective)
     setLoading(false)
   }, [user.id])
 
