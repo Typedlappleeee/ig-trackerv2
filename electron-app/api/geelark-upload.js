@@ -34,14 +34,13 @@ module.exports = async (req, res) => {
 
     const bytes = Buffer.from(await blob.arrayBuffer())
 
-    // Step 2: Get presigned upload URL from GéeLark
-    const ext = storagePath.split('.').pop()?.toLowerCase() ?? 'mp4'
-    const fileType = ['mp4','mov','webm','avi','mkv'].includes(ext) ? ext : 'mp4'
+    // Step 2: Get presigned upload URL from GéeLark (always use 'mp4' — they reject other types)
+    const ext = (storagePath.split('.').pop() ?? 'mp4').toLowerCase()
 
     const glUrlRes = await fetch('https://openapi.geelark.com/open/v1/upload/getUrl', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
-      body: JSON.stringify({ fileType }),
+      body: JSON.stringify({ fileType: 'mp4' }),
     })
     if (!glUrlRes.ok) {
       return res.status(200).json({ ok: false, error: `GéeLark URL error: ${glUrlRes.status}` })
@@ -57,10 +56,9 @@ module.exports = async (req, res) => {
     }
 
     // Step 3: PUT video bytes to GéeLark's S3 URL
-    const mime = fileType === 'mp4' ? 'video/mp4'
-               : fileType === 'mov' ? 'video/quicktime'
-               : fileType === 'webm' ? 'video/webm'
-               : 'application/octet-stream'
+    const mime = ext === 'mov' ? 'video/quicktime'
+               : ext === 'webm' ? 'video/webm'
+               : 'video/mp4'
 
     const putRes = await fetch(uploadUrl, {
       method: 'PUT',
