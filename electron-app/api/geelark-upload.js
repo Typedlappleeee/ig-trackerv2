@@ -51,13 +51,12 @@ module.exports = async (req, res) => {
       return res.status(200).json({ ok: false, error: `GéeLark error: ${glData.msg ?? glData.code}` })
     }
     const d = glData.data ?? {}
-    // GéeLark uses different field names — try common variants
-    const uploadUrl = d.uploadUrl ?? d.url ?? d.upload_url
-    const token     = d.token ?? d.videoToken ?? d.video_token ?? d.fileId ?? d.file_id
+    const uploadUrl = d.uploadUrl
+    const token     = d.resourceUrl  // resourceUrl is what gets passed to the post task as "video"
     if (!uploadUrl || !token) {
       return res.status(200).json({
         ok: false,
-        error: 'No uploadUrl/token from GéeLark. Response keys: ' + Object.keys(d).join(','),
+        error: 'No uploadUrl/resourceUrl from GéeLark. Keys: ' + Object.keys(d).join(','),
       })
     }
 
