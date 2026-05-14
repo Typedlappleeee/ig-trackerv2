@@ -254,32 +254,44 @@ ALTER TABLE public.activity_logs         ENABLE ROW LEVEL SECURITY;
 -- ║  8. HELPERS pour les RLS d'organisation                      ║
 -- ╚══════════════════════════════════════════════════════════════╝
 
+-- IMPORTANT : LANGUAGE plpgsql (pas sql) sinon Postgres inline la fonction
+-- dans les policies RLS → ça annule le SECURITY DEFINER → récursion infinie
+-- "infinite recursion detected in policy for relation ..."
 CREATE OR REPLACE FUNCTION public.is_org_member(p_org uuid)
-RETURNS boolean LANGUAGE sql SECURITY DEFINER STABLE AS $$
-  SELECT EXISTS (
+RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER STABLE
+SET search_path = public AS $$
+BEGIN
+  RETURN EXISTS (
     SELECT 1 FROM public.organization_members
     WHERE org_id = p_org AND user_id = auth.uid()
   );
+END;
 $$;
 
 CREATE OR REPLACE FUNCTION public.is_org_admin(p_org uuid)
-RETURNS boolean LANGUAGE sql SECURITY DEFINER STABLE AS $$
-  SELECT EXISTS (
+RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER STABLE
+SET search_path = public AS $$
+BEGIN
+  RETURN EXISTS (
     SELECT 1 FROM public.organization_members
     WHERE org_id = p_org AND user_id = auth.uid() AND role IN ('owner','admin')
   );
+END;
 $$;
 
 -- True if the calling user shares at least one organisation with p_user.
 -- Used by the profiles RLS to let org members see each other's email + display_name.
 CREATE OR REPLACE FUNCTION public.shares_org_with(p_user uuid)
-RETURNS boolean LANGUAGE sql SECURITY DEFINER STABLE AS $$
-  SELECT EXISTS (
+RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER STABLE
+SET search_path = public AS $$
+BEGIN
+  RETURN EXISTS (
     SELECT 1
     FROM public.organization_members me
     JOIN public.organization_members other ON me.org_id = other.org_id
     WHERE me.user_id = auth.uid() AND other.user_id = p_user
   );
+END;
 $$;
 
 
