@@ -61,14 +61,28 @@ module.exports = async (req, res) => {
     }
 
     // Step 3: PUT video bytes to GéeLark's S3 URL
-    // Content-Type MUST match what GéeLark signed for (always mp4 since we send fileType=mp4)
-    const putRes = await fetch(uploadUrl, {
+    // Try with no Content-Type first (some presigned URLs don't sign Content-Type)
+    let putRes = await fetch(uploadUrl, {
       method: 'PUT',
-      headers: { 'Content-Type': 'video/mp4' },
       body: bytes,
     })
     if (!putRes.ok) {
-      return res.status(200).json({ ok: false, error: `S3 PUT failed: ${putRes.status}` })
+      const errBody = await putRes.text().catch(() => '')
+      console.error('S3 PUT failed (no content-type):', putRes.status, errBody.slice(0, 500))
+      // Retry with explicit Content-Type
+      putRes = await fetch(uploadUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'video/mp4' },
+        body: bytes,
+      })
+      if (!putRes.ok) {
+        const errBody2 = await putRes.text().catch(() => '')
+        console.error('S3 PUT failed (with content-type):', putRes.status, errBody2.slice(0, 500))
+        return res.status(200).json({
+          ok: false,
+          error: `S3 PUT failed: ${putRes.status} — ${errBody2.slice(0, 200)}`,
+        })
+      }
     }
 
     return res.status(200).json({ ok: true, token })
