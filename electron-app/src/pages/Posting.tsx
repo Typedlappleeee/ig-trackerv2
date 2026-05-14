@@ -155,7 +155,7 @@ export function Posting({ user }: PostingProps) {
     const total     = phoneList.length
 
     const creditCost = total * CREDIT_COSTS.posting
-    const creditRes = await checkAndDeductCredits(user.id, creditCost)
+    const creditRes = await checkAndDeductCredits(credits.ownerId, creditCost)
     if (!creditRes.ok) {
       log(`❌ ${creditRes.error ?? 'Crédits insuffisants'} (besoin: ${creditCost} crédits pour ${total} phone${total > 1 ? 's' : ''})`, 'error')
       return

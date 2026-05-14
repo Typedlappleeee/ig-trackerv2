@@ -567,6 +567,7 @@ export function Bank({ user }: BankProps) {
               onClick={() => setSelectedFolder(f)}
               onRename={(newName) => renameFolder(f, newName)}
               onDelete={() => deleteFolder(f)}
+              onDropItem={itemId => { moveItemSave(itemId, f); setSelectedFolder(f) }}
             />
           ))}
         </div>
@@ -743,17 +744,19 @@ export function Bank({ user }: BankProps) {
 }
 
 // ── Folder row with inline rename ────────────────────────────────────────────
-function FolderRow({ name, count, active, onClick, onRename, onDelete }: {
+function FolderRow({ name, count, active, onClick, onRename, onDelete, onDropItem }: {
   name: string
   count: number
   active: boolean
   onClick: () => void
   onRename: (newName: string) => void
   onDelete: () => void
+  onDropItem: (itemId: string) => void
 }) {
   const [editing, setEditing] = useState(false)
   const [val, setVal]         = useState(name)
   const [showActions, setShowActions] = useState(false)
+  const [dragOver, setDragOver] = useState(false)
 
   if (editing) {
     return (
@@ -777,12 +780,20 @@ function FolderRow({ name, count, active, onClick, onRename, onDelete }: {
     <div
       className={`flex items-center gap-2.5 px-3 py-2.5 cursor-pointer transition-colors ${
         active ? 'bg-surface2 border-l-2 border-accent pl-[10px]' : 'hover:bg-surface2'
-      }`}
+      } ${dragOver ? 'bg-accent/20 border-l-2 border-accent pl-[10px]' : ''}`}
       onClick={onClick}
       onMouseEnter={() => setShowActions(true)}
       onMouseLeave={() => setShowActions(false)}
+      onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+      onDragLeave={() => setDragOver(false)}
+      onDrop={e => {
+        e.preventDefault()
+        setDragOver(false)
+        const itemId = e.dataTransfer.getData('bank-item-id')
+        if (itemId) onDropItem(itemId)
+      }}
     >
-      <span className="text-base flex-shrink-0">📂</span>
+      <span className="text-base flex-shrink-0">{dragOver ? '📥' : '📂'}</span>
       <span className="text-xs font-medium text-text flex-1 truncate">{name}</span>
       {showActions ? (
         <div className="flex gap-0.5 flex-shrink-0">
@@ -979,6 +990,8 @@ function VideoCard({ item, onContextMenu, onPlay }: {
 }) {
   return (
     <div
+      draggable
+      onDragStart={e => e.dataTransfer.setData('bank-item-id', item.id)}
       className="bg-card border border-border rounded-xl overflow-hidden hover:border-accent/40 transition-colors group cursor-default select-none"
       onContextMenu={e => onContextMenu(e, item)}
     >
