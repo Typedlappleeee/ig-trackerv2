@@ -129,23 +129,30 @@ const MIGRATION_SQL = `-- Colle dans Supabase → SQL Editor → Run
 alter table public.content_bank add column if not exists folder text default null;`
 
 // ── Add Media modal (drag-drop zone + pick from PC) ───────────────────────────
-function AddMediaModal({ onPick, onDrop, onClose }: {
-  onPick: () => void
-  onDrop: (filePath: string) => void
+function AddMediaModal({ onFiles, onElectronPick, onClose }: {
+  onFiles: (files: File[]) => void
+  onElectronPick?: () => void
   onClose: () => void
 }) {
   const [dragOver, setDragOver] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   function handleDrop(e: React.DragEvent) {
     e.preventDefault()
     e.stopPropagation()
     setDragOver(false)
     const files = Array.from(e.dataTransfer.files)
-    for (const f of files) {
-      const p = (f as File & { path?: string }).path ?? f.name
-      if (p) onDrop(p)
-    }
+    if (files.length > 0) onFiles(files)
     onClose()
+  }
+
+  function handlePickClick() {
+    if (onElectronPick) {
+      onElectronPick()
+      onClose()
+    } else {
+      fileInputRef.current?.click()
+    }
   }
 
   return (
@@ -179,8 +186,21 @@ function AddMediaModal({ onPick, onDrop, onClose }: {
           <div className="flex-1 h-px bg-border" />
         </div>
 
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="video/*,image/*,audio/*,.gif"
+          multiple
+          style={{ display: 'none' }}
+          onChange={e => {
+            const files = Array.from(e.target.files ?? [])
+            if (files.length > 0) onFiles(files)
+            e.target.value = ''
+            onClose()
+          }}
+        />
         <button
-          onClick={() => { onPick(); onClose() }}
+          onClick={handlePickClick}
           className="w-full bg-accent hover:bg-accent2 text-white font-semibold py-2.5 rounded-xl text-sm transition-colors"
         >
           📁 Choisir depuis ton PC
@@ -458,7 +478,7 @@ export function Bank({ user }: BankProps) {
     const folder = (item as unknown as {folder?: string | null}).folder
     const folderMatch = selectedFolder === null ? true : folder === selectedFolder
     if (!folderMatch) return false
-    if (typeFilter !== 'all' && inferType(item.file_url) !== typeFilter) return false
+    if (typeFilter !== 'all' && inferType(item.storage_path ?? item.file_url) !== typeFilter) return false
     if (!search) return true
     const q = search.toLowerCase()
     return item.title.toLowerCase().includes(q) || item.notes.toLowerCase().includes(q) || item.tags.some(t => t.toLowerCase().includes(q))
@@ -682,8 +702,8 @@ export function Bank({ user }: BankProps) {
       {/* ── Modals ── */}
       {showAddModal && (
         <AddMediaModal
-          onPick={pickFile}
-          onDrop={filePath => addFromPath(filePath)}
+          onFiles={async files => { for (const f of files) await addFromFile(f) }}
+          onElectronPick={window.electronAPI?.pickVideoFile ? pickFile : undefined}
           onClose={() => setShowAddModal(false)}
         />
       )}
@@ -784,6 +804,12 @@ function FolderRow({ name, count, active, onClick, onRename, onDelete }: {
 //   4. emoji
 import { getSignedUrl } from '@/lib/storage'
 
+const IMAGE_EXTS = new Set(['jpg','jpeg','png','webp','gif','bmp','heic'])
+function isImagePath(p: string | null | undefined): boolean {
+  if (!p) return false
+  return IMAGE_EXTS.has(p.toLowerCase().split('.').pop() ?? '')
+}
+
 export function VideoThumbnail({ filePath, thumbnailPath, storagePath }: {
   filePath?:      string | null
   thumbnailPath?: string | null
@@ -816,9 +842,16 @@ export function VideoThumbnail({ filePath, thumbnailPath, storagePath }: {
     )
   }
 
-  // 2. Stream video from cloud and grab first frame in the <video> element
+  // 2. Cloud asset (image or video)
   if (storagePath) {
     if (!videoSrc || failed) return <div className="w-full h-full flex items-center justify-center bg-surface2 text-4xl">🎬</div>
+    if (isImagePath(storagePath)) {
+      return (
+        <img src={videoSrc} alt=""
+          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+          onError={() => setFailed(true)} />
+      )
+    }
     return (
       <video
         ref={videoRef}
