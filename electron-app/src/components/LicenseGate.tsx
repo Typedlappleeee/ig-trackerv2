@@ -132,6 +132,20 @@ export function LicenseGate({ userId, email, onActivated, initialStep = 'gate' }
     }
   }
 
+  async function signOut() {
+    await supabase.auth.signOut()
+  }
+
+  const SignOutButton = () => (
+    <button
+      onClick={signOut}
+      className="fixed bottom-5 right-6 z-[10000] px-3 py-1.5 rounded-lg text-xs text-[#a89bd4] hover:text-white transition-colors"
+      style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(139,92,246,0.2)' }}
+    >
+      Se déconnecter →
+    </button>
+  )
+
   // ── Create org step (after activation) ──────────────────────────────────
   if (step === 'create_org') {
     return (
@@ -176,6 +190,7 @@ export function LicenseGate({ userId, email, onActivated, initialStep = 'gate' }
           </div>
           <p className="text-[10px] text-[#2a1f48] text-center mt-4">ScaleFlow — Accès restreint aux comptes autorisés</p>
         </div>
+        <SignOutButton />
       </div>
     )
   }
@@ -419,6 +434,7 @@ export function LicenseGate({ userId, email, onActivated, initialStep = 'gate' }
           ScaleFlow — Accès restreint aux comptes autorisés
         </p>
       </div>
+      <SignOutButton />
     </div>
   )
 }
