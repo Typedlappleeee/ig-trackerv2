@@ -861,7 +861,7 @@ function SubscriptionPanel() {
             <div>
               <p className="text-xs font-black uppercase tracking-wider" style={{ color: '#a78bfa' }}>Standard</p>
               <div className="flex items-baseline gap-1 mt-2">
-                <span className="text-3xl font-black text-white">29,99€</span>
+                <span className="text-3xl font-black text-white">49,99$</span>
                 <span className="text-xs text-text2">/ mois</span>
               </div>
             </div>
@@ -891,7 +891,7 @@ function SubscriptionPanel() {
             <div>
               <p className="text-xs font-black uppercase tracking-wider" style={{ color: '#f472b6' }}>Pro</p>
               <div className="flex items-baseline gap-1 mt-2">
-                <span className="text-3xl font-black text-white">79,99€</span>
+                <span className="text-3xl font-black text-white">99,99$</span>
                 <span className="text-xs text-text2">/ mois</span>
               </div>
             </div>

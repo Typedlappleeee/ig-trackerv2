@@ -1,7 +1,7 @@
 const PLANS = [
   {
     name: 'Standard',
-    price: '29,99€',
+    price: '49,99$',
     period: '/mois',
     accent: '#60a5fa',
     cta: 'Choisir Standard',
@@ -16,7 +16,7 @@ const PLANS = [
   },
   {
     name: 'Pro',
-    price: '79,99€',
+    price: '99,99$',
     period: '/mois',
     accent: '#c084fc',
     popular: true,
