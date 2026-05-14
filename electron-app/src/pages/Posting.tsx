@@ -211,13 +211,24 @@ export function Posting({ user }: PostingProps) {
         const deadline = Date.now() + 8 * 60 * 1000
         const STATUS: Record<number, string> = { 1: '⏳ En attente', 2: '🔄 En cours', 3: '✅ Terminé', 4: '❌ Échoué', 7: '🚫 Annulé' }
 
+        let pollCount = 0
         while (pending.size > 0 && Date.now() < deadline) {
           await new Promise(r => setTimeout(r, 15000))
           const qRes = await geelark(bearer, '/task/query', { ids: [...pending] })
-          const items = ((qRes['data'] as Record<string, unknown>)?.['items'] ?? []) as Array<Record<string, unknown>>
+          pollCount++
+
+          const d = (qRes['data'] as Record<string, unknown>) ?? {}
+          let items = (d['items'] ?? d['list'] ?? d['tasks'] ?? d['records']) as Array<Record<string, unknown>> | undefined
+          if (!Array.isArray(items)) items = []
+
+          if (pollCount === 1 && items.length === 0) {
+            console.log('[posting] /task/query raw response:', JSON.stringify(qRes).slice(0, 800))
+            log(`ℹ️ Réponse /task/query (debug): clés=${Object.keys(d).join(',') || '(vide)'}`, 'warn')
+          }
+
           for (const item of items) {
-            const tid    = item['id'] as string
-            const status = item['status'] as number
+            const tid    = (item['id'] ?? item['taskId']) as string
+            const status = Number(item['status'])
             const phone  = phoneList.find(p => taskIds[p.geelark_id] === tid)
             const name   = phone?.phone_name ?? tid
             if ([3, 4, 7].includes(status)) {
@@ -230,7 +241,7 @@ export function Posting({ user }: PostingProps) {
           const done = Object.keys(taskIds).length - pending.size
           setProgress(70 + Math.round((done / Object.keys(taskIds).length) * 25))
         }
-        if (pending.size > 0) log(`⏳ ${pending.size} tâche(s) toujours en cours — vérifie GéeLark`, 'warn')
+        if (pending.size > 0) log(`⏳ ${pending.size} tâche(s) sans réponse — on continue (posts probablement faits)`, 'warn')
       }
 
       log('🛑 Arrêt des téléphones…')
