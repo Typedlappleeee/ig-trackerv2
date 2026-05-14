@@ -13,14 +13,19 @@ export interface LicenseStatus {
   orgOwnerPlan: 'standard' | 'pro' | 'lifetime' | null
 }
 
+const FAIL_OPEN: LicenseStatus = { valid: true, expiresAt: null, daysLeft: null, source: 'own', isSuperAdmin: false, plan: null, orgOwnerPlan: null }
+
 export async function checkLicense(userId: string, orgId?: string | null): Promise<LicenseStatus> {
   try {
     // Super admin always valid
-    const { data: profile } = await supabase
+    const { data: profile, error: profileErr } = await supabase
       .from('profiles')
       .select('is_super_admin')
       .eq('id', userId)
       .maybeSingle()
+
+    // Any Supabase error (500, network, stale schema cache) → fail open
+    if (profileErr) return FAIL_OPEN
 
     if (profile?.is_super_admin) {
       return { valid: true, expiresAt: null, daysLeft: null, source: 'own', isSuperAdmin: true, plan: 'pro', orgOwnerPlan: null }
@@ -29,28 +34,34 @@ export async function checkLicense(userId: string, orgId?: string | null): Promi
     // Helper: resolve org owner plan (null if not in org mode or user is the owner)
     let orgOwnerPlan: LicenseStatus['plan'] = null
     if (orgId) {
-      const { data: org } = await supabase
+      const { data: org, error: orgErr } = await supabase
         .from('organizations')
         .select('owner_id')
         .eq('id', orgId)
         .maybeSingle()
 
+      if (orgErr) return FAIL_OPEN
+
       if (org?.owner_id && org.owner_id !== userId) {
-        const { data: ownerProfile } = await supabase
+        const { data: ownerProfile, error: ownerProfileErr } = await supabase
           .from('profiles')
           .select('is_super_admin')
           .eq('id', org.owner_id)
           .maybeSingle()
 
+        if (ownerProfileErr) return FAIL_OPEN
+
         if (ownerProfile?.is_super_admin) {
           orgOwnerPlan = 'pro'
         } else {
-          const { data: ownerKey } = await supabase
+          const { data: ownerKey, error: ownerKeyErr } = await supabase
             .from('license_keys')
             .select('expires_at, plan')
             .eq('user_id', org.owner_id)
             .eq('is_active', true)
             .maybeSingle()
+
+          if (ownerKeyErr) return FAIL_OPEN
 
           if (ownerKey) {
             const exp = ownerKey.expires_at ? new Date(ownerKey.expires_at) : null
@@ -70,7 +81,9 @@ export async function checkLicense(userId: string, orgId?: string | null): Promi
       .eq('is_active', true)
       .maybeSingle()
 
-    if (!ownErr && ownKey) {
+    if (ownErr) return FAIL_OPEN
+
+    if (ownKey) {
       const expiresAt = ownKey.expires_at ? new Date(ownKey.expires_at) : null
       if (!expiresAt || expiresAt > new Date()) {
         const daysLeft = expiresAt ? Math.ceil((expiresAt.getTime() - Date.now()) / 86_400_000) : null
@@ -84,8 +97,7 @@ export async function checkLicense(userId: string, orgId?: string | null): Promi
       return { valid: true, expiresAt: null, daysLeft: null, source: 'org_owner', isSuperAdmin: false, plan: orgOwnerPlan, orgOwnerPlan }
     }
   } catch {
-    // Network error or schema not applied yet — fail open so the user isn't blocked
-    return { valid: true, expiresAt: null, daysLeft: null, source: 'own', isSuperAdmin: false, plan: null, orgOwnerPlan: null }
+    return FAIL_OPEN
   }
 
   return { valid: false, expiresAt: null, daysLeft: null, source: 'none', isSuperAdmin: false, plan: null, orgOwnerPlan: null }
