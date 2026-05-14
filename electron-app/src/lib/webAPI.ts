@@ -225,7 +225,26 @@ export function buildWebAPI() {
     // ── Upload video to GéeLark ─────────────────────────────────────────────
     async uploadVideoGeelark(opts: { bearer: string; filePath: string }) {
       try {
-        // Step 1: get presigned upload URL via our proxy
+        // Extract storage path from Supabase signed URL or use as-is
+        const supabaseMatch = opts.filePath.match(/\/object\/sign\/([^/?]+)\/(.+?)(?:\?|$)/)
+        if (supabaseMatch) {
+          // Route through server-side proxy (avoids browser CORS + memory issues)
+          const r = await fetch('/api/geelark-upload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              storagePath: decodeURIComponent(supabaseMatch[2]),
+              bucket: supabaseMatch[1],
+              bearer: opts.bearer,
+            }),
+          })
+          return await r.json() as { ok: boolean; token?: string; error?: string }
+        }
+
+        // Fallback: blob/data URL — load in browser and upload directly
+        const bytes = await fetchFileBytes(opts.filePath)
+        const ext = opts.filePath.split('.').pop()?.toLowerCase() ?? 'mp4'
+
         const urlRes = await fetch('/api/gx', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -233,21 +252,18 @@ export function buildWebAPI() {
             method: 'POST',
             url: 'https://openapi.geelark.com/open/v1/upload/getUrl',
             headers: { Authorization: `Bearer ${opts.bearer}` },
-            body: { fileType: 'mp4' },
+            body: { fileType: ext },
           }),
         })
         const urlData = await urlRes.json() as Record<string, unknown>
         if (!urlData.ok) return { ok: false, error: 'Upload URL failed' }
         const payload = (urlData.data as Record<string, unknown>)
         const apiResp = payload?.['data'] as Record<string, unknown>
-        if (!apiResp) return { ok: false, error: 'No upload data' }
+        if (!apiResp) return { ok: false, error: 'No upload data from GéeLark' }
         const uploadUrl = apiResp['uploadUrl'] as string
         const token     = apiResp['token'] as string
+        if (!uploadUrl || !token) return { ok: false, error: 'Missing uploadUrl or token' }
 
-        // Step 2: read file bytes
-        const bytes = await fetchFileBytes(opts.filePath)
-
-        // Step 3: PUT to presigned S3 URL directly from browser
         const putRes = await fetch(uploadUrl, {
           method: 'PUT',
           headers: { 'Content-Type': 'video/mp4' },
