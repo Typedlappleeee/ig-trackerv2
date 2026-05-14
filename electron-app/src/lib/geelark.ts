@@ -158,19 +158,35 @@ async function ensurePhoneRunning(
     await sleepOrAbort(10000, signal)
   }
 
-  // Status 2 = already starting — skip the /phone/start call and just poll
-  if (st !== 2) {
-    log?.('📱 Envoi de la commande de démarrage…')
-    const startRes = await geelarkFetch('POST', '/phone/start', { ids: [phoneId] }, bearer)
-    const code       = Number(startRes['code'] ?? -1)
-    const success    = Number((startRes['data'] as Record<string, unknown>)?.['successAmount'] ?? 0)
-    const failed     = Number((startRes['data'] as Record<string, unknown>)?.['failAmount'] ?? 0)
-    log?.(`  → code=${code}, démarrés=${success}, échecs=${failed}`)
-    if (code !== 0) {
-      log?.(`  ❌ Erreur API: ${startRes['msg'] ?? startRes['message'] ?? code}`)
+  // Status 2 = already starting — wait briefly then force-restart if still stuck
+  if (st === 2) {
+    log?.('📱 Démarrage déjà en cours (statut 2) — attente 20s…')
+    for (let i = 0; i < 10; i++) {
+      if (signal?.aborted) throw new Error('Annulé')
+      await sleepOrAbort(2000, signal)
+      const list = await fetchAllPhones(bearer)
+      const cur  = list.find(x => x.id === phoneId)
+      const curSt = numStatus(cur?.status)
+      if (curSt === 1) {
+        log?.('✅ Téléphone démarré — sonde du shell…')
+        return probeShellReady(bearer, phoneId, log, signal)
+      }
+      if (curSt !== 2) break  // went to stopped/stopping — let the start logic below handle it
     }
-  } else {
-    log?.('📱 Démarrage déjà en cours (statut 2) — attente…')
+    // Still stuck in status 2 after 20s → force-stop then restart
+    log?.('⚠️ Téléphone bloqué en démarrage — arrêt forcé puis redémarrage…')
+    await geelarkFetch('POST', '/phone/stop', { ids: [phoneId] }, bearer)
+    await sleepOrAbort(8000, signal)
+  }
+
+  log?.('📱 Envoi de la commande de démarrage…')
+  const startRes = await geelarkFetch('POST', '/phone/start', { ids: [phoneId] }, bearer)
+  const code       = Number(startRes['code'] ?? -1)
+  const success    = Number((startRes['data'] as Record<string, unknown>)?.['successAmount'] ?? 0)
+  const failed     = Number((startRes['data'] as Record<string, unknown>)?.['failAmount'] ?? 0)
+  log?.(`  → code=${code}, démarrés=${success}, échecs=${failed}`)
+  if (code !== 0) {
+    log?.(`  ❌ Erreur API: ${startRes['msg'] ?? startRes['message'] ?? code}`)
   }
 
   // Poll up to 120s for status === 1
