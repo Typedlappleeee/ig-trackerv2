@@ -10,6 +10,7 @@ import { VideoThumbnail } from '@/pages/Bank'
 import { BankPicker } from './Bank'
 import { getPostingState, setPostingState, subscribePosting, type TaskLog } from '@/lib/postingStore'
 import { playSuccess } from '@/lib/sounds'
+import { checkAndDeductCredits, CREDIT_COSTS, useCredits } from '@/lib/credits'
 
 interface PostingProps { user: User }
 
@@ -25,6 +26,7 @@ async function geelark(bearer: string, path: string, body: unknown) {
 
 export function Posting({ user }: PostingProps) {
   const { currentOrg, role, perms }    = useOrg()
+  const credits = useCredits()
   const [phones, setPhones]            = useState<Phone[]>([])
   const s                              = getPostingState()
   const [selectedPhones, _setSelPhones]= useState<Set<string>>(s.selectedPhones)
@@ -149,10 +151,20 @@ export function Posting({ user }: PostingProps) {
     if (selectedPhones.size === 0) { log('Sélectionne au moins un téléphone', 'warn'); return }
     if (!filePath)             { log('Sélectionne une vidéo', 'warn'); return }
 
-    playSuccess()
-    setPosting(true); setLogs([]); setProgress(0)
     const phoneList = phones.filter(p => selectedPhones.has(p.id))
     const total     = phoneList.length
+
+    const creditCost = total * CREDIT_COSTS.posting
+    const creditRes = await checkAndDeductCredits(user.id, creditCost)
+    if (!creditRes.ok) {
+      log(`❌ ${creditRes.error ?? 'Crédits insuffisants'} (besoin: ${creditCost} crédits pour ${total} phone${total > 1 ? 's' : ''})`, 'error')
+      return
+    }
+    credits.refresh()
+    log(`💳 ${creditCost} crédits débités (${CREDIT_COSTS.posting}/phone × ${total}) — solde: ${creditRes.balance ?? '?'}`)
+
+    playSuccess()
+    setPosting(true); setLogs([]); setProgress(0)
 
     logActivity({
       orgId: currentOrg?.id ?? null, userId: user.id, userEmail: user.email ?? '',

@@ -13,6 +13,7 @@ import {
   type TaskLog, type TaskStatus, type SelectedVideo,
 } from '@/lib/massPostingStore'
 import { playSuccess } from '@/lib/sounds'
+import { checkAndDeductCredits, CREDIT_COSTS, useCredits } from '@/lib/credits'
 
 interface MassPostingProps { user: User }
 
@@ -46,6 +47,7 @@ async function geelark(bearer: string, path: string, body: unknown) {
 
 export function MassPosting({ user }: MassPostingProps) {
   const { currentOrg, role, perms } = useOrg()
+  const credits = useCredits()
   const [phones, setPhones]               = useState<Phone[]>([])
   const ms                                = getMassPostingState()
   const [selectedPhones, _setSelPhones]   = useState<Set<string>>(ms.selectedPhones)
@@ -208,6 +210,15 @@ export function MassPosting({ user }: MassPostingProps) {
     if (!bearer)                  { log('Token GéeLark manquant — Paramètres', 'error'); return }
     if (phoneList.length === 0)   { log('Sélectionne au moins un téléphone', 'warn'); return }
     if (selectedVideos.length === 0) { log('Sélectionne au moins une vidéo', 'warn'); return }
+
+    const creditCost = phoneList.length * CREDIT_COSTS.mass_posting
+    const creditRes = await checkAndDeductCredits(user.id, creditCost)
+    if (!creditRes.ok) {
+      log(`❌ ${creditRes.error ?? 'Crédits insuffisants'} (besoin: ${creditCost} crédits pour ${phoneList.length} phone${phoneList.length > 1 ? 's' : ''})`, 'error')
+      return
+    }
+    credits.refresh()
+    log(`💳 ${creditCost} crédits débités (${CREDIT_COSTS.mass_posting}/phone × ${phoneList.length}) — solde: ${creditRes.balance ?? '?'}`)
 
     playSuccess()
     setPosting(true)

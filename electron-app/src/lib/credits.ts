@@ -8,8 +8,10 @@ export const PLAN_MONTHLY_CREDITS: Record<string, number> = {
 }
 
 export const CREDIT_COSTS = {
-  montage: 1,
-  remix:   2,
+  montage:      1,
+  remix:        2,
+  posting:      1,  // per phone (single posting page)
+  mass_posting: 2,  // per phone (mass posting page)
 } as const
 
 export const CREDIT_PACKS = [
