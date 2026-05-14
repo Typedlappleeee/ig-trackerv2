@@ -225,42 +225,51 @@ export function buildWebAPI() {
     // ── Upload video to GéeLark ─────────────────────────────────────────────
     async uploadVideoGeelark(opts: { bearer: string; filePath: string }) {
       try {
-        // Step 1: Get presigned S3 URL from GéeLark (server-side, avoids CORS; fast < 1s)
-        const urlRes = await fetch('/api/geelark-geturl', {
+        // Extract storage path from Supabase signed URL or use as-is
+        const supabaseMatch = opts.filePath.match(/\/object\/sign\/([^/?]+)\/(.+?)(?:\?|$)/)
+        if (supabaseMatch) {
+          // Route through server-side proxy (avoids browser CORS + memory issues)
+          const r = await fetch('/api/geelark-upload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              storagePath: decodeURIComponent(supabaseMatch[2]),
+              bucket: supabaseMatch[1],
+              bearer: opts.bearer,
+            }),
+          })
+          return await r.json() as { ok: boolean; token?: string; error?: string }
+        }
+
+        // Fallback: blob/data URL — load in browser and upload directly
+        const bytes = await fetchFileBytes(opts.filePath)
+        const ext = opts.filePath.split('.').pop()?.toLowerCase() ?? 'mp4'
+
+        const urlRes = await fetch('/api/gx', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ bearer: opts.bearer }),
+          body: JSON.stringify({
+            method: 'POST',
+            url: 'https://openapi.geelark.com/open/v1/upload/getUrl',
+            headers: { Authorization: `Bearer ${opts.bearer}` },
+            body: { fileType: ext },
+          }),
         })
-        const urlData = await urlRes.json() as { ok: boolean; uploadUrl?: string; token?: string; error?: string }
-        if (!urlData.ok || !urlData.uploadUrl || !urlData.token) {
-          return { ok: false, error: urlData.error ?? 'Failed to get GéeLark upload URL' }
-        }
-        const { uploadUrl, token } = urlData
+        const urlData = await urlRes.json() as Record<string, unknown>
+        if (!urlData.ok) return { ok: false, error: 'Upload URL failed' }
+        const payload = (urlData.data as Record<string, unknown>)
+        const apiResp = payload?.['data'] as Record<string, unknown>
+        if (!apiResp) return { ok: false, error: 'No upload data from GéeLark' }
+        const uploadUrl = apiResp['uploadUrl'] as string
+        const token     = apiResp['token'] as string
+        if (!uploadUrl || !token) return { ok: false, error: 'Missing uploadUrl or token' }
 
-        // Step 2: Download the video in the browser.
-        // Supabase signed URLs are auth-token-in-query-string, so no CORS issues.
-        // blob: URLs come from the file picker — also directly fetchable.
-        const videoRes = await fetch(opts.filePath)
-        if (!videoRes.ok) {
-          return { ok: false, error: `Video download failed: ${videoRes.status}` }
-        }
-        const bytes = await videoRes.arrayBuffer()
-
-        // Step 3: PUT directly to GéeLark's S3 presigned URL from the browser.
-        // Presigned S3 PUTs are signed for a specific content, so no Content-Type header
-        // (avoids signature mismatch). S3 presigned URLs allow cross-origin PUT.
-        let putRes = await fetch(uploadUrl, { method: 'PUT', body: bytes })
-        if (!putRes.ok) {
-          // Retry with explicit Content-Type in case the presigned URL signed it
-          putRes = await fetch(uploadUrl, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'video/mp4' },
-            body: bytes,
-          })
-          if (!putRes.ok) {
-            return { ok: false, error: `S3 PUT failed: ${putRes.status}` }
-          }
-        }
+        const putRes = await fetch(uploadUrl, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'video/mp4' },
+          body: bytes.buffer as ArrayBuffer,
+        })
+        if (!putRes.ok) return { ok: false, error: `S3 PUT failed: ${putRes.status}` }
 
         return { ok: true, token }
       } catch (err) {
