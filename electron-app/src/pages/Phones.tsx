@@ -445,7 +445,6 @@ function NoteCell({ phone, onSave }: { phone: Phone; onSave: (id: string, v: str
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-const STANDARD_PHONE_LIMIT = 100
 
 export function Phones({ user }: PhonesProps) {
   const { currentOrg, role, perms } = useOrg()
@@ -538,8 +537,7 @@ export function Phones({ user }: PhonesProps) {
     const { data, error: err } = await q
     if (err) setError('Erreur lors du chargement.')
     else {
-      const all = data ?? []
-      setPhones(isPro ? all : all.slice(0, STANDARD_PHONE_LIMIT))
+      setPhones(data ?? [])
     }
     setLoading(false)
     // Trigger an immediate poll if one hasn't happened recently
@@ -723,11 +721,7 @@ export function Phones({ user }: PhonesProps) {
     }
   }
 
-  // Phone limit is always based on the org owner's plan (not the logged-in member's own plan).
-  // A Pro member in a Standard org must still be capped at 100 phones.
-  const planForLimit = currentOrg ? (license.orgOwnerPlan ?? license.plan) : license.plan
-  const isPro = planForLimit === 'pro' || planForLimit === 'lifetime' || license.isSuperAdmin
-  const phoneLimit = isPro ? Infinity : STANDARD_PHONE_LIMIT
+  // Any active subscription grants unlimited phones.
 
   // ── Filtered view ─────────────────────────────────────────────────────────
   const visible = phones.filter(p => {
@@ -893,14 +887,6 @@ export function Phones({ user }: PhonesProps) {
         ))}
       </div>
 
-      {/* Phone limit banner for standard plan */}
-      {!isPro && phones.length >= STANDARD_PHONE_LIMIT && (
-        <div className="flex items-center gap-3 px-4 py-3 rounded-xl mb-2"
-          style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.25)', color: '#fbbf24' }}>
-          <span>⚠</span>
-          <span className="text-xs">Plan Standard : limite de {STANDARD_PHONE_LIMIT} téléphones atteinte. Passe au plan Pro pour un accès illimité.</span>
-        </div>
-      )}
 
       {/* Table */}
       {loading ? (

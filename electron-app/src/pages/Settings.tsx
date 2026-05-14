@@ -719,7 +719,7 @@ function SubscriptionPanel() {
 
   const planLabel = license.plan === 'pro' ? 'Pro' : license.plan === 'lifetime' ? 'À vie' : license.plan === 'standard' ? 'Standard' : '—'
   const planCredits = license.plan === 'pro' || license.plan === 'lifetime' ? 5500 : license.plan === 'standard' ? 2000 : 0
-  const maxPhones   = license.plan === 'pro' || license.plan === 'lifetime' ? '∞' : '100'
+  const maxPhones   = '∞'
 
   return (
     <div className="space-y-6">
