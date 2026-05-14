@@ -482,7 +482,7 @@ import { FullPageLoader }    from '@/components/ui/Spinner'
 const BETA_KEY = 'scaleflow-v1-seen'
 
 function AppContent({ user }: { user: User }) {
-  const { currentOrg, myOrgs, loading: orgLoading } = useOrg()
+  const { currentOrg, myOrgs, loading: orgLoading, loadError: orgLoadError } = useOrg()
   const conns = useConnections(user)
   const [page, setPage]                     = useState<Page>('dashboard')
   const [settingsPanel, setSettingsPanel]   = useState<string | undefined>(undefined)
@@ -594,8 +594,10 @@ function AppContent({ user }: { user: User }) {
   if (onboarding === null) return <FullPageLoader />
   if (onboarding) return <Onboarding user={user} onComplete={() => setOnboarding(false)} />
 
-  // License check — show gate if not yet resolved or invalid
-  if (license === null) return <FullPageLoader />
+  // Wait for orgs to load first — org members without their own key need currentOrg
+  // to be set before checkLicense can return valid:true via the org owner's key.
+  if (orgLoading || license === null) return <FullPageLoader />
+
   if (!license.valid) {
     return (
       <LicenseGate
@@ -606,10 +608,9 @@ function AppContent({ user }: { user: User }) {
     )
   }
 
-  // License valid but no org yet (e.g. just paid via Stripe) — show create org step
-  // Wait for org list to finish loading before checking — avoids flashing the gate on startup
-  if (orgLoading) return <FullPageLoader />
-  if (myOrgs.length === 0 && !license.isSuperAdmin) {
+  // License valid but no org yet (e.g. just paid via Stripe) — show create org step.
+  // Skip if the org query failed (Supabase 500) — fail open rather than blocking the user.
+  if (myOrgs.length === 0 && !license.isSuperAdmin && !orgLoadError) {
     return (
       <LicenseGate
         userId={user.id}

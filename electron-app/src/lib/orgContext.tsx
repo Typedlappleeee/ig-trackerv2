@@ -12,6 +12,7 @@ interface OrgContextValue {
   role:          OrgRole | null         // null when solo
   perms:         PermOverrides          // empty {} when solo
   loading:       boolean
+  loadError:     boolean               // true if the org query failed (e.g. Supabase 500)
   switchOrg:     (orgId: string | null) => void
   refresh:       () => Promise<void>
 }
@@ -22,13 +23,23 @@ export function OrgProvider({ user, children }: { user: User; children: ReactNod
   const [myOrgs, setMyOrgs]         = useState<{ org: Organization; member: OrgMember }[]>([])
   const [currentId, setCurrentId]   = useState<string | null>(() => localStorage.getItem(LS_KEY))
   const [loading, setLoading]       = useState(true)
+  const [loadError, setLoadError]   = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
-    const { data: members } = await supabase
+    const { data: members, error } = await supabase
       .from('organization_members')
       .select('*, organizations(*)')
       .eq('user_id', user.id)
+
+    if (error) {
+      console.error('[orgContext] load error:', error)
+      setLoadError(true)
+      setLoading(false)
+      return
+    }
+
+    setLoadError(false)
     const list = (members ?? [])
       .filter((m: { organizations: Organization | null }) => m.organizations)
       .map((m: OrgMember & { organizations: Organization }) => ({
@@ -67,6 +78,7 @@ export function OrgProvider({ user, children }: { user: User; children: ReactNod
     role:         current?.member.role ?? null,
     perms:        current?.member.perm_overrides ?? {},
     loading,
+    loadError,
     switchOrg,
     refresh: load,
   }
