@@ -46,13 +46,19 @@ module.exports = async (req, res) => {
       return res.status(200).json({ ok: false, error: `GéeLark URL error: ${glUrlRes.status}` })
     }
     const glData = await glUrlRes.json()
+    console.log('GéeLark /upload/getUrl response:', JSON.stringify(glData))
     if (glData.code !== 0) {
       return res.status(200).json({ ok: false, error: `GéeLark error: ${glData.msg ?? glData.code}` })
     }
-    const uploadUrl = glData.data?.uploadUrl
-    const token     = glData.data?.token
+    const d = glData.data ?? {}
+    // GéeLark uses different field names — try common variants
+    const uploadUrl = d.uploadUrl ?? d.url ?? d.upload_url
+    const token     = d.token ?? d.videoToken ?? d.video_token ?? d.fileId ?? d.file_id
     if (!uploadUrl || !token) {
-      return res.status(200).json({ ok: false, error: 'No uploadUrl/token from GéeLark' })
+      return res.status(200).json({
+        ok: false,
+        error: 'No uploadUrl/token from GéeLark. Response keys: ' + Object.keys(d).join(','),
+      })
     }
 
     // Step 3: PUT video bytes to GéeLark's S3 URL
