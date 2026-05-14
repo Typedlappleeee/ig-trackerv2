@@ -61,13 +61,10 @@ module.exports = async (req, res) => {
     }
 
     // Step 3: PUT video bytes to GéeLark's S3 URL
-    const mime = ext === 'mov' ? 'video/quicktime'
-               : ext === 'webm' ? 'video/webm'
-               : 'video/mp4'
-
+    // Content-Type MUST match what GéeLark signed for (always mp4 since we send fileType=mp4)
     const putRes = await fetch(uploadUrl, {
       method: 'PUT',
-      headers: { 'Content-Type': mime },
+      headers: { 'Content-Type': 'video/mp4' },
       body: bytes,
     })
     if (!putRes.ok) {
