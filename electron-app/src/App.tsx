@@ -593,8 +593,10 @@ function AppContent({ user }: { user: User }) {
   if (onboarding === null) return <FullPageLoader />
   if (onboarding) return <Onboarding user={user} onComplete={() => setOnboarding(false)} />
 
-  // License check — show gate if not yet resolved or invalid
-  if (license === null) return <FullPageLoader />
+  // Wait for orgs to load first — org members without their own key need currentOrg
+  // to be set before checkLicense can return valid:true via the org owner's key.
+  if (orgLoading || license === null) return <FullPageLoader />
+
   if (!license.valid) {
     return (
       <LicenseGate
@@ -606,8 +608,6 @@ function AppContent({ user }: { user: User }) {
   }
 
   // License valid but no org yet (e.g. just paid via Stripe) — show create org step
-  // Wait for org list to finish loading before checking — avoids flashing the gate on startup
-  if (orgLoading) return <FullPageLoader />
   if (myOrgs.length === 0 && !license.isSuperAdmin) {
     return (
       <LicenseGate
