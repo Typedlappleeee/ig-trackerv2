@@ -8,6 +8,9 @@ export interface LicenseStatus {
   source: 'own' | 'org_owner' | 'none'
   isSuperAdmin: boolean
   plan: 'standard' | 'pro' | 'lifetime' | null
+  // Org owner's plan — used for phone limits so a Pro member doesn't bypass a Standard org's limit.
+  // null when not in org mode or when the user IS the org owner.
+  orgOwnerPlan: 'standard' | 'pro' | 'lifetime' | null
 }
 
 export async function checkLicense(userId: string, orgId?: string | null): Promise<LicenseStatus> {
@@ -20,10 +23,46 @@ export async function checkLicense(userId: string, orgId?: string | null): Promi
       .maybeSingle()
 
     if (profile?.is_super_admin) {
-      return { valid: true, expiresAt: null, daysLeft: null, source: 'own', isSuperAdmin: true, plan: 'pro' }
+      return { valid: true, expiresAt: null, daysLeft: null, source: 'own', isSuperAdmin: true, plan: 'pro', orgOwnerPlan: null }
     }
 
-    // Check own active key (table may not exist yet → silently skip)
+    // Helper: resolve org owner plan (null if not in org mode or user is the owner)
+    let orgOwnerPlan: LicenseStatus['plan'] = null
+    if (orgId) {
+      const { data: org } = await supabase
+        .from('organizations')
+        .select('owner_id')
+        .eq('id', orgId)
+        .maybeSingle()
+
+      if (org?.owner_id && org.owner_id !== userId) {
+        const { data: ownerProfile } = await supabase
+          .from('profiles')
+          .select('is_super_admin')
+          .eq('id', org.owner_id)
+          .maybeSingle()
+
+        if (ownerProfile?.is_super_admin) {
+          orgOwnerPlan = 'pro'
+        } else {
+          const { data: ownerKey } = await supabase
+            .from('license_keys')
+            .select('expires_at, plan')
+            .eq('user_id', org.owner_id)
+            .eq('is_active', true)
+            .maybeSingle()
+
+          if (ownerKey) {
+            const exp = ownerKey.expires_at ? new Date(ownerKey.expires_at) : null
+            if (!exp || exp > new Date()) {
+              orgOwnerPlan = (ownerKey.plan as LicenseStatus['plan']) ?? 'standard'
+            }
+          }
+        }
+      }
+    }
+
+    // Check own active key — gives access even without an org
     const { data: ownKey, error: ownErr } = await supabase
       .from('license_keys')
       .select('expires_at, plan')
@@ -36,53 +75,19 @@ export async function checkLicense(userId: string, orgId?: string | null): Promi
       if (!expiresAt || expiresAt > new Date()) {
         const daysLeft = expiresAt ? Math.ceil((expiresAt.getTime() - Date.now()) / 86_400_000) : null
         const plan = (ownKey.plan as LicenseStatus['plan']) ?? 'standard'
-        return { valid: true, expiresAt, daysLeft, source: 'own', isSuperAdmin: false, plan }
+        return { valid: true, expiresAt, daysLeft, source: 'own', isSuperAdmin: false, plan, orgOwnerPlan }
       }
     }
 
-    // Check org owner's key (or super admin status)
-    if (orgId) {
-      const { data: org } = await supabase
-        .from('organizations')
-        .select('owner_id')
-        .eq('id', orgId)
-        .maybeSingle()
-
-      if (org?.owner_id && org.owner_id !== userId) {
-        // Owner is super admin → all members get access
-        const { data: ownerProfile } = await supabase
-          .from('profiles')
-          .select('is_super_admin')
-          .eq('id', org.owner_id)
-          .maybeSingle()
-
-        if (ownerProfile?.is_super_admin) {
-          return { valid: true, expiresAt: null, daysLeft: null, source: 'org_owner', isSuperAdmin: false, plan: 'pro' }
-        }
-
-        // Owner has an active license key → all members get access
-        const { data: ownerKey, error: ownerErr } = await supabase
-          .from('license_keys')
-          .select('expires_at, plan')
-          .eq('user_id', org.owner_id)
-          .eq('is_active', true)
-          .maybeSingle()
-
-        if (!ownerErr && ownerKey) {
-          const expiresAt = ownerKey.expires_at ? new Date(ownerKey.expires_at) : null
-          if (!expiresAt || expiresAt > new Date()) {
-            const daysLeft = expiresAt ? Math.ceil((expiresAt.getTime() - Date.now()) / 86_400_000) : null
-            const plan = (ownerKey.plan as LicenseStatus['plan']) ?? 'standard'
-            return { valid: true, expiresAt, daysLeft, source: 'org_owner', isSuperAdmin: false, plan }
-          }
-        }
-      }
+    // Org owner has an active key → member gets access via org
+    if (orgOwnerPlan) {
+      return { valid: true, expiresAt: null, daysLeft: null, source: 'org_owner', isSuperAdmin: false, plan: orgOwnerPlan, orgOwnerPlan }
     }
   } catch {
     // Network error or schema not applied yet — fail open to avoid blocking the user
   }
 
-  return { valid: false, expiresAt: null, daysLeft: null, source: 'none', isSuperAdmin: false, plan: null }
+  return { valid: false, expiresAt: null, daysLeft: null, source: 'none', isSuperAdmin: false, plan: null, orgOwnerPlan: null }
 }
 
 export async function activateKey(key: string, userId: string): Promise<{ success: boolean; error?: string }> {
@@ -119,7 +124,7 @@ export async function activateKey(key: string, userId: string): Promise<{ succes
 
 // React context so any component can read the license status
 export const LicenseContext = createContext<LicenseStatus>({
-  valid: false, expiresAt: null, daysLeft: null, source: 'none', isSuperAdmin: false, plan: null,
+  valid: false, expiresAt: null, daysLeft: null, source: 'none', isSuperAdmin: false, plan: null, orgOwnerPlan: null,
 })
 
 export function useLicense() {

@@ -723,7 +723,10 @@ export function Phones({ user }: PhonesProps) {
     }
   }
 
-  const isPro = license.plan === 'pro' || license.plan === 'lifetime' || license.isSuperAdmin
+  // Phone limit is always based on the org owner's plan (not the logged-in member's own plan).
+  // A Pro member in a Standard org must still be capped at 100 phones.
+  const planForLimit = currentOrg ? (license.orgOwnerPlan ?? license.plan) : license.plan
+  const isPro = planForLimit === 'pro' || planForLimit === 'lifetime' || license.isSuperAdmin
   const phoneLimit = isPro ? Infinity : STANDARD_PHONE_LIMIT
 
   // ── Filtered view ─────────────────────────────────────────────────────────

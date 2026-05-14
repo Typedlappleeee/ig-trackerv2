@@ -651,6 +651,29 @@ function SubscriptionPanel() {
   const [licenseKey, setLicenseKey] = useState<string | null>(null)
   const [copied, setCopied]         = useState(false)
 
+  // Activate a new license key
+  const [newKey, setNewKey]       = useState('')
+  const [keyLoading, setKeyLoading] = useState(false)
+  const [keyResult, setKeyResult] = useState<{ ok: boolean; text: string } | null>(null)
+
+  async function handleActivateKey(e: React.FormEvent) {
+    e.preventDefault()
+    if (!newKey.trim()) return
+    setKeyLoading(true); setKeyResult(null)
+    const { activateKey } = await import('@/lib/license')
+    const userId = (await supabase.auth.getUser()).data.user?.id
+    if (!userId) { setKeyLoading(false); setKeyResult({ ok: false, text: 'Non connecté' }); return }
+    const res = await activateKey(newKey.trim(), userId)
+    setKeyLoading(false)
+    if (res.success) {
+      setKeyResult({ ok: true, text: '✓ Clé activée avec succès !' })
+      setNewKey('')
+      setLicenseKey(newKey.trim().toUpperCase())
+    } else {
+      setKeyResult({ ok: false, text: res.error ?? 'Clé invalide' })
+    }
+  }
+
   // Credit code redemption
   const [creditCode, setCreditCode]       = useState('')
   const [codeLoading, setCodeLoading]     = useState(false)
@@ -747,6 +770,30 @@ function SubscriptionPanel() {
               </button>
             </div>
           </div>
+        )}
+      </div>
+
+      {/* Activate a license key */}
+      <div className="rounded-2xl p-5 space-y-3" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(139,92,246,0.18)' }}>
+        <p className="text-xs font-black text-text uppercase tracking-wider">🔑 Activer une clé</p>
+        <form onSubmit={handleActivateKey} className="flex gap-2">
+          <input
+            value={newKey}
+            onChange={e => setNewKey(e.target.value)}
+            placeholder="XXXX-XXXX-XXXX-XXXX"
+            className="flex-1 bg-bg border border-border rounded-lg px-3 py-2 text-sm font-mono tracking-widest text-text placeholder:text-text2 focus:border-accent focus:outline-none uppercase"
+            spellCheck={false}
+            autoComplete="off"
+          />
+          <button
+            type="submit"
+            disabled={keyLoading || !newKey.trim()}
+            className="px-4 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-40 transition-all"
+            style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)' }}
+          >{keyLoading ? '…' : 'Activer'}</button>
+        </form>
+        {keyResult && (
+          <p className={`text-xs ${keyResult.ok ? 'text-ok' : 'text-danger'}`}>{keyResult.text}</p>
         )}
       </div>
 
@@ -897,8 +944,23 @@ function SubscriptionPanel() {
           </div>
         </div>
         <p className="text-[10px] text-text2/50 mt-3 text-center">
-          Après achat, tu recevras une clé de licence par email à activer dans l'app.
+          Après achat, tu recevras une clé de licence par email à activer ci-dessus.
         </p>
+        <a
+          href="https://t.me/typedlapple"
+          target="_blank"
+          rel="noreferrer"
+          className="mt-4 flex items-center gap-3 rounded-xl p-4 transition-all hover:scale-[1.01]"
+          style={{ background: 'rgba(33,150,243,0.08)', border: '1px solid rgba(33,150,243,0.25)', textDecoration: 'none' }}
+        >
+          <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 flex-shrink-0" style={{ color: '#29b6f6' }}>
+            <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.833.941z"/>
+          </svg>
+          <div>
+            <p className="text-sm font-bold text-text">Payer via Telegram</p>
+            <p className="text-xs text-text2">Contacte @typedlapple pour payer par crypto, PayPal ou autre méthode</p>
+          </div>
+        </a>
       </div>
     </div>
   )
