@@ -231,9 +231,23 @@ export function OrganizationPanel({ user }: Props) {
       return
     }
     setJoinToken('')
+    const orgId = data as string | null
+    if (orgId) {
+      const { data: org } = await supabase
+        .from('organizations').select('owner_id').eq('id', orgId).maybeSingle()
+      const { data: ownerKey } = await supabase
+        .from('license_keys').select('expires_at')
+        .eq('user_id', org?.owner_id ?? '').eq('is_active', true).maybeSingle()
+      const expired = ownerKey?.expires_at ? new Date(ownerKey.expires_at) < new Date() : false
+      if (!ownerKey || expired) {
+        flash("Cette organisation n'a pas d'abonnement actif.", true)
+        await refresh()
+        return
+      }
+    }
     flash('Bienvenue dans l\'organisation ✓')
     await refresh()
-    if (data) switchOrg(data as string)
+    if (orgId) switchOrg(orgId)
   }
 
   async function changeRole(member: MemberRow, newRole: OrgRole) {

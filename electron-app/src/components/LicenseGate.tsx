@@ -112,8 +112,22 @@ export function LicenseGate({ userId, email, onActivated, initialStep = 'gate' }
                 : error.message
       setOrgErr(msg)
     } else {
+      // Verify the org has an active license before letting the user in.
+      const orgId = data as string | null
+      if (orgId) {
+        const { data: org } = await supabase
+          .from('organizations').select('owner_id').eq('id', orgId).maybeSingle()
+        const { data: ownerKey } = await supabase
+          .from('license_keys').select('expires_at')
+          .eq('user_id', org?.owner_id ?? '').eq('is_active', true).maybeSingle()
+        const expired = ownerKey?.expires_at ? new Date(ownerKey.expires_at) < new Date() : false
+        if (!ownerKey || expired) {
+          setOrgErr("Cette organisation n'a pas d'abonnement actif.")
+          return
+        }
+        localStorage.setItem('ig-tracker-current-org', orgId)
+      }
       setOrgSuccess(true)
-      if (data) localStorage.setItem('ig-tracker-current-org', data as string)
       setTimeout(() => window.location.reload(), 1500)
     }
   }
