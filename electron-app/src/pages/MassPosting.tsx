@@ -54,8 +54,6 @@ export function MassPosting({ user }: MassPostingProps) {
   const [selectedVideos, _setSelVideos]   = useState<SelectedVideo[]>(ms.selectedVideos)
   const [caption, _setCaption]            = useState(ms.caption)
   const [mode, setMode]                   = useState<'seq' | 'random'>('seq')
-  const [maxWorkers, setMaxWorkers]       = useState(20)
-  const [staggerMin, setStaggerMin]       = useState(5)
   const [bearer, setBearer]               = useState('')
   const [groqKey, setGroqKey]             = useState('')
   const [posting, _setPosting]            = useState(ms.posting)
@@ -412,26 +410,6 @@ export function MassPosting({ user }: MassPostingProps) {
                   : { color: '#5a6882' }}
               >{m.l}</button>
             ))}
-          </div>
-
-          {/* Workers */}
-          <div className="flex items-center gap-1.5 text-xs text-text2 bg-[#0d0f1c] border border-border rounded-lg px-2.5 py-1.5">
-            <span className="text-text2">⚡</span>
-            <input type="number" min={1} max={50} value={maxWorkers}
-              onChange={e => setMaxWorkers(parseInt(e.target.value) || 20)}
-              className="w-9 bg-transparent text-text text-center focus:outline-none text-[11px]"
-            />
-            <span className="text-[10px]">simult.</span>
-          </div>
-
-          {/* Stagger */}
-          <div className="flex items-center gap-1.5 text-xs text-text2 bg-[#0d0f1c] border border-border rounded-lg px-2.5 py-1.5">
-            <span>⏱</span>
-            <input type="number" min={0} max={60} value={staggerMin}
-              onChange={e => setStaggerMin(parseInt(e.target.value) || 0)}
-              className="w-9 bg-transparent text-text text-center focus:outline-none text-[11px]"
-            />
-            <span className="text-[10px]">min</span>
           </div>
 
           {/* Action buttons */}
