@@ -3,7 +3,7 @@
 create table if not exists support_tickets (
   id          uuid primary key default gen_random_uuid(),
   user_id     uuid not null references auth.users(id) on delete cascade,
-  org_id      uuid references organisations(id) on delete set null,
+  org_id      uuid references organizations(id) on delete set null,
   user_email  text not null,
   org_name    text,
   subject     text not null,
@@ -122,8 +122,8 @@ declare
   v_caller uuid := auth.uid();
 begin
   if not exists (
-    select 1 from license_keys
-    where user_id = v_caller and is_super_admin = true
+    select 1 from profiles
+    where id = v_caller and is_super_admin = true
   ) then
     raise exception 'unauthorized';
   end if;
@@ -157,8 +157,8 @@ declare
   v_caller uuid := auth.uid();
 begin
   if not exists (
-    select 1 from license_keys
-    where user_id = v_caller and is_super_admin = true
+    select 1 from profiles
+    where id = v_caller and is_super_admin = true
   ) then
     raise exception 'unauthorized';
   end if;
@@ -181,8 +181,8 @@ declare
   v_email  text;
 begin
   if not exists (
-    select 1 from license_keys
-    where user_id = v_caller and is_super_admin = true
+    select 1 from profiles
+    where id = v_caller and is_super_admin = true
   ) then
     raise exception 'unauthorized';
   end if;
@@ -206,8 +206,8 @@ declare
   v_caller uuid := auth.uid();
 begin
   if not exists (
-    select 1 from license_keys
-    where user_id = v_caller and is_super_admin = true
+    select 1 from profiles
+    where id = v_caller and is_super_admin = true
   ) then
     raise exception 'unauthorized';
   end if;
