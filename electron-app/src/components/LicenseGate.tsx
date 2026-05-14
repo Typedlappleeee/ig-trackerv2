@@ -7,18 +7,41 @@ interface Props {
   userId: string
   email?: string | null
   onActivated: () => void
+  initialStep?: Step
 }
 
 type Tab = 'subscribe' | 'license' | 'org'
+type Step = 'gate' | 'create_org'
 
 const STRIPE_LINKS = {
   standard: 'https://buy.stripe.com/test_aFa3cu2Lw00LdymdHT5EY00',
   pro:      'https://buy.stripe.com/test_eVq7sK4TEaFp9i6cDP5EY01',
 }
 
-export function LicenseGate({ userId, email, onActivated }: Props) {
+export function LicenseGate({ userId, email, onActivated, initialStep = 'gate' }: Props) {
   const { myOrgs, switchOrg } = useOrg()
   const [tab, setTab]         = useState<Tab>('subscribe')
+  const [step, setStep]       = useState<Step>(initialStep)
+
+  // Create org step
+  const [orgName, setOrgName]         = useState('')
+  const [orgCreateErr, setOrgCreateErr] = useState<string | null>(null)
+  const [orgCreateLoading, setOrgCreateLoading] = useState(false)
+
+  async function handleCreateOrg(e: React.FormEvent) {
+    e.preventDefault()
+    if (!orgName.trim()) return
+    setOrgCreateLoading(true)
+    setOrgCreateErr(null)
+    const { data, error } = await supabase.rpc('create_org', { p_name: orgName.trim() })
+    setOrgCreateLoading(false)
+    if (error) {
+      setOrgCreateErr(error.message)
+    } else {
+      if (data) localStorage.setItem('ig-tracker-current-org', data as string)
+      onActivated()
+    }
+  }
 
   function openStripe(plan: 'standard' | 'pro') {
     const url = new URL(STRIPE_LINKS[plan])
@@ -46,7 +69,7 @@ export function LicenseGate({ userId, email, onActivated }: Props) {
     const res = await activateKey(key, userId)
     setKeyLoading(false)
     if (res.success) {
-      onActivated()
+      setStep('create_org')
     } else {
       setKeyErr(res.error ?? 'Erreur inconnue')
     }
@@ -71,6 +94,74 @@ export function LicenseGate({ userId, email, onActivated }: Props) {
       if (data) localStorage.setItem('ig-tracker-current-org', data as string)
       setTimeout(() => window.location.reload(), 1500)
     }
+  }
+
+  if (step === 'create_org') {
+    return (
+      <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#030307]">
+        <div style={{
+          position: 'absolute', inset: 0, pointerEvents: 'none',
+          background: 'radial-gradient(ellipse 60% 50% at 50% 45%, #1e0b3a44 0%, transparent 70%)',
+        }} />
+        <div className="relative z-10 w-full max-w-sm mx-4">
+          <div className="flex flex-col items-center mb-8">
+            <svg width="52" height="52" viewBox="0 0 100 100" fill="none" className="mb-4">
+              <defs>
+                <linearGradient id="lg-main2" x1="10" y1="98" x2="82" y2="2" gradientUnits="userSpaceOnUse">
+                  <stop offset="0%"   stopColor="#1d4ed8"/>
+                  <stop offset="58%"  stopColor="#7c3aed"/>
+                  <stop offset="100%" stopColor="#a855f7"/>
+                </linearGradient>
+                <linearGradient id="lg-arr2" x1="66" y1="24" x2="90" y2="1" gradientUnits="userSpaceOnUse">
+                  <stop offset="0%"   stopColor="#db2777"/>
+                  <stop offset="100%" stopColor="#f472b6"/>
+                </linearGradient>
+              </defs>
+              <path d="M 66 22 C 76 8 60 3 42 3 C 20 3 12 18 12 32 C 12 46 26 52 46 55 C 66 58 82 65 82 79 C 82 93 68 97 50 97 C 32 97 18 89 16 76"
+                stroke="url(#lg-main2)" strokeWidth="16" strokeLinecap="round" fill="none"/>
+              <line x1="66" y1="22" x2="88" y2="2" stroke="url(#lg-arr2)" strokeWidth="11" strokeLinecap="round"/>
+              <line x1="77" y1="1"  x2="90" y2="1"  stroke="#f472b6" strokeWidth="9" strokeLinecap="round"/>
+              <line x1="90" y1="1"  x2="90" y2="15" stroke="#f472b6" strokeWidth="9" strokeLinecap="round"/>
+            </svg>
+            <h1 className="text-2xl font-black text-white tracking-tight">
+              Scale<span style={{ background: 'linear-gradient(130deg,#8b5cf6,#ec4899)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Flow</span>
+            </h1>
+            <p className="text-[11px] text-[#4a3f7a] uppercase tracking-widest mt-1">Créer mon organisation</p>
+          </div>
+          <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(139,92,246,0.15)' }}>
+            <div className="p-6 space-y-4">
+              <p className="text-xs text-[#6b5fa0] text-center">
+                Ton abonnement est activé ! 🎉<br/>
+                Crée ton organisation pour commencer.
+              </p>
+              <form onSubmit={handleCreateOrg} className="space-y-3">
+                <input
+                  value={orgName}
+                  onChange={e => setOrgName(e.target.value)}
+                  placeholder="Nom de l'organisation"
+                  className="w-full bg-[#0d0a1a] border border-[#2a1f48] rounded-xl px-4 py-3 text-white text-sm placeholder:text-[#3a2f58] focus:outline-none focus:border-[#8b5cf6] transition-colors"
+                  spellCheck={false}
+                  autoComplete="off"
+                  autoFocus
+                />
+                {orgCreateErr && <p className="text-xs text-red-400 text-center">{orgCreateErr}</p>}
+                <button
+                  type="submit"
+                  disabled={orgCreateLoading || !orgName.trim()}
+                  className="w-full py-3 rounded-xl text-sm font-bold text-white transition-all disabled:opacity-40"
+                  style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)' }}
+                >
+                  {orgCreateLoading ? 'Création…' : 'Créer mon organisation →'}
+                </button>
+              </form>
+            </div>
+          </div>
+          <p className="text-[10px] text-[#2a1f48] text-center mt-4">
+            ScaleFlow — Accès restreint aux comptes autorisés
+          </p>
+        </div>
+      </div>
+    )
   }
 
   return (

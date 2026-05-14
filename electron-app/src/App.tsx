@@ -481,7 +481,7 @@ import { FullPageLoader }    from '@/components/ui/Spinner'
 const BETA_KEY = 'scaleflow-v1-seen'
 
 function AppContent({ user }: { user: User }) {
-  const { currentOrg } = useOrg()
+  const { currentOrg, myOrgs } = useOrg()
   const conns = useConnections(user)
   const [page, setPage]                     = useState<Page>('dashboard')
   const [settingsPanel, setSettingsPanel]   = useState<string | undefined>(undefined)
@@ -605,6 +605,18 @@ function AppContent({ user }: { user: User }) {
     )
   }
 
+  // License valid but no org yet (e.g. just paid via Stripe) — show create org step
+  if (myOrgs.length === 0 && !license.isSuperAdmin) {
+    return (
+      <LicenseGate
+        userId={user.id}
+        email={user.email ?? null}
+        initialStep="create_org"
+        onActivated={() => window.location.reload()}
+      />
+    )
+  }
+
   const content = (() => {
     switch (page) {
       case 'dashboard':    return <Dashboard   user={user} key={refreshTick} />
@@ -613,7 +625,6 @@ function AppContent({ user }: { user: User }) {
       case 'posting':      return <Posting     user={user} />
       case 'massposting':  return <MassPosting user={user} />
       case 'bank':         return <Bank        user={user} />
-      case 'autocomment':  return <Autocomment user={user} />
       case 'warmup':       return <Warmup      user={user} />
       case 'montage':      return <Montage     user={user} />
       case 'remix':        return <Remix       user={user} />
