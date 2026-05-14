@@ -866,7 +866,7 @@ function SubscriptionPanel() {
               </div>
             </div>
             <ul className="space-y-1.5 flex-1">
-              {['2 000 crédits / mois', 'Max 100 téléphones', 'Toutes les fonctionnalités', 'Support standard'].map(f => (
+              {['2 000 crédits / mois', 'Téléphones illimités', 'Toutes les fonctionnalités', 'Support standard'].map(f => (
                 <li key={f} className="flex items-center gap-2 text-xs text-text2">
                   <span style={{ color: '#a78bfa' }}>✓</span>{f}
                 </li>
