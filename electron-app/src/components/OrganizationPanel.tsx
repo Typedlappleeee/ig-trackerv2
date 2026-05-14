@@ -342,7 +342,7 @@ export function OrganizationPanel({ user }: Props) {
                     <p className="text-text2 text-xs">{ROLE_LABELS[member.role]}</p>
                   </div>
                   {currentOrg?.id !== org.id && (
-                    <Button size="sm" variant="secondary" onClick={() => switchOrg(org.id)}>Activer</Button>
+                    <Button size="sm" variant="secondary" onClick={() => { switchOrg(org.id); window.location.reload() }}>Activer</Button>
                   )}
                   {member.role === 'owner' ? (
                     <Button size="sm" variant="danger" onClick={() => deleteOrg(org)}>Supprimer</Button>
