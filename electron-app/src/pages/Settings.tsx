@@ -947,7 +947,7 @@ function SubscriptionPanel() {
           Après achat, tu recevras une clé de licence par email à activer ci-dessus.
         </p>
         <a
-          href="https://t.me/typedlapple"
+          href="https://t.me/justquentin"
           target="_blank"
           rel="noreferrer"
           className="mt-4 flex items-center gap-3 rounded-xl p-4 transition-all hover:scale-[1.01]"
@@ -958,7 +958,7 @@ function SubscriptionPanel() {
           </svg>
           <div>
             <p className="text-sm font-bold text-text">Payer via Telegram</p>
-            <p className="text-xs text-text2">Contacte @typedlapple pour payer par crypto, PayPal ou autre méthode</p>
+            <p className="text-xs text-text2">Paiement en crypto — contacte @justquentin</p>
           </div>
         </a>
       </div>
