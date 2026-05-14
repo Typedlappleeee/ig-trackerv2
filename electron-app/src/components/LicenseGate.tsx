@@ -235,7 +235,7 @@ export function LicenseGate({ userId, email, onActivated, initialStep = 'gate' }
                   {myOrgs.map(({ org }) => (
                     <button
                       key={org.id}
-                      onClick={() => switchOrg(org.id)}
+                      onClick={() => { switchOrg(org.id); window.location.reload() }}
                       className="w-full py-2.5 px-4 rounded-xl text-sm font-semibold text-white transition-all flex items-center gap-2"
                       style={{ background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.25)' }}
                     >
