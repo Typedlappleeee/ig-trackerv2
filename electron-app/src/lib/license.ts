@@ -84,7 +84,8 @@ export async function checkLicense(userId: string, orgId?: string | null): Promi
       return { valid: true, expiresAt: null, daysLeft: null, source: 'org_owner', isSuperAdmin: false, plan: orgOwnerPlan, orgOwnerPlan }
     }
   } catch {
-    // Network error or schema not applied yet — fail open to avoid blocking the user
+    // Network error or schema not applied yet — fail open so the user isn't blocked
+    return { valid: true, expiresAt: null, daysLeft: null, source: 'own', isSuperAdmin: false, plan: null, orgOwnerPlan: null }
   }
 
   return { valid: false, expiresAt: null, daysLeft: null, source: 'none', isSuperAdmin: false, plan: null, orgOwnerPlan: null }
