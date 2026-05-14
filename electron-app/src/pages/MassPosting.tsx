@@ -332,7 +332,7 @@ export function MassPosting({ user }: MassPostingProps) {
       if (Object.keys(taskIds).length > 0) {
         log(`⏳ Suivi de ${Object.keys(taskIds).length} tâche(s)…`)
         const pending = new Set(Object.values(taskIds))
-        const deadline = Date.now() + 10 * 60 * 1000
+        const deadline = Date.now() + 8 * 60 * 1000
         const STATUS: Record<number, string> = { 1: '⏳ En attente', 2: '🔄 En cours', 3: '✅ Terminé', 4: '❌ Échoué', 7: '🚫 Annulé' }
 
         let pollCount = 0
@@ -369,6 +369,12 @@ export function MassPosting({ user }: MassPostingProps) {
                   status: status === 3 ? 'done' : 'error',
                   detail: item['failDesc'] as string | undefined,
                 })
+                // Power off this phone immediately now that its task is finished
+                geelark(bearer, '/phone/stop', { ids: [phone.geelark_id] })
+                  .then(() => log(`  💤 ${phone.phone_name} éteint`, 'ok'))
+                  .catch(e => log(`  ⚠️ extinction ${phone.phone_name}: ${e instanceof Error ? e.message : String(e)}`, 'warn'))
+                activePhonesRef.current = activePhonesRef.current.filter(id => id !== phone.geelark_id)
+                activeTasksRef.current  = activeTasksRef.current.filter(id => id !== tid)
               }
             }
           }
@@ -383,9 +389,12 @@ export function MassPosting({ user }: MassPostingProps) {
         }
       }
 
-      // ── Step 5: stop phones ──────────────────────────────────────────────
-      log('🛑 Arrêt des téléphones…')
-      await geelark(bearer, '/phone/stop', { ids: geelarkIds })
+      // ── Step 5: stop any phones still running (timeout / no-response) ────
+      const remaining = activePhonesRef.current
+      if (remaining.length > 0) {
+        log(`🛑 Arrêt des ${remaining.length} téléphone(s) restant(s)…`)
+        await geelark(bearer, '/phone/stop', { ids: remaining })
+      }
       log('🎉 Terminé !', 'ok')
 
     } catch (e: unknown) {
