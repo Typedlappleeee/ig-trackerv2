@@ -481,7 +481,7 @@ import { FullPageLoader }    from '@/components/ui/Spinner'
 const BETA_KEY = 'scaleflow-v1-seen'
 
 function AppContent({ user }: { user: User }) {
-  const { currentOrg, myOrgs, loading: orgLoading } = useOrg()
+  const { currentOrg, myOrgs, loading: orgLoading, loadError: orgLoadError } = useOrg()
   const conns = useConnections(user)
   const [page, setPage]                     = useState<Page>('dashboard')
   const [settingsPanel, setSettingsPanel]   = useState<string | undefined>(undefined)
@@ -607,8 +607,9 @@ function AppContent({ user }: { user: User }) {
     )
   }
 
-  // License valid but no org yet (e.g. just paid via Stripe) — show create org step
-  if (myOrgs.length === 0 && !license.isSuperAdmin) {
+  // License valid but no org yet (e.g. just paid via Stripe) — show create org step.
+  // Skip if the org query failed (Supabase 500) — fail open rather than blocking the user.
+  if (myOrgs.length === 0 && !license.isSuperAdmin && !orgLoadError) {
     return (
       <LicenseGate
         userId={user.id}
