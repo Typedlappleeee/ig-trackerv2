@@ -84,6 +84,29 @@ export async function generateThumbnail(videoBlob: Blob, atSeconds = 0.5): Promi
   })
 }
 
+const IMAGE_EXTS = new Set(['jpg','jpeg','png','webp','gif','bmp','heic'])
+
+async function generateImageThumbnail(imageBlob: Blob): Promise<Blob | null> {
+  return new Promise(resolve => {
+    const img = new Image()
+    const url = URL.createObjectURL(imageBlob)
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+      const maxSide = 480
+      const ratio = Math.min(1, maxSide / Math.max(img.width || 1, img.height || 1))
+      const c = document.createElement('canvas')
+      c.width  = Math.round((img.width  || 480) * ratio)
+      c.height = Math.round((img.height || 480) * ratio)
+      const ctx = c.getContext('2d')
+      if (!ctx) return resolve(null)
+      ctx.drawImage(img, 0, 0, c.width, c.height)
+      c.toBlob(b => resolve(b), 'image/jpeg', 0.78)
+    }
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(null) }
+    img.src = url
+  })
+}
+
 type UploadPhase = 'reading' | 'uploading-video' | 'thumbnail' | 'uploading-thumb'
 
 // Core upload: takes a Blob/File already in memory + a name (for ext detection).
@@ -101,13 +124,14 @@ export async function uploadVideoFromBlob(
   const folder = scopeFolder(scope)
   const storagePath = `videos/${folder}/${id}.${ext}`
 
-  // Generate thumbnail FIRST while the blob is still fresh in renderer memory.
-  // (Some decoders behave poorly on a blob that's been consumed by an upload stream.)
   onProgress?.('thumbnail')
-  const thumb = await generateThumbnail(blob).catch(err => {
-    console.warn('[storage] thumbnail generation failed:', err)
-    return null
-  })
+  const isImage = IMAGE_EXTS.has(ext)
+  const thumb = isImage
+    ? await generateImageThumbnail(blob).catch(() => null)
+    : await generateThumbnail(blob).catch(err => {
+        console.warn('[storage] thumbnail generation failed:', err)
+        return null
+      })
 
   onProgress?.('uploading-video')
   const upRes = await supabase.storage.from(BUCKET).upload(storagePath, blob, {
