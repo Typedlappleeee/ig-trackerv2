@@ -598,7 +598,7 @@ function AppContent({ user }: { user: User }) {
   // to be set before checkLicense can return valid:true via the org owner's key.
   if (orgLoading || license === null) return <FullPageLoader />
 
-  if (!license.valid) {
+  if (!license.valid && myOrgs.length === 0) {
     return (
       <LicenseGate
         userId={user.id}
