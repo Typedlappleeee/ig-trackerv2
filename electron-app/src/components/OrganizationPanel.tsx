@@ -5,6 +5,7 @@ import { useOrg } from '@/lib/orgContext'
 import { ROLE_LABELS, ALL_TABS, canManageOrg } from '@/lib/permissions'
 import { Button } from '@/components/ui/Button'
 import { Input }  from '@/components/ui/Input'
+import { Onboarding } from '@/components/Onboarding'
 
 interface Props { user: User }
 
@@ -28,6 +29,8 @@ export function OrganizationPanel({ user }: Props) {
   const [busy, setBusy]         = useState(false)
   const [msg, setMsg]           = useState<string | null>(null)
   const [err, setErr]           = useState<string | null>(null)
+  // Set to the new org's id right after createOrg succeeds; triggers the API setup wizard.
+  const [setupForOrg, setSetupForOrg] = useState<string | null>(null)
 
   // Detail view (admin / owner) for currentOrg
   const [members, setMembers]     = useState<MemberRow[]>([])
@@ -158,7 +161,10 @@ export function OrganizationPanel({ user }: Props) {
     setNewName('')
     setCreating(false)
     await refresh()
-    if (data) switchOrg(data as string)
+    if (data) {
+      switchOrg(data as string)
+      setSetupForOrg(data as string)
+    }
   }
 
   async function deleteOrg(org: Organization) {
@@ -263,6 +269,16 @@ export function OrganizationPanel({ user }: Props) {
 
   function memberLabel(m: MemberRow): string {
     return m.display_name?.trim() || m.email || m.user_id.slice(0, 8)
+  }
+
+  if (setupForOrg) {
+    return (
+      <Onboarding
+        user={user}
+        orgId={setupForOrg}
+        onComplete={() => setSetupForOrg(null)}
+      />
+    )
   }
 
   return (
