@@ -353,7 +353,7 @@ export function LicenseGate({ userId, email, onActivated, initialStep = 'gate' }
                   >
                     <div className="flex items-baseline justify-between">
                       <div className="text-white text-sm font-bold">Standard</div>
-                      <div className="text-white text-sm"><span className="text-lg font-black">29,99€</span><span className="text-[10px] text-[#6b5fa0]">/mois</span></div>
+                      <div className="text-white text-sm"><span className="text-lg font-black">49,99$</span><span className="text-[10px] text-[#6b5fa0]">/mois</span></div>
                     </div>
                     <div className="text-[11px] text-[#6b5fa0] mt-1">2 000 crédits / mois</div>
                   </button>
@@ -366,7 +366,7 @@ export function LicenseGate({ userId, email, onActivated, initialStep = 'gate' }
                     <div className="absolute top-2 right-2 text-[9px] font-bold text-white px-2 py-0.5 rounded-full" style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)' }}>POPULAIRE</div>
                     <div className="flex items-baseline justify-between">
                       <div className="text-white text-sm font-bold">Pro</div>
-                      <div className="text-white text-sm"><span className="text-lg font-black">79,99€</span><span className="text-[10px] text-[#6b5fa0]">/mois</span></div>
+                      <div className="text-white text-sm"><span className="text-lg font-black">99,99$</span><span className="text-[10px] text-[#6b5fa0]">/mois</span></div>
                     </div>
                     <div className="text-[11px] text-[#6b5fa0] mt-1">5 500 crédits / mois</div>
                   </button>
