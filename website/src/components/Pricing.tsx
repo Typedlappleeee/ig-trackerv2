@@ -21,7 +21,7 @@ const PLANS = [
     accent: '#c084fc',
     popular: true,
     cta: 'Choisir Pro',
-    href: 'https://buy.stripe.com/test_pro',
+    href: 'https://buy.stripe.com/test_eVq7sK4TEaFp9i6cDP5EY01',
     features: [
       '5 500 crédits / mois',
       'Téléphones illimités',

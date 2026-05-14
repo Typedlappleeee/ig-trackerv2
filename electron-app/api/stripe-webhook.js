@@ -79,6 +79,74 @@ async function findUserIdByEmail(supabase, email) {
   }
 }
 
+// Send a welcome email with the license key via Resend.
+// Requires RESEND_API_KEY in env. Silently logs and continues if unset/fails —
+// the subscription is still provisioned regardless.
+async function sendLicenseEmail({ to, plan, licenseKey, periodEnd }) {
+  const apiKey = process.env.RESEND_API_KEY
+  if (!apiKey || !to) return
+  const from   = process.env.RESEND_FROM || 'ScaleFlow <noreply@scaleflow.io>'
+  const appUrl = process.env.APP_URL     || 'https://scaleflow-fvtu.vercel.app/'
+  const planLabel = plan === 'pro' ? 'Pro' : 'Standard'
+  const expiry = periodEnd ? new Date(periodEnd).toLocaleDateString('fr-FR', { day:'2-digit', month:'long', year:'numeric' }) : 'à vie'
+
+  const html = `
+    <div style="font-family:Inter,system-ui,sans-serif;background:#030307;color:#e9e7f5;padding:32px;max-width:560px;margin:auto;border-radius:16px;border:1px solid rgba(139,92,246,0.2)">
+      <div style="text-align:center;margin-bottom:24px">
+        <h1 style="font-size:28px;font-weight:900;margin:0;color:white">
+          Scale<span style="background:linear-gradient(130deg,#8b5cf6,#ec4899);-webkit-background-clip:text;-webkit-text-fill-color:transparent">Flow</span>
+        </h1>
+        <p style="color:#a89bd4;margin:8px 0 0 0;font-size:13px">Bienvenue dans le club 🎉</p>
+      </div>
+
+      <p style="color:#e9e7f5;line-height:1.6">Salut,</p>
+      <p style="color:#e9e7f5;line-height:1.6">Ton abonnement <strong>${planLabel}</strong> est activé. Ta clé de licence :</p>
+
+      <div style="background:rgba(139,92,246,0.10);border:1px solid rgba(139,92,246,0.30);border-radius:12px;padding:16px;text-align:center;margin:20px 0">
+        <code style="font-family:monospace;font-size:14px;letter-spacing:2px;color:#c4b5fd">${licenseKey}</code>
+      </div>
+
+      <p style="color:#a89bd4;font-size:13px;line-height:1.6">
+        Plan : <strong style="color:white">${planLabel}</strong><br/>
+        Renouvellement : <strong style="color:white">${expiry}</strong>
+      </p>
+
+      <div style="text-align:center;margin:28px 0">
+        <a href="${appUrl}" style="display:inline-block;padding:14px 28px;background:linear-gradient(130deg,#7c3aed,#ec4899);color:white;text-decoration:none;border-radius:12px;font-weight:bold">
+          Ouvrir l'app →
+        </a>
+      </div>
+
+      <p style="color:#6b5fa0;font-size:12px;line-height:1.6;margin-top:32px">
+        Si tu n'as pas de compte, crée-le avec cet email — ton abonnement sera reconnu automatiquement.<br/>
+        Une question ? Réponds à ce mail ou écris sur Telegram (@justquentin).
+      </p>
+    </div>
+  `
+
+  try {
+    const r = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type':  'application/json',
+      },
+      body: JSON.stringify({
+        from,
+        to: [to],
+        subject: `Bienvenue sur ScaleFlow — ton accès ${planLabel} 🚀`,
+        html,
+      }),
+    })
+    if (!r.ok) {
+      const txt = await r.text()
+      console.error('Resend send failed', r.status, txt)
+    }
+  } catch (e) {
+    console.error('Resend send error', e.message)
+  }
+}
+
 module.exports = async (req, res) => {
   try {
     if (req.method !== 'POST') {
@@ -140,6 +208,14 @@ module.exports = async (req, res) => {
           p_subscription_id: sub.id,
         })
         if (credErr) console.error('renew_credits_from_subscription error', credErr)
+
+        // Send welcome email with the license key (best-effort, doesn't block)
+        await sendLicenseEmail({
+          to:         session.customer_details?.email || session.customer_email,
+          plan,
+          licenseKey: `STRIPE-${sub.id}`,
+          periodEnd:  expires,
+        })
         break
       }
 
