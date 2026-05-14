@@ -24,7 +24,7 @@ export function Footer() {
               <li><a href="#features" className="hover:text-white transition-colors">Fonctionnalités</a></li>
               <li><a href="#pricing"  className="hover:text-white transition-colors">Tarifs</a></li>
               <li><a href="#faq"      className="hover:text-white transition-colors">FAQ</a></li>
-              <li><a href="https://app.scaleflow.io" className="hover:text-white transition-colors">Ouvrir l'app</a></li>
+              <li><a href="https://scaleflow-fvtu.vercel.app/" className="hover:text-white transition-colors">Ouvrir l'app</a></li>
             </ul>
           </div>
 

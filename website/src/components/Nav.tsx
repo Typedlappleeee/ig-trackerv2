@@ -14,7 +14,7 @@ export function Nav() {
           <a href="#faq"       className="hover:text-text transition-colors">FAQ</a>
         </div>
         <div className="flex items-center gap-2">
-          <a href="https://app.scaleflow.io" className="hidden sm:inline-flex btn-secondary !py-2 !px-4 !text-xs">Ouvrir l'app →</a>
+          <a href="https://scaleflow-fvtu.vercel.app/" className="hidden sm:inline-flex btn-secondary !py-2 !px-4 !text-xs">Ouvrir l'app →</a>
           <a href="#pricing" className="btn-primary !py-2 !px-4 !text-xs">Commencer</a>
         </div>
       </div>

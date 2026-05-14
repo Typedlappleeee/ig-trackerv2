@@ -18,13 +18,27 @@ export function Hero() {
           La seule app conçue pour gérer <span className="text-white font-semibold">100+ comptes</span> sans se prendre la tête.
         </p>
 
-        <div className="flex flex-wrap items-center justify-center gap-3 mb-12">
-          <a href="#pricing" className="btn-primary">
-            Commencer maintenant
-            <span>→</span>
+        <div className="flex flex-wrap items-center justify-center gap-3 mb-6">
+          <a
+            href="https://github.com/typedlappleeee/ig-trackerv2/releases/latest/download/ScaleFlow-Setup.exe"
+            className="btn-primary"
+          >
+            ⬇ Télécharger pour Windows
           </a>
-          <a href="https://app.scaleflow.io" className="btn-secondary">
-            Ouvrir dans le navigateur
+          <a href="https://scaleflow-fvtu.vercel.app/" target="_blank" rel="noreferrer" className="btn-secondary">
+            🌐 Ouvrir dans le navigateur
+          </a>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-center gap-4 mb-12 text-[11px] text-text2">
+          <a href="https://github.com/typedlappleeee/ig-trackerv2/releases/latest/download/ScaleFlow.dmg"
+             className="underline hover:text-text transition-colors">
+            Version Mac (.dmg)
+          </a>
+          <span className="text-muted">·</span>
+          <a href="https://github.com/typedlappleeee/ig-trackerv2/releases" target="_blank" rel="noreferrer"
+             className="underline hover:text-text transition-colors">
+            Toutes les versions
           </a>
         </div>
 
