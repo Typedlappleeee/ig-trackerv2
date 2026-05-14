@@ -25,12 +25,14 @@ export interface CreditState {
   balance: number
   loading: boolean
   refresh: () => void
+  ownerId: string   // user_id whose credits are shown/charged (org owner in org mode, self otherwise)
 }
 
 export const CreditContext = createContext<CreditState>({
   balance: 0,
   loading: true,
   refresh: () => {},
+  ownerId: '',
 })
 
 export function useCredits() {
@@ -45,6 +47,18 @@ export async function fetchBalance(userId: string): Promise<number> {
       .eq('user_id', userId)
       .maybeSingle()
     return data?.balance ?? 0
+  } catch {
+    return 0
+  }
+}
+
+// Fetch org owner's balance via SECURITY DEFINER RPC (bypasses RLS for members).
+// Falls back to own balance if the function doesn't exist yet.
+export async function fetchOrgBalance(orgId: string): Promise<number> {
+  try {
+    const { data, error } = await supabase.rpc('get_org_credit_balance', { p_org_id: orgId })
+    if (error) throw error
+    return typeof data === 'number' ? data : 0
   } catch {
     return 0
   }

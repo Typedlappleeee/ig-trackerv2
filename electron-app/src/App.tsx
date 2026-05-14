@@ -11,7 +11,7 @@ import { playSplash }        from '@/lib/sounds'
 import { startMusic, stopMusic, isMusicEnabled, subscribeMusicState } from '@/lib/music'
 import { checkLicense, LicenseContext, type LicenseStatus } from '@/lib/license'
 import { LicenseGate } from '@/components/LicenseGate'
-import { CreditContext, fetchBalance, maybeGrantMonthlyCredits } from '@/lib/credits'
+import { CreditContext, fetchBalance, fetchOrgBalance, maybeGrantMonthlyCredits } from '@/lib/credits'
 
 // ── ScaleFlow logo SVG ────────────────────────────────────────────────────────
 function ScaleFlowLogoSVG({ size = 96, draw = false }: { size?: number; draw?: boolean }) {
@@ -510,17 +510,20 @@ function AppContent({ user }: { user: User }) {
 
   // License check — re-run whenever the org changes
   useEffect(() => {
-    checkLicense(user.id, currentOrg?.id ?? null).then(l => {
+    checkLicense(user.id, currentOrg?.id ?? null).then(async l => {
       setLicense(l)
-      if (l.valid && l.plan) {
-        maybeGrantMonthlyCredits(user.id, l.plan)
-          .then(() => fetchBalance(user.id).then(b => { setCreditBalance(b); setCreditLoading(false) }))
-          .catch(() => { fetchBalance(user.id).then(b => { setCreditBalance(b); setCreditLoading(false) }) })
-      } else {
-        fetchBalance(user.id).then(b => { setCreditBalance(b); setCreditLoading(false) })
+      // Grant monthly credits for own account (if applicable)
+      if (l.valid && l.plan && l.source === 'own') {
+        await maybeGrantMonthlyCredits(user.id, l.plan).catch(() => {})
       }
+      // Show org owner's credit pool when in org mode, own balance otherwise
+      const bal = currentOrg?.owner_id
+        ? await fetchOrgBalance(currentOrg.id)
+        : await fetchBalance(user.id)
+      setCreditBalance(bal)
+      setCreditLoading(false)
     })
-  }, [user.id, currentOrg?.id])
+  }, [user.id, currentOrg?.id, currentOrg?.owner_id])
 
   // Poll the license every 3s while it's invalid, so an incoming Stripe webhook
   // auto-unblocks the user without needing a manual refresh.
@@ -535,8 +538,14 @@ function AppContent({ user }: { user: User }) {
   }, [license?.valid, user.id, currentOrg?.id])
 
   function refreshCredits() {
-    fetchBalance(user.id).then(b => setCreditBalance(b))
+    const p = currentOrg?.owner_id
+      ? fetchOrgBalance(currentOrg.id)
+      : fetchBalance(user.id)
+    p.then(b => setCreditBalance(b))
   }
+
+  // The user_id whose credits are charged: org owner when in org mode, self otherwise
+  const creditOwnerId = currentOrg?.owner_id ?? user.id
 
   // Sidebar phone count: 0 when no bearer in scope, org-scoped or solo-scoped otherwise.
   useEffect(() => {
@@ -616,7 +625,7 @@ function AppContent({ user }: { user: User }) {
 
   return (
     <LicenseContext.Provider value={license}>
-    <CreditContext.Provider value={{ balance: creditBalance, loading: creditLoading, refresh: refreshCredits }}>
+    <CreditContext.Provider value={{ balance: creditBalance, loading: creditLoading, refresh: refreshCredits, ownerId: creditOwnerId }}>
       {showBeta && <BetaPopup onClose={dismissBeta} />}
       <Layout
         user={user}

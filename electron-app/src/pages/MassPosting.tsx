@@ -212,7 +212,7 @@ export function MassPosting({ user }: MassPostingProps) {
     if (selectedVideos.length === 0) { log('Sélectionne au moins une vidéo', 'warn'); return }
 
     const creditCost = phoneList.length * CREDIT_COSTS.mass_posting
-    const creditRes = await checkAndDeductCredits(user.id, creditCost)
+    const creditRes = await checkAndDeductCredits(credits.ownerId, creditCost)
     if (!creditRes.ok) {
       log(`❌ ${creditRes.error ?? 'Crédits insuffisants'} (besoin: ${creditCost} crédits pour ${phoneList.length} phone${phoneList.length > 1 ? 's' : ''})`, 'error')
       return

@@ -6,7 +6,7 @@ import { BankPicker } from './Bank'
 import { playSuccess, playWhoosh, playError } from '@/lib/sounds'
 import { supabase } from '@/lib/supabase'
 import { uploadVideoFromPath, type UploadScope } from '@/lib/storage'
-import { checkAndDeductCredits, CREDIT_COSTS } from '@/lib/credits'
+import { checkAndDeductCredits, CREDIT_COSTS, useCredits } from '@/lib/credits'
 import { useOrg } from '@/lib/orgContext'
 import { logActivity } from '@/lib/activityLog'
 import { MassRemix } from './MassRemix'
@@ -188,6 +188,7 @@ function VideoCard({ label, filePath, accent = '#8b5cf6', badge, onDurationLoad,
 // ── Main ───────────────────────────────────────────────────────────────────────
 export function Remix({ user }: RemixProps) {
   const { currentOrg } = useOrg()
+  const credits = useCredits()
   const conns = useConnections(user)
   const [mode, setMode] = useState<'solo' | 'masse'>('solo')
   const [step, setStep] = useState<Step>(1)
@@ -363,7 +364,7 @@ export function Remix({ user }: RemixProps) {
   async function generate() {
     if (!originalPath || !newPhase1Path) return
 
-    const creditRes = await checkAndDeductCredits(user.id, CREDIT_COSTS.remix)
+    const creditRes = await checkAndDeductCredits(credits.ownerId, CREDIT_COSTS.remix)
     if (!creditRes.ok) {
       setResult({ ok: false, error: `Crédits insuffisants (solde : ${creditRes.balance ?? 0})` })
       return

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase, type ContentItem } from '@/lib/supabase'
-import { checkAndDeductCredits, CREDIT_COSTS } from '@/lib/credits'
+import { checkAndDeductCredits, CREDIT_COSTS, useCredits } from '@/lib/credits'
 import { VideoThumbnail } from './Bank'
 import { Spinner } from '@/components/ui/Spinner'
 import { Button }  from '@/components/ui/Button'
@@ -364,6 +364,7 @@ function DraggableText({ overlay, onMove }: {
 // ── Main component ────────────────────────────────────────────────────────────────────────────
 export function Montage({ user }: MontageProps) {
   const { currentOrg } = useOrg()
+  const credits = useCredits()
   const conns = useConnections(user)
 
   // AI caption generation state
@@ -529,7 +530,7 @@ export function Montage({ user }: MontageProps) {
     if (!clips.length) return
     setExporting(true); setExpResult(null)
 
-    const creditRes = await checkAndDeductCredits(user.id, CREDIT_COSTS.montage)
+    const creditRes = await checkAndDeductCredits(credits.ownerId, CREDIT_COSTS.montage)
     if (!creditRes.ok) {
       setExporting(false)
       setExpResult({ ok: false, msg: `Crédits insuffisants (solde : ${creditRes.balance ?? 0})` })

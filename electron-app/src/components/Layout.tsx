@@ -53,7 +53,7 @@ function SFLogo({ size = 28 }: { size?: number }) {
 
 export type Page =
   | 'dashboard' | 'phones'
-  | 'stats' | 'posting' | 'massposting' | 'bank' | 'autocomment' | 'aitools' | 'warmup'
+  | 'stats' | 'posting' | 'massposting' | 'bank' | 'aitools' | 'warmup'
   | 'montage' | 'remix'
   | 'settings' | 'licences'
 
@@ -87,7 +87,6 @@ const NAV_SECTIONS: NavSection[] = [
       { id: 'posting',     label: 'Posting',       icon: '🚀' },
       { id: 'massposting', label: 'Mass Posting',  icon: '⚡', beta: true },
       { id: 'bank',        label: 'Banque vidéos', icon: '🗂' },
-      { id: 'autocomment', label: 'Commentaires',  icon: '💬', beta: true },
       { id: 'warmup',      label: 'Warmup Compte', icon: '🔥', beta: true },
       { id: 'aitools',     label: 'Outils IA',     icon: '🔧', beta: true },
     ],
@@ -540,12 +539,6 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             className="fixed z-[9999] bg-surface border border-border rounded-xl shadow-2xl overflow-hidden anim-slide-down"
             style={{ left: orgMenuPos.left, bottom: orgMenuPos.bottom, width: orgMenuPos.width }}
           >
-            <button
-              onClick={() => handleSwitchOrg(null)}
-              className={`w-full flex items-center gap-2 px-3 py-2 text-[12px] text-left hover:bg-surface2 ${!currentOrg ? 'bg-accent/10 text-accent' : 'text-text'}`}
-            >
-              <span>👤</span><span>Mode solo</span>
-            </button>
             {myOrgs.map(({ org }) => (
               <button
                 key={org.id}
