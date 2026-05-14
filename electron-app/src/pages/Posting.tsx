@@ -350,23 +350,22 @@ export function Posting({ user }: PostingProps) {
             style={{ background: 'linear-gradient(135deg,#7c3aed22,#ec489922)', border: '1px solid rgba(139,92,246,0.2)' }}>
             <span className="text-base">🚀</span>
           </div>
-          <div>
+          <div className="flex-1">
             <h1 className="text-lg font-black text-text tracking-tight">Nouveau post</h1>
             <p className="text-text2 text-[11px]">Poste un Reel sur tes téléphones GéeLark</p>
           </div>
+          <button
+            onClick={() => { setFilePath(null); setCaption(''); setTopic('') }}
+            className="text-[11px] text-text2 hover:text-text px-2.5 py-1.5 rounded-lg hover:bg-surface2 transition-colors"
+            title="Réinitialiser le formulaire"
+          >↺ Réinitialiser</button>
         </div>
 
-        {/* Main posting card — rounded 14, #0b0f1a bg */}
+        {/* Main posting card */}
         <div className="bg-[#0b0f1a] border border-[#1a2235] rounded-2xl overflow-hidden">
-          {/* Top bar */}
-          <div className="flex items-center justify-between px-5 py-3 border-b border-border">
-            <p className="text-sm font-semibold text-text">Nouveau post</p>
-            <button onClick={() => { setFilePath(null); setCaption(''); setTopic('') }} className="text-text2 hover:text-text text-sm" title="Réinitialiser">↺</button>
-          </div>
-
           {/* Media row */}
           <div className="px-5 py-4 flex gap-4 border-b border-border">
-            {/* 9:16 portrait preview — Python: 120×213 */}
+            {/* 9:16 portrait preview */}
             <div className="w-[120px] flex-shrink-0">
               <div className="w-[120px] h-[213px] rounded-xl overflow-hidden bg-gradient-to-br from-surface3 to-surface2 flex items-center justify-center">
                 {filePath ? (
@@ -511,17 +510,10 @@ export function Posting({ user }: PostingProps) {
           </div>
         </div>
 
-        {/* Validations + warnings */}
         {!bearer && (
           <div className="px-4 py-3 rounded-lg bg-warn/10 border border-warn/20 text-warn text-sm">
-            ❌ Bearer Token GéeLark manquant — va dans Paramètres
+            ❌ Bearer Token GéeLark manquant — configure-le dans Paramètres
           </div>
-        )}
-        {selectedPhones.size === 0 && bearer && (
-          <p className="text-xs text-text2">⚠ Sélectionne au moins un téléphone</p>
-        )}
-        {!filePath && bearer && selectedPhones.size > 0 && (
-          <p className="text-xs text-text2">⚠ Sélectionne une vidéo</p>
         )}
 
       </div>

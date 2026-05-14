@@ -503,14 +503,31 @@ export function Dashboard({ user }: DashboardProps) {
           )}
         </div>
 
-        {/* Quick start tips */}
+        {/* Empty state / quick start */}
         {phones.length === 0 && !loading && (
-          <div className="bg-card border border-border rounded-xl p-5 space-y-2 text-sm text-text2">
-            <h2 className="text-sm font-semibold text-text mb-3">Démarrage rapide</h2>
-            <div className="flex gap-2"><span style={{ color: '#a78bfa' }}>1.</span><span>Configure ton <span className="text-text font-medium">Bearer Token GéeLark</span> dans Paramètres.</span></div>
-            <div className="flex gap-2"><span style={{ color: '#a78bfa' }}>2.</span><span>Va dans <span className="text-text font-medium">Téléphones</span> et clique sur Sync GéeLark.</span></div>
-            <div className="flex gap-2"><span style={{ color: '#a78bfa' }}>3.</span><span>Ajoute tes comptes Instagram via le menu clic droit.</span></div>
-            <div className="flex gap-2"><span style={{ color: '#a78bfa' }}>4.</span><span>Utilise <span className="text-text font-medium">Stats</span> pour voir tes performances.</span></div>
+          <div className="rounded-2xl p-8 text-center space-y-5" style={{ background: 'rgba(139,92,246,0.04)', border: '1px solid rgba(139,92,246,0.12)' }}>
+            <div className="text-4xl">🚀</div>
+            <div>
+              <p className="text-base font-bold text-text">Bienvenue sur ScaleFlow</p>
+              <p className="text-sm text-text2 mt-1">Suis ces étapes pour commencer</p>
+            </div>
+            <div className="grid grid-cols-2 gap-3 max-w-md mx-auto text-left">
+              {[
+                { n: '1', title: 'Bearer Token', desc: 'Configure ton token GéeLark dans Paramètres → Connexions' },
+                { n: '2', title: 'Sync téléphones', desc: 'Va dans Téléphones et clique "Sync GéeLark"' },
+                { n: '3', title: 'Ajoute Instagram', desc: 'Clic droit sur un téléphone → Session ID' },
+                { n: '4', title: 'Lance le posting', desc: 'Utilise Posting ou Mass Posting pour publier' },
+              ].map(step => (
+                <div key={step.n} className="rounded-xl p-3 flex gap-3 items-start" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(139,92,246,0.1)' }}>
+                  <span className="w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-black flex-shrink-0 mt-0.5"
+                    style={{ background: 'linear-gradient(135deg,#7c3aed,#ec4899)', color: '#fff' }}>{step.n}</span>
+                  <div>
+                    <p className="text-xs font-semibold text-text">{step.title}</p>
+                    <p className="text-[11px] text-text2 mt-0.5 leading-relaxed">{step.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>

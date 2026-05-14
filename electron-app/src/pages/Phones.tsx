@@ -776,18 +776,16 @@ export function Phones({ user }: PhonesProps) {
         />
       )}
 
-    <div className="p-8 space-y-6" onClick={() => setContextMenu(null)}>
+    <div className="p-6 space-y-4" onClick={() => setContextMenu(null)}>
 
       {/* Header */}
       <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-text">Téléphones</h1>
-          <p className="text-text2 text-sm mt-1">
-            Cloud phones GéeLark · Stats IG auto toutes les 5 min (comptes avec session)
+          <p className="text-text2 text-sm mt-0.5 flex items-center gap-2">
+            <span>{phones.length} téléphone{phones.length !== 1 ? 's' : ''}</span>
             {lastUpdated && (
-              <span className="ml-3 text-text2">
-                · màj {lastUpdated.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-              </span>
+              <span className="text-text2/50 text-xs">· màj {lastUpdated.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
             )}
           </p>
         </div>
@@ -800,7 +798,7 @@ export function Phones({ user }: PhonesProps) {
       </div>
 
       {/* KPI cards */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-4 gap-3">
         {([
           { key: 'all',     label: 'TÉLÉPHONES',  color: '#4f9eff', icon: '📱' },
           { key: 'online',  label: 'EN LIGNE',     color: '#00ccaa', icon: '✅' },

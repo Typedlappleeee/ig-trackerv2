@@ -476,6 +476,7 @@ import { Settings }          from '@/pages/Settings'
 import { MassPosting }       from '@/pages/MassPosting'
 import { Warmup }            from '@/pages/Warmup'
 import { Licences }          from '@/pages/Licences'
+import { Support }           from '@/pages/Support'
 import { FullPageLoader }    from '@/components/ui/Spinner'
 
 const BETA_KEY = 'scaleflow-v1-seen'
@@ -630,6 +631,7 @@ function AppContent({ user }: { user: User }) {
       case 'remix':        return <Remix       user={user} />
       case 'aitools':      return <AiTools     user={user} />
       case 'settings':     return <Settings    user={user} initialPanel={settingsPanel as any} />
+      case 'support':      return <Support      user={user} />
       case 'licences':     return <Licences    user={user} />
     }
   })()

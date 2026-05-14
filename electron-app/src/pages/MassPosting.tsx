@@ -460,7 +460,7 @@ export function MassPosting({ user }: MassPostingProps) {
         </div>
 
         {/* Description row */}
-        <div className="flex items-start gap-2">
+        <div className="flex items-center gap-2">
           <textarea
             value={caption}
             onChange={e => setCaption(e.target.value)}
@@ -468,26 +468,23 @@ export function MassPosting({ user }: MassPostingProps) {
             placeholder="Description partagée par tous les téléphones (optionnel)…"
             className="flex-1 bg-[#0a0c15] border border-border rounded-xl px-3 py-2 text-xs text-text placeholder:text-text2 resize-none focus:outline-none focus:border-[#8b5cf6]/50"
           />
-          <div className="flex flex-col gap-1.5">
-            <Button size="sm" variant="secondary" onClick={generateCaption} loading={generating} disabled={!groqKey}>✨ Générer</Button>
-            <input type="text" value={customPrompt} onChange={e => setCustomPrompt(e.target.value)}
-              placeholder="Prompt IA…"
-              className="w-32 bg-[#0a0c15] border border-border rounded-lg px-2 py-1 text-[11px] text-text placeholder:text-text2 focus:outline-none focus:border-[#8b5cf6]/50"
-            />
-            <div className="flex items-center gap-1.5">
-              <button
-                onClick={() => setWithHashtags(v => !v)}
-                className="relative w-7 h-3.5 rounded-full transition-all flex-shrink-0"
-                style={{ background: withHashtags ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : '#1a2035' }}
-              >
-                <span className={`absolute top-0.5 w-2.5 h-2.5 bg-white rounded-full shadow transition-all ${withHashtags ? 'left-[14px]' : 'left-0.5'}`} />
-              </button>
-              <span className="text-[10px] text-text2">#</span>
-            </div>
-            <span className={`text-[10px] font-mono text-right ${caption.length > 2200 ? 'text-danger' : 'text-text2'}`}>
-              {caption.length}/2200
-            </span>
-          </div>
+          <span className={`text-[10px] font-mono ${caption.length > 2200 ? 'text-danger' : 'text-text2'}`}>
+            {caption.length}/2200
+          </span>
+          <Button size="sm" variant="secondary" onClick={generateCaption} loading={generating} disabled={!groqKey}>✨ IA</Button>
+          <input type="text" value={customPrompt} onChange={e => setCustomPrompt(e.target.value)}
+            placeholder="Prompt…"
+            className="w-28 bg-[#0a0c15] border border-border rounded-lg px-2 py-1.5 text-[11px] text-text placeholder:text-text2 focus:outline-none focus:border-[#8b5cf6]/50"
+          />
+          <button
+            onClick={() => setWithHashtags(v => !v)}
+            className="relative w-8 h-4 rounded-full transition-all flex-shrink-0"
+            style={{ background: withHashtags ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : '#1a2035' }}
+            title="Hashtags"
+          >
+            <span className={`absolute top-0.5 w-3 h-3 bg-white rounded-full shadow transition-all ${withHashtags ? 'left-[18px]' : 'left-0.5'}`} />
+          </button>
+          <span className="text-[10px] text-text2">#</span>
         </div>
       </div>
 
