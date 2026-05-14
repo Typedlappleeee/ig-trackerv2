@@ -58,7 +58,7 @@ function ToggleRow({
   )
 }
 
-type GeneralTab = 'apparence' | 'sons' | 'langue'
+type GeneralTab = 'apparence' | 'sons'
 type Panel = 'general' | 'profile' | 'connexions' | 'organization' | 'admin' | 'abonnement'
 interface SettingsProps { user: User; initialPanel?: Panel }
 
@@ -283,7 +283,7 @@ export function Settings({ user, initialPanel }: SettingsProps) {
           <button
             key={t.k}
             onClick={() => setPanel(t.k)}
-            className={`px-3 py-2 text-xs font-semibold border-b-2 transition-colors ${
+            className={`px-3 py-1.5 text-xs font-semibold border-b-2 transition-colors ${
               panel === t.k ? 'border-accent text-accent bg-accent/5' : 'border-transparent text-text2 hover:text-text'
             }`}
           >
@@ -297,7 +297,7 @@ export function Settings({ user, initialPanel }: SettingsProps) {
 
           {/* Sub-tabs */}
           <div className="flex gap-2">
-            {(['apparence', 'sons', 'langue'] as GeneralTab[]).map(t => (
+            {(['apparence', 'sons'] as GeneralTab[]).map(t => (
               <button
                 key={t}
                 onClick={() => setGenTab(t)}
@@ -342,7 +342,6 @@ export function Settings({ user, initialPanel }: SettingsProps) {
 
           {genTab === 'sons' && (
             <div className="space-y-5">
-              <h2 className="text-sm font-semibold text-text">Sons & Musique</h2>
               <ToggleRow
                 checked={notifyPopup}
                 onChange={v => setNotifyPopup(v)}
@@ -394,12 +393,7 @@ export function Settings({ user, initialPanel }: SettingsProps) {
             </div>
           )}
 
-          {genTab === 'langue' && (
-            <div className="space-y-4">
-              <h2 className="text-sm font-semibold text-text">Langue</h2>
-              <p className="text-xs text-text2">Seul le français est disponible pour l'instant.</p>
-            </div>
-          )}
+
         </section>
       )}
 
@@ -730,7 +724,7 @@ function SubscriptionPanel() {
   return (
     <div className="space-y-6">
       {/* Current status */}
-      <div className="rounded-2xl p-5 space-y-4" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(139,92,246,0.18)' }}>
+      <div className="rounded-2xl p-4 space-y-4" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(139,92,246,0.18)' }}>
         <p className="text-xs font-black text-text uppercase tracking-wider">Mon abonnement actuel</p>
 
         <div className="flex items-center justify-between">
@@ -817,6 +811,8 @@ function SubscriptionPanel() {
 
         <div className="rounded-xl p-3 space-y-1" style={{ background: 'rgba(0,0,0,0.2)' }}>
           <p className="text-[10px] font-bold uppercase tracking-wider text-text2 mb-2">Coût des opérations</p>
+          <div className="flex justify-between text-xs"><span className="text-text2">🚀 Posting</span><span className="text-text font-semibold">1 crédit / tél.</span></div>
+          <div className="flex justify-between text-xs"><span className="text-text2">⚡ Mass Posting</span><span className="text-text font-semibold">2 crédits / tél.</span></div>
           <div className="flex justify-between text-xs"><span className="text-text2">✂ Montage vidéo</span><span className="text-text font-semibold">1 crédit</span></div>
           <div className="flex justify-between text-xs"><span className="text-text2">🔀 Remix vidéo</span><span className="text-text font-semibold">2 crédits</span></div>
         </div>
@@ -855,36 +851,6 @@ function SubscriptionPanel() {
         </div>
       </div>
 
-      {/* Credit packs */}
-      <div>
-        <p className="text-xs font-black text-text uppercase tracking-wider mb-4">Acheter des crédits</p>
-        <div className="grid grid-cols-2 gap-3">
-          {[
-            { credits: 100,  price: 4.99,   label: '100 crédits',   bonus: '' },
-            { credits: 500,  price: 19.99,  label: '500 crédits',   bonus: '+ 25 bonus' },
-            { credits: 1500, price: 49.99,  label: '1 500 crédits', bonus: '+ 150 bonus' },
-            { credits: 5000, price: 149.99, label: '5 000 crédits', bonus: '+ 500 bonus' },
-          ].map(pack => (
-            <a
-              key={pack.credits}
-              href={`mailto:contact@scaleflow.app?subject=Achat%20crédits%20ScaleFlow%20—%20${pack.credits}&body=Bonjour%2C%20je%20souhaite%20acheter%20le%20pack%20${pack.credits}%20crédits%20(${pack.price}€).`}
-              className="rounded-xl p-4 flex flex-col gap-2 transition-all hover:scale-[1.02]"
-              style={{ background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.18)', textDecoration: 'none' }}
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-black text-text">{pack.label}</span>
-                <span className="text-xs font-black" style={{ color: '#a78bfa' }}>{pack.price}€</span>
-              </div>
-              {pack.bonus && <span className="text-[10px] text-green-400">{pack.bonus}</span>}
-              <div className="text-[10px] text-text2">{(pack.price / pack.credits * 100).toFixed(1)}c / crédit</div>
-            </a>
-          ))}
-        </div>
-        <p className="text-[10px] text-text2/50 mt-3 text-center">
-          Les crédits sont ajoutés par code après paiement.
-        </p>
-      </div>
-
       {/* Plan pricing */}
       <div>
         <p className="text-xs font-black text-text uppercase tracking-wider mb-4">Abonnements</p>
@@ -895,7 +861,7 @@ function SubscriptionPanel() {
             <div>
               <p className="text-xs font-black uppercase tracking-wider" style={{ color: '#a78bfa' }}>Standard</p>
               <div className="flex items-baseline gap-1 mt-2">
-                <span className="text-3xl font-black text-white">$49.99</span>
+                <span className="text-3xl font-black text-white">29,99€</span>
                 <span className="text-xs text-text2">/ mois</span>
               </div>
             </div>
@@ -907,7 +873,9 @@ function SubscriptionPanel() {
               ))}
             </ul>
             <a
-              href="mailto:contact@scaleflow.app?subject=Achat%20ScaleFlow%20Standard"
+              href="https://t.me/justquentin"
+              target="_blank"
+              rel="noreferrer"
               className="block w-full py-2.5 rounded-xl text-sm font-bold text-center text-white transition-all"
               style={{ background: 'linear-gradient(130deg,#7c3aed,#8b5cf6)' }}
             >
@@ -923,7 +891,7 @@ function SubscriptionPanel() {
             <div>
               <p className="text-xs font-black uppercase tracking-wider" style={{ color: '#f472b6' }}>Pro</p>
               <div className="flex items-baseline gap-1 mt-2">
-                <span className="text-3xl font-black text-white">$99.99</span>
+                <span className="text-3xl font-black text-white">79,99€</span>
                 <span className="text-xs text-text2">/ mois</span>
               </div>
             </div>
@@ -935,7 +903,9 @@ function SubscriptionPanel() {
               ))}
             </ul>
             <a
-              href="mailto:contact@scaleflow.app?subject=Achat%20ScaleFlow%20Pro"
+              href="https://t.me/justquentin"
+              target="_blank"
+              rel="noreferrer"
               className="block w-full py-2.5 rounded-xl text-sm font-bold text-center text-white transition-all"
               style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)', boxShadow: '0 2px 20px -4px rgba(236,72,153,0.4)' }}
             >

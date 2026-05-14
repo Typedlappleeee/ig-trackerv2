@@ -353,117 +353,88 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
           </div>
         </nav>
 
-        {/* Footer card */}
-        <div className="mx-3 mb-2 p-3 rounded-xl bg-sb-card border border-border space-y-1.5">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-black" style={{ background: 'linear-gradient(130deg,#8b5cf6,#ec4899)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' }}>ScaleFlow</span>
-            <span className="text-[9px] text-text2 bg-surface2 px-1.5 py-0.5 rounded">v2.0.0</span>
-          </div>
-          <div className="flex items-center gap-1.5 text-[10px] text-text2">
-            <span>📱</span>
-            <span>{phoneCount ?? 0} téléphone{(phoneCount ?? 0) !== 1 ? 's' : ''}</span>
-          </div>
+        {/* ── Bottom bar ─────────────────────────────────────────── */}
+        <div className="border-t border-border/40 px-3 pt-2 pb-3 space-y-1">
+
+          {/* Credits row */}
           {!credits.loading && (
-            <div className="flex items-center justify-between text-[10px]">
-              <div className="flex items-center gap-1.5 text-text2">
-                <span>💎</span>
-                <span>Crédits</span>
-              </div>
-              <span className="font-bold" style={{ color: credits.balance < 10 ? '#f87171' : '#a78bfa' }}>
+            <div className="flex items-center justify-between px-3 py-1 text-[11px]">
+              <span className="text-text2 flex items-center gap-1.5"><span>💎</span>Crédits</span>
+              <span className="font-bold tabular-nums" style={{ color: credits.balance < 10 ? '#f87171' : '#a78bfa' }}>
                 {credits.balance.toLocaleString('fr-FR')}
               </span>
             </div>
           )}
-          {lastRefreshLabel && (
-            <div className="text-[9px] text-text2/70">{lastRefreshLabel}</div>
-          )}
-        </div>
 
-        {/* Refresh button + Settings */}
-        <div className="px-3 pb-2 space-y-1.5">
-          <button
-            onClick={onRefresh}
-            disabled={!onRefresh}
-            className="w-full text-[12px] font-semibold rounded-lg py-2 transition-opacity disabled:opacity-50"
-            style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff', boxShadow: '0 2px 14px -4px rgba(124,58,237,0.45)' }}
-          >
-            ↺  Rafraîchir
-          </button>
-          <button
-            onClick={() => { playNav(); onNavigate('settings') }}
-            className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[12px] transition-colors ${
-              page === 'settings' ? 'sf-nav-active' : 'text-sb-text hover:bg-sb-hover hover:text-sb-text-act'
-            }`}
-          >
-            <span className="text-base">⚙</span>
-            <span>Paramètres</span>
-          </button>
-          {license.isSuperAdmin && (
+          {/* Phone count + last refresh row */}
+          <div className="flex items-center justify-between px-3 py-0.5 text-[10px] text-text2">
+            <span className="flex items-center gap-1"><span>📱</span>{phoneCount ?? 0} tél.</span>
+            {lastRefreshLabel && <span className="opacity-60">{lastRefreshLabel}</span>}
+          </div>
+
+          {/* Settings + Refresh row */}
+          <div className="flex gap-1 pt-0.5">
             <button
-              onClick={() => { playNav(); onNavigate('licences') }}
-              className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[12px] transition-colors ${
-                page === 'licences' ? 'sf-nav-active' : 'text-sb-text hover:bg-sb-hover hover:text-sb-text-act'
+              onClick={() => { playNav(); onNavigate('settings') }}
+              className={`flex-1 flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-[12px] transition-colors ${
+                page === 'settings' ? 'sf-nav-active' : 'text-sb-text hover:bg-sb-hover hover:text-sb-text-act'
               }`}
             >
-              <span className="text-base">🛡</span>
-              <span>Admin</span>
+              <span className="text-sm">⚙</span>
+              <span className="font-medium">Paramètres</span>
             </button>
-          )}
-        </div>
+            <button
+              onClick={onRefresh}
+              disabled={!onRefresh}
+              className="px-2.5 py-2 rounded-lg text-[13px] text-text2 hover:text-text hover:bg-sb-hover transition-colors disabled:opacity-30"
+              title="Rafraîchir"
+            >↺</button>
+            {license.isSuperAdmin && (
+              <button
+                onClick={() => { playNav(); onNavigate('licences') }}
+                className={`px-2.5 py-2 rounded-lg text-sm transition-colors ${
+                  page === 'licences' ? 'sf-nav-active' : 'text-text2 hover:bg-sb-hover hover:text-sb-text-act'
+                }`}
+                title="Admin"
+              >🛡</button>
+            )}
+          </div>
 
-        {/* Org switcher */}
-        <div className="px-3 pb-2">
+          {/* Org switcher */}
           <button
             ref={orgTriggerRef}
             onClick={() => orgMenuOpen ? setOrgMenuOpen(false) : openOrgMenu()}
             className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[12px] bg-surface border border-border hover:border-accent/40 transition-colors"
           >
-            <span className="text-base flex-shrink-0">{currentOrg ? '🏢' : '👤'}</span>
+            <span className="text-base flex-shrink-0">🏢</span>
             <div className="flex-1 min-w-0 text-left">
-              <p className="text-text truncate font-medium">{currentOrg ? currentOrg.name : 'Mode solo'}</p>
-              {currentOrg && role && <p className="text-[9px] text-text2 uppercase tracking-wider">{role}</p>}
+              <p className="text-text font-medium truncate">{currentOrg?.name ?? 'Organisation'}</p>
+              {license.source === 'own' && (
+                <p className="text-[9px]" style={{ color: license.daysLeft === null ? '#a78bfa' : license.daysLeft <= 7 ? '#fb923c' : '#6b7280' }}>
+                  {license.daysLeft === null ? '∞ à vie' : `${license.daysLeft}j restants`}
+                </p>
+              )}
+              {license.source === 'org_owner' && (
+                <p className="text-[9px] text-blue-400">Via organisation</p>
+              )}
             </div>
+            <span className="text-text2 text-[10px] flex-shrink-0">▾</span>
+          </button>
+
+          {/* User strip */}
+          <button
+            ref={userTriggerRef}
+            onClick={() => userMenuOpen ? setUserMenuOpen(false) : openUserMenu()}
+            className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left hover:bg-sb-hover/40 transition-colors"
+          >
+            <div className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold flex-shrink-0" style={{ background: 'rgba(139,92,246,0.2)', color: '#a78bfa' }}>
+              {user.email?.[0].toUpperCase()}
+            </div>
+            <p className="flex-1 text-[10px] text-text2 truncate">{user.email}</p>
             <span className="text-text2 text-[10px]">▾</span>
           </button>
+
         </div>
-
-        {/* License badge */}
-        {license.source === 'own' && (
-          <div className="px-3 pb-1">
-            <div className="flex items-center justify-between px-3 py-1.5 rounded-lg" style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.15)' }}>
-              <span className="text-[10px] text-[#7c5cbf]">Licence</span>
-              <span className={`text-[10px] font-semibold ${
-                license.daysLeft === null ? 'text-purple-400' :
-                license.daysLeft <= 7    ? 'text-orange-400' :
-                'text-green-400'
-              }`}>
-                {license.daysLeft === null ? '∞ à vie' : `${license.daysLeft}j restants`}
-              </span>
-            </div>
-          </div>
-        )}
-        {license.source === 'org_owner' && (
-          <div className="px-3 pb-1">
-            <div className="flex items-center justify-center px-3 py-1.5 rounded-lg" style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.15)' }}>
-              <span className="text-[10px] text-blue-400">Via organisation 🏢</span>
-            </div>
-          </div>
-        )}
-
-        {/* User strip — click to open the account switcher */}
-        <button
-          ref={userTriggerRef}
-          onClick={() => userMenuOpen ? setUserMenuOpen(false) : openUserMenu()}
-          className="w-full px-3 py-2 border-t border-border flex items-center gap-2 hover:bg-sb-hover/40 transition-colors text-left"
-        >
-          <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0" style={{ background: 'rgba(139,92,246,0.2)', color: '#a78bfa' }}>
-            {user.email?.[0].toUpperCase()}
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-[10px] text-text2 truncate">{user.email}</p>
-          </div>
-          <span className="text-text2 text-[10px]">▾</span>
-        </button>
       </aside>
 
       <main className="flex-1 overflow-auto relative bg-bg">
