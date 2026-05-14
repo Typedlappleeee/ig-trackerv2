@@ -382,7 +382,16 @@ export function Bank({ user }: BankProps) {
   async function pickFile() {
     if (!window.electronAPI?.pickVideoFile) return
     const p = await window.electronAPI.pickVideoFile()
-    if (p) addFromPath(p)
+    if (!p) return
+    // In web mode, pickVideoFile returns a blob: URL. Fetching it via readFileBytes
+    // can fail ("Failed to fetch"). Get the original File from the in-memory store
+    // and upload it directly as a Blob — same path drag-drop uses.
+    if (p.startsWith('blob:')) {
+      const { getStoredFile } = await import('@/lib/webAPI')
+      const file = getStoredFile(p)
+      if (file) { addFromFile(file); return }
+    }
+    addFromPath(p)
   }
 
   function onDragOver(e: React.DragEvent) {
