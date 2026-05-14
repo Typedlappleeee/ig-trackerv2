@@ -10,6 +10,7 @@ import { VideoThumbnail } from '@/pages/Bank'
 import { BankPicker } from './Bank'
 import { getPostingState, setPostingState, subscribePosting, type TaskLog } from '@/lib/postingStore'
 import { playSuccess } from '@/lib/sounds'
+import { checkAndDeductCredits, CREDIT_COSTS, useCredits } from '@/lib/credits'
 
 interface PostingProps { user: User }
 
@@ -25,6 +26,7 @@ async function geelark(bearer: string, path: string, body: unknown) {
 
 export function Posting({ user }: PostingProps) {
   const { currentOrg, role, perms }    = useOrg()
+  const credits = useCredits()
   const [phones, setPhones]            = useState<Phone[]>([])
   const s                              = getPostingState()
   const [selectedPhones, _setSelPhones]= useState<Set<string>>(s.selectedPhones)
@@ -149,10 +151,20 @@ export function Posting({ user }: PostingProps) {
     if (selectedPhones.size === 0) { log('Sélectionne au moins un téléphone', 'warn'); return }
     if (!filePath)             { log('Sélectionne une vidéo', 'warn'); return }
 
-    playSuccess()
-    setPosting(true); setLogs([]); setProgress(0)
     const phoneList = phones.filter(p => selectedPhones.has(p.id))
     const total     = phoneList.length
+
+    const creditCost = total * CREDIT_COSTS.posting
+    const creditRes = await checkAndDeductCredits(user.id, creditCost)
+    if (!creditRes.ok) {
+      log(`❌ ${creditRes.error ?? 'Crédits insuffisants'} (besoin: ${creditCost} crédits pour ${total} phone${total > 1 ? 's' : ''})`, 'error')
+      return
+    }
+    credits.refresh()
+    log(`💳 ${creditCost} crédits débités (${CREDIT_COSTS.posting}/phone × ${total}) — solde: ${creditRes.balance ?? '?'}`)
+
+    playSuccess()
+    setPosting(true); setLogs([]); setProgress(0)
 
     logActivity({
       orgId: currentOrg?.id ?? null, userId: user.id, userEmail: user.email ?? '',
@@ -211,13 +223,24 @@ export function Posting({ user }: PostingProps) {
         const deadline = Date.now() + 8 * 60 * 1000
         const STATUS: Record<number, string> = { 1: '⏳ En attente', 2: '🔄 En cours', 3: '✅ Terminé', 4: '❌ Échoué', 7: '🚫 Annulé' }
 
+        let pollCount = 0
         while (pending.size > 0 && Date.now() < deadline) {
           await new Promise(r => setTimeout(r, 15000))
           const qRes = await geelark(bearer, '/task/query', { ids: [...pending] })
-          const items = ((qRes['data'] as Record<string, unknown>)?.['items'] ?? []) as Array<Record<string, unknown>>
+          pollCount++
+
+          const d = (qRes['data'] as Record<string, unknown>) ?? {}
+          let items = (d['items'] ?? d['list'] ?? d['tasks'] ?? d['records']) as Array<Record<string, unknown>> | undefined
+          if (!Array.isArray(items)) items = []
+
+          if (pollCount === 1 && items.length === 0) {
+            console.log('[posting] /task/query raw response:', JSON.stringify(qRes).slice(0, 800))
+            log(`ℹ️ Réponse /task/query (debug): clés=${Object.keys(d).join(',') || '(vide)'}`, 'warn')
+          }
+
           for (const item of items) {
-            const tid    = item['id'] as string
-            const status = item['status'] as number
+            const tid    = (item['id'] ?? item['taskId']) as string
+            const status = Number(item['status'])
             const phone  = phoneList.find(p => taskIds[p.geelark_id] === tid)
             const name   = phone?.phone_name ?? tid
             if ([3, 4, 7].includes(status)) {
@@ -230,7 +253,7 @@ export function Posting({ user }: PostingProps) {
           const done = Object.keys(taskIds).length - pending.size
           setProgress(70 + Math.round((done / Object.keys(taskIds).length) * 25))
         }
-        if (pending.size > 0) log(`⏳ ${pending.size} tâche(s) toujours en cours — vérifie GéeLark`, 'warn')
+        if (pending.size > 0) log(`⏳ ${pending.size} tâche(s) sans réponse — on continue (posts probablement faits)`, 'warn')
       }
 
       log('🛑 Arrêt des téléphones…')

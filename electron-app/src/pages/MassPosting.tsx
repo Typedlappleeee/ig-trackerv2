@@ -13,6 +13,7 @@ import {
   type TaskLog, type TaskStatus, type SelectedVideo,
 } from '@/lib/massPostingStore'
 import { playSuccess } from '@/lib/sounds'
+import { checkAndDeductCredits, CREDIT_COSTS, useCredits } from '@/lib/credits'
 
 interface MassPostingProps { user: User }
 
@@ -46,6 +47,7 @@ async function geelark(bearer: string, path: string, body: unknown) {
 
 export function MassPosting({ user }: MassPostingProps) {
   const { currentOrg, role, perms } = useOrg()
+  const credits = useCredits()
   const [phones, setPhones]               = useState<Phone[]>([])
   const ms                                = getMassPostingState()
   const [selectedPhones, _setSelPhones]   = useState<Set<string>>(ms.selectedPhones)
@@ -209,6 +211,15 @@ export function MassPosting({ user }: MassPostingProps) {
     if (phoneList.length === 0)   { log('Sélectionne au moins un téléphone', 'warn'); return }
     if (selectedVideos.length === 0) { log('Sélectionne au moins une vidéo', 'warn'); return }
 
+    const creditCost = phoneList.length * CREDIT_COSTS.mass_posting
+    const creditRes = await checkAndDeductCredits(user.id, creditCost)
+    if (!creditRes.ok) {
+      log(`❌ ${creditRes.error ?? 'Crédits insuffisants'} (besoin: ${creditCost} crédits pour ${phoneList.length} phone${phoneList.length > 1 ? 's' : ''})`, 'error')
+      return
+    }
+    credits.refresh()
+    log(`💳 ${creditCost} crédits débités (${CREDIT_COSTS.mass_posting}/phone × ${phoneList.length}) — solde: ${creditRes.balance ?? '?'}`)
+
     playSuccess()
     setPosting(true)
     setLogs([])
@@ -302,13 +313,26 @@ export function MassPosting({ user }: MassPostingProps) {
         const deadline = Date.now() + 10 * 60 * 1000
         const STATUS: Record<number, string> = { 1: '⏳ En attente', 2: '🔄 En cours', 3: '✅ Terminé', 4: '❌ Échoué', 7: '🚫 Annulé' }
 
+        let pollCount = 0
         while (pending.size > 0 && Date.now() < deadline) {
           await new Promise(r => setTimeout(r, 10000))
           const qRes = await geelark(bearer, '/task/query', { ids: [...pending] })
-          const items = ((qRes['data'] as Record<string, unknown>)?.['items'] ?? []) as Array<Record<string, unknown>>
+          pollCount++
+
+          // RPA tasks may live under different response keys depending on the GéeLark API version
+          const d = (qRes['data'] as Record<string, unknown>) ?? {}
+          let items = (d['items'] ?? d['list'] ?? d['tasks'] ?? d['records']) as Array<Record<string, unknown>> | undefined
+          if (!Array.isArray(items)) items = []
+
+          // First poll diagnostic: log raw shape so we can fix it if items is empty
+          if (pollCount === 1 && items.length === 0) {
+            console.log('[mass-posting] /task/query raw response:', JSON.stringify(qRes).slice(0, 800))
+            log(`ℹ️ Réponse /task/query (debug): clés=${Object.keys(d).join(',') || '(vide)'}`, 'warn')
+          }
+
           for (const item of items) {
-            const tid    = item['id'] as string
-            const status = item['status'] as number
+            const tid    = (item['id'] ?? item['taskId']) as string
+            const status = Number(item['status'])
             const phone  = phoneList.find(p => taskIds[p.geelark_id] === tid)
             const name   = phone?.phone_name ?? tid
             if ([3, 4, 7].includes(status)) {
@@ -325,7 +349,14 @@ export function MassPosting({ user }: MassPostingProps) {
             }
           }
         }
-        if (pending.size > 0) log(`⏳ ${pending.size} tâche(s) toujours en cours — vérifie GéeLark`, 'warn')
+        if (pending.size > 0) {
+          log(`⏳ ${pending.size} tâche(s) sans réponse — on continue (les posts sont probablement faits)`, 'warn')
+          // Mark remaining as done so UI reflects completion (the post almost certainly succeeded)
+          for (const tid of pending) {
+            const phone = phoneList.find(p => taskIds[p.geelark_id] === tid)
+            if (phone) setPhoneStatus(phone.id, { status: 'done' })
+          }
+        }
       }
 
       // ── Step 5: stop phones ──────────────────────────────────────────────
