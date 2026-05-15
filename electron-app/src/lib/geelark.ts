@@ -16,17 +16,25 @@ function authHeaders(bearer: string) {
   return { Authorization: `Bearer ${bearer}` }
 }
 
-// Call GéeLark through the Electron main-process proxy to bypass CORS.
+// Call GéeLark: uses Electron IPC proxy on desktop, Vercel /api/geelark proxy on web.
 async function geelarkFetch(method: 'GET' | 'POST', path: string, body?: unknown, bearer?: string) {
-  if (!window.electronAPI?.geelarkRequest) {
-    throw new Error('electronAPI not available')
+  const url = `${BASE}${path}`
+  const headers = bearer ? authHeaders(bearer) : undefined
+
+  if (window.electronAPI?.geelarkRequest) {
+    const result = await window.electronAPI.geelarkRequest({ method, url, headers, body })
+    if (!result.ok) throw new Error(result.error ?? 'Network error')
+    return result.data as Record<string, unknown>
   }
-  const result = await window.electronAPI.geelarkRequest({
-    method,
-    url: `${BASE}${path}`,
-    headers: bearer ? authHeaders(bearer) : undefined,
-    body,
+
+  // Web fallback: route through Vercel proxy (bypasses CORS)
+  const res = await fetch('/api/geelark', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ method, url, headers: headers ?? {}, body }),
   })
+  if (!res.ok) throw new Error(`Proxy HTTP ${res.status}`)
+  const result = await res.json()
   if (!result.ok) throw new Error(result.error ?? 'Network error')
   return result.data as Record<string, unknown>
 }

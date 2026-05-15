@@ -223,19 +223,7 @@ export function Warmup({ user }: WarmupProps) {
     )
   }
 
-  if (!window.electronAPI?.geelarkRequest) {
-    return (
-      <div className="p-8 max-w-lg">
-        <div className="rounded-xl p-5 space-y-2" style={{ background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.25)' }}>
-          <p className="font-semibold" style={{ color: '#fbbf24' }}>⚠ Application desktop requise</p>
-          <p className="text-sm text-text2">
-            Log In / Mass Edit / Warmup utilisent GéeLark via l'IPC Electron.
-            Cette fonctionnalité n'est disponible que dans l'application desktop <strong className="text-text">ScaleFlow</strong>.
-          </p>
-        </div>
-      </div>
-    )
-  }
+  const isWeb = typeof window !== 'undefined' && (window as any).__IS_WEB
 
   if (!bearer) {
     return (
@@ -578,14 +566,16 @@ export function Warmup({ user }: WarmupProps) {
                           className="flex-1 rounded-xl px-3 py-2 text-sm text-white placeholder-white/20 focus:outline-none"
                           style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(139,92,246,0.18)' }}
                         />
-                        <button onClick={async () => {
-                          const p = await window.electronAPI?.pickAnyFile?.({ filters: [{ name: 'Images', extensions: ['jpg','jpeg','png','webp'] }] })
-                          if (p) { setEditPicFile(p); setEditPicUrl('') }
-                        }}
-                          className="px-3 py-2 rounded-xl text-xs font-semibold flex-shrink-0"
-                          style={{ background: 'rgba(139,92,246,0.1)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.2)' }}>
-                          📂 Fichier
-                        </button>
+                        {!isWeb && (
+                          <button onClick={async () => {
+                            const p = await window.electronAPI?.pickAnyFile?.({ filters: [{ name: 'Images', extensions: ['jpg','jpeg','png','webp'] }] })
+                            if (p) { setEditPicFile(p); setEditPicUrl('') }
+                          }}
+                            className="px-3 py-2 rounded-xl text-xs font-semibold flex-shrink-0"
+                            style={{ background: 'rgba(139,92,246,0.1)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.2)' }}>
+                            📂 Fichier
+                          </button>
+                        )}
                       </div>
                       {editPicFile && (
                         <p className="text-[10px] mt-1 text-accent/70 truncate">📎 {fileName(editPicFile)}</p>
