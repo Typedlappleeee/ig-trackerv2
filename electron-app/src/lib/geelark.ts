@@ -127,35 +127,43 @@ async function shellExec(
   throw new Error('GéeLark shell: téléphone non prêt après plusieurs tentatives')
 }
 
-// Ensure the cloud phone is running. Starts it if needed and polls until status=1.
-// Returns true once the phone is running (does NOT block on shell readiness — shell
-// commands have their own retry logic via shellExec).
+// Ensure the cloud phone is running. Starts it if needed and polls until running.
+// GéeLark status: 0=stopped, 1=starting OR running (ambiguous), 2=running OR starting
+// geelarkStatusLabel() treats BOTH 1 and 2 as "online" — so we do the same here.
 async function ensurePhoneRunning(
   bearer: string,
   phoneId: string,
   log?: (m: string) => void,
   signal?: AbortSignal,
 ): Promise<boolean> {
-  const numStatus   = (v: unknown) => Number(v ?? -1)
-  const STATUS_LABELS: Record<number, string> = {
-    0: 'arrêté', 1: 'en cours', 2: 'démarrage', 3: 'arrêt en cours',
-  }
+  const numStatus = (v: unknown) => Number(v ?? -1)
+
+  // "Online" = any status GéeLark considers active (same definition as geelarkStatusLabel)
+  const isOnline = (s: number) => s === 1 || s === 2
+
+  const statusLabel = (s: number) => (
+    s === 0 ? 'arrêté' :
+    s === 1 ? 'en cours/démarrage' :
+    s === 2 ? 'en marche/démarrage' :
+    s === 3 ? 'arrêt en cours' :
+    `inconnu (${s})`
+  )
 
   log?.('🔎 Vérification du statut du téléphone…')
   const phones = await fetchAllPhones(bearer)
   const p = phones.find(x => x.id === phoneId)
   if (!p) {
-    // Log all IDs so the user can spot a mismatch
     const sample = phones.slice(0, 5).map(x => x.id).join(', ')
-    log?.(`❌ Téléphone introuvable (cherché: ${phoneId}) — ${phones.length} téléphone(s) renvoyés. Exemple IDs: ${sample || 'aucun'}`)
+    log?.(`❌ Téléphone introuvable (cherché: "${phoneId}") — ${phones.length} téléphone(s) dans GéeLark`)
+    log?.(`   Exemples d'IDs reçus: ${sample || 'aucun'}`)
     throw new Error(`phone ${phoneId} not found in GéeLark`)
   }
 
   const st = numStatus(p.status)
-  log?.(`📱 Statut initial: ${STATUS_LABELS[st] ?? `inconnu (${st})`} (serialName=${p.serialName ?? p.name ?? '—'})`)
+  log?.(`📱 Statut initial: ${statusLabel(st)} [raw=${st}] — ${p.serialName ?? p.name ?? p.id}`)
 
-  // Already running
-  if (st === 1) {
+  // Already online (status 1 or 2) → go directly
+  if (isOnline(st)) {
     log?.('📱 Téléphone déjà démarré ✓')
     await warmupShellDelay(bearer, phoneId, log, signal)
     return true
@@ -163,32 +171,8 @@ async function ensurePhoneRunning(
 
   // Stopping — wait before attempting start
   if (st === 3) {
-    log?.('⏳ Téléphone en cours d\'arrêt — attente 12s…')
-    await sleepOrAbort(12000, signal)
-  }
-
-  // Already starting — wait up to 40s before force-restarting
-  if (st === 2) {
-    log?.('📱 Démarrage déjà en cours — attente max 40s…')
-    for (let i = 0; i < 20; i++) {
-      if (signal?.aborted) throw new Error('Annulé')
-      await sleepOrAbort(2000, signal)
-      const list  = await fetchAllPhones(bearer)
-      const cur   = list.find(x => x.id === phoneId)
-      const curSt = numStatus(cur?.status)
-      if (curSt === 1) {
-        log?.('✅ Téléphone démarré (était en démarrage)')
-        await warmupShellDelay(bearer, phoneId, log, signal)
-        return true
-      }
-      if (curSt !== 2) {
-        log?.(`  → statut changé à ${STATUS_LABELS[curSt] ?? curSt} — relance démarrage`)
-        break
-      }
-    }
-    log?.('⚠️ Toujours en démarrage après 40s — arrêt forcé puis redémarrage…')
-    await geelarkFetch('POST', '/phone/stop', { ids: [phoneId] }, bearer)
-    await sleepOrAbort(8000, signal)
+    log?.('⏳ Téléphone en cours d\'arrêt — attente 15s…')
+    await sleepOrAbort(15000, signal)
   }
 
   // Send start command
@@ -201,15 +185,13 @@ async function ensurePhoneRunning(
   log?.(`  → code=${code}, démarrés=${success}, échecs=${failed}${msg ? ` (${msg})` : ''}`)
 
   if (code !== 0) {
-    // Hard failure (auth error, invalid ID, quota exceeded)
     log?.(`  ❌ Erreur API démarrage: ${msg || code}`)
     if (success === 0 && failed > 0) {
-      return false // phone definitively refused to start
+      return false
     }
-    // code !== 0 but no explicit failure count — keep polling optimistically
   }
 
-  // Poll up to 120s (every 3s = 40 polls) — less aggressive than before
+  // Poll up to 120s every 3s until status is 1 or 2 (both = online)
   log?.('⏳ Attente démarrage (max 120s)…')
   for (let i = 0; i < 40; i++) {
     if (signal?.aborted) throw new Error('Annulé')
@@ -217,17 +199,17 @@ async function ensurePhoneRunning(
     const list  = await fetchAllPhones(bearer)
     const cur   = list.find(x => x.id === phoneId)
     const curSt = numStatus(cur?.status)
-    if (i % 4 === 0) {
-      log?.(`  ${i * 3}s — statut: ${STATUS_LABELS[curSt] ?? `inconnu (${curSt})`}`)
+    if (i % 3 === 0) {
+      log?.(`  ${i * 3}s — statut: ${statusLabel(curSt)} [raw=${curSt}]`)
     }
-    if (curSt === 1) {
-      log?.(`✅ Téléphone démarré après ${i * 3}s`)
+    if (isOnline(curSt)) {
+      log?.(`✅ Téléphone démarré après ${i * 3}s (statut=${curSt})`)
       await warmupShellDelay(bearer, phoneId, log, signal)
       return true
     }
   }
 
-  log?.('❌ Timeout 120s : téléphone toujours non démarré — vérifier GéeLark')
+  log?.('❌ Timeout 120s : téléphone non démarré — vérifier GéeLark (quota ? ID correct ?)')
   return false
 }
 
