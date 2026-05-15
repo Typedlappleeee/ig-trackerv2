@@ -132,7 +132,8 @@ async function shellExec(
     const code = Number(d['code'] ?? -1)
     const msg  = String(d['msg'] ?? d['message'] ?? code)
     // Treat GéeLark error codes 10001-10099 (phone not ready range) as retryable
-    const isNotReady = NOT_READY.test(msg) || (code >= 10001 && code <= 10099)
+    // 42002 = "phone is not running" — shell daemon not yet up (phone still booting)
+    const isNotReady = NOT_READY.test(msg) || (code >= 10001 && code <= 10099) || code === 42002
     if (isNotReady && attempt < maxRetries - 1) {
       await sleepOrAbort(4000 + attempt * 2000, signal)
       continue
@@ -142,9 +143,8 @@ async function shellExec(
   throw new Error('GéeLark shell: téléphone non prêt après plusieurs tentatives')
 }
 
-// Ensure the cloud phone is running. Starts it if needed and polls until running.
-// GéeLark status: 0=stopped, 1=starting OR running (ambiguous), 2=running OR starting
-// geelarkStatusLabel() treats BOTH 1 and 2 as "online" — so we do the same here.
+// Ensure the cloud phone is running. Starts it if needed and polls until ready.
+// GéeLark status: 0=stopped, 1=running (shell ready), 2=starting (booting, shell not ready), 3=stopping
 async function ensurePhoneRunning(
   bearer: string,
   phoneId: string,
@@ -153,13 +153,15 @@ async function ensurePhoneRunning(
 ): Promise<boolean> {
   const numStatus = (v: unknown) => Number(v ?? -1)
 
-  // "Online" = any status GéeLark considers active (same definition as geelarkStatusLabel)
-  const isOnline = (s: number) => s === 1 || s === 2
+  // Status 1 = fully running, shell accepts commands
+  const isReady    = (s: number) => s === 1
+  // Status 2 = starting (booting), shell returns 42002 "phone is not running"
+  const isBooting  = (s: number) => s === 2
 
   const statusLabel = (s: number) => (
     s === 0 ? 'arrêté' :
-    s === 1 ? 'en cours/démarrage' :
-    s === 2 ? 'en marche/démarrage' :
+    s === 1 ? 'en marche ✅' :
+    s === 2 ? 'démarrage en cours…' :
     s === 3 ? 'arrêt en cours' :
     `inconnu (${s})`
   )
@@ -177,9 +179,9 @@ async function ensurePhoneRunning(
   const st = numStatus(p.status)
   log?.(`📱 Statut initial: ${statusLabel(st)} [raw=${st}] — ${p.serialName ?? p.name ?? p.id}`)
 
-  // Already online (status 1 or 2) → go directly
-  if (isOnline(st)) {
-    log?.('📱 Téléphone déjà démarré ✓')
+  // Already fully running — shell is ready
+  if (isReady(st)) {
+    log?.('📱 Téléphone prêt ✓')
     await warmupShellDelay(bearer, phoneId, log, signal)
     return true
   }
@@ -190,25 +192,27 @@ async function ensurePhoneRunning(
     await sleepOrAbort(15000, signal)
   }
 
-  // Send start command
-  log?.('📱 Envoi commande de démarrage…')
-  const startRes = await geelarkFetch('POST', '/phone/start', { ids: [phoneId] }, bearer)
-  const code    = Number(startRes['code'] ?? -1)
-  const success = Number((startRes['data'] as Record<string, unknown>)?.['successAmount'] ?? 0)
-  const failed  = Number((startRes['data'] as Record<string, unknown>)?.['failAmount'] ?? 0)
-  const msg     = String(startRes['msg'] ?? startRes['message'] ?? '')
-  log?.(`  → code=${code}, démarrés=${success}, échecs=${failed}${msg ? ` (${msg})` : ''}`)
+  // If NOT already booting (status 2), send the start command
+  if (!isBooting(st)) {
+    log?.('📱 Envoi commande de démarrage…')
+    const startRes = await geelarkFetch('POST', '/phone/start', { ids: [phoneId] }, bearer)
+    const code    = Number(startRes['code'] ?? -1)
+    const success = Number((startRes['data'] as Record<string, unknown>)?.['successAmount'] ?? 0)
+    const failed  = Number((startRes['data'] as Record<string, unknown>)?.['failAmount'] ?? 0)
+    const msg     = String(startRes['msg'] ?? startRes['message'] ?? '')
+    log?.(`  → code=${code}, démarrés=${success}, échecs=${failed}${msg ? ` (${msg})` : ''}`)
 
-  if (code !== 0) {
-    log?.(`  ❌ Erreur API démarrage: ${msg || code}`)
-    if (success === 0 && failed > 0) {
-      return false
+    if (code !== 0) {
+      log?.(`  ❌ Erreur API démarrage: ${msg || code}`)
+      if (success === 0 && failed > 0) return false
     }
+  } else {
+    log?.('📱 Téléphone en cours de démarrage — attente qu\'il soit prêt…')
   }
 
-  // Poll every 5s up to 150s until status is 1 or 2 (both = online).
-  // GéeLark can take 10-30s to reflect the new status after a start command.
-  log?.('⏳ Attente démarrage (max 150s) — GéeLark met quelques secondes à mettre à jour le statut…')
+  // Poll every 5s up to 150s until status reaches 1 (shell-ready).
+  // Status 2 (booting) is NOT enough — shell returns 42002 until status becomes 1.
+  log?.('⏳ Attente démarrage complet (max 150s)…')
   const maxPoll = 30  // 30 × 5s = 150s
   for (let i = 0; i < maxPoll; i++) {
     if (signal?.aborted) throw new Error('Annulé')
@@ -218,43 +222,47 @@ async function ensurePhoneRunning(
     const cur   = list.find(x => x.id === phoneId)
     const curSt = numStatus(cur?.status)
     log?.(`  ${elapsed}s — statut: ${statusLabel(curSt)} [raw=${curSt}]`)
-    if (isOnline(curSt)) {
-      log?.(`✅ Téléphone démarré après ${elapsed}s (statut=${curSt})`)
+    if (isReady(curSt)) {
+      log?.(`✅ Téléphone prêt après ${elapsed}s`)
       await warmupShellDelay(bearer, phoneId, log, signal)
       return true
     }
   }
 
-  log?.('❌ Timeout 150s : téléphone non démarré — vérifier GéeLark (quota ? ID correct ?)')
+  log?.('❌ Timeout 150s : téléphone non prêt — vérifier GéeLark (quota ? ID correct ?)')
   return false
 }
 
-// After the phone reaches running status, wait briefly then do a single shell probe
-// so the shell daemon has time to initialise. Does NOT fail the start sequence —
-// individual shellExec() calls handle their own retries if the shell isn't ready yet.
+// After the phone reaches status=1, wait for the shell daemon to accept commands.
+// Retries the probe up to 12 times (60s total) before giving up.
 async function warmupShellDelay(
   bearer: string,
   phoneId: string,
   log?: (m: string) => void,
   signal?: AbortSignal,
 ) {
-  log?.('  ⏳ Pause 5s pour initialisation du shell…')
-  await sleepOrAbort(5000, signal)
+  log?.('  ⏳ Attente initialisation du shell (max 60s)…')
 
-  // Single diagnostic probe — log result but never fail on it
-  try {
-    const r = await geelarkFetch('POST', '/shell/execute', { id: phoneId, cmd: 'echo SHELL_OK' }, bearer)
-    const code = Number(r['code'])
-    const out  = String((r['data'] as Record<string, unknown>)?.['output'] ?? '')
-    if (code === 0 && out.includes('SHELL_OK')) {
-      log?.('  ✅ Shell prêt')
-    } else {
+  for (let attempt = 0; attempt < 12; attempt++) {
+    if (signal?.aborted) throw new Error('Annulé')
+    await sleepOrAbort(5000, signal)
+
+    try {
+      const r   = await geelarkFetch('POST', '/shell/execute', { id: phoneId, cmd: 'echo SHELL_OK' }, bearer)
+      const code = Number(r['code'])
+      const out  = String((r['data'] as Record<string, unknown>)?.['output'] ?? '')
+      if (code === 0 && out.includes('SHELL_OK')) {
+        log?.('  ✅ Shell prêt')
+        return
+      }
       const errMsg = String(r['msg'] ?? r['message'] ?? '')
-      log?.(`  ⚠️ Shell probe: code=${code}${errMsg ? ` msg="${errMsg}"` : ''} — les commandes réessaieront automatiquement`)
+      log?.(`  ↻ Shell pas encore prêt (code=${code}${errMsg ? ` "${errMsg}"` : ''}) — nouvel essai dans 5s…`)
+    } catch (e) {
+      log?.(`  ↻ Shell probe erreur: ${e instanceof Error ? e.message : String(e)} — nouvel essai…`)
     }
-  } catch (e) {
-    log?.(`  ⚠️ Shell probe exception: ${e instanceof Error ? e.message : String(e)} — les commandes réessaieront`)
   }
+
+  log?.('  ⚠️ Shell toujours indisponible après 60s — poursuite quand même (les commandes réessaieront)')
 }
 
 // Reply to an Instagram comment by driving the cloud phone via shell commands.
