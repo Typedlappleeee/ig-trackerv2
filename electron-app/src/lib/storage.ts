@@ -202,6 +202,16 @@ export async function downloadToTemp(path: string): Promise<string> {
 }
 
 
+// Register a blob into the global blob registry used by ffmpeg-web writeInput().
+// Uses window so the registry is shared regardless of module bundling/chunking.
+function regBlob(url: string, blob: Blob): void {
+  try {
+    const w = window as any
+    if (!w.__ffmpegBlobReg) w.__ffmpegBlobReg = new Map()
+    w.__ffmpegBlobReg.set(url, blob)
+  } catch { /* non-browser env (Electron main) — no-op */ }
+}
+
 // Download a storage path and return a same-origin blob: URL (web only).
 // Tries the Supabase SDK download first; falls back to a signed URL + manual fetch.
 // blob: URLs bypass COEP/CORP restrictions that block cross-origin fetches in FFmpeg WASM.
@@ -218,6 +228,7 @@ async function downloadToBlobUrl(storagePath: string): Promise<string> {
     if (!error && data) {
       const url = URL.createObjectURL(data)
       blobUrlCache.set(storagePath, url)
+      regBlob(url, data)
       return url
     }
   } catch {
@@ -233,6 +244,7 @@ async function downloadToBlobUrl(storagePath: string): Promise<string> {
         const blob = await res.blob()
         const url = URL.createObjectURL(blob)
         blobUrlCache.set(storagePath, url)
+        regBlob(url, blob)
         return url
       }
     }

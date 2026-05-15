@@ -8,6 +8,11 @@ const fileStore = new Map<string, File>()
 function storeFile(file: File): string {
   const url = URL.createObjectURL(file)
   fileStore.set(url, file)
+  // Register in the global blob registry so ffmpeg-web writeInput() can use
+  // FileReader (COEP-immune) instead of fetch/XHR which fail under require-corp.
+  const w = window as any
+  if (!w.__ffmpegBlobReg) w.__ffmpegBlobReg = new Map()
+  w.__ffmpegBlobReg.set(url, file)
   return url
 }
 

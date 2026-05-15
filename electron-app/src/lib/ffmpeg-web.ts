@@ -33,23 +33,35 @@ async function getFFmpeg(): Promise<FFmpeg> {
   return _loading
 }
 
-// Write a file into ffmpeg's virtual FS from a blob URL or any URL.
-// For blob:/data: URLs we use XHR instead of fetch() — XHR works in ALL browser
-// security contexts (including COEP require-corp) where fetch(blob:) can fail.
+// Global blob registry — keyed by blob URL, holds the original Blob/File.
+// Using window ensures a single shared instance regardless of module bundling.
+// This lets writeInput() use FileReader (completely COEP/CORS-immune) instead
+// of fetch() or XHR which both fail under strict COEP require-corp.
+function blobReg(): Map<string, Blob> {
+  const w = window as any
+  if (!w.__ffmpegBlobReg) w.__ffmpegBlobReg = new Map<string, Blob>()
+  return w.__ffmpegBlobReg
+}
+
+export function registerBlob(url: string, blob: Blob): void {
+  blobReg().set(url, blob)
+}
+
+// Write a file into ffmpeg's virtual FS.
+// For blob:/data: URLs, use the cached Blob via FileReader (no network call at all).
+// FileReader is completely immune to COEP/CORS/security-policy restrictions.
 async function writeInput(ff: FFmpeg, name: string, url: string): Promise<void> {
   let data: Uint8Array
   if (url.startsWith('blob:') || url.startsWith('data:')) {
-    data = await new Promise<Uint8Array>((resolve, reject) => {
-      const xhr = new XMLHttpRequest()
-      xhr.open('GET', url, true)
-      xhr.responseType = 'arraybuffer'
-      xhr.onload = () => {
-        if (xhr.status === 200 || xhr.status === 0) resolve(new Uint8Array(xhr.response))
-        else reject(new Error(`XHR ${xhr.status} pour ${name}`))
-      }
-      xhr.onerror = () => reject(new Error(`Impossible de lire la vidéo "${name}"`))
-      xhr.send()
-    })
+    const blob = blobReg().get(url)
+    if (blob) {
+      data = await fetchFile(blob)  // uses FileReader internally — no fetch/XHR
+    } else {
+      // Fallback: blob not in registry (shouldn't happen), read via FileReader anyway
+      const resp = await fetch(url)
+      const ab = await resp.arrayBuffer()
+      data = new Uint8Array(ab)
+    }
   } else {
     data = await fetchFile(url)
   }
