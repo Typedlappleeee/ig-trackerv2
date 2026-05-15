@@ -16,11 +16,14 @@ async function getFFmpeg(): Promise<FFmpeg> {
   _loading = (async () => {
     const ff = new FFmpeg()
 
-    // Load from jsDelivr CDN (includes all filters: drawtext, lumakey, etc.)
-    const baseURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm'
+    // Load from same-origin /ffmpeg/ path (files are in public/ffmpeg/).
+    // Previously loaded from jsDelivr CDN but that fails under COEP require-corp
+    // headers (no Cross-Origin-Resource-Policy on CDN responses).
+    // Same-origin files bypass all COEP/CORS restrictions.
+    const base = `${location.origin}/ffmpeg`
     await ff.load({
-      coreURL:   await toBlobURL(`${baseURL}/ffmpeg-core.js`,   'text/javascript'),
-      wasmURL:   await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+      coreURL: await toBlobURL(`${base}/ffmpeg-core.js`,   'text/javascript'),
+      wasmURL: await toBlobURL(`${base}/ffmpeg-core.wasm`, 'application/wasm'),
     })
 
     _ffmpeg = ff
