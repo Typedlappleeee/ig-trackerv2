@@ -14,25 +14,30 @@ async function getFFmpeg(): Promise<FFmpeg> {
   if (_loading) return _loading
 
   _loading = (async () => {
-    const ff = new FFmpeg()
-    const base = `${location.origin}/ffmpeg`
+    try {
+      const ff = new FFmpeg()
+      const base = `${location.origin}/ffmpeg`
 
-    await ff.load({
-      coreURL: await toBlobURL(`${base}/ffmpeg-core.js`,   'text/javascript'),
-      wasmURL: await toBlobURL(`${base}/ffmpeg-core.wasm`, 'application/wasm'),
-    })
+      await ff.load({
+        coreURL: await toBlobURL(`${base}/ffmpeg-core.js`,   'text/javascript'),
+        wasmURL: await toBlobURL(`${base}/ffmpeg-core.wasm`, 'application/wasm'),
+      })
 
-    // Write fonts into WASM virtual FS so drawtext can use fontfile=
-    // (no system fonts exist in the WASM sandbox; fontname-based lookup always fails)
-    const loadFont = async (name: string) => {
-      const r = await fetch(`${base}/${name}`)
-      await ff.writeFile(name, new Uint8Array(await r.arrayBuffer()))
+      // Write fonts into WASM virtual FS so drawtext can use fontfile=
+      // (no system fonts exist in the WASM sandbox; fontname-based lookup always fails)
+      const loadFont = async (name: string) => {
+        const r = await fetch(`${base}/${name}`)
+        await ff.writeFile(name, new Uint8Array(await r.arrayBuffer()))
+      }
+      await loadFont('font-bold.ttf')
+      await loadFont('font.ttf')
+
+      _ffmpeg = ff
+      return ff
+    } catch (err) {
+      _loading = null  // allow retry on next call
+      throw err
     }
-    await loadFont('font-bold.ttf')
-    await loadFont('font.ttf')
-
-    _ffmpeg = ff
-    return ff
   })()
 
   return _loading
