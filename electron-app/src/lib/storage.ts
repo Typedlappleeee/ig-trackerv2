@@ -186,10 +186,6 @@ export async function getSignedUrl(path: string | null | undefined): Promise<str
 // Cache to avoid re-downloading the same cloud video twice within a session
 const tempPathCache = new Map<string, string>()
 
-// Blob object cache keyed by blob URL — lets FFmpeg use FileReader instead of fetch()
-// so it works even in strict COEP contexts that block cross-origin fetches on blob: URLs.
-export const blobObjectStore = new Map<string, Blob>()
-
 // Download a Storage path to a local temp file. Returns the local absolute path.
 export async function downloadToTemp(path: string): Promise<string> {
   const cached = tempPathCache.get(path)
@@ -222,7 +218,6 @@ async function downloadToBlobUrl(storagePath: string): Promise<string> {
     if (!error && data) {
       const url = URL.createObjectURL(data)
       blobUrlCache.set(storagePath, url)
-      blobObjectStore.set(url, data)
       return url
     }
   } catch {
@@ -238,7 +233,6 @@ async function downloadToBlobUrl(storagePath: string): Promise<string> {
         const blob = await res.blob()
         const url = URL.createObjectURL(blob)
         blobUrlCache.set(storagePath, url)
-        blobObjectStore.set(url, blob)
         return url
       }
     }

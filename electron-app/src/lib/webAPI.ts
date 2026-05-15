@@ -8,8 +8,6 @@ const fileStore = new Map<string, File>()
 function storeFile(file: File): string {
   const url = URL.createObjectURL(file)
   fileStore.set(url, file)
-  // Also register in blobObjectStore so FFmpeg can use FileReader instead of fetch()
-  import('./storage').then(({ blobObjectStore }) => blobObjectStore.set(url, file)).catch(() => {})
   return url
 }
 
