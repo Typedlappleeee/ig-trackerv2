@@ -168,7 +168,7 @@ export async function uploadVideoFromPath(
   const r = await window.electronAPI.readFileBytes(filePath)
   if (!r.ok || !r.bytes) throw new Error(r.error || 'Lecture du fichier échouée')
 
-  const blob = new Blob([r.bytes], { type: mimeFor(extOf(filePath)) })
+  const blob = new Blob([r.bytes instanceof Uint8Array ? r.bytes : new Uint8Array(r.bytes)], { type: mimeFor(extOf(filePath)) })
   return uploadVideoFromBlob(blob, filePath, scope, onProgress)
 }
 
