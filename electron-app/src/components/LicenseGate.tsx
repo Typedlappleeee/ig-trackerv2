@@ -168,6 +168,7 @@ export function LicenseGate({ userId, email, onActivated, initialStep = 'gate' }
               </p>
               <form onSubmit={handleCreateOrg} className="space-y-3">
                 <input
+                  name="org-name"
                   value={orgName}
                   onChange={e => setOrgName(e.target.value)}
                   placeholder="Nom de l'organisation"
@@ -293,6 +294,7 @@ export function LicenseGate({ userId, email, onActivated, initialStep = 'gate' }
               ) : (
                 <form onSubmit={handleOrgJoin} className="space-y-3">
                   <input
+                    name="invite-code"
                     value={code}
                     onChange={e => setCode(e.target.value)}
                     placeholder="Code d'invitation"
@@ -407,6 +409,7 @@ export function LicenseGate({ userId, email, onActivated, initialStep = 'gate' }
                   </p>
                   <form onSubmit={handleLicense} className="space-y-3">
                     <input
+                      name="license-key"
                       value={key}
                       onChange={e => setKey(e.target.value)}
                       placeholder="XXXX-XXXX-XXXX-XXXX"

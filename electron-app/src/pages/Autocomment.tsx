@@ -366,6 +366,7 @@ export function Autocomment({ user }: AutocommentProps) {
                       <div className="flex gap-2 pt-1">
                         <input
                           type="text"
+                          name="manual-reply"
                           value={manualReplies[c.pk] ?? ''}
                           onChange={e => setManualReplies(prev => ({ ...prev, [c.pk]: e.target.value }))}
                           onKeyDown={e => { if (e.key === 'Enter') sendManualReply(c) }}
@@ -409,6 +410,7 @@ export function Autocomment({ user }: AutocommentProps) {
                 <label className="text-[10px] uppercase tracking-wider text-text2 font-semibold block mb-1">Clé Groq API</label>
                 <input
                   type="password"
+                  name="groq-key"
                   value={groqKey}
                   onChange={e => setGroqKey(e.target.value)}
                   placeholder="gsk_…"
@@ -419,6 +421,7 @@ export function Autocomment({ user }: AutocommentProps) {
                 <label className="text-[10px] uppercase tracking-wider text-text2 font-semibold block mb-1">Intervalle (min)</label>
                 <input
                   type="number"
+                  name="interval"
                   min={1}
                   max={120}
                   value={interval}
@@ -430,7 +433,8 @@ export function Autocomment({ user }: AutocommentProps) {
             <div>
               <label className="text-[10px] uppercase tracking-wider text-text2 font-semibold block mb-1">Persona IA</label>
               <textarea
-                value={persona}
+                name="persona"
+              value={persona}
                 onChange={e => setPersona(e.target.value)}
                 rows={3}
                 className="w-full bg-bg border border-border rounded px-3 py-2 text-xs text-text resize-none focus:outline-none focus:border-accent"

@@ -433,6 +433,7 @@ export function OrganizationPanel({ user }: Props) {
                         </p>
                       </div>
                       <select
+                        name="member-role"
                         value={m.role}
                         disabled={m.role === 'owner' || isMe}
                         onChange={e => changeRole(m, e.target.value as OrgRole)}
@@ -473,6 +474,7 @@ export function OrganizationPanel({ user }: Props) {
               <div className="flex gap-2">
                 <Input value={invLabel} onChange={e => setInvLabel(e.target.value)} placeholder="Note (ex: Pour Pierre) — optionnel" />
                 <select
+                  name="invite-role"
                   value={invRole}
                   onChange={e => setInvRole(e.target.value as Exclude<OrgRole, 'owner'>)}
                   className="bg-bg border border-border rounded px-2 py-1 text-sm text-text"
@@ -697,6 +699,7 @@ function PermEditor({
                 <span className="text-base">{t.icon}</span>
                 <span className="flex-1 text-xs text-text truncate" title={t.label}>{t.label}</span>
                 <select
+                  name="tool-permission"
                   value={v === undefined ? 'default' : v ? 'allow' : 'deny'}
                   onChange={e => {
                     const val = e.target.value
@@ -717,7 +720,7 @@ function PermEditor({
       <div>
         <p className="text-xs font-bold text-text mb-2">Dossiers de la banque</p>
         <div className="flex flex-col gap-2">
-          <select value={bankMode} onChange={e => setBankMode(e.target.value as 'all' | 'allow' | 'deny')}
+          <select name="bank-mode" value={bankMode} onChange={e => setBankMode(e.target.value as 'all' | 'allow' | 'deny')}
             className="bg-bg border border-border rounded px-2 py-1 text-xs text-text">
             <option value="all">Tous les dossiers</option>
             <option value="allow">Uniquement ces dossiers…</option>
@@ -737,7 +740,7 @@ function PermEditor({
       <div>
         <p className="text-xs font-bold text-text mb-2">Groupes de téléphones (GéeLark)</p>
         <div className="flex flex-col gap-2">
-          <select value={groupMode} onChange={e => setGroupMode(e.target.value as 'all' | 'allow')}
+          <select name="group-mode" value={groupMode} onChange={e => setGroupMode(e.target.value as 'all' | 'allow')}
             className="bg-bg border border-border rounded px-2 py-1 text-xs text-text">
             <option value="all">Tous les groupes</option>
             <option value="allow">Uniquement ces groupes…</option>

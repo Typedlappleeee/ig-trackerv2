@@ -141,6 +141,7 @@ function CreateTicketForm({
           <div className="col-span-2 space-y-1">
             <label className="text-xs font-medium text-muted uppercase tracking-wide">Sujet</label>
             <input
+              name="subject"
               value={subject}
               onChange={e => setSubject(e.target.value)}
               placeholder="Résumé de votre problème"
@@ -151,6 +152,7 @@ function CreateTicketForm({
           <div className="space-y-1">
             <label className="text-xs font-medium text-muted uppercase tracking-wide">Catégorie</label>
             <select
+              name="category"
               value={category}
               onChange={e => setCategory(e.target.value as TicketCategory)}
               className="w-full rounded-lg border border-border/60 bg-background px-3 py-2 text-sm text-text focus:outline-none focus:ring-2 focus:ring-violet-500/40"
@@ -164,6 +166,7 @@ function CreateTicketForm({
           <div className="col-span-2 space-y-1">
             <label className="text-xs font-medium text-muted uppercase tracking-wide">Description</label>
             <textarea
+              name="description"
               value={description}
               onChange={e => setDescription(e.target.value)}
               placeholder="Décrivez votre problème en détail…"
@@ -282,6 +285,7 @@ function ThreadView({
         </div>
         {isAdmin && (
           <select
+            name="ticket-status"
             value={ticket.status}
             onChange={e => onStatusChange(ticket.id, e.target.value as TicketStatus)}
             className="shrink-0 rounded-lg border border-border/60 bg-background px-2 py-1 text-xs text-text focus:outline-none"
@@ -352,6 +356,7 @@ function ThreadView({
         {!isClosed && (
           <div className="border-t border-border/60 p-3 flex gap-2">
             <input
+              name="reply"
               value={reply}
               onChange={e => setReply(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendReply() } }}
@@ -554,6 +559,7 @@ function AdminSupport({ user }: { user: User }) {
       {/* Filters row */}
       <div className="flex items-center gap-2 flex-wrap">
         <input
+          name="search"
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="Rechercher (email, sujet, orga)…"
