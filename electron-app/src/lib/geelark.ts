@@ -559,38 +559,42 @@ export async function updateInstagramProfile(
     log(`📋 Après PDP: ${xml.length} chars`)
   }
 
-  // ── Set name ───────────────────────────────────────────────────────────────
+  // ── Set name (Surnom) ─────────────────────────────────────────────────────
   if (config.profileName?.trim()) {
-    log(`📝 Nom → "${config.profileName}"`)
+    log(`📝 Surnom → "${config.profileName}"`)
+    xml = await dumpXml(bearer, phoneId)
+    log(`📋 XML edit (name): ${xml.length} chars`)
     const namePt =
-      findByResourceId(xml, 'full_name') ??
-      findByText(xml, 'Name', 'Nom', 'Full name', 'Nom complet')
+      findByResourceId(xml, 'full_name', 'name', 'profile_name', 'display_name') ??
+      findByText(xml, 'Surnom', 'Name', 'Nom', 'Full name', 'Nom complet', 'Nickname', 'Display name')
     if (namePt) {
-      log(`   champ à ${namePt}`)
+      log(`   champ Surnom à [${namePt[0]},${namePt[1]}]`)
       await clearAndType(bearer, phoneId, namePt, config.profileName.trim(), log)
     } else {
-      // Name field is typically ~22-25% from top in Edit Profile scroll view
-      const ny = Math.floor(sh * 0.23)
-      log(`   non trouvé → tap (${cx},${ny})`)
+      const ny = Math.floor(sh * 0.28)
+      log(`   Surnom non trouvé → tap coordonnée (${cx},${ny})`)
       await clearAndType(bearer, phoneId, [cx, ny], config.profileName.trim(), log)
     }
+    await sleep(500)
   }
 
-  // ── Set bio ────────────────────────────────────────────────────────────────
+  // ── Set bio (Biographie) ───────────────────────────────────────────────────
   if (config.bio?.trim()) {
-    log('📝 Bio…')
+    log(`📝 Biographie → "${config.bio.substring(0, 30)}…"`)
     xml = await dumpXml(bearer, phoneId)
+    log(`📋 XML edit (bio): ${xml.length} chars`)
     const bioPt =
-      findByResourceId(xml, 'biography') ??
-      findByText(xml, 'Bio', 'Biography', 'Biographie')
+      findByResourceId(xml, 'biography', 'bio', 'profile_bio', 'about') ??
+      findByText(xml, 'Biographie', 'Bio', 'Biography', 'À propos', 'About')
     if (bioPt) {
-      log(`   champ à ${bioPt}`)
+      log(`   champ Bio à [${bioPt[0]},${bioPt[1]}]`)
       await clearAndType(bearer, phoneId, bioPt, config.bio.trim(), log)
     } else {
-      const by = Math.floor(sh * 0.40)
-      log(`   non trouvé → tap (${cx},${by})`)
+      const by = Math.floor(sh * 0.42)
+      log(`   Bio non trouvée → tap coordonnée (${cx},${by})`)
       await clearAndType(bearer, phoneId, [cx, by], config.bio.trim(), log)
     }
+    await sleep(500)
   }
 
   // ── Dismiss keyboard then Save ─────────────────────────────────────────────
