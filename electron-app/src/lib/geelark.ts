@@ -104,7 +104,8 @@ async function shellExec(
 ): Promise<{ output: string; status: number }> {
   const maxRetries = opts?.maxRetries ?? 6
   const signal     = opts?.signal
-  const NOT_READY  = /not running|not started|unavailable|not ready|phone.*start/i
+  // Broad "not ready yet" pattern — include numeric error codes GéeLark uses (10xxx range)
+  const NOT_READY  = /not running|not started|unavailable|not ready|phone.*start|en cours de démarrage|starting/i
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     if (signal?.aborted) throw new Error('Annulé')
@@ -113,129 +114,149 @@ async function shellExec(
       const data = (d['data'] as Record<string, unknown>) ?? {}
       return { output: String(data['output'] ?? ''), status: Number(data['status'] ?? -1) }
     }
-    const msg = String(d['msg'] ?? d['message'] ?? d['code'] ?? '')
-    if (NOT_READY.test(msg) && attempt < maxRetries - 1) {
+    const code = Number(d['code'] ?? -1)
+    const msg  = String(d['msg'] ?? d['message'] ?? code)
+    // Treat GéeLark error codes 10001-10099 (phone not ready range) as retryable
+    const isNotReady = NOT_READY.test(msg) || (code >= 10001 && code <= 10099)
+    if (isNotReady && attempt < maxRetries - 1) {
       await sleepOrAbort(4000 + attempt * 2000, signal)
       continue
     }
-    throw new Error(`GéeLark shell: ${msg}`)
+    throw new Error(`GéeLark shell: ${msg} (code ${code}, cmd="${cmd.slice(0, 60)}")`)
   }
   throw new Error('GéeLark shell: téléphone non prêt après plusieurs tentatives')
 }
 
-// Ensure the cloud phone is running. Starts it if needed and polls until ready.
-// After reaching running state, probes the shell with `echo OK` to confirm it's accepting commands.
+// Ensure the cloud phone is running. Starts it if needed and polls until status=1.
+// Returns true once the phone is running (does NOT block on shell readiness — shell
+// commands have their own retry logic via shellExec).
 async function ensurePhoneRunning(
   bearer: string,
   phoneId: string,
   log?: (m: string) => void,
   signal?: AbortSignal,
 ): Promise<boolean> {
-  // Coerce status to number — GéeLark JSON sometimes returns strings
-  const numStatus = (v: unknown) => Number(v ?? -1)
-  const STATUS_LABELS: Record<number, string> = { 0: 'arrêté', 1: 'en cours', 2: 'démarrage', 3: 'arrêt en cours' }
+  const numStatus   = (v: unknown) => Number(v ?? -1)
+  const STATUS_LABELS: Record<number, string> = {
+    0: 'arrêté', 1: 'en cours', 2: 'démarrage', 3: 'arrêt en cours',
+  }
 
   log?.('🔎 Vérification du statut du téléphone…')
   const phones = await fetchAllPhones(bearer)
   const p = phones.find(x => x.id === phoneId)
   if (!p) {
-    log?.(`❌ Téléphone ${phoneId} introuvable dans GéeLark (${phones.length} téléphones récupérés)`)
-    throw new Error(`phone ${phoneId} not found`)
+    // Log all IDs so the user can spot a mismatch
+    const sample = phones.slice(0, 5).map(x => x.id).join(', ')
+    log?.(`❌ Téléphone introuvable (cherché: ${phoneId}) — ${phones.length} téléphone(s) renvoyés. Exemple IDs: ${sample || 'aucun'}`)
+    throw new Error(`phone ${phoneId} not found in GéeLark`)
   }
 
   const st = numStatus(p.status)
-  log?.(`📱 Statut: ${STATUS_LABELS[st] ?? `inconnu (${st})`}`)
+  log?.(`📱 Statut initial: ${STATUS_LABELS[st] ?? `inconnu (${st})`} (serialName=${p.serialName ?? p.name ?? '—'})`)
 
-  // Already running → probe shell directly
+  // Already running
   if (st === 1) {
-    log?.('📱 Téléphone déjà démarré — sonde du shell…')
-    return probeShellReady(bearer, phoneId, log, signal)
+    log?.('📱 Téléphone déjà démarré ✓')
+    await warmupShellDelay(bearer, phoneId, log, signal)
+    return true
   }
 
-  // Status 3 = stopping — wait a bit before trying to start
+  // Stopping — wait before attempting start
   if (st === 3) {
-    log?.('⏳ Téléphone en cours d\'arrêt — attente 10s…')
-    await sleepOrAbort(10000, signal)
+    log?.('⏳ Téléphone en cours d\'arrêt — attente 12s…')
+    await sleepOrAbort(12000, signal)
   }
 
-  // Status 2 = already starting — wait briefly then force-restart if still stuck
+  // Already starting — wait up to 40s before force-restarting
   if (st === 2) {
-    log?.('📱 Démarrage déjà en cours (statut 2) — attente 20s…')
-    for (let i = 0; i < 10; i++) {
+    log?.('📱 Démarrage déjà en cours — attente max 40s…')
+    for (let i = 0; i < 20; i++) {
       if (signal?.aborted) throw new Error('Annulé')
       await sleepOrAbort(2000, signal)
-      const list = await fetchAllPhones(bearer)
-      const cur  = list.find(x => x.id === phoneId)
+      const list  = await fetchAllPhones(bearer)
+      const cur   = list.find(x => x.id === phoneId)
       const curSt = numStatus(cur?.status)
       if (curSt === 1) {
-        log?.('✅ Téléphone démarré — sonde du shell…')
-        return probeShellReady(bearer, phoneId, log, signal)
+        log?.('✅ Téléphone démarré (était en démarrage)')
+        await warmupShellDelay(bearer, phoneId, log, signal)
+        return true
       }
-      if (curSt !== 2) break  // went to stopped/stopping — let the start logic below handle it
+      if (curSt !== 2) {
+        log?.(`  → statut changé à ${STATUS_LABELS[curSt] ?? curSt} — relance démarrage`)
+        break
+      }
     }
-    // Still stuck in status 2 after 20s → force-stop then restart
-    log?.('⚠️ Téléphone bloqué en démarrage — arrêt forcé puis redémarrage…')
+    log?.('⚠️ Toujours en démarrage après 40s — arrêt forcé puis redémarrage…')
     await geelarkFetch('POST', '/phone/stop', { ids: [phoneId] }, bearer)
     await sleepOrAbort(8000, signal)
   }
 
-  log?.('📱 Envoi de la commande de démarrage…')
+  // Send start command
+  log?.('📱 Envoi commande de démarrage…')
   const startRes = await geelarkFetch('POST', '/phone/start', { ids: [phoneId] }, bearer)
-  const code       = Number(startRes['code'] ?? -1)
-  const success    = Number((startRes['data'] as Record<string, unknown>)?.['successAmount'] ?? 0)
-  const failed     = Number((startRes['data'] as Record<string, unknown>)?.['failAmount'] ?? 0)
-  log?.(`  → code=${code}, démarrés=${success}, échecs=${failed}`)
+  const code    = Number(startRes['code'] ?? -1)
+  const success = Number((startRes['data'] as Record<string, unknown>)?.['successAmount'] ?? 0)
+  const failed  = Number((startRes['data'] as Record<string, unknown>)?.['failAmount'] ?? 0)
+  const msg     = String(startRes['msg'] ?? startRes['message'] ?? '')
+  log?.(`  → code=${code}, démarrés=${success}, échecs=${failed}${msg ? ` (${msg})` : ''}`)
+
   if (code !== 0) {
-    log?.(`  ❌ Erreur API: ${startRes['msg'] ?? startRes['message'] ?? code}`)
+    // Hard failure (auth error, invalid ID, quota exceeded)
+    log?.(`  ❌ Erreur API démarrage: ${msg || code}`)
+    if (success === 0 && failed > 0) {
+      return false // phone definitively refused to start
+    }
+    // code !== 0 but no explicit failure count — keep polling optimistically
   }
 
-  // Poll up to 120s for status === 1
-  let reached = false
-  for (let i = 0; i < 60; i++) {
+  // Poll up to 120s (every 3s = 40 polls) — less aggressive than before
+  log?.('⏳ Attente démarrage (max 120s)…')
+  for (let i = 0; i < 40; i++) {
     if (signal?.aborted) throw new Error('Annulé')
-    await sleepOrAbort(2000, signal)
-    const list = await fetchAllPhones(bearer)
-    const cur  = list.find(x => x.id === phoneId)
+    await sleepOrAbort(3000, signal)
+    const list  = await fetchAllPhones(bearer)
+    const cur   = list.find(x => x.id === phoneId)
     const curSt = numStatus(cur?.status)
-    const curLabel = STATUS_LABELS[curSt] ?? `inconnu (${curSt})`
-    if (i % 5 === 0) log?.(`⏳ ${i * 2}s — statut: ${curLabel}`)
-    if (curSt === 1) { reached = true; break }
+    if (i % 4 === 0) {
+      log?.(`  ${i * 3}s — statut: ${STATUS_LABELS[curSt] ?? `inconnu (${curSt})`}`)
+    }
+    if (curSt === 1) {
+      log?.(`✅ Téléphone démarré après ${i * 3}s`)
+      await warmupShellDelay(bearer, phoneId, log, signal)
+      return true
+    }
   }
 
-  if (!reached) {
-    log?.('❌ Timeout 120s : téléphone non démarré')
-    return false
-  }
-
-  log?.('✅ Téléphone démarré — sonde du shell…')
-  return probeShellReady(bearer, phoneId, log, signal)
+  log?.('❌ Timeout 120s : téléphone toujours non démarré — vérifier GéeLark')
+  return false
 }
 
-// Probes the shell with `echo OK` every 5s until it responds (max 10 attempts = 50s).
-// This replaces fixed sleep() so we know the shell daemon is truly ready.
-async function probeShellReady(
+// After the phone reaches running status, wait briefly then do a single shell probe
+// so the shell daemon has time to initialise. Does NOT fail the start sequence —
+// individual shellExec() calls handle their own retries if the shell isn't ready yet.
+async function warmupShellDelay(
   bearer: string,
   phoneId: string,
   log?: (m: string) => void,
   signal?: AbortSignal,
-): Promise<boolean> {
-  for (let i = 0; i < 10; i++) {
-    if (signal?.aborted) throw new Error('Annulé')
-    try {
-      const r = await geelarkFetch('POST', '/shell/execute', { id: phoneId, cmd: 'echo SHELL_OK' }, bearer)
-      if (Number(r['code']) === 0) {
-        const out = String((r['data'] as Record<string, unknown>)?.['output'] ?? '')
-        if (out.includes('SHELL_OK')) {
-          log?.(`✅ Shell prêt (tentative ${i + 1})`)
-          return true
-        }
-      }
-    } catch { /* shell not ready yet */ }
-    log?.(`  ⏳ Shell pas encore prêt — attente 5s… (${i + 1}/10)`)
-    await sleepOrAbort(5000, signal)
+) {
+  log?.('  ⏳ Pause 5s pour initialisation du shell…')
+  await sleepOrAbort(5000, signal)
+
+  // Single diagnostic probe — log result but never fail on it
+  try {
+    const r = await geelarkFetch('POST', '/shell/execute', { id: phoneId, cmd: 'echo SHELL_OK' }, bearer)
+    const code = Number(r['code'])
+    const out  = String((r['data'] as Record<string, unknown>)?.['output'] ?? '')
+    if (code === 0 && out.includes('SHELL_OK')) {
+      log?.('  ✅ Shell prêt')
+    } else {
+      const errMsg = String(r['msg'] ?? r['message'] ?? '')
+      log?.(`  ⚠️ Shell probe: code=${code}${errMsg ? ` msg="${errMsg}"` : ''} — les commandes réessaieront automatiquement`)
+    }
+  } catch (e) {
+    log?.(`  ⚠️ Shell probe exception: ${e instanceof Error ? e.message : String(e)} — les commandes réessaieront`)
   }
-  log?.('❌ Shell inaccessible après 50s')
-  return false
 }
 
 // Reply to an Instagram comment by driving the cloud phone via shell commands.
@@ -408,10 +429,16 @@ async function clearAndType(
 }
 
 // ── Profile update (name + bio + optional pic) ───────────────────────────────
-async function updateInstagramProfile(
+export interface MassEditConfig {
+  profileName?: string
+  bio?:         string
+  profilePicUrl?: string
+}
+
+export async function updateInstagramProfile(
   bearer: string,
   phoneId: string,
-  config: Pick<WarmupConfig, 'profileName' | 'bio' | 'profilePicUrl'>,
+  config: MassEditConfig,
   log: (m: string) => void,
 ) {
   // ── Wake + unlock ──────────────────────────────────────────────────────────
@@ -692,6 +719,112 @@ async function runWarmupActions(
   log(`✅ Warmup terminé — ${likeCount} likes, ${followCount} follows`)
 }
 
+// ── Instagram login automation ───────────────────────────────────────────────
+export async function loginInstagramAccount(
+  bearer: string,
+  phoneId: string,
+  email: string,
+  password: string,
+  log: (m: string) => void,
+  abortSignal: { abort: boolean },
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const ready = await ensurePhoneRunning(bearer, phoneId, log)
+    if (!ready) return { ok: false, error: 'Téléphone non démarré' }
+    if (abortSignal.abort) return { ok: true }
+
+    log('🔄 Redémarrage d\'Instagram…')
+    await shellExec(bearer, phoneId, 'am force-stop com.instagram.android')
+    await sleep(1500)
+
+    log('📲 Ouverture de la page de connexion…')
+    await shellExec(bearer, phoneId,
+      'am start -n com.instagram.android/.activity.LoginActivity')
+    await sleep(7000)
+
+    const { output: sizeOut } = await shellExec(bearer, phoneId, 'wm size')
+    const sm = sizeOut.match(/(\d+)x(\d+)/)
+    const sw = sm ? parseInt(sm[1]) : 1080
+    const sh = sm ? parseInt(sm[2]) : 2340
+
+    let xml = await dumpXml(bearer, phoneId)
+    log(`📋 Login XML: ${xml.length} chars`)
+
+    // ── Username / email ───────────────────────────────────────────────────
+    log('📧 Saisie de l\'identifiant…')
+    const usernamePt: [number, number] =
+      findByResourceId(xml, 'login_username', 'username', 'email_phone_field') ??
+      findByText(xml,
+        'Phone number, username, or email',
+        'Numéro de téléphone, nom d\'utilisateur ou adresse e-mail',
+        'Username or email', 'Identifiant ou e-mail') ??
+      [Math.floor(sw / 2), Math.floor(sh * 0.42)]
+
+    await clearAndType(bearer, phoneId, usernamePt, email, log)
+    await sleep(600)
+
+    // ── Password ───────────────────────────────────────────────────────────
+    await shellExec(bearer, phoneId, 'input keyevent 61') // TAB → jump to password
+    await sleep(500)
+
+    xml = await dumpXml(bearer, phoneId)
+    log('🔑 Saisie du mot de passe…')
+    const passwordPt: [number, number] =
+      findByResourceId(xml, 'password', 'login_password', 'password_field') ??
+      findByText(xml, 'Password', 'Mot de passe') ??
+      [Math.floor(sw / 2), Math.floor(sh * 0.52)]
+
+    await clearAndType(bearer, phoneId, passwordPt, password, log)
+    await sleep(600)
+
+    // ── Dismiss keyboard ───────────────────────────────────────────────────
+    await shellExec(bearer, phoneId, 'input keyevent 111') // ESCAPE
+    await sleep(500)
+
+    // ── Tap Log In button ──────────────────────────────────────────────────
+    xml = await dumpXml(bearer, phoneId)
+    log('🔐 Tap sur "Se connecter"…')
+    const loginPt: [number, number] =
+      findByText(xml, 'Log in', 'Se connecter', 'Log In', 'Login', 'Connexion') ??
+      findByResourceId(xml, 'button_text', 'login_button', 'button_login') ??
+      [Math.floor(sw / 2), Math.floor(sh * 0.62)]
+
+    await shellExec(bearer, phoneId, `input tap ${loginPt[0]} ${loginPt[1]}`)
+    log('⏳ Connexion en cours… (attente 12s)')
+    await sleep(12000)
+
+    if (abortSignal.abort) return { ok: true }
+
+    // ── Post-login detection ───────────────────────────────────────────────
+    xml = await dumpXml(bearer, phoneId)
+    const xmlLower = xml.toLowerCase()
+
+    const errPatterns = [
+      'incorrect password', 'mot de passe incorrect',
+      'was incorrect', 'try again later', 'réessayer plus tard',
+      'unusual login attempt', 'connexion inhabituelle',
+    ]
+    for (const pat of errPatterns) {
+      if (xmlLower.includes(pat)) {
+        log(`❌ Erreur: ${pat}`)
+        return { ok: false, error: `Login échoué — ${pat}` }
+      }
+    }
+
+    const homeIndicators = ['home_tab', 'feed', 'accueil', 'reels', 'explore', 'ig_bottom_bar']
+    const isHome = homeIndicators.some(p => xmlLower.includes(p))
+    if (isHome) {
+      log('✅ Connexion réussie !')
+    } else {
+      log('⚠️ Connexion probable — vérifier le téléphone (2FA ou challenge possible)')
+    }
+
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) }
+  }
+}
+
 // ── Main entry point ─────────────────────────────────────────────────────────
 export async function warmupAccount(
   bearer: string,
@@ -702,7 +835,7 @@ export async function warmupAccount(
 ): Promise<{ ok: boolean; error?: string }> {
   try {
     const ready = await ensurePhoneRunning(bearer, phoneId, log)
-    if (!ready) return { ok: false, error: 'Le téléphone n\'a pas pu démarrer dans le délai imparti' }
+    if (!ready) return { ok: false, error: 'Téléphone non démarré après 120s — vérifier GéeLark et l\'ID du téléphone' }
 
     const hasProfileUpdate = config.profileName || config.bio || config.profilePicUrl
     if (hasProfileUpdate) {
