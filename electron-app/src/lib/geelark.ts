@@ -352,24 +352,33 @@ async function clearAndType(
   text: string,
   log: (m: string) => void,
 ) {
+  // Tap to focus the field
   await shellExec(bearer, phoneId, `input tap ${point[0]} ${point[1]}`)
-  await sleep(600)
-  // Triple-tap selects all text in most Android text fields
+  await sleep(500)
+  // Double-tap to ensure focus + position cursor
   await shellExec(bearer, phoneId, `input tap ${point[0]} ${point[1]}`)
-  await sleep(120)
-  await shellExec(bearer, phoneId, `input tap ${point[0]} ${point[1]}`)
+  await sleep(400)
+
+  // Select all existing text: CTRL+A (keyevent 277 = A with META_CTRL)
+  await shellExec(bearer, phoneId, 'input keyevent --longpress 29')  // long-press A = select all
   await sleep(300)
-  // Delete the selection (or clear char by char if no selection)
-  await shellExec(bearer, phoneId, 'input keyevent 67')  // DEL
-  await sleep(100)
-  // Belt-and-suspenders: MOVE_END then 150 individual DEL keycodes
+  // Also try CTRL+A via key combination for more compatibility
+  await shellExec(bearer, phoneId, 'input keycombination 113 29')    // CTRL(113) + A(29)
+  await sleep(200)
+  // Delete selected text
+  await shellExec(bearer, phoneId, 'input keyevent 67')  // KEYCODE_DEL
+  await sleep(200)
+
+  // Belt-and-suspenders: move to end then delete 200 chars backwards
   await shellExec(bearer, phoneId, 'input keyevent 123') // KEYCODE_MOVE_END
-  for (let i = 0; i < 15; i++) {
+  await sleep(100)
+  for (let i = 0; i < 20; i++) {
     await shellExec(bearer, phoneId, 'input keyevent 67 67 67 67 67 67 67 67 67 67')
-    await sleep(50)
+    await sleep(40)
   }
   await sleep(200)
-  // Escape for Android shell: spaces → %s, dangerous shell chars escaped
+
+  // Type new text (spaces → %s, shell chars escaped)
   const escaped = text
     .replace(/\\/g, '\\\\')
     .replace(/"/g,  '\\"')
@@ -402,6 +411,10 @@ export async function updateInstagramProfile(
   config: MassEditConfig,
   log: (m: string) => void,
 ) {
+  // ── Start phone first (same pattern as login/warmup) ──────────────────────
+  const ready = await ensurePhoneRunning(bearer, phoneId, log)
+  if (!ready) throw new Error('Téléphone non démarré')
+
   // ── Wake + unlock ──────────────────────────────────────────────────────────
   log('📱 Réveil de l\'écran…')
   await shellExec(bearer, phoneId, 'input keyevent 224')
