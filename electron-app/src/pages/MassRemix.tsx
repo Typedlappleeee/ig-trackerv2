@@ -183,9 +183,15 @@ export function MassRemix({ user }: MassRemixProps) {
               { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: f.data } },
               { type: 'text', text: `[Frame ${fi} — t=${f.timestamp}s]` },
             ])
-            const prompt = `These are ${fr.frames.length} frames from a ${splitTime.toFixed(1)}s video clip (vertical 9:16).
-Identify ALL burned-in text overlays. For each return:
-{"text":"exact string","xAlign":"left"|"center"|"right","yPercent":0-100,"fontSizePx":number,"fontColor":"css-color","bold":false,"startFrame":0,"endFrame":5}
+            const prompt = `These are ${fr.frames.length} frames from a ${splitTime.toFixed(1)}s video clip (vertical 9:16, output resolution 1080×1920).
+Identify ALL burned-in text overlays (titles, captions, subtitles, watermarks). For each return:
+{"text":"exact string","xAlign":"left"|"center"|"right","yPercent":0-100,"fontSizePx":number,"fontColor":"css-color","bold":true,"startFrame":0,"endFrame":5}
+
+Rules for fontSizePx (at 1080×1920):
+- Large title text: 120-200px
+- Subtitles/captions: 70-120px
+- Small labels: 50-80px
+Instagram/TikTok text is typically bold and large — do NOT underestimate.
 Return ONLY a JSON array. If none, return [].`
             const res = await window.electronAPI!.anthropicVisionRequest!({
               apiKey: anthropicKey.trim(), model: 'claude-haiku-4-5-20251001',
@@ -202,9 +208,9 @@ Return ONLY a JSON array. If none, return [].`
                     text: item.text,
                     x: xAlignToExpr(item.xAlign ?? 'center'),
                     y: `h*${Math.max(0.01, Math.min(0.97, (item.yPercent ?? 85) / 100)).toFixed(3)}`,
-                    fontSize: Math.round(Math.max(16, Math.min(200, item.fontSizePx ?? 42))),
+                    fontSize: Math.round(Math.max(40, Math.min(400, item.fontSizePx ?? 100))),
                     fontColor: item.fontColor ?? 'white',
-                    bold: item.bold ?? false,
+                    bold: item.bold ?? true,
                     shadow: true,
                     startTime: Math.round((item.startFrame ?? 0) * interval * 10) / 10,
                     endTime: Math.min(splitTime, Math.round(((item.endFrame ?? fr.frames!.length - 1) + 1) * interval * 10) / 10),

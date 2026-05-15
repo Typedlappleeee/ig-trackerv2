@@ -281,10 +281,15 @@ export async function runFfmpegRemixAIWeb(opts: {
     const afmt = 'aformat=sample_rates=44100:channel_layouts=stereo'
 
     const drawFilters = opts.textOverlays.map(ov => {
-      const escaped = ov.text.replace(/'/g, "’").replace(/:/g, '\\:').replace(/\\/g, '\\\\')
-      const shadow  = ov.shadow !== false ? ':shadowx=2:shadowy=2:shadowcolor=black@1.0' : ''
-      const bold    = ov.bold ? ':font=Arial Bold' : ':font=Arial'
-      return `drawtext=text='${escaped}'${bold}:fontsize=${ov.fontSize}:fontcolor=${ov.fontColor}:x=${ov.x}:y=${ov.y}${shadow}:enable='between(t,${ov.startTime},${ov.endTime})'`
+      const q        = String.fromCharCode(39)
+      const escaped  = ov.text
+        .replace(/'/g, q)
+        .replace(/:/g, '\\:')
+        .replace(/\\/g, '\\\\')
+      const borderPx = Math.max(3, Math.round(ov.fontSize * 0.07))
+      const shadow   = ov.shadow !== false ? ':shadowx=4:shadowy=4:shadowcolor=black@0.7' : ''
+      const bold     = ov.bold ? ':font=Arial Bold' : ':font=Arial'
+      return `drawtext=text=${q}${escaped}${q}${bold}:fontsize=${ov.fontSize}:fontcolor=${ov.fontColor}:x=${ov.x}:y=${ov.y}:borderw=${borderPx}:bordercolor=black@1.0${shadow}:enable=${q}between(t,${ov.startTime},${ov.endTime})${q}`
     }).join(',')
 
     const filterComplex = [

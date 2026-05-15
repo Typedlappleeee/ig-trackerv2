@@ -170,12 +170,17 @@ function VideoCard({ label, filePath, accent = '#8b5cf6', badge, onDurationLoad,
               transform: 'translate(-50%, -50%)',
               fontSize: `calc(${(ov.fontSize / 10.8).toFixed(2)} * 1cqw)`,
               color: ov.fontColor,
-              fontWeight: ov.bold ? '900' : 'normal',
-              textShadow: '0 0 8px rgba(0,0,0,1), 1px 1px 0 rgba(0,0,0,0.9), -1px -1px 0 rgba(0,0,0,0.9)',
+              fontWeight: ov.bold ? '900' : '700',
+              fontFamily: '"Arial Black", "Arial Bold", Arial, sans-serif',
+              // Stroke outline via -webkit-text-stroke (mirrors FFmpeg borderw≈7%)
+              WebkitTextStroke: '0.07em black',
+              // Drop shadow for depth (mirrors FFmpeg shadowx/y=4)
+              textShadow: '0 0.04em 0.1em rgba(0,0,0,0.85)',
               whiteSpace: 'nowrap',
               zIndex: 10,
               lineHeight: 1.1,
-            }}
+              paintOrder: 'stroke fill',
+            } as React.CSSProperties}
           >
             {ov.text}
           </div>
@@ -297,7 +302,7 @@ export function Remix({ user }: RemixProps) {
         { type: 'text', text: `[Frame ${i} — t=${f.timestamp}s]` },
       ])
       const interval = splitTime / (fr.frames.length || 1)
-      const prompt = `These are ${fr.frames.length} frames from a ${splitTime.toFixed(1)}s video clip (vertical 9:16 format, output resolution 1080×1920).\nIdentify ALL burned-in text overlays (titles, captions, subtitles, watermarks). For each return:\n- text: the exact string\n- xPercent: 0-100 — horizontal center of the text block as % of frame width\n- yPercent: 0-100 — vertical center of the text block as % of frame height\n- fontSizePx: exact font size in pixels at 1080px wide × 1920px tall resolution\n- fontColor: CSS hex color (e.g. "#ffffff", "#ffff00")\n- bold: true if the text appears bold or heavy weight\n- startFrame: first frame index where this text is visible\n- endFrame: last frame index where this text is visible\n\nIMPORTANT: xPercent and yPercent must be the CENTER of the text, not the corner.\nMatch the original position as precisely as possible.\n\nReturn ONLY a valid JSON array, no explanation:\n[{"text":"...","xPercent":50,"yPercent":85,"fontSizePx":72,"fontColor":"#ffffff","bold":true,"startFrame":0,"endFrame":5}]\nIf no text overlays exist return [].`
+      const prompt = `These are ${fr.frames.length} frames from a ${splitTime.toFixed(1)}s video clip (vertical 9:16 format, output resolution 1080×1920).\nIdentify ALL burned-in text overlays (titles, captions, subtitles, watermarks). For each return:\n- text: the exact string\n- xPercent: 0-100 — horizontal CENTER of the text block as % of frame width\n- yPercent: 0-100 — vertical CENTER of the text block as % of frame height\n- fontSizePx: font size in pixels at 1080×1920 resolution. Instagram/TikTok titles are typically 80-180px, subtitles 60-100px. Do NOT underestimate — large bold text on mobile is usually 100px or more.\n- fontColor: CSS hex color (e.g. "#ffffff", "#ffff00")\n- bold: true if the text appears bold, heavy, or black-weight\n- startFrame: first frame index where this text is visible\n- endFrame: last frame index where this text is visible\n\nIMPORTANT:\n- xPercent/yPercent = CENTER of the text bounding box, not the corner\n- For large title text covering most of the width, fontSizePx should be 120-200px\n- For subtitles/captions, fontSizePx should be 70-120px\n- Match the original font weight and size as closely as possible\n\nReturn ONLY a valid JSON array, no explanation:\n[{"text":"...","xPercent":50,"yPercent":85,"fontSizePx":120,"fontColor":"#ffffff","bold":true,"startFrame":0,"endFrame":5}]\nIf no text overlays exist return [].`
       const res = await window.electronAPI!.anthropicVisionRequest!({
         apiKey: anthropicKey.trim(), model: 'claude-haiku-4-5-20251001',
         messages: [{ role: 'user', content: [...imageBlocks, { type: 'text', text: prompt }] }],
@@ -319,7 +324,7 @@ export function Remix({ user }: RemixProps) {
           y: yExpr,
           xPercent: Math.max(1, Math.min(99, item.xPercent ?? 50)),
           yPercent: Math.max(1, Math.min(97, item.yPercent ?? 85)),
-          fontSize: Math.round(Math.max(16, Math.min(400, item.fontSizePx ?? 72))),
+          fontSize: Math.round(Math.max(40, Math.min(400, item.fontSizePx ?? 100))),
           fontColor: item.fontColor ?? '#ffffff',
           bold: item.bold ?? true,
           shadow: true,

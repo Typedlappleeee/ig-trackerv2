@@ -879,16 +879,18 @@ ipcMain.handle('run-ffmpeg-remix-ai', async (_event, opts: {
   // Build drawtext chain (comma-separated, applied after scale)
   const drawtextChain = opts.textOverlays.map(ov => {
     const fontFile = findFont(ov.bold)
+    const borderPx = Math.max(3, Math.round(ov.fontSize * 0.07))
     const parts: string[] = [`text='${escText(ov.text)}'`]
     if (fontFile) parts.push(`fontfile='${fontFile}'`)
     parts.push(
       `x=${ov.x}`, `y=${ov.y}`,
       `fontsize=${ov.fontSize}`,
       `fontcolor=${ov.fontColor}`,
+      // Stroke outline (borderw) + shadow — same style as Instagram captions
+      `borderw=${borderPx}`, `bordercolor=black@1.0`,
       `enable='between(t,${ov.startTime},${ov.endTime})'`,
     )
-    // No hard outline — rely on double shadow for legibility (cleaner Instagram style)
-    if (ov.shadow !== false) parts.push(`shadowx=2:shadowy=2:shadowcolor=black@1.0`)
+    if (ov.shadow !== false) parts.push(`shadowx=4:shadowy=4:shadowcolor=black@0.7`)
     return `drawtext=${parts.join(':')}`
   }).join(',')
 
