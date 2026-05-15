@@ -408,10 +408,16 @@ async function clearAndType(
 }
 
 // ── Profile update (name + bio + optional pic) ───────────────────────────────
-async function updateInstagramProfile(
+export interface MassEditConfig {
+  profileName?: string
+  bio?:         string
+  profilePicUrl?: string
+}
+
+export async function updateInstagramProfile(
   bearer: string,
   phoneId: string,
-  config: Pick<WarmupConfig, 'profileName' | 'bio' | 'profilePicUrl'>,
+  config: MassEditConfig,
   log: (m: string) => void,
 ) {
   // ── Wake + unlock ──────────────────────────────────────────────────────────
@@ -690,6 +696,112 @@ async function runWarmupActions(
   }
 
   log(`✅ Warmup terminé — ${likeCount} likes, ${followCount} follows`)
+}
+
+// ── Instagram login automation ───────────────────────────────────────────────
+export async function loginInstagramAccount(
+  bearer: string,
+  phoneId: string,
+  email: string,
+  password: string,
+  log: (m: string) => void,
+  abortSignal: { abort: boolean },
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const ready = await ensurePhoneRunning(bearer, phoneId, log)
+    if (!ready) return { ok: false, error: 'Téléphone non démarré' }
+    if (abortSignal.abort) return { ok: true }
+
+    log('🔄 Redémarrage d\'Instagram…')
+    await shellExec(bearer, phoneId, 'am force-stop com.instagram.android')
+    await sleep(1500)
+
+    log('📲 Ouverture de la page de connexion…')
+    await shellExec(bearer, phoneId,
+      'am start -n com.instagram.android/.activity.LoginActivity')
+    await sleep(7000)
+
+    const { output: sizeOut } = await shellExec(bearer, phoneId, 'wm size')
+    const sm = sizeOut.match(/(\d+)x(\d+)/)
+    const sw = sm ? parseInt(sm[1]) : 1080
+    const sh = sm ? parseInt(sm[2]) : 2340
+
+    let xml = await dumpXml(bearer, phoneId)
+    log(`📋 Login XML: ${xml.length} chars`)
+
+    // ── Username / email ───────────────────────────────────────────────────
+    log('📧 Saisie de l\'identifiant…')
+    const usernamePt: [number, number] =
+      findByResourceId(xml, 'login_username', 'username', 'email_phone_field') ??
+      findByText(xml,
+        'Phone number, username, or email',
+        'Numéro de téléphone, nom d\'utilisateur ou adresse e-mail',
+        'Username or email', 'Identifiant ou e-mail') ??
+      [Math.floor(sw / 2), Math.floor(sh * 0.42)]
+
+    await clearAndType(bearer, phoneId, usernamePt, email, log)
+    await sleep(600)
+
+    // ── Password ───────────────────────────────────────────────────────────
+    await shellExec(bearer, phoneId, 'input keyevent 61') // TAB → jump to password
+    await sleep(500)
+
+    xml = await dumpXml(bearer, phoneId)
+    log('🔑 Saisie du mot de passe…')
+    const passwordPt: [number, number] =
+      findByResourceId(xml, 'password', 'login_password', 'password_field') ??
+      findByText(xml, 'Password', 'Mot de passe') ??
+      [Math.floor(sw / 2), Math.floor(sh * 0.52)]
+
+    await clearAndType(bearer, phoneId, passwordPt, password, log)
+    await sleep(600)
+
+    // ── Dismiss keyboard ───────────────────────────────────────────────────
+    await shellExec(bearer, phoneId, 'input keyevent 111') // ESCAPE
+    await sleep(500)
+
+    // ── Tap Log In button ──────────────────────────────────────────────────
+    xml = await dumpXml(bearer, phoneId)
+    log('🔐 Tap sur "Se connecter"…')
+    const loginPt: [number, number] =
+      findByText(xml, 'Log in', 'Se connecter', 'Log In', 'Login', 'Connexion') ??
+      findByResourceId(xml, 'button_text', 'login_button', 'button_login') ??
+      [Math.floor(sw / 2), Math.floor(sh * 0.62)]
+
+    await shellExec(bearer, phoneId, `input tap ${loginPt[0]} ${loginPt[1]}`)
+    log('⏳ Connexion en cours… (attente 12s)')
+    await sleep(12000)
+
+    if (abortSignal.abort) return { ok: true }
+
+    // ── Post-login detection ───────────────────────────────────────────────
+    xml = await dumpXml(bearer, phoneId)
+    const xmlLower = xml.toLowerCase()
+
+    const errPatterns = [
+      'incorrect password', 'mot de passe incorrect',
+      'was incorrect', 'try again later', 'réessayer plus tard',
+      'unusual login attempt', 'connexion inhabituelle',
+    ]
+    for (const pat of errPatterns) {
+      if (xmlLower.includes(pat)) {
+        log(`❌ Erreur: ${pat}`)
+        return { ok: false, error: `Login échoué — ${pat}` }
+      }
+    }
+
+    const homeIndicators = ['home_tab', 'feed', 'accueil', 'reels', 'explore', 'ig_bottom_bar']
+    const isHome = homeIndicators.some(p => xmlLower.includes(p))
+    if (isHome) {
+      log('✅ Connexion réussie !')
+    } else {
+      log('⚠️ Connexion probable — vérifier le téléphone (2FA ou challenge possible)')
+    }
+
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) }
+  }
 }
 
 // ── Main entry point ─────────────────────────────────────────────────────────
