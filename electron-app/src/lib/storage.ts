@@ -201,14 +201,22 @@ export async function downloadToTemp(path: string): Promise<string> {
   return r.path
 }
 
-// Resolve a content_bank item to a playable URL.
-// On web: returns a signed Supabase URL directly (avoids full download).
-// On Electron: downloads to a local temp file and returns the path.
+// Resolve a content_bank item to a path/URL usable by FFmpeg.
+// On Electron: downloads to a local temp file and returns the absolute path.
+// On Web: downloads the file via the Supabase SDK and returns a blob: URL.
+//   We intentionally avoid returning a signed URL here because FFmpeg WASM
+//   cannot fetch cross-origin URLs when COEP is active (required for SharedArrayBuffer).
+//   A blob: URL is treated as same-origin and bypasses that restriction.
+const blobUrlCache = new Map<string, string>()
 export async function resolveContentToLocalPath(item: Pick<ContentItem, 'storage_path' | 'file_url'>): Promise<string> {
   if (item.storage_path) {
     if ((window as any).__IS_WEB) {
-      const url = await getSignedUrl(item.storage_path)
-      if (!url) throw new Error('URL signée indisponible')
+      const cached = blobUrlCache.get(item.storage_path)
+      if (cached) return cached
+      const { data, error } = await supabase.storage.from(BUCKET).download(item.storage_path)
+      if (error || !data) throw new Error('Téléchargement : ' + (error?.message ?? 'inconnu'))
+      const url = URL.createObjectURL(data)
+      blobUrlCache.set(item.storage_path, url)
       return url
     }
     return downloadToTemp(item.storage_path)
