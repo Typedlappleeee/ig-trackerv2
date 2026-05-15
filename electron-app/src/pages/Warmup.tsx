@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/Button'
 import { useConnections } from '@/lib/connections'
 import { useOrg } from '@/lib/orgContext'
 import {
-  fetchAllPhones, warmupAccount, updateInstagramProfile, loginInstagramAccount,
+  fetchAllPhones, warmupAccount, updateInstagramProfile, loginInstagramAccount, stopPhone,
   type GeelarkPhone, type WarmupConfig,
 } from '@/lib/geelark'
 import { canAccessPhoneGroup } from '@/lib/permissions'
@@ -118,7 +118,7 @@ export function Warmup({ user }: WarmupProps) {
     abortRef.current = { abort: false }
   }
 
-  // ── Launch LOG IN ─────────────────────────────────────────────────────────
+  // ── Launch LOG IN (parallel) ──────────────────────────────────────────────
   async function launchLogin() {
     if (!bearer || !selected.size) return
     const targets = phones.filter(p => selected.has(p.id))
@@ -129,12 +129,11 @@ export function Warmup({ user }: WarmupProps) {
     })
     initJobs(targets)
 
-    for (const phone of targets) {
-      if (abortRef.current.abort) break
+    await Promise.all(targets.map(async phone => {
       const cred = loginCreds[phone.id]
       if (!cred?.email || !cred?.password) {
         updateJob(phone.id, { status: 'error', error: 'Identifiants manquants' })
-        continue
+        return
       }
       updateJob(phone.id, { status: 'running' })
       const result = await loginInstagramAccount(
@@ -143,12 +142,14 @@ export function Warmup({ user }: WarmupProps) {
         abortRef.current,
       )
       updateJob(phone.id, result.ok ? { status: 'done' } : { status: 'error', error: result.error })
-    }
+      addLog(phone.id, '💤 Extinction du téléphone…')
+      await stopPhone(bearer, phone.id)
+    }))
 
     setRunning(false)
   }
 
-  // ── Launch MASS EDIT ──────────────────────────────────────────────────────
+  // ── Launch MASS EDIT (parallel) ───────────────────────────────────────────
   async function launchMassEdit() {
     if (!bearer || !selected.size) return
     const targets = phones.filter(p => selected.has(p.id))
@@ -165,8 +166,7 @@ export function Warmup({ user }: WarmupProps) {
       profilePicUrl: editPicUrl.trim() || undefined,
     }
 
-    for (const phone of targets) {
-      if (abortRef.current.abort) break
+    await Promise.all(targets.map(async phone => {
       updateJob(phone.id, { status: 'running' })
       try {
         await updateInstagramProfile(bearer, phone.id, config, msg => addLog(phone.id, msg))
@@ -174,12 +174,14 @@ export function Warmup({ user }: WarmupProps) {
       } catch (e) {
         updateJob(phone.id, { status: 'error', error: e instanceof Error ? e.message : String(e) })
       }
-    }
+      addLog(phone.id, '💤 Extinction du téléphone…')
+      await stopPhone(bearer, phone.id)
+    }))
 
     setRunning(false)
   }
 
-  // ── Launch WARMUP ─────────────────────────────────────────────────────────
+  // ── Launch WARMUP (parallel) ──────────────────────────────────────────────
   async function launchWarmup() {
     if (!bearer || !selected.size) return
     const targets = phones.filter(p => selected.has(p.id))
@@ -192,12 +194,13 @@ export function Warmup({ user }: WarmupProps) {
 
     const config: WarmupConfig = { browseMinutes, likePosts, watchReels, followSuggested }
 
-    for (const phone of targets) {
-      if (abortRef.current.abort) break
+    await Promise.all(targets.map(async phone => {
       updateJob(phone.id, { status: 'running' })
       const result = await warmupAccount(bearer, phone.id, config, msg => addLog(phone.id, msg), abortRef.current)
       updateJob(phone.id, result.ok ? { status: 'done' } : { status: 'error', error: result.error })
-    }
+      addLog(phone.id, '💤 Extinction du téléphone…')
+      await stopPhone(bearer, phone.id)
+    }))
 
     setRunning(false)
   }
@@ -271,105 +274,6 @@ export function Warmup({ user }: WarmupProps) {
         </div>
       </div>
 
-      {/* Running modal */}
-      {running && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-6"
-          style={{ background: 'rgba(3,1,8,0.92)', backdropFilter: 'blur(8px)' }}>
-          <div className="w-full max-w-lg rounded-2xl overflow-hidden"
-            style={{ background: 'rgba(12,8,28,0.98)', border: '1px solid rgba(139,92,246,0.3)', boxShadow: '0 0 60px rgba(124,58,237,0.2)' }}>
-            <div className="px-6 py-4 flex items-center gap-3"
-              style={{ borderBottom: '1px solid rgba(139,92,246,0.15)', background: 'linear-gradient(135deg,rgba(124,58,237,0.12),rgba(236,72,153,0.06))' }}>
-              <div className="relative w-10 h-10 flex-shrink-0">
-                <div className="absolute inset-0 rounded-full animate-ping opacity-30" style={{ background: 'linear-gradient(135deg,#7c3aed,#ec4899)' }} />
-                <div className="w-10 h-10 rounded-full flex items-center justify-center text-xl"
-                  style={{ background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.3)' }}>
-                  ⚙️
-                </div>
-              </div>
-              <div>
-                <p className="text-sm font-black text-white">
-                  {activeTab === 'login' ? 'Connexion en cours…' : activeTab === 'massEdit' ? 'Mass Edit en cours…' : 'Warmup en cours…'}
-                </p>
-                <p className="text-[11px]" style={{ color: 'rgba(196,181,253,0.5)' }}>
-                  {doneCount} / {jobs.length} téléphone(s) · {progress}%
-                </p>
-              </div>
-            </div>
-
-            <div className="px-6 py-4 space-y-3 max-h-[60vh] overflow-auto">
-              <div className="h-2 rounded-full overflow-hidden" style={{ background: 'rgba(139,92,246,0.12)' }}>
-                <div className="h-full rounded-full transition-all duration-500"
-                  style={{ width: `${progress}%`, background: 'linear-gradient(90deg,#7c3aed,#ec4899)' }} />
-              </div>
-
-              {jobs.map(job => (
-                <div key={job.phone.id} className="rounded-xl overflow-hidden"
-                  style={{ border: `1px solid ${job.status === 'done' ? 'rgba(52,211,153,0.2)' : job.status === 'error' ? 'rgba(239,68,68,0.2)' : 'rgba(139,92,246,0.15)'}` }}>
-                  <div className="px-4 py-2.5 flex items-center gap-3"
-                    style={{ background: job.status === 'done' ? 'rgba(52,211,153,0.06)' : job.status === 'error' ? 'rgba(239,68,68,0.06)' : 'rgba(139,92,246,0.06)' }}>
-                    <span className="text-base flex-shrink-0">
-                      {job.status === 'done' ? '✅' : job.status === 'error' ? '❌' : job.status === 'running' ? '⚙️' : '⏳'}
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-bold text-white truncate">{phoneName(job.phone)}</p>
-                      {job.error && <p className="text-[10px] text-danger">{job.error}</p>}
-                      {job.logs.length > 0 && (
-                        <p className="text-[10px]" style={{ color: 'rgba(196,181,253,0.5)' }}>
-                          {job.logs[job.logs.length - 1]}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  {job.status === 'running' && job.logs.length > 1 && (
-                    <div className="px-4 py-2 space-y-0.5 max-h-24 overflow-auto" style={{ background: 'rgba(0,0,0,0.3)' }}>
-                      {job.logs.slice(-6).map((l, i) => (
-                        <p key={i} className="text-[10px] font-mono" style={{ color: 'rgba(196,181,253,0.4)' }}>{l}</p>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
-
-              <button onClick={() => { abortRef.current.abort = true; setRunning(false) }}
-                className="w-full py-2 rounded-xl text-xs font-semibold"
-                style={{ background: 'rgba(239,68,68,0.08)', color: '#f87171', border: '1px solid rgba(239,68,68,0.2)' }}>
-                ✕ Annuler
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Done modal */}
-      {!running && jobs.length > 0 && (doneCount + errorCount) === jobs.length && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-6"
-          style={{ background: 'rgba(3,1,8,0.88)', backdropFilter: 'blur(6px)' }}>
-          <div className="w-full max-w-md rounded-2xl overflow-hidden"
-            style={{ background: 'rgba(12,8,28,0.98)', border: `1px solid ${errorCount === 0 ? 'rgba(52,211,153,0.3)' : 'rgba(251,191,36,0.3)'}` }}>
-            <div className="px-6 py-5 space-y-4">
-              <div className="text-center space-y-2">
-                <div className="text-4xl">{errorCount === 0 ? '🎉' : '⚠️'}</div>
-                <p className="text-lg font-black text-white">
-                  {errorCount === 0 ? `${doneCount} téléphone(s) traité(s) !` : `${doneCount} / ${jobs.length} réussis`}
-                </p>
-              </div>
-              <div className="space-y-1.5 max-h-52 overflow-auto">
-                {jobs.map(job => (
-                  <div key={job.phone.id} className="flex items-center gap-2 px-3 py-2 rounded-lg"
-                    style={{ background: job.status === 'done' ? 'rgba(52,211,153,0.06)' : 'rgba(239,68,68,0.06)', border: `1px solid ${job.status === 'done' ? 'rgba(52,211,153,0.15)' : 'rgba(239,68,68,0.15)'}` }}>
-                    <span>{job.status === 'done' ? '✅' : '❌'}</span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-bold text-white truncate">{phoneName(job.phone)}</p>
-                      {job.error && <p className="text-[10px] text-danger">{job.error}</p>}
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <Button onClick={() => setJobs([])} className="w-full">Fermer</Button>
-            </div>
-          </div>
-        </div>
-      )}
 
       <div className="flex-1 overflow-auto">
         <div className="p-6 grid grid-cols-[1fr_400px] gap-6 max-w-5xl">
@@ -462,8 +366,99 @@ export function Warmup({ user }: WarmupProps) {
             </div>
           </div>
 
-          {/* ── Right: tab-based config ──────────────────────────────────── */}
+          {/* ── Right: progress panel (when running/done) or tab config ─── */}
           <div className="space-y-4">
+
+            {/* ── Inline progress panel ──────────────────────────────────── */}
+            {(running || (jobs.length > 0 && (doneCount + errorCount) === jobs.length)) && (
+              <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(8,5,20,0.7)', border: '1px solid rgba(139,92,246,0.18)' }}>
+                {/* Header */}
+                <div className="px-5 py-3 flex items-center justify-between"
+                  style={{ borderBottom: '1px solid rgba(139,92,246,0.1)', background: running ? 'linear-gradient(135deg,rgba(124,58,237,0.12),rgba(236,72,153,0.06))' : 'rgba(139,92,246,0.04)' }}>
+                  <div className="flex items-center gap-3">
+                    {running && (
+                      <div className="relative w-6 h-6 flex-shrink-0">
+                        <div className="absolute inset-0 rounded-full animate-ping opacity-40" style={{ background: 'linear-gradient(135deg,#7c3aed,#ec4899)' }} />
+                        <div className="w-6 h-6 rounded-full flex items-center justify-center text-sm"
+                          style={{ background: 'rgba(139,92,246,0.2)', border: '1px solid rgba(139,92,246,0.4)' }}>⚙️</div>
+                      </div>
+                    )}
+                    <div>
+                      <p className="text-xs font-black text-white">
+                        {running
+                          ? (activeTab === 'login' ? 'Connexion en cours…' : activeTab === 'massEdit' ? 'Mass Edit en cours…' : 'Warmup en cours…')
+                          : (errorCount === 0 ? `✅ ${doneCount} téléphone(s) terminé(s)` : `⚠️ ${doneCount}/${jobs.length} réussis`)}
+                      </p>
+                      {running && (
+                        <p className="text-[10px]" style={{ color: 'rgba(196,181,253,0.4)' }}>
+                          {doneCount} terminé · {jobs.filter(j => j.status === 'running').length} en cours · {jobs.filter(j => j.status === 'idle').length} en attente
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  {!running && (
+                    <button onClick={() => setJobs([])}
+                      className="text-[10px] px-3 py-1 rounded-lg"
+                      style={{ background: 'rgba(139,92,246,0.1)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.2)' }}>
+                      Fermer
+                    </button>
+                  )}
+                </div>
+
+                {/* Progress bar */}
+                {running && (
+                  <div className="px-5 pt-3">
+                    <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(139,92,246,0.12)' }}>
+                      <div className="h-full rounded-full transition-all duration-500"
+                        style={{ width: `${progress}%`, background: 'linear-gradient(90deg,#7c3aed,#ec4899)' }} />
+                    </div>
+                    <p className="text-[10px] mt-1 text-right" style={{ color: 'rgba(196,181,253,0.4)' }}>{progress}%</p>
+                  </div>
+                )}
+
+                {/* Job list */}
+                <div className="px-3 pb-3 pt-2 space-y-1.5 max-h-[50vh] overflow-auto">
+                  {jobs.map(job => (
+                    <div key={job.phone.id} className="rounded-xl overflow-hidden"
+                      style={{ border: `1px solid ${job.status === 'done' ? 'rgba(52,211,153,0.2)' : job.status === 'error' ? 'rgba(239,68,68,0.2)' : job.status === 'running' ? 'rgba(139,92,246,0.25)' : 'rgba(139,92,246,0.1)'}` }}>
+                      <div className="px-3 py-2.5 flex items-center gap-2.5"
+                        style={{ background: job.status === 'done' ? 'rgba(52,211,153,0.05)' : job.status === 'error' ? 'rgba(239,68,68,0.05)' : job.status === 'running' ? 'rgba(139,92,246,0.08)' : 'transparent' }}>
+                        <span className="text-sm flex-shrink-0">
+                          {job.status === 'done' ? '✅' : job.status === 'error' ? '❌' : job.status === 'running' ? '⚙️' : '⏳'}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[11px] font-bold text-white truncate">{phoneName(job.phone)}</p>
+                          {job.error && <p className="text-[10px] text-danger truncate">{job.error}</p>}
+                          {!job.error && job.logs.length > 0 && (
+                            <p className="text-[10px] truncate" style={{ color: 'rgba(196,181,253,0.5)' }}>
+                              {job.logs[job.logs.length - 1]}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      {job.status === 'running' && job.logs.length > 1 && (
+                        <div className="px-3 py-1.5 space-y-0.5 max-h-20 overflow-auto" style={{ background: 'rgba(0,0,0,0.25)' }}>
+                          {job.logs.slice(-5).map((l, i) => (
+                            <p key={i} className="text-[9px] font-mono leading-relaxed" style={{ color: 'rgba(196,181,253,0.35)' }}>{l}</p>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Cancel button */}
+                {running && (
+                  <div className="px-3 pb-3">
+                    <button onClick={() => { abortRef.current.abort = true }}
+                      className="w-full py-2 rounded-xl text-xs font-semibold"
+                      style={{ background: 'rgba(239,68,68,0.08)', color: '#f87171', border: '1px solid rgba(239,68,68,0.2)' }}>
+                      ✕ Annuler
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Tab selector */}
             <div className="flex gap-1 p-1 rounded-2xl" style={{ background: 'rgba(8,5,20,0.7)', border: '1px solid rgba(139,92,246,0.18)' }}>

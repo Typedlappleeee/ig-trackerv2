@@ -57,6 +57,13 @@ export function geelarkStatusLabel(status: number): string {
   return (status === 1 || status === 2) ? 'online' : 'offline'
 }
 
+// Stop a single phone (best-effort — never throws).
+export async function stopPhone(bearer: string, phoneId: string): Promise<void> {
+  try {
+    await geelarkFetch('POST', '/phone/stop', { ids: [phoneId] }, bearer)
+  } catch { /* ignore */ }
+}
+
 // Lightweight: fetch only the status of all phones (same endpoint, minimal processing)
 export async function fetchPhoneStatuses(bearer: string): Promise<Map<string, string>> {
   const phones = await fetchAllPhones(bearer)
@@ -701,7 +708,34 @@ async function runWarmupActions(
   log(`✅ Warmup terminé — ${likeCount} likes, ${followCount} follows`)
 }
 
+// Escape text for use inside an Android `input text "..."` shell command.
+function escapeForInputText(text: string): string {
+  return text
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g,  '\\"')
+    .replace(/'/g,  "\\'")
+    .replace(/&/g,  '\\&')
+    .replace(/</g,  '\\<')
+    .replace(/>/g,  '\\>')
+    .replace(/\|/g, '\\|')
+    .replace(/;/g,  '\\;')
+    .replace(/`/g,  '\\`')
+    .replace(/\$/g, '\\$')
+    .replace(/!/g,  '\\!')
+    .replace(/ /g,  '%s')
+}
+
 // ── Instagram login automation ───────────────────────────────────────────────
+// Modern Instagram often redirects the login flow to a Chrome Custom Tab.
+// When Chrome opens, ADB `input text` targets the wrong app and nothing gets typed.
+// Strategy:
+//   1. Force-stop both Instagram AND Chrome before starting.
+//   2. Launch Instagram main activity (not LoginActivity — that triggers Chrome redirect).
+//   3. If Chrome still appears in the XML dump, kill it and re-launch Instagram.
+//   4. Look for the "Log in with email or phone number" button (switches to native login).
+//   5. Type credentials directly into the (empty) native fields — no clearAndType needed.
+//   6. Submit with ENTER (keyevent 66) — more reliable than finding the button.
+//   7. Wait 15s then verify: still on login page → failure, home indicators → success.
 export async function loginInstagramAccount(
   bearer: string,
   phoneId: string,
@@ -713,95 +747,138 @@ export async function loginInstagramAccount(
   try {
     const ready = await ensurePhoneRunning(bearer, phoneId, log)
     if (!ready) return { ok: false, error: 'Téléphone non démarré' }
-    if (abortSignal.abort) return { ok: true }
+    if (abortSignal.abort) return { ok: false, error: 'Annulé' }
 
-    log('🔄 Redémarrage d\'Instagram…')
+    // Kill Instagram AND Chrome — Chrome Custom Tabs steal the login flow in newer IG
+    log('🔄 Arrêt d\'Instagram et Chrome…')
     await shellExec(bearer, phoneId, 'am force-stop com.instagram.android')
+    await shellExec(bearer, phoneId, 'am force-stop com.android.chrome')
+    await shellExec(bearer, phoneId, 'am force-stop com.google.android.chrome')
     await sleep(1500)
-
-    log('📲 Ouverture de la page de connexion…')
-    await shellExec(bearer, phoneId,
-      'am start -n com.instagram.android/.activity.LoginActivity')
-    await sleep(7000)
 
     const { output: sizeOut } = await shellExec(bearer, phoneId, 'wm size')
     const sm = sizeOut.match(/(\d+)x(\d+)/)
     const sw = sm ? parseInt(sm[1]) : 1080
     const sh = sm ? parseInt(sm[2]) : 2340
 
-    let xml = await dumpXml(bearer, phoneId)
-    log(`📋 Login XML: ${xml.length} chars`)
+    // Use MainTabActivity — LoginActivity immediately redirects to Chrome in recent IG builds
+    log('📲 Lancement d\'Instagram (MainActivity)…')
+    await shellExec(bearer, phoneId,
+      'am start -n com.instagram.android/.activity.MainTabActivity')
+    await sleep(10000)
 
-    // ── Username / email ───────────────────────────────────────────────────
+    let xml = await dumpXml(bearer, phoneId)
+    log(`📋 XML initial (${xml.length} chars): ${xml.substring(0, 300)}`)
+
+    // If Chrome opened anyway, kill it and bring Instagram back
+    const chromeOpen = xml.includes('com.android.chrome') || xml.includes('com.google.android.chrome')
+    if (chromeOpen) {
+      log('⚠️ Chrome détecté — fermeture et retour Instagram…')
+      await shellExec(bearer, phoneId, 'am force-stop com.android.chrome')
+      await shellExec(bearer, phoneId, 'am force-stop com.google.android.chrome')
+      await sleep(500)
+      await shellExec(bearer, phoneId,
+        'am start -n com.instagram.android/.activity.MainTabActivity')
+      await sleep(6000)
+      xml = await dumpXml(bearer, phoneId)
+      log(`📋 XML après fermeture Chrome (${xml.length} chars)`)
+    }
+
+    // Some IG builds show a social-login screen first with "Log in with email" link
+    const emailLoginPt = findByText(xml,
+      'Log in with email or phone number',
+      'Log in with phone or email',
+      'Use email or phone number',
+      'Se connecter avec un e-mail ou un numéro de téléphone',
+      'Connexion avec un e-mail ou un numéro de téléphone',
+    )
+    if (emailLoginPt) {
+      log('📧 Tap "Log in with email or phone number"…')
+      await shellExec(bearer, phoneId, `input tap ${emailLoginPt[0]} ${emailLoginPt[1]}`)
+      await sleep(3000)
+      xml = await dumpXml(bearer, phoneId)
+      log(`📋 XML après sélection email (${xml.length} chars)`)
+    }
+
+    // ── Saisie identifiant ─────────────────────────────────────────────────
     log('📧 Saisie de l\'identifiant…')
     const usernamePt: [number, number] =
-      findByResourceId(xml, 'login_username', 'username', 'email_phone_field') ??
+      findByResourceId(xml,
+        'login_username', 'username', 'email_phone_field',
+        'com.instagram.android:id/login_username') ??
       findByText(xml,
         'Phone number, username, or email',
+        'Username, email or mobile number',
         'Numéro de téléphone, nom d\'utilisateur ou adresse e-mail',
-        'Username or email', 'Identifiant ou e-mail') ??
+        'Username or email', 'Identifiant ou e-mail',
+        'Email address', 'Adresse e-mail') ??
       [Math.floor(sw / 2), Math.floor(sh * 0.42)]
 
-    await clearAndType(bearer, phoneId, usernamePt, email, log)
-    await sleep(600)
+    log(`   Champ identifiant à [${usernamePt[0]},${usernamePt[1]}]`)
+    await shellExec(bearer, phoneId, `input tap ${usernamePt[0]} ${usernamePt[1]}`)
+    await sleep(1000)
+    await shellExec(bearer, phoneId, `input text "${escapeForInputText(email)}"`)
+    await sleep(800)
 
-    // ── Password ───────────────────────────────────────────────────────────
-    await shellExec(bearer, phoneId, 'input keyevent 61') // TAB → jump to password
-    await sleep(500)
+    // ── TAB vers le mot de passe ───────────────────────────────────────────
+    await shellExec(bearer, phoneId, 'input keyevent 61')
+    await sleep(700)
 
-    xml = await dumpXml(bearer, phoneId)
+    // ── Saisie mot de passe ────────────────────────────────────────────────
     log('🔑 Saisie du mot de passe…')
-    const passwordPt: [number, number] =
-      findByResourceId(xml, 'password', 'login_password', 'password_field') ??
-      findByText(xml, 'Password', 'Mot de passe') ??
-      [Math.floor(sw / 2), Math.floor(sh * 0.52)]
+    await shellExec(bearer, phoneId, `input text "${escapeForInputText(password)}"`)
+    await sleep(800)
 
-    await clearAndType(bearer, phoneId, passwordPt, password, log)
-    await sleep(600)
+    // ── Soumission via ENTER ───────────────────────────────────────────────
+    log('🔐 Soumission du formulaire (ENTER)…')
+    await shellExec(bearer, phoneId, 'input keyevent 66')
+    log('⏳ Connexion en cours… (attente 15s)')
+    await sleep(15000)
 
-    // ── Dismiss keyboard ───────────────────────────────────────────────────
-    await shellExec(bearer, phoneId, 'input keyevent 111') // ESCAPE
-    await sleep(500)
+    if (abortSignal.abort) return { ok: false, error: 'Annulé' }
 
-    // ── Tap Log In button ──────────────────────────────────────────────────
+    // ── Vérification post-connexion ────────────────────────────────────────
     xml = await dumpXml(bearer, phoneId)
-    log('🔐 Tap sur "Se connecter"…')
-    const loginPt: [number, number] =
-      findByText(xml, 'Log in', 'Se connecter', 'Log In', 'Login', 'Connexion') ??
-      findByResourceId(xml, 'button_text', 'login_button', 'button_login') ??
-      [Math.floor(sw / 2), Math.floor(sh * 0.62)]
-
-    await shellExec(bearer, phoneId, `input tap ${loginPt[0]} ${loginPt[1]}`)
-    log('⏳ Connexion en cours… (attente 12s)')
-    await sleep(12000)
-
-    if (abortSignal.abort) return { ok: true }
-
-    // ── Post-login detection ───────────────────────────────────────────────
-    xml = await dumpXml(bearer, phoneId)
+    log(`📋 XML post-login (${xml.length} chars): ${xml.substring(0, 300)}`)
     const xmlLower = xml.toLowerCase()
+
+    // Still on the login page = credentials were not accepted
+    const loginPageIndicators = [
+      'login_username', 'email_phone_field',
+      'phone number, username, or email',
+      'username, email or mobile number',
+      'numéro de téléphone, nom d\'utilisateur',
+    ]
+    if (loginPageIndicators.some(p => xmlLower.includes(p))) {
+      log('❌ Toujours sur la page de connexion — identifiants refusés ou champs non remplis')
+      return { ok: false, error: 'Connexion échouée — la page de login est toujours visible (identifiants incorrects ?)' }
+    }
 
     const errPatterns = [
       'incorrect password', 'mot de passe incorrect',
       'was incorrect', 'try again later', 'réessayer plus tard',
       'unusual login attempt', 'connexion inhabituelle',
+      'wrong password', "couldn't find your account",
     ]
     for (const pat of errPatterns) {
       if (xmlLower.includes(pat)) {
-        log(`❌ Erreur: ${pat}`)
+        log(`❌ Erreur détectée: "${pat}"`)
         return { ok: false, error: `Login échoué — ${pat}` }
       }
     }
 
-    const homeIndicators = ['home_tab', 'feed', 'accueil', 'reels', 'explore', 'ig_bottom_bar']
-    const isHome = homeIndicators.some(p => xmlLower.includes(p))
-    if (isHome) {
+    const homeIndicators = [
+      'home_tab', 'ig_bottom_bar', 'navigation_bar',
+      'reels_tab', 'clips_tab', 'explore_tab',
+    ]
+    if (homeIndicators.some(p => xmlLower.includes(p))) {
       log('✅ Connexion réussie !')
-    } else {
-      log('⚠️ Connexion probable — vérifier le téléphone (2FA ou challenge possible)')
+      return { ok: true }
     }
 
-    return { ok: true }
+    // Unknown state — could be 2FA, challenge screen, etc.
+    log('⚠️ État inconnu après connexion — 2FA ou challenge possible, vérifier le téléphone')
+    return { ok: false, error: 'État inconnu après connexion — 2FA ou challenge requis, vérifier manuellement' }
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) }
   }
