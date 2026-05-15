@@ -682,6 +682,16 @@ export function Remix({ user }: RemixProps) {
                   <p className="text-sm" style={{ color: 'rgba(196,181,253,0.5)' }}>Remix enregistré avec succès</p>
                 </div>
               </div>
+              {/* Video preview */}
+              {isWeb && result.outputPath?.startsWith('blob:') && (
+                <video
+                  src={result.outputPath}
+                  controls
+                  playsInline
+                  className="w-full rounded-xl max-h-72 bg-black"
+                  style={{ border: '1px solid rgba(255,255,255,0.08)' }}
+                />
+              )}
               {isWeb ? (
                 <div className="rounded-xl px-4 py-3" style={{ background: 'rgba(52,211,153,0.06)', border: '1px solid rgba(52,211,153,0.2)' }}>
                   <p className="text-[10px] uppercase tracking-wider font-bold mb-2" style={{ color: '#34d399' }}>Télécharger</p>
