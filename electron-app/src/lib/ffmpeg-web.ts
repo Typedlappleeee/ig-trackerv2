@@ -15,16 +15,21 @@ async function getFFmpeg(): Promise<FFmpeg> {
 
   _loading = (async () => {
     const ff = new FFmpeg()
-
-    // Load from same-origin /ffmpeg/ path (files are in public/ffmpeg/).
-    // Previously loaded from jsDelivr CDN but that fails under COEP require-corp
-    // headers (no Cross-Origin-Resource-Policy on CDN responses).
-    // Same-origin files bypass all COEP/CORS restrictions.
     const base = `${location.origin}/ffmpeg`
+
     await ff.load({
       coreURL: await toBlobURL(`${base}/ffmpeg-core.js`,   'text/javascript'),
       wasmURL: await toBlobURL(`${base}/ffmpeg-core.wasm`, 'application/wasm'),
     })
+
+    // Write fonts into WASM virtual FS so drawtext can use fontfile=
+    // (no system fonts exist in the WASM sandbox; fontname-based lookup always fails)
+    const loadFont = async (name: string) => {
+      const r = await fetch(`${base}/${name}`)
+      await ff.writeFile(name, new Uint8Array(await r.arrayBuffer()))
+    }
+    await loadFont('font-bold.ttf')
+    await loadFont('font.ttf')
 
     _ffmpeg = ff
     return ff
@@ -276,8 +281,10 @@ export async function runFfmpegRemixAIWeb(opts: {
 }): Promise<{ ok: boolean; outputPath?: string; error?: string }> {
   const FILES = ['ai_orig.mp4', 'ai_new1.mp4', 'ai_out.mp4']
   const ff = await getFFmpeg()
-  // Pre-cleanup: remove stale files from any previous failed run
   for (const f of FILES) await ff.deleteFile(f).catch(() => {})
+  const ffLogs: string[] = []
+  const logHandler = ({ message }: { message: string }) => ffLogs.push(message)
+  ff.on('log', logHandler)
   try {
     await writeInput(ff, 'ai_orig.mp4', opts.originalPath)
     await writeInput(ff, 'ai_new1.mp4', opts.newPhase1Path)
@@ -295,8 +302,8 @@ export async function runFfmpegRemixAIWeb(opts: {
         .replace(/\\/g, '\\\\')
       const borderPx = Math.max(3, Math.round(ov.fontSize * 0.07))
       const shadow   = ov.shadow !== false ? ':shadowx=4:shadowy=4:shadowcolor=black@0.7' : ''
-      const bold     = ov.bold ? ':font=Arial Bold' : ':font=Arial'
-      return `drawtext=text=${q}${escaped}${q}${bold}:fontsize=${ov.fontSize}:fontcolor=${ov.fontColor}:x=${ov.x}:y=${ov.y}:borderw=${borderPx}:bordercolor=black@1.0${shadow}:enable=${q}between(t,${ov.startTime},${ov.endTime})${q}`
+      const fontFile = ov.bold ? 'font-bold.ttf' : 'font.ttf'
+      return `drawtext=text=${q}${escaped}${q}:fontfile=${fontFile}:fontsize=${ov.fontSize}:fontcolor=${ov.fontColor}:x=${ov.x}:y=${ov.y}:borderw=${borderPx}:bordercolor=black@1.0${shadow}:enable=${q}between(t,${ov.startTime},${ov.endTime})${q}`
     }).join(',')
 
     const filterComplex = [
@@ -320,8 +327,11 @@ export async function runFfmpegRemixAIWeb(opts: {
     const url = await readOutput(ff, 'ai_out.mp4')
     return { ok: true, outputPath: url }
   } catch (err) {
-    return { ok: false, error: String(err) }
+    const relevant = ffLogs.filter(l => /error|invalid|unknown|cannot|no such/i.test(l)).slice(-3)
+    const detail   = relevant.length ? '\n' + relevant.join('\n') : ''
+    return { ok: false, error: String(err) + detail }
   } finally {
+    ff.off('log', logHandler)
     for (const f of FILES) await ff.deleteFile(f).catch(() => {})
   }
 }
