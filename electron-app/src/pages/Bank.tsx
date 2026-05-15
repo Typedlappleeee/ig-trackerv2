@@ -933,11 +933,16 @@ export function VideoThumbnail({ filePath, thumbnailPath, storagePath }: {
 function VideoPlayerModal({ item, onClose }: { item: ContentItem; onClose: () => void }) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const [cloudUrl, setCloudUrl] = useState<string | null>(null)
+  const [urlError, setUrlError] = useState(false)
 
   useEffect(() => {
     let cancelled = false
     if (item.storage_path) {
-      getSignedUrl(item.storage_path).then(u => { if (!cancelled) setCloudUrl(u) })
+      getSignedUrl(item.storage_path).then(u => {
+        if (cancelled) return
+        if (u) setCloudUrl(u)
+        else setUrlError(true)
+      })
     }
     return () => { cancelled = true }
   }, [item.storage_path])
@@ -960,6 +965,8 @@ function VideoPlayerModal({ item, onClose }: { item: ContentItem; onClose: () =>
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
+
+  const loading = item.storage_path && !cloudUrl && !urlError
 
   return (
     <div
@@ -987,15 +994,31 @@ function VideoPlayerModal({ item, onClose }: { item: ContentItem; onClose: () =>
           {item.duration && <span className="opacity-60 flex-shrink-0">· {formatDuration(item.duration)}</span>}
         </div>
 
+        {/* Loading / error states */}
+        {loading && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-full border-2 border-white/20 border-t-white animate-spin" />
+          </div>
+        )}
+        {urlError && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-white/60">
+            <span className="text-3xl">⚠️</span>
+            <span className="text-sm">Impossible de charger la vidéo</span>
+          </div>
+        )}
+
         {/* Video fills the container */}
-        <video
-          ref={videoRef}
-          src={localUrl || undefined}
-          controls
-          autoPlay
-          style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
-          onError={() => {}}
-        />
+        {localUrl && (
+          <video
+            key={localUrl}
+            ref={videoRef}
+            src={localUrl}
+            controls
+            autoPlay
+            style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
+            onError={() => setUrlError(true)}
+          />
+        )}
       </div>
     </div>
   )
