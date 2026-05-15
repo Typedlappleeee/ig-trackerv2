@@ -792,18 +792,64 @@ export async function loginInstagramAccount(
     await shellExec(bearer, phoneId, `input text "${escapeForInputText(email)}"`)
     await sleep(800)
 
-    // ── TAB vers le mot de passe ───────────────────────────────────────────
-    await shellExec(bearer, phoneId, 'input keyevent 61')
-    await sleep(700)
+    // ── Après l'email : Next ou champ password direct ─────────────────────
+    await sleep(800)
+
+    // Re-dump to detect whether this is a 2-screen flow (email → Next → password)
+    // or a single-screen flow (both fields visible at once)
+    xml = await dumpXml(bearer, phoneId)
+
+    // Check for Next/Continue button (2-screen Instagram login flow)
+    const nextAfterEmail = findByText(xml,
+      'Next', 'Suivant', 'Continue', 'Continuer', 'Next step',
+    ) ?? findByResourceId(xml, 'next_button', 'action_next', 'button_next')
+
+    if (nextAfterEmail) {
+      log('➡️ Bouton Next détecté — Instagram login en 2 étapes')
+      await shellExec(bearer, phoneId, `input tap ${nextAfterEmail[0]} ${nextAfterEmail[1]}`)
+      await sleep(3000)
+      xml = await dumpXml(bearer, phoneId)
+      log(`📋 XML après Next (${xml.length} chars)`)
+    }
+
+    // Find password field in updated XML
+    const passwordPt: [number, number] | null =
+      findByResourceId(xml,
+        'password', 'login_password', 'com.instagram.android:id/password',
+        'com.instagram.android:id/login_password') ??
+      findByText(xml, 'Password', 'Mot de passe', 'Enter password') ??
+      (nextAfterEmail
+        ? [Math.floor(sw / 2), Math.floor(sh * 0.42)] as [number, number]
+        : null)
+
+    if (passwordPt) {
+      log(`🔑 Champ password à [${passwordPt[0]},${passwordPt[1]}] — tap direct`)
+      await shellExec(bearer, phoneId, `input tap ${passwordPt[0]} ${passwordPt[1]}`)
+      await sleep(800)
+    } else {
+      // Single-screen fallback: TAB from email field
+      log('🔑 Champ password non trouvé — TAB depuis email')
+      await shellExec(bearer, phoneId, 'input keyevent 61')
+      await sleep(700)
+    }
 
     // ── Saisie mot de passe ────────────────────────────────────────────────
     log('🔑 Saisie du mot de passe…')
     await shellExec(bearer, phoneId, `input text "${escapeForInputText(password)}"`)
     await sleep(800)
 
-    // ── Soumission via ENTER ───────────────────────────────────────────────
-    log('🔐 Soumission du formulaire (ENTER)…')
-    await shellExec(bearer, phoneId, 'input keyevent 66')
+    // ── Soumission : bouton Log In ou ENTER ───────────────────────────────────
+    log('🔐 Soumission…')
+    xml = await dumpXml(bearer, phoneId)
+    const loginBtn = findByText(xml, 'Log in', 'Se connecter', 'Log In', 'Sign in', 'Connexion') ??
+                     findByResourceId(xml, 'button_text', 'login_button', 'log_in_button')
+    if (loginBtn) {
+      log(`   Bouton login à [${loginBtn[0]},${loginBtn[1]}]`)
+      await shellExec(bearer, phoneId, `input tap ${loginBtn[0]} ${loginBtn[1]}`)
+    } else {
+      log('   Bouton non trouvé → ENTER')
+      await shellExec(bearer, phoneId, 'input keyevent 66')
+    }
     log('⏳ Connexion en cours… (attente 15s)')
     await sleep(15000)
 
