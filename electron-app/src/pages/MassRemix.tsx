@@ -188,10 +188,8 @@ Identify ALL burned-in text overlays (titles, captions, subtitles, watermarks). 
 {"text":"exact string","xAlign":"left"|"center"|"right","yPercent":0-100,"fontSizePx":number,"fontColor":"css-color","bold":true,"startFrame":0,"endFrame":5}
 
 Rules for fontSizePx (at 1080×1920):
-- Large title text: 120-200px
-- Subtitles/captions: 70-120px
-- Small labels: 50-80px
-Instagram/TikTok text is typically bold and large — do NOT underestimate.
+CRITICAL: text must fit on ONE LINE within 1080px. Use fontSizePx ≤ 900/(text.length×0.55).
+Examples: 6 chars→max 272px, 10 chars→max 163px, 15 chars→max 109px, 20 chars→max 81px, 30 chars→max 54px.
 Return ONLY a JSON array. If none, return [].`
             const res = await window.electronAPI!.anthropicVisionRequest!({
               apiKey: anthropicKey.trim(), model: 'claude-haiku-4-5-20251001',
@@ -208,7 +206,7 @@ Return ONLY a JSON array. If none, return [].`
                     text: item.text,
                     x: xAlignToExpr(item.xAlign ?? 'center'),
                     y: `h*${Math.max(0.01, Math.min(0.97, (item.yPercent ?? 85) / 100)).toFixed(3)}`,
-                    fontSize: Math.round(Math.max(40, Math.min(400, item.fontSizePx ?? 100))),
+                    fontSize: Math.round(Math.max(40, Math.min(200, item.fontSizePx ?? 100, Math.round(900 / Math.max(item.text.length * 0.55, 1))))),
                     fontColor: item.fontColor ?? 'white',
                     bold: item.bold ?? true,
                     shadow: true,

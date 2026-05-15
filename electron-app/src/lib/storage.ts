@@ -186,6 +186,10 @@ export async function getSignedUrl(path: string | null | undefined): Promise<str
 // Cache to avoid re-downloading the same cloud video twice within a session
 const tempPathCache = new Map<string, string>()
 
+// Blob object cache keyed by blob URL — lets FFmpeg use FileReader instead of fetch()
+// so it works even in strict COEP contexts that block cross-origin fetches on blob: URLs.
+export const blobObjectStore = new Map<string, Blob>()
+
 // Download a Storage path to a local temp file. Returns the local absolute path.
 export async function downloadToTemp(path: string): Promise<string> {
   const cached = tempPathCache.get(path)
@@ -210,29 +214,41 @@ async function downloadToBlobUrl(storagePath: string): Promise<string> {
   const cached = blobUrlCache.get(storagePath)
   if (cached) return cached
 
-  // Attempt 1: direct authenticated download via Supabase SDK
-  const { data, error } = await supabase.storage.from(BUCKET).download(storagePath)
-  if (!error && data) {
-    const url = URL.createObjectURL(data)
-    blobUrlCache.set(storagePath, url)
-    return url
+  // Attempt 1: direct authenticated download via Supabase SDK.
+  // Wrapped in try/catch because the SDK can throw a TypeError (network error)
+  // instead of returning {error}, which would bypass the fallback otherwise.
+  try {
+    const { data, error } = await supabase.storage.from(BUCKET).download(storagePath)
+    if (!error && data) {
+      const url = URL.createObjectURL(data)
+      blobUrlCache.set(storagePath, url)
+      blobObjectStore.set(url, data)
+      return url
+    }
+  } catch {
+    // fall through to attempt 2
   }
 
   // Attempt 2: get a signed URL, then fetch it manually to produce a blob URL
-  const signedUrl = await getSignedUrl(storagePath)
-  if (signedUrl) {
-    const res = await fetch(signedUrl)
-    if (res.ok) {
-      const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
-      blobUrlCache.set(storagePath, url)
-      return url
+  try {
+    const signedUrl = await getSignedUrl(storagePath)
+    if (signedUrl) {
+      const res = await fetch(signedUrl)
+      if (res.ok) {
+        const blob = await res.blob()
+        const url = URL.createObjectURL(blob)
+        blobUrlCache.set(storagePath, url)
+        blobObjectStore.set(url, blob)
+        return url
+      }
     }
+  } catch {
+    // fall through to error
   }
 
   throw new Error(
-    `Impossible de télécharger la vidéo (${error?.message ?? 'erreur réseau'}). ` +
-    `Vérifiez vos permissions Supabase ou ré-uploadez le fichier.`
+    `Impossible de télécharger "${storagePath.split('/').pop()}" depuis Supabase. ` +
+    `Vérifiez votre connexion et les permissions du bucket.`
   )
 }
 

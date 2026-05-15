@@ -31,7 +31,18 @@ async function getFFmpeg(): Promise<FFmpeg> {
 }
 
 // Write a file into ffmpeg's virtual FS from a blob URL or any URL.
+// For blob: URLs we use the cached Blob directly via FileReader to avoid any
+// fetch() call — which can fail in strict COEP/CORS browser security contexts.
 async function writeInput(ff: FFmpeg, name: string, url: string): Promise<void> {
+  if (url.startsWith('blob:') || url.startsWith('data:')) {
+    const { blobObjectStore } = await import('./storage')
+    const blob = blobObjectStore.get(url)
+    if (blob) {
+      const data = await fetchFile(blob)
+      await ff.writeFile(name, data)
+      return
+    }
+  }
   const data = await fetchFile(url)
   await ff.writeFile(name, data)
 }
