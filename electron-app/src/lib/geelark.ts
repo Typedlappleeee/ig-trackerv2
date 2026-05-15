@@ -143,94 +143,49 @@ async function shellExec(
   throw new Error('GéeLark shell: téléphone non prêt après plusieurs tentatives')
 }
 
-// Ensure the cloud phone is running. Starts it if needed and polls until ready.
-// GéeLark status: 0=stopped, 1=running (shell ready), 2=starting (booting, shell not ready), 3=stopping
+// Ensure the cloud phone is running. Mirrors MassPosting's approach:
+// always send /phone/start then wait 30s flat (polling status is unreliable).
 async function ensurePhoneRunning(
   bearer: string,
   phoneId: string,
   log?: (m: string) => void,
   signal?: AbortSignal,
 ): Promise<boolean> {
-  const numStatus = (v: unknown) => Number(v ?? -1)
-
-  // Status 1 = fully running, shell accepts commands
-  const isReady    = (s: number) => s === 1
-  // Status 2 = starting (booting), shell returns 42002 "phone is not running"
-  const isBooting  = (s: number) => s === 2
-
-  const statusLabel = (s: number) => (
-    s === 0 ? 'arrêté' :
-    s === 1 ? 'en marche ✅' :
-    s === 2 ? 'démarrage en cours…' :
-    s === 3 ? 'arrêt en cours' :
-    `inconnu (${s})`
-  )
-
-  log?.('🔎 Vérification du statut du téléphone…')
-  const phones = await fetchAllPhones(bearer)
-  const p = phones.find(x => x.id === phoneId)
-  if (!p) {
-    const sample = phones.slice(0, 5).map(x => x.id).join(', ')
-    log?.(`❌ Téléphone introuvable (cherché: "${phoneId}") — ${phones.length} téléphone(s) dans GéeLark`)
-    log?.(`   Exemples d'IDs reçus: ${sample || 'aucun'}`)
-    throw new Error(`phone ${phoneId} not found in GéeLark`)
-  }
-
-  const st = numStatus(p.status)
-  log?.(`📱 Statut initial: ${statusLabel(st)} [raw=${st}] — ${p.serialName ?? p.name ?? p.id}`)
-
-  // Already fully running — shell is ready
-  if (isReady(st)) {
-    log?.('📱 Téléphone prêt ✓')
-    await warmupShellDelay(bearer, phoneId, log, signal)
-    return true
-  }
-
-  // Stopping — wait before attempting start
-  if (st === 3) {
-    log?.('⏳ Téléphone en cours d\'arrêt — attente 15s…')
-    await sleepOrAbort(15000, signal)
-  }
-
-  // If NOT already booting (status 2), send the start command
-  if (!isBooting(st)) {
-    log?.('📱 Envoi commande de démarrage…')
-    const startRes = await geelarkFetch('POST', '/phone/start', { ids: [phoneId] }, bearer)
-    const code    = Number(startRes['code'] ?? -1)
-    const success = Number((startRes['data'] as Record<string, unknown>)?.['successAmount'] ?? 0)
-    const failed  = Number((startRes['data'] as Record<string, unknown>)?.['failAmount'] ?? 0)
-    const msg     = String(startRes['msg'] ?? startRes['message'] ?? '')
-    log?.(`  → code=${code}, démarrés=${success}, échecs=${failed}${msg ? ` (${msg})` : ''}`)
-
-    if (code !== 0) {
-      log?.(`  ❌ Erreur API démarrage: ${msg || code}`)
-      if (success === 0 && failed > 0) return false
+  // Check if phone is currently stopping — wait before trying to start
+  try {
+    const phones = await fetchAllPhones(bearer)
+    const p = phones.find(x => x.id === phoneId)
+    if (p) {
+      const st = Number(p.status ?? -1)
+      const label = st === 0 ? 'arrêté' : st === 1 ? 'en marche' : st === 2 ? 'démarrage en cours' : st === 3 ? 'arrêt en cours' : `inconnu(${st})`
+      log?.(`📱 Statut: ${label} [raw=${st}] — ${p.serialName ?? p.name ?? p.id}`)
+      if (st === 3) {
+        log?.('⏳ En cours d\'arrêt — attente 15s…')
+        await sleepOrAbort(15000, signal)
+      }
     }
-  } else {
-    log?.('📱 Téléphone en cours de démarrage — attente qu\'il soit prêt…')
+  } catch { /* ignore — still attempt start */ }
+
+  // Always send start command (same as MassPosting — GéeLark no-ops if already running)
+  log?.('📱 Envoi commande de démarrage…')
+  const startRes = await geelarkFetch('POST', '/phone/start', { ids: [phoneId] }, bearer)
+  const code    = Number(startRes['code'] ?? -1)
+  const success = Number((startRes['data'] as Record<string, unknown>)?.['successAmount'] ?? 0)
+  const failed  = Number((startRes['data'] as Record<string, unknown>)?.['failAmount'] ?? 0)
+  const msg     = String(startRes['msg'] ?? startRes['message'] ?? '')
+  log?.(`  → code=${code}, démarrés=${success}, échecs=${failed}${msg ? ` (${msg})` : ''}`)
+
+  if (code !== 0 && success === 0 && failed > 0) {
+    log?.(`❌ Impossible de démarrer: ${msg || code}`)
+    return false
   }
 
-  // Poll every 5s up to 150s until status reaches 1 (shell-ready).
-  // Status 2 (booting) is NOT enough — shell returns 42002 until status becomes 1.
-  log?.('⏳ Attente démarrage complet (max 150s)…')
-  const maxPoll = 30  // 30 × 5s = 150s
-  for (let i = 0; i < maxPoll; i++) {
-    if (signal?.aborted) throw new Error('Annulé')
-    await sleepOrAbort(5000, signal)
-    const elapsed = (i + 1) * 5
-    const list  = await fetchAllPhones(bearer)
-    const cur   = list.find(x => x.id === phoneId)
-    const curSt = numStatus(cur?.status)
-    log?.(`  ${elapsed}s — statut: ${statusLabel(curSt)} [raw=${curSt}]`)
-    if (isReady(curSt)) {
-      log?.(`✅ Téléphone prêt après ${elapsed}s`)
-      await warmupShellDelay(bearer, phoneId, log, signal)
-      return true
-    }
-  }
+  // Flat 30s wait then verify shell — same approach as MassPosting
+  log?.('⏳ Boot en cours — attente 30s…')
+  await sleepOrAbort(30000, signal)
 
-  log?.('❌ Timeout 150s : téléphone non prêt — vérifier GéeLark (quota ? ID correct ?)')
-  return false
+  await warmupShellDelay(bearer, phoneId, log, signal)
+  return true
 }
 
 // After the phone reaches status=1, wait for the shell daemon to accept commands.

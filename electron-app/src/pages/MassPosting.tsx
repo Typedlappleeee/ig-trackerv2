@@ -38,10 +38,21 @@ const STATUS_LABEL: Record<TaskStatus['status'], string> = {
 }
 
 async function geelark(bearer: string, path: string, body: unknown) {
-  const r = await window.electronAPI!.geelarkRequest({
-    method: 'POST', url: `${GEELARK}${path}`,
-    headers: { Authorization: `Bearer ${bearer}` }, body,
+  const url     = `${GEELARK}${path}`
+  const headers = { Authorization: `Bearer ${bearer}` }
+  if (window.electronAPI?.geelarkRequest) {
+    const r = await window.electronAPI.geelarkRequest({ method: 'POST', url, headers, body })
+    return r.data as Record<string, unknown>
+  }
+  // Web: route through Vercel proxy
+  const res = await fetch('/api/geelark', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ method: 'POST', url, headers, body }),
   })
+  if (!res.ok) throw new Error(`Proxy HTTP ${res.status}`)
+  const r = await res.json()
+  if (!r.ok) throw new Error(r.error ?? 'Network error')
   return r.data as Record<string, unknown>
 }
 
