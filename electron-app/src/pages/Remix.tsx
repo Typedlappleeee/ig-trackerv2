@@ -83,7 +83,7 @@ function SplitScrubber({ duration, splitTime, onChange }: { duration: number; sp
     if (!barRef.current) return
     const rect  = barRef.current.getBoundingClientRect()
     const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
-    onChange(Math.round(ratio * duration * 10) / 10)
+    onChange(Math.round(ratio * duration * 1000) / 1000)
   }
 
   useEffect(() => {
@@ -231,7 +231,7 @@ export function Remix({ user }: RemixProps) {
 
   const handleOrigDur = useCallback((d: number) => {
     setOriginalDur(d)
-    setSplitTime(prev => prev === 0 ? Math.round(d * 0.5 * 10) / 10 : prev)
+    setSplitTime(prev => prev === 0 ? Math.round(d * 0.5 * 1000) / 1000 : prev)
   }, [])
 
   async function pickOrigFromPC() {
@@ -249,9 +249,9 @@ export function Remix({ user }: RemixProps) {
     const r = await window.electronAPI!.detectSceneChange!({ filePath: originalPath })
     setDetecting(false)
     if (r.ok && r.splitTime != null) {
-      const t = Math.min(originalDur - 0.1, Math.round((r.splitTime + 0.1) * 10) / 10)
+      const t = Math.min(originalDur - 0.033, Math.round(r.splitTime * 1000) / 1000)
       setSplitTime(t)
-      setDetectMsg({ ok: true, text: `Coupure détectée à ${fmtTime(r.splitTime)} → ${fmtTime(t)} (+0.1s)` })
+      setDetectMsg({ ok: true, text: `Coupure détectée à ${fmtTime(t)}` })
       playSuccess()
     } else {
       setDetectMsg({ ok: false, text: r.error ?? 'Aucune coupure détectée' })
@@ -281,9 +281,9 @@ export function Remix({ user }: RemixProps) {
       let parsed: { splitTime?: number; description?: string } = {}
       try { const m = txt.match(/\{[\s\S]*\}/); if (m) parsed = JSON.parse(m[0]) } catch { throw new Error('Réponse IA invalide') }
       if (parsed.splitTime != null && parsed.splitTime > 0 && parsed.splitTime < originalDur) {
-        const t = Math.min(originalDur - 0.1, Math.round((parsed.splitTime + 0.1) * 10) / 10)
+        const t = Math.min(originalDur - 0.033, Math.round(parsed.splitTime * 1000) / 1000)
         setSplitTime(t)
-        setAiDetectMsg({ ok: true, text: `IA : ${fmtTime(parsed.splitTime)} → ${fmtTime(t)}${parsed.description ? ` — ${parsed.description}` : ''}` })
+        setAiDetectMsg({ ok: true, text: `IA : ${fmtTime(t)}${parsed.description ? ` — ${parsed.description}` : ''}` })
         playSuccess()
       } else { throw new Error('Aucune coupure trouvée') }
     } catch (err: unknown) {
