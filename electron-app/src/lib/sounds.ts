@@ -5,8 +5,13 @@ let _ctx: AudioContext | null = null
 
 function ctx(): AudioContext {
   if (!_ctx) _ctx = new AudioContext()
-  if (_ctx.state === 'suspended') _ctx.resume()
   return _ctx
+}
+
+async function resume(): Promise<AudioContext> {
+  const ac = ctx()
+  if (ac.state === 'suspended') await ac.resume()
+  return ac
 }
 
 function note(
@@ -67,10 +72,12 @@ export function playToast(kind: 'ok' | 'error' | 'warn' | 'info') {
 }
 
 /** 4-note C major arpeggio jingle played at app startup */
-export function playSplash() {
+export async function playSplash() {
   try {
-    const ac = ctx()
-    const t0 = ac.currentTime + 0.35  // slight delay after render
+    // Must await resume() — AudioContext starts suspended on web (autoplay policy).
+    // Scheduling notes against a suspended context makes them play late once resumed.
+    const ac = await resume()
+    const t0 = ac.currentTime + 0.05  // tiny scheduling headroom only
 
     // Melody: C4 → E4 → G4 → C5
     const melody = [261.63, 329.63, 392.00, 523.25]
