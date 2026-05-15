@@ -758,6 +758,7 @@ export function MassPosting({ user }: MassPostingProps) {
         <BankPicker
           user={user}
           mode="multi"
+          resolveMode="signed-url"
           onSelect={(paths) => {
             const newVideos: SelectedVideo[] = paths
               .filter(p => !selectedVideos.some(sv => (sv.localPath ?? sv.item.file_url) === p))

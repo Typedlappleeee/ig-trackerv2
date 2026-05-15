@@ -877,7 +877,7 @@ export function VideoThumbnail({ filePath, thumbnailPath, storagePath }: {
         ref={videoRef}
         src={videoSrc}
         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-        muted playsInline preload="metadata" crossOrigin="anonymous"
+        muted playsInline preload="metadata"
         onLoadedMetadata={() => { if (videoRef.current) videoRef.current.currentTime = 0.5 }}
         onError={() => setFailed(true)}
       />
@@ -1057,9 +1057,12 @@ export interface BankPickerProps {
   mode: 'single' | 'multi'
   onSelect: (paths: string[]) => void
   onClose: () => void
+  // 'signed-url': just create a signed URL (fast, no download) — for MassPosting
+  // 'full': download to local path/blob URL — for Remix/FFmpeg (default)
+  resolveMode?: 'full' | 'signed-url'
 }
 
-export function BankPicker({ user, mode, onSelect, onClose }: BankPickerProps) {
+export function BankPicker({ user, mode, onSelect, onClose, resolveMode = 'full' }: BankPickerProps) {
   const { currentOrg, role, perms } = useOrg()
   const [items, setItems]           = useState<ContentItem[]>([])
   const [loading, setLoading]       = useState(true)
@@ -1092,15 +1095,22 @@ export function BankPicker({ user, mode, onSelect, onClose }: BankPickerProps) {
     return item.title.toLowerCase().includes(q) || item.tags.some(t => t.toLowerCase().includes(q))
   })
 
-  // Download cloud-stored items to temp; legacy items return file_url as-is.
   async function resolvePaths(its: ContentItem[]): Promise<string[]> {
     const out: string[] = []
     for (let i = 0; i < its.length; i++) {
       const it = its[i]
       setResolving(`${i + 1}/${its.length} — ${it.title}`)
       try {
-        const { resolveContentToLocalPath } = await import('@/lib/storage')
-        out.push(await resolveContentToLocalPath(it))
+        if (resolveMode === 'signed-url') {
+          // Fast path: just create a signed URL — no full download needed
+          const { getSignedUrl } = await import('@/lib/storage')
+          const url = await getSignedUrl(it.storage_path ?? it.file_url)
+          if (url) out.push(url)
+          else if (it.file_url) out.push(it.file_url)
+        } else {
+          const { resolveContentToLocalPath } = await import('@/lib/storage')
+          out.push(await resolveContentToLocalPath(it))
+        }
       } catch (e) {
         console.error('[BankPicker] resolve failed', it.id, e)
       }
