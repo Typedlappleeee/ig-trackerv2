@@ -823,9 +823,11 @@ export async function loginInstagramAccount(
         : null)
 
     if (passwordPt) {
-      log(`🔑 Champ password à [${passwordPt[0]},${passwordPt[1]}] — tap direct`)
+      log(`🔑 Champ password à [${passwordPt[0]},${passwordPt[1]}] — double tap pour focus`)
       await shellExec(bearer, phoneId, `input tap ${passwordPt[0]} ${passwordPt[1]}`)
-      await sleep(800)
+      await sleep(400)
+      await shellExec(bearer, phoneId, `input tap ${passwordPt[0]} ${passwordPt[1]}`)
+      await sleep(600)
     } else {
       // Single-screen fallback: TAB from email field
       log('🔑 Champ password non trouvé — TAB depuis email')
@@ -838,13 +840,13 @@ export async function loginInstagramAccount(
     await shellExec(bearer, phoneId, `input text "${escapeForInputText(password)}"`)
     await sleep(800)
 
-    // ── Soumission : bouton Log In ou ENTER ───────────────────────────────────
-    log('🔐 Soumission…')
+    // ── Soumission : bouton Log In ────────────────────────────────────────
+    log('🔐 Tap bouton Log in…')
     xml = await dumpXml(bearer, phoneId)
-    const loginBtn = findByText(xml, 'Log in', 'Se connecter', 'Log In', 'Sign in', 'Connexion') ??
-                     findByResourceId(xml, 'button_text', 'login_button', 'log_in_button')
+    const loginBtn = findByText(xml, 'Log in', 'Log In', 'Se connecter', 'Sign in', 'Connexion') ??
+                     findByResourceId(xml, 'log_in_button', 'login_button', 'button_text')
     if (loginBtn) {
-      log(`   Bouton login à [${loginBtn[0]},${loginBtn[1]}]`)
+      log(`   Bouton Log in à [${loginBtn[0]},${loginBtn[1]}]`)
       await shellExec(bearer, phoneId, `input tap ${loginBtn[0]} ${loginBtn[1]}`)
     } else {
       log('   Bouton non trouvé → ENTER')
