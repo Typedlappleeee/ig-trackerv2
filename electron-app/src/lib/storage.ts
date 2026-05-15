@@ -220,22 +220,8 @@ async function downloadToBlobUrl(storagePath: string): Promise<string> {
   const cached = blobUrlCache.get(storagePath)
   if (cached) return cached
 
-  // Attempt 1: direct authenticated download via Supabase SDK.
-  // Wrapped in try/catch because the SDK can throw a TypeError (network error)
-  // instead of returning {error}, which would bypass the fallback otherwise.
-  try {
-    const { data, error } = await supabase.storage.from(BUCKET).download(storagePath)
-    if (!error && data) {
-      const url = URL.createObjectURL(data)
-      blobUrlCache.set(storagePath, url)
-      regBlob(url, data)
-      return url
-    }
-  } catch {
-    // fall through to attempt 2
-  }
-
-  // Attempt 2: get a signed URL, then fetch it manually to produce a blob URL
+  // Attempt 1: signed URL via Supabase CDN — much faster than the API server
+  // for large video files, and avoids the "Thread killed by timeout manager" error.
   try {
     const signedUrl = await getSignedUrl(storagePath)
     if (signedUrl) {
@@ -247,6 +233,19 @@ async function downloadToBlobUrl(storagePath: string): Promise<string> {
         regBlob(url, blob)
         return url
       }
+    }
+  } catch {
+    // fall through to attempt 2
+  }
+
+  // Attempt 2: direct authenticated download via Supabase SDK (slower fallback).
+  try {
+    const { data, error } = await supabase.storage.from(BUCKET).download(storagePath)
+    if (!error && data) {
+      const url = URL.createObjectURL(data)
+      blobUrlCache.set(storagePath, url)
+      regBlob(url, data)
+      return url
     }
   } catch {
     // fall through to error
