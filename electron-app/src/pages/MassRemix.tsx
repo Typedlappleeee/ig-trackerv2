@@ -206,7 +206,7 @@ Return ONLY a JSON array. If none, return [].`
                     text: item.text,
                     x: xAlignToExpr(item.xAlign ?? 'center'),
                     y: `h*${Math.max(0.01, Math.min(0.97, (item.yPercent ?? 85) / 100)).toFixed(3)}`,
-                    fontSize: Math.round(Math.max(40, Math.min(200, item.fontSizePx ?? 100, Math.round(900 / Math.max(item.text.length * 0.55, 1))))),
+                    fontSize: Math.round(Math.max(36, Math.min(130, item.fontSizePx ?? 80, Math.round(950 / Math.max(item.text.length * 0.62, 1))))),
                     fontColor: item.fontColor ?? 'white',
                     bold: item.bold ?? true,
                     shadow: true,

@@ -305,7 +305,7 @@ export async function runFfmpegRemixAIWeb(opts: {
         .replace(/'/g, q)
         .replace(/:/g, '\\:')
         .replace(/\\/g, '\\\\')
-      const borderPx = Math.max(3, Math.round(ov.fontSize * 0.07))
+      const borderPx = Math.max(3, Math.round(ov.fontSize * 0.09))
       const shadow   = ov.shadow !== false ? ':shadowx=4:shadowy=4:shadowcolor=black@0.7' : ''
       const fontFile = ov.bold ? 'font-bold.ttf' : 'font.ttf'
       return `drawtext=text=${q}${escaped}${q}:fontfile=${fontFile}:fontsize=${ov.fontSize}:fontcolor=${ov.fontColor}:x=${ov.x}:y=${ov.y}:borderw=${borderPx}:bordercolor=black@1.0${shadow}:enable=${q}between(t,${ov.startTime},${ov.endTime})${q}`

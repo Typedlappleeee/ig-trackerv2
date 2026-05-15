@@ -174,8 +174,8 @@ function VideoCard({ label, filePath, accent = '#8b5cf6', badge, onDurationLoad,
               color: ov.fontColor,
               fontWeight: ov.bold ? '900' : '700',
               fontFamily: '"Arial Black", "Arial Bold", Arial, sans-serif',
-              // Stroke outline via -webkit-text-stroke (mirrors FFmpeg borderw≈7%)
-              WebkitTextStroke: '0.07em black',
+              // Stroke outline via -webkit-text-stroke (mirrors FFmpeg borderw≈9%)
+              WebkitTextStroke: '0.09em black',
               // Drop shadow for depth (mirrors FFmpeg shadowx/y=4)
               textShadow: '0 0.04em 0.1em rgba(0,0,0,0.85)',
               whiteSpace: 'nowrap',
@@ -326,7 +326,7 @@ export function Remix({ user }: RemixProps) {
           y: yExpr,
           xPercent: Math.max(1, Math.min(99, item.xPercent ?? 50)),
           yPercent: Math.max(1, Math.min(97, item.yPercent ?? 85)),
-          fontSize: Math.round(Math.max(40, Math.min(200, item.fontSizePx ?? 100, Math.round(900 / Math.max(item.text.length * 0.55, 1))))),
+          fontSize: Math.round(Math.max(36, Math.min(130, item.fontSizePx ?? 80, Math.round(950 / Math.max(item.text.length * 0.62, 1))))),
           fontColor: item.fontColor ?? '#ffffff',
           bold: item.bold ?? true,
           shadow: true,
