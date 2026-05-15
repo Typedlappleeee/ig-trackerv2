@@ -198,25 +198,26 @@ async function ensurePhoneRunning(
     }
   }
 
-  // Poll up to 120s every 3s until status is 1 or 2 (both = online)
-  log?.('⏳ Attente démarrage (max 120s)…')
-  for (let i = 0; i < 40; i++) {
+  // Poll every 5s up to 150s until status is 1 or 2 (both = online).
+  // GéeLark can take 10-30s to reflect the new status after a start command.
+  log?.('⏳ Attente démarrage (max 150s) — GéeLark met quelques secondes à mettre à jour le statut…')
+  const maxPoll = 30  // 30 × 5s = 150s
+  for (let i = 0; i < maxPoll; i++) {
     if (signal?.aborted) throw new Error('Annulé')
-    await sleepOrAbort(3000, signal)
+    await sleepOrAbort(5000, signal)
+    const elapsed = (i + 1) * 5
     const list  = await fetchAllPhones(bearer)
     const cur   = list.find(x => x.id === phoneId)
     const curSt = numStatus(cur?.status)
-    if (i % 3 === 0) {
-      log?.(`  ${i * 3}s — statut: ${statusLabel(curSt)} [raw=${curSt}]`)
-    }
+    log?.(`  ${elapsed}s — statut: ${statusLabel(curSt)} [raw=${curSt}]`)
     if (isOnline(curSt)) {
-      log?.(`✅ Téléphone démarré après ${i * 3}s (statut=${curSt})`)
+      log?.(`✅ Téléphone démarré après ${elapsed}s (statut=${curSt})`)
       await warmupShellDelay(bearer, phoneId, log, signal)
       return true
     }
   }
 
-  log?.('❌ Timeout 120s : téléphone non démarré — vérifier GéeLark (quota ? ID correct ?)')
+  log?.('❌ Timeout 150s : téléphone non démarré — vérifier GéeLark (quota ? ID correct ?)')
   return false
 }
 
