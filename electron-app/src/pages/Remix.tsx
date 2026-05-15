@@ -3,6 +3,8 @@ import type { User } from '@supabase/supabase-js'
 import { Button } from '@/components/ui/Button'
 import { Spinner } from '@/components/ui/Spinner'
 import { BankPicker } from './Bank'
+
+const isWeb = typeof window !== 'undefined' && (window as any).__IS_WEB
 import { playSuccess, playWhoosh, playError } from '@/lib/sounds'
 import { supabase } from '@/lib/supabase'
 import { uploadVideoFromPath, type UploadScope } from '@/lib/storage'
@@ -680,10 +682,24 @@ export function Remix({ user }: RemixProps) {
                   <p className="text-sm" style={{ color: 'rgba(196,181,253,0.5)' }}>Remix enregistré avec succès</p>
                 </div>
               </div>
-              <div className="rounded-xl px-4 py-3" style={{ background: 'rgba(52,211,153,0.06)', border: '1px solid rgba(52,211,153,0.2)' }}>
-                <p className="text-[10px] uppercase tracking-wider font-bold mb-1" style={{ color: '#34d399' }}>Fichier local</p>
-                <p className="text-xs font-mono text-white/80 break-all">{result.outputPath}</p>
-              </div>
+              {isWeb ? (
+                <div className="rounded-xl px-4 py-3" style={{ background: 'rgba(52,211,153,0.06)', border: '1px solid rgba(52,211,153,0.2)' }}>
+                  <p className="text-[10px] uppercase tracking-wider font-bold mb-2" style={{ color: '#34d399' }}>Télécharger</p>
+                  <a
+                    href={result.outputPath}
+                    download="remix.mp4"
+                    className="inline-flex items-center gap-2 py-2 px-4 rounded-lg text-sm font-semibold transition-all"
+                    style={{ background: 'linear-gradient(130deg,#059669,#10b981)', color: '#fff' }}
+                  >
+                    ⬇ Télécharger la vidéo
+                  </a>
+                </div>
+              ) : (
+                <div className="rounded-xl px-4 py-3" style={{ background: 'rgba(52,211,153,0.06)', border: '1px solid rgba(52,211,153,0.2)' }}>
+                  <p className="text-[10px] uppercase tracking-wider font-bold mb-1" style={{ color: '#34d399' }}>Fichier local</p>
+                  <p className="text-xs font-mono text-white/80 break-all">{result.outputPath}</p>
+                </div>
+              )}
               {/* Bank upload */}
               <div className="rounded-xl px-4 py-3" style={{ background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.18)' }}>
                 <p className="text-[10px] uppercase tracking-wider font-bold mb-2" style={{ color: '#a78bfa' }}>Exporter vers la banque</p>
