@@ -836,25 +836,44 @@ export function VideoThumbnail({ filePath, thumbnailPath, storagePath }: {
   storagePath?:   string | null
 }) {
   const videoRef = useRef<HTMLVideoElement>(null)
-  const [failed, setFailed] = useState(false)
-  const [thumbUrl, setThumbUrl]     = useState<string | null>(null)
-  const [videoSrc, setVideoSrc]     = useState<string | null>(null)
+  const [failed,   setFailed]   = useState(false)
+  const [loading,  setLoading]  = useState(true)
+  const [thumbUrl, setThumbUrl] = useState<string | null>(null)
+  const [videoSrc, setVideoSrc] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
-    setThumbUrl(null); setVideoSrc(null); setFailed(false)
+    setThumbUrl(null); setVideoSrc(null); setFailed(false); setLoading(true)
     if (thumbnailPath) {
-      getSignedUrl(thumbnailPath).then(u => { if (!cancelled) setThumbUrl(u) })
+      getSignedUrl(thumbnailPath).then(u => {
+        if (cancelled) return
+        setLoading(false)
+        if (u) setThumbUrl(u)
+        else setFailed(true)
+      })
     } else if (storagePath) {
-      getSignedUrl(storagePath).then(u => { if (!cancelled) setVideoSrc(u) })
+      getSignedUrl(storagePath).then(u => {
+        if (cancelled) return
+        setLoading(false)
+        if (u) setVideoSrc(u)
+        else setFailed(true)
+      })
+    } else {
+      setLoading(false)
     }
     return () => { cancelled = true }
   }, [thumbnailPath, storagePath])
 
+  if (failed) return (
+    <div className="w-full h-full flex flex-col items-center justify-center bg-surface2 gap-1">
+      <span className="text-2xl">⚠️</span>
+      <span className="text-[10px] text-text2/50">Indisponible</span>
+    </div>
+  )
+
   // 1. JPEG thumbnail
   if (thumbnailPath) {
-    if (!thumbUrl) return <div className="w-full h-full flex items-center justify-center bg-surface2 text-4xl">🎬</div>
-    if (failed)    return <div className="w-full h-full flex items-center justify-center bg-surface2 text-4xl">🎬</div>
+    if (loading || !thumbUrl) return <div className="w-full h-full flex items-center justify-center bg-surface2 text-4xl animate-pulse">🎬</div>
     return (
       <img src={thumbUrl} alt=""
         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
@@ -864,7 +883,7 @@ export function VideoThumbnail({ filePath, thumbnailPath, storagePath }: {
 
   // 2. Cloud asset (image or video)
   if (storagePath) {
-    if (!videoSrc || failed) return <div className="w-full h-full flex items-center justify-center bg-surface2 text-4xl">🎬</div>
+    if (loading || !videoSrc) return <div className="w-full h-full flex items-center justify-center bg-surface2 text-4xl animate-pulse">🎬</div>
     if (isImagePath(storagePath)) {
       return (
         <img src={videoSrc} alt=""
