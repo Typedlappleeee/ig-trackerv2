@@ -242,6 +242,9 @@ export function Bank({ user }: BankProps) {
   const [ctxMenu, setCtxMenu]       = useState<CtxMenu | null>(null)
   const [playingItem, setPlayingItem] = useState<ContentItem | null>(null)
 
+  // Folder action modal
+  const [folderModal, setFolderModal] = useState<{ name: string; mode: 'delete' | 'merge' } | null>(null)
+
   // Multi-selection
   const [selectionMode, setSelectionMode] = useState(false)
   const [selectedIds, setSelectedIds]     = useState<Set<string>>(new Set())
@@ -490,12 +493,29 @@ export function Bank({ user }: BankProps) {
     if (selectedFolder === oldName) setSelectedFolder(newName)
   }
 
-  async function deleteFolder(name: string) {
-    if (!confirm(`Supprimer le dossier "${name}" ? Les vidéos ne seront pas supprimées.`)) return
-    await supabase.from('content_bank').update({ folder: null }).eq('user_id', user.id).eq('folder', name)
-    setItems(prev => prev.map(i => (i as unknown as {folder:string}).folder === name ? { ...i, folder: null as unknown as string } : i))
+  async function deleteFolder(name: string, withVideos: boolean) {
+    if (withVideos) {
+      const toDelete = items.filter(i => (i as unknown as {folder?: string}).folder === name)
+      if (toDelete.length > 0) {
+        await supabase.from('content_bank').delete().in('id', toDelete.map(i => i.id))
+        deleteStorageObjects(toDelete.flatMap(i => [i.storage_path, i.thumbnail_path]))
+        setItems(prev => prev.filter(i => (i as unknown as {folder?: string}).folder !== name))
+      }
+    } else {
+      await supabase.from('content_bank').update({ folder: null }).eq('user_id', user.id).eq('folder', name)
+      setItems(prev => prev.map(i => (i as unknown as {folder:string}).folder === name ? { ...i, folder: null as unknown as string } : i))
+    }
     persistEmptyFolders(emptyFolders.filter(f => f !== name))
     if (selectedFolder === name) setSelectedFolder(null)
+    setFolderModal(null)
+  }
+
+  async function mergeFolderTo(fromFolder: string, toFolder: string | null) {
+    await supabase.from('content_bank').update({ folder: toFolder }).eq('user_id', user.id).eq('folder', fromFolder)
+    setItems(prev => prev.map(i => (i as unknown as {folder?:string}).folder === fromFolder ? { ...i, folder: toFolder as unknown as string } : i))
+    persistEmptyFolders(emptyFolders.filter(f => f !== fromFolder))
+    if (selectedFolder === fromFolder) setSelectedFolder(toFolder)
+    setFolderModal(null)
   }
 
   // Derived data — folders come from items + empty (newly-created) folders
@@ -596,7 +616,8 @@ export function Bank({ user }: BankProps) {
               active={selectedFolder === f}
               onClick={() => setSelectedFolder(f)}
               onRename={(newName) => renameFolder(f, newName)}
-              onDelete={() => deleteFolder(f)}
+              onDelete={() => setFolderModal({ name: f, mode: 'delete' })}
+              onMerge={() => setFolderModal({ name: f, mode: 'merge' })}
               onDropItem={itemId => { moveItemSave(itemId, f); setSelectedFolder(f) }}
             />
           ))}
@@ -769,6 +790,48 @@ export function Bank({ user }: BankProps) {
         <VideoPlayerModal item={playingItem} onClose={() => setPlayingItem(null)} />
       )}
 
+      {/* ── Folder action modal ── */}
+      {folderModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setFolderModal(null)}>
+          <div className="bg-surface border border-border rounded-2xl p-6 w-80 space-y-4" onClick={e => e.stopPropagation()}>
+            {folderModal.mode === 'delete' ? (<>
+              <div>
+                <p className="font-semibold text-text">Supprimer le dossier <span className="text-accent">"{folderModal.name}"</span></p>
+                <p className="text-xs text-text2 mt-1">
+                  {items.filter(i => (i as unknown as {folder?:string}).folder === folderModal.name).length} vidéo(s) dans ce dossier.
+                </p>
+              </div>
+              <div className="flex flex-col gap-2">
+                <Button onClick={() => deleteFolder(folderModal.name, false)} className="w-full">
+                  📤 Supprimer le dossier, garder les vidéos (→ racine)
+                </Button>
+                <button onClick={() => deleteFolder(folderModal.name, true)}
+                  className="w-full py-2 rounded-xl text-sm font-semibold"
+                  style={{ background: 'rgba(239,68,68,0.12)', color: '#f87171', border: '1px solid rgba(239,68,68,0.25)' }}>
+                  🗑 Supprimer le dossier ET ses vidéos
+                </button>
+                <Button variant="secondary" onClick={() => setFolderModal(null)} className="w-full">Annuler</Button>
+              </div>
+            </>) : (<>
+              <p className="font-semibold text-text">Déplacer les vidéos de <span className="text-accent">"{folderModal.name}"</span> vers…</p>
+              <div className="flex flex-col gap-1 max-h-56 overflow-auto">
+                <button onClick={() => mergeFolderTo(folderModal.name, null)}
+                  className="text-left px-3 py-2 rounded-lg text-sm hover:bg-surface2 text-text2 transition-colors">
+                  🎬 Racine (sans dossier)
+                </button>
+                {folders.filter(f => f !== folderModal.name).map(f => (
+                  <button key={f} onClick={() => mergeFolderTo(folderModal.name, f)}
+                    className="text-left px-3 py-2 rounded-lg text-sm hover:bg-surface2 text-text transition-colors">
+                    📂 {f}
+                  </button>
+                ))}
+              </div>
+              <Button variant="secondary" onClick={() => setFolderModal(null)} className="w-full">Annuler</Button>
+            </>)}
+          </div>
+        </div>
+      )}
+
       {/* ── Bulk move modal ── */}
       {showBulkMove && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowBulkMove(false)}>
@@ -826,13 +889,14 @@ export function Bank({ user }: BankProps) {
 }
 
 // ── Folder row with inline rename ────────────────────────────────────────────
-function FolderRow({ name, count, active, onClick, onRename, onDelete, onDropItem }: {
+function FolderRow({ name, count, active, onClick, onRename, onDelete, onMerge, onDropItem }: {
   name: string
   count: number
   active: boolean
   onClick: () => void
   onRename: (newName: string) => void
   onDelete: () => void
+  onMerge: () => void
   onDropItem: (itemId: string) => void
 }) {
   const [editing, setEditing] = useState(false)
@@ -884,6 +948,11 @@ function FolderRow({ name, count, active, onClick, onRename, onDelete, onDropIte
             className="text-text2 hover:text-accent text-xs px-0.5"
             title="Renommer"
           >✏️</button>
+          <button
+            onClick={e => { e.stopPropagation(); onMerge() }}
+            className="text-text2 hover:text-accent text-xs px-0.5"
+            title="Déplacer vers…"
+          >📂</button>
           <button
             onClick={e => { e.stopPropagation(); onDelete() }}
             className="text-text2 hover:text-danger text-xs px-0.5"
