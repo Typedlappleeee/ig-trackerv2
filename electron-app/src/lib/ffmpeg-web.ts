@@ -430,6 +430,25 @@ function extractCenterFrac(expr: string, dim: 'w' | 'h'): number {
   return 0.5
 }
 
+// Word-wrap text to fit within maxWidth pixels, returns array of lines
+function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
+  const words = text.split(' ')
+  const lines: string[] = []
+  let current = ''
+  for (const word of words) {
+    const candidate = current ? current + ' ' + word : word
+    if (ctx.measureText(candidate).width <= maxWidth) {
+      current = candidate
+    } else {
+      if (current) lines.push(current)
+      // Single word wider than maxWidth — push as-is (better than infinite loop)
+      current = word
+    }
+  }
+  if (current) lines.push(current)
+  return lines
+}
+
 async function renderTextPNG(
   ff: FFmpeg,
   ov: { text: string; x: string; y: string; fontSize: number; fontColor: string; bold?: boolean; shadow?: boolean },
@@ -443,32 +462,44 @@ async function renderTextPNG(
 
   const weight = ov.bold ? 'bold' : 'normal'
   ctx.font = `${weight} ${ov.fontSize}px Arial, sans-serif`
-
-  // Use center alignment — avoids eval() for position expressions
   ctx.textAlign    = 'center'
   ctx.textBaseline = 'middle'
 
-  const cx = W * extractCenterFrac(ov.x, 'w')
-  const cy = H * extractCenterFrac(ov.y, 'h')
+  const maxWidth  = W * 0.88          // 88% of frame width, 6% padding each side
+  const lineH     = ov.fontSize * 1.25
+  const borderPx  = Math.max(3, Math.round(ov.fontSize * 0.09))
+  const lines     = wrapText(ctx, ov.text, maxWidth)
 
-  const borderPx = Math.max(3, Math.round(ov.fontSize * 0.09))
+  // Center block vertically around cy; shift up so the block is centered
+  const cx       = W * extractCenterFrac(ov.x, 'w')
+  const cy       = H * extractCenterFrac(ov.y, 'h')
+  const blockH   = lines.length * lineH
+  const startY   = cy - blockH / 2 + lineH / 2
 
-  // Stroke (border + shadow on stroke only to avoid double shadow)
+  const drawLine = (line: string, ly: number, stroke: boolean) => {
+    if (stroke) {
+      ctx.strokeText(line, cx, ly)
+    } else {
+      ctx.fillText(line, cx, ly)
+    }
+  }
+
+  // Draw stroke pass (border + shadow)
   ctx.strokeStyle = 'rgba(0,0,0,1)'
   ctx.lineWidth   = borderPx * 2
   ctx.lineJoin    = 'round'
   if (ov.shadow !== false) {
-    ctx.shadowColor   = 'rgba(0,0,0,0.7)'
-    ctx.shadowOffsetX = 4
-    ctx.shadowOffsetY = 4
-    ctx.shadowBlur    = 4
+    ctx.shadowColor   = 'rgba(0,0,0,0.8)'
+    ctx.shadowOffsetX = 3
+    ctx.shadowOffsetY = 3
+    ctx.shadowBlur    = 6
   }
-  ctx.strokeText(ov.text, cx, cy)
+  lines.forEach((line, i) => drawLine(line, startY + i * lineH, true))
 
-  // Fill without shadow
+  // Draw fill pass (no shadow — prevent double shadow)
   ctx.shadowColor = 'transparent'
-  ctx.fillStyle   = ov.fontColor
-  ctx.fillText(ov.text, cx, cy)
+  ctx.fillStyle   = ov.fontColor || 'white'
+  lines.forEach((line, i) => drawLine(line, startY + i * lineH, false))
 
   const blob = await new Promise<Blob>((resolve, reject) =>
     canvas.toBlob(b => (b ? resolve(b) : reject(new Error('Canvas toBlob failed'))), 'image/png'),
