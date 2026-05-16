@@ -49,10 +49,11 @@ export interface PermOverrides {
 }
 
 export interface Organization {
-  id:         string
-  name:       string
-  owner_id:   string
-  created_at: string
+  id:              string
+  name:            string
+  owner_id:        string
+  created_at:      string
+  name_updated_at: string | null
 }
 
 export interface OrgMember {
