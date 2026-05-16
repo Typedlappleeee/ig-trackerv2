@@ -289,8 +289,13 @@ export function buildWebAPI() {
     },
 
     async detectSceneChange(opts: unknown) {
-      const { detectSceneChangeWeb } = await import('./ffmpeg-web')
-      return detectSceneChangeWeb(opts as Parameters<typeof detectSceneChangeWeb>[0])
+      const { detectSceneChangeWeb, detectBeatDropWeb } = await import('./ffmpeg-web')
+      const o = opts as Parameters<typeof detectSceneChangeWeb>[0]
+      // Try beat-drop (audio) detection first — most reliable for music-driven content
+      const beat = await detectBeatDropWeb(o.filePath)
+      if (beat.ok && beat.splitTime != null && beat.splitTime > 0) return beat
+      // Fall back to visual scene change detection
+      return detectSceneChangeWeb(o)
     },
 
     async runFfmpegRemix(opts: unknown) {
