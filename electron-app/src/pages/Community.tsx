@@ -12,8 +12,11 @@
  *   title          text,
  *   is_admin       boolean NOT NULL DEFAULT false,
  *   thread_user_id uuid,
+ *   video_url      text,
  *   created_at     timestamptz DEFAULT now()
  * );
+ * -- Si la table existe déjà :
+ * -- ALTER TABLE community_messages ADD COLUMN IF NOT EXISTS video_url text;
  * ALTER TABLE community_messages ENABLE ROW LEVEL SECURITY;
  * CREATE POLICY "community_read"   ON community_messages FOR SELECT USING (auth.role() = 'authenticated');
  * CREATE POLICY "community_insert" ON community_messages FOR INSERT WITH CHECK (auth.uid() = user_id);
@@ -53,7 +56,30 @@
  *   EXISTS (SELECT 1 FROM platform_admins WHERE user_id = auth.uid())
  * );
  *
+ * ALTER TABLE community_messages ADD COLUMN IF NOT EXISTS view_count integer NOT NULL DEFAULT 0;
+ *
+ * CREATE TABLE IF NOT EXISTS community_reactions (
+ *   user_id    uuid REFERENCES auth.users NOT NULL,
+ *   message_id uuid REFERENCES community_messages NOT NULL,
+ *   PRIMARY KEY (user_id, message_id)
+ * );
+ * ALTER TABLE community_reactions ENABLE ROW LEVEL SECURITY;
+ * CREATE POLICY "reactions_read"   ON community_reactions FOR SELECT USING (auth.role() = 'authenticated');
+ * CREATE POLICY "reactions_insert" ON community_reactions FOR INSERT WITH CHECK (auth.uid() = user_id);
+ * CREATE POLICY "reactions_delete" ON community_reactions FOR DELETE USING (auth.uid() = user_id);
+ *
+ * CREATE OR REPLACE FUNCTION increment_view(msg_id uuid) RETURNS void
+ * LANGUAGE sql SECURITY DEFINER AS $$
+ *   UPDATE community_messages SET view_count = view_count + 1 WHERE id = msg_id;
+ * $$;
+ *
  * -- Bucket "avatars" public → Supabase dashboard → Storage
+ *
+ * -- Bucket "community" public pour les vidéos → Supabase dashboard → Storage → New bucket → "community" → Public
+ * -- Puis policies Storage :
+ * -- CREATE POLICY "community_select" ON storage.objects FOR SELECT USING (bucket_id = 'community');
+ * -- CREATE POLICY "community_insert" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'community' AND auth.role() = 'authenticated');
+ * -- CREATE POLICY "community_delete" ON storage.objects FOR DELETE USING (bucket_id = 'community' AND auth.uid()::text = (storage.foldername(name))[1]);
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react'
@@ -77,6 +103,8 @@ interface Message {
   title: string | null
   is_admin: boolean
   thread_user_id: string | null
+  video_url: string | null
+  view_count: number
   created_at: string
 }
 
@@ -146,9 +174,10 @@ function Avatar({ url, name, userId, size = 36, onClick }: {
 
 // ── Chat message row ───────────────────────────────────────────────────────────
 
-function ChatRow({ msg, isOwn, compact, isAdmin, onDelete, onMute }: {
-  msg: Message; isOwn: boolean; compact: boolean
-  isAdmin: boolean; onDelete: (id: string) => void; onMute?: (uid: string, name: string) => void
+function ChatRow({ msg, isOwn, compact, isAdmin, likeCount, liked, onLike, onDelete, onMute }: {
+  msg: Message; isOwn: boolean; compact: boolean; isAdmin: boolean
+  likeCount: number; liked: boolean; onLike: (id: string) => void
+  onDelete: (id: string) => void; onMute?: (uid: string, name: string) => void
 }) {
   return (
     <div className={`flex gap-3 group ${compact ? 'mt-[2px]' : 'mt-4'}`}>
@@ -182,15 +211,27 @@ function ChatRow({ msg, isOwn, compact, isAdmin, onDelete, onMute }: {
           </div>
         )}
         <div className="flex items-end gap-1.5">
-          <p className="flex-1 text-[13.5px] leading-relaxed break-words" style={{ color: 'rgba(212,220,240,0.9)' }}>
-            {msg.content}
-          </p>
+          <div className="flex-1 min-w-0">
+            <p className="text-[13.5px] leading-relaxed break-words" style={{ color: 'rgba(212,220,240,0.9)' }}>
+              {msg.content}
+            </p>
+            {msg.video_url && (
+              <video controls className="mt-2 rounded-xl max-w-full" style={{ maxHeight: 260, background: '#000' }}>
+                <source src={msg.video_url} />
+              </video>
+            )}
+          </div>
           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 pb-0.5">
             {compact && (
               <span className="text-[9px] tabular-nums mr-1" style={{ color: 'rgba(196,181,253,0.35)' }}>
                 {timeAgo(msg.created_at)}
               </span>
             )}
+            <button onClick={() => onLike(msg.id)}
+              className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-lg text-[11px] transition-all"
+              style={{ color: liked ? '#f472b6' : 'rgba(196,181,253,0.4)', background: liked ? 'rgba(236,72,153,0.12)' : 'transparent' }}>
+              ❤️ {likeCount > 0 && <span className="text-[10px] tabular-nums">{likeCount}</span>}
+            </button>
             {isAdmin && !isOwn && onMute && (
               <button onClick={() => onMute(msg.user_id, msg.display_name)}
                 className="w-5 h-5 flex items-center justify-center rounded text-[11px]"
@@ -240,12 +281,20 @@ function SupportMsgRow({ msg, isAdmin, compact, onDelete }: {
             )}
           </div>
         )}
-        <p className="text-[13.5px] leading-relaxed break-words inline-block px-3 py-2 rounded-xl max-w-[85%]"
+        <div className="inline-block px-3 py-2 rounded-xl max-w-[85%]"
           style={isAdminMsg
-            ? { background: 'linear-gradient(135deg,rgba(124,58,237,0.18),rgba(236,72,153,0.1))', color: 'rgba(230,220,255,0.95)', border: '1px solid rgba(139,92,246,0.22)' }
-            : { background: 'rgba(255,255,255,0.04)', color: 'rgba(212,220,240,0.9)', border: '1px solid rgba(255,255,255,0.06)' }}>
-          {msg.content}
-        </p>
+            ? { background: 'linear-gradient(135deg,rgba(124,58,237,0.18),rgba(236,72,153,0.1))', border: '1px solid rgba(139,92,246,0.22)' }
+            : { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
+          <p className="text-[13.5px] leading-relaxed break-words"
+            style={{ color: isAdminMsg ? 'rgba(230,220,255,0.95)' : 'rgba(212,220,240,0.9)' }}>
+            {msg.content}
+          </p>
+          {msg.video_url && (
+            <video controls className="mt-2 rounded-lg max-w-full" style={{ maxHeight: 240, background: '#000' }}>
+              <source src={msg.video_url} />
+            </video>
+          )}
+        </div>
       </div>
     </div>
   )
@@ -253,10 +302,16 @@ function SupportMsgRow({ msg, isAdmin, compact, onDelete }: {
 
 // ── News card ──────────────────────────────────────────────────────────────────
 
-function NewsCard({ msg, isAdmin, onDelete }: { msg: Message; isAdmin: boolean; onDelete: (id: string) => void }) {
+function NewsCard({ msg, isAdmin, likeCount, liked, onLike, onView, onDelete }: {
+  msg: Message; isAdmin: boolean
+  likeCount: number; liked: boolean; onLike: (id: string) => void; onView: (id: string) => void
+  onDelete: (id: string) => void
+}) {
   const [expanded, setExpanded] = useState(false)
   const isLong = msg.content.length > 280
   const shown  = !isLong || expanded ? msg.content : msg.content.slice(0, 280) + '…'
+
+  useEffect(() => { onView(msg.id) }, [msg.id])
   return (
     <div className="rounded-2xl overflow-hidden transition-all hover:border-purple-500/30 group"
       style={{ background: 'rgba(8,5,20,0.8)', border: '1px solid rgba(139,92,246,0.18)', boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}>
@@ -296,6 +351,26 @@ function NewsCard({ msg, isAdmin, onDelete }: { msg: Message; isAdmin: boolean; 
             {expanded ? '▲ Réduire' : '▼ Lire la suite'}
           </button>
         )}
+        {msg.video_url && (
+          <div className="mt-3">
+            <video controls className="w-full rounded-xl" style={{ maxHeight: 320, background: '#000' }}>
+              <source src={msg.video_url} />
+            </video>
+          </div>
+        )}
+        <div className="flex items-center gap-3 mt-4 pt-3" style={{ borderTop: '1px solid rgba(139,92,246,0.08)' }}>
+          <button onClick={() => onLike(msg.id)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-semibold transition-all"
+            style={liked
+              ? { background: 'rgba(236,72,153,0.15)', color: '#f472b6', border: '1px solid rgba(236,72,153,0.25)' }
+              : { background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.5)', border: '1px solid rgba(255,255,255,0.06)' }}>
+            ❤️ <span>{likeCount > 0 ? likeCount : ''} {liked ? 'Aimé' : 'J\'aime'}</span>
+          </button>
+          <div className="flex items-center gap-1 text-[11px]" style={{ color: 'rgba(196,181,253,0.3)' }}>
+            <span>👁</span>
+            <span className="tabular-nums">{msg.view_count}</span>
+          </div>
+        </div>
       </div>
     </div>
   )
@@ -353,8 +428,8 @@ function MuteModal({ targetName, onMute, onClose }: {
 
 // ── Profile modal ──────────────────────────────────────────────────────────────
 
-function ProfileModal({ profile, userId, onClose, onSaved }: {
-  profile: Profile; userId: string; onClose: () => void; onSaved: (p: Profile) => void
+function ProfileModal({ profile, userId, isAdmin, onClose, onSaved }: {
+  profile: Profile; userId: string; isAdmin: boolean; onClose: () => void; onSaved: (p: Profile) => void
 }) {
   const [name, setName]        = useState(profile.display_name)
   const [avatarUrl, setAUrl]   = useState(profile.avatar_url)
@@ -366,7 +441,7 @@ function ProfileModal({ profile, userId, onClose, onSaved }: {
   const daysSince   = profile.name_updated_at
     ? Math.floor((Date.now() - new Date(profile.name_updated_at).getTime()) / 86400000)
     : 999
-  const canChangeName = daysSince >= 90
+  const canChangeName = isAdmin || daysSince >= 90
   const daysLeft      = Math.max(0, 90 - daysSince)
 
   async function handleFile(file: File) {
@@ -437,7 +512,7 @@ function ProfileModal({ profile, userId, onClose, onSaved }: {
               <label className="text-[10px] uppercase tracking-[0.15em] font-black" style={{ color: 'rgba(139,92,246,0.6)' }}>
                 Pseudo
               </label>
-              {!canChangeName && (
+              {!canChangeName && !isAdmin && (
                 <span className="text-[9px] font-semibold px-2 py-0.5 rounded-lg"
                   style={{ background: 'rgba(239,68,68,0.1)', color: 'rgba(252,165,165,0.7)', border: '1px solid rgba(239,68,68,0.15)' }}>
                   🔒 Dans {daysLeft} jour{daysLeft > 1 ? 's' : ''}
@@ -493,8 +568,10 @@ CREATE TABLE IF NOT EXISTS community_messages (
   title          text,
   is_admin       boolean NOT NULL DEFAULT false,
   thread_user_id uuid,
+  video_url      text,
   created_at     timestamptz DEFAULT now()
 );
+-- Si la table existe déjà : ALTER TABLE community_messages ADD COLUMN IF NOT EXISTS video_url text;
 ALTER TABLE community_messages ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "community_read"   ON community_messages FOR SELECT USING (auth.role() = 'authenticated');
 CREATE POLICY "community_insert" ON community_messages FOR INSERT WITH CHECK (auth.uid() = user_id);
@@ -537,7 +614,31 @@ CREATE POLICY "mutes_insert" ON community_mutes FOR INSERT WITH CHECK (
   EXISTS (SELECT 1 FROM platform_admins WHERE user_id = auth.uid())
 );
 
--- 5. Bucket "avatars" public → Supabase dashboard → Storage`
+-- 5. Réactions (likes)
+CREATE TABLE IF NOT EXISTS community_reactions (
+  user_id    uuid REFERENCES auth.users NOT NULL,
+  message_id uuid REFERENCES community_messages NOT NULL,
+  PRIMARY KEY (user_id, message_id)
+);
+ALTER TABLE community_reactions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "reactions_read"   ON community_reactions FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "reactions_insert" ON community_reactions FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "reactions_delete" ON community_reactions FOR DELETE USING (auth.uid() = user_id);
+
+-- Colonne vues + fonction RPC
+ALTER TABLE community_messages ADD COLUMN IF NOT EXISTS view_count integer NOT NULL DEFAULT 0;
+CREATE OR REPLACE FUNCTION increment_view(msg_id uuid) RETURNS void
+LANGUAGE sql SECURITY DEFINER AS $$
+  UPDATE community_messages SET view_count = view_count + 1 WHERE id = msg_id;
+$$;
+
+-- 6. Bucket "avatars" public → Supabase dashboard → Storage
+
+-- 7. Bucket "community" public → Supabase dashboard → Storage → New bucket → "community" → Public
+-- Policies Storage (dans SQL Editor) :
+-- CREATE POLICY "community_select" ON storage.objects FOR SELECT USING (bucket_id = 'community');
+-- CREATE POLICY "community_insert" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'community' AND auth.role() = 'authenticated');
+-- CREATE POLICY "community_delete" ON storage.objects FOR DELETE USING (bucket_id = 'community' AND auth.uid()::text = (storage.foldername(name))[1]);`
 
 function SetupScreen({ onRetry }: { onRetry: () => void }) {
   const [copied, setCopied] = useState(false)
@@ -602,6 +703,14 @@ export function Community({ user }: CommunityProps) {
   const listRef     = useRef<HTMLDivElement>(null)
   const chatRef     = useRef<HTMLTextAreaElement>(null)
   const isAdminRef  = useRef(false)
+  const chatVideoRef = useRef<HTMLInputElement>(null)
+  const newsVideoRef = useRef<HTMLInputElement>(null)
+
+  const [chatVideo, setChatVideo]   = useState<File | null>(null)
+  const [newsVideo, setNewsVideo]   = useState<File | null>(null)
+  const [reactions, setReactions]   = useState<Map<string, number>>(new Map())
+  const [myLikes, setMyLikes]       = useState<Set<string>>(new Set())
+  const viewedRef = useRef<Set<string>>(new Set())
 
   const [newsTitle, setNewsTitle]     = useState('')
   const [newsContent, setNewsContent] = useState('')
@@ -619,7 +728,7 @@ export function Community({ user }: CommunityProps) {
     setLoading(true)
     const { data, error } = await supabase
       .from('community_messages')
-      .select('id, user_id, content, display_name, avatar_url, org_name, channel, title, is_admin, thread_user_id, created_at')
+      .select('id, user_id, content, display_name, avatar_url, org_name, channel, title, is_admin, thread_user_id, video_url, view_count, created_at')
       .order('created_at', { ascending: true })
       .limit(300)
     if (error) { if (error.code === '42P01') setNeedsSetup(true); setLoading(false); return }
@@ -627,6 +736,47 @@ export function Community({ user }: CommunityProps) {
     setMessages(data ?? [])
     setLoading(false)
   }, [])
+
+  const loadReactions = useCallback(async () => {
+    const { data } = await supabase.from('community_reactions').select('user_id, message_id')
+    if (!data) return
+    const counts = new Map<string, number>()
+    const mine   = new Set<string>()
+    for (const r of data) {
+      counts.set(r.message_id, (counts.get(r.message_id) ?? 0) + 1)
+      if (r.user_id === user.id) mine.add(r.message_id)
+    }
+    setReactions(counts)
+    setMyLikes(mine)
+  }, [user.id])
+
+  async function toggleLike(messageId: string) {
+    if (myLikes.has(messageId)) {
+      setMyLikes(prev => { const s = new Set(prev); s.delete(messageId); return s })
+      setReactions(prev => { const m = new Map(prev); m.set(messageId, Math.max(0, (m.get(messageId) ?? 1) - 1)); return m })
+      await supabase.from('community_reactions').delete().eq('user_id', user.id).eq('message_id', messageId)
+    } else {
+      setMyLikes(prev => new Set([...prev, messageId]))
+      setReactions(prev => { const m = new Map(prev); m.set(messageId, (m.get(messageId) ?? 0) + 1); return m })
+      await supabase.from('community_reactions').insert({ user_id: user.id, message_id: messageId })
+    }
+  }
+
+  async function trackView(messageId: string) {
+    if (viewedRef.current.has(messageId)) return
+    viewedRef.current.add(messageId)
+    setMessages(prev => prev.map(m => m.id === messageId ? { ...m, view_count: m.view_count + 1 } : m))
+    await supabase.rpc('increment_view', { msg_id: messageId })
+  }
+
+  async function uploadVideo(file: File): Promise<string | null> {
+    const ext  = file.name.split('.').pop() ?? 'mp4'
+    const path = `${user.id}/${crypto.randomUUID()}.${ext}`
+    const { error } = await supabase.storage.from('community').upload(path, file)
+    if (error) return null
+    const { data } = supabase.storage.from('community').getPublicUrl(path)
+    return data.publicUrl
+  }
 
   useEffect(() => {
     supabase.from('platform_admins').select('user_id').eq('user_id', user.id).maybeSingle()
@@ -652,6 +802,7 @@ export function Community({ user }: CommunityProps) {
 
   useEffect(() => { loadProfile() }, [loadProfile])
   useEffect(() => { loadMessages() }, [loadMessages])
+  useEffect(() => { loadReactions() }, [loadReactions])
 
   useEffect(() => {
     const ch = supabase.channel('community-v3')
@@ -700,12 +851,16 @@ export function Community({ user }: CommunityProps) {
   async function sendChat() {
     if (!requirePseudo() || isMuted) return
     const content = chatDraft.trim()
-    if (!content || chatSending) return
+    if (!content && !chatVideo) return
+    if (chatSending) return
     setChatSend(true); setChatDraft('')
+    const videoFile = chatVideo; setChatVideo(null)
+    const localVideoUrl = videoFile ? URL.createObjectURL(videoFile) : null
     const optId = crypto.randomUUID()
-    const opt: Message = { id: optId, user_id: user.id, content, display_name: profile.display_name, avatar_url: profile.avatar_url, org_name: currentOrg?.name ?? null, channel: 'chat', title: null, is_admin: isAdmin, thread_user_id: null, created_at: new Date().toISOString() }
+    const opt: Message = { id: optId, user_id: user.id, content: content || '', display_name: profile.display_name, avatar_url: profile.avatar_url, org_name: currentOrg?.name ?? null, channel: 'chat', title: null, is_admin: isAdmin, thread_user_id: null, video_url: localVideoUrl, created_at: new Date().toISOString() }
     setMessages(prev => [...prev, opt])
-    const { error, data } = await supabase.from('community_messages').insert({ user_id: user.id, content, display_name: profile.display_name, avatar_url: profile.avatar_url, org_name: currentOrg?.name ?? null, channel: 'chat', title: null, is_admin: isAdmin, thread_user_id: null }).select().single()
+    const video_url = videoFile ? await uploadVideo(videoFile) : null
+    const { error, data } = await supabase.from('community_messages').insert({ user_id: user.id, content: content || '', display_name: profile.display_name, avatar_url: profile.avatar_url, org_name: currentOrg?.name ?? null, channel: 'chat', title: null, is_admin: isAdmin, thread_user_id: null, video_url }).select().single()
     if (error) { setMessages(prev => prev.filter(m => m.id !== optId)); setChatDraft(content) }
     else if (data) setMessages(prev => prev.map(m => m.id === optId ? data as Message : m))
     setChatSend(false)
@@ -714,12 +869,16 @@ export function Community({ user }: CommunityProps) {
 
   async function sendNews() {
     const content = newsContent.trim()
-    if (!content || newsSending) return
+    if (!content && !newsVideo) return
+    if (newsSending) return
     setNewsSend(true)
+    const videoFile = newsVideo; setNewsVideo(null)
+    const localVideoUrl = videoFile ? URL.createObjectURL(videoFile) : null
     const optId = crypto.randomUUID()
-    const opt: Message = { id: optId, user_id: user.id, content, display_name: profile.display_name, avatar_url: profile.avatar_url, org_name: currentOrg?.name ?? null, channel: 'news', title: newsTitle.trim() || null, is_admin: true, thread_user_id: null, created_at: new Date().toISOString() }
+    const opt: Message = { id: optId, user_id: user.id, content: content || '', display_name: profile.display_name, avatar_url: profile.avatar_url, org_name: currentOrg?.name ?? null, channel: 'news', title: newsTitle.trim() || null, is_admin: true, thread_user_id: null, video_url: localVideoUrl, created_at: new Date().toISOString() }
     setMessages(prev => [...prev, opt])
-    const { error, data } = await supabase.from('community_messages').insert({ user_id: user.id, content, display_name: profile.display_name, avatar_url: profile.avatar_url, org_name: currentOrg?.name ?? null, channel: 'news', title: newsTitle.trim() || null, is_admin: true, thread_user_id: null }).select().single()
+    const video_url = videoFile ? await uploadVideo(videoFile) : null
+    const { error, data } = await supabase.from('community_messages').insert({ user_id: user.id, content: content || '', display_name: profile.display_name, avatar_url: profile.avatar_url, org_name: currentOrg?.name ?? null, channel: 'news', title: newsTitle.trim() || null, is_admin: true, thread_user_id: null, video_url }).select().single()
     if (error) setMessages(prev => prev.filter(m => m.id !== optId))
     else if (data) setMessages(prev => prev.map(m => m.id === optId ? data as Message : m))
     setNewsTitle(''); setNewsContent(''); setShowNewsForm(false)
@@ -729,14 +888,18 @@ export function Community({ user }: CommunityProps) {
   async function sendSupport() {
     if (!requirePseudo() || isMuted) return
     const content = chatDraft.trim()
-    if (!content || chatSending) return
+    if (!content && !chatVideo) return
+    if (chatSending) return
     if (isAdmin && !selectedThread) return
     setChatSend(true); setChatDraft('')
+    const videoFile = chatVideo; setChatVideo(null)
+    const localVideoUrl = videoFile ? URL.createObjectURL(videoFile) : null
     const threadId = isAdmin ? selectedThread! : user.id
     const optId = crypto.randomUUID()
-    const opt: Message = { id: optId, user_id: user.id, content, display_name: profile.display_name, avatar_url: profile.avatar_url, org_name: currentOrg?.name ?? null, channel: 'support', title: null, is_admin: isAdmin, thread_user_id: threadId, created_at: new Date().toISOString() }
+    const opt: Message = { id: optId, user_id: user.id, content: content || '', display_name: profile.display_name, avatar_url: profile.avatar_url, org_name: currentOrg?.name ?? null, channel: 'support', title: null, is_admin: isAdmin, thread_user_id: threadId, video_url: localVideoUrl, created_at: new Date().toISOString() }
     setMessages(prev => [...prev, opt])
-    const { error, data } = await supabase.from('community_messages').insert({ user_id: user.id, content, display_name: profile.display_name, avatar_url: profile.avatar_url, org_name: currentOrg?.name ?? null, channel: 'support', title: null, is_admin: isAdmin, thread_user_id: threadId }).select().single()
+    const video_url = videoFile ? await uploadVideo(videoFile) : null
+    const { error, data } = await supabase.from('community_messages').insert({ user_id: user.id, content: content || '', display_name: profile.display_name, avatar_url: profile.avatar_url, org_name: currentOrg?.name ?? null, channel: 'support', title: null, is_admin: isAdmin, thread_user_id: threadId, video_url }).select().single()
     if (error) { setMessages(prev => prev.filter(m => m.id !== optId)); setChatDraft(content) }
     else if (data) setMessages(prev => prev.map(m => m.id === optId ? data as Message : m))
     setChatSend(false)
@@ -889,12 +1052,29 @@ export function Community({ user }: CommunityProps) {
                     <textarea value={newsContent} onChange={e => setNewsContent(e.target.value)}
                       placeholder="Contenu…" rows={4} maxLength={2000}
                       className="w-full rounded-xl px-3.5 py-2.5 text-sm text-white outline-none resize-none sf-input" />
+                    {newsVideo ? (
+                      <div className="flex items-center gap-2 px-3 py-2 rounded-lg"
+                        style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)' }}>
+                        <span className="text-sm">🎬</span>
+                        <span className="text-[11px] flex-1 truncate" style={{ color: '#c4b5fd' }}>{newsVideo.name}</span>
+                        <button onClick={() => setNewsVideo(null)} className="text-[11px]" style={{ color: 'rgba(239,68,68,0.6)' }}>✕</button>
+                      </div>
+                    ) : (
+                      <button onClick={() => newsVideoRef.current?.click()}
+                        className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left transition-all"
+                        style={{ background: 'rgba(139,92,246,0.04)', border: '1px dashed rgba(139,92,246,0.2)', color: 'rgba(196,181,253,0.5)' }}>
+                        <span className="text-sm">🎬</span>
+                        <span className="text-[11px]">Joindre une vidéo (optionnel)</span>
+                      </button>
+                    )}
+                    <input ref={newsVideoRef} type="file" accept="video/*" className="hidden"
+                      onChange={e => { if (e.target.files?.[0]) { setNewsVideo(e.target.files[0]); e.target.value = '' } }} />
                     <div className="flex items-center justify-between">
                       <span className="text-[10px]" style={{ color: 'rgba(196,181,253,0.3)' }}>{newsContent.length}/2000</span>
                       <div className="flex gap-2">
-                        <button onClick={() => setShowNewsForm(false)} className="px-4 py-2 rounded-xl text-[12px] font-semibold"
+                        <button onClick={() => { setShowNewsForm(false); setNewsVideo(null) }} className="px-4 py-2 rounded-xl text-[12px] font-semibold"
                           style={{ background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.6)', border: '1px solid rgba(255,255,255,0.07)' }}>Annuler</button>
-                        <button onClick={sendNews} disabled={!newsContent.trim() || newsSending}
+                        <button onClick={sendNews} disabled={(!newsContent.trim() && !newsVideo) || newsSending}
                           className="px-4 py-2 rounded-xl text-[12px] font-semibold btn-sf-primary disabled:opacity-40">
                           {newsSending ? 'Publication…' : '📢 Publier'}
                         </button>
@@ -918,7 +1098,9 @@ export function Community({ user }: CommunityProps) {
                   </p>
                 </div>
               </div>
-            ) : newsMessages.map(msg => <NewsCard key={msg.id} msg={msg} isAdmin={isAdmin} onDelete={deleteMessage} />)}
+            ) : newsMessages.map(msg => <NewsCard key={msg.id} msg={msg} isAdmin={isAdmin}
+                likeCount={reactions.get(msg.id) ?? 0} liked={myLikes.has(msg.id)}
+                onLike={toggleLike} onView={trackView} onDelete={deleteMessage} />)}
           </div>
         </div>
       )}
@@ -958,7 +1140,8 @@ export function Community({ user }: CommunityProps) {
                   const compact = prev?.user_id === msg.user_id &&
                     new Date(msg.created_at).getTime() - new Date(prev.created_at).getTime() < 5 * 60 * 1000
                   return <ChatRow key={msg.id} msg={msg} isOwn={msg.user_id === user.id} compact={compact}
-                    isAdmin={isAdmin} onDelete={deleteMessage}
+                    isAdmin={isAdmin} likeCount={reactions.get(msg.id) ?? 0} liked={myLikes.has(msg.id)}
+                    onLike={toggleLike} onDelete={deleteMessage}
                     onMute={(uid, name) => { setMuteTarget({ id: uid, name }); setShowMuteModal(true) }} />
                 })}
                 <div ref={bottomRef} className="h-1" />
@@ -985,6 +1168,14 @@ export function Community({ user }: CommunityProps) {
                     {currentOrg && profile.display_name && <span style={{ color: 'rgba(139,92,246,0.6)' }}> · {currentOrg.name}</span>}
                   </span>
                 </div>
+                {chatVideo && (
+                  <div className="flex items-center gap-2 mb-2 px-1 py-1.5 rounded-lg"
+                    style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)' }}>
+                    <span className="text-sm">🎬</span>
+                    <span className="text-[11px] flex-1 truncate" style={{ color: '#c4b5fd' }}>{chatVideo.name}</span>
+                    <button onClick={() => setChatVideo(null)} className="text-[11px]" style={{ color: 'rgba(239,68,68,0.6)' }}>✕</button>
+                  </div>
+                )}
                 <div className="flex items-end gap-3">
                   <Avatar url={profile.avatar_url} name={profile.display_name || '?'} userId={user.id} size={32} />
                   <div className="flex-1 flex items-end gap-2 rounded-xl px-3.5 py-2.5"
@@ -996,13 +1187,20 @@ export function Community({ user }: CommunityProps) {
                       rows={1} maxLength={1000}
                       className="flex-1 bg-transparent text-[13px] text-white resize-none outline-none leading-relaxed"
                       style={{ minHeight: 22, maxHeight: 120 }} />
-                    <button onClick={sendChat} disabled={!chatDraft.trim() || chatSending}
+                    <button onClick={() => chatVideoRef.current?.click()} title="Joindre une vidéo"
+                      className="flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-all active:scale-90"
+                      style={{ color: chatVideo ? '#a78bfa' : 'rgba(196,181,253,0.35)', background: chatVideo ? 'rgba(139,92,246,0.15)' : 'transparent' }}>
+                      <span className="text-[15px]">🎬</span>
+                    </button>
+                    <button onClick={sendChat} disabled={(!chatDraft.trim() && !chatVideo) || chatSending}
                       className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-white transition-all disabled:opacity-30 active:scale-90"
                       style={{ background: 'linear-gradient(135deg,#7c3aed,#ec4899)', boxShadow: '0 2px 12px rgba(124,58,237,0.4)' }}>
                       {chatSending ? <Spinner size="sm" /> : <span className="text-sm leading-none">↑</span>}
                     </button>
                   </div>
                 </div>
+                <input ref={chatVideoRef} type="file" accept="video/*" className="hidden"
+                  onChange={e => { if (e.target.files?.[0]) { setChatVideo(e.target.files[0]); e.target.value = '' } }} />
               </>
             )}
           </div>
@@ -1103,6 +1301,14 @@ export function Community({ user }: CommunityProps) {
                     </div>
                     <div className="flex-shrink-0 px-4 py-3"
                       style={{ borderTop: '1px solid rgba(139,92,246,0.1)', background: 'rgba(6,4,15,0.95)' }}>
+                      {chatVideo && (
+                        <div className="flex items-center gap-2 mb-2 px-2 py-1.5 rounded-lg"
+                          style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)' }}>
+                          <span className="text-sm">🎬</span>
+                          <span className="text-[11px] flex-1 truncate" style={{ color: '#c4b5fd' }}>{chatVideo.name}</span>
+                          <button onClick={() => setChatVideo(null)} className="text-[11px]" style={{ color: 'rgba(239,68,68,0.6)' }}>✕</button>
+                        </div>
+                      )}
                       <div className="flex items-end gap-3">
                         <Avatar url={profile.avatar_url} name={profile.display_name || '?'} userId={user.id} size={32} />
                         <div className="flex-1 flex items-end gap-2 rounded-xl px-3.5 py-2.5"
@@ -1114,7 +1320,12 @@ export function Community({ user }: CommunityProps) {
                             rows={1} maxLength={1000}
                             className="flex-1 bg-transparent text-[13px] text-white resize-none outline-none leading-relaxed"
                             style={{ minHeight: 22, maxHeight: 120 }} />
-                          <button onClick={sendSupport} disabled={!chatDraft.trim() || chatSending}
+                          <button onClick={() => chatVideoRef.current?.click()} title="Joindre une vidéo"
+                            className="flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-all"
+                            style={{ color: chatVideo ? '#a78bfa' : 'rgba(196,181,253,0.35)', background: chatVideo ? 'rgba(139,92,246,0.15)' : 'transparent' }}>
+                            <span className="text-[15px]">🎬</span>
+                          </button>
+                          <button onClick={sendSupport} disabled={(!chatDraft.trim() && !chatVideo) || chatSending}
                             className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-white transition-all disabled:opacity-30 active:scale-90"
                             style={{ background: 'linear-gradient(135deg,#7c3aed,#ec4899)', boxShadow: '0 2px 12px rgba(124,58,237,0.4)' }}>
                             {chatSending ? <Spinner size="sm" /> : <span className="text-sm">↑</span>}
@@ -1175,6 +1386,14 @@ export function Community({ user }: CommunityProps) {
                         Pose ta question à l'équipe <strong style={{ color: 'rgba(147,197,253,0.6)' }}>ScaleFlow</strong>
                       </span>
                     </div>
+                    {chatVideo && (
+                      <div className="flex items-center gap-2 mb-2 px-2 py-1.5 rounded-lg"
+                        style={{ background: 'rgba(96,165,250,0.08)', border: '1px solid rgba(96,165,250,0.2)' }}>
+                        <span className="text-sm">🎬</span>
+                        <span className="text-[11px] flex-1 truncate" style={{ color: '#93c5fd' }}>{chatVideo.name}</span>
+                        <button onClick={() => setChatVideo(null)} className="text-[11px]" style={{ color: 'rgba(239,68,68,0.6)' }}>✕</button>
+                      </div>
+                    )}
                     <div className="flex items-end gap-3">
                       <Avatar url={profile.avatar_url} name={profile.display_name || '?'} userId={user.id} size={32} />
                       <div className="flex-1 flex items-end gap-2 rounded-xl px-3.5 py-2.5"
@@ -1186,7 +1405,12 @@ export function Community({ user }: CommunityProps) {
                           rows={1} maxLength={1000}
                           className="flex-1 bg-transparent text-[13px] text-white resize-none outline-none leading-relaxed"
                           style={{ minHeight: 22, maxHeight: 120 }} />
-                        <button onClick={sendSupport} disabled={!chatDraft.trim() || chatSending}
+                        <button onClick={() => chatVideoRef.current?.click()} title="Joindre une vidéo"
+                          className="flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-all"
+                          style={{ color: chatVideo ? '#93c5fd' : 'rgba(147,197,253,0.35)', background: chatVideo ? 'rgba(96,165,250,0.15)' : 'transparent' }}>
+                          <span className="text-[15px]">🎬</span>
+                        </button>
+                        <button onClick={sendSupport} disabled={(!chatDraft.trim() && !chatVideo) || chatSending}
                           className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-white transition-all disabled:opacity-30 active:scale-90"
                           style={{ background: 'linear-gradient(135deg,#2563eb,#7c3aed)', boxShadow: '0 2px 12px rgba(37,99,235,0.3)' }}>
                           {chatSending ? <Spinner size="sm" /> : <span className="text-sm">↑</span>}
@@ -1202,7 +1426,7 @@ export function Community({ user }: CommunityProps) {
       )}
 
       {showProfile && (
-        <ProfileModal profile={profile} userId={user.id}
+        <ProfileModal profile={profile} userId={user.id} isAdmin={isAdmin}
           onClose={() => setShowProfile(false)}
           onSaved={p => { setProfile(p); setShowProfile(false) }} />
       )}
