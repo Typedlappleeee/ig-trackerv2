@@ -98,6 +98,9 @@ export function MassRemix({ user }: MassRemixProps) {
   const [aiEnabled,    setAiEnabled]    = useState(false)
   const [exportMode,   setExportMode]   = useState<ExportMode>('bank')
   const [outputFolder, setOutputFolder] = useState<string | null>(null)
+  const [bankFolder,   setBankFolder]   = useState<string>('')
+  const [bankFolders,  setBankFolders]  = useState<string[]>([])
+  const [copies,       setCopies]       = useState(1)
 
   const [showBankOrig, setShowBankOrig] = useState(false)
   const [showBankSec,  setShowBankSec]  = useState(false)
@@ -110,6 +113,16 @@ export function MassRemix({ user }: MassRemixProps) {
   const [currentIdx,  setCurrentIdx]  = useState(0)
   const [currentStep, setCurrentStep] = useState<MassJob['status']>('pending')
   const abortRef = useRef(false)
+
+  // Load existing bank folders for the folder selector
+  useEffect(() => {
+    let q = supabase.from('content_bank').select('folder')
+    q = currentOrg ? (q as any).eq('org_id', currentOrg.id) : (q as any).eq('user_id', user.id).is('org_id', null)
+    q.then(({ data }: { data: Array<{ folder?: string | null }> | null }) => {
+      const folders = [...new Set((data ?? []).map(r => r.folder).filter((f): f is string => Boolean(f)))].sort()
+      setBankFolders(folders)
+    })
+  }, [currentOrg?.id])
 
   // Abort generation when component unmounts (user navigates away)
   useEffect(() => {
@@ -141,11 +154,12 @@ export function MassRemix({ user }: MassRemixProps) {
     }
 
     const folder = exportMode === 'folder' ? outputFolder : null
-    const pairs: MassJob[] = originals.map((orig, i) => ({
+    const n = Math.max(1, copies)
+    const pairs: MassJob[] = Array.from({ length: n }, (_, i) => ({
       id: i,
-      originalPath:  orig,
-      secondaryPath: secondaries[i % secondaries.length],
-      status: 'pending',
+      originalPath:  originals[Math.floor(Math.random() * originals.length)],
+      secondaryPath: secondaries[Math.floor(Math.random() * secondaries.length)],
+      status: 'pending' as const,
     }))
     setJobs(pairs)
     setRunning(true)
@@ -286,6 +300,7 @@ Return ONLY a JSON array. If none, return [].`
             user_id: user.id, org_id: currentOrg?.id ?? null,
             title: `Remix ${String(job.id + 1).padStart(3, '0')} — ${fileName(job.originalPath)}`,
             file_url: null, storage_path: up.storagePath, thumbnail_path: up.thumbnailPath,
+            folder: bankFolder.trim() || null,
             tags: [], notes: '',
           })
         } catch (err) {
@@ -449,17 +464,25 @@ Return ONLY a JSON array. If none, return [].`
           </div>
         </div>
 
-        {/* Pairing info */}
+        {/* Copies + pairing */}
         {originals.length > 0 && secondaries.length > 0 && (
-          <div className="rounded-xl px-4 py-2.5 text-xs flex items-center gap-2"
-            style={{ background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.15)', color: 'rgba(196,181,253,0.6)' }}>
-            <span>🔀</span>
-            <span>
-              <strong className="text-white">{originals.length}</strong> originale(s) ×{' '}
-              <strong className="text-white">{secondaries.length}</strong> secondaire(s) ={' '}
-              <strong className="text-white">{originals.length}</strong> remix
-              {secondaries.length < originals.length && ' (secondaires en boucle)'}
-            </span>
+          <div className="rounded-2xl p-4 space-y-3" style={{ background: 'rgba(8,5,20,0.7)', border: '1px solid rgba(139,92,246,0.18)' }}>
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-black text-white">Nombre de copies</p>
+              <div className="flex items-center gap-2">
+                <input type="number" min={1} max={200} value={copies}
+                  onChange={e => setCopies(Math.max(1, Math.min(200, Number(e.target.value))))}
+                  className="w-16 rounded-lg px-2 py-1 text-sm font-bold text-white text-center outline-none"
+                  style={{ background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.3)' }} />
+                <span className="text-xs" style={{ color: 'rgba(196,181,253,0.5)' }}>vidéos</span>
+              </div>
+            </div>
+            <input type="range" min={1} max={50} value={Math.min(copies, 50)}
+              onChange={e => setCopies(Number(e.target.value))} className="w-full" />
+            <p className="text-[10px]" style={{ color: 'rgba(196,181,253,0.45)' }}>
+              🔀 Mix aléatoire — <strong className="text-white/60">{originals.length}</strong> original{originals.length > 1 ? 's' : ''} ×{' '}
+              <strong className="text-white/60">{secondaries.length}</strong> secondaire{secondaries.length > 1 ? 's' : ''} → <strong className="text-violet-400">{copies}</strong> remix générés
+            </p>
           </div>
         )}
 
@@ -483,8 +506,8 @@ Return ONLY a JSON array. If none, return [].`
             </div>
 
             {/* Export mode */}
-            <div>
-              <p className="text-[10px] uppercase tracking-wider font-bold mb-2" style={{ color: 'rgba(196,181,253,0.4)' }}>Export</p>
+            <div className="space-y-2">
+              <p className="text-[10px] uppercase tracking-wider font-bold" style={{ color: 'rgba(196,181,253,0.4)' }}>Export</p>
               <div className="flex gap-2">
                 {(['bank', 'folder'] as ExportMode[]).map(m => (
                   <button key={m} onClick={() => setExportMode(m)} className="flex-1 py-1.5 rounded-lg text-xs font-bold"
@@ -496,8 +519,29 @@ Return ONLY a JSON array. If none, return [].`
                   </button>
                 ))}
               </div>
+              {exportMode === 'bank' && (
+                <div className="space-y-1">
+                  <p className="text-[10px]" style={{ color: 'rgba(196,181,253,0.4)' }}>Dossier dans la banque</p>
+                  <div className="flex gap-2">
+                    {bankFolders.length > 0 && (
+                      <select value={bankFolder}
+                        onChange={e => setBankFolder(e.target.value)}
+                        className="flex-1 rounded-lg px-2 py-1.5 text-xs text-white outline-none"
+                        style={{ background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.2)' }}>
+                        <option value="">— Racine (sans dossier)</option>
+                        {bankFolders.map(f => <option key={f} value={f}>{f}</option>)}
+                      </select>
+                    )}
+                    <input
+                      type="text" placeholder={bankFolders.length > 0 ? 'Ou nouveau…' : 'Nom du dossier (optionnel)'}
+                      value={bankFolder} onChange={e => setBankFolder(e.target.value)}
+                      className="flex-1 rounded-lg px-2 py-1.5 text-xs text-white outline-none placeholder:text-white/20"
+                      style={{ background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.2)' }} />
+                  </div>
+                </div>
+              )}
               {exportMode === 'folder' && (
-                <div className="mt-2 flex items-center gap-2">
+                <div className="flex items-center gap-2">
                   <button onClick={async () => { const f = await window.electronAPI?.pickOutputFolder?.(); if (f) setOutputFolder(f) }}
                     className="text-xs px-3 py-1 rounded-lg"
                     style={{ background: 'rgba(139,92,246,0.1)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.2)' }}>
@@ -534,7 +578,7 @@ Return ONLY a JSON array. If none, return [].`
         {/* Launch */}
         <div className="flex items-center gap-4">
           <Button onClick={launch} disabled={!canLaunch} size="lg">
-            ⚡ Lancer {originals.length > 0 ? `${originals.length} remix` : 'la génération'}
+            ⚡ Lancer {canLaunch ? `${copies} remix` : 'la génération'}
           </Button>
           {!canLaunch && originals.length === 0 && (
             <p className="text-xs" style={{ color: 'rgba(196,181,253,0.35)' }}>
