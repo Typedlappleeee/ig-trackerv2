@@ -245,15 +245,15 @@ export function Bank({ user }: BankProps) {
   // Folder action modal
   const [folderModal, setFolderModal] = useState<{ name: string; mode: 'delete' | 'merge' } | null>(null)
 
-  // Multi-selection
-  const [selectionMode, setSelectionMode] = useState(false)
-  const [selectedIds, setSelectedIds]     = useState<Set<string>>(new Set())
-  const [showBulkMove, setShowBulkMove]   = useState(false)
+  // Multi-selection — selectionMode is derived (true when any item selected)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [showBulkMove, setShowBulkMove] = useState(false)
+  const selectionMode = selectedIds.size > 0
 
   function toggleSelection(id: string) {
     setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
   }
-  function exitSelection() { setSelectionMode(false); setSelectedIds(new Set()) }
+  function exitSelection() { setSelectedIds(new Set()) }
 
   async function deleteSelected() {
     if (!selectedIds.size) return
@@ -631,7 +631,7 @@ export function Bank({ user }: BankProps) {
           <h2 className="text-sm font-semibold text-text mr-2">🗂 Banque de médias</h2>
           <div className="flex-1" />
           <Button onClick={() => setShowAddModal(true)} size="sm">+ Ajouter un média</Button>
-          <Button variant="secondary" size="sm" onClick={() => { setSelectionMode(true); setSelectedIds(new Set()) }}>☑ Sélectionner</Button>
+          <Button variant="secondary" size="sm" onClick={() => setSelectedIds(new Set(visible.map(i => i.id)))}>☑ Tout sélectionner</Button>
           <Button variant="secondary" size="sm" onClick={loadItems}>↺ Rafraîchir</Button>
         </div>
 
@@ -1200,18 +1200,29 @@ function VideoCard({ item, onContextMenu, onPlay, selectionMode, isSelected, onT
         <VideoThumbnail filePath={item.file_url} thumbnailPath={item.thumbnail_path} storagePath={item.storage_path} />
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
 
-        {/* Play button on hover */}
-        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-          <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
-            <span className="text-white text-xl ml-1">▶</span>
-          </div>
-        </div>
+        {/* Checkbox — top-left, always visible on hover or when selected */}
+        <button
+          className={`absolute top-2 left-2 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all z-10 ${
+            isSelected
+              ? 'bg-accent border-accent opacity-100'
+              : 'border-white/70 bg-black/50 opacity-0 group-hover:opacity-100'
+          }`}
+          onClick={e => { e.stopPropagation(); onToggleSelect?.() }}
+          title={isSelected ? 'Désélectionner' : 'Sélectionner'}
+        >
+          {isSelected && <span className="text-white text-xs font-bold leading-none">✓</span>}
+        </button>
 
-        {/* Date — top left */}
-        <div className="absolute top-2 left-2 bg-black/60 backdrop-blur-sm rounded px-1.5 py-0.5 text-[10px] text-white font-medium">
-          {new Date(item.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: '2-digit' })}
-        </div>
-        {/* Duration — top right (fades on hover) */}
+        {/* Play button on hover (hidden in selection mode) */}
+        {!selectionMode && (
+          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+            <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
+              <span className="text-white text-xl ml-1">▶</span>
+            </div>
+          </div>
+        )}
+
+        {/* Duration — top right */}
         {item.duration && (
           <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-sm rounded px-1.5 py-0.5 text-[10px] text-white group-hover:opacity-0 transition-opacity pointer-events-none">
             {formatDuration(item.duration)}
@@ -1234,14 +1245,6 @@ function VideoCard({ item, onContextMenu, onPlay, selectionMode, isSelected, onT
             onClick={e => { e.stopPropagation(); onContextMenu(e, item) }}
             title="Options"
           >⋮</button>
-        )}
-        {/* Checkbox in selection mode */}
-        {selectionMode && (
-          <div className={`absolute top-2 right-2 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
-            isSelected ? 'bg-accent border-accent' : 'border-white/60 bg-black/40'
-          }`}>
-            {isSelected && <span className="text-white text-xs font-bold">✓</span>}
-          </div>
         )}
       </div>
       {/* Tags */}
