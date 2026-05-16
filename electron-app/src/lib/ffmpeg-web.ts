@@ -37,9 +37,11 @@ async function getFFmpeg(): Promise<FFmpeg> {
 
       // Write fonts into WASM virtual FS so drawtext can use fontfile=
       // (no system fonts exist in the WASM sandbox; fontname-based lookup always fails)
+      // Written to root '/' so fontfile=/font-bold.ttf always resolves regardless of cwd
       const loadFont = async (name: string) => {
         const r = await fetch(`${base}/${name}`)
-        await ff.writeFile(name, new Uint8Array(await r.arrayBuffer()))
+        if (!r.ok) throw new Error(`Font fetch failed: ${name} (HTTP ${r.status})`)
+        await ff.writeFile(`/${name}`, new Uint8Array(await r.arrayBuffer()))
       }
       await loadFont('font-bold.ttf')
       await loadFont('font.ttf')
@@ -450,7 +452,7 @@ export async function runFfmpegRemixAIWeb(opts: {
         .replace(/\]/g, '\\]')
       const borderPx = Math.max(3, Math.round(ov.fontSize * 0.09))
       const shadow   = ov.shadow !== false ? ':shadowx=4:shadowy=4:shadowcolor=black@0.7' : ''
-      const fontFile = ov.bold ? 'font-bold.ttf' : 'font.ttf'
+      const fontFile = ov.bold ? '/font-bold.ttf' : '/font.ttf'
       // Use \: escaping only — no single-quote wrapping (unreliable in ffmpeg.wasm)
       return `drawtext=text=${escaped}:fontfile=${fontFile}:fontsize=${ov.fontSize}:fontcolor=${ov.fontColor}:x=${ov.x}:y=${ov.y}:borderw=${borderPx}:bordercolor=black@1.0${shadow}:enable=between(t,${ov.startTime},${ov.endTime})`
     }).join(',')
