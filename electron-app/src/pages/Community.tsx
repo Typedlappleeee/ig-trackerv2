@@ -585,6 +585,7 @@ export function Community({ user }: CommunityProps) {
 
   const [isAdmin, setIsAdmin]       = useState(false)
   const [tab, setTab]               = useState<Channel>('news')
+  const [lastSeenSupportAt, setLastSeenSupportAt] = useState<string>(new Date().toISOString())
   const [messages, setMessages]     = useState<Message[]>([])
   const [loading, setLoading]       = useState(true)
   const [needsSetup, setNeedsSetup] = useState(false)
@@ -836,13 +837,21 @@ export function Community({ user }: CommunityProps) {
             { id: 'chat'    as Channel, label: 'Discussion',           icon: '💬' },
             { id: 'support' as Channel, label: 'Support',              icon: '🎫' },
           ]).map(t => (
-            <button key={t.id} onClick={() => setTab(t.id)}
+            <button key={t.id} onClick={() => {
+                setTab(t.id)
+                if (t.id === 'support') setLastSeenSupportAt(new Date().toISOString())
+              }}
               className="flex items-center gap-1.5 px-4 py-2.5 text-[12.5px] font-bold transition-all relative"
               style={tab === t.id
                 ? { color: '#c4b5fd', borderBottom: '2px solid #8b5cf6', marginBottom: -1 }
                 : { color: 'rgba(196,181,253,0.35)', borderBottom: '2px solid transparent', marginBottom: -1 }}>
               <span className="text-[14px]">{t.icon}</span>
               <span>{t.label}</span>
+              {t.id === 'support' && !isAdmin && tab !== 'support' &&
+                myThreadMessages.some(m => m.is_admin && new Date(m.created_at) > new Date(lastSeenSupportAt)) && (
+                <span className="w-2 h-2 rounded-full flex-shrink-0"
+                  style={{ background: '#ec4899', boxShadow: '0 0 6px #ec4899' }} />
+              )}
             </button>
           ))}
         </div>
