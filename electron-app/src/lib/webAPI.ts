@@ -317,6 +317,11 @@ export function buildWebAPI() {
       const { extractFramesWeb } = await import('./ffmpeg-web')
       return extractFramesWeb(opts as Parameters<typeof extractFramesWeb>[0])
     },
+
+    async runFfmpegTextOverlay(opts: unknown) {
+      const { runFfmpegTextOverlayWeb } = await import('./ffmpeg-web')
+      return runFfmpegTextOverlayWeb(opts as Parameters<typeof runFfmpegTextOverlayWeb>[0])
+    },
   }
 }
 

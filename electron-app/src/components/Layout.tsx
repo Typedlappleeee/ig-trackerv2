@@ -54,7 +54,7 @@ function SFLogo({ size = 28 }: { size?: number }) {
 export type Page =
   | 'dashboard' | 'phones'
   | 'stats' | 'posting' | 'massposting' | 'bank' | 'aitools' | 'warmup'
-  | 'montage' | 'remix'
+  | 'montage' | 'remix' | 'textcopy'
   | 'support'
   | 'settings' | 'licences'
 
@@ -97,8 +97,9 @@ const NAV_SECTIONS: NavSection[] = [
     title: 'Montage',
     defaultOpen: true,
     items: [
-      { id: 'montage', label: 'Montage vidéo', icon: '✂' },
-      { id: 'remix',   label: 'Remix vidéo',   icon: '🔀', beta: true },
+      { id: 'montage',  label: 'Montage vidéo',  icon: '✂' },
+      { id: 'remix',    label: 'Remix vidéo',    icon: '🔀', beta: true },
+      { id: 'textcopy', label: 'Texte IA',        icon: '✍', beta: true },
     ],
   },
 ]

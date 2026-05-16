@@ -617,6 +617,65 @@ export async function runFfmpegRemixAIWeb(opts: {
   }
 }
 
+// ── runFfmpegTextOverlay ──────────────────────────────────────────────────────
+// Takes a video and renders a single text overlay on it via Canvas API.
+// Used by the TextCopy tool to produce N copies with different text positions.
+export async function runFfmpegTextOverlayWeb(opts: {
+  inputPath:   string
+  outputPath:  string
+  preset:      '9:16' | '1:1' | '16:9'
+  text:        string
+  yFrac:       number   // 0–1 vertical center position (e.g. 0.10 = top, 0.87 = bottom)
+  fontSize:    number
+  fontColor:   string
+  bold:        boolean
+  shadow:      boolean
+}): Promise<{ ok: boolean; outputPath?: string; error?: string }> {
+  const FILES = ['txov_in.mp4', 'txov_ov.png', 'txov_out.mp4']
+  const ff = await getFFmpeg()
+  for (const f of FILES) await ff.deleteFile(f).catch(() => {})
+  const ffLogs: string[] = []
+  const logHandler = ({ message }: { message: string }) => ffLogs.push(message)
+  ff.on('log', logHandler)
+  try {
+    await writeInput(ff, 'txov_in.mp4', opts.inputPath)
+
+    const W   = opts.preset === '16:9' ? 1920 : 1080
+    const H   = opts.preset === '9:16' ? 1920 : 1080
+    const scl = `scale=${W}:${H}:force_original_aspect_ratio=decrease,pad=${W}:${H}:-1:-1:color=black,setsar=1`
+
+    await renderTextPNG(ff, {
+      text:      opts.text,
+      x:         'w*0.500',
+      y:         `h*${opts.yFrac.toFixed(3)}`,
+      fontSize:  opts.fontSize,
+      fontColor: opts.fontColor,
+      bold:      opts.bold,
+      shadow:    opts.shadow,
+    }, W, H, 'txov_ov.png')
+
+    await ff.exec([
+      '-i', 'txov_in.mp4', '-i', 'txov_ov.png',
+      '-filter_complex', `[0:v]${scl}[base];[base][1:v]overlay=0:0[vout]`,
+      '-map', '[vout]', '-map', '0:a',
+      '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23',
+      '-c:a', 'aac', '-b:a', '128k',
+      '-movflags', '+faststart', '-y', 'txov_out.mp4',
+    ])
+
+    const url = await readOutput(ff, 'txov_out.mp4')
+    return { ok: true, outputPath: url }
+  } catch (err) {
+    if (isWasmCrash(err)) resetFFmpeg()
+    const relevant = ffLogs.filter(l => /error|invalid|unknown|cannot|no such/i.test(l)).slice(-3)
+    const detail   = relevant.length ? '\n' + relevant.join('\n') : ''
+    return { ok: false, error: String(err) + detail }
+  } finally {
+    ff.off('log', logHandler)
+    for (const f of FILES) await ff.deleteFile(f).catch(() => {})
+  }
+}
+
 // ── runFfmpegMetadata (strip/set metadata tags) ──────────────────────────────
 export async function runFfmpegMetadataWeb(opts: {
   inputPath:  string

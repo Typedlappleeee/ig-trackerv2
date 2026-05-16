@@ -475,6 +475,7 @@ import { Autocomment }       from '@/pages/Autocomment'
 import { Settings }          from '@/pages/Settings'
 import { MassPosting }       from '@/pages/MassPosting'
 import { Warmup }            from '@/pages/Warmup'
+import { TextCopy }          from '@/pages/TextCopy'
 import { Licences }          from '@/pages/Licences'
 import { Support }           from '@/pages/Support'
 import { FullPageLoader }    from '@/components/ui/Spinner'
@@ -632,6 +633,7 @@ function AppContent({ user }: { user: User }) {
       case 'warmup':       return <Warmup      user={user} />
       case 'montage':      return <Montage     user={user} />
       case 'remix':        return <Remix       user={user} />
+      case 'textcopy':     return <TextCopy    user={user} />
       case 'aitools':      return <AiTools     user={user} />
       case 'settings':     return <Settings    user={user} initialPanel={settingsPanel as any} />
       case 'support':      return <Support      user={user} />
