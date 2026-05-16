@@ -511,7 +511,7 @@ const BETA_KEY = 'scaleflow-v1-seen'
 function AppContent({ user }: { user: User }) {
   const { currentOrg, myOrgs, loading: orgLoading, loadError: orgLoadError } = useOrg()
   const conns = useConnections(user)
-  const [page, setPage]                     = useState<Page>('dashboard')
+  const [page, setPage]                     = useState<Page>('community')
   const [settingsPanel, setSettingsPanel]   = useState<string | undefined>(undefined)
   const [onboarding, setOnboarding]         = useState<boolean | null>(null)
   const [showBeta, setShowBeta]             = useState(false)

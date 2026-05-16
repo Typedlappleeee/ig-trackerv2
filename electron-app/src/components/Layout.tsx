@@ -74,8 +74,6 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { id: 'dashboard',   label: 'Dashboard',    icon: '📊' },
       { id: 'phones',      label: 'Téléphones',   icon: '📱' },
-      { id: 'community',   label: 'Communauté',    icon: '💬' },
-      { id: 'support',     label: 'Support',       icon: '🎫' },
     ],
   },
   {
@@ -314,7 +312,41 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
         />
 
         {/* ── Nav ────────────────────────────────────────────────────────────── */}
-        <nav className="sf-sidebar-nav flex-1 overflow-y-auto overflow-x-hidden pt-0.5 pb-2 relative z-10">
+        <nav className="sf-sidebar-nav flex-1 overflow-y-auto overflow-x-hidden pt-1 pb-2 relative z-10">
+
+          {/* Communauté — épinglé en haut */}
+          <div className="px-2 pb-2">
+            <button
+              onClick={() => { playNav(); onNavigate('community') }}
+              className={`
+                relative w-full flex items-center gap-2.5 pl-3 pr-2.5 py-[10px] rounded-xl text-[13px] text-left
+                transition-all duration-150 active:scale-[0.97]
+                ${page === 'community' ? 'sf-nav-active' : 'text-sb-text hover:text-sb-text-act'}
+              `}
+              style={page !== 'community' ? {
+                background: 'linear-gradient(135deg,rgba(139,92,246,0.1),rgba(236,72,153,0.04))',
+                border: '1px solid rgba(139,92,246,0.2)',
+              } : {}}
+            >
+              <span
+                className="text-[16px] w-5 text-center flex-shrink-0"
+                style={page === 'community' ? { filter: 'drop-shadow(0 0 6px rgba(167,139,250,0.7))' } : { opacity: 0.8 }}
+              >
+                💬
+              </span>
+              <span className={`flex-1 ${page === 'community' ? 'font-bold' : 'font-semibold'}`}>Communauté</span>
+              {page !== 'community' && (
+                <span className="text-[7.5px] font-black px-1.5 py-[3px] rounded-md uppercase tracking-wider flex-shrink-0"
+                  style={{ background: 'linear-gradient(130deg,rgba(139,92,246,0.35),rgba(236,72,153,0.25))', color: '#f0a8ff' }}>
+                  NEW
+                </span>
+              )}
+            </button>
+          </div>
+
+          {/* Séparateur */}
+          <div className="mx-3 mb-2" style={{ height: 1, background: 'linear-gradient(90deg,transparent,rgba(139,92,246,0.15),transparent)' }} />
+
           {NAV_SECTIONS.map(section => {
             const visibleItems = section.items.filter(it => isVisibleTab(it.id))
             if (visibleItems.length === 0) return null

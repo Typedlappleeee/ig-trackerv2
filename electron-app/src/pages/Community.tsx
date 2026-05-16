@@ -10,8 +10,9 @@
  *   display_name text NOT NULL DEFAULT '',
  *   avatar_url   text,
  *   org_name     text,
- *   channel      text NOT NULL DEFAULT 'chat',   -- 'news' | 'chat'
+ *   channel      text NOT NULL DEFAULT 'chat',   -- 'news' | 'chat' | 'support'
  *   title        text,                            -- only for channel='news'
+ *   is_admin     boolean NOT NULL DEFAULT false,
  *   created_at   timestamptz DEFAULT now()
  * );
  * ALTER TABLE community_messages ENABLE ROW LEVEL SECURITY;
@@ -55,6 +56,7 @@ interface Message {
   org_name: string | null
   channel: Channel
   title: string | null
+  is_admin: boolean
   created_at: string
 }
 
@@ -135,7 +137,13 @@ function ChatRow({ msg, isOwn, compact }: { msg: Message; isOwn: boolean; compac
             <span className="text-[13px] font-bold leading-none" style={{ color: isOwn ? '#c4b5fd' : '#e8e0ff' }}>
               {msg.display_name || 'Anonyme'}
             </span>
-            {isOwn && (
+            {msg.is_admin && (
+              <span className="text-[8px] font-black uppercase px-1.5 py-[2px] rounded-full tracking-wide flex items-center gap-0.5"
+                style={{ background: 'linear-gradient(130deg,rgba(124,58,237,0.35),rgba(236,72,153,0.25))', color: '#f0a8ff', border: '1px solid rgba(236,72,153,0.25)' }}>
+                ⭐ ScaleFlow Admin
+              </span>
+            )}
+            {isOwn && !msg.is_admin && (
               <span className="text-[8px] font-black uppercase px-1.5 py-[2px] rounded-full tracking-wide"
                 style={{ background: 'rgba(139,92,246,0.2)', color: '#a78bfa' }}>Moi</span>
             )}
@@ -332,6 +340,7 @@ const SETUP_SQL = `CREATE TABLE IF NOT EXISTS community_messages (
   org_name     text,
   channel      text NOT NULL DEFAULT 'chat',
   title        text,
+  is_admin     boolean NOT NULL DEFAULT false,
   created_at   timestamptz DEFAULT now()
 );
 ALTER TABLE community_messages ENABLE ROW LEVEL SECURITY;
@@ -433,7 +442,7 @@ export function Community({ user }: CommunityProps) {
     setLoading(true)
     const { data, error } = await supabase
       .from('community_messages')
-      .select('id, user_id, content, display_name, avatar_url, org_name, channel, title, created_at')
+      .select('id, user_id, content, display_name, avatar_url, org_name, channel, title, is_admin, created_at')
       .order('created_at', { ascending: tab === 'chat' })
       .limit(200)
     if (error) {
@@ -485,6 +494,7 @@ export function Community({ user }: CommunityProps) {
       avatar_url: profile.avatar_url,
       org_name: currentOrg?.name ?? null,
       channel: 'chat', title: null,
+      is_admin: isAdmin,
     })
     if (error) setChatDraft(content)
     setChatSend(false)
@@ -502,6 +512,7 @@ export function Community({ user }: CommunityProps) {
       org_name: currentOrg?.name ?? null,
       channel: 'news',
       title: newsTitle.trim() || null,
+      is_admin: true,
     })
     setNewsTitle(''); setNewsContent(''); setShowNewsForm(false)
     setNewsSend(false)
@@ -852,6 +863,7 @@ export function Community({ user }: CommunityProps) {
                         user_id: user.id, content,
                         display_name: profile.display_name, avatar_url: profile.avatar_url,
                         org_name: currentOrg?.name ?? null, channel: 'support', title: null,
+                        is_admin: isAdmin,
                       }).then(({ error }) => { if (error) setChatDraft(content); setChatSend(false) })
                     }
                   }}
@@ -870,6 +882,7 @@ export function Community({ user }: CommunityProps) {
                       user_id: user.id, content,
                       display_name: profile.display_name, avatar_url: profile.avatar_url,
                       org_name: currentOrg?.name ?? null, channel: 'support', title: null,
+                      is_admin: isAdmin,
                     }).then(({ error }) => { if (error) setChatDraft(content); setChatSend(false) })
                   }}
                   disabled={!chatDraft.trim() || chatSending}
