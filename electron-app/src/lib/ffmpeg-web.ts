@@ -414,7 +414,62 @@ export async function runFfmpegRemixWeb(opts: {
   }
 }
 
-// ── runFfmpegRemixAI (drawtext overlays) ────────────────────────────────────
+// ── Canvas text renderer (replaces drawtext — not available in this WASM build) ──
+async function renderTextPNG(
+  ff: FFmpeg,
+  ov: { text: string; x: string; y: string; fontSize: number; fontColor: string; bold?: boolean; shadow?: boolean },
+  W: number, H: number,
+  fileName: string,
+): Promise<void> {
+  const canvas = document.createElement('canvas')
+  canvas.width  = W
+  canvas.height = H
+  const ctx = canvas.getContext('2d')!
+
+  const weight = ov.bold ? 'bold' : 'normal'
+  ctx.font = `${weight} ${ov.fontSize}px Arial, sans-serif`
+  const textW = ctx.measureText(ov.text).width
+
+  // Evaluate simple FFmpeg expressions (w, h, text_w, text_h)
+  const evalExpr = (expr: string): number => {
+    const s = expr
+      .replace(/\bw\b/g,      String(W))
+      .replace(/\bh\b/g,      String(H))
+      .replace(/\btext_w\b/g, String(textW))
+      .replace(/\btext_h\b/g, String(ov.fontSize))
+    try { return Function('"use strict"; return (' + s + ')')() as number } catch { return 0 }
+  }
+
+  const x = evalExpr(ov.x)
+  const y = evalExpr(ov.y)
+  const borderPx = Math.max(3, Math.round(ov.fontSize * 0.09))
+
+  ctx.textBaseline = 'top'
+
+  // Stroke (border)
+  ctx.strokeStyle = 'rgba(0,0,0,1)'
+  ctx.lineWidth   = borderPx * 2
+  ctx.lineJoin    = 'round'
+  if (ov.shadow !== false) {
+    ctx.shadowColor   = 'rgba(0,0,0,0.7)'
+    ctx.shadowOffsetX = 4
+    ctx.shadowOffsetY = 4
+    ctx.shadowBlur    = 4
+  }
+  ctx.strokeText(ov.text, x, y)
+
+  // Fill (clear shadow first so it doesn't double-render)
+  ctx.shadowColor = 'transparent'
+  ctx.fillStyle   = ov.fontColor
+  ctx.fillText(ov.text, x, y)
+
+  const blob = await new Promise<Blob>((resolve, reject) =>
+    canvas.toBlob(b => (b ? resolve(b) : reject(new Error('Canvas toBlob failed'))), 'image/png'),
+  )
+  await ff.writeFile(fileName, new Uint8Array(await blob.arrayBuffer()))
+}
+
+// ── runFfmpegRemixAI (Canvas text → overlay, no drawtext needed) ─────────────
 export async function runFfmpegRemixAIWeb(opts: {
   newPhase1Path: string
   originalPath:  string
@@ -426,7 +481,8 @@ export async function runFfmpegRemixAIWeb(opts: {
     startTime: number; endTime: number; bold?: boolean; shadow?: boolean
   }>
 }): Promise<{ ok: boolean; outputPath?: string; error?: string }> {
-  const FILES = ['ai_orig.mp4', 'ai_new1.mp4', 'ai_out.mp4']
+  const overlayFiles = opts.textOverlays.map((_, i) => `ai_ov${i}.png`)
+  const FILES = ['ai_orig.mp4', 'ai_new1.mp4', 'ai_out.mp4', ...overlayFiles]
   const ff = await getFFmpeg()
   for (const f of FILES) await ff.deleteFile(f).catch(() => {})
   const ffLogs: string[] = []
@@ -436,38 +492,53 @@ export async function runFfmpegRemixAIWeb(opts: {
     await writeInput(ff, 'ai_orig.mp4', opts.originalPath)
     await writeInput(ff, 'ai_new1.mp4', opts.newPhase1Path)
 
-    const W = opts.preset === '16:9' ? 1920 : 1080
-    const H = opts.preset === '9:16' ? 1920 : 1080
+    const W    = opts.preset === '16:9' ? 1920 : 1080
+    const H    = opts.preset === '9:16' ? 1920 : 1080
     const scl  = `scale=${W}:${H}:force_original_aspect_ratio=decrease,pad=${W}:${H}:-1:-1:color=black,setsar=1`
     const afmt = 'aformat=sample_rates=44100:channel_layouts=stereo'
 
-    const drawFilters = opts.textOverlays.map(ov => {
-      // FFmpeg filter escaping (no shell — direct to WASM):
-      // backslash first, then colon (option separator), then brackets (pad labels)
-      const escaped = ov.text
-        .replace(/\\/g, '\\\\')
-        .replace(/:/g,  '\\:')
-        .replace(/'/g,  "\\'")
-        .replace(/\[/g, '\\[')
-        .replace(/\]/g, '\\]')
-      const borderPx = Math.max(3, Math.round(ov.fontSize * 0.09))
-      const shadow   = ov.shadow !== false ? ':shadowx=4:shadowy=4:shadowcolor=black@0.7' : ''
-      const fontFile = ov.bold ? '/font-bold.ttf' : '/font.ttf'
-      // Use \: escaping only — no single-quote wrapping (unreliable in ffmpeg.wasm)
-      return `drawtext=text=${escaped}:fontfile=${fontFile}:fontsize=${ov.fontSize}:fontcolor=${ov.fontColor}:x=${ov.x}:y=${ov.y}:borderw=${borderPx}:bordercolor=black@1.0${shadow}:enable=between(t,${ov.startTime},${ov.endTime})`
-    }).join(',')
+    // Render each text overlay as a transparent PNG via Canvas API
+    for (let i = 0; i < opts.textOverlays.length; i++) {
+      await renderTextPNG(ff, opts.textOverlays[i], W, H, overlayFiles[i])
+    }
 
-    const filterComplex = [
-      `[0:v]trim=duration=${opts.splitTime},setpts=PTS-STARTPTS,${scl}${drawFilters ? ',' + drawFilters : ''}[v_p1]`,
+    // Build filter_complex:
+    //   [0:v] → phase1 video (scaled)
+    //   [1:v] → phase2 video (scaled)
+    //   concat → merged video
+    //   then chain overlay filters, one per text PNG, with enable= timing
+    const chains: string[] = [
+      `[0:v]trim=duration=${opts.splitTime},setpts=PTS-STARTPTS,${scl}[v_p1]`,
       `[1:v]trim=start=${opts.splitTime},setpts=PTS-STARTPTS,${scl}[v_p2]`,
       `[1:a]asplit=2[ao1][ao2]`,
       `[ao1]atrim=end=${opts.splitTime},asetpts=PTS-STARTPTS,${afmt}[a_p1]`,
       `[ao2]atrim=start=${opts.splitTime},asetpts=PTS-STARTPTS,${afmt}[a_p2]`,
-      `[v_p1][a_p1][v_p2][a_p2]concat=n=2:v=1:a=1[vout][aout]`,
-    ].join(';')
+      `[v_p1][a_p1][v_p2][a_p2]concat=n=2:v=1:a=1[v_merged][aout]`,
+    ]
+
+    // Chain overlays: [v_merged] → [v_ov0] → [v_ov1] → … → [vout]
+    // Each PNG input is at index 2+i (after ai_new1.mp4=0 and ai_orig.mp4=1)
+    let lastPad = 'v_merged'
+    for (let i = 0; i < opts.textOverlays.length; i++) {
+      const ov      = opts.textOverlays[i]
+      const inPad   = lastPad
+      const outPad  = i === opts.textOverlays.length - 1 ? 'vout' : `v_ov${i}`
+      chains.push(`[${inPad}][${2 + i}:v]overlay=0:0:enable=between(t\\,${ov.startTime}\\,${ov.endTime})[${outPad}]`)
+      lastPad = outPad
+    }
+    // If no overlays, rename merged → vout
+    if (opts.textOverlays.length === 0) {
+      chains[chains.length - 1] = chains[chains.length - 1].replace('[v_merged][aout]', '[vout][aout]')
+    }
+
+    const filterComplex = chains.join(';')
+
+    // Build input args: 2 video inputs + one -loop 1 PNG input per overlay
+    const inputArgs: string[] = ['-i', 'ai_new1.mp4', '-i', 'ai_orig.mp4']
+    for (const f of overlayFiles) inputArgs.push('-loop', '1', '-i', f)
 
     await ff.exec([
-      '-i', 'ai_new1.mp4', '-i', 'ai_orig.mp4',
+      ...inputArgs,
       '-filter_complex', filterComplex,
       '-map', '[vout]', '-map', '[aout]',
       '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23',
