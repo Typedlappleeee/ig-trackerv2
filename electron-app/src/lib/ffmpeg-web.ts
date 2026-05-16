@@ -177,34 +177,85 @@ export async function runFfmpegWeb(opts: {
 }
 
 // ── detectSceneChange ─────────────────────────────────────────────────────────
+// Uses FFmpeg's native scene-change metric (select=gt(scene,...)) for frame-accurate
+// detection of real transitions, instead of manual frame-diff at 2fps.
 export async function detectSceneChangeWeb(opts: {
   filePath: string; threshold?: number
 }): Promise<{ ok: boolean; splitTime?: number; duration?: number; error?: string }> {
   const ff = await getFFmpeg()
   await ff.deleteFile('detect.mp4').catch(() => {})
-  await ff.deleteFile('frames.rgb').catch(() => {})
+
+  const logs: string[] = []
+  const logHandler = ({ message }: { message: string }) => logs.push(message)
+
   try {
     await writeInput(ff, 'detect.mp4', opts.filePath)
-    const FPS = 2, W = 32, H = 32
-    const frameSize = W * H * 3
-    await ff.exec([
-      '-hide_banner', '-i', 'detect.mp4',
-      '-vf', `fps=${FPS},scale=${W}:${H}`,
-      '-f', 'rawvideo', '-pix_fmt', 'rgb24',
-      '-y', 'frames.rgb',
-    ])
-    const logs: string[] = []
-    const logHandler = ({ message }: { message: string }) => logs.push(message)
+
+    // Step 1: get duration
     ff.on('log', logHandler)
     await ff.exec(['-hide_banner', '-i', 'detect.mp4', '-f', 'null', '-']).catch(() => {})
     ff.off('log', logHandler)
     const combined = logs.join('\n')
     const durM = combined.match(/Duration:\s*(\d+):(\d+):(\d+\.?\d*)/)
     const duration = durM ? parseInt(durM[1]) * 3600 + parseInt(durM[2]) * 60 + parseFloat(durM[3]) : 0
+
+    // Step 2: FFmpeg native scene detection via select + showinfo
+    // scene value ranges 0–1; values ≥ 0.25 reliably indicate a hard cut
+    const sceneLogs: string[] = []
+    const sceneHandler = ({ message }: { message: string }) => sceneLogs.push(message)
+    ff.on('log', sceneHandler)
+    const threshold = opts.threshold ?? 0.25
+    await ff.exec([
+      '-hide_banner', '-i', 'detect.mp4',
+      '-vf', `select=gt(scene\\,${threshold}),showinfo`,
+      '-vsync', 'vfr', '-an', '-f', 'null', '-',
+    ]).catch(() => {})
+    ff.off('log', sceneHandler)
+
+    // Parse showinfo output: "pts_time:8.541" lines → collect all timestamps
+    const timestamps: number[] = []
+    for (const line of sceneLogs) {
+      const m = line.match(/pts_time:([\d.]+)/)
+      if (m) timestamps.push(parseFloat(m[1]))
+    }
+
+    if (timestamps.length === 0) {
+      // No scene change detected — fallback to manual frame-diff at 10fps/64px
+      return await detectSceneChangeFallback(ff, duration)
+    }
+
+    // Pick the scene change closest to the middle of the video (most likely the intended split)
+    const mid = duration / 2
+    const best = timestamps.reduce((a, b) => Math.abs(a - mid) < Math.abs(b - mid) ? a : b)
+    return { ok: true, splitTime: Math.round(best * 1000) / 1000, duration }
+
+  } catch (err) {
+    if (isWasmCrash(err)) resetFFmpeg()
+    return { ok: false, error: String(err) }
+  } finally {
+    ff.off('log', logHandler)
+    await ff.deleteFile('detect.mp4').catch(() => {})
+  }
+}
+
+// Fallback: manual frame-diff at 10fps with 64×64 frames (more accurate than 2fps/32px)
+async function detectSceneChangeFallback(
+  ff: FFmpeg,
+  duration: number,
+): Promise<{ ok: boolean; splitTime?: number; duration?: number; error?: string }> {
+  await ff.deleteFile('frames.rgb').catch(() => {})
+  try {
+    const FPS = 10, W = 64, H = 64
+    const frameSize = W * H * 3
+    await ff.exec([
+      '-hide_banner', '-i', 'detect.mp4',
+      '-vf', `fps=${FPS},scale=${W}:${H}`,
+      '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-y', 'frames.rgb',
+    ])
     const raw = await ff.readFile('frames.rgb') as Uint8Array
     const nFrames = Math.floor(raw.length / frameSize)
     if (nFrames < 2) return { ok: true, splitTime: duration / 2, duration }
-    const threshold = opts.threshold ?? 0.4
+
     let maxDiff = 0, maxIdx = 0
     for (let i = 1; i < nFrames; i++) {
       const a = raw.subarray((i - 1) * frameSize, i * frameSize)
@@ -214,14 +265,86 @@ export async function detectSceneChangeWeb(opts: {
       diff /= frameSize * 255
       if (diff > maxDiff) { maxDiff = diff; maxIdx = i }
     }
-    if (maxDiff < threshold) return { ok: true, splitTime: duration / 2, duration }
-    return { ok: true, splitTime: Math.round((maxIdx / FPS) * 10) / 10, duration }
+    const splitTime = Math.round((maxIdx / FPS) * 1000) / 1000
+    return { ok: true, splitTime, duration }
+  } catch (err) {
+    return { ok: false, splitTime: duration / 2, duration, error: String(err) }
+  } finally {
+    await ff.deleteFile('frames.rgb').catch(() => {})
+  }
+}
+
+// ── detectBeatDrop ────────────────────────────────────────────────────────────
+// Finds the music beat drop by analyzing audio RMS energy in 100ms windows.
+// The beat drop = the moment where audio energy increases the most (steepest rise).
+// Returns the timestamp of the steepest energy increase, or null if not found.
+export async function detectBeatDropWeb(filePath: string): Promise<{
+  ok: boolean; splitTime?: number; duration?: number; error?: string
+}> {
+  const ff = await getFFmpeg()
+  await ff.deleteFile('beat_in.mp4').catch(() => {})
+  await ff.deleteFile('beat_audio.raw').catch(() => {})
+
+  const logs: string[] = []
+  const logHandler = ({ message }: { message: string }) => logs.push(message)
+
+  try {
+    await writeInput(ff, 'beat_in.mp4', filePath)
+
+    // Get duration
+    ff.on('log', logHandler)
+    await ff.exec(['-hide_banner', '-i', 'beat_in.mp4', '-f', 'null', '-']).catch(() => {})
+    ff.off('log', logHandler)
+    const durM = logs.join('\n').match(/Duration:\s*(\d+):(\d+):(\d+\.?\d*)/)
+    const duration = durM ? parseInt(durM[1]) * 3600 + parseInt(durM[2]) * 60 + parseFloat(durM[3]) : 0
+    if (duration < 1) return { ok: false, error: 'Vidéo trop courte' }
+
+    // Extract mono audio at 4000Hz (lightweight — only need amplitude envelope)
+    await ff.exec([
+      '-hide_banner', '-i', 'beat_in.mp4',
+      '-vn', '-ac', '1', '-ar', '4000', '-f', 's16le', '-y', 'beat_audio.raw',
+    ])
+
+    const raw = await ff.readFile('beat_audio.raw') as Uint8Array
+    const samples = new Int16Array(raw.buffer, raw.byteOffset, Math.floor(raw.byteLength / 2))
+    const SR = 4000
+
+    // Compute RMS energy in 100ms windows
+    const WIN = Math.floor(SR * 0.1)
+    const nWin = Math.floor(samples.length / WIN)
+    if (nWin < 4) return { ok: true, splitTime: duration / 2, duration }
+
+    const rms: number[] = []
+    for (let i = 0; i < nWin; i++) {
+      let sum = 0
+      for (let j = i * WIN; j < (i + 1) * WIN; j++) sum += (samples[j] / 32768) ** 2
+      rms.push(Math.sqrt(sum / WIN))
+    }
+
+    // Smooth over 3 windows to reduce noise
+    const smoothed = rms.map((v, i) =>
+      (rms[Math.max(0, i - 1)] + v + rms[Math.min(nWin - 1, i + 1)]) / 3
+    )
+
+    // Find the steepest upward energy rise (beat drop signature)
+    // Skip first and last 10% of the video (transitions near edges are usually not the intended split)
+    const skip = Math.floor(nWin * 0.10)
+    let maxRise = 0, bestWin = Math.floor(nWin / 2)
+    for (let i = skip + 1; i < nWin - skip; i++) {
+      const rise = smoothed[i] - smoothed[i - 1]
+      if (rise > maxRise) { maxRise = rise; bestWin = i }
+    }
+
+    const splitTime = Math.round((bestWin * 0.1) * 1000) / 1000  // 0.1s per window
+    return { ok: true, splitTime: Math.min(splitTime, duration - 0.033), duration }
+
   } catch (err) {
     if (isWasmCrash(err)) resetFFmpeg()
     return { ok: false, error: String(err) }
   } finally {
-    await ff.deleteFile('detect.mp4').catch(() => {})
-    await ff.deleteFile('frames.rgb').catch(() => {})
+    ff.off('log', logHandler)
+    await ff.deleteFile('beat_in.mp4').catch(() => {})
+    await ff.deleteFile('beat_audio.raw').catch(() => {})
   }
 }
 
