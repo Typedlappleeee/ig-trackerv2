@@ -242,6 +242,36 @@ export function Bank({ user }: BankProps) {
   const [ctxMenu, setCtxMenu]       = useState<CtxMenu | null>(null)
   const [playingItem, setPlayingItem] = useState<ContentItem | null>(null)
 
+  // Multi-selection
+  const [selectionMode, setSelectionMode] = useState(false)
+  const [selectedIds, setSelectedIds]     = useState<Set<string>>(new Set())
+  const [showBulkMove, setShowBulkMove]   = useState(false)
+
+  function toggleSelection(id: string) {
+    setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
+  }
+  function exitSelection() { setSelectionMode(false); setSelectedIds(new Set()) }
+
+  async function deleteSelected() {
+    if (!selectedIds.size) return
+    if (!confirm(`Supprimer ${selectedIds.size} vidéo(s) ? Cette action est irréversible.`)) return
+    const ids = [...selectedIds]
+    const toDelete = items.filter(i => ids.includes(i.id))
+    await supabase.from('content_bank').delete().in('id', ids)
+    deleteStorageObjects(toDelete.flatMap(i => [i.storage_path, i.thumbnail_path]))
+    setItems(prev => prev.filter(i => !ids.includes(i.id)))
+    exitSelection()
+  }
+
+  async function moveSelected(folder: string | null) {
+    if (!selectedIds.size) return
+    const ids = [...selectedIds]
+    await supabase.from('content_bank').update({ folder }).in('id', ids)
+    setItems(prev => prev.map(i => ids.includes(i.id) ? { ...i, folder: folder as unknown as string } : i))
+    setShowBulkMove(false)
+    exitSelection()
+  }
+
   // Modals
   const [renameItem, setRenameItem] = useState<ContentItem | null>(null)
   const [moveItem, setMoveItem]     = useState<ContentItem | null>(null)
@@ -580,7 +610,7 @@ export function Bank({ user }: BankProps) {
           <h2 className="text-sm font-semibold text-text mr-2">🗂 Banque de médias</h2>
           <div className="flex-1" />
           <Button onClick={() => setShowAddModal(true)} size="sm">+ Ajouter un média</Button>
-          <Button variant="secondary" size="sm" onClick={() => alert('Réglage du dossier export à faire dans Paramètres → Profil')}>📂 Export dir</Button>
+          <Button variant="secondary" size="sm" onClick={() => { setSelectionMode(true); setSelectedIds(new Set()) }}>☑ Sélectionner</Button>
           <Button variant="secondary" size="sm" onClick={loadItems}>↺ Rafraîchir</Button>
         </div>
 
@@ -615,6 +645,33 @@ export function Bank({ user }: BankProps) {
           <span className="text-text2 text-xs">{visible.length} média{visible.length !== 1 ? 's' : ''}</span>
           {adding && <span className="text-xs text-accent animate-pulse">Ajout…</span>}
         </div>
+
+        {/* Selection toolbar */}
+        {selectionMode && (
+          <div className="px-6 py-2.5 border-b border-border flex items-center gap-3 flex-shrink-0" style={{ background: 'rgba(139,92,246,0.08)' }}>
+            <span className="text-sm font-bold text-accent">{selectedIds.size} sélectionné{selectedIds.size > 1 ? 's' : ''}</span>
+            <button
+              onClick={() => setSelectedIds(prev => prev.size === visible.length ? new Set() : new Set(visible.map(i => i.id)))}
+              className="text-xs px-2.5 py-1 rounded-lg font-semibold text-text2 hover:text-text transition-colors"
+              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}>
+              {selectedIds.size === visible.length ? '☐ Désélectionner tout' : '☑ Tout sélectionner'}
+            </button>
+            {selectedIds.size > 0 && (<>
+              <button onClick={() => setShowBulkMove(true)}
+                className="text-xs px-3 py-1 rounded-lg font-semibold"
+                style={{ background: 'rgba(139,92,246,0.15)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.3)' }}>
+                📂 Déplacer ({selectedIds.size})
+              </button>
+              <button onClick={deleteSelected}
+                className="text-xs px-3 py-1 rounded-lg font-semibold"
+                style={{ background: 'rgba(239,68,68,0.12)', color: '#f87171', border: '1px solid rgba(239,68,68,0.25)' }}>
+                🗑 Supprimer ({selectedIds.size})
+              </button>
+            </>)}
+            <div className="flex-1" />
+            <button onClick={exitSelection} className="text-xs text-text2 hover:text-text px-2 transition-colors">✕ Annuler</button>
+          </div>
+        )}
 
         {/* Migration notice */}
         {needsMigration && (
@@ -668,6 +725,9 @@ export function Bank({ user }: BankProps) {
                   item={item}
                   onContextMenu={openCtx}
                   onPlay={setPlayingItem}
+                  selectionMode={selectionMode}
+                  isSelected={selectedIds.has(item.id)}
+                  onToggleSelect={() => toggleSelection(item.id)}
                 />
               ))}
             </div>
@@ -707,6 +767,28 @@ export function Bank({ user }: BankProps) {
       {/* ── Video player ── */}
       {playingItem && (
         <VideoPlayerModal item={playingItem} onClose={() => setPlayingItem(null)} />
+      )}
+
+      {/* ── Bulk move modal ── */}
+      {showBulkMove && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowBulkMove(false)}>
+          <div className="bg-surface border border-border rounded-2xl p-6 w-72 space-y-4" onClick={e => e.stopPropagation()}>
+            <p className="font-semibold text-text">Déplacer {selectedIds.size} vidéo{selectedIds.size > 1 ? 's' : ''} vers…</p>
+            <div className="flex flex-col gap-1 max-h-64 overflow-auto">
+              <button onClick={() => moveSelected(null)}
+                className="text-left px-3 py-2 rounded-lg text-sm hover:bg-surface2 text-text2 transition-colors">
+                🎬 Racine (sans dossier)
+              </button>
+              {folders.map(f => (
+                <button key={f} onClick={() => moveSelected(f)}
+                  className="text-left px-3 py-2 rounded-lg text-sm hover:bg-surface2 text-text transition-colors">
+                  📂 {f}
+                </button>
+              ))}
+            </div>
+            <Button variant="secondary" className="w-full" onClick={() => setShowBulkMove(false)}>Annuler</Button>
+          </div>
+        </div>
       )}
 
       {/* ── Modals ── */}
@@ -1025,21 +1107,26 @@ function VideoPlayerModal({ item, onClose }: { item: ContentItem; onClose: () =>
 }
 
 // ── Video card ───────────────────────────────────────────────────────────────
-function VideoCard({ item, onContextMenu, onPlay }: {
+function VideoCard({ item, onContextMenu, onPlay, selectionMode, isSelected, onToggleSelect }: {
   item: ContentItem
   onContextMenu: (e: React.MouseEvent, item: ContentItem) => void
   onPlay: (item: ContentItem) => void
+  selectionMode?: boolean
+  isSelected?: boolean
+  onToggleSelect?: () => void
 }) {
   return (
     <div
-      draggable
+      draggable={!selectionMode}
       onDragStart={e => e.dataTransfer.setData('bank-item-id', item.id)}
-      className="bg-card border border-border rounded-xl overflow-hidden hover:border-accent/40 transition-colors group cursor-default select-none"
-      onContextMenu={e => onContextMenu(e, item)}
+      className={`bg-card border rounded-xl overflow-hidden transition-all group cursor-default select-none ${
+        isSelected ? 'border-accent ring-2 ring-accent/30' : 'border-border hover:border-accent/40'
+      }`}
+      onContextMenu={e => !selectionMode && onContextMenu(e, item)}
     >
       <div
         className="relative aspect-[9/16] bg-surface2 overflow-hidden cursor-pointer"
-        onClick={() => (item.file_url || item.storage_path) && onPlay(item)}
+        onClick={() => selectionMode ? onToggleSelect?.() : (item.file_url || item.storage_path) && onPlay(item)}
       >
         <VideoThumbnail filePath={item.file_url} thumbnailPath={item.thumbnail_path} storagePath={item.storage_path} />
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
@@ -1071,12 +1158,22 @@ function VideoCard({ item, onContextMenu, onPlay }: {
         <div className="absolute bottom-0 left-0 right-0 p-2.5 pointer-events-none">
           <p className="text-xs font-semibold text-white truncate leading-tight">{item.title}</p>
         </div>
-        {/* ⋮ menu button on hover */}
-        <button
-          className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/70 text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white/20"
-          onClick={e => { e.stopPropagation(); onContextMenu(e, item) }}
-          title="Options"
-        >⋮</button>
+        {/* ⋮ menu button on hover (hidden in selection mode) */}
+        {!selectionMode && (
+          <button
+            className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/70 text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white/20"
+            onClick={e => { e.stopPropagation(); onContextMenu(e, item) }}
+            title="Options"
+          >⋮</button>
+        )}
+        {/* Checkbox in selection mode */}
+        {selectionMode && (
+          <div className={`absolute top-2 right-2 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
+            isSelected ? 'bg-accent border-accent' : 'border-white/60 bg-black/40'
+          }`}>
+            {isSelected && <span className="text-white text-xs font-bold">✓</span>}
+          </div>
+        )}
       </div>
       {/* Tags */}
       {item.tags.length > 0 && (
