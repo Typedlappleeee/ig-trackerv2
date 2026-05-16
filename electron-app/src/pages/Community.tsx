@@ -593,9 +593,10 @@ export function Community({ user }: CommunityProps) {
 
   const [chatDraft, setChatDraft]  = useState('')
   const [chatSending, setChatSend] = useState(false)
-  const bottomRef = useRef<HTMLDivElement>(null)
-  const listRef   = useRef<HTMLDivElement>(null)
-  const chatRef   = useRef<HTMLTextAreaElement>(null)
+  const bottomRef   = useRef<HTMLDivElement>(null)
+  const listRef     = useRef<HTMLDivElement>(null)
+  const chatRef     = useRef<HTMLTextAreaElement>(null)
+  const isAdminRef  = useRef(false)
 
   const [newsTitle, setNewsTitle]     = useState('')
   const [newsContent, setNewsContent] = useState('')
@@ -636,13 +637,33 @@ export function Community({ user }: CommunityProps) {
       .catch(() => {})
   }, [user.id])
 
+  useEffect(() => { isAdminRef.current = isAdmin }, [isAdmin])
+
+  useEffect(() => {
+    if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+      Notification.requestPermission()
+    }
+  }, [])
+
   useEffect(() => { loadProfile() }, [loadProfile])
   useEffect(() => { loadMessages() }, [loadMessages])
 
   useEffect(() => {
     const ch = supabase.channel('community-v3')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'community_messages' }, payload => {
-        setMessages(prev => prev.some(m => m.id === payload.new.id) ? prev : [...prev, payload.new as Message])
+        const msg = payload.new as Message
+        setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg])
+        // Notifications (only for messages from others)
+        if (msg.user_id !== user.id && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+          const body = msg.content.slice(0, 80) + (msg.content.length > 80 ? '…' : '')
+          if (msg.channel === 'support' && !msg.is_admin && isAdminRef.current) {
+            // Admin: new ticket message received
+            new Notification(`🎫 Nouveau ticket — ${msg.display_name}`, { body, silent: false })
+          } else if (msg.channel === 'support' && msg.is_admin && msg.thread_user_id === user.id) {
+            // User: admin replied to their ticket
+            new Notification('💬 Réponse à ton ticket', { body: `ScaleFlow Admin : ${body}`, silent: false })
+          }
+        }
       })
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'community_messages' }, payload => {
         setMessages(prev => prev.filter(m => m.id !== (payload.old as any).id))
@@ -1075,7 +1096,7 @@ export function Community({ user }: CommunityProps) {
             </>
           ) : (
             /* User view */
-            <>
+            <div className="flex-1 flex flex-col overflow-hidden">
               <div ref={listRef} className="flex-1 overflow-y-auto px-5 py-4">
                 {loading ? <div className="flex items-center justify-center h-full"><Spinner size="lg" /></div>
                 : myThreadMessages.length === 0 ? (
@@ -1143,7 +1164,7 @@ export function Community({ user }: CommunityProps) {
                   </>
                 )}
               </div>
-            </>
+            </div>
           )}
         </div>
       )}
