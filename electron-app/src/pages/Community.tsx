@@ -121,13 +121,15 @@ function fullDate(iso: string): string {
 function Avatar({ url, name, userId, size = 36, onClick }: {
   url: string | null; name: string; userId: string; size?: number; onClick?: () => void
 }) {
-  const [g1, g2] = gradientForId(userId)
-  const r        = Math.round(size * 0.3)
-  const initials = (name || '?').slice(0, 2).toUpperCase()
+  const [g1, g2]   = gradientForId(userId)
+  const [broken, setBroken] = useState(false)
+  const r          = Math.round(size * 0.3)
+  const initials   = (name || '?').slice(0, 2).toUpperCase()
   const base: React.CSSProperties = { width: size, height: size, borderRadius: r, flexShrink: 0 }
   const cls = onClick ? 'cursor-pointer hover:opacity-90 transition-opacity' : ''
-  if (url) {
+  if (url && !broken) {
     return <img src={url} alt={name} onClick={onClick} className={cls}
+      onError={() => setBroken(true)}
       style={{ ...base, objectFit: 'cover', border: '1.5px solid rgba(255,255,255,0.1)' }} />
   }
   return (
@@ -352,8 +354,9 @@ function ProfileModal({ profile, userId, onClose, onSaved }: {
 }) {
   const [name, setName]        = useState(profile.display_name)
   const [avatarUrl, setAUrl]   = useState(profile.avatar_url)
-  const [uploading, setUpload] = useState(false)
-  const [saving, setSaving]    = useState(false)
+  const [uploading, setUpload]   = useState(false)
+  const [uploadErr, setUploadErr] = useState('')
+  const [saving, setSaving]      = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const daysSince   = profile.name_updated_at
@@ -363,11 +366,12 @@ function ProfileModal({ profile, userId, onClose, onSaved }: {
   const daysLeft      = Math.max(0, 90 - daysSince)
 
   async function handleFile(file: File) {
-    setUpload(true)
+    setUpload(true); setUploadErr('')
     try {
       const ext  = file.name.split('.').pop() ?? 'jpg'
       const path = `${userId}/avatar.${ext}`
-      await supabase.storage.from('avatars').upload(path, file, { upsert: true })
+      const { error } = await supabase.storage.from('avatars').upload(path, file, { upsert: true })
+      if (error) { setUploadErr('Bucket "avatars" introuvable — crée-le en Public dans Supabase → Storage'); return }
       const { data } = supabase.storage.from('avatars').getPublicUrl(path)
       setAUrl(data.publicUrl + `?t=${Date.now()}`)
     } finally { setUpload(false) }
@@ -419,7 +423,10 @@ function ProfileModal({ profile, userId, onClose, onSaved }: {
                 {uploading ? <Spinner size="sm" /> : <><span className="text-lg">📷</span><span className="text-[9px] text-white font-bold">Modifier</span></>}
               </div>
             </div>
-            <p className="text-[10px]" style={{ color: 'rgba(196,181,253,0.35)' }}>Clique pour changer ta photo</p>
+            {uploadErr
+              ? <p className="text-[10px] text-center max-w-[220px]" style={{ color: '#f87171' }}>{uploadErr}</p>
+              : <p className="text-[10px]" style={{ color: 'rgba(196,181,253,0.35)' }}>Clique pour changer ta photo</p>
+            }
           </div>
           <div>
             <div className="flex items-center justify-between mb-2">
