@@ -415,6 +415,21 @@ export async function runFfmpegRemixWeb(opts: {
 }
 
 // ── Canvas text renderer (replaces drawtext — not available in this WASM build) ──
+// Extracts the center fraction from FFmpeg position expressions.
+// Expressions always follow the pattern: w*FRAC-text_w/2 or h*FRAC-text_h/2
+// or (w-text_w)/2. We use textAlign='center'/textBaseline='middle' so we
+// only need the center coords — no eval() needed (avoids CSP unsafe-eval blocks).
+function extractCenterFrac(expr: string, dim: 'w' | 'h'): number {
+  const e = expr.trim()
+  // (w-text_w)/2  or  (h-text_h)/2  → center = 0.5
+  if (/^\(w-text_w\)\/2$/.test(e) || /^\(w\s*\/\s*2\)$/.test(e)) return 0.5
+  if (/^\(h-text_h\)\/2$/.test(e) || /^\(h\s*\/\s*2\)$/.test(e)) return 0.5
+  // w*FRAC… or h*FRAC…
+  if (dim === 'w') { const m = e.match(/^w\s*\*\s*([0-9.]+)/); if (m) return parseFloat(m[1]) }
+  if (dim === 'h') { const m = e.match(/^h\s*\*\s*([0-9.]+)/); if (m) return parseFloat(m[1]) }
+  return 0.5
+}
+
 async function renderTextPNG(
   ff: FFmpeg,
   ov: { text: string; x: string; y: string; fontSize: number; fontColor: string; bold?: boolean; shadow?: boolean },
@@ -428,25 +443,17 @@ async function renderTextPNG(
 
   const weight = ov.bold ? 'bold' : 'normal'
   ctx.font = `${weight} ${ov.fontSize}px Arial, sans-serif`
-  const textW = ctx.measureText(ov.text).width
 
-  // Evaluate simple FFmpeg expressions (w, h, text_w, text_h)
-  const evalExpr = (expr: string): number => {
-    const s = expr
-      .replace(/\bw\b/g,      String(W))
-      .replace(/\bh\b/g,      String(H))
-      .replace(/\btext_w\b/g, String(textW))
-      .replace(/\btext_h\b/g, String(ov.fontSize))
-    try { return Function('"use strict"; return (' + s + ')')() as number } catch { return 0 }
-  }
+  // Use center alignment — avoids eval() for position expressions
+  ctx.textAlign    = 'center'
+  ctx.textBaseline = 'middle'
 
-  const x = evalExpr(ov.x)
-  const y = evalExpr(ov.y)
+  const cx = W * extractCenterFrac(ov.x, 'w')
+  const cy = H * extractCenterFrac(ov.y, 'h')
+
   const borderPx = Math.max(3, Math.round(ov.fontSize * 0.09))
 
-  ctx.textBaseline = 'top'
-
-  // Stroke (border)
+  // Stroke (border + shadow on stroke only to avoid double shadow)
   ctx.strokeStyle = 'rgba(0,0,0,1)'
   ctx.lineWidth   = borderPx * 2
   ctx.lineJoin    = 'round'
@@ -456,12 +463,12 @@ async function renderTextPNG(
     ctx.shadowOffsetY = 4
     ctx.shadowBlur    = 4
   }
-  ctx.strokeText(ov.text, x, y)
+  ctx.strokeText(ov.text, cx, cy)
 
-  // Fill (clear shadow first so it doesn't double-render)
+  // Fill without shadow
   ctx.shadowColor = 'transparent'
   ctx.fillStyle   = ov.fontColor
-  ctx.fillText(ov.text, x, y)
+  ctx.fillText(ov.text, cx, cy)
 
   const blob = await new Promise<Blob>((resolve, reject) =>
     canvas.toBlob(b => (b ? resolve(b) : reject(new Error('Canvas toBlob failed'))), 'image/png'),
