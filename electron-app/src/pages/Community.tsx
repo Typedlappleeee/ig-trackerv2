@@ -121,12 +121,16 @@ function fullDate(iso: string): string {
 function Avatar({ url, name, userId, size = 36, onClick }: {
   url: string | null; name: string; userId: string; size?: number; onClick?: () => void
 }) {
-  const [g1, g2]   = gradientForId(userId)
+  const [g1, g2]            = gradientForId(userId)
   const [broken, setBroken] = useState(false)
-  const r          = Math.round(size * 0.3)
-  const initials   = (name || '?').slice(0, 2).toUpperCase()
+  const r                   = Math.round(size * 0.3)
+  const initials            = (name || '?').slice(0, 2).toUpperCase()
   const base: React.CSSProperties = { width: size, height: size, borderRadius: r, flexShrink: 0 }
   const cls = onClick ? 'cursor-pointer hover:opacity-90 transition-opacity' : ''
+
+  // Reset broken state if URL changes (e.g. after re-upload)
+  useEffect(() => { setBroken(false) }, [url])
+
   if (url && !broken) {
     return <img src={url} alt={name} onClick={onClick} className={cls}
       onError={() => setBroken(true)}
