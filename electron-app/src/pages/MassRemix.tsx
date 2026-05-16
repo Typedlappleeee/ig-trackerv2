@@ -164,9 +164,9 @@ export function MassRemix({ user }: MassRemixProps) {
       updateJob(job.id, { status: 'detecting' })
       const det = await window.electronAPI!.detectSceneChange!({ filePath: job.originalPath })
       const splitTime = det.ok && det.splitTime != null
-        ? Math.min((det.duration ?? 60) - 0.1, Math.round((det.splitTime + 0.1) * 10) / 10)
-        : Math.round((det.duration ?? 60) * 0.5 * 10) / 10
-      updateJob(job.id, { splitTime })
+        ? Math.min((det.duration ?? 60) - 0.1, Math.round(det.splitTime * 1000) / 1000)
+        : undefined  // no real scene change → no phase 2
+      updateJob(job.id, { splitTime: splitTime ?? 0 })
 
       // 2. AI text detection (optional)
       type Overlay = { text: string; x: string; y: string; fontSize: number; fontColor: string; bold: boolean; shadow: boolean; startTime: number; endTime: number }
@@ -176,14 +176,15 @@ export function MassRemix({ user }: MassRemixProps) {
         setCurrentStep('analyzing')
         updateJob(job.id, { status: 'analyzing' })
         try {
-          const fr = await window.electronAPI!.extractFrames!({ filePath: job.originalPath, endTime: splitTime })
+          const analyzeEnd = splitTime ?? (det.duration ?? 60)
+          const fr = await window.electronAPI!.extractFrames!({ filePath: job.originalPath, endTime: analyzeEnd })
           if (fr.ok && fr.frames?.length) {
-            const interval = splitTime / fr.frames.length
+            const interval = analyzeEnd / fr.frames.length
             const imageBlocks = fr.frames.flatMap((f, fi) => [
               { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: f.data } },
               { type: 'text', text: `[Frame ${fi} — t=${f.timestamp}s]` },
             ])
-            const prompt = `These are ${fr.frames.length} frames from a ${splitTime.toFixed(1)}s video clip (vertical 9:16, output resolution 1080×1920).
+            const prompt = `These are ${fr.frames.length} frames from a ${analyzeEnd.toFixed(1)}s video clip (vertical 9:16, output resolution 1080×1920).
 Identify ALL burned-in text overlays (titles, captions, subtitles, watermarks). For each return:
 {"text":"exact string","xAlign":"left"|"center"|"right","yPercent":0-100,"fontSizePx":number,"fontColor":"css-color","bold":true,"startFrame":0,"endFrame":5}
 
@@ -211,7 +212,7 @@ Return ONLY a JSON array. If none, return [].`
                     bold: item.bold ?? true,
                     shadow: true,
                     startTime: Math.round((item.startFrame ?? 0) * interval * 10) / 10,
-                    endTime: Math.min(splitTime, Math.round(((item.endFrame ?? fr.frames!.length - 1) + 1) * interval * 10) / 10),
+                    endTime: Math.min(analyzeEnd, Math.round(((item.endFrame ?? fr.frames!.length - 1) + 1) * interval * 10) / 10),
                   }))
                 }
               } catch { /* ignore parse errors */ }

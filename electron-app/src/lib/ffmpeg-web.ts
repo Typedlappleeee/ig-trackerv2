@@ -222,8 +222,10 @@ export async function detectSceneChangeWeb(opts: {
     }
 
     if (timestamps.length === 0) {
-      // No scene change detected — fallback to manual frame-diff at 10fps/64px
-      return await detectSceneChangeFallback(ff, duration)
+      // No FFmpeg scene change found — try manual frame-diff as last resort
+      const fb = await detectSceneChangeFallback(ff, duration)
+      // If fallback also finds nothing meaningful, propagate the failure
+      return fb
     }
 
     // Pick the scene change closest to the middle of the video (most likely the intended split)
@@ -268,6 +270,8 @@ async function detectSceneChangeFallback(
       diff /= frameSize * 255
       if (diff > maxDiff) { maxDiff = diff; maxIdx = i }
     }
+    // Require a meaningful visual change — below this it's just camera movement/grain, not a scene cut
+    if (maxDiff < 0.10) return { ok: false, error: 'No scene change detected', duration }
     const splitTime = Math.round((maxIdx / FPS) * 1000) / 1000
     return { ok: true, splitTime, duration }
   } catch (err) {
@@ -337,6 +341,9 @@ export async function detectBeatDropWeb(filePath: string): Promise<{
       const rise = smoothed[i] - smoothed[i - 1]
       if (rise > maxRise) { maxRise = rise; bestWin = i }
     }
+
+    // Require a meaningful energy jump — below this it's just background noise, not a beat drop
+    if (maxRise < 0.03) return { ok: false, error: 'No beat drop detected', duration }
 
     const detected = Math.round((bestWin * 0.1) * 1000) / 1000  // 0.1s per window
     const splitTime = Math.round(Math.min(detected + 0.5, duration - 0.033) * 1000) / 1000
@@ -508,10 +515,12 @@ async function renderTextPNG(
 }
 
 // ── runFfmpegRemixAI (Canvas text → overlay, no drawtext needed) ─────────────
+// splitTime is optional: if omitted (no scene change detected), phase 2 is skipped
+// and the output is just newPhase1Path scaled to the preset with text overlays.
 export async function runFfmpegRemixAIWeb(opts: {
   newPhase1Path: string
   originalPath:  string
-  splitTime:     number
+  splitTime?:    number   // undefined = no scene change → no phase 2
   outputPath:    string
   preset:        '9:16' | '1:1' | '16:9'
   textOverlays:  Array<{
@@ -519,6 +528,7 @@ export async function runFfmpegRemixAIWeb(opts: {
     startTime: number; endTime: number; bold?: boolean; shadow?: boolean
   }>
 }): Promise<{ ok: boolean; outputPath?: string; error?: string }> {
+  const hasPhase2  = opts.splitTime != null && opts.splitTime > 0
   const overlayFiles = opts.textOverlays.map((_, i) => `ai_ov${i}.png`)
   const FILES = ['ai_orig.mp4', 'ai_new1.mp4', 'ai_out.mp4', ...overlayFiles]
   const ff = await getFFmpeg()
@@ -527,8 +537,8 @@ export async function runFfmpegRemixAIWeb(opts: {
   const logHandler = ({ message }: { message: string }) => ffLogs.push(message)
   ff.on('log', logHandler)
   try {
-    await writeInput(ff, 'ai_orig.mp4', opts.originalPath)
     await writeInput(ff, 'ai_new1.mp4', opts.newPhase1Path)
+    if (hasPhase2) await writeInput(ff, 'ai_orig.mp4', opts.originalPath)
 
     const W    = opts.preset === '16:9' ? 1920 : 1080
     const H    = opts.preset === '9:16' ? 1920 : 1080
@@ -540,46 +550,50 @@ export async function runFfmpegRemixAIWeb(opts: {
       await renderTextPNG(ff, opts.textOverlays[i], W, H, overlayFiles[i])
     }
 
-    // Build filter_complex:
-    //   [0:v] → phase1 video (scaled)
-    //   [1:v] → phase2 video (scaled)
-    //   concat → merged video
-    //   then chain overlay filters, one per text PNG, with enable= timing
-    const chains: string[] = [
-      `[0:v]trim=duration=${opts.splitTime},setpts=PTS-STARTPTS,${scl}[v_p1]`,
-      `[1:v]trim=start=${opts.splitTime},setpts=PTS-STARTPTS,${scl}[v_p2]`,
-      `[1:a]asplit=2[ao1][ao2]`,
-      `[ao1]atrim=end=${opts.splitTime},asetpts=PTS-STARTPTS,${afmt}[a_p1]`,
-      `[ao2]atrim=start=${opts.splitTime},asetpts=PTS-STARTPTS,${afmt}[a_p2]`,
-      `[v_p1][a_p1][v_p2][a_p2]concat=n=2:v=1:a=1[v_merged][aout]`,
-    ]
+    let chains: string[]
+    let inputArgs: string[]
 
-    // Chain overlays: [v_merged] → [v_ov0] → [v_ov1] → … → [vout]
-    // Each PNG input is at index 2+i (after ai_new1.mp4=0 and ai_orig.mp4=1)
+    if (hasPhase2) {
+      // Phase 1 (new clip) + Phase 2 (original from splitTime)
+      const st = opts.splitTime!
+      chains = [
+        `[0:v]trim=duration=${st},setpts=PTS-STARTPTS,${scl}[v_p1]`,
+        `[1:v]trim=start=${st},setpts=PTS-STARTPTS,${scl}[v_p2]`,
+        `[1:a]asplit=2[ao1][ao2]`,
+        `[ao1]atrim=end=${st},asetpts=PTS-STARTPTS,${afmt}[a_p1]`,
+        `[ao2]atrim=start=${st},asetpts=PTS-STARTPTS,${afmt}[a_p2]`,
+        `[v_p1][a_p1][v_p2][a_p2]concat=n=2:v=1:a=1[v_merged][aout]`,
+      ]
+      inputArgs = ['-i', 'ai_new1.mp4', '-i', 'ai_orig.mp4']
+    } else {
+      // No scene change → use new clip only, no phase 2
+      chains = [
+        `[0:v]${scl}[v_merged]`,
+        `[0:a]${afmt}[aout]`,
+      ]
+      inputArgs = ['-i', 'ai_new1.mp4']
+    }
+
+    // Chain overlay PNGs: [v_merged] → … → [vout]
+    // Each PNG input comes after the video inputs
+    const videoInputCount = hasPhase2 ? 2 : 1
     let lastPad = 'v_merged'
     for (let i = 0; i < opts.textOverlays.length; i++) {
-      const ov      = opts.textOverlays[i]
-      const inPad   = lastPad
-      const outPad  = i === opts.textOverlays.length - 1 ? 'vout' : `v_ov${i}`
-      chains.push(`[${inPad}][${2 + i}:v]overlay=0:0:enable=between(t\\,${ov.startTime}\\,${ov.endTime})[${outPad}]`)
+      const ov     = opts.textOverlays[i]
+      const outPad = i === opts.textOverlays.length - 1 ? 'vout' : `v_ov${i}`
+      chains.push(`[${lastPad}][${videoInputCount + i}:v]overlay=0:0:enable=between(t\\,${ov.startTime}\\,${ov.endTime})[${outPad}]`)
       lastPad = outPad
     }
-    // If no overlays, rename merged → vout
+    // No overlays → v_merged becomes vout
     if (opts.textOverlays.length === 0) {
-      chains[chains.length - 1] = chains[chains.length - 1].replace('[v_merged][aout]', '[vout][aout]')
+      chains[chains.length - 1] = chains[chains.length - 1].replace('[v_merged]', '[vout]').replace('[v_merged][aout]', '[vout][aout]')
     }
 
-    const filterComplex = chains.join(';')
-
-    // Build input args: 2 video inputs + one PNG input per overlay (no -loop 1)
-    // overlay's default eof_action=repeat keeps the last PNG frame for the full video duration
-    // This avoids the infinite-stream hang that -loop 1 causes in ffmpeg.wasm
-    const inputArgs: string[] = ['-i', 'ai_new1.mp4', '-i', 'ai_orig.mp4']
     for (const f of overlayFiles) inputArgs.push('-i', f)
 
     await ff.exec([
       ...inputArgs,
-      '-filter_complex', filterComplex,
+      '-filter_complex', chains.join(';'),
       '-map', '[vout]', '-map', '[aout]',
       '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23',
       '-c:a', 'aac', '-b:a', '128k',
