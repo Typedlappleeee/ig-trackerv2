@@ -328,7 +328,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
                     className="flex-1 text-[9.5px] font-black uppercase tracking-[0.2em] transition-colors"
                     style={{ color: 'rgba(139,92,246,0.4)' }}
                   >
-                    {section.title}
+                    <span>· {section.title}</span>
                   </span>
                   <span
                     className="text-[9px] transition-all duration-200 opacity-40 group-hover:opacity-70"
@@ -425,6 +425,10 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
           </div>
         </nav>
 
+        {/* Fade bottom */}
+        <div className="pointer-events-none flex-shrink-0 h-6 -mt-6 relative z-10"
+          style={{ background: 'linear-gradient(to bottom, transparent, #080614)' }} />
+
         {/* ── Bottom bar ─────────────────────────────────────────────────────── */}
         <div className="relative z-10 pb-3 pt-0">
           {/* Separator */}
@@ -442,8 +446,8 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
                 style={{
                   background: credits.balance < 10
                     ? 'rgba(240,61,85,0.06)'
-                    : 'rgba(139,92,246,0.06)',
-                  border: `1px solid ${credits.balance < 10 ? 'rgba(240,61,85,0.15)' : 'rgba(139,92,246,0.12)'}`,
+                    : 'linear-gradient(135deg, rgba(139,92,246,0.08) 0%, rgba(124,58,237,0.04) 100%)',
+                  border: `1px solid ${credits.balance < 10 ? 'rgba(240,61,85,0.15)' : 'rgba(139,92,246,0.25)'}`,
                 }}
               >
                 <span className="text-[13px] flex-shrink-0">💎</span>
@@ -502,31 +506,28 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             </div>
 
             {/* Org switcher */}
-            <button
-              ref={orgTriggerRef}
-              onClick={() => orgMenuOpen ? setOrgMenuOpen(false) : openOrgMenu()}
-              className="w-full flex items-center gap-2.5 px-3 py-[9px] rounded-xl text-[12px] transition-all group"
-              style={{
-                background: 'rgba(255,255,255,0.03)',
-                border: '1px solid rgba(139,92,246,0.12)',
-              }}
-              onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(139,92,246,0.28)')}
-              onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(139,92,246,0.12)')}
-            >
-              <span className="text-[15px] flex-shrink-0 opacity-80">🏢</span>
-              <div className="flex-1 min-w-0 text-left">
-                <p className="font-semibold truncate" style={{ color: '#e2d9f3' }}>{currentOrg?.name ?? 'Organisation'}</p>
-                {license.source === 'own' && (
-                  <p className="text-[9.5px] mt-0.5" style={{ color: license.daysLeft === null ? '#a78bfa' : license.daysLeft <= 7 ? '#fb923c' : 'rgba(107,114,128,0.8)' }}>
-                    {license.daysLeft === null ? '∞ à vie' : `${license.daysLeft}j restants`}
-                  </p>
-                )}
-                {license.source === 'org_owner' && (
-                  <p className="text-[9.5px] mt-0.5 text-blue-400">Via organisation</p>
-                )}
-              </div>
-              <span className="text-[10px] flex-shrink-0 opacity-40">▾</span>
-            </button>
+            <div style={{ padding: 1, borderRadius: 15, background: 'linear-gradient(135deg, rgba(139,92,246,0.55) 0%, rgba(236,72,153,0.3) 60%, rgba(139,92,246,0.35) 100%)' }}>
+              <button
+                ref={orgTriggerRef}
+                onClick={() => orgMenuOpen ? setOrgMenuOpen(false) : openOrgMenu()}
+                className="w-full flex items-center gap-2.5 px-3 py-[9px] text-[12px] transition-all group"
+                style={{ background: '#09061a', borderRadius: 14, width: '100%' }}
+              >
+                <span className="text-[15px] flex-shrink-0 opacity-80">🏢</span>
+                <div className="flex-1 min-w-0 text-left">
+                  <p className="font-semibold truncate" style={{ color: '#e2d9f3' }}>{currentOrg?.name ?? 'Organisation'}</p>
+                  {license.source === 'own' && (
+                    <p className="text-[9.5px] mt-0.5" style={{ color: license.daysLeft === null ? '#a78bfa' : license.daysLeft <= 7 ? '#fb923c' : 'rgba(107,114,128,0.8)' }}>
+                      {license.daysLeft === null ? '∞ à vie' : `${license.daysLeft}j restants`}
+                    </p>
+                  )}
+                  {license.source === 'org_owner' && (
+                    <p className="text-[9.5px] mt-0.5 text-blue-400">Via organisation</p>
+                  )}
+                </div>
+                <span className="text-[10px] flex-shrink-0 opacity-40">▾</span>
+              </button>
+            </div>
 
             {/* User strip */}
             <button
@@ -536,7 +537,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             >
               {/* Gradient avatar */}
               <div
-                className="w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-black flex-shrink-0"
+                className="w-7 h-7 rounded-[10px] flex items-center justify-center text-[10px] font-black flex-shrink-0"
                 style={{
                   background: 'linear-gradient(135deg, #7c3aed 0%, #ec4899 100%)',
                   boxShadow: '0 2px 8px rgba(124,58,237,0.35)',
@@ -557,6 +558,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
 
       {/* ── Main content ────────────────────────────────────────────────────── */}
       <main className="flex-1 overflow-auto relative bg-bg">
+        <div className="absolute top-0 right-0 w-96 h-96 pointer-events-none" style={{ background: 'radial-gradient(ellipse at top right, rgba(139,92,246,0.06) 0%, transparent 70%)', zIndex: 0 }} />
         {/* Subscription expiry warning */}
         {license.source === 'own' && license.daysLeft !== null && license.daysLeft <= 1 && (
           <div
@@ -629,7 +631,8 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
                 className={`w-full flex items-center gap-2 px-3 py-2 text-[12px] text-left transition-colors ${currentOrg?.id === org.id ? 'text-accent' : 'text-text hover:bg-white/[0.04]'}`}
                 style={currentOrg?.id === org.id ? { background: 'rgba(139,92,246,0.1)' } : {}}
               >
-                <span>🏢</span><span className="truncate">{org.name}</span>
+                <span>🏢</span><span className="truncate flex-1">{org.name}</span>
+                {currentOrg?.id === org.id && <span className="ml-auto text-accent text-xs">✓</span>}
               </button>
             ))}
             <button
@@ -654,7 +657,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             borderRadius: 16,
             padding: '14px 16px',
             width: 230,
-            boxShadow: '0 8px 40px rgba(0,0,0,0.55), 0 0 0 1px rgba(139,92,246,0.08), 0 0 40px -8px rgba(124,58,237,0.25)',
+            boxShadow: '0 8px 40px rgba(0,0,0,0.55), 0 0 0 1px rgba(139,92,246,0.08), 0 0 40px -8px rgba(124,58,237,0.25), 0 0 60px -12px rgba(124,58,237,0.4)',
           }}
         >
           <div className="flex items-center gap-2.5 mb-3">
@@ -709,9 +712,15 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             className="fixed z-[9999] rounded-xl shadow-2xl overflow-hidden anim-slide-down"
             style={{ left: userMenuPos.left, bottom: userMenuPos.bottom, width: Math.max(userMenuPos.width, 240), background: '#0c0919', border: '1px solid rgba(139,92,246,0.2)' }}
           >
-            <div className="px-3 py-2.5 border-b" style={{ borderColor: 'rgba(139,92,246,0.12)', background: 'rgba(139,92,246,0.05)' }}>
-              <p className="text-[10px] uppercase tracking-wider text-text2">Compte actif</p>
-              <p className="text-[12px] text-text truncate">{user.email}</p>
+            <div className="px-3 py-3 border-b flex items-center gap-2.5" style={{ borderColor: 'rgba(139,92,246,0.12)', background: 'linear-gradient(135deg, rgba(139,92,246,0.08), rgba(236,72,153,0.04))' }}>
+              <div className="w-8 h-8 rounded-[10px] flex items-center justify-center text-[13px] font-black flex-shrink-0"
+                style={{ background: 'linear-gradient(135deg, #7c3aed, #ec4899)', boxShadow: '0 2px 10px rgba(124,58,237,0.4)', color: '#fff' }}>
+                {userInitial}
+              </div>
+              <div>
+                <p className="text-[10px] uppercase tracking-wider" style={{ color: 'rgba(167,139,250,0.5)' }}>Compte actif</p>
+                <p className="text-[12px] font-semibold text-white truncate max-w-[160px]">{user.email}</p>
+              </div>
             </div>
 
             {recentAccounts.length > 0 && (
@@ -745,17 +754,20 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
 
             <button
               onClick={handleAddAccount}
-              className="w-full px-3 py-2 text-[12px] text-text hover:bg-white/[0.04] border-t text-left transition-colors"
+              className="w-full px-3 py-2.5 text-[12px] text-text hover:bg-white/[0.04] border-t text-left transition-colors flex items-center gap-2.5"
               style={{ borderColor: 'rgba(139,92,246,0.12)' }}
             >
-              ＋ Ajouter un compte
+              <span className="w-4 h-4 rounded-full border border-current flex items-center justify-center text-[10px] opacity-60">＋</span>
+              <span>Ajouter un compte</span>
             </button>
             <button
               onClick={() => { setUserMenuOpen(false); supabase.auth.signOut() }}
-              className="w-full px-3 py-2 text-[12px] text-danger hover:bg-danger/10 border-t text-left transition-colors"
+              className="w-full px-3 py-2.5 text-[12px] text-danger hover:bg-danger/10 border-t text-left transition-colors flex items-center gap-2.5"
               style={{ borderColor: 'rgba(139,92,246,0.12)' }}
             >
-              ↩ Se déconnecter
+              <span className="flex items-center gap-2">
+                <span>🚪</span><span>Se déconnecter</span>
+              </span>
             </button>
           </div>
         </>

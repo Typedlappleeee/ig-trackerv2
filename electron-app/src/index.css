@@ -140,8 +140,8 @@ html, body, #root {
   50%       { transform: translateY(-5px); }
 }
 @keyframes glow-accent {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(79,142,247,0); }
-  50%       { box-shadow: 0 0 14px 3px rgba(79,142,247,0.25); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(139,92,246,0); }
+  50%       { box-shadow: 0 0 14px 3px rgba(139,92,246,0.25); }
 }
 @keyframes count-up {
   0%   { opacity: 0; transform: translateY(6px); }
@@ -168,8 +168,8 @@ html, body, #root {
   100% { box-shadow: 0 0 0 0 transparent; opacity: 0; }
 }
 @keyframes border-glow {
-  0%, 100% { border-color: rgba(79,142,247,0.15); }
-  50%       { border-color: rgba(79,142,247,0.4); box-shadow: 0 0 18px -4px rgba(79,142,247,0.3); }
+  0%, 100% { border-color: rgba(139,92,246,0.15); }
+  50%       { border-color: rgba(139,92,246,0.4); box-shadow: 0 0 18px -4px rgba(139,92,246,0.3); }
 }
 
 /* ── Utility classes ────────────────────────────────────────────────────────── */
@@ -217,8 +217,8 @@ html, body, #root {
 }
 .card-lift:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 28px -8px rgba(79,158,255,0.16), 0 2px 8px -2px rgba(0,0,0,0.4);
-  border-color: rgba(79,142,247,0.25) !important;
+  box-shadow: 0 8px 28px -8px rgba(139,92,246,0.16), 0 2px 8px -2px rgba(0,0,0,0.4);
+  border-color: rgba(139,92,246,0.25) !important;
 }
 
 /* Shimmer skeleton */
@@ -240,7 +240,7 @@ html, body, #root {
   position: absolute;
   inset: -1px;
   border-radius: inherit;
-  background: linear-gradient(135deg, rgba(79,142,247,0.3), rgba(79,142,247,0.05), rgba(79,142,247,0.15));
+  background: linear-gradient(135deg, rgba(139,92,246,0.35), rgba(139,92,246,0.06), rgba(139,92,246,0.18));
   z-index: -1;
 }
 
@@ -519,4 +519,45 @@ button, a, input, select, textarea {
   border-color: rgba(139,92,246,0.5);
   box-shadow: 0 0 0 3px rgba(139,92,246,0.12);
   outline: none;
+}
+
+/* ── Premium page background ────────────────────────────────────────────────── */
+.sf-page {
+  position: relative;
+  min-height: 100%;
+}
+.sf-page::before {
+  content: '';
+  position: fixed;
+  top: 0; right: 0;
+  width: 600px; height: 500px;
+  background: radial-gradient(ellipse at top right, rgba(139,92,246,0.055) 0%, transparent 65%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Gradient border utility */
+.sf-gradient-border {
+  position: relative;
+}
+.sf-gradient-border::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  background: linear-gradient(135deg, rgba(139,92,246,0.5), rgba(236,72,153,0.3), rgba(139,92,246,0.3));
+  z-index: -1;
+}
+
+/* ── Stat card premium ──────────────────────────────────────────────────────── */
+.stat-card {
+  background: linear-gradient(135deg, rgba(139,92,246,0.07) 0%, rgba(8,5,20,0.9) 100%);
+  border: 1px solid rgba(139,92,246,0.15);
+  border-radius: 16px;
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.15s;
+}
+.stat-card:hover {
+  border-color: rgba(139,92,246,0.3);
+  box-shadow: 0 8px 32px -8px rgba(139,92,246,0.2);
+  transform: translateY(-1px);
 }
