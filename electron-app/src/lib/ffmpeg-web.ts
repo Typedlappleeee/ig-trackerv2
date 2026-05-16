@@ -227,7 +227,8 @@ export async function detectSceneChangeWeb(opts: {
     // Pick the scene change closest to the middle of the video (most likely the intended split)
     const mid = duration / 2
     const best = timestamps.reduce((a, b) => Math.abs(a - mid) < Math.abs(b - mid) ? a : b)
-    return { ok: true, splitTime: Math.round(best * 1000) / 1000, duration }
+    const splitTime = Math.round(Math.min(best + 0.5, duration - 0.033) * 1000) / 1000
+    return { ok: true, splitTime, duration }
 
   } catch (err) {
     if (isWasmCrash(err)) resetFFmpeg()
@@ -335,8 +336,9 @@ export async function detectBeatDropWeb(filePath: string): Promise<{
       if (rise > maxRise) { maxRise = rise; bestWin = i }
     }
 
-    const splitTime = Math.round((bestWin * 0.1) * 1000) / 1000  // 0.1s per window
-    return { ok: true, splitTime: Math.min(splitTime, duration - 0.033), duration }
+    const detected = Math.round((bestWin * 0.1) * 1000) / 1000  // 0.1s per window
+    const splitTime = Math.round(Math.min(detected + 0.5, duration - 0.033) * 1000) / 1000
+    return { ok: true, splitTime, duration }
 
   } catch (err) {
     if (isWasmCrash(err)) resetFFmpeg()
