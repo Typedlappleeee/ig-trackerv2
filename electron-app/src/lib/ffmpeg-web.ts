@@ -533,9 +533,11 @@ export async function runFfmpegRemixAIWeb(opts: {
 
     const filterComplex = chains.join(';')
 
-    // Build input args: 2 video inputs + one -loop 1 PNG input per overlay
+    // Build input args: 2 video inputs + one PNG input per overlay (no -loop 1)
+    // overlay's default eof_action=repeat keeps the last PNG frame for the full video duration
+    // This avoids the infinite-stream hang that -loop 1 causes in ffmpeg.wasm
     const inputArgs: string[] = ['-i', 'ai_new1.mp4', '-i', 'ai_orig.mp4']
-    for (const f of overlayFiles) inputArgs.push('-loop', '1', '-i', f)
+    for (const f of overlayFiles) inputArgs.push('-i', f)
 
     await ff.exec([
       ...inputArgs,
@@ -543,9 +545,7 @@ export async function runFfmpegRemixAIWeb(opts: {
       '-map', '[vout]', '-map', '[aout]',
       '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23',
       '-c:a', 'aac', '-b:a', '128k',
-      '-movflags', '+faststart',
-      '-shortest',   // stop when the finite video/audio streams end (PNG loops are infinite)
-      '-y', 'ai_out.mp4',
+      '-movflags', '+faststart', '-y', 'ai_out.mp4',
     ])
 
     const url = await readOutput(ff, 'ai_out.mp4')
