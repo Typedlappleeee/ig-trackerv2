@@ -1019,24 +1019,43 @@ export function Community({ user }: CommunityProps) {
                       <span className="text-3xl">🎫</span>
                       <p className="text-[11px]" style={{ color: 'rgba(196,181,253,0.3)' }}>Aucun ticket</p>
                     </div>
-                  ) : threadList.map(t => (
-                    <button key={t.user_id} onClick={() => setSelectedThread(t.user_id)}
-                      className="w-full flex items-center gap-2.5 px-2.5 py-2.5 rounded-xl mb-1 text-left transition-all"
-                      style={selectedThread === t.user_id
-                        ? { background: 'rgba(139,92,246,0.18)', border: '1px solid rgba(139,92,246,0.3)' }
-                        : { background: 'transparent', border: '1px solid transparent' }}>
-                      <Avatar url={t.avatar_url} name={t.display_name} userId={t.user_id} size={28} />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[11px] font-bold text-white truncate">{t.display_name || 'Anonyme'}</p>
-                        <p className="text-[9px] truncate" style={{ color: 'rgba(196,181,253,0.4)' }}>
-                          {t.lastMsg.content.slice(0, 26)}{t.lastMsg.content.length > 26 ? '…' : ''}
-                        </p>
-                      </div>
-                      <span className="text-[8px] flex-shrink-0 tabular-nums" style={{ color: 'rgba(196,181,253,0.3)' }}>
-                        {timeAgo(t.lastMsg.created_at)}
-                      </span>
-                    </button>
-                  ))}
+                  ) : threadList.map(t => {
+                    const hasUnread = !t.lastMsg.is_admin && selectedThread !== t.user_id
+                    return (
+                      <button key={t.user_id} onClick={() => setSelectedThread(t.user_id)}
+                        className="w-full flex items-center gap-2.5 px-2.5 py-2.5 rounded-xl mb-1 text-left transition-all"
+                        style={selectedThread === t.user_id
+                          ? { background: 'rgba(139,92,246,0.18)', border: '1px solid rgba(139,92,246,0.3)' }
+                          : hasUnread
+                          ? { background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.22)' }
+                          : { background: 'transparent', border: '1px solid transparent' }}>
+                        <div className="relative flex-shrink-0">
+                          <Avatar url={t.avatar_url} name={t.display_name} userId={t.user_id} size={28} />
+                          {hasUnread && (
+                            <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2"
+                              style={{ background: '#ec4899', borderColor: '#080614' }} />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-[11px] truncate ${hasUnread ? 'font-black text-white' : 'font-bold text-white'}`}>
+                            {t.display_name || 'Anonyme'}
+                          </p>
+                          <p className="text-[9px] truncate" style={{ color: hasUnread ? 'rgba(236,72,153,0.7)' : 'rgba(196,181,253,0.4)' }}>
+                            {hasUnread && '● '}{t.lastMsg.content.slice(0, 24)}{t.lastMsg.content.length > 24 ? '…' : ''}
+                          </p>
+                        </div>
+                        <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                          <span className="text-[8px] tabular-nums" style={{ color: hasUnread ? 'rgba(236,72,153,0.6)' : 'rgba(196,181,253,0.3)' }}>
+                            {timeAgo(t.lastMsg.created_at)}
+                          </span>
+                          {hasUnread && (
+                            <span className="text-[7px] font-black px-1 py-0.5 rounded"
+                              style={{ background: 'rgba(236,72,153,0.2)', color: '#f472b6' }}>NEW</span>
+                          )}
+                        </div>
+                      </button>
+                    )
+                  })}
                 </div>
               </div>
 
