@@ -29,7 +29,7 @@ function api() {
   return window.electronAPI as any
 }
 
-export function TextCopy({ user: _user }: { user: User }) {
+export function TextCopy({ user: _user, onBack }: { user: User; onBack?: () => void }) {
   const toast = useToast()
 
   const [videos,    setVideos]    = useState<Array<{ path: string; name: string }>>([])
@@ -137,7 +137,10 @@ export function TextCopy({ user: _user }: { user: User }) {
 
   return (
     <div className="flex flex-col gap-6 p-6 max-w-3xl mx-auto">
-      <div>
+      <div className="flex items-center gap-3">
+        {onBack && (
+          <button onClick={onBack} className="text-white/40 hover:text-white transition-colors text-lg">←</button>
+        )}
         <h1 className="text-2xl font-black text-white">Texte IA — Dupliquer</h1>
         <p className="text-sm text-white/50 mt-1">
           Ajoute un texte sur tes vidéos avec plusieurs positions différentes pour créer des copies uniques.
