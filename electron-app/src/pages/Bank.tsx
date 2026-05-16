@@ -1097,7 +1097,7 @@ function VideoCard({ item, onContextMenu, onPlay }: {
 export interface BankPickerProps {
   user: User
   mode: 'single' | 'multi'
-  onSelect: (paths: string[]) => void
+  onSelect: (paths: string[], titles?: string[]) => void
   onClose: () => void
   // 'signed-url': just create a signed URL (fast, no download) — for MassPosting
   // 'full': download to local path/blob URL — for Remix/FFmpeg (default)
@@ -1165,7 +1165,7 @@ export function BankPicker({ user, mode, onSelect, onClose, resolveMode = 'full'
     if (mode === 'single') {
       const paths = await resolvePaths([item])
       setResolving(null)
-      if (paths.length > 0) onSelect(paths)
+      if (paths.length > 0) onSelect(paths, [item.title])
       return
     }
     setSelected(prev => {
@@ -1180,7 +1180,7 @@ export function BankPicker({ user, mode, onSelect, onClose, resolveMode = 'full'
     const its = items.filter(i => selected.has(i.id))
     const paths = await resolvePaths(its)
     setResolving(null)
-    onSelect(paths)
+    onSelect(paths, its.map(i => i.title))
   }
 
   return (

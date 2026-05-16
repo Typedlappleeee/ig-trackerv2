@@ -338,15 +338,13 @@ export function TextCopy({ user, onBack }: { user: User; onBack?: () => void }) 
         </section>
       )}
 
-      {/* Bank picker modal */}
+      {/* Bank picker modal — mode=single keeps modal open so user can pick several */}
       {showBankPicker && (
-        <BankPicker user={user} mode="multi" resolveMode="full"
-          onSelect={paths => {
-            setShowBankPicker(false)
-            setVideos(prev => [...prev, ...paths.map(p => ({
-              path: p,
-              name: p.split('/').pop()?.split('?')[0] ?? p,
-            }))])
+        <BankPicker user={user} mode="single" resolveMode="full"
+          onSelect={(paths, titles) => {
+            if (!paths[0]) return
+            setVideos(prev => [...prev, { path: paths[0], name: titles?.[0] ?? paths[0].split('/').pop()?.split('?')[0] ?? paths[0] }])
+            // don't close — let user keep picking; they close via ✕
           }}
           onClose={() => setShowBankPicker(false)} />
       )}
