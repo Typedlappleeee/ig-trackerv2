@@ -171,7 +171,7 @@ function ChatRow({ msg, isOwn, compact, isAdmin, onDelete, onMute }: {
               <span className="text-[8px] font-black uppercase px-1.5 py-[2px] rounded-full tracking-wide"
                 style={{ background: 'rgba(139,92,246,0.2)', color: '#a78bfa' }}>Moi</span>
             )}
-            {msg.org_name && (
+            {msg.org_name && !msg.is_admin && (
               <span className="text-[10px] font-semibold px-2 py-[2px] rounded-full"
                 style={{ background: 'rgba(255,255,255,0.05)', color: 'rgba(196,181,253,0.65)', border: '1px solid rgba(139,92,246,0.15)' }}>
                 {msg.org_name}
@@ -278,7 +278,7 @@ function NewsCard({ msg, isAdmin, onDelete }: { msg: Message; isAdmin: boolean; 
                 style={{ background: 'linear-gradient(130deg,rgba(124,58,237,0.35),rgba(236,72,153,0.2))', color: '#f0a8ff', border: '1px solid rgba(236,72,153,0.2)' }}>
                 Admin
               </span>
-              {msg.org_name && <span className="text-[10px]" style={{ color: 'rgba(196,181,253,0.45)' }}>{msg.org_name}</span>}
+              {msg.org_name && !msg.is_admin && <span className="text-[10px]" style={{ color: 'rgba(196,181,253,0.45)' }}>{msg.org_name}</span>}
               <span className="ml-auto text-[10px]" style={{ color: 'rgba(196,181,253,0.35)' }} title={fullDate(msg.created_at)}>
                 {timeAgo(msg.created_at)}
               </span>
