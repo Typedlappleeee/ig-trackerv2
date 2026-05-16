@@ -208,8 +208,9 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
   }
 
   const isVisibleTab = (id: Page): boolean => {
-    if (id === 'licences') return license.isSuperAdmin
-    if (id === 'support') return true
+    if (id === 'licences')  return license.isSuperAdmin
+    if (id === 'support')   return true
+    if (id === 'community') return true
     return role ? canSeeTab(role, perms, id as import('@/lib/supabase').PageKey) : true
   }
 
