@@ -163,9 +163,39 @@ export function MassRemix({ user }: MassRemixProps) {
       setCurrentStep('detecting')
       updateJob(job.id, { status: 'detecting' })
       const det = await window.electronAPI!.detectSceneChange!({ filePath: job.originalPath })
-      const splitTime = det.ok && det.splitTime != null
+      let splitTime = det.ok && det.splitTime != null
         ? Math.min((det.duration ?? 60) - 0.1, Math.round(det.splitTime * 1000) / 1000)
         : undefined  // no real scene change → no phase 2
+
+      // If a split was found, check that phase 2 isn't just more person/footage
+      // (phase 2 should be a different scene — if it still shows a person, skip it)
+      if (splitTime != null && anthropicKey.trim()) {
+        try {
+          const totalDur = det.duration ?? 60
+          const phase2Mid = Math.min(splitTime + 2, totalDur - 0.5)
+          const fr2 = await window.electronAPI!.extractFrames!({
+            filePath: job.originalPath,
+            startTime: phase2Mid,
+            endTime: Math.min(phase2Mid + 1, totalDur),
+          })
+          if (fr2.ok && fr2.frames?.[0]) {
+            const res = await window.electronAPI!.anthropicVisionRequest!({
+              apiKey: anthropicKey.trim(),
+              model: 'claude-haiku-4-5-20251001',
+              messages: [{ role: 'user', content: [
+                { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: fr2.frames[0].data } },
+                { type: 'text', text: 'Is there a person or human face clearly visible in this frame? Answer only "yes" or "no".' },
+              ]}],
+              maxTokens: 5,
+            })
+            if (res.ok) {
+              const answer = ((res.data as any)?.content?.[0]?.text ?? '').toLowerCase()
+              if (answer.includes('yes')) splitTime = undefined  // still shows a person → no phase 2
+            }
+          }
+        } catch { /* if check fails, keep splitTime as-is */ }
+      }
+
       updateJob(job.id, { splitTime: splitTime ?? 0 })
 
       // 2. AI text detection (optional)

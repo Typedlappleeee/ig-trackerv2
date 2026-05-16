@@ -642,30 +642,33 @@ export async function runFfmpegMetadataWeb(opts: {
 
 // ── extractFrames (for AI vision analysis) ───────────────────────────────────
 export async function extractFramesWeb(opts: {
-  filePath: string; endTime: number; fps?: number
+  filePath: string; endTime: number; startTime?: number; fps?: number
 }): Promise<{
   ok: boolean
   frames?: Array<{ index: number; timestamp: number; data: string }>
   count?: number
   error?: string
 }> {
-  const targetCount = Math.min(8, Math.max(1, Math.ceil(opts.endTime)))
+  const start      = opts.startTime ?? 0
+  const duration   = opts.endTime - start
+  const targetCount = Math.min(8, Math.max(1, Math.ceil(duration)))
   const frameFiles  = Array.from({ length: targetCount }, (_, i) => `frame_${String(i + 1).padStart(4, '0')}.jpg`)
   const ff = await getFFmpeg()
   await ff.deleteFile('frames_in.mp4').catch(() => {})
   for (const f of frameFiles) await ff.deleteFile(f).catch(() => {})
   try {
     await writeInput(ff, 'frames_in.mp4', opts.filePath)
-    const fps = targetCount / opts.endTime
+    const fps = targetCount / duration
+    const seekArgs = start > 0 ? ['-ss', String(start)] : []
     await ff.exec([
-      '-i', 'frames_in.mp4',
-      '-t', String(opts.endTime),
+      ...seekArgs, '-i', 'frames_in.mp4',
+      '-t', String(duration),
       '-vf', `fps=${fps.toFixed(4)},scale=640:-2`,
       '-q:v', '5',
       '-y', 'frame_%04d.jpg',
     ])
     const frames: Array<{ index: number; timestamp: number; data: string }> = []
-    const interval = opts.endTime / targetCount
+    const interval = duration / targetCount
     for (let i = 1; i <= targetCount; i++) {
       const name = `frame_${String(i).padStart(4, '0')}.jpg`
       try {

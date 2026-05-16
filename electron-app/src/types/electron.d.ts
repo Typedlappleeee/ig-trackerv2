@@ -74,7 +74,7 @@ interface ElectronAPI {
   }) => Promise<{ ok: boolean; outputPath?: string; error?: string; command?: string }>
   detectSceneChange: (opts: { filePath: string; threshold?: number }) =>
     Promise<{ ok: boolean; times: number[]; splitTime?: number; duration: number; error?: string }>
-  extractFrames: (opts: { filePath: string; endTime: number; fps?: number }) =>
+  extractFrames: (opts: { filePath: string; endTime: number; startTime?: number; fps?: number }) =>
     Promise<{ ok: boolean; frames?: Array<{ index: number; timestamp: number; data: string }>; count?: number; error?: string }>
   anthropicVisionRequest: (opts: {
     apiKey: string; model?: string; messages: unknown[]; maxTokens?: number
