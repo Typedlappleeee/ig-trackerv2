@@ -51,7 +51,7 @@ export type Page =
   | 'dashboard' | 'phones'
   | 'stats' | 'posting' | 'massposting' | 'bank' | 'aitools' | 'warmup'
   | 'montage' | 'remix' | 'textcopy'
-  | 'support'
+  | 'community' | 'support'
   | 'settings' | 'licences'
 
 interface LayoutProps {
@@ -74,6 +74,7 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { id: 'dashboard',   label: 'Dashboard',    icon: '📊' },
       { id: 'phones',      label: 'Téléphones',   icon: '📱' },
+      { id: 'community',   label: 'Communauté',    icon: '💬' },
       { id: 'support',     label: 'Support',       icon: '🎫' },
     ],
   },

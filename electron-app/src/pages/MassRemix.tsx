@@ -520,24 +520,47 @@ Return ONLY a JSON array. If none, return [].`
                 ))}
               </div>
               {exportMode === 'bank' && (
-                <div className="space-y-1">
-                  <p className="text-[10px]" style={{ color: 'rgba(196,181,253,0.4)' }}>Dossier dans la banque</p>
-                  <div className="flex gap-2">
-                    {bankFolders.length > 0 && (
-                      <select value={bankFolder}
-                        onChange={e => setBankFolder(e.target.value)}
-                        className="flex-1 rounded-lg px-2 py-1.5 text-xs text-white outline-none"
-                        style={{ background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.2)' }}>
-                        <option value="">— Racine (sans dossier)</option>
-                        {bankFolders.map(f => <option key={f} value={f}>{f}</option>)}
-                      </select>
-                    )}
+                <div className="rounded-xl p-3 space-y-2.5"
+                  style={{ background: 'rgba(139,92,246,0.07)', border: '1px solid rgba(139,92,246,0.18)' }}>
+                  <p className="text-[10px] uppercase tracking-wider font-bold" style={{ color: 'rgba(139,92,246,0.7)' }}>
+                    📁 Dossier dans la banque
+                  </p>
+                  {bankFolders.length > 0 && (
+                    <select
+                      value={bankFolders.includes(bankFolder) ? bankFolder : ''}
+                      onChange={e => setBankFolder(e.target.value)}
+                      className="w-full rounded-lg px-3 py-2 text-xs font-semibold text-white outline-none"
+                      style={{ background: 'rgba(8,5,20,0.8)', border: '1px solid rgba(139,92,246,0.3)', color: '#e2d9f3' }}>
+                      <option value="" style={{ background: '#0c0919' }}>— Racine (sans dossier)</option>
+                      {bankFolders.map(f => (
+                        <option key={f} value={f} style={{ background: '#0c0919' }}>{f}</option>
+                      ))}
+                    </select>
+                  )}
+                  <div className="relative">
                     <input
-                      type="text" placeholder={bankFolders.length > 0 ? 'Ou nouveau…' : 'Nom du dossier (optionnel)'}
-                      value={bankFolder} onChange={e => setBankFolder(e.target.value)}
-                      className="flex-1 rounded-lg px-2 py-1.5 text-xs text-white outline-none placeholder:text-white/20"
-                      style={{ background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.2)' }} />
+                      type="text"
+                      placeholder={bankFolders.length > 0 ? 'Ou créer un nouveau dossier…' : 'Nom du dossier (optionnel)'}
+                      value={bankFolder}
+                      onChange={e => setBankFolder(e.target.value)}
+                      className="w-full rounded-lg px-3 py-2 text-xs font-semibold text-white outline-none placeholder:opacity-30"
+                      style={{ background: 'rgba(8,5,20,0.8)', border: `1px solid ${bankFolder.trim() ? 'rgba(139,92,246,0.6)' : 'rgba(139,92,246,0.2)'}`, color: '#e2d9f3' }}
+                    />
+                    {bankFolder.trim() && (
+                      <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
+                        <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md"
+                          style={{ background: 'rgba(139,92,246,0.25)', color: '#c4b5fd' }}>
+                          ✓ {bankFolder.trim()}
+                        </span>
+                      </div>
+                    )}
                   </div>
+                  {bankFolder.trim() && (
+                    <p className="text-[10px] flex items-center gap-1.5" style={{ color: 'rgba(167,139,250,0.8)' }}>
+                      <span>📂</span>
+                      <span>Les vidéos iront dans <strong>«&nbsp;{bankFolder.trim()}&nbsp;»</strong></span>
+                    </p>
+                  )}
                 </div>
               )}
               {exportMode === 'folder' && (

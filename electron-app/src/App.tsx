@@ -503,6 +503,7 @@ import { Warmup }            from '@/pages/Warmup'
 import { TextCopy }          from '@/pages/TextCopy'
 import { Licences }          from '@/pages/Licences'
 import { Support }           from '@/pages/Support'
+import { Community }         from '@/pages/Community'
 import { FullPageLoader }    from '@/components/ui/Spinner'
 
 const BETA_KEY = 'scaleflow-v1-seen'
@@ -661,6 +662,7 @@ function AppContent({ user }: { user: User }) {
       case 'textcopy':     return <TextCopy    user={user} />
       case 'aitools':      return <AiTools     user={user} />
       case 'settings':     return <Settings    user={user} initialPanel={settingsPanel as any} />
+      case 'community':    return <Community    user={user} />
       case 'support':      return <Support      user={user} />
       case 'licences':     return <Licences    user={user} />
     }
