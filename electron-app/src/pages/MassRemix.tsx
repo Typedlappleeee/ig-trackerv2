@@ -269,6 +269,7 @@ Return ONLY a JSON array. If none, return [].`
         newPhase1Path: job.secondaryPath,
         originalPath:  job.originalPath,
         splitTime, outputPath, preset,
+        targetDuration: det.duration ?? undefined,
         textOverlays,
       })
 

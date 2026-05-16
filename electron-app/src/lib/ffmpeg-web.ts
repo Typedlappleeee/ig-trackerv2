@@ -521,6 +521,7 @@ export async function runFfmpegRemixAIWeb(opts: {
   newPhase1Path: string
   originalPath:  string
   splitTime?:    number   // undefined = no scene change → no phase 2
+  targetDuration?: number // trim output to this duration (matches original length)
   outputPath:    string
   preset:        '9:16' | '1:1' | '16:9'
   textOverlays:  Array<{
@@ -566,10 +567,13 @@ export async function runFfmpegRemixAIWeb(opts: {
       ]
       inputArgs = ['-i', 'ai_new1.mp4', '-i', 'ai_orig.mp4']
     } else {
-      // No scene change → use new clip only, no phase 2
+      // No scene change → use new clip only, trimmed to original duration if known
+      const trimFilter = opts.targetDuration ? `trim=duration=${opts.targetDuration},setpts=PTS-STARTPTS,` : ''
       chains = [
-        `[0:v]${scl}[v_merged]`,
-        `[0:a]${afmt}[aout]`,
+        `[0:v]${trimFilter}${scl}[v_merged]`,
+        opts.targetDuration
+          ? `[0:a]atrim=duration=${opts.targetDuration},asetpts=PTS-STARTPTS,${afmt}[aout]`
+          : `[0:a]${afmt}[aout]`,
       ]
       inputArgs = ['-i', 'ai_new1.mp4']
     }
