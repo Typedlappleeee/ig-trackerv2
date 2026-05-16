@@ -87,10 +87,10 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { id: 'stats',       label: 'Stats',         icon: '📈' },
       { id: 'posting',     label: 'Posting',       icon: '🚀' },
-      { id: 'massposting', label: 'Mass Posting',  icon: '⚡', beta: true },
+      { id: 'massposting', label: 'Mass Posting',  icon: '⚡' },
       { id: 'bank',        label: 'Banque vidéos', icon: '🗂' },
       { id: 'warmup',      label: 'Warmup Compte', icon: '🔥', beta: true },
-      { id: 'aitools',     label: 'Outils IA',     icon: '🔧', beta: true },
+      { id: 'aitools',     label: 'Outils IA',     icon: '🔧' },
     ],
   },
   {
@@ -98,7 +98,7 @@ const NAV_SECTIONS: NavSection[] = [
     defaultOpen: true,
     items: [
       { id: 'montage',  label: 'Montage vidéo',  icon: '✂' },
-      { id: 'remix',    label: 'Remix vidéo',    icon: '🔀', beta: true },
+      { id: 'remix',    label: 'Remix vidéo',    icon: '🔀' },
       { id: 'textcopy', label: 'Texte IA',        icon: '✍', beta: true },
     ],
   },
@@ -255,19 +255,19 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
 
   return (
     <div className="h-screen overflow-hidden bg-bg flex">
-      <aside className="w-[230px] flex-shrink-0 flex flex-col border-r border-border/60 bg-sb-bg">
+      <aside className="w-[224px] flex-shrink-0 flex flex-col border-r bg-sb-bg" style={{ borderColor: 'rgba(139,92,246,0.1)' }}>
         {/* Logo */}
-        <div className="px-4 py-4 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden"
-            style={{ background: 'linear-gradient(145deg,#0f0620,#1a0d35)', border: '1px solid rgba(139,92,246,0.2)' }}>
-            <SFLogo size={26} />
+        <div className="px-4 pt-5 pb-4 flex items-center gap-3">
+          <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
+            style={{ background: 'linear-gradient(145deg,#130826,#1e0d42)', border: '1px solid rgba(139,92,246,0.35)', boxShadow: '0 0 16px rgba(139,92,246,0.15)' }}>
+            <SFLogo size={22} />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="font-black text-[13px] leading-tight tracking-tight">
+            <p className="font-black text-[14px] leading-tight tracking-tight">
               <span style={{ color: '#f0eeff' }}>Scale</span>
               <span className="sf-logo-shimmer">Flow</span>
             </p>
-            <p className="text-[10px] text-ok flex items-center gap-1.5 leading-tight mt-0.5">
+            <p className="text-[10px] flex items-center gap-1.5 leading-tight mt-0.5" style={{ color: '#00ccaa' }}>
               <span className="w-1.5 h-1.5 rounded-full bg-ok inline-block anim-pulse" />
               actif
             </p>
@@ -275,10 +275,10 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
         </div>
 
         {/* Divider */}
-        <div className="mx-3 h-px bg-gradient-to-r from-transparent via-border/60 to-transparent mb-1" />
+        <div className="mx-3 h-px mb-2" style={{ background: 'linear-gradient(90deg,transparent,rgba(139,92,246,0.2),transparent)' }} />
 
         {/* Nav sections */}
-        <nav className="flex-1 overflow-auto pt-1 pb-2">
+        <nav className="flex-1 overflow-auto pt-0.5 pb-2">
           {NAV_SECTIONS.map(section => {
             const visibleItems = section.items.filter(it => isVisibleTab(it.id))
             if (visibleItems.length === 0) return null
@@ -287,13 +287,10 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
               <div key={section.title} className="mb-1">
                 <button
                   onClick={() => toggleSection(section.title)}
-                  className="w-full flex items-center gap-1.5 px-4 py-1.5 text-[9px] font-bold text-sb-section/70 uppercase tracking-[0.12em] hover:text-sb-section transition-colors"
+                  className="w-full flex items-center gap-2 px-4 py-1.5 text-left transition-colors"
                 >
-                  <span
-                    className="w-3 inline-block transition-transform duration-200"
-                    style={{ transform: isOpen ? 'rotate(0deg)' : 'rotate(-90deg)' }}
-                  >▾</span>
-                  <span className="flex-1 text-left">{section.title}</span>
+                  <span className="text-[8px] font-black uppercase tracking-[0.18em] flex-1" style={{ color: 'rgba(139,92,246,0.45)' }}>{section.title}</span>
+                  <span className="text-[10px] transition-transform duration-200 inline-block" style={{ color: 'rgba(139,92,246,0.3)', transform: isOpen ? 'rotate(0deg)' : 'rotate(-90deg)' }}>▾</span>
                 </button>
                 {isOpen && (
                   <div className="space-y-0.5 px-2 pb-1">
@@ -304,17 +301,17 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
                           key={item.id}
                           onClick={() => { playNav(); onNavigate(item.id) }}
                           className={`
-                            relative w-full flex items-center gap-2.5 pl-3 pr-2 py-2 rounded-lg text-[13px] text-left
+                            relative w-full flex items-center gap-2.5 pl-3 pr-2 py-[7px] rounded-lg text-[12.5px] text-left
                             transition-all duration-150 active:scale-[0.98]
-                            ${active ? 'sf-nav-active' : 'text-sb-text hover:bg-sb-hover/80 hover:text-sb-text-act'}
+                            ${active ? 'sf-nav-active' : 'text-sb-text hover:bg-sb-hover hover:text-sb-text-act'}
                           `}
                         >
-                          <span className={`text-base w-5 text-center flex-shrink-0 transition-transform duration-150 ${active ? 'scale-110' : 'text-sb-icon'}`}>
+                          <span className={`text-[15px] w-5 text-center flex-shrink-0 transition-all duration-150 ${active ? 'scale-110' : 'opacity-60'}`}>
                             {item.icon}
                           </span>
-                          <span className={`flex-1 ${active ? 'font-semibold' : 'font-medium'}`}>{item.label}</span>
+                          <span className={`flex-1 ${active ? 'font-semibold text-white' : 'font-medium'}`}>{item.label}</span>
                           {item.beta && (
-                            <span className="text-[8px] font-bold uppercase px-1.5 py-0.5 rounded-md tracking-wide"
+                            <span className="text-[7.5px] font-black uppercase px-1.5 py-0.5 rounded tracking-widest"
                               style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff' }}>BETA</span>
                           )}
                         </button>

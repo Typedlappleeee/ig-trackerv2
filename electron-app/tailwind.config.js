@@ -5,30 +5,30 @@ export default {
     extend: {
       colors: {
         // Aligned exactly with Python app.py palette (lines 41-56) "Bleu" theme
-        bg:       '#080b14',
-        surface:  '#0c0f1c',
-        surface2: '#111528',
-        surface3: '#171c30',
-        border:   '#1a2035',
-        card:     '#0d1120',
-        hl:       '#141a2c',  // hover/highlight
-        accent:   '#4f8ef7',  // primary blue
-        accent2:  '#3d7ae5',  // hover blue
+        bg:       '#06040f',
+        surface:  '#0a0816',
+        surface2: '#100d1f',
+        surface3: '#161228',
+        border:   '#1e1830',
+        card:     '#0c0a1a',
+        hl:       '#13102a',
+        accent:   '#8b5cf6',  // violet
+        accent2:  '#7c3aed',  // violet hover
         danger:   '#f03d55',
         ok:       '#00ccaa',
         warn:     '#ffaa2a',
-        text:     '#d4dcf0',
-        text2:    '#5a6882',
-        muted:    '#1e2640',
-        // Sidebar palette (matches Python `SB_BG`, `ACT`)
-        'sb-bg':       '#0b0e18',
-        'sb-active':   '#162040',
-        'sb-hover':    '#0f1728',
-        'sb-text':     '#6e80a2',
-        'sb-text-act': '#e8eaf0',
-        'sb-icon':     '#4d5e80',
-        'sb-section':  '#3d5070',
-        'sb-card':     '#0e1424',
+        text:     '#e2d9f3',
+        text2:    '#5a4e7a',
+        muted:    '#1a1430',
+        // Sidebar
+        'sb-bg':       '#080614',
+        'sb-active':   '#1a1035',
+        'sb-hover':    '#0e0b20',
+        'sb-text':     '#6b5e8a',
+        'sb-text-act': '#ede8ff',
+        'sb-icon':     '#4d3d6e',
+        'sb-section':  '#3d2f5a',
+        'sb-card':     '#0c0a1c',
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],

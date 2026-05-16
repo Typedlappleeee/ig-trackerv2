@@ -420,6 +420,31 @@ function SplashScreen({ onDone }: { onDone: () => void }) {
 }
 
 // ── Welcome popup (shown once per device after onboarding) ───────────────────
+function BugScreen() {
+  return (
+    <div className="flex flex-col items-center justify-center h-full min-h-[70vh] gap-6 select-none">
+      <div className="relative">
+        <div className="w-24 h-24 rounded-3xl flex items-center justify-center"
+          style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.18)' }}>
+          <span className="text-5xl">🐛</span>
+        </div>
+        <div className="absolute -inset-4 rounded-[40px] opacity-30"
+          style={{ background: 'radial-gradient(circle, rgba(239,68,68,0.12) 0%, transparent 70%)' }} />
+      </div>
+      <div className="text-center space-y-2 max-w-xs">
+        <p className="text-xl font-black text-white">Bug rencontré</p>
+        <p className="text-sm" style={{ color: 'rgba(212,220,240,0.45)' }}>
+          Cette section est temporairement indisponible.<br />Nous travaillons dessus.
+        </p>
+      </div>
+      <div className="px-4 py-2 rounded-xl text-xs font-semibold"
+        style={{ background: 'rgba(239,68,68,0.08)', color: '#f87171', border: '1px solid rgba(239,68,68,0.2)' }}>
+        En cours de correction
+      </div>
+    </div>
+  )
+}
+
 function BetaPopup({ onClose }: { onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md">
@@ -624,9 +649,9 @@ function AppContent({ user }: { user: User }) {
 
   const content = (() => {
     switch (page) {
-      case 'dashboard':    return <Dashboard   user={user} key={refreshTick} />
+      case 'dashboard':    return <BugScreen />
       case 'phones':       return <Phones      user={user} key={refreshTick} />
-      case 'stats':        return <Stats       user={user} key={refreshTick} />
+      case 'stats':        return <BugScreen />
       case 'posting':      return <Posting     user={user} />
       case 'massposting':  return <MassPosting user={user} />
       case 'bank':         return <Bank        user={user} />

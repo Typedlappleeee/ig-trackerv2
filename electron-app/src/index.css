@@ -476,11 +476,11 @@ button, a, input, select, textarea {
 
 /* Active nav item */
 .sf-nav-active {
-  background: linear-gradient(90deg, rgba(139,92,246,0.16) 0%, rgba(139,92,246,0.04) 100%) !important;
-  box-shadow: inset 3px 0 0 #8b5cf6;
-  color: #c4b5fd !important;
+  background: linear-gradient(90deg, rgba(139,92,246,0.18) 0%, rgba(139,92,246,0.05) 100%) !important;
+  box-shadow: inset 2.5px 0 0 #a78bfa, 0 1px 8px rgba(139,92,246,0.08);
+  color: #ede8ff !important;
 }
-.sf-nav-active svg { color: #a78bfa !important; }
+.sf-nav-active svg { color: #c4b5fd !important; }
 
 /* Section divider */
 .sf-divider {
