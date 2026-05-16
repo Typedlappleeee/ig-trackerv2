@@ -8,6 +8,18 @@ import { fetchFile, toBlobURL } from '@ffmpeg/util'
 let _ffmpeg: FFmpeg | null = null
 let _loading: Promise<FFmpeg> | null = null
 
+// Detect WASM-level crashes that corrupt the FFmpeg instance irreversibly
+function isWasmCrash(err: unknown): boolean {
+  const msg = String(err instanceof Error ? err.message : err)
+  return /memory access out of bounds|RuntimeError|Aborted|unreachable|out of memory|OOM/i.test(msg)
+}
+
+// Invalidate the singleton so the next getFFmpeg() call creates a fresh WASM instance
+function resetFFmpeg(): void {
+  _ffmpeg = null
+  _loading = null
+}
+
 // Singleton FFmpeg instance — loaded once, reused across calls.
 async function getFFmpeg(): Promise<FFmpeg> {
   if (_ffmpeg) return _ffmpeg
@@ -156,6 +168,7 @@ export async function runFfmpegWeb(opts: {
     const url = await readOutput(ff, 'output.mp4')
     return { ok: true, outputPath: url }
   } catch (err) {
+    if (isWasmCrash(err)) resetFFmpeg()
     return { ok: false, error: String(err) }
   } finally {
     for (let i = 0; i < n; i++) await ff.deleteFile(`in${i}.mp4`).catch(() => {})
@@ -204,6 +217,7 @@ export async function detectSceneChangeWeb(opts: {
     if (maxDiff < threshold) return { ok: true, splitTime: duration / 2, duration }
     return { ok: true, splitTime: Math.round((maxIdx / FPS) * 10) / 10, duration }
   } catch (err) {
+    if (isWasmCrash(err)) resetFFmpeg()
     return { ok: false, error: String(err) }
   } finally {
     await ff.deleteFile('detect.mp4').catch(() => {})
@@ -266,6 +280,7 @@ export async function runFfmpegRemixWeb(opts: {
     const url = await readOutput(ff, 'remix_out.mp4')
     return { ok: true, outputPath: url }
   } catch (err) {
+    if (isWasmCrash(err)) resetFFmpeg()
     return { ok: false, error: String(err) }
   } finally {
     for (const f of FILES) await ff.deleteFile(f).catch(() => {})
@@ -332,6 +347,7 @@ export async function runFfmpegRemixAIWeb(opts: {
     const url = await readOutput(ff, 'ai_out.mp4')
     return { ok: true, outputPath: url }
   } catch (err) {
+    if (isWasmCrash(err)) resetFFmpeg()
     const relevant = ffLogs.filter(l => /error|invalid|unknown|cannot|no such/i.test(l)).slice(-3)
     const detail   = relevant.length ? '\n' + relevant.join('\n') : ''
     return { ok: false, error: String(err) + detail }
@@ -361,6 +377,7 @@ export async function runFfmpegMetadataWeb(opts: {
     const url = await readOutput(ff, 'meta_out.mp4')
     return { ok: true, outputPath: url }
   } catch (err) {
+    if (isWasmCrash(err)) resetFFmpeg()
     return { ok: false, error: String(err) }
   } finally {
     for (const f of FILES) await ff.deleteFile(f).catch(() => {})
@@ -408,6 +425,7 @@ export async function extractFramesWeb(opts: {
     }
     return { ok: true, frames, count: frames.length }
   } catch (err) {
+    if (isWasmCrash(err)) resetFFmpeg()
     return { ok: false, error: String(err) }
   } finally {
     await ff.deleteFile('frames_in.mp4').catch(() => {})
