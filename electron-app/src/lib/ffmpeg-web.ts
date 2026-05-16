@@ -543,7 +543,9 @@ export async function runFfmpegRemixAIWeb(opts: {
       '-map', '[vout]', '-map', '[aout]',
       '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23',
       '-c:a', 'aac', '-b:a', '128k',
-      '-movflags', '+faststart', '-y', 'ai_out.mp4',
+      '-movflags', '+faststart',
+      '-shortest',   // stop when the finite video/audio streams end (PNG loops are infinite)
+      '-y', 'ai_out.mp4',
     ])
 
     const url = await readOutput(ff, 'ai_out.mp4')
