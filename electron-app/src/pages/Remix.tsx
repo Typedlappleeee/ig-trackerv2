@@ -317,7 +317,7 @@ export function Remix({ user }: RemixProps) {
       const overlays: TextOverlayUI[] = parsed.map((item, idx) => {
         // Center the text at xPercent/yPercent by subtracting half text dimensions
         const xExpr = `w*${(Math.max(1, Math.min(99, item.xPercent ?? 50)) / 100).toFixed(3)}-text_w/2`
-        const yExpr = `h*${(Math.max(1, Math.min(97, item.yPercent ?? 85)) / 100).toFixed(3)}-text_h/2`
+        const yExpr = `h*${(Math.max(0.55, Math.min(0.82, (item.yPercent ?? 72) / 100)).toFixed(3))}-text_h/2`
         return {
           id: idx,
           text: item.text,
@@ -325,7 +325,7 @@ export function Remix({ user }: RemixProps) {
           x: xExpr,
           y: yExpr,
           xPercent: Math.max(1, Math.min(99, item.xPercent ?? 50)),
-          yPercent: Math.max(1, Math.min(97, item.yPercent ?? 85)),
+          yPercent: Math.max(55, Math.min(82, item.yPercent ?? 72)),
           fontSize: Math.round(Math.max(36, Math.min(130, item.fontSizePx ?? 80, Math.round(950 / Math.max(item.text.length * 0.62, 1))))),
           fontColor: item.fontColor ?? '#ffffff',
           bold: item.bold ?? true,

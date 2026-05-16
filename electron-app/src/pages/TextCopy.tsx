@@ -10,11 +10,11 @@ import { supabase } from '@/lib/supabase'
 const isWeb = typeof window !== 'undefined' && (window as any).__IS_WEB
 
 const POSITIONS = [
-  { label: 'Très haut', yFrac: 0.10 },
-  { label: 'Haut',      yFrac: 0.27 },
-  { label: 'Centre',    yFrac: 0.50 },
-  { label: 'Bas',       yFrac: 0.72 },
-  { label: 'Très bas',  yFrac: 0.87 },
+  { label: 'Position 1', yFrac: 0.58 },
+  { label: 'Position 2', yFrac: 0.64 },
+  { label: 'Position 3', yFrac: 0.70 },
+  { label: 'Position 4', yFrac: 0.76 },
+  { label: 'Position 5', yFrac: 0.81 },
 ]
 
 type ExportMode = 'download' | 'bank'

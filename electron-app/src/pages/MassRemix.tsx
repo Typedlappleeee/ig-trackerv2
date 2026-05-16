@@ -236,7 +236,7 @@ Return ONLY a JSON array. If none, return [].`
                   textOverlays = parsed.map(item => ({
                     text: item.text,
                     x: xAlignToExpr(item.xAlign ?? 'center'),
-                    y: `h*${Math.max(0.01, Math.min(0.97, (item.yPercent ?? 85) / 100)).toFixed(3)}`,
+                    y: `h*${Math.max(0.55, Math.min(0.82, (item.yPercent ?? 72) / 100)).toFixed(3)}`,
                     fontSize: Math.round(Math.max(36, Math.min(130, item.fontSizePx ?? 80, Math.round(950 / Math.max(item.text.length * 0.62, 1))))),
                     fontColor: item.fontColor ?? 'white',
                     bold: item.bold ?? true,
