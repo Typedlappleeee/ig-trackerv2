@@ -1,50 +1,69 @@
 /*
- * ── Community ──────────────────────────────────────────────────────────────────
- *
  * SQL à exécuter dans Supabase SQL Editor :
  *
  * CREATE TABLE IF NOT EXISTS community_messages (
- *   id           uuid DEFAULT gen_random_uuid() PRIMARY KEY,
- *   user_id      uuid REFERENCES auth.users NOT NULL,
- *   content      text NOT NULL CHECK (char_length(content) <= 2000),
- *   display_name text NOT NULL DEFAULT '',
- *   avatar_url   text,
- *   org_name     text,
- *   channel      text NOT NULL DEFAULT 'chat',   -- 'news' | 'chat' | 'support'
- *   title        text,                            -- only for channel='news'
- *   is_admin     boolean NOT NULL DEFAULT false,
- *   created_at   timestamptz DEFAULT now()
+ *   id             uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+ *   user_id        uuid REFERENCES auth.users NOT NULL,
+ *   content        text NOT NULL CHECK (char_length(content) <= 2000),
+ *   display_name   text NOT NULL DEFAULT '',
+ *   avatar_url     text,
+ *   org_name       text,
+ *   channel        text NOT NULL DEFAULT 'chat',
+ *   title          text,
+ *   is_admin       boolean NOT NULL DEFAULT false,
+ *   thread_user_id uuid,
+ *   created_at     timestamptz DEFAULT now()
  * );
  * ALTER TABLE community_messages ENABLE ROW LEVEL SECURITY;
- * CREATE POLICY "community_read"   ON community_messages
- *   FOR SELECT USING (auth.role() = 'authenticated');
- * CREATE POLICY "community_insert" ON community_messages
- *   FOR INSERT WITH CHECK (auth.uid() = user_id);
+ * CREATE POLICY "community_read"   ON community_messages FOR SELECT USING (auth.role() = 'authenticated');
+ * CREATE POLICY "community_insert" ON community_messages FOR INSERT WITH CHECK (auth.uid() = user_id);
+ * CREATE POLICY "community_delete" ON community_messages FOR DELETE USING (
+ *   auth.uid() = user_id OR
+ *   EXISTS (SELECT 1 FROM platform_admins WHERE user_id = auth.uid())
+ * );
  *
  * CREATE TABLE IF NOT EXISTS user_profiles (
- *   user_id      uuid PRIMARY KEY REFERENCES auth.users,
- *   display_name text NOT NULL DEFAULT '',
- *   avatar_url   text,
- *   updated_at   timestamptz DEFAULT now()
+ *   user_id         uuid PRIMARY KEY REFERENCES auth.users,
+ *   display_name    text NOT NULL DEFAULT '',
+ *   avatar_url      text,
+ *   name_updated_at timestamptz,
+ *   updated_at      timestamptz DEFAULT now()
  * );
  * ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
- * CREATE POLICY "profiles_read" ON user_profiles
- *   FOR SELECT USING (auth.role() = 'authenticated');
- * CREATE POLICY "profiles_own"  ON user_profiles
- *   FOR ALL USING (auth.uid() = user_id);
+ * CREATE POLICY "profiles_read" ON user_profiles FOR SELECT USING (auth.role() = 'authenticated');
+ * CREATE POLICY "profiles_own"  ON user_profiles FOR ALL USING (auth.uid() = user_id);
  *
- * -- Storage bucket: "avatars" (public) via Supabase dashboard → Storage
+ * CREATE TABLE IF NOT EXISTS platform_admins (
+ *   user_id uuid PRIMARY KEY REFERENCES auth.users
+ * );
+ * ALTER TABLE platform_admins ENABLE ROW LEVEL SECURITY;
+ * CREATE POLICY "platform_admins_read" ON platform_admins FOR SELECT USING (auth.role() = 'authenticated');
+ * -- INSERT INTO platform_admins (user_id) VALUES ('TON-USER-ID-ICI');
+ *
+ * CREATE TABLE IF NOT EXISTS community_mutes (
+ *   id          uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+ *   user_id     uuid REFERENCES auth.users NOT NULL,
+ *   muted_by    uuid REFERENCES auth.users NOT NULL,
+ *   muted_until timestamptz NOT NULL,
+ *   created_at  timestamptz DEFAULT now()
+ * );
+ * ALTER TABLE community_mutes ENABLE ROW LEVEL SECURITY;
+ * CREATE POLICY "mutes_read"   ON community_mutes FOR SELECT USING (auth.role() = 'authenticated');
+ * CREATE POLICY "mutes_insert" ON community_mutes FOR INSERT WITH CHECK (
+ *   EXISTS (SELECT 1 FROM platform_admins WHERE user_id = auth.uid())
+ * );
+ *
+ * -- Bucket "avatars" public → Supabase dashboard → Storage
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import type { User } from '@supabase/supabase-js'
-import { supabase }      from '@/lib/supabase'
-import { useOrg }        from '@/lib/orgContext'
-import { useLicense }    from '@/lib/license'
-import { Spinner }       from '@/components/ui/Spinner'
+import { supabase }   from '@/lib/supabase'
+import { useOrg }     from '@/lib/orgContext'
+import { useLicense } from '@/lib/license'
+import { Spinner }    from '@/components/ui/Spinner'
 
 interface CommunityProps { user: User }
-
 type Channel = 'news' | 'chat' | 'support'
 
 interface Message {
@@ -57,25 +76,22 @@ interface Message {
   channel: Channel
   title: string | null
   is_admin: boolean
+  thread_user_id: string | null
   created_at: string
 }
 
 interface Profile {
   display_name: string
   avatar_url: string | null
+  name_updated_at: string | null
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 const GRADIENT_PAIRS: [string, string][] = [
-  ['#7c3aed', '#ec4899'],
-  ['#2563eb', '#7c3aed'],
-  ['#059669', '#0ea5e9'],
-  ['#ea580c', '#f59e0b'],
-  ['#dc2626', '#f43f5e'],
-  ['#0891b2', '#6366f1'],
-  ['#7c3aed', '#0ea5e9'],
-  ['#d97706', '#ec4899'],
+  ['#7c3aed', '#ec4899'], ['#2563eb', '#7c3aed'], ['#059669', '#0ea5e9'],
+  ['#ea580c', '#f59e0b'], ['#dc2626', '#f43f5e'], ['#0891b2', '#6366f1'],
+  ['#7c3aed', '#0ea5e9'], ['#d97706', '#ec4899'],
 ]
 
 function gradientForId(id: string): [string, string] {
@@ -86,9 +102,9 @@ function gradientForId(id: string): [string, string] {
 
 function timeAgo(iso: string): string {
   const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000)
-  if (diff < 60)    return 'à l\'instant'
-  if (diff < 3600)  return `${Math.floor(diff / 60)}min`
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h`
+  if (diff < 60)        return 'à l\'instant'
+  if (diff < 3600)      return `${Math.floor(diff / 60)}min`
+  if (diff < 86400)     return `${Math.floor(diff / 3600)}h`
   if (diff < 86400 * 7) return `${Math.floor(diff / 86400)}j`
   return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
 }
@@ -106,11 +122,10 @@ function Avatar({ url, name, userId, size = 36, onClick }: {
   url: string | null; name: string; userId: string; size?: number; onClick?: () => void
 }) {
   const [g1, g2] = gradientForId(userId)
-  const r = Math.round(size * 0.3)
+  const r        = Math.round(size * 0.3)
   const initials = (name || '?').slice(0, 2).toUpperCase()
   const base: React.CSSProperties = { width: size, height: size, borderRadius: r, flexShrink: 0 }
   const cls = onClick ? 'cursor-pointer hover:opacity-90 transition-opacity' : ''
-
   if (url) {
     return <img src={url} alt={name} onClick={onClick} className={cls}
       style={{ ...base, objectFit: 'cover', border: '1.5px solid rgba(255,255,255,0.1)' }} />
@@ -125,7 +140,10 @@ function Avatar({ url, name, userId, size = 36, onClick }: {
 
 // ── Chat message row ───────────────────────────────────────────────────────────
 
-function ChatRow({ msg, isOwn, compact }: { msg: Message; isOwn: boolean; compact: boolean }) {
+function ChatRow({ msg, isOwn, compact, isAdmin, onDelete, onMute }: {
+  msg: Message; isOwn: boolean; compact: boolean
+  isAdmin: boolean; onDelete: (id: string) => void; onMute?: (uid: string, name: string) => void
+}) {
   return (
     <div className={`flex gap-3 group ${compact ? 'mt-[2px]' : 'mt-4'}`}>
       <div style={{ width: 34, flexShrink: 0 }}>
@@ -138,7 +156,7 @@ function ChatRow({ msg, isOwn, compact }: { msg: Message; isOwn: boolean; compac
               {msg.display_name || 'Anonyme'}
             </span>
             {msg.is_admin && (
-              <span className="text-[8px] font-black uppercase px-1.5 py-[2px] rounded-full tracking-wide flex items-center gap-0.5"
+              <span className="text-[8px] font-black uppercase px-1.5 py-[2px] rounded-full tracking-wide"
                 style={{ background: 'linear-gradient(130deg,rgba(124,58,237,0.35),rgba(236,72,153,0.25))', color: '#f0a8ff', border: '1px solid rgba(236,72,153,0.25)' }}>
                 ⭐ ScaleFlow Admin
               </span>
@@ -154,22 +172,74 @@ function ChatRow({ msg, isOwn, compact }: { msg: Message; isOwn: boolean; compac
               </span>
             )}
             <span className="ml-auto text-[10px] opacity-0 group-hover:opacity-60 transition-opacity tabular-nums"
-              style={{ color: 'rgba(196,181,253,0.5)' }}>
-              {timeAgo(msg.created_at)}
-            </span>
+              style={{ color: 'rgba(196,181,253,0.5)' }}>{timeAgo(msg.created_at)}</span>
           </div>
         )}
-        <div className="flex items-end gap-2">
+        <div className="flex items-end gap-1.5">
           <p className="flex-1 text-[13.5px] leading-relaxed break-words" style={{ color: 'rgba(212,220,240,0.9)' }}>
             {msg.content}
           </p>
-          {compact && (
-            <span className="text-[9px] opacity-0 group-hover:opacity-40 transition-opacity flex-shrink-0 pb-0.5 tabular-nums"
-              style={{ color: 'rgba(196,181,253,0.5)' }}>
-              {timeAgo(msg.created_at)}
-            </span>
-          )}
+          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 pb-0.5">
+            {compact && (
+              <span className="text-[9px] tabular-nums mr-1" style={{ color: 'rgba(196,181,253,0.35)' }}>
+                {timeAgo(msg.created_at)}
+              </span>
+            )}
+            {isAdmin && !isOwn && onMute && (
+              <button onClick={() => onMute(msg.user_id, msg.display_name)}
+                className="w-5 h-5 flex items-center justify-center rounded text-[11px]"
+                style={{ color: 'rgba(251,191,36,0.6)' }} title="Muter">🔇</button>
+            )}
+            {isAdmin && (
+              <button onClick={() => onDelete(msg.id)}
+                className="w-5 h-5 flex items-center justify-center rounded text-[11px]"
+                style={{ color: 'rgba(239,68,68,0.6)' }} title="Supprimer">🗑</button>
+            )}
+          </div>
         </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Support message row ────────────────────────────────────────────────────────
+
+function SupportMsgRow({ msg, isAdmin, compact, onDelete }: {
+  msg: Message; isAdmin: boolean; compact: boolean; onDelete: (id: string) => void
+}) {
+  const isAdminMsg = msg.is_admin
+  return (
+    <div className={`flex gap-3 group ${compact ? 'mt-[2px]' : 'mt-4'} ${isAdminMsg ? 'flex-row-reverse' : ''}`}>
+      <div style={{ width: 34, flexShrink: 0 }}>
+        {!compact && <Avatar url={msg.avatar_url} name={msg.display_name} userId={msg.user_id} size={34} />}
+      </div>
+      <div className={`flex-1 min-w-0 ${isAdminMsg ? 'flex flex-col items-end' : ''}`}>
+        {!compact && (
+          <div className={`flex items-center gap-2 mb-[3px] flex-wrap ${isAdminMsg ? 'justify-end' : ''}`}>
+            <span className="text-[13px] font-bold" style={{ color: isAdminMsg ? '#93c5fd' : '#e8e0ff' }}>
+              {msg.display_name || 'Anonyme'}
+            </span>
+            {isAdminMsg && (
+              <span className="text-[8px] font-black uppercase px-1.5 py-[2px] rounded-full"
+                style={{ background: 'linear-gradient(130deg,rgba(124,58,237,0.35),rgba(236,72,153,0.25))', color: '#f0a8ff', border: '1px solid rgba(236,72,153,0.25)' }}>
+                ⭐ ScaleFlow Admin
+              </span>
+            )}
+            <span className="text-[10px] opacity-0 group-hover:opacity-60 transition-opacity ml-auto tabular-nums"
+              style={{ color: 'rgba(196,181,253,0.5)' }}>{timeAgo(msg.created_at)}</span>
+            {isAdmin && (
+              <button onClick={() => onDelete(msg.id)}
+                className="opacity-0 group-hover:opacity-100 transition-opacity text-[11px]"
+                style={{ color: 'rgba(239,68,68,0.6)' }}>🗑</button>
+            )}
+          </div>
+        )}
+        <p className="text-[13.5px] leading-relaxed break-words inline-block px-3 py-2 rounded-xl max-w-[85%]"
+          style={isAdminMsg
+            ? { background: 'linear-gradient(135deg,rgba(124,58,237,0.18),rgba(236,72,153,0.1))', color: 'rgba(230,220,255,0.95)', border: '1px solid rgba(139,92,246,0.22)' }
+            : { background: 'rgba(255,255,255,0.04)', color: 'rgba(212,220,240,0.9)', border: '1px solid rgba(255,255,255,0.06)' }}>
+          {msg.content}
+        </p>
       </div>
     </div>
   )
@@ -177,27 +247,22 @@ function ChatRow({ msg, isOwn, compact }: { msg: Message; isOwn: boolean; compac
 
 // ── News card ──────────────────────────────────────────────────────────────────
 
-function NewsCard({ msg }: { msg: Message }) {
+function NewsCard({ msg, isAdmin, onDelete }: { msg: Message; isAdmin: boolean; onDelete: (id: string) => void }) {
   const [expanded, setExpanded] = useState(false)
   const isLong = msg.content.length > 280
-  const shown = !isLong || expanded ? msg.content : msg.content.slice(0, 280) + '…'
-
+  const shown  = !isLong || expanded ? msg.content : msg.content.slice(0, 280) + '…'
   return (
-    <div className="rounded-2xl overflow-hidden transition-all hover:border-purple-500/30"
+    <div className="rounded-2xl overflow-hidden transition-all hover:border-purple-500/30 group"
       style={{ background: 'rgba(8,5,20,0.8)', border: '1px solid rgba(139,92,246,0.18)', boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}>
-      {/* Top accent bar */}
       <div className="h-[3px]" style={{ background: 'linear-gradient(90deg,#7c3aed,#ec4899)' }} />
       <div className="p-5">
-        {/* Header */}
         <div className="flex items-start gap-3 mb-4">
           <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
             style={{ background: 'linear-gradient(135deg,rgba(139,92,246,0.2),rgba(236,72,153,0.1))', border: '1px solid rgba(139,92,246,0.2)' }}>
             📢
           </div>
           <div className="flex-1 min-w-0">
-            {msg.title && (
-              <p className="text-base font-black text-white leading-tight mb-1">{msg.title}</p>
-            )}
+            {msg.title && <p className="text-base font-black text-white leading-tight mb-1">{msg.title}</p>}
             <div className="flex items-center gap-2 flex-wrap">
               <div className="flex items-center gap-1.5">
                 <Avatar url={msg.avatar_url} name={msg.display_name} userId={msg.user_id} size={18} />
@@ -207,27 +272,74 @@ function NewsCard({ msg }: { msg: Message }) {
                 style={{ background: 'linear-gradient(130deg,rgba(124,58,237,0.35),rgba(236,72,153,0.2))', color: '#f0a8ff', border: '1px solid rgba(236,72,153,0.2)' }}>
                 Admin
               </span>
-              {msg.org_name && (
-                <span className="text-[10px]" style={{ color: 'rgba(196,181,253,0.45)' }}>{msg.org_name}</span>
-              )}
+              {msg.org_name && <span className="text-[10px]" style={{ color: 'rgba(196,181,253,0.45)' }}>{msg.org_name}</span>}
               <span className="ml-auto text-[10px]" style={{ color: 'rgba(196,181,253,0.35)' }} title={fullDate(msg.created_at)}>
                 {timeAgo(msg.created_at)}
               </span>
+              {isAdmin && (
+                <button onClick={() => onDelete(msg.id)}
+                  className="opacity-0 group-hover:opacity-100 transition-opacity text-[12px]"
+                  style={{ color: 'rgba(239,68,68,0.6)' }}>🗑</button>
+              )}
             </div>
           </div>
         </div>
-
-        {/* Content */}
-        <p className="text-[13.5px] leading-relaxed whitespace-pre-wrap" style={{ color: 'rgba(212,220,240,0.85)' }}>
-          {shown}
-        </p>
+        <p className="text-[13.5px] leading-relaxed whitespace-pre-wrap" style={{ color: 'rgba(212,220,240,0.85)' }}>{shown}</p>
         {isLong && (
-          <button onClick={() => setExpanded(v => !v)}
-            className="mt-2 text-[11px] font-semibold transition-colors"
-            style={{ color: '#a78bfa' }}>
+          <button onClick={() => setExpanded(v => !v)} className="mt-2 text-[11px] font-semibold" style={{ color: '#a78bfa' }}>
             {expanded ? '▲ Réduire' : '▼ Lire la suite'}
           </button>
         )}
+      </div>
+    </div>
+  )
+}
+
+// ── Mute modal ─────────────────────────────────────────────────────────────────
+
+function MuteModal({ targetName, onMute, onClose }: {
+  targetName: string; onMute: (minutes: number) => void; onClose: () => void
+}) {
+  const [custom, setCustom] = useState('')
+  const DURATIONS = [
+    { label: '30 minutes', minutes: 30 },
+    { label: '2 heures',   minutes: 120 },
+    { label: '24 heures',  minutes: 1440 },
+    { label: '7 jours',    minutes: 10080 },
+    { label: '30 jours',   minutes: 43200 },
+  ]
+  return (
+    <div className="fixed inset-0 z-[9980] flex items-center justify-center"
+      style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(10px)' }}
+      onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="w-full max-w-[300px] mx-4 rounded-2xl overflow-hidden anim-scale-in"
+        style={{ background: '#0c0919', border: '1px solid rgba(251,191,36,0.3)', boxShadow: '0 32px 80px rgba(0,0,0,0.7)' }}>
+        <div className="flex items-center justify-between px-5 py-4"
+          style={{ borderBottom: '1px solid rgba(251,191,36,0.1)', background: 'rgba(251,191,36,0.04)' }}>
+          <div>
+            <p className="font-black text-white text-[14px]">🔇 Muter {targetName}</p>
+            <p className="text-[10px] mt-0.5" style={{ color: 'rgba(251,191,36,0.5)' }}>Durée du mute</p>
+          </div>
+          <button onClick={onClose} className="w-7 h-7 rounded-lg flex items-center justify-center text-sm hover:bg-white/[0.06]"
+            style={{ color: 'rgba(196,181,253,0.5)' }}>✕</button>
+        </div>
+        <div className="p-4 space-y-1.5">
+          {DURATIONS.map(d => (
+            <button key={d.minutes} onClick={() => onMute(d.minutes)}
+              className="w-full text-left px-4 py-2.5 rounded-xl text-[13px] font-semibold transition-all hover:bg-yellow-400/10"
+              style={{ color: 'rgba(251,191,36,0.8)', border: '1px solid rgba(251,191,36,0.1)' }}>
+              {d.label}
+            </button>
+          ))}
+          <div className="flex gap-2 pt-1">
+            <input type="number" value={custom} onChange={e => setCustom(e.target.value)}
+              placeholder="Durée custom (min)…" min={1}
+              className="flex-1 rounded-xl px-3 py-2.5 text-sm text-white outline-none sf-input" />
+            <button onClick={() => { const m = parseInt(custom); if (m > 0) onMute(m) }}
+              disabled={!custom || parseInt(custom) <= 0}
+              className="px-3 py-2.5 rounded-xl text-sm font-semibold btn-sf-primary disabled:opacity-40">OK</button>
+          </div>
+        </div>
       </div>
     </div>
   )
@@ -238,11 +350,17 @@ function NewsCard({ msg }: { msg: Message }) {
 function ProfileModal({ profile, userId, onClose, onSaved }: {
   profile: Profile; userId: string; onClose: () => void; onSaved: (p: Profile) => void
 }) {
-  const [name, setName]       = useState(profile.display_name)
-  const [avatarUrl, setAUrl]  = useState(profile.avatar_url)
+  const [name, setName]        = useState(profile.display_name)
+  const [avatarUrl, setAUrl]   = useState(profile.avatar_url)
   const [uploading, setUpload] = useState(false)
-  const [saving, setSaving]   = useState(false)
+  const [saving, setSaving]    = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+
+  const daysSince   = profile.name_updated_at
+    ? Math.floor((Date.now() - new Date(profile.name_updated_at).getTime()) / 86400000)
+    : 999
+  const canChangeName = daysSince >= 90
+  const daysLeft      = Math.max(0, 90 - daysSince)
 
   async function handleFile(file: File) {
     setUpload(true)
@@ -257,14 +375,24 @@ function ProfileModal({ profile, userId, onClose, onSaved }: {
 
   async function save() {
     setSaving(true)
-    const trimmed = name.trim() || profile.display_name
+    const trimmed     = name.trim()
+    const nameChanged = canChangeName && trimmed && trimmed !== profile.display_name
     await supabase.from('user_profiles').upsert({
-      user_id: userId, display_name: trimmed, avatar_url: avatarUrl,
+      user_id: userId,
+      display_name: canChangeName && trimmed ? trimmed : profile.display_name,
+      avatar_url: avatarUrl,
       updated_at: new Date().toISOString(),
+      ...(nameChanged ? { name_updated_at: new Date().toISOString() } : {}),
     })
-    onSaved({ display_name: trimmed, avatar_url: avatarUrl })
+    onSaved({
+      display_name: canChangeName && trimmed ? trimmed : profile.display_name,
+      avatar_url: avatarUrl,
+      name_updated_at: nameChanged ? new Date().toISOString() : profile.name_updated_at,
+    })
     setSaving(false)
   }
+
+  const displayedName = canChangeName ? name : profile.display_name
 
   return (
     <div className="fixed inset-0 z-[9980] flex items-center justify-center"
@@ -278,13 +406,13 @@ function ProfileModal({ profile, userId, onClose, onSaved }: {
             <p className="font-black text-white text-[15px]">Mon profil</p>
             <p className="text-[10px] mt-0.5" style={{ color: 'rgba(196,181,253,0.45)' }}>Visible par toute la communauté</p>
           </div>
-          <button onClick={onClose} className="w-7 h-7 rounded-lg flex items-center justify-center text-sm transition-colors hover:bg-white/[0.06]"
+          <button onClick={onClose} className="w-7 h-7 rounded-lg flex items-center justify-center text-sm hover:bg-white/[0.06]"
             style={{ color: 'rgba(196,181,253,0.5)' }}>✕</button>
         </div>
         <div className="p-5 space-y-5">
           <div className="flex flex-col items-center gap-3">
             <div className="relative group">
-              <Avatar url={avatarUrl} name={name || profile.display_name} userId={userId} size={80} />
+              <Avatar url={avatarUrl} name={displayedName || '?'} userId={userId} size={80} />
               <div onClick={() => fileRef.current?.click()}
                 className="absolute inset-0 flex flex-col items-center justify-center gap-1 cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
                 style={{ background: 'rgba(0,0,0,0.6)', borderRadius: Math.round(80 * 0.3) }}>
@@ -294,20 +422,31 @@ function ProfileModal({ profile, userId, onClose, onSaved }: {
             <p className="text-[10px]" style={{ color: 'rgba(196,181,253,0.35)' }}>Clique pour changer ta photo</p>
           </div>
           <div>
-            <label className="block text-[10px] uppercase tracking-[0.15em] font-black mb-2"
-              style={{ color: 'rgba(139,92,246,0.6)' }}>Pseudo</label>
-            <input type="text" value={name} onChange={e => setName(e.target.value)}
-              placeholder="Ton pseudo…" maxLength={32}
-              className="w-full rounded-xl px-3.5 py-2.5 text-sm text-white outline-none sf-input" />
-            <div className="flex justify-end mt-1">
-              <span className="text-[9px]" style={{ color: 'rgba(196,181,253,0.25)' }}>{name.length}/32</span>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-[10px] uppercase tracking-[0.15em] font-black" style={{ color: 'rgba(139,92,246,0.6)' }}>
+                Pseudo
+              </label>
+              {!canChangeName && (
+                <span className="text-[9px] font-semibold px-2 py-0.5 rounded-lg"
+                  style={{ background: 'rgba(239,68,68,0.1)', color: 'rgba(252,165,165,0.7)', border: '1px solid rgba(239,68,68,0.15)' }}>
+                  🔒 Dans {daysLeft} jour{daysLeft > 1 ? 's' : ''}
+                </span>
+              )}
             </div>
+            <input type="text" value={displayedName} onChange={e => canChangeName && setName(e.target.value)}
+              disabled={!canChangeName} placeholder="Ton pseudo…" maxLength={32}
+              className="w-full rounded-xl px-3.5 py-2.5 text-sm text-white outline-none sf-input disabled:opacity-50 disabled:cursor-not-allowed" />
+            {canChangeName && (
+              <div className="flex justify-end mt-1">
+                <span className="text-[9px]" style={{ color: 'rgba(196,181,253,0.25)' }}>{name.length}/32</span>
+              </div>
+            )}
           </div>
           <div className="rounded-xl p-3 flex items-center gap-3"
             style={{ background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.12)' }}>
-            <Avatar url={avatarUrl} name={name || '?'} userId={userId} size={36} />
+            <Avatar url={avatarUrl} name={displayedName || '?'} userId={userId} size={36} />
             <div>
-              <p className="text-[12px] font-bold text-white">{name || 'Ton pseudo'}</p>
+              <p className="text-[12px] font-bold text-white">{displayedName || 'Ton pseudo'}</p>
               <p className="text-[10px]" style={{ color: 'rgba(196,181,253,0.4)' }}>Aperçu</p>
             </div>
           </div>
@@ -331,37 +470,63 @@ function ProfileModal({ profile, userId, onClose, onSaved }: {
 
 // ── Setup screen ───────────────────────────────────────────────────────────────
 
-const SETUP_SQL = `CREATE TABLE IF NOT EXISTS community_messages (
-  id           uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id      uuid REFERENCES auth.users NOT NULL,
-  content      text NOT NULL CHECK (char_length(content) <= 2000),
-  display_name text NOT NULL DEFAULT '',
-  avatar_url   text,
-  org_name     text,
-  channel      text NOT NULL DEFAULT 'chat',
-  title        text,
-  is_admin     boolean NOT NULL DEFAULT false,
-  created_at   timestamptz DEFAULT now()
+const SETUP_SQL = `-- 1. Messages
+CREATE TABLE IF NOT EXISTS community_messages (
+  id             uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id        uuid REFERENCES auth.users NOT NULL,
+  content        text NOT NULL CHECK (char_length(content) <= 2000),
+  display_name   text NOT NULL DEFAULT '',
+  avatar_url     text,
+  org_name       text,
+  channel        text NOT NULL DEFAULT 'chat',
+  title          text,
+  is_admin       boolean NOT NULL DEFAULT false,
+  thread_user_id uuid,
+  created_at     timestamptz DEFAULT now()
 );
 ALTER TABLE community_messages ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "community_read"   ON community_messages
-  FOR SELECT USING (auth.role() = 'authenticated');
-CREATE POLICY "community_insert" ON community_messages
-  FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "community_read"   ON community_messages FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "community_insert" ON community_messages FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "community_delete" ON community_messages FOR DELETE USING (
+  auth.uid() = user_id OR EXISTS (SELECT 1 FROM platform_admins WHERE user_id = auth.uid())
+);
 
+-- 2. Profils
 CREATE TABLE IF NOT EXISTS user_profiles (
-  user_id      uuid PRIMARY KEY REFERENCES auth.users,
-  display_name text NOT NULL DEFAULT '',
-  avatar_url   text,
-  updated_at   timestamptz DEFAULT now()
+  user_id         uuid PRIMARY KEY REFERENCES auth.users,
+  display_name    text NOT NULL DEFAULT '',
+  avatar_url      text,
+  name_updated_at timestamptz,
+  updated_at      timestamptz DEFAULT now()
 );
 ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "profiles_read" ON user_profiles
-  FOR SELECT USING (auth.role() = 'authenticated');
-CREATE POLICY "profiles_own"  ON user_profiles
-  FOR ALL USING (auth.uid() = user_id);
+CREATE POLICY "profiles_read" ON user_profiles FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "profiles_own"  ON user_profiles FOR ALL USING (auth.uid() = user_id);
 
--- Bucket "avatars" public → Supabase dashboard → Storage`
+-- 3. Admins ScaleFlow
+CREATE TABLE IF NOT EXISTS platform_admins (
+  user_id uuid PRIMARY KEY REFERENCES auth.users
+);
+ALTER TABLE platform_admins ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "platform_admins_read" ON platform_admins FOR SELECT USING (auth.role() = 'authenticated');
+-- Ajoute ton user_id :
+-- INSERT INTO platform_admins (user_id) VALUES ('TON-USER-ID-ICI');
+
+-- 4. Mutes
+CREATE TABLE IF NOT EXISTS community_mutes (
+  id          uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id     uuid REFERENCES auth.users NOT NULL,
+  muted_by    uuid REFERENCES auth.users NOT NULL,
+  muted_until timestamptz NOT NULL,
+  created_at  timestamptz DEFAULT now()
+);
+ALTER TABLE community_mutes ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "mutes_read"   ON community_mutes FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "mutes_insert" ON community_mutes FOR INSERT WITH CHECK (
+  EXISTS (SELECT 1 FROM platform_admins WHERE user_id = auth.uid())
+);
+
+-- 5. Bucket "avatars" public → Supabase dashboard → Storage`
 
 function SetupScreen({ onRetry }: { onRetry: () => void }) {
   const [copied, setCopied] = useState(false)
@@ -404,99 +569,112 @@ function SetupScreen({ onRetry }: { onRetry: () => void }) {
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export function Community({ user }: CommunityProps) {
-  const { currentOrg, role }   = useOrg()
-  const license                = useLicense()
-  const isAdmin = license.isSuperAdmin || role === 'admin' || role === 'owner'
+  const { currentOrg } = useOrg()
+  useLicense() // keep context warm
 
+  const [isAdmin, setIsAdmin]       = useState(false)
   const [tab, setTab]               = useState<Channel>('news')
   const [messages, setMessages]     = useState<Message[]>([])
   const [loading, setLoading]       = useState(true)
   const [needsSetup, setNeedsSetup] = useState(false)
-  const [profile, setProfile]       = useState<Profile>({
-    display_name: user.email?.split('@')[0] ?? 'Anonyme',
-    avatar_url: null,
-  })
-  const [showProfile, setShowProfile] = useState(false)
+  const [profile, setProfile]       = useState<Profile>({ display_name: '', avatar_url: null, name_updated_at: null })
+  const [showProfile, setShowProfile]   = useState(false)
+  const [mutedUntil, setMutedUntil]     = useState<string | null>(null)
+  const [showMuteModal, setShowMuteModal] = useState(false)
+  const [muteTarget, setMuteTarget]     = useState<{ id: string; name: string } | null>(null)
+  const [selectedThread, setSelectedThread] = useState<string | null>(null)
 
-  // Chat state
-  const [chatDraft, setChatDraft]   = useState('')
-  const [chatSending, setChatSend]  = useState(false)
-  const bottomRef  = useRef<HTMLDivElement>(null)
-  const listRef    = useRef<HTMLDivElement>(null)
-  const chatRef    = useRef<HTMLTextAreaElement>(null)
+  const [chatDraft, setChatDraft]  = useState('')
+  const [chatSending, setChatSend] = useState(false)
+  const bottomRef = useRef<HTMLDivElement>(null)
+  const listRef   = useRef<HTMLDivElement>(null)
+  const chatRef   = useRef<HTMLTextAreaElement>(null)
 
-  // News post state (admin only)
-  const [newsTitle,   setNewsTitle]   = useState('')
+  const [newsTitle, setNewsTitle]     = useState('')
   const [newsContent, setNewsContent] = useState('')
   const [newsSending, setNewsSend]    = useState(false)
   const [showNewsForm, setShowNewsForm] = useState(false)
 
   const loadProfile = useCallback(async () => {
     const { data } = await supabase
-      .from('user_profiles').select('display_name, avatar_url')
+      .from('user_profiles').select('display_name, avatar_url, name_updated_at')
       .eq('user_id', user.id).maybeSingle()
-    if (data) setProfile({ display_name: data.display_name || user.email?.split('@')[0] || 'Anonyme', avatar_url: data.avatar_url })
-  }, [user.id, user.email])
+    if (data) setProfile({ display_name: data.display_name || '', avatar_url: data.avatar_url, name_updated_at: data.name_updated_at })
+  }, [user.id])
 
   const loadMessages = useCallback(async () => {
     setLoading(true)
     const { data, error } = await supabase
       .from('community_messages')
-      .select('id, user_id, content, display_name, avatar_url, org_name, channel, title, is_admin, created_at')
-      .order('created_at', { ascending: tab === 'chat' })
-      .limit(200)
-    if (error) {
-      if (error.code === '42P01') setNeedsSetup(true)
-      setLoading(false); return
-    }
+      .select('id, user_id, content, display_name, avatar_url, org_name, channel, title, is_admin, thread_user_id, created_at')
+      .order('created_at', { ascending: true })
+      .limit(300)
+    if (error) { if (error.code === '42P01') setNeedsSetup(true); setLoading(false); return }
     setNeedsSetup(false)
     setMessages(data ?? [])
     setLoading(false)
-  }, [tab])
+  }, [])
+
+  useEffect(() => {
+    supabase.from('platform_admins').select('user_id').eq('user_id', user.id).maybeSingle()
+      .then(({ data }) => setIsAdmin(!!data))
+      .catch(() => {})
+  }, [user.id])
+
+  useEffect(() => {
+    supabase.from('community_mutes').select('muted_until')
+      .eq('user_id', user.id).gt('muted_until', new Date().toISOString())
+      .order('muted_until', { ascending: false }).limit(1).maybeSingle()
+      .then(({ data }) => setMutedUntil(data?.muted_until ?? null))
+      .catch(() => {})
+  }, [user.id])
 
   useEffect(() => { loadProfile() }, [loadProfile])
   useEffect(() => { loadMessages() }, [loadMessages])
 
-  // Realtime
   useEffect(() => {
-    const ch = supabase
-      .channel('community-v2')
+    const ch = supabase.channel('community-v3')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'community_messages' }, payload => {
         setMessages(prev => prev.some(m => m.id === payload.new.id) ? prev : [...prev, payload.new as Message])
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'community_messages' }, payload => {
+        setMessages(prev => prev.filter(m => m.id !== (payload.old as any).id))
       })
       .subscribe()
     return () => { supabase.removeChannel(ch) }
   }, [])
 
-  // Auto-scroll (chat only)
   useEffect(() => {
-    if (tab !== 'chat') return
+    if (tab !== 'chat' && tab !== 'support') return
     const el = listRef.current
     if (!el) return
-    const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 220
-    if (isNearBottom) bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, tab])
+    if (el.scrollHeight - el.scrollTop - el.clientHeight < 220)
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages, tab, selectedThread])
 
-  // Scroll to bottom instantly on initial load
   useEffect(() => {
-    if (!loading && tab === 'chat') {
+    if (!loading && (tab === 'chat' || tab === 'support'))
       setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'instant' as any }), 50)
-    }
-  }, [loading, tab])
+  }, [loading, tab, selectedThread])
+
+  const isMuted = mutedUntil !== null && new Date(mutedUntil) > new Date()
+
+  function requirePseudo(): boolean {
+    if (!profile.display_name) { setShowProfile(true); return false }
+    return true
+  }
 
   async function sendChat() {
+    if (!requirePseudo() || isMuted) return
     const content = chatDraft.trim()
     if (!content || chatSending) return
     setChatSend(true); setChatDraft('')
-    const { error } = await supabase.from('community_messages').insert({
-      user_id: user.id, content,
-      display_name: profile.display_name,
-      avatar_url: profile.avatar_url,
-      org_name: currentOrg?.name ?? null,
-      channel: 'chat', title: null,
-      is_admin: isAdmin,
-    })
-    if (error) setChatDraft(content)
+    const optId = crypto.randomUUID()
+    const opt: Message = { id: optId, user_id: user.id, content, display_name: profile.display_name, avatar_url: profile.avatar_url, org_name: currentOrg?.name ?? null, channel: 'chat', title: null, is_admin: isAdmin, thread_user_id: null, created_at: new Date().toISOString() }
+    setMessages(prev => [...prev, opt])
+    const { error, data } = await supabase.from('community_messages').insert({ user_id: user.id, content, display_name: profile.display_name, avatar_url: profile.avatar_url, org_name: currentOrg?.name ?? null, channel: 'chat', title: null, is_admin: isAdmin, thread_user_id: null }).select().single()
+    if (error) { setMessages(prev => prev.filter(m => m.id !== optId)); setChatDraft(content) }
+    else if (data) setMessages(prev => prev.map(m => m.id === optId ? data as Message : m))
     setChatSend(false)
     chatRef.current?.focus()
   }
@@ -505,17 +683,41 @@ export function Community({ user }: CommunityProps) {
     const content = newsContent.trim()
     if (!content || newsSending) return
     setNewsSend(true)
-    await supabase.from('community_messages').insert({
-      user_id: user.id, content,
-      display_name: profile.display_name,
-      avatar_url: profile.avatar_url,
-      org_name: currentOrg?.name ?? null,
-      channel: 'news',
-      title: newsTitle.trim() || null,
-      is_admin: true,
-    })
+    const optId = crypto.randomUUID()
+    const opt: Message = { id: optId, user_id: user.id, content, display_name: profile.display_name, avatar_url: profile.avatar_url, org_name: currentOrg?.name ?? null, channel: 'news', title: newsTitle.trim() || null, is_admin: true, thread_user_id: null, created_at: new Date().toISOString() }
+    setMessages(prev => [...prev, opt])
+    const { error, data } = await supabase.from('community_messages').insert({ user_id: user.id, content, display_name: profile.display_name, avatar_url: profile.avatar_url, org_name: currentOrg?.name ?? null, channel: 'news', title: newsTitle.trim() || null, is_admin: true, thread_user_id: null }).select().single()
+    if (error) setMessages(prev => prev.filter(m => m.id !== optId))
+    else if (data) setMessages(prev => prev.map(m => m.id === optId ? data as Message : m))
     setNewsTitle(''); setNewsContent(''); setShowNewsForm(false)
     setNewsSend(false)
+  }
+
+  async function sendSupport() {
+    if (!requirePseudo() || isMuted) return
+    const content = chatDraft.trim()
+    if (!content || chatSending) return
+    if (isAdmin && !selectedThread) return
+    setChatSend(true); setChatDraft('')
+    const threadId = isAdmin ? selectedThread! : user.id
+    const optId = crypto.randomUUID()
+    const opt: Message = { id: optId, user_id: user.id, content, display_name: profile.display_name, avatar_url: profile.avatar_url, org_name: currentOrg?.name ?? null, channel: 'support', title: null, is_admin: isAdmin, thread_user_id: threadId, created_at: new Date().toISOString() }
+    setMessages(prev => [...prev, opt])
+    const { error, data } = await supabase.from('community_messages').insert({ user_id: user.id, content, display_name: profile.display_name, avatar_url: profile.avatar_url, org_name: currentOrg?.name ?? null, channel: 'support', title: null, is_admin: isAdmin, thread_user_id: threadId }).select().single()
+    if (error) { setMessages(prev => prev.filter(m => m.id !== optId)); setChatDraft(content) }
+    else if (data) setMessages(prev => prev.map(m => m.id === optId ? data as Message : m))
+    setChatSend(false)
+  }
+
+  async function deleteMessage(id: string) {
+    setMessages(prev => prev.filter(m => m.id !== id))
+    await supabase.from('community_messages').delete().eq('id', id)
+  }
+
+  async function muteUser(userId: string, minutes: number) {
+    const muted_until = new Date(Date.now() + minutes * 60000).toISOString()
+    await supabase.from('community_mutes').insert({ user_id: userId, muted_by: user.id, muted_until })
+    setShowMuteModal(false); setMuteTarget(null)
   }
 
   if (needsSetup) return <SetupScreen onRetry={loadMessages} />
@@ -523,16 +725,37 @@ export function Community({ user }: CommunityProps) {
   const newsMessages    = messages.filter(m => m.channel === 'news').reverse()
   const chatMessages    = messages.filter(m => m.channel === 'chat')
   const supportMessages = messages.filter(m => m.channel === 'support')
+
+  const myThreadMessages = supportMessages
+    .filter(m => m.thread_user_id === user.id || (!m.thread_user_id && m.user_id === user.id))
+
+  const threadMap = new Map<string, { user_id: string; display_name: string; avatar_url: string | null; lastMsg: Message }>()
+  for (const msg of supportMessages) {
+    const tid = msg.thread_user_id ?? msg.user_id
+    const ex  = threadMap.get(tid)
+    if (!ex || new Date(msg.created_at) > new Date(ex.lastMsg.created_at)) {
+      threadMap.set(tid, {
+        user_id: tid,
+        display_name: !msg.is_admin ? msg.display_name : (ex?.display_name ?? msg.display_name),
+        avatar_url:   !msg.is_admin ? msg.avatar_url   : (ex?.avatar_url   ?? msg.avatar_url),
+        lastMsg: msg,
+      })
+    }
+  }
+  const threadList = Array.from(threadMap.values())
+    .sort((a, b) => new Date(b.lastMsg.created_at).getTime() - new Date(a.lastMsg.created_at).getTime())
+  const threadMessages = selectedThread
+    ? supportMessages.filter(m => (m.thread_user_id ?? m.user_id) === selectedThread)
+    : []
+
   const [g1, g2] = gradientForId(user.id)
 
   return (
     <div className="h-full flex flex-col" style={{ background: '#06040f' }}>
 
-      {/* ── Header ───────────────────────────────────────────────────────────── */}
+      {/* Header */}
       <div className="flex-shrink-0"
         style={{ borderBottom: '1px solid rgba(139,92,246,0.12)', background: 'rgba(8,5,20,0.9)', backdropFilter: 'blur(12px)' }}>
-
-        {/* Top row */}
         <div className="flex items-center justify-between px-5 py-3">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-xl flex items-center justify-center"
@@ -542,32 +765,44 @@ export function Community({ user }: CommunityProps) {
             <div>
               <p className="text-[14px] font-black text-white leading-tight">Communauté</p>
               <p className="text-[10px] leading-tight" style={{ color: 'rgba(196,181,253,0.4)' }}>
-                {tab === 'news'
-                  ? `${newsMessages.length} actualité${newsMessages.length > 1 ? 's' : ''}`
-                  : `${chatMessages.length} message${chatMessages.length > 1 ? 's' : ''}`}
+                {tab === 'news' ? `${newsMessages.length} actualité${newsMessages.length > 1 ? 's' : ''}` :
+                 tab === 'chat' ? `${chatMessages.length} message${chatMessages.length > 1 ? 's' : ''}` :
+                 isAdmin ? `${threadList.length} ticket${threadList.length > 1 ? 's' : ''}` :
+                 `${myThreadMessages.length} message${myThreadMessages.length > 1 ? 's' : ''}`}
               </p>
             </div>
           </div>
-
-          {/* Profile button */}
           <button onClick={() => setShowProfile(true)}
             className="flex items-center gap-2.5 pl-2.5 pr-3 py-2 rounded-xl transition-all hover:bg-white/[0.04] group"
             style={{ border: '1px solid rgba(139,92,246,0.12)' }}>
-            <Avatar url={profile.avatar_url} name={profile.display_name} userId={user.id} size={28} />
+            <Avatar url={profile.avatar_url} name={profile.display_name || '?'} userId={user.id} size={28} />
             <div className="text-left">
-              <p className="text-[11.5px] font-semibold leading-tight text-white">{profile.display_name}</p>
+              <p className="text-[11.5px] font-semibold leading-tight" style={{ color: profile.display_name ? 'white' : 'rgba(196,181,253,0.4)' }}>
+                {profile.display_name || 'Définir pseudo'}
+              </p>
               {currentOrg && <p className="text-[9.5px] leading-tight" style={{ color: 'rgba(139,92,246,0.7)' }}>{currentOrg.name}</p>}
             </div>
             <span className="text-[10px] opacity-0 group-hover:opacity-50 transition-opacity ml-1" style={{ color: '#a78bfa' }}>✏</span>
           </button>
         </div>
 
-        {/* Tabs */}
+        {isMuted && (
+          <div className="mx-5 mb-3 px-4 py-2 rounded-xl flex items-center gap-2"
+            style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)' }}>
+            <span className="text-sm">🔇</span>
+            <p className="text-[11px]" style={{ color: 'rgba(251,191,36,0.8)' }}>
+              Tu es muté jusqu'au <strong>
+                {new Date(mutedUntil!).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}
+              </strong>
+            </p>
+          </div>
+        )}
+
         <div className="flex px-5 gap-1 pb-0">
           {([
-            { id: 'news'    as Channel, label: 'Actualités ScaleFlow', icon: '📢', badge: newsMessages.length > 0 ? String(newsMessages.length) : undefined },
-            { id: 'chat'    as Channel, label: 'Discussion',           icon: '💬', badge: chatMessages.length > 0 ? String(chatMessages.length) : undefined },
-            { id: 'support' as Channel, label: 'Support',              icon: '🎫', badge: supportMessages.length > 0 ? String(supportMessages.length) : undefined },
+            { id: 'news'    as Channel, label: 'Actualités ScaleFlow', icon: '📢' },
+            { id: 'chat'    as Channel, label: 'Discussion',           icon: '💬' },
+            { id: 'support' as Channel, label: 'Support',              icon: '🎫' },
           ]).map(t => (
             <button key={t.id} onClick={() => setTab(t.id)}
               className="flex items-center gap-1.5 px-4 py-2.5 text-[12.5px] font-bold transition-all relative"
@@ -576,25 +811,14 @@ export function Community({ user }: CommunityProps) {
                 : { color: 'rgba(196,181,253,0.35)', borderBottom: '2px solid transparent', marginBottom: -1 }}>
               <span className="text-[14px]">{t.icon}</span>
               <span>{t.label}</span>
-              {t.badge && (
-                <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full"
-                  style={tab === t.id
-                    ? { background: 'rgba(139,92,246,0.25)', color: '#a78bfa' }
-                    : { background: 'rgba(255,255,255,0.06)', color: 'rgba(196,181,253,0.4)' }}>
-                  {t.badge}
-                </span>
-              )}
             </button>
           ))}
         </div>
       </div>
 
-      {/* ── Content ──────────────────────────────────────────────────────────── */}
-
       {/* NEWS TAB */}
       {tab === 'news' && (
         <div ref={listRef} className="flex-1 overflow-y-auto">
-          {/* Admin post button */}
           {isAdmin && (
             <div className="px-5 pt-5">
               {!showNewsForm ? (
@@ -602,56 +826,35 @@ export function Community({ user }: CommunityProps) {
                   className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl text-left transition-all group"
                   style={{ background: 'rgba(139,92,246,0.07)', border: '1px dashed rgba(139,92,246,0.3)' }}>
                   <div className="w-8 h-8 rounded-xl flex items-center justify-center text-base flex-shrink-0"
-                    style={{ background: 'linear-gradient(135deg,rgba(139,92,246,0.2),rgba(236,72,153,0.1))', border: '1px solid rgba(139,92,246,0.25)' }}>
-                    📢
-                  </div>
+                    style={{ background: 'linear-gradient(135deg,rgba(139,92,246,0.2),rgba(236,72,153,0.1))', border: '1px solid rgba(139,92,246,0.25)' }}>📢</div>
                   <div>
-                    <p className="text-[12.5px] font-semibold text-white group-hover:text-accent transition-colors">
-                      Publier une actualité
-                    </p>
-                    <p className="text-[10px]" style={{ color: 'rgba(196,181,253,0.4)' }}>
-                      Visible par tous les membres
-                    </p>
+                    <p className="text-[12.5px] font-semibold text-white group-hover:text-accent transition-colors">Publier une actualité</p>
+                    <p className="text-[10px]" style={{ color: 'rgba(196,181,253,0.4)' }}>Visible par tous les membres</p>
                   </div>
                   <span className="ml-auto text-[10px] font-black px-2 py-1 rounded-lg"
-                    style={{ background: 'linear-gradient(130deg,rgba(124,58,237,0.35),rgba(236,72,153,0.2))', color: '#f0a8ff' }}>
-                    ADMIN
-                  </span>
+                    style={{ background: 'linear-gradient(130deg,rgba(124,58,237,0.35),rgba(236,72,153,0.2))', color: '#f0a8ff' }}>ADMIN</span>
                 </button>
               ) : (
                 <div className="rounded-2xl overflow-hidden"
-                  style={{ background: 'rgba(8,5,20,0.9)', border: '1px solid rgba(139,92,246,0.3)', boxShadow: '0 8px 32px rgba(0,0,0,0.4)' }}>
+                  style={{ background: 'rgba(8,5,20,0.9)', border: '1px solid rgba(139,92,246,0.3)' }}>
                   <div className="px-4 py-3 flex items-center justify-between"
                     style={{ borderBottom: '1px solid rgba(139,92,246,0.12)', background: 'linear-gradient(135deg,rgba(139,92,246,0.1),rgba(236,72,153,0.05))' }}>
-                    <div className="flex items-center gap-2">
-                      <span className="text-base">📢</span>
-                      <p className="text-[12px] font-black text-white">Nouvelle actualité</p>
-                    </div>
-                    <button onClick={() => setShowNewsForm(false)}
-                      className="text-sm transition-colors hover:text-white" style={{ color: 'rgba(196,181,253,0.4)' }}>✕</button>
+                    <div className="flex items-center gap-2"><span>📢</span><p className="text-[12px] font-black text-white">Nouvelle actualité</p></div>
+                    <button onClick={() => setShowNewsForm(false)} style={{ color: 'rgba(196,181,253,0.4)' }}>✕</button>
                   </div>
                   <div className="p-4 space-y-3">
-                    <input
-                      type="text" value={newsTitle} onChange={e => setNewsTitle(e.target.value)}
-                      placeholder="Titre (optionnel)…"
-                      className="w-full rounded-xl px-3.5 py-2.5 text-sm font-bold text-white outline-none sf-input"
-                    />
-                    <textarea
-                      value={newsContent} onChange={e => setNewsContent(e.target.value)}
-                      placeholder="Contenu de l'actualité…"
-                      rows={4} maxLength={2000}
-                      className="w-full rounded-xl px-3.5 py-2.5 text-sm text-white outline-none resize-none sf-input"
-                    />
+                    <input type="text" value={newsTitle} onChange={e => setNewsTitle(e.target.value)}
+                      placeholder="Titre (optionnel)…" className="w-full rounded-xl px-3.5 py-2.5 text-sm font-bold text-white outline-none sf-input" />
+                    <textarea value={newsContent} onChange={e => setNewsContent(e.target.value)}
+                      placeholder="Contenu…" rows={4} maxLength={2000}
+                      className="w-full rounded-xl px-3.5 py-2.5 text-sm text-white outline-none resize-none sf-input" />
                     <div className="flex items-center justify-between">
                       <span className="text-[10px]" style={{ color: 'rgba(196,181,253,0.3)' }}>{newsContent.length}/2000</span>
                       <div className="flex gap-2">
-                        <button onClick={() => setShowNewsForm(false)}
-                          className="px-4 py-2 rounded-xl text-[12px] font-semibold transition-all"
-                          style={{ background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.6)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                          Annuler
-                        </button>
+                        <button onClick={() => setShowNewsForm(false)} className="px-4 py-2 rounded-xl text-[12px] font-semibold"
+                          style={{ background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.6)', border: '1px solid rgba(255,255,255,0.07)' }}>Annuler</button>
                         <button onClick={sendNews} disabled={!newsContent.trim() || newsSending}
-                          className="px-4 py-2 rounded-xl text-[12px] font-semibold transition-all btn-sf-primary disabled:opacity-40">
+                          className="px-4 py-2 rounded-xl text-[12px] font-semibold btn-sf-primary disabled:opacity-40">
                           {newsSending ? 'Publication…' : '📢 Publier'}
                         </button>
                       </div>
@@ -661,12 +864,9 @@ export function Community({ user }: CommunityProps) {
               )}
             </div>
           )}
-
-          {/* News list */}
           <div className="p-5 space-y-4">
-            {loading ? (
-              <div className="flex items-center justify-center py-12"><Spinner size="lg" /></div>
-            ) : newsMessages.length === 0 ? (
+            {loading ? <div className="flex items-center justify-center py-12"><Spinner size="lg" /></div>
+            : newsMessages.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 gap-4 text-center">
                 <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl"
                   style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.12)' }}>📢</div>
@@ -677,9 +877,7 @@ export function Community({ user }: CommunityProps) {
                   </p>
                 </div>
               </div>
-            ) : (
-              newsMessages.map(msg => <NewsCard key={msg.id} msg={msg} />)
-            )}
+            ) : newsMessages.map(msg => <NewsCard key={msg.id} msg={msg} isAdmin={isAdmin} onDelete={deleteMessage} />)}
           </div>
         </div>
       )}
@@ -701,9 +899,7 @@ export function Community({ user }: CommunityProps) {
             ) : chatMessages.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full gap-4">
                 <div className="w-20 h-20 rounded-3xl flex items-center justify-center text-4xl"
-                  style={{ background: 'linear-gradient(135deg,rgba(139,92,246,0.12),rgba(236,72,153,0.06))', border: '1px solid rgba(139,92,246,0.15)' }}>
-                  💬
-                </div>
+                  style={{ background: 'linear-gradient(135deg,rgba(139,92,246,0.12),rgba(236,72,153,0.06))', border: '1px solid rgba(139,92,246,0.15)' }}>💬</div>
                 <div className="text-center space-y-1.5">
                   <p className="text-base font-black text-white">Aucun message pour l'instant</p>
                   <p className="text-sm" style={{ color: 'rgba(196,181,253,0.4)' }}>Sois le premier à écrire !</p>
@@ -713,196 +909,248 @@ export function Community({ user }: CommunityProps) {
               <>
                 <div className="flex items-center gap-3 mb-4">
                   <div className="flex-1 h-px" style={{ background: 'rgba(139,92,246,0.1)' }} />
-                  <span className="text-[10px] font-semibold px-2" style={{ color: 'rgba(196,181,253,0.3)' }}>
-                    Début de la discussion
-                  </span>
+                  <span className="text-[10px] font-semibold px-2" style={{ color: 'rgba(196,181,253,0.3)' }}>Début de la discussion</span>
                   <div className="flex-1 h-px" style={{ background: 'rgba(139,92,246,0.1)' }} />
                 </div>
                 {chatMessages.map((msg, i) => {
-                  const prev = chatMessages[i - 1]
+                  const prev    = chatMessages[i - 1]
                   const compact = prev?.user_id === msg.user_id &&
                     new Date(msg.created_at).getTime() - new Date(prev.created_at).getTime() < 5 * 60 * 1000
-                  return <ChatRow key={msg.id} msg={msg} isOwn={msg.user_id === user.id} compact={compact} />
+                  return <ChatRow key={msg.id} msg={msg} isOwn={msg.user_id === user.id} compact={compact}
+                    isAdmin={isAdmin} onDelete={deleteMessage}
+                    onMute={(uid, name) => { setMuteTarget({ id: uid, name }); setShowMuteModal(true) }} />
                 })}
                 <div ref={bottomRef} className="h-1" />
               </>
             )}
           </div>
-
-          {/* Chat input */}
           <div className="flex-shrink-0 px-4 py-3"
             style={{ borderTop: '1px solid rgba(139,92,246,0.1)', background: 'rgba(6,4,15,0.95)' }}>
-            <div className="flex items-center gap-2 mb-2 px-1">
-              <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: `linear-gradient(135deg,${g1},${g2})` }} />
-              <span className="text-[10px]" style={{ color: 'rgba(196,181,253,0.35)' }}>
-                Tu écris en tant que <strong style={{ color: 'rgba(196,181,253,0.6)' }}>{profile.display_name}</strong>
-                {currentOrg && <span style={{ color: 'rgba(139,92,246,0.6)' }}> · {currentOrg.name}</span>}
-              </span>
-            </div>
-            <div className="flex items-end gap-3">
-              <Avatar url={profile.avatar_url} name={profile.display_name} userId={user.id} size={32} />
-              <div className="flex-1 flex items-end gap-2 rounded-xl px-3.5 py-2.5"
-                style={{ background: 'rgba(139,92,246,0.07)', border: '1px solid rgba(139,92,246,0.2)' }}>
-                <textarea
-                  ref={chatRef}
-                  value={chatDraft}
-                  onChange={e => setChatDraft(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat() } }}
-                  onInput={e => { const el = e.currentTarget; el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 120) + 'px' }}
-                  placeholder="Écrire un message… (⏎ pour envoyer)"
-                  rows={1} maxLength={1000}
-                  className="flex-1 bg-transparent text-[13px] text-white resize-none outline-none leading-relaxed"
-                  style={{ minHeight: 22, maxHeight: 120 }}
-                />
-                <button onClick={sendChat} disabled={!chatDraft.trim() || chatSending}
-                  className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-white transition-all disabled:opacity-30 active:scale-90"
-                  style={{ background: 'linear-gradient(135deg,#7c3aed,#ec4899)', boxShadow: '0 2px 12px rgba(124,58,237,0.4)' }}>
-                  {chatSending ? <Spinner size="sm" /> : <span className="text-sm leading-none">↑</span>}
-                </button>
+            {isMuted ? (
+              <div className="flex items-center gap-2 px-4 py-3 rounded-xl"
+                style={{ background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.15)' }}>
+                <span>🔇</span>
+                <p className="text-[12px]" style={{ color: 'rgba(251,191,36,0.7)' }}>Tu es muté — impossible d'envoyer des messages.</p>
               </div>
-            </div>
+            ) : (
+              <>
+                <div className="flex items-center gap-2 mb-2 px-1">
+                  <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: `linear-gradient(135deg,${g1},${g2})` }} />
+                  <span className="text-[10px]" style={{ color: 'rgba(196,181,253,0.35)' }}>
+                    Tu écris en tant que{' '}
+                    <strong style={{ color: profile.display_name ? 'rgba(196,181,253,0.6)' : '#a78bfa' }}>
+                      {profile.display_name || '→ définis ton pseudo d\'abord'}
+                    </strong>
+                    {currentOrg && profile.display_name && <span style={{ color: 'rgba(139,92,246,0.6)' }}> · {currentOrg.name}</span>}
+                  </span>
+                </div>
+                <div className="flex items-end gap-3">
+                  <Avatar url={profile.avatar_url} name={profile.display_name || '?'} userId={user.id} size={32} />
+                  <div className="flex-1 flex items-end gap-2 rounded-xl px-3.5 py-2.5"
+                    style={{ background: 'rgba(139,92,246,0.07)', border: '1px solid rgba(139,92,246,0.2)' }}>
+                    <textarea ref={chatRef} value={chatDraft} onChange={e => setChatDraft(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat() } }}
+                      onInput={e => { const el = e.currentTarget; el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 120) + 'px' }}
+                      placeholder={profile.display_name ? 'Écrire un message… (⏎ pour envoyer)' : 'Clique sur ton avatar pour définir ton pseudo…'}
+                      rows={1} maxLength={1000}
+                      className="flex-1 bg-transparent text-[13px] text-white resize-none outline-none leading-relaxed"
+                      style={{ minHeight: 22, maxHeight: 120 }} />
+                    <button onClick={sendChat} disabled={!chatDraft.trim() || chatSending}
+                      className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-white transition-all disabled:opacity-30 active:scale-90"
+                      style={{ background: 'linear-gradient(135deg,#7c3aed,#ec4899)', boxShadow: '0 2px 12px rgba(124,58,237,0.4)' }}>
+                      {chatSending ? <Spinner size="sm" /> : <span className="text-sm leading-none">↑</span>}
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </>
       )}
 
       {/* SUPPORT TAB */}
       {tab === 'support' && (
-        <>
-          <div ref={listRef} className="flex-1 overflow-y-auto px-5 py-4">
-            {loading ? (
-              <div className="flex items-center justify-center h-full"><Spinner size="lg" /></div>
-            ) : supportMessages.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full gap-4">
-                <div className="w-20 h-20 rounded-3xl flex items-center justify-center text-4xl"
-                  style={{ background: 'linear-gradient(135deg,rgba(96,165,250,0.12),rgba(139,92,246,0.06))', border: '1px solid rgba(96,165,250,0.15)' }}>
-                  🎫
-                </div>
-                <div className="text-center space-y-1.5">
-                  <p className="text-base font-black text-white">Aucune question pour l'instant</p>
-                  <p className="text-sm" style={{ color: 'rgba(196,181,253,0.4)' }}>
-                    Pose ta question — l'équipe te répondra ici.
+        <div className="flex-1 flex overflow-hidden">
+          {isAdmin ? (
+            <>
+              {/* Thread list */}
+              <div className="w-56 flex-shrink-0 overflow-y-auto"
+                style={{ borderRight: '1px solid rgba(139,92,246,0.1)', background: 'rgba(8,5,20,0.4)' }}>
+                <div className="px-3 pt-3 pb-2">
+                  <p className="text-[9px] uppercase tracking-widest font-black mb-3 px-1"
+                    style={{ color: 'rgba(139,92,246,0.5)' }}>
+                    🎫 Tickets ({threadList.length})
                   </p>
-                </div>
-              </div>
-            ) : (
-              <>
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="flex-1 h-px" style={{ background: 'rgba(96,165,250,0.15)' }} />
-                  <span className="text-[10px] font-semibold px-2" style={{ color: 'rgba(147,197,253,0.4)' }}>Support ScaleFlow</span>
-                  <div className="flex-1 h-px" style={{ background: 'rgba(96,165,250,0.15)' }} />
-                </div>
-                {supportMessages.map((msg, i) => {
-                  const prev = supportMessages[i - 1]
-                  const compact = prev?.user_id === msg.user_id &&
-                    new Date(msg.created_at).getTime() - new Date(prev.created_at).getTime() < 5 * 60 * 1000
-                  const msgIsAdmin = isAdmin && msg.user_id === user.id
-                  return (
-                    <div key={msg.id} className={`flex gap-3 group ${compact ? 'mt-[2px]' : 'mt-4'} ${msgIsAdmin ? 'flex-row-reverse' : ''}`}>
-                      <div style={{ width: 34, flexShrink: 0 }}>
-                        {!compact && <Avatar url={msg.avatar_url} name={msg.display_name} userId={msg.user_id} size={34} />}
-                      </div>
-                      <div className={`flex-1 min-w-0 ${msgIsAdmin ? 'text-right' : ''}`}>
-                        {!compact && (
-                          <div className={`flex items-center gap-2 mb-[3px] flex-wrap ${msgIsAdmin ? 'justify-end' : ''}`}>
-                            <span className="text-[13px] font-bold leading-none" style={{ color: msgIsAdmin ? '#93c5fd' : '#e8e0ff' }}>
-                              {msg.display_name || 'Anonyme'}
-                            </span>
-                            {msgIsAdmin && (
-                              <span className="text-[8px] font-black uppercase px-1.5 py-[2px] rounded-full tracking-wide"
-                                style={{ background: 'rgba(96,165,250,0.2)', color: '#93c5fd' }}>Support</span>
-                            )}
-                            {msg.org_name && (
-                              <span className="text-[10px] font-semibold px-2 py-[2px] rounded-full"
-                                style={{ background: 'rgba(255,255,255,0.05)', color: 'rgba(196,181,253,0.65)', border: '1px solid rgba(139,92,246,0.15)' }}>
-                                {msg.org_name}
-                              </span>
-                            )}
-                            <span className="text-[10px] opacity-0 group-hover:opacity-60 transition-opacity tabular-nums ml-auto"
-                              style={{ color: 'rgba(196,181,253,0.5)' }}>{timeAgo(msg.created_at)}</span>
-                          </div>
-                        )}
-                        <p className={`text-[13.5px] leading-relaxed break-words inline-block px-3 py-2 rounded-xl ${msgIsAdmin ? 'ml-auto' : ''}`}
-                          style={msgIsAdmin
-                            ? { background: 'rgba(96,165,250,0.12)', color: 'rgba(212,230,255,0.9)', border: '1px solid rgba(96,165,250,0.2)' }
-                            : { color: 'rgba(212,220,240,0.9)' }}>
-                          {msg.content}
+                  {loading ? <div className="flex justify-center py-8"><Spinner size="sm" /></div>
+                  : threadList.length === 0 ? (
+                    <div className="flex flex-col items-center py-8 gap-2 text-center">
+                      <span className="text-3xl">🎫</span>
+                      <p className="text-[11px]" style={{ color: 'rgba(196,181,253,0.3)' }}>Aucun ticket</p>
+                    </div>
+                  ) : threadList.map(t => (
+                    <button key={t.user_id} onClick={() => setSelectedThread(t.user_id)}
+                      className="w-full flex items-center gap-2.5 px-2.5 py-2.5 rounded-xl mb-1 text-left transition-all"
+                      style={selectedThread === t.user_id
+                        ? { background: 'rgba(139,92,246,0.18)', border: '1px solid rgba(139,92,246,0.3)' }
+                        : { background: 'transparent', border: '1px solid transparent' }}>
+                      <Avatar url={t.avatar_url} name={t.display_name} userId={t.user_id} size={28} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[11px] font-bold text-white truncate">{t.display_name || 'Anonyme'}</p>
+                        <p className="text-[9px] truncate" style={{ color: 'rgba(196,181,253,0.4)' }}>
+                          {t.lastMsg.content.slice(0, 26)}{t.lastMsg.content.length > 26 ? '…' : ''}
                         </p>
                       </div>
-                    </div>
-                  )
-                })}
-                <div ref={bottomRef} className="h-1" />
-              </>
-            )}
-          </div>
-          {/* Support input */}
-          <div className="flex-shrink-0 px-4 py-3"
-            style={{ borderTop: '1px solid rgba(96,165,250,0.1)', background: 'rgba(6,4,15,0.95)' }}>
-            <div className="flex items-center gap-2 mb-2 px-1">
-              <div className="w-1.5 h-1.5 rounded-full flex-shrink-0 bg-blue-400" />
-              <span className="text-[10px]" style={{ color: 'rgba(196,181,253,0.35)' }}>
-                {isAdmin
-                  ? <><strong style={{ color: 'rgba(147,197,253,0.7)' }}>Mode support</strong> — ta réponse sera mise en avant</>
-                  : <>Pose ta question à l'équipe <strong style={{ color: 'rgba(147,197,253,0.6)' }}>ScaleFlow</strong></>}
-              </span>
-            </div>
-            <div className="flex items-end gap-3">
-              <Avatar url={profile.avatar_url} name={profile.display_name} userId={user.id} size={32} />
-              <div className="flex-1 flex items-end gap-2 rounded-xl px-3.5 py-2.5"
-                style={{ background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.2)' }}>
-                <textarea
-                  value={chatDraft}
-                  onChange={e => setChatDraft(e.target.value)}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault()
-                      const content = chatDraft.trim()
-                      if (!content || chatSending) return
-                      setChatSend(true); setChatDraft('')
-                      supabase.from('community_messages').insert({
-                        user_id: user.id, content,
-                        display_name: profile.display_name, avatar_url: profile.avatar_url,
-                        org_name: currentOrg?.name ?? null, channel: 'support', title: null,
-                        is_admin: isAdmin,
-                      }).then(({ error }) => { if (error) setChatDraft(content); setChatSend(false) })
-                    }
-                  }}
-                  onInput={e => { const el = e.currentTarget; el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 120) + 'px' }}
-                  placeholder={isAdmin ? 'Répondre à la communauté…' : 'Pose ta question ici…'}
-                  rows={1} maxLength={1000}
-                  className="flex-1 bg-transparent text-[13px] text-white resize-none outline-none leading-relaxed"
-                  style={{ minHeight: 22, maxHeight: 120 }}
-                />
-                <button
-                  onClick={() => {
-                    const content = chatDraft.trim()
-                    if (!content || chatSending) return
-                    setChatSend(true); setChatDraft('')
-                    supabase.from('community_messages').insert({
-                      user_id: user.id, content,
-                      display_name: profile.display_name, avatar_url: profile.avatar_url,
-                      org_name: currentOrg?.name ?? null, channel: 'support', title: null,
-                      is_admin: isAdmin,
-                    }).then(({ error }) => { if (error) setChatDraft(content); setChatSend(false) })
-                  }}
-                  disabled={!chatDraft.trim() || chatSending}
-                  className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-white transition-all disabled:opacity-30 active:scale-90"
-                  style={{ background: 'linear-gradient(135deg,#2563eb,#7c3aed)', boxShadow: '0 2px 12px rgba(37,99,235,0.35)' }}>
-                  {chatSending ? <Spinner size="sm" /> : <span className="text-sm leading-none">↑</span>}
-                </button>
+                      <span className="text-[8px] flex-shrink-0 tabular-nums" style={{ color: 'rgba(196,181,253,0.3)' }}>
+                        {timeAgo(t.lastMsg.created_at)}
+                      </span>
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
-          </div>
-        </>
+
+              {/* Selected thread */}
+              <div className="flex-1 flex flex-col overflow-hidden">
+                {!selectedThread ? (
+                  <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center p-6">
+                    <span className="text-5xl opacity-20">💬</span>
+                    <p className="font-bold text-white">Sélectionne un ticket</p>
+                    <p className="text-sm" style={{ color: 'rgba(196,181,253,0.4)' }}>Clique sur un utilisateur à gauche</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex-shrink-0 px-4 py-2.5 flex items-center gap-2.5"
+                      style={{ borderBottom: '1px solid rgba(139,92,246,0.1)', background: 'rgba(8,5,20,0.6)' }}>
+                      {(() => { const t = threadList.find(t => t.user_id === selectedThread); return t ? (
+                        <>
+                          <Avatar url={t.avatar_url} name={t.display_name} userId={t.user_id} size={26} />
+                          <div>
+                            <p className="text-[12px] font-black text-white">{t.display_name || 'Anonyme'}</p>
+                            <p className="text-[9px]" style={{ color: 'rgba(196,181,253,0.35)' }}>
+                              {threadMessages.length} message{threadMessages.length > 1 ? 's' : ''}
+                            </p>
+                          </div>
+                        </>
+                      ) : null })()}
+                    </div>
+                    <div ref={listRef} className="flex-1 overflow-y-auto px-4 py-3">
+                      {threadMessages.map((msg, i) => {
+                        const prev    = threadMessages[i - 1]
+                        const compact = prev?.user_id === msg.user_id &&
+                          new Date(msg.created_at).getTime() - new Date(prev.created_at).getTime() < 5 * 60 * 1000
+                        return <SupportMsgRow key={msg.id} msg={msg} isAdmin={isAdmin} compact={compact} onDelete={deleteMessage} />
+                      })}
+                      <div ref={bottomRef} className="h-2" />
+                    </div>
+                    <div className="flex-shrink-0 px-4 py-3"
+                      style={{ borderTop: '1px solid rgba(139,92,246,0.1)', background: 'rgba(6,4,15,0.95)' }}>
+                      <div className="flex items-end gap-3">
+                        <Avatar url={profile.avatar_url} name={profile.display_name || '?'} userId={user.id} size={32} />
+                        <div className="flex-1 flex items-end gap-2 rounded-xl px-3.5 py-2.5"
+                          style={{ background: 'linear-gradient(135deg,rgba(124,58,237,0.08),rgba(236,72,153,0.04))', border: '1px solid rgba(139,92,246,0.25)' }}>
+                          <textarea value={chatDraft} onChange={e => setChatDraft(e.target.value)}
+                            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendSupport() } }}
+                            onInput={e => { const el = e.currentTarget; el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 120) + 'px' }}
+                            placeholder="Répondre en tant qu'admin…"
+                            rows={1} maxLength={1000}
+                            className="flex-1 bg-transparent text-[13px] text-white resize-none outline-none leading-relaxed"
+                            style={{ minHeight: 22, maxHeight: 120 }} />
+                          <button onClick={sendSupport} disabled={!chatDraft.trim() || chatSending}
+                            className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-white transition-all disabled:opacity-30 active:scale-90"
+                            style={{ background: 'linear-gradient(135deg,#7c3aed,#ec4899)', boxShadow: '0 2px 12px rgba(124,58,237,0.4)' }}>
+                            {chatSending ? <Spinner size="sm" /> : <span className="text-sm">↑</span>}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            </>
+          ) : (
+            /* User view */
+            <>
+              <div ref={listRef} className="flex-1 overflow-y-auto px-5 py-4">
+                {loading ? <div className="flex items-center justify-center h-full"><Spinner size="lg" /></div>
+                : myThreadMessages.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full gap-4">
+                    <div className="w-20 h-20 rounded-3xl flex items-center justify-center text-4xl"
+                      style={{ background: 'linear-gradient(135deg,rgba(96,165,250,0.12),rgba(139,92,246,0.06))', border: '1px solid rgba(96,165,250,0.15)' }}>🎫</div>
+                    <div className="text-center space-y-1.5">
+                      <p className="text-base font-black text-white">Ouvre un ticket de support</p>
+                      <p className="text-sm" style={{ color: 'rgba(196,181,253,0.4)' }}>
+                        Pose ta question — l'équipe ScaleFlow te répondra ici.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="flex-1 h-px" style={{ background: 'rgba(96,165,250,0.1)' }} />
+                      <span className="text-[10px] font-semibold px-2" style={{ color: 'rgba(147,197,253,0.35)' }}>Ton ticket de support</span>
+                      <div className="flex-1 h-px" style={{ background: 'rgba(96,165,250,0.1)' }} />
+                    </div>
+                    {myThreadMessages.map((msg, i) => {
+                      const prev    = myThreadMessages[i - 1]
+                      const compact = prev?.user_id === msg.user_id &&
+                        new Date(msg.created_at).getTime() - new Date(prev.created_at).getTime() < 5 * 60 * 1000
+                      return <SupportMsgRow key={msg.id} msg={msg} isAdmin={isAdmin} compact={compact} onDelete={deleteMessage} />
+                    })}
+                    <div ref={bottomRef} className="h-1" />
+                  </>
+                )}
+              </div>
+              <div className="flex-shrink-0 px-4 py-3"
+                style={{ borderTop: '1px solid rgba(96,165,250,0.1)', background: 'rgba(6,4,15,0.95)' }}>
+                {isMuted ? (
+                  <div className="flex items-center gap-2 px-4 py-3 rounded-xl"
+                    style={{ background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.15)' }}>
+                    <span>🔇</span>
+                    <p className="text-[12px]" style={{ color: 'rgba(251,191,36,0.7)' }}>Tu es muté — impossible d'envoyer des messages.</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-2 mb-2 px-1">
+                      <div className="w-1.5 h-1.5 rounded-full flex-shrink-0 bg-blue-400/60" />
+                      <span className="text-[10px]" style={{ color: 'rgba(196,181,253,0.35)' }}>
+                        Pose ta question à l'équipe <strong style={{ color: 'rgba(147,197,253,0.6)' }}>ScaleFlow</strong>
+                      </span>
+                    </div>
+                    <div className="flex items-end gap-3">
+                      <Avatar url={profile.avatar_url} name={profile.display_name || '?'} userId={user.id} size={32} />
+                      <div className="flex-1 flex items-end gap-2 rounded-xl px-3.5 py-2.5"
+                        style={{ background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.2)' }}>
+                        <textarea value={chatDraft} onChange={e => setChatDraft(e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendSupport() } }}
+                          onInput={e => { const el = e.currentTarget; el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 120) + 'px' }}
+                          placeholder={profile.display_name ? 'Pose ta question… (⏎ pour envoyer)' : 'Définis ton pseudo d\'abord…'}
+                          rows={1} maxLength={1000}
+                          className="flex-1 bg-transparent text-[13px] text-white resize-none outline-none leading-relaxed"
+                          style={{ minHeight: 22, maxHeight: 120 }} />
+                        <button onClick={sendSupport} disabled={!chatDraft.trim() || chatSending}
+                          className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-white transition-all disabled:opacity-30 active:scale-90"
+                          style={{ background: 'linear-gradient(135deg,#2563eb,#7c3aed)', boxShadow: '0 2px 12px rgba(37,99,235,0.3)' }}>
+                          {chatSending ? <Spinner size="sm" /> : <span className="text-sm">↑</span>}
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            </>
+          )}
+        </div>
       )}
 
-      {/* Profile modal */}
       {showProfile && (
-        <ProfileModal
-          profile={profile} userId={user.id}
+        <ProfileModal profile={profile} userId={user.id}
           onClose={() => setShowProfile(false)}
-          onSaved={p => { setProfile(p); setShowProfile(false) }}
-        />
+          onSaved={p => { setProfile(p); setShowProfile(false) }} />
+      )}
+
+      {showMuteModal && muteTarget && (
+        <MuteModal targetName={muteTarget.name}
+          onMute={minutes => muteUser(muteTarget.id, minutes)}
+          onClose={() => { setShowMuteModal(false); setMuteTarget(null) }} />
       )}
     </div>
   )
