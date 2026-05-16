@@ -474,13 +474,33 @@ button, a, input, select, textarea {
   animation: sf-beam-fade var(--beam-dur, 2.4s) ease-out var(--beam-delay, 0s) both;
 }
 
-/* Active nav item */
+/* Active nav item — premium filled style */
 .sf-nav-active {
-  background: linear-gradient(90deg, rgba(139,92,246,0.18) 0%, rgba(139,92,246,0.05) 100%) !important;
-  box-shadow: inset 2.5px 0 0 #a78bfa, 0 1px 8px rgba(139,92,246,0.08);
+  background: linear-gradient(135deg, rgba(139,92,246,0.22) 0%, rgba(124,58,237,0.12) 50%, rgba(139,92,246,0.08) 100%) !important;
+  box-shadow:
+    inset 0 0 0 1px rgba(139,92,246,0.22),
+    0 2px 12px rgba(139,92,246,0.12),
+    0 0 0 0.5px rgba(0,0,0,0.2);
   color: #ede8ff !important;
+  position: relative;
+}
+.sf-nav-active::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 20%; bottom: 20%;
+  width: 2.5px;
+  background: linear-gradient(180deg, #c4b5fd, #a78bfa, #c4b5fd);
+  border-radius: 0 2px 2px 0;
+  box-shadow: 0 0 8px rgba(167,139,250,0.8);
 }
 .sf-nav-active svg { color: #c4b5fd !important; }
+
+/* Sidebar nav — hide scrollbar but keep scroll */
+.sf-sidebar-nav {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.sf-sidebar-nav::-webkit-scrollbar { display: none; }
 
 /* Section divider */
 .sf-divider {
