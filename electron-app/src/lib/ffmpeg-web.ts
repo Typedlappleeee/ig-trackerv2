@@ -440,15 +440,19 @@ export async function runFfmpegRemixAIWeb(opts: {
     const afmt = 'aformat=sample_rates=44100:channel_layouts=stereo'
 
     const drawFilters = opts.textOverlays.map(ov => {
-      const q        = String.fromCharCode(39)
-      const escaped  = ov.text
-        .replace(/'/g, q)
-        .replace(/:/g, '\\:')
+      // FFmpeg filter escaping (no shell — direct to WASM):
+      // backslash first, then colon (option separator), then brackets (pad labels)
+      const escaped = ov.text
         .replace(/\\/g, '\\\\')
+        .replace(/:/g,  '\\:')
+        .replace(/'/g,  "\\'")
+        .replace(/\[/g, '\\[')
+        .replace(/\]/g, '\\]')
       const borderPx = Math.max(3, Math.round(ov.fontSize * 0.09))
       const shadow   = ov.shadow !== false ? ':shadowx=4:shadowy=4:shadowcolor=black@0.7' : ''
       const fontFile = ov.bold ? 'font-bold.ttf' : 'font.ttf'
-      return `drawtext=text=${q}${escaped}${q}:fontfile=${fontFile}:fontsize=${ov.fontSize}:fontcolor=${ov.fontColor}:x=${ov.x}:y=${ov.y}:borderw=${borderPx}:bordercolor=black@1.0${shadow}:enable=${q}between(t,${ov.startTime},${ov.endTime})${q}`
+      // Use \: escaping only — no single-quote wrapping (unreliable in ffmpeg.wasm)
+      return `drawtext=text=${escaped}:fontfile=${fontFile}:fontsize=${ov.fontSize}:fontcolor=${ov.fontColor}:x=${ov.x}:y=${ov.y}:borderw=${borderPx}:bordercolor=black@1.0${shadow}:enable=between(t,${ov.startTime},${ov.endTime})`
     }).join(',')
 
     const filterComplex = [
