@@ -978,7 +978,7 @@ export async function loginInstagramAccount(
       const xml2 = await dumpXml(bearer, phoneId)
       log(`📋 XML après "Try another way" (${xml2.length} chars)`)
 
-      // Tap "Authentication app" / "Authenticator app"
+      // Tap "Authentication app" radio option to select it
       const authAppPt =
         findByText(xml2,
           'Authentication app', 'Authenticator app',
@@ -987,19 +987,18 @@ export async function loginInstagramAccount(
         ) ?? [Math.floor(sw / 2), Math.floor(sh * 0.45)]
       log(`   Tap "Authentication app" à [${authAppPt[0]},${authAppPt[1]}]…`)
       await shellExec(bearer, phoneId, `input tap ${authAppPt[0]} ${authAppPt[1]}`)
-      await sleep(4000)
+      await sleep(1500)
 
-      // Instagram shows an intermediate info screen with a "Continue" button before the code field
+      // "Continue" is on the same screen — tap it to confirm the selection
       const xml2b = await dumpXml(bearer, phoneId)
-      log(`📋 XML après "Authentication app" (${xml2b.length} chars)`)
+      log(`📋 XML avec bouton Continue (${xml2b.length} chars)`)
       const continuePt =
-        findByText(xml2b, 'Continue', 'Continuer', 'Next', 'Suivant', 'OK', 'Got it') ??
-        findByResourceId(xml2b, 'continue_button', 'next_button', 'ok_button')
-      if (continuePt) {
-        log(`   Tap "Continue" à [${continuePt[0]},${continuePt[1]}]…`)
-        await shellExec(bearer, phoneId, `input tap ${continuePt[0]} ${continuePt[1]}`)
-        await sleep(3000)
-      }
+        findByText(xml2b, 'Continue', 'Continuer', 'Next', 'Suivant') ??
+        findByResourceId(xml2b, 'continue_button', 'next_button') ??
+        [Math.floor(sw / 2), Math.floor(sh * 0.88)]
+      log(`   Tap "Continue" à [${continuePt[0]},${continuePt[1]}]…`)
+      await shellExec(bearer, phoneId, `input tap ${continuePt[0]} ${continuePt[1]}`)
+      await sleep(4000)
 
       // Now we should be on the TOTP code entry screen — reuse existing 2FA logic
       xml = await dumpXml(bearer, phoneId)
