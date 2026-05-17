@@ -16,7 +16,7 @@ import { CreditContext, fetchBalance, fetchOrgBalance, maybeGrantMonthlyCredits 
 // ── ScaleFlow logo SVG ────────────────────────────────────────────────────────
 function ScaleFlowLogoSVG({ size = 96, draw = false }: { size?: number; draw?: boolean }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <svg width={size} height={size} viewBox="0 0 100 100" fill="none" overflow="visible" xmlns="http://www.w3.org/2000/svg">
       <defs>
         <linearGradient id="sp-g" x1="50" y1="5" x2="50" y2="95" gradientUnits="userSpaceOnUse">
           <stop offset="0%"   stopColor="#60a5fa"/>
@@ -220,23 +220,14 @@ function FlameOverlay() {
 const SPLASH_DURATION = 3600
 
 // Pre-computed burst particles (angle → px/py offset in px)
-const SF_PARTICLES = [
-  { px: 90,  py: 0,   size: 4, dur: '0.92s', delay: '0.74s', col: '#ec4899' },
-  { px: 70,  py: 28,  size: 2, dur: '0.76s', delay: '0.79s', col: '#8b5cf6' },
-  { px: 78,  py: 78,  size: 3, dur: '1.02s', delay: '0.71s', col: '#3b82f6' },
-  { px: 30,  py: 74,  size: 2, dur: '0.82s', delay: '0.82s', col: '#ec4899' },
-  { px: 0,   py: 95,  size: 4, dur: '0.88s', delay: '0.75s', col: '#8b5cf6' },
-  { px: -37, py: 88,  size: 2, dur: '0.93s', delay: '0.84s', col: '#3b82f6' },
-  { px: -70, py: 70,  size: 3, dur: '0.79s', delay: '0.73s', col: '#ec4899' },
-  { px: -76, py: 31,  size: 2, dur: '0.90s', delay: '0.86s', col: '#8b5cf6' },
-  { px: -95, py: 0,   size: 4, dur: '0.84s', delay: '0.77s', col: '#3b82f6' },
-  { px: -67, py: -27, size: 2, dur: '0.97s', delay: '0.88s', col: '#ec4899' },
-  { px: -75, py: -75, size: 3, dur: '0.77s', delay: '0.72s', col: '#8b5cf6' },
-  { px: -29, py: -72, size: 2, dur: '0.91s', delay: '0.80s', col: '#3b82f6' },
-  { px: 0,   py: -92, size: 4, dur: '0.85s', delay: '0.78s', col: '#ec4899' },
-  { px: 37,  py: -65, size: 2, dur: '0.89s', delay: '0.83s', col: '#8b5cf6' },
-  { px: 82,  py: -82, size: 3, dur: '0.94s', delay: '0.70s', col: '#3b82f6' },
-  { px: 74,  py: -30, size: 2, dur: '0.87s', delay: '0.76s', col: '#ec4899' },
+const ORBITERS = [
+  { r: 92,  dur: 3.6, delay: 0,     cw: true,  col: '#60a5fa', size: 7 },
+  { r: 92,  dur: 3.6, delay: -1.8,  cw: true,  col: '#818cf8', size: 5 },
+  { r: 125, dur: 5.4, delay: 0,     cw: false, col: '#a855f7', size: 6 },
+  { r: 125, dur: 5.4, delay: -1.8,  cw: false, col: '#ec4899', size: 5 },
+  { r: 125, dur: 5.4, delay: -3.6,  cw: false, col: '#f472b6', size: 4 },
+  { r: 158, dur: 7.8, delay: 0,     cw: true,  col: '#34d399', size: 5 },
+  { r: 158, dur: 7.8, delay: -3.9,  cw: true,  col: '#2563eb', size: 6 },
 ]
 
 const STATUS_MSGS = [
@@ -285,81 +276,113 @@ function SplashScreen({ onDone }: { onDone: () => void }) {
         animation: 'sf-bg-breathe 3s ease-in-out 1s infinite',
       }} />
 
-      {/* ── Subtle purple grid ── */}
-      <div style={{
-        position: 'absolute', inset: 0, pointerEvents: 'none', opacity: 0.03,
-        backgroundImage: 'linear-gradient(#8b5cf6 1px, transparent 1px), linear-gradient(90deg, #8b5cf6 1px, transparent 1px)',
-        backgroundSize: '80px 80px',
-      }} />
-
-      {/* ── Horizontal scan line ── */}
-      <div style={{
-        position: 'absolute', left: 0, right: 0, height: 1.5, pointerEvents: 'none',
-        background: 'linear-gradient(90deg, transparent 0%, #8b5cf622 15%, #8b5cf699 50%, #8b5cf622 85%, transparent 100%)',
-        animation: 'sf-scan 5s linear 0.6s infinite',
-      }} />
-
-      {/* ── Light beams radiating from logo center ── */}
-      {[0, 45, 90, 135, 180, 225, 270, 315].map((angle, i) => (
-        <div key={i} className="sf-beam" style={{
-          height: 240,
-          transform: `rotate(${angle}deg)`,
-          opacity: 0,
-          ['--beam-dur' as string]: `${2.0 + (i % 3) * 0.4}s`,
-          ['--beam-delay' as string]: `${0.72 + i * 0.08}s`,
-          background: `linear-gradient(to bottom, ${i % 2 === 0 ? '#8b5cf6' : '#ec4899'}88, transparent)`,
+      {/* ── Aurora background blobs ── */}
+      {[
+        { col: 'rgba(37,99,235,0.13)',   size: 440, x: -160, y: -200, anim: 'sf-blob-a 15s ease-in-out infinite' },
+        { col: 'rgba(124,58,237,0.10)',  size: 380, x: 100,  y: 80,   anim: 'sf-blob-b 19s ease-in-out -7s infinite' },
+        { col: 'rgba(236,72,153,0.07)',  size: 320, x: -50,  y: 130,  anim: 'sf-blob-c 12s ease-in-out -4s infinite' },
+      ].map((b, i) => (
+        <div key={i} style={{
+          position: 'absolute', pointerEvents: 'none',
+          width: b.size, height: b.size * 0.65,
+          left: `calc(50% + ${b.x}px)`, top: `calc(50% + ${b.y}px)`,
+          transform: 'translate(-50%,-50%)',
+          borderRadius: '50%',
+          background: `radial-gradient(circle, ${b.col} 0%, transparent 70%)`,
+          filter: 'blur(55px)',
+          animation: b.anim,
         }} />
       ))}
 
-      {/* ── Logo area: rings + particles + logo ── */}
-      <div style={{ position: 'relative', width: 120, height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 44 }}>
+      {/* ── Logo area ── */}
+      <div style={{ position: 'relative', width: 120, height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 44, overflow: 'visible' }}>
 
-        {/* Expanding rings burst */}
-        {(['sf-ring-1', 'sf-ring-2', 'sf-ring-3'] as const).map(cls => (
-          <div key={cls} className={cls} style={{
-            position: 'absolute', inset: 0, borderRadius: '50%',
-            border: '1.5px solid #8b5cf6', pointerEvents: 'none',
+        {/* Looping pulse rings */}
+        {[
+          { delay: 0,    col: 'rgba(96,165,250,0.6)' },
+          { delay: 0.85, col: 'rgba(124,58,237,0.45)' },
+          { delay: 1.7,  col: 'rgba(236,72,153,0.35)' },
+        ].map((ring, i) => (
+          <div key={`pr-${i}`} style={{
+            position: 'absolute', top: '50%', left: '50%',
+            width: 148, height: 148, marginLeft: -74, marginTop: -74,
+            borderRadius: '50%', border: `1.5px solid ${ring.col}`,
+            pointerEvents: 'none',
+            animation: `sf-pulse-ring 2.6s ease-out ${ring.delay}s infinite`,
           }} />
         ))}
 
-        {/* Burst particles */}
-        {SF_PARTICLES.map((p, i) => (
-          <div
-            key={i}
-            className="sf-particle"
-            style={{
+        {/* Comet arcs — rotating partial SVG strokes with glow */}
+        <svg style={{ position: 'absolute', top: '50%', left: '50%', overflow: 'visible', pointerEvents: 'none', animation: 'sf-orbit-cw 5.5s linear infinite' }} width="0" height="0">
+          <defs>
+            <filter id="hg-a" x="-80%" y="-80%" width="260%" height="260%">
+              <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="b"/>
+              <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+          </defs>
+          <circle cx="0" cy="0" r="106" stroke="#60a5fa" strokeWidth="3" fill="none"
+            strokeDasharray="170 497" strokeLinecap="round" filter="url(#hg-a)" strokeOpacity="0.9"/>
+        </svg>
+
+        <svg style={{ position: 'absolute', top: '50%', left: '50%', overflow: 'visible', pointerEvents: 'none', animation: 'sf-orbit-ccw 9s linear -1.5s infinite' }} width="0" height="0">
+          <defs>
+            <filter id="hg-b" x="-80%" y="-80%" width="260%" height="260%">
+              <feGaussianBlur in="SourceGraphic" stdDeviation="3.5" result="b"/>
+              <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+          </defs>
+          <circle cx="0" cy="0" r="132" stroke="#a855f7" strokeWidth="2.5" fill="none"
+            strokeDasharray="145 685" strokeLinecap="round" filter="url(#hg-b)" strokeOpacity="0.75"/>
+        </svg>
+
+        <svg style={{ position: 'absolute', top: '50%', left: '50%', overflow: 'visible', pointerEvents: 'none', animation: 'sf-orbit-cw 13s linear -4s infinite' }} width="0" height="0">
+          <defs>
+            <filter id="hg-c" x="-80%" y="-80%" width="260%" height="260%">
+              <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="b"/>
+              <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+          </defs>
+          <circle cx="0" cy="0" r="161" stroke="#ec4899" strokeWidth="2" fill="none"
+            strokeDasharray="125 887" strokeLinecap="round" filter="url(#hg-c)" strokeOpacity="0.6"/>
+        </svg>
+
+        {/* Orbiting neon dots */}
+        {ORBITERS.map((o, i) => (
+          <div key={`orb-${i}`} style={{
+            position: 'absolute', top: '50%', left: '50%',
+            width: o.r * 2, height: o.r * 2,
+            marginLeft: -o.r, marginTop: -o.r,
+            borderRadius: '50%', pointerEvents: 'none',
+            animation: `sf-orbit-${o.cw ? 'cw' : 'ccw'} ${o.dur}s linear ${o.delay}s infinite`,
+          }}>
+            <div style={{
               position: 'absolute',
-              top: '50%', left: '50%',
-              width: p.size, height: p.size, borderRadius: '50%',
-              background: p.col,
-              boxShadow: `0 0 ${p.size * 3}px ${p.size}px ${p.col}88`,
-              marginLeft: -p.size / 2, marginTop: -p.size / 2,
-              ['--px' as string]: `${p.px}px`,
-              ['--py' as string]: `${p.py}px`,
-              ['--dur' as string]: p.dur,
-              ['--delay' as string]: p.delay,
-              pointerEvents: 'none',
-            }}
-          />
+              top: -o.size / 2, left: '50%', transform: 'translateX(-50%)',
+              width: o.size, height: o.size, borderRadius: '50%',
+              background: o.col,
+              boxShadow: `0 0 ${o.size * 2}px ${o.size}px ${o.col}88, 0 0 ${o.size * 5}px ${o.size * 2}px ${o.col}44`,
+            }} />
+          </div>
         ))}
 
         {/* ScaleFlow S logo — rounded square with spinning neon border */}
-        <div className="sf-logo-anim" style={{ position: 'relative', width: 110, height: 110 }}>
-          {/* Spinning neon border */}
+        <div className="sf-logo-anim" style={{ position: 'relative', width: 110, height: 110, zIndex: 2 }}>
+          {/* Spinning neon border — faster on splash */}
           <div className="logo-neon-ring" style={{
             position: 'absolute', inset: -3, borderRadius: 28, pointerEvents: 'none',
+            animationDuration: '2.2s',
           }} />
           {/* Outer ambient glow */}
           <div style={{
-            position: 'absolute', inset: -14, borderRadius: 36, pointerEvents: 'none',
-            background: 'radial-gradient(circle, rgba(124,58,237,0.28) 0%, transparent 70%)',
-            filter: 'blur(10px)',
+            position: 'absolute', inset: -18, borderRadius: 38, pointerEvents: 'none',
+            background: 'radial-gradient(circle, rgba(124,58,237,0.35) 0%, transparent 70%)',
+            filter: 'blur(12px)',
           }} />
           {/* Dark background square */}
           <div style={{
             position: 'absolute', inset: 0, borderRadius: 26,
             background: 'linear-gradient(145deg, #0d0820 0%, #100626 50%, #160b30 100%)',
-            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)',
+            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.07)',
           }} />
           {/* S logo */}
           <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

@@ -13,7 +13,7 @@ import { useCredits } from '@/lib/credits'
 
 function SFLogo({ size = 28 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 100 100" fill="none">
+    <svg width={size} height={size} viewBox="0 0 100 100" fill="none" overflow="visible">
       <defs>
         <linearGradient id="sfl-g" x1="50" y1="5" x2="50" y2="95" gradientUnits="userSpaceOnUse">
           <stop offset="0%"   stopColor="#60a5fa"/>
