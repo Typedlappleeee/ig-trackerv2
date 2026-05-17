@@ -919,7 +919,7 @@ export async function loginInstagramAccount(
     // ── Vérification post-connexion ────────────────────────────────────────
     xml = await dumpXml(bearer, phoneId)
     log(`📋 XML post-login (${xml.length} chars): ${xml.substring(0, 300)}`)
-    const xmlLower = xml.toLowerCase()
+    let xmlLower = xml.toLowerCase()
 
     // Still on the login page = credentials were not accepted
     const loginPageIndicators = [
@@ -991,6 +991,7 @@ export async function loginInstagramAccount(
 
       // Now we should be on the TOTP code entry screen — reuse existing 2FA logic
       xml = await dumpXml(bearer, phoneId)
+      xmlLower = xml.toLowerCase()
       log(`📋 XML écran TOTP (${xml.length} chars)`)
     }
 
