@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase, type Phone } from '@/lib/supabase'
+import { createScheduledPost, defaultSchedValue, fmtScheduledTime } from '@/lib/schedulerService'
 import { useOrg } from '@/lib/orgContext'
 import { useConnections } from '@/lib/connections'
 import { canAccessPhoneGroup } from '@/lib/permissions'
@@ -47,6 +48,8 @@ export function Posting({ user }: PostingProps) {
   const [progress, _setProgress]       = useState(s.progress)
   const [showLogs, setShowLogs]        = useState(false)
   const [showBankPicker, setShowBankPicker] = useState(false)
+  const [schedMode, setSchedMode]      = useState<'now' | 'scheduled'>('now')
+  const [schedTime, setSchedTime]      = useState(defaultSchedValue())
   const logEndRef                      = useRef<HTMLDivElement>(null)
 
   // Persist-aware setters — update both React state and module-level store
@@ -144,6 +147,37 @@ export function Posting({ user }: PostingProps) {
       log(`❌ ${e instanceof Error ? e.message : String(e)}`, 'error')
     }
     setGenerating(false)
+  }
+
+  async function schedulePost() {
+    if (!bearer)                  { log('Token GéeLark manquant — Paramètres', 'error'); return }
+    if (selectedPhones.size === 0){ log('Sélectionne au moins un téléphone', 'warn'); return }
+    if (!filePath)                { log('Sélectionne une vidéo', 'warn'); return }
+    if (!schedTime)               { log('Sélectionne une heure de programmation', 'warn'); return }
+    const scheduledAt = new Date(schedTime)
+    if (scheduledAt <= new Date()) { log('⚠ L\'heure doit être dans le futur', 'warn'); return }
+
+    const phoneList = phones.filter(p => selectedPhones.has(p.id))
+    setPosting(true); setLogs([]); setProgress(5)
+    try {
+      log('📤 Upload de la vidéo vers GéeLark…')
+      const up = await window.electronAPI!.uploadVideoGeelark({ bearer, filePath })
+      if (!up.ok || !up.token) { log(`❌ Upload échoué: ${up.error}`, 'error'); return }
+      log(`✅ Vidéo prête (token: ${up.token.slice(0, 12)}…)`, 'ok')
+      await createScheduledPost({
+        userId: user.id, orgId: currentOrg?.id ?? null, type: 'posting',
+        scheduledAt,
+        phones: phoneList.map(p => ({ id: p.id, geelark_id: p.geelark_id, phone_name: p.phone_name, ig_username: p.ig_username })),
+        videos: [{ token: up.token, title: filePath.split(/[\\/]/).pop() ?? 'video' }],
+        caption, delayMinutes: delayBetween, mode: 'seq', bearerToken: bearer,
+      })
+      log(`📅 Programmé pour ${fmtScheduledTime(scheduledAt.toISOString())} — ${phoneList.length} téléphone(s)`, 'ok')
+      setSchedMode('now')
+    } catch (err: any) {
+      log(`❌ Erreur: ${err.message}`, 'error')
+    } finally {
+      setPosting(false); setProgress(0)
+    }
   }
 
   async function post() {
@@ -488,24 +522,60 @@ export function Posting({ user }: PostingProps) {
             </div>
           )}
 
-          {/* Launch button */}
-          <div className="px-5 py-4">
+          {/* Schedule toggle + Launch */}
+          <div className="px-5 pt-3 pb-4 space-y-3">
+            {/* Mode toggle */}
+            <div className="flex gap-1 p-1 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+              <button onClick={() => setSchedMode('now')}
+                className="flex-1 py-2 rounded-lg text-[12px] font-bold transition-all"
+                style={schedMode === 'now'
+                  ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: 'white' }
+                  : { color: 'rgba(196,181,253,0.35)' }}>
+                ⚡ Maintenant
+              </button>
+              <button onClick={() => setSchedMode('scheduled')}
+                className="flex-1 py-2 rounded-lg text-[12px] font-bold transition-all"
+                style={schedMode === 'scheduled'
+                  ? { background: 'linear-gradient(130deg,#2563eb,#7c3aed)', color: 'white' }
+                  : { color: 'rgba(196,181,253,0.35)' }}>
+                📅 Programmer
+              </button>
+            </div>
+            {/* Datetime picker */}
+            {schedMode === 'scheduled' && (
+              <div>
+                <label className="text-[10px] uppercase tracking-[0.15em] font-black mb-1.5 block" style={{ color: 'rgba(37,99,235,0.8)' }}>
+                  Heure locale
+                </label>
+                <input type="datetime-local" value={schedTime}
+                  onChange={e => setSchedTime(e.target.value)}
+                  min={new Date().toISOString().slice(0, 16)}
+                  className="w-full rounded-xl px-3.5 py-2.5 text-sm text-white outline-none sf-input" />
+              </div>
+            )}
+            {/* Action button */}
             <button
-              onClick={post}
-              disabled={posting || !bearer || selectedPhones.size === 0 || !filePath}
+              onClick={schedMode === 'now' ? post : schedulePost}
+              disabled={posting || !bearer || selectedPhones.size === 0 || !filePath || (schedMode === 'scheduled' && !schedTime)}
               className="w-full py-3.5 rounded-xl text-sm font-black text-white transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
               style={{
                 background: posting || !bearer || selectedPhones.size === 0 || !filePath
                   ? '#1a2035'
-                  : 'linear-gradient(130deg,#7c3aed,#ec4899)',
+                  : schedMode === 'scheduled'
+                    ? 'linear-gradient(130deg,#2563eb,#7c3aed)'
+                    : 'linear-gradient(130deg,#7c3aed,#ec4899)',
                 boxShadow: posting || !bearer || selectedPhones.size === 0 || !filePath
                   ? 'none'
-                  : '0 4px 24px -4px rgba(124,58,237,0.5)',
+                  : schedMode === 'scheduled'
+                    ? '0 4px 24px -4px rgba(37,99,235,0.5)'
+                    : '0 4px 24px -4px rgba(124,58,237,0.5)',
               }}
             >
               {posting
-                ? `⏳ En cours (${selectedPhones.size} téléphones)…`
-                : `⚡ Lancer le posting — ${selectedPhones.size} compte${selectedPhones.size !== 1 ? 's' : ''}`}
+                ? schedMode === 'scheduled' ? '📤 Upload en cours…' : `⏳ En cours (${selectedPhones.size} téléphones)…`
+                : schedMode === 'scheduled'
+                  ? `📅 Programmer — ${selectedPhones.size} compte${selectedPhones.size !== 1 ? 's' : ''}`
+                  : `⚡ Lancer — ${selectedPhones.size} compte${selectedPhones.size !== 1 ? 's' : ''}`}
             </button>
           </div>
         </div>

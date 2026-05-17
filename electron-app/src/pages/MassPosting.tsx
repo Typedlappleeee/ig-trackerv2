@@ -14,6 +14,7 @@ import {
 } from '@/lib/massPostingStore'
 import { playSuccess } from '@/lib/sounds'
 import { checkAndDeductCredits, CREDIT_COSTS, useCredits } from '@/lib/credits'
+import { createScheduledPost, defaultSchedValue, fmtScheduledTime } from '@/lib/schedulerService'
 
 interface MassPostingProps { user: User }
 
@@ -77,6 +78,8 @@ export function MassPosting({ user }: MassPostingProps) {
   const [groups, setGroups]               = useState<string[]>(['Tous'])
   const [phoneSearch, setPhoneSearch]     = useState('')
   const [showBankPicker, setShowBankPicker] = useState(false)
+  const [schedMode, setSchedMode] = useState<'now' | 'scheduled'>('now')
+  const [schedTime, setSchedTime] = useState(defaultSchedValue())
   const stopRef                           = useRef(false)
   const activePhonesRef                   = useRef<string[]>([])
   const activeTasksRef                    = useRef<string[]>([])
@@ -235,6 +238,41 @@ export function MassPosting({ user }: MassPostingProps) {
       log(`❌ ${e instanceof Error ? e.message : String(e)}`, 'error')
     }
     setGenerating(false)
+  }
+
+  async function scheduleMassPost() {
+    if (!bearer)                    { log('Token GéeLark manquant — Paramètres', 'error'); return }
+    if (phoneList.length === 0)     { log('Sélectionne au moins un téléphone', 'warn'); return }
+    if (selectedVideos.length === 0){ log('Sélectionne au moins une vidéo', 'warn'); return }
+    if (!schedTime)                 { log('Sélectionne une heure de programmation', 'warn'); return }
+    const scheduledAt = new Date(schedTime)
+    if (scheduledAt <= new Date())  { log('⚠ L\'heure doit être dans le futur', 'warn'); return }
+
+    setPosting(true); setLogs([])
+    try {
+      log(`📤 Upload de ${selectedVideos.length} vidéo(s) vers GéeLark…`)
+      const tokenMap = new Map<number, string>()
+      for (let i = 0; i < selectedVideos.length; i++) {
+        const sv = selectedVideos[i]
+        const up = await window.electronAPI!.uploadVideoGeelark({ bearer, filePath: sv.path })
+        if (!up.ok || !up.token) { log(`❌ Upload échoué pour ${sv.title}: ${up.error}`, 'error'); return }
+        tokenMap.set(i, up.token)
+        log(`✅ Vidéo ${i + 1}/${selectedVideos.length} prête`, 'ok')
+      }
+      await createScheduledPost({
+        userId: user.id, orgId: currentOrg?.id ?? null, type: 'mass_posting',
+        scheduledAt,
+        phones: phoneList.map(p => ({ id: p.id, geelark_id: p.geelark_id, phone_name: p.phone_name, ig_username: p.ig_username })),
+        videos: selectedVideos.map((v, i) => ({ token: tokenMap.get(i)!, title: v.title })),
+        caption, delayMinutes: 0, mode, bearerToken: bearer,
+      })
+      log(`📅 Programmé pour ${fmtScheduledTime(scheduledAt.toISOString())} — ${phoneList.length} téléphone(s)`, 'ok')
+      setSchedMode('now')
+    } catch (err: any) {
+      log(`❌ Erreur: ${err.message}`, 'error')
+    } finally {
+      setPosting(false)
+    }
   }
 
   async function post() {
@@ -460,30 +498,64 @@ export function MassPosting({ user }: MassPostingProps) {
             ))}
           </div>
 
+          {/* Mode toggle */}
+          <div className="flex gap-1 p-0.5 rounded-lg" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+            <button onClick={() => setSchedMode('now')}
+              className="px-3 py-1.5 rounded-md text-[11px] font-bold transition-all"
+              style={schedMode === 'now'
+                ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: 'white' }
+                : { color: 'rgba(196,181,253,0.4)' }}>
+              ⚡ Maintenant
+            </button>
+            <button onClick={() => setSchedMode('scheduled')}
+              className="px-3 py-1.5 rounded-md text-[11px] font-bold transition-all"
+              style={schedMode === 'scheduled'
+                ? { background: 'linear-gradient(130deg,#2563eb,#7c3aed)', color: 'white' }
+                : { color: 'rgba(196,181,253,0.4)' }}>
+              📅 Programmer
+            </button>
+          </div>
           {/* Action buttons */}
           <button
-            onClick={post}
-            disabled={posting || !bearer || phoneList.length === 0 || selectedVideos.length === 0}
+            onClick={schedMode === 'now' ? post : scheduleMassPost}
+            disabled={posting || !bearer || phoneList.length === 0 || selectedVideos.length === 0 || (schedMode === 'scheduled' && !schedTime)}
             className="px-4 py-2 rounded-xl text-xs font-black text-white transition-all active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed"
             style={{
               background: posting || !bearer || phoneList.length === 0 || selectedVideos.length === 0
                 ? '#1a2035'
-                : 'linear-gradient(130deg,#7c3aed,#ec4899)',
+                : schedMode === 'scheduled'
+                  ? 'linear-gradient(130deg,#2563eb,#7c3aed)'
+                  : 'linear-gradient(130deg,#7c3aed,#ec4899)',
               boxShadow: posting || !bearer || phoneList.length === 0 || selectedVideos.length === 0
                 ? 'none'
                 : '0 4px 20px -4px rgba(124,58,237,0.5)',
             }}
           >
-            {posting ? '⏳ En cours…' : '⚡ Lancer'}
+            {posting
+              ? schedMode === 'scheduled' ? '📤 Upload…' : '⏳ En cours…'
+              : schedMode === 'scheduled' ? '📅 Programmer' : '⚡ Lancer'}
           </button>
           <button
             onClick={stop}
-            disabled={!posting}
+            disabled={!posting || schedMode === 'scheduled'}
             className="px-3 py-2 rounded-xl text-xs font-semibold text-danger border border-danger/30 hover:bg-danger/10 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
           >
             ⏹ Stopper
           </button>
         </div>
+
+        {/* Datetime picker (schedule mode) */}
+        {schedMode === 'scheduled' && (
+          <div className="flex items-center gap-3 px-1">
+            <label className="text-[10px] uppercase tracking-widest font-black flex-shrink-0" style={{ color: 'rgba(37,99,235,0.8)' }}>
+              📅 Heure locale
+            </label>
+            <input type="datetime-local" value={schedTime}
+              onChange={e => setSchedTime(e.target.value)}
+              min={new Date().toISOString().slice(0, 16)}
+              className="flex-1 rounded-xl px-3 py-2 text-sm text-white outline-none sf-input" />
+          </div>
+        )}
 
         {/* Description row */}
         <div className="flex items-center gap-2">

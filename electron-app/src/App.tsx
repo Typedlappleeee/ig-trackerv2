@@ -499,6 +499,7 @@ import { AiTools }           from '@/pages/AiTools'
 import { Autocomment }       from '@/pages/Autocomment'
 import { Settings }          from '@/pages/Settings'
 import { MassPosting }       from '@/pages/MassPosting'
+import { Scheduler }         from '@/pages/Scheduler'
 import { Warmup }            from '@/pages/Warmup'
 import { TextCopy }          from '@/pages/TextCopy'
 import { Licences }          from '@/pages/Licences'
@@ -655,6 +656,7 @@ function AppContent({ user }: { user: User }) {
       case 'stats':        return <BugScreen />
       case 'posting':      return <Posting     user={user} />
       case 'massposting':  return <MassPosting user={user} />
+      case 'scheduler':    return <Scheduler   user={user} />
       case 'bank':         return <Bank        user={user} />
       case 'warmup':       return <Warmup      user={user} />
       case 'montage':      return <Montage     user={user} />
