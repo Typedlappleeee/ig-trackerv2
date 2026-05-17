@@ -36,7 +36,7 @@ export interface UserItem {
 export type OrgRole = 'owner' | 'admin' | 'member' | 'viewer'
 
 export type PageKey =
-  | 'dashboard' | 'phones' | 'stats' | 'posting' | 'massposting'
+  | 'dashboard' | 'phones' | 'stats' | 'posting' | 'massposting' | 'scheduler'
   | 'bank' | 'autocomment' | 'warmup' | 'aitools' | 'montage' | 'remix' | 'settings'
 
 // Per-member overrides on top of role defaults.
@@ -49,10 +49,11 @@ export interface PermOverrides {
 }
 
 export interface Organization {
-  id:         string
-  name:       string
-  owner_id:   string
-  created_at: string
+  id:              string
+  name:            string
+  owner_id:        string
+  created_at:      string
+  name_updated_at: string | null
 }
 
 export interface OrgMember {

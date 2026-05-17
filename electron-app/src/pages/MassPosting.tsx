@@ -11,9 +11,12 @@ import { BankPicker } from './Bank'
 import {
   getMassPostingState, setMassPostingState, subscribeMassPosting,
   type TaskLog, type TaskStatus, type SelectedVideo,
+  resetMassPosting,
 } from '@/lib/massPostingStore'
 import { playSuccess } from '@/lib/sounds'
 import { checkAndDeductCredits, CREDIT_COSTS, useCredits } from '@/lib/credits'
+import { createScheduledPost, fmtScheduledTime } from '@/lib/schedulerService'
+import { ScheduleModal } from '@/components/ScheduleModal'
 
 interface MassPostingProps { user: User }
 
@@ -38,10 +41,21 @@ const STATUS_LABEL: Record<TaskStatus['status'], string> = {
 }
 
 async function geelark(bearer: string, path: string, body: unknown) {
-  const r = await window.electronAPI!.geelarkRequest({
-    method: 'POST', url: `${GEELARK}${path}`,
-    headers: { Authorization: `Bearer ${bearer}` }, body,
+  const url     = `${GEELARK}${path}`
+  const headers = { Authorization: `Bearer ${bearer}` }
+  if (window.electronAPI?.geelarkRequest) {
+    const r = await window.electronAPI.geelarkRequest({ method: 'POST', url, headers, body })
+    return r.data as Record<string, unknown>
+  }
+  // Web: route through Vercel proxy
+  const res = await fetch('/api/geelark', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ method: 'POST', url, headers, body }),
   })
+  if (!res.ok) throw new Error(`Proxy HTTP ${res.status}`)
+  const r = await res.json()
+  if (!r.ok) throw new Error(r.error ?? 'Network error')
   return r.data as Record<string, unknown>
 }
 
@@ -66,6 +80,7 @@ export function MassPosting({ user }: MassPostingProps) {
   const [groups, setGroups]               = useState<string[]>(['Tous'])
   const [phoneSearch, setPhoneSearch]     = useState('')
   const [showBankPicker, setShowBankPicker] = useState(false)
+  const [showScheduleModal, setShowScheduleModal] = useState(false)
   const stopRef                           = useRef(false)
   const activePhonesRef                   = useRef<string[]>([])
   const activeTasksRef                    = useRef<string[]>([])
@@ -226,6 +241,40 @@ export function MassPosting({ user }: MassPostingProps) {
     setGenerating(false)
   }
 
+  async function scheduleMassPost(scheduledAt: Date) {
+    if (!bearer)                    { log('Token GéeLark manquant — Paramètres', 'error'); return }
+    if (phoneList.length === 0)     { log('Sélectionne au moins un téléphone', 'warn'); return }
+    if (selectedVideos.length === 0){ log('Sélectionne au moins une vidéo', 'warn'); return }
+    setShowScheduleModal(false)
+    setPosting(true); setLogs([])
+    try {
+      log(`📤 Upload de ${selectedVideos.length} vidéo(s) vers GéeLark…`)
+      const tokenMap = new Map<number, string>()
+      for (let i = 0; i < selectedVideos.length; i++) {
+        const sv = selectedVideos[i]
+        const filePath = sv.localPath ?? sv.item.file_url
+        if (!filePath) { log(`❌ Chemin manquant pour ${sv.item.title}`, 'error'); return }
+        const up = await window.electronAPI!.uploadVideoGeelark({ bearer, filePath })
+        if (!up.ok || !up.token) { log(`❌ Upload échoué pour ${sv.item.title}: ${up.error}`, 'error'); return }
+        tokenMap.set(i, up.token)
+        log(`✅ Vidéo ${i + 1}/${selectedVideos.length} prête`, 'ok')
+      }
+      await createScheduledPost({
+        userId: user.id, orgId: currentOrg?.id ?? null,
+        createdByName: user.email?.split('@')[0] ?? 'Moi',
+        type: 'mass_posting', scheduledAt,
+        phones: phoneList.map(p => ({ id: p.id, geelark_id: p.geelark_id, phone_name: p.phone_name, ig_username: p.ig_username })),
+        videos: selectedVideos.map((v, i) => ({ token: tokenMap.get(i)!, title: v.item.title })),
+        caption, delayMinutes: 0, mode, bearerToken: bearer,
+      })
+      log(`📅 Programmé pour ${fmtScheduledTime(scheduledAt.toISOString())} — ${phoneList.length} téléphone(s)`, 'ok')
+    } catch (err: any) {
+      log(`❌ Erreur: ${err.message}`, 'error')
+    } finally {
+      setPosting(false)
+    }
+  }
+
   async function post() {
     if (!bearer)                  { log('Token GéeLark manquant — Paramètres', 'error'); return }
     if (phoneList.length === 0)   { log('Sélectionne au moins un téléphone', 'warn'); return }
@@ -322,6 +371,15 @@ export function MassPosting({ user }: MassPostingProps) {
           activeTasksRef.current = [...activeTasksRef.current, tid]
           setPhoneStatus(asgn.phone.id, { status: 'posting', taskId: tid })
           log(`  ✅ Tâche créée pour ${asgn.phone.phone_name}`, 'ok')
+          // Auto-stop after 5 minutes regardless of task status
+          setTimeout(() => {
+            if (activePhonesRef.current.includes(asgn.phone.geelark_id)) {
+              geelark(bearer, '/phone/stop', { ids: [asgn.phone.geelark_id] })
+                .then(() => log(`  ⏱️ ${asgn.phone.phone_name} éteint (timeout 5min)`, 'warn'))
+                .catch(() => {})
+              activePhonesRef.current = activePhonesRef.current.filter(id => id !== asgn.phone.geelark_id)
+            }
+          }, 5 * 60 * 1000)
         } else {
           log(`  ❌ ${asgn.phone.phone_name}: ${taskRes['msg'] ?? taskRes['code']}`, 'error')
           setPhoneStatus(asgn.phone.id, { status: 'error', detail: String(taskRes['msg'] ?? taskRes['code']) })
@@ -332,7 +390,7 @@ export function MassPosting({ user }: MassPostingProps) {
       if (Object.keys(taskIds).length > 0) {
         log(`⏳ Suivi de ${Object.keys(taskIds).length} tâche(s)…`)
         const pending = new Set(Object.values(taskIds))
-        const deadline = Date.now() + 8 * 60 * 1000
+        const deadline = Date.now() + 6 * 60 * 1000
         const STATUS: Record<number, string> = { 1: '⏳ En attente', 2: '🔄 En cours', 3: '✅ Terminé', 4: '❌ Échoué', 7: '🚫 Annulé' }
 
         let pollCount = 0
@@ -395,7 +453,13 @@ export function MassPosting({ user }: MassPostingProps) {
         log(`🛑 Arrêt des ${remaining.length} téléphone(s) restant(s)…`)
         await geelark(bearer, '/phone/stop', { ids: remaining })
       }
-      log('🎉 Terminé !', 'ok')
+
+      // Mark every phone as done
+      for (const p of phoneList) setPhoneStatus(p.id, { status: 'done' })
+
+      log('🎉 Terminé ! Réinitialisation dans 5s…', 'ok')
+      await new Promise(r => setTimeout(r, 5000))
+      resetMassPosting()
 
     } catch (e: unknown) {
       log(`❌ Erreur: ${e instanceof Error ? e.message : String(e)}`, 'error')
@@ -419,176 +483,163 @@ export function MassPosting({ user }: MassPostingProps) {
   const withSessions = phones.filter(p => p.ig_sessionid).length
 
   return (
-    <div className="flex flex-col h-full min-h-screen">
-      {/* Header */}
-      <div className="px-6 py-4 border-b border-border flex flex-col gap-3 flex-shrink-0" style={{ background: '#06080e' }}>
+    <div className="h-full flex flex-col overflow-hidden">
+      {/* Page header */}
+      <div className="flex-shrink-0 px-10 pt-9 pb-7 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        <div>
+          <h1 className="text-[28px] font-black text-white leading-none">Mass Posting</h1>
+          <p className="text-[13px] text-text2 mt-0.5">
+            {phoneList.length} cible{phoneList.length !== 1 ? 's' : ''} · {selectedVideos.length} vidéo{selectedVideos.length !== 1 ? 's' : ''}
+            {withSessions > 0 && <span className="ml-2 text-ok">· {withSessions} session IG</span>}
+          </p>
+        </div>
         <div className="flex items-center gap-3">
-          {/* Title block */}
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-            style={{ background: 'linear-gradient(135deg,#7c3aed22,#ec489922)', border: '1px solid rgba(139,92,246,0.2)' }}>
-            <span className="text-base">⚡</span>
-          </div>
-          <div>
-            <h1 className="text-lg font-black text-text tracking-tight">Mass Posting</h1>
-            <p className="text-text2 text-[11px]">
-              {phoneList.length} cible{phoneList.length !== 1 ? 's' : ''} · {selectedVideos.length} vidéo{selectedVideos.length !== 1 ? 's' : ''}
-              {withSessions > 0 && <span className="ml-2 text-ok">· {withSessions} session IG</span>}
-            </p>
-          </div>
-          <div className="flex-1" />
-
           {/* Mode toggle */}
-          <div className="flex rounded-lg p-0.5 text-xs" style={{ background: '#0d0f1c', border: '1px solid #1a2035' }}>
+          <div className="flex rounded-xl p-1 gap-1" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
             {([{ k: 'seq', l: 'Séquentiel' }, { k: 'random', l: 'Aléatoire' }] as const).map(m => (
               <button key={m.k} onClick={() => setMode(m.k)}
-                className="px-3 py-1.5 rounded-md font-semibold transition-all text-[11px]"
+                className="px-4 py-2 rounded-lg text-[13px] font-semibold transition-all"
                 style={mode === m.k
                   ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: 'white' }
-                  : { color: '#5a6882' }}
+                  : { color: 'rgba(148,163,184,0.7)' }}
               >{m.l}</button>
             ))}
           </div>
-
-          {/* Action buttons */}
-          <button
-            onClick={post}
-            disabled={posting || !bearer || phoneList.length === 0 || selectedVideos.length === 0}
-            className="px-4 py-2 rounded-xl text-xs font-black text-white transition-all active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed"
-            style={{
-              background: posting || !bearer || phoneList.length === 0 || selectedVideos.length === 0
-                ? '#1a2035'
-                : 'linear-gradient(130deg,#7c3aed,#ec4899)',
-              boxShadow: posting || !bearer || phoneList.length === 0 || selectedVideos.length === 0
-                ? 'none'
-                : '0 4px 20px -4px rgba(124,58,237,0.5)',
-            }}
-          >
-            {posting ? '⏳ En cours…' : '⚡ Lancer'}
-          </button>
           <button
             onClick={stop}
             disabled={!posting}
-            className="px-3 py-2 rounded-xl text-xs font-semibold text-danger border border-danger/30 hover:bg-danger/10 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+            className="rounded-xl px-5 py-2.5 text-[13px] font-semibold transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+            style={{ background: 'rgba(239,68,68,0.08)', color: '#f87171', border: '1px solid rgba(239,68,68,0.2)' }}
           >
             ⏹ Stopper
           </button>
-        </div>
-
-        {/* Description row */}
-        <div className="flex items-center gap-2">
-          <textarea
-            value={caption}
-            onChange={e => setCaption(e.target.value)}
-            rows={2}
-            placeholder="Description partagée par tous les téléphones (optionnel)…"
-            className="flex-1 bg-[#0a0c15] border border-border rounded-xl px-3 py-2 text-xs text-text placeholder:text-text2 resize-none focus:outline-none focus:border-[#8b5cf6]/50"
-          />
-          <span className={`text-[10px] font-mono ${caption.length > 2200 ? 'text-danger' : 'text-text2'}`}>
-            {caption.length}/2200
-          </span>
-          <Button size="sm" variant="secondary" onClick={generateCaption} loading={generating} disabled={!groqKey}>✨ IA</Button>
-          <input type="text" value={customPrompt} onChange={e => setCustomPrompt(e.target.value)}
-            placeholder="Prompt…"
-            className="w-28 bg-[#0a0c15] border border-border rounded-lg px-2 py-1.5 text-[11px] text-text placeholder:text-text2 focus:outline-none focus:border-[#8b5cf6]/50"
-          />
           <button
-            onClick={() => setWithHashtags(v => !v)}
-            className="relative w-8 h-4 rounded-full transition-all flex-shrink-0"
-            style={{ background: withHashtags ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : '#1a2035' }}
-            title="Hashtags"
+            onClick={() => setShowScheduleModal(true)}
+            disabled={posting || !bearer || phoneList.length === 0 || selectedVideos.length === 0}
+            className="rounded-xl px-5 py-2.5 text-[13px] font-semibold transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(37,99,235,0.3)', color: '#60a5fa' }}
           >
-            <span className={`absolute top-0.5 w-3 h-3 bg-white rounded-full shadow transition-all ${withHashtags ? 'left-[18px]' : 'left-0.5'}`} />
+            📅 Programmer
           </button>
-          <span className="text-[10px] text-text2">#</span>
+          <button
+            onClick={post}
+            disabled={posting || !bearer || phoneList.length === 0 || selectedVideos.length === 0}
+            className="rounded-xl px-5 py-2.5 text-[13px] font-black text-white transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
+            style={{
+              background: posting || !bearer || phoneList.length === 0 || selectedVideos.length === 0
+                ? 'rgba(255,255,255,0.06)' : 'linear-gradient(130deg,#7c3aed,#ec4899)',
+              boxShadow: posting || !bearer || phoneList.length === 0 || selectedVideos.length === 0
+                ? 'none' : '0 4px 20px -4px rgba(124,58,237,0.5)',
+            }}>
+            {posting ? '⏳ En cours…' : '⚡ Lancer'}
+          </button>
         </div>
       </div>
 
       {!bearer && (
-        <div className="mx-8 mt-4 px-4 py-3 rounded-lg bg-warn/10 border border-warn/20 text-warn text-sm flex-shrink-0">
+        <div className="flex-shrink-0 mx-10 mt-6 px-5 py-4 rounded-2xl text-[13px] text-warn"
+          style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)' }}>
           ⚠ Token GéeLark manquant — configure-le dans Paramètres.
         </div>
       )}
 
-      {/* 3-column grid */}
+      {/* 3-column body */}
       <div className="flex-1 overflow-hidden flex min-h-0">
 
         {/* ── Column 1: Videos ─────────────────────────────────────────────── */}
-        <div className="w-72 flex-shrink-0 flex flex-col border-r border-border" style={{ background: '#0a0d15' }}>
-          <div className="px-4 py-3 border-b border-border flex items-center justify-between">
-            <p className="text-sm font-bold text-text">🎬 Vidéos</p>
-            <span className="text-xs text-text2">{selectedVideos.length} sélectionnée(s)</span>
+        <aside className="w-72 flex-shrink-0 flex flex-col" style={{ borderRight: '1px solid rgba(255,255,255,0.06)', background: '#07090f' }}>
+          <div className="flex-shrink-0 px-5 pt-5 pb-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+            <div className="flex items-center justify-between mb-4">
+              <p className="text-[15px] font-bold text-white">Vidéos</p>
+              <span className="text-[12px] font-semibold px-2.5 py-0.5 rounded-full text-white"
+                style={{ background: selectedVideos.length > 0 ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.07)' }}>
+                {selectedVideos.length}
+              </span>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => pickLocalFile(-1)}
+                className="flex-1 flex items-center justify-center gap-1.5 rounded-xl px-3 py-2.5 text-[13px] font-semibold transition-colors"
+                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
+              >
+                💾 PC
+              </button>
+              <button
+                onClick={() => setShowBankPicker(true)}
+                className="flex-1 flex items-center justify-center gap-1.5 rounded-xl px-3 py-2.5 text-[13px] font-semibold transition-colors"
+                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
+              >
+                🗂 Banque
+              </button>
+            </div>
           </div>
-          {/* Source buttons */}
-          <div className="px-3 py-2 border-b border-border flex gap-2">
-            <button
-              onClick={() => pickLocalFile(-1)}
-              className="flex-1 flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg text-xs text-text2 hover:bg-surface2 border border-dashed border-border hover:border-accent/40 transition-colors"
-            >
-              <span>💻</span>
-              <span>PC</span>
-            </button>
-            <button
-              onClick={() => setShowBankPicker(true)}
-              className="flex-1 flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg text-xs text-text2 hover:bg-surface2 border border-dashed border-border hover:border-accent/40 transition-colors"
-            >
-              <span>🗂</span>
-              <span>Banque</span>
-            </button>
-          </div>
-          {/* Selected videos list */}
-          <div className="flex-1 overflow-auto py-2">
+          <div className="flex-1 overflow-auto">
             {selectedVideos.length === 0 ? (
-              <p className="px-4 py-6 text-xs text-text2 text-center">Aucune vidéo sélectionnée.</p>
+              <div className="px-5 py-10 text-center">
+                <p className="text-3xl mb-3">🎬</p>
+                <p className="text-[13px] font-bold text-white mb-1">Aucune vidéo</p>
+                <p className="text-[12px] text-text2">Ajoute depuis la banque ou le PC</p>
+              </div>
             ) : selectedVideos.map((sv, selIdx) => {
               const fp = sv.localPath ?? sv.item.file_url
               return (
                 <div
                   key={sv.item.id}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 border-b border-border/30"
+                  className="flex items-center gap-3 px-4 py-3"
+                  style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}
                 >
-                  <div className="w-10 flex-shrink-0 aspect-[9/16] rounded overflow-hidden bg-surface2">
+                  <div className="w-10 flex-shrink-0 aspect-[9/16] rounded-lg overflow-hidden"
+                    style={{ background: 'rgba(255,255,255,0.05)' }}>
                     <VideoThumbnail filePath={fp ?? ''} thumbnailPath={sv.item.thumbnail_path} storagePath={sv.item.storage_path} />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs font-bold text-accent">#{selIdx + 1}</p>
-                    <p className="text-xs text-text truncate">{sv.item.title}</p>
+                    <p className="text-[12px] font-bold" style={{ color: '#8b5cf6' }}>#{selIdx + 1}</p>
+                    <p className="text-[13px] text-white truncate">{sv.item.title}</p>
                   </div>
                   <button
                     onClick={() => setSelVideos(prev => prev.filter((_, i) => i !== selIdx))}
-                    className="text-text2 hover:text-danger text-sm flex-shrink-0"
+                    className="text-text2 hover:text-danger transition-colors flex-shrink-0 text-[14px]"
                   >✕</button>
                 </div>
               )
             })}
           </div>
-        </div>
+        </aside>
 
         {/* ── Column 2: Phones ─────────────────────────────────────────────── */}
-        <div className="w-64 flex-shrink-0 flex flex-col border-r border-border" style={{ background: '#090c14' }}>
-          <div className="px-4 py-3 border-b border-border">
-            <p className="text-sm font-bold text-text">📱 Téléphones</p>
+        <aside className="w-64 flex-shrink-0 flex flex-col" style={{ borderRight: '1px solid rgba(255,255,255,0.06)', background: '#07090f' }}>
+          <div className="flex-shrink-0 px-5 pt-5 pb-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-[15px] font-bold text-white">Téléphones</p>
+              <span className="text-[12px] font-semibold px-2.5 py-0.5 rounded-full text-white"
+                style={{ background: selectedPhones.size > 0 ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.07)' }}>
+                {selectedPhones.size}
+              </span>
+            </div>
             <select
               value={groupFilter}
               onChange={e => setGroupFilter(e.target.value)}
-              className="mt-1.5 w-full bg-surface border border-border rounded px-2 py-1 text-xs text-text focus:outline-none focus:border-accent"
+              className="w-full rounded-xl px-4 py-2.5 text-[13px] focus:outline-none mb-2"
+              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
             >
-              {groups.map(g => <option key={g} value={g}>{g}</option>)}
+              {groups.map(g => <option key={g} value={g} style={{ background: '#0d1120', color: '#e2d9f3' }}>{g}</option>)}
             </select>
             <input
-              type="text" placeholder="🔍 Rechercher…" value={phoneSearch}
+              type="text" placeholder="Rechercher…" value={phoneSearch}
               onChange={e => setPhoneSearch(e.target.value)}
-              className="mt-1.5 w-full bg-surface border border-border rounded px-2 py-1 text-xs text-text placeholder:text-text2 focus:outline-none focus:border-accent"
+              className="w-full rounded-xl px-4 py-2.5 text-[13px] placeholder:text-text2 focus:outline-none"
+              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
             />
           </div>
-          <div className="px-3 py-1.5 flex gap-3 border-b border-border">
+          <div className="flex-shrink-0 px-5 py-2.5 flex gap-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
             <button onClick={() => setSelPhones(new Set(visiblePhones.map(p => p.id)))}
-              className="text-xs text-accent hover:text-text">Tout</button>
+              className="text-[12px] font-semibold text-[#8b5cf6] hover:text-white transition-colors">Tout</button>
             <button onClick={() => setSelPhones(new Set())}
-              className="text-xs text-text2 hover:text-text">Aucun</button>
-            <span className="ml-auto text-xs text-text2">{selectedPhones.size} sél.</span>
+              className="text-[12px] text-text2 hover:text-white transition-colors">Aucun</button>
+            <span className="ml-auto text-[12px] text-text2">{visiblePhones.length} tel.</span>
           </div>
           <div className="flex-1 overflow-auto">
-            {visiblePhones.map((phone, i) => {
+            {visiblePhones.map((phone) => {
               const checked = selectedPhones.has(phone.id)
               const asgn = assignments.find(a => a.phone.id === phone.id)
               const ts = taskStatuses.get(phone.id)
@@ -596,160 +647,202 @@ export function MassPosting({ user }: MassPostingProps) {
                 <button
                   key={phone.id}
                   onClick={() => togglePhone(phone.id)}
-                  className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left border-b border-border/40 transition-colors ${
-                    checked ? 'bg-accent/10' : 'hover:bg-surface2'
+                  className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-all ${
+                    checked ? '' : 'hover:bg-white/[0.02]'
                   }`}
+                  style={checked ? { background: 'rgba(139,92,246,0.08)', borderBottom: '1px solid rgba(255,255,255,0.04)' } : { borderBottom: '1px solid rgba(255,255,255,0.04)' }}
                 >
-                  <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold flex-shrink-0 ${
-                    checked ? 'bg-accent text-white' : 'bg-surface2 text-text2'
-                  }`}>
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center text-[12px] font-black flex-shrink-0"
+                    style={checked ? { background: 'linear-gradient(135deg,#7c3aed,#ec4899)', color: 'white' } : { background: 'rgba(255,255,255,0.06)', color: '#94a3b8' }}>
                     {phone.ig_username?.[0]?.toUpperCase() ?? phone.phone_name?.[0]?.toUpperCase() ?? '?'}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs font-medium text-text truncate">{phone.phone_name}</p>
-                    {phone.ig_username && (
-                      <p className="text-[10px] text-accent truncate">@{phone.ig_username}</p>
-                    )}
+                    <p className="text-[13px] font-semibold text-white truncate">{phone.phone_name}</p>
+                    {phone.ig_username && <p className="text-[12px] text-[#8b5cf6]/80 truncate">@{phone.ig_username}</p>}
                     {ts && ts.status !== 'idle' && (
-                      <p className={`text-[10px] ${STATUS_COLOR[ts.status]}`}>{STATUS_LABEL[ts.status]}</p>
+                      <p className={`text-[11px] ${STATUS_COLOR[ts.status]}`}>{STATUS_LABEL[ts.status]}</p>
                     )}
                   </div>
                   {asgn?.video && (
-                    <span className="text-[10px] text-text2 bg-surface px-1 py-0.5 rounded flex-shrink-0">
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-lg flex-shrink-0"
+                      style={{ background: 'rgba(139,92,246,0.12)', color: '#a78bfa' }}>
                       #{(asgn.videoIndex + 1)}
                     </span>
                   )}
-                  <span className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${
-                    checked ? 'bg-accent border-accent' : 'border-border'
-                  }`}>
-                    {checked && <span className="text-white text-[10px]">✓</span>}
-                  </span>
+                  <div className="w-4 h-4 rounded flex items-center justify-center flex-shrink-0"
+                    style={checked ? { background: 'linear-gradient(135deg,#7c3aed,#ec4899)', border: 'none' } : { border: '1px solid rgba(255,255,255,0.15)' }}>
+                    {checked && <span className="text-white text-[9px] font-bold leading-none">✓</span>}
+                  </div>
                 </button>
               )
             })}
           </div>
-        </div>
+        </aside>
 
-        {/* ── Column 3: Assignments ────────────────────────────────────────── */}
-        <div className="flex-1 overflow-auto p-6 space-y-5">
-          {/* Assignments */}
-          <div>
-            <h2 className="text-sm font-semibold text-text mb-3">
-              🗂 Assignations
-              {assignments.length > 0 && (
-                <span className="ml-2 text-text2 font-normal">{assignments.length} téléphone(s)</span>
-              )}
-            </h2>
+        {/* ── Column 3: Assignments + Caption + Logs ───────────────────────── */}
+        <div className="flex-1 overflow-y-auto px-8 pb-10">
+          <div className="space-y-6 mt-8">
 
-            {assignments.length === 0 ? (
-              <div className="bg-card border border-dashed border-border rounded-xl p-8 text-center text-text2">
-                <p className="text-3xl mb-2">📋</p>
-                <p className="text-sm">Sélectionne des téléphones et des vidéos pour voir les assignations</p>
-                <p className="text-xs mt-1">Chaque téléphone est automatiquement assigné à une vidéo (rotation)</p>
+            {/* Caption card */}
+            <div className="rounded-2xl p-6" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-[15px] font-bold text-white">Description</p>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setWithHashtags(v => !v)}
+                    className="relative w-11 h-6 rounded-full transition-colors flex-shrink-0"
+                    style={{ background: withHashtags ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.08)' }}
+                    title="Hashtags"
+                  >
+                    <span className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform ${withHashtags ? 'translate-x-6' : 'translate-x-1'}`} />
+                  </button>
+                  <span className="text-[12px] text-text2">#</span>
+                  <span className={`text-[12px] font-mono ${caption.length > 2200 ? 'text-danger' : 'text-text2'}`}>
+                    {caption.length}/2200
+                  </span>
+                </div>
               </div>
-            ) : (
-              <div className="grid grid-cols-2 xl:grid-cols-3 gap-3">
-                {assignments.map(({ phone, video, videoIndex }) => {
-                  const ts = taskStatuses.get(phone.id)
-                  const statusColor = ts ? STATUS_COLOR[ts.status] : ''
-                  return (
-                    <div
-                      key={phone.id}
-                      className={`bg-card border rounded-xl p-3 space-y-2 transition-colors ${
-                        ts?.status === 'done'  ? 'border-ok/40' :
-                        ts?.status === 'error' ? 'border-danger/40' :
-                        ts?.status === 'posting' ? 'border-warn/40' :
-                        'border-border'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-full bg-accent/20 text-accent flex items-center justify-center text-xs font-bold flex-shrink-0">
-                          {phone.ig_username?.[0]?.toUpperCase() ?? phone.phone_name?.[0]?.toUpperCase() ?? '?'}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-xs font-medium text-text truncate">{phone.phone_name}</p>
-                          {phone.ig_username && (
-                            <p className="text-[10px] text-accent truncate">@{phone.ig_username}</p>
-                          )}
-                        </div>
-                        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                          phone.status === 'online' ? 'bg-ok' : 'bg-text2'
-                        }`} />
-                      </div>
-                      {video ? (
+              <textarea
+                value={caption}
+                onChange={e => setCaption(e.target.value)}
+                rows={4}
+                placeholder="Description partagée par tous les téléphones (optionnel)…"
+                className="w-full rounded-xl px-4 py-3 text-[13px] placeholder:text-text2 resize-y focus:outline-none"
+                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
+              />
+              <div className="flex items-center gap-2 mt-3">
+                <Button size="sm" variant="secondary" onClick={generateCaption} loading={generating} disabled={!groqKey}>✨ Générer avec IA</Button>
+                <input type="text" value={customPrompt} onChange={e => setCustomPrompt(e.target.value)}
+                  placeholder="Prompt personnalisé…"
+                  className="flex-1 rounded-xl px-4 py-2.5 text-[13px] placeholder:text-text2 focus:outline-none"
+                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
+                />
+              </div>
+            </div>
+
+            {/* Assignments card */}
+            <div className="rounded-2xl p-6" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-[15px] font-bold text-white">Assignations</p>
+                {assignments.length > 0 && (
+                  <span className="text-[13px] text-text2">{assignments.length} téléphone(s)</span>
+                )}
+              </div>
+
+              {assignments.length === 0 ? (
+                <div className="rounded-2xl p-10 text-center" style={{ border: '1px dashed rgba(255,255,255,0.08)' }}>
+                  <p className="text-4xl mb-3">📋</p>
+                  <p className="text-base font-bold text-white mb-1">Aucune assignation</p>
+                  <p className="text-[13px] text-text2">Sélectionne des téléphones et des vidéos pour voir les assignations</p>
+                  <p className="text-[12px] text-text2 mt-1">Chaque téléphone est automatiquement assigné à une vidéo (rotation)</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 xl:grid-cols-3 gap-4">
+                  {assignments.map(({ phone, video, videoIndex }) => {
+                    const ts = taskStatuses.get(phone.id)
+                    const statusColor = ts ? STATUS_COLOR[ts.status] : ''
+                    return (
+                      <div
+                        key={phone.id}
+                        className="rounded-2xl p-4 space-y-3 transition-colors"
+                        style={{
+                          background: 'rgba(255,255,255,0.02)',
+                          border: ts?.status === 'done'    ? '1px solid rgba(52,211,153,0.3)'
+                                : ts?.status === 'error'   ? '1px solid rgba(239,68,68,0.3)'
+                                : ts?.status === 'posting' ? '1px solid rgba(251,191,36,0.3)'
+                                : '1px solid rgba(255,255,255,0.07)',
+                        }}
+                      >
                         <div className="flex items-center gap-2">
-                          {/* Video thumbnail */}
-                          <div className="w-8 flex-shrink-0 aspect-[9/16] rounded overflow-hidden bg-surface2">
-                            <VideoThumbnail filePath={video.localPath ?? video.item.file_url ?? ''} thumbnailPath={video.item.thumbnail_path} storagePath={video.item.storage_path} />
+                          <div className="w-8 h-8 rounded-full flex items-center justify-center text-[12px] font-bold flex-shrink-0"
+                            style={{ background: 'rgba(139,92,246,0.15)', color: '#a78bfa' }}>
+                            {phone.ig_username?.[0]?.toUpperCase() ?? phone.phone_name?.[0]?.toUpperCase() ?? '?'}
                           </div>
                           <div className="min-w-0 flex-1">
-                            <p className="text-[10px] text-accent font-bold">#{videoIndex + 1}</p>
-                            <p className="text-[10px] text-text2 truncate">{video.item.title}</p>
+                            <p className="text-[13px] font-semibold text-white truncate">{phone.phone_name}</p>
+                            {phone.ig_username && (
+                              <p className="text-[12px] text-[#8b5cf6]/80 truncate">@{phone.ig_username}</p>
+                            )}
                           </div>
+                          <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                            phone.status === 'online' ? 'bg-ok' : 'bg-text2'
+                          }`} />
                         </div>
-                      ) : (
-                        <div className="bg-surface rounded-lg px-2 py-1.5">
-                          <span className="text-xs text-text2 italic">Aucune vidéo</span>
-                        </div>
-                      )}
-                      {/* Per-phone progress */}
-                      {ts && ts.status !== 'idle' && (
-                        <div className="space-y-1">
-                          <p className={`text-[10px] font-medium ${statusColor}`}>
-                            {STATUS_LABEL[ts.status]}
-                            {ts.detail && <span className="opacity-70"> — {ts.detail}</span>}
-                          </p>
-                          {(ts.status === 'uploading' || ts.status === 'posting') && (
-                            <div className="w-full h-1 bg-surface2 rounded-full overflow-hidden">
-                              <div className={`h-full rounded-full animate-pulse ${
-                                ts.status === 'uploading' ? 'bg-blue-400 w-2/3' : 'bg-warn w-4/5'
-                              }`} />
+                        {video ? (
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 flex-shrink-0 aspect-[9/16] rounded-lg overflow-hidden"
+                              style={{ background: 'rgba(255,255,255,0.05)' }}>
+                              <VideoThumbnail filePath={video.localPath ?? video.item.file_url ?? ''} thumbnailPath={video.item.thumbnail_path} storagePath={video.item.storage_path} />
                             </div>
-                          )}
-                          {ts.status === 'done' && (
-                            <div className="w-full h-1 bg-ok/20 rounded-full overflow-hidden">
-                              <div className="h-full bg-ok rounded-full w-full" />
+                            <div className="min-w-0 flex-1">
+                              <p className="text-[11px] font-bold" style={{ color: '#8b5cf6' }}>#{videoIndex + 1}</p>
+                              <p className="text-[12px] text-text2 truncate">{video.item.title}</p>
                             </div>
-                          )}
-                          {ts.status === 'error' && (
-                            <div className="w-full h-1 bg-danger/20 rounded-full overflow-hidden">
-                              <div className="h-full bg-danger rounded-full w-full" />
-                            </div>
-                          )}
-                        </div>
-                      )}
+                          </div>
+                        ) : (
+                          <div className="rounded-xl px-3 py-2"
+                            style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                            <span className="text-[12px] text-text2 italic">Aucune vidéo</span>
+                          </div>
+                        )}
+                        {ts && ts.status !== 'idle' && (
+                          <div className="space-y-1.5">
+                            <p className={`text-[12px] font-medium ${statusColor}`}>
+                              {STATUS_LABEL[ts.status]}
+                              {ts.detail && <span className="opacity-70"> — {ts.detail}</span>}
+                            </p>
+                            {(ts.status === 'uploading' || ts.status === 'posting') && (
+                              <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
+                                <div className={`h-full rounded-full animate-pulse ${
+                                  ts.status === 'uploading' ? 'bg-blue-400 w-2/3' : 'bg-warn w-4/5'
+                                }`} />
+                              </div>
+                            )}
+                            {ts.status === 'done' && (
+                              <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(52,211,153,0.1)' }}>
+                                <div className="h-full bg-ok rounded-full w-full" />
+                              </div>
+                            )}
+                            {ts.status === 'error' && (
+                              <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(239,68,68,0.1)' }}>
+                                <div className="h-full bg-danger rounded-full w-full" />
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Log panel */}
+            {logs.length > 0 && (
+              <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                <div className="px-6 py-4 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                  <p className="text-[15px] font-bold text-white">Journal</p>
+                  {!posting && (
+                    <button onClick={() => setLogs([])} className="text-[13px] text-text2 hover:text-white transition-colors">Effacer</button>
+                  )}
+                </div>
+                <div className="px-6 py-4 max-h-48 overflow-auto font-mono text-[12px] space-y-1">
+                  {logs.map((l, i) => (
+                    <div key={i} className={`flex gap-3 ${
+                      l.level === 'ok'    ? 'text-ok'    :
+                      l.level === 'error' ? 'text-danger' :
+                      l.level === 'warn'  ? 'text-warn'   :
+                      'text-text2'
+                    }`}>
+                      <span className="text-text2/60 flex-shrink-0">{l.time}</span>
+                      <span>{l.message}</span>
                     </div>
-                  )
-                })}
+                  ))}
+                  <div ref={logEndRef} />
+                </div>
               </div>
             )}
           </div>
-
-          {/* Log panel */}
-          {logs.length > 0 && (
-            <div className="bg-card border border-border rounded-xl overflow-hidden">
-              <div className="px-4 py-2 border-b border-border flex items-center justify-between">
-                <p className="text-xs font-semibold text-text">Journal</p>
-                {!posting && (
-                  <button onClick={() => setLogs([])} className="text-xs text-text2 hover:text-text">Effacer</button>
-                )}
-              </div>
-              <div className="p-4 max-h-48 overflow-auto font-mono text-xs space-y-1">
-                {logs.map((l, i) => (
-                  <div key={i} className={`flex gap-3 ${
-                    l.level === 'ok'    ? 'text-ok'    :
-                    l.level === 'error' ? 'text-danger' :
-                    l.level === 'warn'  ? 'text-warn'   :
-                    'text-text2'
-                  }`}>
-                    <span className="text-text2 flex-shrink-0">{l.time}</span>
-                    <span>{l.message}</span>
-                  </div>
-                ))}
-                <div ref={logEndRef} />
-              </div>
-            </div>
-          )}
         </div>
       </div>
 
@@ -758,6 +851,7 @@ export function MassPosting({ user }: MassPostingProps) {
         <BankPicker
           user={user}
           mode="multi"
+          resolveMode="signed-url"
           onSelect={(paths) => {
             const newVideos: SelectedVideo[] = paths
               .filter(p => !selectedVideos.some(sv => (sv.localPath ?? sv.item.file_url) === p))
@@ -785,6 +879,17 @@ export function MassPosting({ user }: MassPostingProps) {
             setShowBankPicker(false)
           }}
           onClose={() => setShowBankPicker(false)}
+        />
+      )}
+
+      {showScheduleModal && (
+        <ScheduleModal
+          type="mass_posting"
+          phonesCount={phoneList.length}
+          videosCount={selectedVideos.length}
+          videoTitle={selectedVideos.length === 1 ? selectedVideos[0].item.title : `${selectedVideos.length} vidéos`}
+          onConfirm={scheduleMassPost}
+          onClose={() => setShowScheduleModal(false)}
         />
       )}
     </div>

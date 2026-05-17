@@ -168,7 +168,7 @@ export async function uploadVideoFromPath(
   const r = await window.electronAPI.readFileBytes(filePath)
   if (!r.ok || !r.bytes) throw new Error(r.error || 'Lecture du fichier échouée')
 
-  const blob = new Blob([r.bytes], { type: mimeFor(extOf(filePath)) })
+  const blob = new Blob([r.bytes instanceof Uint8Array ? r.bytes : new Uint8Array(r.bytes)], { type: mimeFor(extOf(filePath)) })
   return uploadVideoFromBlob(blob, filePath, scope, onProgress)
 }
 
@@ -201,19 +201,83 @@ export async function downloadToTemp(path: string): Promise<string> {
   return r.path
 }
 
-// Resolve a content_bank item to a playable URL.
-// On web: returns a signed Supabase URL directly (avoids full download).
-// On Electron: downloads to a local temp file and returns the path.
-export async function resolveContentToLocalPath(item: Pick<ContentItem, 'storage_path' | 'file_url'>): Promise<string> {
-  if (item.storage_path) {
-    if ((window as any).__IS_WEB) {
-      const url = await getSignedUrl(item.storage_path)
-      if (!url) throw new Error('URL signée indisponible')
+
+// Register a blob into the global blob registry used by ffmpeg-web writeInput().
+// Uses window so the registry is shared regardless of module bundling/chunking.
+function regBlob(url: string, blob: Blob): void {
+  try {
+    const w = window as any
+    if (!w.__ffmpegBlobReg) w.__ffmpegBlobReg = new Map()
+    w.__ffmpegBlobReg.set(url, blob)
+  } catch { /* non-browser env (Electron main) — no-op */ }
+}
+
+// Download a storage path and return a same-origin blob: URL (web only).
+// Tries the Supabase SDK download first; falls back to a signed URL + manual fetch.
+// blob: URLs bypass COEP/CORP restrictions that block cross-origin fetches in FFmpeg WASM.
+const blobUrlCache = new Map<string, string>()
+async function downloadToBlobUrl(storagePath: string): Promise<string> {
+  const cached = blobUrlCache.get(storagePath)
+  if (cached) return cached
+
+  // Attempt 1: signed URL via Supabase CDN — much faster than the API server
+  // for large video files, and avoids the "Thread killed by timeout manager" error.
+  try {
+    const signedUrl = await getSignedUrl(storagePath)
+    if (signedUrl) {
+      const res = await fetch(signedUrl)
+      if (res.ok) {
+        const blob = await res.blob()
+        const url = URL.createObjectURL(blob)
+        blobUrlCache.set(storagePath, url)
+        regBlob(url, blob)
+        return url
+      }
+    }
+  } catch {
+    // fall through to attempt 2
+  }
+
+  // Attempt 2: direct authenticated download via Supabase SDK (slower fallback).
+  try {
+    const { data, error } = await supabase.storage.from(BUCKET).download(storagePath)
+    if (!error && data) {
+      const url = URL.createObjectURL(data)
+      blobUrlCache.set(storagePath, url)
+      regBlob(url, data)
       return url
     }
-    return downloadToTemp(item.storage_path)
+  } catch {
+    // fall through to error
   }
-  if (item.file_url) return item.file_url
+
+  throw new Error(
+    `Impossible de télécharger "${storagePath.split('/').pop()}" depuis Supabase. ` +
+    `Vérifiez votre connexion et les permissions du bucket.`
+  )
+}
+
+// Resolve a content_bank item to a path/URL usable by FFmpeg.
+// On Electron: downloads to a local temp file and returns the absolute path.
+// On Web: always produces a blob: URL so FFmpeg WASM can load it (cross-origin URLs fail).
+export async function resolveContentToLocalPath(item: Pick<ContentItem, 'storage_path' | 'file_url'>): Promise<string> {
+  const isWeb = (window as any).__IS_WEB
+
+  if (item.storage_path) {
+    return isWeb ? downloadToBlobUrl(item.storage_path) : downloadToTemp(item.storage_path)
+  }
+
+  if (item.file_url) {
+    // If it looks like a real URL (http/https/blob/data), use it directly on web or Electron
+    if (/^(https?|blob|data):/.test(item.file_url)) return item.file_url
+
+    // Legacy items: file_url holds a local path (Electron only) or a bare storage path
+    if (!isWeb) return item.file_url  // Electron: pass local path to FFmpeg binary as-is
+
+    // Web: treat the value as a Supabase storage path and try to download it
+    return downloadToBlobUrl(item.file_url)
+  }
+
   throw new Error('Aucune source vidéo disponible')
 }
 

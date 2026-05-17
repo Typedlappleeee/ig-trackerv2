@@ -678,7 +678,7 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
   ]
 
   return (
-    <div ref={dropRef} className="flex flex-col h-screen min-h-0 bg-bg"
+    <div ref={dropRef} className="flex flex-col h-full min-h-0 bg-bg"
       onDragOver={onOsDragOver} onDragLeave={onOsDragLeave} onDrop={onOsDrop}>
 
       {/* OS drop overlay */}
@@ -692,13 +692,13 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
       )}
 
       {/* ── TOP TOOLBAR (CapCut-style) ─────────────────────────────────────────────────────────────────── */}
-      <div className="flex-shrink-0 border-b border-border bg-surface">
+      <div className="flex-shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)' }}>
         {/* Row 1: project name + tabs */}
         <div className="flex items-center">
           {/* Project name */}
-          <div className="w-56 flex-shrink-0 px-4 py-2 border-r border-border">
+          <div className="w-56 flex-shrink-0 px-4 py-3" style={{ borderRight: '1px solid rgba(255,255,255,0.06)' }}>
             <input value={projectName} onChange={e => setProjName(e.target.value)}
-              className="text-sm font-semibold text-text bg-transparent focus:outline-none w-full truncate"
+              className="text-[13px] font-semibold text-white bg-transparent focus:outline-none w-full truncate"
               placeholder="Nom du montage…" />
           </div>
 
@@ -706,7 +706,7 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
           <div className="flex flex-1 overflow-x-auto">
             {TABS.map(t => (
               <button key={t.id} onClick={() => setActiveTab(t.id)}
-                className={`flex items-center gap-1.5 px-5 py-2.5 text-xs font-medium border-b-2 transition-all whitespace-nowrap ${
+                className={`flex items-center gap-1.5 px-5 py-3 text-[12px] font-medium border-b-2 transition-all whitespace-nowrap ${
                   activeTab === t.id
                     ? 'border-accent text-accent'
                     : 'border-transparent text-text2 hover:text-text'
@@ -717,16 +717,17 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
           </div>
 
           {/* Right controls */}
-          <div className="flex items-center gap-2 px-4 border-l border-border flex-shrink-0">
-            <span className="text-[10px] text-text2">Format:</span>
+          <div className="flex items-center gap-2 px-4 flex-shrink-0" style={{ borderLeft: '1px solid rgba(255,255,255,0.06)' }}>
+            <span className="text-[11px] text-text2">Format:</span>
             {(['9:16','1:1','16:9'] as Preset[]).map(p => (
               <button key={p} onClick={() => setPreset(p)}
-                className={`px-2 py-1 rounded text-[11px] font-mono transition-all ${preset === p ? 'bg-accent text-white' : 'text-text2 hover:text-text bg-surface2'}`}>
+                className={`px-2.5 py-1.5 rounded-lg text-[11px] font-mono transition-all ${preset === p ? 'text-white' : 'text-text2 hover:text-text'}`}
+                style={preset === p ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)' } : { background: 'rgba(255,255,255,0.05)' }}>
                 {p}
               </button>
             ))}
-            <span className="text-[9px] text-text2 ml-1">{PRESET_DIMS[preset]}</span>
-            <div className="w-px h-5 bg-border mx-1" />
+            <span className="text-[10px] text-text2 ml-1">{PRESET_DIMS[preset]}</span>
+            <div className="w-px h-5 mx-1" style={{ background: 'rgba(255,255,255,0.08)' }} />
             <Button size="sm" onClick={handleExport} loading={exporting} disabled={!clips.length}>
               Exporter
             </Button>

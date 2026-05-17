@@ -331,135 +331,66 @@ export function Dashboard({ user }: DashboardProps) {
   ]
 
   return (
-    <div className="flex h-full min-h-screen">
-      {/* Left sidebar: per-account selector — Python: 210px wide */}
-      <aside className="w-[210px] flex-shrink-0 flex flex-col border-r border-border bg-[#0e1118] anim-slide-l">
-        <div className="px-4 py-3 border-b border-border">
-          <p className="text-xs font-bold text-text2 uppercase tracking-wider">Comptes</p>
-        </div>
-        <div className="flex-1 overflow-auto py-1 anim-stagger">
-          {loading ? (
-            <div className="flex justify-center py-8"><Spinner size="sm" /></div>
-          ) : (
-            <>
-              {/* Total row */}
+    <div className="h-full flex flex-col overflow-hidden">
+
+      {/* ── Header ─────────────────────────────────────────────────────────── */}
+      <div
+        className="flex-shrink-0 px-10 pt-9 pb-7 flex items-center justify-between"
+        style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}
+      >
+        <h1 className="text-[28px] font-black text-white leading-none">Dashboard</h1>
+
+        <div className="flex items-center gap-3">
+          {/* Range pills */}
+          <div className="flex gap-1 p-1 rounded-xl" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+            {RANGES.map(({ key, label }) => (
               <button
-                onClick={() => setSelPhone(null)}
-                className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-all rounded-lg mx-1 my-0.5 ${
-                  selPhone === null
-                    ? 'border'
-                    : 'hover:bg-surface2 border border-transparent'
+                key={key}
+                onClick={() => setRange(key)}
+                className={`px-3.5 py-1.5 rounded-lg text-[12px] font-semibold transition-all ${
+                  range === key ? 'text-white' : 'text-text2 hover:text-text hover:bg-white/[0.04]'
                 }`}
-                style={selPhone === null ? { background: 'rgba(139,92,246,0.12)', borderColor: 'rgba(139,92,246,0.25)', width: 'calc(100% - 8px)' } : { width: 'calc(100% - 8px)' }}
-              >
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 transition-transform ${selPhone === null ? 'scale-110' : ''}`} style={{ background: 'rgba(139,92,246,0.2)', color: '#a78bfa' }}>📊</div>
-                <div className="min-w-0 flex-1">
-                  <p className={`text-xs ${selPhone === null ? 'font-bold' : 'text-text'}`} style={selPhone === null ? { color: '#c4b5fd' } : {}}>Tous les comptes</p>
-                </div>
-              </button>
-
-              {/* Per-phone rows */}
-              {linkedPhones.map(phone => {
-                const dotColor =
-                  phone.ig_status === 'active'      ? '#00ccaa' :
-                  phone.ig_status === 'error'       ? '#f03d55' :
-                  phone.ig_status === 'rate_limited'? '#ffaa2a' :
-                  '#5a6882'
-                const initials = (phone.ig_username ?? phone.phone_name).slice(0, 2).toUpperCase()
-                const active = selPhone?.id === phone.id
-                return (
-                  <button
-                    key={phone.id}
-                    onClick={() => setSelPhone(phone)}
-                    className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition-all rounded-lg mx-1 my-0.5 ${
-                      active ? 'border' : 'hover:bg-surface2 border border-transparent'
-                    }`}
-                    style={active ? { background: 'rgba(139,92,246,0.12)', borderColor: 'rgba(139,92,246,0.25)', width: 'calc(100% - 8px)' } : { width: 'calc(100% - 8px)' }}
-                  >
-                    <div
-                      className={`w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0 transition-transform ${active ? 'scale-110 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.5)]' : ''}`}
-                      style={{ background: avatarColor(phone.ig_username ?? phone.phone_name) }}
-                    >
-                      {initials}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className={`text-xs truncate ${active ? 'font-bold' : 'text-text'}`} style={active ? { color: '#c4b5fd' } : {}}>
-                        {phone.phone_name.length > 20 ? phone.phone_name.slice(0, 20) + '…' : phone.phone_name}
-                      </p>
-                      {phone.ig_username && (
-                        <p className="text-[10px] text-text2 truncate">@{phone.ig_username.length > 18 ? phone.ig_username.slice(0, 18) + '…' : phone.ig_username}</p>
-                      )}
-                    </div>
-                    <span className="relative w-2 h-2 rounded-full flex-shrink-0" style={{ background: dotColor }}>
-                      {phone.ig_status === 'active' && (
-                        <span className="absolute inset-0 rounded-full animate-ping opacity-50" style={{ background: dotColor }} />
-                      )}
-                    </span>
-                  </button>
-                )
-              })}
-            </>
-          )}
-        </div>
-      </aside>
-
-      {/* Right panel */}
-      <div className="flex-1 overflow-auto p-6 space-y-5">
-        {/* Title */}
-        <h1 className="text-xl font-bold text-text">
-          {selPhone ? `📱 ${selPhone.phone_name}` : 'Résumé des vues'}
-        </h1>
-
-        {/* Summary card with views + 6-cell KPI grid (Python layout) */}
-        <div className="bg-card border border-border rounded-xl p-5 flex gap-5 anim-page card-lift" style={{ animationDelay: '0.04s' }}>
-          {/* Left: total views */}
-          <div className="flex items-center gap-4 pr-5 border-r border-border">
-            <div className="w-[46px] h-[46px] rounded-full flex items-center justify-center text-xl anim-float" style={{ background: 'rgba(139,92,246,0.15)', color: '#a78bfa' }}>👁</div>
-            <div>
-              <p className="text-[10px] font-semibold text-text2 uppercase tracking-wider">{selPhone ? 'Vues du compte' : 'Total vues'}</p>
-              <p className="text-[24px] font-bold text-text leading-none mt-1 anim-number-pop" key={kpis.totalNow}>
-                {kpis.totalNow.toLocaleString('fr-FR')}
-              </p>
-            </div>
-          </div>
-
-          {/* Right: 3x2 KPI grid */}
-          <div className="flex-1 grid grid-cols-3 gap-2 anim-stagger">
-            {[
-              { label: "Vues aujourd'hui", value: kpis.today,    icon: '👁',  color: '#a78bfa' },
-              { label: 'Croissance',        value: kpis.delta,    icon: kpis.delta !== null && kpis.delta >= 0 ? '📈' : '📉', color: kpis.delta !== null && kpis.delta >= 0 ? '#00ccaa' : '#f03d55', sign: true },
-              selPhone
-                ? { label: 'Statut IG',     value: selPhone.ig_status === 'active' ? 'Actif' : selPhone.ig_status === 'error' ? 'Banni' : selPhone.ig_status ?? '—', icon: '✅', color: '#00ccaa', isText: true }
-                : { label: 'Téléphones actifs', value: kpis.activePhones, icon: '📱', color: '#00ccaa' },
-              { label: 'Record journalier', value: kpis.peak,     icon: '🏆', color: '#ffaa2a' },
-              { label: 'Moyenne / jour',    value: kpis.avg,      icon: '📊', color: '#5a6882' },
-              selPhone
-                ? { label: 'Vidéos',         value: kpis.videos,   icon: '🎥', color: '#a56ef5' }
-                : { label: 'Bannis',         value: kpis.banned,   icon: '🚫', color: '#f03d55' },
-            ].map((kpi, i) => (
-              <div key={i} className="bg-surface2 border border-border rounded-lg p-3 card-lift">
-                <div className="flex items-center gap-1.5 mb-1.5">
-                  <span className="text-sm">{kpi.icon}</span>
-                  <span className="text-[9px] font-semibold text-text2 uppercase tracking-wider">{kpi.label}</span>
-                </div>
-                <p className="text-base font-bold anim-number-pop" style={{ color: kpi.color }} key={String(kpi.value)}>
-                  {(() => {
-                    if ('isText' in kpi && kpi.isText) return kpi.value as string
-                    const v = kpi.value
-                    if (v === null) return '—'
-                    if (typeof v !== 'number') return v
-                    if ('sign' in kpi && kpi.sign && v > 0) return `+${v.toLocaleString('fr-FR')}`
-                    return v.toLocaleString('fr-FR')
-                  })()}
-                </p>
-              </div>
+                style={range === key ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', boxShadow: '0 1px 8px -2px rgba(124,58,237,0.5)' } : {}}
+              >{label}</button>
             ))}
           </div>
+
+          {/* Account dropdown */}
+          {linkedPhones.length > 0 && (
+            <div className="relative">
+              <select
+                value={selPhone?.id ?? ''}
+                onChange={e => {
+                  const found = linkedPhones.find(p => p.id === e.target.value) ?? null
+                  setSelPhone(found)
+                }}
+                className="appearance-none outline-none px-4 py-2.5 rounded-xl text-[13px] font-semibold cursor-pointer"
+                style={{
+                  background: 'rgba(255,255,255,0.05)',
+                  border: '1px solid rgba(255,255,255,0.09)',
+                  color: 'rgba(196,181,253,0.8)',
+                  paddingRight: '2.5rem',
+                }}
+              >
+                <option value="" style={{ background: '#0d1120', color: '#e2d9f3' }}>Tous les comptes</option>
+                {linkedPhones.map(p => (
+                  <option key={p.id} value={p.id} style={{ background: '#0d1120', color: '#e2d9f3' }}>
+                    {p.phone_name}
+                  </option>
+                ))}
+              </select>
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] pointer-events-none" style={{ color: 'rgba(196,181,253,0.5)' }}>▾</span>
+            </div>
+          )}
         </div>
+      </div>
+
+      {/* ── Scrollable content ─────────────────────────────────────────────── */}
+      <div className="flex-1 overflow-y-auto px-10 pb-10">
 
         {/* Schema migration notice */}
         {schemaMissing && (
-          <div className="bg-warn/10 border border-warn/30 rounded-xl p-5 space-y-3">
+          <div className="mt-7 bg-warn/10 border border-warn/30 rounded-xl p-5 space-y-3">
             <div className="flex items-start gap-3">
               <span className="text-2xl flex-shrink-0">⚠</span>
               <div className="flex-1 min-w-0">
@@ -479,33 +410,11 @@ export function Dashboard({ user }: DashboardProps) {
           </div>
         )}
 
-        {/* Chart card with range pills */}
-        <div className="bg-card border border-border rounded-xl p-5 anim-page card-lift" style={{ animationDelay: '0.08s' }}>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-semibold text-text">Tendances des vues</h2>
-            <div className="flex gap-1 bg-surface2 p-1 rounded-lg">
-              {RANGES.map(({ key, label }) => (
-                <button
-                  key={key}
-                  onClick={() => setRange(key)}
-                  className={`px-3 py-1 rounded-md text-xs font-semibold transition-all ${
-                    range === key ? 'text-white' : 'text-text2 hover:text-text hover:bg-surface3/50'
-                  }`}
-                  style={range === key ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', boxShadow: '0 1px 8px -2px rgba(124,58,237,0.5)' } : {}}
-                >{label}</button>
-              ))}
-            </div>
-          </div>
-          {loadingChart ? (
-            <div className="flex justify-center py-12"><Spinner /></div>
-          ) : (
-            <LineChart data={chartData} height={280} />
-          )}
-        </div>
-
-        {/* Empty state / quick start */}
-        {phones.length === 0 && !loading && (
-          <div className="rounded-2xl p-8 text-center space-y-5" style={{ background: 'rgba(139,92,246,0.04)', border: '1px solid rgba(139,92,246,0.12)' }}>
+        {loading ? (
+          <div className="flex justify-center py-24"><Spinner /></div>
+        ) : phones.length === 0 ? (
+          /* ── Empty state ─────────────────────────────────────────────────── */
+          <div className="mt-10 rounded-2xl p-10 text-center space-y-6" style={{ background: 'rgba(139,92,246,0.04)', border: '1px solid rgba(139,92,246,0.12)' }}>
             <div className="text-4xl">🚀</div>
             <div>
               <p className="text-base font-bold text-text">Bienvenue sur ScaleFlow</p>
@@ -529,6 +438,191 @@ export function Dashboard({ user }: DashboardProps) {
               ))}
             </div>
           </div>
+        ) : (
+          <>
+            {/* ── 4 KPI cards ────────────────────────────────────────────────── */}
+            <div className="grid grid-cols-4 gap-6 mt-8">
+              {/* totalNow */}
+              <div
+                className="rounded-2xl p-7"
+                style={{ background: 'rgba(129,140,248,0.05)', border: '1px solid rgba(129,140,248,0.12)' }}
+              >
+                <div className="flex items-center gap-2 mb-5">
+                  <span className="text-[18px]">👁</span>
+                  <span className="text-[12px] font-semibold" style={{ color: 'rgba(148,163,184,0.7)' }}>
+                    {selPhone ? 'Vues du compte' : 'Total vues'}
+                  </span>
+                </div>
+                <p className="text-[42px] font-black text-white leading-none anim-number-pop" key={kpis.totalNow}>
+                  {fmt(kpis.totalNow)}
+                </p>
+              </div>
+
+              {/* today + delta */}
+              <div
+                className="rounded-2xl p-7"
+                style={{ background: 'rgba(96,165,250,0.05)', border: '1px solid rgba(96,165,250,0.12)' }}
+              >
+                <div className="flex items-center gap-2 mb-5">
+                  <span className="text-[18px]">{kpis.delta !== null && kpis.delta >= 0 ? '📈' : '📉'}</span>
+                  <span className="text-[12px] font-semibold" style={{ color: 'rgba(148,163,184,0.7)' }}>Aujourd'hui</span>
+                </div>
+                <p className="text-[42px] font-black text-white leading-none anim-number-pop" key={kpis.today}>
+                  {fmt(kpis.today)}
+                </p>
+                {kpis.delta !== null && (
+                  <p className={`text-[13px] font-semibold mt-2 ${kpis.delta >= 0 ? 'text-ok' : 'text-danger'}`}>
+                    {kpis.delta >= 0 ? '▲' : '▼'} {fmt(Math.abs(kpis.delta))} vs hier
+                  </p>
+                )}
+              </div>
+
+              {/* peak */}
+              <div
+                className="rounded-2xl p-7"
+                style={{ background: 'rgba(251,191,36,0.05)', border: '1px solid rgba(251,191,36,0.12)' }}
+              >
+                <div className="flex items-center gap-2 mb-5">
+                  <span className="text-[18px]">🏆</span>
+                  <span className="text-[12px] font-semibold" style={{ color: 'rgba(148,163,184,0.7)' }}>Record</span>
+                </div>
+                <p className="text-[42px] font-black text-white leading-none anim-number-pop" key={kpis.peak}>
+                  {fmt(kpis.peak)}
+                </p>
+              </div>
+
+              {/* avg */}
+              <div
+                className="rounded-2xl p-7"
+                style={{ background: 'rgba(52,211,153,0.05)', border: '1px solid rgba(52,211,153,0.12)' }}
+              >
+                <div className="flex items-center gap-2 mb-5">
+                  <span className="text-[18px]">📊</span>
+                  <span className="text-[12px] font-semibold" style={{ color: 'rgba(148,163,184,0.7)' }}>Moyenne / jour</span>
+                </div>
+                <p className="text-[42px] font-black text-white leading-none anim-number-pop" key={kpis.avg}>
+                  {fmt(kpis.avg)}
+                </p>
+              </div>
+            </div>
+
+            {/* ── 3 secondary stat chips ──────────────────────────────────────── */}
+            <div className="grid grid-cols-3 gap-5 mt-5">
+              {/* Active phones */}
+              <div
+                className="rounded-2xl px-6 py-5 flex items-center gap-4"
+                style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}
+              >
+                <span className="text-[22px]">📱</span>
+                <div>
+                  <p className="text-[11px] font-semibold mb-1" style={{ color: 'rgba(148,163,184,0.65)' }}>Téléphones actifs</p>
+                  <p className="text-[22px] font-black text-white leading-none">
+                    {kpis.activePhones}<span className="text-[14px] font-semibold ml-1" style={{ color: 'rgba(148,163,184,0.5)' }}>/ {phones.length}</span>
+                  </p>
+                </div>
+              </div>
+
+              {/* Banned */}
+              <div
+                className="rounded-2xl px-6 py-5 flex items-center gap-4"
+                style={{
+                  background: kpis.banned > 0 ? 'rgba(240,61,85,0.06)' : 'rgba(255,255,255,0.03)',
+                  border: `1px solid ${kpis.banned > 0 ? 'rgba(240,61,85,0.2)' : 'rgba(255,255,255,0.07)'}`,
+                }}
+              >
+                <span className="text-[22px]">🚫</span>
+                <div>
+                  <p className="text-[11px] font-semibold mb-1" style={{ color: 'rgba(148,163,184,0.65)' }}>Bannis / Erreur</p>
+                  <p
+                    className="text-[22px] font-black leading-none"
+                    style={{ color: kpis.banned > 0 ? '#f03d55' : 'white' }}
+                  >
+                    {kpis.banned}
+                  </p>
+                </div>
+              </div>
+
+              {/* Videos (if selPhone) or IG accounts */}
+              {selPhone ? (
+                <div
+                  className="rounded-2xl px-6 py-5 flex items-center gap-4"
+                  style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}
+                >
+                  <span className="text-[22px]">🎥</span>
+                  <div>
+                    <p className="text-[11px] font-semibold mb-1" style={{ color: 'rgba(148,163,184,0.65)' }}>Vidéos</p>
+                    <p className="text-[22px] font-black text-white leading-none">{fmt(kpis.videos)}</p>
+                  </div>
+                </div>
+              ) : (
+                <div
+                  className="rounded-2xl px-6 py-5 flex items-center gap-4"
+                  style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}
+                >
+                  <span className="text-[22px]">📷</span>
+                  <div>
+                    <p className="text-[11px] font-semibold mb-1" style={{ color: 'rgba(148,163,184,0.65)' }}>Comptes IG liés</p>
+                    <p className="text-[22px] font-black text-white leading-none">{linkedPhones.length}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* ── Chart card ──────────────────────────────────────────────────── */}
+            <div
+              className="rounded-2xl p-8 mt-5"
+              style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}
+            >
+              <p className="text-[15px] font-bold text-white mb-7">Tendances des vues</p>
+              {loadingChart ? (
+                <div className="flex justify-center" style={{ height: 320 }}><Spinner /></div>
+              ) : (
+                <LineChart data={chartData} height={320} />
+              )}
+            </div>
+
+            {/* ── Account chips (multi-account overview) ──────────────────────── */}
+            {!selPhone && linkedPhones.length > 1 && (
+              <div className="mt-5">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] mb-3" style={{ color: 'rgba(139,92,246,0.5)' }}>
+                  · Comptes
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {linkedPhones.map(phone => {
+                    const dotColor =
+                      phone.ig_status === 'active'       ? '#00ccaa' :
+                      phone.ig_status === 'error'        ? '#f03d55' :
+                      phone.ig_status === 'rate_limited' ? '#ffaa2a' :
+                      '#5a6882'
+                    const initials = (phone.ig_username ?? phone.phone_name).slice(0, 2).toUpperCase()
+                    return (
+                      <button
+                        key={phone.id}
+                        onClick={() => setSelPhone(phone)}
+                        className="flex items-center gap-2 px-3.5 py-2 rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98]"
+                        style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
+                      >
+                        <div
+                          className="w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold text-white flex-shrink-0"
+                          style={{ background: avatarColor(phone.ig_username ?? phone.phone_name) }}
+                        >
+                          {initials}
+                        </div>
+                        <span className="text-[12px] font-semibold text-text">
+                          {phone.phone_name.length > 18 ? phone.phone_name.slice(0, 18) + '…' : phone.phone_name}
+                        </span>
+                        <span className="relative w-2 h-2 rounded-full flex-shrink-0" style={{ background: dotColor }}>
+                          {phone.ig_status === 'active' && (
+                            <span className="absolute inset-0 rounded-full animate-ping opacity-50" style={{ background: dotColor }} />
+                          )}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

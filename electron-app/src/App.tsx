@@ -16,51 +16,32 @@ import { CreditContext, fetchBalance, fetchOrgBalance, maybeGrantMonthlyCredits 
 // ── ScaleFlow logo SVG ────────────────────────────────────────────────────────
 function ScaleFlowLogoSVG({ size = 96, draw = false }: { size?: number; draw?: boolean }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <svg width={size} height={size} viewBox="0 0 100 100" fill="none" overflow="visible" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <linearGradient id="sp-main" x1="10" y1="98" x2="82" y2="2" gradientUnits="userSpaceOnUse">
-          <stop offset="0%"   stopColor="#1d4ed8"/>
-          <stop offset="28%"  stopColor="#3b5af0"/>
-          <stop offset="58%"  stopColor="#7c3aed"/>
+        <linearGradient id="sp-g" x1="50" y1="5" x2="50" y2="95" gradientUnits="userSpaceOnUse">
+          <stop offset="0%"   stopColor="#60a5fa"/>
+          <stop offset="45%"  stopColor="#818cf8"/>
           <stop offset="100%" stopColor="#a855f7"/>
         </linearGradient>
-        <linearGradient id="sp-depth" x1="10" y1="98" x2="82" y2="2" gradientUnits="userSpaceOnUse">
-          <stop offset="0%"   stopColor="#0c1f6e"/>
-          <stop offset="55%"  stopColor="#2e1065"/>
-          <stop offset="100%" stopColor="#3b0764"/>
-        </linearGradient>
-        <linearGradient id="sp-arr" x1="66" y1="24" x2="90" y2="1" gradientUnits="userSpaceOnUse">
-          <stop offset="0%"   stopColor="#db2777"/>
-          <stop offset="100%" stopColor="#f472b6"/>
-        </linearGradient>
+        <filter id="sp-glow" x="-60%" y="-60%" width="220%" height="220%" colorInterpolationFilters="sRGB">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="blur"/>
+          <feColorMatrix in="blur" type="matrix"
+            values="0 0 0 0 0.38  0 0 0 0 0.25  0 0 0 0 1   0 0 0 1 0" result="colored"/>
+          <feMerge><feMergeNode in="colored"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
       </defs>
-      {/* Depth/3D shadow layer */}
+      {/* Outer glow halo */}
       <path
         d="M 66 22 C 76 8 60 3 42 3 C 20 3 12 18 12 32 C 12 46 26 52 46 55 C 66 58 82 65 82 79 C 82 93 68 97 50 97 C 32 97 18 89 16 76"
-        stroke="url(#sp-depth)" strokeWidth="18" strokeLinecap="round" fill="none"
-        transform="translate(2.5,4.5)" opacity="0.65"
+        stroke="#7c3aed" strokeWidth="24" strokeLinecap="round" fill="none" opacity="0.3"
       />
-      {/* Main S ribbon */}
+      {/* Main S */}
       <path
         pathLength="1"
         d="M 66 22 C 76 8 60 3 42 3 C 20 3 12 18 12 32 C 12 46 26 52 46 55 C 66 58 82 65 82 79 C 82 93 68 97 50 97 C 32 97 18 89 16 76"
-        stroke="url(#sp-main)" strokeWidth="16" strokeLinecap="round" fill="none"
+        stroke="url(#sp-g)" strokeWidth="16" strokeLinecap="round" fill="none"
+        filter="url(#sp-glow)"
         className={draw ? 'sf-draw-path' : undefined}
-      />
-      {/* Arrow diagonal */}
-      <line x1="66" y1="22" x2="88" y2="2"
-        stroke="url(#sp-arr)" strokeWidth="11" strokeLinecap="round"
-        className={draw ? 'sf-arrow' : undefined}
-      />
-      {/* Arrow L-head horizontal */}
-      <line x1="77" y1="1" x2="90" y2="1"
-        stroke="#f472b6" strokeWidth="9" strokeLinecap="round"
-        className={draw ? 'sf-arrow' : undefined}
-      />
-      {/* Arrow L-head vertical */}
-      <line x1="90" y1="1" x2="90" y2="15"
-        stroke="#f472b6" strokeWidth="9" strokeLinecap="round"
-        className={draw ? 'sf-arrow' : undefined}
       />
     </svg>
   )
@@ -239,23 +220,14 @@ function FlameOverlay() {
 const SPLASH_DURATION = 3600
 
 // Pre-computed burst particles (angle → px/py offset in px)
-const SF_PARTICLES = [
-  { px: 90,  py: 0,   size: 4, dur: '0.92s', delay: '0.74s', col: '#ec4899' },
-  { px: 70,  py: 28,  size: 2, dur: '0.76s', delay: '0.79s', col: '#8b5cf6' },
-  { px: 78,  py: 78,  size: 3, dur: '1.02s', delay: '0.71s', col: '#3b82f6' },
-  { px: 30,  py: 74,  size: 2, dur: '0.82s', delay: '0.82s', col: '#ec4899' },
-  { px: 0,   py: 95,  size: 4, dur: '0.88s', delay: '0.75s', col: '#8b5cf6' },
-  { px: -37, py: 88,  size: 2, dur: '0.93s', delay: '0.84s', col: '#3b82f6' },
-  { px: -70, py: 70,  size: 3, dur: '0.79s', delay: '0.73s', col: '#ec4899' },
-  { px: -76, py: 31,  size: 2, dur: '0.90s', delay: '0.86s', col: '#8b5cf6' },
-  { px: -95, py: 0,   size: 4, dur: '0.84s', delay: '0.77s', col: '#3b82f6' },
-  { px: -67, py: -27, size: 2, dur: '0.97s', delay: '0.88s', col: '#ec4899' },
-  { px: -75, py: -75, size: 3, dur: '0.77s', delay: '0.72s', col: '#8b5cf6' },
-  { px: -29, py: -72, size: 2, dur: '0.91s', delay: '0.80s', col: '#3b82f6' },
-  { px: 0,   py: -92, size: 4, dur: '0.85s', delay: '0.78s', col: '#ec4899' },
-  { px: 37,  py: -65, size: 2, dur: '0.89s', delay: '0.83s', col: '#8b5cf6' },
-  { px: 82,  py: -82, size: 3, dur: '0.94s', delay: '0.70s', col: '#3b82f6' },
-  { px: 74,  py: -30, size: 2, dur: '0.87s', delay: '0.76s', col: '#ec4899' },
+const ORBITERS = [
+  { r: 92,  dur: 3.6, delay: 0,     cw: true,  col: '#60a5fa', size: 7 },
+  { r: 92,  dur: 3.6, delay: -1.8,  cw: true,  col: '#818cf8', size: 5 },
+  { r: 125, dur: 5.4, delay: 0,     cw: false, col: '#a855f7', size: 6 },
+  { r: 125, dur: 5.4, delay: -1.8,  cw: false, col: '#ec4899', size: 5 },
+  { r: 125, dur: 5.4, delay: -3.6,  cw: false, col: '#f472b6', size: 4 },
+  { r: 158, dur: 7.8, delay: 0,     cw: true,  col: '#34d399', size: 5 },
+  { r: 158, dur: 7.8, delay: -3.9,  cw: true,  col: '#2563eb', size: 6 },
 ]
 
 const STATUS_MSGS = [
@@ -304,67 +276,118 @@ function SplashScreen({ onDone }: { onDone: () => void }) {
         animation: 'sf-bg-breathe 3s ease-in-out 1s infinite',
       }} />
 
-      {/* ── Subtle purple grid ── */}
-      <div style={{
-        position: 'absolute', inset: 0, pointerEvents: 'none', opacity: 0.03,
-        backgroundImage: 'linear-gradient(#8b5cf6 1px, transparent 1px), linear-gradient(90deg, #8b5cf6 1px, transparent 1px)',
-        backgroundSize: '80px 80px',
-      }} />
-
-      {/* ── Horizontal scan line ── */}
-      <div style={{
-        position: 'absolute', left: 0, right: 0, height: 1.5, pointerEvents: 'none',
-        background: 'linear-gradient(90deg, transparent 0%, #8b5cf622 15%, #8b5cf699 50%, #8b5cf622 85%, transparent 100%)',
-        animation: 'sf-scan 5s linear 0.6s infinite',
-      }} />
-
-      {/* ── Light beams radiating from logo center ── */}
-      {[0, 45, 90, 135, 180, 225, 270, 315].map((angle, i) => (
-        <div key={i} className="sf-beam" style={{
-          height: 240,
-          transform: `rotate(${angle}deg)`,
-          opacity: 0,
-          ['--beam-dur' as string]: `${2.0 + (i % 3) * 0.4}s`,
-          ['--beam-delay' as string]: `${0.72 + i * 0.08}s`,
-          background: `linear-gradient(to bottom, ${i % 2 === 0 ? '#8b5cf6' : '#ec4899'}88, transparent)`,
+      {/* ── Aurora background blobs ── */}
+      {[
+        { col: 'rgba(37,99,235,0.13)',   size: 440, x: -160, y: -200, anim: 'sf-blob-a 15s ease-in-out infinite' },
+        { col: 'rgba(124,58,237,0.10)',  size: 380, x: 100,  y: 80,   anim: 'sf-blob-b 19s ease-in-out -7s infinite' },
+        { col: 'rgba(236,72,153,0.07)',  size: 320, x: -50,  y: 130,  anim: 'sf-blob-c 12s ease-in-out -4s infinite' },
+      ].map((b, i) => (
+        <div key={i} style={{
+          position: 'absolute', pointerEvents: 'none',
+          width: b.size, height: b.size * 0.65,
+          left: `calc(50% + ${b.x}px)`, top: `calc(50% + ${b.y}px)`,
+          transform: 'translate(-50%,-50%)',
+          borderRadius: '50%',
+          background: `radial-gradient(circle, ${b.col} 0%, transparent 70%)`,
+          filter: 'blur(55px)',
+          animation: b.anim,
         }} />
       ))}
 
-      {/* ── Logo area: rings + particles + logo ── */}
-      <div style={{ position: 'relative', width: 120, height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 44 }}>
+      {/* ── Logo area ── */}
+      <div style={{ position: 'relative', width: 120, height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 44, overflow: 'visible' }}>
 
-        {/* Expanding rings burst */}
-        {(['sf-ring-1', 'sf-ring-2', 'sf-ring-3'] as const).map(cls => (
-          <div key={cls} className={cls} style={{
-            position: 'absolute', inset: 0, borderRadius: '50%',
-            border: '1.5px solid #8b5cf6', pointerEvents: 'none',
+        {/* Looping pulse rings */}
+        {[
+          { delay: 0,    col: 'rgba(96,165,250,0.6)' },
+          { delay: 0.85, col: 'rgba(124,58,237,0.45)' },
+          { delay: 1.7,  col: 'rgba(236,72,153,0.35)' },
+        ].map((ring, i) => (
+          <div key={`pr-${i}`} style={{
+            position: 'absolute', top: '50%', left: '50%',
+            width: 148, height: 148, marginLeft: -74, marginTop: -74,
+            borderRadius: '50%', border: `1.5px solid ${ring.col}`,
+            pointerEvents: 'none',
+            animation: `sf-pulse-ring 2.6s ease-out ${ring.delay}s infinite`,
           }} />
         ))}
 
-        {/* Burst particles */}
-        {SF_PARTICLES.map((p, i) => (
-          <div
-            key={i}
-            className="sf-particle"
-            style={{
+        {/* Comet arcs — rotating partial SVG strokes with glow */}
+        <svg style={{ position: 'absolute', top: '50%', left: '50%', overflow: 'visible', pointerEvents: 'none', animation: 'sf-orbit-cw 5.5s linear infinite' }} width="0" height="0">
+          <defs>
+            <filter id="hg-a" x="-80%" y="-80%" width="260%" height="260%">
+              <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="b"/>
+              <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+          </defs>
+          <circle cx="0" cy="0" r="106" stroke="#60a5fa" strokeWidth="3" fill="none"
+            strokeDasharray="170 497" strokeLinecap="round" filter="url(#hg-a)" strokeOpacity="0.9"/>
+        </svg>
+
+        <svg style={{ position: 'absolute', top: '50%', left: '50%', overflow: 'visible', pointerEvents: 'none', animation: 'sf-orbit-ccw 9s linear -1.5s infinite' }} width="0" height="0">
+          <defs>
+            <filter id="hg-b" x="-80%" y="-80%" width="260%" height="260%">
+              <feGaussianBlur in="SourceGraphic" stdDeviation="3.5" result="b"/>
+              <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+          </defs>
+          <circle cx="0" cy="0" r="132" stroke="#a855f7" strokeWidth="2.5" fill="none"
+            strokeDasharray="145 685" strokeLinecap="round" filter="url(#hg-b)" strokeOpacity="0.75"/>
+        </svg>
+
+        <svg style={{ position: 'absolute', top: '50%', left: '50%', overflow: 'visible', pointerEvents: 'none', animation: 'sf-orbit-cw 13s linear -4s infinite' }} width="0" height="0">
+          <defs>
+            <filter id="hg-c" x="-80%" y="-80%" width="260%" height="260%">
+              <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="b"/>
+              <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+          </defs>
+          <circle cx="0" cy="0" r="161" stroke="#ec4899" strokeWidth="2" fill="none"
+            strokeDasharray="125 887" strokeLinecap="round" filter="url(#hg-c)" strokeOpacity="0.6"/>
+        </svg>
+
+        {/* Orbiting neon dots */}
+        {ORBITERS.map((o, i) => (
+          <div key={`orb-${i}`} style={{
+            position: 'absolute', top: '50%', left: '50%',
+            width: o.r * 2, height: o.r * 2,
+            marginLeft: -o.r, marginTop: -o.r,
+            borderRadius: '50%', pointerEvents: 'none',
+            animation: `sf-orbit-${o.cw ? 'cw' : 'ccw'} ${o.dur}s linear ${o.delay}s infinite`,
+          }}>
+            <div style={{
               position: 'absolute',
-              top: '50%', left: '50%',
-              width: p.size, height: p.size, borderRadius: '50%',
-              background: p.col,
-              boxShadow: `0 0 ${p.size * 3}px ${p.size}px ${p.col}88`,
-              marginLeft: -p.size / 2, marginTop: -p.size / 2,
-              ['--px' as string]: `${p.px}px`,
-              ['--py' as string]: `${p.py}px`,
-              ['--dur' as string]: p.dur,
-              ['--delay' as string]: p.delay,
-              pointerEvents: 'none',
-            }}
-          />
+              top: -o.size / 2, left: '50%', transform: 'translateX(-50%)',
+              width: o.size, height: o.size, borderRadius: '50%',
+              background: o.col,
+              boxShadow: `0 0 ${o.size * 2}px ${o.size}px ${o.col}88, 0 0 ${o.size * 5}px ${o.size * 2}px ${o.col}44`,
+            }} />
+          </div>
         ))}
 
-        {/* ScaleFlow S logo */}
-        <div className="sf-logo-anim">
-          <ScaleFlowLogoSVG size={110} draw />
+        {/* ScaleFlow S logo — rounded square with spinning neon border */}
+        <div className="sf-logo-anim" style={{ position: 'relative', width: 110, height: 110, zIndex: 2 }}>
+          {/* Spinning neon border — faster on splash */}
+          <div className="logo-neon-ring" style={{
+            position: 'absolute', inset: -3, borderRadius: 28, pointerEvents: 'none',
+            animationDuration: '2.2s',
+          }} />
+          {/* Outer ambient glow */}
+          <div style={{
+            position: 'absolute', inset: -18, borderRadius: 38, pointerEvents: 'none',
+            background: 'radial-gradient(circle, rgba(124,58,237,0.35) 0%, transparent 70%)',
+            filter: 'blur(12px)',
+          }} />
+          {/* Dark background square */}
+          <div style={{
+            position: 'absolute', inset: 0, borderRadius: 26,
+            background: 'linear-gradient(145deg, #0d0820 0%, #100626 50%, #160b30 100%)',
+            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.07)',
+          }} />
+          {/* S logo */}
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <ScaleFlowLogoSVG size={80} draw />
+          </div>
         </div>
       </div>
 
@@ -420,6 +443,31 @@ function SplashScreen({ onDone }: { onDone: () => void }) {
 }
 
 // ── Welcome popup (shown once per device after onboarding) ───────────────────
+function BugScreen() {
+  return (
+    <div className="flex flex-col items-center justify-center h-full min-h-[70vh] gap-6 select-none">
+      <div className="relative">
+        <div className="w-24 h-24 rounded-3xl flex items-center justify-center"
+          style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.18)' }}>
+          <span className="text-5xl">🐛</span>
+        </div>
+        <div className="absolute -inset-4 rounded-[40px] opacity-30"
+          style={{ background: 'radial-gradient(circle, rgba(239,68,68,0.12) 0%, transparent 70%)' }} />
+      </div>
+      <div className="text-center space-y-2 max-w-xs">
+        <p className="text-xl font-black text-white">Bug rencontré</p>
+        <p className="text-sm" style={{ color: 'rgba(212,220,240,0.45)' }}>
+          Cette section est temporairement indisponible.<br />Nous travaillons dessus.
+        </p>
+      </div>
+      <div className="px-4 py-2 rounded-xl text-xs font-semibold"
+        style={{ background: 'rgba(239,68,68,0.08)', color: '#f87171', border: '1px solid rgba(239,68,68,0.2)' }}>
+        En cours de correction
+      </div>
+    </div>
+  )
+}
+
 function BetaPopup({ onClose }: { onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md">
@@ -474,9 +522,12 @@ import { AiTools }           from '@/pages/AiTools'
 import { Autocomment }       from '@/pages/Autocomment'
 import { Settings }          from '@/pages/Settings'
 import { MassPosting }       from '@/pages/MassPosting'
+import { Scheduler }         from '@/pages/Scheduler'
 import { Warmup }            from '@/pages/Warmup'
+import { TextCopy }          from '@/pages/TextCopy'
 import { Licences }          from '@/pages/Licences'
 import { Support }           from '@/pages/Support'
+import { Community }         from '@/pages/Community'
 import { FullPageLoader }    from '@/components/ui/Spinner'
 
 const BETA_KEY = 'scaleflow-v1-seen'
@@ -484,7 +535,7 @@ const BETA_KEY = 'scaleflow-v1-seen'
 function AppContent({ user }: { user: User }) {
   const { currentOrg, myOrgs, loading: orgLoading, loadError: orgLoadError } = useOrg()
   const conns = useConnections(user)
-  const [page, setPage]                     = useState<Page>('dashboard')
+  const [page, setPage]                     = useState<Page>('community')
   const [settingsPanel, setSettingsPanel]   = useState<string | undefined>(undefined)
   const [onboarding, setOnboarding]         = useState<boolean | null>(null)
   const [showBeta, setShowBeta]             = useState(false)
@@ -623,17 +674,20 @@ function AppContent({ user }: { user: User }) {
 
   const content = (() => {
     switch (page) {
-      case 'dashboard':    return <Dashboard   user={user} key={refreshTick} />
+      case 'dashboard':    return <BugScreen />
       case 'phones':       return <Phones      user={user} key={refreshTick} />
-      case 'stats':        return <Stats       user={user} key={refreshTick} />
+      case 'stats':        return <BugScreen />
       case 'posting':      return <Posting     user={user} />
       case 'massposting':  return <MassPosting user={user} />
+      case 'scheduler':    return <Scheduler   user={user} />
       case 'bank':         return <Bank        user={user} />
       case 'warmup':       return <Warmup      user={user} />
       case 'montage':      return <Montage     user={user} />
       case 'remix':        return <Remix       user={user} />
+      case 'textcopy':     return <TextCopy    user={user} />
       case 'aitools':      return <AiTools     user={user} />
       case 'settings':     return <Settings    user={user} initialPanel={settingsPanel as any} />
+      case 'community':    return <Community    user={user} />
       case 'support':      return <Support      user={user} />
       case 'licences':     return <Licences    user={user} />
     }

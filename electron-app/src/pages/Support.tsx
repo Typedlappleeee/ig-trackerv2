@@ -79,7 +79,7 @@ function fmtDate(iso: string) {
 // ── Badge ─────────────────────────────────────────────────────────────────────
 function StatusBadge({ status }: { status: TicketStatus }) {
   return (
-    <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${STATUS_COLORS[status]}`}>
+    <span className={`text-[12px] px-2 py-0.5 rounded-full border font-medium ${STATUS_COLORS[status]}`}>
       {STATUS_LABELS[status]}
     </span>
   )
@@ -125,67 +125,75 @@ function CreateTicketForm({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className="flex items-center gap-3">
         <button
           onClick={onCancel}
-          className="text-sm text-muted hover:text-text transition-colors"
+          className="text-[13px] text-text2 hover:text-text transition-colors"
         >
           ← Retour
         </button>
-        <h2 className="text-base font-semibold text-text">Nouveau ticket</h2>
+        <h2 className="text-[22px] font-black text-white">Nouveau ticket</h2>
       </div>
 
-      <div className="rounded-xl border border-border/60 bg-card p-5 space-y-4">
-        <div className="grid grid-cols-2 gap-3">
-          <div className="col-span-2 space-y-1">
-            <label className="text-xs font-medium text-muted uppercase tracking-wide">Sujet</label>
+      <div className="rounded-2xl p-6 space-y-5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+        <div className="grid grid-cols-2 gap-5">
+          <div className="col-span-2 space-y-2">
+            <label className="text-[12px] font-medium text-text2 uppercase tracking-wide">Sujet</label>
             <input
+              name="subject"
               value={subject}
               onChange={e => setSubject(e.target.value)}
               placeholder="Résumé de votre problème"
-              className="w-full rounded-lg border border-border/60 bg-background px-3 py-2 text-sm text-text placeholder:text-muted/50 focus:outline-none focus:ring-2 focus:ring-violet-500/40"
+              className="w-full rounded-xl px-4 py-2.5 text-[13px] focus:outline-none"
+              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
             />
           </div>
 
-          <div className="space-y-1">
-            <label className="text-xs font-medium text-muted uppercase tracking-wide">Catégorie</label>
+          <div className="space-y-2">
+            <label className="text-[12px] font-medium text-text2 uppercase tracking-wide">Catégorie</label>
             <select
+              name="category"
               value={category}
               onChange={e => setCategory(e.target.value as TicketCategory)}
-              className="w-full rounded-lg border border-border/60 bg-background px-3 py-2 text-sm text-text focus:outline-none focus:ring-2 focus:ring-violet-500/40"
+              className="w-full rounded-xl px-4 py-2.5 text-[13px] focus:outline-none"
+              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
             >
               {(Object.entries(CATEGORY_LABELS) as [TicketCategory, string][]).map(([k, v]) => (
-                <option key={k} value={k}>{v}</option>
+                <option key={k} value={k} style={{ background: '#0d1120', color: '#e2d9f3' }}>{v}</option>
               ))}
             </select>
           </div>
 
-          <div className="col-span-2 space-y-1">
-            <label className="text-xs font-medium text-muted uppercase tracking-wide">Description</label>
+          <div className="col-span-2 space-y-2">
+            <label className="text-[12px] font-medium text-text2 uppercase tracking-wide">Description</label>
             <textarea
+              name="description"
               value={description}
               onChange={e => setDescription(e.target.value)}
               placeholder="Décrivez votre problème en détail…"
               rows={5}
-              className="w-full rounded-lg border border-border/60 bg-background px-3 py-2 text-sm text-text placeholder:text-muted/50 focus:outline-none focus:ring-2 focus:ring-violet-500/40 resize-none"
+              className="w-full rounded-xl px-4 py-2.5 text-[13px] focus:outline-none resize-none"
+              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
             />
           </div>
         </div>
 
-        {error && <p className="text-xs text-red-400">{error}</p>}
+        {error && <p className="text-[13px] text-red-400">{error}</p>}
 
-        <div className="flex justify-end gap-2">
+        <div className="flex justify-end gap-3">
           <button
             onClick={onCancel}
-            className="rounded-lg border border-border/60 px-4 py-1.5 text-sm text-muted hover:text-text transition-colors"
+            className="rounded-xl px-5 py-2.5 text-[13px] font-semibold"
+            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
           >
             Annuler
           </button>
           <button
             onClick={submit}
             disabled={saving}
-            className="rounded-lg bg-violet-600 hover:bg-violet-500 disabled:opacity-50 px-4 py-1.5 text-sm font-medium text-white transition-colors"
+            className="rounded-xl px-5 py-2.5 text-[13px] font-semibold text-white disabled:opacity-50"
+            style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)' }}
           >
             {saving ? 'Envoi…' : 'Envoyer le ticket'}
           </button>
@@ -257,23 +265,23 @@ function ThreadView({
   const isClosed = ticket.status === 'closed' || ticket.status === 'resolved'
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-start gap-3">
-        <button onClick={onBack} className="mt-0.5 text-sm text-muted hover:text-text transition-colors shrink-0">
+      <div className="flex items-start gap-4">
+        <button onClick={onBack} className="mt-1 text-[13px] text-text2 hover:text-text transition-colors shrink-0">
           ←
         </button>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <h2 className="text-base font-semibold text-text truncate">{ticket.subject}</h2>
+            <h2 className="text-[20px] font-black text-white truncate">{ticket.subject}</h2>
             <StatusBadge status={ticket.status} />
             {isAdmin && (
-              <span className={`text-xs font-medium ${PRIORITY_COLORS[ticket.priority]}`}>
+              <span className={`text-[13px] font-medium ${PRIORITY_COLORS[ticket.priority]}`}>
                 {PRIORITY_LABELS[ticket.priority]}
               </span>
             )}
           </div>
-          <p className="text-xs text-muted mt-0.5">
+          <p className="text-[12px] text-text2 mt-1">
             {ticket.user_email}
             {ticket.org_name && <> · <span className="text-violet-400">{ticket.org_name}</span></>}
             {' · '}{CATEGORY_LABELS[ticket.category]}
@@ -282,58 +290,60 @@ function ThreadView({
         </div>
         {isAdmin && (
           <select
+            name="ticket-status"
             value={ticket.status}
             onChange={e => onStatusChange(ticket.id, e.target.value as TicketStatus)}
-            className="shrink-0 rounded-lg border border-border/60 bg-background px-2 py-1 text-xs text-text focus:outline-none"
+            className="shrink-0 rounded-xl px-3 py-2 text-[13px] focus:outline-none"
+            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
           >
-            <option value="open">Ouvert</option>
-            <option value="in_progress">En cours</option>
-            <option value="resolved">Résolu</option>
-            <option value="closed">Fermé</option>
+            <option value="open" style={{ background: '#0d1120', color: '#e2d9f3' }}>Ouvert</option>
+            <option value="in_progress" style={{ background: '#0d1120', color: '#e2d9f3' }}>En cours</option>
+            <option value="resolved" style={{ background: '#0d1120', color: '#e2d9f3' }}>Résolu</option>
+            <option value="closed" style={{ background: '#0d1120', color: '#e2d9f3' }}>Fermé</option>
           </select>
         )}
       </div>
 
       {/* Description card */}
-      <div className="rounded-xl border border-border/60 bg-card p-4">
-        <p className="text-xs font-medium text-muted uppercase tracking-wide mb-1.5">Description initiale</p>
-        <p className="text-sm text-text whitespace-pre-wrap">{ticket.description}</p>
+      <div className="rounded-2xl p-6" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+        <p className="text-[12px] font-medium text-text2 uppercase tracking-wide mb-3">Description initiale</p>
+        <p className="text-[13px] text-text whitespace-pre-wrap">{ticket.description}</p>
       </div>
 
       {/* Messages */}
-      <div className="rounded-xl border border-border/60 bg-card overflow-hidden">
-        <div className="max-h-72 overflow-y-auto p-4 space-y-3">
+      <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+        <div className="max-h-80 overflow-y-auto p-5 space-y-4">
           {loading ? (
-            <p className="text-xs text-muted text-center py-4">Chargement…</p>
+            <p className="text-[13px] text-text2 text-center py-4">Chargement…</p>
           ) : messages.length === 0 ? (
-            <p className="text-xs text-muted text-center py-4">Aucun message pour l'instant.</p>
+            <p className="text-[13px] text-text2 text-center py-4">Aucun message pour l'instant.</p>
           ) : (
             messages.map(m => (
               <div
                 key={m.id}
-                className={`flex gap-2 ${m.sender_id === userId && !m.is_admin ? 'flex-row-reverse' : ''}`}
+                className={`flex gap-3 ${m.sender_id === userId && !m.is_admin ? 'flex-row-reverse' : ''}`}
               >
                 <div
-                  className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+                  className={`w-8 h-8 rounded-full flex items-center justify-center text-[13px] font-bold shrink-0 ${
                     m.is_admin ? 'bg-violet-600/30 text-violet-300' : 'bg-zinc-700 text-zinc-200'
                   }`}
                 >
                   {m.is_admin ? '🛡' : m.sender_email[0]?.toUpperCase()}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5 mb-0.5">
-                    <span className="text-xs font-medium text-text">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-[13px] font-medium text-text">
                       {m.is_admin ? 'Support' : m.sender_email}
                     </span>
                     {m.is_admin && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-violet-500/20 text-violet-300 border border-violet-500/30">
+                      <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-violet-500/20 text-violet-300 border border-violet-500/30">
                         Admin
                       </span>
                     )}
-                    <span className="text-[10px] text-muted">{fmtDate(m.created_at)}</span>
+                    <span className="text-[12px] text-text2">{fmtDate(m.created_at)}</span>
                   </div>
                   <div
-                    className={`rounded-xl px-3 py-2 text-sm text-text whitespace-pre-wrap ${
+                    className={`rounded-xl px-4 py-3 text-[13px] text-text whitespace-pre-wrap ${
                       m.is_admin
                         ? 'bg-violet-600/10 border border-violet-500/20'
                         : 'bg-zinc-800/60 border border-border/40'
@@ -350,18 +360,21 @@ function ThreadView({
 
         {/* Reply input */}
         {!isClosed && (
-          <div className="border-t border-border/60 p-3 flex gap-2">
+          <div className="px-5 py-4 flex gap-3" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
             <input
+              name="reply"
               value={reply}
               onChange={e => setReply(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendReply() } }}
               placeholder="Répondre…"
-              className="flex-1 rounded-lg border border-border/60 bg-background px-3 py-1.5 text-sm text-text placeholder:text-muted/50 focus:outline-none focus:ring-2 focus:ring-violet-500/40"
+              className="flex-1 rounded-xl px-4 py-2.5 text-[13px] focus:outline-none"
+              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
             />
             <button
               onClick={sendReply}
               disabled={sending || !reply.trim()}
-              className="rounded-lg bg-violet-600 hover:bg-violet-500 disabled:opacity-50 px-3 py-1.5 text-sm font-medium text-white transition-colors"
+              className="rounded-xl px-5 py-2.5 text-[13px] font-semibold text-white disabled:opacity-50"
+              style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)' }}
             >
               {sending ? '…' : 'Envoyer'}
             </button>
@@ -401,85 +414,107 @@ function UserSupport({ user }: { user: User }) {
 
   if (view === 'create') {
     return (
-      <CreateTicketForm
-        user={user}
-        orgId={currentOrg?.id ?? null}
-        orgName={currentOrg?.name ?? null}
-        onCreated={() => { load(); setView('list') }}
-        onCancel={() => setView('list')}
-      />
+      <div className="h-full flex flex-col overflow-hidden">
+        <div className="flex-shrink-0 px-10 pt-9 pb-7" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+          <h1 className="text-[28px] font-black text-white leading-none">Support</h1>
+        </div>
+        <div className="flex-1 overflow-y-auto px-10 pb-10 mt-8">
+          <CreateTicketForm
+            user={user}
+            orgId={currentOrg?.id ?? null}
+            orgName={currentOrg?.name ?? null}
+            onCreated={() => { load(); setView('list') }}
+            onCancel={() => setView('list')}
+          />
+        </div>
+      </div>
     )
   }
 
   if (view === 'thread' && active) {
     return (
-      <ThreadView
-        ticket={active}
-        userId={user.id}
-        isAdmin={false}
-        onBack={() => { setView('list'); load() }}
-        onStatusChange={() => {}}
-      />
+      <div className="h-full flex flex-col overflow-hidden">
+        <div className="flex-shrink-0 px-10 pt-9 pb-7" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+          <h1 className="text-[28px] font-black text-white leading-none">Support</h1>
+        </div>
+        <div className="flex-1 overflow-y-auto px-10 pb-10 mt-8">
+          <ThreadView
+            ticket={active}
+            userId={user.id}
+            isAdmin={false}
+            onBack={() => { setView('list'); load() }}
+            onStatusChange={() => {}}
+          />
+        </div>
+      </div>
     )
   }
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+    <div className="h-full flex flex-col overflow-hidden">
+      {/* Page header */}
+      <div className="flex-shrink-0 px-10 pt-9 pb-7 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
         <div>
-          <h1 className="text-lg font-semibold text-text">Support</h1>
-          <p className="text-xs text-muted mt-0.5">Besoin d'aide ? Créez un ticket et notre équipe vous répondra.</p>
+          <h1 className="text-[28px] font-black text-white leading-none">Support</h1>
+          <p className="text-[13px] text-text2 mt-0.5">Besoin d'aide ? Créez un ticket et notre équipe vous répondra.</p>
         </div>
         <button
           onClick={() => setView('create')}
-          className="flex items-center gap-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 px-3 py-1.5 text-sm font-medium text-white transition-colors"
+          className="rounded-xl px-5 py-2.5 text-[13px] font-semibold text-white"
+          style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)' }}
         >
           + Nouveau ticket
         </button>
       </div>
 
-      {/* Tickets list */}
-      {loading ? (
-        <div className="rounded-xl border border-border/60 bg-card p-8 text-center">
-          <p className="text-sm text-muted">Chargement…</p>
-        </div>
-      ) : tickets.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-border/50 bg-card/50 p-10 text-center space-y-3">
-          <div className="text-3xl">🎫</div>
-          <p className="text-sm font-medium text-text">Aucun ticket pour l'instant</p>
-          <p className="text-xs text-muted">Créez un ticket si vous avez besoin d'aide.</p>
-          <button
-            onClick={() => setView('create')}
-            className="mt-1 inline-flex items-center gap-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 px-4 py-2 text-sm font-medium text-white transition-colors"
-          >
-            Créer un ticket
-          </button>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {tickets.map(t => (
-            <button
-              key={t.id}
-              onClick={() => openTicket(t)}
-              className="w-full text-left rounded-xl border border-border/60 bg-card hover:bg-card/80 px-4 py-3 transition-colors"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-sm font-medium text-text truncate">{t.subject}</span>
-                    <StatusBadge status={t.status} />
+      {/* Scrollable content */}
+      <div className="flex-1 overflow-y-auto px-10 pb-10">
+        <div className="mt-8 space-y-4">
+          {/* Tickets list */}
+          {loading ? (
+            <div className="rounded-2xl p-10 text-center" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <p className="text-[13px] text-text2">Chargement…</p>
+            </div>
+          ) : tickets.length === 0 ? (
+            <div className="rounded-2xl p-10 text-center space-y-4" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <div className="text-4xl">🎫</div>
+              <p className="text-base font-bold text-white">Aucun ticket pour l'instant</p>
+              <p className="text-[13px] text-text2">Créez un ticket si vous avez besoin d'aide.</p>
+              <button
+                onClick={() => setView('create')}
+                className="mt-2 inline-flex items-center gap-1.5 rounded-xl px-5 py-2.5 text-[13px] font-semibold text-white"
+                style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)' }}
+              >
+                Créer un ticket
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {tickets.map(t => (
+                <button
+                  key={t.id}
+                  onClick={() => openTicket(t)}
+                  className="w-full text-left rounded-2xl px-5 py-4 transition-all hover:bg-white/[0.03]"
+                  style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-[13px] font-medium text-text truncate">{t.subject}</span>
+                        <StatusBadge status={t.status} />
+                      </div>
+                      <p className="text-[12px] text-text2 mt-1">
+                        {CATEGORY_LABELS[t.category]} · {fmtDate(t.created_at)}
+                      </p>
+                    </div>
+                    <span className="text-[13px] text-text2 shrink-0">→</span>
                   </div>
-                  <p className="text-xs text-muted mt-0.5">
-                    {CATEGORY_LABELS[t.category]} · {fmtDate(t.created_at)}
-                  </p>
-                </div>
-                <span className="text-xs text-muted shrink-0">→</span>
-              </div>
-            </button>
-          ))}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   )
 }
@@ -525,103 +560,121 @@ function AdminSupport({ user }: { user: User }) {
 
   if (active) {
     return (
-      <ThreadView
-        ticket={active}
-        userId={user.id}
-        isAdmin={true}
-        onBack={() => { setActive(null); load() }}
-        onStatusChange={handleStatusChange}
-      />
+      <div className="h-full flex flex-col overflow-hidden">
+        <div className="flex-shrink-0 px-10 pt-9 pb-7" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+          <h1 className="text-[28px] font-black text-white leading-none">Support Admin</h1>
+        </div>
+        <div className="flex-1 overflow-y-auto px-10 pb-10 mt-8">
+          <ThreadView
+            ticket={active}
+            userId={user.id}
+            isAdmin={true}
+            onBack={() => { setActive(null); load() }}
+            onStatusChange={handleStatusChange}
+          />
+        </div>
+      </div>
     )
   }
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+    <div className="h-full flex flex-col overflow-hidden">
+      {/* Page header */}
+      <div className="flex-shrink-0 px-10 pt-9 pb-7 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
         <div>
-          <h1 className="text-lg font-semibold text-text">Tickets support</h1>
-          <p className="text-xs text-muted mt-0.5">{tickets.length} ticket(s) au total</p>
+          <h1 className="text-[28px] font-black text-white leading-none">Tickets support</h1>
+          <p className="text-[13px] text-text2 mt-0.5">{tickets.length} ticket(s) au total</p>
         </div>
         <button
           onClick={load}
-          className="rounded-lg border border-border/60 px-3 py-1.5 text-sm text-muted hover:text-text transition-colors"
+          className="rounded-xl px-5 py-2.5 text-[13px] font-semibold"
+          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
         >
           ↺ Actualiser
         </button>
       </div>
 
-      {/* Filters row */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <input
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder="Rechercher (email, sujet, orga)…"
-          className="flex-1 min-w-48 rounded-lg border border-border/60 bg-background px-3 py-1.5 text-sm text-text placeholder:text-muted/50 focus:outline-none focus:ring-2 focus:ring-violet-500/40"
-        />
-        {(['all', 'open', 'in_progress', 'resolved', 'closed'] as const).map(s => (
-          <button
-            key={s}
-            onClick={() => setFilter(s)}
-            className={`rounded-lg px-3 py-1 text-xs font-medium border transition-colors ${
-              filter === s
-                ? 'bg-violet-600/20 border-violet-500/40 text-violet-300'
-                : 'border-border/50 text-muted hover:text-text'
-            }`}
-          >
-            {s === 'all' ? 'Tous' : STATUS_LABELS[s as TicketStatus]}
-            <span className="ml-1 text-[10px] opacity-70">({counts[s] ?? 0})</span>
-          </button>
-        ))}
-      </div>
+      {/* Scrollable content */}
+      <div className="flex-1 overflow-y-auto px-10 pb-10">
+        <div className="mt-8 space-y-6">
 
-      {/* Table */}
-      {loading ? (
-        <div className="rounded-xl border border-border/60 bg-card p-8 text-center">
-          <p className="text-sm text-muted">Chargement…</p>
+          {/* Filters row */}
+          <div className="flex items-center gap-3 flex-wrap">
+            <input
+              name="search"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Rechercher (email, sujet, orga)…"
+              className="flex-1 min-w-48 rounded-xl px-4 py-2.5 text-[13px] focus:outline-none"
+              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
+            />
+            {(['all', 'open', 'in_progress', 'resolved', 'closed'] as const).map(s => (
+              <button
+                key={s}
+                onClick={() => setFilter(s)}
+                className={`rounded-xl px-4 py-2.5 text-[13px] font-medium border transition-colors ${
+                  filter === s
+                    ? 'bg-violet-600/20 border-violet-500/40 text-violet-300'
+                    : 'text-text2 hover:text-text'
+                }`}
+                style={filter !== s ? { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' } : {}}
+              >
+                {s === 'all' ? 'Tous' : STATUS_LABELS[s as TicketStatus]}
+                <span className="ml-1 text-[11px] opacity-70">({counts[s] ?? 0})</span>
+              </button>
+            ))}
+          </div>
+
+          {/* Table */}
+          {loading ? (
+            <div className="rounded-2xl p-10 text-center" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <p className="text-[13px] text-text2">Chargement…</p>
+            </div>
+          ) : shown.length === 0 ? (
+            <div className="rounded-2xl p-10 text-center" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <p className="text-[13px] text-text2">Aucun ticket trouvé.</p>
+            </div>
+          ) : (
+            <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <table className="w-full">
+                <thead>
+                  <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)' }}>
+                    <th className="text-left px-5 py-3.5 text-[12px] font-semibold text-text2 uppercase tracking-wide">Sujet</th>
+                    <th className="text-left px-5 py-3.5 text-[12px] font-semibold text-text2 uppercase tracking-wide">Email</th>
+                    <th className="text-left px-5 py-3.5 text-[12px] font-semibold text-text2 uppercase tracking-wide">Orga</th>
+                    <th className="text-left px-5 py-3.5 text-[12px] font-semibold text-text2 uppercase tracking-wide">Cat.</th>
+                    <th className="text-left px-5 py-3.5 text-[12px] font-semibold text-text2 uppercase tracking-wide">Statut</th>
+                    <th className="text-left px-5 py-3.5 text-[12px] font-semibold text-text2 uppercase tracking-wide">Priorité</th>
+                    <th className="text-left px-5 py-3.5 text-[12px] font-semibold text-text2 uppercase tracking-wide">Msgs</th>
+                    <th className="text-left px-5 py-3.5 text-[12px] font-semibold text-text2 uppercase tracking-wide">Màj</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {shown.map(t => (
+                    <tr
+                      key={t.id}
+                      onClick={() => setActive(t)}
+                      className="cursor-pointer transition-colors hover:bg-white/[0.02]"
+                      style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}
+                    >
+                      <td className="px-5 py-4 text-[13px] font-medium text-text max-w-40 truncate">{t.subject}</td>
+                      <td className="px-5 py-4 text-[13px] text-text2">{t.user_email}</td>
+                      <td className="px-5 py-4 text-[13px] text-violet-400">{t.org_name ?? '—'}</td>
+                      <td className="px-5 py-4 text-[13px] text-text2">{CATEGORY_LABELS[t.category as TicketCategory]}</td>
+                      <td className="px-5 py-4"><StatusBadge status={t.status} /></td>
+                      <td className={`px-5 py-4 text-[13px] font-medium ${PRIORITY_COLORS[t.priority]}`}>
+                        {PRIORITY_LABELS[t.priority]}
+                      </td>
+                      <td className="px-5 py-4 text-[13px] text-text2 text-center">{t.message_count ?? 0}</td>
+                      <td className="px-5 py-4 text-[13px] text-text2 whitespace-nowrap">{fmtDate(t.updated_at)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
-      ) : shown.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-border/50 bg-card/50 p-8 text-center">
-          <p className="text-sm text-muted">Aucun ticket trouvé.</p>
-        </div>
-      ) : (
-        <div className="rounded-xl border border-border/60 bg-card overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border/60 bg-background/50">
-                <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted uppercase tracking-wide">Sujet</th>
-                <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted uppercase tracking-wide">Email</th>
-                <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted uppercase tracking-wide">Orga</th>
-                <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted uppercase tracking-wide">Cat.</th>
-                <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted uppercase tracking-wide">Statut</th>
-                <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted uppercase tracking-wide">Priorité</th>
-                <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted uppercase tracking-wide">Msgs</th>
-                <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted uppercase tracking-wide">Màj</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border/40">
-              {shown.map(t => (
-                <tr
-                  key={t.id}
-                  onClick={() => setActive(t)}
-                  className="cursor-pointer hover:bg-background/40 transition-colors"
-                >
-                  <td className="px-4 py-3 font-medium text-text max-w-40 truncate">{t.subject}</td>
-                  <td className="px-4 py-3 text-muted text-xs">{t.user_email}</td>
-                  <td className="px-4 py-3 text-xs text-violet-400">{t.org_name ?? '—'}</td>
-                  <td className="px-4 py-3 text-xs text-muted">{CATEGORY_LABELS[t.category as TicketCategory]}</td>
-                  <td className="px-4 py-3"><StatusBadge status={t.status} /></td>
-                  <td className={`px-4 py-3 text-xs font-medium ${PRIORITY_COLORS[t.priority]}`}>
-                    {PRIORITY_LABELS[t.priority]}
-                  </td>
-                  <td className="px-4 py-3 text-xs text-muted text-center">{t.message_count ?? 0}</td>
-                  <td className="px-4 py-3 text-xs text-muted whitespace-nowrap">{fmtDate(t.updated_at)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      </div>
     </div>
   )
 }
@@ -631,7 +684,7 @@ export function Support({ user }: { user: User }) {
   const license = useLicense()
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
+    <div className="h-full flex flex-col overflow-hidden">
       {license.isSuperAdmin ? (
         <AdminSupport user={user} />
       ) : (

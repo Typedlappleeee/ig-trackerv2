@@ -8,6 +8,11 @@ const fileStore = new Map<string, File>()
 function storeFile(file: File): string {
   const url = URL.createObjectURL(file)
   fileStore.set(url, file)
+  // Register in the global blob registry so ffmpeg-web writeInput() can use
+  // FileReader (COEP-immune) instead of fetch/XHR which fail under require-corp.
+  const w = window as any
+  if (!w.__ffmpegBlobReg) w.__ffmpegBlobReg = new Map()
+  w.__ffmpegBlobReg.set(url, file)
   return url
 }
 
@@ -284,8 +289,13 @@ export function buildWebAPI() {
     },
 
     async detectSceneChange(opts: unknown) {
-      const { detectSceneChangeWeb } = await import('./ffmpeg-web')
-      return detectSceneChangeWeb(opts as Parameters<typeof detectSceneChangeWeb>[0])
+      const { detectSceneChangeWeb, detectBeatDropWeb } = await import('./ffmpeg-web')
+      const o = opts as Parameters<typeof detectSceneChangeWeb>[0]
+      // Try beat-drop (audio) detection first — most reliable for music-driven content
+      const beat = await detectBeatDropWeb(o.filePath)
+      if (beat.ok && beat.splitTime != null && beat.splitTime > 0) return beat
+      // Fall back to visual scene change detection
+      return detectSceneChangeWeb(o)
     },
 
     async runFfmpegRemix(opts: unknown) {
@@ -306,6 +316,11 @@ export function buildWebAPI() {
     async extractFrames(opts: unknown) {
       const { extractFramesWeb } = await import('./ffmpeg-web')
       return extractFramesWeb(opts as Parameters<typeof extractFramesWeb>[0])
+    },
+
+    async runFfmpegTextOverlay(opts: unknown) {
+      const { runFfmpegTextOverlayWeb } = await import('./ffmpeg-web')
+      return runFfmpegTextOverlayWeb(opts as Parameters<typeof runFfmpegTextOverlayWeb>[0])
     },
   }
 }

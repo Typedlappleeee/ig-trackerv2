@@ -43,6 +43,10 @@ export function OrganizationPanel({ user }: Props) {
   const [myDisplayName, setMyDisplayName] = useState('')
   const [editingName, setEditingName]     = useState(false)
 
+  // Org rename
+  const [renamingOrgId, setRenamingOrgId] = useState<string | null>(null)
+  const [renameValue, setRenameValue]     = useState('')
+
   // Invite form
   const [invLabel, setInvLabel] = useState('')
   const [invRole,  setInvRole]  = useState<Exclude<OrgRole, 'owner'>>('member')
@@ -175,6 +179,20 @@ export function OrganizationPanel({ user }: Props) {
     if (error) { flash(error.message, true); return }
     flash('Organisation supprimée')
     switchOrg(null)
+    await refresh()
+  }
+
+  async function renameOrg(org: Organization) {
+    const trimmed = renameValue.trim()
+    if (!trimmed || trimmed === org.name) { setRenamingOrgId(null); return }
+    setBusy(true)
+    const { error } = await supabase.from('organizations')
+      .update({ name: trimmed, name_updated_at: new Date().toISOString() })
+      .eq('id', org.id)
+    setBusy(false)
+    if (error) { flash(error.message, true); return }
+    flash('Nom de l\'organisation modifié')
+    setRenamingOrgId(null)
     await refresh()
   }
 
@@ -364,23 +382,55 @@ export function OrganizationPanel({ user }: Props) {
             <p className="text-text2 text-sm">Aucune organisation. Crée-en une ou rejoins-en une avec un code d'invitation.</p>
           ) : (
             <ul className="space-y-2">
-              {myOrgs.map(({ org, member }) => (
-                <li key={org.id} className={`flex items-center gap-3 p-3 rounded-lg border ${currentOrg?.id === org.id ? 'border-accent/40 bg-accent/5' : 'border-border bg-surface'}`}>
-                  <span className="text-xl">🏢</span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-text font-medium truncate">{org.name}</p>
-                    <p className="text-text2 text-xs">{ROLE_LABELS[member.role]}</p>
-                  </div>
-                  {currentOrg?.id !== org.id && (
-                    <Button size="sm" variant="secondary" onClick={() => { switchOrg(org.id); window.location.reload() }}>Activer</Button>
-                  )}
-                  {member.role === 'owner' ? (
-                    <Button size="sm" variant="danger" onClick={() => deleteOrg(org)}>Supprimer</Button>
-                  ) : (
-                    <Button size="sm" variant="secondary" onClick={() => leaveOrg(org.id)}>Quitter</Button>
-                  )}
-                </li>
-              ))}
+              {myOrgs.map(({ org, member }) => {
+                const isOwner = member.role === 'owner'
+                const lastChange = org.name_updated_at ?? org.created_at
+                const daysSince  = Math.floor((Date.now() - new Date(lastChange).getTime()) / 86400000)
+                const canRename  = isOwner && daysSince >= 90
+                const daysLeft   = Math.max(0, 90 - daysSince)
+                const isRenaming = renamingOrgId === org.id
+                return (
+                  <li key={org.id} className={`rounded-lg border ${currentOrg?.id === org.id ? 'border-accent/40 bg-accent/5' : 'border-border bg-surface'}`}>
+                    <div className="flex items-center gap-3 p-3">
+                      <span className="text-xl">🏢</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-text font-medium truncate">{org.name}</p>
+                        <p className="text-text2 text-xs">{ROLE_LABELS[member.role]}</p>
+                      </div>
+                      {currentOrg?.id !== org.id && (
+                        <Button size="sm" variant="secondary" onClick={() => { switchOrg(org.id); window.location.reload() }}>Activer</Button>
+                      )}
+                      {isOwner && !isRenaming && (
+                        <Button size="sm" variant="secondary"
+                          onClick={() => { setRenamingOrgId(org.id); setRenameValue(org.name) }}
+                          disabled={!canRename}
+                          title={canRename ? 'Renommer' : `Renommage disponible dans ${daysLeft} jour${daysLeft > 1 ? 's' : ''}`}>
+                          ✎
+                        </Button>
+                      )}
+                      {isOwner ? (
+                        <Button size="sm" variant="danger" onClick={() => deleteOrg(org)}>Supprimer</Button>
+                      ) : (
+                        <Button size="sm" variant="secondary" onClick={() => leaveOrg(org.id)}>Quitter</Button>
+                      )}
+                    </div>
+                    {isOwner && !canRename && (
+                      <p className="px-3 pb-2 text-[11px]" style={{ color: 'rgba(196,181,253,0.4)' }}>
+                        🔒 Renommage disponible dans <strong>{daysLeft}</strong> jour{daysLeft > 1 ? 's' : ''}
+                      </p>
+                    )}
+                    {isRenaming && (
+                      <div className="flex gap-2 items-center px-3 pb-3">
+                        <Input value={renameValue} onChange={e => setRenameValue(e.target.value)}
+                          placeholder="Nouveau nom…" maxLength={48}
+                          onKeyDown={e => { if (e.key === 'Enter') renameOrg(org); if (e.key === 'Escape') setRenamingOrgId(null) }} />
+                        <Button size="sm" onClick={() => renameOrg(org)} loading={busy}>OK</Button>
+                        <Button size="sm" variant="secondary" onClick={() => setRenamingOrgId(null)}>Annuler</Button>
+                      </div>
+                    )}
+                  </li>
+                )
+              })}
             </ul>
           )}
         </section>
@@ -433,6 +483,7 @@ export function OrganizationPanel({ user }: Props) {
                         </p>
                       </div>
                       <select
+                        name="member-role"
                         value={m.role}
                         disabled={m.role === 'owner' || isMe}
                         onChange={e => changeRole(m, e.target.value as OrgRole)}
@@ -473,6 +524,7 @@ export function OrganizationPanel({ user }: Props) {
               <div className="flex gap-2">
                 <Input value={invLabel} onChange={e => setInvLabel(e.target.value)} placeholder="Note (ex: Pour Pierre) — optionnel" />
                 <select
+                  name="invite-role"
                   value={invRole}
                   onChange={e => setInvRole(e.target.value as Exclude<OrgRole, 'owner'>)}
                   className="bg-bg border border-border rounded px-2 py-1 text-sm text-text"
@@ -697,6 +749,7 @@ function PermEditor({
                 <span className="text-base">{t.icon}</span>
                 <span className="flex-1 text-xs text-text truncate" title={t.label}>{t.label}</span>
                 <select
+                  name="tool-permission"
                   value={v === undefined ? 'default' : v ? 'allow' : 'deny'}
                   onChange={e => {
                     const val = e.target.value
@@ -717,7 +770,7 @@ function PermEditor({
       <div>
         <p className="text-xs font-bold text-text mb-2">Dossiers de la banque</p>
         <div className="flex flex-col gap-2">
-          <select value={bankMode} onChange={e => setBankMode(e.target.value as 'all' | 'allow' | 'deny')}
+          <select name="bank-mode" value={bankMode} onChange={e => setBankMode(e.target.value as 'all' | 'allow' | 'deny')}
             className="bg-bg border border-border rounded px-2 py-1 text-xs text-text">
             <option value="all">Tous les dossiers</option>
             <option value="allow">Uniquement ces dossiers…</option>
@@ -737,7 +790,7 @@ function PermEditor({
       <div>
         <p className="text-xs font-bold text-text mb-2">Groupes de téléphones (GéeLark)</p>
         <div className="flex flex-col gap-2">
-          <select value={groupMode} onChange={e => setGroupMode(e.target.value as 'all' | 'allow')}
+          <select name="group-mode" value={groupMode} onChange={e => setGroupMode(e.target.value as 'all' | 'allow')}
             className="bg-bg border border-border rounded px-2 py-1 text-xs text-text">
             <option value="all">Tous les groupes</option>
             <option value="allow">Uniquement ces groupes…</option>

@@ -30,6 +30,28 @@ html, body, #root {
   border-radius: 4px;
 }
 
+/* ── Logo neon spin ─────────────────────────────────────────────────────────── */
+@property --logo-neon-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+@keyframes logo-neon-spin {
+  to { --logo-neon-angle: 360deg; }
+}
+.logo-neon-ring {
+  animation: logo-neon-spin 3.5s linear infinite;
+  background: conic-gradient(
+    from var(--logo-neon-angle),
+    #1d4ed8 0%,
+    #7c3aed 22%,
+    #ec4899 44%,
+    #60a5fa 56%,
+    #7c3aed 78%,
+    #1d4ed8 100%
+  );
+}
+
 /* ── Splash screen ──────────────────────────────────────────────────────────── */
 @property --splash-angle {
   syntax: '<angle>';
@@ -140,8 +162,8 @@ html, body, #root {
   50%       { transform: translateY(-5px); }
 }
 @keyframes glow-accent {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(79,142,247,0); }
-  50%       { box-shadow: 0 0 14px 3px rgba(79,142,247,0.25); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(139,92,246,0); }
+  50%       { box-shadow: 0 0 14px 3px rgba(139,92,246,0.25); }
 }
 @keyframes count-up {
   0%   { opacity: 0; transform: translateY(6px); }
@@ -168,8 +190,8 @@ html, body, #root {
   100% { box-shadow: 0 0 0 0 transparent; opacity: 0; }
 }
 @keyframes border-glow {
-  0%, 100% { border-color: rgba(79,142,247,0.15); }
-  50%       { border-color: rgba(79,142,247,0.4); box-shadow: 0 0 18px -4px rgba(79,142,247,0.3); }
+  0%, 100% { border-color: rgba(139,92,246,0.15); }
+  50%       { border-color: rgba(139,92,246,0.4); box-shadow: 0 0 18px -4px rgba(139,92,246,0.3); }
 }
 
 /* ── Utility classes ────────────────────────────────────────────────────────── */
@@ -217,8 +239,8 @@ html, body, #root {
 }
 .card-lift:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 28px -8px rgba(79,158,255,0.16), 0 2px 8px -2px rgba(0,0,0,0.4);
-  border-color: rgba(79,142,247,0.25) !important;
+  box-shadow: 0 8px 28px -8px rgba(139,92,246,0.16), 0 2px 8px -2px rgba(0,0,0,0.4);
+  border-color: rgba(139,92,246,0.25) !important;
 }
 
 /* Shimmer skeleton */
@@ -240,7 +262,7 @@ html, body, #root {
   position: absolute;
   inset: -1px;
   border-radius: inherit;
-  background: linear-gradient(135deg, rgba(79,142,247,0.3), rgba(79,142,247,0.05), rgba(79,142,247,0.15));
+  background: linear-gradient(135deg, rgba(139,92,246,0.35), rgba(139,92,246,0.06), rgba(139,92,246,0.18));
   z-index: -1;
 }
 
@@ -311,6 +333,34 @@ button, a, input, select, textarea {
 }
 
 /* ── ScaleFlow Splash Animations ─────────────────────────────────────────────── */
+
+/* Orbital rotation */
+@keyframes sf-orbit-cw  { to { transform: rotate(360deg); } }
+@keyframes sf-orbit-ccw { to { transform: rotate(-360deg); } }
+
+/* Continuous looping pulse ring */
+@keyframes sf-pulse-ring {
+  0%   { transform: scale(0.8);  opacity: 0.9; }
+  100% { transform: scale(2.55); opacity: 0; }
+}
+
+/* Background aurora blob drift */
+@keyframes sf-blob-a {
+  0%,100% { transform: translate(0px,0px) scale(1); }
+  33%     { transform: translate(50px,-32px) scale(1.13); }
+  66%     { transform: translate(-26px,40px) scale(0.9); }
+}
+@keyframes sf-blob-b {
+  0%,100% { transform: translate(0px,0px) scale(1); }
+  42%     { transform: translate(-58px,22px) scale(1.16); }
+  72%     { transform: translate(42px,-44px) scale(0.87); }
+}
+@keyframes sf-blob-c {
+  0%,100% { transform: translate(0px,0px) scale(1); }
+  35%     { transform: translate(34px,50px) scale(1.09); }
+  68%     { transform: translate(-46px,-24px) scale(0.93); }
+}
+
 @keyframes sf-logo-in {
   0%   { opacity: 0; transform: scale(0.25) rotate(-10deg); filter: blur(24px); }
   62%  { opacity: 1; transform: scale(1.08) rotate(1.5deg); filter: blur(0); }
@@ -474,13 +524,33 @@ button, a, input, select, textarea {
   animation: sf-beam-fade var(--beam-dur, 2.4s) ease-out var(--beam-delay, 0s) both;
 }
 
-/* Active nav item */
+/* Active nav item — premium filled style */
 .sf-nav-active {
-  background: linear-gradient(90deg, rgba(139,92,246,0.16) 0%, rgba(139,92,246,0.04) 100%) !important;
-  box-shadow: inset 3px 0 0 #8b5cf6;
-  color: #c4b5fd !important;
+  background: linear-gradient(135deg, rgba(139,92,246,0.22) 0%, rgba(124,58,237,0.12) 50%, rgba(139,92,246,0.08) 100%) !important;
+  box-shadow:
+    inset 0 0 0 1px rgba(139,92,246,0.22),
+    0 2px 12px rgba(139,92,246,0.12),
+    0 0 0 0.5px rgba(0,0,0,0.2);
+  color: #ede8ff !important;
+  position: relative;
 }
-.sf-nav-active svg { color: #a78bfa !important; }
+.sf-nav-active::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 20%; bottom: 20%;
+  width: 2.5px;
+  background: linear-gradient(180deg, #c4b5fd, #a78bfa, #c4b5fd);
+  border-radius: 0 2px 2px 0;
+  box-shadow: 0 0 8px rgba(167,139,250,0.8);
+}
+.sf-nav-active svg { color: #c4b5fd !important; }
+
+/* Sidebar nav — hide scrollbar but keep scroll */
+.sf-sidebar-nav {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.sf-sidebar-nav::-webkit-scrollbar { display: none; }
 
 /* Section divider */
 .sf-divider {
@@ -499,4 +569,45 @@ button, a, input, select, textarea {
   border-color: rgba(139,92,246,0.5);
   box-shadow: 0 0 0 3px rgba(139,92,246,0.12);
   outline: none;
+}
+
+/* ── Premium page background ────────────────────────────────────────────────── */
+.sf-page {
+  position: relative;
+  min-height: 100%;
+}
+.sf-page::before {
+  content: '';
+  position: fixed;
+  top: 0; right: 0;
+  width: 600px; height: 500px;
+  background: radial-gradient(ellipse at top right, rgba(139,92,246,0.055) 0%, transparent 65%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Gradient border utility */
+.sf-gradient-border {
+  position: relative;
+}
+.sf-gradient-border::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  background: linear-gradient(135deg, rgba(139,92,246,0.5), rgba(236,72,153,0.3), rgba(139,92,246,0.3));
+  z-index: -1;
+}
+
+/* ── Stat card premium ──────────────────────────────────────────────────────── */
+.stat-card {
+  background: linear-gradient(135deg, rgba(139,92,246,0.07) 0%, rgba(8,5,20,0.9) 100%);
+  border: 1px solid rgba(139,92,246,0.15);
+  border-radius: 16px;
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.15s;
+}
+.stat-card:hover {
+  border-color: rgba(139,92,246,0.3);
+  box-shadow: 0 8px 32px -8px rgba(139,92,246,0.2);
+  transform: translateY(-1px);
 }

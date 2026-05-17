@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase, type Phone } from '@/lib/supabase'
+import { createScheduledPost, fmtScheduledTime } from '@/lib/schedulerService'
+import { ScheduleModal } from '@/components/ScheduleModal'
 import { useOrg } from '@/lib/orgContext'
 import { useConnections } from '@/lib/connections'
 import { canAccessPhoneGroup } from '@/lib/permissions'
@@ -47,6 +49,7 @@ export function Posting({ user }: PostingProps) {
   const [progress, _setProgress]       = useState(s.progress)
   const [showLogs, setShowLogs]        = useState(false)
   const [showBankPicker, setShowBankPicker] = useState(false)
+  const [showScheduleModal, setShowScheduleModal] = useState(false)
   const logEndRef                      = useRef<HTMLDivElement>(null)
 
   // Persist-aware setters — update both React state and module-level store
@@ -144,6 +147,35 @@ export function Posting({ user }: PostingProps) {
       log(`❌ ${e instanceof Error ? e.message : String(e)}`, 'error')
     }
     setGenerating(false)
+  }
+
+  async function schedulePost(scheduledAt: Date) {
+    if (!bearer)                  { log('Token GéeLark manquant — Paramètres', 'error'); return }
+    if (selectedPhones.size === 0){ log('Sélectionne au moins un téléphone', 'warn'); return }
+    if (!filePath)                { log('Sélectionne une vidéo', 'warn'); return }
+    setShowScheduleModal(false)
+
+    const phoneList = phones.filter(p => selectedPhones.has(p.id))
+    setPosting(true); setLogs([]); setProgress(5)
+    try {
+      log('📤 Upload de la vidéo vers GéeLark…')
+      const up = await window.electronAPI!.uploadVideoGeelark({ bearer, filePath })
+      if (!up.ok || !up.token) { log(`❌ Upload échoué: ${up.error}`, 'error'); return }
+      log(`✅ Vidéo prête (token: ${up.token.slice(0, 12)}…)`, 'ok')
+      await createScheduledPost({
+        userId: user.id, orgId: currentOrg?.id ?? null,
+        createdByName: user.email?.split('@')[0] ?? 'Moi',
+        type: 'posting', scheduledAt,
+        phones: phoneList.map(p => ({ id: p.id, geelark_id: p.geelark_id, phone_name: p.phone_name, ig_username: p.ig_username })),
+        videos: [{ token: up.token, title: filePath.split(/[\\/]/).pop() ?? 'video' }],
+        caption, delayMinutes: delayBetween, mode: 'seq', bearerToken: bearer,
+      })
+      log(`📅 Programmé pour ${fmtScheduledTime(scheduledAt.toISOString())} — ${phoneList.length} téléphone(s)`, 'ok')
+    } catch (err: any) {
+      log(`❌ Erreur: ${err.message}`, 'error')
+    } finally {
+      setPosting(false); setProgress(0)
+    }
   }
 
   async function post() {
@@ -280,62 +312,60 @@ export function Posting({ user }: PostingProps) {
   const fileName = filePath ? filePath.replace(/\\/g, '/').split('/').pop() ?? filePath : null
 
   return (
-    <div className="flex h-full min-h-screen">
+    <div className="h-full flex overflow-hidden">
       {/* Left: phone selector */}
-      <aside className="w-60 flex-shrink-0 flex flex-col border-r border-border" style={{ background: '#07090f' }}>
-        <div className="px-4 py-3 border-b border-border">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-bold text-text uppercase tracking-wider">Comptes</p>
-            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full text-white"
-              style={{ background: selectedPhones.size > 0 ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : '#1a2035' }}>
+      <aside className="w-64 flex-shrink-0 flex flex-col" style={{ borderRight: '1px solid rgba(255,255,255,0.06)', background: '#07090f' }}>
+        {/* Sidebar header */}
+        <div className="flex-shrink-0 px-5 pt-6 pb-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-[13px] font-bold text-white">Comptes</p>
+            <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full text-white"
+              style={{ background: selectedPhones.size > 0 ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.07)' }}>
               {selectedPhones.size}
             </span>
           </div>
           <select value={groupFilter} onChange={e => setGroup(e.target.value)}
-            className="w-full bg-[#0c0e1a] border border-border rounded-lg px-2 py-1.5 text-xs text-text focus:outline-none focus:border-[#8b5cf6]/60">
-            {groups.map(g => <option key={g} value={g}>{g}</option>)}
+            className="w-full rounded-xl px-4 py-2.5 text-[13px] focus:outline-none mb-2"
+            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}>
+            {groups.map(g => <option key={g} value={g} style={{ background: '#0d1120', color: '#e2d9f3' }}>{g}</option>)}
           </select>
           <input
-            type="text" placeholder="🔍 Rechercher…" value={phoneSearch}
+            type="text" placeholder="Rechercher…" value={phoneSearch}
             onChange={e => setPhoneSearch(e.target.value)}
-            className="w-full bg-[#0c0e1a] border border-border rounded-lg px-2 py-1.5 text-xs text-text placeholder:text-text2 focus:outline-none focus:border-[#8b5cf6]/60 mt-1.5"
+            className="w-full rounded-xl px-4 py-2.5 text-[13px] placeholder:text-text2 focus:outline-none"
+            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
           />
         </div>
-        <div className="px-3 py-2 flex gap-3 border-b border-border">
+        <div className="flex-shrink-0 px-5 py-2.5 flex gap-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
           <button onClick={() => setSelPhones(new Set(visiblePhones.map(p => p.id)))}
-            className="text-[11px] font-semibold text-[#8b5cf6] hover:text-text transition-colors">Tout</button>
+            className="text-[12px] font-semibold text-[#8b5cf6] hover:text-white transition-colors">Tout</button>
           <button onClick={() => setSelPhones(new Set())}
-            className="text-[11px] text-text2 hover:text-text transition-colors">Aucun</button>
-          <span className="ml-auto text-[11px] text-text2">{visiblePhones.length} tel.</span>
+            className="text-[12px] text-text2 hover:text-white transition-colors">Aucun</button>
+          <span className="ml-auto text-[12px] text-text2">{visiblePhones.length} tel.</span>
         </div>
         <div className="flex-1 overflow-auto">
           {visiblePhones.map(phone => {
             const checked = selectedPhones.has(phone.id)
             return (
               <button key={phone.id} onClick={() => togglePhone(phone.id)}
-                className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-all border-b border-border/30 ${
-                  checked ? 'bg-[#8b5cf6]/8' : 'hover:bg-[#0f1122]'
+                className={`w-full flex items-center gap-3 px-5 py-3 text-left transition-all ${
+                  checked ? '' : 'hover:bg-white/[0.02]'
                 }`}
+                style={checked ? { background: 'rgba(139,92,246,0.08)', borderBottom: '1px solid rgba(255,255,255,0.04)' } : { borderBottom: '1px solid rgba(255,255,255,0.04)' }}
               >
-                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-black flex-shrink-0 transition-all ${
-                  checked
-                    ? 'text-white'
-                    : 'bg-[#111428] text-text2'
-                }`}
-                  style={checked ? { background: 'linear-gradient(135deg,#7c3aed,#ec4899)' } : undefined}
+                <div className="w-8 h-8 rounded-full flex items-center justify-center text-[12px] font-black flex-shrink-0 transition-all"
+                  style={checked ? { background: 'linear-gradient(135deg,#7c3aed,#ec4899)', color: 'white' } : { background: 'rgba(255,255,255,0.06)', color: '#94a3b8' }}
                 >
                   {phone.ig_username?.[0]?.toUpperCase() ?? phone.phone_name?.[0]?.toUpperCase() ?? '?'}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-[11px] font-semibold text-text truncate">{phone.phone_name}</p>
-                  {phone.ig_username && <p className="text-[10px] text-[#8b5cf6]/80 truncate">@{phone.ig_username}</p>}
+                  <p className="text-[13px] font-semibold text-white truncate">{phone.phone_name}</p>
+                  {phone.ig_username && <p className="text-[12px] text-[#8b5cf6]/80 truncate">@{phone.ig_username}</p>}
                 </div>
-                <div className={`w-3.5 h-3.5 rounded-sm border flex items-center justify-center flex-shrink-0 transition-all ${
-                  checked ? 'border-transparent' : 'border-border'
-                }`}
-                  style={checked ? { background: 'linear-gradient(135deg,#7c3aed,#ec4899)' } : undefined}
+                <div className="w-4 h-4 rounded flex items-center justify-center flex-shrink-0 transition-all"
+                  style={checked ? { background: 'linear-gradient(135deg,#7c3aed,#ec4899)', border: 'none' } : { border: '1px solid rgba(255,255,255,0.15)' }}
                 >
-                  {checked && <span className="text-white text-[8px] font-bold leading-none">✓</span>}
+                  {checked && <span className="text-white text-[9px] font-bold leading-none">✓</span>}
                 </div>
               </button>
             )
@@ -344,178 +374,194 @@ export function Posting({ user }: PostingProps) {
       </aside>
 
       {/* Right: form */}
-      <div className="flex-1 overflow-auto p-6 space-y-4">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
-            style={{ background: 'linear-gradient(135deg,#7c3aed22,#ec489922)', border: '1px solid rgba(139,92,246,0.2)' }}>
-            <span className="text-base">🚀</span>
-          </div>
-          <div className="flex-1">
-            <h1 className="text-lg font-black text-text tracking-tight">Nouveau post</h1>
-            <p className="text-text2 text-[11px]">Poste un Reel sur tes téléphones GéeLark</p>
+      <div className="h-full flex flex-col overflow-hidden flex-1">
+        {/* Page header */}
+        <div className="flex-shrink-0 px-10 pt-9 pb-7 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+          <div>
+            <h1 className="text-[28px] font-black text-white leading-none">Nouveau post</h1>
+            <p className="text-[13px] text-text2 mt-0.5">Poste un Reel sur tes téléphones GéeLark</p>
           </div>
           <button
             onClick={() => { setFilePath(null); setCaption(''); setTopic('') }}
-            className="text-[11px] text-text2 hover:text-text px-2.5 py-1.5 rounded-lg hover:bg-surface2 transition-colors"
-            title="Réinitialiser le formulaire"
-          >↺ Réinitialiser</button>
+            className="rounded-xl px-5 py-2.5 text-[13px] font-semibold transition-colors"
+            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
+          >
+            ↺ Réinitialiser
+          </button>
         </div>
 
-        {/* Main posting card */}
-        <div className="bg-[#0b0f1a] border border-[#1a2235] rounded-2xl overflow-hidden">
-          {/* Media row */}
-          <div className="px-5 py-4 flex gap-4 border-b border-border">
-            {/* 9:16 portrait preview */}
-            <div className="w-[120px] flex-shrink-0">
-              <div className="w-[120px] h-[213px] rounded-xl overflow-hidden bg-gradient-to-br from-surface3 to-surface2 flex items-center justify-center">
-                {filePath ? (
-                  <VideoThumbnail filePath={filePath} />
-                ) : (
-                  <div className="text-center text-text2 text-xs">📹<br/>Choisir<br/>une vidéo</div>
-                )}
-              </div>
-            </div>
-            {/* Right column */}
-            <div className="flex-1 min-w-0 space-y-2">
-              <p className="text-[10px] uppercase tracking-wider text-text2 font-semibold">Vidéo</p>
-              <p className="text-sm text-text truncate">{fileName ?? 'Aucune vidéo sélectionnée'}</p>
-              <div className="flex gap-2 flex-wrap pt-2">
-                <Button size="sm" onClick={() => setShowBankPicker(true)}>📂 Choisir depuis la banque</Button>
-                <Button variant="secondary" size="sm" onClick={pickLocalFile}>💾 Depuis le PC</Button>
-                {filePath && (
-                  <Button variant="secondary" size="sm" onClick={() => setFilePath(null)}>✕ Retirer</Button>
-                )}
-              </div>
-            </div>
-          </div>
+        {/* Scrollable content */}
+        <div className="flex-1 overflow-y-auto px-10 pb-10">
+          <div className="space-y-6 mt-8">
 
-          {/* Description */}
-          <div className="px-5 py-4 border-b border-border">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-[10px] uppercase tracking-wider text-text2 font-semibold">Description</p>
-              <span className={`text-[10px] font-mono ${caption.length > 2200 ? 'text-danger' : 'text-text2'}`}>
-                {caption.length} / 2200
-              </span>
-            </div>
-            <textarea
-              value={caption}
-              onChange={e => setCaption(e.target.value)}
-              rows={5}
-              placeholder="Écris ta description Instagram…"
-              className="w-full bg-[#080c14] border border-border rounded-lg px-3 py-2 text-sm text-text placeholder:text-text2 resize-y focus:outline-none focus:border-accent"
-            />
-            {/* Generate description row */}
-            <div className="flex gap-2 mt-3">
-              <Button variant="secondary" size="sm" onClick={generateCaption} loading={generating} disabled={!groqKey}>
-                ✨ Générer
-              </Button>
-              <input
-                type="text"
-                value={topic}
-                onChange={e => setTopic(e.target.value)}
-                placeholder="sujet / niche…"
-                className="flex-1 bg-[#080c14] border border-border rounded-lg px-3 py-1.5 text-xs text-text placeholder:text-text2 focus:outline-none focus:border-accent"
-              />
-            </div>
-            <input
-              type="text"
-              value={customPrompt}
-              onChange={e => setCustomPrompt(e.target.value)}
-              placeholder="Prompt IA (optionnel)"
-              className="mt-2 w-full bg-[#080c14] border border-border rounded-lg px-3 py-1.5 text-xs text-text placeholder:text-text2 focus:outline-none focus:border-accent"
-            />
-          </div>
-
-          {/* Options */}
-          <div className="px-5 py-3 border-b border-border flex items-center gap-3">
-            <span className="text-base">📅</span>
-            <span className="flex-1 text-sm text-text">Délai entre comptes</span>
-            <input
-              type="number"
-              min={0}
-              max={120}
-              value={delayBetween}
-              onChange={e => setDelayBetween(parseInt(e.target.value) || 0)}
-              className="w-20 bg-[#080c14] border border-border rounded px-2 py-1 text-xs text-text focus:outline-none focus:border-accent"
-            />
-            <span className="text-xs text-text2">min</span>
-          </div>
-          <div className="px-5 py-3 border-b border-border flex items-center gap-3">
-            <span className="text-base">#️⃣</span>
-            <span className="flex-1 text-sm text-text">Avec hashtags</span>
-            <button
-              onClick={() => setWithHashtags(v => !v)}
-              className={`relative w-10 h-5 rounded-full transition-colors ${withHashtags ? 'bg-accent' : 'bg-surface3'}`}
-            >
-              <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${withHashtags ? 'translate-x-5' : 'translate-x-0.5'}`} />
-            </button>
-          </div>
-
-          {/* Progress + Logs */}
-          {(posting || progress > 0) && (
-            <div className="px-5 py-4 border-b border-border space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-text">Progression</span>
-                <span className="text-xs font-mono text-text2">{progress}%</span>
+            {!bearer && (
+              <div className="px-5 py-4 rounded-2xl text-[13px] text-warn"
+                style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)' }}>
+                ❌ Bearer Token GéeLark manquant — configure-le dans Paramètres
               </div>
-              <div className="w-full h-1.5 bg-surface3 rounded-full overflow-hidden relative">
-                <div
-                  className={`h-full rounded-full transition-all duration-500 ${progress >= 100 ? 'bg-ok' : 'bg-accent'}`}
-                  style={{ width: `${progress}%` }}
+            )}
+
+            {/* Main posting card */}
+            <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+              {/* Media row */}
+              <div className="px-6 py-5 flex gap-6" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                {/* 9:16 portrait preview */}
+                <div className="w-[110px] flex-shrink-0">
+                  <div className="w-[110px] h-[196px] rounded-xl overflow-hidden flex items-center justify-center"
+                    style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                    {filePath ? (
+                      <VideoThumbnail filePath={filePath} />
+                    ) : (
+                      <div className="text-center text-text2 text-[13px]">📹<br/>Choisir<br/>une vidéo</div>
+                    )}
+                  </div>
+                </div>
+                {/* Right column */}
+                <div className="flex-1 min-w-0 flex flex-col justify-center gap-3">
+                  <div>
+                    <p className="text-[12px] text-text2 mb-1">Vidéo sélectionnée</p>
+                    <p className="text-[13px] text-white truncate font-medium">{fileName ?? 'Aucune vidéo sélectionnée'}</p>
+                  </div>
+                  <div className="flex gap-2 flex-wrap">
+                    <Button size="sm" onClick={() => setShowBankPicker(true)}>📂 Choisir depuis la banque</Button>
+                    <Button variant="secondary" size="sm" onClick={pickLocalFile}>💾 Depuis le PC</Button>
+                    {filePath && (
+                      <Button variant="secondary" size="sm" onClick={() => setFilePath(null)}>✕ Retirer</Button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Description */}
+              <div className="px-6 py-5" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-[15px] font-bold text-white">Description</p>
+                  <span className={`text-[12px] font-mono ${caption.length > 2200 ? 'text-danger' : 'text-text2'}`}>
+                    {caption.length} / 2200
+                  </span>
+                </div>
+                <textarea
+                  value={caption}
+                  onChange={e => setCaption(e.target.value)}
+                  rows={5}
+                  placeholder="Écris ta description Instagram…"
+                  className="w-full rounded-xl px-4 py-3 text-[13px] placeholder:text-text2 resize-y focus:outline-none"
+                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
                 />
-                <div className="absolute inset-0 bg-gradient-to-b from-white/20 to-transparent" style={{ height: '50%' }} />
+                {/* Generate description row */}
+                <div className="flex gap-2 mt-3">
+                  <Button variant="secondary" size="sm" onClick={generateCaption} loading={generating} disabled={!groqKey}>
+                    ✨ Générer
+                  </Button>
+                  <input
+                    type="text"
+                    value={topic}
+                    onChange={e => setTopic(e.target.value)}
+                    placeholder="sujet / niche…"
+                    className="flex-1 rounded-xl px-4 py-2.5 text-[13px] placeholder:text-text2 focus:outline-none"
+                    style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
+                  />
+                </div>
+                <input
+                  type="text"
+                  value={customPrompt}
+                  onChange={e => setCustomPrompt(e.target.value)}
+                  placeholder="Prompt IA (optionnel)"
+                  className="mt-2 w-full rounded-xl px-4 py-2.5 text-[13px] placeholder:text-text2 focus:outline-none"
+                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
+                />
               </div>
-              <button
-                onClick={() => setShowLogs(v => !v)}
-                className="text-[11px] text-text2 hover:text-text flex items-center gap-1"
-              >
-                <span style={{ transform: showLogs ? 'rotate(90deg)' : 'rotate(0deg)' }} className="inline-block transition-transform">▶</span>
-                Journal détaillé ({logs.length})
-              </button>
-              {showLogs && logs.length > 0 && (
-                <div className="bg-bg border border-border rounded-lg p-3 max-h-48 overflow-auto font-mono text-[10px] space-y-0.5">
-                  {logs.map((l, i) => (
-                    <div key={i} className={`flex gap-2 ${
-                      l.level === 'ok' ? 'text-ok' : l.level === 'error' ? 'text-danger' : l.level === 'warn' ? 'text-warn' : 'text-text2'
-                    }`}>
-                      <span className="text-text2/60 flex-shrink-0">{l.time}</span>
-                      <span>{l.message}</span>
+
+              {/* Options */}
+              <div className="px-6 py-4 flex items-center gap-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                <span className="text-base">📅</span>
+                <span className="flex-1 text-[13px] text-white">Délai entre comptes</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={120}
+                  value={delayBetween}
+                  onChange={e => setDelayBetween(parseInt(e.target.value) || 0)}
+                  className="w-20 rounded-xl px-4 py-2.5 text-[13px] text-center focus:outline-none"
+                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
+                />
+                <span className="text-[13px] text-text2">min</span>
+              </div>
+              <div className="px-6 py-4 flex items-center gap-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                <span className="text-base">#️⃣</span>
+                <span className="flex-1 text-[13px] text-white">Avec hashtags</span>
+                <button
+                  onClick={() => setWithHashtags(v => !v)}
+                  className="relative w-11 h-6 rounded-full transition-colors flex-shrink-0"
+                  style={{ background: withHashtags ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.08)' }}
+                >
+                  <span className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform ${withHashtags ? 'translate-x-6' : 'translate-x-1'}`} />
+                </button>
+              </div>
+
+              {/* Progress + Logs */}
+              {(posting || progress > 0) && (
+                <div className="px-6 py-5 space-y-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[13px] font-semibold text-white">Progression</span>
+                    <span className="text-[13px] font-mono text-text2">{progress}%</span>
+                  </div>
+                  <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
+                    <div
+                      className={`h-full rounded-full transition-all duration-500 ${progress >= 100 ? 'bg-ok' : ''}`}
+                      style={{ width: `${progress}%`, background: progress >= 100 ? undefined : 'linear-gradient(90deg,#7c3aed,#ec4899)' }}
+                    />
+                  </div>
+                  <button
+                    onClick={() => setShowLogs(v => !v)}
+                    className="text-[12px] text-text2 hover:text-white flex items-center gap-1.5 transition-colors"
+                  >
+                    <span style={{ transform: showLogs ? 'rotate(90deg)' : 'rotate(0deg)' }} className="inline-block transition-transform">▶</span>
+                    Journal détaillé ({logs.length})
+                  </button>
+                  {showLogs && logs.length > 0 && (
+                    <div className="rounded-xl p-4 max-h-48 overflow-auto font-mono text-[12px] space-y-1"
+                      style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                      {logs.map((l, i) => (
+                        <div key={i} className={`flex gap-2 ${
+                          l.level === 'ok' ? 'text-ok' : l.level === 'error' ? 'text-danger' : l.level === 'warn' ? 'text-warn' : 'text-text2'
+                        }`}>
+                          <span className="text-text2/60 flex-shrink-0">{l.time}</span>
+                          <span>{l.message}</span>
+                        </div>
+                      ))}
+                      <div ref={logEndRef} />
                     </div>
-                  ))}
-                  <div ref={logEndRef} />
+                  )}
                 </div>
               )}
-            </div>
-          )}
 
-          {/* Launch button */}
-          <div className="px-5 py-4">
-            <button
-              onClick={post}
-              disabled={posting || !bearer || selectedPhones.size === 0 || !filePath}
-              className="w-full py-3.5 rounded-xl text-sm font-black text-white transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
-              style={{
-                background: posting || !bearer || selectedPhones.size === 0 || !filePath
-                  ? '#1a2035'
-                  : 'linear-gradient(130deg,#7c3aed,#ec4899)',
-                boxShadow: posting || !bearer || selectedPhones.size === 0 || !filePath
-                  ? 'none'
-                  : '0 4px 24px -4px rgba(124,58,237,0.5)',
-              }}
-            >
-              {posting
-                ? `⏳ En cours (${selectedPhones.size} téléphones)…`
-                : `⚡ Lancer le posting — ${selectedPhones.size} compte${selectedPhones.size !== 1 ? 's' : ''}`}
-            </button>
+              {/* Actions */}
+              <div className="px-6 py-5 flex gap-3">
+                <button
+                  onClick={post}
+                  disabled={posting || !bearer || selectedPhones.size === 0 || !filePath}
+                  className="flex-[2] py-3 rounded-xl text-[13px] font-black text-white transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
+                  style={{
+                    background: posting || !bearer || selectedPhones.size === 0 || !filePath
+                      ? 'rgba(255,255,255,0.06)' : 'linear-gradient(130deg,#7c3aed,#ec4899)',
+                    boxShadow: posting || !bearer || selectedPhones.size === 0 || !filePath
+                      ? 'none' : '0 4px 24px -4px rgba(124,58,237,0.5)',
+                  }}>
+                  {posting ? `⏳ En cours…` : `⚡ Lancer — ${selectedPhones.size} compte${selectedPhones.size !== 1 ? 's' : ''}`}
+                </button>
+                <button
+                  onClick={() => setShowScheduleModal(true)}
+                  disabled={posting || !bearer || selectedPhones.size === 0 || !filePath}
+                  className="flex-1 py-3 rounded-xl text-[13px] font-black transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
+                  style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(37,99,235,0.3)', color: '#60a5fa' }}>
+                  📅 Programmer
+                </button>
+              </div>
+            </div>
+
           </div>
         </div>
-
-        {!bearer && (
-          <div className="px-4 py-3 rounded-lg bg-warn/10 border border-warn/20 text-warn text-sm">
-            ❌ Bearer Token GéeLark manquant — configure-le dans Paramètres
-          </div>
-        )}
-
       </div>
 
       {/* Bank picker modal */}
@@ -525,6 +571,18 @@ export function Posting({ user }: PostingProps) {
           mode="single"
           onSelect={([path]) => { if (path) setFilePath(path); setShowBankPicker(false) }}
           onClose={() => setShowBankPicker(false)}
+        />
+      )}
+
+      {/* Schedule modal */}
+      {showScheduleModal && (
+        <ScheduleModal
+          type="posting"
+          phonesCount={selectedPhones.size}
+          videosCount={filePath ? 1 : 0}
+          videoTitle={filePath?.split(/[\\/]/).pop()}
+          onConfirm={schedulePost}
+          onClose={() => setShowScheduleModal(false)}
         />
       )}
     </div>

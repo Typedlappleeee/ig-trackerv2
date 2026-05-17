@@ -74,13 +74,17 @@ interface ElectronAPI {
   }) => Promise<{ ok: boolean; outputPath?: string; error?: string; command?: string }>
   detectSceneChange: (opts: { filePath: string; threshold?: number }) =>
     Promise<{ ok: boolean; times: number[]; splitTime?: number; duration: number; error?: string }>
-  extractFrames: (opts: { filePath: string; endTime: number; fps?: number }) =>
+  runFfmpegTextOverlay: (opts: {
+    inputPath: string; outputPath: string; preset: '9:16' | '1:1' | '16:9'
+    text: string; yFrac: number; fontSize: number; fontColor: string; bold: boolean; shadow: boolean
+  }) => Promise<{ ok: boolean; outputPath?: string; error?: string }>
+  extractFrames: (opts: { filePath: string; endTime: number; startTime?: number; fps?: number }) =>
     Promise<{ ok: boolean; frames?: Array<{ index: number; timestamp: number; data: string }>; count?: number; error?: string }>
   anthropicVisionRequest: (opts: {
     apiKey: string; model?: string; messages: unknown[]; maxTokens?: number
   }) => Promise<{ ok: boolean; data?: unknown; error?: string }>
   runFfmpegRemixAI: (opts: {
-    newPhase1Path: string; originalPath: string; splitTime: number
+    newPhase1Path: string; originalPath: string; splitTime?: number; targetDuration?: number
     outputPath: string; preset: '9:16' | '1:1' | '16:9'
     textOverlays: AiTextOverlay[]
   }) => Promise<{ ok: boolean; outputPath?: string; error?: string; command?: string }>

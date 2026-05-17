@@ -202,250 +202,267 @@ export function Licences({ user: _user }: Props) {
   }
 
   return (
-    <div className="p-6 space-y-6 max-w-5xl mx-auto">
-      <div>
-        <h1 className="text-xl font-bold text-text">🛡 Admin — Licences</h1>
-        <p className="text-xs text-text2 mt-0.5">Gère les clés d'accès à ScaleFlow</p>
-      </div>
+    <div className="h-full flex flex-col overflow-hidden">
 
-      {/* Stats */}
-      <div className="grid grid-cols-4 gap-3">
-        {[
-          { label: 'Total',    value: stats.total,   color: 'text-text' },
-          { label: 'Dispo',    value: stats.active,  color: 'text-green-400' },
-          { label: 'Utilisées', value: stats.used,   color: 'text-blue-400' },
-          { label: 'Expirées', value: stats.expired, color: 'text-red-400' },
-        ].map(s => (
-          <div key={s.label} className="rounded-xl p-4 text-center" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(139,92,246,0.12)' }}>
-            <p className={`text-2xl font-black ${s.color}`}>{s.value}</p>
-            <p className="text-[11px] text-text2 mt-0.5">{s.label}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Create key */}
-      <div className="rounded-xl p-5 space-y-4" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(139,92,246,0.15)' }}>
-        <p className="text-sm font-semibold text-text">Créer une clé</p>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div className="space-y-1">
-            <label className="text-[11px] text-text2 uppercase tracking-wide">Clé générée</label>
-            <div className="flex gap-2">
-              <input
-                value={genKey}
-                onChange={e => setGenKey(e.target.value.toUpperCase())}
-                className="flex-1 bg-[#0d0a1a] border border-border rounded-lg px-3 py-2 text-sm font-mono tracking-widest text-text focus:outline-none focus:border-accent"
-              />
-              <button onClick={() => setGenKey(generateKey())} className="px-3 py-2 rounded-lg text-xs text-text2 hover:text-text transition-colors" style={{ background: 'rgba(255,255,255,0.05)' }}>
-                ↺
-              </button>
-            </div>
-          </div>
-          <div className="space-y-1">
-            <label className="text-[11px] text-text2 uppercase tracking-wide">Durée</label>
-            <div className="flex gap-1 flex-wrap">
-              {DURATIONS.map(d => (
-                <button
-                  key={d.label}
-                  onClick={() => setDuration(d.days)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${duration === d.days ? 'text-white' : 'text-text2 hover:text-text'}`}
-                  style={duration === d.days ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)' } : { background: 'rgba(255,255,255,0.05)' }}
-                >
-                  {d.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="space-y-1">
-            <label className="text-[11px] text-text2 uppercase tracking-wide">Plan</label>
-            <div className="flex gap-1">
-              {['standard', 'pro', 'lifetime'].map(p => (
-                <button
-                  key={p}
-                  onClick={() => setPlan(p)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium capitalize transition-all ${plan === p ? 'text-white' : 'text-text2 hover:text-text'}`}
-                  style={plan === p ? { background: 'rgba(139,92,246,0.3)', border: '1px solid rgba(139,92,246,0.5)' } : { background: 'rgba(255,255,255,0.05)' }}
-                >
-                  {p}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="space-y-1">
-            <label className="text-[11px] text-text2 uppercase tracking-wide">Notes (optionnel)</label>
-            <Input value={notes} onChange={e => setNotes(e.target.value)} placeholder="ex: Discord @pseudo" />
-          </div>
+      {/* Page header */}
+      <div className="flex-shrink-0 px-10 pt-9 pb-7 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        <div>
+          <h1 className="text-[28px] font-black text-white leading-none">🛡 Admin — Licences</h1>
+          <p className="text-[13px] text-text2 mt-0.5">Gère les clés d'accès à ScaleFlow</p>
         </div>
-        <Button onClick={createKey} disabled={creating} className="w-full">
-          {creating ? 'Création…' : '+ Créer la clé'}
-        </Button>
       </div>
 
-      {/* List */}
-      <div className="space-y-3">
-        <div className="flex flex-wrap gap-2 items-center">
-          <Input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Rechercher une clé ou email…"
-            className="flex-1 min-w-[200px]"
-          />
-          {(['all', 'active', 'used', 'expired'] as const).map(f => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium capitalize transition-all ${filter === f ? 'text-white' : 'text-text2 hover:text-text'}`}
-              style={filter === f ? { background: 'rgba(139,92,246,0.3)', border: '1px solid rgba(139,92,246,0.4)' } : { background: 'rgba(255,255,255,0.05)' }}
-            >
-              {f === 'all' ? 'Toutes' : f === 'active' ? 'Disponibles' : f === 'used' ? 'Utilisées' : 'Expirées'}
-            </button>
+      {/* Scrollable content */}
+      <div className="flex-1 overflow-y-auto px-10 pb-10">
+
+        {/* Stats */}
+        <div className="grid grid-cols-4 gap-6 mt-8">
+          {[
+            { label: 'Total',     value: stats.total,   color: 'text-text' },
+            { label: 'Dispo',     value: stats.active,  color: 'text-green-400' },
+            { label: 'Utilisées', value: stats.used,    color: 'text-blue-400' },
+            { label: 'Expirées',  value: stats.expired, color: 'text-red-400' },
+          ].map(s => (
+            <div key={s.label} className="rounded-2xl p-6 text-center" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(139,92,246,0.12)' }}>
+              <p className={`text-3xl font-black ${s.color}`}>{s.value}</p>
+              <p className="text-[12px] text-text2 mt-1">{s.label}</p>
+            </div>
           ))}
         </div>
 
-        {loading ? (
-          <p className="text-text2 text-sm text-center py-8">Chargement…</p>
-        ) : filtered.length === 0 ? (
-          <p className="text-text2 text-sm text-center py-8">Aucune clé trouvée</p>
-        ) : (
-          <div className="space-y-2">
-            {filtered.map(k => (
-              <div key={k.id} className={`rounded-xl px-4 py-3 flex flex-wrap items-center gap-3 transition-opacity ${!k.is_active ? 'opacity-50' : ''}`}
-                style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(139,92,246,0.1)' }}>
-                {/* Key */}
-                <button
-                  onClick={() => copyKey(k.key)}
-                  className="font-mono text-sm text-text tracking-widest hover:text-accent transition-colors flex items-center gap-1.5"
-                  title="Copier"
-                >
-                  {k.key}
-                  <span className="text-[10px] text-text2">{copied === k.key ? '✓' : '⎘'}</span>
+        {/* Create key */}
+        <div className="rounded-2xl p-6 space-y-5 mt-8" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(139,92,246,0.15)' }}>
+          <p className="text-[15px] font-bold text-white mb-4">Créer une clé</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div className="space-y-2">
+              <label className="text-[12px] text-text2 uppercase tracking-wide">Clé générée</label>
+              <div className="flex gap-2">
+                <input
+                  value={genKey}
+                  onChange={e => setGenKey(e.target.value.toUpperCase())}
+                  className="flex-1 rounded-xl px-4 py-2.5 text-[13px] font-mono tracking-widest focus:outline-none"
+                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
+                />
+                <button onClick={() => setGenKey(generateKey())} className="px-4 py-2.5 rounded-xl text-[13px] text-text2 hover:text-text transition-colors" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                  ↺
                 </button>
-
-                {/* Plan badge */}
-                <span className="text-[10px] px-2 py-0.5 rounded-full capitalize font-medium" style={{ background: 'rgba(139,92,246,0.15)', color: '#a78bfa' }}>
-                  {k.plan}
-                </span>
-
-                {/* Status */}
-                {!k.is_active ? (
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-500/10 text-red-400 font-medium">Révoquée</span>
-                ) : k.user_id ? (
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 font-medium">Activée</span>
-                ) : (
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-500/10 text-green-400 font-medium">Disponible</span>
-                )}
-
-                {/* Expiry */}
-                <span className={`text-[11px] font-medium ml-auto ${daysLeftColor(k.expires_at)}`}>
-                  {daysLeft(k.expires_at)}
-                </span>
-
-                {/* User email */}
-                {k.user_email && (
-                  <span className="text-[11px] text-text2 truncate max-w-[160px]">{k.user_email}</span>
-                )}
-
-                {/* Notes */}
-                {k.notes && <span className="text-[11px] text-text2 italic truncate max-w-[120px]">{k.notes}</span>}
-
-                {/* Actions */}
-                <div className="flex gap-1">
-                  {k.is_active && (
-                    <button
-                      onClick={() => revokeKey(k.id)}
-                      className="text-[10px] px-2 py-1 rounded-lg text-orange-400 hover:bg-orange-400/10 transition-colors"
-                    >
-                      Révoquer
-                    </button>
-                  )}
-                  <button
-                    onClick={() => deleteKey(k.id)}
-                    className="text-[10px] px-2 py-1 rounded-lg text-red-400 hover:bg-red-400/10 transition-colors"
-                  >
-                    Supprimer
-                  </button>
-                </div>
               </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-[12px] text-text2 uppercase tracking-wide">Durée</label>
+              <div className="flex gap-2 flex-wrap">
+                {DURATIONS.map(d => (
+                  <button
+                    key={d.label}
+                    onClick={() => setDuration(d.days)}
+                    className={`px-4 py-2 rounded-xl text-[13px] font-medium transition-all ${duration === d.days ? 'text-white' : 'text-text2 hover:text-text'}`}
+                    style={duration === d.days ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)' } : { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}
+                  >
+                    {d.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-[12px] text-text2 uppercase tracking-wide">Plan</label>
+              <div className="flex gap-2">
+                {['standard', 'pro', 'lifetime'].map(p => (
+                  <button
+                    key={p}
+                    onClick={() => setPlan(p)}
+                    className={`px-4 py-2 rounded-xl text-[13px] font-medium capitalize transition-all ${plan === p ? 'text-white' : 'text-text2 hover:text-text'}`}
+                    style={plan === p ? { background: 'rgba(139,92,246,0.3)', border: '1px solid rgba(139,92,246,0.5)' } : { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}
+                  >
+                    {p}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-[12px] text-text2 uppercase tracking-wide">Notes (optionnel)</label>
+              <Input value={notes} onChange={e => setNotes(e.target.value)} placeholder="ex: Discord @pseudo" />
+            </div>
+          </div>
+          <Button onClick={createKey} disabled={creating} className="w-full">
+            {creating ? 'Création…' : '+ Créer la clé'}
+          </Button>
+        </div>
+
+        {/* List */}
+        <div className="space-y-4 mt-8">
+          <div className="flex flex-wrap gap-3 items-center">
+            <Input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Rechercher une clé ou email…"
+              className="flex-1 min-w-[200px]"
+            />
+            {(['all', 'active', 'used', 'expired'] as const).map(f => (
+              <button
+                key={f}
+                onClick={() => setFilter(f)}
+                className={`px-4 py-2.5 rounded-xl text-[13px] font-medium capitalize transition-all ${filter === f ? 'text-white' : 'text-text2 hover:text-text'}`}
+                style={filter === f ? { background: 'rgba(139,92,246,0.3)', border: '1px solid rgba(139,92,246,0.4)' } : { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}
+              >
+                {f === 'all' ? 'Toutes' : f === 'active' ? 'Disponibles' : f === 'used' ? 'Utilisées' : 'Expirées'}
+              </button>
             ))}
           </div>
-        )}
-      </div>
 
-      {/* ── Credit Codes ──────────────────────────────────────────────────── */}
-      <div className="space-y-4 pt-4 border-t border-border">
-        <div>
-          <h2 className="text-base font-bold text-text">💎 Codes crédit</h2>
-          <p className="text-xs text-text2 mt-0.5">Génère des codes que les utilisateurs peuvent échanger contre des crédits</p>
-        </div>
-
-        {/* Create form */}
-        <div className="rounded-2xl p-5 space-y-4" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(139,92,246,0.18)' }}>
-          <p className="text-xs font-black text-text uppercase tracking-wider">Nouveau code</p>
-          <div className="grid grid-cols-3 gap-3">
-            <div className="space-y-1">
-              <p className="text-[10px] text-text2 uppercase tracking-wider">Code</p>
-              <Input value={ccGenCode} onChange={e => setCcGenCode(e.target.value.toUpperCase())}
-                className="font-mono text-sm" />
-              <button onClick={() => setCcGenCode(generateCreditCode())}
-                className="text-[10px] text-accent hover:underline">↺ Régénérer</button>
+          {loading ? (
+            <div className="rounded-2xl p-10 text-center" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <p className="text-[13px] text-text2">Chargement…</p>
             </div>
-            <div className="space-y-1">
-              <p className="text-[10px] text-text2 uppercase tracking-wider">Montant (crédits)</p>
-              <Input type="number" value={ccAmount} onChange={e => setCcAmount(Number(e.target.value))}
-                min={1} className="text-sm" />
+          ) : filtered.length === 0 ? (
+            <div className="rounded-2xl p-10 text-center" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <p className="text-base font-bold text-white mb-2">🔑</p>
+              <p className="text-[13px] text-text2">Aucune clé trouvée</p>
             </div>
-            <div className="space-y-1">
-              <p className="text-[10px] text-text2 uppercase tracking-wider">Notes</p>
-              <Input value={ccNotes} onChange={e => setCcNotes(e.target.value)}
-                placeholder="Optionnel…" className="text-sm" />
-            </div>
-          </div>
-          <Button onClick={createCreditCode} disabled={ccCreating || !ccGenCode.trim() || ccAmount < 1}>
-            {ccCreating ? 'Création…' : '+ Créer le code'}
-          </Button>
-          {ccCreateErr && (
-            <p className="text-xs text-red-400 mt-2">Erreur : {ccCreateErr}</p>
-          )}
-        </div>
-
-        {/* Code list */}
-        <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
-          {ccLoading ? (
-            <div className="p-8 text-center text-text2 text-sm">Chargement…</div>
-          ) : creditCodes.length === 0 ? (
-            <div className="p-8 text-center text-text2 text-sm">Aucun code créé.</div>
           ) : (
-            <div className="divide-y divide-border">
-              {creditCodes.map(c => (
-                <div key={c.id} className="flex items-center gap-3 px-4 py-3">
-                  <code className="flex-1 font-mono text-xs text-text">{c.code}</code>
-                  <span className="text-xs font-bold" style={{ color: '#a78bfa' }}>+{c.amount} crédits</span>
-                  {c.used_by ? (
-                    <span className="text-[10px] text-text2">Utilisé</span>
-                  ) : c.is_active ? (
-                    <span className="text-[10px] text-green-400">Disponible</span>
-                  ) : (
-                    <span className="text-[10px] text-red-400">Révoqué</span>
-                  )}
-                  {c.notes && <span className="text-[10px] text-text2 italic">{c.notes}</span>}
+            <div className="space-y-3">
+              {filtered.map(k => (
+                <div key={k.id} className={`rounded-xl px-5 py-4 flex flex-wrap items-center gap-3 transition-opacity ${!k.is_active ? 'opacity-50' : ''}`}
+                  style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(139,92,246,0.1)' }}>
+                  {/* Key */}
                   <button
-                    onClick={() => { navigator.clipboard.writeText(c.code); setCopied(c.code); setTimeout(() => setCopied(null), 1500) }}
-                    className="text-[10px] px-2 py-1 rounded-lg transition-colors"
-                    style={{ color: copied === c.code ? '#34d399' : '#a78bfa', background: 'rgba(139,92,246,0.1)' }}
+                    onClick={() => copyKey(k.key)}
+                    className="font-mono text-[13px] text-text tracking-widest hover:text-accent transition-colors flex items-center gap-1.5"
+                    title="Copier"
                   >
-                    {copied === c.code ? '✓' : 'Copier'}
+                    {k.key}
+                    <span className="text-[12px] text-text2">{copied === k.key ? '✓' : '⎘'}</span>
                   </button>
-                  {c.is_active && !c.used_by && (
-                    <button
-                      onClick={() => revokeCreditCode(c.id)}
-                      className="text-[10px] px-2 py-1 rounded-lg text-orange-400 hover:bg-orange-400/10 transition-colors"
-                    >
-                      Révoquer
-                    </button>
+
+                  {/* Plan badge */}
+                  <span className="text-[12px] px-2 py-0.5 rounded-full capitalize font-medium" style={{ background: 'rgba(139,92,246,0.15)', color: '#a78bfa' }}>
+                    {k.plan}
+                  </span>
+
+                  {/* Status */}
+                  {!k.is_active ? (
+                    <span className="text-[12px] px-2 py-0.5 rounded-full bg-red-500/10 text-red-400 font-medium">Révoquée</span>
+                  ) : k.user_id ? (
+                    <span className="text-[12px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 font-medium">Activée</span>
+                  ) : (
+                    <span className="text-[12px] px-2 py-0.5 rounded-full bg-green-500/10 text-green-400 font-medium">Disponible</span>
                   )}
+
+                  {/* Expiry */}
+                  <span className={`text-[13px] font-medium ml-auto ${daysLeftColor(k.expires_at)}`}>
+                    {daysLeft(k.expires_at)}
+                  </span>
+
+                  {/* User email */}
+                  {k.user_email && (
+                    <span className="text-[12px] text-text2 truncate max-w-[160px]">{k.user_email}</span>
+                  )}
+
+                  {/* Notes */}
+                  {k.notes && <span className="text-[12px] text-text2 italic truncate max-w-[120px]">{k.notes}</span>}
+
+                  {/* Actions */}
+                  <div className="flex gap-1">
+                    {k.is_active && (
+                      <button
+                        onClick={() => revokeKey(k.id)}
+                        className="text-[12px] px-3 py-1.5 rounded-lg text-orange-400 hover:bg-orange-400/10 transition-colors"
+                      >
+                        Révoquer
+                      </button>
+                    )}
+                    <button
+                      onClick={() => deleteKey(k.id)}
+                      className="text-[12px] px-3 py-1.5 rounded-lg text-red-400 hover:bg-red-400/10 transition-colors"
+                    >
+                      Supprimer
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
           )}
+        </div>
+
+        {/* ── Credit Codes ──────────────────────────────────────────────────── */}
+        <div className="mt-10 space-y-6">
+          <div>
+            <h2 className="text-[22px] font-black text-white leading-none">💎 Codes crédit</h2>
+            <p className="text-[13px] text-text2 mt-0.5">Génère des codes que les utilisateurs peuvent échanger contre des crédits</p>
+          </div>
+
+          {/* Create form */}
+          <div className="rounded-2xl p-6 space-y-5" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(139,92,246,0.18)' }}>
+            <p className="text-[15px] font-bold text-white mb-4">Nouveau code</p>
+            <div className="grid grid-cols-3 gap-5">
+              <div className="space-y-2">
+                <p className="text-[12px] text-text2 uppercase tracking-wider">Code</p>
+                <Input value={ccGenCode} onChange={e => setCcGenCode(e.target.value.toUpperCase())}
+                  className="font-mono text-[13px]" />
+                <button onClick={() => setCcGenCode(generateCreditCode())}
+                  className="text-[12px] text-accent hover:underline">↺ Régénérer</button>
+              </div>
+              <div className="space-y-2">
+                <p className="text-[12px] text-text2 uppercase tracking-wider">Montant (crédits)</p>
+                <Input type="number" value={ccAmount} onChange={e => setCcAmount(Number(e.target.value))}
+                  min={1} className="text-[13px]" />
+              </div>
+              <div className="space-y-2">
+                <p className="text-[12px] text-text2 uppercase tracking-wider">Notes</p>
+                <Input value={ccNotes} onChange={e => setCcNotes(e.target.value)}
+                  placeholder="Optionnel…" className="text-[13px]" />
+              </div>
+            </div>
+            <Button onClick={createCreditCode} disabled={ccCreating || !ccGenCode.trim() || ccAmount < 1}>
+              {ccCreating ? 'Création…' : '+ Créer le code'}
+            </Button>
+            {ccCreateErr && (
+              <p className="text-[13px] text-red-400 mt-2">Erreur : {ccCreateErr}</p>
+            )}
+          </div>
+
+          {/* Code list */}
+          <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)' }}>
+            {ccLoading ? (
+              <div className="p-10 text-center text-[13px] text-text2">Chargement…</div>
+            ) : creditCodes.length === 0 ? (
+              <div className="p-10 text-center">
+                <p className="text-2xl mb-3">💎</p>
+                <p className="text-[13px] text-text2">Aucun code créé.</p>
+              </div>
+            ) : (
+              <div className="divide-y" style={{ borderColor: 'rgba(255,255,255,0.05)' }}>
+                {creditCodes.map(c => (
+                  <div key={c.id} className="flex items-center gap-3 px-5 py-4">
+                    <code className="flex-1 font-mono text-[13px] text-text">{c.code}</code>
+                    <span className="text-[13px] font-bold" style={{ color: '#a78bfa' }}>+{c.amount} crédits</span>
+                    {c.used_by ? (
+                      <span className="text-[12px] text-text2">Utilisé</span>
+                    ) : c.is_active ? (
+                      <span className="text-[12px] text-green-400">Disponible</span>
+                    ) : (
+                      <span className="text-[12px] text-red-400">Révoqué</span>
+                    )}
+                    {c.notes && <span className="text-[12px] text-text2 italic">{c.notes}</span>}
+                    <button
+                      onClick={() => { navigator.clipboard.writeText(c.code); setCopied(c.code); setTimeout(() => setCopied(null), 1500) }}
+                      className="text-[12px] px-3 py-1.5 rounded-lg transition-colors"
+                      style={{ color: copied === c.code ? '#34d399' : '#a78bfa', background: 'rgba(139,92,246,0.1)' }}
+                    >
+                      {copied === c.code ? '✓' : 'Copier'}
+                    </button>
+                    {c.is_active && !c.used_by && (
+                      <button
+                        onClick={() => revokeCreditCode(c.id)}
+                        className="text-[12px] px-3 py-1.5 rounded-lg text-orange-400 hover:bg-orange-400/10 transition-colors"
+                      >
+                        Révoquer
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

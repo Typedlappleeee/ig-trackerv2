@@ -8,14 +8,10 @@ export default defineConfig({
   resolve: {
     alias: { '@': path.resolve(__dirname, './src') },
   },
-  // ffmpeg.wasm needs SharedArrayBuffer → must set COOP/COEP headers.
-  // In dev mode Vite can set them; in production Vercel handles it via vercel.json.
-  server: {
-    headers: {
-      'Cross-Origin-Opener-Policy':   'same-origin',
-      'Cross-Origin-Embedder-Policy': 'require-corp',
-    },
-  },
+  // @ffmpeg/core (single-threaded) does NOT use SharedArrayBuffer and therefore
+  // does NOT need COOP/COEP. Setting COEP require-corp blocks Supabase storage
+  // fetches (net::ERR_FAILED 200 OK) because Supabase doesn't return CORP headers.
+  server: {},
   optimizeDeps: {
     // Don't pre-bundle ffmpeg — it must stay as an ES module
     exclude: ['@ffmpeg/ffmpeg', '@ffmpeg/util'],

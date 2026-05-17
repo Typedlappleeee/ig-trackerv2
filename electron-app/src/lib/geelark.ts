@@ -16,17 +16,25 @@ function authHeaders(bearer: string) {
   return { Authorization: `Bearer ${bearer}` }
 }
 
-// Call GéeLark through the Electron main-process proxy to bypass CORS.
+// Call GéeLark: uses Electron IPC proxy on desktop, Vercel /api/geelark proxy on web.
 async function geelarkFetch(method: 'GET' | 'POST', path: string, body?: unknown, bearer?: string) {
-  if (!window.electronAPI?.geelarkRequest) {
-    throw new Error('electronAPI not available')
+  const url = `${BASE}${path}`
+  const headers = bearer ? authHeaders(bearer) : undefined
+
+  if (window.electronAPI?.geelarkRequest) {
+    const result = await window.electronAPI.geelarkRequest({ method, url, headers, body })
+    if (!result.ok) throw new Error(result.error ?? 'Network error')
+    return result.data as Record<string, unknown>
   }
-  const result = await window.electronAPI.geelarkRequest({
-    method,
-    url: `${BASE}${path}`,
-    headers: bearer ? authHeaders(bearer) : undefined,
-    body,
+
+  // Web fallback: route through Vercel proxy (bypasses CORS)
+  const res = await fetch('/api/geelark', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ method, url, headers: headers ?? {}, body }),
   })
+  if (!res.ok) throw new Error(`Proxy HTTP ${res.status}`)
+  const result = await res.json()
   if (!result.ok) throw new Error(result.error ?? 'Network error')
   return result.data as Record<string, unknown>
 }
@@ -124,7 +132,8 @@ async function shellExec(
     const code = Number(d['code'] ?? -1)
     const msg  = String(d['msg'] ?? d['message'] ?? code)
     // Treat GéeLark error codes 10001-10099 (phone not ready range) as retryable
-    const isNotReady = NOT_READY.test(msg) || (code >= 10001 && code <= 10099)
+    // 42002 = "phone is not running" — shell daemon not yet up (phone still booting)
+    const isNotReady = NOT_READY.test(msg) || (code >= 10001 && code <= 10099) || code === 42002
     if (isNotReady && attempt < maxRetries - 1) {
       await sleepOrAbort(4000 + attempt * 2000, signal)
       continue
@@ -134,55 +143,30 @@ async function shellExec(
   throw new Error('GéeLark shell: téléphone non prêt après plusieurs tentatives')
 }
 
-// Ensure the cloud phone is running. Starts it if needed and polls until running.
-// GéeLark status: 0=stopped, 1=starting OR running (ambiguous), 2=running OR starting
-// geelarkStatusLabel() treats BOTH 1 and 2 as "online" — so we do the same here.
+// Ensure the cloud phone is running. Mirrors MassPosting's approach:
+// always send /phone/start then wait 30s flat (polling status is unreliable).
 async function ensurePhoneRunning(
   bearer: string,
   phoneId: string,
   log?: (m: string) => void,
   signal?: AbortSignal,
 ): Promise<boolean> {
-  const numStatus = (v: unknown) => Number(v ?? -1)
+  // Check if phone is currently stopping — wait before trying to start
+  try {
+    const phones = await fetchAllPhones(bearer)
+    const p = phones.find(x => x.id === phoneId)
+    if (p) {
+      const st = Number(p.status ?? -1)
+      const label = st === 0 ? 'en marche' : st === 1 ? 'arrêté' : st === 2 ? 'démarrage en cours' : st === 3 ? 'arrêt en cours' : `inconnu(${st})`
+      log?.(`📱 Statut: ${label} [raw=${st}] — ${p.serialName ?? p.name ?? p.id}`)
+      if (st === 3) {
+        log?.('⏳ En cours d\'arrêt — attente 15s…')
+        await sleepOrAbort(15000, signal)
+      }
+    }
+  } catch { /* ignore — still attempt start */ }
 
-  // "Online" = any status GéeLark considers active (same definition as geelarkStatusLabel)
-  const isOnline = (s: number) => s === 1 || s === 2
-
-  const statusLabel = (s: number) => (
-    s === 0 ? 'arrêté' :
-    s === 1 ? 'en cours/démarrage' :
-    s === 2 ? 'en marche/démarrage' :
-    s === 3 ? 'arrêt en cours' :
-    `inconnu (${s})`
-  )
-
-  log?.('🔎 Vérification du statut du téléphone…')
-  const phones = await fetchAllPhones(bearer)
-  const p = phones.find(x => x.id === phoneId)
-  if (!p) {
-    const sample = phones.slice(0, 5).map(x => x.id).join(', ')
-    log?.(`❌ Téléphone introuvable (cherché: "${phoneId}") — ${phones.length} téléphone(s) dans GéeLark`)
-    log?.(`   Exemples d'IDs reçus: ${sample || 'aucun'}`)
-    throw new Error(`phone ${phoneId} not found in GéeLark`)
-  }
-
-  const st = numStatus(p.status)
-  log?.(`📱 Statut initial: ${statusLabel(st)} [raw=${st}] — ${p.serialName ?? p.name ?? p.id}`)
-
-  // Already online (status 1 or 2) → go directly
-  if (isOnline(st)) {
-    log?.('📱 Téléphone déjà démarré ✓')
-    await warmupShellDelay(bearer, phoneId, log, signal)
-    return true
-  }
-
-  // Stopping — wait before attempting start
-  if (st === 3) {
-    log?.('⏳ Téléphone en cours d\'arrêt — attente 15s…')
-    await sleepOrAbort(15000, signal)
-  }
-
-  // Send start command
+  // Always send start command (GéeLark no-ops if already running)
   log?.('📱 Envoi commande de démarrage…')
   const startRes = await geelarkFetch('POST', '/phone/start', { ids: [phoneId] }, bearer)
   const code    = Number(startRes['code'] ?? -1)
@@ -191,61 +175,69 @@ async function ensurePhoneRunning(
   const msg     = String(startRes['msg'] ?? startRes['message'] ?? '')
   log?.(`  → code=${code}, démarrés=${success}, échecs=${failed}${msg ? ` (${msg})` : ''}`)
 
-  if (code !== 0) {
-    log?.(`  ❌ Erreur API démarrage: ${msg || code}`)
-    if (success === 0 && failed > 0) {
-      return false
-    }
+  if (code !== 0 && success === 0 && failed > 0) {
+    log?.(`❌ Impossible de démarrer: ${msg || code}`)
+    return false
   }
 
-  // Poll up to 120s every 3s until status is 1 or 2 (both = online)
-  log?.('⏳ Attente démarrage (max 120s)…')
-  for (let i = 0; i < 40; i++) {
+  // Phase 1: wait for phone status=1 (running) via status API — max 120s
+  log?.('⏳ Attente démarrage du téléphone (max 120s)…')
+  let statusReady = false
+  for (let i = 0; i < 24; i++) {
     if (signal?.aborted) throw new Error('Annulé')
-    await sleepOrAbort(3000, signal)
-    const list  = await fetchAllPhones(bearer)
-    const cur   = list.find(x => x.id === phoneId)
-    const curSt = numStatus(cur?.status)
-    if (i % 3 === 0) {
-      log?.(`  ${i * 3}s — statut: ${statusLabel(curSt)} [raw=${curSt}]`)
-    }
-    if (isOnline(curSt)) {
-      log?.(`✅ Téléphone démarré après ${i * 3}s (statut=${curSt})`)
-      await warmupShellDelay(bearer, phoneId, log, signal)
-      return true
-    }
+    await sleepOrAbort(5000, signal)
+    try {
+      const phones = await fetchAllPhones(bearer)
+      const p = phones.find(x => x.id === phoneId)
+      const st = Number(p?.status ?? -1)
+      if (st === 0) {
+        log?.('  📱 Téléphone démarré (status=0)')
+        statusReady = true
+        break
+      }
+      const label = st === 2 ? 'démarrage…' : st === 1 ? 'arrêté ?' : `status=${st}`
+      log?.(`  ⏳ ${label} (${(i + 1) * 5}s écoulées)`)
+    } catch { /* ignore polling errors */ }
+  }
+  if (!statusReady) {
+    log?.('  ⚠️ Status API n\'a pas confirmé le démarrage — tentative shell quand même')
   }
 
-  log?.('❌ Timeout 120s : téléphone non démarré — vérifier GéeLark (quota ? ID correct ?)')
-  return false
+  // Phase 2: wait for shell daemon to accept commands — max 120s
+  await warmupShellDelay(bearer, phoneId, log, signal)
+  return true
 }
 
-// After the phone reaches running status, wait briefly then do a single shell probe
-// so the shell daemon has time to initialise. Does NOT fail the start sequence —
-// individual shellExec() calls handle their own retries if the shell isn't ready yet.
+// After the phone reaches status=1, wait for the shell daemon to accept commands.
+// Retries the probe up to 30 times (150s total) before giving up.
 async function warmupShellDelay(
   bearer: string,
   phoneId: string,
   log?: (m: string) => void,
   signal?: AbortSignal,
 ) {
-  log?.('  ⏳ Pause 5s pour initialisation du shell…')
-  await sleepOrAbort(5000, signal)
+  log?.('  ⏳ Attente initialisation du shell (max 150s)…')
 
-  // Single diagnostic probe — log result but never fail on it
-  try {
-    const r = await geelarkFetch('POST', '/shell/execute', { id: phoneId, cmd: 'echo SHELL_OK' }, bearer)
-    const code = Number(r['code'])
-    const out  = String((r['data'] as Record<string, unknown>)?.['output'] ?? '')
-    if (code === 0 && out.includes('SHELL_OK')) {
-      log?.('  ✅ Shell prêt')
-    } else {
+  for (let attempt = 0; attempt < 30; attempt++) {
+    if (signal?.aborted) throw new Error('Annulé')
+    await sleepOrAbort(5000, signal)
+
+    try {
+      const r   = await geelarkFetch('POST', '/shell/execute', { id: phoneId, cmd: 'echo SHELL_OK' }, bearer)
+      const code = Number(r['code'])
+      const out  = String((r['data'] as Record<string, unknown>)?.['output'] ?? '')
+      if (code === 0 && out.includes('SHELL_OK')) {
+        log?.('  ✅ Shell prêt')
+        return
+      }
       const errMsg = String(r['msg'] ?? r['message'] ?? '')
-      log?.(`  ⚠️ Shell probe: code=${code}${errMsg ? ` msg="${errMsg}"` : ''} — les commandes réessaieront automatiquement`)
+      log?.(`  ↻ Shell pas encore prêt (code=${code}${errMsg ? ` "${errMsg}"` : ''}) — nouvel essai dans 5s… (${attempt + 1}/30)`)
+    } catch (e) {
+      log?.(`  ↻ Shell probe erreur: ${e instanceof Error ? e.message : String(e)} — nouvel essai…`)
     }
-  } catch (e) {
-    log?.(`  ⚠️ Shell probe exception: ${e instanceof Error ? e.message : String(e)} — les commandes réessaieront`)
   }
+
+  log?.('  ⚠️ Shell toujours indisponible après 150s — poursuite quand même (les commandes réessaieront)')
 }
 
 // Reply to an Instagram comment by driving the cloud phone via shell commands.
@@ -345,12 +337,21 @@ function parseBoundsCenter(bounds: string): [number, number] | null {
 }
 
 // Find element center by matching text/content-desc in UIAutomator XML
+function extractBoundsFromElement(element: string): [number, number] | null {
+  const m = element.match(/bounds="(\[[^\]]+\]\[[^\]]+\])"/)
+  return m ? parseBoundsCenter(m[1]) : null
+}
+
 function findByText(xml: string, ...texts: string[]): [number, number] | null {
   for (const text of texts) {
     const escaped = text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-    const re = new RegExp(`(?:text|content-desc)="${escaped}"[^>]*bounds="(\\[[^\\]]+\\]\\[[^\\]]+\\])"`)
+    // Match the full element tag so bounds order doesn't matter
+    const re = new RegExp(`<[^>]*(?:text|content-desc)="${escaped}"[^>]*>`)
     const m = xml.match(re)
-    if (m) return parseBoundsCenter(m[1])
+    if (m) {
+      const pt = extractBoundsFromElement(m[0])
+      if (pt) return pt
+    }
   }
   return null
 }
@@ -358,9 +359,12 @@ function findByText(xml: string, ...texts: string[]): [number, number] | null {
 function findByResourceId(xml: string, ...ids: string[]): [number, number] | null {
   for (const id of ids) {
     const escaped = id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-    const re = new RegExp(`resource-id="[^"]*${escaped}[^"]*"[^>]*bounds="(\\[[^\\]]+\\]\\[[^\\]]+\\])"`)
+    const re = new RegExp(`<[^>]*resource-id="[^"]*${escaped}[^"]*"[^>]*>`)
     const m = xml.match(re)
-    if (m) return parseBoundsCenter(m[1])
+    if (m) {
+      const pt = extractBoundsFromElement(m[0])
+      if (pt) return pt
+    }
   }
   return null
 }
@@ -380,24 +384,33 @@ async function clearAndType(
   text: string,
   log: (m: string) => void,
 ) {
+  // Tap to focus the field
   await shellExec(bearer, phoneId, `input tap ${point[0]} ${point[1]}`)
-  await sleep(600)
-  // Triple-tap selects all text in most Android text fields
+  await sleep(500)
+  // Double-tap to ensure focus + position cursor
   await shellExec(bearer, phoneId, `input tap ${point[0]} ${point[1]}`)
-  await sleep(120)
-  await shellExec(bearer, phoneId, `input tap ${point[0]} ${point[1]}`)
+  await sleep(400)
+
+  // Select all existing text: CTRL+A (keyevent 277 = A with META_CTRL)
+  await shellExec(bearer, phoneId, 'input keyevent --longpress 29')  // long-press A = select all
   await sleep(300)
-  // Delete the selection (or clear char by char if no selection)
-  await shellExec(bearer, phoneId, 'input keyevent 67')  // DEL
-  await sleep(100)
-  // Belt-and-suspenders: MOVE_END then 150 individual DEL keycodes
+  // Also try CTRL+A via key combination for more compatibility
+  await shellExec(bearer, phoneId, 'input keycombination 113 29')    // CTRL(113) + A(29)
+  await sleep(200)
+  // Delete selected text
+  await shellExec(bearer, phoneId, 'input keyevent 67')  // KEYCODE_DEL
+  await sleep(200)
+
+  // Belt-and-suspenders: move to end then delete 200 chars backwards
   await shellExec(bearer, phoneId, 'input keyevent 123') // KEYCODE_MOVE_END
-  for (let i = 0; i < 15; i++) {
+  await sleep(100)
+  for (let i = 0; i < 20; i++) {
     await shellExec(bearer, phoneId, 'input keyevent 67 67 67 67 67 67 67 67 67 67')
-    await sleep(50)
+    await sleep(40)
   }
   await sleep(200)
-  // Escape for Android shell: spaces → %s, dangerous shell chars escaped
+
+  // Type new text (spaces → %s, shell chars escaped)
   const escaped = text
     .replace(/\\/g, '\\\\')
     .replace(/"/g,  '\\"')
@@ -430,6 +443,10 @@ export async function updateInstagramProfile(
   config: MassEditConfig,
   log: (m: string) => void,
 ) {
+  // ── Start phone first (same pattern as login/warmup) ──────────────────────
+  const ready = await ensurePhoneRunning(bearer, phoneId, log)
+  if (!ready) throw new Error('Téléphone non démarré')
+
   // ── Wake + unlock ──────────────────────────────────────────────────────────
   log('📱 Réveil de l\'écran…')
   await shellExec(bearer, phoneId, 'input keyevent 224')
@@ -574,38 +591,42 @@ export async function updateInstagramProfile(
     log(`📋 Après PDP: ${xml.length} chars`)
   }
 
-  // ── Set name ───────────────────────────────────────────────────────────────
+  // ── Set name (Surnom) ─────────────────────────────────────────────────────
   if (config.profileName?.trim()) {
-    log(`📝 Nom → "${config.profileName}"`)
+    log(`📝 Surnom → "${config.profileName}"`)
+    xml = await dumpXml(bearer, phoneId)
+    log(`📋 XML edit (name): ${xml.length} chars`)
     const namePt =
-      findByResourceId(xml, 'full_name') ??
-      findByText(xml, 'Name', 'Nom', 'Full name', 'Nom complet')
+      findByResourceId(xml, 'full_name', 'name', 'profile_name', 'display_name') ??
+      findByText(xml, 'Surnom', 'Name', 'Nom', 'Full name', 'Nom complet', 'Nickname', 'Display name')
     if (namePt) {
-      log(`   champ à ${namePt}`)
+      log(`   champ Surnom à [${namePt[0]},${namePt[1]}]`)
       await clearAndType(bearer, phoneId, namePt, config.profileName.trim(), log)
     } else {
-      // Name field is typically ~22-25% from top in Edit Profile scroll view
-      const ny = Math.floor(sh * 0.23)
-      log(`   non trouvé → tap (${cx},${ny})`)
+      const ny = Math.floor(sh * 0.28)
+      log(`   Surnom non trouvé → tap coordonnée (${cx},${ny})`)
       await clearAndType(bearer, phoneId, [cx, ny], config.profileName.trim(), log)
     }
+    await sleep(500)
   }
 
-  // ── Set bio ────────────────────────────────────────────────────────────────
+  // ── Set bio (Biographie) ───────────────────────────────────────────────────
   if (config.bio?.trim()) {
-    log('📝 Bio…')
+    log(`📝 Biographie → "${config.bio.substring(0, 30)}…"`)
     xml = await dumpXml(bearer, phoneId)
+    log(`📋 XML edit (bio): ${xml.length} chars`)
     const bioPt =
-      findByResourceId(xml, 'biography') ??
-      findByText(xml, 'Bio', 'Biography', 'Biographie')
+      findByResourceId(xml, 'biography', 'bio', 'profile_bio', 'about') ??
+      findByText(xml, 'Biographie', 'Bio', 'Biography', 'À propos', 'About')
     if (bioPt) {
-      log(`   champ à ${bioPt}`)
+      log(`   champ Bio à [${bioPt[0]},${bioPt[1]}]`)
       await clearAndType(bearer, phoneId, bioPt, config.bio.trim(), log)
     } else {
-      const by = Math.floor(sh * 0.40)
-      log(`   non trouvé → tap (${cx},${by})`)
+      const by = Math.floor(sh * 0.42)
+      log(`   Bio non trouvée → tap coordonnée (${cx},${by})`)
       await clearAndType(bearer, phoneId, [cx, by], config.bio.trim(), log)
     }
+    await sleep(500)
   }
 
   // ── Dismiss keyboard then Save ─────────────────────────────────────────────
@@ -743,6 +764,7 @@ export async function loginInstagramAccount(
   password: string,
   log: (m: string) => void,
   abortSignal: { abort: boolean },
+  totpSecret?: string,
 ): Promise<{ ok: boolean; error?: string }> {
   try {
     const ready = await ensurePhoneRunning(bearer, phoneId, log)
@@ -755,6 +777,14 @@ export async function loginInstagramAccount(
     await shellExec(bearer, phoneId, 'am force-stop com.android.chrome')
     await shellExec(bearer, phoneId, 'am force-stop com.google.android.chrome')
     await sleep(1500)
+
+    // Wait 1 minute before opening Instagram to let the phone fully settle
+    log('⏳ Attente 60s avant ouverture d\'Instagram…')
+    for (let s = 60; s > 0; s -= 10) {
+      if (abortSignal.abort) return { ok: false, error: 'Annulé' }
+      log(`  ⏳ ${s}s…`)
+      await sleep(s > 10 ? 10000 : s * 1000)
+    }
 
     const { output: sizeOut } = await shellExec(bearer, phoneId, 'wm size')
     const sm = sizeOut.match(/(\d+)x(\d+)/)
@@ -785,6 +815,19 @@ export async function loginInstagramAccount(
     }
 
     // Some IG builds show a social-login screen first with "Log in with email" link
+    // Handle "Join Instagram" onboarding screen (fresh install) — tap "I already have a profile"
+    const alreadyHavePt = findByText(xml,
+      'I already have a profile', 'J\'ai déjà un profil', 'J\'ai déjà un compte',
+      'Already have an account', 'Log in', 'Se connecter',
+    )
+    if (alreadyHavePt) {
+      log('📲 Écran "Join Instagram" détecté — tap "I already have a profile"…')
+      await shellExec(bearer, phoneId, `input tap ${alreadyHavePt[0]} ${alreadyHavePt[1]}`)
+      await sleep(4000)
+      xml = await dumpXml(bearer, phoneId)
+      log(`📋 XML après tap (${xml.length} chars)`)
+    }
+
     const emailLoginPt = findByText(xml,
       'Log in with email or phone number',
       'Log in with phone or email',
@@ -820,18 +863,66 @@ export async function loginInstagramAccount(
     await shellExec(bearer, phoneId, `input text "${escapeForInputText(email)}"`)
     await sleep(800)
 
-    // ── TAB vers le mot de passe ───────────────────────────────────────────
-    await shellExec(bearer, phoneId, 'input keyevent 61')
-    await sleep(700)
+    // ── Après l'email : Next ou champ password direct ─────────────────────
+    await sleep(800)
+
+    // Re-dump to detect whether this is a 2-screen flow (email → Next → password)
+    // or a single-screen flow (both fields visible at once)
+    xml = await dumpXml(bearer, phoneId)
+
+    // Check for Next/Continue button (2-screen Instagram login flow)
+    const nextAfterEmail = findByText(xml,
+      'Next', 'Suivant', 'Continue', 'Continuer', 'Next step',
+    ) ?? findByResourceId(xml, 'next_button', 'action_next', 'button_next')
+
+    if (nextAfterEmail) {
+      log('➡️ Bouton Next détecté — Instagram login en 2 étapes')
+      await shellExec(bearer, phoneId, `input tap ${nextAfterEmail[0]} ${nextAfterEmail[1]}`)
+      await sleep(3000)
+      xml = await dumpXml(bearer, phoneId)
+      log(`📋 XML après Next (${xml.length} chars)`)
+    }
+
+    // Find password field in updated XML
+    const passwordPt: [number, number] | null =
+      findByResourceId(xml,
+        'password', 'login_password', 'com.instagram.android:id/password',
+        'com.instagram.android:id/login_password') ??
+      findByText(xml, 'Password', 'Mot de passe', 'Enter password') ??
+      (nextAfterEmail
+        ? [Math.floor(sw / 2), Math.floor(sh * 0.42)] as [number, number]
+        : null)
+
+    if (passwordPt) {
+      log(`🔑 Champ password à [${passwordPt[0]},${passwordPt[1]}] — double tap pour focus`)
+      await shellExec(bearer, phoneId, `input tap ${passwordPt[0]} ${passwordPt[1]}`)
+      await sleep(400)
+      await shellExec(bearer, phoneId, `input tap ${passwordPt[0]} ${passwordPt[1]}`)
+      await sleep(600)
+    } else {
+      // Single-screen fallback: TAB from email field
+      log('🔑 Champ password non trouvé — TAB depuis email')
+      await shellExec(bearer, phoneId, 'input keyevent 61')
+      await sleep(700)
+    }
 
     // ── Saisie mot de passe ────────────────────────────────────────────────
     log('🔑 Saisie du mot de passe…')
     await shellExec(bearer, phoneId, `input text "${escapeForInputText(password)}"`)
     await sleep(800)
 
-    // ── Soumission via ENTER ───────────────────────────────────────────────
-    log('🔐 Soumission du formulaire (ENTER)…')
-    await shellExec(bearer, phoneId, 'input keyevent 66')
+    // ── Soumission : bouton Log In ────────────────────────────────────────
+    log('🔐 Tap bouton Log in…')
+    xml = await dumpXml(bearer, phoneId)
+    const loginBtn = findByText(xml, 'Log in', 'Log In', 'Se connecter', 'Sign in', 'Connexion') ??
+                     findByResourceId(xml, 'log_in_button', 'login_button', 'button_text')
+    if (loginBtn) {
+      log(`   Bouton Log in à [${loginBtn[0]},${loginBtn[1]}]`)
+      await shellExec(bearer, phoneId, `input tap ${loginBtn[0]} ${loginBtn[1]}`)
+    } else {
+      log('   Bouton non trouvé → ENTER')
+      await shellExec(bearer, phoneId, 'input keyevent 66')
+    }
     log('⏳ Connexion en cours… (attente 15s)')
     await sleep(15000)
 
@@ -840,7 +931,7 @@ export async function loginInstagramAccount(
     // ── Vérification post-connexion ────────────────────────────────────────
     xml = await dumpXml(bearer, phoneId)
     log(`📋 XML post-login (${xml.length} chars): ${xml.substring(0, 300)}`)
-    const xmlLower = xml.toLowerCase()
+    let xmlLower = xml.toLowerCase()
 
     // Still on the login page = credentials were not accepted
     const loginPageIndicators = [
@@ -876,9 +967,147 @@ export async function loginInstagramAccount(
       return { ok: true }
     }
 
-    // Unknown state — could be 2FA, challenge screen, etc.
-    log('⚠️ État inconnu après connexion — 2FA ou challenge possible, vérifier le téléphone')
-    return { ok: false, error: 'État inconnu après connexion — 2FA ou challenge requis, vérifier manuellement' }
+    // ── "Check your notifications" OR "Choose a way to confirm" challenge ────
+    const isDeviceApproval = [
+      'check your notifications on another device',
+      'vérifiez vos notifications sur un autre appareil',
+      'waiting for approval', 'en attente d\'approbation',
+      'approve from the other device', 'approuver depuis l\'autre appareil',
+      'choose a way to confirm', 'choisissez une méthode de confirmation',
+      'these are your available confirmation methods',
+    ].some(p => xmlLower.includes(p))
+
+    if (isDeviceApproval) {
+      if (!totpSecret?.trim()) {
+        log('⚠️ Challenge confirmation — aucun secret TOTP configuré')
+        return { ok: false, error: 'Challenge détecté — configure le secret TOTP pour l\'automatiser' }
+      }
+
+      let xmlChallenge = xml
+
+      // If it's the "waiting for approval" screen, tap "Try another way" first
+      const needsTryAnother = [
+        'check your notifications on another device',
+        'waiting for approval', 'en attente d\'approbation',
+        'approve from the other device',
+      ].some(p => xmlLower.includes(p))
+
+      if (needsTryAnother) {
+        log('📱 Tap "Try another way"…')
+        const tryAnotherPt =
+          findByText(xml, 'Try another way', 'Essayer une autre méthode', 'Try another method') ??
+          [Math.floor(sw / 2), Math.floor(sh * 0.75)]
+        await shellExec(bearer, phoneId, `input tap ${tryAnotherPt[0]} ${tryAnotherPt[1]}`)
+        await sleep(4000)
+        xmlChallenge = await dumpXml(bearer, phoneId)
+        log(`📋 XML écran choix méthode (${xmlChallenge.length} chars)`)
+      } else {
+        log('📱 Écran "Choose a way to confirm" détecté directement')
+      }
+
+      // Select "Authentication app" radio button
+      const authAppPt =
+        findByText(xmlChallenge,
+          'Authentication app', 'Authenticator app',
+          'Application d\'authentification', 'App d\'authentification',
+          'Get a code from your authenticator app',
+        ) ?? [Math.floor(sw / 2), Math.floor(sh * 0.38)]
+      log(`   Tap "Authentication app" à [${authAppPt[0]},${authAppPt[1]}]…`)
+      await shellExec(bearer, phoneId, `input tap ${authAppPt[0]} ${authAppPt[1]}`)
+      await sleep(1500)
+
+      // "Continue" button is at the bottom of the same screen (~95% height)
+      const xmlAfterSelect = await dumpXml(bearer, phoneId)
+      log(`📋 XML après sélection (${xmlAfterSelect.length} chars): ${xmlAfterSelect.substring(0, 400)}`)
+      const continuePt =
+        findByText(xmlAfterSelect, 'Continue', 'Continuer', 'Next', 'Suivant') ??
+        findByResourceId(xmlAfterSelect, 'continue_button', 'next_button', 'primary_button') ??
+        [Math.floor(sw / 2), Math.floor(sh * 0.94)]
+      log(`   Tap "Continue" à [${continuePt[0]},${continuePt[1]}]…`)
+      await shellExec(bearer, phoneId, `input tap ${continuePt[0]} ${continuePt[1]}`)
+      await sleep(4000)
+
+      // Now on the TOTP code entry screen
+      xml = await dumpXml(bearer, phoneId)
+      xmlLower = xml.toLowerCase()
+      log(`📋 XML écran TOTP (${xml.length} chars)`)
+    }
+
+    // ── 2FA screen detection ───────────────────────────────────────────────
+    const twoFaPatterns = [
+      'two-factor', 'two_factor', '2-step', '2 step',
+      'authentification à deux', 'double authentification',
+      'confirmation_code', 'two_factor_confirmation',
+      'enter the 6-digit', 'entrez le code à 6',
+      'enter confirmation code', 'entrez le code de confirmation',
+      'get a login code', 'obtenez un code',
+      'security code', 'code de sécurité',
+      'authentication code', 'code d\'authentification',
+      'confirm your identity', 'confirmez votre identité',
+    ]
+    const is2FA = twoFaPatterns.some(p => xmlLower.includes(p))
+
+    if (is2FA && totpSecret?.trim()) {
+      log('🔐 Écran 2FA détecté — génération du code TOTP…')
+      const { generateTOTP } = await import('./totp')
+      const code = await generateTOTP(totpSecret.trim())
+      log(`🔢 Code TOTP généré : ${code}`)
+
+      // Find the 6-digit input field
+      const codePt: [number, number] =
+        findByResourceId(xml,
+          'two_factor_confirmation_code_field', 'confirmation_code',
+          'security_code', 'auth_code', 'otp_code') ??
+        findByText(xml, '______', 'Enter code', 'Entrez le code', 'Code') ??
+        [Math.floor(sw / 2), Math.floor(sh * 0.45)]
+
+      log(`   Champ code à [${codePt[0]},${codePt[1]}]`)
+      await shellExec(bearer, phoneId, `input tap ${codePt[0]} ${codePt[1]}`)
+      await sleep(600)
+      await shellExec(bearer, phoneId, `input text "${code}"`)
+      await sleep(600)
+
+      // Re-dump XML to get confirm button (the button might only appear after filling)
+      const xml2 = await dumpXml(bearer, phoneId)
+      const confirmPt =
+        findByText(xml2, 'Confirm', 'Confirmer', 'Submit', 'Valider', 'Verify', 'Vérifier', 'Next', 'Suivant', 'Continue') ??
+        findByResourceId(xml2, 'confirmation_button', 'submit_button', 'verify_button', 'next_button')
+      if (confirmPt) {
+        log(`   Bouton confirmation à [${confirmPt[0]},${confirmPt[1]}]`)
+        await shellExec(bearer, phoneId, `input tap ${confirmPt[0]} ${confirmPt[1]}`)
+      } else {
+        log('   Bouton non trouvé → ENTER')
+        await shellExec(bearer, phoneId, 'input keyevent 66')
+      }
+
+      log('⏳ Validation du code 2FA (12s)…')
+      await sleep(12000)
+
+      const xml3 = await dumpXml(bearer, phoneId)
+      const xmlLower3 = xml3.toLowerCase()
+      const badCode = ['incorrect code', 'code incorrect', 'wrong code', 'invalid code',
+                       'code invalide', 'code expiré', 'expired code']
+      if (badCode.some(p => xmlLower3.includes(p))) {
+        return { ok: false, error: 'Code 2FA refusé — secret TOTP incorrect ou code expiré' }
+      }
+      // Still on the 2FA screen = code was rejected
+      const still2FA = twoFaPatterns.some(p => xmlLower3.includes(p))
+      if (still2FA) {
+        return { ok: false, error: 'Code 2FA refusé — toujours sur l\'écran 2FA' }
+      }
+      // Any other screen (home, onboarding, permissions…) = success
+      log('✅ Connexion réussie avec 2FA !')
+      return { ok: true }
+    }
+
+    if (is2FA) {
+      log('⚠️ Écran 2FA détecté mais aucun secret TOTP configuré')
+      return { ok: false, error: 'Écran 2FA — configure le secret TOTP dans le Warmup pour l\'automatiser' }
+    }
+
+    // Unknown state
+    log('⚠️ État inconnu après connexion — vérifier le téléphone')
+    return { ok: false, error: 'État inconnu après connexion — vérifier manuellement' }
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) }
   }

@@ -42,9 +42,9 @@ function IgThumbnail({ src, sessionid }: { src: string; sessionid?: string | nul
       .catch(() => { if (!cancelled) setFailed(true) })
     return () => { cancelled = true }
   }, [src, sessionid])
-  if (failed || !src) return <div className="w-11 h-11 rounded bg-surface3 flex items-center justify-center text-lg flex-shrink-0">🎥</div>
-  if (!dataUrl)       return <div className="w-11 h-11 rounded bg-surface3 flex-shrink-0 animate-pulse" />
-  return <img src={dataUrl} alt="" className="w-11 h-11 rounded object-cover flex-shrink-0" />
+  if (failed || !src) return <div className="w-12 h-12 rounded-xl flex items-center justify-center text-xl flex-shrink-0" style={{ background: 'rgba(255,255,255,0.05)' }}>🎥</div>
+  if (!dataUrl)       return <div className="w-12 h-12 rounded-xl flex-shrink-0 animate-pulse" style={{ background: 'rgba(255,255,255,0.05)' }} />
+  return <img src={dataUrl} alt="" className="w-12 h-12 rounded-xl object-cover flex-shrink-0" />
 }
 
 const DEFAULT_PERSONA = "Tu es un créateur de contenu Instagram sympathique. Réponds en français, de façon courte (1-2 phrases), chaleureuse et engageante."
@@ -235,11 +235,20 @@ export function Autocomment({ user }: AutocommentProps) {
   })
 
   return (
-    <div className="flex flex-col h-full min-h-screen">
-      {/* Top: account chips */}
-      <div className="flex-shrink-0 bg-[#070a10] border-b border-border h-14 flex items-center gap-2 px-4 overflow-x-auto">
+    <div className="h-full flex flex-col overflow-hidden">
+
+      {/* Header */}
+      <div className="flex-shrink-0 px-10 pt-9 pb-7 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        <div>
+          <h1 className="text-[28px] font-black text-white leading-none">Auto-Commentaires</h1>
+          <p className="text-[13px] text-text2 mt-0.5">Réponse IA ou manuelle aux commentaires Instagram</p>
+        </div>
+      </div>
+
+      {/* Account chips bar */}
+      <div className="flex-shrink-0 px-6 py-3 flex items-center gap-2 overflow-x-auto" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
         {phones.length === 0 ? (
-          <p className="text-text2 text-sm">Aucun compte Instagram lié — va dans Téléphones d'abord.</p>
+          <p className="text-[13px] text-text2">Aucun compte Instagram lié — va dans Téléphones d'abord.</p>
         ) : phones.map((p, i) => {
           const palette = ['#4f8ef7','#22c55e','#f59e0b','#e0245e','#8b5cf6','#06b6d4','#f97316','#ec4899']
           const color = palette[i % palette.length]
@@ -248,16 +257,17 @@ export function Autocomment({ user }: AutocommentProps) {
             <button
               key={p.id}
               onClick={() => loadPosts(p)}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all flex-shrink-0 ${
-                active ? 'border-accent bg-accent/10' : 'border-border bg-surface hover:border-accent/40'
-              }`}
+              className="flex items-center gap-2.5 px-4 py-2 rounded-xl transition-all flex-shrink-0"
+              style={active
+                ? { background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.4)' }
+                : { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
             >
-              <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold text-white" style={{ background: color }}>
+              <div className="w-7 h-7 rounded-full flex items-center justify-center text-[12px] font-bold text-white flex-shrink-0" style={{ background: color }}>
                 {(p.ig_username ?? p.phone_name)[0].toUpperCase()}
               </div>
               <div className="text-left">
-                <p className="text-xs font-semibold text-text leading-none">@{p.ig_username}</p>
-                <p className="text-[9px] text-text2 leading-none mt-0.5 flex items-center gap-1">
+                <p className="text-[13px] font-semibold text-white leading-none">@{p.ig_username}</p>
+                <p className="text-[11px] text-text2 leading-none mt-0.5 flex items-center gap-1">
                   <span className={`w-1.5 h-1.5 rounded-full ${p.ig_sessionid ? 'bg-ok' : 'bg-danger'}`} />
                   {p.ig_sessionid ? 'session OK' : 'no session'}
                 </p>
@@ -268,22 +278,24 @@ export function Autocomment({ user }: AutocommentProps) {
       </div>
 
       <div className="flex-1 flex overflow-hidden">
-        {/* Left: post list */}
-        <aside className="w-[310px] flex-shrink-0 flex flex-col border-r border-border bg-sb-bg">
-          <div className="px-4 py-3 border-b border-border flex items-center gap-2">
-            <p className="text-sm font-bold text-text flex-1">
+
+        {/* ── Left: post list ──────────────────────────────────────────────── */}
+        <aside className="w-[300px] flex-shrink-0 flex flex-col overflow-hidden" style={{ borderRight: '1px solid rgba(255,255,255,0.06)' }}>
+          <div className="px-5 py-3.5 flex items-center gap-2" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+            <p className="text-[13px] font-bold text-white flex-1">
               {selectedPhone ? `@${selectedPhone.ig_username}` : 'Sélectionne un compte'}
             </p>
             {selectedPhone && (
               <button
                 onClick={() => loadPosts(selectedPhone)}
-                className="text-text2 hover:text-accent text-sm"
+                className="text-text2 hover:text-white text-[15px] transition-colors"
                 title="Recharger"
               >⟳</button>
             )}
           </div>
+
           {/* Filters */}
-          <div className="px-3 py-2 border-b border-border flex gap-1">
+          <div className="px-4 py-2.5 flex gap-1.5" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
             {([
               { k: 'all',     l: 'Tous'        },
               { k: 'replied', l: '✓ Commentés' },
@@ -292,73 +304,84 @@ export function Autocomment({ user }: AutocommentProps) {
               <button
                 key={f.k}
                 onClick={() => setPostFilter(f.k)}
-                className={`px-2.5 py-1 rounded-full text-[10px] transition-colors ${
-                  postFilter === f.k
-                    ? f.k === 'replied' ? 'bg-ok/20 text-ok' : f.k === 'new' ? 'bg-danger/20 text-danger' : 'bg-accent/20 text-accent'
-                    : 'text-text2 hover:bg-surface2'
-                }`}
+                className="px-3 py-1.5 rounded-xl text-[12px] font-semibold transition-colors"
+                style={postFilter === f.k
+                  ? f.k === 'replied'
+                    ? { background: 'rgba(52,211,153,0.15)', color: '#34d399', border: '1px solid rgba(52,211,153,0.3)' }
+                    : f.k === 'new'
+                    ? { background: 'rgba(239,68,68,0.15)', color: '#f87171', border: '1px solid rgba(239,68,68,0.3)' }
+                    : { background: 'rgba(139,92,246,0.15)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.3)' }
+                  : { background: 'transparent', color: 'rgba(196,181,253,0.4)', border: '1px solid transparent' }}
               >{f.l}</button>
             ))}
           </div>
 
-          <div className="flex-1 overflow-auto">
+          <div className="flex-1 overflow-y-auto">
             {loading ? (
               <div className="flex justify-center py-10"><Spinner /></div>
             ) : visiblePosts.length === 0 ? (
-              <p className="px-4 py-6 text-xs text-text2 text-center">
-                {selectedPhone ? 'Aucune vidéo' : 'Choisis un compte au-dessus'}
-              </p>
+              <div className="px-5 py-10 text-center">
+                <p className="text-3xl mb-3">🎬</p>
+                <p className="text-[13px] text-text2">
+                  {selectedPhone ? 'Aucune vidéo' : 'Choisis un compte au-dessus'}
+                </p>
+              </div>
             ) : visiblePosts.map(p => (
               <button
                 key={p.id}
                 onClick={() => selectPost(p)}
-                className={`w-full flex items-start gap-3 px-3 py-2.5 text-left border-b border-border/30 transition-colors ${
-                  selectedPost?.id === p.id ? 'bg-surface2' : 'hover:bg-surface'
-                }`}
+                className="w-full flex items-start gap-3 px-4 py-3.5 text-left transition-colors"
+                style={selectedPost?.id === p.id
+                  ? { background: 'rgba(139,92,246,0.1)', borderBottom: '1px solid rgba(255,255,255,0.05)' }
+                  : { borderBottom: '1px solid rgba(255,255,255,0.04)' }}
               >
                 <IgThumbnail src={p.thumbnail} sessionid={selectedPhone?.ig_sessionid} />
                 <div className="min-w-0 flex-1">
-                  <p className="text-[10px] text-text2">
+                  <p className="text-[12px] text-text2">
                     🎥 {p.taken_at ? new Date(p.taken_at * 1000).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'}
                   </p>
-                  <p className="text-xs text-text truncate">{p.caption || `Reel ${p.shortcode}`}</p>
-                  <p className="text-[10px] text-text2 mt-0.5">💬 {p.comment_count}</p>
+                  <p className="text-[13px] text-white truncate mt-0.5">{p.caption || `Reel ${p.shortcode}`}</p>
+                  <p className="text-[12px] text-text2 mt-0.5">💬 {p.comment_count}</p>
                 </div>
               </button>
             ))}
           </div>
         </aside>
 
-        {/* Right: comments + config */}
-        <div className="flex-1 flex flex-col">
+        {/* ── Right: comments + config ─────────────────────────────────────── */}
+        <div className="flex-1 flex flex-col overflow-hidden">
           {!selectedPost ? (
-            <div className="flex-1 flex items-center justify-center text-text2">
-              <div className="text-center space-y-2">
-                <p className="text-5xl">✈️</p>
-                <p className="text-sm">Sélectionne une vidéo pour commencer</p>
+            <div className="flex-1 flex items-center justify-center">
+              <div className="rounded-2xl p-10 text-center" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                <div className="text-5xl mb-4">✈️</div>
+                <p className="text-base font-bold text-white">Sélectionne une vidéo</p>
+                <p className="text-[13px] text-text2 mt-1">Choisis une vidéo dans la liste pour commencer</p>
               </div>
             </div>
           ) : (
             <>
-              <div className="px-6 py-3 border-b border-border flex items-center gap-2">
-                <h2 className="text-sm font-semibold text-text">💬 Commentaires</h2>
-                <span className="text-text2 text-xs">{comments.length}</span>
-                <button onClick={() => loadComments(selectedPost)} className="ml-auto text-text2 hover:text-accent text-sm">⟳</button>
+              <div className="flex-shrink-0 px-6 py-3.5 flex items-center gap-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                <h2 className="text-[15px] font-bold text-white">💬 Commentaires</h2>
+                <span className="text-[13px] text-text2">{comments.length}</span>
+                <button onClick={() => loadComments(selectedPost)} className="ml-auto text-text2 hover:text-white text-[15px] transition-colors">⟳</button>
               </div>
-              <div className="flex-1 overflow-auto p-4 space-y-3">
+              <div className="flex-1 overflow-y-auto px-6 py-5 space-y-3">
                 {loadingComments ? (
-                  <Spinner />
+                  <div className="flex justify-center py-10"><Spinner /></div>
                 ) : comments.length === 0 ? (
-                  <p className="text-text2 text-sm text-center py-10">Aucun commentaire chargé.</p>
+                  <div className="rounded-2xl p-10 text-center" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                    <p className="text-3xl mb-3">💬</p>
+                    <p className="text-[13px] text-text2">Aucun commentaire chargé.</p>
+                  </div>
                 ) : comments.map(c => (
-                  <div key={c.pk} className="bg-card border border-border rounded-lg p-3 space-y-1.5">
+                  <div key={c.pk} className="rounded-2xl p-4 space-y-2" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
                     <div className="flex items-center gap-2">
-                      <p className="text-xs font-semibold text-accent">@{c.username}</p>
-                      {c.replied && <span className="text-[10px] text-ok bg-ok/10 px-1.5 py-0.5 rounded">✓ Répondu</span>}
+                      <p className="text-[13px] font-bold text-accent">@{c.username}</p>
+                      {c.replied && <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ background: 'rgba(52,211,153,0.12)', color: '#34d399', border: '1px solid rgba(52,211,153,0.2)' }}>✓ Répondu</span>}
                     </div>
-                    <p className="text-sm text-text">{c.text}</p>
+                    <p className="text-[13px] text-white">{c.text}</p>
                     {c.replied && (
-                      <p className="text-xs text-ok/80 flex items-start gap-1.5 border-l-2 border-ok/30 pl-2">
+                      <p className="text-[13px] flex items-start gap-2 pl-3 pt-1" style={{ borderLeft: '2px solid rgba(52,211,153,0.3)', color: '#34d399' }}>
                         <span className="flex-1">{c.replied}</span>
                       </p>
                     )}
@@ -366,18 +389,21 @@ export function Autocomment({ user }: AutocommentProps) {
                       <div className="flex gap-2 pt-1">
                         <input
                           type="text"
+                          name="manual-reply"
                           value={manualReplies[c.pk] ?? ''}
                           onChange={e => setManualReplies(prev => ({ ...prev, [c.pk]: e.target.value }))}
                           onKeyDown={e => { if (e.key === 'Enter') sendManualReply(c) }}
                           placeholder="Écrire une réponse…"
-                          className="flex-1 bg-bg border border-border rounded px-2 py-1 text-xs text-text placeholder:text-text2 focus:outline-none focus:border-accent"
+                          className="flex-1 rounded-xl px-4 py-2.5 text-[13px] placeholder:text-text2 focus:outline-none"
+                          style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
                         />
                         <button
                           onClick={() => sendManualReply(c)}
                           disabled={!manualReplies[c.pk]?.trim() || sendingReply === c.pk}
-                          className="px-3 py-1 bg-accent hover:bg-accent/80 disabled:opacity-40 text-white text-xs rounded transition-colors"
+                          className="rounded-xl px-4 py-2.5 text-[13px] font-semibold disabled:opacity-40 transition-colors"
+                          style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff' }}
                         >
-                          {sendingReply === c.pk ? '…' : '↑'}
+                          {sendingReply === c.pk ? '…' : '↑ Envoyer'}
                         </button>
                       </div>
                     )}
@@ -388,72 +414,84 @@ export function Autocomment({ user }: AutocommentProps) {
           )}
 
           {/* Config bar */}
-          <div className="border-t border-border bg-[#070a10] p-4 space-y-3">
+          <div className="flex-shrink-0 px-6 py-5 space-y-4" style={{ borderTop: '1px solid rgba(255,255,255,0.06)', background: 'rgba(0,0,0,0.2)' }}>
             {/* Mode toggle */}
-            <div className="flex items-center gap-2 pb-1">
-              <span className="text-[10px] uppercase tracking-wider text-text2 font-semibold">Mode réponse</span>
-              <div className="flex rounded-lg overflow-hidden border border-border ml-2">
+            <div className="flex items-center gap-3">
+              <span className="text-[12px] uppercase tracking-wider text-text2 font-semibold">Mode réponse</span>
+              <div className="flex rounded-xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.09)' }}>
                 <button
                   onClick={() => setReplyMode('ai')}
-                  className={`px-3 py-1 text-xs transition-colors ${replyMode === 'ai' ? 'bg-accent text-white' : 'text-text2 hover:text-text'}`}
+                  className="px-4 py-2 text-[13px] font-semibold transition-colors"
+                  style={replyMode === 'ai'
+                    ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff' }
+                    : { background: 'transparent', color: 'rgba(196,181,253,0.5)' }}
                 >🤖 IA Auto</button>
                 <button
                   onClick={() => setReplyMode('manual')}
-                  className={`px-3 py-1 text-xs transition-colors ${replyMode === 'manual' ? 'bg-accent text-white' : 'text-text2 hover:text-text'}`}
+                  className="px-4 py-2 text-[13px] font-semibold transition-colors"
+                  style={replyMode === 'manual'
+                    ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff' }
+                    : { background: 'transparent', color: 'rgba(196,181,253,0.5)' }}
                 >✍️ Manuel</button>
               </div>
             </div>
-            {replyMode === 'ai' && (<>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-[10px] uppercase tracking-wider text-text2 font-semibold block mb-1">Clé Groq API</label>
-                <input
-                  type="password"
-                  value={groqKey}
-                  onChange={e => setGroqKey(e.target.value)}
-                  placeholder="gsk_…"
-                  className="w-full bg-bg border border-border rounded px-3 py-1.5 text-xs text-text placeholder:text-text2 focus:outline-none focus:border-accent"
-                />
-              </div>
-              <div>
-                <label className="text-[10px] uppercase tracking-wider text-text2 font-semibold block mb-1">Intervalle (min)</label>
-                <input
-                  type="number"
-                  min={1}
-                  max={120}
-                  value={interval}
-                  onChange={e => setInterval_(parseInt(e.target.value) || 5)}
-                  className="w-full bg-bg border border-border rounded px-3 py-1.5 text-xs text-text focus:outline-none focus:border-accent"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="text-[10px] uppercase tracking-wider text-text2 font-semibold block mb-1">Persona IA</label>
-              <textarea
-                value={persona}
-                onChange={e => setPersona(e.target.value)}
-                rows={3}
-                className="w-full bg-bg border border-border rounded px-3 py-2 text-xs text-text resize-none focus:outline-none focus:border-accent"
-              />
-            </div>
-            </>)}
-            {replyMode === 'ai' ? (
-              <div className="flex gap-2">
-                {!running ? (
-                  <Button size="sm" onClick={start} className="flex-1 !bg-ok hover:!bg-ok/80 !text-bg">▶ Démarrer</Button>
-                ) : (
-                  <Button size="sm" onClick={stop} variant="danger" className="flex-1">■ Arrêter</Button>
-                )}
-                <Button size="sm" variant="secondary" onClick={() => setLogs([])}>🗑</Button>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <div className="flex gap-2 items-center">
-                  <p className="text-[10px] text-text2 flex-1">✍️ Mode manuel — écris ta réponse sous chaque commentaire puis clique sur ↑ Envoyer.</p>
-                  <Button size="sm" variant="secondary" onClick={() => setLogs([])}>🗑</Button>
+
+            {replyMode === 'ai' && (
+              <>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[12px] uppercase tracking-wider text-text2 font-semibold block mb-2">Clé Groq API</label>
+                    <input
+                      type="password"
+                      name="groq-key"
+                      value={groqKey}
+                      onChange={e => setGroqKey(e.target.value)}
+                      placeholder="gsk_…"
+                      className="w-full rounded-xl px-4 py-2.5 text-[13px] placeholder:text-text2 focus:outline-none"
+                      style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[12px] uppercase tracking-wider text-text2 font-semibold block mb-2">Intervalle (min)</label>
+                    <input
+                      type="number"
+                      name="interval"
+                      min={1}
+                      max={120}
+                      value={interval}
+                      onChange={e => setInterval_(parseInt(e.target.value) || 5)}
+                      className="w-full rounded-xl px-4 py-2.5 text-[13px] focus:outline-none"
+                      style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
+                    />
+                  </div>
                 </div>
-                <div className="flex items-center gap-3 p-2 bg-bg border border-border rounded">
-                  <label className="flex items-center gap-2 text-[11px] text-text cursor-pointer">
+                <div>
+                  <label className="text-[12px] uppercase tracking-wider text-text2 font-semibold block mb-2">Persona IA</label>
+                  <textarea
+                    name="persona"
+                    value={persona}
+                    onChange={e => setPersona(e.target.value)}
+                    rows={2}
+                    className="w-full rounded-xl px-4 py-2.5 text-[13px] resize-none focus:outline-none"
+                    style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
+                  />
+                </div>
+                <div className="flex gap-2">
+                  {!running ? (
+                    <Button size="sm" onClick={start} className="flex-1 !bg-ok hover:!bg-ok/80 !text-bg">▶ Démarrer</Button>
+                  ) : (
+                    <Button size="sm" onClick={stop} variant="danger" className="flex-1">■ Arrêter</Button>
+                  )}
+                  <Button size="sm" variant="secondary" onClick={() => setLogs([])}>🗑 Logs</Button>
+                </div>
+              </>
+            )}
+
+            {replyMode === 'manual' && (
+              <div className="space-y-3">
+                <p className="text-[13px] text-text2">✍️ Mode manuel — écris ta réponse sous chaque commentaire puis clique sur Envoyer.</p>
+                <div className="flex items-center gap-3 rounded-xl px-4 py-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                  <label className="flex items-center gap-2.5 text-[13px] text-white cursor-pointer">
                     <input
                       type="checkbox"
                       checked={useGeelark}
@@ -462,11 +500,13 @@ export function Autocomment({ user }: AutocommentProps) {
                     📱 Envoyer via téléphone GéeLark <span className="text-text2">(indétectable, ~15s)</span>
                   </label>
                 </div>
+                <Button size="sm" variant="secondary" onClick={() => setLogs([])}>🗑 Effacer logs</Button>
               </div>
             )}
+
             {/* Log */}
-            <div className="bg-bg border border-border rounded p-2 max-h-24 overflow-auto font-mono text-[10px] text-text2 space-y-0.5">
-              {logs.length === 0 ? <p className="text-text2/50">Aucun log</p> : logs.map((l, i) => <p key={i}>{l}</p>)}
+            <div className="rounded-xl p-3 max-h-20 overflow-y-auto font-mono text-[11px] text-text2 space-y-0.5" style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.06)' }}>
+              {logs.length === 0 ? <p className="opacity-40">Aucun log</p> : logs.map((l, i) => <p key={i}>{l}</p>)}
             </div>
           </div>
         </div>

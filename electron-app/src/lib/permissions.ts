@@ -6,19 +6,19 @@ import type { OrgRole, PermOverrides, PageKey } from './supabase'
 // can edit their profile / see organisation info.
 const ROLE_TABS: Record<OrgRole, Record<PageKey, boolean>> = {
   owner: {
-    dashboard: true, phones: true, stats: true, posting: true, massposting: true,
+    dashboard: true, phones: true, stats: true, posting: true, massposting: true, scheduler: true,
     bank: true, autocomment: true, warmup: true, aitools: true, montage: true, remix: true, settings: true,
   },
   admin: {
-    dashboard: true, phones: true, stats: true, posting: true, massposting: true,
+    dashboard: true, phones: true, stats: true, posting: true, massposting: true, scheduler: true,
     bank: true, autocomment: true, warmup: true, aitools: true, montage: true, remix: true, settings: true,
   },
   member: {
-    dashboard: true, phones: true, stats: true, posting: true, massposting: true,
+    dashboard: true, phones: true, stats: true, posting: true, massposting: true, scheduler: true,
     bank: true, autocomment: true, warmup: true, aitools: true, montage: true, remix: true, settings: false,
   },
   viewer: {
-    dashboard: true, phones: true, stats: true, posting: false, massposting: false,
+    dashboard: true, phones: true, stats: true, posting: false, massposting: false, scheduler: false,
     bank: true, autocomment: false, warmup: false, aitools: false, montage: false, remix: false, settings: false,
   },
 }

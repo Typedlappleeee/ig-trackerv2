@@ -51,8 +51,8 @@ function ToggleRow({
         <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${checked ? 'translate-x-5' : 'translate-x-0'}`} />
       </div>
       <div className="flex-1 select-none" onClick={() => onChange(!checked)}>
-        <p className={`text-sm font-medium transition-colors ${checked ? 'text-text' : 'text-text2'}`}>{title}</p>
-        <p className="text-[11px] text-text2/70 mt-0.5">{sub}</p>
+        <p className={`text-[13px] font-medium transition-colors ${checked ? 'text-text' : 'text-text2'}`}>{title}</p>
+        <p className="text-[12px] text-text2/70 mt-0.5">{sub}</p>
       </div>
     </label>
   )
@@ -265,13 +265,43 @@ export function Settings({ user, initialPanel }: SettingsProps) {
     }
   }
 
-  if (loading) return <div className="p-8 text-text2 text-sm">Chargement…</div>
+  if (loading) return (
+    <div className="h-full flex flex-col overflow-hidden">
+      <div className="flex-shrink-0 px-10 pt-9 pb-7" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        <h1 className="text-[28px] font-black text-white leading-none">Paramètres</h1>
+      </div>
+      <div className="flex-1 flex items-center justify-center">
+        <p className="text-[13px] text-text2">Chargement…</p>
+      </div>
+    </div>
+  )
 
   return (
-    <div className="p-6 space-y-5 max-w-xl">
+    <div className="h-full flex flex-col overflow-hidden">
 
-      {/* Top tabs (Python: 3 tabs) */}
-      <div className="flex gap-1 border-b border-border">
+      {/* Page header */}
+      <div className="flex-shrink-0 px-10 pt-9 pb-7 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        <div>
+          <h1 className="text-[28px] font-black text-white leading-none">Paramètres</h1>
+          <p className="text-[13px] text-text2 mt-0.5">Personnalise ton expérience</p>
+        </div>
+        {panel === 'general' && (
+          <div className="flex items-center gap-4">
+            {saved && <span className="text-[13px] text-ok">✓ Sauvegardé</span>}
+            <button
+              onClick={save}
+              disabled={saving}
+              className="rounded-xl px-5 py-2.5 text-[13px] font-semibold text-white disabled:opacity-50"
+              style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)' }}
+            >
+              {saving ? 'Sauvegarde…' : '💾 Sauvegarder'}
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Tab navigation */}
+      <div className="flex-shrink-0 px-10 pt-5 pb-0 flex gap-1" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
         {([
           { k: 'general',      l: '⚙ Général'       },
           { k: 'profile',      l: '👤 Profil'        },
@@ -283,8 +313,8 @@ export function Settings({ user, initialPanel }: SettingsProps) {
           <button
             key={t.k}
             onClick={() => setPanel(t.k)}
-            className={`px-3 py-1.5 text-xs font-semibold border-b-2 transition-colors ${
-              panel === t.k ? 'border-accent text-accent bg-accent/5' : 'border-transparent text-text2 hover:text-text'
+            className={`px-4 py-2.5 text-[13px] font-semibold border-b-2 transition-colors -mb-px ${
+              panel === t.k ? 'border-accent text-accent' : 'border-transparent text-text2 hover:text-text'
             }`}
           >
             {t.l}
@@ -292,170 +322,191 @@ export function Settings({ user, initialPanel }: SettingsProps) {
         ))}
       </div>
 
-      {panel === 'general' && (
-        <section className="space-y-6">
+      {/* Scrollable content */}
+      <div className="flex-1 overflow-y-auto px-10 pb-10">
 
-          {/* Sub-tabs */}
-          <div className="flex gap-2">
-            {(['apparence', 'sons'] as GeneralTab[]).map(t => (
-              <button
-                key={t}
-                onClick={() => setGenTab(t)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium capitalize transition-all ${
-                  genTab === t ? 'bg-accent text-white' : 'bg-surface2 text-text2 hover:text-text'
-                }`}
-              >
-                {t}
-              </button>
-            ))}
-          </div>
+        {panel === 'general' && (
+          <div className="mt-8 space-y-6 max-w-2xl">
 
-          {genTab === 'apparence' && (
-            <div className="space-y-4">
-              <h2 className="text-sm font-semibold text-text">Thème de couleur</h2>
-              <div className="flex flex-wrap gap-3">
-                {THEMES.map(t => (
-                  <button
-                    key={t}
-                    onClick={() => { handleTheme(t); handleSwatchClick() }}
-                    className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium border transition-all ${
-                      theme === t
-                        ? 'border-accent bg-accent/10 text-accent'
-                        : 'border-border bg-surface2 text-text2 hover:border-accent/40'
-                    }`}
-                  >
-                    <span
-                      className="w-3 h-3 rounded-full"
-                      style={{ background: THEME_COLORS[t] }}
-                    />
-                    {t}
-                  </button>
-                ))}
-              </div>
-              {pixelUnlocked && (
-                <div className="mt-2 px-3 py-2 rounded-lg bg-surface2 border border-border text-xs text-text2">
-                  🎮 Mode Pixel débloqué
-                </div>
-              )}
+            {/* Sub-tabs */}
+            <div className="flex gap-2">
+              {(['apparence', 'sons'] as GeneralTab[]).map(t => (
+                <button
+                  key={t}
+                  onClick={() => setGenTab(t)}
+                  className={`px-4 py-2.5 rounded-xl text-[13px] font-medium capitalize transition-all ${
+                    genTab === t ? 'text-white' : 'text-text2 hover:text-text'
+                  }`}
+                  style={genTab === t ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)' } : { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}
+                >
+                  {t}
+                </button>
+              ))}
             </div>
-          )}
 
-          {genTab === 'sons' && (
-            <div className="space-y-5">
-              <ToggleRow
-                checked={notifyPopup}
-                onChange={v => setNotifyPopup(v)}
-                title="Notifications popup"
-                sub="Affiche une notification en haut à droite lors d'actions importantes"
-              />
-              <ToggleRow
-                checked={notifySound}
-                onChange={v => setNotifySound(v)}
-                title="Sons de navigation"
-                sub="Joue un son lors des changements de page"
-              />
-              <ToggleRow
-                checked={musicOn}
-                onChange={v => { setMusicOn(v); setMusicEnabled(v) }}
-                title="Musique d'ambiance"
-                sub="Joue une musique en fond lors de l'utilisation de l'app"
-                accent
-              />
-              {musicOn && (
-                <>
-                  <div className="space-y-2">
-                    <p className="text-xs font-medium text-text">Track</p>
-                    <div className="flex flex-wrap gap-2">
-                      {TRACKS.map((tr, i) => (
-                        <button
-                          key={i}
-                          onClick={() => { setMusicTrackS(i); setTrack(i) }}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                            musicTrack === i ? 'bg-accent text-white' : 'bg-surface2 text-text2 hover:text-text'
-                          }`}
-                        >
-                          {tr.name}
-                        </button>
-                      ))}
+            {genTab === 'apparence' && (
+              <div className="rounded-2xl p-6 space-y-5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                <h2 className="text-[15px] font-bold text-white">Thème de couleur</h2>
+                <div className="flex flex-wrap gap-3">
+                  {THEMES.map(t => (
+                    <button
+                      key={t}
+                      onClick={() => { handleTheme(t); handleSwatchClick() }}
+                      className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-medium border transition-all ${
+                        theme === t
+                          ? 'border-accent bg-accent/10 text-accent'
+                          : 'border-border bg-surface2 text-text2 hover:border-accent/40'
+                      }`}
+                    >
+                      <span
+                        className="w-3 h-3 rounded-full"
+                        style={{ background: THEME_COLORS[t] }}
+                      />
+                      {t}
+                    </button>
+                  ))}
+                </div>
+                {pixelUnlocked && (
+                  <div className="px-4 py-3 rounded-xl text-[13px] text-text2" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                    🎮 Mode Pixel débloqué
+                  </div>
+                )}
+              </div>
+            )}
+
+            {genTab === 'sons' && (
+              <div className="rounded-2xl p-6 space-y-6" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                <h2 className="text-[15px] font-bold text-white mb-4">Sons & Notifications</h2>
+                <ToggleRow
+                  checked={notifyPopup}
+                  onChange={v => setNotifyPopup(v)}
+                  title="Notifications popup"
+                  sub="Affiche une notification en haut à droite lors d'actions importantes"
+                />
+                <ToggleRow
+                  checked={notifySound}
+                  onChange={v => setNotifySound(v)}
+                  title="Sons de navigation"
+                  sub="Joue un son lors des changements de page"
+                />
+                <ToggleRow
+                  checked={musicOn}
+                  onChange={v => { setMusicOn(v); setMusicEnabled(v) }}
+                  title="Musique d'ambiance"
+                  sub="Joue une musique en fond lors de l'utilisation de l'app"
+                  accent
+                />
+                {musicOn && (
+                  <div className="space-y-5 pt-2 border-t" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+                    <div className="space-y-3">
+                      <p className="text-[13px] font-medium text-text">Track</p>
+                      <div className="flex flex-wrap gap-2">
+                        {TRACKS.map((tr, i) => (
+                          <button
+                            key={i}
+                            onClick={() => { setMusicTrackS(i); setTrack(i) }}
+                            className={`px-4 py-2 rounded-xl text-[13px] font-medium transition-all ${
+                              musicTrack === i ? 'text-white' : 'text-text2 hover:text-text'
+                            }`}
+                            style={musicTrack === i ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)' } : { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}
+                          >
+                            {tr.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-[13px] font-medium text-text">Volume — {Math.round(musicVol * 100)}%</p>
+                      <input
+                        type="range" min={0} max={1} step={0.05}
+                        value={musicVol}
+                        onChange={e => { const v = parseFloat(e.target.value); setMusicVol(v); setVolume(v) }}
+                        className="w-full accent-accent"
+                      />
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    <p className="text-xs font-medium text-text">Volume — {Math.round(musicVol * 100)}%</p>
-                    <input
-                      type="range" min={0} max={1} step={0.05}
-                      value={musicVol}
-                      onChange={e => { const v = parseFloat(e.target.value); setMusicVol(v); setVolume(v) }}
-                      className="w-full accent-accent"
-                    />
-                  </div>
-                </>
-              )}
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Profil ─────────────────────────────────────────────────────────── */}
+        {panel === 'profile' && (
+          <div className="mt-8 max-w-2xl">
+            <div className="rounded-2xl p-6 space-y-5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <h2 className="text-[15px] font-bold text-white mb-4">Mon Profil</h2>
+              <Input label="Email" type="email" placeholder="contact@example.com" value={profileEmail} onChange={e => setProfileEmail(e.target.value)} />
+              <Input label="Nom complet" placeholder="Jean Dupont" value={profileName} onChange={e => setProfileName(e.target.value)} />
+              <Input label="Pseudo (visible par l'équipe)" placeholder="@jean" value={displayName} onChange={e => setDisplayName(e.target.value)} />
+              <div className="flex items-center gap-4 pt-2">
+                <Button onClick={saveProfile} loading={saving}>💾 Sauvegarder le profil</Button>
+                {saved && <span className="text-[13px] text-ok">✓ Sauvegardé</span>}
+              </div>
             </div>
-          )}
-
-
-        </section>
-      )}
-
-      {/* ── Profil ─────────────────────────────────────────────────────────── */}
-      {panel === 'profile' && (
-        <section className="space-y-4">
-          <h2 className="text-sm font-semibold text-text">Mon Profil</h2>
-          <Input label="Email" type="email" placeholder="contact@example.com" value={profileEmail} onChange={e => setProfileEmail(e.target.value)} />
-          <Input label="Nom complet" placeholder="Jean Dupont" value={profileName} onChange={e => setProfileName(e.target.value)} />
-          <Input label="Pseudo (visible par l'équipe)" placeholder="@jean" value={displayName} onChange={e => setDisplayName(e.target.value)} />
-          <Button onClick={saveProfile} loading={saving} className="w-full">💾 Sauvegarder le profil</Button>
-        </section>
-      )}
-
-      {/* ── Organisation ────────────────────────────────────────────────────── */}
-      {panel === 'organization' && <OrganizationPanel user={user} />}
-
-      {/* ── Connexions ─────────────────────────────────────────────────────── */}
-      {panel === 'connexions' && canSeeConnexions && (
-        <div className="space-y-5">
-          <div className={`px-4 py-2.5 rounded-lg text-xs flex items-center gap-2 ${
-            currentOrg ? 'bg-accent/10 border border-accent/30 text-accent' : 'bg-surface2 border border-border text-text2'
-          }`}>
-            {currentOrg
-              ? <><span>🏢</span><span>Mode organisation — <strong>{currentOrg.name}</strong>{!canEditOrgConnexions && <span className="text-warn"> · Lecture seule (admin requis)</span>}</span></>
-              : <><span>👤</span><span>Mode solo — ces clés sont privées à votre compte</span></>
-            }
           </div>
+        )}
 
-          <div className="space-y-4">
-            <h2 className="text-sm font-semibold text-text">Connexions GéeLark</h2>
-            <Input label="Bearer Token GéeLark" type="password" placeholder="Bearer …" value={bearer} onChange={e => setBearer(e.target.value)} disabled={!!currentOrg && !canEditOrgConnexions} />
-            <Input label="URL Proxy (optionnel)" placeholder="http://…" value={proxyUrl} onChange={e => setProxyUrl(e.target.value)} disabled={!!currentOrg && !canEditOrgConnexions} />
-            <Input label="Session ID Instagram" type="password" placeholder="sessionid=…" value={igSession} onChange={e => setIgSession(e.target.value)} disabled={!!currentOrg && !canEditOrgConnexions} />
-            <Button onClick={saveConnexions} loading={saving} disabled={!!currentOrg && !canEditOrgConnexions}>💾 Sauvegarder</Button>
+        {/* ── Organisation ────────────────────────────────────────────────────── */}
+        {panel === 'organization' && (
+          <div className="mt-8">
+            <OrganizationPanel user={user} />
           </div>
+        )}
 
-          <div className="space-y-4 pt-4 border-t border-border">
-            <h2 className="text-sm font-semibold text-text">Clés API</h2>
-            <Input label="Groq API Key" type="password" placeholder="gsk_…" value={groqKey} onChange={e => setGroqKey(e.target.value)} disabled={!!currentOrg && !canEditOrgConnexions} />
-            <Input label="Anthropic API Key" type="password" placeholder="sk-ant-…" value={anthropicKey} onChange={e => setAnthropicKey(e.target.value)} disabled={!!currentOrg && !canEditOrgConnexions} />
-            <Button onClick={saveConnexions} loading={saving} disabled={!!currentOrg && !canEditOrgConnexions} className="w-full">💾 Sauvegarder les clés API</Button>
+        {/* ── Connexions ─────────────────────────────────────────────────────── */}
+        {panel === 'connexions' && canSeeConnexions && (
+          <div className="mt-8 max-w-2xl space-y-6">
+            <div className={`px-5 py-3 rounded-xl text-[13px] flex items-center gap-2 ${
+              currentOrg ? 'bg-accent/10 border border-accent/30 text-accent' : 'text-text2'
+            }`}
+              style={!currentOrg ? { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' } : {}}
+            >
+              {currentOrg
+                ? <><span>🏢</span><span>Mode organisation — <strong>{currentOrg.name}</strong>{!canEditOrgConnexions && <span className="text-warn"> · Lecture seule (admin requis)</span>}</span></>
+                : <><span>👤</span><span>Mode solo — ces clés sont privées à votre compte</span></>
+              }
+            </div>
+
+            <div className="rounded-2xl p-6 space-y-5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <h2 className="text-[15px] font-bold text-white mb-4">Connexions GéeLark</h2>
+              <Input label="Bearer Token GéeLark" type="password" placeholder="Bearer …" value={bearer} onChange={e => setBearer(e.target.value)} disabled={!!currentOrg && !canEditOrgConnexions} />
+              <Input label="URL Proxy (optionnel)" placeholder="http://…" value={proxyUrl} onChange={e => setProxyUrl(e.target.value)} disabled={!!currentOrg && !canEditOrgConnexions} />
+              <Input label="Session ID Instagram" type="password" placeholder="sessionid=…" value={igSession} onChange={e => setIgSession(e.target.value)} disabled={!!currentOrg && !canEditOrgConnexions} />
+              <div className="flex items-center gap-4 pt-2">
+                <Button onClick={saveConnexions} loading={saving} disabled={!!currentOrg && !canEditOrgConnexions}>💾 Sauvegarder</Button>
+                {saved && <span className="text-[13px] text-ok">✓ Sauvegardé</span>}
+              </div>
+            </div>
+
+            <div className="rounded-2xl p-6 space-y-5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <h2 className="text-[15px] font-bold text-white mb-4">Clés API</h2>
+              <Input label="Groq API Key" type="password" placeholder="gsk_…" value={groqKey} onChange={e => setGroqKey(e.target.value)} disabled={!!currentOrg && !canEditOrgConnexions} />
+              <Input label="Anthropic API Key" type="password" placeholder="sk-ant-…" value={anthropicKey} onChange={e => setAnthropicKey(e.target.value)} disabled={!!currentOrg && !canEditOrgConnexions} />
+              <Button onClick={saveConnexions} loading={saving} disabled={!!currentOrg && !canEditOrgConnexions} className="w-full">💾 Sauvegarder les clés API</Button>
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* ── Admin ───────────────────────────────────────────────────────────── */}
-      {panel === 'admin' && license.isSuperAdmin && <AdminPanel user={user} />}
+        {/* ── Admin ───────────────────────────────────────────────────────────── */}
+        {panel === 'admin' && license.isSuperAdmin && (
+          <div className="mt-8">
+            <AdminPanel user={user} />
+          </div>
+        )}
 
-      {/* ── Abonnement ──────────────────────────────────────────────────────── */}
-      {panel === 'abonnement' && <SubscriptionPanel />}
+        {/* ── Abonnement ──────────────────────────────────────────────────────── */}
+        {panel === 'abonnement' && (
+          <div className="mt-8">
+            <SubscriptionPanel />
+          </div>
+        )}
 
-      {/* Bottom save bar */}
-      {error && (
-        <div className="px-4 py-3 rounded-lg bg-danger/10 border border-danger/20 text-danger text-sm">{error}</div>
-      )}
-      {panel === 'general' && (
-        <div className="flex items-center gap-4 sticky bottom-4 bg-bg/80 backdrop-blur-sm py-2">
-          <Button onClick={save} loading={saving}>💾 Sauvegarder</Button>
-          {saved && <span className="text-sm text-ok">✓ Sauvegardé</span>}
-        </div>
-      )}
+        {/* Error bar */}
+        {error && (
+          <div className="mt-6 px-5 py-4 rounded-xl text-[13px] text-danger max-w-2xl" style={{ background: 'rgba(255,92,110,0.08)', border: '1px solid rgba(255,92,110,0.2)' }}>{error}</div>
+        )}
+      </div>
     </div>
   )
 }
@@ -556,38 +607,39 @@ function AdminPanel({ user: _user }: { user: User }) {
   })
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6 max-w-3xl">
       {/* Stats */}
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-4 gap-6">
         {[
           ['Total', stats.total, 'text-text'],
           ['Dispo', stats.dispo, 'text-green-400'],
           ['Actives', stats.actives, 'text-blue-400'],
           ['Expirées', stats.expirées, 'text-red-400'],
         ].map(([l, v, c]) => (
-          <div key={l as string} className="rounded-xl p-3 text-center" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(139,92,246,0.12)' }}>
-            <p className={`text-xl font-black ${c}`}>{v}</p>
-            <p className="text-[10px] text-text2 mt-0.5">{l}</p>
+          <div key={l as string} className="rounded-2xl p-6 text-center" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(139,92,246,0.12)' }}>
+            <p className={`text-2xl font-black ${c}`}>{v}</p>
+            <p className="text-[12px] text-text2 mt-1">{l}</p>
           </div>
         ))}
       </div>
 
       {/* Créer */}
-      <div className="rounded-xl p-4 space-y-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(139,92,246,0.15)' }}>
-        <p className="text-xs font-semibold text-text uppercase tracking-wider">Créer une clé</p>
+      <div className="rounded-2xl p-6 space-y-4" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(139,92,246,0.15)' }}>
+        <p className="text-[15px] font-bold text-white mb-4">Créer une clé</p>
         <div className="flex gap-2">
           <input
             value={newKey}
             onChange={e => setNewKey(e.target.value.toUpperCase())}
-            className="flex-1 bg-[#0d0a1a] border border-border rounded-lg px-3 py-2 text-sm font-mono tracking-widest text-text focus:outline-none focus:border-accent"
+            className="flex-1 rounded-xl px-4 py-2.5 text-[13px] font-mono tracking-widest focus:outline-none"
+            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
           />
-          <button onClick={() => setNewKey(genKey())} className="px-3 py-2 rounded-lg text-text2 hover:text-text text-sm" style={{ background: 'rgba(255,255,255,0.05)' }}>↺</button>
+          <button onClick={() => setNewKey(genKey())} className="px-4 py-2.5 rounded-xl text-[13px] text-text2 hover:text-text" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)' }}>↺</button>
         </div>
-        <div className="flex flex-wrap gap-1">
+        <div className="flex flex-wrap gap-2">
           {DURATIONS.map(d => (
             <button key={d.label} onClick={() => setDuration(d.days)}
-              className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${duration === d.days ? 'text-white' : 'text-text2 hover:text-text'}`}
-              style={duration === d.days ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)' } : { background: 'rgba(255,255,255,0.05)' }}>
+              className={`px-4 py-2 rounded-xl text-[13px] font-medium transition-all ${duration === d.days ? 'text-white' : 'text-text2 hover:text-text'}`}
+              style={duration === d.days ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)' } : { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}>
               {d.label}
             </button>
           ))}
@@ -595,41 +647,41 @@ function AdminPanel({ user: _user }: { user: User }) {
         <div className="flex gap-2">
           {['standard', 'pro', 'lifetime'].map(p => (
             <button key={p} onClick={() => setPlan(p)}
-              className={`px-3 py-1 rounded-lg text-xs capitalize transition-all ${plan === p ? 'text-white' : 'text-text2'}`}
-              style={plan === p ? { background: 'rgba(139,92,246,0.3)', border: '1px solid rgba(139,92,246,0.5)' } : { background: 'rgba(255,255,255,0.05)' }}>
+              className={`px-4 py-2 rounded-xl text-[13px] capitalize transition-all ${plan === p ? 'text-white' : 'text-text2'}`}
+              style={plan === p ? { background: 'rgba(139,92,246,0.3)', border: '1px solid rgba(139,92,246,0.5)' } : { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}>
               {p}
             </button>
           ))}
         </div>
         <Input value={notes} onChange={e => setNotes(e.target.value)} placeholder="Notes (ex: Discord @pseudo)" />
-        {createErr && <p className="text-xs text-red-400 text-center">{createErr}</p>}
+        {createErr && <p className="text-[13px] text-red-400 text-center">{createErr}</p>}
         <Button onClick={create} loading={creating} className="w-full">+ Créer la clé</Button>
       </div>
 
       {/* Liste */}
-      <div className="space-y-2">
+      <div className="space-y-3">
         <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher clé ou email…" />
-        {loading ? <p className="text-text2 text-sm text-center py-6">Chargement…</p> : filtered.length === 0 ? (
-          <p className="text-text2 text-sm text-center py-6">Aucune clé</p>
+        {loading ? <p className="text-[13px] text-text2 text-center py-8">Chargement…</p> : filtered.length === 0 ? (
+          <p className="text-[13px] text-text2 text-center py-8">Aucune clé</p>
         ) : filtered.map(k => (
-          <div key={k.id} className={`rounded-xl px-3 py-2.5 flex flex-wrap items-center gap-2 ${!k.is_active ? 'opacity-50' : ''}`}
+          <div key={k.id} className={`rounded-xl px-5 py-4 flex flex-wrap items-center gap-2 ${!k.is_active ? 'opacity-50' : ''}`}
             style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(139,92,246,0.1)' }}>
-            <button onClick={() => copy(k.key)} className="font-mono text-xs text-text tracking-widest hover:text-accent transition-colors">
-              {k.key} <span className="text-[10px] text-text2">{copied === k.key ? '✓' : '⎘'}</span>
+            <button onClick={() => copy(k.key)} className="font-mono text-[13px] text-text tracking-widest hover:text-accent transition-colors">
+              {k.key} <span className="text-[12px] text-text2">{copied === k.key ? '✓' : '⎘'}</span>
             </button>
-            <span className="text-[10px] px-1.5 py-0.5 rounded-full capitalize" style={{ background: 'rgba(139,92,246,0.15)', color: '#a78bfa' }}>{k.plan}</span>
+            <span className="text-[12px] px-2 py-0.5 rounded-full capitalize" style={{ background: 'rgba(139,92,246,0.15)', color: '#a78bfa' }}>{k.plan}</span>
             {!k.is_active
-              ? <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-500/10 text-red-400">Révoquée</span>
+              ? <span className="text-[12px] px-2 py-0.5 rounded-full bg-red-500/10 text-red-400">Révoquée</span>
               : k.user_id
-                ? <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400">Activée</span>
-                : <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-green-500/10 text-green-400">Dispo</span>
+                ? <span className="text-[12px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400">Activée</span>
+                : <span className="text-[12px] px-2 py-0.5 rounded-full bg-green-500/10 text-green-400">Dispo</span>
             }
-            <span className={`text-[11px] font-semibold ml-auto ${daysColor(k.expires_at)}`}>{daysLeft(k.expires_at)}</span>
-            {k.user_email && <span className="text-[10px] text-text2 truncate max-w-[140px]">{k.user_email}</span>}
-            {k.notes && <span className="text-[10px] text-text2 italic truncate max-w-[100px]">{k.notes}</span>}
+            <span className={`text-[13px] font-semibold ml-auto ${daysColor(k.expires_at)}`}>{daysLeft(k.expires_at)}</span>
+            {k.user_email && <span className="text-[12px] text-text2 truncate max-w-[140px]">{k.user_email}</span>}
+            {k.notes && <span className="text-[12px] text-text2 italic truncate max-w-[100px]">{k.notes}</span>}
             <div className="flex gap-1">
-              {k.is_active && <button onClick={() => revoke(k.id)} className="text-[10px] px-2 py-0.5 rounded text-orange-400 hover:bg-orange-400/10">Révoquer</button>}
-              <button onClick={() => del(k.id)} className="text-[10px] px-2 py-0.5 rounded text-red-400 hover:bg-red-400/10">Suppr.</button>
+              {k.is_active && <button onClick={() => revoke(k.id)} className="text-[12px] px-2 py-1 rounded text-orange-400 hover:bg-orange-400/10">Révoquer</button>}
+              <button onClick={() => del(k.id)} className="text-[12px] px-2 py-1 rounded text-red-400 hover:bg-red-400/10">Suppr.</button>
             </div>
           </div>
         ))}
@@ -722,42 +774,42 @@ function SubscriptionPanel() {
   const maxPhones   = '∞'
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-2xl">
       {/* Current status */}
-      <div className="rounded-2xl p-4 space-y-4" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(139,92,246,0.18)' }}>
-        <p className="text-xs font-black text-text uppercase tracking-wider">Mon abonnement actuel</p>
+      <div className="rounded-2xl p-6 space-y-4" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(139,92,246,0.18)' }}>
+        <p className="text-[15px] font-bold text-white mb-4">Mon abonnement actuel</p>
 
         <div className="flex items-center justify-between">
-          <span className="text-sm text-text2">Statut</span>
-          <span className="text-sm font-bold" style={{ color: statusColor }}>{statusLabel}</span>
+          <span className="text-[13px] text-text2">Statut</span>
+          <span className="text-[13px] font-bold" style={{ color: statusColor }}>{statusLabel}</span>
         </div>
 
         {license.plan && (
           <div className="flex items-center justify-between">
-            <span className="text-sm text-text2">Plan</span>
-            <span className="text-sm font-bold" style={{ color: '#a78bfa' }}>{planLabel}</span>
+            <span className="text-[13px] text-text2">Plan</span>
+            <span className="text-[13px] font-bold" style={{ color: '#a78bfa' }}>{planLabel}</span>
           </div>
         )}
 
         {license.expiresAt && (
           <div className="flex items-center justify-between">
-            <span className="text-sm text-text2">Expiration</span>
-            <span className="text-sm font-semibold text-text">
+            <span className="text-[13px] text-text2">Expiration</span>
+            <span className="text-[13px] font-semibold text-text">
               {license.expiresAt.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
             </span>
           </div>
         )}
 
         {licenseKey && (
-          <div className="space-y-1.5">
-            <p className="text-xs text-text2">Clé de licence</p>
+          <div className="space-y-2">
+            <p className="text-[12px] text-text2">Clé de licence</p>
             <div className="flex items-center gap-2">
-              <code className="flex-1 bg-surface2 border border-border rounded-lg px-3 py-2 text-sm font-mono tracking-widest text-text2 truncate">
+              <code className="flex-1 rounded-xl px-4 py-2.5 text-[13px] font-mono tracking-widest text-text2 truncate" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
                 {licenseKey}
               </code>
               <button
                 onClick={copy}
-                className="px-3 py-2 rounded-lg text-xs font-semibold transition-all flex-shrink-0"
+                className="px-4 py-2.5 rounded-xl text-[13px] font-semibold transition-all flex-shrink-0"
                 style={{ background: copied ? 'rgba(52,211,153,0.12)' : 'rgba(139,92,246,0.1)', color: copied ? '#34d399' : '#a78bfa', border: `1px solid ${copied ? 'rgba(52,211,153,0.25)' : 'rgba(139,92,246,0.2)'}` }}
               >
                 {copied ? '✓ Copié' : 'Copier'}
@@ -768,106 +820,108 @@ function SubscriptionPanel() {
       </div>
 
       {/* Activate a license key */}
-      <div className="rounded-2xl p-5 space-y-3" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(139,92,246,0.18)' }}>
-        <p className="text-xs font-black text-text uppercase tracking-wider">🔑 Activer une clé</p>
+      <div className="rounded-2xl p-6 space-y-4" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(139,92,246,0.18)' }}>
+        <p className="text-[15px] font-bold text-white mb-4">🔑 Activer une clé</p>
         <form onSubmit={handleActivateKey} className="flex gap-2">
           <input
             value={newKey}
             onChange={e => setNewKey(e.target.value)}
             placeholder="XXXX-XXXX-XXXX-XXXX"
-            className="flex-1 bg-bg border border-border rounded-lg px-3 py-2 text-sm font-mono tracking-widest text-text placeholder:text-text2 focus:border-accent focus:outline-none uppercase"
+            className="flex-1 rounded-xl px-4 py-2.5 text-[13px] font-mono tracking-widest focus:outline-none uppercase"
+            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
             spellCheck={false}
             autoComplete="off"
           />
           <button
             type="submit"
             disabled={keyLoading || !newKey.trim()}
-            className="px-4 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-40 transition-all"
+            className="rounded-xl px-5 py-2.5 text-[13px] font-semibold text-white disabled:opacity-40 transition-all"
             style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)' }}
           >{keyLoading ? '…' : 'Activer'}</button>
         </form>
         {keyResult && (
-          <p className={`text-xs ${keyResult.ok ? 'text-ok' : 'text-danger'}`}>{keyResult.text}</p>
+          <p className={`text-[13px] ${keyResult.ok ? 'text-ok' : 'text-danger'}`}>{keyResult.text}</p>
         )}
       </div>
 
       {/* Credits */}
-      <div className="rounded-2xl p-5 space-y-4" style={{ background: 'rgba(139,92,246,0.04)', border: '1px solid rgba(139,92,246,0.2)' }}>
-        <p className="text-xs font-black text-text uppercase tracking-wider">💎 Crédits</p>
+      <div className="rounded-2xl p-6 space-y-5" style={{ background: 'rgba(139,92,246,0.04)', border: '1px solid rgba(139,92,246,0.2)' }}>
+        <p className="text-[15px] font-bold text-white mb-4">💎 Crédits</p>
 
         <div className="flex items-center justify-between">
-          <span className="text-sm text-text2">Solde actuel</span>
-          <span className="text-2xl font-black" style={{ color: creditBalance < 10 ? '#f87171' : '#a78bfa' }}>
+          <span className="text-[13px] text-text2">Solde actuel</span>
+          <span className="text-3xl font-black" style={{ color: creditBalance < 10 ? '#f87171' : '#a78bfa' }}>
             {creditBalance.toLocaleString('fr-FR')}
           </span>
         </div>
 
         {planCredits > 0 && (
-          <div className="flex items-center justify-between text-xs text-text2">
-            <span>Crédits mensuels inclus (plan {planLabel})</span>
-            <span className="font-semibold text-text">{planCredits.toLocaleString('fr-FR')} / mois</span>
+          <div className="flex items-center justify-between">
+            <span className="text-[13px] text-text2">Crédits mensuels inclus (plan {planLabel})</span>
+            <span className="text-[13px] font-semibold text-text">{planCredits.toLocaleString('fr-FR')} / mois</span>
           </div>
         )}
 
-        <div className="rounded-xl p-3 space-y-1" style={{ background: 'rgba(0,0,0,0.2)' }}>
-          <p className="text-[10px] font-bold uppercase tracking-wider text-text2 mb-2">Coût des opérations</p>
-          <div className="flex justify-between text-xs"><span className="text-text2">🚀 Posting</span><span className="text-text font-semibold">1 crédit / tél.</span></div>
-          <div className="flex justify-between text-xs"><span className="text-text2">⚡ Mass Posting</span><span className="text-text font-semibold">2 crédits / tél.</span></div>
-          <div className="flex justify-between text-xs"><span className="text-text2">✂ Montage vidéo</span><span className="text-text font-semibold">1 crédit</span></div>
-          <div className="flex justify-between text-xs"><span className="text-text2">🔀 Remix vidéo</span><span className="text-text font-semibold">2 crédits</span></div>
+        <div className="rounded-xl p-4 space-y-2" style={{ background: 'rgba(0,0,0,0.2)' }}>
+          <p className="text-[12px] font-bold uppercase tracking-wider text-text2 mb-3">Coût des opérations</p>
+          <div className="flex justify-between"><span className="text-[13px] text-text2">🚀 Posting</span><span className="text-[13px] text-text font-semibold">1 crédit / tél.</span></div>
+          <div className="flex justify-between"><span className="text-[13px] text-text2">⚡ Mass Posting</span><span className="text-[13px] text-text font-semibold">2 crédits / tél.</span></div>
+          <div className="flex justify-between"><span className="text-[13px] text-text2">✂ Montage vidéo</span><span className="text-[13px] text-text font-semibold">1 crédit</span></div>
+          <div className="flex justify-between"><span className="text-[13px] text-text2">🔀 Remix vidéo</span><span className="text-[13px] text-text font-semibold">2 crédits</span></div>
         </div>
 
-        <div className="rounded-xl p-3" style={{ background: 'rgba(0,0,0,0.2)' }}>
-          <p className="text-[10px] font-bold uppercase tracking-wider text-text2 mb-2">Téléphones GéeLark</p>
-          <div className="flex justify-between text-xs">
-            <span className="text-text2">Maximum autorisé</span>
-            <span className="font-semibold" style={{ color: maxPhones === '∞' ? '#34d399' : '#a78bfa' }}>{maxPhones}</span>
+        <div className="rounded-xl p-4" style={{ background: 'rgba(0,0,0,0.2)' }}>
+          <p className="text-[12px] font-bold uppercase tracking-wider text-text2 mb-3">Téléphones GéeLark</p>
+          <div className="flex justify-between">
+            <span className="text-[13px] text-text2">Maximum autorisé</span>
+            <span className="text-[13px] font-semibold" style={{ color: maxPhones === '∞' ? '#34d399' : '#a78bfa' }}>{maxPhones}</span>
           </div>
         </div>
 
         {/* Redeem code */}
-        <div className="space-y-2 pt-2 border-t border-border/40">
-          <p className="text-xs font-semibold text-text2">Activer un code crédit</p>
+        <div className="space-y-3 pt-2" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+          <p className="text-[13px] font-semibold text-text2">Activer un code crédit</p>
           <form onSubmit={handleRedeemCode} className="flex gap-2">
             <input
               value={creditCode}
               onChange={e => { setCreditCode(e.target.value); setCodeResult(null) }}
               placeholder="CODE-XXXX"
-              className="flex-1 bg-surface2 border border-border rounded-lg px-3 py-2 text-sm font-mono text-text placeholder:text-text2/40 focus:outline-none focus:border-accent/50 uppercase"
+              className="flex-1 rounded-xl px-4 py-2.5 text-[13px] font-mono focus:outline-none uppercase"
+              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
               spellCheck={false}
             />
             <button
               type="submit"
               disabled={codeLoading || !creditCode.trim()}
-              className="px-4 py-2 rounded-lg text-xs font-bold text-white transition-all disabled:opacity-40"
+              className="px-5 py-2.5 rounded-xl text-[13px] font-bold text-white transition-all disabled:opacity-40"
               style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)' }}
             >
               {codeLoading ? '…' : 'Activer'}
             </button>
           </form>
           {codeResult && (
-            <p className="text-xs" style={{ color: codeResult.ok ? '#34d399' : '#f87171' }}>{codeResult.text}</p>
+            <p className="text-[13px]" style={{ color: codeResult.ok ? '#34d399' : '#f87171' }}>{codeResult.text}</p>
           )}
         </div>
       </div>
 
       {/* Plan pricing */}
       <div>
-        <p className="text-xs font-black text-text uppercase tracking-wider mb-4">Abonnements</p>
-        <div className="grid grid-cols-2 gap-4">
+        <p className="text-[15px] font-bold text-white mb-6">Abonnements</p>
+        <div className="grid grid-cols-2 gap-6">
 
           {/* Standard */}
-          <div className="rounded-2xl p-5 space-y-4 flex flex-col" style={{ background: 'rgba(139,92,246,0.05)', border: '1px solid rgba(139,92,246,0.25)' }}>
+          <div className="rounded-2xl p-6 space-y-5 flex flex-col" style={{ background: 'rgba(139,92,246,0.05)', border: '1px solid rgba(139,92,246,0.25)' }}>
             <div>
-              <p className="text-xs font-black uppercase tracking-wider" style={{ color: '#a78bfa' }}>Standard</p>
+              <p className="text-[13px] font-black uppercase tracking-wider" style={{ color: '#a78bfa' }}>Standard</p>
               <div className="flex items-baseline gap-1 mt-2">
                 <span className="text-3xl font-black text-white">49,99$</span>
-                <span className="text-xs text-text2">/ mois</span>
+                <span className="text-[13px] text-text2">/ mois</span>
               </div>
             </div>
-            <ul className="space-y-1.5 flex-1">
+            <ul className="space-y-2 flex-1">
               {['2 000 crédits / mois', 'Téléphones illimités', 'Toutes les fonctionnalités', 'Support standard'].map(f => (
-                <li key={f} className="flex items-center gap-2 text-xs text-text2">
+                <li key={f} className="flex items-center gap-2 text-[13px] text-text2">
                   <span style={{ color: '#a78bfa' }}>✓</span>{f}
                 </li>
               ))}
@@ -876,7 +930,7 @@ function SubscriptionPanel() {
               href="https://t.me/justquentin"
               target="_blank"
               rel="noreferrer"
-              className="block w-full py-2.5 rounded-xl text-sm font-bold text-center text-white transition-all"
+              className="block w-full py-2.5 rounded-xl text-[13px] font-bold text-center text-white transition-all"
               style={{ background: 'linear-gradient(130deg,#7c3aed,#8b5cf6)' }}
             >
               Acheter →
@@ -884,20 +938,20 @@ function SubscriptionPanel() {
           </div>
 
           {/* Pro */}
-          <div className="rounded-2xl p-5 space-y-4 flex flex-col relative overflow-hidden" style={{ background: 'linear-gradient(145deg,rgba(236,72,153,0.08),rgba(124,58,237,0.08))', border: '1px solid rgba(236,72,153,0.35)' }}>
-            <div className="absolute top-3 right-3 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider" style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff' }}>
+          <div className="rounded-2xl p-6 space-y-5 flex flex-col relative overflow-hidden" style={{ background: 'linear-gradient(145deg,rgba(236,72,153,0.08),rgba(124,58,237,0.08))', border: '1px solid rgba(236,72,153,0.35)' }}>
+            <div className="absolute top-3 right-3 text-[11px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider" style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff' }}>
               Populaire
             </div>
             <div>
-              <p className="text-xs font-black uppercase tracking-wider" style={{ color: '#f472b6' }}>Pro</p>
+              <p className="text-[13px] font-black uppercase tracking-wider" style={{ color: '#f472b6' }}>Pro</p>
               <div className="flex items-baseline gap-1 mt-2">
                 <span className="text-3xl font-black text-white">99,99$</span>
-                <span className="text-xs text-text2">/ mois</span>
+                <span className="text-[13px] text-text2">/ mois</span>
               </div>
             </div>
-            <ul className="space-y-1.5 flex-1">
+            <ul className="space-y-2 flex-1">
               {['5 500 crédits / mois', 'Téléphones illimités', 'Membres illimités (org)', 'Support prioritaire 24/7'].map(f => (
-                <li key={f} className="flex items-center gap-2 text-xs text-text2">
+                <li key={f} className="flex items-center gap-2 text-[13px] text-text2">
                   <span style={{ color: '#f472b6' }}>✓</span>{f}
                 </li>
               ))}
@@ -906,29 +960,29 @@ function SubscriptionPanel() {
               href="https://t.me/justquentin"
               target="_blank"
               rel="noreferrer"
-              className="block w-full py-2.5 rounded-xl text-sm font-bold text-center text-white transition-all"
+              className="block w-full py-2.5 rounded-xl text-[13px] font-bold text-center text-white transition-all"
               style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)', boxShadow: '0 2px 20px -4px rgba(236,72,153,0.4)' }}
             >
               Acheter →
             </a>
           </div>
         </div>
-        <p className="text-[10px] text-text2/50 mt-3 text-center">
+        <p className="text-[12px] text-text2/50 mt-4 text-center">
           Après achat, tu recevras une clé de licence par email à activer ci-dessus.
         </p>
         <a
           href="https://t.me/justquentin"
           target="_blank"
           rel="noreferrer"
-          className="mt-4 flex items-center gap-3 rounded-xl p-4 transition-all hover:scale-[1.01]"
+          className="mt-5 flex items-center gap-3 rounded-2xl p-5 transition-all hover:scale-[1.01]"
           style={{ background: 'rgba(33,150,243,0.08)', border: '1px solid rgba(33,150,243,0.25)', textDecoration: 'none' }}
         >
           <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 flex-shrink-0" style={{ color: '#29b6f6' }}>
             <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.833.941z"/>
           </svg>
           <div>
-            <p className="text-sm font-bold text-text">Payer via Telegram</p>
-            <p className="text-xs text-text2">Paiement en crypto — contacte @justquentin</p>
+            <p className="text-[13px] font-bold text-text">Payer via Telegram</p>
+            <p className="text-[12px] text-text2">Paiement en crypto — contacte @justquentin</p>
           </div>
         </a>
       </div>
