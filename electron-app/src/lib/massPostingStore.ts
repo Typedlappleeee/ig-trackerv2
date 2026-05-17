@@ -60,6 +60,13 @@ export function setMassPostingState(patch: Partial<MassPostingState>) {
   notify()
 }
 
+export function resetMassPosting() {
+  state.posting      = false
+  state.logs         = []
+  state.taskStatuses = new Map()
+  notify()
+}
+
 export function subscribeMassPosting(cb: () => void): () => void {
   subs.add(cb)
   return () => subs.delete(cb)

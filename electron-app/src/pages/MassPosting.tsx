@@ -11,6 +11,7 @@ import { BankPicker } from './Bank'
 import {
   getMassPostingState, setMassPostingState, subscribeMassPosting,
   type TaskLog, type TaskStatus, type SelectedVideo,
+  resetMassPosting,
 } from '@/lib/massPostingStore'
 import { playSuccess } from '@/lib/sounds'
 import { checkAndDeductCredits, CREDIT_COSTS, useCredits } from '@/lib/credits'
@@ -452,7 +453,13 @@ export function MassPosting({ user }: MassPostingProps) {
         log(`🛑 Arrêt des ${remaining.length} téléphone(s) restant(s)…`)
         await geelark(bearer, '/phone/stop', { ids: remaining })
       }
-      log('🎉 Terminé !', 'ok')
+
+      // Mark every phone as done
+      for (const p of phoneList) setPhoneStatus(p.id, { status: 'done' })
+
+      log('🎉 Terminé ! Réinitialisation dans 5s…', 'ok')
+      await new Promise(r => setTimeout(r, 5000))
+      resetMassPosting()
 
     } catch (e: unknown) {
       log(`❌ Erreur: ${e instanceof Error ? e.message : String(e)}`, 'error')
