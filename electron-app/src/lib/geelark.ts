@@ -989,6 +989,18 @@ export async function loginInstagramAccount(
       await shellExec(bearer, phoneId, `input tap ${authAppPt[0]} ${authAppPt[1]}`)
       await sleep(4000)
 
+      // Instagram shows an intermediate info screen with a "Continue" button before the code field
+      const xml2b = await dumpXml(bearer, phoneId)
+      log(`📋 XML après "Authentication app" (${xml2b.length} chars)`)
+      const continuePt =
+        findByText(xml2b, 'Continue', 'Continuer', 'Next', 'Suivant', 'OK', 'Got it') ??
+        findByResourceId(xml2b, 'continue_button', 'next_button', 'ok_button')
+      if (continuePt) {
+        log(`   Tap "Continue" à [${continuePt[0]},${continuePt[1]}]…`)
+        await shellExec(bearer, phoneId, `input tap ${continuePt[0]} ${continuePt[1]}`)
+        await sleep(3000)
+      }
+
       // Now we should be on the TOTP code entry screen — reuse existing 2FA logic
       xml = await dumpXml(bearer, phoneId)
       xmlLower = xml.toLowerCase()
