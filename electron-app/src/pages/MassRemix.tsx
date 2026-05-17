@@ -67,7 +67,7 @@ function VideoListPanel({
           💾 PC
         </button>
       </div>
-      <div className="flex-1 overflow-auto space-y-2 min-h-[120px] max-h-72">
+      <div className="flex-1 overflow-auto space-y-2 min-h-[80px] max-h-[160px]">
         {paths.length === 0 ? (
           <div className="rounded-2xl p-6 text-center text-[13px]" style={{ border: `1px dashed ${accent}25`, color: 'rgba(196,181,253,0.4)' }}>
             Aucune vidéo — ajoute depuis la banque ou le PC
@@ -443,165 +443,151 @@ Return ONLY a JSON array. If none, return [].`
           </Button>
         </div>
 
-        {/* Scrollable content */}
-        <div className="flex-1 overflow-y-auto px-10 pb-10">
-          <div className="space-y-6 mt-8">
+        {/* Main layout — no scroll needed */}
+        <div className="flex-1 min-h-0 flex flex-col px-10 py-7 gap-5">
 
-            {/* Video pickers */}
-            <div className="grid grid-cols-2 gap-6">
-              <div className="rounded-2xl p-6" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(139,92,246,0.2)' }}>
-                <VideoListPanel
-                  label="Vidéos originales"
-                  paths={originals}
-                  accent="#8b5cf6"
-                  onAddBank={() => setShowBankOrig(true)}
-                  onAddPC={async () => { const p = await pickPC(false); setOriginals(prev => [...prev, ...p]) }}
-                  onRemove={i => setOriginals(prev => prev.filter((_, j) => j !== i))}
-                />
-              </div>
-              <div className="rounded-2xl p-6" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(236,72,153,0.18)' }}>
-                <VideoListPanel
-                  label="Nouvelles Phase 1"
-                  paths={secondaries}
-                  accent="#ec4899"
-                  onAddBank={() => setShowBankSec(true)}
-                  onAddPC={async () => { const p = await pickPC(false); setSecondaries(prev => [...prev, ...p]) }}
-                  onRemove={i => setSecondaries(prev => prev.filter((_, j) => j !== i))}
-                />
+          {/* Row 1: Video pickers */}
+          <div className="grid grid-cols-2 gap-5" style={{ flexShrink: 0 }}>
+            <div className="rounded-2xl p-5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(139,92,246,0.2)' }}>
+              <VideoListPanel
+                label="Vidéos originales"
+                paths={originals}
+                accent="#8b5cf6"
+                onAddBank={() => setShowBankOrig(true)}
+                onAddPC={async () => { const p = await pickPC(false); setOriginals(prev => [...prev, ...p]) }}
+                onRemove={i => setOriginals(prev => prev.filter((_, j) => j !== i))}
+              />
+            </div>
+            <div className="rounded-2xl p-5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(236,72,153,0.18)' }}>
+              <VideoListPanel
+                label="Nouvelles Phase 1"
+                paths={secondaries}
+                accent="#ec4899"
+                onAddBank={() => setShowBankSec(true)}
+                onAddPC={async () => { const p = await pickPC(false); setSecondaries(prev => [...prev, ...p]) }}
+                onRemove={i => setSecondaries(prev => prev.filter((_, j) => j !== i))}
+              />
+            </div>
+          </div>
+
+          {/* Row 2: Settings strip — 4 columns always visible */}
+          <div className="grid grid-cols-4 gap-5" style={{ flexShrink: 0 }}>
+
+            {/* Format */}
+            <div className="rounded-2xl p-5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <p className="text-[12px] text-text2 mb-3 uppercase tracking-wide font-semibold">Format</p>
+              <div className="flex flex-col gap-2">
+                {(['9:16', '1:1', '16:9'] as Preset[]).map(p => (
+                  <button key={p} onClick={() => setPreset(p)} className="w-full py-2 rounded-xl text-[13px] font-bold"
+                    style={preset === p
+                      ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff' }
+                      : { background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.6)', border: '1px solid rgba(255,255,255,0.08)' }
+                    }>{p}</button>
+                ))}
               </div>
             </div>
 
-            {/* Copies + pairing */}
-            {originals.length > 0 && secondaries.length > 0 && (
-              <div className="rounded-2xl p-6 space-y-4" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                <div className="flex items-center justify-between">
-                  <p className="text-[15px] font-bold text-white">Nombre de copies</p>
-                  <div className="flex items-center gap-3">
-                    <input type="number" min={1} max={200} value={copies}
-                      onChange={e => setCopies(Math.max(1, Math.min(200, Number(e.target.value))))}
-                      className="w-20 rounded-xl px-4 py-2.5 text-[13px] font-bold text-white text-center focus:outline-none"
-                      style={{ background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.3)' }} />
-                    <span className="text-[13px] text-text2">vidéos</span>
-                  </div>
-                </div>
-                <input type="range" min={1} max={50} value={Math.min(copies, 50)}
-                  onChange={e => setCopies(Number(e.target.value))} className="w-full" />
-                <p className="text-[13px] text-text2">
-                  🔀 Mix aléatoire — <strong className="text-white/70">{originals.length}</strong> original{originals.length > 1 ? 's' : ''} ×{' '}
-                  <strong className="text-white/70">{secondaries.length}</strong> secondaire{secondaries.length > 1 ? 's' : ''} → <strong className="text-violet-400">{copies}</strong> remix générés
+            {/* Copies */}
+            <div className="rounded-2xl p-5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <p className="text-[12px] text-text2 mb-3 uppercase tracking-wide font-semibold">Copies</p>
+              <input type="number" min={1} max={200} value={copies}
+                onChange={e => setCopies(Math.max(1, Math.min(200, Number(e.target.value))))}
+                className="w-full rounded-xl px-4 py-2.5 text-[22px] font-black text-white text-center focus:outline-none mb-3"
+                style={{ background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.3)' }} />
+              <input type="range" min={1} max={50} value={Math.min(copies, 50)}
+                onChange={e => setCopies(Number(e.target.value))} className="w-full" />
+              {originals.length > 0 && secondaries.length > 0 && (
+                <p className="text-[11px] text-text2 mt-2">
+                  {originals.length} orig × {secondaries.length} sec → <strong className="text-violet-400">{copies}</strong> remix
                 </p>
+              )}
+            </div>
+
+            {/* Export */}
+            <div className="rounded-2xl p-5 space-y-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <p className="text-[12px] text-text2 uppercase tracking-wide font-semibold">Export</p>
+              <div className="flex gap-2">
+                {(['bank', 'folder'] as ExportMode[]).map(m => (
+                  <button key={m} onClick={() => setExportMode(m)} className="flex-1 py-2 rounded-xl text-[12px] font-bold"
+                    style={exportMode === m
+                      ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff' }
+                      : { background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.6)', border: '1px solid rgba(255,255,255,0.08)' }
+                    }>
+                    {m === 'bank' ? '☁ Banque' : '💾 Dossier'}
+                  </button>
+                ))}
               </div>
-            )}
+              {exportMode === 'bank' && (
+                <>
+                  {bankFolders.length > 0 && (
+                    <select
+                      value={bankFolders.includes(bankFolder) ? bankFolder : ''}
+                      onChange={e => setBankFolder(e.target.value)}
+                      className="w-full rounded-xl px-3 py-2 text-[12px] focus:outline-none"
+                      style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(139,92,246,0.3)', color: '#e2d9f3' }}>
+                      <option value="" style={{ background: '#0c0919' }}>— Racine</option>
+                      {bankFolders.map(f => (
+                        <option key={f} value={f} style={{ background: '#0c0919' }}>{f}</option>
+                      ))}
+                    </select>
+                  )}
+                  <input
+                    type="text"
+                    placeholder={bankFolders.length > 0 ? 'Nouveau dossier…' : 'Dossier (optionnel)'}
+                    value={bankFolder}
+                    onChange={e => setBankFolder(e.target.value)}
+                    className="w-full rounded-xl px-3 py-2 text-[12px] focus:outline-none placeholder:opacity-30"
+                    style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${bankFolder.trim() ? 'rgba(139,92,246,0.6)' : 'rgba(139,92,246,0.2)'}`, color: '#e2d9f3' }}
+                  />
+                </>
+              )}
+              {exportMode === 'folder' && (
+                <div className="space-y-2">
+                  <button onClick={async () => { const f = await window.electronAPI?.pickOutputFolder?.(); if (f) setOutputFolder(f) }}
+                    className="w-full rounded-xl px-3 py-2 text-[12px] font-semibold"
+                    style={{ background: 'rgba(139,92,246,0.1)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.2)' }}>
+                    📁 Choisir dossier…
+                  </button>
+                  {outputFolder && <p className="text-[11px] font-mono truncate text-text2">{outputFolder}</p>}
+                </div>
+              )}
+            </div>
 
-            {/* Settings */}
-            <div className="rounded-2xl p-6 space-y-5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-              <p className="text-[15px] font-bold text-white">Paramètres</p>
-
-              <div className="grid grid-cols-2 gap-6">
-                {/* Preset */}
+            {/* AI toggle */}
+            <div className="rounded-2xl p-5 flex flex-col" style={{ background: aiEnabled ? 'rgba(124,58,237,0.08)' : 'rgba(255,255,255,0.03)', border: `1px solid ${aiEnabled ? 'rgba(139,92,246,0.35)' : 'rgba(255,255,255,0.07)'}`, transition: 'all 0.2s' }}>
+              <p className="text-[12px] text-text2 mb-3 uppercase tracking-wide font-semibold">Détection IA</p>
+              <div className="flex-1 flex flex-col justify-between">
                 <div>
-                  <p className="text-[12px] text-text2 mb-3">Format de sortie</p>
-                  <div className="flex gap-2">
-                    {(['9:16', '1:1', '16:9'] as Preset[]).map(p => (
-                      <button key={p} onClick={() => setPreset(p)} className="flex-1 py-2.5 rounded-xl text-[13px] font-bold"
-                        style={preset === p
-                          ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff' }
-                          : { background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.6)', border: '1px solid rgba(255,255,255,0.08)' }
-                        }>{p}</button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Export mode */}
-                <div className="space-y-3">
-                  <p className="text-[12px] text-text2">Destination d'export</p>
-                  <div className="flex gap-2">
-                    {(['bank', 'folder'] as ExportMode[]).map(m => (
-                      <button key={m} onClick={() => setExportMode(m)} className="flex-1 py-2.5 rounded-xl text-[13px] font-bold"
-                        style={exportMode === m
-                          ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff' }
-                          : { background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.6)', border: '1px solid rgba(255,255,255,0.08)' }
-                        }>
-                        {m === 'bank' ? '☁ Banque' : '💾 Dossier'}
-                      </button>
-                    ))}
-                  </div>
-                  {exportMode === 'bank' && (
-                    <div className="rounded-xl p-4 space-y-3"
-                      style={{ background: 'rgba(139,92,246,0.07)', border: '1px solid rgba(139,92,246,0.18)' }}>
-                      <p className="text-[12px] font-bold" style={{ color: 'rgba(139,92,246,0.9)' }}>
-                        📁 Dossier dans la banque
-                      </p>
-                      {bankFolders.length > 0 && (
-                        <select
-                          value={bankFolders.includes(bankFolder) ? bankFolder : ''}
-                          onChange={e => setBankFolder(e.target.value)}
-                          className="w-full rounded-xl px-4 py-2.5 text-[13px] font-semibold text-white focus:outline-none"
-                          style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(139,92,246,0.3)', color: '#e2d9f3' }}>
-                          <option value="" style={{ background: '#0c0919' }}>— Racine (sans dossier)</option>
-                          {bankFolders.map(f => (
-                            <option key={f} value={f} style={{ background: '#0c0919' }}>{f}</option>
-                          ))}
-                        </select>
-                      )}
-                      <input
-                        type="text"
-                        placeholder={bankFolders.length > 0 ? 'Ou créer un nouveau dossier…' : 'Nom du dossier (optionnel)'}
-                        value={bankFolder}
-                        onChange={e => setBankFolder(e.target.value)}
-                        className="w-full rounded-xl px-4 py-2.5 text-[13px] font-semibold focus:outline-none placeholder:opacity-30"
-                        style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${bankFolder.trim() ? 'rgba(139,92,246,0.6)' : 'rgba(139,92,246,0.2)'}`, color: '#e2d9f3' }}
-                      />
-                      {bankFolder.trim() && (
-                        <p className="text-[12px] flex items-center gap-1.5" style={{ color: 'rgba(167,139,250,0.8)' }}>
-                          <span>📂</span>
-                          <span>Les vidéos iront dans <strong>«&nbsp;{bankFolder.trim()}&nbsp;»</strong></span>
-                        </p>
-                      )}
-                    </div>
-                  )}
-                  {exportMode === 'folder' && (
-                    <div className="flex items-center gap-3">
-                      <button onClick={async () => { const f = await window.electronAPI?.pickOutputFolder?.(); if (f) setOutputFolder(f) }}
-                        className="rounded-xl px-4 py-2.5 text-[13px] font-semibold"
-                        style={{ background: 'rgba(139,92,246,0.1)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.2)' }}>
-                        📁 Choisir…
-                      </button>
-                      {outputFolder && <span className="text-[12px] font-mono truncate text-text2">{outputFolder}</span>}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* AI text toggle */}
-              <div className="flex items-start gap-4 rounded-xl p-4" style={{ background: 'rgba(139,92,246,0.05)', border: '1px solid rgba(139,92,246,0.12)' }}>
-                <button onClick={() => setAiEnabled(v => !v)}
-                  className="flex-shrink-0 w-11 h-6 rounded-full transition-all relative mt-0.5"
-                  style={{ background: aiEnabled ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.08)' }}>
-                  <span className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform ${aiEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
-                </button>
-                <div className="flex-1 min-w-0">
-                  <p className="text-[13px] font-semibold text-white">✨ Détection texte IA (Claude Vision)</p>
-                  <p className="text-[12px] text-text2 mt-0.5">
-                    Analyse chaque vidéo originale et recopie le texte. Plus lent mais plus précis.
+                  <p className="text-[13px] font-semibold text-white mb-1">✨ Claude Vision</p>
+                  <p className="text-[11px] text-text2 leading-relaxed">
+                    Détecte et recopie le texte des vidéos originales automatiquement.
                   </p>
                   {aiEnabled && !anthropicKey && (
-                    <p className="mt-2 text-[12px]" style={{ color: '#fbbf24' }}>
-                      ⚠ Configure ta clé Anthropic dans Paramètres → Connexions
+                    <p className="mt-2 text-[11px]" style={{ color: '#fbbf24' }}>
+                      ⚠ Clé Anthropic manquante dans Paramètres
                     </p>
                   )}
                 </div>
+                <button onClick={() => setAiEnabled(v => !v)}
+                  className="mt-4 w-full py-2.5 rounded-xl text-[13px] font-bold transition-all"
+                  style={aiEnabled
+                    ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff', boxShadow: '0 2px 12px rgba(124,58,237,0.35)' }
+                    : { background: 'rgba(255,255,255,0.05)', color: 'rgba(196,181,253,0.6)', border: '1px solid rgba(255,255,255,0.08)' }
+                  }>
+                  {aiEnabled ? '✓ Activée' : 'Activer'}
+                </button>
               </div>
             </div>
 
-            {/* Launch hint */}
-            {!canLaunch && originals.length === 0 && (
-              <p className="text-[13px] text-text2">
-                Ajoute des vidéos originales et secondaires pour commencer
-              </p>
-            )}
-
           </div>
+
+          {/* Launch hint when empty */}
+          {originals.length === 0 && (
+            <p className="text-[13px] text-text2 text-center">
+              Ajoute des vidéos originales et secondaires pour commencer
+            </p>
+          )}
+
         </div>
       </div>
     </>
