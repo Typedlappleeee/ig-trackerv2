@@ -166,7 +166,7 @@ async function ensurePhoneRunning(
     }
   } catch { /* ignore — still attempt start */ }
 
-  // Always send start command (same as MassPosting — GéeLark no-ops if already running)
+  // Always send start command (GéeLark no-ops if already running)
   log?.('📱 Envoi commande de démarrage…')
   const startRes = await geelarkFetch('POST', '/phone/start', { ids: [phoneId] }, bearer)
   const code    = Number(startRes['code'] ?? -1)
@@ -180,25 +180,45 @@ async function ensurePhoneRunning(
     return false
   }
 
-  // Flat 30s wait then verify shell — same approach as MassPosting
-  log?.('⏳ Boot en cours — attente 30s…')
-  await sleepOrAbort(30000, signal)
+  // Phase 1: wait for phone status=1 (running) via status API — max 120s
+  log?.('⏳ Attente démarrage du téléphone (max 120s)…')
+  let statusReady = false
+  for (let i = 0; i < 24; i++) {
+    if (signal?.aborted) throw new Error('Annulé')
+    await sleepOrAbort(5000, signal)
+    try {
+      const phones = await fetchAllPhones(bearer)
+      const p = phones.find(x => x.id === phoneId)
+      const st = Number(p?.status ?? -1)
+      if (st === 1) {
+        log?.('  📱 Téléphone démarré (status=1)')
+        statusReady = true
+        break
+      }
+      const label = st === 2 ? 'démarrage…' : st === 0 ? 'arrêté ?' : `status=${st}`
+      log?.(`  ⏳ ${label} (${(i + 1) * 5}s écoulées)`)
+    } catch { /* ignore polling errors */ }
+  }
+  if (!statusReady) {
+    log?.('  ⚠️ Status API n\'a pas confirmé le démarrage — tentative shell quand même')
+  }
 
+  // Phase 2: wait for shell daemon to accept commands — max 120s
   await warmupShellDelay(bearer, phoneId, log, signal)
   return true
 }
 
 // After the phone reaches status=1, wait for the shell daemon to accept commands.
-// Retries the probe up to 12 times (60s total) before giving up.
+// Retries the probe up to 30 times (150s total) before giving up.
 async function warmupShellDelay(
   bearer: string,
   phoneId: string,
   log?: (m: string) => void,
   signal?: AbortSignal,
 ) {
-  log?.('  ⏳ Attente initialisation du shell (max 60s)…')
+  log?.('  ⏳ Attente initialisation du shell (max 150s)…')
 
-  for (let attempt = 0; attempt < 12; attempt++) {
+  for (let attempt = 0; attempt < 30; attempt++) {
     if (signal?.aborted) throw new Error('Annulé')
     await sleepOrAbort(5000, signal)
 
@@ -211,13 +231,13 @@ async function warmupShellDelay(
         return
       }
       const errMsg = String(r['msg'] ?? r['message'] ?? '')
-      log?.(`  ↻ Shell pas encore prêt (code=${code}${errMsg ? ` "${errMsg}"` : ''}) — nouvel essai dans 5s…`)
+      log?.(`  ↻ Shell pas encore prêt (code=${code}${errMsg ? ` "${errMsg}"` : ''}) — nouvel essai dans 5s… (${attempt + 1}/30)`)
     } catch (e) {
       log?.(`  ↻ Shell probe erreur: ${e instanceof Error ? e.message : String(e)} — nouvel essai…`)
     }
   }
 
-  log?.('  ⚠️ Shell toujours indisponible après 60s — poursuite quand même (les commandes réessaieront)')
+  log?.('  ⚠️ Shell toujours indisponible après 150s — poursuite quand même (les commandes réessaieront)')
 }
 
 // Reply to an Instagram comment by driving the cloud phone via shell commands.
