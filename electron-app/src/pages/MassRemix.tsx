@@ -49,37 +49,45 @@ function VideoListPanel({
   onAddBank: () => void; onAddPC: () => void; onRemove: (i: number) => void
 }) {
   return (
-    <div className="flex flex-col gap-4 min-w-0">
-      <div className="flex items-center justify-between">
-        <p className="text-[15px] font-bold text-white">{label}</p>
-        <span className="text-[12px] font-bold px-2.5 py-0.5 rounded-full"
-          style={{ background: `${accent}22`, color: accent }}>{paths.length}</span>
+    <div className="flex flex-col h-full min-h-0">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2.5">
+          <div className="w-1.5 h-5 rounded-full flex-shrink-0" style={{ background: accent }} />
+          <p className="text-[14px] font-bold text-white">{label}</p>
+        </div>
+        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full"
+          style={{ background: `${accent}20`, color: accent }}>
+          {paths.length} vidéo{paths.length !== 1 ? 's' : ''}
+        </span>
       </div>
-      <div className="flex gap-2">
+
+      <div className="flex gap-2 mb-3 flex-shrink-0">
         <button onClick={onAddBank}
-          className="flex-1 rounded-xl px-4 py-2.5 text-[13px] font-semibold"
-          style={{ background: `${accent}18`, color: accent, border: `1px solid ${accent}30` }}>
+          className="flex-1 rounded-xl py-2 text-[12px] font-semibold transition-all hover:brightness-110"
+          style={{ background: `${accent}15`, color: accent, border: `1px solid ${accent}28` }}>
           🗂 Banque
         </button>
         <button onClick={onAddPC}
-          className="flex-1 rounded-xl px-4 py-2.5 text-[13px] font-semibold"
-          style={{ background: 'rgba(255,255,255,0.05)', color: 'rgba(196,181,253,0.8)', border: '1px solid rgba(255,255,255,0.09)' }}>
+          className="flex-1 rounded-xl py-2 text-[12px] font-semibold transition-all"
+          style={{ background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.7)', border: '1px solid rgba(255,255,255,0.07)' }}>
           💾 PC
         </button>
       </div>
-      <div className="flex-1 overflow-auto space-y-2 min-h-[80px] max-h-[160px]">
+
+      <div className="flex-1 min-h-0 overflow-y-auto space-y-1.5">
         {paths.length === 0 ? (
-          <div className="rounded-2xl p-6 text-center text-[13px]" style={{ border: `1px dashed ${accent}25`, color: 'rgba(196,181,253,0.4)' }}>
-            Aucune vidéo — ajoute depuis la banque ou le PC
+          <div className="h-full flex items-center justify-center rounded-xl text-[12px]"
+            style={{ border: `1px dashed ${accent}20`, color: 'rgba(196,181,253,0.3)', minHeight: 72 }}>
+            Aucune vidéo ajoutée
           </div>
         ) : paths.map((p, i) => (
-          <div key={i} className="flex items-center gap-3 rounded-xl px-4 py-2.5"
-            style={{ background: `${accent}08`, border: `1px solid ${accent}18` }}>
-            <span className="text-[12px] font-bold w-5 text-center flex-shrink-0"
+          <div key={i} className="group flex items-center gap-2.5 rounded-xl px-3 py-2"
+            style={{ background: `${accent}07`, border: `1px solid ${accent}15` }}>
+            <span className="text-[11px] font-black w-4 text-center flex-shrink-0 opacity-50"
               style={{ color: accent }}>{i + 1}</span>
-            <span className="text-[13px] font-mono truncate flex-1 text-white/70">{fileName(p)}</span>
+            <span className="text-[12px] font-mono truncate flex-1" style={{ color: 'rgba(226,217,243,0.6)' }}>{fileName(p)}</span>
             <button onClick={() => onRemove(i)}
-              className="text-[13px] flex-shrink-0 text-danger/50 hover:text-danger transition-colors">✕</button>
+              className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-[11px] text-danger/60 hover:text-danger">✕</button>
           </div>
         ))}
       </div>
@@ -432,23 +440,28 @@ Return ONLY a JSON array. If none, return [].`
       )}
 
       <div className="h-full flex flex-col overflow-hidden">
-        {/* Page header */}
-        <div className="flex-shrink-0 px-10 pt-9 pb-7 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+
+        {/* Header */}
+        <div className="flex-shrink-0 px-10 pt-9 pb-6 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
           <div>
             <h1 className="text-[28px] font-black text-white leading-none">Mass Remix</h1>
-            <p className="text-[13px] text-text2 mt-0.5">Génère des remixes vidéo en masse avec FFmpeg + IA</p>
+            <p className="text-[13px] text-text2 mt-1">Génère des remixes vidéo en masse avec FFmpeg + IA</p>
           </div>
-          <Button onClick={launch} disabled={!canLaunch} size="lg">
-            ⚡ Lancer {canLaunch ? `${copies} remix` : 'la génération'}
-          </Button>
+          <button
+            onClick={launch} disabled={!canLaunch}
+            className="flex items-center gap-2.5 px-6 py-3 rounded-xl text-[14px] font-bold transition-all disabled:opacity-40"
+            style={{ background: canLaunch ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.06)', color: '#fff', boxShadow: canLaunch ? '0 4px 20px rgba(124,58,237,0.4)' : 'none' }}>
+            <span>⚡</span>
+            <span>Lancer {copies} remix</span>
+          </button>
         </div>
 
-        {/* Main layout — no scroll needed */}
-        <div className="flex-1 min-h-0 flex flex-col px-10 py-7 gap-5">
+        {/* Body — 2 columns */}
+        <div className="flex-1 min-h-0 flex gap-6 px-10 py-8">
 
-          {/* Row 1: Video pickers */}
-          <div className="grid grid-cols-2 gap-5" style={{ flexShrink: 0 }}>
-            <div className="rounded-2xl p-5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(139,92,246,0.2)' }}>
+          {/* LEFT — video pickers */}
+          <div className="flex-1 min-w-0 flex flex-col gap-5">
+            <div className="flex-1 min-h-0 rounded-2xl p-6" style={{ background: 'rgba(139,92,246,0.04)', border: '1px solid rgba(139,92,246,0.15)' }}>
               <VideoListPanel
                 label="Vidéos originales"
                 paths={originals}
@@ -458,7 +471,7 @@ Return ONLY a JSON array. If none, return [].`
                 onRemove={i => setOriginals(prev => prev.filter((_, j) => j !== i))}
               />
             </div>
-            <div className="rounded-2xl p-5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(236,72,153,0.18)' }}>
+            <div className="flex-1 min-h-0 rounded-2xl p-6" style={{ background: 'rgba(236,72,153,0.04)', border: '1px solid rgba(236,72,153,0.15)' }}>
               <VideoListPanel
                 label="Nouvelles Phase 1"
                 paths={secondaries}
@@ -470,124 +483,123 @@ Return ONLY a JSON array. If none, return [].`
             </div>
           </div>
 
-          {/* Row 2: Settings strip — 4 columns always visible */}
-          <div className="grid grid-cols-4 gap-5" style={{ flexShrink: 0 }}>
+          {/* RIGHT — settings panel */}
+          <div className="w-72 flex-shrink-0 flex flex-col gap-4 overflow-y-auto">
+
+            {/* Copies */}
+            <div className="rounded-2xl p-5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <p className="text-[11px] font-bold uppercase tracking-widest mb-4" style={{ color: 'rgba(148,163,184,0.5)' }}>Nombre de copies</p>
+              <div className="flex items-center gap-3 mb-3">
+                <button onClick={() => setCopies(c => Math.max(1, c - 1))}
+                  className="w-9 h-9 rounded-xl text-[18px] font-black flex items-center justify-center transition-all hover:bg-white/[0.07]"
+                  style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(196,181,253,0.7)' }}>−</button>
+                <input type="number" min={1} max={200} value={copies}
+                  onChange={e => setCopies(Math.max(1, Math.min(200, Number(e.target.value))))}
+                  className="flex-1 rounded-xl py-2 text-[28px] font-black text-white text-center focus:outline-none"
+                  style={{ background: 'transparent', border: 'none' }} />
+                <button onClick={() => setCopies(c => Math.min(200, c + 1))}
+                  className="w-9 h-9 rounded-xl text-[18px] font-black flex items-center justify-center transition-all hover:bg-white/[0.07]"
+                  style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(196,181,253,0.7)' }}>+</button>
+              </div>
+              <input type="range" min={1} max={50} value={Math.min(copies, 50)}
+                onChange={e => setCopies(Number(e.target.value))} className="w-full" />
+              {originals.length > 0 && secondaries.length > 0 && (
+                <p className="text-[11px] mt-2" style={{ color: 'rgba(148,163,184,0.5)' }}>
+                  🔀 {originals.length} orig × {secondaries.length} sec → <span style={{ color: '#a78bfa' }}>{copies} vidéos</span>
+                </p>
+              )}
+            </div>
 
             {/* Format */}
             <div className="rounded-2xl p-5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-              <p className="text-[12px] text-text2 mb-3 uppercase tracking-wide font-semibold">Format</p>
-              <div className="flex flex-col gap-2">
+              <p className="text-[11px] font-bold uppercase tracking-widest mb-4" style={{ color: 'rgba(148,163,184,0.5)' }}>Format de sortie</p>
+              <div className="flex gap-2">
                 {(['9:16', '1:1', '16:9'] as Preset[]).map(p => (
-                  <button key={p} onClick={() => setPreset(p)} className="w-full py-2 rounded-xl text-[13px] font-bold"
+                  <button key={p} onClick={() => setPreset(p)}
+                    className="flex-1 py-2.5 rounded-xl text-[13px] font-bold transition-all"
                     style={preset === p
-                      ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff' }
-                      : { background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.6)', border: '1px solid rgba(255,255,255,0.08)' }
+                      ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff', boxShadow: '0 2px 10px rgba(124,58,237,0.3)' }
+                      : { background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.5)', border: '1px solid rgba(255,255,255,0.07)' }
                     }>{p}</button>
                 ))}
               </div>
             </div>
 
-            {/* Copies */}
-            <div className="rounded-2xl p-5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-              <p className="text-[12px] text-text2 mb-3 uppercase tracking-wide font-semibold">Copies</p>
-              <input type="number" min={1} max={200} value={copies}
-                onChange={e => setCopies(Math.max(1, Math.min(200, Number(e.target.value))))}
-                className="w-full rounded-xl px-4 py-2.5 text-[22px] font-black text-white text-center focus:outline-none mb-3"
-                style={{ background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.3)' }} />
-              <input type="range" min={1} max={50} value={Math.min(copies, 50)}
-                onChange={e => setCopies(Number(e.target.value))} className="w-full" />
-              {originals.length > 0 && secondaries.length > 0 && (
-                <p className="text-[11px] text-text2 mt-2">
-                  {originals.length} orig × {secondaries.length} sec → <strong className="text-violet-400">{copies}</strong> remix
-                </p>
-              )}
-            </div>
-
             {/* Export */}
             <div className="rounded-2xl p-5 space-y-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-              <p className="text-[12px] text-text2 uppercase tracking-wide font-semibold">Export</p>
+              <p className="text-[11px] font-bold uppercase tracking-widest mb-1" style={{ color: 'rgba(148,163,184,0.5)' }}>Destination</p>
               <div className="flex gap-2">
                 {(['bank', 'folder'] as ExportMode[]).map(m => (
-                  <button key={m} onClick={() => setExportMode(m)} className="flex-1 py-2 rounded-xl text-[12px] font-bold"
+                  <button key={m} onClick={() => setExportMode(m)}
+                    className="flex-1 py-2.5 rounded-xl text-[12px] font-bold transition-all"
                     style={exportMode === m
                       ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff' }
-                      : { background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.6)', border: '1px solid rgba(255,255,255,0.08)' }
+                      : { background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.5)', border: '1px solid rgba(255,255,255,0.07)' }
                     }>
                     {m === 'bank' ? '☁ Banque' : '💾 Dossier'}
                   </button>
                 ))}
               </div>
               {exportMode === 'bank' && (
-                <>
+                <div className="space-y-2">
                   {bankFolders.length > 0 && (
                     <select
                       value={bankFolders.includes(bankFolder) ? bankFolder : ''}
                       onChange={e => setBankFolder(e.target.value)}
                       className="w-full rounded-xl px-3 py-2 text-[12px] focus:outline-none"
-                      style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(139,92,246,0.3)', color: '#e2d9f3' }}>
-                      <option value="" style={{ background: '#0c0919' }}>— Racine</option>
-                      {bankFolders.map(f => (
-                        <option key={f} value={f} style={{ background: '#0c0919' }}>{f}</option>
-                      ))}
+                      style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2d9f3' }}>
+                      <option value="" style={{ background: '#0c0919', color: '#e2d9f3' }}>— Racine (sans dossier)</option>
+                      {bankFolders.map(f => <option key={f} value={f} style={{ background: '#0c0919', color: '#e2d9f3' }}>{f}</option>)}
                     </select>
                   )}
-                  <input
-                    type="text"
-                    placeholder={bankFolders.length > 0 ? 'Nouveau dossier…' : 'Dossier (optionnel)'}
-                    value={bankFolder}
-                    onChange={e => setBankFolder(e.target.value)}
+                  <input type="text"
+                    placeholder={bankFolders.length > 0 ? 'Ou nouveau dossier…' : 'Dossier (optionnel)'}
+                    value={bankFolder} onChange={e => setBankFolder(e.target.value)}
                     className="w-full rounded-xl px-3 py-2 text-[12px] focus:outline-none placeholder:opacity-30"
-                    style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${bankFolder.trim() ? 'rgba(139,92,246,0.6)' : 'rgba(139,92,246,0.2)'}`, color: '#e2d9f3' }}
-                  />
-                </>
+                    style={{ background: 'rgba(255,255,255,0.05)', border: `1px solid ${bankFolder.trim() ? 'rgba(139,92,246,0.5)' : 'rgba(255,255,255,0.09)'}`, color: '#e2d9f3' }} />
+                </div>
               )}
               {exportMode === 'folder' && (
                 <div className="space-y-2">
                   <button onClick={async () => { const f = await window.electronAPI?.pickOutputFolder?.(); if (f) setOutputFolder(f) }}
-                    className="w-full rounded-xl px-3 py-2 text-[12px] font-semibold"
+                    className="w-full rounded-xl px-3 py-2.5 text-[12px] font-semibold"
                     style={{ background: 'rgba(139,92,246,0.1)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.2)' }}>
-                    📁 Choisir dossier…
+                    📁 Choisir un dossier…
                   </button>
-                  {outputFolder && <p className="text-[11px] font-mono truncate text-text2">{outputFolder}</p>}
+                  {outputFolder && <p className="text-[11px] font-mono truncate" style={{ color: 'rgba(148,163,184,0.5)' }}>{outputFolder}</p>}
                 </div>
               )}
             </div>
 
-            {/* AI toggle */}
-            <div className="rounded-2xl p-5 flex flex-col" style={{ background: aiEnabled ? 'rgba(124,58,237,0.08)' : 'rgba(255,255,255,0.03)', border: `1px solid ${aiEnabled ? 'rgba(139,92,246,0.35)' : 'rgba(255,255,255,0.07)'}`, transition: 'all 0.2s' }}>
-              <p className="text-[12px] text-text2 mb-3 uppercase tracking-wide font-semibold">Détection IA</p>
-              <div className="flex-1 flex flex-col justify-between">
-                <div>
-                  <p className="text-[13px] font-semibold text-white mb-1">✨ Claude Vision</p>
-                  <p className="text-[11px] text-text2 leading-relaxed">
-                    Détecte et recopie le texte des vidéos originales automatiquement.
-                  </p>
-                  {aiEnabled && !anthropicKey && (
-                    <p className="mt-2 text-[11px]" style={{ color: '#fbbf24' }}>
-                      ⚠ Clé Anthropic manquante dans Paramètres
-                    </p>
-                  )}
+            {/* AI Detection */}
+            <button
+              onClick={() => setAiEnabled(v => !v)}
+              className="rounded-2xl p-5 text-left transition-all w-full"
+              style={{
+                background: aiEnabled ? 'rgba(124,58,237,0.1)' : 'rgba(255,255,255,0.03)',
+                border: `1px solid ${aiEnabled ? 'rgba(139,92,246,0.4)' : 'rgba(255,255,255,0.07)'}`,
+              }}>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-[11px] font-bold uppercase tracking-widest" style={{ color: 'rgba(148,163,184,0.5)' }}>Détection texte IA</p>
+                <div className="w-9 h-5 rounded-full relative flex-shrink-0 transition-all"
+                  style={{ background: aiEnabled ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.1)' }}>
+                  <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${aiEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
                 </div>
-                <button onClick={() => setAiEnabled(v => !v)}
-                  className="mt-4 w-full py-2.5 rounded-xl text-[13px] font-bold transition-all"
-                  style={aiEnabled
-                    ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff', boxShadow: '0 2px 12px rgba(124,58,237,0.35)' }
-                    : { background: 'rgba(255,255,255,0.05)', color: 'rgba(196,181,253,0.6)', border: '1px solid rgba(255,255,255,0.08)' }
-                  }>
-                  {aiEnabled ? '✓ Activée' : 'Activer'}
-                </button>
               </div>
-            </div>
+              <p className="text-[13px] font-semibold" style={{ color: aiEnabled ? '#c4b5fd' : 'rgba(196,181,253,0.5)' }}>
+                ✨ Claude Vision
+              </p>
+              <p className="text-[11px] mt-1 leading-relaxed" style={{ color: 'rgba(148,163,184,0.5)' }}>
+                Analyse et recopie le texte des vidéos. Plus lent mais précis.
+              </p>
+              {aiEnabled && !anthropicKey && (
+                <p className="mt-2 text-[11px] font-semibold" style={{ color: '#fbbf24' }}>
+                  ⚠ Clé Anthropic manquante
+                </p>
+              )}
+            </button>
 
           </div>
-
-          {/* Launch hint when empty */}
-          {originals.length === 0 && (
-            <p className="text-[13px] text-text2 text-center">
-              Ajoute des vidéos originales et secondaires pour commencer
-            </p>
-          )}
-
         </div>
       </div>
     </>
