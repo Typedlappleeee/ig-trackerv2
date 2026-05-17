@@ -165,8 +165,9 @@ export function Posting({ user }: PostingProps) {
       if (!up.ok || !up.token) { log(`❌ Upload échoué: ${up.error}`, 'error'); return }
       log(`✅ Vidéo prête (token: ${up.token.slice(0, 12)}…)`, 'ok')
       await createScheduledPost({
-        userId: user.id, orgId: currentOrg?.id ?? null, type: 'posting',
-        scheduledAt,
+        userId: user.id, orgId: currentOrg?.id ?? null,
+        createdByName: user.email?.split('@')[0] ?? 'Moi',
+        type: 'posting', scheduledAt,
         phones: phoneList.map(p => ({ id: p.id, geelark_id: p.geelark_id, phone_name: p.phone_name, ig_username: p.ig_username })),
         videos: [{ token: up.token, title: filePath.split(/[\\/]/).pop() ?? 'video' }],
         caption, delayMinutes: delayBetween, mode: 'seq', bearerToken: bearer,

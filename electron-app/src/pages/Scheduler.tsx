@@ -34,6 +34,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
+import { useOrg } from '@/lib/orgContext'
 import {
   loadScheduledPosts, cancelScheduledPost, claimScheduledPost,
   executeScheduledPost, finishScheduledPost, fmtScheduledTime, timeUntil,
@@ -67,6 +68,7 @@ const TYPE_LABEL: Record<string, string> = {
 }
 
 export function Scheduler({ user }: Props) {
+  const { role }                  = useOrg()
   const [posts, setPosts]         = useState<ScheduledPost[]>([])
   const [loading, setLoading]     = useState(true)
   const [tab, setTab]             = useState<TabFilter>('pending')
@@ -76,12 +78,18 @@ export function Scheduler({ user }: Props) {
   const timersRef                 = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
   const runningRef                = useRef<Set<string>>(new Set())
 
+  // Can cancel: own post OR org admin/owner
+  function canCancel(post: ScheduledPost) {
+    if (post.user_id === user.id) return true
+    return role === 'owner' || role === 'admin'
+  }
+
   const reload = useCallback(async () => {
     setLoading(true)
-    const all = await loadScheduledPosts(user.id)
+    const all = await loadScheduledPosts()
     setPosts(all)
     setLoading(false)
-  }, [user.id])
+  }, [])
 
   // Register a timeout for a pending post and execute when due
   const scheduleExecution = useCallback((post: ScheduledPost) => {
@@ -133,15 +141,14 @@ export function Scheduler({ user }: Props) {
     const ch = supabase.channel('scheduler-page')
       .on('postgres_changes', {
         event: 'INSERT', schema: 'public', table: 'scheduled_posts',
-        filter: `user_id=eq.${user.id}`,
       }, payload => {
         const p = payload.new as ScheduledPost
-        setPosts(prev => [p, ...prev])
-        if (p.status === 'pending') scheduleExecution(p)
+        setPosts(prev => prev.some(x => x.id === p.id) ? prev : [p, ...prev])
+        // Only auto-execute our own posts
+        if (p.status === 'pending' && p.user_id === user.id) scheduleExecution(p)
       })
       .on('postgres_changes', {
         event: 'UPDATE', schema: 'public', table: 'scheduled_posts',
-        filter: `user_id=eq.${user.id}`,
       }, payload => {
         const updated = payload.new as ScheduledPost
         setPosts(prev => prev.map(p => p.id === updated.id ? updated : p))
@@ -238,6 +245,8 @@ export function Scheduler({ user }: Props) {
           <PostCard
             key={post.id}
             post={post}
+            isOwn={post.user_id === user.id}
+            canCancel={canCancel(post)}
             isRunning={runningPost === post.id}
             runLogs={runLogs?.id === post.id ? runLogs.msgs : null}
             cancelling={cancelling === post.id}
@@ -265,8 +274,10 @@ export function Scheduler({ user }: Props) {
 
 // ── Post card ──────────────────────────────────────────────────────────────────
 
-function PostCard({ post, isRunning, runLogs, cancelling, onCancel }: {
+function PostCard({ post, isOwn, canCancel, isRunning, runLogs, cancelling, onCancel }: {
   post: ScheduledPost
+  isOwn: boolean
+  canCancel: boolean
   isRunning: boolean
   runLogs: string[] | null
   cancelling: boolean
@@ -310,6 +321,12 @@ function PostCard({ post, isRunning, runLogs, cancelling, onCancel }: {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-[13px] font-black text-white">{TYPE_LABEL[post.type]}</span>
+              {post.created_by_name && (
+                <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold"
+                  style={{ background: isOwn ? 'rgba(139,92,246,0.12)' : 'rgba(255,255,255,0.05)', color: isOwn ? '#a78bfa' : 'rgba(196,181,253,0.5)' }}>
+                  {isOwn ? '👤 Moi' : `👤 ${post.created_by_name}`}
+                </span>
+              )}
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
                 style={{
                   background: post.status === 'done'     ? 'rgba(52,211,153,0.12)'
@@ -339,7 +356,7 @@ function PostCard({ post, isRunning, runLogs, cancelling, onCancel }: {
             </div>
           </div>
 
-          {isPending && (
+          {isPending && canCancel && (
             <button onClick={onCancel} disabled={cancelling}
               className="flex-shrink-0 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all disabled:opacity-50"
               style={{ background: 'rgba(239,68,68,0.1)', color: '#f87171', border: '1px solid rgba(239,68,68,0.2)' }}>

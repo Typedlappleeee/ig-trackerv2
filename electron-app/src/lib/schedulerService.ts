@@ -18,52 +18,55 @@ export type ScheduleStatus = 'pending' | 'running' | 'done' | 'failed' | 'cancel
 export type PostingType    = 'posting' | 'mass_posting'
 
 export interface ScheduledPost {
-  id:            string
-  user_id:       string
-  org_id:        string | null
-  type:          PostingType
-  status:        ScheduleStatus
-  scheduled_at:  string
-  phones:        ScheduledPhoneRecord[]
-  videos:        ScheduledVideoRecord[]
-  caption:       string
-  delay_minutes: number
-  mode:          'seq' | 'random'
-  bearer_token:  string
-  result:        { logs: string[] } | null
-  error_msg:     string | null
-  created_at:    string
-  executed_at:   string | null
+  id:              string
+  user_id:         string
+  org_id:          string | null
+  created_by_name: string
+  type:            PostingType
+  status:          ScheduleStatus
+  scheduled_at:    string
+  phones:          ScheduledPhoneRecord[]
+  videos:          ScheduledVideoRecord[]
+  caption:         string
+  delay_minutes:   number
+  mode:            'seq' | 'random'
+  bearer_token:    string
+  result:          { logs: string[] } | null
+  error_msg:       string | null
+  created_at:      string
+  executed_at:     string | null
 }
 
 export interface CreateScheduledPostInput {
-  userId:       string
-  orgId:        string | null
-  type:         PostingType
-  scheduledAt:  Date
-  phones:       ScheduledPhoneRecord[]
-  videos:       ScheduledVideoRecord[]
-  caption:      string
-  delayMinutes: number
-  mode:         'seq' | 'random'
-  bearerToken:  string
+  userId:          string
+  orgId:           string | null
+  createdByName:   string
+  type:            PostingType
+  scheduledAt:     Date
+  phones:          ScheduledPhoneRecord[]
+  videos:          ScheduledVideoRecord[]
+  caption:         string
+  delayMinutes:    number
+  mode:            'seq' | 'random'
+  bearerToken:     string
 }
 
 // ── DB operations ──────────────────────────────────────────────────────────────
 
 export async function createScheduledPost(input: CreateScheduledPostInput): Promise<ScheduledPost> {
   const { data, error } = await supabase.from('scheduled_posts').insert({
-    user_id:       input.userId,
-    org_id:        input.orgId,
-    type:          input.type,
-    status:        'pending',
-    scheduled_at:  input.scheduledAt.toISOString(),
-    phones:        input.phones,
-    videos:        input.videos,
-    caption:       input.caption,
-    delay_minutes: input.delayMinutes,
-    mode:          input.mode,
-    bearer_token:  input.bearerToken,
+    user_id:          input.userId,
+    org_id:           input.orgId,
+    created_by_name:  input.createdByName,
+    type:             input.type,
+    status:           'pending',
+    scheduled_at:     input.scheduledAt.toISOString(),
+    phones:           input.phones,
+    videos:           input.videos,
+    caption:          input.caption,
+    delay_minutes:    input.delayMinutes,
+    mode:             input.mode,
+    bearer_token:     input.bearerToken,
   }).select().single()
   if (error) throw new Error(error.message)
   return data as ScheduledPost
@@ -75,12 +78,12 @@ export async function cancelScheduledPost(id: string): Promise<void> {
     .eq('id', id).eq('status', 'pending')
 }
 
-export async function loadScheduledPosts(userId: string): Promise<ScheduledPost[]> {
+// Loads all posts visible to the user (RLS handles org filtering)
+export async function loadScheduledPosts(): Promise<ScheduledPost[]> {
   const { data } = await supabase.from('scheduled_posts')
     .select('*')
-    .eq('user_id', userId)
     .order('scheduled_at', { ascending: false })
-    .limit(100)
+    .limit(200)
   return (data ?? []) as ScheduledPost[]
 }
 

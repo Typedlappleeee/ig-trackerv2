@@ -262,8 +262,9 @@ export function MassPosting({ user }: MassPostingProps) {
         log(`✅ Vidéo ${i + 1}/${selectedVideos.length} prête`, 'ok')
       }
       await createScheduledPost({
-        userId: user.id, orgId: currentOrg?.id ?? null, type: 'mass_posting',
-        scheduledAt,
+        userId: user.id, orgId: currentOrg?.id ?? null,
+        createdByName: user.email?.split('@')[0] ?? 'Moi',
+        type: 'mass_posting', scheduledAt,
         phones: phoneList.map(p => ({ id: p.id, geelark_id: p.geelark_id, phone_name: p.phone_name, ig_username: p.ig_username })),
         videos: selectedVideos.map((v, i) => ({ token: tokenMap.get(i)!, title: v.item.title })),
         caption, delayMinutes: 0, mode, bearerToken: bearer,
