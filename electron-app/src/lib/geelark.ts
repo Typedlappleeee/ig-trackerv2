@@ -337,12 +337,21 @@ function parseBoundsCenter(bounds: string): [number, number] | null {
 }
 
 // Find element center by matching text/content-desc in UIAutomator XML
+function extractBoundsFromElement(element: string): [number, number] | null {
+  const m = element.match(/bounds="(\[[^\]]+\]\[[^\]]+\])"/)
+  return m ? parseBoundsCenter(m[1]) : null
+}
+
 function findByText(xml: string, ...texts: string[]): [number, number] | null {
   for (const text of texts) {
     const escaped = text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-    const re = new RegExp(`(?:text|content-desc)="${escaped}"[^>]*bounds="(\\[[^\\]]+\\]\\[[^\\]]+\\])"`)
+    // Match the full element tag so bounds order doesn't matter
+    const re = new RegExp(`<[^>]*(?:text|content-desc)="${escaped}"[^>]*>`)
     const m = xml.match(re)
-    if (m) return parseBoundsCenter(m[1])
+    if (m) {
+      const pt = extractBoundsFromElement(m[0])
+      if (pt) return pt
+    }
   }
   return null
 }
@@ -350,9 +359,12 @@ function findByText(xml: string, ...texts: string[]): [number, number] | null {
 function findByResourceId(xml: string, ...ids: string[]): [number, number] | null {
   for (const id of ids) {
     const escaped = id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-    const re = new RegExp(`resource-id="[^"]*${escaped}[^"]*"[^>]*bounds="(\\[[^\\]]+\\]\\[[^\\]]+\\])"`)
+    const re = new RegExp(`<[^>]*resource-id="[^"]*${escaped}[^"]*"[^>]*>`)
     const m = xml.match(re)
-    if (m) return parseBoundsCenter(m[1])
+    if (m) {
+      const pt = extractBoundsFromElement(m[0])
+      if (pt) return pt
+    }
   }
   return null
 }
