@@ -955,52 +955,67 @@ export async function loginInstagramAccount(
       return { ok: true }
     }
 
-    // ── "Check your notifications on another device" challenge ────────────────
+    // ── "Check your notifications" OR "Choose a way to confirm" challenge ────
     const isDeviceApproval = [
       'check your notifications on another device',
       'vérifiez vos notifications sur un autre appareil',
       'waiting for approval', 'en attente d\'approbation',
       'approve from the other device', 'approuver depuis l\'autre appareil',
+      'choose a way to confirm', 'choisissez une méthode de confirmation',
+      'these are your available confirmation methods',
     ].some(p => xmlLower.includes(p))
 
     if (isDeviceApproval) {
       if (!totpSecret?.trim()) {
-        log('⚠️ Challenge "approuver sur autre appareil" — aucun secret TOTP configuré')
-        return { ok: false, error: 'Challenge appareil détecté — configure le secret TOTP pour l\'automatiser' }
+        log('⚠️ Challenge confirmation — aucun secret TOTP configuré')
+        return { ok: false, error: 'Challenge détecté — configure le secret TOTP pour l\'automatiser' }
       }
-      log('📱 Challenge "autre appareil" détecté — tap "Try another way"…')
-      const tryAnotherPt =
-        findByText(xml, 'Try another way', 'Essayer une autre méthode', 'Try another method') ??
-        [Math.floor(sw / 2), Math.floor(sh * 0.75)]
-      await shellExec(bearer, phoneId, `input tap ${tryAnotherPt[0]} ${tryAnotherPt[1]}`)
-      await sleep(4000)
 
-      const xml2 = await dumpXml(bearer, phoneId)
-      log(`📋 XML après "Try another way" (${xml2.length} chars)`)
+      let xmlChallenge = xml
 
-      // Tap "Authentication app" radio option to select it
+      // If it's the "waiting for approval" screen, tap "Try another way" first
+      const needsTryAnother = [
+        'check your notifications on another device',
+        'waiting for approval', 'en attente d\'approbation',
+        'approve from the other device',
+      ].some(p => xmlLower.includes(p))
+
+      if (needsTryAnother) {
+        log('📱 Tap "Try another way"…')
+        const tryAnotherPt =
+          findByText(xml, 'Try another way', 'Essayer une autre méthode', 'Try another method') ??
+          [Math.floor(sw / 2), Math.floor(sh * 0.75)]
+        await shellExec(bearer, phoneId, `input tap ${tryAnotherPt[0]} ${tryAnotherPt[1]}`)
+        await sleep(4000)
+        xmlChallenge = await dumpXml(bearer, phoneId)
+        log(`📋 XML écran choix méthode (${xmlChallenge.length} chars)`)
+      } else {
+        log('📱 Écran "Choose a way to confirm" détecté directement')
+      }
+
+      // Select "Authentication app" radio button
       const authAppPt =
-        findByText(xml2,
+        findByText(xmlChallenge,
           'Authentication app', 'Authenticator app',
           'Application d\'authentification', 'App d\'authentification',
           'Get a code from your authenticator app',
-        ) ?? [Math.floor(sw / 2), Math.floor(sh * 0.45)]
+        ) ?? [Math.floor(sw / 2), Math.floor(sh * 0.38)]
       log(`   Tap "Authentication app" à [${authAppPt[0]},${authAppPt[1]}]…`)
       await shellExec(bearer, phoneId, `input tap ${authAppPt[0]} ${authAppPt[1]}`)
       await sleep(1500)
 
-      // "Continue" is on the same screen — tap it to confirm the selection
-      const xml2b = await dumpXml(bearer, phoneId)
-      log(`📋 XML avec bouton Continue (${xml2b.length} chars): ${xml2b.substring(0, 600)}`)
+      // "Continue" button is at the bottom of the same screen (~95% height)
+      const xmlAfterSelect = await dumpXml(bearer, phoneId)
+      log(`📋 XML après sélection (${xmlAfterSelect.length} chars): ${xmlAfterSelect.substring(0, 400)}`)
       const continuePt =
-        findByText(xml2b, 'Continue', 'Continuer', 'Next', 'Suivant') ??
-        findByResourceId(xml2b, 'continue_button', 'next_button') ??
-        [Math.floor(sw / 2), Math.floor(sh * 0.88)]
+        findByText(xmlAfterSelect, 'Continue', 'Continuer', 'Next', 'Suivant') ??
+        findByResourceId(xmlAfterSelect, 'continue_button', 'next_button', 'primary_button') ??
+        [Math.floor(sw / 2), Math.floor(sh * 0.94)]
       log(`   Tap "Continue" à [${continuePt[0]},${continuePt[1]}]…`)
       await shellExec(bearer, phoneId, `input tap ${continuePt[0]} ${continuePt[1]}`)
       await sleep(4000)
 
-      // Now we should be on the TOTP code entry screen — reuse existing 2FA logic
+      // Now on the TOTP code entry screen
       xml = await dumpXml(bearer, phoneId)
       xmlLower = xml.toLowerCase()
       log(`📋 XML écran TOTP (${xml.length} chars)`)
