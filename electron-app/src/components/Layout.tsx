@@ -353,14 +353,14 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             if (visibleItems.length === 0) return null
             const isOpen = openSections[section.title]
             return (
-              <div key={section.title} className="mb-1.5">
+              <div key={section.title} className="mb-3">
                 {/* Section header */}
                 <button
                   onClick={() => toggleSection(section.title)}
-                  className="w-full flex items-center gap-2 px-4 py-[5px] text-left group"
+                  className="w-full flex items-center gap-2 px-4 py-[7px] text-left group"
                 >
                   <span
-                    className="flex-1 text-[9.5px] font-black uppercase tracking-[0.2em] transition-colors"
+                    className="flex-1 text-[10.5px] font-black uppercase tracking-[0.2em] transition-colors"
                     style={{ color: 'rgba(139,92,246,0.4)' }}
                   >
                     <span>· {section.title}</span>
@@ -374,7 +374,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
                 </button>
 
                 {isOpen && (
-                  <div className="px-2 space-y-[2px] pb-1">
+                  <div className="px-2 space-y-[3px] pb-1">
                     {visibleItems.map(item => {
                       const active = page === item.id
                       return (
@@ -382,7 +382,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
                           key={item.id}
                           onClick={() => { playNav(); onNavigate(item.id) }}
                           className={`
-                            relative w-full flex items-center gap-2.5 pl-3 pr-2.5 py-[8px] rounded-xl text-[12.5px] text-left
+                            relative w-full flex items-center gap-2.5 pl-3 pr-2.5 py-[11px] rounded-xl text-[12.5px] text-left
                             transition-all duration-150 active:scale-[0.97]
                             ${active ? 'sf-nav-active' : 'hover:bg-white/[0.04] text-sb-text hover:text-sb-text-act'}
                           `}
@@ -428,9 +428,9 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
           <div className="mb-0.5">
             <button
               onClick={() => setSoonOpen(v => !v)}
-              className="w-full flex items-center gap-2 px-4 py-[5px] text-left group"
+              className="w-full flex items-center gap-2 px-4 py-[7px] text-left group"
             >
-              <span className="flex-1 text-[9.5px] font-black uppercase tracking-[0.2em]" style={{ color: 'rgba(139,92,246,0.4)' }}>
+              <span className="flex-1 text-[10.5px] font-black uppercase tracking-[0.2em]" style={{ color: 'rgba(139,92,246,0.4)' }}>
                 Bientôt
               </span>
               <span
@@ -441,10 +441,10 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
               </span>
             </button>
             {soonOpen && (
-              <div className="px-2 space-y-[2px] pb-1">
+              <div className="px-2 space-y-[3px] pb-1">
                 {SOON_ITEMS.map(item => (
                   <div key={item.label} className="group/soon relative">
-                    <div className="w-full flex items-center gap-2.5 pl-3 pr-2.5 py-[8px] rounded-xl text-[12.5px] cursor-not-allowed transition-colors hover:bg-white/[0.03]">
+                    <div className="w-full flex items-center gap-2.5 pl-3 pr-2.5 py-[11px] rounded-xl text-[12.5px] cursor-not-allowed transition-colors hover:bg-white/[0.03]">
                       <span className={`text-[15px] w-5 text-center flex-shrink-0 opacity-50 ${item.color}`}>{item.icon}</span>
                       <span className="font-medium flex-1" style={{ color: 'rgba(107,94,138,0.7)' }}>{item.label}</span>
                       <span
