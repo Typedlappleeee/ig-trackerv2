@@ -30,6 +30,28 @@ html, body, #root {
   border-radius: 4px;
 }
 
+/* ── Logo neon spin ─────────────────────────────────────────────────────────── */
+@property --logo-neon-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+@keyframes logo-neon-spin {
+  to { --logo-neon-angle: 360deg; }
+}
+.logo-neon-ring {
+  animation: logo-neon-spin 3.5s linear infinite;
+  background: conic-gradient(
+    from var(--logo-neon-angle),
+    #1d4ed8 0%,
+    #7c3aed 22%,
+    #ec4899 44%,
+    #60a5fa 56%,
+    #7c3aed 78%,
+    #1d4ed8 100%
+  );
+}
+
 /* ── Splash screen ──────────────────────────────────────────────────────────── */
 @property --splash-angle {
   syntax: '<angle>';

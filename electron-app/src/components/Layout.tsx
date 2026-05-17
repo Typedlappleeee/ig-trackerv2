@@ -15,34 +15,29 @@ function SFLogo({ size = 28 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 100 100" fill="none">
       <defs>
-        <linearGradient id="sfl-main" x1="10" y1="98" x2="82" y2="2" gradientUnits="userSpaceOnUse">
-          <stop offset="0%"   stopColor="#1d4ed8"/>
-          <stop offset="28%"  stopColor="#3b5af0"/>
-          <stop offset="58%"  stopColor="#7c3aed"/>
+        <linearGradient id="sfl-g" x1="50" y1="5" x2="50" y2="95" gradientUnits="userSpaceOnUse">
+          <stop offset="0%"   stopColor="#60a5fa"/>
+          <stop offset="45%"  stopColor="#818cf8"/>
           <stop offset="100%" stopColor="#a855f7"/>
         </linearGradient>
-        <linearGradient id="sfl-depth" x1="10" y1="98" x2="82" y2="2" gradientUnits="userSpaceOnUse">
-          <stop offset="0%"   stopColor="#0c1f6e"/>
-          <stop offset="55%"  stopColor="#2e1065"/>
-          <stop offset="100%" stopColor="#3b0764"/>
-        </linearGradient>
-        <linearGradient id="sfl-arr" x1="66" y1="24" x2="90" y2="1" gradientUnits="userSpaceOnUse">
-          <stop offset="0%"   stopColor="#db2777"/>
-          <stop offset="100%" stopColor="#f472b6"/>
-        </linearGradient>
+        <filter id="sfl-glow" x="-60%" y="-60%" width="220%" height="220%" colorInterpolationFilters="sRGB">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur"/>
+          <feColorMatrix in="blur" type="matrix"
+            values="0 0 0 0 0.38  0 0 0 0 0.25  0 0 0 0 1   0 0 0 1 0" result="colored"/>
+          <feMerge><feMergeNode in="colored"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
       </defs>
+      {/* Glow halo */}
       <path
         d="M 66 22 C 76 8 60 3 42 3 C 20 3 12 18 12 32 C 12 46 26 52 46 55 C 66 58 82 65 82 79 C 82 93 68 97 50 97 C 32 97 18 89 16 76"
-        stroke="url(#sfl-depth)" strokeWidth="18" strokeLinecap="round" fill="none"
-        transform="translate(2.5,4.5)" opacity="0.65"
+        stroke="#7c3aed" strokeWidth="22" strokeLinecap="round" fill="none" opacity="0.35"
       />
+      {/* Main S */}
       <path
         d="M 66 22 C 76 8 60 3 42 3 C 20 3 12 18 12 32 C 12 46 26 52 46 55 C 66 58 82 65 82 79 C 82 93 68 97 50 97 C 32 97 18 89 16 76"
-        stroke="url(#sfl-main)" strokeWidth="16" strokeLinecap="round" fill="none"
+        stroke="url(#sfl-g)" strokeWidth="16" strokeLinecap="round" fill="none"
+        filter="url(#sfl-glow)"
       />
-      <line x1="66" y1="22" x2="88" y2="2" stroke="url(#sfl-arr)" strokeWidth="11" strokeLinecap="round"/>
-      <line x1="77" y1="1" x2="90" y2="1" stroke="#f472b6" strokeWidth="9" strokeLinecap="round"/>
-      <line x1="90" y1="1" x2="90" y2="15" stroke="#f472b6" strokeWidth="9" strokeLinecap="round"/>
     </svg>
   )
 }
@@ -64,7 +59,7 @@ interface LayoutProps {
   children:  React.ReactNode
 }
 
-interface NavItem  { id: Page; label: string; icon: string; beta?: boolean }
+interface NavItem  { id: Page; label: string; icon: string; beta?: boolean; isNew?: boolean }
 interface NavSection { title: string; items: NavItem[]; defaultOpen?: boolean }
 
 const NAV_SECTIONS: NavSection[] = [
@@ -83,7 +78,7 @@ const NAV_SECTIONS: NavSection[] = [
       { id: 'stats',       label: 'Stats',         icon: '📈' },
       { id: 'posting',     label: 'Posting',       icon: '🚀' },
       { id: 'massposting', label: 'Mass Posting',  icon: '⚡' },
-      { id: 'scheduler',   label: 'Programmation', icon: '📅' },
+      { id: 'scheduler',   label: 'Programmation', icon: '📅', isNew: true },
       { id: 'bank',        label: 'Banque vidéos', icon: '🗂' },
       { id: 'warmup',      label: 'Warmup Compte', icon: '🔥', beta: true },
       { id: 'aitools',     label: 'Outils IA',     icon: '🔧' },
@@ -268,23 +263,28 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
 
         {/* ── Logo ──────────────────────────────────────────────────────────── */}
         <div className="relative z-10 px-4 pt-5 pb-4 flex items-center gap-3">
-          {/* Icon with glow ring */}
-          <div className="relative flex-shrink-0">
-            {/* Outer glow ring */}
+          {/* Icon with neon spinning ring */}
+          <div className="relative flex-shrink-0" style={{ width: 36, height: 36 }}>
+            {/* Spinning neon border */}
             <div
-              className="absolute inset-0 rounded-[13px] pointer-events-none"
+              className="logo-neon-ring absolute rounded-[15px] pointer-events-none"
+              style={{ inset: '-2px' }}
+            />
+            {/* Soft outer glow */}
+            <div
+              className="absolute pointer-events-none"
               style={{
-                background: 'radial-gradient(circle, rgba(139,92,246,0.35) 0%, transparent 70%)',
-                transform: 'scale(1.7)',
+                inset: '-6px',
+                borderRadius: 20,
+                background: 'radial-gradient(circle, rgba(124,58,237,0.3) 0%, transparent 70%)',
                 filter: 'blur(6px)',
               }}
             />
             <div
-              className="w-9 h-9 rounded-[13px] flex items-center justify-center relative"
+              className="w-9 h-9 rounded-[13px] flex items-center justify-center relative z-10"
               style={{
-                background: 'linear-gradient(145deg, #160b30 0%, #0f0722 50%, #1a0840 100%)',
-                border: '1px solid rgba(139,92,246,0.4)',
-                boxShadow: '0 0 0 1px rgba(139,92,246,0.08), 0 4px 20px rgba(139,92,246,0.2), inset 0 1px 0 rgba(255,255,255,0.06)',
+                background: 'linear-gradient(145deg, #0d0820 0%, #100626 50%, #160b30 100%)',
+                boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.07)',
               }}
             >
               <SFLogo size={24} />
@@ -405,6 +405,14 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
                               style={{ background: 'linear-gradient(130deg,rgba(124,58,237,0.4),rgba(236,72,153,0.4))', color: '#e879f9', border: '1px solid rgba(236,72,153,0.2)' }}
                             >
                               BETA
+                            </span>
+                          )}
+                          {item.isNew && (
+                            <span
+                              className="text-[7px] font-black uppercase px-1.5 py-[3px] rounded-md tracking-[0.12em]"
+                              style={{ background: 'linear-gradient(130deg,rgba(16,185,129,0.35),rgba(52,211,153,0.25))', color: '#34d399', border: '1px solid rgba(52,211,153,0.25)' }}
+                            >
+                              NEW
                             </span>
                           )}
                         </button>
