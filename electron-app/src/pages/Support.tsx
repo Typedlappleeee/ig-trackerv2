@@ -160,7 +160,7 @@ function CreateTicketForm({
               style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
             >
               {(Object.entries(CATEGORY_LABELS) as [TicketCategory, string][]).map(([k, v]) => (
-                <option key={k} value={k}>{v}</option>
+                <option key={k} value={k} style={{ background: '#0d1120', color: '#e2d9f3' }}>{v}</option>
               ))}
             </select>
           </div>
@@ -296,10 +296,10 @@ function ThreadView({
             className="shrink-0 rounded-xl px-3 py-2 text-[13px] focus:outline-none"
             style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
           >
-            <option value="open">Ouvert</option>
-            <option value="in_progress">En cours</option>
-            <option value="resolved">Résolu</option>
-            <option value="closed">Fermé</option>
+            <option value="open" style={{ background: '#0d1120', color: '#e2d9f3' }}>Ouvert</option>
+            <option value="in_progress" style={{ background: '#0d1120', color: '#e2d9f3' }}>En cours</option>
+            <option value="resolved" style={{ background: '#0d1120', color: '#e2d9f3' }}>Résolu</option>
+            <option value="closed" style={{ background: '#0d1120', color: '#e2d9f3' }}>Fermé</option>
           </select>
         )}
       </div>

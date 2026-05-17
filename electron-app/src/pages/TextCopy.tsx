@@ -256,9 +256,9 @@ export function TextCopy({ user, onBack }: { user: User; onBack?: () => void }) 
                 <select value={preset} onChange={e => setPreset(e.target.value as any)}
                   className="rounded-xl px-4 py-2.5 text-[13px] text-white outline-none"
                   style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}>
-                  <option value="9:16">9:16 (Reels)</option>
-                  <option value="1:1">1:1 (Carré)</option>
-                  <option value="16:9">16:9 (Paysage)</option>
+                  <option value="9:16" style={{ background: '#0d1120', color: '#e2d9f3' }}>9:16 (Reels)</option>
+                  <option value="1:1" style={{ background: '#0d1120', color: '#e2d9f3' }}>1:1 (Carré)</option>
+                  <option value="16:9" style={{ background: '#0d1120', color: '#e2d9f3' }}>16:9 (Paysage)</option>
                 </select>
               </div>
             </div>

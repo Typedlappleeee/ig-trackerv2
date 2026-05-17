@@ -606,7 +606,7 @@ export function MassPosting({ user }: MassPostingProps) {
               className="w-full rounded-xl px-4 py-2.5 text-[13px] focus:outline-none mb-2"
               style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
             >
-              {groups.map(g => <option key={g} value={g}>{g}</option>)}
+              {groups.map(g => <option key={g} value={g} style={{ background: '#0d1120', color: '#e2d9f3' }}>{g}</option>)}
             </select>
             <input
               type="text" placeholder="Rechercher…" value={phoneSearch}

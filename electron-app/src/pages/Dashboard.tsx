@@ -372,7 +372,7 @@ export function Dashboard({ user }: DashboardProps) {
                   paddingRight: '2.5rem',
                 }}
               >
-                <option value="">Tous les comptes</option>
+                <option value="" style={{ background: '#0d1120', color: '#e2d9f3' }}>Tous les comptes</option>
                 {linkedPhones.map(p => (
                   <option key={p.id} value={p.id} style={{ background: '#0d1120', color: '#e2d9f3' }}>
                     {p.phone_name}
