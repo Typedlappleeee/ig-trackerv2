@@ -16,34 +16,36 @@ function fileName(p: string) { return p.split(/[\\/]/).pop() ?? p }
 function ScoreBar({ score, label, comment }: { score: number; label: string; comment: string }) {
   const color = score >= 7 ? '#34d399' : score >= 5 ? '#fbbf24' : '#f87171'
   return (
-    <div className="space-y-1">
-      <div className="flex items-center justify-between text-xs">
-        <span style={{ color: 'rgba(196,181,253,0.7)' }}>{label}</span>
-        <span className="font-black" style={{ color }}>{score}/10</span>
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between">
+        <span className="text-[13px] text-text2">{label}</span>
+        <span className="text-[13px] font-black" style={{ color }}>{score}/10</span>
       </div>
-      <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(139,92,246,0.12)' }}>
+      <div className="h-2 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.07)' }}>
         <div className="h-full rounded-full transition-all duration-700"
           style={{ width: `${score * 10}%`, background: color }} />
       </div>
-      <p className="text-[10px]" style={{ color: 'rgba(196,181,253,0.45)' }}>{comment}</p>
+      <p className="text-[12px] text-text2">{comment}</p>
     </div>
   )
 }
 
 function ToolShell({ title, icon, children, onBack }: { title: string; icon: string; children: React.ReactNode; onBack: () => void }) {
   return (
-    <div className="flex flex-col h-full" style={{ background: '#06040f' }}>
-      <div className="flex-shrink-0 px-6 py-4 flex items-center gap-3"
-        style={{ borderBottom: '1px solid rgba(139,92,246,0.12)', background: 'rgba(8,5,20,0.6)' }}>
-        <button onClick={onBack} className="text-xs px-3 py-1.5 rounded-lg flex-shrink-0"
-          style={{ background: 'rgba(139,92,246,0.1)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.2)' }}>
+    <div className="h-full flex flex-col overflow-hidden">
+      <div className="flex-shrink-0 px-10 pt-9 pb-7 flex items-center gap-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        <button onClick={onBack}
+          className="rounded-xl px-4 py-2.5 text-[13px] font-semibold flex-shrink-0"
+          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}>
           ← Retour
         </button>
-        <span className="text-lg">{icon}</span>
-        <p className="text-sm font-black text-white">{title}</p>
+        <span className="text-2xl">{icon}</span>
+        <h1 className="text-[22px] font-black text-white leading-none">{title}</h1>
       </div>
-      <div className="flex-1 overflow-auto p-6 max-w-2xl">
-        {children}
+      <div className="flex-1 overflow-y-auto px-10 pb-10 pt-8">
+        <div className="max-w-2xl">
+          {children}
+        </div>
       </div>
     </div>
   )
@@ -112,14 +114,14 @@ Return ONLY valid JSON, no explanation outside the JSON:
   return (
     <ToolShell title="Score Viral" icon="🔥" onBack={onBack}>
       <div className="space-y-5">
-        <p className="text-xs" style={{ color: 'rgba(196,181,253,0.5)' }}>
+        <p className="text-[13px] text-text2">
           Upload une vidéo, Claude analyse les frames et note son potentiel viral sur 5 critères.
         </p>
 
-        <div className="rounded-2xl p-4 space-y-3" style={{ background: 'rgba(8,5,20,0.8)', border: '1px solid rgba(139,92,246,0.18)' }}>
+        <div className="rounded-2xl p-5 space-y-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
           {filePath
-            ? <p className="text-xs font-mono text-white/70 truncate">📹 {fileName(filePath)}</p>
-            : <p className="text-xs" style={{ color: 'rgba(196,181,253,0.4)' }}>Aucune vidéo sélectionnée</p>
+            ? <p className="text-[13px] font-mono text-white/70 truncate">📹 {fileName(filePath)}</p>
+            : <p className="text-[13px] text-text2">Aucune vidéo sélectionnée</p>
           }
           <Button variant="secondary" onClick={async () => {
             const p = await window.electronAPI!.pickVideoFile()
@@ -129,37 +131,44 @@ Return ONLY valid JSON, no explanation outside the JSON:
           </Button>
         </div>
 
-        {error && <p className="text-xs text-danger bg-danger/10 border border-danger/20 rounded-xl px-4 py-3">{error}</p>}
+        {error && (
+          <div className="rounded-xl px-4 py-3" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#f87171' }}>
+            <p className="text-[13px]">{error}</p>
+          </div>
+        )}
 
         <Button className="w-full" disabled={!filePath || !anthropicKey} loading={loading} onClick={analyze}>
           🔥 Analyser le potentiel viral
         </Button>
 
         {!anthropicKey && (
-          <p className="text-xs text-warn/80">⚠ Clé Anthropic manquante — configure-la dans Paramètres → Connexions</p>
+          <div className="rounded-xl px-4 py-3" style={{ background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.2)', color: '#fbbf24' }}>
+            <p className="text-[13px]">⚠ Clé Anthropic manquante — configure-la dans Paramètres → Connexions</p>
+          </div>
         )}
 
         {result && (
           <div className="space-y-4">
             {/* Overall score */}
-            <div className="rounded-2xl p-5 text-center space-y-1" style={{ background: 'rgba(8,5,20,0.9)', border: `1px solid ${overallColor}40` }}>
-              <p className="text-[10px] uppercase tracking-widest font-bold" style={{ color: 'rgba(196,181,253,0.4)' }}>Score Global</p>
-              <p className="text-5xl font-black" style={{ color: overallColor }}>{result.overall.toFixed(1)}</p>
-              <p className="text-[10px]" style={{ color: 'rgba(196,181,253,0.4)' }}>/ 10</p>
-              <p className="text-xs text-white/70 mt-2">{result.verdict}</p>
+            <div className="rounded-2xl p-6 text-center space-y-1" style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${overallColor}40` }}>
+              <p className="text-[12px] uppercase tracking-widest font-bold text-text2">Score Global</p>
+              <p className="text-[52px] font-black leading-none" style={{ color: overallColor }}>{result.overall.toFixed(1)}</p>
+              <p className="text-[12px] text-text2">/ 10</p>
+              <p className="text-[13px] text-white/70 mt-2">{result.verdict}</p>
             </div>
 
             {/* Category scores */}
-            <div className="rounded-2xl p-4 space-y-4" style={{ background: 'rgba(8,5,20,0.8)', border: '1px solid rgba(139,92,246,0.15)' }}>
+            <div className="rounded-2xl p-5 space-y-5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <p className="text-[15px] font-bold text-white mb-4">Critères détaillés</p>
               {Object.entries(result.scores).map(([key, val]) => (
                 <ScoreBar key={key} score={val.score} label={SCORE_LABELS[key] ?? key} comment={val.comment} />
               ))}
             </div>
 
             {/* Top recommendation */}
-            <div className="rounded-xl px-4 py-3 space-y-1" style={{ background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.2)' }}>
-              <p className="text-[10px] uppercase tracking-wider font-bold" style={{ color: '#fbbf24' }}>💡 Top recommandation</p>
-              <p className="text-xs text-white/80">{result.topRecommendation}</p>
+            <div className="rounded-xl px-5 py-4 space-y-1.5" style={{ background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.2)' }}>
+              <p className="text-[12px] uppercase tracking-wider font-bold" style={{ color: '#fbbf24' }}>💡 Top recommandation</p>
+              <p className="text-[13px] text-white/80">{result.topRecommendation}</p>
             </div>
           </div>
         )}
@@ -226,14 +235,14 @@ Return ONLY valid JSON:
   return (
     <ToolShell title="Structure Virale" icon="🧬" onBack={onBack}>
       <div className="space-y-5">
-        <p className="text-xs" style={{ color: 'rgba(196,181,253,0.5)' }}>
+        <p className="text-[13px] text-text2">
           Décompose la structure narrative d'une vidéo — hook, valeur, CTA — pour comprendre pourquoi ça marche.
         </p>
 
-        <div className="rounded-2xl p-4 space-y-3" style={{ background: 'rgba(8,5,20,0.8)', border: '1px solid rgba(139,92,246,0.18)' }}>
+        <div className="rounded-2xl p-5 space-y-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
           {filePath
-            ? <p className="text-xs font-mono text-white/70 truncate">📹 {fileName(filePath)}</p>
-            : <p className="text-xs" style={{ color: 'rgba(196,181,253,0.4)' }}>Aucune vidéo sélectionnée</p>
+            ? <p className="text-[13px] font-mono text-white/70 truncate">📹 {fileName(filePath)}</p>
+            : <p className="text-[13px] text-text2">Aucune vidéo sélectionnée</p>
           }
           <Button variant="secondary" onClick={async () => {
             const p = await window.electronAPI!.pickVideoFile()
@@ -243,40 +252,46 @@ Return ONLY valid JSON:
           </Button>
         </div>
 
-        {error && <p className="text-xs text-danger bg-danger/10 border border-danger/20 rounded-xl px-4 py-3">{error}</p>}
+        {error && (
+          <div className="rounded-xl px-4 py-3" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#f87171' }}>
+            <p className="text-[13px]">{error}</p>
+          </div>
+        )}
 
         <Button className="w-full" disabled={!filePath || !anthropicKey} loading={loading} onClick={analyze}>
           🧬 Analyser la structure
         </Button>
 
         {!anthropicKey && (
-          <p className="text-xs text-warn/80">⚠ Clé Anthropic manquante — configure-la dans Paramètres → Connexions</p>
+          <div className="rounded-xl px-4 py-3" style={{ background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.2)', color: '#fbbf24' }}>
+            <p className="text-[13px]">⚠ Clé Anthropic manquante — configure-la dans Paramètres → Connexions</p>
+          </div>
         )}
 
         {result && (
           <div className="space-y-4">
             {/* Timeline */}
-            <div className="rounded-2xl p-4 space-y-3" style={{ background: 'rgba(8,5,20,0.9)', border: '1px solid rgba(139,92,246,0.15)' }}>
-              <p className="text-[10px] uppercase tracking-widest font-bold" style={{ color: 'rgba(196,181,253,0.4)' }}>Timeline</p>
+            <div className="rounded-2xl p-5 space-y-4" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <p className="text-[15px] font-bold text-white">Timeline</p>
               {result.segments.map((seg, i) => {
                 const color = TYPE_COLOR[seg.type] ?? '#a78bfa'
                 return (
                   <div key={i} className="flex items-start gap-3">
-                    <div className="flex-shrink-0 w-14 text-right">
-                      <span className="text-[10px] font-mono" style={{ color: 'rgba(196,181,253,0.5)' }}>
+                    <div className="flex-shrink-0 w-16 text-right">
+                      <span className="text-[12px] font-mono text-text2">
                         {seg.from}s–{seg.to}s
                       </span>
                     </div>
                     <div className="w-1 self-stretch rounded-full flex-shrink-0" style={{ background: color }} />
                     <div className="flex-1 pb-2">
                       <div className="flex items-center gap-2">
-                        <span className="text-[9px] px-1.5 py-0.5 rounded font-black uppercase tracking-wider"
+                        <span className="text-[11px] px-2 py-0.5 rounded font-bold uppercase tracking-wider"
                           style={{ background: `${color}18`, color }}>
                           {TYPE_LABEL[seg.type] ?? seg.type}
                         </span>
-                        <span className="text-xs font-semibold text-white">{seg.label}</span>
+                        <span className="text-[13px] font-semibold text-white">{seg.label}</span>
                       </div>
-                      {seg.notes && <p className="text-[10px] mt-0.5" style={{ color: 'rgba(196,181,253,0.45)' }}>{seg.notes}</p>}
+                      {seg.notes && <p className="text-[12px] mt-0.5 text-text2">{seg.notes}</p>}
                     </div>
                   </div>
                 )
@@ -284,19 +299,19 @@ Return ONLY valid JSON:
             </div>
 
             {/* Summary */}
-            <div className="rounded-xl px-4 py-3" style={{ background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.15)' }}>
-              <p className="text-xs text-white/70">{result.summary}</p>
+            <div className="rounded-xl px-5 py-4" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <p className="text-[13px] text-white/70">{result.summary}</p>
             </div>
 
             {/* Strengths + improvements */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-xl p-3 space-y-2" style={{ background: 'rgba(52,211,153,0.06)', border: '1px solid rgba(52,211,153,0.2)' }}>
-                <p className="text-[10px] font-black uppercase tracking-wider" style={{ color: '#34d399' }}>✅ Points forts</p>
-                {result.strengths.map((s, i) => <p key={i} className="text-[10px] text-white/60">• {s}</p>)}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="rounded-xl p-4 space-y-2.5" style={{ background: 'rgba(52,211,153,0.06)', border: '1px solid rgba(52,211,153,0.2)' }}>
+                <p className="text-[12px] font-black uppercase tracking-wider" style={{ color: '#34d399' }}>✅ Points forts</p>
+                {result.strengths.map((s, i) => <p key={i} className="text-[13px] text-white/60">• {s}</p>)}
               </div>
-              <div className="rounded-xl p-3 space-y-2" style={{ background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.2)' }}>
-                <p className="text-[10px] font-black uppercase tracking-wider" style={{ color: '#fbbf24' }}>💡 Améliorations</p>
-                {result.improvements.map((s, i) => <p key={i} className="text-[10px] text-white/60">• {s}</p>)}
+              <div className="rounded-xl p-4 space-y-2.5" style={{ background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.2)' }}>
+                <p className="text-[12px] font-black uppercase tracking-wider" style={{ color: '#fbbf24' }}>💡 Améliorations</p>
+                {result.improvements.map((s, i) => <p key={i} className="text-[13px] text-white/60">• {s}</p>)}
               </div>
             </div>
           </div>
@@ -390,25 +405,25 @@ Rate each category 1-10. Return ONLY valid JSON:
   return (
     <ToolShell title="Audit Thumbnail" icon="🖼" onBack={onBack}>
       <div className="space-y-5">
-        <p className="text-xs" style={{ color: 'rgba(196,181,253,0.5)' }}>
+        <p className="text-[13px] text-text2">
           Analyse ta miniature sur 5 critères de performance. Accepte une image ou une vidéo (prend le premier frame).
         </p>
 
         <div className="flex gap-2">
           {[{ label: '🖼 Image', v: false }, { label: '🎬 Vidéo', v: true }].map(({ label, v }) => (
             <button key={String(v)} onClick={() => { setIsVideo(v); setFilePath(null); setResult(null) }}
-              className="flex-1 py-2 rounded-xl text-xs font-bold"
+              className="flex-1 py-2.5 rounded-xl text-[13px] font-bold"
               style={isVideo === v
                 ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff' }
-                : { background: 'rgba(139,92,246,0.06)', color: 'rgba(196,181,253,0.5)', border: '1px solid rgba(139,92,246,0.12)' }
+                : { background: 'rgba(255,255,255,0.05)', color: 'rgba(196,181,253,0.5)', border: '1px solid rgba(255,255,255,0.07)' }
               }>{label}</button>
           ))}
         </div>
 
-        <div className="rounded-2xl p-4 space-y-3" style={{ background: 'rgba(8,5,20,0.8)', border: '1px solid rgba(139,92,246,0.18)' }}>
+        <div className="rounded-2xl p-5 space-y-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
           {filePath
-            ? <p className="text-xs font-mono text-white/70 truncate">{isVideo ? '📹' : '🖼'} {fileName(filePath)}</p>
-            : <p className="text-xs" style={{ color: 'rgba(196,181,253,0.4)' }}>Aucun fichier sélectionné</p>
+            ? <p className="text-[13px] font-mono text-white/70 truncate">{isVideo ? '📹' : '🖼'} {fileName(filePath)}</p>
+            : <p className="text-[13px] text-text2">Aucun fichier sélectionné</p>
           }
           <Button variant="secondary" onClick={async () => {
             const p = isVideo
@@ -420,34 +435,41 @@ Rate each category 1-10. Return ONLY valid JSON:
           </Button>
         </div>
 
-        {error && <p className="text-xs text-danger bg-danger/10 border border-danger/20 rounded-xl px-4 py-3">{error}</p>}
+        {error && (
+          <div className="rounded-xl px-4 py-3" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#f87171' }}>
+            <p className="text-[13px]">{error}</p>
+          </div>
+        )}
 
         <Button className="w-full" disabled={!filePath || !anthropicKey} loading={loading} onClick={analyze}>
           🖼 Auditer le thumbnail
         </Button>
 
         {!anthropicKey && (
-          <p className="text-xs text-warn/80">⚠ Clé Anthropic manquante — configure-la dans Paramètres → Connexions</p>
+          <div className="rounded-xl px-4 py-3" style={{ background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.2)', color: '#fbbf24' }}>
+            <p className="text-[13px]">⚠ Clé Anthropic manquante — configure-la dans Paramètres → Connexions</p>
+          </div>
         )}
 
         {result && (
           <div className="space-y-4">
-            <div className="rounded-2xl p-5 text-center space-y-1" style={{ background: 'rgba(8,5,20,0.9)', border: `1px solid ${overallColor}40` }}>
-              <p className="text-[10px] uppercase tracking-widest font-bold" style={{ color: 'rgba(196,181,253,0.4)' }}>Score Global</p>
-              <p className="text-5xl font-black" style={{ color: overallColor }}>{result.overall.toFixed(1)}</p>
-              <p className="text-[10px]" style={{ color: 'rgba(196,181,253,0.4)' }}>/ 10</p>
-              <p className="text-xs text-white/70 mt-2">{result.verdict}</p>
+            <div className="rounded-2xl p-6 text-center space-y-1" style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${overallColor}40` }}>
+              <p className="text-[12px] uppercase tracking-widest font-bold text-text2">Score Global</p>
+              <p className="text-[52px] font-black leading-none" style={{ color: overallColor }}>{result.overall.toFixed(1)}</p>
+              <p className="text-[12px] text-text2">/ 10</p>
+              <p className="text-[13px] text-white/70 mt-2">{result.verdict}</p>
             </div>
 
-            <div className="rounded-2xl p-4 space-y-4" style={{ background: 'rgba(8,5,20,0.8)', border: '1px solid rgba(139,92,246,0.15)' }}>
+            <div className="rounded-2xl p-5 space-y-5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <p className="text-[15px] font-bold text-white">Critères détaillés</p>
               {Object.entries(result.scores).map(([key, val]) => (
                 <ScoreBar key={key} score={val.score} label={SCORE_LABELS[key] ?? key} comment={val.comment} />
               ))}
             </div>
 
-            <div className="rounded-xl px-4 py-3 space-y-2" style={{ background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.2)' }}>
-              <p className="text-[10px] font-black uppercase tracking-wider" style={{ color: '#fbbf24' }}>🔧 Corrections prioritaires</p>
-              {result.topFixes.map((f, i) => <p key={i} className="text-xs text-white/70">• {f}</p>)}
+            <div className="rounded-xl px-5 py-4 space-y-2.5" style={{ background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.2)' }}>
+              <p className="text-[12px] font-black uppercase tracking-wider" style={{ color: '#fbbf24' }}>🔧 Corrections prioritaires</p>
+              {result.topFixes.map((f, i) => <p key={i} className="text-[13px] text-white/70">• {f}</p>)}
             </div>
           </div>
         )}
