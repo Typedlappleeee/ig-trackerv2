@@ -999,11 +999,14 @@ export async function loginInstagramAccount(
       if (badCode.some(p => xmlLower3.includes(p))) {
         return { ok: false, error: 'Code 2FA refusé — secret TOTP incorrect ou code expiré' }
       }
-      if (homeIndicators.some(p => xmlLower3.includes(p))) {
-        log('✅ Connexion réussie avec 2FA !')
-        return { ok: true }
+      // Still on the 2FA screen = code was rejected
+      const still2FA = twoFaPatterns.some(p => xmlLower3.includes(p))
+      if (still2FA) {
+        return { ok: false, error: 'Code 2FA refusé — toujours sur l\'écran 2FA' }
       }
-      return { ok: false, error: 'État inconnu après validation 2FA — vérifier manuellement' }
+      // Any other screen (home, onboarding, permissions…) = success
+      log('✅ Connexion réussie avec 2FA !')
+      return { ok: true }
     }
 
     if (is2FA) {
