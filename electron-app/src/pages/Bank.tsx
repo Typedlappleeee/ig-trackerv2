@@ -551,7 +551,7 @@ export function Bank({ user }: BankProps) {
   return (
     <div
       ref={dropRef}
-      className={`flex h-full min-h-screen transition-colors ${dragging ? 'bg-accent/5' : ''}`}
+      className={`h-full flex flex-col overflow-hidden transition-colors ${dragging ? 'bg-accent/5' : ''}`}
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
       onDrop={onDrop}
@@ -566,193 +566,218 @@ export function Bank({ user }: BankProps) {
         </div>
       )}
 
-      {/* ── Left sidebar: folders ── */}
-      <aside className="w-52 flex-shrink-0 flex flex-col border-r border-border bg-surface">
-        <div className="px-4 py-3 border-b border-border flex items-center justify-between">
-          <p className="text-[10px] font-semibold text-text2 uppercase tracking-widest">Dossiers</p>
-          <button
-            onClick={() => setShowNewFolder(v => !v)}
-            className="text-text2 hover:text-accent text-lg leading-none transition-colors"
-            title="Nouveau dossier"
-          >+</button>
+      {/* ── Page header ── */}
+      <div className="flex-shrink-0 px-10 pt-9 pb-7 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        <div>
+          <h1 className="text-[28px] font-black text-white leading-none">Banque de médias</h1>
+          <p className="text-[13px] text-text2 mt-0.5">{items.length} média{items.length !== 1 ? 's' : ''} · glisse-dépose ou importe depuis ton PC</p>
         </div>
-
-        {showNewFolder && (
-          <div className="px-2 py-2 border-b border-border flex gap-1">
-            <input
-              autoFocus
-              placeholder="Nom du dossier…"
-              className="flex-1 bg-bg border border-border rounded px-2 py-1 text-xs text-text focus:border-accent focus:outline-none"
-              value={newFolderName}
-              onChange={e => setNewFolderName(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') createFolder(); if (e.key === 'Escape') { setShowNewFolder(false); setNewFolderName('') } }}
-            />
-            <button
-              onClick={createFolder}
-              className="px-2 py-1 text-xs bg-accent/20 text-accent rounded hover:bg-accent/30 transition-colors"
-            >OK</button>
-          </div>
-        )}
-
-        <div className="flex-1 overflow-auto py-1">
-          {/* All videos */}
+        <div className="flex items-center gap-3">
           <button
-            onClick={() => setSelectedFolder(null)}
-            className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-colors ${
-              selectedFolder === null ? 'bg-surface2 border-l-2 border-accent pl-[10px]' : 'hover:bg-surface2'
-            }`}
-          >
-            <span className="text-base flex-shrink-0">🎬</span>
-            <span className="text-xs font-medium text-text flex-1">Toute la banque</span>
-            <span className="text-[10px] text-text2 flex-shrink-0">{items.length}</span>
+            onClick={() => setShowAddModal(true)}
+            className="rounded-xl px-5 py-2.5 text-[13px] font-semibold text-white"
+            style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)' }}>
+            + Ajouter un média
           </button>
-
-          {/* Folder list */}
-          {folders.map(f => (
-            <FolderRow
-              key={f}
-              name={f}
-              count={items.filter(i => (i as unknown as {folder?: string}).folder === f).length}
-              active={selectedFolder === f}
-              onClick={() => setSelectedFolder(f)}
-              onRename={(newName) => renameFolder(f, newName)}
-              onDelete={() => setFolderModal({ name: f, mode: 'delete' })}
-              onMerge={() => setFolderModal({ name: f, mode: 'merge' })}
-              onDropItem={itemId => { moveItemSave(itemId, f); setSelectedFolder(f) }}
-            />
-          ))}
+          <button
+            onClick={() => setSelectedIds(new Set(visible.map(i => i.id)))}
+            className="rounded-xl px-5 py-2.5 text-[13px] font-semibold"
+            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}>
+            ☑ Tout sélectionner
+          </button>
+          <button
+            onClick={loadItems}
+            className="rounded-xl px-5 py-2.5 text-[13px] font-semibold"
+            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}>
+            ↺ Rafraîchir
+          </button>
         </div>
-      </aside>
+      </div>
 
-      {/* ── Main area ── */}
-      <div className="flex-1 overflow-auto flex flex-col">
-        {/* Header (Python: top bar at #070a10) */}
-        <div className="px-6 py-3 border-b border-border bg-[#070a10] flex items-center gap-2 flex-shrink-0">
-          <h2 className="text-sm font-semibold text-text mr-2">🗂 Banque de médias</h2>
-          <div className="flex-1" />
-          <Button onClick={() => setShowAddModal(true)} size="sm">+ Ajouter un média</Button>
-          <Button variant="secondary" size="sm" onClick={() => setSelectedIds(new Set(visible.map(i => i.id)))}>☑ Tout sélectionner</Button>
-          <Button variant="secondary" size="sm" onClick={loadItems}>↺ Rafraîchir</Button>
-        </div>
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+        {/* ── Left sidebar: folders ── */}
+        <aside className="w-56 flex-shrink-0 flex flex-col" style={{ borderRight: '1px solid rgba(255,255,255,0.06)' }}>
+          <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+            <p className="text-[12px] font-semibold text-text2 uppercase tracking-widest">Dossiers</p>
+            <button
+              onClick={() => setShowNewFolder(v => !v)}
+              className="text-text2 hover:text-accent text-lg leading-none transition-colors"
+              title="Nouveau dossier"
+            >+</button>
+          </div>
 
-        {/* Filter bar */}
-        <div className="px-6 py-3 border-b border-border bg-[#070a10] flex items-center gap-3 flex-shrink-0">
-          <input
-            type="text"
-            placeholder="🔍  Rechercher…"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="flex-1 max-w-sm bg-surface border border-border rounded-lg px-3 py-1.5 text-xs text-text placeholder:text-text2 focus:border-accent focus:outline-none transition-colors"
-          />
-          {/* Type pills */}
-          <div className="flex gap-1">
-            {([
-              { k: 'all',   l: 'Tous'  },
-              { k: 'video', l: 'Vidéo' },
-              { k: 'photo', l: 'Photo' },
-              { k: 'gif',   l: 'GIF'   },
-              { k: 'audio', l: 'Audio' },
-            ] as const).map(t => (
+          {showNewFolder && (
+            <div className="px-3 py-2.5 flex gap-2" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+              <input
+                autoFocus
+                placeholder="Nom du dossier…"
+                className="flex-1 rounded-xl px-3 py-2 text-[13px] focus:outline-none"
+                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
+                value={newFolderName}
+                onChange={e => setNewFolderName(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') createFolder(); if (e.key === 'Escape') { setShowNewFolder(false); setNewFolderName('') } }}
+              />
               <button
-                key={t.k}
-                onClick={() => setTypeFilter(t.k)}
-                className={`px-3 py-1 rounded-full text-[11px] font-semibold transition-colors ${
-                  typeFilter === t.k ? 'bg-accent text-white' : 'bg-surface text-text2 hover:text-text'
-                }`}
-              >{t.l}</button>
-            ))}
-          </div>
-          <div className="flex-1" />
-          <span className="text-text2 text-xs">{visible.length} média{visible.length !== 1 ? 's' : ''}</span>
-          {adding && <span className="text-xs text-accent animate-pulse">Ajout…</span>}
-        </div>
-
-        {/* Selection toolbar */}
-        {selectionMode && (
-          <div className="px-6 py-2.5 border-b border-border flex items-center gap-3 flex-shrink-0" style={{ background: 'rgba(139,92,246,0.08)' }}>
-            <span className="text-sm font-bold text-accent">{selectedIds.size} sélectionné{selectedIds.size > 1 ? 's' : ''}</span>
-            <button
-              onClick={() => setSelectedIds(prev => prev.size === visible.length ? new Set() : new Set(visible.map(i => i.id)))}
-              className="text-xs px-2.5 py-1 rounded-lg font-semibold text-text2 hover:text-text transition-colors"
-              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}>
-              {selectedIds.size === visible.length ? '☐ Désélectionner tout' : '☑ Tout sélectionner'}
-            </button>
-            {selectedIds.size > 0 && (<>
-              <button onClick={() => setShowBulkMove(true)}
-                className="text-xs px-3 py-1 rounded-lg font-semibold"
-                style={{ background: 'rgba(139,92,246,0.15)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.3)' }}>
-                📂 Déplacer ({selectedIds.size})
-              </button>
-              <button onClick={deleteSelected}
-                className="text-xs px-3 py-1 rounded-lg font-semibold"
-                style={{ background: 'rgba(239,68,68,0.12)', color: '#f87171', border: '1px solid rgba(239,68,68,0.25)' }}>
-                🗑 Supprimer ({selectedIds.size})
-              </button>
-            </>)}
-            <div className="flex-1" />
-            <button onClick={exitSelection} className="text-xs text-text2 hover:text-text px-2 transition-colors">✕ Annuler</button>
-          </div>
-        )}
-
-        {/* Migration notice */}
-        {needsMigration && (
-          <div className="mx-6 mt-4 bg-warn/10 border border-warn/30 rounded-xl p-4 flex items-start gap-3">
-            <span className="text-xl flex-shrink-0">⚠</span>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-warn">Migration requise — colonne "folder" manquante</p>
-              <p className="text-xs text-text2 mt-1">Colle ce SQL dans Supabase → SQL Editor → Run :</p>
-              <code className="text-[11px] font-mono text-text2 block mt-1">{MIGRATION_SQL.trim()}</code>
-            </div>
-            <button
-              onClick={() => { navigator.clipboard.writeText(MIGRATION_SQL); setSqlCopied(true); setTimeout(() => setSqlCopied(false), 2000) }}
-              className="px-3 py-1.5 bg-warn text-black text-xs font-semibold rounded-lg hover:bg-warn/80 flex-shrink-0"
-            >
-              {sqlCopied ? '✓ Copié' : '📋 Copier'}
-            </button>
-          </div>
-        )}
-
-        {error && (
-          <div className="mx-6 mt-4 px-4 py-3 rounded-lg bg-danger/10 border border-danger/20 text-danger text-sm flex items-center gap-2">
-            <span>{error}</span>
-            <button onClick={() => setError(null)} className="ml-auto text-danger hover:text-text">✕</button>
-          </div>
-        )}
-
-        {uploadStatus && (
-          <div className="mx-6 mt-4 px-4 py-3 rounded-lg bg-accent/10 border border-accent/30 text-accent text-sm flex items-center gap-2">
-            <span className="animate-spin">↻</span>
-            <span>{uploadStatus}</span>
-          </div>
-        )}
-
-        {/* Content */}
-        <div className="flex-1 p-6">
-          {loading ? (
-            <div className="flex justify-center py-16"><Spinner size="lg" /></div>
-          ) : items.length === 0 ? (
-            <div className="text-center py-20 text-text2 space-y-4">
-              <p className="text-5xl">🎬</p>
-              <p className="font-medium text-base">Banque vide</p>
-              <p className="text-sm">Glisse-dépose tes vidéos ici ou clique sur<br/><span className="text-accent font-medium">📂 Ajouter une vidéo</span> dans la colonne gauche.</p>
-            </div>
-          ) : visible.length === 0 ? (
-            <p className="text-center py-8 text-text2 text-sm">Aucun résultat.</p>
-          ) : (
-            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
-              {visible.map(item => (
-                <VideoCard
-                  key={item.id}
-                  item={item}
-                  onContextMenu={openCtx}
-                  onPlay={setPlayingItem}
-                  selectionMode={selectionMode}
-                  isSelected={selectedIds.has(item.id)}
-                  onToggleSelect={() => toggleSelection(item.id)}
-                />
-              ))}
+                onClick={createFolder}
+                className="px-3 py-2 text-[13px] font-semibold rounded-xl"
+                style={{ background: 'rgba(139,92,246,0.2)', color: '#a78bfa' }}>OK</button>
             </div>
           )}
+
+          <div className="flex-1 overflow-auto py-1">
+            {/* All videos */}
+            <button
+              onClick={() => setSelectedFolder(null)}
+              className={`w-full flex items-center gap-2.5 px-4 py-3 text-left transition-colors ${
+                selectedFolder === null ? 'border-l-2 border-accent pl-[14px]' : 'hover:bg-white/[0.03]'
+              }`}
+              style={selectedFolder === null ? { background: 'rgba(139,92,246,0.08)' } : {}}
+            >
+              <span className="text-base flex-shrink-0">🎬</span>
+              <span className="text-[13px] font-medium text-text flex-1">Toute la banque</span>
+              <span className="text-[12px] text-text2 flex-shrink-0">{items.length}</span>
+            </button>
+
+            {/* Folder list */}
+            {folders.map(f => (
+              <FolderRow
+                key={f}
+                name={f}
+                count={items.filter(i => (i as unknown as {folder?: string}).folder === f).length}
+                active={selectedFolder === f}
+                onClick={() => setSelectedFolder(f)}
+                onRename={(newName) => renameFolder(f, newName)}
+                onDelete={() => setFolderModal({ name: f, mode: 'delete' })}
+                onMerge={() => setFolderModal({ name: f, mode: 'merge' })}
+                onDropItem={itemId => { moveItemSave(itemId, f); setSelectedFolder(f) }}
+              />
+            ))}
+          </div>
+        </aside>
+
+        {/* ── Main area ── */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {/* Filter bar */}
+          <div className="flex-shrink-0 px-6 py-3 flex items-center gap-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+            <input
+              type="text"
+              placeholder="🔍  Rechercher…"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="flex-1 max-w-sm rounded-xl px-4 py-2.5 text-[13px] placeholder:text-text2 focus:outline-none transition-colors"
+              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
+            />
+            {/* Type pills */}
+            <div className="flex gap-1.5">
+              {([
+                { k: 'all',   l: 'Tous'  },
+                { k: 'video', l: 'Vidéo' },
+                { k: 'photo', l: 'Photo' },
+                { k: 'gif',   l: 'GIF'   },
+                { k: 'audio', l: 'Audio' },
+              ] as const).map(t => (
+                <button
+                  key={t.k}
+                  onClick={() => setTypeFilter(t.k)}
+                  className={`px-3 py-1.5 rounded-full text-[12px] font-semibold transition-colors ${
+                    typeFilter === t.k ? 'bg-accent text-white' : 'text-text2 hover:text-text'
+                  }`}
+                  style={typeFilter !== t.k ? { background: 'rgba(255,255,255,0.05)' } : {}}
+                >{t.l}</button>
+              ))}
+            </div>
+            <div className="flex-1" />
+            <span className="text-text2 text-[13px]">{visible.length} média{visible.length !== 1 ? 's' : ''}</span>
+            {adding && <span className="text-[13px] text-accent animate-pulse">Ajout…</span>}
+          </div>
+
+          {/* Selection toolbar */}
+          {selectionMode && (
+            <div className="flex-shrink-0 px-6 py-3 flex items-center gap-3" style={{ background: 'rgba(139,92,246,0.08)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+              <span className="text-[13px] font-bold text-accent">{selectedIds.size} sélectionné{selectedIds.size > 1 ? 's' : ''}</span>
+              <button
+                onClick={() => setSelectedIds(prev => prev.size === visible.length ? new Set() : new Set(visible.map(i => i.id)))}
+                className="text-[13px] px-3 py-1.5 rounded-xl font-semibold text-text2 hover:text-text transition-colors"
+                style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)' }}>
+                {selectedIds.size === visible.length ? '☐ Désélectionner tout' : '☑ Tout sélectionner'}
+              </button>
+              {selectedIds.size > 0 && (<>
+                <button onClick={() => setShowBulkMove(true)}
+                  className="text-[13px] px-3 py-1.5 rounded-xl font-semibold"
+                  style={{ background: 'rgba(139,92,246,0.15)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.3)' }}>
+                  📂 Déplacer ({selectedIds.size})
+                </button>
+                <button onClick={deleteSelected}
+                  className="text-[13px] px-3 py-1.5 rounded-xl font-semibold"
+                  style={{ background: 'rgba(239,68,68,0.12)', color: '#f87171', border: '1px solid rgba(239,68,68,0.25)' }}>
+                  🗑 Supprimer ({selectedIds.size})
+                </button>
+              </>)}
+              <div className="flex-1" />
+              <button onClick={exitSelection} className="text-[13px] text-text2 hover:text-text px-2 transition-colors">✕ Annuler</button>
+            </div>
+          )}
+
+          {/* Migration notice */}
+          {needsMigration && (
+            <div className="mx-6 mt-5 rounded-2xl p-5 flex items-start gap-3" style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.25)' }}>
+              <span className="text-xl flex-shrink-0">⚠</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-[13px] font-semibold text-warn">Migration requise — colonne "folder" manquante</p>
+                <p className="text-[12px] text-text2 mt-1">Colle ce SQL dans Supabase → SQL Editor → Run :</p>
+                <code className="text-[12px] font-mono text-text2 block mt-1">{MIGRATION_SQL.trim()}</code>
+              </div>
+              <button
+                onClick={() => { navigator.clipboard.writeText(MIGRATION_SQL); setSqlCopied(true); setTimeout(() => setSqlCopied(false), 2000) }}
+                className="px-3 py-2 rounded-xl text-[12px] font-semibold flex-shrink-0"
+                style={{ background: 'rgba(251,191,36,0.15)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.3)' }}>
+                {sqlCopied ? '✓ Copié' : '📋 Copier'}
+              </button>
+            </div>
+          )}
+
+          {error && (
+            <div className="mx-6 mt-5 px-5 py-3 rounded-2xl flex items-center gap-3" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
+              <span className="text-[13px] text-danger flex-1">{error}</span>
+              <button onClick={() => setError(null)} className="text-danger hover:text-text">✕</button>
+            </div>
+          )}
+
+          {uploadStatus && (
+            <div className="mx-6 mt-5 px-5 py-3 rounded-2xl flex items-center gap-3" style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)' }}>
+              <span className="animate-spin text-accent">↻</span>
+              <span className="text-[13px] text-accent">{uploadStatus}</span>
+            </div>
+          )}
+
+          {/* Content */}
+          <div className="flex-1 overflow-y-auto px-6 pb-8 pt-6">
+            {loading ? (
+              <div className="flex justify-center py-16"><Spinner size="lg" /></div>
+            ) : items.length === 0 ? (
+              <div className="rounded-2xl p-10 text-center" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                <p className="text-5xl mb-4">🎬</p>
+                <p className="text-base font-bold text-white mb-2">Banque vide</p>
+                <p className="text-[13px] text-text2">Glisse-dépose tes vidéos ici ou clique sur<br/><span className="text-accent font-medium">+ Ajouter un média</span> en haut à droite.</p>
+              </div>
+            ) : visible.length === 0 ? (
+              <p className="text-center py-8 text-text2 text-[13px]">Aucun résultat.</p>
+            ) : (
+              <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
+                {visible.map(item => (
+                  <VideoCard
+                    key={item.id}
+                    item={item}
+                    onContextMenu={openCtx}
+                    onPlay={setPlayingItem}
+                    selectionMode={selectionMode}
+                    isSelected={selectedIds.has(item.id)}
+                    onToggleSelect={() => toggleSelection(item.id)}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
