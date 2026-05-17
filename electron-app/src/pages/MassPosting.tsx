@@ -254,8 +254,10 @@ export function MassPosting({ user }: MassPostingProps) {
       const tokenMap = new Map<number, string>()
       for (let i = 0; i < selectedVideos.length; i++) {
         const sv = selectedVideos[i]
-        const up = await window.electronAPI!.uploadVideoGeelark({ bearer, filePath: sv.path })
-        if (!up.ok || !up.token) { log(`❌ Upload échoué pour ${sv.title}: ${up.error}`, 'error'); return }
+        const filePath = sv.localPath ?? sv.item.file_url
+        if (!filePath) { log(`❌ Chemin manquant pour ${sv.item.title}`, 'error'); return }
+        const up = await window.electronAPI!.uploadVideoGeelark({ bearer, filePath })
+        if (!up.ok || !up.token) { log(`❌ Upload échoué pour ${sv.item.title}: ${up.error}`, 'error'); return }
         tokenMap.set(i, up.token)
         log(`✅ Vidéo ${i + 1}/${selectedVideos.length} prête`, 'ok')
       }
@@ -263,7 +265,7 @@ export function MassPosting({ user }: MassPostingProps) {
         userId: user.id, orgId: currentOrg?.id ?? null, type: 'mass_posting',
         scheduledAt,
         phones: phoneList.map(p => ({ id: p.id, geelark_id: p.geelark_id, phone_name: p.phone_name, ig_username: p.ig_username })),
-        videos: selectedVideos.map((v, i) => ({ token: tokenMap.get(i)!, title: v.title })),
+        videos: selectedVideos.map((v, i) => ({ token: tokenMap.get(i)!, title: v.item.title })),
         caption, delayMinutes: 0, mode, bearerToken: bearer,
       })
       log(`📅 Programmé pour ${fmtScheduledTime(scheduledAt.toISOString())} — ${phoneList.length} téléphone(s)`, 'ok')
