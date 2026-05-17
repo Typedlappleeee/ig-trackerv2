@@ -484,39 +484,73 @@ Return ONLY a JSON array. If none, return [].`
           </div>
 
           {/* RIGHT — settings panel */}
-          <div className="w-72 flex-shrink-0 flex flex-col gap-4 overflow-y-auto">
+          <div className="w-72 flex-shrink-0 flex flex-col gap-3">
 
             {/* Copies */}
-            <div className="rounded-2xl p-5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-              <p className="text-[11px] font-bold uppercase tracking-widest mb-4" style={{ color: 'rgba(148,163,184,0.5)' }}>Nombre de copies</p>
-              <div className="flex items-center gap-3 mb-3">
+            <div className="rounded-2xl p-4" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: 'rgba(148,163,184,0.5)' }}>Nombre de copies</p>
+              <div className="flex items-center gap-3 mb-2">
                 <button onClick={() => setCopies(c => Math.max(1, c - 1))}
-                  className="w-9 h-9 rounded-xl text-[18px] font-black flex items-center justify-center transition-all hover:bg-white/[0.07]"
+                  className="w-8 h-8 rounded-xl text-[16px] font-black flex items-center justify-center transition-all hover:bg-white/[0.07]"
                   style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(196,181,253,0.7)' }}>−</button>
                 <input type="number" min={1} max={200} value={copies}
                   onChange={e => setCopies(Math.max(1, Math.min(200, Number(e.target.value))))}
-                  className="flex-1 rounded-xl py-2 text-[28px] font-black text-white text-center focus:outline-none"
+                  className="flex-1 py-1 text-[26px] font-black text-white text-center focus:outline-none"
                   style={{ background: 'transparent', border: 'none' }} />
                 <button onClick={() => setCopies(c => Math.min(200, c + 1))}
-                  className="w-9 h-9 rounded-xl text-[18px] font-black flex items-center justify-center transition-all hover:bg-white/[0.07]"
+                  className="w-8 h-8 rounded-xl text-[16px] font-black flex items-center justify-center transition-all hover:bg-white/[0.07]"
                   style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(196,181,253,0.7)' }}>+</button>
               </div>
               <input type="range" min={1} max={50} value={Math.min(copies, 50)}
                 onChange={e => setCopies(Number(e.target.value))} className="w-full" />
               {originals.length > 0 && secondaries.length > 0 && (
-                <p className="text-[11px] mt-2" style={{ color: 'rgba(148,163,184,0.5)' }}>
+                <p className="text-[11px] mt-1.5" style={{ color: 'rgba(148,163,184,0.45)' }}>
                   🔀 {originals.length} orig × {secondaries.length} sec → <span style={{ color: '#a78bfa' }}>{copies} vidéos</span>
                 </p>
               )}
             </div>
 
+            {/* AI Detection — prominent, before format */}
+            <button
+              onClick={() => setAiEnabled(v => !v)}
+              className="rounded-2xl p-4 text-left transition-all w-full"
+              style={{
+                background: aiEnabled ? 'rgba(124,58,237,0.12)' : 'rgba(255,255,255,0.03)',
+                border: `1px solid ${aiEnabled ? 'rgba(139,92,246,0.45)' : 'rgba(255,255,255,0.07)'}`,
+                boxShadow: aiEnabled ? '0 0 20px rgba(124,58,237,0.12)' : 'none',
+              }}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-[16px]">✨</span>
+                  <div>
+                    <p className="text-[13px] font-bold leading-tight" style={{ color: aiEnabled ? '#c4b5fd' : 'rgba(196,181,253,0.6)' }}>
+                      Détection texte IA
+                    </p>
+                    <p className="text-[11px] leading-tight" style={{ color: 'rgba(148,163,184,0.45)' }}>Claude Vision</p>
+                  </div>
+                </div>
+                <div className="w-10 h-[22px] rounded-full relative flex-shrink-0 transition-all"
+                  style={{ background: aiEnabled ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.1)' }}>
+                  <span className={`absolute top-[3px] w-4 h-4 rounded-full bg-white shadow transition-transform ${aiEnabled ? 'translate-x-5' : 'translate-x-[3px]'}`} />
+                </div>
+              </div>
+              {aiEnabled && (
+                <p className="mt-2 text-[11px] leading-relaxed" style={{ color: 'rgba(148,163,184,0.5)' }}>
+                  Analyse et recopie le texte des vidéos automatiquement.
+                </p>
+              )}
+              {aiEnabled && !anthropicKey && (
+                <p className="mt-1.5 text-[11px] font-semibold" style={{ color: '#fbbf24' }}>⚠ Clé Anthropic manquante</p>
+              )}
+            </button>
+
             {/* Format */}
-            <div className="rounded-2xl p-5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-              <p className="text-[11px] font-bold uppercase tracking-widest mb-4" style={{ color: 'rgba(148,163,184,0.5)' }}>Format de sortie</p>
+            <div className="rounded-2xl p-4" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: 'rgba(148,163,184,0.5)' }}>Format de sortie</p>
               <div className="flex gap-2">
                 {(['9:16', '1:1', '16:9'] as Preset[]).map(p => (
                   <button key={p} onClick={() => setPreset(p)}
-                    className="flex-1 py-2.5 rounded-xl text-[13px] font-bold transition-all"
+                    className="flex-1 py-2 rounded-xl text-[13px] font-bold transition-all"
                     style={preset === p
                       ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff', boxShadow: '0 2px 10px rgba(124,58,237,0.3)' }
                       : { background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.5)', border: '1px solid rgba(255,255,255,0.07)' }
@@ -526,12 +560,12 @@ Return ONLY a JSON array. If none, return [].`
             </div>
 
             {/* Export */}
-            <div className="rounded-2xl p-5 space-y-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-              <p className="text-[11px] font-bold uppercase tracking-widest mb-1" style={{ color: 'rgba(148,163,184,0.5)' }}>Destination</p>
+            <div className="rounded-2xl p-4 space-y-2.5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'rgba(148,163,184,0.5)' }}>Destination</p>
               <div className="flex gap-2">
                 {(['bank', 'folder'] as ExportMode[]).map(m => (
                   <button key={m} onClick={() => setExportMode(m)}
-                    className="flex-1 py-2.5 rounded-xl text-[12px] font-bold transition-all"
+                    className="flex-1 py-2 rounded-xl text-[12px] font-bold transition-all"
                     style={exportMode === m
                       ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff' }
                       : { background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.5)', border: '1px solid rgba(255,255,255,0.07)' }
@@ -562,42 +596,14 @@ Return ONLY a JSON array. If none, return [].`
               {exportMode === 'folder' && (
                 <div className="space-y-2">
                   <button onClick={async () => { const f = await window.electronAPI?.pickOutputFolder?.(); if (f) setOutputFolder(f) }}
-                    className="w-full rounded-xl px-3 py-2.5 text-[12px] font-semibold"
+                    className="w-full rounded-xl px-3 py-2 text-[12px] font-semibold"
                     style={{ background: 'rgba(139,92,246,0.1)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.2)' }}>
                     📁 Choisir un dossier…
                   </button>
-                  {outputFolder && <p className="text-[11px] font-mono truncate" style={{ color: 'rgba(148,163,184,0.5)' }}>{outputFolder}</p>}
+                  {outputFolder && <p className="text-[11px] font-mono truncate" style={{ color: 'rgba(148,163,184,0.45)' }}>{outputFolder}</p>}
                 </div>
               )}
             </div>
-
-            {/* AI Detection */}
-            <button
-              onClick={() => setAiEnabled(v => !v)}
-              className="rounded-2xl p-5 text-left transition-all w-full"
-              style={{
-                background: aiEnabled ? 'rgba(124,58,237,0.1)' : 'rgba(255,255,255,0.03)',
-                border: `1px solid ${aiEnabled ? 'rgba(139,92,246,0.4)' : 'rgba(255,255,255,0.07)'}`,
-              }}>
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-[11px] font-bold uppercase tracking-widest" style={{ color: 'rgba(148,163,184,0.5)' }}>Détection texte IA</p>
-                <div className="w-9 h-5 rounded-full relative flex-shrink-0 transition-all"
-                  style={{ background: aiEnabled ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.1)' }}>
-                  <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${aiEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
-                </div>
-              </div>
-              <p className="text-[13px] font-semibold" style={{ color: aiEnabled ? '#c4b5fd' : 'rgba(196,181,253,0.5)' }}>
-                ✨ Claude Vision
-              </p>
-              <p className="text-[11px] mt-1 leading-relaxed" style={{ color: 'rgba(148,163,184,0.5)' }}>
-                Analyse et recopie le texte des vidéos. Plus lent mais précis.
-              </p>
-              {aiEnabled && !anthropicKey && (
-                <p className="mt-2 text-[11px] font-semibold" style={{ color: '#fbbf24' }}>
-                  ⚠ Clé Anthropic manquante
-                </p>
-              )}
-            </button>
 
           </div>
         </div>
