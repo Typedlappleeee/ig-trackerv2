@@ -157,7 +157,7 @@ async function ensurePhoneRunning(
     const p = phones.find(x => x.id === phoneId)
     if (p) {
       const st = Number(p.status ?? -1)
-      const label = st === 0 ? 'arrêté' : st === 1 ? 'en marche' : st === 2 ? 'démarrage en cours' : st === 3 ? 'arrêt en cours' : `inconnu(${st})`
+      const label = st === 0 ? 'en marche' : st === 1 ? 'arrêté' : st === 2 ? 'démarrage en cours' : st === 3 ? 'arrêt en cours' : `inconnu(${st})`
       log?.(`📱 Statut: ${label} [raw=${st}] — ${p.serialName ?? p.name ?? p.id}`)
       if (st === 3) {
         log?.('⏳ En cours d\'arrêt — attente 15s…')
@@ -190,12 +190,12 @@ async function ensurePhoneRunning(
       const phones = await fetchAllPhones(bearer)
       const p = phones.find(x => x.id === phoneId)
       const st = Number(p?.status ?? -1)
-      if (st === 1) {
-        log?.('  📱 Téléphone démarré (status=1)')
+      if (st === 0) {
+        log?.('  📱 Téléphone démarré (status=0)')
         statusReady = true
         break
       }
-      const label = st === 2 ? 'démarrage…' : st === 0 ? 'arrêté ?' : `status=${st}`
+      const label = st === 2 ? 'démarrage…' : st === 1 ? 'arrêté ?' : `status=${st}`
       log?.(`  ⏳ ${label} (${(i + 1) * 5}s écoulées)`)
     } catch { /* ignore polling errors */ }
   }
