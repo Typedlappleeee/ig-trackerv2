@@ -955,6 +955,45 @@ export async function loginInstagramAccount(
       return { ok: true }
     }
 
+    // ── "Check your notifications on another device" challenge ────────────────
+    const isDeviceApproval = [
+      'check your notifications on another device',
+      'vérifiez vos notifications sur un autre appareil',
+      'waiting for approval', 'en attente d\'approbation',
+      'approve from the other device', 'approuver depuis l\'autre appareil',
+    ].some(p => xmlLower.includes(p))
+
+    if (isDeviceApproval) {
+      if (!totpSecret?.trim()) {
+        log('⚠️ Challenge "approuver sur autre appareil" — aucun secret TOTP configuré')
+        return { ok: false, error: 'Challenge appareil détecté — configure le secret TOTP pour l\'automatiser' }
+      }
+      log('📱 Challenge "autre appareil" détecté — tap "Try another way"…')
+      const tryAnotherPt =
+        findByText(xml, 'Try another way', 'Essayer une autre méthode', 'Try another method') ??
+        [Math.floor(sw / 2), Math.floor(sh * 0.75)]
+      await shellExec(bearer, phoneId, `input tap ${tryAnotherPt[0]} ${tryAnotherPt[1]}`)
+      await sleep(4000)
+
+      const xml2 = await dumpXml(bearer, phoneId)
+      log(`📋 XML après "Try another way" (${xml2.length} chars)`)
+
+      // Tap "Authentication app" / "Authenticator app"
+      const authAppPt =
+        findByText(xml2,
+          'Authentication app', 'Authenticator app',
+          'Application d\'authentification', 'App d\'authentification',
+          'Get a code from your authenticator app',
+        ) ?? [Math.floor(sw / 2), Math.floor(sh * 0.45)]
+      log(`   Tap "Authentication app" à [${authAppPt[0]},${authAppPt[1]}]…`)
+      await shellExec(bearer, phoneId, `input tap ${authAppPt[0]} ${authAppPt[1]}`)
+      await sleep(4000)
+
+      // Now we should be on the TOTP code entry screen — reuse existing 2FA logic
+      xml = await dumpXml(bearer, phoneId)
+      log(`📋 XML écran TOTP (${xml.length} chars)`)
+    }
+
     // ── 2FA screen detection ───────────────────────────────────────────────
     const twoFaPatterns = [
       'two-factor', 'two_factor', '2-step', '2 step',
