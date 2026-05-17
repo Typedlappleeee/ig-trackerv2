@@ -33,8 +33,8 @@ function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false)
   return (
     <button onClick={() => { navigator.clipboard.writeText(text).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000) }) }}
-      className="text-xs px-3 py-1.5 rounded-lg transition-all"
-      style={{ background: copied ? 'rgba(52,211,153,0.12)' : 'rgba(139,92,246,0.08)', color: copied ? '#34d399' : '#a78bfa', border: `1px solid ${copied ? 'rgba(52,211,153,0.25)' : 'rgba(139,92,246,0.2)'}` }}>
+      className="rounded-xl px-4 py-2.5 text-[13px] font-semibold transition-all"
+      style={{ background: copied ? 'rgba(52,211,153,0.12)' : 'rgba(255,255,255,0.06)', color: copied ? '#34d399' : '#e2e8f0', border: `1px solid ${copied ? 'rgba(52,211,153,0.25)' : 'rgba(255,255,255,0.09)'}` }}>
       {copied ? '✓ Copié' : '📋 Copier'}
     </button>
   )
@@ -43,16 +43,16 @@ function CopyButton({ text }: { text: string }) {
 function ResultBox({ value, rows = 8 }: { value: string; rows?: number }) {
   return (
     <textarea rows={rows} value={value} readOnly
-      className="w-full rounded-xl px-3 py-2 text-xs font-mono text-white/80 resize-none focus:outline-none"
-      style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(139,92,246,0.15)' }} />
+      className="w-full rounded-xl px-4 py-3 text-[13px] font-mono text-white/80 resize-none focus:outline-none"
+      style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }} />
   )
 }
 
 function FieldInput({ placeholder, value, onChange, textarea, rows }: {
   placeholder: string; value: string; onChange: (v: string) => void; textarea?: boolean; rows?: number
 }) {
-  const cls = "w-full rounded-xl px-3 py-2 text-sm text-white placeholder-white/20 focus:outline-none focus:border-accent/60"
-  const style = { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(139,92,246,0.18)' }
+  const cls = "w-full rounded-xl px-4 py-2.5 text-[13px] text-white placeholder:text-text2 focus:outline-none"
+  const style = { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }
   return textarea
     ? <textarea rows={rows ?? 4} placeholder={placeholder} value={value} onChange={e => onChange(e.target.value)} className={cls} style={style} />
     : <input type="text" placeholder={placeholder} value={value} onChange={e => onChange(e.target.value)} className={cls} style={style} />
@@ -61,9 +61,9 @@ function FieldInput({ placeholder, value, onChange, textarea, rows }: {
 function SelectInput({ value, onChange, options }: { value: string; onChange: (v: string) => void; options: string[] }) {
   return (
     <select value={value} onChange={e => onChange(e.target.value)}
-      className="w-full rounded-xl px-3 py-2 text-sm text-white focus:outline-none"
-      style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(139,92,246,0.18)' }}>
-      {options.map(o => <option key={o} value={o}>{o}</option>)}
+      className="w-full rounded-xl px-4 py-2.5 text-[13px] focus:outline-none"
+      style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}>
+      {options.map(o => <option key={o} value={o} style={{ background: '#0c0e1a' }}>{o}</option>)}
     </select>
   )
 }
@@ -72,19 +72,25 @@ function ToolShell({ title, icon, children, onBack, error }: {
   title: string; icon: string; children: React.ReactNode; onBack: () => void; error?: string | null
 }) {
   return (
-    <div className="flex flex-col h-full" style={{ background: '#06040f' }}>
-      <div className="flex-shrink-0 px-6 py-4 flex items-center gap-3"
-        style={{ borderBottom: '1px solid rgba(139,92,246,0.12)', background: 'rgba(8,5,20,0.6)' }}>
-        <button onClick={onBack} className="text-xs px-3 py-1.5 rounded-lg flex-shrink-0"
-          style={{ background: 'rgba(139,92,246,0.1)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.2)' }}>
+    <div className="h-full flex flex-col overflow-hidden">
+      <div className="flex-shrink-0 px-10 pt-9 pb-7 flex items-center gap-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        <button onClick={onBack}
+          className="rounded-xl px-4 py-2.5 text-[13px] font-semibold flex-shrink-0"
+          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}>
           ← Retour
         </button>
-        <span className="text-lg">{icon}</span>
-        <p className="text-sm font-black text-white">{title}</p>
+        <span className="text-2xl">{icon}</span>
+        <h1 className="text-[22px] font-black text-white leading-none">{title}</h1>
       </div>
-      <div className="flex-1 overflow-auto p-6 max-w-2xl space-y-4">
-        {error && <p className="text-xs text-danger bg-danger/10 border border-danger/20 rounded-xl px-4 py-3">{error}</p>}
-        {children}
+      <div className="flex-1 overflow-y-auto px-10 pb-10 pt-8">
+        <div className="max-w-2xl space-y-5">
+          {error && (
+            <div className="rounded-xl px-4 py-3" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#f87171' }}>
+              <p className="text-[13px]">{error}</p>
+            </div>
+          )}
+          {children}
+        </div>
       </div>
     </div>
   )
@@ -111,7 +117,7 @@ function StratConcurrente({ groqKey, onBack }: { groqKey: string; onBack: () => 
 
   return (
     <ToolShell title="Stratégie Concurrente" icon="🔍" onBack={onBack} error={error}>
-      <p className="text-xs" style={{ color: 'rgba(196,181,253,0.5)' }}>Entre un pseudo concurrent ou une niche pour obtenir une stratégie complète.</p>
+      <p className="text-[13px] text-text2">Entre un pseudo concurrent ou une niche pour obtenir une stratégie complète.</p>
       <FieldInput placeholder="@concurrent ou niche (ex: fitness, crypto)" value={handle} onChange={setHandle} />
       <div className="flex gap-2">
         <Button onClick={run} loading={loading} disabled={!handle.trim()}>🔍 Analyser</Button>
@@ -143,7 +149,7 @@ function CaptionsVirales({ groqKey, onBack }: { groqKey: string; onBack: () => v
 
   return (
     <ToolShell title="Captions Virales" icon="💬" onBack={onBack} error={error}>
-      <p className="text-xs" style={{ color: 'rgba(196,181,253,0.5)' }}>Génère une caption complète avec hook, corps, CTA et hashtags.</p>
+      <p className="text-[13px] text-text2">Génère une caption complète avec hook, corps, CTA et hashtags.</p>
       <div className="grid grid-cols-2 gap-3">
         <FieldInput placeholder="Sujet du post" value={subject} onChange={setSubject} />
         <SelectInput value={tone} onChange={setTone} options={TONES} />
@@ -181,7 +187,7 @@ function Planificateur({ groqKey, onBack, userId }: { groqKey: string; onBack: (
 
   return (
     <ToolShell title="Planificateur 7 Jours" icon="📅" onBack={onBack} error={error}>
-      <p className="text-xs" style={{ color: 'rgba(196,181,253,0.5)' }}>Calendrier éditorial complet sur 7 jours pour ta niche.</p>
+      <p className="text-[13px] text-text2">Calendrier éditorial complet sur 7 jours pour ta niche.</p>
       <FieldInput placeholder="Niche (fitness, crypto, lifestyle…)" value={niche} onChange={setNiche} />
       <div className="flex gap-2">
         <Button onClick={run} loading={loading} disabled={!niche.trim()}>📅 Planifier</Button>
@@ -224,23 +230,23 @@ Format le script comme si c'était prêt à lire face caméra. Inclus les indica
 
   return (
     <ToolShell title="Script Reel Complet" icon="🎬" onBack={onBack} error={error}>
-      <p className="text-xs" style={{ color: 'rgba(196,181,253,0.5)' }}>Génère un script complet prêt à lire face caméra — hook, corps, CTA avec timings.</p>
+      <p className="text-[13px] text-text2">Génère un script complet prêt à lire face caméra — hook, corps, CTA avec timings.</p>
       <FieldInput placeholder="Sujet de ta vidéo" value={subject} onChange={setSubject} />
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <p className="text-[10px] uppercase tracking-wider font-bold mb-2" style={{ color: 'rgba(196,181,253,0.4)' }}>Durée</p>
+          <p className="text-[12px] uppercase tracking-wider font-bold mb-2 text-text2">Durée</p>
           <div className="flex gap-2">
             {['15s', '30s', '60s'].map(d => (
-              <button key={d} onClick={() => setDuration(d)} className="flex-1 py-1.5 rounded-lg text-xs font-bold"
+              <button key={d} onClick={() => setDuration(d)} className="flex-1 py-2.5 rounded-xl text-[13px] font-bold"
                 style={duration === d
                   ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff' }
-                  : { background: 'rgba(139,92,246,0.06)', color: 'rgba(196,181,253,0.5)', border: '1px solid rgba(139,92,246,0.12)' }
+                  : { background: 'rgba(255,255,255,0.05)', color: 'rgba(196,181,253,0.5)', border: '1px solid rgba(255,255,255,0.07)' }
                 }>{d}</button>
             ))}
           </div>
         </div>
         <div>
-          <p className="text-[10px] uppercase tracking-wider font-bold mb-2" style={{ color: 'rgba(196,181,253,0.4)' }}>Ton</p>
+          <p className="text-[12px] uppercase tracking-wider font-bold mb-2 text-text2">Ton</p>
           <SelectInput value={tone} onChange={setTone} options={TONES} />
         </div>
       </div>
@@ -289,7 +295,7 @@ Chaque hook doit faire maximum 2 lignes. Format :
 
   return (
     <ToolShell title="3 Hooks A/B/C" icon="🪝" onBack={onBack} error={error}>
-      <p className="text-xs" style={{ color: 'rgba(196,181,253,0.5)' }}>Génère 3 hooks radicalement différents pour tester lequel performe le mieux.</p>
+      <p className="text-[13px] text-text2">Génère 3 hooks radicalement différents pour tester lequel performe le mieux.</p>
       <FieldInput placeholder="Sujet de ta vidéo" value={subject} onChange={setSubject} />
       <div className="flex gap-2">
         <Button onClick={run} loading={loading} disabled={!subject.trim()}>🪝 Générer les hooks</Button>
@@ -333,7 +339,7 @@ Réponds avec :
 
   return (
     <ToolShell title="Bio Optimizer" icon="👤" onBack={onBack} error={error}>
-      <p className="text-xs" style={{ color: 'rgba(196,181,253,0.5)' }}>Réécrit ta bio Instagram pour maximiser les conversions selon ton objectif.</p>
+      <p className="text-[13px] text-text2">Réécrit ta bio Instagram pour maximiser les conversions selon ton objectif.</p>
       <FieldInput placeholder="Ta bio actuelle (colle-la ici)" value={bio} onChange={setBio} textarea rows={3} />
       <div className="grid grid-cols-2 gap-3">
         <FieldInput placeholder="Niche / domaine" value={niche} onChange={setNiche} />
@@ -376,7 +382,7 @@ Commentaire 2 → [réponse]
 
   return (
     <ToolShell title="Réponses Commentaires" icon="💬" onBack={onBack} error={error}>
-      <p className="text-xs" style={{ color: 'rgba(196,181,253,0.5)' }}>Colle jusqu'à 20 commentaires (un par ligne), l'IA génère une réponse personnalisée pour chacun.</p>
+      <p className="text-[13px] text-text2">Colle jusqu'à 20 commentaires (un par ligne), l'IA génère une réponse personnalisée pour chacun.</p>
       <FieldInput placeholder={"Commentaire 1\nCommentaire 2\nCommentaire 3…"} value={comments} onChange={setComments} textarea rows={5} />
       <SelectInput value={tone} onChange={setTone} options={['Sympathique', 'Professionnel', 'Humoristique', 'Motivant', 'Mystérieux']} />
       <div className="flex gap-2">
@@ -425,17 +431,17 @@ Pour chaque langue, format :
 
   return (
     <ToolShell title="Traducteur Multi-Marché" icon="🌍" onBack={onBack} error={error}>
-      <p className="text-xs" style={{ color: 'rgba(196,181,253,0.5)' }}>Adapte ta caption pour plusieurs marchés avec hashtags locaux — pas juste une traduction.</p>
+      <p className="text-[13px] text-text2">Adapte ta caption pour plusieurs marchés avec hashtags locaux — pas juste une traduction.</p>
       <FieldInput placeholder="Colle ta caption française ici…" value={caption} onChange={setCaption} textarea rows={4} />
       <div>
-        <p className="text-[10px] uppercase tracking-wider font-bold mb-2" style={{ color: 'rgba(196,181,253,0.4)' }}>Langues cibles</p>
+        <p className="text-[12px] uppercase tracking-wider font-bold mb-3 text-text2">Langues cibles</p>
         <div className="flex flex-wrap gap-2">
           {LANG_OPTIONS.map(l => (
             <button key={l} onClick={() => toggleLang(l)}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+              className="px-4 py-2 rounded-xl text-[13px] font-semibold transition-all"
               style={langs.includes(l)
                 ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff' }
-                : { background: 'rgba(139,92,246,0.06)', color: 'rgba(196,181,253,0.5)', border: '1px solid rgba(139,92,246,0.12)' }
+                : { background: 'rgba(255,255,255,0.05)', color: 'rgba(196,181,253,0.5)', border: '1px solid rgba(255,255,255,0.07)' }
               }>{l}</button>
           ))}
         </div>
@@ -489,7 +495,7 @@ Produis une analyse complète :
 
   return (
     <ToolShell title="Analyse Concurrent" icon="🕵️" onBack={onBack} error={error}>
-      <p className="text-xs" style={{ color: 'rgba(196,181,253,0.5)' }}>Analyse complète d'un concurrent — ce qu'il fait bien, les gaps à exploiter et un plan d'action.</p>
+      <p className="text-[13px] text-text2">Analyse complète d'un concurrent — ce qu'il fait bien, les gaps à exploiter et un plan d'action.</p>
       <div className="grid grid-cols-2 gap-3">
         <FieldInput placeholder="@concurrent ou compte" value={handle} onChange={setHandle} />
         <FieldInput placeholder="Niche (optionnel)" value={niche} onChange={setNiche} />
@@ -527,26 +533,26 @@ function ToolCard({ icon, title, desc, tags, locked, onClick }: {
 }) {
   return (
     <button onClick={onClick}
-      className="rounded-2xl p-4 text-left space-y-3 transition-all hover:scale-[1.02] group"
-      style={{ background: 'rgba(8,5,20,0.7)', border: '1px solid rgba(139,92,246,0.18)', opacity: locked ? 0.5 : 1 }}>
+      className="rounded-2xl p-5 text-left space-y-3 transition-all hover:scale-[1.02] group"
+      style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', opacity: locked ? 0.5 : 1 }}>
       <div className="flex items-start justify-between">
-        <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
-          style={{ background: 'linear-gradient(135deg,#7c3aed18,#ec489918)', border: '1px solid rgba(139,92,246,0.2)' }}>
+        <div className="w-11 h-11 rounded-xl flex items-center justify-center text-2xl flex-shrink-0"
+          style={{ background: 'linear-gradient(135deg,rgba(124,58,237,0.15),rgba(236,72,153,0.15))', border: '1px solid rgba(255,255,255,0.07)' }}>
           {icon}
         </div>
-        {locked && <span className="text-[9px] px-1.5 py-0.5 rounded font-black"
+        {locked && <span className="text-[11px] px-2 py-0.5 rounded font-bold"
           style={{ background: 'rgba(251,191,36,0.1)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.2)' }}>
           Clé Anthropic requise
         </span>}
       </div>
       <div>
-        <p className="text-xs font-black text-white group-hover:text-purple-300 transition-colors">{title}</p>
-        <p className="text-[10px] mt-1 leading-relaxed" style={{ color: 'rgba(196,181,253,0.5)' }}>{desc}</p>
+        <p className="text-[13px] font-bold text-white group-hover:text-purple-300 transition-colors">{title}</p>
+        <p className="text-[12px] mt-1 leading-relaxed text-text2">{desc}</p>
       </div>
-      <div className="flex flex-wrap gap-1">
+      <div className="flex flex-wrap gap-1.5">
         {tags.map(t => (
-          <span key={t} className="text-[9px] px-1.5 py-0.5 rounded-full font-bold"
-            style={{ background: 'rgba(139,92,246,0.08)', color: 'rgba(196,181,253,0.5)' }}>{t}</span>
+          <span key={t} className="text-[11px] px-2 py-0.5 rounded-full font-semibold"
+            style={{ background: 'rgba(139,92,246,0.1)', color: 'rgba(196,181,253,0.6)' }}>{t}</span>
         ))}
       </div>
     </button>
@@ -560,21 +566,32 @@ export function AiTools({ user }: AiToolsProps) {
 
   if (conns.loading) {
     return (
-      <div className="p-8 flex items-center gap-3">
-        <div className="animate-spin w-5 h-5 rounded-full border-2 border-accent border-t-transparent" />
-        <span className="text-sm text-text2">Chargement des connexions…</span>
+      <div className="h-full flex flex-col overflow-hidden">
+        <div className="flex-1 flex items-center justify-center">
+          <div className="flex items-center gap-3">
+            <div className="animate-spin w-5 h-5 rounded-full border-2 border-accent border-t-transparent" />
+            <span className="text-[13px] text-text2">Chargement des connexions…</span>
+          </div>
+        </div>
       </div>
     )
   }
 
   if (!conns.groq) {
     return (
-      <div className="p-8 max-w-2xl">
-        <h1 className="text-xl font-bold text-text mb-4">🔧 Outils IA</h1>
-        <div className="bg-warn/10 border border-warn/30 rounded-xl p-5 space-y-2">
-          <p className="text-warn font-semibold">⚠ Clé Groq API manquante</p>
-          <p className="text-sm text-text2">Va dans <span className="text-text font-semibold">Paramètres → Connexions → Clés API</span> et colle ta clé Groq.</p>
-          <p className="text-xs text-text2/70">Gratuit sur <span className="text-accent">groq.com</span> → API Keys → Create</p>
+      <div className="h-full flex flex-col overflow-hidden">
+        <div className="flex-shrink-0 px-10 pt-9 pb-7 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+          <div>
+            <h1 className="text-[28px] font-black text-white leading-none">Outils IA</h1>
+            <p className="text-[13px] text-text2 mt-0.5">Groq · Claude Vision · FFmpeg</p>
+          </div>
+        </div>
+        <div className="flex-1 overflow-y-auto px-10 pb-10 pt-8">
+          <div className="max-w-lg rounded-2xl p-6" style={{ background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.2)' }}>
+            <p className="text-[15px] font-bold text-warn mb-2">⚠ Clé Groq API manquante</p>
+            <p className="text-[13px] text-text2 mb-1">Va dans <strong className="text-white">Paramètres → Connexions → Clés API</strong> et colle ta clé Groq.</p>
+            <p className="text-[12px] text-text2">Gratuit sur <span className="text-accent">groq.com</span> → API Keys → Create</p>
+          </div>
         </div>
       </div>
     )
@@ -605,56 +622,57 @@ export function AiTools({ user }: AiToolsProps) {
 
   // Hub
   return (
-    <div className="flex flex-col h-full" style={{ background: '#06040f' }}>
-      <div className="flex-shrink-0 px-6 py-4" style={{ borderBottom: '1px solid rgba(139,92,246,0.12)', background: 'rgba(8,5,20,0.6)' }}>
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center text-lg"
-            style={{ background: 'linear-gradient(135deg,#7c3aed22,#ec489922)', border: '1px solid rgba(139,92,246,0.25)' }}>🔧</div>
-          <div>
-            <h1 className="text-sm font-black text-white">Outils IA</h1>
-            <p className="text-[10px]" style={{ color: 'rgba(196,181,253,0.4)' }}>
-              {GROQ_TOOLS.length + VISION_TOOLS_META.length + 1} outils · Groq · Claude Vision · FFmpeg
-            </p>
-          </div>
+    <div className="h-full flex flex-col overflow-hidden">
+
+      {/* Header */}
+      <div className="flex-shrink-0 px-10 pt-9 pb-7 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        <div>
+          <h1 className="text-[28px] font-black text-white leading-none">Outils IA</h1>
+          <p className="text-[13px] text-text2 mt-0.5">
+            {GROQ_TOOLS.length + VISION_TOOLS_META.length + 2} outils · Groq · Claude Vision · FFmpeg
+          </p>
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto p-6 space-y-6">
+      <div className="flex-1 overflow-y-auto px-10 pb-10">
+        <div className="pt-8 space-y-8">
 
-        {/* Vidéo */}
-        <div>
-          <p className="text-[10px] uppercase tracking-widest font-black mb-3" style={{ color: 'rgba(196,181,253,0.3)' }}>Vidéo</p>
-          <div className="grid grid-cols-3 gap-3">
-            <ToolCard icon="🏷" title="Changeur de Métadonnées"
-              desc="Supprime toutes les métadonnées et injecte un timestamp aléatoire." tags={['FFmpeg', 'Instant', 'Stream copy']}
-              onClick={() => setActive('metadata')} />
-            <ToolCard icon="✍" title="Texte IA — Dupliquer"
-              desc="Ajoute un texte sur tes vidéos avec plusieurs positions différentes pour créer des copies uniques." tags={['FFmpeg', 'Canvas', 'Mass']}
-              onClick={() => setActive('textcopy')} />
+          {/* Vidéo */}
+          <div>
+            <p className="text-[12px] uppercase tracking-widest font-black mb-4 text-text2">Vidéo</p>
+            <div className="grid grid-cols-3 gap-4">
+              <ToolCard icon="🏷" title="Changeur de Métadonnées"
+                desc="Supprime toutes les métadonnées et injecte un timestamp aléatoire." tags={['FFmpeg', 'Instant', 'Stream copy']}
+                onClick={() => setActive('metadata')} />
+              <ToolCard icon="✍" title="Texte IA — Dupliquer"
+                desc="Ajoute un texte sur tes vidéos avec plusieurs positions différentes pour créer des copies uniques." tags={['FFmpeg', 'Canvas', 'Mass']}
+                onClick={() => setActive('textcopy')} />
+            </div>
           </div>
-        </div>
 
-        {/* Groq IA */}
-        <div>
-          <p className="text-[10px] uppercase tracking-widest font-black mb-3" style={{ color: 'rgba(196,181,253,0.3)' }}>Groq IA — Texte & Stratégie</p>
-          <div className="grid grid-cols-3 gap-3">
-            {GROQ_TOOLS.map(t => (
-              <ToolCard key={t.id} {...t} onClick={() => setActive(t.id)} />
-            ))}
+          {/* Groq IA */}
+          <div>
+            <p className="text-[12px] uppercase tracking-widest font-black mb-4 text-text2">Groq IA — Texte & Stratégie</p>
+            <div className="grid grid-cols-3 gap-4">
+              {GROQ_TOOLS.map(t => (
+                <ToolCard key={t.id} {...t} onClick={() => setActive(t.id)} />
+              ))}
+            </div>
           </div>
-        </div>
 
-        {/* Vision IA */}
-        <div>
-          <p className="text-[10px] uppercase tracking-widest font-black mb-3" style={{ color: 'rgba(196,181,253,0.3)' }}>
-            Claude Vision — Analyse Vidéo & Image
-            {!conns.anthropic && <span className="ml-2 text-warn/70 normal-case">⚠ Clé Anthropic manquante</span>}
-          </p>
-          <div className="grid grid-cols-3 gap-3">
-            {VISION_TOOLS_META.map(t => (
-              <ToolCard key={t.id} {...t} locked={!conns.anthropic} onClick={() => setActive(t.id)} />
-            ))}
+          {/* Vision IA */}
+          <div>
+            <p className="text-[12px] uppercase tracking-widest font-black mb-4 text-text2">
+              Claude Vision — Analyse Vidéo & Image
+              {!conns.anthropic && <span className="ml-2 text-warn/70 normal-case">⚠ Clé Anthropic manquante</span>}
+            </p>
+            <div className="grid grid-cols-3 gap-4">
+              {VISION_TOOLS_META.map(t => (
+                <ToolCard key={t.id} {...t} locked={!conns.anthropic} onClick={() => setActive(t.id)} />
+              ))}
+            </div>
           </div>
+
         </div>
       </div>
     </div>

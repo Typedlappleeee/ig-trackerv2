@@ -28,41 +28,41 @@ function StatusDot({ status }: { status: string }) {
 
 // ── IG Status badge ─────────────────────────────────────────────────────────
 function IgStatusBadge({ phone }: { phone: Phone }) {
-  if (!phone.ig_username) return <span className="text-xs text-text2">—</span>
+  if (!phone.ig_username) return <span className="text-[13px] text-text2">—</span>
   if (phone.ig_status === 'active') return (
     <span className="inline-flex items-center gap-1">
       <span className="w-2 h-2 rounded-full bg-ok animate-pulse flex-shrink-0" />
-      <span className="text-[11px] text-ok font-semibold">IG OK</span>
+      <span className="text-[12px] text-ok font-semibold">IG OK</span>
     </span>
   )
   if (phone.ig_status === 'expired') return (
     <span className="inline-flex items-center gap-1" title="Session Instagram expirée — re-login requis">
       <span className="w-2 h-2 rounded-full bg-danger flex-shrink-0" />
-      <span className="text-[11px] text-danger font-semibold">Session expirée</span>
+      <span className="text-[12px] text-danger font-semibold">Session expirée</span>
     </span>
   )
   if (phone.ig_status === 'error') return (
     <span className="inline-flex items-center gap-1">
       <span className="w-2 h-2 rounded-full bg-danger flex-shrink-0" />
-      <span className="text-[11px] text-danger font-semibold">Erreur</span>
+      <span className="text-[12px] text-danger font-semibold">Erreur</span>
     </span>
   )
   if (phone.ig_status === 'rate_limited') return (
     <span className="inline-flex items-center gap-1">
       <span className="w-2 h-2 rounded-full bg-warn flex-shrink-0" />
-      <span className="text-[11px] text-warn font-semibold">Limité</span>
+      <span className="text-[12px] text-warn font-semibold">Limité</span>
     </span>
   )
   if (phone.ig_sessionid) return (
     <span className="inline-flex items-center gap-1">
       <span className="w-2 h-2 rounded-full bg-accent flex-shrink-0" />
-      <span className="text-[11px] text-accent font-semibold">Session</span>
+      <span className="text-[12px] text-accent font-semibold">Session</span>
     </span>
   )
   return (
     <span className="inline-flex items-center gap-1">
       <span className="w-2 h-2 rounded-full bg-text2/40 flex-shrink-0" />
-      <span className="text-[11px] text-text2">Public</span>
+      <span className="text-[12px] text-text2">Public</span>
     </span>
   )
 }
@@ -72,7 +72,7 @@ function Countdown({ secondsLeft }: { secondsLeft: number }) {
   const m = Math.floor(secondsLeft / 60)
   const s = secondsLeft % 60
   return (
-    <span className="text-xs text-text2 tabular-nums">
+    <span className="text-[13px] text-text2 tabular-nums">
       ↻ {m > 0 ? `${m}m ` : ''}{s.toString().padStart(2, '0')}s
     </span>
   )
@@ -381,23 +381,23 @@ function IgCell({ phone, onSave }: { phone: Phone; onSave: (id: string, u: strin
 
   if (editing) return (
     <div className="flex items-center gap-1">
-      <span className="text-xs text-text2">@</span>
+      <span className="text-[13px] text-text2">@</span>
       <input
         ref={ref} value={value} onChange={e => setValue(e.target.value)}
         onKeyDown={onKey} onBlur={save} disabled={saving}
-        className="w-28 bg-surface border border-accent rounded px-1 py-0.5 text-xs text-text focus:outline-none"
+        className="w-28 bg-surface border border-accent rounded px-1 py-0.5 text-[13px] text-text focus:outline-none"
       />
     </div>
   )
 
   return (
-    <button onClick={() => setEditing(true)} className="text-xs text-left group flex items-center gap-1.5 min-w-0" title="Cliquer pour éditer">
+    <button onClick={() => setEditing(true)} className="text-[13px] text-left group flex items-center gap-1.5 min-w-0" title="Cliquer pour éditer">
       {phone.ig_username ? (
         <span className="text-accent truncate">@{phone.ig_username}</span>
       ) : (
         <span className="text-text2 italic">+ ajouter</span>
       )}
-      <span className="opacity-0 group-hover:opacity-40 text-text2 text-[10px] flex-shrink-0">✎</span>
+      <span className="opacity-0 group-hover:opacity-40 text-text2 text-[11px] flex-shrink-0">✎</span>
     </button>
   )
 }
@@ -427,19 +427,19 @@ function NoteCell({ phone, onSave }: { phone: Phone; onSave: (id: string, v: str
     <input
       ref={ref} value={value} onChange={e => setValue(e.target.value)}
       onKeyDown={onKey} onBlur={save} disabled={saving}
-      className="w-full bg-surface border border-accent rounded px-1 py-0.5 text-xs text-text focus:outline-none"
+      className="w-full bg-surface border border-accent rounded px-1 py-0.5 text-[13px] text-text focus:outline-none"
       placeholder="Note…"
     />
   )
 
   return (
-    <button onClick={() => setEditing(true)} className="text-xs text-left group flex items-center gap-1.5 min-w-0 w-full" title="Cliquer pour éditer">
+    <button onClick={() => setEditing(true)} className="text-[13px] text-left group flex items-center gap-1.5 min-w-0 w-full" title="Cliquer pour éditer">
       {phone.remark ? (
         <span className="text-text2 truncate">{phone.remark}</span>
       ) : (
         <span className="text-text2/40 italic">+ note</span>
       )}
-      <span className="opacity-0 group-hover:opacity-40 text-text2 text-[10px] flex-shrink-0">✎</span>
+      <span className="opacity-0 group-hover:opacity-40 text-text2 text-[11px] flex-shrink-0">✎</span>
     </button>
   )
 }
@@ -770,197 +770,205 @@ export function Phones({ user }: PhonesProps) {
         />
       )}
 
-    <div className="p-6 space-y-4" onClick={() => setContextMenu(null)}>
+      <div className="h-full flex flex-col overflow-hidden" onClick={() => setContextMenu(null)}>
 
-      {/* Header */}
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-text">Téléphones</h1>
-          <p className="text-text2 text-sm mt-0.5 flex items-center gap-2">
-            <span>{phones.length} téléphone{phones.length !== 1 ? 's' : ''}</span>
-            {lastUpdated && (
-              <span className="text-text2/50 text-xs">· màj {lastUpdated.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
-            )}
-          </p>
-        </div>
-        <Button size="sm"
-          onClick={syncFromGeelark} loading={syncing}
-          disabled={!bearer}
-          title="Importe / met à jour les téléphones depuis ton compte GéeLark">
-          🔄 Sync GéeLark
-        </Button>
-      </div>
-
-      {/* KPI cards */}
-      <div className="grid grid-cols-4 gap-3">
-        {([
-          { key: 'all',     label: 'TÉLÉPHONES',  color: '#4f9eff', icon: '📱' },
-          { key: 'online',  label: 'EN LIGNE',     color: '#00ccaa', icon: '✅' },
-          { key: 'offline', label: 'HORS LIGNE',   color: '#5a6882', icon: '📴' },
-          { key: 'views',   label: 'VUES TOTALES', color: '#ffaa2a', icon: '👁' },
-        ] as const).map(({ key, label, color, icon }) => (
-          <button key={key}
-            onClick={() => key !== 'views' && setFilter(key as typeof filter)}
-            className={`bg-card border rounded-xl p-4 text-left transition-all ${
-              key !== 'views' && filter === key ? 'border-accent' : 'border-border hover:border-accent/40'
-            }`}
-          >
-            <div className="flex items-center gap-2 mb-2">
-              <span>{icon}</span>
-              <span className="text-xs font-semibold text-text2">{label}</span>
-            </div>
-            <p className="text-2xl font-bold" style={{ color }}>
-              {key === 'views' ? counts.views.toLocaleString('fr-FR') : counts[key]}
+        {/* Header */}
+        <div className="flex-shrink-0 px-10 pt-9 pb-7 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+          <div>
+            <h1 className="text-[28px] font-black text-white leading-none">Téléphones</h1>
+            <p className="text-[13px] text-text2 mt-0.5 flex items-center gap-2">
+              <span>{phones.length} téléphone{phones.length !== 1 ? 's' : ''}</span>
+              {lastUpdated && (
+                <span className="text-text2/50">· màj {lastUpdated.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
+              )}
             </p>
-          </button>
-        ))}
-      </div>
-
-      {/* Auto-refresh controls */}
-      <div className="flex items-center gap-4 px-4 py-3 bg-card border border-border rounded-xl">
-        <span className="text-xs font-medium text-text">Auto-statut</span>
-
-        <button
-          onClick={() => { const next = !autoRefresh; poller.setEnabled(next); setAutoRefresh(next) }}
-          className={`relative w-8 h-4 rounded-full transition-colors ${autoRefresh ? 'bg-accent' : 'bg-surface2'}`}
-        >
-          <span className={`absolute top-0.5 w-3 h-3 bg-white rounded-full shadow transition-all ${autoRefresh ? 'left-[18px]' : 'left-0.5'}`} />
-        </button>
-
-        <div className="flex items-center gap-1">
-          {INTERVALS.map(({ label, value }) => (
-            <button key={value}
-              onClick={() => changeInterval(value)}
-              disabled={!autoRefresh}
-              className={`px-2.5 py-1 rounded text-xs transition-all disabled:opacity-40 ${
-                intervalSec === value ? 'bg-accent/20 text-accent' : 'text-text2 hover:text-text'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
+          </div>
+          <Button size="sm"
+            onClick={syncFromGeelark} loading={syncing}
+            disabled={!bearer}
+            title="Importe / met à jour les téléphones depuis ton compte GéeLark">
+            🔄 Sync GéeLark
+          </Button>
         </div>
 
-        {autoRefresh && bearer && (
-          <>
-            <div className="ml-auto"><Countdown secondsLeft={countdown} /></div>
-            <span className="flex items-center gap-1.5 text-xs text-ok">
-              <span className="w-1.5 h-1.5 rounded-full bg-ok animate-pulse" />Live
-            </span>
-          </>
-        )}
-      </div>
+        {/* Scrollable content */}
+        <div className="flex-1 overflow-y-auto px-10 pb-10">
 
-      {/* Warnings */}
-      {!bearer && (
-        <div className="px-4 py-3 rounded-lg bg-warn/10 border border-warn/20 text-warn text-sm">
-          ⚠ Token GéeLark manquant — configure-le dans <span className="font-semibold">Paramètres</span>.
-        </div>
-      )}
-      {error && (
-        <div className="px-4 py-3 rounded-lg bg-danger/10 border border-danger/20 text-danger text-sm flex justify-between">
-          <span>{error}</span>
-          <button onClick={() => setError(null)} className="opacity-60 hover:opacity-100 ml-3">✕</button>
-        </div>
-      )}
-      {pollError && (
-        <div className="px-4 py-2 rounded-lg bg-warn/10 border border-warn/20 text-warn text-xs flex justify-between">
-          <span>⚠ {pollError}</span>
-          <button onClick={() => setPollError(null)} className="opacity-60 hover:opacity-100 ml-3">✕</button>
-        </div>
-      )}
-
-      {/* Search + filter */}
-      <div className="flex items-center gap-3">
-        <input type="text" placeholder="🔍 Rechercher…" value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="flex-1 bg-surface border border-border rounded-lg px-4 py-2 text-sm text-text placeholder:text-text2 focus:border-accent focus:outline-none transition-colors"
-        />
-        {(['all', 'online', 'offline'] as const).map(f => (
-          <button key={f} onClick={() => setFilter(f)}
-            className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${
-              filter === f ? 'bg-accent/20 text-accent' : 'text-text2 hover:text-text'
-            }`}
-          >
-            {f === 'all' ? 'Tous' : f === 'online' ? 'En ligne' : 'Hors ligne'}
-          </button>
-        ))}
-      </div>
-
-
-      {/* Table */}
-      {loading ? (
-        <div className="flex justify-center py-16"><Spinner size="lg" /></div>
-      ) : phones.length === 0 ? (
-        <div className="text-center py-16 text-text2 space-y-3">
-          <p className="text-4xl">📱</p>
-          <p className="font-medium">Aucun téléphone synchronisé</p>
-          <p className="text-sm">Clique sur "Sync GéeLark" pour importer tes phones.</p>
-        </div>
-      ) : (
-        <div className="bg-card border border-border rounded-xl overflow-hidden">
-          {/* Header */}
-          <div className="grid grid-cols-[28px_1fr_100px_150px_120px_80px_90px_70px_110px_36px] px-4 py-2 border-b border-border bg-surface">
-            {['#', 'Téléphone', 'Groupe', 'Instagram', 'Status IG', 'En ligne', 'Followers', 'Vues', 'Note', ''].map(h => (
-              <span key={h} className="text-xs font-semibold text-text2 uppercase tracking-wider">{h}</span>
+          {/* KPI cards */}
+          <div className="grid grid-cols-4 gap-6 mt-8">
+            {([
+              { key: 'all',     label: 'TÉLÉPHONES',  color: '#4f9eff', icon: '📱' },
+              { key: 'online',  label: 'EN LIGNE',     color: '#00ccaa', icon: '✅' },
+              { key: 'offline', label: 'HORS LIGNE',   color: '#5a6882', icon: '📴' },
+              { key: 'views',   label: 'VUES TOTALES', color: '#ffaa2a', icon: '👁' },
+            ] as const).map(({ key, label, color, icon }) => (
+              <button key={key}
+                onClick={() => key !== 'views' && setFilter(key as typeof filter)}
+                className={`rounded-2xl p-6 text-left transition-all ${
+                  key !== 'views' && filter === key ? 'border-accent' : 'hover:border-accent/40'
+                }`}
+                style={{ background: 'rgba(255,255,255,0.03)', border: key !== 'views' && filter === key ? '1px solid var(--color-accent)' : '1px solid rgba(255,255,255,0.07)' }}
+              >
+                <div className="flex items-center gap-2 mb-3">
+                  <span>{icon}</span>
+                  <span className="text-[12px] font-semibold text-text2">{label}</span>
+                </div>
+                <p className="text-3xl font-black" style={{ color }}>
+                  {key === 'views' ? counts.views.toLocaleString('fr-FR') : counts[key]}
+                </p>
+              </button>
             ))}
           </div>
-          {visible.length === 0 ? (
-            <p className="px-4 py-8 text-center text-text2 text-sm">Aucun résultat.</p>
-          ) : (
-            <div className="divide-y divide-border">
-              {visible.map((phone, i) => (
-                <div key={phone.id}
-                  className="grid grid-cols-[28px_1fr_100px_150px_120px_80px_90px_70px_110px_36px] px-4 py-3 hover:bg-surface/50 transition-colors items-center cursor-default"
-                  onContextMenu={e => {
-                    e.preventDefault(); e.stopPropagation()
-                    setContextMenu({ phone, x: e.clientX, y: e.clientY })
-                  }}
+
+          {/* Auto-refresh controls */}
+          <div className="flex items-center gap-4 px-5 py-4 rounded-2xl mt-6" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+            <span className="text-[13px] font-medium text-text">Auto-statut</span>
+
+            <button
+              onClick={() => { const next = !autoRefresh; poller.setEnabled(next); setAutoRefresh(next) }}
+              className={`relative w-8 h-4 rounded-full transition-colors ${autoRefresh ? 'bg-accent' : 'bg-surface2'}`}
+            >
+              <span className={`absolute top-0.5 w-3 h-3 bg-white rounded-full shadow transition-all ${autoRefresh ? 'left-[18px]' : 'left-0.5'}`} />
+            </button>
+
+            <div className="flex items-center gap-1">
+              {INTERVALS.map(({ label, value }) => (
+                <button key={value}
+                  onClick={() => changeInterval(value)}
+                  disabled={!autoRefresh}
+                  className={`px-3 py-1.5 rounded-lg text-[13px] transition-all disabled:opacity-40 ${
+                    intervalSec === value ? 'bg-accent/20 text-accent' : 'text-text2 hover:text-text'
+                  }`}
                 >
-                  <span className="text-xs text-text2">{i + 1}</span>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-text truncate">{phone.phone_name}</p>
-                    {phone.serial_no && (
-                      <p className="text-[10px] text-text2 font-mono truncate">{phone.serial_no}</p>
-                    )}
-                  </div>
-                  <span className="text-xs text-text2 truncate">{phone.group_name ?? '—'}</span>
-                  <IgCell phone={phone} onSave={saveIgUsername} />
-                  <IgStatusBadge phone={phone} />
-                  <div className="flex items-center gap-1.5" title={phone.status === 'online' ? 'Téléphone en ligne' : 'Téléphone hors ligne'}>
-                    <StatusDot status={phone.status} />
-                  </div>
-                  <span className="text-xs text-text">
-                    {phone.followers ? phone.followers.toLocaleString('fr-FR') : '—'}
-                  </span>
-                  <span className="text-xs text-text">
-                    {phone.total_views ? phone.total_views.toLocaleString('fr-FR') : '—'}
-                  </span>
-                  <NoteCell phone={phone} onSave={saveRemark} />
-                  {/* ⋮ button */}
-                  <button
-                    onClick={e => { e.stopPropagation(); setContextMenu({ phone, x: e.clientX, y: e.clientY }) }}
-                    className="flex items-center justify-center w-7 h-7 rounded-lg text-text2 hover:bg-surface2 hover:text-text transition-colors text-lg leading-none"
-                    title="Plus d'options"
-                  >
-                    ⋮
-                  </button>
-                </div>
+                  {label}
+                </button>
               ))}
             </div>
+
+            {autoRefresh && bearer && (
+              <>
+                <div className="ml-auto"><Countdown secondsLeft={countdown} /></div>
+                <span className="flex items-center gap-1.5 text-[13px] text-ok">
+                  <span className="w-1.5 h-1.5 rounded-full bg-ok animate-pulse" />Live
+                </span>
+              </>
+            )}
+          </div>
+
+          {/* Warnings */}
+          {!bearer && (
+            <div className="px-5 py-4 rounded-2xl mt-6" style={{ background: 'rgba(255,170,42,0.08)', border: '1px solid rgba(255,170,42,0.2)', color: '#ffaa2a' }}>
+              <span className="text-[13px]">⚠ Token GéeLark manquant — configure-le dans <span className="font-semibold">Paramètres</span>.</span>
+            </div>
+          )}
+          {error && (
+            <div className="px-5 py-4 rounded-2xl mt-6 flex justify-between" style={{ background: 'rgba(255,92,110,0.08)', border: '1px solid rgba(255,92,110,0.2)', color: '#ff5c6e' }}>
+              <span className="text-[13px]">{error}</span>
+              <button onClick={() => setError(null)} className="opacity-60 hover:opacity-100 ml-3">✕</button>
+            </div>
+          )}
+          {pollError && (
+            <div className="px-5 py-3 rounded-2xl mt-4 flex justify-between" style={{ background: 'rgba(255,170,42,0.08)', border: '1px solid rgba(255,170,42,0.2)', color: '#ffaa2a' }}>
+              <span className="text-[13px]">⚠ {pollError}</span>
+              <button onClick={() => setPollError(null)} className="opacity-60 hover:opacity-100 ml-3">✕</button>
+            </div>
+          )}
+
+          {/* Search + filter */}
+          <div className="flex items-center gap-3 mt-6">
+            <input type="text" placeholder="🔍 Rechercher…" value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="flex-1 rounded-xl px-4 py-2.5 text-[13px] focus:outline-none transition-colors"
+              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
+            />
+            {(['all', 'online', 'offline'] as const).map(f => (
+              <button key={f} onClick={() => setFilter(f)}
+                className={`px-4 py-2.5 rounded-xl text-[13px] font-medium transition-all ${
+                  filter === f ? 'bg-accent/20 text-accent' : 'text-text2 hover:text-text'
+                }`}
+                style={filter === f ? {} : { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}
+              >
+                {f === 'all' ? 'Tous' : f === 'online' ? 'En ligne' : 'Hors ligne'}
+              </button>
+            ))}
+          </div>
+
+          {/* Table */}
+          <div className="mt-6">
+            {loading ? (
+              <div className="flex justify-center py-16"><Spinner size="lg" /></div>
+            ) : phones.length === 0 ? (
+              <div className="rounded-2xl p-10 text-center" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                <p className="text-4xl mb-4">📱</p>
+                <p className="text-base font-bold text-white mb-2">Aucun téléphone synchronisé</p>
+                <p className="text-[13px] text-text2">Clique sur "Sync GéeLark" pour importer tes phones.</p>
+              </div>
+            ) : (
+              <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                {/* Table Header */}
+                <div className="grid grid-cols-[28px_1fr_100px_150px_120px_80px_90px_70px_110px_36px] px-5 py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.07)', background: 'rgba(255,255,255,0.02)' }}>
+                  {['#', 'Téléphone', 'Groupe', 'Instagram', 'Status IG', 'En ligne', 'Followers', 'Vues', 'Note', ''].map(h => (
+                    <span key={h} className="text-[12px] font-semibold text-text2 uppercase tracking-wider">{h}</span>
+                  ))}
+                </div>
+                {visible.length === 0 ? (
+                  <p className="px-5 py-10 text-center text-[13px] text-text2">Aucun résultat.</p>
+                ) : (
+                  <div className="divide-y" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
+                    {visible.map((phone, i) => (
+                      <div key={phone.id}
+                        className="grid grid-cols-[28px_1fr_100px_150px_120px_80px_90px_70px_110px_36px] px-5 py-4 transition-colors items-center cursor-default hover:bg-white/[0.02]"
+                        onContextMenu={e => {
+                          e.preventDefault(); e.stopPropagation()
+                          setContextMenu({ phone, x: e.clientX, y: e.clientY })
+                        }}
+                      >
+                        <span className="text-[13px] text-text2">{i + 1}</span>
+                        <div className="min-w-0">
+                          <p className="text-[13px] font-medium text-text truncate">{phone.phone_name}</p>
+                          {phone.serial_no && (
+                            <p className="text-[11px] text-text2 font-mono truncate">{phone.serial_no}</p>
+                          )}
+                        </div>
+                        <span className="text-[13px] text-text2 truncate">{phone.group_name ?? '—'}</span>
+                        <IgCell phone={phone} onSave={saveIgUsername} />
+                        <IgStatusBadge phone={phone} />
+                        <div className="flex items-center gap-1.5" title={phone.status === 'online' ? 'Téléphone en ligne' : 'Téléphone hors ligne'}>
+                          <StatusDot status={phone.status} />
+                        </div>
+                        <span className="text-[13px] text-text">
+                          {phone.followers ? phone.followers.toLocaleString('fr-FR') : '—'}
+                        </span>
+                        <span className="text-[13px] text-text">
+                          {phone.total_views ? phone.total_views.toLocaleString('fr-FR') : '—'}
+                        </span>
+                        <NoteCell phone={phone} onSave={saveRemark} />
+                        {/* ⋮ button */}
+                        <button
+                          onClick={e => { e.stopPropagation(); setContextMenu({ phone, x: e.clientX, y: e.clientY }) }}
+                          className="flex items-center justify-center w-7 h-7 rounded-lg text-text2 hover:bg-surface2 hover:text-text transition-colors text-lg leading-none"
+                          title="Plus d'options"
+                        >
+                          ⋮
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {!loading && visible.length > 0 && (
+            <p className="text-[12px] text-text2 text-right mt-4">
+              {visible.length} téléphone{visible.length > 1 ? 's' : ''}
+              {phones.length !== visible.length && ` sur ${phones.length}`}
+              {counts.views > 0 && ` · ${counts.views.toLocaleString('fr-FR')} vues`}
+              {' · '}Clic droit ou ⋮ pour plus d'options
+            </p>
           )}
         </div>
-      )}
-
-      {!loading && visible.length > 0 && (
-        <p className="text-xs text-text2 text-right">
-          {visible.length} téléphone{visible.length > 1 ? 's' : ''}
-          {phones.length !== visible.length && ` sur ${phones.length}`}
-          {counts.views > 0 && ` · ${counts.views.toLocaleString('fr-FR')} vues`}
-          {' · '}Clic droit ou ⋮ pour plus d'options
-        </p>
-      )}
-    </div>
+      </div>
     </>
   )
 }

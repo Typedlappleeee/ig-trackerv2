@@ -49,38 +49,37 @@ function VideoListPanel({
   onAddBank: () => void; onAddPC: () => void; onRemove: (i: number) => void
 }) {
   return (
-    <div className="flex flex-col gap-3 min-w-0">
+    <div className="flex flex-col gap-4 min-w-0">
       <div className="flex items-center justify-between">
-        <p className="text-sm font-black text-white">{label}</p>
-        <span className="text-xs font-bold px-2 py-0.5 rounded-full"
+        <p className="text-[15px] font-bold text-white">{label}</p>
+        <span className="text-[12px] font-bold px-2.5 py-0.5 rounded-full"
           style={{ background: `${accent}22`, color: accent }}>{paths.length}</span>
       </div>
-      <div className="flex gap-2 flex-wrap">
+      <div className="flex gap-2">
         <button onClick={onAddBank}
-          className="text-xs px-3 py-1.5 rounded-lg font-semibold"
+          className="flex-1 rounded-xl px-4 py-2.5 text-[13px] font-semibold"
           style={{ background: `${accent}18`, color: accent, border: `1px solid ${accent}30` }}>
           🗂 Banque
         </button>
         <button onClick={onAddPC}
-          className="text-xs px-3 py-1.5 rounded-lg font-semibold"
-          style={{ background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.7)', border: '1px solid rgba(255,255,255,0.08)' }}>
+          className="flex-1 rounded-xl px-4 py-2.5 text-[13px] font-semibold"
+          style={{ background: 'rgba(255,255,255,0.05)', color: 'rgba(196,181,253,0.8)', border: '1px solid rgba(255,255,255,0.09)' }}>
           💾 PC
         </button>
       </div>
-      <div className="flex-1 overflow-auto space-y-1.5 min-h-[120px] max-h-80">
+      <div className="flex-1 overflow-auto space-y-2 min-h-[120px] max-h-72">
         {paths.length === 0 ? (
-          <div className="rounded-xl p-4 text-center text-xs" style={{ border: `1px dashed ${accent}25`, color: 'rgba(196,181,253,0.3)' }}>
+          <div className="rounded-2xl p-6 text-center text-[13px]" style={{ border: `1px dashed ${accent}25`, color: 'rgba(196,181,253,0.4)' }}>
             Aucune vidéo — ajoute depuis la banque ou le PC
           </div>
         ) : paths.map((p, i) => (
-          <div key={i} className="flex items-center gap-2 rounded-lg px-3 py-1.5"
+          <div key={i} className="flex items-center gap-3 rounded-xl px-4 py-2.5"
             style={{ background: `${accent}08`, border: `1px solid ${accent}18` }}>
-            <span className="text-[10px] font-bold w-5 text-center flex-shrink-0"
+            <span className="text-[12px] font-bold w-5 text-center flex-shrink-0"
               style={{ color: accent }}>{i + 1}</span>
-            <span className="text-xs font-mono truncate flex-1 text-white/70">{fileName(p)}</span>
+            <span className="text-[13px] font-mono truncate flex-1 text-white/70">{fileName(p)}</span>
             <button onClick={() => onRemove(i)}
-              className="text-[11px] flex-shrink-0"
-              style={{ color: 'rgba(239,68,68,0.5)' }}>✕</button>
+              className="text-[13px] flex-shrink-0 text-danger/50 hover:text-danger transition-colors">✕</button>
           </div>
         ))}
       </div>
@@ -333,8 +332,7 @@ Return ONLY a JSON array. If none, return [].`
       {running && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-6" style={{ background: 'rgba(3,1,8,0.92)', backdropFilter: 'blur(8px)' }}>
           <div className="w-full max-w-md rounded-2xl overflow-hidden" style={{ background: 'rgba(12,8,28,0.98)', border: '1px solid rgba(139,92,246,0.3)', boxShadow: '0 0 60px rgba(124,58,237,0.25)' }}>
-            {/* Header */}
-            <div className="px-6 py-4" style={{ borderBottom: '1px solid rgba(139,92,246,0.15)', background: 'linear-gradient(135deg,rgba(124,58,237,0.12),rgba(236,72,153,0.06))' }}>
+            <div className="px-6 py-5" style={{ borderBottom: '1px solid rgba(139,92,246,0.15)', background: 'linear-gradient(135deg,rgba(124,58,237,0.12),rgba(236,72,153,0.06))' }}>
               <div className="flex items-center gap-3">
                 <div className="relative w-10 h-10 flex-shrink-0">
                   <div className="absolute inset-0 rounded-full animate-ping opacity-30" style={{ background: 'linear-gradient(135deg,#7c3aed,#ec4899)' }} />
@@ -343,42 +341,38 @@ Return ONLY a JSON array. If none, return [].`
                   </div>
                 </div>
                 <div>
-                  <p className="text-sm font-black text-white">Génération en cours…</p>
-                  <p className="text-[11px]" style={{ color: 'rgba(196,181,253,0.5)' }}>
+                  <p className="text-[15px] font-black text-white">Génération en cours…</p>
+                  <p className="text-[13px] text-text2">
                     Vidéo {currentIdx + 1} / {jobs.length} — {STEP_LABEL[currentStep] ?? currentStep}
                   </p>
                 </div>
               </div>
             </div>
 
-            {/* Progress bar */}
-            <div className="px-6 py-4 space-y-3">
-              <div className="flex items-center justify-between text-xs mb-1">
-                <span style={{ color: 'rgba(196,181,253,0.5)' }}>{doneCount} terminée(s)</span>
+            <div className="px-6 py-5 space-y-4">
+              <div className="flex items-center justify-between text-[13px] mb-1">
+                <span className="text-text2">{doneCount} terminée(s)</span>
                 <span className="font-bold" style={{ color: '#a78bfa' }}>{progress}%</span>
-                <span style={{ color: 'rgba(196,181,253,0.5)' }}>{jobs.length} total</span>
+                <span className="text-text2">{jobs.length} total</span>
               </div>
               <div className="h-2.5 rounded-full overflow-hidden" style={{ background: 'rgba(139,92,246,0.12)' }}>
                 <div className="h-full rounded-full transition-all duration-500"
                   style={{ width: `${progress}%`, background: 'linear-gradient(90deg,#7c3aed,#ec4899)' }} />
               </div>
 
-              {/* Current file */}
               <div className="rounded-xl px-4 py-3 space-y-1" style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.15)' }}>
-                <p className="text-[10px] uppercase tracking-wider font-bold" style={{ color: '#a78bfa' }}>En cours</p>
-                <p className="text-xs font-mono text-white/80 truncate">{fileName(jobs[currentIdx]?.originalPath ?? '')}</p>
-                <p className="text-[10px]" style={{ color: 'rgba(196,181,253,0.4)' }}>→ {fileName(jobs[currentIdx]?.secondaryPath ?? '')}</p>
+                <p className="text-[11px] uppercase tracking-wider font-bold" style={{ color: '#a78bfa' }}>En cours</p>
+                <p className="text-[13px] font-mono text-white/80 truncate">{fileName(jobs[currentIdx]?.originalPath ?? '')}</p>
+                <p className="text-[12px] text-text2">→ {fileName(jobs[currentIdx]?.secondaryPath ?? '')}</p>
               </div>
 
-              {/* Job list (last 5) */}
-              <div className="space-y-1 max-h-40 overflow-auto">
+              <div className="space-y-1.5 max-h-40 overflow-auto">
                 {jobs.map(job => (
-                  <div key={job.id} className="flex items-center gap-2 px-3 py-1.5 rounded-lg"
+                  <div key={job.id} className="flex items-center gap-3 px-3 py-2 rounded-xl"
                     style={{ background: job.status === 'done' ? 'rgba(52,211,153,0.06)' : job.status === 'error' ? 'rgba(239,68,68,0.06)' : 'transparent' }}>
-                    <span className="w-5 text-[10px] font-bold flex-shrink-0 text-center"
-                      style={{ color: 'rgba(196,181,253,0.35)' }}>#{job.id + 1}</span>
-                    <span className="flex-1 text-[10px] font-mono truncate" style={{ color: 'rgba(196,181,253,0.6)' }}>{fileName(job.originalPath)}</span>
-                    <span className="text-[10px] font-semibold flex-shrink-0"
+                    <span className="w-5 text-[12px] font-bold flex-shrink-0 text-center text-text2">#{job.id + 1}</span>
+                    <span className="flex-1 text-[12px] font-mono truncate text-text2">{fileName(job.originalPath)}</span>
+                    <span className="text-[12px] font-semibold flex-shrink-0"
                       style={{ color: job.status === 'done' ? '#34d399' : job.status === 'error' ? '#f87171' : '#a78bfa' }}>
                       {STATUS_LABEL[job.status]}
                     </span>
@@ -387,7 +381,7 @@ Return ONLY a JSON array. If none, return [].`
               </div>
 
               <button onClick={() => { abortRef.current = true; setRunning(false) }}
-                className="w-full py-2 rounded-xl text-xs font-semibold"
+                className="w-full py-2.5 rounded-xl text-[13px] font-semibold"
                 style={{ background: 'rgba(239,68,68,0.08)', color: '#f87171', border: '1px solid rgba(239,68,68,0.2)' }}>
                 ✕ Annuler la génération
               </button>
@@ -400,23 +394,22 @@ Return ONLY a JSON array. If none, return [].`
       {!running && jobs.length > 0 && (doneCount + errorCount) === jobs.length && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-6" style={{ background: 'rgba(3,1,8,0.88)', backdropFilter: 'blur(6px)' }}>
           <div className="w-full max-w-md rounded-2xl overflow-hidden" style={{ background: 'rgba(12,8,28,0.98)', border: `1px solid ${errorCount === 0 ? 'rgba(52,211,153,0.3)' : 'rgba(251,191,36,0.3)'}` }}>
-            <div className="px-6 py-5 space-y-4">
+            <div className="px-6 py-6 space-y-5">
               <div className="text-center space-y-2">
-                <div className="text-4xl">{errorCount === 0 ? '✅' : '⚠️'}</div>
-                <p className="text-lg font-black text-white">
+                <div className="text-5xl">{errorCount === 0 ? '✅' : '⚠️'}</div>
+                <p className="text-[20px] font-black text-white">
                   {errorCount === 0 ? 'Tous les remixes générés !' : `${doneCount} / ${jobs.length} terminés`}
                 </p>
-                {errorCount > 0 && <p className="text-sm" style={{ color: '#fbbf24' }}>{errorCount} erreur(s)</p>}
+                {errorCount > 0 && <p className="text-[13px]" style={{ color: '#fbbf24' }}>{errorCount} erreur(s)</p>}
               </div>
-              {/* Results list */}
-              <div className="space-y-1 max-h-52 overflow-auto">
+              <div className="space-y-2 max-h-52 overflow-auto">
                 {jobs.map(job => (
-                  <div key={job.id} className="flex items-center gap-2 px-3 py-2 rounded-lg"
+                  <div key={job.id} className="flex items-center gap-3 px-4 py-2.5 rounded-xl"
                     style={{ background: job.status === 'done' ? 'rgba(52,211,153,0.06)' : 'rgba(239,68,68,0.06)', border: `1px solid ${job.status === 'done' ? 'rgba(52,211,153,0.15)' : 'rgba(239,68,68,0.15)'}` }}>
-                    <span className="text-sm">{job.status === 'done' ? '✅' : '❌'}</span>
+                    <span className="text-base">{job.status === 'done' ? '✅' : '❌'}</span>
                     <div className="flex-1 min-w-0">
-                      <p className="text-[11px] font-mono truncate text-white/70">{fileName(job.originalPath)}</p>
-                      {job.error && <p className="text-[9px]" style={{ color: '#f87171' }}>{job.error}</p>}
+                      <p className="text-[13px] font-mono truncate text-white/70">{fileName(job.originalPath)}</p>
+                      {job.error && <p className="text-[11px]" style={{ color: '#f87171' }}>{job.error}</p>}
                     </div>
                   </div>
                 ))}
@@ -438,176 +431,177 @@ Return ONLY a JSON array. If none, return [].`
           onClose={() => setShowBankSec(false)} />
       )}
 
-      <div className="flex flex-col h-full overflow-auto p-6 gap-6" style={{ background: '#06040f' }}>
-
-        {/* Video pickers */}
-        <div className="grid grid-cols-2 gap-6">
-          <div className="rounded-2xl p-4 space-y-3" style={{ background: 'rgba(8,5,20,0.7)', border: '1px solid rgba(139,92,246,0.18)' }}>
-            <VideoListPanel
-              label="Vidéos originales"
-              paths={originals}
-              accent="#8b5cf6"
-              onAddBank={() => setShowBankOrig(true)}
-              onAddPC={async () => { const p = await pickPC(false); setOriginals(prev => [...prev, ...p]) }}
-              onRemove={i => setOriginals(prev => prev.filter((_, j) => j !== i))}
-            />
+      <div className="h-full flex flex-col overflow-hidden">
+        {/* Page header */}
+        <div className="flex-shrink-0 px-10 pt-9 pb-7 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+          <div>
+            <h1 className="text-[28px] font-black text-white leading-none">Mass Remix</h1>
+            <p className="text-[13px] text-text2 mt-0.5">Génère des remixes vidéo en masse avec FFmpeg + IA</p>
           </div>
-          <div className="rounded-2xl p-4 space-y-3" style={{ background: 'rgba(8,5,20,0.7)', border: '1px solid rgba(236,72,153,0.15)' }}>
-            <VideoListPanel
-              label="Nouvelles Phase 1"
-              paths={secondaries}
-              accent="#ec4899"
-              onAddBank={() => setShowBankSec(true)}
-              onAddPC={async () => { const p = await pickPC(false); setSecondaries(prev => [...prev, ...p]) }}
-              onRemove={i => setSecondaries(prev => prev.filter((_, j) => j !== i))}
-            />
-          </div>
-        </div>
-
-        {/* Copies + pairing */}
-        {originals.length > 0 && secondaries.length > 0 && (
-          <div className="rounded-2xl p-4 space-y-3" style={{ background: 'rgba(8,5,20,0.7)', border: '1px solid rgba(139,92,246,0.18)' }}>
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-black text-white">Nombre de copies</p>
-              <div className="flex items-center gap-2">
-                <input type="number" min={1} max={200} value={copies}
-                  onChange={e => setCopies(Math.max(1, Math.min(200, Number(e.target.value))))}
-                  className="w-16 rounded-lg px-2 py-1 text-sm font-bold text-white text-center outline-none"
-                  style={{ background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.3)' }} />
-                <span className="text-xs" style={{ color: 'rgba(196,181,253,0.5)' }}>vidéos</span>
-              </div>
-            </div>
-            <input type="range" min={1} max={50} value={Math.min(copies, 50)}
-              onChange={e => setCopies(Number(e.target.value))} className="w-full" />
-            <p className="text-[10px]" style={{ color: 'rgba(196,181,253,0.45)' }}>
-              🔀 Mix aléatoire — <strong className="text-white/60">{originals.length}</strong> original{originals.length > 1 ? 's' : ''} ×{' '}
-              <strong className="text-white/60">{secondaries.length}</strong> secondaire{secondaries.length > 1 ? 's' : ''} → <strong className="text-violet-400">{copies}</strong> remix générés
-            </p>
-          </div>
-        )}
-
-        {/* Settings */}
-        <div className="rounded-2xl p-4 space-y-4" style={{ background: 'rgba(8,5,20,0.7)', border: '1px solid rgba(255,255,255,0.06)' }}>
-          <p className="text-xs font-black uppercase tracking-wider" style={{ color: 'rgba(196,181,253,0.4)' }}>Paramètres</p>
-
-          <div className="grid grid-cols-2 gap-4">
-            {/* Preset */}
-            <div>
-              <p className="text-[10px] uppercase tracking-wider font-bold mb-2" style={{ color: 'rgba(196,181,253,0.4)' }}>Format</p>
-              <div className="flex gap-2">
-                {(['9:16', '1:1', '16:9'] as Preset[]).map(p => (
-                  <button key={p} onClick={() => setPreset(p)} className="flex-1 py-1.5 rounded-lg text-xs font-bold"
-                    style={preset === p
-                      ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff' }
-                      : { background: 'rgba(139,92,246,0.06)', color: 'rgba(196,181,253,0.5)', border: '1px solid rgba(139,92,246,0.12)' }
-                    }>{p}</button>
-                ))}
-              </div>
-            </div>
-
-            {/* Export mode */}
-            <div className="space-y-2">
-              <p className="text-[10px] uppercase tracking-wider font-bold" style={{ color: 'rgba(196,181,253,0.4)' }}>Export</p>
-              <div className="flex gap-2">
-                {(['bank', 'folder'] as ExportMode[]).map(m => (
-                  <button key={m} onClick={() => setExportMode(m)} className="flex-1 py-1.5 rounded-lg text-xs font-bold"
-                    style={exportMode === m
-                      ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff' }
-                      : { background: 'rgba(139,92,246,0.06)', color: 'rgba(196,181,253,0.5)', border: '1px solid rgba(139,92,246,0.12)' }
-                    }>
-                    {m === 'bank' ? '☁ Banque' : '💾 Dossier'}
-                  </button>
-                ))}
-              </div>
-              {exportMode === 'bank' && (
-                <div className="rounded-xl p-3 space-y-2.5"
-                  style={{ background: 'rgba(139,92,246,0.07)', border: '1px solid rgba(139,92,246,0.18)' }}>
-                  <p className="text-[10px] uppercase tracking-wider font-bold" style={{ color: 'rgba(139,92,246,0.7)' }}>
-                    📁 Dossier dans la banque
-                  </p>
-                  {bankFolders.length > 0 && (
-                    <select
-                      value={bankFolders.includes(bankFolder) ? bankFolder : ''}
-                      onChange={e => setBankFolder(e.target.value)}
-                      className="w-full rounded-lg px-3 py-2 text-xs font-semibold text-white outline-none"
-                      style={{ background: 'rgba(8,5,20,0.8)', border: '1px solid rgba(139,92,246,0.3)', color: '#e2d9f3' }}>
-                      <option value="" style={{ background: '#0c0919' }}>— Racine (sans dossier)</option>
-                      {bankFolders.map(f => (
-                        <option key={f} value={f} style={{ background: '#0c0919' }}>{f}</option>
-                      ))}
-                    </select>
-                  )}
-                  <div className="relative">
-                    <input
-                      type="text"
-                      placeholder={bankFolders.length > 0 ? 'Ou créer un nouveau dossier…' : 'Nom du dossier (optionnel)'}
-                      value={bankFolder}
-                      onChange={e => setBankFolder(e.target.value)}
-                      className="w-full rounded-lg px-3 py-2 text-xs font-semibold text-white outline-none placeholder:opacity-30"
-                      style={{ background: 'rgba(8,5,20,0.8)', border: `1px solid ${bankFolder.trim() ? 'rgba(139,92,246,0.6)' : 'rgba(139,92,246,0.2)'}`, color: '#e2d9f3' }}
-                    />
-                    {bankFolder.trim() && (
-                      <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
-                        <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md"
-                          style={{ background: 'rgba(139,92,246,0.25)', color: '#c4b5fd' }}>
-                          ✓ {bankFolder.trim()}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                  {bankFolder.trim() && (
-                    <p className="text-[10px] flex items-center gap-1.5" style={{ color: 'rgba(167,139,250,0.8)' }}>
-                      <span>📂</span>
-                      <span>Les vidéos iront dans <strong>«&nbsp;{bankFolder.trim()}&nbsp;»</strong></span>
-                    </p>
-                  )}
-                </div>
-              )}
-              {exportMode === 'folder' && (
-                <div className="flex items-center gap-2">
-                  <button onClick={async () => { const f = await window.electronAPI?.pickOutputFolder?.(); if (f) setOutputFolder(f) }}
-                    className="text-xs px-3 py-1 rounded-lg"
-                    style={{ background: 'rgba(139,92,246,0.1)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.2)' }}>
-                    📁 Choisir…
-                  </button>
-                  {outputFolder && <span className="text-[10px] font-mono truncate" style={{ color: 'rgba(196,181,253,0.5)' }}>{outputFolder}</span>}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* AI text toggle */}
-          <div className="flex items-start gap-3 rounded-xl p-3" style={{ background: 'rgba(139,92,246,0.05)', border: '1px solid rgba(139,92,246,0.12)' }}>
-            <button onClick={() => setAiEnabled(v => !v)}
-              className="flex-shrink-0 w-10 h-5 rounded-full transition-all relative"
-              style={{ background: aiEnabled ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(139,92,246,0.15)' }}>
-              <div className="absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all"
-                style={{ left: aiEnabled ? 'calc(100% - 18px)' : '2px' }} />
-            </button>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-white">✨ Détection texte IA (Claude Vision)</p>
-              <p className="text-[10px] mt-0.5" style={{ color: 'rgba(196,181,253,0.4)' }}>
-                Analyse chaque vidéo originale et recopie le texte. Plus lent mais plus précis.
-              </p>
-              {aiEnabled && !anthropicKey && (
-                <p className="mt-1.5 text-[10px]" style={{ color: '#fbbf24' }}>
-                  ⚠ Configure ta clé Anthropic dans Paramètres → Connexions
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Launch */}
-        <div className="flex items-center gap-4">
           <Button onClick={launch} disabled={!canLaunch} size="lg">
             ⚡ Lancer {canLaunch ? `${copies} remix` : 'la génération'}
           </Button>
-          {!canLaunch && originals.length === 0 && (
-            <p className="text-xs" style={{ color: 'rgba(196,181,253,0.35)' }}>
-              Ajoute des vidéos originales et secondaires pour commencer
-            </p>
-          )}
+        </div>
+
+        {/* Scrollable content */}
+        <div className="flex-1 overflow-y-auto px-10 pb-10">
+          <div className="space-y-6 mt-8">
+
+            {/* Video pickers */}
+            <div className="grid grid-cols-2 gap-6">
+              <div className="rounded-2xl p-6" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(139,92,246,0.2)' }}>
+                <VideoListPanel
+                  label="Vidéos originales"
+                  paths={originals}
+                  accent="#8b5cf6"
+                  onAddBank={() => setShowBankOrig(true)}
+                  onAddPC={async () => { const p = await pickPC(false); setOriginals(prev => [...prev, ...p]) }}
+                  onRemove={i => setOriginals(prev => prev.filter((_, j) => j !== i))}
+                />
+              </div>
+              <div className="rounded-2xl p-6" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(236,72,153,0.18)' }}>
+                <VideoListPanel
+                  label="Nouvelles Phase 1"
+                  paths={secondaries}
+                  accent="#ec4899"
+                  onAddBank={() => setShowBankSec(true)}
+                  onAddPC={async () => { const p = await pickPC(false); setSecondaries(prev => [...prev, ...p]) }}
+                  onRemove={i => setSecondaries(prev => prev.filter((_, j) => j !== i))}
+                />
+              </div>
+            </div>
+
+            {/* Copies + pairing */}
+            {originals.length > 0 && secondaries.length > 0 && (
+              <div className="rounded-2xl p-6 space-y-4" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                <div className="flex items-center justify-between">
+                  <p className="text-[15px] font-bold text-white">Nombre de copies</p>
+                  <div className="flex items-center gap-3">
+                    <input type="number" min={1} max={200} value={copies}
+                      onChange={e => setCopies(Math.max(1, Math.min(200, Number(e.target.value))))}
+                      className="w-20 rounded-xl px-4 py-2.5 text-[13px] font-bold text-white text-center focus:outline-none"
+                      style={{ background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.3)' }} />
+                    <span className="text-[13px] text-text2">vidéos</span>
+                  </div>
+                </div>
+                <input type="range" min={1} max={50} value={Math.min(copies, 50)}
+                  onChange={e => setCopies(Number(e.target.value))} className="w-full" />
+                <p className="text-[13px] text-text2">
+                  🔀 Mix aléatoire — <strong className="text-white/70">{originals.length}</strong> original{originals.length > 1 ? 's' : ''} ×{' '}
+                  <strong className="text-white/70">{secondaries.length}</strong> secondaire{secondaries.length > 1 ? 's' : ''} → <strong className="text-violet-400">{copies}</strong> remix générés
+                </p>
+              </div>
+            )}
+
+            {/* Settings */}
+            <div className="rounded-2xl p-6 space-y-5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <p className="text-[15px] font-bold text-white">Paramètres</p>
+
+              <div className="grid grid-cols-2 gap-6">
+                {/* Preset */}
+                <div>
+                  <p className="text-[12px] text-text2 mb-3">Format de sortie</p>
+                  <div className="flex gap-2">
+                    {(['9:16', '1:1', '16:9'] as Preset[]).map(p => (
+                      <button key={p} onClick={() => setPreset(p)} className="flex-1 py-2.5 rounded-xl text-[13px] font-bold"
+                        style={preset === p
+                          ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff' }
+                          : { background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.6)', border: '1px solid rgba(255,255,255,0.08)' }
+                        }>{p}</button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Export mode */}
+                <div className="space-y-3">
+                  <p className="text-[12px] text-text2">Destination d'export</p>
+                  <div className="flex gap-2">
+                    {(['bank', 'folder'] as ExportMode[]).map(m => (
+                      <button key={m} onClick={() => setExportMode(m)} className="flex-1 py-2.5 rounded-xl text-[13px] font-bold"
+                        style={exportMode === m
+                          ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff' }
+                          : { background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.6)', border: '1px solid rgba(255,255,255,0.08)' }
+                        }>
+                        {m === 'bank' ? '☁ Banque' : '💾 Dossier'}
+                      </button>
+                    ))}
+                  </div>
+                  {exportMode === 'bank' && (
+                    <div className="rounded-xl p-4 space-y-3"
+                      style={{ background: 'rgba(139,92,246,0.07)', border: '1px solid rgba(139,92,246,0.18)' }}>
+                      <p className="text-[12px] font-bold" style={{ color: 'rgba(139,92,246,0.9)' }}>
+                        📁 Dossier dans la banque
+                      </p>
+                      {bankFolders.length > 0 && (
+                        <select
+                          value={bankFolders.includes(bankFolder) ? bankFolder : ''}
+                          onChange={e => setBankFolder(e.target.value)}
+                          className="w-full rounded-xl px-4 py-2.5 text-[13px] font-semibold text-white focus:outline-none"
+                          style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(139,92,246,0.3)', color: '#e2d9f3' }}>
+                          <option value="" style={{ background: '#0c0919' }}>— Racine (sans dossier)</option>
+                          {bankFolders.map(f => (
+                            <option key={f} value={f} style={{ background: '#0c0919' }}>{f}</option>
+                          ))}
+                        </select>
+                      )}
+                      <input
+                        type="text"
+                        placeholder={bankFolders.length > 0 ? 'Ou créer un nouveau dossier…' : 'Nom du dossier (optionnel)'}
+                        value={bankFolder}
+                        onChange={e => setBankFolder(e.target.value)}
+                        className="w-full rounded-xl px-4 py-2.5 text-[13px] font-semibold focus:outline-none placeholder:opacity-30"
+                        style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${bankFolder.trim() ? 'rgba(139,92,246,0.6)' : 'rgba(139,92,246,0.2)'}`, color: '#e2d9f3' }}
+                      />
+                      {bankFolder.trim() && (
+                        <p className="text-[12px] flex items-center gap-1.5" style={{ color: 'rgba(167,139,250,0.8)' }}>
+                          <span>📂</span>
+                          <span>Les vidéos iront dans <strong>«&nbsp;{bankFolder.trim()}&nbsp;»</strong></span>
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  {exportMode === 'folder' && (
+                    <div className="flex items-center gap-3">
+                      <button onClick={async () => { const f = await window.electronAPI?.pickOutputFolder?.(); if (f) setOutputFolder(f) }}
+                        className="rounded-xl px-4 py-2.5 text-[13px] font-semibold"
+                        style={{ background: 'rgba(139,92,246,0.1)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.2)' }}>
+                        📁 Choisir…
+                      </button>
+                      {outputFolder && <span className="text-[12px] font-mono truncate text-text2">{outputFolder}</span>}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* AI text toggle */}
+              <div className="flex items-start gap-4 rounded-xl p-4" style={{ background: 'rgba(139,92,246,0.05)', border: '1px solid rgba(139,92,246,0.12)' }}>
+                <button onClick={() => setAiEnabled(v => !v)}
+                  className="flex-shrink-0 w-11 h-6 rounded-full transition-all relative mt-0.5"
+                  style={{ background: aiEnabled ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.08)' }}>
+                  <span className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform ${aiEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
+                </button>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[13px] font-semibold text-white">✨ Détection texte IA (Claude Vision)</p>
+                  <p className="text-[12px] text-text2 mt-0.5">
+                    Analyse chaque vidéo originale et recopie le texte. Plus lent mais plus précis.
+                  </p>
+                  {aiEnabled && !anthropicKey && (
+                    <p className="mt-2 text-[12px]" style={{ color: '#fbbf24' }}>
+                      ⚠ Configure ta clé Anthropic dans Paramètres → Connexions
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Launch hint */}
+            {!canLaunch && originals.length === 0 && (
+              <p className="text-[13px] text-text2">
+                Ajoute des vidéos originales et secondaires pour commencer
+              </p>
+            )}
+
+          </div>
         </div>
       </div>
     </>

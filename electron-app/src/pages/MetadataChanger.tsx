@@ -207,40 +207,54 @@ export function MetadataChanger({ user, onBack }: MetadataChangerProps) {
           onClose={() => setShowBank(false)} />
       )}
 
-      <div className="flex flex-col h-full overflow-auto" style={{ background: '#06040f' }}>
+      <div className="h-full flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="flex-shrink-0 px-6 py-4 flex items-center gap-3"
-          style={{ borderBottom: '1px solid rgba(139,92,246,0.12)', background: 'rgba(8,5,20,0.6)' }}>
-          <button onClick={onBack} className="text-xs px-3 py-1.5 rounded-lg"
-            style={{ background: 'rgba(139,92,246,0.1)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.2)' }}>
-            ← Retour
-          </button>
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center text-lg"
-            style={{ background: 'linear-gradient(135deg,#7c3aed22,#ec489922)', border: '1px solid rgba(139,92,246,0.25)' }}>🏷</div>
-          <div>
-            <p className="text-sm font-black text-white">Changeur de Métadonnées</p>
-            <p className="text-[10px]" style={{ color: 'rgba(196,181,253,0.4)' }}>
-              Supprime toutes les métadonnées · Nouveau timestamp aléatoire · Copie sans ré-encodage
-            </p>
+        <div className="flex-shrink-0 px-10 pt-9 pb-7 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+          <div className="flex items-center gap-3">
+            <button onClick={onBack} className="rounded-xl px-4 py-2.5 text-[13px] font-semibold"
+              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}>
+              ← Retour
+            </button>
+            <div>
+              <h1 className="text-[28px] font-black text-white leading-none">Changeur de Métadonnées</h1>
+              <p className="text-[13px] text-text2 mt-0.5">
+                Supprime toutes les métadonnées · Nouveau timestamp aléatoire · Copie sans ré-encodage
+              </p>
+            </div>
           </div>
         </div>
 
-        <div className="flex-1 p-6 space-y-5 max-w-3xl mx-auto w-full">
+        <div className="flex-1 overflow-y-auto px-10 pb-10">
+        <div className="space-y-6 max-w-3xl mx-auto pt-8">
 
           {/* Video selection */}
-          <div className="rounded-2xl p-4 space-y-3" style={{ background: 'rgba(8,5,20,0.7)', border: '1px solid rgba(139,92,246,0.15)' }}>
-            <p className="text-xs font-black uppercase tracking-wider" style={{ color: 'rgba(196,181,253,0.4)' }}>Vidéo source</p>
-            <div className="flex gap-2 flex-wrap">
-              <Button onClick={() => { setShowBank(true); playWhoosh() }}>🗂 Depuis la banque</Button>
-              <Button variant="secondary" onClick={pickFromPC}>💾 Depuis le PC</Button>
-              {videoPath && <Button variant="secondary" onClick={() => { setVideoPath(null); setPhase('idle') }}>✕</Button>}
+          <div className="rounded-2xl p-6 space-y-4" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+            <p className="text-[15px] font-bold text-white">Vidéo source</p>
+            <div className="flex gap-3 flex-wrap">
+              <button onClick={() => { setShowBank(true); playWhoosh() }}
+                className="rounded-xl px-5 py-2.5 text-[13px] font-semibold text-white"
+                style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)' }}>
+                🗂 Depuis la banque
+              </button>
+              <button onClick={pickFromPC}
+                className="rounded-xl px-5 py-2.5 text-[13px] font-semibold"
+                style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}>
+                💾 Depuis le PC
+              </button>
+              {videoPath && (
+                <button onClick={() => { setVideoPath(null); setPhase('idle') }}
+                  className="rounded-xl px-5 py-2.5 text-[13px] font-semibold"
+                  style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}>
+                  ✕
+                </button>
+              )}
             </div>
             {videoPath && (
-              <div className="rounded-lg px-3 py-2 text-xs font-mono truncate flex items-center gap-2"
-                style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.15)', color: '#a78bfa' }}>
+              <div className="rounded-xl px-4 py-3 text-[13px] font-mono truncate flex items-center gap-2"
+                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}>
                 {phase === 'reading' && <Spinner size="sm" />}
                 {fileName(videoPath)}
-                {duration && <span className="ml-auto flex-shrink-0" style={{ color: 'rgba(196,181,253,0.4)' }}>
+                {duration && <span className="ml-auto flex-shrink-0 text-text2">
                   {Math.floor(duration / 60)}:{String(Math.floor(duration % 60)).padStart(2, '0')}
                 </span>}
               </div>
@@ -249,7 +263,7 @@ export function MetadataChanger({ user, onBack }: MetadataChangerProps) {
 
           {/* Metadata table */}
           {(phase === 'ready' || phase === 'done') && (
-            <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(8,5,20,0.7)', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
               <div className="px-4 py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
                 <div className="grid grid-cols-[140px_1fr_1fr] gap-2 text-[9px] uppercase tracking-wider font-black"
                   style={{ color: 'rgba(196,181,253,0.35)' }}>
@@ -299,7 +313,7 @@ export function MetadataChanger({ user, onBack }: MetadataChangerProps) {
 
           {/* Processing */}
           {phase === 'processing' && (
-            <div className="rounded-2xl p-8 text-center space-y-4" style={{ background: 'rgba(8,5,20,0.7)', border: '1px solid rgba(139,92,246,0.15)' }}>
+            <div className="rounded-2xl p-10 text-center space-y-4" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
               <div className="relative mx-auto w-16 h-16">
                 <div className="absolute inset-0 rounded-full animate-ping opacity-20" style={{ background: 'linear-gradient(135deg,#7c3aed,#ec4899)' }} />
                 <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.3)' }}>
@@ -313,17 +327,17 @@ export function MetadataChanger({ user, onBack }: MetadataChangerProps) {
 
           {/* Action buttons */}
           {phase === 'ready' && videoPath && (
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-4">
               <button onClick={process}
-                className="rounded-xl py-3 flex flex-col items-center gap-1.5 text-sm font-semibold transition-all"
-                style={{ background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.25)', color: '#c4b5fd' }}>
-                <span className="text-xl">💾</span>
+                className="rounded-xl py-4 flex flex-col items-center gap-2 text-[13px] font-semibold transition-all"
+                style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}>
+                <span className="text-2xl">💾</span>
                 Sauver sur le PC
               </button>
               <button onClick={processToBank}
-                className="rounded-xl py-3 flex flex-col items-center gap-1.5 text-sm font-semibold transition-all"
-                style={{ background: 'linear-gradient(135deg,rgba(124,58,237,0.15),rgba(236,72,153,0.08))', border: '1px solid rgba(139,92,246,0.3)', color: '#c4b5fd' }}>
-                <span className="text-xl">☁</span>
+                className="rounded-xl py-4 flex flex-col items-center gap-2 text-[13px] font-semibold text-white transition-all"
+                style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)' }}>
+                <span className="text-2xl">☁</span>
                 Traiter et exporter banque
               </button>
             </div>
@@ -331,8 +345,8 @@ export function MetadataChanger({ user, onBack }: MetadataChangerProps) {
 
           {/* Done */}
           {phase === 'done' && outputPath && (
-            <div className="space-y-4">
-              <div className="rounded-2xl p-5 space-y-3"
+            <div className="space-y-5">
+              <div className="rounded-2xl p-6 space-y-4"
                 style={{ background: 'rgba(52,211,153,0.06)', border: '1px solid rgba(52,211,153,0.2)' }}>
                 <div className="flex items-center gap-3">
                   <span className="text-2xl">✅</span>
@@ -359,25 +373,25 @@ export function MetadataChanger({ user, onBack }: MetadataChangerProps) {
 
               {/* Bank export */}
               {!uploadDone ? (
-                <div className="rounded-2xl p-4 space-y-3" style={{ background: 'rgba(8,5,20,0.7)', border: '1px solid rgba(139,92,246,0.18)' }}>
-                  <p className="text-xs font-black uppercase tracking-wider" style={{ color: 'rgba(196,181,253,0.4)' }}>Ajouter à la banque</p>
+                <div className="rounded-2xl p-6 space-y-4" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                  <p className="text-[15px] font-bold text-white">Ajouter à la banque</p>
                   <div className="flex gap-3">
                     <button onClick={() => uploadToBank(false)} disabled={uploading}
-                      className="flex-1 py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
-                      style={{ background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.2)', color: '#c4b5fd' }}>
+                      className="flex-1 py-2.5 rounded-xl text-[13px] font-semibold flex items-center justify-center gap-2 disabled:opacity-50 text-white"
+                      style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)' }}>
                       {uploading ? <><Spinner size="sm" /> Upload…</> : '☁ Ajouter à la banque'}
                     </button>
                     {bankItemId && (
                       <button onClick={() => uploadToBank(true)} disabled={uploading}
-                        className="flex-1 py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
-                        style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#f87171' }}>
+                        className="flex-1 py-2.5 rounded-xl text-[13px] font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
+                        style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)', color: '#f87171' }}>
                         {uploading ? <><Spinner size="sm" /> Upload…</> : '🗑 Remplacer dans la banque'}
                       </button>
                     )}
                   </div>
                 </div>
               ) : (
-                <p className="text-sm font-semibold text-center" style={{ color: '#34d399' }}>✓ Ajouté à la banque !</p>
+                <p className="text-[13px] font-semibold text-center" style={{ color: '#34d399' }}>✓ Ajouté à la banque !</p>
               )}
 
               <div className="flex gap-3">
@@ -393,14 +407,15 @@ export function MetadataChanger({ user, onBack }: MetadataChangerProps) {
 
           {/* Empty state */}
           {phase === 'idle' && (
-            <div className="rounded-2xl p-10 text-center" style={{ background: 'rgba(139,92,246,0.04)', border: '1px dashed rgba(139,92,246,0.2)' }}>
-              <p className="text-4xl mb-3 opacity-40">🏷</p>
-              <p className="text-sm font-semibold text-white mb-1">Sélectionne une vidéo</p>
-              <p className="text-xs" style={{ color: 'rgba(196,181,253,0.4)' }}>
+            <div className="rounded-2xl p-10 text-center" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <p className="text-5xl mb-4">🏷</p>
+              <p className="text-base font-bold text-white mb-2">Sélectionne une vidéo</p>
+              <p className="text-[13px] text-text2 max-w-sm mx-auto">
                 L'outil lira ses métadonnées actuelles, les supprimera toutes et injectera un nouveau timestamp aléatoire — sans ré-encoder, en une seconde.
               </p>
             </div>
           )}
+        </div>
         </div>
       </div>
     </>

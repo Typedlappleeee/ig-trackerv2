@@ -949,36 +949,40 @@ export function Community({ user }: CommunityProps) {
   const [g1, g2] = gradientForId(user.id)
 
   return (
-    <div className="h-full flex flex-col overflow-hidden">
+    <div className="h-full flex flex-col overflow-hidden" style={{ background: '#06040f' }}>
 
       {/* Header */}
-      <div className="flex-shrink-0 px-10 pt-9 pb-7 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-        <div>
-          <h1 className="text-[28px] font-black text-white leading-none">Communauté</h1>
-          <p className="text-[13px] text-text2 mt-0.5">
-            {tab === 'news' ? `${newsMessages.length} actualité${newsMessages.length > 1 ? 's' : ''}` :
-             tab === 'chat' ? `${chatMessages.length} message${chatMessages.length > 1 ? 's' : ''}` :
-             isAdmin ? `${threadList.length} ticket${threadList.length > 1 ? 's' : ''}` :
-             `${myThreadMessages.length} message${myThreadMessages.length > 1 ? 's' : ''}`}
-          </p>
-        </div>
-        <button onClick={() => setShowProfile(true)}
-          className="flex items-center gap-2.5 pl-2.5 pr-3 py-2 rounded-xl transition-all hover:bg-white/[0.04] group"
-          style={{ border: '1px solid rgba(255,255,255,0.09)' }}>
-          <Avatar url={profile.avatar_url} name={profile.display_name || '?'} userId={user.id} size={28} />
-          <div className="text-left">
-            <p className="text-[13px] font-semibold leading-tight" style={{ color: profile.display_name ? 'white' : 'rgba(196,181,253,0.4)' }}>
-              {profile.display_name || 'Définir pseudo'}
-            </p>
-            {currentOrg && <p className="text-[12px] leading-tight" style={{ color: 'rgba(139,92,246,0.7)' }}>{currentOrg.name}</p>}
+      <div className="flex-shrink-0"
+        style={{ borderBottom: '1px solid rgba(139,92,246,0.12)', background: 'rgba(8,5,20,0.9)', backdropFilter: 'blur(12px)' }}>
+        <div className="flex items-center justify-between px-5 py-3">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center"
+              style={{ background: 'linear-gradient(135deg,rgba(139,92,246,0.25),rgba(236,72,153,0.12))', border: '1px solid rgba(139,92,246,0.25)' }}>
+              <span className="text-base">💬</span>
+            </div>
+            <div>
+              <p className="text-[14px] font-black text-white leading-tight">Communauté</p>
+              <p className="text-[10px] leading-tight" style={{ color: 'rgba(196,181,253,0.4)' }}>
+                {tab === 'news' ? `${newsMessages.length} actualité${newsMessages.length > 1 ? 's' : ''}` :
+                 tab === 'chat' ? `${chatMessages.length} message${chatMessages.length > 1 ? 's' : ''}` :
+                 isAdmin ? `${threadList.length} ticket${threadList.length > 1 ? 's' : ''}` :
+                 `${myThreadMessages.length} message${myThreadMessages.length > 1 ? 's' : ''}`}
+              </p>
+            </div>
           </div>
-          <span className="text-[10px] opacity-0 group-hover:opacity-50 transition-opacity ml-1" style={{ color: '#a78bfa' }}>✏</span>
-        </button>
-      </div>
-
-      {/* Tab bar + mute notice */}
-      <div className="flex-shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-        <div>
+          <button onClick={() => setShowProfile(true)}
+            className="flex items-center gap-2.5 pl-2.5 pr-3 py-2 rounded-xl transition-all hover:bg-white/[0.04] group"
+            style={{ border: '1px solid rgba(139,92,246,0.12)' }}>
+            <Avatar url={profile.avatar_url} name={profile.display_name || '?'} userId={user.id} size={28} />
+            <div className="text-left">
+              <p className="text-[11.5px] font-semibold leading-tight" style={{ color: profile.display_name ? 'white' : 'rgba(196,181,253,0.4)' }}>
+                {profile.display_name || 'Définir pseudo'}
+              </p>
+              {currentOrg && <p className="text-[9.5px] leading-tight" style={{ color: 'rgba(139,92,246,0.7)' }}>{currentOrg.name}</p>}
+            </div>
+            <span className="text-[10px] opacity-0 group-hover:opacity-50 transition-opacity ml-1" style={{ color: '#a78bfa' }}>✏</span>
+          </button>
+        </div>
 
         {isMuted && (
           <div className="mx-5 mb-3 px-4 py-2 rounded-xl flex items-center gap-2"
