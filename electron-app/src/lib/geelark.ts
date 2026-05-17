@@ -803,6 +803,19 @@ export async function loginInstagramAccount(
     }
 
     // Some IG builds show a social-login screen first with "Log in with email" link
+    // Handle "Join Instagram" onboarding screen (fresh install) — tap "I already have a profile"
+    const alreadyHavePt = findByText(xml,
+      'I already have a profile', 'J\'ai déjà un profil', 'J\'ai déjà un compte',
+      'Already have an account', 'Log in', 'Se connecter',
+    )
+    if (alreadyHavePt) {
+      log('📲 Écran "Join Instagram" détecté — tap "I already have a profile"…')
+      await shellExec(bearer, phoneId, `input tap ${alreadyHavePt[0]} ${alreadyHavePt[1]}`)
+      await sleep(4000)
+      xml = await dumpXml(bearer, phoneId)
+      log(`📋 XML après tap (${xml.length} chars)`)
+    }
+
     const emailLoginPt = findByText(xml,
       'Log in with email or phone number',
       'Log in with phone or email',
