@@ -21,7 +21,7 @@ interface PhoneJob {
   error?: string
 }
 
-interface LoginCred { email: string; password: string }
+interface LoginCred { email: string; password: string; totpSecret: string }
 
 function fileName(p: string) { return p.split(/[\\/]/).pop() ?? p }
 
@@ -99,7 +99,7 @@ export function Warmup({ user }: WarmupProps) {
 
   function setLoginCred(phoneId: string, field: keyof LoginCred, value: string) {
     setLoginCreds(prev => {
-      const existing = prev[phoneId] ?? { email: '', password: '' }
+      const existing = prev[phoneId] ?? { email: '', password: '', totpSecret: '' }
       return { ...prev, [phoneId]: { ...existing, [field]: value } }
     })
   }
@@ -140,6 +140,7 @@ export function Warmup({ user }: WarmupProps) {
         bearer, phone.id, cred.email, cred.password,
         msg => addLog(phone.id, msg),
         abortRef.current,
+        cred.totpSecret || undefined,
       )
       updateJob(phone.id, result.ok ? { status: 'done' } : { status: 'error', error: result.error })
       addLog(phone.id, '💤 Extinction du téléphone…')
@@ -479,7 +480,7 @@ export function Warmup({ user }: WarmupProps) {
                   ) : (
                     <div className="divide-y max-h-[400px] overflow-auto" style={{ borderColor: 'rgba(255,255,255,0.05)' }}>
                       {selectedPhones.map(phone => {
-                        const cred = loginCreds[phone.id] ?? { email: '', password: '' }
+                        const cred = loginCreds[phone.id] ?? { email: '', password: '', totpSecret: '' }
                         return (
                           <div key={phone.id} className="px-5 py-4 space-y-3">
                             <p className="text-[13px] font-bold text-white">{phoneName(phone)}</p>
@@ -499,6 +500,25 @@ export function Warmup({ user }: WarmupProps) {
                               className="w-full rounded-xl px-4 py-2.5 text-[13px] placeholder:text-text2 focus:outline-none"
                               style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
                             />
+                            <div className="space-y-1">
+                              <input
+                                type="text"
+                                placeholder="Secret 2FA (optionnel) — ex: JBSWY3DPEHPK3PXP"
+                                value={cred.totpSecret}
+                                onChange={e => setLoginCred(phone.id, 'totpSecret', e.target.value)}
+                                className="w-full rounded-xl px-4 py-2.5 text-[13px] placeholder:text-text2 focus:outline-none font-mono"
+                                style={{
+                                  background: cred.totpSecret ? 'rgba(124,58,237,0.08)' : 'rgba(255,255,255,0.03)',
+                                  border: `1px solid ${cred.totpSecret ? 'rgba(139,92,246,0.4)' : 'rgba(255,255,255,0.07)'}`,
+                                  color: '#c4b5fd',
+                                }}
+                              />
+                              {cred.totpSecret && (
+                                <p className="text-[11px] px-1" style={{ color: 'rgba(139,92,246,0.7)' }}>
+                                  ✨ Code 2FA sera généré automatiquement si Instagram le demande
+                                </p>
+                              )}
+                            </div>
                           </div>
                         )
                       })}
@@ -508,8 +528,7 @@ export function Warmup({ user }: WarmupProps) {
 
                 <div className="rounded-xl px-4 py-3 text-[12px]"
                   style={{ background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.18)', color: 'rgba(251,191,36,0.8)' }}>
-                  ⚠ Le téléphone démarre, ouvre Instagram et saisit les identifiants automatiquement.
-                  En cas de 2FA ou challenge de sécurité, tu devras intervenir manuellement sur le téléphone.
+                  ⚠ Le téléphone démarre et saisit les identifiants automatiquement. Si 2FA est activé, renseigne le secret TOTP — le code sera généré et saisi automatiquement.
                 </div>
 
                 <Button

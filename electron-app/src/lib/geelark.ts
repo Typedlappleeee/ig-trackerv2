@@ -732,6 +732,7 @@ export async function loginInstagramAccount(
   password: string,
   log: (m: string) => void,
   abortSignal: { abort: boolean },
+  totpSecret?: string,
 ): Promise<{ ok: boolean; error?: string }> {
   try {
     const ready = await ensurePhoneRunning(bearer, phoneId, log)
@@ -913,9 +914,78 @@ export async function loginInstagramAccount(
       return { ok: true }
     }
 
-    // Unknown state — could be 2FA, challenge screen, etc.
-    log('⚠️ État inconnu après connexion — 2FA ou challenge possible, vérifier le téléphone')
-    return { ok: false, error: 'État inconnu après connexion — 2FA ou challenge requis, vérifier manuellement' }
+    // ── 2FA screen detection ───────────────────────────────────────────────
+    const twoFaPatterns = [
+      'two-factor', 'two_factor', '2-step', '2 step',
+      'authentification à deux', 'double authentification',
+      'confirmation_code', 'two_factor_confirmation',
+      'enter the 6-digit', 'entrez le code à 6',
+      'enter confirmation code', 'entrez le code de confirmation',
+      'get a login code', 'obtenez un code',
+      'security code', 'code de sécurité',
+      'authentication code', 'code d\'authentification',
+      'confirm your identity', 'confirmez votre identité',
+    ]
+    const is2FA = twoFaPatterns.some(p => xmlLower.includes(p))
+
+    if (is2FA && totpSecret?.trim()) {
+      log('🔐 Écran 2FA détecté — génération du code TOTP…')
+      const { generateTOTP } = await import('./totp')
+      const code = await generateTOTP(totpSecret.trim())
+      log(`🔢 Code TOTP généré : ${code}`)
+
+      // Find the 6-digit input field
+      const codePt: [number, number] =
+        findByResourceId(xml,
+          'two_factor_confirmation_code_field', 'confirmation_code',
+          'security_code', 'auth_code', 'otp_code') ??
+        findByText(xml, '______', 'Enter code', 'Entrez le code', 'Code') ??
+        [Math.floor(sw / 2), Math.floor(sh * 0.45)]
+
+      log(`   Champ code à [${codePt[0]},${codePt[1]}]`)
+      await shellExec(bearer, phoneId, `input tap ${codePt[0]} ${codePt[1]}`)
+      await sleep(600)
+      await shellExec(bearer, phoneId, `input text "${code}"`)
+      await sleep(600)
+
+      // Re-dump XML to get confirm button (the button might only appear after filling)
+      const xml2 = await dumpXml(bearer, phoneId)
+      const confirmPt =
+        findByText(xml2, 'Confirm', 'Confirmer', 'Submit', 'Valider', 'Verify', 'Vérifier', 'Next', 'Suivant', 'Continue') ??
+        findByResourceId(xml2, 'confirmation_button', 'submit_button', 'verify_button', 'next_button')
+      if (confirmPt) {
+        log(`   Bouton confirmation à [${confirmPt[0]},${confirmPt[1]}]`)
+        await shellExec(bearer, phoneId, `input tap ${confirmPt[0]} ${confirmPt[1]}`)
+      } else {
+        log('   Bouton non trouvé → ENTER')
+        await shellExec(bearer, phoneId, 'input keyevent 66')
+      }
+
+      log('⏳ Validation du code 2FA (12s)…')
+      await sleep(12000)
+
+      const xml3 = await dumpXml(bearer, phoneId)
+      const xmlLower3 = xml3.toLowerCase()
+      const badCode = ['incorrect code', 'code incorrect', 'wrong code', 'invalid code',
+                       'code invalide', 'code expiré', 'expired code']
+      if (badCode.some(p => xmlLower3.includes(p))) {
+        return { ok: false, error: 'Code 2FA refusé — secret TOTP incorrect ou code expiré' }
+      }
+      if (homeIndicators.some(p => xmlLower3.includes(p))) {
+        log('✅ Connexion réussie avec 2FA !')
+        return { ok: true }
+      }
+      return { ok: false, error: 'État inconnu après validation 2FA — vérifier manuellement' }
+    }
+
+    if (is2FA) {
+      log('⚠️ Écran 2FA détecté mais aucun secret TOTP configuré')
+      return { ok: false, error: 'Écran 2FA — configure le secret TOTP dans le Warmup pour l\'automatiser' }
+    }
+
+    // Unknown state
+    log('⚠️ État inconnu après connexion — vérifier le téléphone')
+    return { ok: false, error: 'État inconnu après connexion — vérifier manuellement' }
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) }
   }
