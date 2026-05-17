@@ -116,6 +116,22 @@ interface Profile {
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
+function isImageMedia(url: string): boolean {
+  return /\.(jpg|jpeg|png|gif|webp|avif|bmp|svg)(\?|$)/i.test(url)
+}
+
+function MediaBlock({ url, maxHeight = 280 }: { url: string; maxHeight?: number }) {
+  if (isImageMedia(url)) {
+    return <img src={url} alt="" className="mt-2 rounded-xl max-w-full object-contain"
+      style={{ maxHeight, background: 'rgba(0,0,0,0.3)' }} />
+  }
+  return (
+    <video controls className="mt-2 rounded-xl max-w-full" style={{ maxHeight, background: '#000' }}>
+      <source src={url} />
+    </video>
+  )
+}
+
 const GRADIENT_PAIRS: [string, string][] = [
   ['#7c3aed', '#ec4899'], ['#2563eb', '#7c3aed'], ['#059669', '#0ea5e9'],
   ['#ea580c', '#f59e0b'], ['#dc2626', '#f43f5e'], ['#0891b2', '#6366f1'],
@@ -215,11 +231,7 @@ function ChatRow({ msg, isOwn, compact, isAdmin, likeCount, liked, onLike, onDel
             <p className="text-[13.5px] leading-relaxed break-words" style={{ color: 'rgba(212,220,240,0.9)' }}>
               {msg.content}
             </p>
-            {msg.video_url && (
-              <video controls className="mt-2 rounded-xl max-w-full" style={{ maxHeight: 260, background: '#000' }}>
-                <source src={msg.video_url} />
-              </video>
-            )}
+            {msg.video_url && <MediaBlock url={msg.video_url} maxHeight={260} />}
           </div>
           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 pb-0.5">
             {compact && (
@@ -289,11 +301,7 @@ function SupportMsgRow({ msg, isAdmin, compact, onDelete }: {
             style={{ color: isAdminMsg ? 'rgba(230,220,255,0.95)' : 'rgba(212,220,240,0.9)' }}>
             {msg.content}
           </p>
-          {msg.video_url && (
-            <video controls className="mt-2 rounded-lg max-w-full" style={{ maxHeight: 240, background: '#000' }}>
-              <source src={msg.video_url} />
-            </video>
-          )}
+          {msg.video_url && <MediaBlock url={msg.video_url} maxHeight={240} />}
         </div>
       </div>
     </div>
@@ -351,13 +359,7 @@ function NewsCard({ msg, isAdmin, likeCount, liked, onLike, onView, onDelete }: 
             {expanded ? '▲ Réduire' : '▼ Lire la suite'}
           </button>
         )}
-        {msg.video_url && (
-          <div className="mt-3">
-            <video controls className="w-full rounded-xl" style={{ maxHeight: 320, background: '#000' }}>
-              <source src={msg.video_url} />
-            </video>
-          </div>
-        )}
+        {msg.video_url && <div className="mt-3"><MediaBlock url={msg.video_url} maxHeight={320} /></div>}
         <div className="flex items-center gap-3 mt-4 pt-3" style={{ borderTop: '1px solid rgba(139,92,246,0.08)' }}>
           <button onClick={() => onLike(msg.id)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-semibold transition-all"
@@ -1055,7 +1057,7 @@ export function Community({ user }: CommunityProps) {
                     {newsVideo ? (
                       <div className="flex items-center gap-2 px-3 py-2 rounded-lg"
                         style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)' }}>
-                        <span className="text-sm">🎬</span>
+                        <span className="text-sm">📎</span>
                         <span className="text-[11px] flex-1 truncate" style={{ color: '#c4b5fd' }}>{newsVideo.name}</span>
                         <button onClick={() => setNewsVideo(null)} className="text-[11px]" style={{ color: 'rgba(239,68,68,0.6)' }}>✕</button>
                       </div>
@@ -1063,11 +1065,11 @@ export function Community({ user }: CommunityProps) {
                       <button onClick={() => newsVideoRef.current?.click()}
                         className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left transition-all"
                         style={{ background: 'rgba(139,92,246,0.04)', border: '1px dashed rgba(139,92,246,0.2)', color: 'rgba(196,181,253,0.5)' }}>
-                        <span className="text-sm">🎬</span>
+                        <span className="text-sm">📎</span>
                         <span className="text-[11px]">Joindre une vidéo (optionnel)</span>
                       </button>
                     )}
-                    <input ref={newsVideoRef} type="file" accept="video/*" className="hidden"
+                    <input ref={newsVideoRef} type="file" accept="image/*,video/*" className="hidden"
                       onChange={e => { if (e.target.files?.[0]) { setNewsVideo(e.target.files[0]); e.target.value = '' } }} />
                     <div className="flex items-center justify-between">
                       <span className="text-[10px]" style={{ color: 'rgba(196,181,253,0.3)' }}>{newsContent.length}/2000</span>
@@ -1171,7 +1173,7 @@ export function Community({ user }: CommunityProps) {
                 {chatVideo && (
                   <div className="flex items-center gap-2 mb-2 px-1 py-1.5 rounded-lg"
                     style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)' }}>
-                    <span className="text-sm">🎬</span>
+                    <span className="text-sm">📎</span>
                     <span className="text-[11px] flex-1 truncate" style={{ color: '#c4b5fd' }}>{chatVideo.name}</span>
                     <button onClick={() => setChatVideo(null)} className="text-[11px]" style={{ color: 'rgba(239,68,68,0.6)' }}>✕</button>
                   </div>
@@ -1190,7 +1192,7 @@ export function Community({ user }: CommunityProps) {
                     <button onClick={() => chatVideoRef.current?.click()} title="Joindre une vidéo"
                       className="flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-all active:scale-90"
                       style={{ color: chatVideo ? '#a78bfa' : 'rgba(196,181,253,0.35)', background: chatVideo ? 'rgba(139,92,246,0.15)' : 'transparent' }}>
-                      <span className="text-[15px]">🎬</span>
+                      <span className="text-[15px]">📎</span>
                     </button>
                     <button onClick={sendChat} disabled={(!chatDraft.trim() && !chatVideo) || chatSending}
                       className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-white transition-all disabled:opacity-30 active:scale-90"
@@ -1199,7 +1201,7 @@ export function Community({ user }: CommunityProps) {
                     </button>
                   </div>
                 </div>
-                <input ref={chatVideoRef} type="file" accept="video/*" className="hidden"
+                <input ref={chatVideoRef} type="file" accept="image/*,video/*" className="hidden"
                   onChange={e => { if (e.target.files?.[0]) { setChatVideo(e.target.files[0]); e.target.value = '' } }} />
               </>
             )}
@@ -1304,7 +1306,7 @@ export function Community({ user }: CommunityProps) {
                       {chatVideo && (
                         <div className="flex items-center gap-2 mb-2 px-2 py-1.5 rounded-lg"
                           style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)' }}>
-                          <span className="text-sm">🎬</span>
+                          <span className="text-sm">📎</span>
                           <span className="text-[11px] flex-1 truncate" style={{ color: '#c4b5fd' }}>{chatVideo.name}</span>
                           <button onClick={() => setChatVideo(null)} className="text-[11px]" style={{ color: 'rgba(239,68,68,0.6)' }}>✕</button>
                         </div>
@@ -1323,7 +1325,7 @@ export function Community({ user }: CommunityProps) {
                           <button onClick={() => chatVideoRef.current?.click()} title="Joindre une vidéo"
                             className="flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-all"
                             style={{ color: chatVideo ? '#a78bfa' : 'rgba(196,181,253,0.35)', background: chatVideo ? 'rgba(139,92,246,0.15)' : 'transparent' }}>
-                            <span className="text-[15px]">🎬</span>
+                            <span className="text-[15px]">📎</span>
                           </button>
                           <button onClick={sendSupport} disabled={(!chatDraft.trim() && !chatVideo) || chatSending}
                             className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-white transition-all disabled:opacity-30 active:scale-90"
@@ -1389,7 +1391,7 @@ export function Community({ user }: CommunityProps) {
                     {chatVideo && (
                       <div className="flex items-center gap-2 mb-2 px-2 py-1.5 rounded-lg"
                         style={{ background: 'rgba(96,165,250,0.08)', border: '1px solid rgba(96,165,250,0.2)' }}>
-                        <span className="text-sm">🎬</span>
+                        <span className="text-sm">📎</span>
                         <span className="text-[11px] flex-1 truncate" style={{ color: '#93c5fd' }}>{chatVideo.name}</span>
                         <button onClick={() => setChatVideo(null)} className="text-[11px]" style={{ color: 'rgba(239,68,68,0.6)' }}>✕</button>
                       </div>
@@ -1408,7 +1410,7 @@ export function Community({ user }: CommunityProps) {
                         <button onClick={() => chatVideoRef.current?.click()} title="Joindre une vidéo"
                           className="flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-all"
                           style={{ color: chatVideo ? '#93c5fd' : 'rgba(147,197,253,0.35)', background: chatVideo ? 'rgba(96,165,250,0.15)' : 'transparent' }}>
-                          <span className="text-[15px]">🎬</span>
+                          <span className="text-[15px]">📎</span>
                         </button>
                         <button onClick={sendSupport} disabled={(!chatDraft.trim() && !chatVideo) || chatSending}
                           className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-white transition-all disabled:opacity-30 active:scale-90"
