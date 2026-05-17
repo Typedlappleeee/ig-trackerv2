@@ -371,15 +371,15 @@ export function MassPosting({ user }: MassPostingProps) {
           activeTasksRef.current = [...activeTasksRef.current, tid]
           setPhoneStatus(asgn.phone.id, { status: 'posting', taskId: tid })
           log(`  ✅ Tâche créée pour ${asgn.phone.phone_name}`, 'ok')
-          // Auto-stop after 3 minutes regardless of task status
+          // Auto-stop after 5 minutes regardless of task status
           setTimeout(() => {
             if (activePhonesRef.current.includes(asgn.phone.geelark_id)) {
               geelark(bearer, '/phone/stop', { ids: [asgn.phone.geelark_id] })
-                .then(() => log(`  ⏱️ ${asgn.phone.phone_name} éteint (timeout 3min)`, 'warn'))
+                .then(() => log(`  ⏱️ ${asgn.phone.phone_name} éteint (timeout 5min)`, 'warn'))
                 .catch(() => {})
               activePhonesRef.current = activePhonesRef.current.filter(id => id !== asgn.phone.geelark_id)
             }
-          }, 3 * 60 * 1000)
+          }, 5 * 60 * 1000)
         } else {
           log(`  ❌ ${asgn.phone.phone_name}: ${taskRes['msg'] ?? taskRes['code']}`, 'error')
           setPhoneStatus(asgn.phone.id, { status: 'error', detail: String(taskRes['msg'] ?? taskRes['code']) })
@@ -390,7 +390,7 @@ export function MassPosting({ user }: MassPostingProps) {
       if (Object.keys(taskIds).length > 0) {
         log(`⏳ Suivi de ${Object.keys(taskIds).length} tâche(s)…`)
         const pending = new Set(Object.values(taskIds))
-        const deadline = Date.now() + 4 * 60 * 1000
+        const deadline = Date.now() + 6 * 60 * 1000
         const STATUS: Record<number, string> = { 1: '⏳ En attente', 2: '🔄 En cours', 3: '✅ Terminé', 4: '❌ Échoué', 7: '🚫 Annulé' }
 
         let pollCount = 0
