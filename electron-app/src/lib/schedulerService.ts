@@ -125,13 +125,23 @@ export async function executeScheduledPost(
   post: ScheduledPost,
   onLog: (msg: string) => void,
 ): Promise<boolean> {
-  const { bearer_token: bearer, phones, videos, caption, delay_minutes, mode } = post
+  const { bearer_token: bearer, caption, delay_minutes, mode } = post
+
+  // Supabase Realtime can deliver jsonb columns as strings — parse defensively
+  const phones = (typeof post.phones === 'string'
+    ? JSON.parse(post.phones as unknown as string)
+    : post.phones) as ScheduledPhoneRecord[]
+  const videos = (typeof post.videos === 'string'
+    ? JSON.parse(post.videos as unknown as string)
+    : post.videos) as ScheduledVideoRecord[]
+
   const geelarkIds = phones.map(p => p.geelark_id)
 
   try {
     // 1. Start phones
     onLog(`▶ Démarrage de ${phones.length} téléphone(s)…`)
-    await gPost(bearer, '/phone/start', { ids: geelarkIds })
+    const startRes = await gPost(bearer, '/phone/start', { ids: geelarkIds }) as any
+    if (startRes.code !== 0) onLog(`⚠ Démarrage: ${startRes.msg ?? startRes.code}`)
 
     // 2. Wait for boot
     onLog('⏳ Boot téléphones (30s)…')
@@ -151,36 +161,39 @@ export async function executeScheduledPost(
         ? Math.floor(Math.random() * videos.length)
         : i % videos.length
       const res = await gPost(bearer, '/rpa/task/instagramPubReels', {
-        id:         phone.geelark_id,
-        scheduleAt: Math.floor(Date.now() / 1000),
+        id:          phone.geelark_id,
+        scheduleAt:  Math.floor(Date.now() / 1000),
         description: caption,
-        video:      [videos[videoIdx].token],
+        video:       [videos[videoIdx].token],
       }) as any
-      if (res.data?.id) {
+      if (res.code === 0 && res.data?.id) {
         taskIds.push(res.data.id)
         onLog(`✅ Tâche créée : ${phone.ig_username ?? phone.phone_name}`)
       } else {
-        onLog(`⚠ Tâche échouée : ${phone.ig_username ?? phone.phone_name}`)
+        onLog(`⚠ Tâche échouée (${phone.ig_username ?? phone.phone_name}): code=${res.code} msg=${res.msg ?? '?'}`)
       }
     }
 
-    // 4. Poll until done (max 8 min)
+    // 4. Poll until done (max 10 min)
     if (taskIds.length > 0) {
       onLog('⏳ Attente de complétion…')
       let elapsed = 0
-      while (elapsed < 8 * 60_000) {
+      const pending = new Set(taskIds)
+      while (pending.size > 0 && elapsed < 10 * 60_000) {
         await sleep(15_000)
         elapsed += 15_000
-        const q = await gPost(bearer, '/task/query', { ids: taskIds }) as any
-        const items: any[] = q.data?.items ?? []
-        let allDone = true
+        const q = await gPost(bearer, '/task/query', { ids: [...pending] }) as any
+        const d = (q.data ?? q) as any
+        const items: any[] = d.items ?? d.list ?? d.tasks ?? d.records ?? []
         for (const it of items) {
-          if (it.status === 3)      onLog(`✅ Succès : ${it.id}`)
-          else if (it.status === 4) onLog(`❌ Échec : ${it.failDesc ?? it.id}`)
-          else                      allDone = false
+          const tid = it.id ?? it.taskId
+          const st  = Number(it.status)
+          if (st === 3) { onLog(`✅ Succès : ${tid}`); pending.delete(tid) }
+          else if (st === 4) { onLog(`❌ Échec : ${it.failDesc ?? tid}`); pending.delete(tid) }
+          else if ([7, 8].includes(st)) { onLog(`🚫 Annulé : ${tid}`); pending.delete(tid) }
         }
-        if (allDone) break
       }
+      if (pending.size > 0) onLog(`⏳ ${pending.size} tâche(s) toujours en attente après timeout`)
     }
 
     // 5. Stop phones

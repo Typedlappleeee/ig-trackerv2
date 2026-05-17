@@ -142,7 +142,14 @@ export function Scheduler({ user }: Props) {
       .on('postgres_changes', {
         event: 'INSERT', schema: 'public', table: 'scheduled_posts',
       }, payload => {
-        const p = payload.new as ScheduledPost
+        // Supabase Realtime returns jsonb columns as strings — parse defensively
+        const raw = payload.new as any
+        const p: ScheduledPost = {
+          ...raw,
+          phones: typeof raw.phones === 'string' ? JSON.parse(raw.phones) : (raw.phones ?? []),
+          videos: typeof raw.videos === 'string' ? JSON.parse(raw.videos) : (raw.videos ?? []),
+          result: typeof raw.result === 'string' ? JSON.parse(raw.result) : raw.result,
+        }
         setPosts(prev => prev.some(x => x.id === p.id) ? prev : [p, ...prev])
         // Only auto-execute our own posts
         if (p.status === 'pending' && p.user_id === user.id) scheduleExecution(p)
@@ -150,7 +157,13 @@ export function Scheduler({ user }: Props) {
       .on('postgres_changes', {
         event: 'UPDATE', schema: 'public', table: 'scheduled_posts',
       }, payload => {
-        const updated = payload.new as ScheduledPost
+        const raw = payload.new as any
+        const updated: ScheduledPost = {
+          ...raw,
+          phones: typeof raw.phones === 'string' ? JSON.parse(raw.phones) : (raw.phones ?? []),
+          videos: typeof raw.videos === 'string' ? JSON.parse(raw.videos) : (raw.videos ?? []),
+          result: typeof raw.result === 'string' ? JSON.parse(raw.result) : raw.result,
+        }
         setPosts(prev => prev.map(p => p.id === updated.id ? updated : p))
       })
       .subscribe()
