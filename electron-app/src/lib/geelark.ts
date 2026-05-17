@@ -991,7 +991,7 @@ export async function loginInstagramAccount(
 
       // "Continue" is on the same screen — tap it to confirm the selection
       const xml2b = await dumpXml(bearer, phoneId)
-      log(`📋 XML avec bouton Continue (${xml2b.length} chars)`)
+      log(`📋 XML avec bouton Continue (${xml2b.length} chars): ${xml2b.substring(0, 600)}`)
       const continuePt =
         findByText(xml2b, 'Continue', 'Continuer', 'Next', 'Suivant') ??
         findByResourceId(xml2b, 'continue_button', 'next_button') ??
