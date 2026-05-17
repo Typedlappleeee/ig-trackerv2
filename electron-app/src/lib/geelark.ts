@@ -766,6 +766,14 @@ export async function loginInstagramAccount(
     await shellExec(bearer, phoneId, 'am force-stop com.google.android.chrome')
     await sleep(1500)
 
+    // Wait 1 minute before opening Instagram to let the phone fully settle
+    log('⏳ Attente 60s avant ouverture d\'Instagram…')
+    for (let s = 60; s > 0; s -= 10) {
+      if (abortSignal.abort) return { ok: false, error: 'Annulé' }
+      log(`  ⏳ ${s}s…`)
+      await sleep(s > 10 ? 10000 : s * 1000)
+    }
+
     const { output: sizeOut } = await shellExec(bearer, phoneId, 'wm size')
     const sm = sizeOut.match(/(\d+)x(\d+)/)
     const sw = sm ? parseInt(sm[1]) : 1080
