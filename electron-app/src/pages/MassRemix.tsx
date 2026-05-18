@@ -332,23 +332,34 @@ Return ONLY a valid JSON array. If no text, return [].`
               const m = txt.match(/\[[\s\S]*\]/)
               if (m) {
                 const parsed = JSON.parse(m[0]) as Array<{ text: string; xAlign: string; yPercent: number; fontSizePx: number; fontColor: string; bold?: boolean; startFrame: number; endFrame: number }>
+                const frameCount = fr.frames!.length
+                // Output frame height (for y-clamping so text stays on-screen)
+                const outH = preset === '9:16' ? 1920 : 1080
                 textOverlays = parsed.map(item => {
                   const len = Math.max(item.text.length, 1)
-                  // Max font size that fits in 1080px width (with some margin)
                   const maxByLength = Math.round(1080 / (len * 0.6))
                   const fontSize = Math.round(Math.max(28, Math.min(400, item.fontSizePx ?? 80, maxByLength)))
-                  // Y: allow full range of the frame (3% to 97%)
-                  const yFrac = Math.max(0.03, Math.min(0.97, (item.yPercent ?? 50) / 100))
+                  // Clamp yFrac so text center never goes closer to an edge than fontSize/2
+                  const margin = (fontSize * 0.6) / outH   // conservative half-height margin
+                  const yFrac  = Math.max(margin, Math.min(1 - margin, (item.yPercent ?? 50) / 100))
+                  // Text timing: if text spans ≥80% of frames, show it for the full clip
+                  const sf = item.startFrame ?? 0
+                  const ef = item.endFrame   ?? frameCount - 1
+                  const coversAll = (ef - sf + 1) >= frameCount * 0.8
+                  const startTime = coversAll ? 0 : Math.round(sf * interval * 10) / 10
+                  const endTime   = coversAll
+                    ? analyzeEnd
+                    : Math.min(analyzeEnd, Math.max(startTime + interval * 2, Math.round((ef + 1) * interval * 10) / 10))
                   return {
                     text: item.text,
                     x: xAlignToExpr(item.xAlign ?? 'center'),
-                    y: `h*${yFrac.toFixed(3)}-${Math.round(fontSize / 2)}`,
+                    y: `h*${yFrac.toFixed(4)}-${Math.round(fontSize / 2)}`,
                     fontSize,
                     fontColor: item.fontColor ?? 'white',
                     bold: item.bold ?? true,
                     shadow: true,
-                    startTime: Math.round((item.startFrame ?? 0) * interval * 10) / 10,
-                    endTime: Math.min(analyzeEnd, Math.round(((item.endFrame ?? fr.frames!.length - 1) + 1) * interval * 10) / 10),
+                    startTime,
+                    endTime,
                   }
                 })
                 addLog(job.id, `   ${textOverlays.length} overlay(s): ${textOverlays.map(o => `"${o.text}"@${o.fontSize}px`).join(', ')}`)
@@ -379,12 +390,16 @@ Return ONLY a valid JSON array. If no text, return [].`
           outputPath = tmp.path
         }
 
+        // Trim output to original video duration so secondary doesn't run long
+        const targetDuration = det.ok && det.duration ? det.duration : undefined
+
         const gen = await withTimeout(
           window.electronAPI!.runFfmpegRemixAI!({
             newPhase1Path: job.secondaryPath,
             originalPath:  job.originalPath,
             splitTime, outputPath, preset,
             textOverlays,
+            targetDuration,
           }),
           40_000, 'FFmpeg'
         )

@@ -863,11 +863,12 @@ function hasAudioStream(ffmpegBin: string, filePath: string): Promise<boolean> {
 
 // ── IPC: FFmpeg remix with AI-detected drawtext overlays ─────────────────────
 ipcMain.handle('run-ffmpeg-remix-ai', async (_event, opts: {
-  newPhase1Path: string
-  originalPath:  string
-  splitTime:     number
-  outputPath:    string
-  preset:        '9:16' | '1:1' | '16:9'
+  newPhase1Path:   string
+  originalPath:    string
+  splitTime:       number
+  outputPath:      string
+  preset:          '9:16' | '1:1' | '16:9'
+  targetDuration?: number   // trim output to original video duration
   textOverlays:  Array<{
     text:      string
     x:         string
@@ -920,8 +921,12 @@ ipcMain.handle('run-ffmpeg-remix-ai', async (_event, opts: {
     const borderPx = Math.max(3, Math.round(ov.fontSize * 0.07))
     const parts: string[] = [`text='${escText(ov.text)}'`]
     if (fontFile) parts.push(`fontfile='${fontFile}'`)
+    // Clamp y so text stays fully on-screen regardless of font size or yFrac.
+    // text_h = actual rendered text height (FFmpeg drawtext built-in variable).
+    // Wrap in single quotes so the commas in max/min don't break the option parser.
+    const ySafe = `'max(0,min(h-text_h,${ov.y}))'`
     parts.push(
-      `x=${ov.x}`, `y=${ov.y}`,
+      `x=${ov.x}`, `y=${ySafe}`,
       `fontsize=${ov.fontSize}`,
       `fontcolor=${ov.fontColor}`,
       `borderw=${borderPx}`, `bordercolor=black@1.0`,
@@ -950,13 +955,15 @@ ipcMain.handle('run-ffmpeg-remix-ai', async (_event, opts: {
   let args: string[]
 
   if (!splitTime) {
-    // No valid split point — just re-encode the new phase1 clip with overlays (no concat)
+    // No valid split point — re-encode secondary clip, trimmed to original duration
     args = [
       '-nostdin',
       '-i', opts.newPhase1Path,
       '-vf', `fps=30,${vfPhase1}`,
       ...commonOutputFlags,
       '-an',
+      // Trim to original video duration so secondary doesn't run longer than original
+      ...(opts.targetDuration != null ? ['-t', String(opts.targetDuration)] : []),
       '-y', opts.outputPath,
     ]
   } else {

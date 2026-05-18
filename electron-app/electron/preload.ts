@@ -108,11 +108,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // FFmpeg remix with AI-detected drawtext overlays
   runFfmpegRemixAI: (opts: {
-    newPhase1Path: string
-    originalPath:  string
-    splitTime:     number
-    outputPath:    string
-    preset:        '9:16' | '1:1' | '16:9'
+    newPhase1Path:   string
+    originalPath:    string
+    splitTime:       number
+    outputPath:      string
+    preset:          '9:16' | '1:1' | '16:9'
+    targetDuration?: number
     textOverlays:  Array<{
       text: string; x: string; y: string
       fontSize: number; fontColor: string
