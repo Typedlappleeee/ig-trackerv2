@@ -310,7 +310,7 @@ Return ONLY a JSON array. If none, return [].`
             splitTime, outputPath, preset,
             textOverlays,
           }),
-          75_000, 'FFmpeg'
+          40_000, 'FFmpeg'
         )
 
         if (!gen.ok) { updateJob(job.id, { status: 'error', error: gen.error ?? 'Erreur FFmpeg' }); playError(); continue }
