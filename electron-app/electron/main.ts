@@ -152,6 +152,37 @@ ipcMain.handle('fetch-instagram-html', async (_event, username: string) => {
 
     const extractHtml = async () => {
       if (settled || browser.isDestroyed()) return
+
+      // After the browser has settled on the profile page, Instagram cookies are now set.
+      // Try the API call with those cookies first — this is far more reliable than regex-parsing HTML.
+      try {
+        const cookies = await session.defaultSession.cookies.get({ domain: '.instagram.com' })
+        const csrftoken = cookies.find(c => c.name === 'csrftoken')?.value
+        if (csrftoken) {
+          console.log('[IG] Browser loaded, retrying API with fresh cookies...')
+          const apiRes = await session.defaultSession.fetch(
+            `https://www.instagram.com/api/v1/users/web_profile_info/?username=${encodeURIComponent(username)}`,
+            {
+              headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                'X-IG-App-ID': '936619743392459',
+                'X-CSRFToken': csrftoken,
+                'Accept': '*/*',
+              },
+            }
+          )
+          console.log(`[IG] Post-browser API status: ${apiRes.status}`)
+          if (apiRes.ok) {
+            const json = await apiRes.json() as Record<string, unknown>
+            finish({ ok: true, apiJson: json })
+            return
+          }
+        }
+      } catch (e) {
+        console.log('[IG] Post-browser API retry failed:', String(e))
+      }
+
+      // Fallback: extract raw HTML for regex parsing
       try {
         const data = await browser.webContents.executeJavaScript(`({
           url: location.href,

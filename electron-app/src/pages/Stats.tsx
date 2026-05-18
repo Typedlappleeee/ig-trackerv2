@@ -42,21 +42,36 @@ function playVideoOpen() {
 }
 
 async function fetchIgVideos(username: string): Promise<IgVideo[]> {
-  if (!window.electronAPI?.geelarkRequest) return []
+  if (!window.electronAPI) return []
   const clean = username.replace(/^@/, '')
-  const result = await window.electronAPI.geelarkRequest({
-    method: 'GET',
-    url: `https://www.instagram.com/api/v1/users/web_profile_info/?username=${encodeURIComponent(clean)}`,
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-      'X-IG-App-ID': '936619743392459',
-      'Accept': '*/*',
-    },
-  })
-  if (!result.ok) return []
+
+  // Prefer fetchInstagramHtml which uses session cookies (set by the hidden browser)
+  // for much higher success rate. Fall back to geelarkRequest (no cookies) if unavailable.
+  let user: Record<string, unknown> | null = null
+  if (window.electronAPI.fetchInstagramHtml) {
+    const res = await window.electronAPI.fetchInstagramHtml(clean)
+    if (res.ok && res.apiJson) {
+      const json = res.apiJson as Record<string, unknown>
+      user = ((json['data'] as Record<string, unknown>)?.['user']) as Record<string, unknown> ?? null
+    }
+  }
+  if (!user && window.electronAPI.geelarkRequest) {
+    const result = await window.electronAPI.geelarkRequest({
+      method: 'GET',
+      url: `https://www.instagram.com/api/v1/users/web_profile_info/?username=${encodeURIComponent(clean)}`,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'X-IG-App-ID': '936619743392459',
+        'Accept': '*/*',
+      },
+    })
+    if (result.ok) {
+      const data = result.data as Record<string, unknown>
+      user = (data?.['data'] as Record<string, unknown>)?.['user'] as Record<string, unknown> ?? null
+    }
+  }
+  if (!user) return []
   try {
-    const data = result.data as Record<string, unknown>
-    const user = (data?.['data'] as Record<string, unknown>)?.['user'] as Record<string, unknown>
 
     function edgeToVideos(edges: unknown[]): IgVideo[] {
       return edges.map((e: unknown) => {
