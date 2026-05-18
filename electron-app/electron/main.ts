@@ -568,8 +568,8 @@ ipcMain.handle('upload-video-geelark', async (_event, opts: {
 // ── IPC: run FFmpeg montage ──────────────────────────────────────────────────
 // Builds a concat + scale filter and runs ffmpeg.
 // Returns { ok, outputPath } or { ok: false, error, command }
-const FFMPEG_TIMEOUT       = 20 * 1000  // 20s for quick ops (detect, extract, metadata)
-const FFMPEG_REMIX_TIMEOUT = 35 * 1000  // 35s for remix re-encode — MUST stay < renderer withTimeout (40s)
+const FFMPEG_TIMEOUT       = 50 * 1000  // 50s for quick ops (detect, extract, metadata)
+const FFMPEG_REMIX_TIMEOUT = 110 * 1000 // 110s for remix re-encode — MUST stay < renderer withTimeout (120s)
 ipcMain.handle('run-ffmpeg', async (_event, opts: {
   clips:      Array<{ filePath: string; trimStart: number; trimEnd: number }>
   outputPath: string

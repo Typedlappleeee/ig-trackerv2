@@ -205,7 +205,7 @@ export function MassRemix({ user }: MassRemixProps) {
 
         const det = await withTimeout(
           window.electronAPI!.detectSceneChange!({ filePath: job.originalPath }),
-          30_000, 'détection scène'
+          60_000, 'détection scène'
         )
 
         if (!det.ok) {
@@ -234,7 +234,7 @@ export function MassRemix({ user }: MassRemixProps) {
               startTime: 0.5,
               endTime: 1.5,
             }),
-            20_000, 'frame debut'
+            45_000, 'frame debut'
           )
 
           // Frame 2 : juste après le cut
@@ -245,7 +245,7 @@ export function MassRemix({ user }: MassRemixProps) {
               startTime: phase2Start,
               endTime: Math.min(phase2Start + 1, totalDur),
             }),
-            20_000, 'frame phase2'
+            45_000, 'frame phase2'
           )
 
           if (fr1.ok && fr1.frames?.[0] && fr2.ok && fr2.frames?.[0]) {
@@ -261,7 +261,7 @@ export function MassRemix({ user }: MassRemixProps) {
                 ]}],
                 maxTokens: 5,
               }),
-              20_000, 'AI changement décor'
+              30_000, 'AI changement décor'
             )
             if (res.ok) {
               const answer = ((res.data as any)?.content?.[0]?.text ?? '').toLowerCase().trim()
@@ -291,7 +291,7 @@ export function MassRemix({ user }: MassRemixProps) {
           const analyzeEnd = splitTime ?? (det.duration ?? 60)
           const fr = await withTimeout(
             window.electronAPI!.extractFrames!({ filePath: job.originalPath, endTime: analyzeEnd }),
-            20_000, 'extraction frames'
+            45_000, 'extraction frames'
           )
           if (fr.ok && fr.frames?.length) {
             addLog(job.id, `   ${fr.frames.length} frames extraites (jusqu'à ${analyzeEnd.toFixed(1)}s)`)
@@ -325,7 +325,7 @@ Return ONLY a valid JSON array. If no text, return [].`
                 messages: [{ role: 'user', content: [...imageBlocks, { type: 'text', text: prompt }] }],
                 maxTokens: 2000,
               }),
-              30_000, 'AI analyse texte'
+              45_000, 'AI analyse texte'
             )
             if (res.ok) {
               const txt = (res.data as { content: Array<{ type: string; text: string }> })?.content?.[0]?.text ?? '[]'
@@ -401,7 +401,7 @@ Return ONLY a valid JSON array. If no text, return [].`
             textOverlays,
             targetDuration,
           }),
-          40_000, 'FFmpeg'
+          120_000, 'FFmpeg'
         )
 
         if (gen.command) addLog(job.id, `   cmd: ${gen.command}`)
@@ -441,7 +441,7 @@ Return ONLY a valid JSON array. If no text, return [].`
         updateJob(job.id, { status: 'error', error: msg })
         playError()
       }
-    }), 3)
+    }), 2)
 
     setRunning(false)
   }
