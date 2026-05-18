@@ -568,7 +568,8 @@ ipcMain.handle('upload-video-geelark', async (_event, opts: {
 // ── IPC: run FFmpeg montage ──────────────────────────────────────────────────
 // Builds a concat + scale filter and runs ffmpeg.
 // Returns { ok, outputPath } or { ok: false, error, command }
-const FFMPEG_TIMEOUT = 20 * 1000  // 20-second hard kill — stuck video → error, next one
+const FFMPEG_TIMEOUT       = 20 * 1000  // 20s for quick ops (detect, extract, metadata)
+const FFMPEG_REMIX_TIMEOUT = 60 * 1000  // 60s for full re-encode (remix AI)
 ipcMain.handle('run-ffmpeg', async (_event, opts: {
   clips:      Array<{ filePath: string; trimStart: number; trimEnd: number }>
   outputPath: string
@@ -925,13 +926,13 @@ ipcMain.handle('run-ffmpeg-remix-ai', async (_event, opts: {
     ? opts.splitTime
     : null
 
-  const commonOutputArgs = [
+  // Common output flags (WITHOUT the output path — must be last)
+  const commonOutputFlags = [
     '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23',
     '-r', '30',
     '-movflags', '+faststart',
     '-avoid_negative_ts', 'make_zero',
     '-max_muxing_queue_size', '9999',
-    '-y', opts.outputPath,
   ]
 
   let args: string[]
@@ -942,8 +943,9 @@ ipcMain.handle('run-ffmpeg-remix-ai', async (_event, opts: {
       '-nostdin',
       '-i', opts.newPhase1Path,
       '-vf', `fps=30,${vfPhase1}`,
-      ...commonOutputArgs,
+      ...commonOutputFlags,
       '-an',
+      '-y', opts.outputPath,
     ]
   } else {
     // Probe original for audio so we don't hang on a missing audio stream
@@ -962,16 +964,16 @@ ipcMain.handle('run-ffmpeg-remix-ai', async (_event, opts: {
         `[ao2]atrim=start=${splitTime},asetpts=PTS-STARTPTS,${afmt}[a_p2]`,
         `[v_p1][a_p1][v_p2][a_p2]concat=n=2:v=1:a=1[vout][aout]`,
       ].join(';')
-      mapArgs    = ['-map', '[vout]', '-map', '[aout]']
+      mapArgs      = ['-map', '[vout]', '-map', '[aout]']
       audioEncArgs = ['-c:a', 'aac', '-b:a', '128k']
     } else {
-      // No audio in original — concat video only
+      // No audio in original — concat video only, no audio output
       filterComplex = [
         `[0:v]trim=duration=${splitTime},fps=30,setpts=PTS-STARTPTS,${vfPhase1}[v_p1]`,
         `[1:v]trim=start=${splitTime},fps=30,setpts=PTS-STARTPTS,${scl}[v_p2]`,
         `[v_p1][v_p2]concat=n=2:v=1:a=0[vout]`,
       ].join(';')
-      mapArgs    = ['-map', '[vout]']
+      mapArgs      = ['-map', '[vout]']
       audioEncArgs = ['-an']
     }
 
@@ -981,15 +983,16 @@ ipcMain.handle('run-ffmpeg-remix-ai', async (_event, opts: {
       '-i', opts.originalPath,
       '-filter_complex', filterComplex,
       ...mapArgs,
-      ...commonOutputArgs,
+      ...commonOutputFlags,
       ...audioEncArgs,
+      '-y', opts.outputPath,   // output path LAST — always
     ]
   }
 
   const command = `ffmpeg ${args.map(a => a.includes(' ') ? `"${a}"` : a).join(' ')}`
 
   return new Promise(resolve => {
-    execFile(ffmpegBin, args, { maxBuffer: 200 * 1024 * 1024, timeout: FFMPEG_TIMEOUT, killSignal: 'SIGKILL' }, err => {
+    execFile(ffmpegBin, args, { maxBuffer: 200 * 1024 * 1024, timeout: FFMPEG_REMIX_TIMEOUT, killSignal: 'SIGKILL' }, err => {
       if (err) resolve({ ok: false, error: err.message, command })
       else     resolve({ ok: true, outputPath: opts.outputPath, command })
     })

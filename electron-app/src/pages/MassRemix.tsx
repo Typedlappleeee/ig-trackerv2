@@ -308,10 +308,9 @@ Return ONLY a JSON array. If none, return [].`
             newPhase1Path: job.secondaryPath,
             originalPath:  job.originalPath,
             splitTime, outputPath, preset,
-            targetDuration: det.duration ?? undefined,
             textOverlays,
           }),
-          20_000, 'FFmpeg'
+          75_000, 'FFmpeg'
         )
 
         if (!gen.ok) { updateJob(job.id, { status: 'error', error: gen.error ?? 'Erreur FFmpeg' }); playError(); continue }
