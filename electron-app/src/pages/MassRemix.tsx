@@ -286,13 +286,17 @@ Return ONLY a JSON array. If none, return [].`
         outputPath = tmp.path
       }
 
-      const gen = await window.electronAPI!.runFfmpegRemixAI!({
+      const ffmpegPromise = window.electronAPI!.runFfmpegRemixAI!({
         newPhase1Path: job.secondaryPath,
         originalPath:  job.originalPath,
         splitTime, outputPath, preset,
         targetDuration: det.duration ?? undefined,
         textOverlays,
       })
+      const timeoutPromise = new Promise<{ ok: false; error: string }>(r =>
+        setTimeout(() => r({ ok: false, error: 'Timeout FFmpeg (20s)' }), 20_000)
+      )
+      const gen = await Promise.race([ffmpegPromise, timeoutPromise])
 
       if (!gen.ok) { updateJob(job.id, { status: 'error', error: gen.error ?? 'Erreur FFmpeg', outputPath }); playError(); continue }
       updateJob(job.id, { outputPath: gen.outputPath ?? outputPath })
