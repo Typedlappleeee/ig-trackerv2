@@ -228,6 +228,7 @@ export function Dashboard({ user }: DashboardProps) {
   const [chartData, setChartData]   = useState<ViewPoint[]>([])
   const [loading, setLoading]       = useState(true)
   const [loadingChart, setLC]       = useState(false)
+  const [fetchingStats, setFetchingStats] = useState(false)
   const [schemaMissing, setSchemaMissing] = useState(false)
   const [sqlCopied, setSqlCopied]   = useState(false)
 
@@ -243,6 +244,7 @@ export function Dashboard({ user }: DashboardProps) {
       // Fetch fresh Instagram stats for each phone with a username, then snapshot
       const withUsername = loaded.filter(p => p.ig_username)
       if (withUsername.length === 0) return
+      setFetchingStats(true)
       const now = new Date().toISOString()
       const rows: { user_id: string; phone_id: string; views: number; recorded_at: string }[] = []
       for (const p of withUsername) {
@@ -255,6 +257,7 @@ export function Dashboard({ user }: DashboardProps) {
       }
       if (rows.length > 0)
         supabase.from('views_history').insert(rows).then(() => {})
+      setFetchingStats(false)
     })
   }, [currentOrg?.id, user.id, conns.bearer])
 
@@ -362,7 +365,16 @@ export function Dashboard({ user }: DashboardProps) {
         className="flex-shrink-0 px-10 pt-9 pb-7 flex items-center justify-between"
         style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}
       >
-        <h1 className="text-[28px] font-black text-white leading-none">Dashboard</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-[28px] font-black text-white leading-none">Dashboard</h1>
+          {fetchingStats && (
+            <div className="flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-medium"
+              style={{ background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.25)', color: 'rgba(167,139,250,0.9)' }}>
+              <span className="inline-block w-2 h-2 rounded-full animate-pulse" style={{ background: '#8b5cf6' }} />
+              Actualisation des stats…
+            </div>
+          )}
+        </div>
 
         <div className="flex items-center gap-3">
           {/* Range pills */}
@@ -399,7 +411,7 @@ export function Dashboard({ user }: DashboardProps) {
                 <option value="" style={{ background: '#0d1120', color: '#e2d9f3' }}>Tous les comptes</option>
                 {linkedPhones.map(p => (
                   <option key={p.id} value={p.id} style={{ background: '#0d1120', color: '#e2d9f3' }}>
-                    {p.phone_name}
+                    {p.ig_username ? `@${p.ig_username}` : p.phone_name}
                   </option>
                 ))}
               </select>
@@ -448,7 +460,7 @@ export function Dashboard({ user }: DashboardProps) {
               {[
                 { n: '1', title: 'Bearer Token', desc: 'Configure ton token GéeLark dans Paramètres → Connexions' },
                 { n: '2', title: 'Sync téléphones', desc: 'Va dans Téléphones et clique "Sync GéeLark"' },
-                { n: '3', title: 'Ajoute Instagram', desc: 'Clic droit sur un téléphone → Session ID' },
+                { n: '3', title: 'Ajoute Instagram', desc: 'Renseigne le nom d\'utilisateur Instagram sur chaque téléphone' },
                 { n: '4', title: 'Lance le posting', desc: 'Utilise Posting ou Mass Posting pour publier' },
               ].map(step => (
                 <div key={step.n} className="rounded-xl p-3 flex gap-3 items-start" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(139,92,246,0.1)' }}>
@@ -464,69 +476,42 @@ export function Dashboard({ user }: DashboardProps) {
           </div>
         ) : (
           <>
-            {/* ── 4 KPI cards ────────────────────────────────────────────────── */}
-            <div className="grid grid-cols-4 gap-6 mt-8">
-              {/* totalNow */}
-              <div
-                className="rounded-2xl p-7"
-                style={{ background: 'rgba(129,140,248,0.05)', border: '1px solid rgba(129,140,248,0.12)' }}
-              >
-                <div className="flex items-center gap-2 mb-5">
-                  <span className="text-[18px]">👁</span>
-                  <span className="text-[12px] font-semibold" style={{ color: 'rgba(148,163,184,0.7)' }}>
-                    {selPhone ? 'Vues du compte' : 'Total vues'}
-                  </span>
-                </div>
-                <p className="text-[42px] font-black text-white leading-none anim-number-pop" key={kpis.peak}>
-                  {fmt(kpis.peak)}
-                </p>
-              </div>
+            {/* ── Hero KPI — Aujourd'hui ───────────────────────────────────────── */}
+            <div className="mt-8 rounded-2xl p-8 relative overflow-hidden"
+              style={{ background: 'linear-gradient(135deg, rgba(124,58,237,0.18) 0%, rgba(236,72,153,0.12) 100%)', border: '1px solid rgba(139,92,246,0.25)' }}
+            >
+              {/* Decorative glow */}
+              <div className="absolute -top-12 -right-12 w-48 h-48 rounded-full pointer-events-none"
+                style={{ background: 'radial-gradient(circle, rgba(139,92,246,0.2) 0%, transparent 70%)' }} />
 
-              {/* today + delta */}
-              <div
-                className="rounded-2xl p-7"
-                style={{ background: 'rgba(96,165,250,0.05)', border: '1px solid rgba(96,165,250,0.12)' }}
-              >
-                <div className="flex items-center gap-2 mb-5">
-                  <span className="text-[18px]">{kpis.delta !== null && kpis.delta >= 0 ? '📈' : '📉'}</span>
-                  <span className="text-[12px] font-semibold" style={{ color: 'rgba(148,163,184,0.7)' }}>Aujourd'hui</span>
-                </div>
-                <p className="text-[42px] font-black text-white leading-none anim-number-pop" key={kpis.today}>
-                  {fmt(kpis.today)}
-                </p>
-                {kpis.delta !== null && (
-                  <p className={`text-[13px] font-semibold mt-2 ${kpis.delta >= 0 ? 'text-ok' : 'text-danger'}`}>
-                    {kpis.delta >= 0 ? '▲' : '▼'} {fmt(Math.abs(kpis.delta))} vs hier
+              <div className="flex items-end justify-between relative z-10">
+                <div>
+                  <p className="text-[12px] font-semibold uppercase tracking-widest mb-3" style={{ color: 'rgba(196,181,253,0.7)' }}>
+                    Vues aujourd'hui {selPhone && selPhone.ig_username ? `· @${selPhone.ig_username}` : ''}
                   </p>
-                )}
-              </div>
-
-              {/* peak */}
-              <div
-                className="rounded-2xl p-7"
-                style={{ background: 'rgba(251,191,36,0.05)', border: '1px solid rgba(251,191,36,0.12)' }}
-              >
-                <div className="flex items-center gap-2 mb-5">
-                  <span className="text-[18px]">🏆</span>
-                  <span className="text-[12px] font-semibold" style={{ color: 'rgba(148,163,184,0.7)' }}>Record</span>
+                  <p className="text-[64px] font-black text-white leading-none anim-number-pop" key={kpis.today}>
+                    {fmt(kpis.today)}
+                  </p>
+                  {kpis.delta !== null && (
+                    <p className={`text-[14px] font-semibold mt-3 ${kpis.delta >= 0 ? 'text-ok' : 'text-danger'}`}>
+                      {kpis.delta >= 0 ? '▲' : '▼'} {fmt(Math.abs(kpis.delta))} vs hier
+                    </p>
+                  )}
                 </div>
-                <p className="text-[42px] font-black text-white leading-none anim-number-pop" key={kpis.peak}>
-                  {fmt(kpis.peak)}
-                </p>
-              </div>
-
-              {/* avg */}
-              <div
-                className="rounded-2xl p-7"
-                style={{ background: 'rgba(52,211,153,0.05)', border: '1px solid rgba(52,211,153,0.12)' }}
-              >
-                <div className="flex items-center gap-2 mb-5">
-                  <span className="text-[18px]">📊</span>
-                  <span className="text-[12px] font-semibold" style={{ color: 'rgba(148,163,184,0.7)' }}>Moyenne / jour</span>
+                <div className="grid grid-cols-3 gap-4 text-right">
+                  <div className="rounded-xl px-5 py-4" style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                    <p className="text-[10px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'rgba(148,163,184,0.6)' }}>Record</p>
+                    <p className="text-[26px] font-black text-white leading-none">{fmt(kpis.peak)}</p>
+                  </div>
+                  <div className="rounded-xl px-5 py-4" style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                    <p className="text-[10px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'rgba(148,163,184,0.6)' }}>Moyenne</p>
+                    <p className="text-[26px] font-black text-white leading-none">{fmt(kpis.avg)}</p>
+                  </div>
+                  <div className="rounded-xl px-5 py-4" style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                    <p className="text-[10px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'rgba(148,163,184,0.6)' }}>Comptes</p>
+                    <p className="text-[26px] font-black text-white leading-none">{kpis.activePhones}</p>
+                  </div>
                 </div>
-                <p className="text-[42px] font-black text-white leading-none anim-number-pop" key={kpis.avg}>
-                  {fmt(kpis.avg)}
-                </p>
               </div>
             </div>
 
@@ -535,9 +520,12 @@ export function Dashboard({ user }: DashboardProps) {
               {/* Active phones */}
               <div
                 className="rounded-2xl px-6 py-5 flex items-center gap-4"
-                style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}
+                style={{ background: 'rgba(129,140,248,0.05)', border: '1px solid rgba(129,140,248,0.14)' }}
               >
-                <span className="text-[22px]">📱</span>
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                  style={{ background: 'rgba(129,140,248,0.15)' }}>
+                  <span className="text-[18px]">📱</span>
+                </div>
                 <div>
                   <p className="text-[11px] font-semibold mb-1" style={{ color: 'rgba(148,163,184,0.65)' }}>Téléphones actifs</p>
                   <p className="text-[22px] font-black text-white leading-none">
@@ -550,17 +538,18 @@ export function Dashboard({ user }: DashboardProps) {
               <div
                 className="rounded-2xl px-6 py-5 flex items-center gap-4"
                 style={{
-                  background: kpis.banned > 0 ? 'rgba(240,61,85,0.06)' : 'rgba(255,255,255,0.03)',
-                  border: `1px solid ${kpis.banned > 0 ? 'rgba(240,61,85,0.2)' : 'rgba(255,255,255,0.07)'}`,
+                  background: kpis.banned > 0 ? 'rgba(240,61,85,0.07)' : 'rgba(255,255,255,0.03)',
+                  border: `1px solid ${kpis.banned > 0 ? 'rgba(240,61,85,0.22)' : 'rgba(255,255,255,0.07)'}`,
                 }}
               >
-                <span className="text-[22px]">🚫</span>
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                  style={{ background: kpis.banned > 0 ? 'rgba(240,61,85,0.15)' : 'rgba(255,255,255,0.05)' }}>
+                  <span className="text-[18px]">🚫</span>
+                </div>
                 <div>
                   <p className="text-[11px] font-semibold mb-1" style={{ color: 'rgba(148,163,184,0.65)' }}>Bannis / Erreur</p>
-                  <p
-                    className="text-[22px] font-black leading-none"
-                    style={{ color: kpis.banned > 0 ? '#f03d55' : 'white' }}
-                  >
+                  <p className="text-[22px] font-black leading-none"
+                    style={{ color: kpis.banned > 0 ? '#f03d55' : 'white' }}>
                     {kpis.banned}
                   </p>
                 </div>
@@ -570,20 +559,26 @@ export function Dashboard({ user }: DashboardProps) {
               {selPhone ? (
                 <div
                   className="rounded-2xl px-6 py-5 flex items-center gap-4"
-                  style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}
+                  style={{ background: 'rgba(52,211,153,0.05)', border: '1px solid rgba(52,211,153,0.14)' }}
                 >
-                  <span className="text-[22px]">🎥</span>
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                    style={{ background: 'rgba(52,211,153,0.12)' }}>
+                    <span className="text-[18px]">🎥</span>
+                  </div>
                   <div>
-                    <p className="text-[11px] font-semibold mb-1" style={{ color: 'rgba(148,163,184,0.65)' }}>Vidéos</p>
+                    <p className="text-[11px] font-semibold mb-1" style={{ color: 'rgba(148,163,184,0.65)' }}>Vidéos postées</p>
                     <p className="text-[22px] font-black text-white leading-none">{fmt(kpis.videos)}</p>
                   </div>
                 </div>
               ) : (
                 <div
                   className="rounded-2xl px-6 py-5 flex items-center gap-4"
-                  style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}
+                  style={{ background: 'rgba(251,191,36,0.05)', border: '1px solid rgba(251,191,36,0.14)' }}
                 >
-                  <span className="text-[22px]">📷</span>
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                    style={{ background: 'rgba(251,191,36,0.12)' }}>
+                    <span className="text-[18px]">📷</span>
+                  </div>
                   <div>
                     <p className="text-[11px] font-semibold mb-1" style={{ color: 'rgba(148,163,184,0.65)' }}>Comptes IG liés</p>
                     <p className="text-[22px] font-black text-white leading-none">{linkedPhones.length}</p>
@@ -597,7 +592,10 @@ export function Dashboard({ user }: DashboardProps) {
               className="rounded-2xl p-8 mt-5"
               style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}
             >
-              <p className="text-[15px] font-bold text-white mb-7">Tendances des vues</p>
+              <div className="flex items-baseline gap-3 mb-7">
+                <p className="text-[15px] font-bold text-white">Tendances des vues</p>
+                <p className="text-[12px] font-medium" style={{ color: 'rgba(139,92,246,0.7)' }}>Vues gagnées par jour</p>
+              </div>
               {loadingChart ? (
                 <div className="flex justify-center" style={{ height: 320 }}><Spinner /></div>
               ) : (
@@ -618,7 +616,8 @@ export function Dashboard({ user }: DashboardProps) {
                       phone.ig_status === 'error'        ? '#f03d55' :
                       phone.ig_status === 'rate_limited' ? '#ffaa2a' :
                       '#5a6882'
-                    const initials = (phone.ig_username ?? phone.phone_name).slice(0, 2).toUpperCase()
+                    const handle   = phone.ig_username ?? phone.phone_name
+                    const initials = handle.slice(0, 2).toUpperCase()
                     return (
                       <button
                         key={phone.id}
@@ -628,12 +627,14 @@ export function Dashboard({ user }: DashboardProps) {
                       >
                         <div
                           className="w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold text-white flex-shrink-0"
-                          style={{ background: avatarColor(phone.ig_username ?? phone.phone_name) }}
+                          style={{ background: avatarColor(handle) }}
                         >
                           {initials}
                         </div>
                         <span className="text-[12px] font-semibold text-text">
-                          {phone.phone_name.length > 18 ? phone.phone_name.slice(0, 18) + '…' : phone.phone_name}
+                          {phone.ig_username
+                            ? `@${phone.ig_username.length > 16 ? phone.ig_username.slice(0, 16) + '…' : phone.ig_username}`
+                            : phone.phone_name.length > 18 ? phone.phone_name.slice(0, 18) + '…' : phone.phone_name}
                         </span>
                         <span className="relative w-2 h-2 rounded-full flex-shrink-0" style={{ background: dotColor }}>
                           {phone.ig_status === 'active' && (
