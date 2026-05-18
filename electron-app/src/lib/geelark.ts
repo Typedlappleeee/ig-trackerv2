@@ -517,8 +517,8 @@ export async function updateInstagramProfile(
   }
   await sleep(4000)
 
-  // ── Hamburger menu (top-right) → Settings and privacy ────────────────────
-  log('⚙️ Ouverture Paramètres…')
+  // ── Hamburger menu (☰ top-right) ─────────────────────────────────────────
+  log('☰ Ouverture menu…')
   xml = await dumpXml(bearer, phoneId)
   const menuPt =
     findByResourceId(xml, 'action_bar_overflow_button', 'hamburger_button',
@@ -531,66 +531,83 @@ export async function updateInstagramProfile(
   }
   await sleep(2500)
 
-  xml = await dumpXml(bearer, phoneId)
-  const settingsPt =
-    findByText(xml, 'Settings and privacy', 'Paramètres et confidentialité',
-      'Settings', 'Paramètres') ??
-    findByResourceId(xml, 'settings_row', 'settings_privacy', 'settings_and_privacy')
-  if (settingsPt) {
-    await shellExec(bearer, phoneId, `input tap ${settingsPt[0]} ${settingsPt[1]}`)
-  } else {
-    await shellExec(bearer, phoneId, `input tap ${cx} ${Math.floor(sh * 0.12)}`)
-  }
-  await sleep(3500)
-
-  // ── Account Center ────────────────────────────────────────────────────────
+  // ── Account Center — directement visible dans le panneau hamburger ────────
   log('🏛 Account Center…')
   xml = await dumpXml(bearer, phoneId)
   let acPt =
     findByText(xml, 'Account Center', 'Centre de comptes', 'Accounts Center',
       'Meta Account Center') ??
     findByResourceId(xml, 'account_center_row', 'accounts_center', 'account_center')
+
   if (!acPt) {
-    // Scroll down and retry
-    await shellExec(bearer, phoneId,
-      `input swipe ${cx} ${Math.floor(sh * 0.7)} ${cx} ${Math.floor(sh * 0.3)} 600`)
-    await sleep(1200)
-    xml = await dumpXml(bearer, phoneId)
-    acPt = findByText(xml, 'Account Center', 'Centre de comptes', 'Accounts Center',
-      'Meta Account Center')
+    // Sur certaines versions Instagram, Account Center est sous "Settings and privacy"
+    const settingsPt =
+      findByText(xml, 'Settings and privacy', 'Paramètres et confidentialité',
+        'Settings', 'Paramètres') ??
+      findByResourceId(xml, 'settings_row', 'settings_privacy', 'settings_and_privacy')
+    if (settingsPt) {
+      await shellExec(bearer, phoneId, `input tap ${settingsPt[0]} ${settingsPt[1]}`)
+      await sleep(3000)
+      xml = await dumpXml(bearer, phoneId)
+      acPt =
+        findByText(xml, 'Account Center', 'Centre de comptes', 'Accounts Center',
+          'Meta Account Center') ??
+        findByResourceId(xml, 'account_center_row', 'accounts_center', 'account_center')
+      if (!acPt) {
+        // Scroll down pour trouver Account Center
+        await shellExec(bearer, phoneId,
+          `input swipe ${cx} ${Math.floor(sh * 0.7)} ${cx} ${Math.floor(sh * 0.3)} 600`)
+        await sleep(1000)
+        xml = await dumpXml(bearer, phoneId)
+        acPt = findByText(xml, 'Account Center', 'Centre de comptes', 'Accounts Center',
+          'Meta Account Center')
+      }
+    }
   }
+
   if (acPt) {
     await shellExec(bearer, phoneId, `input tap ${acPt[0]} ${acPt[1]}`)
   } else {
-    throw new Error('Account Center non trouvé dans les paramètres')
+    throw new Error('Account Center non trouvé')
   }
   await sleep(4000)
 
-  // ── Profile and personal details ──────────────────────────────────────────
-  log('👤 Profile and personal details…')
+  // ── Cliquer sur le profil (compte Instagram) ──────────────────────────────
+  log('👤 Sélection du profil…')
   xml = await dumpXml(bearer, phoneId)
+
+  // Le compte est affiché comme élément cliquable dans Account Center.
+  // Sur certaines versions il faut d'abord taper "Profile and personal details"
+  // puis le compte apparaît ; sur d'autres le compte est directement visible.
   const profDetailsPt =
     findByText(xml, 'Profile and personal details', 'Profil et informations personnelles',
       'Personal details', 'Profile information', 'Profile details') ??
     findByResourceId(xml, 'profile_details_row', 'personal_details', 'profile_info_row')
-  if (profDetailsPt) {
-    await shellExec(bearer, phoneId, `input tap ${profDetailsPt[0]} ${profDetailsPt[1]}`)
-  } else {
-    await shellExec(bearer, phoneId, `input tap ${cx} ${Math.floor(sh * 0.25)}`)
-  }
-  await sleep(3500)
 
-  // ── Tap the account (there's always one) ─────────────────────────────────
-  log('📱 Sélection du compte…')
-  xml = await dumpXml(bearer, phoneId)
-  const accountPt =
-    findByResourceId(xml, 'account_item', 'profile_account_row', 'account_row', 'ig_account') ??
-    // Account row is typically first tappable item after the header ~28% height
-    null
-  if (accountPt) {
-    await shellExec(bearer, phoneId, `input tap ${accountPt[0]} ${accountPt[1]}`)
+  if (profDetailsPt) {
+    // Version Instagram avec sous-menu "Profile and personal details"
+    await shellExec(bearer, phoneId, `input tap ${profDetailsPt[0]} ${profDetailsPt[1]}`)
+    await sleep(3000)
+    xml = await dumpXml(bearer, phoneId)
+    // Maintenant tapper le compte dans la liste
+    const accountPt =
+      findByResourceId(xml, 'account_item', 'profile_account_row', 'account_row', 'ig_account')
+    if (accountPt) {
+      await shellExec(bearer, phoneId, `input tap ${accountPt[0]} ${accountPt[1]}`)
+    } else {
+      // Le compte est toujours la première ligne après l'en-tête
+      await shellExec(bearer, phoneId, `input tap ${cx} ${Math.floor(sh * 0.28)}`)
+    }
   } else {
-    await shellExec(bearer, phoneId, `input tap ${cx} ${Math.floor(sh * 0.28)}`)
+    // Le compte est directement visible dans Account Center — tapper dessus
+    const accountPt =
+      findByResourceId(xml, 'account_item', 'profile_account_row', 'account_row', 'ig_account') ??
+      findByResourceId(xml, 'instagram_account', 'linked_account', 'profile_icon')
+    if (accountPt) {
+      await shellExec(bearer, phoneId, `input tap ${accountPt[0]} ${accountPt[1]}`)
+    } else {
+      await shellExec(bearer, phoneId, `input tap ${cx} ${Math.floor(sh * 0.28)}`)
+    }
   }
   await sleep(3500)
 
