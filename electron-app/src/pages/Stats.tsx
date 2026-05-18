@@ -259,8 +259,11 @@ export function Stats({ user }: StatsProps) {
   return (
     <div className="h-full flex flex-col overflow-hidden">
 
-      {/* Header */}
-      <div className="flex-shrink-0 px-10 pt-9 pb-7 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+      {/* ── Page header ───────────────────────────────────────────────────── */}
+      <div
+        className="flex-shrink-0 px-10 pt-9 pb-7 flex items-center justify-between"
+        style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}
+      >
         <div>
           <h1 className="text-[28px] font-black text-white leading-none">Statistiques Instagram</h1>
           <p className="text-[13px] text-text2 mt-0.5">
@@ -283,9 +286,16 @@ export function Stats({ user }: StatsProps) {
 
       <div className="flex-1 overflow-hidden flex">
 
-        {/* ── Sidebar ─────────────────────────────────────────────────────── */}
-        <aside className="w-64 flex-shrink-0 flex flex-col overflow-hidden" style={{ borderRight: '1px solid rgba(255,255,255,0.06)' }}>
-          <div className="px-4 py-3 space-y-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        {/* ── Sidebar ───────────────────────────────────────────────────── */}
+        <aside
+          className="w-64 flex-shrink-0 flex flex-col overflow-hidden"
+          style={{ borderRight: '1px solid rgba(255,255,255,0.06)' }}
+        >
+          {/* Search / title */}
+          <div
+            className="px-4 py-3 space-y-3"
+            style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}
+          >
             <p className="text-[13px] font-bold text-white">Comptes Instagram</p>
             <form onSubmit={e => { e.preventDefault(); searchByUsername(searchInput) }}>
               <div className="relative">
@@ -297,17 +307,21 @@ export function Stats({ user }: StatsProps) {
                   className="w-full rounded-xl px-3 py-2 text-[12px] pr-8 placeholder:text-text2 focus:outline-none"
                   style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
                 />
-                <button type="submit" className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text2 hover:text-white transition-colors text-[13px]">→</button>
+                <button
+                  type="submit"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text2 hover:text-white transition-colors text-[13px]"
+                >→</button>
               </div>
             </form>
           </div>
 
-          <div className="flex-1 overflow-y-auto py-2">
+          {/* Account list */}
+          <div className="flex-1 overflow-y-auto py-1">
             {phones.length === 0 ? (
               <div className="px-5 py-8 text-center space-y-2">
                 <p className="text-3xl">📱</p>
                 <p className="text-[13px] text-text2">
-                  Aucun compte lié.<br/>Va dans Téléphones → colonne Instagram.
+                  Aucun compte lié.<br />Va dans Téléphones → colonne Instagram.
                 </p>
               </div>
             ) : phones.map(phone => {
@@ -317,14 +331,15 @@ export function Stats({ user }: StatsProps) {
                 <button
                   key={phone.id}
                   onClick={() => selectPhone(phone)}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-left transition-all duration-150"
+                  className="w-full flex items-center gap-3 px-4 py-3.5 text-left transition-all duration-150"
                   style={isSelected ? {
                     background: 'rgba(139,92,246,0.1)',
                     boxShadow: 'inset 3px 0 0 #8b5cf6',
                   } : undefined}
                 >
+                  {/* Avatar */}
                   <div
-                    className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0 transition-transform duration-150"
+                    className="w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center text-sm font-bold text-white transition-transform duration-150"
                     style={{
                       background: isSelected
                         ? 'linear-gradient(135deg, #7c3aed, #ec4899)'
@@ -336,153 +351,210 @@ export function Stats({ user }: StatsProps) {
                   >
                     {initial}
                   </div>
+
+                  {/* Labels */}
                   <div className="min-w-0 flex-1">
                     <p className="text-[13px] font-semibold truncate" style={{ color: isSelected ? '#c4b5fd' : '#d4dcf0' }}>
                       @{phone.ig_username}
                     </p>
-                    <p className="text-[12px] text-text2 truncate">{phone.phone_name}</p>
+                    <p className="text-[11px] text-text2 truncate mt-0.5">{phone.phone_name}</p>
                   </div>
-                  <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                    {phone.status === 'online' && (
-                      <span className="relative w-1.5 h-1.5 rounded-full bg-ok">
-                        <span className="absolute inset-0 rounded-full bg-ok animate-ping opacity-60" />
-                      </span>
-                    )}
-                    {phone.ig_sessionid && (
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded"
-                        style={{ background: 'rgba(139,92,246,0.15)', color: '#a78bfa' }}>
-                        🔑
-                      </span>
-                    )}
-                  </div>
+
+                  {/* Online dot only — no session badge */}
+                  {phone.status === 'online' && (
+                    <span className="relative flex-shrink-0 w-1.5 h-1.5 rounded-full bg-ok">
+                      <span className="absolute inset-0 rounded-full bg-ok animate-ping opacity-60" />
+                    </span>
+                  )}
                 </button>
               )
             })}
           </div>
         </aside>
 
-        {/* ── Main panel ──────────────────────────────────────────────────── */}
+        {/* ── Main panel ────────────────────────────────────────────────── */}
         <div className="flex-1 overflow-y-auto px-8 pb-10">
           {!selected ? (
+
+            /* Empty state — no account selected */
             <div className="flex items-center justify-center h-full">
-              <div className="rounded-2xl p-10 text-center" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                <div className="text-5xl mb-4">📈</div>
-                <p className="text-base font-bold text-white">Sélectionne un compte</p>
-                <p className="text-[13px] text-text2 mt-1">Choisis un compte Instagram dans la liste à gauche</p>
+              <div
+                className="rounded-2xl px-14 py-12 text-center"
+                style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}
+              >
+                <div
+                  className="w-14 h-14 rounded-2xl mx-auto mb-5 flex items-center justify-center"
+                  style={{ background: 'linear-gradient(135deg,#7c3aed,#ec4899)', boxShadow: '0 4px 24px rgba(124,58,237,0.35)' }}
+                >
+                  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+                  </svg>
+                </div>
+                <p className="text-[15px] font-bold text-white">Recherche un compte</p>
+                <p className="text-[13px] text-text2 mt-1.5 max-w-[220px] mx-auto leading-relaxed">
+                  Sélectionne un compte dans la liste ou colle un @username dans la barre de recherche.
+                </p>
               </div>
             </div>
-          ) : (
-            <div className="pt-8 space-y-6">
 
-              {/* ── Profile header ──────────────────────────────────────── */}
-              <div className="rounded-2xl p-6 flex items-start gap-5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                <div className="w-16 h-16 rounded-2xl flex-shrink-0 overflow-hidden"
-                  style={{ boxShadow: '0 4px 20px rgba(124,58,237,0.4)' }}>
-                  {profilePic ? (
-                    <img src={profilePic} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-2xl font-black text-white"
-                      style={{ background: 'linear-gradient(135deg, #7c3aed 0%, #ec4899 100%)' }}>
-                      {selected.ig_username?.[0].toUpperCase()}
-                    </div>
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h2 className="text-[22px] font-bold text-white">@{selected.ig_username}</h2>
-                    {selected.ig_sessionid && (
-                      <span className="text-[11px] font-bold px-2 py-0.5 rounded-full"
-                        style={{ background: 'rgba(52,211,153,0.12)', color: '#34d399', border: '1px solid rgba(52,211,153,0.25)' }}>
-                        🔑 Session
-                      </span>
-                    )}
-                    <span
-                      className="text-[11px] font-bold px-2 py-0.5 rounded-full"
-                      style={selected.status === 'online'
-                        ? { background: 'rgba(52,211,153,0.12)', color: '#34d399', border: '1px solid rgba(52,211,153,0.25)' }
-                        : { background: 'rgba(255,255,255,0.05)', color: 'rgba(196,181,253,0.4)' }}
+          ) : (
+            <div className="pt-6 space-y-6">
+
+              {/* ── Instagram-style profile header ──────────────────────── */}
+              <div
+                className="rounded-2xl overflow-hidden"
+                style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}
+              >
+                {/* Gradient banner */}
+                <div
+                  className="h-20 w-full"
+                  style={{ background: 'linear-gradient(135deg, #3b0764 0%, #6d28d9 45%, #be185d 100%)' }}
+                />
+
+                {/* Avatar + username row */}
+                <div className="px-6 pb-5">
+                  <div className="flex items-end gap-4 -mt-11">
+                    {/* Circular avatar overlapping banner */}
+                    <div
+                      className="w-[88px] h-[88px] rounded-full flex-shrink-0 overflow-hidden"
+                      style={{ boxShadow: '0 0 0 4px #111, 0 4px 24px rgba(124,58,237,0.5)' }}
                     >
-                      {selected.status}
-                    </span>
+                      {profilePic ? (
+                        <img src={profilePic} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <div
+                          className="w-full h-full flex items-center justify-center text-3xl font-black text-white"
+                          style={{ background: 'linear-gradient(135deg, #7c3aed 0%, #ec4899 100%)' }}
+                        >
+                          {selected.ig_username?.[0].toUpperCase()}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Status badge — aligned to bottom of avatar row */}
+                    <div className="mb-2 ml-auto flex-shrink-0">
+                      {selected.status === 'online' && (
+                        <span
+                          className="text-[11px] font-semibold px-2.5 py-1 rounded-full"
+                          style={{ background: 'rgba(52,211,153,0.12)', color: '#34d399', border: '1px solid rgba(52,211,153,0.2)' }}
+                        >
+                          En ligne
+                        </span>
+                      )}
+                    </div>
                   </div>
+
+                  {/* Username */}
+                  <h2 className="text-[22px] font-black text-white mt-3 leading-none">
+                    @{selected.ig_username}
+                  </h2>
+
+                  {/* Device / group */}
                   {selected.id !== '__search__' && (
-                    <p className="text-[13px] text-text2 mt-0.5">
-                      {selected.phone_name} · {selected.group_name ?? 'Sans groupe'}
+                    <p className="text-[12px] text-text2 mt-1">
+                      {selected.phone_name}{selected.group_name ? ` · ${selected.group_name}` : ''}
                     </p>
                   )}
+
+                  {/* Bio */}
                   {stats?.bio && (
-                    <p className="text-[13px] mt-2 max-w-md line-clamp-2 text-text2">{stats.bio}</p>
+                    <p className="text-[13px] text-text2 mt-2.5 max-w-lg line-clamp-2 leading-relaxed">
+                      {stats.bio}
+                    </p>
                   )}
+
+                  {/* Inline stats: followers · following · posts */}
+                  {loadingStats ? (
+                    <div className="flex items-center gap-6 mt-4">
+                      {[80, 70, 50].map((w, i) => (
+                        <div key={i} className="animate-pulse rounded-md h-8" style={{ width: w, background: 'rgba(139,92,246,0.1)' }} />
+                      ))}
+                    </div>
+                  ) : stats ? (
+                    <div className="flex items-center gap-6 mt-4">
+                      {([
+                        { label: 'followers',    value: stats.followers },
+                        { label: 'abonnements',  value: stats.following },
+                        { label: 'posts',        value: stats.posts     },
+                      ] as const).map(({ label, value }, i) => (
+                        <div key={label} className="flex items-baseline gap-1.5">
+                          {i > 0 && <span className="text-text2 mr-4">·</span>}
+                          <span className="text-[18px] font-black text-white">{fmt(value)}</span>
+                          <span className="text-[12px] text-text2">{label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
               </div>
 
               {/* Error banner */}
               {loadError && (
-                <div className="px-5 py-3.5 rounded-xl flex items-center gap-2"
-                  style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)', color: '#fbbf24' }}>
-                  <span>⚠</span><span className="text-[13px]">{loadError}</span>
+                <div
+                  className="px-5 py-3.5 rounded-xl flex items-center gap-2"
+                  style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)', color: '#fbbf24' }}
+                >
+                  <span>⚠</span>
+                  <span className="text-[13px]">{loadError}</span>
                 </div>
               )}
 
-              {/* ── KPI cards ───────────────────────────────────────────── */}
+              {/* ── Highlight card: total views ──────────────────────────── */}
               {loadingStats ? (
-                <div className="grid grid-cols-4 gap-4">
-                  {[0,1,2,3].map(i => (
-                    <div key={i} className="rounded-2xl h-28 animate-pulse"
-                      style={{ background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.1)' }} />
-                  ))}
-                </div>
+                <div
+                  className="rounded-2xl h-24 animate-pulse"
+                  style={{ background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.1)' }}
+                />
               ) : stats ? (
-                <div className="grid grid-cols-4 gap-4">
-                  {([
-                    { label: 'Followers',    value: stats.followers,   gradient: 'linear-gradient(135deg,#7c3aed,#a78bfa)', glow: '#8b5cf6', icon: '👥' },
-                    { label: 'Abonnements',  value: stats.following,   gradient: 'linear-gradient(135deg,#1e3a5f,#3b82f6)', glow: '#3b82f6', icon: '➡' },
-                    { label: 'Posts',        value: stats.posts,       gradient: 'linear-gradient(135deg,#065f46,#34d399)', glow: '#34d399', icon: '📸' },
-                    { label: 'Vues totales', value: stats.total_views, gradient: 'linear-gradient(135deg,#78350f,#f59e0b)', glow: '#f59e0b', icon: '👁'  },
-                  ] as const).map(({ label, value, gradient, glow, icon }) => (
-                    <div
-                      key={label}
-                      className="rounded-2xl p-5 relative overflow-hidden transition-transform duration-200 hover:-translate-y-0.5"
-                      style={{
-                        background: 'rgba(255,255,255,0.03)',
-                        border: '1px solid rgba(255,255,255,0.07)',
-                        boxShadow: `0 4px 24px -8px ${glow}44`,
-                      }}
-                    >
-                      <div className="absolute top-0 left-4 right-4 h-[2px] rounded-b-full" style={{ background: gradient }} />
-                      <div className="flex items-center gap-2 mb-3 mt-1">
-                        <span className="text-base">{icon}</span>
-                        <span className="text-[12px] font-bold uppercase tracking-wider text-text2">{label}</span>
-                      </div>
-                      <p className="text-[28px] font-black leading-none">
-                        <AnimatedNumber value={value} color={glow} />
-                      </p>
-                    </div>
-                  ))}
+                <div
+                  className="rounded-2xl p-5 relative overflow-hidden transition-transform duration-200 hover:-translate-y-0.5"
+                  style={{
+                    background: 'rgba(255,255,255,0.03)',
+                    border: '1px solid rgba(255,255,255,0.07)',
+                    boxShadow: '0 4px 24px -8px rgba(245,158,11,0.25)',
+                  }}
+                >
+                  <div
+                    className="absolute top-0 left-4 right-4 h-[2px] rounded-b-full"
+                    style={{ background: 'linear-gradient(90deg,#78350f,#f59e0b)' }}
+                  />
+                  <p className="text-[11px] font-bold uppercase tracking-widest text-text2 mb-1 mt-0.5">
+                    Vues des 12 derniers posts
+                  </p>
+                  <p className="text-[32px] font-black leading-none">
+                    <AnimatedNumber value={stats.total_views} color="#f59e0b" />
+                  </p>
                 </div>
               ) : !loadError ? (
-                <div className="rounded-2xl p-8 text-center" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                <div
+                  className="rounded-2xl p-8 text-center"
+                  style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}
+                >
                   <p className="text-[13px] text-text2">Impossible de charger les stats — compte privé ou Instagram indisponible.</p>
                 </div>
               ) : null}
 
               {/* ── Videos section ──────────────────────────────────────── */}
               <div>
+                {/* Section header */}
                 <div className="flex items-center justify-between mb-5">
                   <div className="flex items-center gap-2">
-                    <h3 className="text-[15px] font-bold text-white flex items-center gap-2">
-                      <span>🎬</span>
-                      <span>Vidéos</span>
-                    </h3>
+                    <h3 className="text-[15px] font-bold text-white">Vidéos</h3>
                     {videos.length > 0 && (
-                      <span className="text-[12px] font-bold px-2.5 py-0.5 rounded-full"
-                        style={{ background: 'rgba(139,92,246,0.15)', color: '#a78bfa' }}>
+                      <span
+                        className="text-[12px] font-bold px-2.5 py-0.5 rounded-full"
+                        style={{ background: 'rgba(139,92,246,0.15)', color: '#a78bfa' }}
+                      >
                         {videos.length}
                       </span>
                     )}
                   </div>
-                  <div className="flex items-center gap-1 p-1 rounded-xl"
-                    style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+
+                  {/* Sort tabs */}
+                  <div
+                    className="flex items-center gap-1 p-1 rounded-xl"
+                    style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}
+                  >
                     {([
                       { key: 'recent', label: 'Récent'    },
                       { key: 'views',  label: '+ de vues' },
@@ -502,23 +574,28 @@ export function Stats({ user }: StatsProps) {
                   </div>
                 </div>
 
+                {/* Video grid */}
                 {loadingList ? (
                   <div className="grid grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
                     {[...Array(6)].map((_, i) => (
-                      <div key={i} className="rounded-xl overflow-hidden animate-pulse"
-                        style={{ aspectRatio: '9/16', background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.08)' }}>
-                        <div className="w-full h-full" style={{ background: `linear-gradient(135deg, rgba(139,92,246,0.06) 0%, rgba(236,72,153,0.04) 100%)` }} />
+                      <div
+                        key={i}
+                        className="rounded-xl overflow-hidden animate-pulse"
+                        style={{ aspectRatio: '9/16', background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.08)' }}
+                      >
+                        <div className="w-full h-full" style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.06) 0%, rgba(236,72,153,0.04) 100%)' }} />
                       </div>
                     ))}
                   </div>
                 ) : videos.length === 0 ? (
-                  <div className="rounded-2xl p-10 text-center" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                  <div
+                    className="rounded-2xl p-10 text-center"
+                    style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}
+                  >
                     <div className="text-5xl mb-4">🎥</div>
                     <p className="text-base font-bold text-white">Aucune vidéo</p>
                     <p className="text-[13px] text-text2 mt-1">
-                      {loadError ? 'Chargement échoué.' : selected.ig_sessionid
-                        ? 'Aucune vidéo trouvée.'
-                        : 'Ajoute un Session ID pour charger les vidéos privées.'}
+                      {loadError ? 'Chargement échoué.' : 'Aucune vidéo trouvée.'}
                     </p>
                   </div>
                 ) : (
@@ -555,6 +632,7 @@ export function Stats({ user }: StatsProps) {
                               )}
                               <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/15 to-transparent pointer-events-none" />
 
+                              {/* Play button overlay */}
                               <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none">
                                 <div
                                   className="w-14 h-14 rounded-full flex items-center justify-center"
@@ -564,27 +642,35 @@ export function Stats({ user }: StatsProps) {
                                 </div>
                               </div>
 
+                              {/* Top badges */}
                               <div className="absolute top-2 left-2 right-2 flex items-start justify-between pointer-events-none">
-                                <span className="text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded"
-                                  style={{ background: 'rgba(0,0,0,0.65)', color: '#fff', backdropFilter: 'blur(4px)' }}>
+                                <span
+                                  className="text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded"
+                                  style={{ background: 'rgba(0,0,0,0.65)', color: '#fff', backdropFilter: 'blur(4px)' }}
+                                >
                                   REEL
                                 </span>
                                 {tier === 'high' && (
-                                  <span className="text-[8px] font-black px-1.5 py-0.5 rounded"
-                                    style={{ background: 'rgba(139,92,246,0.7)', color: '#fff' }}>
+                                  <span
+                                    className="text-[8px] font-black px-1.5 py-0.5 rounded"
+                                    style={{ background: 'rgba(139,92,246,0.7)', color: '#fff' }}
+                                  >
                                     🔥 TOP
                                   </span>
                                 )}
                               </div>
 
+                              {/* Bottom stats */}
                               <div className="absolute bottom-0 left-0 right-0 p-3 space-y-1.5">
                                 <div className="flex items-baseline gap-1.5">
                                   <span className="text-[22px] font-black text-white leading-none">{fmt(video.views)}</span>
                                   <span className="text-[10px] text-white/50">vues</span>
                                 </div>
                                 <div className="h-[2px] rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.12)' }}>
-                                  <div className="h-full rounded-full transition-all duration-700"
-                                    style={{ width: `${(video.views / maxV) * 100}%`, background: tier === 'high' ? '#a78bfa' : 'rgba(255,255,255,0.5)' }} />
+                                  <div
+                                    className="h-full rounded-full transition-all duration-700"
+                                    style={{ width: `${(video.views / maxV) * 100}%`, background: tier === 'high' ? '#a78bfa' : 'rgba(255,255,255,0.5)' }}
+                                  />
                                 </div>
                                 <div className="flex items-center gap-2 text-[10px] text-white/60 font-medium">
                                   {video.likes    > 0 && <span>♥ {fmt(video.likes)}</span>}
@@ -656,61 +742,66 @@ function IgVideoPlayerModal({ video, onClose }: { video: IgVideo; onClose: () =>
       style={{ background: 'rgba(0,0,0,0.92)', backdropFilter: 'blur(20px)' }}
       onClick={onClose}
     >
-      <div
-        className="relative anim-scale-in"
-        onClick={e => e.stopPropagation()}
-      >
+      <div className="relative anim-scale-in" onClick={e => e.stopPropagation()}>
+
+        {/* Close button */}
         <button
           onClick={onClose}
           className="absolute -top-10 right-0 z-20 w-8 h-8 rounded-full flex items-center justify-center text-white/60 hover:text-white transition-colors"
-          style={{ background: 'rgba(0,0,0,0.4)' }}
-        >✕</button>
+          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
+        >
+          ✕
+        </button>
 
-        <div className="flex items-center gap-3 text-white text-xs mb-2 px-1">
-          <span className="font-semibold" style={{ color: '#c4b5fd' }}>👁 {video.views.toLocaleString('fr-FR')}</span>
+        {/* Meta row */}
+        <div className="flex items-center gap-3 text-xs mb-2 px-1">
+          <span className="font-semibold" style={{ color: '#c4b5fd' }}>
+            {video.views.toLocaleString('fr-FR')} vues
+          </span>
           {video.likes    > 0 && <span style={{ color: '#f9a8d4' }}>♥ {video.likes.toLocaleString('fr-FR')}</span>}
           {video.comments > 0 && <span style={{ color: 'rgba(196,181,253,0.6)' }}>✎ {video.comments.toLocaleString('fr-FR')}</span>}
-          <a href={video.url} target="_blank" rel="noreferrer"
-            className="ml-auto transition-colors"
-            style={{ color: 'rgba(139,92,246,0.7)' }}
-            onMouseEnter={e => (e.currentTarget.style.color = '#a78bfa')}
-            onMouseLeave={e => (e.currentTarget.style.color = 'rgba(139,92,246,0.7)')}
+          <a
+            href={video.url}
+            target="_blank"
+            rel="noreferrer"
+            className="ml-auto text-[11px] font-semibold transition-colors"
+            style={{ color: '#a78bfa' }}
           >
-            ↗ Instagram
+            ↗ Voir sur Instagram
           </a>
         </div>
 
+        {/* Video shell */}
         <div
-          className="rounded-xl overflow-hidden shadow-2xl flex items-center justify-center"
+          className="rounded-2xl overflow-hidden flex items-center justify-center"
           style={{
             background: '#000',
-            boxShadow: '0 0 60px rgba(139,92,246,0.2)',
+            boxShadow: '0 0 60px rgba(139,92,246,0.2), 0 0 0 1px rgba(139,92,246,0.15)',
             maxWidth: 'min(49.5vh, 92vw)',
             minWidth: 200,
           }}
         >
           {err ? (
-            <div className="flex flex-col items-center gap-3 p-8 text-center">
-              <span className="text-4xl opacity-40">🎥</span>
+            <div className="flex flex-col items-center gap-3 p-10 text-center">
+              <div
+                className="w-12 h-12 rounded-xl flex items-center justify-center"
+                style={{ background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.2)' }}
+              >
+                <span className="text-2xl">🎥</span>
+              </div>
               <p className="text-[13px]" style={{ color: '#f87171' }}>{err}</p>
             </div>
           ) : loading ? (
-            <div className="flex flex-col items-center gap-3 p-12">
+            <div className="flex flex-col items-center gap-3 p-14">
               <Spinner size="lg" />
-              <p className="text-[13px] text-text2">Téléchargement…</p>
+              <p className="text-[13px] text-text2">Chargement…</p>
             </div>
           ) : (
             <video
               src={localUrl}
               controls
               autoPlay
-              style={{
-                display: 'block',
-                maxHeight: '88vh',
-                maxWidth: '100%',
-                width: 'auto',
-                height: 'auto',
-              }}
+              style={{ display: 'block', maxHeight: '88vh', maxWidth: '100%', width: 'auto', height: 'auto' }}
             />
           )}
         </div>
