@@ -201,38 +201,36 @@ export function MassRemix({ user }: MassRemixProps) {
           ? Math.min((det.duration ?? 60) - 0.1, Math.round(det.splitTime * 1000) / 1000)
           : undefined
 
-        // Check phase 2 isn't still a person (optional AI check — skip on timeout)
+        // Check phase 2 isn't still a person
         if (splitTime != null && anthropicKey.trim()) {
-          try {
-            const totalDur = det.duration ?? 60
-            const phase2Mid = Math.min(splitTime + 2, totalDur - 0.5)
-            const fr2 = await withTimeout(
-              window.electronAPI!.extractFrames!({
-                filePath: job.originalPath,
-                startTime: phase2Mid,
-                endTime: Math.min(phase2Mid + 1, totalDur),
+          const totalDur = det.duration ?? 60
+          const phase2Mid = Math.min(splitTime + 2, totalDur - 0.5)
+          const fr2 = await withTimeout(
+            window.electronAPI!.extractFrames!({
+              filePath: job.originalPath,
+              startTime: phase2Mid,
+              endTime: Math.min(phase2Mid + 1, totalDur),
+            }),
+            15_000, 'frames phase2'
+          )
+          if (fr2.ok && fr2.frames?.[0]) {
+            const res = await withTimeout(
+              window.electronAPI!.anthropicVisionRequest!({
+                apiKey: anthropicKey.trim(),
+                model: 'claude-haiku-4-5-20251001',
+                messages: [{ role: 'user', content: [
+                  { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: fr2.frames[0].data } },
+                  { type: 'text', text: 'Is there a person or human face clearly visible in this frame? Answer only "yes" or "no".' },
+                ]}],
+                maxTokens: 5,
               }),
-              15_000, 'frames phase2'
+              20_000, 'AI phase2'
             )
-            if (fr2.ok && fr2.frames?.[0]) {
-              const res = await withTimeout(
-                window.electronAPI!.anthropicVisionRequest!({
-                  apiKey: anthropicKey.trim(),
-                  model: 'claude-haiku-4-5-20251001',
-                  messages: [{ role: 'user', content: [
-                    { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: fr2.frames[0].data } },
-                    { type: 'text', text: 'Is there a person or human face clearly visible in this frame? Answer only "yes" or "no".' },
-                  ]}],
-                  maxTokens: 5,
-                }),
-                20_000, 'AI phase2'
-              )
-              if (res.ok) {
-                const answer = ((res.data as any)?.content?.[0]?.text ?? '').toLowerCase()
-                if (answer.includes('yes')) splitTime = undefined
-              }
+            if (res.ok) {
+              const answer = ((res.data as any)?.content?.[0]?.text ?? '').toLowerCase()
+              if (answer.includes('yes')) splitTime = undefined
             }
-          } catch { /* timeout or error → keep splitTime as-is */ }
+          }
         }
 
         updateJob(job.id, { splitTime: splitTime ?? 0 })
@@ -244,19 +242,18 @@ export function MassRemix({ user }: MassRemixProps) {
         if (aiEnabled && anthropicKey.trim()) {
           setCurrentStep('analyzing')
           updateJob(job.id, { status: 'analyzing' })
-          try {
-            const analyzeEnd = splitTime ?? (det.duration ?? 60)
-            const fr = await withTimeout(
-              window.electronAPI!.extractFrames!({ filePath: job.originalPath, endTime: analyzeEnd }),
-              15_000, 'extraction frames'
-            )
-            if (fr.ok && fr.frames?.length) {
-              const interval = analyzeEnd / fr.frames.length
-              const imageBlocks = fr.frames.flatMap((f, fi) => [
-                { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: f.data } },
-                { type: 'text', text: `[Frame ${fi} — t=${f.timestamp}s]` },
-              ])
-              const prompt = `These are ${fr.frames.length} frames from a ${analyzeEnd.toFixed(1)}s video clip (vertical 9:16, output resolution 1080×1920).
+          const analyzeEnd = splitTime ?? (det.duration ?? 60)
+          const fr = await withTimeout(
+            window.electronAPI!.extractFrames!({ filePath: job.originalPath, endTime: analyzeEnd }),
+            15_000, 'extraction frames'
+          )
+          if (fr.ok && fr.frames?.length) {
+            const interval = analyzeEnd / fr.frames.length
+            const imageBlocks = fr.frames.flatMap((f, fi) => [
+              { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: f.data } },
+              { type: 'text', text: `[Frame ${fi} — t=${f.timestamp}s]` },
+            ])
+            const prompt = `These are ${fr.frames.length} frames from a ${analyzeEnd.toFixed(1)}s video clip (vertical 9:16, output resolution 1080×1920).
 Identify ALL burned-in text overlays (titles, captions, subtitles, watermarks). For each return:
 {"text":"exact string","xAlign":"left"|"center"|"right","yPercent":0-100,"fontSizePx":number,"fontColor":"css-color","bold":true,"startFrame":0,"endFrame":5}
 
@@ -264,36 +261,33 @@ Rules for fontSizePx (at 1080×1920):
 CRITICAL: text must fit on ONE LINE within 1080px. Use fontSizePx ≤ 900/(text.length×0.55).
 Examples: 6 chars→max 272px, 10 chars→max 163px, 15 chars→max 109px, 20 chars→max 81px, 30 chars→max 54px.
 Return ONLY a JSON array. If none, return [].`
-              const res = await withTimeout(
-                window.electronAPI!.anthropicVisionRequest!({
-                  apiKey: anthropicKey.trim(), model: 'claude-haiku-4-5-20251001',
-                  messages: [{ role: 'user', content: [...imageBlocks, { type: 'text', text: prompt }] }],
-                  maxTokens: 2000,
-                }),
-                30_000, 'AI analyse texte'
-              )
-              if (res.ok) {
-                const txt = (res.data as { content: Array<{ type: string; text: string }> })?.content?.[0]?.text ?? '[]'
-                try {
-                  const m = txt.match(/\[[\s\S]*\]/)
-                  if (m) {
-                    const parsed = JSON.parse(m[0]) as Array<{ text: string; xAlign: string; yPercent: number; fontSizePx: number; fontColor: string; bold?: boolean; startFrame: number; endFrame: number }>
-                    textOverlays = parsed.map(item => ({
-                      text: item.text,
-                      x: xAlignToExpr(item.xAlign ?? 'center'),
-                      y: `h*${Math.max(0.55, Math.min(0.82, (item.yPercent ?? 72) / 100)).toFixed(3)}`,
-                      fontSize: Math.round(Math.max(36, Math.min(130, item.fontSizePx ?? 80, Math.round(950 / Math.max(item.text.length * 0.62, 1))))),
-                      fontColor: item.fontColor ?? 'white',
-                      bold: item.bold ?? true,
-                      shadow: true,
-                      startTime: Math.round((item.startFrame ?? 0) * interval * 10) / 10,
-                      endTime: Math.min(analyzeEnd, Math.round(((item.endFrame ?? fr.frames!.length - 1) + 1) * interval * 10) / 10),
-                    }))
-                  }
-                } catch { /* ignore parse errors */ }
+            const res = await withTimeout(
+              window.electronAPI!.anthropicVisionRequest!({
+                apiKey: anthropicKey.trim(), model: 'claude-haiku-4-5-20251001',
+                messages: [{ role: 'user', content: [...imageBlocks, { type: 'text', text: prompt }] }],
+                maxTokens: 2000,
+              }),
+              30_000, 'AI analyse texte'
+            )
+            if (res.ok) {
+              const txt = (res.data as { content: Array<{ type: string; text: string }> })?.content?.[0]?.text ?? '[]'
+              const m = txt.match(/\[[\s\S]*\]/)
+              if (m) {
+                const parsed = JSON.parse(m[0]) as Array<{ text: string; xAlign: string; yPercent: number; fontSizePx: number; fontColor: string; bold?: boolean; startFrame: number; endFrame: number }>
+                textOverlays = parsed.map(item => ({
+                  text: item.text,
+                  x: xAlignToExpr(item.xAlign ?? 'center'),
+                  y: `h*${Math.max(0.55, Math.min(0.82, (item.yPercent ?? 72) / 100)).toFixed(3)}`,
+                  fontSize: Math.round(Math.max(36, Math.min(130, item.fontSizePx ?? 80, Math.round(950 / Math.max(item.text.length * 0.62, 1))))),
+                  fontColor: item.fontColor ?? 'white',
+                  bold: item.bold ?? true,
+                  shadow: true,
+                  startTime: Math.round((item.startFrame ?? 0) * interval * 10) / 10,
+                  endTime: Math.min(analyzeEnd, Math.round(((item.endFrame ?? fr.frames!.length - 1) + 1) * interval * 10) / 10),
+                }))
               }
             }
-          } catch { /* timeout → continue without overlays */ }
+          }
         }
 
         // ── 3. Generate ──────────────────────────────────────────────────────
