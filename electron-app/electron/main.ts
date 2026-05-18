@@ -81,56 +81,100 @@ function getIgBrowser(): BrowserWindow {
   return _igBrowser
 }
 
-// Fetch Instagram profile HTML.
-// Strategy: try the web_profile_info JSON API first (fast, uses session cookies from the
-// hidden browser so it works after the first browser visit). Fall back to loading the
-// full profile page in the hidden browser (slower, handles GDPR consent automatically).
+// Fetch Instagram profile data via the web_profile_info JSON API.
+// Strategy:
+//   1. Try the API directly — works if instagram.com cookies already exist in the session.
+//   2. If no cookies yet, fetch instagram.com/username/ to get cookies (Set-Cookie),
+//      then immediately retry the API. No hidden browser needed for this.
+//   3. Hidden browser fallback only if the fetch-based approach gets blocked (rare).
 ipcMain.handle('fetch-instagram-html', async (_event, username: string) => {
+  const IG_UA      = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+  const IG_APP_ID  = '936619743392459'
+  const apiUrl     = `https://www.instagram.com/api/v1/users/web_profile_info/?username=${encodeURIComponent(username)}`
   const profileUrl = `https://www.instagram.com/${encodeURIComponent(username)}/`
 
-  // ── Fast path: API call with session cookies ──────────────────────────────
-  // session.defaultSession.fetch() automatically sends all instagram.com cookies
-  // (csrftoken, ig_did, etc.) set by the hidden browser. net.fetch does NOT do this.
-  try {
+  async function getCsrf(): Promise<string | undefined> {
     const cookies = await session.defaultSession.cookies.get({ domain: '.instagram.com' })
-    const csrftoken = cookies.find(c => c.name === 'csrftoken')?.value
+    return cookies.find(c => c.name === 'csrftoken')?.value
+        ?? cookies.find(c => c.name === 'csrftoken')?.value
+  }
 
-    if (csrftoken) {
-      console.log('[IG] Trying API with session cookies...')
-      const apiRes = await session.defaultSession.fetch(
-        `https://www.instagram.com/api/v1/users/web_profile_info/?username=${encodeURIComponent(username)}`,
-        {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-            'X-IG-App-ID': '936619743392459',
-            'X-CSRFToken': csrftoken,
-            'Accept': '*/*',
-          },
-        }
-      )
-      console.log(`[IG] API status: ${apiRes.status}`)
-      if (apiRes.ok) {
-        const json = await apiRes.json() as Record<string, unknown>
-        return { ok: true, apiJson: json }
-      }
-      if (apiRes.status === 401) {
-        // Session expired/rate-limited — clear cookies so browser slow-path starts fresh
-        console.log('[IG] 401 — clearing session, falling back to browser')
+  async function callApi(csrftoken: string): Promise<Record<string, unknown> | null> {
+    try {
+      const res = await session.defaultSession.fetch(apiUrl, {
+        headers: {
+          'User-Agent':    IG_UA,
+          'X-IG-App-ID':  IG_APP_ID,
+          'X-CSRFToken':  csrftoken,
+          'Referer':      profileUrl,
+          'Origin':       'https://www.instagram.com',
+          'Accept':       '*/*',
+          'Accept-Language': 'fr-FR,fr;q=0.9,en;q=0.8',
+        },
+      })
+      console.log(`[IG] API ${username}: ${res.status}`)
+      if (res.ok) return await res.json() as Record<string, unknown>
+      if (res.status === 401 || res.status === 403) {
+        // Clear stale cookies so next attempt starts fresh
         const all = await session.defaultSession.cookies.get({ domain: '.instagram.com' })
         await Promise.all(all.flatMap(c => [
           session.defaultSession.cookies.remove('https://www.instagram.com', c.name),
           session.defaultSession.cookies.remove('https://instagram.com', c.name),
         ]))
-        if (_igBrowser && !_igBrowser.isDestroyed()) { _igBrowser.destroy(); _igBrowser = null }
-        // Fall through to browser slow-path below (do NOT return here)
       }
-    }
-  } catch (e) {
-    console.log('[IG] API fast-path failed:', String(e))
+    } catch (e) { console.log('[IG] callApi error:', String(e)) }
+    return null
   }
 
-  // ── Slow path: full browser page load ────────────────────────────────────
-  // Handles GDPR cookie consent automatically, then extracts HTML.
+  // ── Attempt 1: cookies already exist ─────────────────────────────────────
+  let csrf = await getCsrf()
+  if (csrf) {
+    const json = await callApi(csrf)
+    if (json) return { ok: true, apiJson: json }
+  }
+
+  // ── Attempt 2: seed cookies via a plain fetch of the profile page ─────────
+  // session.defaultSession.fetch stores Set-Cookie automatically, no browser needed.
+  console.log('[IG] No cookies — seeding via profile page fetch...')
+  try {
+    await session.defaultSession.fetch(profileUrl, {
+      headers: {
+        'User-Agent':      IG_UA,
+        'Accept':          'text/html,application/xhtml+xml,*/*;q=0.8',
+        'Accept-Language': 'fr-FR,fr;q=0.9,en;q=0.8',
+        'Accept-Encoding': 'gzip, deflate, br',
+      },
+      redirect: 'follow',
+    })
+  } catch (e) { console.log('[IG] Seed fetch error:', String(e)) }
+
+  csrf = await getCsrf()
+  if (csrf) {
+    const json = await callApi(csrf)
+    if (json) return { ok: true, apiJson: json }
+  }
+
+  // ── Attempt 3: seed via homepage (different cookie set) ──────────────────
+  console.log('[IG] Trying homepage seed...')
+  try {
+    await session.defaultSession.fetch('https://www.instagram.com/', {
+      headers: {
+        'User-Agent':      IG_UA,
+        'Accept':          'text/html,application/xhtml+xml,*/*;q=0.8',
+        'Accept-Language': 'fr-FR,fr;q=0.9,en;q=0.8',
+      },
+      redirect: 'follow',
+    })
+  } catch (e) { console.log('[IG] Homepage seed error:', String(e)) }
+
+  csrf = await getCsrf()
+  if (csrf) {
+    const json = await callApi(csrf)
+    if (json) return { ok: true, apiJson: json }
+  }
+
+  // ── Attempt 4: hidden browser fallback (handles consent walls) ────────────
+  console.log('[IG] All fetch attempts failed — falling back to hidden browser')
   const browser = getIgBrowser()
 
   return new Promise<unknown>(resolve => {
@@ -145,75 +189,36 @@ ipcMain.handle('fetch-instagram-html', async (_event, username: string) => {
       resolve(result)
     }
 
-    const globalTimer = setTimeout(() => {
-      console.log('[IG] Browser timeout')
-      finish({ ok: false, error: 'timeout' })
-    }, 35000)
+    const globalTimer = setTimeout(() => finish({ ok: false, error: 'timeout' }), 40000)
 
-    const extractHtml = async () => {
+    const tryApiThenHtml = async () => {
       if (settled || browser.isDestroyed()) return
-
-      // After the browser has settled on the profile page, Instagram cookies are now set.
-      // Try the API call with those cookies first — this is far more reliable than regex-parsing HTML.
-      try {
-        const cookies = await session.defaultSession.cookies.get({ domain: '.instagram.com' })
-        const csrftoken = cookies.find(c => c.name === 'csrftoken')?.value
-        if (csrftoken) {
-          console.log('[IG] Browser loaded, retrying API with fresh cookies...')
-          const apiRes = await session.defaultSession.fetch(
-            `https://www.instagram.com/api/v1/users/web_profile_info/?username=${encodeURIComponent(username)}`,
-            {
-              headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-                'X-IG-App-ID': '936619743392459',
-                'X-CSRFToken': csrftoken,
-                'Accept': '*/*',
-              },
-            }
-          )
-          console.log(`[IG] Post-browser API status: ${apiRes.status}`)
-          if (apiRes.ok) {
-            const json = await apiRes.json() as Record<string, unknown>
-            finish({ ok: true, apiJson: json })
-            return
-          }
-        }
-      } catch (e) {
-        console.log('[IG] Post-browser API retry failed:', String(e))
+      const c = await getCsrf()
+      if (c) {
+        const json = await callApi(c)
+        if (json) { finish({ ok: true, apiJson: json }); return }
       }
-
-      // Fallback: extract raw HTML for regex parsing
       try {
-        const data = await browser.webContents.executeJavaScript(`({
-          url: location.href,
-          html: document.documentElement.innerHTML.slice(0, 200000)
-        })`)
-        const d = data as { url: string; html: string }
-        console.log(`[IG] Extracted from ${d.url} (${d.html.length} chars)`)
-        finish({ ok: true, ...d })
-      } catch (e) {
-        finish({ ok: false, error: String(e) })
-      }
+        const data = await browser.webContents.executeJavaScript(
+          `({ url: location.href, html: document.documentElement.innerHTML.slice(0, 200000) })`
+        )
+        finish({ ok: true, ...(data as { url: string; html: string }) })
+      } catch (e) { finish({ ok: false, error: String(e) }) }
     }
 
     const onLoad = async () => {
       if (settled || browser.isDestroyed()) return
       loadCount++
-      if (loadCount > 6) { finish({ ok: false, error: 'too many navigations' }); return }
-
-      await new Promise(r => setTimeout(r, 2500))
+      if (loadCount > 8) { finish({ ok: false, error: 'too many navigations' }); return }
+      await new Promise(r => setTimeout(r, 2000))
       if (settled || browser.isDestroyed()) return
 
       const currentUrl = browser.webContents.getURL()
-      console.log(`[IG] Browser load ${loadCount}: ${currentUrl}`)
-
       if (currentUrl.includes('/accounts/login') || currentUrl.includes('/challenge/')) {
-        console.log('[IG] Login/challenge page — giving up')
-        finish({ ok: false, error: 'login required' })
-        return
+        finish({ ok: false, error: 'login required' }); return
       }
 
-      // Accept GDPR cookie consent if shown
+      // Accept GDPR consent if shown
       const accepted = await browser.webContents.executeJavaScript(`
         (() => {
           const byAttr = document.querySelector('[data-cookiebanner="accept_button"]')
@@ -221,10 +226,9 @@ ipcMain.handle('fetch-instagram-html', async (_event, username: string) => {
           if (byAttr) { byAttr.click(); return true }
           const btn = [...document.querySelectorAll('button')].find(b => {
             const t = (b.textContent || '').trim().toLowerCase()
-            return t === 'allow all cookies' || t === 'allow all' || t === 'accept all'
-              || t === 'autoriser tout' || t === 'tout accepter'
-              || t === 'autoriser tous les cookies'
-              || t === 'allow essential and optional cookies'
+            return ['allow all cookies','allow all','accept all','autoriser tout',
+                    'tout accepter','autoriser tous les cookies',
+                    'allow essential and optional cookies'].includes(t)
           })
           if (btn) { btn.click(); return true }
           return false
@@ -232,41 +236,19 @@ ipcMain.handle('fetch-instagram-html', async (_event, username: string) => {
       `).catch(() => false)
 
       if (accepted) {
-        console.log('[IG] Consent clicked — waiting for page update')
-        // Give Instagram time to reload (or update in-place). The next did-stop-loading
-        // will call onLoad again if a full navigation happens.
-        await new Promise(r => setTimeout(r, 5000))
+        await new Promise(r => setTimeout(r, 4000))
         if (settled) return
-
-        // Check where we ended up
         const afterUrl = browser.webContents.getURL()
-        console.log(`[IG] After consent: ${afterUrl}`)
-
-        if (!afterUrl.includes(`/${username}`)) {
-          // Consent redirected us to homepage — navigate back to the profile
-          console.log('[IG] Redirected away, navigating back to profile')
-          browser.loadURL(profileUrl)
-          return
-        }
-        // Page updated in-place — extract now
-        await extractHtml()
-      } else {
-        // No consent button — check we're on the right page
-        if (!currentUrl.includes(`/${username}`)) {
-          console.log('[IG] Wrong page, navigating to profile')
-          browser.loadURL(profileUrl)
-          return
-        }
-        await extractHtml()
+        if (!afterUrl.includes(`/${username}`)) { browser.loadURL(profileUrl); return }
+      } else if (!currentUrl.includes(`/${username}`)) {
+        browser.loadURL(profileUrl); return
       }
+      await tryApiThenHtml()
     }
 
     browser.webContents.on('did-stop-loading', onLoad)
     browser.loadURL(profileUrl, {
-      extraHeaders: [
-        'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language: fr-FR,fr;q=0.9,en-US;q=0.8',
-      ].join('\r\n'),
+      extraHeaders: 'Accept: text/html,application/xhtml+xml,*/*;q=0.8\r\nAccept-Language: fr-FR,fr;q=0.9\r\n',
     }).catch(err => finish({ ok: false, error: String(err) }))
   })
 })
