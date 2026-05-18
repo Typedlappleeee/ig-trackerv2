@@ -4,6 +4,7 @@ import { supabase, type Phone } from '@/lib/supabase'
 import { useOrg } from '@/lib/orgContext'
 import { useConnections } from '@/lib/connections'
 import { Spinner } from '@/components/ui/Spinner'
+import { fetchIgStats } from '@/lib/instagram'
 
 interface DashboardProps { user: User }
 
@@ -234,19 +235,27 @@ export function Dashboard({ user }: DashboardProps) {
     if (!conns.bearer) { setPhones([]); setLoading(false); return }
     let q = supabase.from('phones').select('*').order('phone_name')
     q = currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
-    q.then(({ data }) => {
-        const loaded = data ?? []
-        setPhones(loaded)
-        setLoading(false)
-        // Snapshot today's totals
-        const withViews = loaded.filter(p => (p.total_views ?? 0) > 0)
-        if (withViews.length > 0) {
-          const now = new Date().toISOString()
-          supabase.from('views_history').insert(
-            withViews.map(p => ({ user_id: user.id, phone_id: p.id, views: p.total_views, recorded_at: now }))
-          ).then(() => {})
-        }
-      })
+    q.then(async ({ data }) => {
+      const loaded = data ?? []
+      setPhones(loaded)
+      setLoading(false)
+
+      // Fetch fresh Instagram stats for each phone with a username, then snapshot
+      const withUsername = loaded.filter(p => p.ig_username)
+      if (withUsername.length === 0) return
+      const now = new Date().toISOString()
+      const rows: { user_id: string; phone_id: string; views: number; recorded_at: string }[] = []
+      for (const p of withUsername) {
+        try {
+          const stats = await fetchIgStats(p.ig_username!)
+          if (stats && stats.total_views > 0)
+            rows.push({ user_id: user.id, phone_id: p.id, views: stats.total_views, recorded_at: now })
+        } catch { /* ignore individual failures */ }
+        await new Promise(r => setTimeout(r, 800)) // small delay to avoid rate-limiting
+      }
+      if (rows.length > 0)
+        supabase.from('views_history').insert(rows).then(() => {})
+    })
   }, [currentOrg?.id, user.id, conns.bearer])
 
   useEffect(() => { loadChart() }, [selPhone, range, phones])
@@ -273,34 +282,47 @@ export function Dashboard({ user }: DashboardProps) {
     setSchemaMissing(false)
     const rows = data ?? []
 
-    const byDay = new Map<string, number>()
     const dayKey = (iso: string) => {
       const d = new Date(iso)
       return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
     }
+    const fmtDay = (d: Date) =>
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+
+    // Last (highest) snapshot per day per phone → sum across phones per day
+    const maxByDayPhone = new Map<string, Map<string, number>>() // day → phoneId → maxViews
     for (const row of rows) {
       const day = dayKey(row.recorded_at)
-      const cur = byDay.get(day) ?? 0
-      byDay.set(day, Math.max(cur, row.views as number))
+      if (!maxByDayPhone.has(day)) maxByDayPhone.set(day, new Map())
+      const phoneMap = maxByDayPhone.get(day)!
+      const cur = phoneMap.get(row.phone_id) ?? 0
+      phoneMap.set(row.phone_id, Math.max(cur, row.views as number))
+    }
+    // Total views per day = sum of max per phone
+    const totalByDay = new Map<string, number>()
+    for (const [day, phoneMap] of maxByDayPhone)
+      totalByDay.set(day, [...phoneMap.values()].reduce((a, b) => a + b, 0))
+
+    // Sort days and compute DAILY DELTA (views gained = today_total - yesterday_total)
+    const sortedDays = [...totalByDay.entries()].sort(([a], [b]) => a.localeCompare(b))
+    const deltaByDay = new Map<string, number>()
+    for (let i = 0; i < sortedDays.length; i++) {
+      const [day, views] = sortedDays[i]
+      deltaByDay.set(day, i === 0 ? 0 : Math.max(0, views - sortedDays[i - 1][1]))
     }
 
-    // Build a complete day-by-day series for fixed ranges, filling gaps with 0.
+    // Build chart series
     let pts: ViewPoint[]
     if (range === 'all') {
-      const sorted = [...byDay.entries()].sort(([a], [b]) => a.localeCompare(b))
-      pts = sorted.map(([label, value]) => ({ label, value, date: new Date(label) }))
+      pts = sortedDays.map(([label]) => ({ label, value: deltaByDay.get(label) ?? 0, date: new Date(label) }))
     } else {
       const days = range === '24h' ? 1 : range === '7d' ? 7 : 30
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
+      const today = new Date(); today.setHours(0, 0, 0, 0)
       pts = []
-      const fmt = (d: Date) =>
-        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
       for (let i = days - 1; i >= 0; i--) {
-        const d = new Date(today)
-        d.setDate(d.getDate() - i)
-        const label = fmt(d)
-        pts.push({ label, value: byDay.get(label) ?? 0, date: new Date(d) })
+        const d = new Date(today); d.setDate(d.getDate() - i)
+        const label = fmtDay(d)
+        pts.push({ label, value: deltaByDay.get(label) ?? 0, date: new Date(d) })
       }
     }
     setChartData(pts)
@@ -309,16 +331,18 @@ export function Dashboard({ user }: DashboardProps) {
 
   // KPI calculations (matches Python 6-cell grid)
   const kpis = useMemo(() => {
+    // today = views gained today (last bar), prev = views gained yesterday
     const today    = chartData.length > 0 ? chartData[chartData.length - 1].value : 0
     const prev     = chartData.length > 1 ? chartData[chartData.length - 2].value : null
-    const delta    = prev !== null ? today - prev : null
+    const delta    = prev !== null ? today - prev : null  // vs yesterday
     const peak     = chartData.length > 0 ? Math.max(...chartData.map(p => p.value)) : 0
-    const avg      = chartData.length > 0 ? Math.round(chartData.reduce((s, p) => s + p.value, 0) / chartData.length) : 0
-    const totalNow = selPhone ? (selPhone.total_views ?? 0) : phones.reduce((s, p) => s + (p.total_views ?? 0), 0)
-    const activePhones = phones.filter(p => p.status === 'online').length
+    const nonZero  = chartData.filter(p => p.value > 0)
+    const avg      = nonZero.length > 0 ? Math.round(nonZero.reduce((s, p) => s + p.value, 0) / nonZero.length) : 0
+    const linkedPhones = phones.filter(p => p.ig_username)
+    const activePhones = linkedPhones.length
     const banned   = phones.filter(p => p.ig_status === 'error').length
     const videos   = selPhone ? (selPhone.video_count ?? 0) : 0
-    return { today, delta, peak, avg, totalNow, activePhones, banned, videos }
+    return { today, delta, peak, avg, activePhones, banned, videos }
   }, [chartData, phones, selPhone])
 
   const linkedPhones = phones.filter(p => p.ig_username)
@@ -453,8 +477,8 @@ export function Dashboard({ user }: DashboardProps) {
                     {selPhone ? 'Vues du compte' : 'Total vues'}
                   </span>
                 </div>
-                <p className="text-[42px] font-black text-white leading-none anim-number-pop" key={kpis.totalNow}>
-                  {fmt(kpis.totalNow)}
+                <p className="text-[42px] font-black text-white leading-none anim-number-pop" key={kpis.peak}>
+                  {fmt(kpis.peak)}
                 </p>
               </div>
 
