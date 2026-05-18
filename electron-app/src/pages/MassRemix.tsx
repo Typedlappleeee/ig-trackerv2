@@ -9,6 +9,15 @@ import { uploadVideoFromPath, type UploadScope } from '@/lib/storage'
 import { useOrg } from '@/lib/orgContext'
 import { useConnections } from '@/lib/connections'
 
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(`Timeout ${label} (${ms / 1000}s)`)), ms)
+    ),
+  ])
+}
+
 interface MassRemixProps { user: User }
 
 type Preset = '9:16' | '1:1' | '16:9'
@@ -180,62 +189,74 @@ export function MassRemix({ user }: MassRemixProps) {
       if (abortRef.current) break
       setCurrentIdx(job.id)
 
-      // 1. Detect split
-      setCurrentStep('detecting')
-      updateJob(job.id, { status: 'detecting' })
-      const det = await window.electronAPI!.detectSceneChange!({ filePath: job.originalPath })
-      let splitTime = det.ok && det.splitTime != null
-        ? Math.min((det.duration ?? 60) - 0.1, Math.round(det.splitTime * 1000) / 1000)
-        : undefined  // no real scene change → no phase 2
+      try {
+        // ── 1. Detect split ──────────────────────────────────────────────────
+        setCurrentStep('detecting')
+        updateJob(job.id, { status: 'detecting' })
+        const det = await withTimeout(
+          window.electronAPI!.detectSceneChange!({ filePath: job.originalPath }),
+          30_000, 'détection scène'
+        )
+        let splitTime = det.ok && det.splitTime != null
+          ? Math.min((det.duration ?? 60) - 0.1, Math.round(det.splitTime * 1000) / 1000)
+          : undefined
 
-      // If a split was found, check that phase 2 isn't just more person/footage
-      // (phase 2 should be a different scene — if it still shows a person, skip it)
-      if (splitTime != null && anthropicKey.trim()) {
-        try {
-          const totalDur = det.duration ?? 60
-          const phase2Mid = Math.min(splitTime + 2, totalDur - 0.5)
-          const fr2 = await window.electronAPI!.extractFrames!({
-            filePath: job.originalPath,
-            startTime: phase2Mid,
-            endTime: Math.min(phase2Mid + 1, totalDur),
-          })
-          if (fr2.ok && fr2.frames?.[0]) {
-            const res = await window.electronAPI!.anthropicVisionRequest!({
-              apiKey: anthropicKey.trim(),
-              model: 'claude-haiku-4-5-20251001',
-              messages: [{ role: 'user', content: [
-                { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: fr2.frames[0].data } },
-                { type: 'text', text: 'Is there a person or human face clearly visible in this frame? Answer only "yes" or "no".' },
-              ]}],
-              maxTokens: 5,
-            })
-            if (res.ok) {
-              const answer = ((res.data as any)?.content?.[0]?.text ?? '').toLowerCase()
-              if (answer.includes('yes')) splitTime = undefined  // still shows a person → no phase 2
+        // Check phase 2 isn't still a person (optional AI check — skip on timeout)
+        if (splitTime != null && anthropicKey.trim()) {
+          try {
+            const totalDur = det.duration ?? 60
+            const phase2Mid = Math.min(splitTime + 2, totalDur - 0.5)
+            const fr2 = await withTimeout(
+              window.electronAPI!.extractFrames!({
+                filePath: job.originalPath,
+                startTime: phase2Mid,
+                endTime: Math.min(phase2Mid + 1, totalDur),
+              }),
+              15_000, 'frames phase2'
+            )
+            if (fr2.ok && fr2.frames?.[0]) {
+              const res = await withTimeout(
+                window.electronAPI!.anthropicVisionRequest!({
+                  apiKey: anthropicKey.trim(),
+                  model: 'claude-haiku-4-5-20251001',
+                  messages: [{ role: 'user', content: [
+                    { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: fr2.frames[0].data } },
+                    { type: 'text', text: 'Is there a person or human face clearly visible in this frame? Answer only "yes" or "no".' },
+                  ]}],
+                  maxTokens: 5,
+                }),
+                20_000, 'AI phase2'
+              )
+              if (res.ok) {
+                const answer = ((res.data as any)?.content?.[0]?.text ?? '').toLowerCase()
+                if (answer.includes('yes')) splitTime = undefined
+              }
             }
-          }
-        } catch { /* if check fails, keep splitTime as-is */ }
-      }
+          } catch { /* timeout or error → keep splitTime as-is */ }
+        }
 
-      updateJob(job.id, { splitTime: splitTime ?? 0 })
+        updateJob(job.id, { splitTime: splitTime ?? 0 })
 
-      // 2. AI text detection (optional)
-      type Overlay = { text: string; x: string; y: string; fontSize: number; fontColor: string; bold: boolean; shadow: boolean; startTime: number; endTime: number }
-      let textOverlays: Overlay[] = []
+        // ── 2. AI text detection (optional — skip on timeout) ────────────────
+        type Overlay = { text: string; x: string; y: string; fontSize: number; fontColor: string; bold: boolean; shadow: boolean; startTime: number; endTime: number }
+        let textOverlays: Overlay[] = []
 
-      if (aiEnabled && anthropicKey.trim()) {
-        setCurrentStep('analyzing')
-        updateJob(job.id, { status: 'analyzing' })
-        try {
-          const analyzeEnd = splitTime ?? (det.duration ?? 60)
-          const fr = await window.electronAPI!.extractFrames!({ filePath: job.originalPath, endTime: analyzeEnd })
-          if (fr.ok && fr.frames?.length) {
-            const interval = analyzeEnd / fr.frames.length
-            const imageBlocks = fr.frames.flatMap((f, fi) => [
-              { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: f.data } },
-              { type: 'text', text: `[Frame ${fi} — t=${f.timestamp}s]` },
-            ])
-            const prompt = `These are ${fr.frames.length} frames from a ${analyzeEnd.toFixed(1)}s video clip (vertical 9:16, output resolution 1080×1920).
+        if (aiEnabled && anthropicKey.trim()) {
+          setCurrentStep('analyzing')
+          updateJob(job.id, { status: 'analyzing' })
+          try {
+            const analyzeEnd = splitTime ?? (det.duration ?? 60)
+            const fr = await withTimeout(
+              window.electronAPI!.extractFrames!({ filePath: job.originalPath, endTime: analyzeEnd }),
+              15_000, 'extraction frames'
+            )
+            if (fr.ok && fr.frames?.length) {
+              const interval = analyzeEnd / fr.frames.length
+              const imageBlocks = fr.frames.flatMap((f, fi) => [
+                { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: f.data } },
+                { type: 'text', text: `[Frame ${fi} — t=${f.timestamp}s]` },
+              ])
+              const prompt = `These are ${fr.frames.length} frames from a ${analyzeEnd.toFixed(1)}s video clip (vertical 9:16, output resolution 1080×1920).
 Identify ALL burned-in text overlays (titles, captions, subtitles, watermarks). For each return:
 {"text":"exact string","xAlign":"left"|"center"|"right","yPercent":0-100,"fontSizePx":number,"fontColor":"css-color","bold":true,"startFrame":0,"endFrame":5}
 
@@ -243,70 +264,73 @@ Rules for fontSizePx (at 1080×1920):
 CRITICAL: text must fit on ONE LINE within 1080px. Use fontSizePx ≤ 900/(text.length×0.55).
 Examples: 6 chars→max 272px, 10 chars→max 163px, 15 chars→max 109px, 20 chars→max 81px, 30 chars→max 54px.
 Return ONLY a JSON array. If none, return [].`
-            const res = await window.electronAPI!.anthropicVisionRequest!({
-              apiKey: anthropicKey.trim(), model: 'claude-haiku-4-5-20251001',
-              messages: [{ role: 'user', content: [...imageBlocks, { type: 'text', text: prompt }] }],
-              maxTokens: 2000,
-            })
-            if (res.ok) {
-              const txt = (res.data as { content: Array<{ type: string; text: string }> })?.content?.[0]?.text ?? '[]'
-              try {
-                const m = txt.match(/\[[\s\S]*\]/)
-                if (m) {
-                  const parsed = JSON.parse(m[0]) as Array<{ text: string; xAlign: string; yPercent: number; fontSizePx: number; fontColor: string; bold?: boolean; startFrame: number; endFrame: number }>
-                  textOverlays = parsed.map(item => ({
-                    text: item.text,
-                    x: xAlignToExpr(item.xAlign ?? 'center'),
-                    y: `h*${Math.max(0.55, Math.min(0.82, (item.yPercent ?? 72) / 100)).toFixed(3)}`,
-                    fontSize: Math.round(Math.max(36, Math.min(130, item.fontSizePx ?? 80, Math.round(950 / Math.max(item.text.length * 0.62, 1))))),
-                    fontColor: item.fontColor ?? 'white',
-                    bold: item.bold ?? true,
-                    shadow: true,
-                    startTime: Math.round((item.startFrame ?? 0) * interval * 10) / 10,
-                    endTime: Math.min(analyzeEnd, Math.round(((item.endFrame ?? fr.frames!.length - 1) + 1) * interval * 10) / 10),
-                  }))
-                }
-              } catch { /* ignore parse errors */ }
+              const res = await withTimeout(
+                window.electronAPI!.anthropicVisionRequest!({
+                  apiKey: anthropicKey.trim(), model: 'claude-haiku-4-5-20251001',
+                  messages: [{ role: 'user', content: [...imageBlocks, { type: 'text', text: prompt }] }],
+                  maxTokens: 2000,
+                }),
+                30_000, 'AI analyse texte'
+              )
+              if (res.ok) {
+                const txt = (res.data as { content: Array<{ type: string; text: string }> })?.content?.[0]?.text ?? '[]'
+                try {
+                  const m = txt.match(/\[[\s\S]*\]/)
+                  if (m) {
+                    const parsed = JSON.parse(m[0]) as Array<{ text: string; xAlign: string; yPercent: number; fontSizePx: number; fontColor: string; bold?: boolean; startFrame: number; endFrame: number }>
+                    textOverlays = parsed.map(item => ({
+                      text: item.text,
+                      x: xAlignToExpr(item.xAlign ?? 'center'),
+                      y: `h*${Math.max(0.55, Math.min(0.82, (item.yPercent ?? 72) / 100)).toFixed(3)}`,
+                      fontSize: Math.round(Math.max(36, Math.min(130, item.fontSizePx ?? 80, Math.round(950 / Math.max(item.text.length * 0.62, 1))))),
+                      fontColor: item.fontColor ?? 'white',
+                      bold: item.bold ?? true,
+                      shadow: true,
+                      startTime: Math.round((item.startFrame ?? 0) * interval * 10) / 10,
+                      endTime: Math.min(analyzeEnd, Math.round(((item.endFrame ?? fr.frames!.length - 1) + 1) * interval * 10) / 10),
+                    }))
+                  }
+                } catch { /* ignore parse errors */ }
+              }
             }
-          }
-        } catch { /* continue without overlays */ }
-      }
+          } catch { /* timeout → continue without overlays */ }
+        }
 
-      // 3. Generate
-      setCurrentStep('generating')
-      updateJob(job.id, { status: 'generating' })
-      const outName = `remix_${String(job.id + 1).padStart(3, '0')}.mp4`
-      let outputPath: string
-      if (folder) {
-        outputPath = folder.replace(/\\/g, '/') + '/' + outName
-      } else {
-        // temp path for bank export
-        const tmp = await window.electronAPI!.writeTempFile!({ name: outName, bytes: new ArrayBuffer(0) })
-        if (!tmp.ok || !tmp.path) { updateJob(job.id, { status: 'error', error: 'Impossible de créer le fichier temp' }); continue }
-        outputPath = tmp.path
-      }
+        // ── 3. Generate ──────────────────────────────────────────────────────
+        setCurrentStep('generating')
+        updateJob(job.id, { status: 'generating' })
+        const outName = `remix_${String(job.id + 1).padStart(3, '0')}.mp4`
+        let outputPath: string
+        if (folder) {
+          outputPath = folder.replace(/\\/g, '/') + '/' + outName
+        } else {
+          const tmp = await window.electronAPI!.writeTempFile!({ name: outName, bytes: new ArrayBuffer(0) })
+          if (!tmp.ok || !tmp.path) { updateJob(job.id, { status: 'error', error: 'Impossible de créer le fichier temp' }); continue }
+          outputPath = tmp.path
+        }
 
-      const ffmpegPromise = window.electronAPI!.runFfmpegRemixAI!({
-        newPhase1Path: job.secondaryPath,
-        originalPath:  job.originalPath,
-        splitTime, outputPath, preset,
-        targetDuration: det.duration ?? undefined,
-        textOverlays,
-      })
-      const timeoutPromise = new Promise<{ ok: false; error: string }>(r =>
-        setTimeout(() => r({ ok: false, error: 'Timeout FFmpeg (20s)' }), 20_000)
-      )
-      const gen = await Promise.race([ffmpegPromise, timeoutPromise])
+        const gen = await withTimeout(
+          window.electronAPI!.runFfmpegRemixAI!({
+            newPhase1Path: job.secondaryPath,
+            originalPath:  job.originalPath,
+            splitTime, outputPath, preset,
+            targetDuration: det.duration ?? undefined,
+            textOverlays,
+          }),
+          20_000, 'FFmpeg'
+        )
 
-      if (!gen.ok) { updateJob(job.id, { status: 'error', error: gen.error ?? 'Erreur FFmpeg', outputPath }); playError(); continue }
-      updateJob(job.id, { outputPath: gen.outputPath ?? outputPath })
+        if (!gen.ok) { updateJob(job.id, { status: 'error', error: gen.error ?? 'Erreur FFmpeg' }); playError(); continue }
+        updateJob(job.id, { outputPath: gen.outputPath ?? outputPath })
 
-      // 4. Upload to bank if needed
-      if (exportMode === 'bank') {
-        setCurrentStep('uploading')
-        updateJob(job.id, { status: 'uploading' })
-        try {
-          const up = await uploadVideoFromPath(gen.outputPath ?? outputPath, scope)
+        // ── 4. Upload to bank if needed ──────────────────────────────────────
+        if (exportMode === 'bank') {
+          setCurrentStep('uploading')
+          updateJob(job.id, { status: 'uploading' })
+          const up = await withTimeout(
+            uploadVideoFromPath(gen.outputPath ?? outputPath, scope),
+            90_000, 'upload'
+          )
           await supabase.from('content_bank').insert({
             user_id: user.id, org_id: currentOrg?.id ?? null,
             title: `Remix ${String(job.id + 1).padStart(3, '0')} — ${fileName(job.originalPath)}`,
@@ -314,13 +338,14 @@ Return ONLY a JSON array. If none, return [].`
             folder: bankFolder.trim() || null,
             tags: [], notes: '',
           })
-        } catch (err) {
-          updateJob(job.id, { status: 'error', error: String(err) }); playError(); continue
         }
-      }
 
-      updateJob(job.id, { status: 'done' })
-      playSuccess()
+        updateJob(job.id, { status: 'done' })
+        playSuccess()
+      } catch (err) {
+        updateJob(job.id, { status: 'error', error: err instanceof Error ? err.message : String(err) })
+        playError()
+      }
     }
 
     setRunning(false)
