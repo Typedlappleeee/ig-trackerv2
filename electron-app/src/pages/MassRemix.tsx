@@ -206,41 +206,62 @@ export function MassRemix({ user }: MassRemixProps) {
           ? `✅ Scène: splitTime=${splitTime != null ? splitTime + 's' : 'non trouvé'}, durée=${det.duration ?? '?'}s`
           : `⚠️ Pas de scène détectée — concat désactivé`)
 
-        // Check phase 2 isn't still a person
+        // Vérification changement de décor : compare un frame du début avec un frame
+        // juste après le cut. Si le décor/fond est le même (même personne, même lieu),
+        // on annule le cut — ça ne sert à rien de séparer deux plans du même clip.
         if (splitTime != null && anthropicKey.trim()) {
           const totalDur = det.duration ?? 60
-          const phase2Mid = Math.min(splitTime + 2, totalDur - 0.5)
-          addLog(job.id, `🤖 Vérif. phase2 (t=${phase2Mid.toFixed(1)}s)…`)
+          addLog(job.id, `🤖 Vérif. changement de décor (cut à ${splitTime}s)…`)
+
+          // Frame 1 : début de la vidéo (~1s)
+          const fr1 = await withTimeout(
+            window.electronAPI!.extractFrames!({
+              filePath: job.originalPath,
+              startTime: 0.5,
+              endTime: 1.5,
+            }),
+            15_000, 'frame debut'
+          )
+
+          // Frame 2 : juste après le cut
+          const phase2Start = Math.min(splitTime + 0.5, totalDur - 0.5)
           const fr2 = await withTimeout(
             window.electronAPI!.extractFrames!({
               filePath: job.originalPath,
-              startTime: phase2Mid,
-              endTime: Math.min(phase2Mid + 1, totalDur),
+              startTime: phase2Start,
+              endTime: Math.min(phase2Start + 1, totalDur),
             }),
-            15_000, 'frames phase2'
+            15_000, 'frame phase2'
           )
-          if (fr2.ok && fr2.frames?.[0]) {
+
+          if (fr1.ok && fr1.frames?.[0] && fr2.ok && fr2.frames?.[0]) {
             const res = await withTimeout(
               window.electronAPI!.anthropicVisionRequest!({
                 apiKey: anthropicKey.trim(),
                 model: 'claude-haiku-4-5-20251001',
                 messages: [{ role: 'user', content: [
+                  { type: 'text', text: 'Compare these two video frames (frame 1 = beginning, frame 2 = after scene cut):' },
+                  { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: fr1.frames[0].data } },
                   { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: fr2.frames[0].data } },
-                  { type: 'text', text: 'Is there a person or human face clearly visible in this frame? Answer only "yes" or "no".' },
+                  { type: 'text', text: 'Has the scene/location/background DRASTICALLY changed between frame 1 and frame 2? Answer "yes" only if the decor, setting, or environment is clearly different (different room, outdoor vs indoor, completely different background). Answer "no" if it is the same person in the same or very similar setting. Answer only "yes" or "no".' },
                 ]}],
                 maxTokens: 5,
               }),
-              20_000, 'AI phase2'
+              20_000, 'AI changement décor'
             )
             if (res.ok) {
-              const answer = ((res.data as any)?.content?.[0]?.text ?? '').toLowerCase()
-              if (answer.includes('yes')) {
-                addLog(job.id, '⚠️ Phase2 contient une personne → concat désactivé')
+              const answer = ((res.data as any)?.content?.[0]?.text ?? '').toLowerCase().trim()
+              if (!answer.startsWith('yes')) {
+                addLog(job.id, '⚠️ Décor identique avant/après cut → concat désactivé')
                 splitTime = undefined
               } else {
-                addLog(job.id, '✅ Phase2 OK (pas de personne)')
+                addLog(job.id, '✅ Changement de décor confirmé → concat activé')
               }
+            } else {
+              addLog(job.id, `⚠️ Vérif. décor échouée (${(res as any).error}) → concat conservé`)
             }
+          } else {
+            addLog(job.id, '⚠️ Extraction frames échouée → vérif. décor ignorée')
           }
         }
 
