@@ -127,8 +127,6 @@ export function MassRemix({ user }: MassRemixProps) {
 
   const [jobs,        setJobs]        = useState<MassJob[]>([])
   const [running,     setRunning]     = useState(false)
-  const [currentIdx,  setCurrentIdx]  = useState(0)
-  const [currentStep, setCurrentStep] = useState<MassJob['status']>('pending')
   const abortRef = useRef(false)
 
   // Load existing bank folders for the folder selector
@@ -145,13 +143,6 @@ export function MassRemix({ user }: MassRemixProps) {
   useEffect(() => {
     return () => { abortRef.current = true }
   }, [])
-
-  // Keep currentStep in sync with the active job
-  useEffect(() => {
-    if (!running || jobs.length === 0) return
-    const active = jobs.find(j => j.status !== 'done' && j.status !== 'error' && j.status !== 'pending')
-    if (active) setCurrentStep(active.status)
-  }, [jobs, running])
 
   function updateJob(id: number, patch: Partial<MassJob>) {
     setJobs(prev => prev.map(j => j.id === id ? { ...j, ...patch } : j))
@@ -184,19 +175,15 @@ export function MassRemix({ user }: MassRemixProps) {
     }))
     setJobs(pairs)
     setRunning(true)
-    setCurrentIdx(0)
-    setCurrentStep('detecting')
     abortRef.current = false
 
     const scope: UploadScope = currentOrg ? { mode: 'org', id: currentOrg.id } : { mode: 'user', id: user.id }
 
-    for (const job of pairs) {
-      if (abortRef.current) break
-      setCurrentIdx(job.id)
+    await Promise.all(pairs.map(async (job) => {
+      if (abortRef.current) return
 
       try {
         // ── 1. Detect split ──────────────────────────────────────────────────
-        setCurrentStep('detecting')
         updateJob(job.id, { status: 'detecting' })
         addLog(job.id, `▶ Vidéo originale : ${fileName(job.originalPath)}`)
         addLog(job.id, `▶ Vidéo secondaire: ${fileName(job.secondaryPath)}`)
@@ -264,7 +251,6 @@ export function MassRemix({ user }: MassRemixProps) {
         let textOverlays: Overlay[] = []
 
         if (aiEnabled && anthropicKey.trim()) {
-          setCurrentStep('analyzing')
           updateJob(job.id, { status: 'analyzing' })
           addLog(job.id, '✨ Analyse texte IA…')
           const analyzeEnd = splitTime ?? (det.duration ?? 60)
@@ -322,7 +308,6 @@ Return ONLY a JSON array. If none, return [].`
         }
 
         // ── 3. Generate ──────────────────────────────────────────────────────
-        setCurrentStep('generating')
         updateJob(job.id, { status: 'generating' })
         addLog(job.id, `⚙️ FFmpeg — splitTime=${splitTime != null ? splitTime + 's' : 'null'}, preset=${preset}, overlays=${textOverlays.length}`)
 
@@ -335,7 +320,7 @@ Return ONLY a JSON array. If none, return [].`
           if (!tmp.ok || !tmp.path) {
             addLog(job.id, '❌ Impossible de créer le fichier temporaire')
             updateJob(job.id, { status: 'error', error: 'Impossible de créer le fichier temp' })
-            continue
+            return
           }
           outputPath = tmp.path
         }
@@ -356,14 +341,13 @@ Return ONLY a JSON array. If none, return [].`
           addLog(job.id, `❌ FFmpeg: ${gen.error ?? 'erreur inconnue'}`)
           updateJob(job.id, { status: 'error', error: gen.error ?? 'Erreur FFmpeg' })
           playError()
-          continue
+          return
         }
         addLog(job.id, '✅ FFmpeg OK')
         updateJob(job.id, { outputPath: gen.outputPath ?? outputPath })
 
         // ── 4. Upload to bank if needed ──────────────────────────────────────
         if (exportMode === 'bank') {
-          setCurrentStep('uploading')
           updateJob(job.id, { status: 'uploading' })
           addLog(job.id, '☁️ Upload banque…')
           const up = await withTimeout(
@@ -388,7 +372,7 @@ Return ONLY a JSON array. If none, return [].`
         updateJob(job.id, { status: 'error', error: msg })
         playError()
       }
-    }
+    }))
 
     setRunning(false)
   }
@@ -398,12 +382,7 @@ Return ONLY a JSON array. If none, return [].`
   const canLaunch  = originals.length > 0 && secondaries.length > 0 && !running
   const progress   = jobs.length > 0 ? Math.round((doneCount + errorCount) / jobs.length * 100) : 0
 
-  const STEP_LABEL: Record<string, string> = {
-    detecting:  '🔍 Détection scène…',
-    analyzing:  '✨ Analyse texte IA…',
-    generating: '⚙ Génération FFmpeg…',
-    uploading:  '☁ Upload banque…',
-  }
+  const runningCount = jobs.filter(j => j.status !== 'pending' && j.status !== 'done' && j.status !== 'error').length
 
   return (
     <>
@@ -420,9 +399,9 @@ Return ONLY a JSON array. If none, return [].`
                   </div>
                 </div>
                 <div>
-                  <p className="text-[15px] font-black text-white">Génération en cours…</p>
+                  <p className="text-[15px] font-black text-white">Génération en parallèle…</p>
                   <p className="text-[13px] text-text2">
-                    Vidéo {currentIdx + 1} / {jobs.length} — {STEP_LABEL[currentStep] ?? currentStep}
+                    {runningCount} en cours · {doneCount} terminée(s) · {errorCount} erreur(s)
                   </p>
                 </div>
               </div>
@@ -430,29 +409,23 @@ Return ONLY a JSON array. If none, return [].`
 
             <div className="px-6 py-5 space-y-4">
               <div className="flex items-center justify-between text-[13px] mb-1">
-                <span className="text-text2">{doneCount} terminée(s)</span>
+                <span className="text-text2">{doneCount + errorCount} / {jobs.length}</span>
                 <span className="font-bold" style={{ color: '#a78bfa' }}>{progress}%</span>
-                <span className="text-text2">{jobs.length} total</span>
+                <span className="text-text2">{runningCount} actives</span>
               </div>
               <div className="h-2.5 rounded-full overflow-hidden" style={{ background: 'rgba(139,92,246,0.12)' }}>
                 <div className="h-full rounded-full transition-all duration-500"
                   style={{ width: `${progress}%`, background: 'linear-gradient(90deg,#7c3aed,#ec4899)' }} />
               </div>
 
-              <div className="rounded-xl px-4 py-3 space-y-1" style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.15)' }}>
-                <p className="text-[11px] uppercase tracking-wider font-bold" style={{ color: '#a78bfa' }}>En cours</p>
-                <p className="text-[13px] font-mono text-white/80 truncate">{fileName(jobs[currentIdx]?.originalPath ?? '')}</p>
-                <p className="text-[12px] text-text2">→ {fileName(jobs[currentIdx]?.secondaryPath ?? '')}</p>
-              </div>
-
-              <div className="space-y-1.5 max-h-40 overflow-auto">
+              <div className="space-y-1.5 max-h-52 overflow-auto">
                 {jobs.map(job => (
                   <div key={job.id} className="flex items-center gap-3 px-3 py-2 rounded-xl"
-                    style={{ background: job.status === 'done' ? 'rgba(52,211,153,0.06)' : job.status === 'error' ? 'rgba(239,68,68,0.06)' : 'transparent' }}>
+                    style={{ background: job.status === 'done' ? 'rgba(52,211,153,0.06)' : job.status === 'error' ? 'rgba(239,68,68,0.06)' : job.status === 'pending' ? 'transparent' : 'rgba(139,92,246,0.06)' }}>
                     <span className="w-5 text-[12px] font-bold flex-shrink-0 text-center text-text2">#{job.id + 1}</span>
                     <span className="flex-1 text-[12px] font-mono truncate text-text2">{fileName(job.originalPath)}</span>
-                    <span className="text-[12px] font-semibold flex-shrink-0"
-                      style={{ color: job.status === 'done' ? '#34d399' : job.status === 'error' ? '#f87171' : '#a78bfa' }}>
+                    <span className="text-[11px] font-semibold flex-shrink-0"
+                      style={{ color: job.status === 'done' ? '#34d399' : job.status === 'error' ? '#f87171' : job.status === 'pending' ? 'rgba(196,181,253,0.3)' : '#a78bfa' }}>
                       {STATUS_LABEL[job.status]}
                     </span>
                   </div>
