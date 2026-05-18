@@ -576,38 +576,34 @@ export async function updateInstagramProfile(
   log('👤 Sélection du profil…')
   xml = await dumpXml(bearer, phoneId)
 
-  // Le compte est affiché comme élément cliquable dans Account Center.
-  // Sur certaines versions il faut d'abord taper "Profile and personal details"
-  // puis le compte apparaît ; sur d'autres le compte est directement visible.
+  // Étape 1 : si on est dans Account Center et qu'il y a "Profile and personal details"
   const profDetailsPt =
     findByText(xml, 'Profile and personal details', 'Profil et informations personnelles',
       'Personal details', 'Profile information', 'Profile details') ??
     findByResourceId(xml, 'profile_details_row', 'personal_details', 'profile_info_row')
 
   if (profDetailsPt) {
-    // Version Instagram avec sous-menu "Profile and personal details"
     await shellExec(bearer, phoneId, `input tap ${profDetailsPt[0]} ${profDetailsPt[1]}`)
     await sleep(3000)
     xml = await dumpXml(bearer, phoneId)
-    // Maintenant tapper le compte dans la liste
-    const accountPt =
-      findByResourceId(xml, 'account_item', 'profile_account_row', 'account_row', 'ig_account')
-    if (accountPt) {
-      await shellExec(bearer, phoneId, `input tap ${accountPt[0]} ${accountPt[1]}`)
-    } else {
-      // Le compte est toujours la première ligne après l'en-tête
-      await shellExec(bearer, phoneId, `input tap ${cx} ${Math.floor(sh * 0.28)}`)
-    }
+  }
+
+  // Étape 2 : on est sur l'écran "Profiles" (ou similaire) qui liste le compte Instagram.
+  // Le compte apparaît comme une ligne "username / Instagram" cliquable.
+  // On cherche la ligne Instagram (sublabel "Instagram" ou par resource-id).
+  const igAccountPt =
+    findByText(xml, 'Instagram') ??  // sublabel "Instagram" sur la ligne du compte
+    findByResourceId(xml, 'account_item', 'profile_account_row', 'account_row',
+      'ig_account', 'instagram_account', 'linked_account') ??
+    null
+
+  if (igAccountPt) {
+    log(`   Compte trouvé à ${igAccountPt}`)
+    await shellExec(bearer, phoneId, `input tap ${igAccountPt[0]} ${igAccountPt[1]}`)
   } else {
-    // Le compte est directement visible dans Account Center — tapper dessus
-    const accountPt =
-      findByResourceId(xml, 'account_item', 'profile_account_row', 'account_row', 'ig_account') ??
-      findByResourceId(xml, 'instagram_account', 'linked_account', 'profile_icon')
-    if (accountPt) {
-      await shellExec(bearer, phoneId, `input tap ${accountPt[0]} ${accountPt[1]}`)
-    } else {
-      await shellExec(bearer, phoneId, `input tap ${cx} ${Math.floor(sh * 0.28)}`)
-    }
+    // Fallback : le compte est toujours la première ligne de la liste (~33% hauteur)
+    log(`   Compte non trouvé → tap coordonnée (${cx}, ${Math.floor(sh * 0.33)})`)
+    await shellExec(bearer, phoneId, `input tap ${cx} ${Math.floor(sh * 0.33)}`)
   }
   await sleep(3500)
 
