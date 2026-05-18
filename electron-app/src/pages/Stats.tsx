@@ -55,27 +55,41 @@ async function fetchIgVideos(username: string): Promise<IgVideo[]> {
   })
   if (!result.ok) return []
   try {
-    const data     = result.data as Record<string, unknown>
-    const user     = (data?.['data'] as Record<string, unknown>)?.['user'] as Record<string, unknown>
-    const timeline = user?.['edge_owner_to_timeline_media'] as Record<string, unknown>
-    const edges    = (timeline?.['edges'] as unknown[]) ?? []
-    const videos: IgVideo[] = edges.map((e: unknown) => {
-      const node = (e as Record<string, unknown>)['node'] as Record<string, unknown>
-      return {
-        id:        node['id'] as string,
-        shortcode: node['shortcode'] as string,
-        url:       `https://www.instagram.com/reel/${node['shortcode']}/`,
-        video_url: (node['video_url'] as string) ?? '',
-        views:     (node['video_view_count'] as number) ?? 0,
-        likes:     ((node['edge_liked_by'] as Record<string, number>)?.count) ?? 0,
-        comments:  ((node['edge_media_to_comment'] as Record<string, number>)?.count) ?? 0,
-        thumbnail: (node['thumbnail_src'] as string) ?? '',
-        timestamp: node['taken_at_timestamp']
-          ? new Date((node['taken_at_timestamp'] as number) * 1000).toISOString()
-          : '',
-        isVideo: (node['is_video'] as boolean) ?? false,
-      }
+    const data = result.data as Record<string, unknown>
+    const user = (data?.['data'] as Record<string, unknown>)?.['user'] as Record<string, unknown>
+
+    function edgeToVideos(edges: unknown[]): IgVideo[] {
+      return edges.map((e: unknown) => {
+        const node = (e as Record<string, unknown>)['node'] as Record<string, unknown>
+        return {
+          id:        node['id'] as string,
+          shortcode: node['shortcode'] as string,
+          url:       `https://www.instagram.com/reel/${node['shortcode']}/`,
+          video_url: (node['video_url'] as string) ?? '',
+          views:     (node['video_view_count'] as number) ?? (node['play_count'] as number) ?? 0,
+          likes:     ((node['edge_liked_by'] as Record<string, number>)?.count) ?? 0,
+          comments:  ((node['edge_media_to_comment'] as Record<string, number>)?.count) ?? 0,
+          thumbnail: (node['thumbnail_src'] as string) ?? (node['display_url'] as string) ?? '',
+          timestamp: node['taken_at_timestamp']
+            ? new Date((node['taken_at_timestamp'] as number) * 1000).toISOString()
+            : '',
+          isVideo: (node['is_video'] as boolean) ?? false,
+        }
+      }).filter(v => v.isVideo)
+    }
+
+    // Merge posts grid + reels feed, deduplicate by id
+    const gridEdges  = (user?.['edge_owner_to_timeline_media'] as Record<string, unknown>)?.['edges'] as unknown[] ?? []
+    const reelEdges  = (user?.['edge_felix_video_timeline']    as Record<string, unknown>)?.['edges'] as unknown[] ?? []
+    const allEdges   = [...reelEdges, ...gridEdges]
+    const seen       = new Set<string>()
+    const deduped    = allEdges.filter((e: unknown) => {
+      const id = ((e as Record<string, unknown>)['node'] as Record<string, unknown>)?.['id'] as string
+      if (seen.has(id)) return false
+      seen.add(id); return true
     })
+    const videos = edgeToVideos(deduped)
+
     if (window.electronAPI) {
       await Promise.all(videos.map(async v => {
         if (!v.thumbnail) return
