@@ -8,6 +8,19 @@ import { fetchFile, toBlobURL } from '@ffmpeg/util'
 let _ffmpeg: FFmpeg | null = null
 let _loading: Promise<FFmpeg> | null = null
 
+// Global exec lock — wasm FFmpeg is NOT thread-safe. Serialise all ff.exec()
+// calls so concurrent callers don't corrupt the shared wasm memory.
+let _execTail: Promise<void> = Promise.resolve()
+function withFfmpegLock<T>(fn: () => Promise<T>): Promise<T> {
+  let release!: () => void
+  const prev = _execTail
+  _execTail = new Promise<void>(r => { release = r })
+  return prev.then(fn).then(
+    v  => { release(); return v },
+    e  => { release(); throw e  },
+  )
+}
+
 // Detect WASM-level crashes that corrupt the FFmpeg instance irreversibly
 function isWasmCrash(err: unknown): boolean {
   const msg = String(err instanceof Error ? err.message : err)

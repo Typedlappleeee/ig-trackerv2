@@ -903,8 +903,15 @@ ipcMain.handle('run-ffmpeg-remix-ai', async (_event, opts: {
   }
 
   // Escape text for FFmpeg drawtext filter
+  // % is a format-string specifier in drawtext and must be doubled
   function escText(t: string): string {
-    return t.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/:/g, '\\:').replace(/\[/g, '\\[').replace(/\]/g, '\\]')
+    return t
+      .replace(/\\/g, '\\\\')
+      .replace(/'/g,  "\\'")
+      .replace(/:/g,  '\\:')
+      .replace(/\[/g, '\\[')
+      .replace(/\]/g, '\\]')
+      .replace(/%/g,  '%%')
   }
 
   // Build drawtext chain (comma-separated, applied after scale)

@@ -46,6 +46,20 @@ async function fetchFileBytes(url: string): Promise<Uint8Array> {
   return new Uint8Array(await r.arrayBuffer())
 }
 
+// ── Wasm FFmpeg mutex ────────────────────────────────────────────────────────
+// ffmpeg.wasm uses a single shared wasm instance — running two ff.exec() calls
+// concurrently corrupts memory. All wasm FFmpeg operations are serialised here.
+let _wasmTail: Promise<void> = Promise.resolve()
+function wasmQueue<T>(fn: () => Promise<T>): Promise<T> {
+  let release!: () => void
+  const prev = _wasmTail
+  _wasmTail = new Promise<void>(r => { release = r })
+  return prev.then(fn).then(
+    v => { release(); return v },
+    e => { release(); throw e },
+  )
+}
+
 // ── Build the web electronAPI object ────────────────────────────────────────
 export function buildWebAPI() {
   return {
@@ -282,45 +296,57 @@ export function buildWebAPI() {
       }
     },
 
-    // ── FFmpeg operations (delegate to ffmpeg.wasm) ─────────────────────────
+    // ── FFmpeg operations (delegate to ffmpeg.wasm, serialised via wasmQueue) ──
     async runFfmpeg(opts: unknown) {
-      const { runFfmpegWeb } = await import('./ffmpeg-web')
-      return runFfmpegWeb(opts as Parameters<typeof runFfmpegWeb>[0])
+      return wasmQueue(async () => {
+        const { runFfmpegWeb } = await import('./ffmpeg-web')
+        return runFfmpegWeb(opts as Parameters<typeof runFfmpegWeb>[0])
+      })
     },
 
     async detectSceneChange(opts: unknown) {
-      const { detectSceneChangeWeb, detectBeatDropWeb } = await import('./ffmpeg-web')
-      const o = opts as Parameters<typeof detectSceneChangeWeb>[0]
-      // Try beat-drop (audio) detection first — most reliable for music-driven content
-      const beat = await detectBeatDropWeb(o.filePath)
-      if (beat.ok && beat.splitTime != null && beat.splitTime > 0) return beat
-      // Fall back to visual scene change detection
-      return detectSceneChangeWeb(o)
+      return wasmQueue(async () => {
+        const { detectSceneChangeWeb, detectBeatDropWeb } = await import('./ffmpeg-web')
+        const o = opts as Parameters<typeof detectSceneChangeWeb>[0]
+        const beat = await detectBeatDropWeb(o.filePath)
+        if (beat.ok && beat.splitTime != null && beat.splitTime > 0) return beat
+        return detectSceneChangeWeb(o)
+      })
     },
 
     async runFfmpegRemix(opts: unknown) {
-      const { runFfmpegRemixWeb } = await import('./ffmpeg-web')
-      return runFfmpegRemixWeb(opts as Parameters<typeof runFfmpegRemixWeb>[0])
+      return wasmQueue(async () => {
+        const { runFfmpegRemixWeb } = await import('./ffmpeg-web')
+        return runFfmpegRemixWeb(opts as Parameters<typeof runFfmpegRemixWeb>[0])
+      })
     },
 
     async runFfmpegRemixAI(opts: unknown) {
-      const { runFfmpegRemixAIWeb } = await import('./ffmpeg-web')
-      return runFfmpegRemixAIWeb(opts as Parameters<typeof runFfmpegRemixAIWeb>[0])
+      return wasmQueue(async () => {
+        const { runFfmpegRemixAIWeb } = await import('./ffmpeg-web')
+        return runFfmpegRemixAIWeb(opts as Parameters<typeof runFfmpegRemixAIWeb>[0])
+      })
     },
 
     async runFfmpegMetadata(opts: unknown) {
-      const { runFfmpegMetadataWeb } = await import('./ffmpeg-web')
-      return runFfmpegMetadataWeb(opts as Parameters<typeof runFfmpegMetadataWeb>[0])
+      return wasmQueue(async () => {
+        const { runFfmpegMetadataWeb } = await import('./ffmpeg-web')
+        return runFfmpegMetadataWeb(opts as Parameters<typeof runFfmpegMetadataWeb>[0])
+      })
     },
 
     async extractFrames(opts: unknown) {
-      const { extractFramesWeb } = await import('./ffmpeg-web')
-      return extractFramesWeb(opts as Parameters<typeof extractFramesWeb>[0])
+      return wasmQueue(async () => {
+        const { extractFramesWeb } = await import('./ffmpeg-web')
+        return extractFramesWeb(opts as Parameters<typeof extractFramesWeb>[0])
+      })
     },
 
     async runFfmpegTextOverlay(opts: unknown) {
-      const { runFfmpegTextOverlayWeb } = await import('./ffmpeg-web')
-      return runFfmpegTextOverlayWeb(opts as Parameters<typeof runFfmpegTextOverlayWeb>[0])
+      return wasmQueue(async () => {
+        const { runFfmpegTextOverlayWeb } = await import('./ffmpeg-web')
+        return runFfmpegTextOverlayWeb(opts as Parameters<typeof runFfmpegTextOverlayWeb>[0])
+      })
     },
   }
 }
