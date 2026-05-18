@@ -974,9 +974,13 @@ ipcMain.handle('run-ffmpeg-remix-ai', async (_event, opts: {
     let mapArgs: string[]
     let audioEncArgs: string[]
 
+    // Use -t splitTime on the secondary INPUT (not trim= filter) so that if the
+    // secondary video is shorter than splitTime, FFmpeg stops cleanly instead of
+    // freezing on the last frame until the trim duration is reached.
+    // Phase 2 = original from splitTime → end (no upper trim → always complete).
     if (origHasAudio) {
       filterComplex = [
-        `[0:v]trim=duration=${splitTime},fps=30,setpts=PTS-STARTPTS,${vfPhase1}[v_p1]`,
+        `[0:v]fps=30,setpts=PTS-STARTPTS,${vfPhase1}[v_p1]`,
         `[1:v]trim=start=${splitTime},fps=30,setpts=PTS-STARTPTS,${scl}[v_p2]`,
         `[1:a]asplit=2[ao1][ao2]`,
         `[ao1]atrim=end=${splitTime},asetpts=PTS-STARTPTS,${afmt}[a_p1]`,
@@ -986,9 +990,8 @@ ipcMain.handle('run-ffmpeg-remix-ai', async (_event, opts: {
       mapArgs      = ['-map', '[vout]', '-map', '[aout]']
       audioEncArgs = ['-c:a', 'aac', '-b:a', '128k']
     } else {
-      // No audio in original — concat video only, no audio output
       filterComplex = [
-        `[0:v]trim=duration=${splitTime},fps=30,setpts=PTS-STARTPTS,${vfPhase1}[v_p1]`,
+        `[0:v]fps=30,setpts=PTS-STARTPTS,${vfPhase1}[v_p1]`,
         `[1:v]trim=start=${splitTime},fps=30,setpts=PTS-STARTPTS,${scl}[v_p2]`,
         `[v_p1][v_p2]concat=n=2:v=1:a=0[vout]`,
       ].join(';')
@@ -998,13 +1001,13 @@ ipcMain.handle('run-ffmpeg-remix-ai', async (_event, opts: {
 
     args = [
       '-nostdin',
-      '-i', opts.newPhase1Path,
-      '-i', opts.originalPath,
+      '-t', String(splitTime), '-i', opts.newPhase1Path,  // stop reading secondary at splitTime
+      '-i', opts.originalPath,                              // full original (phase 2 = splitTime→end)
       '-filter_complex', filterComplex,
       ...mapArgs,
       ...commonOutputFlags,
       ...audioEncArgs,
-      '-y', opts.outputPath,   // output path LAST — always
+      '-y', opts.outputPath,
     ]
   }
 
