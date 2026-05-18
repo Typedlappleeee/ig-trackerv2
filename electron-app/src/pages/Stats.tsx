@@ -200,10 +200,14 @@ export function Stats({ user }: StatsProps) {
     else { setLS(true); setLL(true) }
 
     try {
-      if (phone.ig_sessionid && window.electronAPI?.fetchInstagramBySession) {
+      // Find a usable session: prefer the phone's own session, else borrow one from any other phone
+      const borrowedSession = phones.find(p => p.ig_sessionid && p.id !== phone.id)?.ig_sessionid ?? null
+      const sessionToUse   = phone.ig_sessionid ?? borrowedSession
+
+      if (sessionToUse && window.electronAPI?.fetchInstagramBySession) {
         const r = await window.electronAPI.fetchInstagramBySession({
-          username: phone.ig_username,
-          sessionid: phone.ig_sessionid,
+          username:  phone.ig_username,
+          sessionid: sessionToUse,
         })
         if (r.ok) {
           setStats({
