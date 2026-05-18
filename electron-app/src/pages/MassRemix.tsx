@@ -31,6 +31,7 @@ interface MassJob {
   splitTime?:   number
   error?:       string
   outputPath?:  string
+  logs:         string[]
 }
 
 const STATUS_LABEL: Record<MassJob['status'], string> = {
@@ -155,6 +156,9 @@ export function MassRemix({ user }: MassRemixProps) {
   function updateJob(id: number, patch: Partial<MassJob>) {
     setJobs(prev => prev.map(j => j.id === id ? { ...j, ...patch } : j))
   }
+  function addLog(id: number, line: string) {
+    setJobs(prev => prev.map(j => j.id === id ? { ...j, logs: [...j.logs, line] } : j))
+  }
 
   async function pickPC(multi: boolean): Promise<string[]> {
     const p = await window.electronAPI?.pickVideoFile?.()
@@ -176,6 +180,7 @@ export function MassRemix({ user }: MassRemixProps) {
       originalPath:  originals[Math.floor(Math.random() * originals.length)],
       secondaryPath: secondaries[Math.floor(Math.random() * secondaries.length)],
       status: 'pending' as const,
+      logs: [],
     }))
     setJobs(pairs)
     setRunning(true)
@@ -193,18 +198,32 @@ export function MassRemix({ user }: MassRemixProps) {
         // ── 1. Detect split ──────────────────────────────────────────────────
         setCurrentStep('detecting')
         updateJob(job.id, { status: 'detecting' })
+        addLog(job.id, `▶ Vidéo originale : ${fileName(job.originalPath)}`)
+        addLog(job.id, `▶ Vidéo secondaire: ${fileName(job.secondaryPath)}`)
+        addLog(job.id, '🔍 Détection scène…')
+
         const det = await withTimeout(
           window.electronAPI!.detectSceneChange!({ filePath: job.originalPath }),
           30_000, 'détection scène'
         )
+
+        if (!det.ok) {
+          addLog(job.id, `❌ Détection échouée: ${det.error ?? 'inconnu'}`)
+        }
+
         let splitTime = det.ok && det.splitTime != null
           ? Math.min((det.duration ?? 60) - 0.1, Math.round(det.splitTime * 1000) / 1000)
           : undefined
+
+        addLog(job.id, det.ok
+          ? `✅ Scène: splitTime=${splitTime != null ? splitTime + 's' : 'non trouvé'}, durée=${det.duration ?? '?'}s`
+          : `⚠️ Pas de scène détectée — concat désactivé`)
 
         // Check phase 2 isn't still a person
         if (splitTime != null && anthropicKey.trim()) {
           const totalDur = det.duration ?? 60
           const phase2Mid = Math.min(splitTime + 2, totalDur - 0.5)
+          addLog(job.id, `🤖 Vérif. phase2 (t=${phase2Mid.toFixed(1)}s)…`)
           const fr2 = await withTimeout(
             window.electronAPI!.extractFrames!({
               filePath: job.originalPath,
@@ -228,26 +247,33 @@ export function MassRemix({ user }: MassRemixProps) {
             )
             if (res.ok) {
               const answer = ((res.data as any)?.content?.[0]?.text ?? '').toLowerCase()
-              if (answer.includes('yes')) splitTime = undefined
+              if (answer.includes('yes')) {
+                addLog(job.id, '⚠️ Phase2 contient une personne → concat désactivé')
+                splitTime = undefined
+              } else {
+                addLog(job.id, '✅ Phase2 OK (pas de personne)')
+              }
             }
           }
         }
 
         updateJob(job.id, { splitTime: splitTime ?? 0 })
 
-        // ── 2. AI text detection (optional — skip on timeout) ────────────────
+        // ── 2. AI text detection ─────────────────────────────────────────────
         type Overlay = { text: string; x: string; y: string; fontSize: number; fontColor: string; bold: boolean; shadow: boolean; startTime: number; endTime: number }
         let textOverlays: Overlay[] = []
 
         if (aiEnabled && anthropicKey.trim()) {
           setCurrentStep('analyzing')
           updateJob(job.id, { status: 'analyzing' })
+          addLog(job.id, '✨ Analyse texte IA…')
           const analyzeEnd = splitTime ?? (det.duration ?? 60)
           const fr = await withTimeout(
             window.electronAPI!.extractFrames!({ filePath: job.originalPath, endTime: analyzeEnd }),
             15_000, 'extraction frames'
           )
           if (fr.ok && fr.frames?.length) {
+            addLog(job.id, `   ${fr.frames.length} frames extraites (jusqu'à ${analyzeEnd.toFixed(1)}s)`)
             const interval = analyzeEnd / fr.frames.length
             const imageBlocks = fr.frames.flatMap((f, fi) => [
               { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: f.data } },
@@ -285,21 +311,32 @@ Return ONLY a JSON array. If none, return [].`
                   startTime: Math.round((item.startFrame ?? 0) * interval * 10) / 10,
                   endTime: Math.min(analyzeEnd, Math.round(((item.endFrame ?? fr.frames!.length - 1) + 1) * interval * 10) / 10),
                 }))
+                addLog(job.id, `   ${textOverlays.length} overlay(s) détecté(s)`)
               }
+            } else {
+              addLog(job.id, `   Analyse IA échouée: ${(res as any).error ?? 'inconnu'}`)
             }
+          } else {
+            addLog(job.id, `   Extraction frames échouée: ${fr.ok ? 'aucune frame' : (fr as any).error ?? 'inconnu'}`)
           }
         }
 
         // ── 3. Generate ──────────────────────────────────────────────────────
         setCurrentStep('generating')
         updateJob(job.id, { status: 'generating' })
+        addLog(job.id, `⚙️ FFmpeg — splitTime=${splitTime != null ? splitTime + 's' : 'null'}, preset=${preset}, overlays=${textOverlays.length}`)
+
         const outName = `remix_${String(job.id + 1).padStart(3, '0')}.mp4`
         let outputPath: string
         if (folder) {
           outputPath = folder.replace(/\\/g, '/') + '/' + outName
         } else {
           const tmp = await window.electronAPI!.writeTempFile!({ name: outName, bytes: new ArrayBuffer(0) })
-          if (!tmp.ok || !tmp.path) { updateJob(job.id, { status: 'error', error: 'Impossible de créer le fichier temp' }); continue }
+          if (!tmp.ok || !tmp.path) {
+            addLog(job.id, '❌ Impossible de créer le fichier temporaire')
+            updateJob(job.id, { status: 'error', error: 'Impossible de créer le fichier temp' })
+            continue
+          }
           outputPath = tmp.path
         }
 
@@ -313,13 +350,22 @@ Return ONLY a JSON array. If none, return [].`
           40_000, 'FFmpeg'
         )
 
-        if (!gen.ok) { updateJob(job.id, { status: 'error', error: gen.error ?? 'Erreur FFmpeg' }); playError(); continue }
+        if (gen.command) addLog(job.id, `   cmd: ${gen.command}`)
+
+        if (!gen.ok) {
+          addLog(job.id, `❌ FFmpeg: ${gen.error ?? 'erreur inconnue'}`)
+          updateJob(job.id, { status: 'error', error: gen.error ?? 'Erreur FFmpeg' })
+          playError()
+          continue
+        }
+        addLog(job.id, '✅ FFmpeg OK')
         updateJob(job.id, { outputPath: gen.outputPath ?? outputPath })
 
         // ── 4. Upload to bank if needed ──────────────────────────────────────
         if (exportMode === 'bank') {
           setCurrentStep('uploading')
           updateJob(job.id, { status: 'uploading' })
+          addLog(job.id, '☁️ Upload banque…')
           const up = await withTimeout(
             uploadVideoFromPath(gen.outputPath ?? outputPath, scope),
             90_000, 'upload'
@@ -331,12 +377,15 @@ Return ONLY a JSON array. If none, return [].`
             folder: bankFolder.trim() || null,
             tags: [], notes: '',
           })
+          addLog(job.id, '✅ Upload OK')
         }
 
         updateJob(job.id, { status: 'done' })
         playSuccess()
       } catch (err) {
-        updateJob(job.id, { status: 'error', error: err instanceof Error ? err.message : String(err) })
+        const msg = err instanceof Error ? err.message : String(err)
+        addLog(job.id, `❌ Erreur fatale: ${msg}`)
+        updateJob(job.id, { status: 'error', error: msg })
         playError()
       }
     }
@@ -432,16 +481,32 @@ Return ONLY a JSON array. If none, return [].`
                 </p>
                 {errorCount > 0 && <p className="text-[13px]" style={{ color: '#fbbf24' }}>{errorCount} erreur(s)</p>}
               </div>
-              <div className="space-y-2 max-h-52 overflow-auto">
+              <div className="space-y-2 max-h-72 overflow-auto">
                 {jobs.map(job => (
-                  <div key={job.id} className="flex items-center gap-3 px-4 py-2.5 rounded-xl"
-                    style={{ background: job.status === 'done' ? 'rgba(52,211,153,0.06)' : 'rgba(239,68,68,0.06)', border: `1px solid ${job.status === 'done' ? 'rgba(52,211,153,0.15)' : 'rgba(239,68,68,0.15)'}` }}>
-                    <span className="text-base">{job.status === 'done' ? '✅' : '❌'}</span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[13px] font-mono truncate text-white/70">{fileName(job.originalPath)}</p>
-                      {job.error && <p className="text-[11px]" style={{ color: '#f87171' }}>{job.error}</p>}
-                    </div>
-                  </div>
+                  <details key={job.id} className="rounded-xl overflow-hidden"
+                    style={{ background: job.status === 'done' ? 'rgba(52,211,153,0.06)' : 'rgba(239,68,68,0.06)', border: `1px solid ${job.status === 'done' ? 'rgba(52,211,153,0.15)' : 'rgba(239,68,68,0.2)'}` }}
+                    open={job.status === 'error'}>
+                    <summary className="flex items-center gap-3 px-4 py-2.5 cursor-pointer list-none">
+                      <span className="text-base flex-shrink-0">{job.status === 'done' ? '✅' : '❌'}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[13px] font-mono truncate text-white/70">{fileName(job.originalPath)}</p>
+                        {job.error && <p className="text-[11px] font-semibold" style={{ color: '#f87171' }}>{job.error}</p>}
+                      </div>
+                      {job.logs.length > 0 && (
+                        <span className="text-[10px] flex-shrink-0" style={{ color: 'rgba(196,181,253,0.4)' }}>▼ logs</span>
+                      )}
+                    </summary>
+                    {job.logs.length > 0 && (
+                      <div className="px-4 pb-3 space-y-0.5 border-t" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+                        {job.logs.map((line, i) => (
+                          <p key={i} className="text-[10px] font-mono break-all leading-snug"
+                            style={{ color: line.startsWith('❌') ? '#f87171' : line.startsWith('✅') ? '#34d399' : line.startsWith('⚠️') ? '#fbbf24' : 'rgba(196,181,253,0.55)' }}>
+                            {line}
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                  </details>
                 ))}
               </div>
               <Button onClick={() => { setJobs([]); setRunning(false) }} className="w-full">Fermer</Button>
