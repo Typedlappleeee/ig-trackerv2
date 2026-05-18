@@ -46,10 +46,11 @@ export function Warmup({ user }: WarmupProps) {
   const [loginCreds, setLoginCreds] = useState<Record<string, LoginCred>>({})
 
   // ── MASS EDIT state ───────────────────────────────────────────────────────
-  const [editName,    setEditName]    = useState('')
-  const [editBio,     setEditBio]     = useState('')
-  const [editPicUrl,  setEditPicUrl]  = useState('')
-  const [editPicFile, setEditPicFile] = useState<string | null>(null)
+  const [editName,     setEditName]     = useState('')
+  const [editUsername, setEditUsername] = useState('')
+  const [editBio,      setEditBio]      = useState('')
+  const [editPicUrl,   setEditPicUrl]   = useState('')
+  const [editPicFile,  setEditPicFile]  = useState<string | null>(null)
 
   // ── WARMUP state ──────────────────────────────────────────────────────────
   const [browseMinutes,   setBrowseMinutes]   = useState(15)
@@ -162,9 +163,10 @@ export function Warmup({ user }: WarmupProps) {
     initJobs(targets)
 
     const config = {
-      profileName:   editName.trim()   || undefined,
-      bio:           editBio.trim()    || undefined,
-      profilePicUrl: editPicUrl.trim() || undefined,
+      profileName:   editName.trim()     || undefined,
+      username:      editUsername.trim() || undefined,
+      bio:           editBio.trim()      || undefined,
+      profilePicUrl: editPicUrl.trim()   || undefined,
     }
 
     await Promise.all(targets.map(async phone => {
@@ -563,6 +565,19 @@ export function Warmup({ user }: WarmupProps) {
                       />
                     </div>
                     <div>
+                      <label className="text-[12px] uppercase tracking-wider font-bold block mb-2 text-text2">Nom d'utilisateur (@pseudo)</label>
+                      <div className="relative">
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[13px]" style={{ color: 'rgba(196,181,253,0.5)' }}>@</span>
+                        <input type="text" placeholder="marie.fitness"
+                          value={editUsername.replace(/^@/, '')}
+                          onChange={e => setEditUsername(e.target.value.replace(/^@/, ''))}
+                          className="w-full rounded-xl pl-8 pr-4 py-2.5 text-[13px] placeholder:text-text2 focus:outline-none"
+                          style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
+                        />
+                      </div>
+                      <p className="text-[11px] mt-1 text-text2">Instagram peut refuser si le pseudo est déjà pris</p>
+                    </div>
+                    <div>
                       <label className="text-[12px] uppercase tracking-wider font-bold block mb-2 text-text2">Bio</label>
                       <textarea rows={3} placeholder="Ex: 🏋️ Coach fitness certifiée | -10kg en 90 jours ↓"
                         value={editBio} onChange={e => setEditBio(e.target.value)}
@@ -606,7 +621,7 @@ export function Warmup({ user }: WarmupProps) {
                 <Button
                   className="w-full py-3 text-[13px] font-bold"
                   disabled={selectedPhones.length === 0 || running ||
-                    (!editName.trim() && !editBio.trim() && !editPicUrl.trim())}
+                    (!editName.trim() && !editUsername.trim() && !editBio.trim() && !editPicUrl.trim())}
                   loading={running}
                   onClick={launchMassEdit}
                 >
