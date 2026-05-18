@@ -146,6 +146,8 @@ export function Stats({ user }: StatsProps) {
   const [sort, setSort]         = useState<SortKey>('recent')
   const [playingVideo, setPlayingVideo] = useState<IgVideo | null>(null)
   const [retrying, setRetrying] = useState(false)
+  const [searchInput, setSearchInput]   = useState('')
+  const [profilePic, setProfilePic]     = useState<string | null>(null)
 
   useEffect(() => {
     if (!conns.bearer) { setPhones([]); return }
@@ -158,10 +160,22 @@ export function Stats({ user }: StatsProps) {
     })
   }, [currentOrg?.id, user.id, conns.bearer])
 
+  async function searchByUsername(raw: string) {
+    const clean = raw
+      .replace(/^https?:\/\/(www\.)?instagram\.com\//, '')
+      .replace(/^@/, '')
+      .replace(/[/?#].*$/, '')
+      .trim()
+    if (!clean) return
+    const virtual = { id: '__search__', ig_username: clean, phone_name: clean, ig_sessionid: null, ig_status: null, status: null, group_name: null } as unknown as Phone
+    await selectPhone(virtual)
+    setSearchInput('')
+  }
+
   async function selectPhone(phone: Phone, retry = false) {
     playNav()
     setSelected(phone)
-    setStats(null); setVideos([]); setLoadErr(null)
+    setStats(null); setVideos([]); setLoadErr(null); setProfilePic(null)
     if (!phone.ig_username) return
     if (retry) setRetrying(true)
     else { setLS(true); setLL(true) }
@@ -174,12 +188,13 @@ export function Stats({ user }: StatsProps) {
         })
         if (r.ok) {
           setStats({
-            username:    phone.ig_username,
-            followers:   r.followers   ?? 0,
-            following:   r.following   ?? 0,
-            posts:       r.posts       ?? 0,
-            total_views: r.total_views ?? 0,
-            bio:         r.bio         ?? '',
+            username:        phone.ig_username,
+            followers:       r.followers   ?? 0,
+            following:       r.following   ?? 0,
+            posts:           r.posts       ?? 0,
+            total_views:     r.total_views ?? 0,
+            bio:             r.bio         ?? '',
+            profile_pic_url: (r as Record<string, unknown>)['profile_pic_url'] as string ?? '',
           })
           setLS(false)
           setVideos((r.videos ?? []).map(v => ({
@@ -204,6 +219,11 @@ export function Stats({ user }: StatsProps) {
       if (retry) invalidateIgCache(phone.ig_username)
       const s = await fetchIgStats(phone.ig_username, { force: retry })
       setStats(s); setLS(false)
+      if (s?.profile_pic_url && window.electronAPI?.fetchImage) {
+        window.electronAPI.fetchImage({ url: s.profile_pic_url })
+          .then(r => { if (r.ok && r.dataUrl) setProfilePic(r.dataUrl) })
+          .catch(() => {})
+      }
       const v = await fetchIgVideos(phone.ig_username)
       setVideos(v); setLL(false)
       if (!s && v.length === 0)
@@ -251,9 +271,21 @@ export function Stats({ user }: StatsProps) {
 
         {/* ── Sidebar ─────────────────────────────────────────────────────── */}
         <aside className="w-64 flex-shrink-0 flex flex-col overflow-hidden" style={{ borderRight: '1px solid rgba(255,255,255,0.06)' }}>
-          <div className="px-5 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+          <div className="px-4 py-3 space-y-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
             <p className="text-[13px] font-bold text-white">Comptes Instagram</p>
-            <p className="text-[12px] text-text2 mt-0.5">{phones.length} compte{phones.length !== 1 ? 's' : ''} liés</p>
+            <form onSubmit={e => { e.preventDefault(); searchByUsername(searchInput) }}>
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="@username ou lien…"
+                  value={searchInput}
+                  onChange={e => setSearchInput(e.target.value)}
+                  className="w-full rounded-xl px-3 py-2 text-[12px] pr-8 placeholder:text-text2 focus:outline-none"
+                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
+                />
+                <button type="submit" className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text2 hover:text-white transition-colors text-[13px]">→</button>
+              </div>
+            </form>
           </div>
 
           <div className="flex-1 overflow-y-auto py-2">
@@ -330,14 +362,16 @@ export function Stats({ user }: StatsProps) {
 
               {/* ── Profile header ──────────────────────────────────────── */}
               <div className="rounded-2xl p-6 flex items-start gap-5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                <div
-                  className="w-16 h-16 rounded-2xl flex items-center justify-center text-2xl font-black text-white flex-shrink-0"
-                  style={{
-                    background: 'linear-gradient(135deg, #7c3aed 0%, #ec4899 100%)',
-                    boxShadow: '0 4px 20px rgba(124,58,237,0.5)',
-                  }}
-                >
-                  {selected.ig_username?.[0].toUpperCase()}
+                <div className="w-16 h-16 rounded-2xl flex-shrink-0 overflow-hidden"
+                  style={{ boxShadow: '0 4px 20px rgba(124,58,237,0.4)' }}>
+                  {profilePic ? (
+                    <img src={profilePic} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-2xl font-black text-white"
+                      style={{ background: 'linear-gradient(135deg, #7c3aed 0%, #ec4899 100%)' }}>
+                      {selected.ig_username?.[0].toUpperCase()}
+                    </div>
+                  )}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
@@ -357,9 +391,11 @@ export function Stats({ user }: StatsProps) {
                       {selected.status}
                     </span>
                   </div>
-                  <p className="text-[13px] text-text2 mt-0.5">
-                    {selected.phone_name} · {selected.group_name ?? 'Sans groupe'}
-                  </p>
+                  {selected.id !== '__search__' && (
+                    <p className="text-[13px] text-text2 mt-0.5">
+                      {selected.phone_name} · {selected.group_name ?? 'Sans groupe'}
+                    </p>
+                  )}
                   {stats?.bio && (
                     <p className="text-[13px] mt-2 max-w-md line-clamp-2 text-text2">{stats.bio}</p>
                   )}
