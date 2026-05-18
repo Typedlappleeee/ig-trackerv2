@@ -568,7 +568,7 @@ ipcMain.handle('upload-video-geelark', async (_event, opts: {
 // ── IPC: run FFmpeg montage ──────────────────────────────────────────────────
 // Builds a concat + scale filter and runs ffmpeg.
 // Returns { ok, outputPath } or { ok: false, error, command }
-const FFMPEG_TIMEOUT = 15 * 1000  // 15-second hard kill — stuck video → error, next one
+const FFMPEG_TIMEOUT = 20 * 1000  // 20-second hard kill — stuck video → error, next one
 ipcMain.handle('run-ffmpeg', async (_event, opts: {
   clips:      Array<{ filePath: string; trimStart: number; trimEnd: number }>
   outputPath: string
