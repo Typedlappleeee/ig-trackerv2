@@ -845,6 +845,16 @@ ipcMain.handle('anthropic-vision-request', async (_event, opts: {
   }
 })
 
+// ── Helper: probe whether a video file has at least one audio stream ─────────
+function hasAudioStream(ffmpegBin: string, filePath: string): Promise<boolean> {
+  return new Promise(resolve => {
+    execFile(ffmpegBin, ['-nostdin', '-hide_banner', '-i', filePath],
+      { timeout: 8000, killSignal: 'SIGKILL' },
+      (_err, _stdout, stderr) => resolve(/Audio:/.test(stderr ?? ''))
+    )
+  })
+}
+
 // ── IPC: FFmpeg remix with AI-detected drawtext overlays ─────────────────────
 ipcMain.handle('run-ffmpeg-remix-ai', async (_event, opts: {
   newPhase1Path: string
@@ -901,7 +911,6 @@ ipcMain.handle('run-ffmpeg-remix-ai', async (_event, opts: {
       `x=${ov.x}`, `y=${ov.y}`,
       `fontsize=${ov.fontSize}`,
       `fontcolor=${ov.fontColor}`,
-      // Stroke outline (borderw) + shadow — same style as Instagram captions
       `borderw=${borderPx}`, `bordercolor=black@1.0`,
       `enable='between(t,${ov.startTime},${ov.endTime})'`,
     )
@@ -911,27 +920,72 @@ ipcMain.handle('run-ffmpeg-remix-ai', async (_event, opts: {
 
   const vfPhase1 = opts.textOverlays.length > 0 ? `${scl},${drawtextChain}` : scl
 
-  // Always use original audio (input 1) — new video visuals only, no new-video sound
-  const filterComplex = [
-    `[0:v]trim=duration=${opts.splitTime},setpts=PTS-STARTPTS,${vfPhase1}[v_p1]`,
-    `[1:v]trim=start=${opts.splitTime},setpts=PTS-STARTPTS,${scl}[v_p2]`,
-    `[1:a]asplit=2[ao1][ao2]`,
-    `[ao1]atrim=end=${opts.splitTime},asetpts=PTS-STARTPTS,${afmt}[a_p1]`,
-    `[ao2]atrim=start=${opts.splitTime},asetpts=PTS-STARTPTS,${afmt}[a_p2]`,
-    `[v_p1][a_p1][v_p2][a_p2]concat=n=2:v=1:a=1[vout][aout]`,
-  ].join(';')
+  // Validate splitTime — undefined/NaN/0 means we can't concat, so just re-encode phase1 alone
+  const splitTime = (opts.splitTime != null && !isNaN(opts.splitTime) && opts.splitTime > 0)
+    ? opts.splitTime
+    : null
 
-  const args = [
-    '-nostdin',
-    '-i', opts.newPhase1Path,
-    '-i', opts.originalPath,
-    '-filter_complex', filterComplex,
-    '-map', '[vout]', '-map', '[aout]',
-    '-c:v', 'libx264', '-preset', 'fast', '-crf', '23',
-    '-c:a', 'aac', '-b:a', '128k',
+  const commonOutputArgs = [
+    '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23',
+    '-r', '30',
     '-movflags', '+faststart',
+    '-avoid_negative_ts', 'make_zero',
+    '-max_muxing_queue_size', '9999',
     '-y', opts.outputPath,
   ]
+
+  let args: string[]
+
+  if (!splitTime) {
+    // No valid split point — just re-encode the new phase1 clip with overlays (no concat)
+    args = [
+      '-nostdin',
+      '-i', opts.newPhase1Path,
+      '-vf', `fps=30,${vfPhase1}`,
+      ...commonOutputArgs,
+      '-an',
+    ]
+  } else {
+    // Probe original for audio so we don't hang on a missing audio stream
+    const origHasAudio = await hasAudioStream(ffmpegBin, opts.originalPath)
+
+    let filterComplex: string
+    let mapArgs: string[]
+    let audioEncArgs: string[]
+
+    if (origHasAudio) {
+      filterComplex = [
+        `[0:v]trim=duration=${splitTime},fps=30,setpts=PTS-STARTPTS,${vfPhase1}[v_p1]`,
+        `[1:v]trim=start=${splitTime},fps=30,setpts=PTS-STARTPTS,${scl}[v_p2]`,
+        `[1:a]asplit=2[ao1][ao2]`,
+        `[ao1]atrim=end=${splitTime},asetpts=PTS-STARTPTS,${afmt}[a_p1]`,
+        `[ao2]atrim=start=${splitTime},asetpts=PTS-STARTPTS,${afmt}[a_p2]`,
+        `[v_p1][a_p1][v_p2][a_p2]concat=n=2:v=1:a=1[vout][aout]`,
+      ].join(';')
+      mapArgs    = ['-map', '[vout]', '-map', '[aout]']
+      audioEncArgs = ['-c:a', 'aac', '-b:a', '128k']
+    } else {
+      // No audio in original — concat video only
+      filterComplex = [
+        `[0:v]trim=duration=${splitTime},fps=30,setpts=PTS-STARTPTS,${vfPhase1}[v_p1]`,
+        `[1:v]trim=start=${splitTime},fps=30,setpts=PTS-STARTPTS,${scl}[v_p2]`,
+        `[v_p1][v_p2]concat=n=2:v=1:a=0[vout]`,
+      ].join(';')
+      mapArgs    = ['-map', '[vout]']
+      audioEncArgs = ['-an']
+    }
+
+    args = [
+      '-nostdin',
+      '-i', opts.newPhase1Path,
+      '-i', opts.originalPath,
+      '-filter_complex', filterComplex,
+      ...mapArgs,
+      ...commonOutputArgs,
+      ...audioEncArgs,
+    ]
+  }
+
   const command = `ffmpeg ${args.map(a => a.includes(' ') ? `"${a}"` : a).join(' ')}`
 
   return new Promise(resolve => {
