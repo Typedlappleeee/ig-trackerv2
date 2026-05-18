@@ -95,7 +95,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('detect-scene-change', opts),
 
   // Extract video frames as base64 JPEGs (for AI text analysis)
-  extractFrames: (opts: { filePath: string; endTime: number; fps?: number }) =>
+  extractFrames: (opts: { filePath: string; startTime?: number; endTime: number; fps?: number }) =>
     ipcRenderer.invoke('extract-frames', opts),
 
   // Anthropic Claude API with vision support (bypasses CORS)

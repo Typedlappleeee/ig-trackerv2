@@ -220,7 +220,7 @@ export function MassRemix({ user }: MassRemixProps) {
               startTime: 0.5,
               endTime: 1.5,
             }),
-            15_000, 'frame debut'
+            20_000, 'frame debut'
           )
 
           // Frame 2 : juste après le cut
@@ -231,7 +231,7 @@ export function MassRemix({ user }: MassRemixProps) {
               startTime: phase2Start,
               endTime: Math.min(phase2Start + 1, totalDur),
             }),
-            15_000, 'frame phase2'
+            20_000, 'frame phase2'
           )
 
           if (fr1.ok && fr1.frames?.[0] && fr2.ok && fr2.frames?.[0]) {
@@ -277,7 +277,7 @@ export function MassRemix({ user }: MassRemixProps) {
           const analyzeEnd = splitTime ?? (det.duration ?? 60)
           const fr = await withTimeout(
             window.electronAPI!.extractFrames!({ filePath: job.originalPath, endTime: analyzeEnd }),
-            15_000, 'extraction frames'
+            20_000, 'extraction frames'
           )
           if (fr.ok && fr.frames?.length) {
             addLog(job.id, `   ${fr.frames.length} frames extraites (jusqu'à ${analyzeEnd.toFixed(1)}s)`)

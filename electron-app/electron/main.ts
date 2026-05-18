@@ -776,25 +776,30 @@ ipcMain.handle('run-ffmpeg-remix', async (_event, opts: {
 
 // ── IPC: extract video frames as base64 JPEGs (for AI text analysis) ────────
 ipcMain.handle('extract-frames', async (_event, opts: {
-  filePath: string
-  endTime:  number
-  fps?:     number
+  filePath:   string
+  startTime?: number
+  endTime:    number
+  fps?:       number
 }) => {
   const ffmpegBin = getFfmpegBin()
   const tmpDir    = path.join(os.tmpdir(), `sf-frames-${Date.now()}`)
+  const startTime = Math.max(0, opts.startTime ?? 0)
+  const duration  = Math.max(0.1, opts.endTime - startTime)
 
   try {
     mkdirSync(tmpDir, { recursive: true })
 
-    // Target max 8 frames regardless of video length
-    const targetCount = Math.min(8, Math.max(1, Math.ceil(opts.endTime)))
-    const fps         = targetCount / opts.endTime
+    // Target max 8 frames over the requested duration
+    const targetCount  = Math.min(8, Math.max(1, Math.ceil(duration)))
+    const fps          = targetCount / duration
     const framePattern = path.join(tmpDir, 'frame_%04d.jpg')
 
     await new Promise<void>((resolve, reject) => {
       execFile(ffmpegBin, [
-        '-nostdin', '-i', opts.filePath,
-        '-t', String(opts.endTime),
+        '-nostdin',
+        '-ss', String(startTime),   // fast seek BEFORE -i → jump directly to keyframe
+        '-i', opts.filePath,
+        '-t', String(duration),     // duration from startTime, not absolute endTime
         '-vf', `fps=${fps.toFixed(4)},scale=640:-2`,
         '-q:v', '5',
         '-y', framePattern,
@@ -802,10 +807,10 @@ ipcMain.handle('extract-frames', async (_event, opts: {
     })
 
     const files    = readdirSync(tmpDir).filter(f => f.endsWith('.jpg')).sort()
-    const interval = opts.endTime / (files.length || 1)
+    const interval = duration / (files.length || 1)
     const frames   = files.map((f, i) => ({
       index:     i,
-      timestamp: Math.round(i * interval * 10) / 10,
+      timestamp: Math.round((startTime + i * interval) * 10) / 10,
       data:      readFileSync(path.join(tmpDir, f)).toString('base64'),
     }))
 
