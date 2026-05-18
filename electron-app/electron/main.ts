@@ -568,6 +568,7 @@ ipcMain.handle('upload-video-geelark', async (_event, opts: {
 // ── IPC: run FFmpeg montage ──────────────────────────────────────────────────
 // Builds a concat + scale filter and runs ffmpeg.
 // Returns { ok, outputPath } or { ok: false, error, command }
+const FFMPEG_TIMEOUT = 8 * 60 * 1000  // 8-minute hard kill — prevents infinite hangs
 ipcMain.handle('run-ffmpeg', async (_event, opts: {
   clips:      Array<{ filePath: string; trimStart: number; trimEnd: number }>
   outputPath: string
@@ -596,6 +597,7 @@ ipcMain.handle('run-ffmpeg', async (_event, opts: {
   filterParts.push(`${concatIn}concat=n=${n}:v=1:a=1[vout][aout]`)
 
   const args = [
+    '-nostdin',
     ...inputs,
     '-filter_complex', filterParts.join(';'),
     '-map', '[vout]', '-map', '[aout]',
@@ -608,13 +610,9 @@ ipcMain.handle('run-ffmpeg', async (_event, opts: {
   const command = `ffmpeg ${args.map(a => a.includes(' ') ? `"${a}"` : a).join(' ')}`
 
   return new Promise(resolve => {
-    execFile(ffmpegBin, args, { maxBuffer: 100 * 1024 * 1024 }, (err) => {
-      if (err) {
-        // If ffmpeg not found, return the command so user can run it manually
-        resolve({ ok: false, error: err.message, command })
-      } else {
-        resolve({ ok: true, outputPath: opts.outputPath, command })
-      }
+    execFile(ffmpegBin, args, { maxBuffer: 100 * 1024 * 1024, timeout: FFMPEG_TIMEOUT, killSignal: 'SIGKILL' }, (err) => {
+      if (err) resolve({ ok: false, error: err.message, command })
+      else     resolve({ ok: true, outputPath: opts.outputPath, command })
     })
   })
 })
@@ -636,11 +634,11 @@ ipcMain.handle('detect-scene-change', async (_event, opts: {
 
   return new Promise(resolve => {
     execFile(ffmpegBin, [
-      '-hide_banner', '-i', opts.filePath,
+      '-nostdin', '-hide_banner', '-i', opts.filePath,
       '-vf', `fps=${FPS},scale=${W}:${H}`,
       '-f', 'rawvideo', '-pix_fmt', 'rgb24',
       '-y', rawFile,
-    ], { maxBuffer: 5 * 1024 * 1024 }, (err, _stdout, stderr) => {
+    ], { maxBuffer: 5 * 1024 * 1024, timeout: FFMPEG_TIMEOUT, killSignal: 'SIGKILL' }, (err, _stdout, stderr) => {
 
       if (err) console.log('[scene-detect] ffmpeg error:', err.message.split('\n')[0])
 
@@ -756,6 +754,7 @@ ipcMain.handle('run-ffmpeg-remix', async (_event, opts: {
   }
 
   const args = [
+    '-nostdin',
     '-i', opts.newPhase1Path,
     '-i', opts.originalPath,
     '-filter_complex', filterComplex,
@@ -767,7 +766,7 @@ ipcMain.handle('run-ffmpeg-remix', async (_event, opts: {
   ]
   const command = `ffmpeg ${args.map(a => a.includes(' ') ? `"${a}"` : a).join(' ')}`
   return new Promise(resolve => {
-    execFile(ffmpegBin, args, { maxBuffer: 200 * 1024 * 1024 }, (err) => {
+    execFile(ffmpegBin, args, { maxBuffer: 200 * 1024 * 1024, timeout: FFMPEG_TIMEOUT, killSignal: 'SIGKILL' }, (err) => {
       if (err) resolve({ ok: false, error: err.message, command })
       else     resolve({ ok: true,  outputPath: opts.outputPath, command })
     })
@@ -793,12 +792,12 @@ ipcMain.handle('extract-frames', async (_event, opts: {
 
     await new Promise<void>((resolve, reject) => {
       execFile(ffmpegBin, [
-        '-i', opts.filePath,
+        '-nostdin', '-i', opts.filePath,
         '-t', String(opts.endTime),
         '-vf', `fps=${fps.toFixed(4)},scale=640:-2`,
         '-q:v', '5',
         '-y', framePattern,
-      ], { maxBuffer: 200 * 1024 * 1024 }, err => { if (err) reject(err); else resolve() })
+      ], { maxBuffer: 200 * 1024 * 1024, timeout: FFMPEG_TIMEOUT, killSignal: 'SIGKILL' }, err => { if (err) reject(err); else resolve() })
     })
 
     const files    = readdirSync(tmpDir).filter(f => f.endsWith('.jpg')).sort()
@@ -923,6 +922,7 @@ ipcMain.handle('run-ffmpeg-remix-ai', async (_event, opts: {
   ].join(';')
 
   const args = [
+    '-nostdin',
     '-i', opts.newPhase1Path,
     '-i', opts.originalPath,
     '-filter_complex', filterComplex,
@@ -935,7 +935,7 @@ ipcMain.handle('run-ffmpeg-remix-ai', async (_event, opts: {
   const command = `ffmpeg ${args.map(a => a.includes(' ') ? `"${a}"` : a).join(' ')}`
 
   return new Promise(resolve => {
-    execFile(ffmpegBin, args, { maxBuffer: 200 * 1024 * 1024 }, err => {
+    execFile(ffmpegBin, args, { maxBuffer: 200 * 1024 * 1024, timeout: FFMPEG_TIMEOUT, killSignal: 'SIGKILL' }, err => {
       if (err) resolve({ ok: false, error: err.message, command })
       else     resolve({ ok: true, outputPath: opts.outputPath, command })
     })
@@ -1008,7 +1008,7 @@ ipcMain.handle('run-ffmpeg-metadata', async (_event, opts: {
   metadata:   Record<string, string>  // key/value pairs to set; empty value = remove
 }) => {
   const ffmpegBin = getFfmpegBin()
-  const args: string[] = ['-hide_banner', '-i', opts.inputPath, '-map_metadata', '-1']
+  const args: string[] = ['-nostdin', '-hide_banner', '-i', opts.inputPath, '-map_metadata', '-1']
   for (const [k, v] of Object.entries(opts.metadata)) {
     if (v) { args.push('-metadata', `${k}=${v}`) }
   }
@@ -1016,7 +1016,7 @@ ipcMain.handle('run-ffmpeg-metadata', async (_event, opts: {
   args.push('-c', 'copy', '-movflags', '+faststart', '-y', opts.outputPath)
   return new Promise<{ ok: boolean; outputPath?: string; command?: string; error?: string }>(resolve => {
     const command = [ffmpegBin, ...args].join(' ')
-    execFile(ffmpegBin, args, { encoding: 'utf8' }, (err, _stdout, stderr) => {
+    execFile(ffmpegBin, args, { encoding: 'utf8', timeout: FFMPEG_TIMEOUT, killSignal: 'SIGKILL' }, (err, _stdout, stderr) => {
       if (err) resolve({ ok: false, command, error: stderr.split('\n').filter(Boolean).pop() ?? err.message })
       else     resolve({ ok: true, outputPath: opts.outputPath, command })
     })
