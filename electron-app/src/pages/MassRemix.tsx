@@ -18,6 +18,20 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
   ])
 }
 
+// Run tasks with at most `concurrency` running at the same time
+async function pLimit<T>(tasks: Array<() => Promise<T>>, concurrency: number): Promise<T[]> {
+  const results: T[] = new Array(tasks.length)
+  let idx = 0
+  async function worker() {
+    while (idx < tasks.length) {
+      const i = idx++
+      results[i] = await tasks[i]()
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(concurrency, tasks.length) }, worker))
+  return results
+}
+
 interface MassRemixProps { user: User }
 
 type Preset = '9:16' | '1:1' | '16:9'
@@ -179,7 +193,7 @@ export function MassRemix({ user }: MassRemixProps) {
 
     const scope: UploadScope = currentOrg ? { mode: 'org', id: currentOrg.id } : { mode: 'user', id: user.id }
 
-    await Promise.all(pairs.map(async (job) => {
+    await pLimit(pairs.map(job => async () => {
       if (abortRef.current) return
 
       try {
@@ -412,7 +426,7 @@ Return ONLY a valid JSON array. If no text, return [].`
         updateJob(job.id, { status: 'error', error: msg })
         playError()
       }
-    }))
+    }), 3)
 
     setRunning(false)
   }
