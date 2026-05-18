@@ -674,9 +674,9 @@ function AppContent({ user }: { user: User }) {
 
   const content = (() => {
     switch (page) {
-      case 'dashboard':    return <BugScreen />
+      case 'dashboard':    return <Dashboard   user={user} />
       case 'phones':       return <Phones      user={user} key={refreshTick} />
-      case 'stats':        return <BugScreen />
+      case 'stats':        return <Stats       user={user} />
       case 'posting':      return <Posting     user={user} />
       case 'massposting':  return <MassPosting user={user} />
       case 'scheduler':    return <Scheduler   user={user} />
