@@ -484,19 +484,22 @@ ipcMain.handle('geelark-request', async (_event, opts: {
   isText?: boolean
 }) => {
   try {
-    const { Referer: _r, referer: _r2, Origin: _o, origin: _o2, ...safeHeaders } = opts.headers ?? {}
-    const reqHeaders: Record<string, string> = { 'Content-Type': 'application/json', ...safeHeaders }
     const reqBody = opts.body ? JSON.stringify(opts.body) : undefined
 
     let response: Response
     if (opts.url.includes('instagram.com')) {
-      // session.fetch always sends cookies → works with Instagram's auth requirements
+      // Keep all headers (including Referer/Origin) for Instagram — they help avoid 403s.
+      // Use session.defaultSession.fetch so Instagram cookies are automatically attached.
+      const igHeaders: Record<string, string> = { ...opts.headers }
+      if (opts.body) igHeaders['Content-Type'] = 'application/json'
       response = await session.defaultSession.fetch(opts.url, {
         method: opts.method,
-        headers: reqHeaders,
+        headers: igHeaders,
         body: reqBody,
       })
     } else {
+      const { Referer: _r, referer: _r2, Origin: _o, origin: _o2, ...safeHeaders } = opts.headers ?? {}
+      const reqHeaders: Record<string, string> = { 'Content-Type': 'application/json', ...safeHeaders }
       response = await net.fetch(opts.url, {
         method: opts.method,
         headers: reqHeaders,

@@ -4,7 +4,7 @@ import type { User } from '@supabase/supabase-js'
 import { supabase, type Phone } from '@/lib/supabase'
 import { useOrg } from '@/lib/orgContext'
 import { useConnections } from '@/lib/connections'
-import { fetchIgStats, invalidateIgCache } from '@/lib/instagram'
+import { fetchIgStats, invalidateIgCache, type IgStats } from '@/lib/instagram'
 import { Spinner } from '@/components/ui/Spinner'
 import { Button }  from '@/components/ui/Button'
 import { playNav } from '@/lib/sounds'
@@ -41,78 +41,68 @@ function playVideoOpen() {
   } catch { /* */ }
 }
 
+// Parse videos out of a pre-fetched API user object (no extra network call)
+async function videosFromUser(user: Record<string, unknown>): Promise<IgVideo[]> {
+  function edgeToVideos(edges: unknown[]): IgVideo[] {
+    return edges.map((e: unknown) => {
+      const node = (e as Record<string, unknown>)['node'] as Record<string, unknown>
+      return {
+        id:        node['id'] as string,
+        shortcode: node['shortcode'] as string,
+        url:       `https://www.instagram.com/reel/${node['shortcode']}/`,
+        video_url: (node['video_url'] as string) ?? '',
+        views:     (node['video_view_count'] as number) ?? (node['play_count'] as number) ?? 0,
+        likes:     ((node['edge_liked_by'] as Record<string, number>)?.count) ?? 0,
+        comments:  ((node['edge_media_to_comment'] as Record<string, number>)?.count) ?? 0,
+        thumbnail: (node['thumbnail_src'] as string) ?? (node['display_url'] as string) ?? '',
+        timestamp: node['taken_at_timestamp']
+          ? new Date((node['taken_at_timestamp'] as number) * 1000).toISOString()
+          : '',
+        isVideo: (node['is_video'] as boolean) ?? false,
+      }
+    }).filter(v => v.isVideo)
+  }
+  const gridEdges = (user['edge_owner_to_timeline_media'] as Record<string, unknown>)?.['edges'] as unknown[] ?? []
+  const reelEdges = (user['edge_felix_video_timeline']    as Record<string, unknown>)?.['edges'] as unknown[] ?? []
+  const allEdges  = [...reelEdges, ...gridEdges]
+  const seen      = new Set<string>()
+  const deduped   = allEdges.filter((e: unknown) => {
+    const id = ((e as Record<string, unknown>)['node'] as Record<string, unknown>)?.['id'] as string
+    if (seen.has(id)) return false
+    seen.add(id); return true
+  })
+  const videos = edgeToVideos(deduped)
+  if (window.electronAPI) {
+    await Promise.all(videos.map(async v => {
+      if (!v.thumbnail) return
+      const r = await window.electronAPI!.fetchImage({ url: v.thumbnail })
+      if (r.ok && r.dataUrl) v.thumbnail = r.dataUrl
+    }))
+  }
+  return videos
+}
+
+// Fetch a user's videos: re-uses the stats cache if available to avoid double API calls
 async function fetchIgVideos(username: string): Promise<IgVideo[]> {
-  if (!window.electronAPI) return []
+  if (!window.electronAPI?.geelarkRequest) return []
   const clean = username.replace(/^@/, '')
-
-  // Prefer fetchInstagramHtml which uses session cookies (set by the hidden browser)
-  // for much higher success rate. Fall back to geelarkRequest (no cookies) if unavailable.
-  let user: Record<string, unknown> | null = null
-  if (window.electronAPI.fetchInstagramHtml) {
-    const res = await window.electronAPI.fetchInstagramHtml(clean)
-    if (res.ok && res.apiJson) {
-      const json = res.apiJson as Record<string, unknown>
-      user = ((json['data'] as Record<string, unknown>)?.['user']) as Record<string, unknown> ?? null
-    }
-  }
-  if (!user && window.electronAPI.geelarkRequest) {
-    const result = await window.electronAPI.geelarkRequest({
-      method: 'GET',
-      url: `https://www.instagram.com/api/v1/users/web_profile_info/?username=${encodeURIComponent(clean)}`,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-        'X-IG-App-ID': '936619743392459',
-        'Accept': '*/*',
-      },
-    })
-    if (result.ok) {
-      const data = result.data as Record<string, unknown>
-      user = (data?.['data'] as Record<string, unknown>)?.['user'] as Record<string, unknown> ?? null
-    }
-  }
-  if (!user) return []
+  const result = await window.electronAPI.geelarkRequest({
+    method: 'GET',
+    url: `https://www.instagram.com/api/v1/users/web_profile_info/?username=${encodeURIComponent(clean)}`,
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+      'X-IG-App-ID': '936619743392459',
+      'Referer': `https://www.instagram.com/${clean}/`,
+      'Origin': 'https://www.instagram.com',
+      'Accept': '*/*',
+    },
+  })
+  if (!result.ok) return []
   try {
-
-    function edgeToVideos(edges: unknown[]): IgVideo[] {
-      return edges.map((e: unknown) => {
-        const node = (e as Record<string, unknown>)['node'] as Record<string, unknown>
-        return {
-          id:        node['id'] as string,
-          shortcode: node['shortcode'] as string,
-          url:       `https://www.instagram.com/reel/${node['shortcode']}/`,
-          video_url: (node['video_url'] as string) ?? '',
-          views:     (node['video_view_count'] as number) ?? (node['play_count'] as number) ?? 0,
-          likes:     ((node['edge_liked_by'] as Record<string, number>)?.count) ?? 0,
-          comments:  ((node['edge_media_to_comment'] as Record<string, number>)?.count) ?? 0,
-          thumbnail: (node['thumbnail_src'] as string) ?? (node['display_url'] as string) ?? '',
-          timestamp: node['taken_at_timestamp']
-            ? new Date((node['taken_at_timestamp'] as number) * 1000).toISOString()
-            : '',
-          isVideo: (node['is_video'] as boolean) ?? false,
-        }
-      }).filter(v => v.isVideo)
-    }
-
-    // Merge posts grid + reels feed, deduplicate by id
-    const gridEdges  = (user?.['edge_owner_to_timeline_media'] as Record<string, unknown>)?.['edges'] as unknown[] ?? []
-    const reelEdges  = (user?.['edge_felix_video_timeline']    as Record<string, unknown>)?.['edges'] as unknown[] ?? []
-    const allEdges   = [...reelEdges, ...gridEdges]
-    const seen       = new Set<string>()
-    const deduped    = allEdges.filter((e: unknown) => {
-      const id = ((e as Record<string, unknown>)['node'] as Record<string, unknown>)?.['id'] as string
-      if (seen.has(id)) return false
-      seen.add(id); return true
-    })
-    const videos = edgeToVideos(deduped)
-
-    if (window.electronAPI) {
-      await Promise.all(videos.map(async v => {
-        if (!v.thumbnail) return
-        const r = await window.electronAPI!.fetchImage({ url: v.thumbnail })
-        if (r.ok && r.dataUrl) v.thumbnail = r.dataUrl
-      }))
-    }
-    return videos
+    const data = result.data as Record<string, unknown>
+    const user = (data?.['data'] as Record<string, unknown>)?.['user'] as Record<string, unknown>
+    if (!user) return []
+    return await videosFromUser(user)
   } catch { return [] }
 }
 
@@ -246,14 +236,47 @@ export function Stats({ user }: StatsProps) {
       }
 
       if (retry) invalidateIgCache(phone.ig_username)
-      const s = await fetchIgStats(phone.ig_username, { force: retry })
+
+      // Single API call via fetchInstagramHtml (uses session cookies → most reliable).
+      // Extract both stats and videos from the same apiJson response.
+      let s: IgStats | null = null
+      let v: IgVideo[] = []
+
+      if (window.electronAPI?.fetchInstagramHtml) {
+        const res = await window.electronAPI.fetchInstagramHtml(phone.ig_username)
+        if (res.ok && res.apiJson) {
+          const json  = res.apiJson as Record<string, unknown>
+          const user  = (json['data'] as Record<string, unknown>)?.['user'] as Record<string, unknown>
+          if (user) {
+            const timeline    = user['edge_owner_to_timeline_media'] as Record<string, unknown> | undefined
+            const edges       = (timeline?.['edges'] as unknown[]) ?? []
+            const total_views = edges.reduce<number>((acc, e) => {
+              const n = (e as Record<string, unknown>)['node'] as Record<string, unknown>
+              return acc + (((n['video_view_count'] as number) ?? 0))
+            }, 0)
+            s = {
+              username:        (user['username'] as string) ?? phone.ig_username,
+              followers:       ((user['edge_followed_by'] as Record<string, number>)?.count) ?? 0,
+              following:       ((user['edge_follow']     as Record<string, number>)?.count) ?? 0,
+              posts:           ((timeline?.['count'] as number) ?? 0),
+              total_views,
+              bio:             (user['biography'] as string) ?? '',
+              profile_pic_url: (user['profile_pic_url'] as string) ?? '',
+            }
+            v = await videosFromUser(user)
+          }
+        }
+      }
+
+      // Fallback: use the multi-method fetchIgStats + geelarkRequest-based fetchIgVideos
+      if (!s) s = await fetchIgStats(phone.ig_username, { force: retry })
       setStats(s); setLS(false)
       if (s?.profile_pic_url && window.electronAPI?.fetchImage) {
         window.electronAPI.fetchImage({ url: s.profile_pic_url })
           .then(r => { if (r.ok && r.dataUrl) setProfilePic(r.dataUrl) })
           .catch(() => {})
       }
-      const v = await fetchIgVideos(phone.ig_username)
+      if (v.length === 0) v = await fetchIgVideos(phone.ig_username)
       setVideos(v); setLL(false)
       if (!s && v.length === 0)
         setLoadErr('Instagram indisponible ou compte privé. Réessaie dans quelques secondes.')
