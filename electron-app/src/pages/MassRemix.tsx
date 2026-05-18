@@ -286,14 +286,25 @@ export function MassRemix({ user }: MassRemixProps) {
               { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: f.data } },
               { type: 'text', text: `[Frame ${fi} — t=${f.timestamp}s]` },
             ])
-            const prompt = `These are ${fr.frames.length} frames from a ${analyzeEnd.toFixed(1)}s video clip (vertical 9:16, output resolution 1080×1920).
-Identify ALL burned-in text overlays (titles, captions, subtitles, watermarks). For each return:
-{"text":"exact string","xAlign":"left"|"center"|"right","yPercent":0-100,"fontSizePx":number,"fontColor":"css-color","bold":true,"startFrame":0,"endFrame":5}
+            const prompt = `These are ${fr.frames.length} frames from a ${analyzeEnd.toFixed(1)}s video clip. Output resolution: 1080×1920 (vertical 9:16).
+Identify ALL burned-in text overlays (titles, captions, subtitles, watermarks, any visible text).
 
-Rules for fontSizePx (at 1080×1920):
-CRITICAL: text must fit on ONE LINE within 1080px. Use fontSizePx ≤ 900/(text.length×0.55).
-Examples: 6 chars→max 272px, 10 chars→max 163px, 15 chars→max 109px, 20 chars→max 81px, 30 chars→max 54px.
-Return ONLY a JSON array. If none, return [].`
+For EACH text overlay return a JSON object:
+{"text":"exact string as shown","xAlign":"left"|"center"|"right","yPercent":0-100,"fontSizePx":number,"fontColor":"white"|"black"|"#rrggbb","bold":true|false,"startFrame":0,"endFrame":${fr.frames.length - 1}}
+
+Position rules (IMPORTANT — match the original position exactly):
+- yPercent=0 means TOP of frame, yPercent=100 means BOTTOM. Be precise.
+- Text at the very top → yPercent 3-10. Text in middle → 40-60. Text at bottom → 75-95.
+- xAlign: "center" if centered, "left" if near left edge, "right" if near right edge.
+
+Font size rules (at 1080px wide output):
+- Large title text (2-5 chars) → 150-350px
+- Medium text (6-12 chars) → 80-180px
+- Normal caption (13-25 chars) → 50-100px
+- Long subtitle (26+ chars) → 30-60px
+- NEVER exceed 1080/(text.length×0.6) to avoid overflow.
+
+Return ONLY a valid JSON array. If no text, return [].`
             const res = await withTimeout(
               window.electronAPI!.anthropicVisionRequest!({
                 apiKey: anthropicKey.trim(), model: 'claude-haiku-4-5-20251001',
@@ -307,18 +318,26 @@ Return ONLY a JSON array. If none, return [].`
               const m = txt.match(/\[[\s\S]*\]/)
               if (m) {
                 const parsed = JSON.parse(m[0]) as Array<{ text: string; xAlign: string; yPercent: number; fontSizePx: number; fontColor: string; bold?: boolean; startFrame: number; endFrame: number }>
-                textOverlays = parsed.map(item => ({
-                  text: item.text,
-                  x: xAlignToExpr(item.xAlign ?? 'center'),
-                  y: `h*${Math.max(0.55, Math.min(0.82, (item.yPercent ?? 72) / 100)).toFixed(3)}`,
-                  fontSize: Math.round(Math.max(36, Math.min(130, item.fontSizePx ?? 80, Math.round(950 / Math.max(item.text.length * 0.62, 1))))),
-                  fontColor: item.fontColor ?? 'white',
-                  bold: item.bold ?? true,
-                  shadow: true,
-                  startTime: Math.round((item.startFrame ?? 0) * interval * 10) / 10,
-                  endTime: Math.min(analyzeEnd, Math.round(((item.endFrame ?? fr.frames!.length - 1) + 1) * interval * 10) / 10),
-                }))
-                addLog(job.id, `   ${textOverlays.length} overlay(s) détecté(s)`)
+                textOverlays = parsed.map(item => {
+                  const len = Math.max(item.text.length, 1)
+                  // Max font size that fits in 1080px width (with some margin)
+                  const maxByLength = Math.round(1080 / (len * 0.6))
+                  const fontSize = Math.round(Math.max(28, Math.min(400, item.fontSizePx ?? 80, maxByLength)))
+                  // Y: allow full range of the frame (3% to 97%)
+                  const yFrac = Math.max(0.03, Math.min(0.97, (item.yPercent ?? 50) / 100))
+                  return {
+                    text: item.text,
+                    x: xAlignToExpr(item.xAlign ?? 'center'),
+                    y: `h*${yFrac.toFixed(3)}-${Math.round(fontSize / 2)}`,
+                    fontSize,
+                    fontColor: item.fontColor ?? 'white',
+                    bold: item.bold ?? true,
+                    shadow: true,
+                    startTime: Math.round((item.startFrame ?? 0) * interval * 10) / 10,
+                    endTime: Math.min(analyzeEnd, Math.round(((item.endFrame ?? fr.frames!.length - 1) + 1) * interval * 10) / 10),
+                  }
+                })
+                addLog(job.id, `   ${textOverlays.length} overlay(s): ${textOverlays.map(o => `"${o.text}"@${o.fontSize}px`).join(', ')}`)
               }
             } else {
               addLog(job.id, `   Analyse IA échouée: ${(res as any).error ?? 'inconnu'}`)
