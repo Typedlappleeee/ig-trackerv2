@@ -66,6 +66,23 @@ function xAlignToExpr(align: string): string {
   return '(w-text_w)/2'
 }
 
+// Split text into lines that fit within frameW at the given fontSize.
+// Returns at least one element.
+function wrapText(text: string, fontSize: number, frameW = 1080): string[] {
+  const charsPerLine = Math.max(1, Math.floor(frameW / (fontSize * 0.58)))
+  if (text.length <= charsPerLine) return [text]
+  const words = text.split(' ')
+  const lines: string[] = []
+  let cur = ''
+  for (const w of words) {
+    const next = cur ? `${cur} ${w}` : w
+    if (next.length <= charsPerLine) { cur = next }
+    else { if (cur) lines.push(cur); cur = w }
+  }
+  if (cur) lines.push(cur)
+  return lines.length ? lines : [text]
+}
+
 function VideoListPanel({
   label, paths, accent, onAddBank, onAddPC, onRemove,
 }: {
@@ -136,6 +153,9 @@ export function MassRemix({ user }: MassRemixProps) {
   const [showBankOrig, setShowBankOrig] = useState(false)
   const [showBankSec,  setShowBankSec]  = useState(false)
 
+  const [splitMode,      setSplitMode]      = useState<'auto' | 'manual'>('auto')
+  const [manualSplitSec, setManualSplitSec] = useState<string>('3')
+
   // anthropic key from DB (connections), fallback to localStorage
   const anthropicKey = conns.anthropic || localStorage.getItem('sf_anthropic_key') || ''
 
@@ -197,85 +217,76 @@ export function MassRemix({ user }: MassRemixProps) {
       if (abortRef.current) return
 
       try {
-        // ── 1. Detect split ──────────────────────────────────────────────────
         updateJob(job.id, { status: 'detecting' })
         addLog(job.id, `▶ Vidéo originale : ${fileName(job.originalPath)}`)
         addLog(job.id, `▶ Vidéo secondaire: ${fileName(job.secondaryPath)}`)
-        addLog(job.id, '🔍 Détection scène…')
 
-        const det = await withTimeout(
-          window.electronAPI!.detectSceneChange!({ filePath: job.originalPath }),
-          60_000, 'détection scène'
-        )
+        // ── 1. Detect / set split time ───────────────────────────────────────
+        let splitTime: number | undefined
+        let detDuration: number | undefined
 
-        if (!det.ok) {
-          addLog(job.id, `❌ Détection échouée: ${det.error ?? 'inconnu'}`)
-        }
-
-        let splitTime = det.ok && det.splitTime != null
-          ? Math.min((det.duration ?? 60) - 0.1, Math.round(det.splitTime * 1000) / 1000)
-          : undefined
-
-        addLog(job.id, det.ok
-          ? `✅ Scène: splitTime=${splitTime != null ? splitTime + 's' : 'non trouvé'}, durée=${det.duration ?? '?'}s`
-          : `⚠️ Pas de scène détectée — concat désactivé`)
-
-        // Vérification changement de décor : compare un frame du début avec un frame
-        // juste après le cut. Si le décor/fond est le même (même personne, même lieu),
-        // on annule le cut — ça ne sert à rien de séparer deux plans du même clip.
-        if (splitTime != null && anthropicKey.trim()) {
-          const totalDur = det.duration ?? 60
-          addLog(job.id, `🤖 Vérif. changement de décor (cut à ${splitTime}s)…`)
-
-          // Frame 1 : début de la vidéo (~1s)
-          const fr1 = await withTimeout(
-            window.electronAPI!.extractFrames!({
-              filePath: job.originalPath,
-              startTime: 0.5,
-              endTime: 1.5,
-            }),
-            45_000, 'frame debut'
+        if (splitMode === 'manual') {
+          const manualSt = parseFloat(manualSplitSec)
+          splitTime = (!isNaN(manualSt) && manualSt > 0) ? manualSt : undefined
+          addLog(job.id, `✂️ Coupe manuelle: ${splitTime != null ? splitTime + 's' : 'désactivée'}`)
+        } else {
+          addLog(job.id, '🔍 Détection scène…')
+          const det = await withTimeout(
+            window.electronAPI!.detectSceneChange!({ filePath: job.originalPath }),
+            60_000, 'détection scène'
           )
+          if (!det.ok) addLog(job.id, `❌ Détection échouée: ${det.error ?? 'inconnu'}`)
 
-          // Frame 2 : juste après le cut
-          const phase2Start = Math.min(splitTime + 0.5, totalDur - 0.5)
-          const fr2 = await withTimeout(
-            window.electronAPI!.extractFrames!({
-              filePath: job.originalPath,
-              startTime: phase2Start,
-              endTime: Math.min(phase2Start + 1, totalDur),
-            }),
-            45_000, 'frame phase2'
-          )
+          detDuration = det.duration
+          splitTime = det.ok && det.splitTime != null
+            ? Math.min((det.duration ?? 60) - 0.1, Math.round(det.splitTime * 1000) / 1000)
+            : undefined
 
-          if (fr1.ok && fr1.frames?.[0] && fr2.ok && fr2.frames?.[0]) {
-            const res = await withTimeout(
-              window.electronAPI!.anthropicVisionRequest!({
-                apiKey: anthropicKey.trim(),
-                model: 'claude-haiku-4-5-20251001',
-                messages: [{ role: 'user', content: [
-                  { type: 'text', text: 'Compare these two video frames (frame 1 = beginning, frame 2 = after scene cut):' },
-                  { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: fr1.frames[0].data } },
-                  { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: fr2.frames[0].data } },
-                  { type: 'text', text: 'Has the scene/location/background DRASTICALLY changed between frame 1 and frame 2? Answer "yes" only if the decor, setting, or environment is clearly different (different room, outdoor vs indoor, completely different background). Answer "no" if it is the same person in the same or very similar setting. Answer only "yes" or "no".' },
-                ]}],
-                maxTokens: 5,
-              }),
-              30_000, 'AI changement décor'
+          addLog(job.id, det.ok
+            ? `✅ Scène: splitTime=${splitTime != null ? splitTime + 's' : 'non trouvé'}, durée=${det.duration ?? '?'}s`
+            : `⚠️ Pas de scène détectée — concat désactivé`)
+
+          // Vérif. changement de décor (auto mode only)
+          if (splitTime != null && anthropicKey.trim()) {
+            const totalDur = det.duration ?? 60
+            addLog(job.id, `🤖 Vérif. changement de décor (cut à ${splitTime}s)…`)
+            const fr1 = await withTimeout(
+              window.electronAPI!.extractFrames!({ filePath: job.originalPath, startTime: 0.5, endTime: 1.5 }),
+              45_000, 'frame debut'
             )
-            if (res.ok) {
-              const answer = ((res.data as any)?.content?.[0]?.text ?? '').toLowerCase().trim()
-              if (!answer.startsWith('yes')) {
-                addLog(job.id, '⚠️ Décor identique avant/après cut → concat désactivé')
-                splitTime = undefined
+            const phase2Start = Math.min(splitTime + 0.5, totalDur - 0.5)
+            const fr2 = await withTimeout(
+              window.electronAPI!.extractFrames!({ filePath: job.originalPath, startTime: phase2Start, endTime: Math.min(phase2Start + 1, totalDur) }),
+              45_000, 'frame phase2'
+            )
+            if (fr1.ok && fr1.frames?.[0] && fr2.ok && fr2.frames?.[0]) {
+              const res = await withTimeout(
+                window.electronAPI!.anthropicVisionRequest!({
+                  apiKey: anthropicKey.trim(), model: 'claude-haiku-4-5-20251001',
+                  messages: [{ role: 'user', content: [
+                    { type: 'text', text: 'Compare these two video frames (frame 1 = beginning, frame 2 = after scene cut):' },
+                    { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: fr1.frames[0].data } },
+                    { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: fr2.frames[0].data } },
+                    { type: 'text', text: 'Has the scene/location/background DRASTICALLY changed between frame 1 and frame 2? Answer "yes" only if the decor, setting, or environment is clearly different (different room, outdoor vs indoor, completely different background). Answer "no" if it is the same person in the same or very similar setting. Answer only "yes" or "no".' },
+                  ]}],
+                  maxTokens: 5,
+                }),
+                30_000, 'AI changement décor'
+              )
+              if (res.ok) {
+                const answer = ((res.data as any)?.content?.[0]?.text ?? '').toLowerCase().trim()
+                if (!answer.startsWith('yes')) {
+                  addLog(job.id, '⚠️ Décor identique → concat désactivé')
+                  splitTime = undefined
+                } else {
+                  addLog(job.id, '✅ Changement de décor confirmé → concat activé')
+                }
               } else {
-                addLog(job.id, '✅ Changement de décor confirmé → concat activé')
+                addLog(job.id, `⚠️ Vérif. décor échouée → concat conservé`)
               }
             } else {
-              addLog(job.id, `⚠️ Vérif. décor échouée (${(res as any).error}) → concat conservé`)
+              addLog(job.id, '⚠️ Extraction frames échouée → vérif. décor ignorée')
             }
-          } else {
-            addLog(job.id, '⚠️ Extraction frames échouée → vérif. décor ignorée')
           }
         }
 
@@ -288,7 +299,7 @@ export function MassRemix({ user }: MassRemixProps) {
         if (aiEnabled && anthropicKey.trim()) {
           updateJob(job.id, { status: 'analyzing' })
           addLog(job.id, '✨ Analyse texte IA…')
-          const analyzeEnd = splitTime ?? (det.duration ?? 60)
+          const analyzeEnd = splitTime ?? detDuration ?? 30
           const fr = await withTimeout(
             window.electronAPI!.extractFrames!({ filePath: job.originalPath, endTime: analyzeEnd }),
             45_000, 'extraction frames'
@@ -300,25 +311,26 @@ export function MassRemix({ user }: MassRemixProps) {
               { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: f.data } },
               { type: 'text', text: `[Frame ${fi} — t=${f.timestamp}s]` },
             ])
-            const prompt = `These are ${fr.frames.length} frames from a ${analyzeEnd.toFixed(1)}s video clip. Output resolution: 1080×1920 (vertical 9:16).
-Identify ALL burned-in text overlays (titles, captions, subtitles, watermarks, any visible text).
+            const prompt = `These are ${fr.frames.length} frames from a ${analyzeEnd.toFixed(1)}s vertical video (1080×1920).
+Your job: identify EVERY burned-in text overlay visible anywhere in the frames (titles, captions, subtitles, watermarks, stickers, any readable text). Do NOT skip any text, even partial.
 
 For EACH text overlay return a JSON object:
-{"text":"exact string as shown","xAlign":"left"|"center"|"right","yPercent":0-100,"fontSizePx":number,"fontColor":"white"|"black"|"#rrggbb","bold":true|false,"startFrame":0,"endFrame":${fr.frames.length - 1}}
+{"text":"exact string","xAlign":"left"|"center"|"right","yPercent":0-100,"fontSizePx":number,"fontColor":"white"|"black"|"#rrggbb","bold":true|false,"startFrame":0,"endFrame":${fr.frames.length - 1}}
 
-Position rules (IMPORTANT — match the original position exactly):
-- yPercent=0 means TOP of frame, yPercent=100 means BOTTOM. Be precise.
-- Text at the very top → yPercent 3-10. Text in middle → 40-60. Text at bottom → 75-95.
-- xAlign: "center" if centered, "left" if near left edge, "right" if near right edge.
+Position (yPercent): 0=top edge, 100=bottom edge. Be precise — match where text actually appears.
+- Text clearly in top area → 5-25
+- Text clearly in bottom area → 70-92
+- Text in middle → 40-60 (only if it truly is centered)
 
-Font size rules (at 1080px wide output):
-- Large title text (2-5 chars) → 150-350px
-- Medium text (6-12 chars) → 80-180px
-- Normal caption (13-25 chars) → 50-100px
-- Long subtitle (26+ chars) → 30-60px
-- NEVER exceed 1080/(text.length×0.6) to avoid overflow.
+Font size (fontSizePx): size of the text AS IT APPEARS in a 1080px wide frame.
+- Very large heading → 80-150px
+- Normal caption → 50-80px
+- Small subtitle → 36-55px
 
-Return ONLY a valid JSON array. If no text, return [].`
+startFrame/endFrame: first and last frame index where this text is visible.
+
+Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.`
+
             const res = await withTimeout(
               window.electronAPI!.anthropicVisionRequest!({
                 apiKey: anthropicKey.trim(), model: 'claude-haiku-4-5-20251001',
@@ -333,16 +345,21 @@ Return ONLY a valid JSON array. If no text, return [].`
               if (m) {
                 const parsed = JSON.parse(m[0]) as Array<{ text: string; xAlign: string; yPercent: number; fontSizePx: number; fontColor: string; bold?: boolean; startFrame: number; endFrame: number }>
                 const frameCount = fr.frames!.length
-                // Output frame height (for y-clamping so text stays on-screen)
                 const outH = preset === '9:16' ? 1920 : 1080
-                textOverlays = parsed.map(item => {
-                  const len = Math.max(item.text.length, 1)
-                  const maxByLength = Math.round(1080 / (len * 0.6))
-                  const fontSize = Math.round(Math.max(28, Math.min(400, item.fontSizePx ?? 80, maxByLength)))
-                  // Clamp yFrac so text center never goes closer to an edge than fontSize/2
-                  const margin = (fontSize * 0.6) / outH   // conservative half-height margin
-                  const yFrac  = Math.max(margin, Math.min(1 - margin, (item.yPercent ?? 50) / 100))
-                  // Text timing: if text spans ≥80% of frames, show it for the full clip
+                const outW = preset === '16:9' ? 1920 : 1080
+
+                parsed.forEach(item => {
+                  // Font size: slightly larger than AI suggests, capped reasonably
+                  const fontSize = Math.round(Math.max(44, Math.min(160, (item.fontSizePx ?? 64) * 1.15)))
+
+                  // Position: respect AI detection but avoid dead-center zone (35-65%)
+                  const rawY = (item.yPercent ?? 50) / 100
+                  let yFrac: number
+                  if (rawY < 0.35)      yFrac = Math.max(0.06, rawY)          // upper zone
+                  else if (rawY > 0.65) yFrac = Math.min(0.92, rawY)          // lower zone
+                  else                  yFrac = rawY > 0.5 ? 0.78 : 0.18      // center → snap to lower or upper
+
+                  // Timing
                   const sf = item.startFrame ?? 0
                   const ef = item.endFrame   ?? frameCount - 1
                   const coversAll = (ef - sf + 1) >= frameCount * 0.8
@@ -350,19 +367,27 @@ Return ONLY a valid JSON array. If no text, return [].`
                   const endTime   = coversAll
                     ? analyzeEnd
                     : Math.min(analyzeEnd, Math.max(startTime + interval * 2, Math.round((ef + 1) * interval * 10) / 10))
-                  return {
-                    text: item.text,
-                    x: xAlignToExpr(item.xAlign ?? 'center'),
-                    y: `h*${yFrac.toFixed(4)}-${Math.round(fontSize / 2)}`,
-                    fontSize,
-                    fontColor: item.fontColor ?? 'white',
-                    bold: item.bold ?? true,
-                    shadow: true,
-                    startTime,
-                    endTime,
-                  }
+
+                  // Word-wrap: split into lines, create one overlay per line
+                  const lines = wrapText(item.text, fontSize, outW)
+                  const lineStepFrac = (fontSize * 1.3) / outH
+
+                  lines.forEach((line, li) => {
+                    const lineYFrac = Math.min(0.95, yFrac + li * lineStepFrac)
+                    textOverlays.push({
+                      text: line,
+                      x: xAlignToExpr(item.xAlign ?? 'center'),
+                      y: `h*${lineYFrac.toFixed(4)}-${Math.round(fontSize / 2)}`,
+                      fontSize,
+                      fontColor: item.fontColor ?? 'white',
+                      bold: item.bold ?? true,
+                      shadow: true,
+                      startTime,
+                      endTime,
+                    })
+                  })
                 })
-                addLog(job.id, `   ${textOverlays.length} overlay(s): ${textOverlays.map(o => `"${o.text}"@${o.fontSize}px`).join(', ')}`)
+                addLog(job.id, `   ${parsed.length} texte(s) → ${textOverlays.length} overlay(s): ${textOverlays.map(o => `"${o.text}"@${o.fontSize}px`).join(', ')}`)
               }
             } else {
               addLog(job.id, `   Analyse IA échouée: ${(res as any).error ?? 'inconnu'}`)
@@ -672,6 +697,42 @@ Return ONLY a valid JSON array. If no text, return [].`
                 <p className="mt-1.5 text-[11px] font-semibold" style={{ color: '#fbbf24' }}>⚠ Clé Anthropic manquante</p>
               )}
             </button>
+
+            {/* Split mode */}
+            <div className="rounded-2xl p-4 space-y-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'rgba(148,163,184,0.5)' }}>Point de coupe Phase 2</p>
+              <div className="flex gap-2">
+                <button onClick={() => setSplitMode('auto')}
+                  className="flex-1 py-2 rounded-xl text-[13px] font-bold transition-all"
+                  style={splitMode === 'auto'
+                    ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff', boxShadow: '0 2px 10px rgba(124,58,237,0.3)' }
+                    : { background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.5)', border: '1px solid rgba(255,255,255,0.07)' }
+                  }>🤖 Auto</button>
+                <button onClick={() => setSplitMode('manual')}
+                  className="flex-1 py-2 rounded-xl text-[13px] font-bold transition-all"
+                  style={splitMode === 'manual'
+                    ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff', boxShadow: '0 2px 10px rgba(124,58,237,0.3)' }
+                    : { background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.5)', border: '1px solid rgba(255,255,255,0.07)' }
+                  }>✂️ Manuel</button>
+              </div>
+              {splitMode === 'manual' && (
+                <div className="flex items-center gap-3">
+                  <label className="text-[12px] flex-shrink-0" style={{ color: 'rgba(196,181,253,0.7)' }}>Couper à</label>
+                  <input
+                    type="number" min={0.1} step={0.1} value={manualSplitSec}
+                    onChange={e => setManualSplitSec(e.target.value)}
+                    className="flex-1 rounded-xl px-3 py-1.5 text-[14px] font-bold text-white text-center focus:outline-none"
+                    style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(139,92,246,0.3)' }}
+                  />
+                  <span className="text-[12px] flex-shrink-0" style={{ color: 'rgba(148,163,184,0.5)' }}>sec</span>
+                </div>
+              )}
+              {splitMode === 'auto' && (
+                <p className="text-[11px] leading-relaxed" style={{ color: 'rgba(148,163,184,0.45)' }}>
+                  Détecte automatiquement la scène de changement.
+                </p>
+              )}
+            </div>
 
             {/* Format */}
             <div className="rounded-2xl p-4" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
