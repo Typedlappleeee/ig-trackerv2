@@ -365,44 +365,49 @@ export function MassRemix({ user }: MassRemixProps) {
             ? `✅ Scène: splitTime=${splitTime != null ? splitTime + 's' : 'non trouvé'}, durée=${det.duration ?? '?'}s`
             : `⚠️ Pas de scène détectée — concat désactivé`)
 
-          // Vérif. changement de décor — fire-and-forget (informationnel, ne bloque pas l'étape 2)
+          // Vérif. personne + décor — BLOQUANT : si même personne ET même décor → annuler le cut
           if (splitTime != null && anthropicKey.trim()) {
-            const totalDur = det.duration ?? 60
-            const phase2Start = Math.min(splitTime + 0.5, totalDur - 0.5)
-            ;(async () => {
-              try {
-                addLog(job.id, `🤖 Vérif. décor en arrière-plan (cut à ${splitTime}s)…`)
-                const [fr1, fr2] = await Promise.all([
-                  withTimeout(
-                    window.electronAPI!.extractFrames!({ filePath: job.originalPath, startTime: 0.5, endTime: 1.5 }),
-                    20_000, 'frame debut'
-                  ),
-                  withTimeout(
-                    window.electronAPI!.extractFrames!({ filePath: job.originalPath, startTime: phase2Start, endTime: Math.min(phase2Start + 1, totalDur) }),
-                    20_000, 'frame phase2'
-                  ),
-                ])
-                if (fr1.ok && fr1.frames?.[0] && fr2.ok && fr2.frames?.[0]) {
-                  const res = await withTimeout(
-                    window.electronAPI!.anthropicVisionRequest!({
-                      apiKey: anthropicKey.trim(), model: 'claude-haiku-4-5-20251001',
-                      messages: [{ role: 'user', content: [
-                        { type: 'text', text: 'Compare these two video frames (frame 1 = beginning, frame 2 = after scene cut):' },
-                        { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: fr1.frames[0].data } },
-                        { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: fr2.frames[0].data } },
-                        { type: 'text', text: 'Has the scene/location/background DRASTICALLY changed? Answer only "yes" or "no".' },
-                      ]}],
-                      maxTokens: 5,
-                    }),
-                    20_000, 'AI décor'
-                  )
-                  if (res.ok) {
-                    const answer = ((res.data as any)?.content?.[0]?.text ?? '').toLowerCase().trim()
-                    addLog(job.id, answer.startsWith('yes') ? '✅ Décor différent confirmé' : '⚠️ Décor similaire')
+            try {
+              const totalDur = det.duration ?? 60
+              const phase2Start = Math.min(splitTime + 0.5, totalDur - 0.5)
+              addLog(job.id, `🤖 Vérif. personne/décor (cut à ${splitTime}s)…`)
+              const [fr1, fr2] = await Promise.all([
+                withTimeout(
+                  window.electronAPI!.extractFrames!({ filePath: job.originalPath, startTime: 0.5, endTime: 1.5 }),
+                  20_000, 'frame debut'
+                ),
+                withTimeout(
+                  window.electronAPI!.extractFrames!({ filePath: job.originalPath, startTime: phase2Start, endTime: Math.min(phase2Start + 1, totalDur) }),
+                  20_000, 'frame phase2'
+                ),
+              ])
+              if (fr1.ok && fr1.frames?.[0] && fr2.ok && fr2.frames?.[0]) {
+                const res = await withTimeout(
+                  window.electronAPI!.anthropicVisionRequest!({
+                    apiKey: anthropicKey.trim(), model: 'claude-haiku-4-5-20251001',
+                    messages: [{ role: 'user', content: [
+                      { type: 'text', text: 'These are two frames from a video: frame 1 (before cut) and frame 2 (after cut).' },
+                      { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: fr1.frames[0].data } },
+                      { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: fr2.frames[0].data } },
+                      { type: 'text', text: 'Are the SAME person AND the SAME background/location/decor present in both frames (even with a slightly different angle or quick cut)? Answer ONLY "yes" or "no".' },
+                    ]}],
+                    maxTokens: 5,
+                  }),
+                  20_000, 'AI décor'
+                )
+                if (res.ok) {
+                  const answer = ((res.data as any)?.content?.[0]?.text ?? '').toLowerCase().trim()
+                  if (answer.startsWith('yes')) {
+                    addLog(job.id, '⚠️ Même personne/décor détecté → coupe annulée')
+                    splitTime = undefined
+                  } else {
+                    addLog(job.id, '✅ Changement de scène confirmé → coupe maintenue')
                   }
                 }
-              } catch { /* silencieux — purement informatif */ }
-            })()
+              }
+            } catch (e) {
+              addLog(job.id, `⚠️ Vérif. décor ignorée: ${String(e).slice(0, 60)}`)
+            }
           }
         }
 
