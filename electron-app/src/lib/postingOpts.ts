@@ -18,8 +18,11 @@ const DEFAULTS: PostingOpts = {
 }
 
 export function loadPostingOpts(): PostingOpts {
-  try { return { ...DEFAULTS, ...JSON.parse(localStorage.getItem(KEY) ?? '{}') } }
-  catch { return { ...DEFAULTS } }
+  // intervalMode always starts as 'none' (off) — only numeric values are restored
+  try {
+    const saved = JSON.parse(localStorage.getItem(KEY) ?? '{}')
+    return { ...DEFAULTS, intervalMin: saved.intervalMin ?? DEFAULTS.intervalMin, intervalMax: saved.intervalMax ?? DEFAULTS.intervalMax, intervalMode: 'none' }
+  } catch { return { ...DEFAULTS } }
 }
 
 export function savePostingOpts(opts: PostingOpts) {
