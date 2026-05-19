@@ -915,9 +915,18 @@ ipcMain.handle('run-ffmpeg-remix-ai', async (_event, opts: {
       .replace(/%/g,  '%%')
   }
 
+  function hasEmoji(t: string): boolean {
+    // Match emoji Unicode ranges (basic emoji + extended)
+    return /[\u{1F000}-\u{1FFFF}]|[\u{2600}-\u{27BF}]|[\u{1F300}-\u{1F9FF}]|\u{FE0F}/u.test(t)
+  }
+
+  const EMOJI_FONT = '/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf'
+
   // Build drawtext chain (comma-separated, applied after scale)
   const drawtextChain = opts.textOverlays.map(ov => {
-    const fontFile = findFont(ov.bold)
+    // Use NotoColorEmoji when text contains emoji — FFmpeg 6+ with libharfbuzz renders color emoji
+    const useEmoji = hasEmoji(ov.text) && existsSync(EMOJI_FONT)
+    const fontFile = useEmoji ? EMOJI_FONT : findFont(ov.bold)
     const borderPx = Math.max(3, Math.round(ov.fontSize * 0.07))
     const parts: string[] = [`text='${escText(ov.text)}'`]
     if (fontFile) parts.push(`fontfile='${fontFile}'`)
