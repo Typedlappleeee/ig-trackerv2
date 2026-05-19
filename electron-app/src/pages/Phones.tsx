@@ -614,19 +614,22 @@ export function Phones({ user }: PhonesProps) {
         remark:     p.remark ?? null,
         synced_at:  new Date().toISOString(),
       }))
-      // Conflict strategy:
-      // - Solo → use the real UNIQUE(user_id, geelark_id) constraint
-      // - Org  → PostgREST can't use partial indexes, so do it manually:
-      //          fetch existing rows, then batch-update + insert new ones
+      // Conflict strategy: always fetch by (user_id + geelark_id) globally to avoid
+      // duplicate key violations when a phone exists under a different org_id.
       const currentGeelarkIds = new Set(rows.map(r => r.geelark_id))
 
       if (currentOrg) {
-        const { data: existing } = await supabase
-          .from('phones').select('id,geelark_id').eq('org_id', currentOrg.id)
-        const existingMap = new Map((existing ?? []).map((p: { id: string; geelark_id: string }) => [p.geelark_id, p.id]))
+        // Fetch ALL phones for this user (any org_id) that match the current GéeLark set
+        const { data: existingAll } = await supabase
+          .from('phones').select('id,geelark_id')
+          .eq('user_id', user.id)
+          .in('geelark_id', [...currentGeelarkIds])
+        const existingMap = new Map((existingAll ?? []).map((p: { id: string; geelark_id: string }) => [p.geelark_id, p.id]))
 
-        // Delete phones removed from GéeLark
-        const toDelete = (existing ?? []).filter((p: { geelark_id: string }) => !currentGeelarkIds.has(p.geelark_id))
+        // Delete phones removed from GéeLark (only those already in this org)
+        const { data: orgPhones } = await supabase
+          .from('phones').select('id,geelark_id').eq('org_id', currentOrg.id)
+        const toDelete = (orgPhones ?? []).filter((p: { geelark_id: string }) => !currentGeelarkIds.has(p.geelark_id))
         if (toDelete.length > 0) {
           await supabase.from('phones').delete().in('id', toDelete.map((p: { id: string }) => p.id))
         }
@@ -644,7 +647,7 @@ export function Phones({ user }: PhonesProps) {
           if (error) throw new Error(error.message)
         }
       } else {
-        // Delete phones removed from GéeLark (solo mode)
+        // Solo mode — delete phones no longer in GéeLark then upsert the rest
         await supabase.from('phones')
           .delete()
           .eq('user_id', user.id)
