@@ -37,15 +37,19 @@ interface MassRemixProps { user: User }
 type Preset = '9:16' | '1:1' | '16:9'
 type ExportMode = 'bank' | 'folder'
 
-interface MassJob {
-  id:           number
-  originalPath: string
+interface PlannedPair {
+  id:            number
+  originalPath:  string
   secondaryPath: string
+  cutSec?:       number
+}
+
+interface MassJob extends PlannedPair {
   status: 'pending' | 'detecting' | 'analyzing' | 'generating' | 'uploading' | 'done' | 'error'
-  splitTime?:   number
-  error?:       string
-  outputPath?:  string
-  logs:         string[]
+  splitTime?: number
+  error?:     string
+  outputPath?: string
+  logs:       string[]
 }
 
 const STATUS_LABEL: Record<MassJob['status'], string> = {
@@ -59,6 +63,8 @@ const STATUS_LABEL: Record<MassJob['status'], string> = {
 }
 
 function fileName(p: string) { return p.replace(/\\/g, '/').split('/').pop() ?? p }
+function toFileUrl(p: string) { return 'file:///' + p.replace(/\\/g, '/') }
+function formatSec(s: number) { const m = Math.floor(s / 60); return `${m}:${Math.floor(s % 60).toString().padStart(2, '0')}` }
 
 function xAlignToExpr(align: string): string {
   if (align === 'right') return 'w*0.96-text_w'
@@ -156,6 +162,16 @@ export function MassRemix({ user }: MassRemixProps) {
   const [splitMode,      setSplitMode]      = useState<'auto' | 'manual'>('auto')
   const [manualSplitSec, setManualSplitSec] = useState<string>('3')
 
+  // Preview plan state
+  const [plannedPairs,   setPlannedPairs]   = useState<PlannedPair[]>([])
+  const [previewOpen,    setPreviewOpen]    = useState(false)
+  const [selectedPairId, setSelectedPairId] = useState<number | null>(null)
+  const [vidCurrentTime, setVidCurrentTime] = useState(0)
+  const [vidDuration,    setVidDuration]    = useState(0)
+  const vidRef       = useRef<HTMLVideoElement>(null)
+  const timelineRef  = useRef<HTMLDivElement>(null)
+  const draggingRef2 = useRef(false)
+
   // anthropic key from DB (connections), fallback to localStorage
   const anthropicKey = conns.anthropic || localStorage.getItem('sf_anthropic_key') || ''
 
@@ -190,7 +206,25 @@ export function MassRemix({ user }: MassRemixProps) {
     return p ? [p] : []
   }
 
-  async function launch() {
+  function openPreview() {
+    const n = Math.max(1, copies)
+    const pairs: PlannedPair[] = Array.from({ length: n }, (_, i) => ({
+      id: i,
+      originalPath:  originals[Math.floor(Math.random() * originals.length)],
+      secondaryPath: secondaries[Math.floor(Math.random() * secondaries.length)],
+    }))
+    setPlannedPairs(pairs)
+    setSelectedPairId(pairs.length > 0 ? 0 : null)
+    setVidCurrentTime(0)
+    setVidDuration(0)
+    setPreviewOpen(true)
+  }
+
+  function setCutForPair(id: number, sec: number | undefined) {
+    setPlannedPairs(prev => prev.map(p => p.id === id ? { ...p, cutSec: sec } : p))
+  }
+
+  async function launch(prePlanned?: PlannedPair[]) {
     if (!originals.length || !secondaries.length) return
     if (exportMode === 'folder' && !outputFolder) {
       const f = await window.electronAPI?.pickOutputFolder?.()
@@ -200,10 +234,16 @@ export function MassRemix({ user }: MassRemixProps) {
 
     const folder = exportMode === 'folder' ? outputFolder : null
     const n = Math.max(1, copies)
-    const pairs: MassJob[] = Array.from({ length: n }, (_, i) => ({
+    const basePairs = prePlanned ?? Array.from({ length: n }, (_, i) => ({
       id: i,
       originalPath:  originals[Math.floor(Math.random() * originals.length)],
       secondaryPath: secondaries[Math.floor(Math.random() * secondaries.length)],
+    } as PlannedPair))
+    const pairs: MassJob[] = basePairs.map((p, i) => ({
+      id: i,
+      originalPath:  p.originalPath,
+      secondaryPath: p.secondaryPath,
+      cutSec:        p.cutSec,
       status: 'pending' as const,
       logs: [],
     }))
@@ -225,7 +265,10 @@ export function MassRemix({ user }: MassRemixProps) {
         let splitTime: number | undefined
         let detDuration: number | undefined
 
-        if (splitMode === 'manual') {
+        if (job.cutSec != null) {
+          splitTime = job.cutSec
+          addLog(job.id, `✂️ Coupe personnalisée (aperçu): ${splitTime}s`)
+        } else if (splitMode === 'manual') {
           const manualSt = parseFloat(manualSplitSec)
           splitTime = (!isNaN(manualSt) && manualSt > 0) ? manualSt : undefined
           addLog(job.id, `✂️ Coupe manuelle: ${splitTime != null ? splitTime + 's' : 'désactivée'}`)
@@ -416,7 +459,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
         }
 
         // Trim output to original video duration so secondary doesn't run long
-        const targetDuration = det.ok && det.duration ? det.duration : undefined
+        const targetDuration = detDuration ?? undefined
 
         const gen = await withTimeout(
           window.electronAPI!.runFfmpegRemixAI!({
@@ -477,9 +520,193 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
   const progress   = jobs.length > 0 ? Math.round((doneCount + errorCount) / jobs.length * 100) : 0
 
   const runningCount = jobs.filter(j => j.status !== 'pending' && j.status !== 'done' && j.status !== 'error').length
+  const selectedPair = plannedPairs.find(p => p.id === selectedPairId) ?? null
 
   return (
     <>
+      {/* ── Preview plan modal ── */}
+      {previewOpen && !running && (
+        <div className="fixed inset-0 z-50 flex flex-col" style={{ background: 'rgba(3,1,8,0.97)' }}>
+          {/* Header */}
+          <div className="flex-shrink-0 flex items-center justify-between px-8 py-4"
+            style={{ borderBottom: '1px solid rgba(139,92,246,0.2)', background: 'rgba(12,8,28,0.9)' }}>
+            <div>
+              <p className="text-[18px] font-black text-white">Plan des remixes</p>
+              <p className="text-[12px]" style={{ color: 'rgba(148,163,184,0.6)' }}>{plannedPairs.length} paires · Cliquez pour prévisualiser et régler le point de coupe</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <button onClick={() => setPreviewOpen(false)}
+                className="px-4 py-2 rounded-xl text-[13px] font-semibold transition-all"
+                style={{ background: 'rgba(255,255,255,0.05)', color: 'rgba(196,181,253,0.7)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                ✕ Fermer
+              </button>
+              <button
+                onClick={() => { setPreviewOpen(false); launch(plannedPairs) }}
+                className="px-6 py-2.5 rounded-xl text-[14px] font-bold transition-all"
+                style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff', boxShadow: '0 4px 20px rgba(124,58,237,0.4)' }}>
+                ⚡ Lancer {plannedPairs.length} remix
+              </button>
+            </div>
+          </div>
+
+          {/* Body */}
+          <div className="flex-1 min-h-0 flex overflow-hidden">
+            {/* Left: pair list */}
+            <div className="w-64 flex-shrink-0 overflow-y-auto" style={{ borderRight: '1px solid rgba(139,92,246,0.12)', background: 'rgba(8,5,20,0.7)' }}>
+              {plannedPairs.map(pair => (
+                <button key={pair.id}
+                  onClick={() => { setSelectedPairId(pair.id); setVidCurrentTime(0); setVidDuration(0) }}
+                  className="w-full text-left px-4 py-3 flex items-start gap-3 transition-all"
+                  style={{
+                    borderBottom: '1px solid rgba(139,92,246,0.07)',
+                    borderLeft: selectedPairId === pair.id ? '3px solid #7c3aed' : '3px solid transparent',
+                    background: selectedPairId === pair.id ? 'rgba(139,92,246,0.12)' : 'transparent',
+                  }}>
+                  <span className="text-[11px] font-black pt-0.5 flex-shrink-0" style={{ color: 'rgba(139,92,246,0.55)' }}>#{pair.id + 1}</span>
+                  <div className="flex-1 min-w-0 space-y-0.5">
+                    <p className="text-[11px] font-mono truncate" style={{ color: 'rgba(226,217,243,0.75)' }}>{fileName(pair.originalPath)}</p>
+                    <p className="text-[10px] font-mono truncate" style={{ color: 'rgba(236,72,153,0.6)' }}>{fileName(pair.secondaryPath)}</p>
+                    {pair.cutSec != null
+                      ? <p className="text-[10px] font-semibold" style={{ color: '#eab308' }}>✂ {pair.cutSec.toFixed(1)}s</p>
+                      : <p className="text-[10px]" style={{ color: 'rgba(148,163,184,0.3)' }}>{splitMode === 'manual' ? `✂ ${manualSplitSec}s (global)` : '🤖 auto'}</p>
+                    }
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            {/* Right: video player */}
+            <div className="flex-1 min-w-0 flex flex-col items-center justify-center gap-5 p-8 overflow-y-auto">
+              {selectedPair ? (
+                <>
+                  {/* Video */}
+                  <div className="relative rounded-2xl overflow-hidden flex-shrink-0"
+                    style={{
+                      background: '#000',
+                      maxHeight: 'calc(100vh - 300px)',
+                      aspectRatio: preset === '9:16' ? '9/16' : preset === '1:1' ? '1/1' : '16/9',
+                      maxWidth: preset === '9:16' ? 280 : '100%',
+                    }}>
+                    <video
+                      ref={vidRef}
+                      key={selectedPair.originalPath}
+                      src={toFileUrl(selectedPair.originalPath)}
+                      className="w-full h-full object-contain"
+                      onTimeUpdate={() => setVidCurrentTime(vidRef.current?.currentTime ?? 0)}
+                      onLoadedMetadata={() => setVidDuration(vidRef.current?.duration ?? 0)}
+                      onClick={() => { const v = vidRef.current; if (v) v.paused ? v.play() : v.pause() }}
+                      style={{ cursor: 'pointer', display: 'block' }}
+                    />
+                    {/* Cut line overlay on video */}
+                    {selectedPair.cutSec != null && vidDuration > 0 && (
+                      <div className="absolute top-0 bottom-0 pointer-events-none"
+                        style={{ left: `${(selectedPair.cutSec / vidDuration) * 100}%`, width: 2, background: 'rgba(234,179,8,0.9)', boxShadow: '0 0 8px rgba(234,179,8,0.6)' }} />
+                    )}
+                    {/* Play hint */}
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-0 hover:opacity-100 transition-opacity">
+                      <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.5)' }}>
+                        <span className="text-white text-xl ml-1">▶</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Timeline controls */}
+                  <div className="w-full max-w-lg space-y-3 flex-shrink-0">
+                    <div className="flex items-center gap-3">
+                      <button onClick={() => { const v = vidRef.current; if (v) v.paused ? v.play() : v.pause() }}
+                        className="w-9 h-9 rounded-xl flex items-center justify-center text-[15px] flex-shrink-0"
+                        style={{ background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.3)', color: '#a78bfa' }}>
+                        ▶
+                      </button>
+                      <span className="text-[12px] font-mono" style={{ color: 'rgba(148,163,184,0.6)' }}>
+                        {formatSec(vidCurrentTime)} / {formatSec(vidDuration)}
+                      </span>
+                      {selectedPair.cutSec != null && (
+                        <>
+                          <span className="text-[12px] font-bold ml-auto" style={{ color: '#eab308' }}>✂ {selectedPair.cutSec.toFixed(1)}s</span>
+                          <button onClick={() => setCutForPair(selectedPair.id, undefined)}
+                            className="text-[11px] px-2 py-1 rounded-lg"
+                            style={{ background: 'rgba(239,68,68,0.1)', color: '#f87171', border: '1px solid rgba(239,68,68,0.2)' }}>
+                            ✕ Effacer
+                          </button>
+                        </>
+                      )}
+                    </div>
+
+                    <p className="text-[11px]" style={{ color: 'rgba(148,163,184,0.45)' }}>
+                      Cliquez (ou glissez) sur la barre pour définir le point de coupe ✂
+                    </p>
+
+                    {/* Timeline bar */}
+                    <div
+                      ref={timelineRef}
+                      className="relative h-10 rounded-xl select-none"
+                      style={{ background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.2)', cursor: vidDuration > 0 ? 'crosshair' : 'default' }}
+                      onMouseDown={e => {
+                        if (!timelineRef.current || vidDuration <= 0) return
+                        draggingRef2.current = true
+                        const rect = timelineRef.current.getBoundingClientRect()
+                        const frac = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
+                        const sec = Math.round(frac * vidDuration * 10) / 10
+                        setCutForPair(selectedPair.id, sec)
+                        if (vidRef.current) vidRef.current.currentTime = sec
+                      }}
+                      onMouseMove={e => {
+                        if (!draggingRef2.current || !timelineRef.current || vidDuration <= 0) return
+                        const rect = timelineRef.current.getBoundingClientRect()
+                        const frac = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
+                        const sec = Math.round(frac * vidDuration * 10) / 10
+                        setCutForPair(selectedPair.id, sec)
+                        if (vidRef.current) vidRef.current.currentTime = sec
+                      }}
+                      onMouseUp={() => { draggingRef2.current = false }}
+                      onMouseLeave={() => { draggingRef2.current = false }}>
+                      {/* Playback fill */}
+                      {vidDuration > 0 && (
+                        <div className="absolute top-0 bottom-0 left-0 rounded-xl pointer-events-none"
+                          style={{ width: `${(vidCurrentTime / vidDuration) * 100}%`, background: 'rgba(139,92,246,0.3)' }} />
+                      )}
+                      {/* Cut marker */}
+                      {selectedPair.cutSec != null && vidDuration > 0 && (
+                        <div className="absolute top-0 bottom-0 flex items-center pointer-events-none"
+                          style={{ left: `${(selectedPair.cutSec / vidDuration) * 100}%`, transform: 'translateX(-1px)' }}>
+                          <div style={{ width: 3, height: '100%', background: '#eab308', borderRadius: 2, boxShadow: '0 0 8px rgba(234,179,8,0.6)' }} />
+                          <div className="absolute -top-7 whitespace-nowrap text-[10px] font-bold px-1.5 py-0.5 rounded-md"
+                            style={{ color: '#000', background: '#eab308', transform: 'translateX(-50%)' }}>
+                            ✂ {selectedPair.cutSec.toFixed(1)}s
+                          </div>
+                        </div>
+                      )}
+                      {/* Time labels */}
+                      {vidDuration > 0 && (
+                        <div className="absolute inset-x-2 inset-y-0 flex items-center justify-between pointer-events-none">
+                          {[0, 0.25, 0.5, 0.75, 1].map(f => (
+                            <span key={f} className="text-[9px]" style={{ color: 'rgba(148,163,184,0.35)' }}>
+                              {formatSec(f * vidDuration)}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {!vidDuration && (
+                      <p className="text-[11px] text-center" style={{ color: 'rgba(148,163,184,0.3)' }}>
+                        Cliquez sur la vidéo pour la charger
+                      </p>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div className="text-center space-y-3 opacity-40">
+                  <div className="text-6xl">🎬</div>
+                  <p className="text-[14px]" style={{ color: 'rgba(196,181,253,0.6)' }}>Sélectionnez un remix pour le prévisualiser</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Progress modal ── */}
       {running && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-6" style={{ background: 'rgba(3,1,8,0.92)', backdropFilter: 'blur(8px)' }}>
@@ -601,13 +828,22 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
             <h1 className="text-[28px] font-black text-white leading-none">Mass Remix</h1>
             <p className="text-[13px] text-text2 mt-1">Génère des remixes vidéo en masse avec FFmpeg + IA</p>
           </div>
-          <button
-            onClick={launch} disabled={!canLaunch}
-            className="flex items-center gap-2.5 px-6 py-3 rounded-xl text-[14px] font-bold transition-all disabled:opacity-40"
-            style={{ background: canLaunch ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.06)', color: '#fff', boxShadow: canLaunch ? '0 4px 20px rgba(124,58,237,0.4)' : 'none' }}>
-            <span>⚡</span>
-            <span>Lancer {copies} remix</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={openPreview} disabled={!canLaunch}
+              className="flex items-center gap-2 px-4 py-3 rounded-xl text-[14px] font-bold transition-all disabled:opacity-40"
+              style={{ background: canLaunch ? 'rgba(139,92,246,0.15)' : 'rgba(255,255,255,0.04)', color: canLaunch ? '#a78bfa' : 'rgba(255,255,255,0.2)', border: '1px solid rgba(139,92,246,0.25)' }}>
+              <span>👁</span>
+              <span>Plan</span>
+            </button>
+            <button
+              onClick={() => launch()} disabled={!canLaunch}
+              className="flex items-center gap-2.5 px-6 py-3 rounded-xl text-[14px] font-bold transition-all disabled:opacity-40"
+              style={{ background: canLaunch ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.06)', color: '#fff', boxShadow: canLaunch ? '0 4px 20px rgba(124,58,237,0.4)' : 'none' }}>
+              <span>⚡</span>
+              <span>Lancer {copies} remix</span>
+            </button>
+          </div>
         </div>
 
         {/* Body — 2 columns */}
