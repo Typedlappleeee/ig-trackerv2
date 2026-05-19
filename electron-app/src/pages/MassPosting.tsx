@@ -370,16 +370,17 @@ export function MassPosting({ user }: MassPostingProps) {
     })
 
     try {
-      // ── Step 1: upload unique videos ─────────────────────────────────────
-      log(`📤 Upload de ${selectedVideos.length} vidéo(s) vers GéeLark…`)
+      // ── Step 1: upload only videos actually assigned to a phone ──────────
+      const usedIndices = [...new Set(assignments.map(a => a.videoIndex).filter(i => i >= 0))]
+      log(`📤 Upload de ${usedIndices.length} vidéo(s) vers GéeLark…`)
       const tokenMap = new Map<number, string>() // videoIndex → token
 
-      for (let vi = 0; vi < selectedVideos.length; vi++) {
+      for (const vi of usedIndices) {
         const sv = selectedVideos[vi]
 
         // Mark phones using this video as uploading
-        phoneList.forEach((p, i) => {
-          if (i % selectedVideos.length === vi) setPhoneStatus(p.id, { status: 'uploading' })
+        assignments.forEach(a => {
+          if (a.videoIndex === vi) setPhoneStatus(a.phone.id, { status: 'uploading' })
         })
 
         const fileSource = sv.localPath ?? sv.item.file_url
@@ -387,18 +388,16 @@ export function MassPosting({ user }: MassPostingProps) {
           log(`⚠️ Vidéo ${vi + 1} sans source — ignorée`, 'warn')
           continue
         }
-        let token: string
         const up = await window.electronAPI!.uploadVideoGeelark({ bearer, filePath: fileSource })
         if (!up.ok || !up.token) {
           log(`❌ Upload échoué (${sv.item.title}): ${up.error}`, 'error')
-          phoneList.forEach((p, i) => {
-            if (i % selectedVideos.length === vi) setPhoneStatus(p.id, { status: 'error', detail: up.error })
+          assignments.forEach(a => {
+            if (a.videoIndex === vi) setPhoneStatus(a.phone.id, { status: 'error', detail: up.error })
           })
           continue
         }
-        token = up.token
 
-        tokenMap.set(vi, token)
+        tokenMap.set(vi, up.token)
         log(`✅ Vidéo ${vi + 1} uploadée (${sv.item.title.slice(0, 30)}…)`, 'ok')
       }
 
