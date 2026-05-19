@@ -365,45 +365,44 @@ export function MassRemix({ user }: MassRemixProps) {
             ? `✅ Scène: splitTime=${splitTime != null ? splitTime + 's' : 'non trouvé'}, durée=${det.duration ?? '?'}s`
             : `⚠️ Pas de scène détectée — concat désactivé`)
 
-          // Vérif. changement de décor (auto mode only) — informationnel uniquement
+          // Vérif. changement de décor — fire-and-forget (informationnel, ne bloque pas l'étape 2)
           if (splitTime != null && anthropicKey.trim()) {
             const totalDur = det.duration ?? 60
-            addLog(job.id, `🤖 Vérif. changement de décor (cut à ${splitTime}s)…`)
-            const fr1 = await withTimeout(
-              window.electronAPI!.extractFrames!({ filePath: job.originalPath, startTime: 0.5, endTime: 1.5 }),
-              45_000, 'frame debut'
-            )
             const phase2Start = Math.min(splitTime + 0.5, totalDur - 0.5)
-            const fr2 = await withTimeout(
-              window.electronAPI!.extractFrames!({ filePath: job.originalPath, startTime: phase2Start, endTime: Math.min(phase2Start + 1, totalDur) }),
-              45_000, 'frame phase2'
-            )
-            if (fr1.ok && fr1.frames?.[0] && fr2.ok && fr2.frames?.[0]) {
-              const res = await withTimeout(
-                window.electronAPI!.anthropicVisionRequest!({
-                  apiKey: anthropicKey.trim(), model: 'claude-haiku-4-5-20251001',
-                  messages: [{ role: 'user', content: [
-                    { type: 'text', text: 'Compare these two video frames (frame 1 = beginning, frame 2 = after scene cut):' },
-                    { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: fr1.frames[0].data } },
-                    { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: fr2.frames[0].data } },
-                    { type: 'text', text: 'Has the scene/location/background DRASTICALLY changed between frame 1 and frame 2? Answer "yes" only if the decor, setting, or environment is clearly different (different room, outdoor vs indoor, completely different background). Answer "no" if it is the same person in the same or very similar setting. Answer only "yes" or "no".' },
-                  ]}],
-                  maxTokens: 5,
-                }),
-                30_000, 'AI changement décor'
-              )
-              if (res.ok) {
-                const answer = ((res.data as any)?.content?.[0]?.text ?? '').toLowerCase().trim()
-                // Note: we keep splitTime regardless — concat always happens at detected scene change
-                addLog(job.id, answer.startsWith('yes')
-                  ? '✅ Changement de décor confirmé'
-                  : '⚠️ Décor similaire (concat conservé quand même)')
-              } else {
-                addLog(job.id, `⚠️ Vérif. décor échouée — concat conservé`)
-              }
-            } else {
-              addLog(job.id, '⚠️ Extraction frames échouée — vérif. décor ignorée')
-            }
+            ;(async () => {
+              try {
+                addLog(job.id, `🤖 Vérif. décor en arrière-plan (cut à ${splitTime}s)…`)
+                const [fr1, fr2] = await Promise.all([
+                  withTimeout(
+                    window.electronAPI!.extractFrames!({ filePath: job.originalPath, startTime: 0.5, endTime: 1.5 }),
+                    20_000, 'frame debut'
+                  ),
+                  withTimeout(
+                    window.electronAPI!.extractFrames!({ filePath: job.originalPath, startTime: phase2Start, endTime: Math.min(phase2Start + 1, totalDur) }),
+                    20_000, 'frame phase2'
+                  ),
+                ])
+                if (fr1.ok && fr1.frames?.[0] && fr2.ok && fr2.frames?.[0]) {
+                  const res = await withTimeout(
+                    window.electronAPI!.anthropicVisionRequest!({
+                      apiKey: anthropicKey.trim(), model: 'claude-haiku-4-5-20251001',
+                      messages: [{ role: 'user', content: [
+                        { type: 'text', text: 'Compare these two video frames (frame 1 = beginning, frame 2 = after scene cut):' },
+                        { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: fr1.frames[0].data } },
+                        { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: fr2.frames[0].data } },
+                        { type: 'text', text: 'Has the scene/location/background DRASTICALLY changed? Answer only "yes" or "no".' },
+                      ]}],
+                      maxTokens: 5,
+                    }),
+                    20_000, 'AI décor'
+                  )
+                  if (res.ok) {
+                    const answer = ((res.data as any)?.content?.[0]?.text ?? '').toLowerCase().trim()
+                    addLog(job.id, answer.startsWith('yes') ? '✅ Décor différent confirmé' : '⚠️ Décor similaire')
+                  }
+                }
+              } catch { /* silencieux — purement informatif */ }
+            })()
           }
         }
 
