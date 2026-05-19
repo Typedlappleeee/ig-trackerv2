@@ -79,6 +79,8 @@ export function MassPosting({ user }: MassPostingProps) {
   const [groupFilter, setGroupFilter]     = useState('Tous')
   const [groups, setGroups]               = useState<string[]>(['Tous'])
   const [phoneSearch, setPhoneSearch]     = useState('')
+  const [phonePickMode, setPhonePickMode] = useState<'phones' | 'groups'>('phones')
+  const [selectedGroups, setSelectedGroups] = useState<Set<string>>(new Set())
   const [showBankPicker, setShowBankPicker] = useState(false)
   const [showFolderPick, setShowFolderPick] = useState(false)
   const [bankFolders, setBankFolders]       = useState<{ name: string; count: number }[]>([])
@@ -190,6 +192,26 @@ export function MassPosting({ user }: MassPostingProps) {
       newVideos.push({ item: { ...item, file_url: url ?? item.file_url }, localPath: null })
     }
     if (newVideos.length) setSelVideos(prev => [...prev, ...newVideos])
+  }
+
+  function toggleGroup(groupName: string) {
+    const inGroup = phones.filter(p => {
+      if (role && !canAccessPhoneGroup(role, perms, p.group_name)) return false
+      return p.group_name === groupName
+    })
+    const alreadySelected = selectedGroups.has(groupName)
+    setSelectedGroups(prev => {
+      const next = new Set(prev)
+      if (alreadySelected) next.delete(groupName)
+      else next.add(groupName)
+      return next
+    })
+    setSelPhones(prev => {
+      const next = new Set(prev)
+      if (alreadySelected) inGroup.forEach(p => next.delete(p.id))
+      else inGroup.forEach(p => next.add(p.id))
+      return next
+    })
   }
 
   async function pickLocalFile(_index: number) {
@@ -656,48 +678,94 @@ export function MassPosting({ user }: MassPostingProps) {
 
         {/* ── Column 2: Phones ─────────────────────────────────────────────── */}
         <aside className="w-64 flex-shrink-0 flex flex-col" style={{ borderRight: '1px solid rgba(255,255,255,0.06)', background: '#07090f' }}>
+          {/* Header + mode toggle */}
           <div className="flex-shrink-0 px-5 pt-5 pb-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
             <div className="flex items-center justify-between mb-3">
-              <p className="text-[15px] font-bold text-white">Téléphones</p>
+              <p className="text-[15px] font-bold text-white">Cibles</p>
               <span className="text-[12px] font-semibold px-2.5 py-0.5 rounded-full text-white"
                 style={{ background: selectedPhones.size > 0 ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.07)' }}>
                 {selectedPhones.size}
               </span>
             </div>
-            <select
-              value={groupFilter}
-              onChange={e => {
-                const g = e.target.value
-                setGroupFilter(g)
-                if (g !== 'Tous') {
-                  const inGroup = phones.filter(p => {
-                    if (role && !canAccessPhoneGroup(role, perms, p.group_name)) return false
-                    return p.group_name === g
-                  })
-                  setSelPhones(new Set(inGroup.map(p => p.id)))
-                }
-              }}
-              className="w-full rounded-xl px-4 py-2.5 text-[13px] focus:outline-none mb-2"
-              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
-            >
-              {groups.map(g => <option key={g} value={g} style={{ background: '#0d1120', color: '#e2d9f3' }}>{g}</option>)}
-            </select>
-            <input
-              type="text" placeholder="Rechercher…" value={phoneSearch}
-              onChange={e => setPhoneSearch(e.target.value)}
-              className="w-full rounded-xl px-4 py-2.5 text-[13px] placeholder:text-text2 focus:outline-none"
-              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
-            />
+            {/* Mode toggle */}
+            <div className="flex rounded-xl p-1 gap-1 mb-3" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+              {([{ k: 'phones', l: '📱 Téléphones' }, { k: 'groups', l: '👥 Groupes' }] as const).map(m => (
+                <button key={m.k} onClick={() => setPhonePickMode(m.k)}
+                  className="flex-1 py-2 rounded-lg text-[12px] font-semibold transition-all"
+                  style={phonePickMode === m.k
+                    ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: 'white' }
+                    : { color: 'rgba(148,163,184,0.7)' }}>
+                  {m.l}
+                </button>
+              ))}
+            </div>
+
+            {/* Phone mode controls */}
+            {phonePickMode === 'phones' && (
+              <>
+                <select
+                  value={groupFilter}
+                  onChange={e => {
+                    const g = e.target.value
+                    setGroupFilter(g)
+                    if (g !== 'Tous') {
+                      const inGroup = phones.filter(p => {
+                        if (role && !canAccessPhoneGroup(role, perms, p.group_name)) return false
+                        return p.group_name === g
+                      })
+                      setSelPhones(new Set(inGroup.map(p => p.id)))
+                    }
+                  }}
+                  className="w-full rounded-xl px-4 py-2.5 text-[13px] focus:outline-none mb-2"
+                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
+                >
+                  {groups.map(g => <option key={g} value={g} style={{ background: '#0d1120', color: '#e2d9f3' }}>{g}</option>)}
+                </select>
+                <input
+                  type="text" placeholder="Rechercher…" value={phoneSearch}
+                  onChange={e => setPhoneSearch(e.target.value)}
+                  className="w-full rounded-xl px-4 py-2.5 text-[13px] placeholder:text-text2 focus:outline-none"
+                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
+                />
+              </>
+            )}
+
+            {/* Group mode: quick-select all / none */}
+            {phonePickMode === 'groups' && (
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    const realGroups = groups.filter(g => g !== 'Tous')
+                    setSelectedGroups(new Set(realGroups))
+                    setSelPhones(new Set(phones.filter(p => {
+                      if (role && !canAccessPhoneGroup(role, perms, p.group_name)) return false
+                      return Boolean(p.group_name)
+                    }).map(p => p.id)))
+                  }}
+                  className="text-[12px] font-semibold text-[#8b5cf6] hover:text-white transition-colors">Tout</button>
+                <button
+                  onClick={() => { setSelectedGroups(new Set()); setSelPhones(new Set()) }}
+                  className="text-[12px] text-text2 hover:text-white transition-colors">Aucun</button>
+              </div>
+            )}
           </div>
-          <div className="flex-shrink-0 px-5 py-2.5 flex gap-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-            <button onClick={() => setSelPhones(new Set(visiblePhones.map(p => p.id)))}
-              className="text-[12px] font-semibold text-[#8b5cf6] hover:text-white transition-colors">Tout</button>
-            <button onClick={() => setSelPhones(new Set())}
-              className="text-[12px] text-text2 hover:text-white transition-colors">Aucun</button>
-            <span className="ml-auto text-[12px] text-text2">{visiblePhones.length} tel.</span>
-          </div>
+
+          {/* Tout / Aucun bar — phones mode only */}
+          {phonePickMode === 'phones' && (
+            <div className="flex-shrink-0 px-5 py-2.5 flex gap-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+              <button onClick={() => setSelPhones(new Set(visiblePhones.map(p => p.id)))}
+                className="text-[12px] font-semibold text-[#8b5cf6] hover:text-white transition-colors">Tout</button>
+              <button onClick={() => setSelPhones(new Set())}
+                className="text-[12px] text-text2 hover:text-white transition-colors">Aucun</button>
+              <span className="ml-auto text-[12px] text-text2">{visiblePhones.length} tel.</span>
+            </div>
+          )}
+
+          {/* ── List body ── */}
           <div className="flex-1 overflow-auto">
-            {visiblePhones.map((phone) => {
+
+            {/* Phones mode */}
+            {phonePickMode === 'phones' && visiblePhones.map((phone) => {
               const checked = selectedPhones.has(phone.id)
               const asgn = assignments.find(a => a.phone.id === phone.id)
               const ts = taskStatuses.get(phone.id)
@@ -734,6 +802,53 @@ export function MassPosting({ user }: MassPostingProps) {
                 </button>
               )
             })}
+
+            {/* Groups mode */}
+            {phonePickMode === 'groups' && (() => {
+              const realGroups = groups.filter(g => g !== 'Tous')
+              if (realGroups.length === 0) return (
+                <div className="px-5 py-10 text-center">
+                  <p className="text-3xl mb-3">👥</p>
+                  <p className="text-[13px] font-bold text-white mb-1">Aucun groupe</p>
+                  <p className="text-[12px] text-text2">Assigne des groupes à tes téléphones</p>
+                </div>
+              )
+              return realGroups.map(g => {
+                const inGroup = phones.filter(p => {
+                  if (role && !canAccessPhoneGroup(role, perms, p.group_name)) return false
+                  return p.group_name === g
+                })
+                const checked = selectedGroups.has(g)
+                const selCount = inGroup.filter(p => selectedPhones.has(p.id)).length
+                return (
+                  <button
+                    key={g}
+                    onClick={() => toggleGroup(g)}
+                    className="w-full flex items-center gap-3 px-4 py-4 text-left transition-all"
+                    style={checked
+                      ? { background: 'rgba(139,92,246,0.1)', borderBottom: '1px solid rgba(139,92,246,0.1)' }
+                      : { borderBottom: '1px solid rgba(255,255,255,0.04)' }}
+                  >
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center text-[18px] flex-shrink-0"
+                      style={checked
+                        ? { background: 'linear-gradient(135deg,#7c3aed,#ec4899)' }
+                        : { background: 'rgba(255,255,255,0.06)' }}>
+                      👥
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[13px] font-bold text-white truncate">{g}</p>
+                      <p className="text-[11px]" style={{ color: checked ? '#a78bfa' : 'rgba(148,163,184,0.5)' }}>
+                        {checked ? `${selCount} / ${inGroup.length} sélectionnés` : `${inGroup.length} téléphone${inGroup.length !== 1 ? 's' : ''}`}
+                      </p>
+                    </div>
+                    <div className="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0"
+                      style={checked ? { background: 'linear-gradient(135deg,#7c3aed,#ec4899)' } : { border: '1px solid rgba(255,255,255,0.15)' }}>
+                      {checked && <span className="text-white text-[10px] font-bold">✓</span>}
+                    </div>
+                  </button>
+                )
+              })
+            })()}
           </div>
         </aside>
 
