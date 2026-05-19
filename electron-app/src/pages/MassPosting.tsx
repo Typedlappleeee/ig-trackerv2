@@ -17,6 +17,8 @@ import { playSuccess } from '@/lib/sounds'
 import { checkAndDeductCredits, CREDIT_COSTS, useCredits } from '@/lib/credits'
 import { createScheduledPost, fmtScheduledTime } from '@/lib/schedulerService'
 import { ScheduleModal } from '@/components/ScheduleModal'
+import { loadPostingOpts, savePostingOpts, buildScheduleTimes, type PostingOpts } from '@/lib/postingOpts'
+import { PostingOptions } from '@/components/PostingOptions'
 
 interface MassPostingProps { user: User }
 
@@ -82,6 +84,7 @@ export function MassPosting({ user }: MassPostingProps) {
   const [phonePickMode, setPhonePickMode] = useState<'phones' | 'groups'>('phones')
   const [selectedGroups, setSelectedGroups] = useState<Set<string>>(new Set())
   const [showBankPicker, setShowBankPicker] = useState(false)
+  const [postingOpts, setPostingOpts]       = useState<PostingOpts>(loadPostingOpts)
   const [showFolderPick, setShowFolderPick] = useState(false)
   const [bankFolders, setBankFolders]       = useState<{ name: string; count: number }[]>([])
   const [folderLoading, setFolderLoading]   = useState(false)
@@ -413,8 +416,14 @@ export function MassPosting({ user }: MassPostingProps) {
       // ── Step 3: create RPA tasks ──────────────────────────────────────────
       log('🎬 Création des tâches de post…')
       const taskIds: Record<string, string> = {}
+      const scheduleTimes = buildScheduleTimes(assignments.length, postingOpts)
+      if (postingOpts.intervalMode !== 'none' && assignments.length > 1) {
+        const lastMin = Math.round((scheduleTimes[scheduleTimes.length - 1] - scheduleTimes[0]) / 60)
+        log(`⏱ Intervalle activé — dernier post dans ~${lastMin} min`, 'info')
+      }
 
-      for (const asgn of assignments) {
+      for (let ai = 0; ai < assignments.length; ai++) {
+        const asgn = assignments[ai]
         const token = tokenMap.get(asgn.videoIndex)
         if (!token) {
           log(`  ⚠️ ${asgn.phone.phone_name}: pas de token vidéo`, 'warn')
@@ -424,7 +433,7 @@ export function MassPosting({ user }: MassPostingProps) {
         setPhoneStatus(asgn.phone.id, { status: 'posting' })
         const taskRes = await geelark(bearer, '/rpa/task/instagramPubReels', {
           id:          asgn.phone.geelark_id,
-          scheduleAt:  Math.floor(Date.now() / 1000),
+          scheduleAt:  scheduleTimes[ai],
           description: caption,
           video:       [token],
         })
@@ -855,6 +864,9 @@ export function MassPosting({ user }: MassPostingProps) {
         {/* ── Column 3: Assignments + Caption + Logs ───────────────────────── */}
         <div className="flex-1 overflow-y-auto px-8 pb-10">
           <div className="space-y-6 mt-8">
+
+            {/* Posting options */}
+            <PostingOptions opts={postingOpts} onChange={o => { setPostingOpts(o); savePostingOpts(o) }} />
 
             {/* Caption card */}
             <div className="rounded-2xl p-6" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>

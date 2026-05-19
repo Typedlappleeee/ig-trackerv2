@@ -11,6 +11,8 @@ import { Button }  from '@/components/ui/Button'
 import { VideoThumbnail } from '@/pages/Bank'
 import { BankPicker } from './Bank'
 import { getPostingState, setPostingState, subscribePosting, type TaskLog } from '@/lib/postingStore'
+import { loadPostingOpts, savePostingOpts, buildScheduleTimes, type PostingOpts } from '@/lib/postingOpts'
+import { PostingOptions } from '@/components/PostingOptions'
 import { playSuccess } from '@/lib/sounds'
 import { checkAndDeductCredits, CREDIT_COSTS, useCredits } from '@/lib/credits'
 
@@ -37,7 +39,7 @@ export function Posting({ user }: PostingProps) {
   const [topic, setTopic]              = useState('')
   const [withHashtags, setWithHashtags]= useState(true)
   const [customPrompt, setCustomPrompt]= useState('')
-  const [delayBetween, setDelayBetween]= useState(5)
+  const [postingOpts, setPostingOpts]  = useState<PostingOpts>(loadPostingOpts)
   const [bearer, setBearer]            = useState('')
   const [groqKey, setGroqKey]          = useState('')
   const [groupFilter, setGroup]        = useState('Tous')
@@ -168,7 +170,7 @@ export function Posting({ user }: PostingProps) {
         type: 'posting', scheduledAt,
         phones: phoneList.map(p => ({ id: p.id, geelark_id: p.geelark_id, phone_name: p.phone_name, ig_username: p.ig_username })),
         videos: [{ token: up.token, title: filePath.split(/[\\/]/).pop() ?? 'video' }],
-        caption, delayMinutes: delayBetween, mode: 'seq', bearerToken: bearer,
+        caption, delayMinutes: postingOpts.intervalMode !== 'none' ? postingOpts.intervalMin : 0, mode: 'seq', bearerToken: bearer,
       })
       log(`📅 Programmé pour ${fmtScheduledTime(scheduledAt.toISOString())} — ${phoneList.length} téléphone(s)`, 'ok')
     } catch (err: any) {
@@ -229,11 +231,17 @@ export function Posting({ user }: PostingProps) {
       setProgress(60)
       log('🎬 Création des tâches de post…')
       const taskIds: Record<string, string> = {}
+      const scheduleTimes = buildScheduleTimes(phoneList.length, postingOpts)
+      if (postingOpts.intervalMode !== 'none' && phoneList.length > 1) {
+        const lastMin = Math.round((scheduleTimes[scheduleTimes.length - 1] - scheduleTimes[0]) / 60)
+        log(`⏱ Intervalle activé — dernier post dans ~${lastMin} min`, 'info')
+      }
 
-      for (const phone of phoneList) {
+      for (let pi = 0; pi < phoneList.length; pi++) {
+        const phone = phoneList[pi]
         const taskRes = await geelark(bearer, '/rpa/task/instagramPubReels', {
           id:          phone.geelark_id,
-          scheduleAt:  Math.floor(Date.now() / 1000),
+          scheduleAt:  scheduleTimes[pi],
           description: caption,
           video:       [videoToken],
         })
@@ -473,19 +481,8 @@ export function Posting({ user }: PostingProps) {
               </div>
 
               {/* Options */}
-              <div className="px-6 py-4 flex items-center gap-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                <span className="text-base">📅</span>
-                <span className="flex-1 text-[13px] text-white">Délai entre comptes</span>
-                <input
-                  type="number"
-                  min={0}
-                  max={120}
-                  value={delayBetween}
-                  onChange={e => setDelayBetween(parseInt(e.target.value) || 0)}
-                  className="w-20 rounded-xl px-4 py-2.5 text-[13px] text-center focus:outline-none"
-                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
-                />
-                <span className="text-[13px] text-text2">min</span>
+              <div className="px-6 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                <PostingOptions opts={postingOpts} onChange={setPostingOpts} />
               </div>
               <div className="px-6 py-4 flex items-center gap-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
                 <span className="text-base">#️⃣</span>
