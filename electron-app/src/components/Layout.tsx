@@ -95,13 +95,6 @@ const NAV_SECTIONS: NavSection[] = [
   },
 ]
 
-interface SoonItem { label: string; icon: string; color?: string; tooltip: string }
-const SOON_ITEMS: SoonItem[] = [
-  { label: 'Twitter / X',  icon: '𝕏',  color: 'text-sky-400',    tooltip: 'Automatise tes posts et réponses sur Twitter/X' },
-  { label: 'Threads',      icon: '🧵', color: 'text-pink-400',   tooltip: 'Gère tes Threads depuis IG Tracker' },
-  { label: 'Reddit',       icon: '🟠', color: 'text-orange-400', tooltip: 'Planifie et publie sur Reddit automatiquement' },
-  { label: 'Multiposting', icon: '🌐', color: 'text-purple-400', tooltip: 'Poste sur tous les réseaux sociaux en une seule action' },
-]
 
 export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefresh, children }: LayoutProps) {
   const toast = useToast()
@@ -113,7 +106,6 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
       return Object.fromEntries(NAV_SECTIONS.map(s => [s.title, s.defaultOpen ?? true]))
     }
   })
-  const [soonOpen, setSoonOpen] = useState(false)
   const [now, setNow] = useState(Date.now())
   const [orgMenuOpen, setOrgMenuOpen] = useState(false)
   const orgTriggerRef                 = useRef<HTMLButtonElement>(null)
@@ -424,48 +416,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             )
           })}
 
-          {/* Bientôt section */}
-          <div className="mb-0.5">
-            <button
-              onClick={() => setSoonOpen(v => !v)}
-              className="w-full flex items-center gap-2 px-4 py-[7px] text-left group"
-            >
-              <span className="flex-1 text-[10.5px] font-black uppercase tracking-[0.2em]" style={{ color: 'rgba(139,92,246,0.4)' }}>
-                Bientôt
-              </span>
-              <span
-                className="text-[9px] transition-all duration-200 opacity-40 group-hover:opacity-70"
-                style={{ color: '#a78bfa', transform: soonOpen ? 'rotate(0deg)' : 'rotate(-90deg)', display: 'inline-block' }}
-              >
-                ▾
-              </span>
-            </button>
-            {soonOpen && (
-              <div className="px-2 space-y-[3px] pb-1">
-                {SOON_ITEMS.map(item => (
-                  <div key={item.label} className="group/soon relative">
-                    <div className="w-full flex items-center gap-2.5 pl-3 pr-2.5 py-[11px] rounded-xl text-[12.5px] cursor-not-allowed transition-colors hover:bg-white/[0.03]">
-                      <span className={`text-[15px] w-5 text-center flex-shrink-0 opacity-50 ${item.color}`}>{item.icon}</span>
-                      <span className="font-medium flex-1" style={{ color: 'rgba(107,94,138,0.7)' }}>{item.label}</span>
-                      <span
-                        className="text-[7px] font-black uppercase px-1.5 py-[3px] rounded-md tracking-[0.12em]"
-                        style={{ background: 'rgba(139,92,246,0.1)', color: 'rgba(167,139,250,0.6)', border: '1px solid rgba(139,92,246,0.12)' }}
-                      >
-                        SOON
-                      </span>
-                    </div>
-                    <div className="absolute left-full top-1/2 -translate-y-1/2 ml-2 z-50 hidden group-hover/soon:block pointer-events-none">
-                      <div className="rounded-xl px-3 py-2.5 text-[11px] w-48 shadow-2xl"
-                        style={{ background: '#0f0c1e', border: '1px solid rgba(139,92,246,0.2)' }}>
-                        <p className="font-semibold text-accent mb-1">{item.label}</p>
-                        <p className="leading-snug" style={{ color: 'rgba(212,220,240,0.5)' }}>{item.tooltip}</p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          {/* Bientôt section supprimée */}
         </nav>
 
         {/* Fade bottom */}
