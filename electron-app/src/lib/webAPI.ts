@@ -318,10 +318,10 @@ export function buildWebAPI() {
     },
 
     async runFfmpegRemixAI(opts: unknown) {
-      return wasmQueue(async () => {
-        const { runFfmpegRemixAIWeb } = await import('./ffmpeg-web')
-        return runFfmpegRemixAIWeb(opts as Parameters<typeof runFfmpegRemixAIWeb>[0])
-      })
+      // MediaRecorder fast path doesn't use WASM — no wasmQueue needed.
+      // The internal WASM fallback uses withFfmpegLock directly.
+      const { runFfmpegRemixAIWeb } = await import('./ffmpeg-web')
+      return runFfmpegRemixAIWeb(opts as Parameters<typeof runFfmpegRemixAIWeb>[0])
     },
 
     async runFfmpegMetadata(opts: unknown) {

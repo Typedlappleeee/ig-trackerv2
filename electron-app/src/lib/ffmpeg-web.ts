@@ -527,20 +527,158 @@ async function renderTextPNG(
   await ff.writeFile(fileName, new Uint8Array(await blob.arrayBuffer()))
 }
 
-// ── runFfmpegRemixAI (Canvas text → overlay, no drawtext needed) ─────────────
-// splitTime is optional: if omitted (no scene change detected), phase 2 is skipped
-// and the output is just newPhase1Path scaled to the preset with text overlays.
-export async function runFfmpegRemixAIWeb(opts: {
-  newPhase1Path: string
-  originalPath:  string
-  splitTime?:    number   // undefined = no scene change → no phase 2
-  targetDuration?: number // trim output to this duration (matches original length)
-  outputPath:    string
-  preset:        '9:16' | '1:1' | '16:9'
-  textOverlays:  Array<{
-    text: string; x: string; y: string; fontSize: number; fontColor: string
-    startTime: number; endTime: number; bold?: boolean; shadow?: boolean
-  }>
+// ── drawOverlayText ───────────────────────────────────────────────────────────
+function drawOverlayText(
+  ctx: CanvasRenderingContext2D,
+  ov: { text: string; x: string; y: string; fontSize: number; fontColor: string; bold?: boolean; shadow?: boolean },
+  W: number, H: number,
+): void {
+  const weight = ov.bold ? 'bold' : 'normal'
+  ctx.font = `${weight} ${ov.fontSize}px Arial, sans-serif`
+  ctx.textAlign    = 'center'
+  ctx.textBaseline = 'middle'
+  const cx = W * extractCenterFrac(ov.x, 'w')
+  const cy = H * extractCenterFrac(ov.y, 'h')
+  const borderPx = Math.max(3, Math.round(ov.fontSize * 0.09))
+
+  ctx.strokeStyle = 'rgba(0,0,0,1)'
+  ctx.lineWidth   = borderPx * 2
+  ctx.lineJoin    = 'round'
+  if (ov.shadow !== false) {
+    ctx.shadowColor   = 'rgba(0,0,0,0.8)'
+    ctx.shadowOffsetX = 3; ctx.shadowOffsetY = 3; ctx.shadowBlur = 6
+  }
+  ctx.strokeText(ov.text, cx, cy)
+  ctx.shadowColor = 'transparent'
+  ctx.fillStyle   = ov.fontColor || 'white'
+  ctx.fillText(ov.text, cx, cy)
+}
+
+// ── remixViaMediaRecorder ─────────────────────────────────────────────────────
+// Records the remix using the browser's hardware video encoder via MediaRecorder.
+// Phase 1: secondary clip video + original audio (0 → splitTime)
+// Phase 2: original clip video + audio (splitTime → end)
+// Text overlays are rendered directly onto the canvas.
+// Returns a Blob in the best supported format (MP4 > WebM H264 > WebM VP9).
+async function remixViaMediaRecorder(opts: {
+  newPhase1Path:  string
+  originalPath:   string
+  splitTime:      number   // 0 = no split, use secondary for full duration
+  targetDuration?: number
+  preset:         '9:16' | '1:1' | '16:9'
+  textOverlays:   Array<{ text: string; x: string; y: string; fontSize: number; fontColor: string; startTime: number; endTime: number; bold?: boolean; shadow?: boolean }>
+}): Promise<{ blob: Blob; mimeType: string }> {
+  const W = opts.preset === '16:9' ? 1920 : 1080
+  const H = opts.preset === '9:16' ? 1920 : 1080
+  const hasSplit = opts.splitTime > 0
+
+  // ── load videos ──────────────────────────────────────────────────────────────
+  const loadVid = (src: string): Promise<HTMLVideoElement> => new Promise((res, rej) => {
+    const v = document.createElement('video')
+    v.muted = true; v.playsInline = true; v.preload = 'auto'; v.src = src
+    v.onloadeddata = () => res(v)
+    v.onerror      = () => rej(new Error('Impossible de charger la vidéo'))
+    setTimeout(() => rej(new Error('Timeout chargement vidéo')), 30_000)
+  })
+  const [secVid, origVid] = await Promise.all([
+    hasSplit ? loadVid(opts.newPhase1Path) : null,
+    loadVid(opts.originalPath),
+  ])
+  const totalDuration = opts.targetDuration ?? origVid.duration
+
+  // ── canvas + capture stream ───────────────────────────────────────────────────
+  const canvas = document.createElement('canvas')
+  canvas.width = W; canvas.height = H
+  const ctx = canvas.getContext('2d', { alpha: false })!
+  const canvasStream: MediaStream = (canvas as any).captureStream(30)
+
+  // ── audio routing ─────────────────────────────────────────────────────────────
+  // Use AudioContext to route origVid's audio to the recorder without playing through speakers.
+  const audioCtx = new AudioContext()
+  const audioDest = audioCtx.createMediaStreamDestination()
+  const audioSrc  = audioCtx.createMediaElementSource(origVid)
+  audioSrc.connect(audioDest)   // → recorder only, not speakers
+  origVid.muted = false          // needed so AudioContext captures it
+
+  const stream = new MediaStream([
+    canvasStream.getVideoTracks()[0],
+    audioDest.stream.getAudioTracks()[0],
+  ])
+
+  // ── MediaRecorder — pick best codec ──────────────────────────────────────────
+  const mimeType = [
+    'video/mp4',
+    'video/webm;codecs=h264,opus',
+    'video/webm;codecs=vp9,opus',
+    'video/webm;codecs=vp8,opus',
+    'video/webm',
+  ].find(m => MediaRecorder.isTypeSupported(m)) ?? 'video/webm'
+
+  const chunks: Blob[] = []
+  const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 5_000_000, audioBitsPerSecond: 128_000 })
+  recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data) }
+  recorder.start(250)
+
+  // ── draw loop ─────────────────────────────────────────────────────────────────
+  let switched = !hasSplit   // already in phase 2 if no split
+  let animId = 0
+
+  const drawFrame = () => {
+    const t = origVid.currentTime
+
+    // Switch from secondary to original once splitTime is reached
+    if (!switched && t >= opts.splitTime) {
+      switched = true
+      secVid?.pause()
+    }
+
+    const source = switched ? origVid : secVid!
+    const vw = source.videoWidth  || W
+    const vh = source.videoHeight || H
+    const scale = Math.min(W / vw, H / vh)
+    const dw = vw * scale, dh = vh * scale
+
+    ctx.fillStyle = '#000'
+    ctx.fillRect(0, 0, W, H)
+    ctx.drawImage(source, (W - dw) / 2, (H - dh) / 2, dw, dh)
+
+    for (const ov of opts.textOverlays) {
+      if (t >= ov.startTime && t <= ov.endTime) drawOverlayText(ctx, ov, W, H)
+    }
+
+    if (!origVid.ended && origVid.currentTime < totalDuration) {
+      animId = requestAnimationFrame(drawFrame)
+    } else {
+      recorder.stop()
+    }
+  }
+
+  // ── seek & play ───────────────────────────────────────────────────────────────
+  const seekTo = (v: HTMLVideoElement, t: number) => new Promise<void>(r => {
+    if (Math.abs(v.currentTime - t) < 0.05) { r(); return }
+    v.onseeked = () => { v.onseeked = null; r() }
+    v.currentTime = t
+  })
+
+  await seekTo(origVid, 0)
+  if (hasSplit && secVid) await seekTo(secVid, 0)
+
+  origVid.play()
+  if (hasSplit && secVid) secVid.play()
+  animId = requestAnimationFrame(drawFrame)
+
+  await new Promise<void>(res => { recorder.onstop = () => res() })
+  cancelAnimationFrame(animId)
+  await audioCtx.close()
+
+  return { blob: new Blob(chunks, { type: recorder.mimeType || mimeType }), mimeType }
+}
+
+// ── runFfmpegRemixAIWasm (WASM fallback) ─────────────────────────────────────
+async function runFfmpegRemixAIWasm(opts: {
+  newPhase1Path: string; originalPath: string; splitTime?: number; targetDuration?: number
+  outputPath: string; preset: '9:16' | '1:1' | '16:9'
+  textOverlays: Array<{ text: string; x: string; y: string; fontSize: number; fontColor: string; startTime: number; endTime: number; bold?: boolean; shadow?: boolean }>
 }): Promise<{ ok: boolean; outputPath?: string; error?: string }> {
   const hasPhase2  = opts.splitTime != null && opts.splitTime > 0
   const overlayFiles = opts.textOverlays.map((_, i) => `ai_ov${i}.png`)
@@ -553,22 +691,15 @@ export async function runFfmpegRemixAIWeb(opts: {
   try {
     await writeInput(ff, 'ai_new1.mp4', opts.newPhase1Path)
     if (hasPhase2) await writeInput(ff, 'ai_orig.mp4', opts.originalPath)
-
     const W    = opts.preset === '16:9' ? 1920 : 1080
     const H    = opts.preset === '9:16' ? 1920 : 1080
     const scl  = `scale=${W}:${H}:force_original_aspect_ratio=decrease,pad=${W}:${H}:-1:-1:color=black,setsar=1`
     const afmt = 'aformat=sample_rates=44100:channel_layouts=stereo'
-
-    // Render each text overlay as a transparent PNG via Canvas API
     for (let i = 0; i < opts.textOverlays.length; i++) {
       await renderTextPNG(ff, opts.textOverlays[i], W, H, overlayFiles[i])
     }
-
-    let chains: string[]
-    let inputArgs: string[]
-
+    let chains: string[], inputArgs: string[]
     if (hasPhase2) {
-      // Phase 1 (new clip) + Phase 2 (original from splitTime)
       const st = opts.splitTime!
       chains = [
         `[0:v]trim=duration=${st},setpts=PTS-STARTPTS,${scl}[v_p1]`,
@@ -580,7 +711,6 @@ export async function runFfmpegRemixAIWeb(opts: {
       ]
       inputArgs = ['-i', 'ai_new1.mp4', '-i', 'ai_orig.mp4']
     } else {
-      // No scene change → use new clip only, trimmed to original duration if known
       const trimFilter = opts.targetDuration ? `trim=duration=${opts.targetDuration},setpts=PTS-STARTPTS,` : ''
       chains = [
         `[0:v]${trimFilter}${scl}[v_merged]`,
@@ -590,24 +720,18 @@ export async function runFfmpegRemixAIWeb(opts: {
       ]
       inputArgs = ['-i', 'ai_new1.mp4']
     }
-
-    // Chain overlay PNGs: [v_merged] → … → [vout]
-    // Each PNG input comes after the video inputs
     const videoInputCount = hasPhase2 ? 2 : 1
     let lastPad = 'v_merged'
     for (let i = 0; i < opts.textOverlays.length; i++) {
-      const ov     = opts.textOverlays[i]
+      const ov = opts.textOverlays[i]
       const outPad = i === opts.textOverlays.length - 1 ? 'vout' : `v_ov${i}`
       chains.push(`[${lastPad}][${videoInputCount + i}:v]overlay=0:0:enable=between(t\\,${ov.startTime}\\,${ov.endTime})[${outPad}]`)
       lastPad = outPad
     }
-    // No overlays → v_merged becomes vout
     if (opts.textOverlays.length === 0) {
       chains[chains.length - 1] = chains[chains.length - 1].replace('[v_merged]', '[vout]').replace('[v_merged][aout]', '[vout][aout]')
     }
-
     for (const f of overlayFiles) inputArgs.push('-i', f)
-
     await ff.exec([
       ...inputArgs,
       '-filter_complex', chains.join(';'),
@@ -616,18 +740,77 @@ export async function runFfmpegRemixAIWeb(opts: {
       '-c:a', 'aac', '-b:a', '128k',
       '-movflags', '+faststart', '-y', 'ai_out.mp4',
     ])
-
     const url = await readOutput(ff, 'ai_out.mp4')
     return { ok: true, outputPath: url }
   } catch (err) {
     if (isWasmCrash(err)) resetFFmpeg()
     const relevant = ffLogs.filter(l => /error|invalid|unknown|cannot|no such/i.test(l)).slice(-3)
-    const detail   = relevant.length ? '\n' + relevant.join('\n') : ''
-    return { ok: false, error: String(err) + detail }
+    return { ok: false, error: String(err) + (relevant.length ? '\n' + relevant.join('\n') : '') }
   } finally {
     ff.off('log', logHandler)
     for (const f of FILES) await ff.deleteFile(f).catch(() => {})
   }
+}
+
+// ── runFfmpegRemixAI (Canvas text → overlay, no drawtext needed) ─────────────
+// Fast path: MediaRecorder with browser hardware encoder.
+// Fallback: WASM FFmpeg (slower, used when MediaRecorder not supported or fails).
+export async function runFfmpegRemixAIWeb(opts: {
+  newPhase1Path: string
+  originalPath:  string
+  splitTime?:    number
+  targetDuration?: number
+  outputPath:    string
+  preset:        '9:16' | '1:1' | '16:9'
+  textOverlays:  Array<{
+    text: string; x: string; y: string; fontSize: number; fontColor: string
+    startTime: number; endTime: number; bold?: boolean; shadow?: boolean
+  }>
+}): Promise<{ ok: boolean; outputPath?: string; error?: string }> {
+  const splitTime = (opts.splitTime != null && !isNaN(opts.splitTime) && opts.splitTime > 0)
+    ? opts.splitTime : 0
+
+  // ── Fast path: hardware encoding via MediaRecorder ────────────────────────
+  if (typeof MediaRecorder !== 'undefined') {
+    try {
+      const { blob, mimeType } = await remixViaMediaRecorder({ ...opts, splitTime })
+
+      // If browser gave us native MP4, return directly
+      if (mimeType.startsWith('video/mp4')) {
+        return { ok: true, outputPath: URL.createObjectURL(blob) }
+      }
+
+      // WebM with H.264 → fast remux to MP4 via WASM (-c copy, no re-encode)
+      if (mimeType.includes('h264')) {
+        try {
+          return await withFfmpegLock(async () => {
+            const ff = await getFFmpeg()
+            await ff.deleteFile('mr_in.webm').catch(() => {})
+            await ff.deleteFile('mr_out.mp4').catch(() => {})
+            await ff.writeFile('mr_in.webm', new Uint8Array(await blob.arrayBuffer()))
+            await ff.exec(['-nostdin', '-i', 'mr_in.webm', '-c', 'copy', '-movflags', '+faststart', '-y', 'mr_out.mp4'])
+            const url = await readOutput(ff, 'mr_out.mp4')
+            await ff.deleteFile('mr_in.webm').catch(() => {})
+            await ff.deleteFile('mr_out.mp4').catch(() => {})
+            return { ok: true, outputPath: url }
+          })
+        } catch {
+          // Remux failed → return WebM blob as-is (GéeLark may accept it)
+          return { ok: true, outputPath: URL.createObjectURL(blob) }
+        }
+      }
+
+      // VP9/VP8 WebM → return as-is (GéeLark generally accepts WebM too)
+      return { ok: true, outputPath: URL.createObjectURL(blob) }
+
+    } catch (err) {
+      console.warn('[remix] MediaRecorder failed, falling back to WASM:', String(err))
+      if (isWasmCrash(err)) resetFFmpeg()
+    }
+  }
+
+  // ── Fallback: WASM FFmpeg ─────────────────────────────────────────────────
+  return withFfmpegLock(() => runFfmpegRemixAIWasm(opts))
 }
 
 // ── runFfmpegTextOverlay ──────────────────────────────────────────────────────
