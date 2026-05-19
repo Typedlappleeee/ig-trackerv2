@@ -14,6 +14,7 @@ module.exports.config = { api: { bodyParser: false } }
 const PLAN_BY_PRICE = {
   [process.env.STRIPE_PRICE_STANDARD || '']: 'standard',
   [process.env.STRIPE_PRICE_PRO      || '']: 'pro',
+  [process.env.STRIPE_PRICE_ORG      || '']: 'organisation',
 }
 
 async function readRawBody(req) {

@@ -2,23 +2,40 @@ import { createContext, useContext } from 'react'
 import { supabase } from './supabase'
 
 export const PLAN_MONTHLY_CREDITS: Record<string, number> = {
-  standard: 2000,
-  pro:      5500,
-  lifetime: 5500,
+  standard:     2500,
+  pro:          5500,
+  organisation: 11000,
+}
+
+// Max phones per plan (Infinity = unlimited)
+export const PLAN_MAX_PHONES: Record<string, number> = {
+  standard:     50,
+  pro:          200,
+  organisation: Infinity,
+}
+
+// Max accounts in a single mass-posting batch
+export const PLAN_MAX_MASS_POSTING: Record<string, number> = {
+  standard:     10,
+  pro:          Infinity,
+  organisation: Infinity,
 }
 
 export const CREDIT_COSTS = {
   montage:      1,
   remix:        2,
-  posting:      1,  // per phone (single posting page)
-  mass_posting: 2,  // per phone (mass posting page)
+  posting:      1,  // per phone
+  mass_posting: 2,  // per phone
 } as const
 
+// Credit packs — intentionally more expensive per credit than subscriptions
+// to encourage monthly plans (Standard = $0.020/cr, Pro = $0.0182/cr, Org = $0.0136/cr)
 export const CREDIT_PACKS = [
-  { credits: 100,  price: 4.99,  label: '100 crédits',   bonus: '' },
-  { credits: 500,  price: 19.99, label: '500 crédits',   bonus: '+25 bonus' },
-  { credits: 1500, price: 49.99, label: '1 500 crédits', bonus: '+150 bonus' },
-  { credits: 5000, price: 149.99, label: '5 000 crédits', bonus: '+500 bonus' },
+  { credits: 500,   price: 19.99,  label: '500 crédits',    perCr: 0.040 },
+  { credits: 1200,  price: 39.99,  label: '1 200 crédits',  perCr: 0.033 },
+  { credits: 2500,  price: 74.99,  label: '2 500 crédits',  perCr: 0.030 },
+  { credits: 6000,  price: 164.99, label: '6 000 crédits',  perCr: 0.027 },
+  { credits: 15000, price: 374.99, label: '15 000 crédits', perCr: 0.025 },
 ]
 
 export interface CreditState {

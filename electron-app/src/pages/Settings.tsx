@@ -645,7 +645,7 @@ function AdminPanel({ user: _user }: { user: User }) {
           ))}
         </div>
         <div className="flex gap-2">
-          {['standard', 'pro', 'lifetime'].map(p => (
+          {['standard', 'pro', 'organisation'].map(p => (
             <button key={p} onClick={() => setPlan(p)}
               className={`px-4 py-2 rounded-xl text-[13px] capitalize transition-all ${plan === p ? 'text-white' : 'text-text2'}`}
               style={plan === p ? { background: 'rgba(139,92,246,0.3)', border: '1px solid rgba(139,92,246,0.5)' } : { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}>
@@ -769,9 +769,9 @@ function SubscriptionPanel() {
     : license.daysLeft <= 0 ? 'Expiré'
     : `Actif — ${license.daysLeft}j restants`
 
-  const planLabel = license.plan === 'pro' ? 'Pro' : license.plan === 'lifetime' ? 'À vie' : license.plan === 'standard' ? 'Standard' : '—'
-  const planCredits = license.plan === 'pro' || license.plan === 'lifetime' ? 5500 : license.plan === 'standard' ? 2000 : 0
-  const maxPhones   = '∞'
+  const planLabel   = license.plan === 'organisation' ? 'Organisation' : license.plan === 'pro' ? 'Pro' : license.plan === 'standard' ? 'Standard' : '—'
+  const planCredits = license.plan === 'organisation' ? 11000 : license.plan === 'pro' ? 5500 : license.plan === 'standard' ? 2500 : 0
+  const maxPhones   = license.plan === 'organisation' ? '∞' : license.plan === 'pro' ? '200' : license.plan === 'standard' ? '50' : '—'
 
   return (
     <div className="space-y-6 max-w-2xl">

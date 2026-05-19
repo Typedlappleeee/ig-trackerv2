@@ -8,7 +8,8 @@ import { fetchAllPhones, geelarkStatusLabel, extractInstagramSessionId } from '@
 import * as poller from '@/lib/phonePoller'
 import { Button }  from '@/components/ui/Button'
 import { Spinner } from '@/components/ui/Spinner'
-import { useLicense } from '@/lib/license'
+import { useLicense, effectivePlan } from '@/lib/license'
+import { PLAN_MAX_PHONES } from '@/lib/credits'
 
 interface PhonesProps { user: User }
 
@@ -596,6 +597,11 @@ export function Phones({ user }: PhonesProps) {
     try {
       const items = await fetchAllPhones(bearer)
       if (items.length === 0) { setError('Aucun téléphone trouvé.'); setSyncing(false); return }
+      if (items.length > phoneLimit) {
+        setError(`Limite du plan atteinte : ${phoneLimit} téléphones max (${effectivePlan(license) ?? 'standard'}). Passez au plan supérieur pour en ajouter plus.`)
+        setSyncing(false)
+        return
+      }
 
       const rows = items.map(p => ({
         user_id:    user.id,                        // always the current authenticated user (RLS requires it)
@@ -721,7 +727,7 @@ export function Phones({ user }: PhonesProps) {
     }
   }
 
-  // Any active subscription grants unlimited phones.
+  const phoneLimit = PLAN_MAX_PHONES[effectivePlan(license) ?? ''] ?? Infinity
 
   // ── Filtered view ─────────────────────────────────────────────────────────
   const visible = phones.filter(p => {
