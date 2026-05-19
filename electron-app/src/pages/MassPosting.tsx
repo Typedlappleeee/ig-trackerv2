@@ -914,6 +914,69 @@ export function MassPosting({ user }: MassPostingProps) {
               </div>
             </div>
 
+            {/* Configuration summary card */}
+            {(selectedVideos.length > 0 || selectedPhones.size > 0) && (() => {
+              // Video pool label
+              const folders = [...new Set(selectedVideos.map(sv => sv.item.folder).filter(Boolean))]
+              const videoLabel = folders.length === 1
+                ? folders[0]!
+                : selectedVideos.length > 0
+                  ? `${selectedVideos.length} vidéo${selectedVideos.length !== 1 ? 's' : ''} sélectionnée${selectedVideos.length !== 1 ? 's' : ''}`
+                  : null
+
+              // Phone pool label
+              const phoneLabel = phonePickMode === 'groups' && selectedGroups.size > 0
+                ? `${selectedGroups.size} groupe${selectedGroups.size !== 1 ? 's' : ''} sélectionné${selectedGroups.size !== 1 ? 's' : ''}`
+                : selectedPhones.size > 0
+                  ? `${selectedPhones.size} téléphone${selectedPhones.size !== 1 ? 's' : ''} sélectionné${selectedPhones.size !== 1 ? 's' : ''}`
+                  : null
+              const phoneSubLabel = phonePickMode === 'groups' && selectedGroups.size > 0 && selectedPhones.size > 0
+                ? `(${selectedPhones.size} téléphones)`
+                : null
+
+              return (
+                <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                  <div className="px-5 pt-4 pb-3">
+                    <p className="text-[15px] font-bold text-white">Configuration du posting</p>
+                  </div>
+
+                  {videoLabel && (
+                    <>
+                      <div className="px-5 pb-1.5">
+                        <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'rgba(148,163,184,0.35)' }}>Pool de vidéos</p>
+                      </div>
+                      <div className="flex items-center gap-3 px-5 py-3 mx-3 mb-2 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)' }}>
+                        <span className="text-[18px] flex-shrink-0">📁</span>
+                        <span className="flex-1 text-[13px] font-semibold text-white truncate">{videoLabel}</span>
+                        <span className="text-[12px] flex-shrink-0" style={{ color: 'rgba(148,163,184,0.5)' }}>
+                          {selectedVideos.length} vidéo{selectedVideos.length !== 1 ? 's' : ''}
+                        </span>
+                        <span className="text-[12px]" style={{ color: 'rgba(148,163,184,0.3)' }}>›</span>
+                      </div>
+                    </>
+                  )}
+
+                  {phoneLabel && (
+                    <>
+                      <div className="px-5 pb-1.5">
+                        <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'rgba(148,163,184,0.35)' }}>
+                          {phonePickMode === 'groups' ? 'Groupe de téléphones' : 'Téléphones'}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-3 px-5 py-3 mx-3 mb-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)' }}>
+                        <span className="text-[18px] flex-shrink-0">{phonePickMode === 'groups' ? '👥' : '📱'}</span>
+                        <span className="flex-1 text-[13px] font-semibold text-white truncate">
+                          {phoneLabel}
+                          {phoneSubLabel && <span className="ml-1.5 font-normal" style={{ color: 'rgba(148,163,184,0.5)' }}>{phoneSubLabel}</span>}
+                        </span>
+                        <span className="text-[12px]" style={{ color: 'rgba(148,163,184,0.3)' }}>›</span>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )
+            })()}
+
             {/* Assignments card */}
             <div className="rounded-2xl p-6" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
               <div className="flex items-center justify-between mb-4">
