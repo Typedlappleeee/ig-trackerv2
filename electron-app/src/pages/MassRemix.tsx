@@ -468,11 +468,12 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                   // Font size: slightly larger than AI suggests, capped reasonably
                   const fontSize = Math.round(Math.max(44, Math.min(160, (item.fontSizePx ?? 64) * 1.15)))
 
-                  // Position: only top (≤12%) or bottom (≥80%) to avoid the face/head zone
+                  // Position: top (5-12%) or bottom (72-82%) to avoid face zone (15-70%)
                   const rawY = (item.yPercent ?? 50) / 100
                   let yFrac: number
-                  if (rawY < 0.15) yFrac = Math.max(0.06, rawY)   // very top → keep top
-                  else             yFrac = Math.min(0.88, Math.max(0.80, rawY > 0.65 ? rawY : 0.82)) // everything else → bottom
+                  if (rawY < 0.20)      yFrac = Math.max(0.05, Math.min(0.12, rawY))        // top zone
+                  else if (rawY > 0.70) yFrac = Math.min(0.82, Math.max(0.72, rawY))        // bottom zone
+                  else                  yFrac = 0.76                                          // center → snap to bottom
 
                   // Timing
                   const sf = item.startFrame ?? 0
