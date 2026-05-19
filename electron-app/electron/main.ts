@@ -698,10 +698,10 @@ ipcMain.handle('detect-scene-change', async (_event, opts: {
         : [sorted[0]]
       const times = picked.map(d => d.time)
 
-      const mid  = duration / 2
-      const best = times.reduce((a, b) => Math.abs(b - mid) < Math.abs(a - mid) ? b : a)
+      // Pick the LAST scene change so phase 2 = final scene of the original
+      const best = Math.max(...times)
 
-      console.log('[scene-detect] best=', best, 'maxDist=', maxDist.toFixed(1))
+      console.log('[scene-detect] best=', best, 'times=', times, 'maxDist=', maxDist.toFixed(1))
       resolve({ ok: true, times, splitTime: best, duration })
     })
   })
@@ -945,8 +945,9 @@ ipcMain.handle('run-ffmpeg-remix-ai', async (_event, opts: {
 
   // Common output flags (WITHOUT the output path — must be last)
   const commonOutputFlags = [
-    '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23',
-    '-r', '30',
+    '-c:v', 'libx264', '-preset', 'fast', '-crf', '20',
+    '-r', '30', '-fps_mode', 'cfr',   // force constant 30 fps output
+    '-pix_fmt', 'yuv420p',
     '-movflags', '+faststart',
     '-avoid_negative_ts', 'make_zero',
     '-max_muxing_queue_size', '9999',
@@ -959,7 +960,7 @@ ipcMain.handle('run-ffmpeg-remix-ai', async (_event, opts: {
     args = [
       '-nostdin',
       '-i', opts.newPhase1Path,
-      '-vf', `fps=30,${vfPhase1}`,
+      '-vf', `fps=30,setpts=PTS-STARTPTS,${vfPhase1}`,
       ...commonOutputFlags,
       '-an',
       // Trim to original video duration so secondary doesn't run longer than original
