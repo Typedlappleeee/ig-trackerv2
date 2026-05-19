@@ -528,18 +528,25 @@ async function renderTextPNG(
 }
 
 // ── drawOverlayText ───────────────────────────────────────────────────────────
+// Same rendering logic as renderTextPNG: word-wrap, multi-line, border + shadow.
 function drawOverlayText(
   ctx: CanvasRenderingContext2D,
   ov: { text: string; x: string; y: string; fontSize: number; fontColor: string; bold?: boolean; shadow?: boolean },
   W: number, H: number,
 ): void {
-  const weight = ov.bold ? 'bold' : 'normal'
-  ctx.font = `${weight} ${ov.fontSize}px Arial, sans-serif`
+  const weight   = ov.bold ? 'bold' : 'normal'
+  ctx.font       = `${weight} ${ov.fontSize}px Arial, sans-serif`
   ctx.textAlign    = 'center'
   ctx.textBaseline = 'middle'
-  const cx = W * extractCenterFrac(ov.x, 'w')
-  const cy = H * extractCenterFrac(ov.y, 'h')
+
+  const maxWidth = W * 0.88
+  const lineH    = ov.fontSize * 1.25
   const borderPx = Math.max(3, Math.round(ov.fontSize * 0.09))
+  const lines    = wrapText(ctx, ov.text, maxWidth)
+  const cx       = W * extractCenterFrac(ov.x, 'w')
+  const cy       = H * extractCenterFrac(ov.y, 'h')
+  const blockH   = lines.length * lineH
+  const startY   = cy - blockH / 2 + lineH / 2
 
   ctx.strokeStyle = 'rgba(0,0,0,1)'
   ctx.lineWidth   = borderPx * 2
@@ -548,10 +555,11 @@ function drawOverlayText(
     ctx.shadowColor   = 'rgba(0,0,0,0.8)'
     ctx.shadowOffsetX = 3; ctx.shadowOffsetY = 3; ctx.shadowBlur = 6
   }
-  ctx.strokeText(ov.text, cx, cy)
+  lines.forEach((line, i) => ctx.strokeText(line, cx, startY + i * lineH))
+
   ctx.shadowColor = 'transparent'
   ctx.fillStyle   = ov.fontColor || 'white'
-  ctx.fillText(ov.text, cx, cy)
+  lines.forEach((line, i) => ctx.fillText(line, cx, startY + i * lineH))
 }
 
 // ── remixViaMediaRecorder ─────────────────────────────────────────────────────
