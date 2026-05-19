@@ -968,10 +968,9 @@ ipcMain.handle('run-ffmpeg-remix-ai', async (_event, opts: {
     args = [
       '-nostdin',
       '-i', opts.newPhase1Path,
-      '-vf', `fps=30,setpts=PTS-STARTPTS,${vfPhase1}`,
+      '-vf', `setpts=PTS-STARTPTS,${vfPhase1}`,
       ...commonOutputFlags,
       '-an',
-      // Trim to original video duration so secondary doesn't run longer than original
       ...(opts.targetDuration != null ? ['-t', String(opts.targetDuration)] : []),
       '-y', opts.outputPath,
     ]
@@ -983,14 +982,16 @@ ipcMain.handle('run-ffmpeg-remix-ai', async (_event, opts: {
     let mapArgs: string[]
     let audioEncArgs: string[]
 
-    // Use -t splitTime on the secondary INPUT (not trim= filter) so that if the
-    // secondary video is shorter than splitTime, FFmpeg stops cleanly instead of
-    // freezing on the last frame until the trim duration is reached.
-    // Phase 2 = original from splitTime → end (no upper trim → always complete).
+    // Input layout:
+    //  [0] secondary  — read up to splitTime via -t (avoids last-frame freeze)
+    //  [1] original   — full file, used for audio atrim
+    //  [2] original   — fast-seeked to splitTime via -ss (clean timestamps, no trim filter needed)
+    // Using -ss before input (fast seek) instead of trim= filter eliminates timestamp
+    // discontinuities that caused frozen frames in the concat output.
     if (origHasAudio) {
       filterComplex = [
-        `[0:v]fps=30,setpts=PTS-STARTPTS,${vfPhase1}[v_p1]`,
-        `[1:v]trim=start=${splitTime},fps=30,setpts=PTS-STARTPTS,${scl}[v_p2]`,
+        `[0:v]setpts=PTS-STARTPTS,${vfPhase1}[v_p1]`,
+        `[2:v]setpts=PTS-STARTPTS,${scl}[v_p2]`,
         `[1:a]asplit=2[ao1][ao2]`,
         `[ao1]atrim=end=${splitTime},asetpts=PTS-STARTPTS,${afmt}[a_p1]`,
         `[ao2]atrim=start=${splitTime},asetpts=PTS-STARTPTS,${afmt}[a_p2]`,
@@ -1000,8 +1001,8 @@ ipcMain.handle('run-ffmpeg-remix-ai', async (_event, opts: {
       audioEncArgs = ['-c:a', 'aac', '-b:a', '128k']
     } else {
       filterComplex = [
-        `[0:v]fps=30,setpts=PTS-STARTPTS,${vfPhase1}[v_p1]`,
-        `[1:v]trim=start=${splitTime},fps=30,setpts=PTS-STARTPTS,${scl}[v_p2]`,
+        `[0:v]setpts=PTS-STARTPTS,${vfPhase1}[v_p1]`,
+        `[2:v]setpts=PTS-STARTPTS,${scl}[v_p2]`,
         `[v_p1][v_p2]concat=n=2:v=1:a=0[vout]`,
       ].join(';')
       mapArgs      = ['-map', '[vout]']
@@ -1010,8 +1011,9 @@ ipcMain.handle('run-ffmpeg-remix-ai', async (_event, opts: {
 
     args = [
       '-nostdin',
-      '-t', String(splitTime), '-i', opts.newPhase1Path,  // stop reading secondary at splitTime
-      '-i', opts.originalPath,                              // full original (phase 2 = splitTime→end)
+      '-t', String(splitTime), '-i', opts.newPhase1Path,  // [0] secondary up to splitTime
+      '-i', opts.originalPath,                              // [1] full original (audio)
+      '-ss', String(splitTime), '-i', opts.originalPath,   // [2] original fast-seeked (video phase 2)
       '-filter_complex', filterComplex,
       ...mapArgs,
       ...commonOutputFlags,
