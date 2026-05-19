@@ -63,7 +63,8 @@ const STATUS_LABEL: Record<MassJob['status'], string> = {
 }
 
 function fileName(p: string) { return p.replace(/\\/g, '/').split('/').pop() ?? p }
-function toFileUrl(p: string) { return 'file:///' + p.replace(/\\/g, '/') }
+// localvideo:// custom protocol registered in Electron main (supports byte-range / seeking)
+function toFileUrl(p: string) { return 'localvideo://' + (p.startsWith('/') ? '' : '/') + p.replace(/\\/g, '/') }
 function formatSec(s: number) { const m = Math.floor(s / 60); return `${m}:${Math.floor(s % 60).toString().padStart(2, '0')}` }
 
 function xAlignToExpr(align: string): string {
@@ -534,6 +535,17 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
               <p className="text-[18px] font-black text-white">Plan des remixes</p>
               <p className="text-[12px]" style={{ color: 'rgba(148,163,184,0.6)' }}>{plannedPairs.length} paires · Cliquez pour prévisualiser et régler le point de coupe</p>
             </div>
+            {/* Global default cut (used for pairs with no per-pair override when mode=manual) */}
+            {splitMode === 'manual' && (
+              <div className="flex items-center gap-2 px-3 py-2 rounded-xl" style={{ background: 'rgba(234,179,8,0.08)', border: '1px solid rgba(234,179,8,0.2)' }}>
+                <span className="text-[12px]" style={{ color: '#eab308' }}>✂ Défaut</span>
+                <input type="number" min={0.1} step={0.1} value={manualSplitSec}
+                  onChange={e => setManualSplitSec(e.target.value)}
+                  className="w-16 rounded-lg px-2 py-1 text-[13px] font-bold text-center focus:outline-none"
+                  style={{ background: 'rgba(234,179,8,0.1)', border: '1px solid rgba(234,179,8,0.25)', color: '#eab308' }} />
+                <span className="text-[11px]" style={{ color: 'rgba(234,179,8,0.6)' }}>sec (paires sans coupe)</span>
+              </div>
+            )}
             <div className="flex items-center gap-3">
               <button onClick={() => setPreviewOpen(false)}
                 className="px-4 py-2 rounded-xl text-[13px] font-semibold transition-all"
@@ -592,6 +604,8 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                       key={selectedPair.originalPath}
                       src={toFileUrl(selectedPair.originalPath)}
                       className="w-full h-full object-contain"
+                      preload="auto"
+                      muted
                       onTimeUpdate={() => setVidCurrentTime(vidRef.current?.currentTime ?? 0)}
                       onLoadedMetadata={() => setVidDuration(vidRef.current?.duration ?? 0)}
                       onClick={() => { const v = vidRef.current; if (v) v.paused ? v.play() : v.pause() }}
@@ -691,7 +705,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
 
                     {!vidDuration && (
                       <p className="text-[11px] text-center" style={{ color: 'rgba(148,163,184,0.3)' }}>
-                        Cliquez sur la vidéo pour la charger
+                        Chargement de la vidéo…
                       </p>
                     )}
                   </div>
@@ -944,30 +958,22 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                     ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff', boxShadow: '0 2px 10px rgba(124,58,237,0.3)' }
                     : { background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.5)', border: '1px solid rgba(255,255,255,0.07)' }
                   }>🤖 Auto</button>
-                <button onClick={() => setSplitMode('manual')}
+                <button
+                  onClick={() => { setSplitMode('manual'); if (canLaunch) openPreview() }}
                   className="flex-1 py-2 rounded-xl text-[13px] font-bold transition-all"
                   style={splitMode === 'manual'
                     ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff', boxShadow: '0 2px 10px rgba(124,58,237,0.3)' }
                     : { background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.5)', border: '1px solid rgba(255,255,255,0.07)' }
                   }>✂️ Manuel</button>
               </div>
-              {splitMode === 'manual' && (
-                <div className="flex items-center gap-3">
-                  <label className="text-[12px] flex-shrink-0" style={{ color: 'rgba(196,181,253,0.7)' }}>Couper à</label>
-                  <input
-                    type="number" min={0.1} step={0.1} value={manualSplitSec}
-                    onChange={e => setManualSplitSec(e.target.value)}
-                    className="flex-1 rounded-xl px-3 py-1.5 text-[14px] font-bold text-white text-center focus:outline-none"
-                    style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(139,92,246,0.3)' }}
-                  />
-                  <span className="text-[12px] flex-shrink-0" style={{ color: 'rgba(148,163,184,0.5)' }}>sec</span>
-                </div>
-              )}
-              {splitMode === 'auto' && (
-                <p className="text-[11px] leading-relaxed" style={{ color: 'rgba(148,163,184,0.45)' }}>
-                  Détecte automatiquement la scène de changement.
-                </p>
-              )}
+              {splitMode === 'manual'
+                ? <p className="text-[11px] leading-relaxed" style={{ color: 'rgba(148,163,184,0.45)' }}>
+                    Définissez le point de coupe par vidéo dans l'aperçu.
+                  </p>
+                : <p className="text-[11px] leading-relaxed" style={{ color: 'rgba(148,163,184,0.45)' }}>
+                    Détecte automatiquement la scène de changement.
+                  </p>
+              }
             </div>
 
             {/* Format */}
