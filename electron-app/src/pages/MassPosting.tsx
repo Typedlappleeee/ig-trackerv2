@@ -88,6 +88,7 @@ export function MassPosting({ user }: MassPostingProps) {
   const [showFolderPick, setShowFolderPick] = useState(false)
   const [bankFolders, setBankFolders]       = useState<{ name: string; count: number }[]>([])
   const [folderLoading, setFolderLoading]   = useState(false)
+  const [addingFolder, setAddingFolder]     = useState<string | null>(null)
   const [showScheduleModal, setShowScheduleModal] = useState(false)
   const stopRef                           = useRef(false)
   const activePhonesRef                   = useRef<string[]>([])
@@ -176,25 +177,30 @@ export function MassPosting({ user }: MassPostingProps) {
 
   async function addFolderVideos(folderName: string) {
     setShowFolderPick(false)
-    let q = supabase.from('content_bank').select('*').order('created_at', { ascending: false })
-    q = currentOrg
-      ? (q as any).eq('org_id', currentOrg.id).eq('folder', folderName)
-      : (q as any).eq('user_id', user.id).is('org_id', null).eq('folder', folderName)
-    const { data } = await q
-    const items = (data ?? []) as ContentItem[]
-    if (!items.length) return
-    const { getSignedUrl } = await import('@/lib/storage')
-    const newVideos: SelectedVideo[] = []
-    for (const item of items) {
-      if (!item.storage_path && !item.file_url) continue
-      if (selectedVideos.some(sv => sv.item.id === item.id)) continue
-      let url: string | null = null
-      try {
-        url = await getSignedUrl(item.storage_path ?? item.file_url)
-      } catch { url = item.file_url }
-      newVideos.push({ item: { ...item, file_url: url ?? item.file_url }, localPath: null })
+    setAddingFolder(folderName)
+    try {
+      let q = supabase.from('content_bank').select('*').order('created_at', { ascending: false })
+      q = currentOrg
+        ? (q as any).eq('org_id', currentOrg.id).eq('folder', folderName)
+        : (q as any).eq('user_id', user.id).is('org_id', null).eq('folder', folderName)
+      const { data } = await q
+      const items = (data ?? []) as ContentItem[]
+      if (!items.length) return
+      const { getSignedUrl } = await import('@/lib/storage')
+      const newVideos: SelectedVideo[] = []
+      for (const item of items) {
+        if (!item.storage_path && !item.file_url) continue
+        if (selectedVideos.some(sv => sv.item.id === item.id)) continue
+        let url: string | null = null
+        try {
+          url = await getSignedUrl(item.storage_path ?? item.file_url)
+        } catch { url = item.file_url }
+        newVideos.push({ item: { ...item, file_url: url ?? item.file_url }, localPath: null })
+      }
+      if (newVideos.length) setSelVideos(prev => [...prev, ...newVideos])
+    } finally {
+      setAddingFolder(null)
     }
-    if (newVideos.length) setSelVideos(prev => [...prev, ...newVideos])
   }
 
   function toggleGroup(groupName: string) {
@@ -651,6 +657,17 @@ export function MassPosting({ user }: MassPostingProps) {
               </button>
             </div>
           </div>
+          {addingFolder && (
+            <div className="flex-shrink-0 flex items-center gap-3 px-5 py-3"
+              style={{ background: 'rgba(139,92,246,0.08)', borderBottom: '1px solid rgba(139,92,246,0.15)' }}>
+              <svg className="animate-spin w-4 h-4 flex-shrink-0" style={{ color: '#a78bfa' }} viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="31.4" strokeDashoffset="10" />
+              </svg>
+              <p className="text-[12px] font-semibold truncate" style={{ color: '#a78bfa' }}>
+                Ajout de «{addingFolder}» en cours…
+              </p>
+            </div>
+          )}
           <div className="flex-1 overflow-auto">
             {selectedVideos.length === 0 ? (
               <div className="px-5 py-10 text-center">

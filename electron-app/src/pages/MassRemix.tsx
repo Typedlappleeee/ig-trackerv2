@@ -102,9 +102,9 @@ function wrapText(text: string, fontSize: number, frameW = 1080): string[] {
 }
 
 function VideoListPanel({
-  label, paths, accent, onAddBank, onAddPC, onAddFolder, onRemove,
+  label, paths, accent, loading, onAddBank, onAddPC, onAddFolder, onRemove,
 }: {
-  label: string; paths: string[]; accent: string
+  label: string; paths: string[]; accent: string; loading?: boolean
   onAddBank: () => void; onAddPC: () => void; onAddFolder: () => void; onRemove: (i: number) => void
 }) {
   return (
@@ -138,6 +138,15 @@ function VideoListPanel({
         </button>
       </div>
 
+      {loading && (
+        <div className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 mb-2 flex-shrink-0"
+          style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)' }}>
+          <svg className="animate-spin w-4 h-4 flex-shrink-0" style={{ color: '#a78bfa' }} viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="31.4" strokeDashoffset="10" />
+          </svg>
+          <p className="text-[12px] font-semibold" style={{ color: '#a78bfa' }}>Ajout du dossier en cours…</p>
+        </div>
+      )}
       <div className="flex-1 min-h-0 overflow-y-auto space-y-1.5">
         {paths.length === 0 ? (
           <div className="h-full flex items-center justify-center rounded-xl text-[12px]"
@@ -177,9 +186,11 @@ export function MassRemix({ user }: MassRemixProps) {
   const [showBankSec,  setShowBankSec]  = useState(false)
 
   // Folder quick-pick for originals/secondaries
-  const [folderTarget,  setFolderTarget]  = useState<'orig' | 'sec' | null>(null)
-  const [folderList,    setFolderList]    = useState<{ name: string; count: number }[]>([])
-  const [folderLoading, setFolderLoading] = useState(false)
+  const [folderTarget,   setFolderTarget]  = useState<'orig' | 'sec' | null>(null)
+  const [folderList,     setFolderList]    = useState<{ name: string; count: number }[]>([])
+  const [folderLoading,  setFolderLoading] = useState(false)
+  const [addingFolder,   setAddingFolder]  = useState<string | null>(null)
+  const [addingTarget,   setAddingTarget]  = useState<'orig' | 'sec' | null>(null)
 
   const [splitMode,      setSplitMode]      = useState<'auto' | 'manual'>('auto')
   const [manualSplitSec, setManualSplitSec] = useState<string>('3')
@@ -246,22 +257,29 @@ export function MassRemix({ user }: MassRemixProps) {
   async function addFolderVideos(folderName: string) {
     const target = folderTarget
     setFolderTarget(null)
-    let q = supabase.from('content_bank').select('*').order('created_at', { ascending: false })
-    q = currentOrg
-      ? (q as any).eq('org_id', currentOrg.id).eq('folder', folderName)
-      : (q as any).eq('user_id', user.id).is('org_id', null).eq('folder', folderName)
-    const { data } = await q
-    const items = (data ?? []) as Array<{ storage_path: string | null; file_url: string | null }>
-    if (!items.length) return
-    const { resolveContentToLocalPath } = await import('@/lib/storage')
-    const paths: string[] = []
-    for (const item of items) {
-      if (!item.storage_path && !item.file_url) continue
-      try { paths.push(await resolveContentToLocalPath(item)) } catch { /* skip */ }
+    setAddingFolder(folderName)
+    setAddingTarget(target)
+    try {
+      let q = supabase.from('content_bank').select('*').order('created_at', { ascending: false })
+      q = currentOrg
+        ? (q as any).eq('org_id', currentOrg.id).eq('folder', folderName)
+        : (q as any).eq('user_id', user.id).is('org_id', null).eq('folder', folderName)
+      const { data } = await q
+      const items = (data ?? []) as Array<{ storage_path: string | null; file_url: string | null }>
+      if (!items.length) return
+      const { resolveContentToLocalPath } = await import('@/lib/storage')
+      const paths: string[] = []
+      for (const item of items) {
+        if (!item.storage_path && !item.file_url) continue
+        try { paths.push(await resolveContentToLocalPath(item)) } catch { /* skip */ }
+      }
+      if (!paths.length) return
+      if (target === 'orig') setOriginals(prev => [...prev, ...paths.filter(p => !prev.includes(p))])
+      else                   setSecondaries(prev => [...prev, ...paths.filter(p => !prev.includes(p))])
+    } finally {
+      setAddingFolder(null)
+      setAddingTarget(null)
     }
-    if (!paths.length) return
-    if (target === 'orig') setOriginals(prev => [...prev, ...paths.filter(p => !prev.includes(p))])
-    else                   setSecondaries(prev => [...prev, ...paths.filter(p => !prev.includes(p))])
   }
 
   function openPreview() {
@@ -973,6 +991,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                 label="Vidéos originales"
                 paths={originals}
                 accent="#8b5cf6"
+                loading={addingTarget === 'orig'}
                 onAddBank={() => setShowBankOrig(true)}
                 onAddFolder={() => openFolderPick('orig')}
                 onAddPC={async () => { const p = await pickPC(false); setOriginals(prev => [...prev, ...p]) }}
@@ -984,6 +1003,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                 label="Nouvelles Phase 1"
                 paths={secondaries}
                 accent="#ec4899"
+                loading={addingTarget === 'sec'}
                 onAddBank={() => setShowBankSec(true)}
                 onAddFolder={() => openFolderPick('sec')}
                 onAddPC={async () => { const p = await pickPC(false); setSecondaries(prev => [...prev, ...p]) }}
