@@ -452,8 +452,9 @@ export function MassPosting({ user }: MassPostingProps) {
           setTimeout(() => {
             if (activePhonesRef.current.includes(asgn.phone.geelark_id)) {
               geelark(bearer, '/phone/stop', { ids: [asgn.phone.geelark_id] })
-                .then(() => log(`  ⏱️ ${asgn.phone.phone_name} éteint (timeout 5min)`, 'warn'))
+                .then(() => log(`  ✅ ${asgn.phone.phone_name} — posting fini`, 'ok'))
                 .catch(() => {})
+              setPhoneStatus(asgn.phone.id, { status: 'done' })
               activePhonesRef.current = activePhonesRef.current.filter(id => id !== asgn.phone.geelark_id)
             }
           }, 5 * 60 * 1000)
@@ -537,6 +538,8 @@ export function MassPosting({ user }: MassPostingProps) {
       log('🎉 Terminé ! Réinitialisation dans 5s…', 'ok')
       await new Promise(r => setTimeout(r, 5000))
       resetMassPosting()
+      setSelPhones(new Set())
+      setSelVideos([])
 
     } catch (e: unknown) {
       log(`❌ Erreur: ${e instanceof Error ? e.message : String(e)}`, 'error')
