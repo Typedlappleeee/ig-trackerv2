@@ -102,10 +102,10 @@ function wrapText(text: string, fontSize: number, frameW = 1080): string[] {
 }
 
 function VideoListPanel({
-  label, paths, accent, onAddBank, onAddPC, onRemove,
+  label, paths, accent, onAddBank, onAddPC, onAddFolder, onRemove,
 }: {
   label: string; paths: string[]; accent: string
-  onAddBank: () => void; onAddPC: () => void; onRemove: (i: number) => void
+  onAddBank: () => void; onAddPC: () => void; onAddFolder: () => void; onRemove: (i: number) => void
 }) {
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -125,6 +125,11 @@ function VideoListPanel({
           className="flex-1 rounded-xl py-2 text-[12px] font-semibold transition-all hover:brightness-110"
           style={{ background: `${accent}15`, color: accent, border: `1px solid ${accent}28` }}>
           🗂 Banque
+        </button>
+        <button onClick={onAddFolder}
+          className="flex-1 rounded-xl py-2 text-[12px] font-semibold transition-all hover:brightness-110"
+          style={{ background: 'rgba(139,92,246,0.08)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.2)' }}>
+          📁 Dossier
         </button>
         <button onClick={onAddPC}
           className="flex-1 rounded-xl py-2 text-[12px] font-semibold transition-all"
@@ -171,6 +176,11 @@ export function MassRemix({ user }: MassRemixProps) {
   const [showBankOrig, setShowBankOrig] = useState(false)
   const [showBankSec,  setShowBankSec]  = useState(false)
 
+  // Folder quick-pick for originals/secondaries
+  const [folderTarget,  setFolderTarget]  = useState<'orig' | 'sec' | null>(null)
+  const [folderList,    setFolderList]    = useState<{ name: string; count: number }[]>([])
+  const [folderLoading, setFolderLoading] = useState(false)
+
   const [splitMode,      setSplitMode]      = useState<'auto' | 'manual'>('auto')
   const [manualSplitSec, setManualSplitSec] = useState<string>('3')
 
@@ -216,6 +226,42 @@ export function MassRemix({ user }: MassRemixProps) {
   async function pickPC(multi: boolean): Promise<string[]> {
     const p = await window.electronAPI?.pickVideoFile?.()
     return p ? [p] : []
+  }
+
+  async function openFolderPick(target: 'orig' | 'sec') {
+    setFolderLoading(true)
+    setFolderTarget(target)
+    let q = supabase.from('content_bank').select('folder')
+    q = currentOrg ? (q as any).eq('org_id', currentOrg.id) : (q as any).eq('user_id', user.id).is('org_id', null)
+    const { data } = await q
+    const counts = new Map<string, number>()
+    for (const row of data ?? []) {
+      const f = (row as { folder?: string | null }).folder
+      if (f) counts.set(f, (counts.get(f) ?? 0) + 1)
+    }
+    setFolderList([...counts.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([name, count]) => ({ name, count })))
+    setFolderLoading(false)
+  }
+
+  async function addFolderVideos(folderName: string) {
+    const target = folderTarget
+    setFolderTarget(null)
+    let q = supabase.from('content_bank').select('*').order('created_at', { ascending: false })
+    q = currentOrg
+      ? (q as any).eq('org_id', currentOrg.id).eq('folder', folderName)
+      : (q as any).eq('user_id', user.id).is('org_id', null).eq('folder', folderName)
+    const { data } = await q
+    const items = (data ?? []) as Array<{ storage_path: string | null; file_url: string | null }>
+    if (!items.length) return
+    const { resolveContentToLocalPath } = await import('@/lib/storage')
+    const paths: string[] = []
+    for (const item of items) {
+      if (!item.storage_path && !item.file_url) continue
+      try { paths.push(await resolveContentToLocalPath(item)) } catch { /* skip */ }
+    }
+    if (!paths.length) return
+    if (target === 'orig') setOriginals(prev => [...prev, ...paths.filter(p => !prev.includes(p))])
+    else                   setSecondaries(prev => [...prev, ...paths.filter(p => !prev.includes(p))])
   }
 
   function openPreview() {
@@ -855,6 +901,42 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
           onClose={() => setShowBankSec(false)} />
       )}
 
+      {/* Folder quick-pick modal */}
+      {folderTarget !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
+          onClick={() => setFolderTarget(null)}>
+          <div className="rounded-2xl overflow-hidden w-80" onClick={e => e.stopPropagation()}
+            style={{ background: '#0d0a1e', border: '1px solid rgba(139,92,246,0.25)' }}>
+            <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(139,92,246,0.12)' }}>
+              <p className="text-[14px] font-bold text-white">
+                📁 {folderTarget === 'orig' ? 'Dossier — Originales' : 'Dossier — Phase 1'}
+              </p>
+              <button onClick={() => setFolderTarget(null)} className="text-text2 hover:text-white text-lg leading-none">✕</button>
+            </div>
+            {folderLoading ? (
+              <div className="py-10 text-center text-text2 text-[13px]">Chargement…</div>
+            ) : folderList.length === 0 ? (
+              <div className="py-10 text-center text-text2 text-[13px]">Aucun dossier dans la banque</div>
+            ) : (
+              <div className="max-h-80 overflow-y-auto py-2">
+                {folderList.map(f => (
+                  <button key={f.name} onClick={() => addFolderVideos(f.name)}
+                    className="w-full flex items-center gap-3 px-5 py-3 text-left transition-all hover:bg-white/[0.03]"
+                    style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                    <span className="text-[18px]">📂</span>
+                    <span className="flex-1 text-[13px] font-semibold text-white truncate">{f.name}</span>
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full"
+                      style={{ background: 'rgba(139,92,246,0.12)', color: '#a78bfa' }}>
+                      {f.count} vid.
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="h-full flex flex-col overflow-hidden">
 
         {/* Header */}
@@ -892,6 +974,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                 paths={originals}
                 accent="#8b5cf6"
                 onAddBank={() => setShowBankOrig(true)}
+                onAddFolder={() => openFolderPick('orig')}
                 onAddPC={async () => { const p = await pickPC(false); setOriginals(prev => [...prev, ...p]) }}
                 onRemove={i => setOriginals(prev => prev.filter((_, j) => j !== i))}
               />
@@ -902,6 +985,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                 paths={secondaries}
                 accent="#ec4899"
                 onAddBank={() => setShowBankSec(true)}
+                onAddFolder={() => openFolderPick('sec')}
                 onAddPC={async () => { const p = await pickPC(false); setSecondaries(prev => [...prev, ...p]) }}
                 onRemove={i => setSecondaries(prev => prev.filter((_, j) => j !== i))}
               />
