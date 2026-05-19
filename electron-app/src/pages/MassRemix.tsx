@@ -469,18 +469,10 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                 const outH = preset === '9:16' ? 1920 : 1080
                 const outW = preset === '16:9' ? 1920 : 1080
 
-                parsed.forEach(item => {
-                  // Font size: slightly larger than AI suggests, capped reasonably
+                // ── Step 1: resolve timing + font for each item ────────────────
+                type TItem = { text: string; xAlign: string; rawY: number; fontSize: number; fontColor: string; bold: boolean; startTime: number; endTime: number }
+                const items: TItem[] = parsed.map(item => {
                   const fontSize = Math.round(Math.max(44, Math.min(160, (item.fontSizePx ?? 64) * 1.15)))
-
-                  // Position: top (5-12%) or bottom (72-82%) to avoid face zone (15-70%)
-                  const rawY = (item.yPercent ?? 50) / 100
-                  let yFrac: number
-                  if (rawY < 0.20)      yFrac = Math.max(0.05, Math.min(0.12, rawY))        // top zone
-                  else if (rawY > 0.70) yFrac = Math.min(0.82, Math.max(0.72, rawY))        // bottom zone
-                  else                  yFrac = 0.76                                          // center → snap to bottom
-
-                  // Timing
                   const sf = item.startFrame ?? 0
                   const ef = item.endFrame   ?? frameCount - 1
                   const coversAll = (ef - sf + 1) >= frameCount * 0.8
@@ -488,23 +480,59 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                   const endTime   = coversAll
                     ? analyzeEnd
                     : Math.min(analyzeEnd, Math.max(startTime + interval * 2, Math.round((ef + 1) * interval * 10) / 10))
+                  return { text: item.text, xAlign: item.xAlign ?? 'center', rawY: (item.yPercent ?? 50) / 100, fontSize, fontColor: item.fontColor ?? 'white', bold: item.bold ?? true, startTime, endTime }
+                })
 
-                  // Word-wrap: split into lines, create one overlay per line
-                  const lines = wrapText(item.text, fontSize, outW)
-                  const lineStepFrac = (fontSize * 1.45) / outH
+                // ── Step 2: assign zones (top / bottom) to avoid face + overlaps ─
+                // Base zone from original position: top if rawY < 0.35, else bottom
+                type Zone = 'top' | 'bottom'
+                const zones: Zone[] = items.map(it => it.rawY < 0.35 ? 'top' : 'bottom')
+                // Conflict resolution: if two temporally-concurrent items share a zone → flip the later one
+                for (let i = 1; i < items.length; i++) {
+                  for (let j = 0; j < i; j++) {
+                    const overlap = items[j].endTime > items[i].startTime && items[j].startTime < items[i].endTime
+                    if (overlap && zones[j] === zones[i]) zones[i] = zones[i] === 'bottom' ? 'top' : 'bottom'
+                  }
+                }
+
+                // ── Step 3: generate per-line overlays inside their zone ──────────
+                // Track the lowest used yFrac per zone per concurrent group to avoid line overlap
+                items.forEach((item, idx) => {
+                  const zone   = zones[idx]
+                  const lines  = wrapText(item.text, item.fontSize, outW)
+                  const stepFr = (item.fontSize * 1.3) / outH
+
+                  // Find the lowest yFrac already used by concurrent items in the same zone
+                  let baseY: number
+                  if (zone === 'top') {
+                    baseY = 0.07
+                  } else {
+                    // Start just below any concurrent bottom items
+                    const concurrentBottomMax = items
+                      .slice(0, idx)
+                      .filter((_, j) => zones[j] === 'bottom' && items[j].endTime > item.startTime && items[j].startTime < item.endTime)
+                      .reduce((max, it) => {
+                        const n = wrapText(it.text, it.fontSize, outW).length
+                        const st = (it.fontSize * 1.3) / outH
+                        return Math.max(max, 0.76 + (n - 1) * st)
+                      }, 0.76)
+                    baseY = concurrentBottomMax
+                  }
 
                   lines.forEach((line, li) => {
-                    const lineYFrac = Math.min(0.95, yFrac + li * lineStepFrac)
+                    const lineYFrac = zone === 'top'
+                      ? Math.min(0.13, baseY + li * stepFr)
+                      : Math.min(0.87, baseY + li * stepFr)
                     textOverlays.push({
                       text: line,
-                      x: xAlignToExpr(item.xAlign ?? 'center'),
-                      y: `h*${lineYFrac.toFixed(4)}-${Math.round(fontSize / 2)}`,
-                      fontSize,
-                      fontColor: item.fontColor ?? 'white',
-                      bold: item.bold ?? true,
+                      x: xAlignToExpr(item.xAlign),
+                      y: `h*${lineYFrac.toFixed(4)}-${Math.round(item.fontSize / 2)}`,
+                      fontSize: item.fontSize,
+                      fontColor: item.fontColor,
+                      bold: item.bold,
                       shadow: true,
-                      startTime,
-                      endTime,
+                      startTime: item.startTime,
+                      endTime:   item.endTime,
                     })
                   })
                 })
