@@ -908,68 +908,103 @@ function SubscriptionPanel() {
       {/* Plan pricing */}
       <div>
         <p className="text-[15px] font-bold text-white mb-6">Abonnements</p>
-        <div className="grid grid-cols-2 gap-6">
+        <div className="grid grid-cols-3 gap-4">
 
           {/* Standard */}
-          <div className="rounded-2xl p-6 space-y-5 flex flex-col" style={{ background: 'rgba(139,92,246,0.05)', border: '1px solid rgba(139,92,246,0.25)' }}>
+          <div className="rounded-2xl p-5 space-y-4 flex flex-col" style={{ background: 'rgba(96,165,250,0.05)', border: '1px solid rgba(96,165,250,0.2)' }}>
             <div>
-              <p className="text-[13px] font-black uppercase tracking-wider" style={{ color: '#a78bfa' }}>Standard</p>
-              <div className="flex items-baseline gap-1 mt-2">
-                <span className="text-3xl font-black text-white">49,99$</span>
-                <span className="text-[13px] text-text2">/ mois</span>
+              <p className="text-[12px] font-black uppercase tracking-wider" style={{ color: '#60a5fa' }}>Standard</p>
+              <div className="flex items-baseline gap-1 mt-1.5">
+                <span className="text-2xl font-black text-white">49,99$</span>
+                <span className="text-[12px] text-text2">/ mois</span>
               </div>
             </div>
-            <ul className="space-y-2 flex-1">
-              {['2 000 crédits / mois', 'Téléphones illimités', 'Toutes les fonctionnalités', 'Support standard'].map(f => (
-                <li key={f} className="flex items-center gap-2 text-[13px] text-text2">
-                  <span style={{ color: '#a78bfa' }}>✓</span>{f}
+            <ul className="space-y-1.5 flex-1">
+              {['2 500 crédits / mois', '50 téléphones max', 'Toutes les fonctionnalités', 'Mass Posting — 10 comptes', 'Support 24/7'].map(f => (
+                <li key={f} className="flex items-start gap-2 text-[12px] text-text2">
+                  <span className="mt-px flex-shrink-0" style={{ color: '#60a5fa' }}>✓</span>{f}
                 </li>
               ))}
             </ul>
-            <a
-              href="https://t.me/justquentin"
-              target="_blank"
-              rel="noreferrer"
-              className="block w-full py-2.5 rounded-xl text-[13px] font-bold text-center text-white transition-all"
-              style={{ background: 'linear-gradient(130deg,#7c3aed,#8b5cf6)' }}
-            >
-              Acheter →
+            <a href="https://t.me/justquentin" target="_blank" rel="noreferrer"
+              className="block w-full py-2.5 rounded-xl text-[12px] font-bold text-center text-white transition-all hover:brightness-110"
+              style={{ background: 'rgba(96,165,250,0.2)', border: '1px solid rgba(96,165,250,0.35)' }}>
+              Obtenir →
             </a>
           </div>
 
           {/* Pro */}
-          <div className="rounded-2xl p-6 space-y-5 flex flex-col relative overflow-hidden" style={{ background: 'linear-gradient(145deg,rgba(236,72,153,0.08),rgba(124,58,237,0.08))', border: '1px solid rgba(236,72,153,0.35)' }}>
-            <div className="absolute top-3 right-3 text-[11px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider" style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff' }}>
+          <div className="rounded-2xl p-5 space-y-4 flex flex-col relative overflow-hidden" style={{ background: 'linear-gradient(145deg,rgba(236,72,153,0.08),rgba(124,58,237,0.08))', border: '1px solid rgba(236,72,153,0.4)' }}>
+            <div className="absolute top-2.5 right-2.5 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider" style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff' }}>
               Populaire
             </div>
             <div>
-              <p className="text-[13px] font-black uppercase tracking-wider" style={{ color: '#f472b6' }}>Pro</p>
-              <div className="flex items-baseline gap-1 mt-2">
-                <span className="text-3xl font-black text-white">99,99$</span>
-                <span className="text-[13px] text-text2">/ mois</span>
+              <p className="text-[12px] font-black uppercase tracking-wider" style={{ color: '#f472b6' }}>Pro</p>
+              <div className="flex items-baseline gap-1 mt-1.5">
+                <span className="text-2xl font-black text-white">99,99$</span>
+                <span className="text-[12px] text-text2">/ mois</span>
               </div>
             </div>
-            <ul className="space-y-2 flex-1">
-              {['5 500 crédits / mois', 'Téléphones illimités', 'Membres illimités (org)', 'Support prioritaire 24/7'].map(f => (
-                <li key={f} className="flex items-center gap-2 text-[13px] text-text2">
-                  <span style={{ color: '#f472b6' }}>✓</span>{f}
+            <ul className="space-y-1.5 flex-1">
+              {['5 500 crédits / mois', '200 téléphones max', 'Toutes les fonctionnalités', 'Mass Posting illimité', 'Support 24/7'].map(f => (
+                <li key={f} className="flex items-start gap-2 text-[12px] text-text2">
+                  <span className="mt-px flex-shrink-0" style={{ color: '#f472b6' }}>✓</span>{f}
                 </li>
               ))}
             </ul>
-            <a
-              href="https://t.me/justquentin"
-              target="_blank"
-              rel="noreferrer"
-              className="block w-full py-2.5 rounded-xl text-[13px] font-bold text-center text-white transition-all"
-              style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)', boxShadow: '0 2px 20px -4px rgba(236,72,153,0.4)' }}
-            >
-              Acheter →
+            <a href="https://t.me/justquentin" target="_blank" rel="noreferrer"
+              className="block w-full py-2.5 rounded-xl text-[12px] font-bold text-center text-white transition-all"
+              style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)', boxShadow: '0 2px 16px -4px rgba(236,72,153,0.4)' }}>
+              Obtenir →
+            </a>
+          </div>
+
+          {/* Organisation */}
+          <div className="rounded-2xl p-5 space-y-4 flex flex-col" style={{ background: 'rgba(52,211,153,0.05)', border: '1px solid rgba(52,211,153,0.2)' }}>
+            <div>
+              <p className="text-[12px] font-black uppercase tracking-wider" style={{ color: '#34d399' }}>Organisation</p>
+              <div className="flex items-baseline gap-1 mt-1.5">
+                <span className="text-2xl font-black text-white">149,99$</span>
+                <span className="text-[12px] text-text2">/ mois</span>
+              </div>
+            </div>
+            <ul className="space-y-1.5 flex-1">
+              {['11 000 crédits / mois', 'Téléphones illimités', 'Toutes les fonctionnalités', 'Mass Posting illimité', 'Support 24/7 prioritaire', 'Proposition d\'ajouts'].map(f => (
+                <li key={f} className="flex items-start gap-2 text-[12px] text-text2">
+                  <span className="mt-px flex-shrink-0" style={{ color: '#34d399' }}>✓</span>{f}
+                </li>
+              ))}
+            </ul>
+            <a href="https://t.me/justquentin" target="_blank" rel="noreferrer"
+              className="block w-full py-2.5 rounded-xl text-[12px] font-bold text-center text-white transition-all hover:brightness-110"
+              style={{ background: 'rgba(52,211,153,0.2)', border: '1px solid rgba(52,211,153,0.35)' }}>
+              Obtenir →
             </a>
           </div>
         </div>
-        <p className="text-[12px] text-text2/50 mt-4 text-center">
-          Après achat, tu recevras une clé de licence par email à activer ci-dessus.
-        </p>
+
+        {/* Credit packs */}
+        <div className="mt-6">
+          <p className="text-[13px] font-bold text-white mb-3">Packs de crédits</p>
+          <div className="grid grid-cols-5 gap-3">
+            {[
+              { cr: '500',    price: '19,99$' },
+              { cr: '1 200',  price: '39,99$' },
+              { cr: '2 500',  price: '74,99$' },
+              { cr: '6 000',  price: '164,99$' },
+              { cr: '15 000', price: '374,99$' },
+            ].map(pk => (
+              <a key={pk.cr} href="https://t.me/justquentin" target="_blank" rel="noreferrer"
+                className="rounded-xl p-3.5 text-center transition-all hover:brightness-110 no-underline"
+                style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(139,92,246,0.15)', textDecoration: 'none' }}>
+                <div className="text-[15px] font-black text-white">{pk.cr}</div>
+                <div className="text-[10px] text-text2 mb-1.5">crédits</div>
+                <div className="text-[12px] font-bold" style={{ color: '#a78bfa' }}>{pk.price}</div>
+              </a>
+            ))}
+          </div>
+        </div>
+
         <a
           href="https://t.me/justquentin"
           target="_blank"
@@ -981,9 +1016,10 @@ function SubscriptionPanel() {
             <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.833.941z"/>
           </svg>
           <div>
-            <p className="text-[13px] font-bold text-text">Payer via Telegram</p>
-            <p className="text-[12px] text-text2">Paiement en crypto — contacte @justquentin</p>
+            <p className="text-[13px] font-bold text-text">Commander via Telegram</p>
+            <p className="text-[12px] text-text2">Crypto / virement — clé envoyée immédiatement · @justquentin</p>
           </div>
+          <div className="ml-auto text-[#29b6f6] text-lg">→</div>
         </a>
       </div>
     </div>
