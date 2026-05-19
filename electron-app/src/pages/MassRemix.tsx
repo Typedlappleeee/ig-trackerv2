@@ -294,7 +294,7 @@ export function MassRemix({ user }: MassRemixProps) {
             ? `✅ Scène: splitTime=${splitTime != null ? splitTime + 's' : 'non trouvé'}, durée=${det.duration ?? '?'}s`
             : `⚠️ Pas de scène détectée — concat désactivé`)
 
-          // Vérif. changement de décor (auto mode only)
+          // Vérif. changement de décor (auto mode only) — informationnel uniquement
           if (splitTime != null && anthropicKey.trim()) {
             const totalDur = det.duration ?? 60
             addLog(job.id, `🤖 Vérif. changement de décor (cut à ${splitTime}s)…`)
@@ -323,17 +323,15 @@ export function MassRemix({ user }: MassRemixProps) {
               )
               if (res.ok) {
                 const answer = ((res.data as any)?.content?.[0]?.text ?? '').toLowerCase().trim()
-                if (!answer.startsWith('yes')) {
-                  addLog(job.id, '⚠️ Décor identique → concat désactivé')
-                  splitTime = undefined
-                } else {
-                  addLog(job.id, '✅ Changement de décor confirmé → concat activé')
-                }
+                // Note: we keep splitTime regardless — concat always happens at detected scene change
+                addLog(job.id, answer.startsWith('yes')
+                  ? '✅ Changement de décor confirmé'
+                  : '⚠️ Décor similaire (concat conservé quand même)')
               } else {
-                addLog(job.id, `⚠️ Vérif. décor échouée → concat conservé`)
+                addLog(job.id, `⚠️ Vérif. décor échouée — concat conservé`)
               }
             } else {
-              addLog(job.id, '⚠️ Extraction frames échouée → vérif. décor ignorée')
+              addLog(job.id, '⚠️ Extraction frames échouée — vérif. décor ignorée')
             }
           }
         }
