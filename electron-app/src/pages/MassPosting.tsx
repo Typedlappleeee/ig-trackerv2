@@ -80,6 +80,9 @@ export function MassPosting({ user }: MassPostingProps) {
   const [groups, setGroups]               = useState<string[]>(['Tous'])
   const [phoneSearch, setPhoneSearch]     = useState('')
   const [showBankPicker, setShowBankPicker] = useState(false)
+  const [showFolderPick, setShowFolderPick] = useState(false)
+  const [bankFolders, setBankFolders]       = useState<{ name: string; count: number }[]>([])
+  const [folderLoading, setFolderLoading]   = useState(false)
   const [showScheduleModal, setShowScheduleModal] = useState(false)
   const stopRef                           = useRef(false)
   const activePhonesRef                   = useRef<string[]>([])
@@ -149,6 +152,44 @@ export function MassPosting({ user }: MassPostingProps) {
       else next.add(id)
       return next
     })
+  }
+
+  async function openFolderPick() {
+    setFolderLoading(true)
+    let q = supabase.from('content_bank').select('folder')
+    q = currentOrg ? (q as any).eq('org_id', currentOrg.id) : (q as any).eq('user_id', user.id).is('org_id', null)
+    const { data } = await q
+    const counts = new Map<string, number>()
+    for (const row of data ?? []) {
+      const f = (row as { folder?: string | null }).folder
+      if (f) counts.set(f, (counts.get(f) ?? 0) + 1)
+    }
+    setBankFolders([...counts.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([name, count]) => ({ name, count })))
+    setFolderLoading(false)
+    setShowFolderPick(true)
+  }
+
+  async function addFolderVideos(folderName: string) {
+    setShowFolderPick(false)
+    let q = supabase.from('content_bank').select('*').order('created_at', { ascending: false })
+    q = currentOrg
+      ? (q as any).eq('org_id', currentOrg.id).eq('folder', folderName)
+      : (q as any).eq('user_id', user.id).is('org_id', null).eq('folder', folderName)
+    const { data } = await q
+    const items = (data ?? []) as ContentItem[]
+    if (!items.length) return
+    const { getSignedUrl } = await import('@/lib/storage')
+    const newVideos: SelectedVideo[] = []
+    for (const item of items) {
+      if (!item.storage_path && !item.file_url) continue
+      if (selectedVideos.some(sv => sv.item.id === item.id)) continue
+      let url: string | null = null
+      try {
+        url = await getSignedUrl(item.storage_path ?? item.file_url)
+      } catch { url = item.file_url }
+      newVideos.push({ item: { ...item, file_url: url ?? item.file_url }, localPath: null })
+    }
+    if (newVideos.length) setSelVideos(prev => [...prev, ...newVideos])
   }
 
   async function pickLocalFile(_index: number) {
@@ -571,6 +612,13 @@ export function MassPosting({ user }: MassPostingProps) {
               >
                 🗂 Banque
               </button>
+              <button
+                onClick={openFolderPick}
+                className="flex-1 flex items-center justify-center gap-1.5 rounded-xl px-3 py-2.5 text-[13px] font-semibold transition-colors"
+                style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)', color: '#a78bfa' }}
+              >
+                📁 Dossier
+              </button>
             </div>
           </div>
           <div className="flex-1 overflow-auto">
@@ -855,6 +903,39 @@ export function MassPosting({ user }: MassPostingProps) {
           </div>
         </div>
       </div>
+
+      {/* Folder quick-pick modal */}
+      {showFolderPick && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => setShowFolderPick(false)}>
+          <div className="rounded-2xl overflow-hidden w-80" onClick={e => e.stopPropagation()}
+            style={{ background: '#0d0a1e', border: '1px solid rgba(139,92,246,0.25)' }}>
+            <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(139,92,246,0.12)' }}>
+              <p className="text-[14px] font-bold text-white">📁 Choisir un dossier</p>
+              <button onClick={() => setShowFolderPick(false)} className="text-text2 hover:text-white text-lg leading-none">✕</button>
+            </div>
+            {folderLoading ? (
+              <div className="py-10 text-center text-text2 text-[13px]">Chargement…</div>
+            ) : bankFolders.length === 0 ? (
+              <div className="py-10 text-center text-text2 text-[13px]">Aucun dossier dans la banque</div>
+            ) : (
+              <div className="max-h-80 overflow-y-auto py-2">
+                {bankFolders.map(f => (
+                  <button key={f.name} onClick={() => addFolderVideos(f.name)}
+                    className="w-full flex items-center gap-3 px-5 py-3 text-left transition-all hover:bg-white/[0.03]"
+                    style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                    <span className="text-[18px]">📂</span>
+                    <span className="flex-1 text-[13px] font-semibold text-white truncate">{f.name}</span>
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full"
+                      style={{ background: 'rgba(139,92,246,0.12)', color: '#a78bfa' }}>
+                      {f.count} vid.
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Bank picker modal */}
       {showBankPicker && (

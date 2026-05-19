@@ -63,8 +63,12 @@ const STATUS_LABEL: Record<MassJob['status'], string> = {
 }
 
 function fileName(p: string) { return p.replace(/\\/g, '/').split('/').pop() ?? p }
-// localvideo:// custom protocol registered in Electron main (supports byte-range / seeking)
-function toFileUrl(p: string) { return 'localvideo://' + (p.startsWith('/') ? '' : '/') + p.replace(/\\/g, '/') }
+// localvideo:// custom protocol registered in Electron main (supports byte-range / seeking).
+// If the path is already an HTTP/blob URL (e.g. Supabase signed URL), use it directly.
+function toFileUrl(p: string) {
+  if (/^(https?|blob):/.test(p)) return p
+  return 'localvideo://' + (p.startsWith('/') ? '' : '/') + p.replace(/\\/g, '/')
+}
 function formatSec(s: number) { const m = Math.floor(s / 60); return `${m}:${Math.floor(s % 60).toString().padStart(2, '0')}` }
 
 function xAlignToExpr(align: string): string {
@@ -635,6 +639,18 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                       <span className="text-[12px] font-mono" style={{ color: 'rgba(148,163,184,0.6)' }}>
                         {formatSec(vidCurrentTime)} / {formatSec(vidDuration)}
                       </span>
+                      {vidDuration > 0 && (
+                        <button
+                          onClick={() => {
+                            const sec = Math.round(vidCurrentTime * 10) / 10
+                            setCutForPair(selectedPair.id, sec)
+                            vidRef.current?.pause()
+                          }}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-bold transition-all hover:brightness-110"
+                          style={{ background: 'rgba(234,179,8,0.15)', border: '1px solid rgba(234,179,8,0.3)', color: '#eab308' }}>
+                          ✂ Couper ici
+                        </button>
+                      )}
                       {selectedPair.cutSec != null && (
                         <>
                           <span className="text-[12px] font-bold ml-auto" style={{ color: '#eab308' }}>✂ {selectedPair.cutSec.toFixed(1)}s</span>
