@@ -618,7 +618,17 @@ export function MassPosting({ user }: MassPostingProps) {
             </div>
             <select
               value={groupFilter}
-              onChange={e => setGroupFilter(e.target.value)}
+              onChange={e => {
+                const g = e.target.value
+                setGroupFilter(g)
+                if (g !== 'Tous') {
+                  const inGroup = phones.filter(p => {
+                    if (role && !canAccessPhoneGroup(role, perms, p.group_name)) return false
+                    return p.group_name === g
+                  })
+                  setSelPhones(new Set(inGroup.map(p => p.id)))
+                }
+              }}
               className="w-full rounded-xl px-4 py-2.5 text-[13px] focus:outline-none mb-2"
               style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
             >

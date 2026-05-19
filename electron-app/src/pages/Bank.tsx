@@ -281,6 +281,7 @@ export function Bank({ user }: BankProps) {
   const [tagsItem, setTagsItem]     = useState<ContentItem | null>(null)
 
   const dropRef = useRef<HTMLDivElement>(null)
+  const dragCounter = useRef(0)
 
   useEffect(() => { loadItems() }, [currentOrg?.id])
 
@@ -428,13 +429,21 @@ export function Bank({ user }: BankProps) {
   }
 
   function onDragOver(e: React.DragEvent) {
-    e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; setDragging(true)
+    e.preventDefault(); e.dataTransfer.dropEffect = 'copy'
+  }
+  function onDragEnter(e: React.DragEvent) {
+    e.preventDefault()
+    dragCounter.current += 1
+    if (dragCounter.current === 1) setDragging(true)
   }
   function onDragLeave(e: React.DragEvent) {
-    if (!dropRef.current?.contains(e.relatedTarget as Node)) setDragging(false)
+    dragCounter.current -= 1
+    if (dragCounter.current <= 0) { dragCounter.current = 0; setDragging(false) }
   }
   async function onDrop(e: React.DragEvent) {
-    e.preventDefault(); setDragging(false)
+    e.preventDefault()
+    dragCounter.current = 0
+    setDragging(false)
     const files = Array.from(e.dataTransfer.files)
     if (files.length === 0) return
     // Process sequentially — concurrent thumbnail generation on N large videos
@@ -553,6 +562,7 @@ export function Bank({ user }: BankProps) {
       ref={dropRef}
       className={`h-full flex flex-col overflow-hidden transition-colors ${dragging ? 'bg-accent/5' : ''}`}
       onDragOver={onDragOver}
+      onDragEnter={onDragEnter}
       onDragLeave={onDragLeave}
       onDrop={onDrop}
     >
