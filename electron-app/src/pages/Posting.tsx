@@ -37,7 +37,7 @@ export function Posting({ user }: PostingProps) {
   const [filePath, _setFilePath]       = useState<string | null>(s.filePath)
   const [caption, _setCaption]         = useState(s.caption)
   const [topic, setTopic]              = useState('')
-  const [withHashtags, setWithHashtags]= useState(true)
+  const [withHashtags, setWithHashtags]= useState(false)
   const [customPrompt, setCustomPrompt]= useState('')
   const [postingOpts, setPostingOpts]  = useState<PostingOpts>(loadPostingOpts)
   const [bearer, setBearer]            = useState('')

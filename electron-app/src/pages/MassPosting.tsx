@@ -74,7 +74,7 @@ export function MassPosting({ user }: MassPostingProps) {
   const [groqKey, setGroqKey]             = useState('')
   const [posting, _setPosting]            = useState(ms.posting)
   const [generating, setGenerating]       = useState(false)
-  const [withHashtags, setWithHashtags]   = useState(true)
+  const [withHashtags, setWithHashtags]   = useState(false)
   const [customPrompt, setCustomPrompt]   = useState('')
   const [logs, _setLogs]                  = useState<TaskLog[]>(ms.logs)
   const [taskStatuses, _setTaskStatuses]  = useState<Map<string, TaskStatus>>(ms.taskStatuses)
@@ -881,20 +881,9 @@ export function MassPosting({ user }: MassPostingProps) {
             <div className="rounded-2xl p-6" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
               <div className="flex items-center justify-between mb-4">
                 <p className="text-[15px] font-bold text-white">Description</p>
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={() => setWithHashtags(v => !v)}
-                    className="relative w-11 h-6 rounded-full transition-colors flex-shrink-0"
-                    style={{ background: withHashtags ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.08)' }}
-                    title="Hashtags"
-                  >
-                    <span className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform ${withHashtags ? 'translate-x-6' : 'translate-x-1'}`} />
-                  </button>
-                  <span className="text-[12px] text-text2">#</span>
-                  <span className={`text-[12px] font-mono ${caption.length > 2200 ? 'text-danger' : 'text-text2'}`}>
-                    {caption.length}/2200
-                  </span>
-                </div>
+                <span className={`text-[12px] font-mono ${caption.length > 2200 ? 'text-danger' : 'text-text2'}`}>
+                  {caption.length}/2200
+                </span>
               </div>
               <textarea
                 value={caption}
@@ -911,6 +900,17 @@ export function MassPosting({ user }: MassPostingProps) {
                   className="flex-1 rounded-xl px-4 py-2.5 text-[13px] placeholder:text-text2 focus:outline-none"
                   style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
                 />
+                {/* Hashtag toggle — inline, clearly inside the card */}
+                <button
+                  onClick={() => setWithHashtags(v => !v)}
+                  className="flex items-center gap-2 rounded-xl px-3 py-2.5 transition-all flex-shrink-0"
+                  style={withHashtags
+                    ? { background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.25)', color: '#a78bfa' }
+                    : { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(148,163,184,0.5)' }}
+                  title="Hashtags"
+                >
+                  <span className="text-[12px] font-bold">#</span>
+                </button>
               </div>
             </div>
 
