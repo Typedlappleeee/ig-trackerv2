@@ -921,10 +921,9 @@ ipcMain.handle('run-ffmpeg-remix-ai', async (_event, opts: {
     const borderPx = Math.max(3, Math.round(ov.fontSize * 0.07))
     const parts: string[] = [`text='${escText(ov.text)}'`]
     if (fontFile) parts.push(`fontfile='${fontFile}'`)
-    // Clamp y so text stays fully on-screen regardless of font size or yFrac.
-    // text_h = actual rendered text height (FFmpeg drawtext built-in variable).
-    // Wrap in single quotes so the commas in max/min don't break the option parser.
-    const ySafe = `'max(0,min(h-text_h,${ov.y}))'`
+    // Clamp y so text stays fully on-screen. text_h = rendered height of this line.
+    // Add a small bottom margin (text_h * 0.2) so descenders don't clip.
+    const ySafe = `'max(4,min(h-text_h-8,${ov.y}))'`
     parts.push(
       `x=${ov.x}`, `y=${ySafe}`,
       `fontsize=${ov.fontSize}`,

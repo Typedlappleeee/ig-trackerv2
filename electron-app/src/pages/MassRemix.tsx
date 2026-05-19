@@ -80,9 +80,16 @@ function xAlignToExpr(align: string): string {
 // Split text into lines that fit within frameW at the given fontSize.
 // Returns at least one element.
 function wrapText(text: string, fontSize: number, frameW = 1080): string[] {
-  const charsPerLine = Math.max(1, Math.floor(frameW / (fontSize * 0.58)))
+  // Use 80% of frame width with a conservative char-width multiplier (bold fonts are wide)
+  const charsPerLine = Math.max(1, Math.floor((frameW * 0.80) / (fontSize * 0.62)))
   if (text.length <= charsPerLine) return [text]
   const words = text.split(' ')
+  if (words.length === 1) {
+    // Single long word: force-split at character limit
+    const out: string[] = []
+    for (let i = 0; i < text.length; i += charsPerLine) out.push(text.slice(i, i + charsPerLine))
+    return out
+  }
   const lines: string[] = []
   let cur = ''
   for (const w of words) {
@@ -416,7 +423,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
 
                   // Word-wrap: split into lines, create one overlay per line
                   const lines = wrapText(item.text, fontSize, outW)
-                  const lineStepFrac = (fontSize * 1.3) / outH
+                  const lineStepFrac = (fontSize * 1.45) / outH
 
                   lines.forEach((line, li) => {
                     const lineYFrac = Math.min(0.95, yFrac + li * lineStepFrac)
