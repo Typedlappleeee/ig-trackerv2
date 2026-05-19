@@ -191,107 +191,107 @@ export async function runFfmpegWeb(opts: {
   }
 }
 
+// ── captureFrameAtTime ────────────────────────────────────────────────────────
+// Seeks a <video> element to `t` and draws 64×64 pixels onto a canvas.
+// Returns null if the seek times out (3 s) or fails.
+function captureFrameAtTime(
+  video: HTMLVideoElement,
+  ctx: CanvasRenderingContext2D,
+  t: number,
+): Promise<Uint8ClampedArray | null> {
+  return new Promise(res => {
+    const tid = setTimeout(() => { video.onseeked = null; res(null) }, 3000)
+    video.onseeked = () => {
+      clearTimeout(tid)
+      video.onseeked = null
+      ctx.drawImage(video, 0, 0, 64, 64)
+      res(ctx.getImageData(0, 0, 64, 64).data)
+    }
+    video.currentTime = t
+  })
+}
+
 // ── detectSceneChange ─────────────────────────────────────────────────────────
-// Uses FFmpeg's native scene-change metric (select=gt(scene,...)) for frame-accurate
-// detection of real transitions, instead of manual frame-diff at 2fps.
+// Uses the browser's native video decoder + Canvas API to compare frames.
+// No WASM copy needed — avoids loading the whole file into WASM memory.
+// Returns {ok:false} when no meaningful scene change is found (no fallback cut).
 export async function detectSceneChangeWeb(opts: {
   filePath: string; threshold?: number
 }): Promise<{ ok: boolean; splitTime?: number; duration?: number; error?: string }> {
-  const ff = await getFFmpeg()
-  await ff.deleteFile('detect.mp4').catch(() => {})
+  return new Promise(resolve => {
+    const video = document.createElement('video')
+    video.muted = true
+    video.preload = 'metadata'
+    video.src = opts.filePath
 
-  const logs: string[] = []
-  const logHandler = ({ message }: { message: string }) => logs.push(message)
+    const globalTimeout = setTimeout(() => {
+      video.src = ''
+      resolve({ ok: false, error: 'Timeout chargement vidéo' })
+    }, 25_000)
 
-  try {
-    await writeInput(ff, 'detect.mp4', opts.filePath)
+    video.onloadedmetadata = async () => {
+      const duration = video.duration
+      if (!isFinite(duration) || duration < 1) {
+        clearTimeout(globalTimeout)
+        video.src = ''
+        resolve({ ok: false, error: 'Durée invalide', duration: 0 })
+        return
+      }
 
-    // Step 1: get duration
-    ff.on('log', logHandler)
-    await ff.exec(['-hide_banner', '-i', 'detect.mp4', '-f', 'null', '-']).catch(() => {})
-    ff.off('log', logHandler)
-    const combined = logs.join('\n')
-    const durM = combined.match(/Duration:\s*(\d+):(\d+):(\d+\.?\d*)/)
-    const duration = durM ? parseInt(durM[1]) * 3600 + parseInt(durM[2]) * 60 + parseFloat(durM[3]) : 0
+      const W = 64, H = 64
+      const canvas = document.createElement('canvas')
+      canvas.width = W; canvas.height = H
+      const ctx = canvas.getContext('2d')!
 
-    // Step 2: FFmpeg native scene detection via select + showinfo
-    // scene value ranges 0–1; values ≥ 0.25 reliably indicate a hard cut
-    const sceneLogs: string[] = []
-    const sceneHandler = ({ message }: { message: string }) => sceneLogs.push(message)
-    ff.on('log', sceneHandler)
-    const threshold = opts.threshold ?? 0.25
-    await ff.exec([
-      '-hide_banner', '-i', 'detect.mp4',
-      '-vf', `select=gt(scene\\,${threshold}),showinfo`,
-      '-vsync', 'vfr', '-an', '-f', 'null', '-',
-    ]).catch(() => {})
-    ff.off('log', sceneHandler)
+      // Sample up to 30 timestamps spread across the video
+      const maxSamples = 30
+      const step = duration / maxSamples
+      const times = Array.from({ length: maxSamples }, (_, i) => (i + 0.5) * step)
 
-    // Parse showinfo output: "pts_time:8.541" lines → collect all timestamps
-    const timestamps: number[] = []
-    for (const line of sceneLogs) {
-      const m = line.match(/pts_time:([\d.]+)/)
-      if (m) timestamps.push(parseFloat(m[1]))
+      const frames: Array<{ t: number; data: Uint8ClampedArray }> = []
+      for (const t of times) {
+        const data = await captureFrameAtTime(video, ctx, t)
+        if (data) frames.push({ t, data })
+      }
+
+      clearTimeout(globalTimeout)
+      video.src = ''
+
+      if (frames.length < 4) {
+        resolve({ ok: false, error: 'Pas assez de frames capturées', duration })
+        return
+      }
+
+      // Compute normalised RGB diff between consecutive frames
+      const pixelCount = W * H
+      const threshold = opts.threshold ?? 0.12
+      let maxDiff = 0
+      let bestT = frames[1].t
+
+      for (let i = 1; i < frames.length; i++) {
+        const a = frames[i - 1].data, b = frames[i].data
+        let diff = 0
+        for (let j = 0; j < a.length; j += 4) {
+          diff += Math.abs(b[j] - a[j]) + Math.abs(b[j + 1] - a[j + 1]) + Math.abs(b[j + 2] - a[j + 2])
+        }
+        diff /= pixelCount * 3 * 255
+        if (diff > maxDiff) { maxDiff = diff; bestT = frames[i].t }
+      }
+
+      if (maxDiff < threshold) {
+        resolve({ ok: false, error: 'Aucun changement de scène détecté', duration })
+        return
+      }
+
+      const splitTime = Math.round(Math.min(bestT, duration - 0.033) * 1000) / 1000
+      resolve({ ok: true, splitTime, duration })
     }
 
-    if (timestamps.length === 0) {
-      // No FFmpeg scene change found — try manual frame-diff as last resort
-      const fb = await detectSceneChangeFallback(ff, duration)
-      // If fallback also finds nothing meaningful, propagate the failure
-      return fb
+    video.onerror = () => {
+      clearTimeout(globalTimeout)
+      resolve({ ok: false, error: 'Impossible de charger la vidéo' })
     }
-
-    // Pick the scene change closest to the middle of the video (most likely the intended split)
-    const mid = duration / 2
-    const best = timestamps.reduce((a, b) => Math.abs(a - mid) < Math.abs(b - mid) ? a : b)
-    const splitTime = Math.round(Math.min(best + 0.5, duration - 0.033) * 1000) / 1000
-    return { ok: true, splitTime, duration }
-
-  } catch (err) {
-    if (isWasmCrash(err)) resetFFmpeg()
-    return { ok: false, error: String(err) }
-  } finally {
-    ff.off('log', logHandler)
-    await ff.deleteFile('detect.mp4').catch(() => {})
-  }
-}
-
-// Fallback: manual frame-diff at 10fps with 64×64 frames (more accurate than 2fps/32px)
-async function detectSceneChangeFallback(
-  ff: FFmpeg,
-  duration: number,
-): Promise<{ ok: boolean; splitTime?: number; duration?: number; error?: string }> {
-  await ff.deleteFile('frames.rgb').catch(() => {})
-  try {
-    const FPS = 10, W = 64, H = 64
-    const frameSize = W * H * 3
-    await ff.exec([
-      '-hide_banner', '-i', 'detect.mp4',
-      '-vf', `fps=${FPS},scale=${W}:${H}`,
-      '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-y', 'frames.rgb',
-    ])
-    const raw = await ff.readFile('frames.rgb') as Uint8Array
-    const nFrames = Math.floor(raw.length / frameSize)
-    if (nFrames < 2) return { ok: true, splitTime: duration / 2, duration }
-
-    let maxDiff = 0, maxIdx = 0
-    for (let i = 1; i < nFrames; i++) {
-      const a = raw.subarray((i - 1) * frameSize, i * frameSize)
-      const b = raw.subarray(i * frameSize, (i + 1) * frameSize)
-      let diff = 0
-      for (let j = 0; j < frameSize; j++) diff += Math.abs(a[j] - b[j])
-      diff /= frameSize * 255
-      if (diff > maxDiff) { maxDiff = diff; maxIdx = i }
-    }
-    // Require a meaningful visual change — below this it's just camera movement/grain, not a scene cut
-    if (maxDiff < 0.10) return { ok: false, error: 'No scene change detected', duration }
-    const splitTime = Math.round((maxIdx / FPS) * 1000) / 1000
-    return { ok: true, splitTime, duration }
-  } catch (err) {
-    return { ok: false, splitTime: duration / 2, duration, error: String(err) }
-  } finally {
-    await ff.deleteFile('frames.rgb').catch(() => {})
-  }
+  })
 }
 
 // ── detectBeatDrop ────────────────────────────────────────────────────────────
@@ -716,7 +716,19 @@ export async function runFfmpegMetadataWeb(opts: {
   }
 }
 
+// ── seekVideo ─────────────────────────────────────────────────────────────────
+// Seeks a video element to `t` and resolves when the seek completes (or times out).
+function seekVideo(video: HTMLVideoElement, t: number): Promise<boolean> {
+  return new Promise(res => {
+    const tid = setTimeout(() => { video.onseeked = null; res(false) }, 3000)
+    video.onseeked = () => { clearTimeout(tid); video.onseeked = null; res(true) }
+    video.currentTime = t
+  })
+}
+
 // ── extractFrames (for AI vision analysis) ───────────────────────────────────
+// Uses Canvas+Video instead of WASM — avoids loading the full video into WASM memory.
+// Produces JPEG base64 frames identical to the Electron IPC version.
 export async function extractFramesWeb(opts: {
   filePath: string; endTime: number; startTime?: number; fps?: number
 }): Promise<{
@@ -725,45 +737,49 @@ export async function extractFramesWeb(opts: {
   count?: number
   error?: string
 }> {
-  const start      = opts.startTime ?? 0
-  const duration   = opts.endTime - start
+  const start = opts.startTime ?? 0
+  const duration = Math.max(0.1, opts.endTime - start)
   const targetCount = Math.min(8, Math.max(1, Math.ceil(duration)))
-  const frameFiles  = Array.from({ length: targetCount }, (_, i) => `frame_${String(i + 1).padStart(4, '0')}.jpg`)
-  const ff = await getFFmpeg()
-  await ff.deleteFile('frames_in.mp4').catch(() => {})
-  for (const f of frameFiles) await ff.deleteFile(f).catch(() => {})
-  try {
-    await writeInput(ff, 'frames_in.mp4', opts.filePath)
-    const fps = targetCount / duration
-    const seekArgs = start > 0 ? ['-ss', String(start)] : []
-    await ff.exec([
-      ...seekArgs, '-i', 'frames_in.mp4',
-      '-t', String(duration),
-      '-vf', `fps=${fps.toFixed(4)},scale=640:-2`,
-      '-q:v', '5',
-      '-y', 'frame_%04d.jpg',
-    ])
-    const frames: Array<{ index: number; timestamp: number; data: string }> = []
-    const interval = duration / targetCount
-    for (let i = 1; i <= targetCount; i++) {
-      const name = `frame_${String(i).padStart(4, '0')}.jpg`
-      try {
-        const data = await ff.readFile(name) as Uint8Array
-        let binary = ''
-        data.forEach(b => { binary += String.fromCharCode(b) })
-        frames.push({
-          index:     i - 1,
-          timestamp: Math.round((i - 1) * interval * 10) / 10,
-          data:      btoa(binary),
-        })
-      } catch { break }
+
+  return new Promise(resolve => {
+    const video = document.createElement('video')
+    video.muted = true
+    video.preload = 'metadata'
+    video.src = opts.filePath
+
+    const globalTimeout = setTimeout(() => {
+      video.src = ''
+      resolve({ ok: false, error: 'Timeout chargement vidéo pour extraction frames' })
+    }, 30_000)
+
+    video.onloadedmetadata = async () => {
+      const W = 640
+      const H = Math.round(W * (video.videoHeight / (video.videoWidth || 1))) || 360
+      const canvas = document.createElement('canvas')
+      canvas.width = W; canvas.height = H
+      const ctx = canvas.getContext('2d')!
+
+      const interval = duration / targetCount
+      const times = Array.from({ length: targetCount }, (_, i) => start + (i + 0.5) * interval)
+
+      const frames: Array<{ index: number; timestamp: number; data: string }> = []
+      for (let i = 0; i < times.length; i++) {
+        const ok = await seekVideo(video, times[i])
+        if (!ok) continue
+        ctx.drawImage(video, 0, 0, W, H)
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.8)
+        const b64 = dataUrl.split(',')[1] ?? ''
+        if (b64) frames.push({ index: i, timestamp: Math.round(times[i] * 10) / 10, data: b64 })
+      }
+
+      clearTimeout(globalTimeout)
+      video.src = ''
+      resolve({ ok: true, frames, count: frames.length })
     }
-    return { ok: true, frames, count: frames.length }
-  } catch (err) {
-    if (isWasmCrash(err)) resetFFmpeg()
-    return { ok: false, error: String(err) }
-  } finally {
-    await ff.deleteFile('frames_in.mp4').catch(() => {})
-    for (const f of frameFiles) await ff.deleteFile(f).catch(() => {})
-  }
+
+    video.onerror = () => {
+      clearTimeout(globalTimeout)
+      resolve({ ok: false, error: 'Impossible de charger la vidéo pour extraction frames' })
+    }
+  })
 }

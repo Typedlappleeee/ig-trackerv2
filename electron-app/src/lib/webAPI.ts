@@ -305,13 +305,9 @@ export function buildWebAPI() {
     },
 
     async detectSceneChange(opts: unknown) {
-      return wasmQueue(async () => {
-        const { detectSceneChangeWeb, detectBeatDropWeb } = await import('./ffmpeg-web')
-        const o = opts as Parameters<typeof detectSceneChangeWeb>[0]
-        const beat = await detectBeatDropWeb(o.filePath)
-        if (beat.ok && beat.splitTime != null && beat.splitTime > 0) return beat
-        return detectSceneChangeWeb(o)
-      })
+      // Canvas-based — no WASM, no wasmQueue needed
+      const { detectSceneChangeWeb } = await import('./ffmpeg-web')
+      return detectSceneChangeWeb(opts as Parameters<typeof detectSceneChangeWeb>[0])
     },
 
     async runFfmpegRemix(opts: unknown) {
@@ -336,10 +332,9 @@ export function buildWebAPI() {
     },
 
     async extractFrames(opts: unknown) {
-      return wasmQueue(async () => {
-        const { extractFramesWeb } = await import('./ffmpeg-web')
-        return extractFramesWeb(opts as Parameters<typeof extractFramesWeb>[0])
-      })
+      // Canvas-based — no WASM, no wasmQueue needed
+      const { extractFramesWeb } = await import('./ffmpeg-web')
+      return extractFramesWeb(opts as Parameters<typeof extractFramesWeb>[0])
     },
 
     async runFfmpegTextOverlay(opts: unknown) {

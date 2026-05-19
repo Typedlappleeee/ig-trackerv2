@@ -418,7 +418,7 @@ export function MassRemix({ user }: MassRemixProps) {
           const analyzeEnd = splitTime ?? detDuration ?? 30
           const fr = await withTimeout(
             window.electronAPI!.extractFrames!({ filePath: job.originalPath, endTime: analyzeEnd }),
-            45_000, 'extraction frames'
+            180_000, 'extraction frames'
           )
           if (fr.ok && fr.frames?.length) {
             addLog(job.id, `   ${fr.frames.length} frames extraites (jusqu'à ${analyzeEnd.toFixed(1)}s)`)
@@ -453,7 +453,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                 messages: [{ role: 'user', content: [...imageBlocks, { type: 'text', text: prompt }] }],
                 maxTokens: 2000,
               }),
-              45_000, 'AI analyse texte'
+              90_000, 'AI analyse texte'
             )
             if (res.ok) {
               const txt = (res.data as { content: Array<{ type: string; text: string }> })?.content?.[0]?.text ?? '[]'
@@ -542,7 +542,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
             textOverlays,
             targetDuration,
           }),
-          120_000, 'FFmpeg'
+          360_000, 'FFmpeg'
         )
 
         if (gen.command) addLog(job.id, `   cmd: ${gen.command}`)
