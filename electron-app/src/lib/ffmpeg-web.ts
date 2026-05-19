@@ -641,8 +641,8 @@ async function remixViaMediaRecorder(opts: {
   const drawFrame = () => {
     const t = origVid.currentTime
 
-    // Switch from secondary to original once splitTime is reached
-    if (!switched && t >= opts.splitTime) {
+    // Switch from secondary to original 0.2s after splitTime to avoid stray frames
+    if (!switched && t >= opts.splitTime + 0.2) {
       switched = true
       secVid?.pause()
     }
