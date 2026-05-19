@@ -437,17 +437,31 @@ export async function runFfmpegRemixWeb(opts: {
 // ── Canvas text renderer (replaces drawtext — not available in this WASM build) ──
 // Extracts the center fraction from FFmpeg position expressions.
 // Expressions always follow the pattern: w*FRAC-text_w/2 or h*FRAC-text_h/2
-// or (w-text_w)/2. We use textAlign='center'/textBaseline='middle' so we
-// only need the center coords — no eval() needed (avoids CSP unsafe-eval blocks).
-function extractCenterFrac(expr: string, dim: 'w' | 'h'): number {
+// Parses FFmpeg drawtext x/y expressions → Canvas draw params.
+// FFmpeg x = LEFT edge of text; y = TOP edge of text.
+// We convert to the Canvas textAlign/textBaseline='middle' equivalents.
+
+// For x: returns { align, x } where x is the Canvas anchor coordinate.
+function getXDrawParams(expr: string, W: number): { align: CanvasTextAlign; x: number } {
   const e = expr.trim()
-  // (w-text_w)/2  or  (h-text_h)/2  → center = 0.5
-  if (/^\(w-text_w\)\/2$/.test(e) || /^\(w\s*\/\s*2\)$/.test(e)) return 0.5
-  if (/^\(h-text_h\)\/2$/.test(e) || /^\(h\s*\/\s*2\)$/.test(e)) return 0.5
-  // w*FRAC… or h*FRAC…
-  if (dim === 'w') { const m = e.match(/^w\s*\*\s*([0-9.]+)/); if (m) return parseFloat(m[1]) }
-  if (dim === 'h') { const m = e.match(/^h\s*\*\s*([0-9.]+)/); if (m) return parseFloat(m[1]) }
-  return 0.5
+  // center: (w-text_w)/2 or (w/2)
+  if (/^\(w-text_w\)\/2$/.test(e) || /^\(w\s*\/\s*2\)$/.test(e)) return { align: 'center', x: W * 0.5 }
+  // right-aligned: w*FRAC-text_w  → Canvas right anchor at W*FRAC
+  const rm = e.match(/^w\s*\*\s*([0-9.]+)\s*-\s*text_w$/)
+  if (rm) return { align: 'right', x: W * parseFloat(rm[1]) }
+  // left-aligned: w*FRAC  → Canvas left anchor at W*FRAC
+  const lm = e.match(/^w\s*\*\s*([0-9.]+)/)
+  if (lm) return { align: 'left', x: W * parseFloat(lm[1]) }
+  return { align: 'center', x: W * 0.5 }
+}
+
+// For y: FFmpeg y = h*FRAC - fontSize/2 → center = H*FRAC (middle baseline).
+function getYCenter(expr: string, H: number): number {
+  const e = expr.trim()
+  if (/^\(h-text_h\)\/2$/.test(e) || /^\(h\s*\/\s*2\)$/.test(e)) return H * 0.5
+  const m = e.match(/^h\s*\*\s*([0-9.]+)/)
+  if (m) return H * parseFloat(m[1])
+  return H * 0.5
 }
 
 // Word-wrap text to fit within maxWidth pixels, returns array of lines
@@ -482,41 +496,33 @@ async function renderTextPNG(
 
   const weight = ov.bold ? 'bold' : 'normal'
   ctx.font = `${weight} ${ov.fontSize}px Arial, sans-serif`
-  ctx.textAlign    = 'center'
   ctx.textBaseline = 'middle'
 
-  const maxWidth  = W * 0.88          // 88% of frame width, 6% padding each side
+  const { align, x: cx } = getXDrawParams(ov.x, W)
+  const cy       = getYCenter(ov.y, H)
+  ctx.textAlign  = align
+
+  const maxWidth  = W * 0.88
   const lineH     = ov.fontSize * 1.25
   const borderPx  = Math.max(3, Math.round(ov.fontSize * 0.09))
   const lines     = wrapText(ctx, ov.text, maxWidth)
-
-  // Center block vertically around cy; shift up so the block is centered
-  const cx       = W * extractCenterFrac(ov.x, 'w')
-  const cy       = H * extractCenterFrac(ov.y, 'h')
-  const blockH   = lines.length * lineH
-  const startY   = cy - blockH / 2 + lineH / 2
+  const blockH    = lines.length * lineH
+  const startY    = cy - blockH / 2 + lineH / 2
 
   const drawLine = (line: string, ly: number, stroke: boolean) => {
-    if (stroke) {
-      ctx.strokeText(line, cx, ly)
-    } else {
-      ctx.fillText(line, cx, ly)
-    }
+    if (stroke) ctx.strokeText(line, cx, ly)
+    else        ctx.fillText(line, cx, ly)
   }
 
-  // Draw stroke pass (border + shadow)
   ctx.strokeStyle = 'rgba(0,0,0,1)'
   ctx.lineWidth   = borderPx * 2
   ctx.lineJoin    = 'round'
   if (ov.shadow !== false) {
     ctx.shadowColor   = 'rgba(0,0,0,0.8)'
-    ctx.shadowOffsetX = 3
-    ctx.shadowOffsetY = 3
-    ctx.shadowBlur    = 6
+    ctx.shadowOffsetX = 3; ctx.shadowOffsetY = 3; ctx.shadowBlur = 6
   }
   lines.forEach((line, i) => drawLine(line, startY + i * lineH, true))
 
-  // Draw fill pass (no shadow — prevent double shadow)
   ctx.shadowColor = 'transparent'
   ctx.fillStyle   = ov.fontColor || 'white'
   lines.forEach((line, i) => drawLine(line, startY + i * lineH, false))
@@ -536,15 +542,16 @@ function drawOverlayText(
 ): void {
   const weight   = ov.bold ? 'bold' : 'normal'
   ctx.font       = `${weight} ${ov.fontSize}px Arial, sans-serif`
-  ctx.textAlign    = 'center'
   ctx.textBaseline = 'middle'
+
+  const { align, x: cx } = getXDrawParams(ov.x, W)
+  const cy       = getYCenter(ov.y, H)
+  ctx.textAlign  = align
 
   const maxWidth = W * 0.88
   const lineH    = ov.fontSize * 1.25
   const borderPx = Math.max(3, Math.round(ov.fontSize * 0.09))
   const lines    = wrapText(ctx, ov.text, maxWidth)
-  const cx       = W * extractCenterFrac(ov.x, 'w')
-  const cy       = H * extractCenterFrac(ov.y, 'h')
   const blockH   = lines.length * lineH
   const startY   = cy - blockH / 2 + lineH / 2
 
