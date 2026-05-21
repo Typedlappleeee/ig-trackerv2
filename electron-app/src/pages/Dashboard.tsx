@@ -11,7 +11,6 @@ interface DashboardProps { user: User }
 type Range = '24h' | '7d' | '30d' | 'all'
 interface ViewPoint { label: string; value: number; date: Date }
 
-// Deterministic avatar color from string (matches Python _stats_avatar_color)
 function avatarColor(s: string): string {
   const palette = ['#3b5bdb', '#2f9e44', '#c2255c', '#e8590c', '#5c7cfa', '#0ca678', '#f76707', '#9c36b5']
   let hash = 0
@@ -25,10 +24,7 @@ function fmt(n: number): string {
   return n.toLocaleString('fr-FR')
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Bar chart with hover tooltip — mirrors _dash_redraw_chart in Python
-// ─────────────────────────────────────────────────────────────────────────────
-function LineChart({ data, height = 280 }: { data: ViewPoint[]; height?: number }) {
+function LineChart({ data, height = 260 }: { data: ViewPoint[]; height?: number }) {
   const [hover, setHover] = useState<{ idx: number } | null>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
   const [w, setW] = useState(900)
@@ -42,13 +38,14 @@ function LineChart({ data, height = 280 }: { data: ViewPoint[]; height?: number 
 
   if (data.length === 0) {
     return (
-      <div className="flex items-center justify-center text-text2 text-sm" style={{ height }}>
-        Aucune donnée — actualisez l'onglet Téléphones d'abord
+      <div className="flex flex-col items-center justify-center gap-3 text-text2 text-sm" style={{ height }}>
+        <span className="text-3xl opacity-30">📈</span>
+        <span>Aucune donnée — actualisez l'onglet Téléphones d'abord</span>
       </div>
     )
   }
 
-  const ml = 56, mr = 20, mt = 24, mb = 44
+  const ml = 52, mr = 16, mt = 20, mb = 40
   const plotW = Math.max(w - ml - mr, 100)
   const plotH = height - mt - mb
   const max = Math.max(...data.map(d => d.value), 1)
@@ -59,7 +56,6 @@ function LineChart({ data, height = 280 }: { data: ViewPoint[]; height?: number 
     y: mt + plotH - (d.value / max) * plotH,
   }))
 
-  // Catmull-Rom → cubic bezier smooth path
   function smoothPath(points: { x: number; y: number }[]): string {
     if (points.length === 1) return `M${points[0].x},${points[0].y}`
     let d = `M${points[0].x},${points[0].y}`
@@ -87,57 +83,58 @@ function LineChart({ data, height = 280 }: { data: ViewPoint[]; height?: number 
     <div ref={wrapRef} className="relative select-none" style={{ height }}>
       <svg width={w} height={height} className="block">
         <defs>
-          <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#8b5cf6" stopOpacity="0.3" />
-            <stop offset="100%" stopColor="#ec4899" stopOpacity="0.02" />
+          <linearGradient id="dash-area-grad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#8B5CF6" stopOpacity="0.28" />
+            <stop offset="75%" stopColor="#8B5CF6" stopOpacity="0.04" />
+            <stop offset="100%" stopColor="#8B5CF6" stopOpacity="0" />
           </linearGradient>
-          <linearGradient id="lineGrad" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stopColor="#8b5cf6" />
-            <stop offset="100%" stopColor="#ec4899" />
+          <linearGradient id="dash-line-grad" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor="#8B5CF6" />
+            <stop offset="100%" stopColor="#A855F7" />
           </linearGradient>
-          <filter id="glowLine">
-            <feGaussianBlur stdDeviation="2" result="blur" />
-            <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
-          </filter>
         </defs>
 
-        {/* Grid */}
+        {/* Grid lines */}
         {[0, 1, 2, 3, 4].map(i => {
           const y = mt + (plotH * i) / 4
           return (
             <g key={i}>
-              <line x1={ml} y1={y} x2={ml + plotW} y2={y} stroke="#1e2438" strokeDasharray="4 5" />
-              <text x={ml - 8} y={y + 4} textAnchor="end" fill="#5a6882" fontSize="10" fontFamily="Segoe UI,system-ui,sans-serif">
+              <line x1={ml} y1={y} x2={ml + plotW} y2={y}
+                stroke="rgba(139,92,246,0.07)" strokeDasharray="4 6" />
+              <text x={ml - 8} y={y + 4} textAnchor="end"
+                fill="#4B4B5E" fontSize="10" fontFamily="Inter,system-ui,sans-serif">
                 {fmt(Math.round(max * (1 - i / 4)))}
               </text>
             </g>
           )
         })}
 
-        {/* Area */}
-        <path d={areaPath} fill="url(#areaGrad)" />
+        {/* Area fill */}
+        <path d={areaPath} fill="url(#dash-area-grad)" />
 
-        {/* Glow copy of line */}
-        <path d={linePath} fill="none" stroke="#8b5cf6" strokeWidth="5" strokeOpacity="0.18" strokeLinecap="round" />
+        {/* Glow copy */}
+        <path d={linePath} fill="none" stroke="#8B5CF6" strokeWidth="6"
+          strokeOpacity="0.12" strokeLinecap="round" />
 
         {/* Main line */}
-        <path d={linePath} fill="none" stroke="url(#lineGrad)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+        <path d={linePath} fill="none" stroke="url(#dash-line-grad)"
+          strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
 
-        {/* Dots — always for ≤14 pts, only hovered otherwise */}
+        {/* Dots */}
         {pts.map((p, i) => {
           const isLast = i === pts.length - 1
           const isHov  = hover?.idx === i
           const show   = data.length <= 14 || isHov || isLast
           return show ? (
             <circle key={i} cx={p.x} cy={p.y}
-              r={isHov ? 6 : isLast ? 4 : 3}
-              fill={isLast ? '#f472b6' : '#8b5cf6'}
-              stroke="#0d1120" strokeWidth="2"
+              r={isHov ? 5 : isLast ? 4 : 3}
+              fill={isLast ? '#A855F7' : '#8B5CF6'}
+              stroke="#07070B" strokeWidth="2"
             />
           ) : null
         })}
 
-        {/* Invisible hover strips */}
+        {/* Hover strips */}
         {pts.map((p, i) => (
           <rect key={i}
             x={i === 0 ? ml : (p.x + pts[i - 1].x) / 2}
@@ -158,7 +155,7 @@ function LineChart({ data, height = 280 }: { data: ViewPoint[]; height?: number 
         {/* Vertical cursor */}
         {hoverPt && (
           <line x1={hoverPt.x} y1={mt} x2={hoverPt.x} y2={mt + plotH}
-            stroke="#8b5cf6" strokeWidth="1" strokeDasharray="4 3" opacity="0.5"
+            stroke="#8B5CF6" strokeWidth="1" strokeDasharray="3 4" opacity="0.4"
           />
         )}
 
@@ -166,8 +163,9 @@ function LineChart({ data, height = 280 }: { data: ViewPoint[]; height?: number 
         {data.map((d, i) => {
           if (i % labelStep !== 0 && i !== data.length - 1) return null
           return (
-            <text key={i} x={pts[i].x} y={mt + plotH + 18}
-              textAnchor="middle" fill="#5a6882" fontSize="10" fontFamily="Segoe UI,system-ui,sans-serif">
+            <text key={i} x={pts[i].x} y={mt + plotH + 16}
+              textAnchor="middle" fill="#4B4B5E" fontSize="10"
+              fontFamily="Inter,system-ui,sans-serif">
               {d.date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
             </text>
           )
@@ -184,16 +182,20 @@ function LineChart({ data, height = 280 }: { data: ViewPoint[]; height?: number 
           <div
             className="absolute pointer-events-none rounded-xl px-3 py-2.5 shadow-2xl"
             style={{
-              background: 'rgba(8,5,20,0.92)', border: '1px solid rgba(139,92,246,0.4)', backdropFilter: 'blur(16px)',
+              background: '#0E0E16',
+              border: '1px solid rgba(139,92,246,0.35)',
+              backdropFilter: 'blur(20px)',
               left: Math.min(Math.max(hoverPt.x - 80, ml), w - 172),
-              top: Math.max(hoverPt.y - 80, 4),
+              top: Math.max(hoverPt.y - 76, 4),
               width: 164,
             }}
           >
-            <p className="text-[11px] font-bold text-text mb-1">
+            <p className="text-[11px] font-bold text-white mb-1.5">
               {d.date.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })}
             </p>
-            <p className="text-text2 text-[11px]">Vues : <span className="font-semibold" style={{ color: '#a78bfa' }}>{fmt(d.value)}</span></p>
+            <p className="text-text2 text-[11px]">
+              Vues : <span className="font-semibold text-[#c4b5fd]">{fmt(d.value)}</span>
+            </p>
             {delta !== null && (
               <p className={`text-[11px] font-semibold mt-0.5 ${delta >= 0 ? 'text-ok' : 'text-danger'}`}>
                 {delta >= 0 ? '▲' : '▼'} {fmt(Math.abs(delta))}
@@ -241,7 +243,6 @@ export function Dashboard({ user }: DashboardProps) {
       setPhones(loaded)
       setLoading(false)
 
-      // Fetch fresh Instagram stats for each phone with a username, then snapshot
       const withUsername = loaded.filter(p => p.ig_username)
       if (withUsername.length === 0) return
       setFetchingStats(true)
@@ -252,8 +253,8 @@ export function Dashboard({ user }: DashboardProps) {
           const stats = await fetchIgStats(p.ig_username!)
           if (stats && stats.total_views > 0)
             rows.push({ user_id: user.id, phone_id: p.id, views: stats.total_views, recorded_at: now })
-        } catch { /* ignore individual failures */ }
-        await new Promise(r => setTimeout(r, 800)) // small delay to avoid rate-limiting
+        } catch { /* ignore */ }
+        await new Promise(r => setTimeout(r, 800))
       }
       if (rows.length > 0)
         supabase.from('views_history').insert(rows).then(() => {})
@@ -292,8 +293,7 @@ export function Dashboard({ user }: DashboardProps) {
     const fmtDay = (d: Date) =>
       `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 
-    // Last (highest) snapshot per day per phone → sum across phones per day
-    const maxByDayPhone = new Map<string, Map<string, number>>() // day → phoneId → maxViews
+    const maxByDayPhone = new Map<string, Map<string, number>>()
     for (const row of rows) {
       const day = dayKey(row.recorded_at)
       if (!maxByDayPhone.has(day)) maxByDayPhone.set(day, new Map())
@@ -301,12 +301,10 @@ export function Dashboard({ user }: DashboardProps) {
       const cur = phoneMap.get(row.phone_id) ?? 0
       phoneMap.set(row.phone_id, Math.max(cur, row.views as number))
     }
-    // Total views per day = sum of max per phone
     const totalByDay = new Map<string, number>()
     for (const [day, phoneMap] of maxByDayPhone)
       totalByDay.set(day, [...phoneMap.values()].reduce((a, b) => a + b, 0))
 
-    // Sort days and compute DAILY DELTA (views gained = today_total - yesterday_total)
     const sortedDays = [...totalByDay.entries()].sort(([a], [b]) => a.localeCompare(b))
     const deltaByDay = new Map<string, number>()
     for (let i = 0; i < sortedDays.length; i++) {
@@ -314,7 +312,6 @@ export function Dashboard({ user }: DashboardProps) {
       deltaByDay.set(day, i === 0 ? 0 : Math.max(0, views - sortedDays[i - 1][1]))
     }
 
-    // Build chart series
     let pts: ViewPoint[]
     if (range === 'all') {
       pts = sortedDays.map(([label]) => ({ label, value: deltaByDay.get(label) ?? 0, date: new Date(label) }))
@@ -332,21 +329,19 @@ export function Dashboard({ user }: DashboardProps) {
     setLC(false)
   }
 
-  // KPI calculations (matches Python 6-cell grid)
   const kpis = useMemo(() => {
-    // today = views gained today (last bar), prev = views gained yesterday
     const today    = chartData.length > 0 ? chartData[chartData.length - 1].value : 0
     const prev     = chartData.length > 1 ? chartData[chartData.length - 2].value : null
-    const delta    = prev !== null ? today - prev : null  // vs yesterday
+    const delta    = prev !== null ? today - prev : null
+    const deltaPct = prev && prev > 0 ? ((today - prev) / prev) * 100 : null
     const peak     = chartData.length > 0 ? Math.max(...chartData.map(p => p.value)) : 0
     const nonZero  = chartData.filter(p => p.value > 0)
     const avg      = nonZero.length > 0 ? Math.round(nonZero.reduce((s, p) => s + p.value, 0) / nonZero.length) : 0
     const linkedPhones = phones.filter(p => p.ig_username)
     const activePhones = linkedPhones.length
     const banned   = phones.filter(p => p.ig_status === 'error').length
-    const videos   = selPhone ? (selPhone.video_count ?? 0) : 0
-    return { today, delta, peak, avg, activePhones, banned, videos }
-  }, [chartData, phones, selPhone])
+    return { today, delta, deltaPct, peak, avg, activePhones, banned }
+  }, [chartData, phones])
 
   const linkedPhones = phones.filter(p => p.ig_username)
 
@@ -357,90 +352,108 @@ export function Dashboard({ user }: DashboardProps) {
     { key: 'all', label: 'Tout' },
   ]
 
+  // Hour greeting
+  const hour = new Date().getHours()
+  const greeting = hour < 12 ? 'Bonjour' : hour < 18 ? 'Bon après-midi' : 'Bonsoir'
+  const firstName = user.email?.split('@')[0] ?? ''
+
   return (
-    <div className="h-full flex flex-col overflow-hidden">
+    <div className="h-full flex flex-col overflow-hidden" style={{ background: '#07070B' }}>
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div
-        className="flex-shrink-0 px-10 pt-9 pb-7 flex items-center justify-between"
-        style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}
+        className="flex-shrink-0 px-8 pt-7 pb-6 flex items-center justify-between"
+        style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}
       >
-        <div className="flex items-center gap-3">
-          <h1 className="text-[28px] font-black text-white leading-none">Dashboard</h1>
-          {fetchingStats && (
-            <div className="flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-medium"
-              style={{ background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.25)', color: 'rgba(167,139,250,0.9)' }}>
-              <span className="inline-block w-2 h-2 rounded-full animate-pulse" style={{ background: '#8b5cf6' }} />
-              Actualisation des stats…
-            </div>
-          )}
+        <div>
+          <div className="flex items-center gap-3">
+            <h1 className="text-[22px] font-black text-white leading-none tracking-tight">
+              {greeting}, <span style={{ color: '#c4b5fd' }}>{firstName}</span> 👋
+            </h1>
+            {fetchingStats && (
+              <div className="flex items-center gap-2 px-2.5 py-1 rounded-full text-[10px] font-semibold"
+                style={{ background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.2)', color: '#c4b5fd' }}>
+                <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse inline-block" />
+                Actualisation…
+              </div>
+            )}
+          </div>
+          <p className="text-[12px] mt-1" style={{ color: '#6B6B7A' }}>
+            Vue d'ensemble de tes performances Instagram
+          </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
           {/* Range pills */}
-          <div className="flex gap-1 p-1 rounded-xl" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+          <div className="flex gap-0.5 p-1 rounded-xl"
+            style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
             {RANGES.map(({ key, label }) => (
               <button
                 key={key}
                 onClick={() => setRange(key)}
-                className={`px-3.5 py-1.5 rounded-lg text-[12px] font-semibold transition-all ${
-                  range === key ? 'text-white' : 'text-text2 hover:text-text hover:bg-white/[0.04]'
+                className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all ${
+                  range === key ? 'text-white' : 'text-text2 hover:text-white hover:bg-white/[0.04]'
                 }`}
-                style={range === key ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', boxShadow: '0 1px 8px -2px rgba(124,58,237,0.5)' } : {}}
+                style={range === key ? {
+                  background: 'linear-gradient(130deg,#7C3AED,#8B5CF6)',
+                  boxShadow: '0 1px 8px -2px rgba(124,58,237,0.55)',
+                } : {}}
               >{label}</button>
             ))}
           </div>
 
-          {/* Account dropdown */}
+          {/* Account selector */}
           {linkedPhones.length > 0 && (
             <div className="relative">
               <select
                 value={selPhone?.id ?? ''}
-                onChange={e => {
-                  const found = linkedPhones.find(p => p.id === e.target.value) ?? null
-                  setSelPhone(found)
-                }}
-                className="appearance-none outline-none px-4 py-2.5 rounded-xl text-[13px] font-semibold cursor-pointer"
+                onChange={e => setSelPhone(linkedPhones.find(p => p.id === e.target.value) ?? null)}
+                className="appearance-none outline-none pl-3 pr-8 py-2 rounded-xl text-[12px] font-semibold cursor-pointer"
                 style={{
-                  background: 'rgba(255,255,255,0.05)',
-                  border: '1px solid rgba(255,255,255,0.09)',
-                  color: 'rgba(196,181,253,0.8)',
-                  paddingRight: '2.5rem',
+                  background: '#0E0E16',
+                  border: '1px solid rgba(139,92,246,0.2)',
+                  color: '#c4b5fd',
                 }}
               >
-                <option value="" style={{ background: '#0d1120', color: '#e2d9f3' }}>Tous les comptes</option>
+                <option value="" style={{ background: '#0E0E16', color: '#e2e2f0' }}>Tous les comptes</option>
                 {linkedPhones.map(p => (
-                  <option key={p.id} value={p.id} style={{ background: '#0d1120', color: '#e2d9f3' }}>
+                  <option key={p.id} value={p.id} style={{ background: '#0E0E16', color: '#e2e2f0' }}>
                     {p.ig_username ? `@${p.ig_username}` : p.phone_name}
                   </option>
                 ))}
               </select>
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] pointer-events-none" style={{ color: 'rgba(196,181,253,0.5)' }}>▾</span>
+              <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[9px] pointer-events-none"
+                style={{ color: 'rgba(196,181,253,0.4)' }}>▾</span>
             </div>
           )}
         </div>
       </div>
 
-      {/* ── Scrollable content ─────────────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto px-10 pb-10">
+      {/* ── Scrollable body ─────────────────────────────────────────────────── */}
+      <div className="flex-1 overflow-y-auto px-8 pb-10">
 
-        {/* Schema migration notice */}
+        {/* Schema warning */}
         {schemaMissing && (
-          <div className="mt-7 bg-warn/10 border border-warn/30 rounded-xl p-5 space-y-3">
+          <div className="mt-6 rounded-xl p-4 space-y-3"
+            style={{ background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.2)' }}>
             <div className="flex items-start gap-3">
-              <span className="text-2xl flex-shrink-0">⚠</span>
+              <span className="text-xl flex-shrink-0">⚠️</span>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-warn">Table <code>views_history</code> introuvable — migration requise</p>
-                <p className="text-xs text-text2 mt-1">Va dans <strong className="text-text">Supabase → SQL Editor</strong>, colle le code ci-dessous et clique <strong className="text-text">Run</strong>.</p>
+                <p className="text-sm font-semibold text-warn">Table <code>views_history</code> introuvable</p>
+                <p className="text-xs text-text2 mt-0.5">
+                  Va dans <strong className="text-text">Supabase → SQL Editor</strong>, colle le code ci-dessous et clique <strong className="text-text">Run</strong>.
+                </p>
               </div>
               <button
                 onClick={() => { navigator.clipboard.writeText(SCHEMA_V3_SQL); setSqlCopied(true); setTimeout(() => setSqlCopied(false), 2000) }}
-                className="px-3 py-1.5 bg-warn text-black text-xs font-semibold rounded-lg hover:bg-warn/80 flex-shrink-0"
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold flex-shrink-0 transition-all"
+                style={{ background: '#F59E0B', color: '#000' }}
               >
                 {sqlCopied ? '✓ Copié' : '📋 Copier'}
               </button>
             </div>
-            <pre className="text-[10px] font-mono text-text2 bg-surface rounded-lg p-3 overflow-x-auto whitespace-pre-wrap">
+            <pre className="text-[10px] font-mono text-text2 rounded-lg p-3 overflow-x-auto whitespace-pre-wrap"
+              style={{ background: '#0E0E16' }}>
               {SCHEMA_V3_SQL}
             </pre>
           </div>
@@ -449,189 +462,168 @@ export function Dashboard({ user }: DashboardProps) {
         {loading ? (
           <div className="flex justify-center py-24"><Spinner /></div>
         ) : phones.length === 0 ? (
-          /* ── Empty state ─────────────────────────────────────────────────── */
-          <div className="mt-10 rounded-2xl p-10 text-center space-y-6" style={{ background: 'rgba(139,92,246,0.04)', border: '1px solid rgba(139,92,246,0.12)' }}>
-            <div className="text-4xl">🚀</div>
+
+          /* ── Empty / onboarding state ─────────────────────────────────── */
+          <div className="mt-10 rounded-2xl p-10 text-center space-y-7"
+            style={{ background: '#0E0E16', border: '1px solid rgba(139,92,246,0.12)' }}>
+            <div className="w-16 h-16 rounded-2xl mx-auto flex items-center justify-center text-3xl"
+              style={{ background: 'linear-gradient(135deg,rgba(139,92,246,0.2),rgba(168,85,247,0.1))' }}>
+              🚀
+            </div>
             <div>
-              <p className="text-base font-bold text-text">Bienvenue sur ScaleFlow</p>
-              <p className="text-sm text-text2 mt-1">Suis ces étapes pour commencer</p>
+              <p className="text-lg font-black text-white">Bienvenue sur ScaleFlow</p>
+              <p className="text-sm text-text2 mt-1">Suis ces étapes pour démarrer</p>
             </div>
             <div className="grid grid-cols-2 gap-3 max-w-md mx-auto text-left">
               {[
-                { n: '1', title: 'Bearer Token', desc: 'Configure ton token GéeLark dans Paramètres → Connexions' },
+                { n: '1', title: 'Bearer Token',    desc: 'Configure ton token GéeLark dans Paramètres → Connexions' },
                 { n: '2', title: 'Sync téléphones', desc: 'Va dans Téléphones et clique "Sync GéeLark"' },
-                { n: '3', title: 'Ajoute Instagram', desc: 'Renseigne le nom d\'utilisateur Instagram sur chaque téléphone' },
+                { n: '3', title: 'Ajoute Instagram', desc: 'Renseigne le nom d\'utilisateur IG sur chaque téléphone' },
                 { n: '4', title: 'Lance le posting', desc: 'Utilise Posting ou Mass Posting pour publier' },
               ].map(step => (
-                <div key={step.n} className="rounded-xl p-3 flex gap-3 items-start" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(139,92,246,0.1)' }}>
-                  <span className="w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-black flex-shrink-0 mt-0.5"
-                    style={{ background: 'linear-gradient(135deg,#7c3aed,#ec4899)', color: '#fff' }}>{step.n}</span>
+                <div key={step.n} className="rounded-xl p-3 flex gap-3 items-start"
+                  style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(139,92,246,0.1)' }}>
+                  <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black flex-shrink-0 mt-0.5"
+                    style={{ background: 'linear-gradient(135deg,#7C3AED,#A855F7)', color: '#fff' }}>{step.n}</span>
                   <div>
-                    <p className="text-xs font-semibold text-text">{step.title}</p>
+                    <p className="text-xs font-semibold text-white">{step.title}</p>
                     <p className="text-[11px] text-text2 mt-0.5 leading-relaxed">{step.desc}</p>
                   </div>
                 </div>
               ))}
             </div>
           </div>
-        ) : (
-          <>
-            {/* ── Hero KPI — Aujourd'hui ───────────────────────────────────────── */}
-            <div className="mt-8 rounded-2xl p-8 relative overflow-hidden"
-              style={{ background: 'linear-gradient(135deg, rgba(124,58,237,0.18) 0%, rgba(236,72,153,0.12) 100%)', border: '1px solid rgba(139,92,246,0.25)' }}
-            >
-              {/* Decorative glow */}
-              <div className="absolute -top-12 -right-12 w-48 h-48 rounded-full pointer-events-none"
-                style={{ background: 'radial-gradient(circle, rgba(139,92,246,0.2) 0%, transparent 70%)' }} />
 
-              <div className="flex items-end justify-between relative z-10">
-                <div>
-                  <p className="text-[12px] font-semibold uppercase tracking-widest mb-3" style={{ color: 'rgba(196,181,253,0.7)' }}>
-                    Vues aujourd'hui {selPhone && selPhone.ig_username ? `· @${selPhone.ig_username}` : ''}
-                  </p>
-                  <p className="text-[64px] font-black text-white leading-none anim-number-pop" key={kpis.today}>
-                    {fmt(kpis.today)}
-                  </p>
+        ) : (
+          <div className="space-y-5 mt-6 anim-stagger">
+
+            {/* ── 4 KPI Cards ──────────────────────────────────────────────── */}
+            <div className="grid grid-cols-4 gap-4">
+
+              {/* Vues aujourd'hui */}
+              <div className="stat-card card-glow rounded-2xl p-5 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-20 h-20 pointer-events-none"
+                  style={{ background: 'radial-gradient(circle at top right, rgba(139,92,246,0.12) 0%, transparent 65%)' }} />
+                <div className="flex items-center justify-between mb-3">
+                  <div className="w-8 h-8 rounded-xl flex items-center justify-center text-base"
+                    style={{ background: 'rgba(139,92,246,0.15)' }}>👁</div>
                   {kpis.delta !== null && (
-                    <p className={`text-[14px] font-semibold mt-3 ${kpis.delta >= 0 ? 'text-ok' : 'text-danger'}`}>
-                      {kpis.delta >= 0 ? '▲' : '▼'} {fmt(Math.abs(kpis.delta))} vs hier
-                    </p>
+                    <span className={`trend-chip ${kpis.delta >= 0 ? 'trend-up' : 'trend-down'}`}>
+                      {kpis.delta >= 0 ? '▲' : '▼'} {kpis.deltaPct !== null ? `${Math.abs(kpis.deltaPct).toFixed(0)}%` : fmt(Math.abs(kpis.delta))}
+                    </span>
                   )}
                 </div>
-                <div className="grid grid-cols-3 gap-4 text-right">
-                  <div className="rounded-xl px-5 py-4" style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                    <p className="text-[10px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'rgba(148,163,184,0.6)' }}>Record</p>
-                    <p className="text-[26px] font-black text-white leading-none">{fmt(kpis.peak)}</p>
-                  </div>
-                  <div className="rounded-xl px-5 py-4" style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                    <p className="text-[10px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'rgba(148,163,184,0.6)' }}>Moyenne</p>
-                    <p className="text-[26px] font-black text-white leading-none">{fmt(kpis.avg)}</p>
-                  </div>
-                  <div className="rounded-xl px-5 py-4" style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                    <p className="text-[10px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'rgba(148,163,184,0.6)' }}>Comptes</p>
-                    <p className="text-[26px] font-black text-white leading-none">{kpis.activePhones}</p>
-                  </div>
+                <p className="text-[11px] font-semibold mb-1.5" style={{ color: '#6B6B7A' }}>
+                  Vues aujourd'hui{selPhone?.ig_username ? ` · @${selPhone.ig_username}` : ''}
+                </p>
+                <p className="text-[34px] font-black text-white leading-none kpi-value anim-number-pop" key={kpis.today}>
+                  {fmt(kpis.today)}
+                </p>
+              </div>
+
+              {/* Record */}
+              <div className="stat-card card-glow rounded-2xl p-5 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-20 h-20 pointer-events-none"
+                  style={{ background: 'radial-gradient(circle at top right, rgba(168,85,247,0.1) 0%, transparent 65%)' }} />
+                <div className="flex items-center justify-between mb-3">
+                  <div className="w-8 h-8 rounded-xl flex items-center justify-center text-base"
+                    style={{ background: 'rgba(168,85,247,0.15)' }}>🏆</div>
                 </div>
+                <p className="text-[11px] font-semibold mb-1.5" style={{ color: '#6B6B7A' }}>Record</p>
+                <p className="text-[34px] font-black text-white leading-none kpi-value">{fmt(kpis.peak)}</p>
+              </div>
+
+              {/* Moyenne */}
+              <div className="stat-card card-glow rounded-2xl p-5 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-20 h-20 pointer-events-none"
+                  style={{ background: 'radial-gradient(circle at top right, rgba(34,197,94,0.08) 0%, transparent 65%)' }} />
+                <div className="flex items-center justify-between mb-3">
+                  <div className="w-8 h-8 rounded-xl flex items-center justify-center text-base"
+                    style={{ background: 'rgba(34,197,94,0.12)' }}>📈</div>
+                </div>
+                <p className="text-[11px] font-semibold mb-1.5" style={{ color: '#6B6B7A' }}>Moyenne / jour</p>
+                <p className="text-[34px] font-black text-white leading-none kpi-value">{fmt(kpis.avg)}</p>
+              </div>
+
+              {/* Comptes actifs / bannés */}
+              <div className="stat-card card-glow rounded-2xl p-5 relative overflow-hidden"
+                style={kpis.banned > 0 ? { borderColor: 'rgba(239,68,68,0.25)' } : {}}>
+                <div className="absolute top-0 right-0 w-20 h-20 pointer-events-none"
+                  style={{ background: kpis.banned > 0
+                    ? 'radial-gradient(circle at top right, rgba(239,68,68,0.1) 0%, transparent 65%)'
+                    : 'radial-gradient(circle at top right, rgba(59,130,246,0.08) 0%, transparent 65%)' }} />
+                <div className="flex items-center justify-between mb-3">
+                  <div className="w-8 h-8 rounded-xl flex items-center justify-center text-base"
+                    style={{ background: kpis.banned > 0 ? 'rgba(239,68,68,0.15)' : 'rgba(59,130,246,0.12)' }}>
+                    📱
+                  </div>
+                  {kpis.banned > 0 && (
+                    <span className="trend-chip trend-down">{kpis.banned} bannis</span>
+                  )}
+                </div>
+                <p className="text-[11px] font-semibold mb-1.5" style={{ color: '#6B6B7A' }}>Comptes actifs</p>
+                <p className="text-[34px] font-black leading-none kpi-value"
+                  style={{ color: kpis.banned > 0 ? '#EF4444' : 'white' }}>
+                  {kpis.activePhones}
+                  <span className="text-[16px] font-semibold ml-1.5" style={{ color: '#4B4B5E' }}>
+                    / {phones.length}
+                  </span>
+                </p>
               </div>
             </div>
 
-            {/* ── 3 secondary stat chips ──────────────────────────────────────── */}
-            <div className="grid grid-cols-3 gap-5 mt-5">
-              {/* Active phones */}
-              <div
-                className="rounded-2xl px-6 py-5 flex items-center gap-4"
-                style={{ background: 'rgba(129,140,248,0.05)', border: '1px solid rgba(129,140,248,0.14)' }}
-              >
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-                  style={{ background: 'rgba(129,140,248,0.15)' }}>
-                  <span className="text-[18px]">📱</span>
+            {/* ── Chart card ───────────────────────────────────────────────── */}
+            <div className="rounded-2xl p-6 card-glow"
+              style={{ background: '#0E0E16', border: '1px solid rgba(139,92,246,0.12)' }}>
+              <div className="flex items-center justify-between mb-5">
+                <div className="flex items-center gap-3">
+                  <p className="text-[14px] font-bold text-white">Tendances des vues</p>
+                  <span className="text-[11px] px-2 py-0.5 rounded-full font-medium"
+                    style={{ background: 'rgba(139,92,246,0.1)', color: 'rgba(196,181,253,0.7)', border: '1px solid rgba(139,92,246,0.15)' }}>
+                    vues gagnées / jour
+                  </span>
                 </div>
-                <div>
-                  <p className="text-[11px] font-semibold mb-1" style={{ color: 'rgba(148,163,184,0.65)' }}>Téléphones actifs</p>
-                  <p className="text-[22px] font-black text-white leading-none">
-                    {kpis.activePhones}<span className="text-[14px] font-semibold ml-1" style={{ color: 'rgba(148,163,184,0.5)' }}>/ {phones.length}</span>
-                  </p>
-                </div>
-              </div>
-
-              {/* Banned */}
-              <div
-                className="rounded-2xl px-6 py-5 flex items-center gap-4"
-                style={{
-                  background: kpis.banned > 0 ? 'rgba(240,61,85,0.07)' : 'rgba(255,255,255,0.03)',
-                  border: `1px solid ${kpis.banned > 0 ? 'rgba(240,61,85,0.22)' : 'rgba(255,255,255,0.07)'}`,
-                }}
-              >
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-                  style={{ background: kpis.banned > 0 ? 'rgba(240,61,85,0.15)' : 'rgba(255,255,255,0.05)' }}>
-                  <span className="text-[18px]">🚫</span>
-                </div>
-                <div>
-                  <p className="text-[11px] font-semibold mb-1" style={{ color: 'rgba(148,163,184,0.65)' }}>Bannis / Erreur</p>
-                  <p className="text-[22px] font-black leading-none"
-                    style={{ color: kpis.banned > 0 ? '#f03d55' : 'white' }}>
-                    {kpis.banned}
-                  </p>
-                </div>
-              </div>
-
-              {/* Videos (if selPhone) or IG accounts */}
-              {selPhone ? (
-                <div
-                  className="rounded-2xl px-6 py-5 flex items-center gap-4"
-                  style={{ background: 'rgba(52,211,153,0.05)', border: '1px solid rgba(52,211,153,0.14)' }}
-                >
-                  <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-                    style={{ background: 'rgba(52,211,153,0.12)' }}>
-                    <span className="text-[18px]">🎥</span>
+                {loadingChart && (
+                  <div className="flex items-center gap-1.5 text-[11px] text-text2">
+                    <span className="w-3 h-3 border-2 border-accent/30 border-t-accent rounded-full animate-spin inline-block" />
+                    Chargement…
                   </div>
-                  <div>
-                    <p className="text-[11px] font-semibold mb-1" style={{ color: 'rgba(148,163,184,0.65)' }}>Vidéos postées</p>
-                    <p className="text-[22px] font-black text-white leading-none">{fmt(kpis.videos)}</p>
-                  </div>
-                </div>
-              ) : (
-                <div
-                  className="rounded-2xl px-6 py-5 flex items-center gap-4"
-                  style={{ background: 'rgba(251,191,36,0.05)', border: '1px solid rgba(251,191,36,0.14)' }}
-                >
-                  <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-                    style={{ background: 'rgba(251,191,36,0.12)' }}>
-                    <span className="text-[18px]">📷</span>
-                  </div>
-                  <div>
-                    <p className="text-[11px] font-semibold mb-1" style={{ color: 'rgba(148,163,184,0.65)' }}>Comptes IG liés</p>
-                    <p className="text-[22px] font-black text-white leading-none">{linkedPhones.length}</p>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* ── Chart card ──────────────────────────────────────────────────── */}
-            <div
-              className="rounded-2xl p-8 mt-5"
-              style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}
-            >
-              <div className="flex items-baseline gap-3 mb-7">
-                <p className="text-[15px] font-bold text-white">Tendances des vues</p>
-                <p className="text-[12px] font-medium" style={{ color: 'rgba(139,92,246,0.7)' }}>Vues gagnées par jour</p>
+                )}
               </div>
               {loadingChart ? (
-                <div className="flex justify-center" style={{ height: 320 }}><Spinner /></div>
+                <div className="flex justify-center" style={{ height: 260 }}><Spinner /></div>
               ) : (
-                <LineChart data={chartData} height={320} />
+                <LineChart data={chartData} height={260} />
               )}
             </div>
 
-            {/* ── Account chips (multi-account overview) ──────────────────────── */}
+            {/* ── Account chips ────────────────────────────────────────────── */}
             {!selPhone && linkedPhones.length > 1 && (
-              <div className="mt-5">
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] mb-3" style={{ color: 'rgba(139,92,246,0.5)' }}>
-                  · Comptes
-                </p>
+              <div className="rounded-2xl p-5 card-glow"
+                style={{ background: '#0E0E16', border: '1px solid rgba(139,92,246,0.1)' }}>
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] mb-3.5"
+                  style={{ color: 'rgba(139,92,246,0.45)' }}>· Comptes</p>
                 <div className="flex flex-wrap gap-2">
                   {linkedPhones.map(phone => {
                     const dotColor =
-                      phone.ig_status === 'active'       ? '#00ccaa' :
-                      phone.ig_status === 'error'        ? '#f03d55' :
-                      phone.ig_status === 'rate_limited' ? '#ffaa2a' :
-                      '#5a6882'
+                      phone.ig_status === 'active'       ? '#22C55E' :
+                      phone.ig_status === 'error'        ? '#EF4444' :
+                      phone.ig_status === 'rate_limited' ? '#F59E0B' :
+                      '#4B4B5E'
                     const handle   = phone.ig_username ?? phone.phone_name
                     const initials = handle.slice(0, 2).toUpperCase()
                     return (
                       <button
                         key={phone.id}
                         onClick={() => setSelPhone(phone)}
-                        className="flex items-center gap-2 px-3.5 py-2 rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98]"
-                        style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
+                        className="flex items-center gap-2 px-3 py-2 rounded-xl transition-all hover:scale-[1.02] active:scale-[0.97]"
+                        style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}
                       >
-                        <div
-                          className="w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold text-white flex-shrink-0"
-                          style={{ background: avatarColor(handle) }}
-                        >
+                        <div className="w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold text-white flex-shrink-0"
+                          style={{ background: avatarColor(handle) }}>
                           {initials}
                         </div>
-                        <span className="text-[12px] font-semibold text-text">
+                        <span className="text-[12px] font-semibold text-white">
                           {phone.ig_username
                             ? `@${phone.ig_username.length > 16 ? phone.ig_username.slice(0, 16) + '…' : phone.ig_username}`
                             : phone.phone_name.length > 18 ? phone.phone_name.slice(0, 18) + '…' : phone.phone_name}
@@ -647,7 +639,8 @@ export function Dashboard({ user }: DashboardProps) {
                 </div>
               </div>
             )}
-          </>
+
+          </div>
         )}
       </div>
     </div>

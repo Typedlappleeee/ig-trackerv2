@@ -43,6 +43,7 @@ function SFLogo({ size = 28 }: { size?: number }) {
 }
 
 export type Page =
+  | 'dashboard'
   | 'phones'
   | 'posting' | 'massposting' | 'scheduler' | 'bank' | 'aitools' | 'warmup'
   | 'montage' | 'remix' | 'textcopy'
@@ -67,6 +68,7 @@ const NAV_SECTIONS: NavSection[] = [
     title: 'Principal',
     defaultOpen: true,
     items: [
+      { id: 'dashboard',   label: 'Dashboard',    icon: '📊' },
       { id: 'phones',      label: 'Téléphones',   icon: '📱' },
     ],
   },
@@ -195,6 +197,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
     if (id === 'licences')  return license.isSuperAdmin
     if (id === 'support')   return true
     if (id === 'community') return true
+    if (id === 'dashboard') return true
     return role ? canSeeTab(role, perms, id as import('@/lib/supabase').PageKey) : true
   }
 
@@ -238,7 +241,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
       <aside
         className="w-[228px] flex-shrink-0 flex flex-col relative overflow-hidden"
         style={{
-          background: 'linear-gradient(180deg, #080614 0%, #060412 100%)',
+          background: 'linear-gradient(180deg, #09090F 0%, #07070B 100%)',
           borderRight: '1px solid rgba(139,92,246,0.12)',
         }}
       >
@@ -419,7 +422,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
 
         {/* Fade bottom */}
         <div className="pointer-events-none flex-shrink-0 h-6 -mt-6 relative z-10"
-          style={{ background: 'linear-gradient(to bottom, transparent, #080614)' }} />
+          style={{ background: 'linear-gradient(to bottom, transparent, #07070B)' }} />
 
         {/* ── Bottom bar ─────────────────────────────────────────────────────── */}
         <div className="relative z-10 pb-3 pt-0">
@@ -503,7 +506,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
                 ref={orgTriggerRef}
                 onClick={() => orgMenuOpen ? setOrgMenuOpen(false) : openOrgMenu()}
                 className="w-full flex items-center gap-2.5 px-3 py-[9px] text-[12px] transition-all group"
-                style={{ background: '#09061a', borderRadius: 14, width: '100%' }}
+                style={{ background: '#09090F', borderRadius: 14, width: '100%' }}
               >
                 <span className="text-[15px] flex-shrink-0 opacity-80">🏢</span>
                 <div className="flex-1 min-w-0 text-left">
@@ -595,7 +598,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
               <p className="text-text2/50 text-xs">Contactez un administrateur pour modifier vos droits d'accès.</p>
             </div>
             <button
-              onClick={() => onNavigate('phones')}
+              onClick={() => onNavigate('dashboard')}
               className="px-6 py-2.5 active:scale-95 text-white text-sm font-semibold rounded-xl transition-all btn-sf-primary"
             >
               Retour au Dashboard
