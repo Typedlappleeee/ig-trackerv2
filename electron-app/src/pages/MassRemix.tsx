@@ -233,6 +233,13 @@ export function MassRemix({ user }: MassRemixProps) {
     return () => { abortRef.current = true }
   }, [])
 
+  // Global mouseup so drag always ends even if cursor leaves the timeline div
+  useEffect(() => {
+    const up = () => { draggingRef2.current = false }
+    window.addEventListener('mouseup', up)
+    return () => window.removeEventListener('mouseup', up)
+  }, [])
+
   // Keyboard control for cut editor: ←→ frame step, Shift+←→ 0.1s, Space play/pause
   useEffect(() => {
     if (!previewOpen) return
@@ -706,7 +713,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
             {/* Global default cut (used for pairs with no per-pair override when mode=manual) */}
             {splitMode === 'manual' && (
               <div className="flex items-center gap-2 px-3 py-2 rounded-xl" style={{ background: 'rgba(234,179,8,0.08)', border: '1px solid rgba(234,179,8,0.2)' }}>
-                <span className="text-[12px]" style={{ color: '#eab308' }}>✂ Défaut</span>
+                <span className="text-[12px]" style={{ color: '#eab308' }}>Défaut</span>
                 <input type="number" min={0.1} step={0.1} value={manualSplitSec}
                   onChange={e => setManualSplitSec(e.target.value)}
                   className="w-16 rounded-lg px-2 py-1 text-[13px] font-bold text-center focus:outline-none"
@@ -872,13 +879,13 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                       }}
                       onMouseDown={e => {
                         if (!timelineRef.current || vidDuration <= 0) return
+                        e.preventDefault()
                         draggingRef2.current = true
                         const rect = timelineRef.current.getBoundingClientRect()
                         const frac = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
                         const sec  = Math.round(frac * vidDuration * 1000) / 1000
                         setCutForPair(selectedPair.id, sec)
                         if (vidRef.current) { vidRef.current.pause(); vidRef.current.currentTime = sec }
-                        setVidCurrentTime(sec)
                       }}
                       onMouseMove={e => {
                         if (!timelineRef.current || vidDuration <= 0) return
@@ -887,12 +894,11 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                         setHoverTime(frac * vidDuration)
                         if (!draggingRef2.current) return
                         const sec = Math.round(frac * vidDuration * 1000) / 1000
-                        setCutForPair(selectedPair.id, sec)
-                        if (vidRef.current) { vidRef.current.currentTime = sec }
-                        setVidCurrentTime(sec)
+                        // Update cut + seek, but don't also call setVidCurrentTime — onTimeUpdate handles it
+                        setPlannedPairs(prev => prev.map(p => p.id === selectedPair.id ? { ...p, cutSec: sec } : p))
+                        if (vidRef.current) vidRef.current.currentTime = sec
                       }}
-                      onMouseUp={() => { draggingRef2.current = false }}
-                      onMouseLeave={() => { draggingRef2.current = false; setHoverTime(null) }}>
+                      onMouseLeave={() => setHoverTime(null)}>
 
                       {vidDuration > 0 && (<>
                         {/* Played region */}
