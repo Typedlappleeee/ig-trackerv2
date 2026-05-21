@@ -414,13 +414,15 @@ export function MassRemix({ user }: MassRemixProps) {
           if (!det.ok) addLog(job.id, `❌ Détection échouée: ${det.error ?? 'inconnu'}`)
 
           detDuration = det.duration
-          splitTime = det.ok && det.splitTime != null
-            ? Math.min((det.duration ?? 60) - 0.1, Math.round(det.splitTime * 1000) / 1000)
-            : undefined
-
-          addLog(job.id, det.ok
-            ? `✅ Scène: splitTime=${splitTime != null ? splitTime + 's' : 'non trouvé'}, durée=${det.duration ?? '?'}s`
-            : `⚠️ Pas de scène détectée — concat désactivé`)
+          if (det.ok && det.splitTime != null) {
+            splitTime = Math.min((det.duration ?? 60) - 0.1, Math.round(det.splitTime * 1000) / 1000)
+            addLog(job.id, `✅ Scène: splitTime=${splitTime}s, durée=${det.duration ?? '?'}s`)
+          } else {
+            // No scene change found — fall back to 25% of duration, capped at 3s
+            const fallback = Math.round(Math.min(3, Math.max(0.5, (det.duration ?? 12) * 0.25)) * 1000) / 1000
+            splitTime = fallback
+            addLog(job.id, `⚠️ Pas de scène détectée → coupe par défaut à ${fallback}s`)
+          }
 
           // Vérif. décor — si le BACKGROUND/LIEU est le même des 2 côtés du cut → annuler
           // On vérifie seulement le fond, pas la personne (plus fiable)
@@ -595,7 +597,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                       : Math.min(0.87, baseY + li * stepFr)
                     textOverlays.push({
                       text: line,
-                      x: xAlignToExpr(item.xAlign),
+                      x: '(w-text_w)/2',
                       y: `h*${lineYFrac.toFixed(4)}-${Math.round(item.fontSize / 2)}`,
                       fontSize: item.fontSize,
                       fontColor: item.fontColor,

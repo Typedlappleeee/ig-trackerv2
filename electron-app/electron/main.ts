@@ -964,16 +964,31 @@ ipcMain.handle('run-ffmpeg-remix-ai', async (_event, opts: {
   let args: string[]
 
   if (!splitTime) {
-    // No valid split point — re-encode secondary clip, trimmed to original duration
-    args = [
-      '-nostdin',
-      '-i', opts.newPhase1Path,
-      '-vf', `setpts=PTS-STARTPTS,${vfPhase1}`,
-      ...commonOutputFlags,
-      '-an',
-      ...(opts.targetDuration != null ? ['-t', String(opts.targetDuration)] : []),
-      '-y', opts.outputPath,
-    ]
+    // No valid split point — re-encode secondary clip with original audio
+    const origHasAudio0 = await hasAudioStream(ffmpegBin, opts.originalPath)
+    if (origHasAudio0) {
+      args = [
+        '-nostdin',
+        '-i', opts.newPhase1Path,
+        '-i', opts.originalPath,
+        '-filter_complex', `[0:v]setpts=PTS-STARTPTS,${vfPhase1}[vout];[1:a]${afmt}[aout]`,
+        '-map', '[vout]', '-map', '[aout]',
+        ...commonOutputFlags,
+        '-c:a', 'aac', '-b:a', '128k',
+        ...(opts.targetDuration != null ? ['-t', String(opts.targetDuration)] : []),
+        '-y', opts.outputPath,
+      ]
+    } else {
+      args = [
+        '-nostdin',
+        '-i', opts.newPhase1Path,
+        '-vf', `setpts=PTS-STARTPTS,${vfPhase1}`,
+        ...commonOutputFlags,
+        '-an',
+        ...(opts.targetDuration != null ? ['-t', String(opts.targetDuration)] : []),
+        '-y', opts.outputPath,
+      ]
+    }
   } else {
     // Probe original for audio so we don't hang on a missing audio stream
     const origHasAudio = await hasAudioStream(ffmpegBin, opts.originalPath)
