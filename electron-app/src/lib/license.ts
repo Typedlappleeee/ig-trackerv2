@@ -1,16 +1,18 @@
 import { createContext, useContext } from 'react'
 import { supabase } from './supabase'
 
+export type Plan = 'standard' | 'pro' | 'organisation'
+
 export interface LicenseStatus {
   valid: boolean
-  expiresAt: Date | null   // null = lifetime
-  daysLeft: number | null  // null = lifetime
+  expiresAt: Date | null   // null = no expiry (set by admin for long-term keys)
+  daysLeft: number | null  // null = no expiry
   source: 'own' | 'org_owner' | 'none'
   isSuperAdmin: boolean
-  plan: 'standard' | 'pro' | 'lifetime' | null
+  plan: Plan | null
   // Org owner's plan — used for phone limits so a Pro member doesn't bypass a Standard org's limit.
   // null when not in org mode or when the user IS the org owner.
-  orgOwnerPlan: 'standard' | 'pro' | 'lifetime' | null
+  orgOwnerPlan: Plan | null
 }
 
 const FAIL_OPEN: LicenseStatus = { valid: true, expiresAt: null, daysLeft: null, source: 'own', isSuperAdmin: false, plan: null, orgOwnerPlan: null }
@@ -28,7 +30,7 @@ export async function checkLicense(userId: string, orgId?: string | null): Promi
     if (profileErr) return FAIL_OPEN
 
     if (profile?.is_super_admin) {
-      return { valid: true, expiresAt: null, daysLeft: null, source: 'own', isSuperAdmin: true, plan: 'pro', orgOwnerPlan: null }
+      return { valid: true, expiresAt: null, daysLeft: null, source: 'own', isSuperAdmin: true, plan: 'organisation', orgOwnerPlan: null }
     }
 
     // Helper: resolve org owner plan (null if not in org mode or user is the owner)
@@ -136,6 +138,11 @@ export async function activateKey(key: string, userId: string): Promise<{ succes
 }
 
 // React context so any component can read the license status
+// Resolve the effective plan for phone/feature limits (org member uses owner's plan)
+export function effectivePlan(license: LicenseStatus): Plan | null {
+  return license.orgOwnerPlan ?? license.plan
+}
+
 export const LicenseContext = createContext<LicenseStatus>({
   valid: false, expiresAt: null, daysLeft: null, source: 'none', isSuperAdmin: false, plan: null, orgOwnerPlan: null,
 })

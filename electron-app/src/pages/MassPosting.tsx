@@ -17,6 +17,8 @@ import { playSuccess } from '@/lib/sounds'
 import { checkAndDeductCredits, CREDIT_COSTS, useCredits } from '@/lib/credits'
 import { createScheduledPost, fmtScheduledTime } from '@/lib/schedulerService'
 import { ScheduleModal } from '@/components/ScheduleModal'
+import { loadPostingOpts, savePostingOpts, buildScheduleTimes, type PostingOpts } from '@/lib/postingOpts'
+import { PostingOptions } from '@/components/PostingOptions'
 
 interface MassPostingProps { user: User }
 
@@ -72,14 +74,21 @@ export function MassPosting({ user }: MassPostingProps) {
   const [groqKey, setGroqKey]             = useState('')
   const [posting, _setPosting]            = useState(ms.posting)
   const [generating, setGenerating]       = useState(false)
-  const [withHashtags, setWithHashtags]   = useState(true)
+  const [withHashtags, setWithHashtags]   = useState(false)
   const [customPrompt, setCustomPrompt]   = useState('')
   const [logs, _setLogs]                  = useState<TaskLog[]>(ms.logs)
   const [taskStatuses, _setTaskStatuses]  = useState<Map<string, TaskStatus>>(ms.taskStatuses)
   const [groupFilter, setGroupFilter]     = useState('Tous')
   const [groups, setGroups]               = useState<string[]>(['Tous'])
   const [phoneSearch, setPhoneSearch]     = useState('')
+  const [phonePickMode, setPhonePickMode] = useState<'phones' | 'groups'>('phones')
+  const [selectedGroups, setSelectedGroups] = useState<Set<string>>(new Set())
   const [showBankPicker, setShowBankPicker] = useState(false)
+  const [postingOpts, setPostingOpts]       = useState<PostingOpts>(loadPostingOpts)
+  const [showFolderPick, setShowFolderPick] = useState(false)
+  const [bankFolders, setBankFolders]       = useState<{ name: string; count: number }[]>([])
+  const [folderLoading, setFolderLoading]   = useState(false)
+  const [addingFolder, setAddingFolder]     = useState<string | null>(null)
   const [showScheduleModal, setShowScheduleModal] = useState(false)
   const stopRef                           = useRef(false)
   const activePhonesRef                   = useRef<string[]>([])
@@ -147,6 +156,69 @@ export function MassPosting({ user }: MassPostingProps) {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
       else next.add(id)
+      return next
+    })
+  }
+
+  async function openFolderPick() {
+    setFolderLoading(true)
+    let q = supabase.from('content_bank').select('folder')
+    q = currentOrg ? (q as any).eq('org_id', currentOrg.id) : (q as any).eq('user_id', user.id).is('org_id', null)
+    const { data } = await q
+    const counts = new Map<string, number>()
+    for (const row of data ?? []) {
+      const f = (row as { folder?: string | null }).folder
+      if (f) counts.set(f, (counts.get(f) ?? 0) + 1)
+    }
+    setBankFolders([...counts.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([name, count]) => ({ name, count })))
+    setFolderLoading(false)
+    setShowFolderPick(true)
+  }
+
+  async function addFolderVideos(folderName: string) {
+    setShowFolderPick(false)
+    setAddingFolder(folderName)
+    try {
+      let q = supabase.from('content_bank').select('*').order('created_at', { ascending: false })
+      q = currentOrg
+        ? (q as any).eq('org_id', currentOrg.id).eq('folder', folderName)
+        : (q as any).eq('user_id', user.id).is('org_id', null).eq('folder', folderName)
+      const { data } = await q
+      const items = (data ?? []) as ContentItem[]
+      if (!items.length) return
+      const { getSignedUrl } = await import('@/lib/storage')
+      const newVideos: SelectedVideo[] = []
+      for (const item of items) {
+        if (!item.storage_path && !item.file_url) continue
+        if (selectedVideos.some(sv => sv.item.id === item.id)) continue
+        let url: string | null = null
+        try {
+          url = await getSignedUrl(item.storage_path ?? item.file_url)
+        } catch { url = item.file_url }
+        newVideos.push({ item: { ...item, file_url: url ?? item.file_url }, localPath: null })
+      }
+      if (newVideos.length) setSelVideos(prev => [...prev, ...newVideos])
+    } finally {
+      setAddingFolder(null)
+    }
+  }
+
+  function toggleGroup(groupName: string) {
+    const inGroup = phones.filter(p => {
+      if (role && !canAccessPhoneGroup(role, perms, p.group_name)) return false
+      return p.group_name === groupName
+    })
+    const alreadySelected = selectedGroups.has(groupName)
+    setSelectedGroups(prev => {
+      const next = new Set(prev)
+      if (alreadySelected) next.delete(groupName)
+      else next.add(groupName)
+      return next
+    })
+    setSelPhones(prev => {
+      const next = new Set(prev)
+      if (alreadySelected) inGroup.forEach(p => next.delete(p.id))
+      else inGroup.forEach(p => next.add(p.id))
       return next
     })
   }
@@ -304,16 +376,17 @@ export function MassPosting({ user }: MassPostingProps) {
     })
 
     try {
-      // ── Step 1: upload unique videos ─────────────────────────────────────
-      log(`📤 Upload de ${selectedVideos.length} vidéo(s) vers GéeLark…`)
+      // ── Step 1: upload only videos actually assigned to a phone ──────────
+      const usedIndices = [...new Set(assignments.map(a => a.videoIndex).filter(i => i >= 0))]
+      log(`📤 Upload de ${usedIndices.length} vidéo(s) vers GéeLark…`)
       const tokenMap = new Map<number, string>() // videoIndex → token
 
-      for (let vi = 0; vi < selectedVideos.length; vi++) {
+      for (const vi of usedIndices) {
         const sv = selectedVideos[vi]
 
         // Mark phones using this video as uploading
-        phoneList.forEach((p, i) => {
-          if (i % selectedVideos.length === vi) setPhoneStatus(p.id, { status: 'uploading' })
+        assignments.forEach(a => {
+          if (a.videoIndex === vi) setPhoneStatus(a.phone.id, { status: 'uploading' })
         })
 
         const fileSource = sv.localPath ?? sv.item.file_url
@@ -321,18 +394,16 @@ export function MassPosting({ user }: MassPostingProps) {
           log(`⚠️ Vidéo ${vi + 1} sans source — ignorée`, 'warn')
           continue
         }
-        let token: string
         const up = await window.electronAPI!.uploadVideoGeelark({ bearer, filePath: fileSource })
         if (!up.ok || !up.token) {
           log(`❌ Upload échoué (${sv.item.title}): ${up.error}`, 'error')
-          phoneList.forEach((p, i) => {
-            if (i % selectedVideos.length === vi) setPhoneStatus(p.id, { status: 'error', detail: up.error })
+          assignments.forEach(a => {
+            if (a.videoIndex === vi) setPhoneStatus(a.phone.id, { status: 'error', detail: up.error })
           })
           continue
         }
-        token = up.token
 
-        tokenMap.set(vi, token)
+        tokenMap.set(vi, up.token)
         log(`✅ Vidéo ${vi + 1} uploadée (${sv.item.title.slice(0, 30)}…)`, 'ok')
       }
 
@@ -350,8 +421,14 @@ export function MassPosting({ user }: MassPostingProps) {
       // ── Step 3: create RPA tasks ──────────────────────────────────────────
       log('🎬 Création des tâches de post…')
       const taskIds: Record<string, string> = {}
+      const scheduleTimes = buildScheduleTimes(assignments.length, postingOpts)
+      if (postingOpts.intervalMode !== 'none' && assignments.length > 1) {
+        const lastMin = Math.round((scheduleTimes[scheduleTimes.length - 1] - scheduleTimes[0]) / 60)
+        log(`⏱ Intervalle activé — dernier post dans ~${lastMin} min`, 'info')
+      }
 
-      for (const asgn of assignments) {
+      for (let ai = 0; ai < assignments.length; ai++) {
+        const asgn = assignments[ai]
         const token = tokenMap.get(asgn.videoIndex)
         if (!token) {
           log(`  ⚠️ ${asgn.phone.phone_name}: pas de token vidéo`, 'warn')
@@ -361,7 +438,7 @@ export function MassPosting({ user }: MassPostingProps) {
         setPhoneStatus(asgn.phone.id, { status: 'posting' })
         const taskRes = await geelark(bearer, '/rpa/task/instagramPubReels', {
           id:          asgn.phone.geelark_id,
-          scheduleAt:  Math.floor(Date.now() / 1000),
+          scheduleAt:  scheduleTimes[ai],
           description: caption,
           video:       [token],
         })
@@ -375,8 +452,9 @@ export function MassPosting({ user }: MassPostingProps) {
           setTimeout(() => {
             if (activePhonesRef.current.includes(asgn.phone.geelark_id)) {
               geelark(bearer, '/phone/stop', { ids: [asgn.phone.geelark_id] })
-                .then(() => log(`  ⏱️ ${asgn.phone.phone_name} éteint (timeout 5min)`, 'warn'))
+                .then(() => log(`  ✅ ${asgn.phone.phone_name} — posting fini`, 'ok'))
                 .catch(() => {})
+              setPhoneStatus(asgn.phone.id, { status: 'done' })
               activePhonesRef.current = activePhonesRef.current.filter(id => id !== asgn.phone.geelark_id)
             }
           }, 5 * 60 * 1000)
@@ -460,6 +538,8 @@ export function MassPosting({ user }: MassPostingProps) {
       log('🎉 Terminé ! Réinitialisation dans 5s…', 'ok')
       await new Promise(r => setTimeout(r, 5000))
       resetMassPosting()
+      setSelPhones(new Set())
+      setSelVideos([])
 
     } catch (e: unknown) {
       log(`❌ Erreur: ${e instanceof Error ? e.message : String(e)}`, 'error')
@@ -571,8 +651,26 @@ export function MassPosting({ user }: MassPostingProps) {
               >
                 🗂 Banque
               </button>
+              <button
+                onClick={openFolderPick}
+                className="flex-1 flex items-center justify-center gap-1.5 rounded-xl px-3 py-2.5 text-[13px] font-semibold transition-colors"
+                style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)', color: '#a78bfa' }}
+              >
+                📁 Dossier
+              </button>
             </div>
           </div>
+          {addingFolder && (
+            <div className="flex-shrink-0 flex items-center gap-3 px-5 py-3"
+              style={{ background: 'rgba(139,92,246,0.08)', borderBottom: '1px solid rgba(139,92,246,0.15)' }}>
+              <svg className="animate-spin w-4 h-4 flex-shrink-0" style={{ color: '#a78bfa' }} viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="31.4" strokeDashoffset="10" />
+              </svg>
+              <p className="text-[12px] font-semibold truncate" style={{ color: '#a78bfa' }}>
+                Ajout de «{addingFolder}» en cours…
+              </p>
+            </div>
+          )}
           <div className="flex-1 overflow-auto">
             {selectedVideos.length === 0 ? (
               <div className="px-5 py-10 text-center">
@@ -608,38 +706,84 @@ export function MassPosting({ user }: MassPostingProps) {
 
         {/* ── Column 2: Phones ─────────────────────────────────────────────── */}
         <aside className="w-64 flex-shrink-0 flex flex-col" style={{ borderRight: '1px solid rgba(255,255,255,0.06)', background: '#07090f' }}>
+          {/* Header + mode toggle */}
           <div className="flex-shrink-0 px-5 pt-5 pb-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
             <div className="flex items-center justify-between mb-3">
-              <p className="text-[15px] font-bold text-white">Téléphones</p>
+              <p className="text-[15px] font-bold text-white">Cibles</p>
               <span className="text-[12px] font-semibold px-2.5 py-0.5 rounded-full text-white"
                 style={{ background: selectedPhones.size > 0 ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.07)' }}>
                 {selectedPhones.size}
               </span>
             </div>
-            <select
-              value={groupFilter}
-              onChange={e => setGroupFilter(e.target.value)}
-              className="w-full rounded-xl px-4 py-2.5 text-[13px] focus:outline-none mb-2"
-              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
-            >
-              {groups.map(g => <option key={g} value={g} style={{ background: '#0d1120', color: '#e2d9f3' }}>{g}</option>)}
-            </select>
-            <input
-              type="text" placeholder="Rechercher…" value={phoneSearch}
-              onChange={e => setPhoneSearch(e.target.value)}
-              className="w-full rounded-xl px-4 py-2.5 text-[13px] placeholder:text-text2 focus:outline-none"
-              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
-            />
+            {/* Mode toggle */}
+            <div className="flex rounded-xl p-1 gap-1 mb-3" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+              {([{ k: 'phones', l: '📱 Téléphones' }, { k: 'groups', l: '👥 Groupes' }] as const).map(m => (
+                <button key={m.k} onClick={() => setPhonePickMode(m.k)}
+                  className="flex-1 py-2 rounded-lg text-[12px] font-semibold transition-all"
+                  style={phonePickMode === m.k
+                    ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: 'white' }
+                    : { color: 'rgba(148,163,184,0.7)' }}>
+                  {m.l}
+                </button>
+              ))}
+            </div>
+
+            {/* Phone mode controls */}
+            {phonePickMode === 'phones' && (
+              <>
+                <select
+                  value={groupFilter}
+                  onChange={e => setGroupFilter(e.target.value)}
+                  className="w-full rounded-xl px-4 py-2.5 text-[13px] focus:outline-none mb-2"
+                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
+                >
+                  {groups.map(g => <option key={g} value={g} style={{ background: '#0d1120', color: '#e2d9f3' }}>{g}</option>)}
+                </select>
+                <input
+                  type="text" placeholder="Rechercher…" value={phoneSearch}
+                  onChange={e => setPhoneSearch(e.target.value)}
+                  className="w-full rounded-xl px-4 py-2.5 text-[13px] placeholder:text-text2 focus:outline-none"
+                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
+                />
+              </>
+            )}
+
+            {/* Group mode: quick-select all / none */}
+            {phonePickMode === 'groups' && (
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    const realGroups = groups.filter(g => g !== 'Tous')
+                    setSelectedGroups(new Set(realGroups))
+                    setSelPhones(new Set(phones.filter(p => {
+                      if (role && !canAccessPhoneGroup(role, perms, p.group_name)) return false
+                      return Boolean(p.group_name)
+                    }).map(p => p.id)))
+                  }}
+                  className="text-[12px] font-semibold text-[#8b5cf6] hover:text-white transition-colors">Tout</button>
+                <button
+                  onClick={() => { setSelectedGroups(new Set()); setSelPhones(new Set()) }}
+                  className="text-[12px] text-text2 hover:text-white transition-colors">Aucun</button>
+              </div>
+            )}
           </div>
-          <div className="flex-shrink-0 px-5 py-2.5 flex gap-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-            <button onClick={() => setSelPhones(new Set(visiblePhones.map(p => p.id)))}
-              className="text-[12px] font-semibold text-[#8b5cf6] hover:text-white transition-colors">Tout</button>
-            <button onClick={() => setSelPhones(new Set())}
-              className="text-[12px] text-text2 hover:text-white transition-colors">Aucun</button>
-            <span className="ml-auto text-[12px] text-text2">{visiblePhones.length} tel.</span>
-          </div>
+
+          {/* Tout / Aucun bar — phones mode only */}
+          {phonePickMode === 'phones' && (
+            <div className="flex-shrink-0 px-5 py-2.5 flex gap-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+              <button onClick={() => setSelPhones(new Set(visiblePhones.map(p => p.id)))}
+                className="text-[12px] font-semibold text-[#8b5cf6] hover:text-white transition-colors">Tout</button>
+              <button onClick={() => setSelPhones(new Set())}
+                className="text-[12px] text-text2 hover:text-white transition-colors">Aucun</button>
+              <span className="ml-auto text-[12px] text-text2">{visiblePhones.length} tel.</span>
+            </div>
+          )}
+
+          {/* ── List body ── */}
           <div className="flex-1 overflow-auto">
-            {visiblePhones.map((phone) => {
+
+            {/* Phones mode */}
+            {phonePickMode === 'phones' && visiblePhones.map((phone) => {
               const checked = selectedPhones.has(phone.id)
               const asgn = assignments.find(a => a.phone.id === phone.id)
               const ts = taskStatuses.get(phone.id)
@@ -676,6 +820,53 @@ export function MassPosting({ user }: MassPostingProps) {
                 </button>
               )
             })}
+
+            {/* Groups mode */}
+            {phonePickMode === 'groups' && (() => {
+              const realGroups = groups.filter(g => g !== 'Tous')
+              if (realGroups.length === 0) return (
+                <div className="px-5 py-10 text-center">
+                  <p className="text-3xl mb-3">👥</p>
+                  <p className="text-[13px] font-bold text-white mb-1">Aucun groupe</p>
+                  <p className="text-[12px] text-text2">Assigne des groupes à tes téléphones</p>
+                </div>
+              )
+              return realGroups.map(g => {
+                const inGroup = phones.filter(p => {
+                  if (role && !canAccessPhoneGroup(role, perms, p.group_name)) return false
+                  return p.group_name === g
+                })
+                const checked = selectedGroups.has(g)
+                const selCount = inGroup.filter(p => selectedPhones.has(p.id)).length
+                return (
+                  <button
+                    key={g}
+                    onClick={() => toggleGroup(g)}
+                    className="w-full flex items-center gap-3 px-4 py-4 text-left transition-all"
+                    style={checked
+                      ? { background: 'rgba(139,92,246,0.1)', borderBottom: '1px solid rgba(139,92,246,0.1)' }
+                      : { borderBottom: '1px solid rgba(255,255,255,0.04)' }}
+                  >
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center text-[18px] flex-shrink-0"
+                      style={checked
+                        ? { background: 'linear-gradient(135deg,#7c3aed,#ec4899)' }
+                        : { background: 'rgba(255,255,255,0.06)' }}>
+                      👥
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[13px] font-bold text-white truncate">{g}</p>
+                      <p className="text-[11px]" style={{ color: checked ? '#a78bfa' : 'rgba(148,163,184,0.5)' }}>
+                        {checked ? `${selCount} / ${inGroup.length} sélectionnés` : `${inGroup.length} téléphone${inGroup.length !== 1 ? 's' : ''}`}
+                      </p>
+                    </div>
+                    <div className="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0"
+                      style={checked ? { background: 'linear-gradient(135deg,#7c3aed,#ec4899)' } : { border: '1px solid rgba(255,255,255,0.15)' }}>
+                      {checked && <span className="text-white text-[10px] font-bold">✓</span>}
+                    </div>
+                  </button>
+                )
+              })
+            })()}
           </div>
         </aside>
 
@@ -683,24 +874,16 @@ export function MassPosting({ user }: MassPostingProps) {
         <div className="flex-1 overflow-y-auto px-8 pb-10">
           <div className="space-y-6 mt-8">
 
+            {/* Posting options */}
+            <PostingOptions opts={postingOpts} onChange={o => { setPostingOpts(o); savePostingOpts(o) }} />
+
             {/* Caption card */}
             <div className="rounded-2xl p-6" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
               <div className="flex items-center justify-between mb-4">
                 <p className="text-[15px] font-bold text-white">Description</p>
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={() => setWithHashtags(v => !v)}
-                    className="relative w-11 h-6 rounded-full transition-colors flex-shrink-0"
-                    style={{ background: withHashtags ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.08)' }}
-                    title="Hashtags"
-                  >
-                    <span className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform ${withHashtags ? 'translate-x-6' : 'translate-x-1'}`} />
-                  </button>
-                  <span className="text-[12px] text-text2">#</span>
-                  <span className={`text-[12px] font-mono ${caption.length > 2200 ? 'text-danger' : 'text-text2'}`}>
-                    {caption.length}/2200
-                  </span>
-                </div>
+                <span className={`text-[12px] font-mono ${caption.length > 2200 ? 'text-danger' : 'text-text2'}`}>
+                  {caption.length}/2200
+                </span>
               </div>
               <textarea
                 value={caption}
@@ -717,8 +900,82 @@ export function MassPosting({ user }: MassPostingProps) {
                   className="flex-1 rounded-xl px-4 py-2.5 text-[13px] placeholder:text-text2 focus:outline-none"
                   style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
                 />
+                {/* Hashtag toggle — inline, clearly inside the card */}
+                <button
+                  onClick={() => setWithHashtags(v => !v)}
+                  className="flex items-center gap-2 rounded-xl px-3 py-2.5 transition-all flex-shrink-0"
+                  style={withHashtags
+                    ? { background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.25)', color: '#a78bfa' }
+                    : { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(148,163,184,0.5)' }}
+                  title="Hashtags"
+                >
+                  <span className="text-[12px] font-bold">#</span>
+                </button>
               </div>
             </div>
+
+            {/* Configuration summary card */}
+            {(selectedVideos.length > 0 || selectedPhones.size > 0) && (() => {
+              // Video pool label
+              const folders = [...new Set(selectedVideos.map(sv => sv.item.folder).filter(Boolean))]
+              const videoLabel = folders.length === 1
+                ? folders[0]!
+                : selectedVideos.length > 0
+                  ? `${selectedVideos.length} vidéo${selectedVideos.length !== 1 ? 's' : ''} sélectionnée${selectedVideos.length !== 1 ? 's' : ''}`
+                  : null
+
+              // Phone pool label
+              const phoneLabel = phonePickMode === 'groups' && selectedGroups.size > 0
+                ? `${selectedGroups.size} groupe${selectedGroups.size !== 1 ? 's' : ''} sélectionné${selectedGroups.size !== 1 ? 's' : ''}`
+                : selectedPhones.size > 0
+                  ? `${selectedPhones.size} téléphone${selectedPhones.size !== 1 ? 's' : ''} sélectionné${selectedPhones.size !== 1 ? 's' : ''}`
+                  : null
+              const phoneSubLabel = phonePickMode === 'groups' && selectedGroups.size > 0 && selectedPhones.size > 0
+                ? `(${selectedPhones.size} téléphones)`
+                : null
+
+              return (
+                <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                  <div className="px-5 pt-4 pb-3">
+                    <p className="text-[15px] font-bold text-white">Configuration du posting</p>
+                  </div>
+
+                  {videoLabel && (
+                    <>
+                      <div className="px-5 pb-1.5">
+                        <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'rgba(148,163,184,0.35)' }}>Pool de vidéos</p>
+                      </div>
+                      <div className="flex items-center gap-3 px-5 py-3 mx-3 mb-2 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)' }}>
+                        <span className="text-[18px] flex-shrink-0">📁</span>
+                        <span className="flex-1 text-[13px] font-semibold text-white truncate">{videoLabel}</span>
+                        <span className="text-[12px] flex-shrink-0" style={{ color: 'rgba(148,163,184,0.5)' }}>
+                          {selectedVideos.length} vidéo{selectedVideos.length !== 1 ? 's' : ''}
+                        </span>
+                        <span className="text-[12px]" style={{ color: 'rgba(148,163,184,0.3)' }}>›</span>
+                      </div>
+                    </>
+                  )}
+
+                  {phoneLabel && (
+                    <>
+                      <div className="px-5 pb-1.5">
+                        <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'rgba(148,163,184,0.35)' }}>
+                          {phonePickMode === 'groups' ? 'Groupe de téléphones' : 'Téléphones'}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-3 px-5 py-3 mx-3 mb-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)' }}>
+                        <span className="text-[18px] flex-shrink-0">{phonePickMode === 'groups' ? '👥' : '📱'}</span>
+                        <span className="flex-1 text-[13px] font-semibold text-white truncate">
+                          {phoneLabel}
+                          {phoneSubLabel && <span className="ml-1.5 font-normal" style={{ color: 'rgba(148,163,184,0.5)' }}>{phoneSubLabel}</span>}
+                        </span>
+                        <span className="text-[12px]" style={{ color: 'rgba(148,163,184,0.3)' }}>›</span>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )
+            })()}
 
             {/* Assignments card */}
             <div className="rounded-2xl p-6" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
@@ -845,6 +1102,39 @@ export function MassPosting({ user }: MassPostingProps) {
           </div>
         </div>
       </div>
+
+      {/* Folder quick-pick modal */}
+      {showFolderPick && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => setShowFolderPick(false)}>
+          <div className="rounded-2xl overflow-hidden w-80" onClick={e => e.stopPropagation()}
+            style={{ background: '#0d0a1e', border: '1px solid rgba(139,92,246,0.25)' }}>
+            <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(139,92,246,0.12)' }}>
+              <p className="text-[14px] font-bold text-white">📁 Choisir un dossier</p>
+              <button onClick={() => setShowFolderPick(false)} className="text-text2 hover:text-white text-lg leading-none">✕</button>
+            </div>
+            {folderLoading ? (
+              <div className="py-10 text-center text-text2 text-[13px]">Chargement…</div>
+            ) : bankFolders.length === 0 ? (
+              <div className="py-10 text-center text-text2 text-[13px]">Aucun dossier dans la banque</div>
+            ) : (
+              <div className="max-h-80 overflow-y-auto py-2">
+                {bankFolders.map(f => (
+                  <button key={f.name} onClick={() => addFolderVideos(f.name)}
+                    className="w-full flex items-center gap-3 px-5 py-3 text-left transition-all hover:bg-white/[0.03]"
+                    style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                    <span className="text-[18px]">📂</span>
+                    <span className="flex-1 text-[13px] font-semibold text-white truncate">{f.name}</span>
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full"
+                      style={{ background: 'rgba(139,92,246,0.12)', color: '#a78bfa' }}>
+                      {f.count} vid.
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Bank picker modal */}
       {showBankPicker && (

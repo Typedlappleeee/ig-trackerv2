@@ -281,6 +281,7 @@ export function Bank({ user }: BankProps) {
   const [tagsItem, setTagsItem]     = useState<ContentItem | null>(null)
 
   const dropRef = useRef<HTMLDivElement>(null)
+  const dragCounter = useRef(0)
 
   useEffect(() => { loadItems() }, [currentOrg?.id])
 
@@ -428,13 +429,21 @@ export function Bank({ user }: BankProps) {
   }
 
   function onDragOver(e: React.DragEvent) {
-    e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; setDragging(true)
+    e.preventDefault(); e.dataTransfer.dropEffect = 'copy'
+  }
+  function onDragEnter(e: React.DragEvent) {
+    e.preventDefault()
+    dragCounter.current += 1
+    if (dragCounter.current === 1) setDragging(true)
   }
   function onDragLeave(e: React.DragEvent) {
-    if (!dropRef.current?.contains(e.relatedTarget as Node)) setDragging(false)
+    dragCounter.current -= 1
+    if (dragCounter.current <= 0) { dragCounter.current = 0; setDragging(false) }
   }
   async function onDrop(e: React.DragEvent) {
-    e.preventDefault(); setDragging(false)
+    e.preventDefault()
+    dragCounter.current = 0
+    setDragging(false)
     const files = Array.from(e.dataTransfer.files)
     if (files.length === 0) return
     // Process sequentially — concurrent thumbnail generation on N large videos
@@ -485,8 +494,9 @@ export function Bank({ user }: BankProps) {
 
   async function renameFolder(oldName: string, newName: string) {
     if (!newName || newName === oldName) return
-    // Update DB rows in this folder
-    await supabase.from('content_bank').update({ folder: newName }).eq('user_id', user.id).eq('folder', oldName)
+    let q = supabase.from('content_bank').update({ folder: newName }).eq('folder', oldName)
+    q = currentOrg ? (q as any).eq('org_id', currentOrg.id) : (q as any).eq('user_id', user.id).is('org_id', null)
+    await q
     setItems(prev => prev.map(i => (i as unknown as {folder:string}).folder === oldName ? { ...i, folder: newName as unknown as string } : i))
     // Update localStorage empty folders
     persistEmptyFolders(emptyFolders.map(f => f === oldName ? newName : f))
@@ -502,7 +512,9 @@ export function Bank({ user }: BankProps) {
         setItems(prev => prev.filter(i => (i as unknown as {folder?: string}).folder !== name))
       }
     } else {
-      await supabase.from('content_bank').update({ folder: null }).eq('user_id', user.id).eq('folder', name)
+      let qu = supabase.from('content_bank').update({ folder: null }).eq('folder', name)
+      qu = currentOrg ? (qu as any).eq('org_id', currentOrg.id) : (qu as any).eq('user_id', user.id).is('org_id', null)
+      await qu
       setItems(prev => prev.map(i => (i as unknown as {folder:string}).folder === name ? { ...i, folder: null as unknown as string } : i))
     }
     persistEmptyFolders(emptyFolders.filter(f => f !== name))
@@ -511,7 +523,9 @@ export function Bank({ user }: BankProps) {
   }
 
   async function mergeFolderTo(fromFolder: string, toFolder: string | null) {
-    await supabase.from('content_bank').update({ folder: toFolder }).eq('user_id', user.id).eq('folder', fromFolder)
+    let qm = supabase.from('content_bank').update({ folder: toFolder }).eq('folder', fromFolder)
+    qm = currentOrg ? (qm as any).eq('org_id', currentOrg.id) : (qm as any).eq('user_id', user.id).is('org_id', null)
+    await qm
     setItems(prev => prev.map(i => (i as unknown as {folder?:string}).folder === fromFolder ? { ...i, folder: toFolder as unknown as string } : i))
     persistEmptyFolders(emptyFolders.filter(f => f !== fromFolder))
     if (selectedFolder === fromFolder) setSelectedFolder(toFolder)
@@ -553,6 +567,7 @@ export function Bank({ user }: BankProps) {
       ref={dropRef}
       className={`h-full flex flex-col overflow-hidden transition-colors ${dragging ? 'bg-accent/5' : ''}`}
       onDragOver={onDragOver}
+      onDragEnter={onDragEnter}
       onDragLeave={onDragLeave}
       onDrop={onDrop}
     >

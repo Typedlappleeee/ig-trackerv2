@@ -95,7 +95,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('detect-scene-change', opts),
 
   // Extract video frames as base64 JPEGs (for AI text analysis)
-  extractFrames: (opts: { filePath: string; endTime: number; fps?: number }) =>
+  extractFrames: (opts: { filePath: string; startTime?: number; endTime: number; fps?: number }) =>
     ipcRenderer.invoke('extract-frames', opts),
 
   // Anthropic Claude API with vision support (bypasses CORS)
@@ -108,11 +108,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // FFmpeg remix with AI-detected drawtext overlays
   runFfmpegRemixAI: (opts: {
-    newPhase1Path: string
-    originalPath:  string
-    splitTime:     number
-    outputPath:    string
-    preset:        '9:16' | '1:1' | '16:9'
+    newPhase1Path:   string
+    originalPath:    string
+    splitTime:       number
+    outputPath:      string
+    preset:          '9:16' | '1:1' | '16:9'
+    targetDuration?: number
     textOverlays:  Array<{
       text: string; x: string; y: string
       fontSize: number; fontColor: string

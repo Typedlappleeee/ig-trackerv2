@@ -201,6 +201,21 @@ export async function downloadToTemp(path: string): Promise<string> {
   return r.path
 }
 
+// Download an arbitrary HTTPS URL to a local temp file (Electron only).
+async function downloadHttpToTemp(url: string): Promise<string> {
+  const cached = tempPathCache.get(url)
+  if (cached) return cached
+  const r = await fetch(url)
+  if (!r.ok) throw new Error(`HTTP ${r.status} lors du téléchargement`)
+  const bytes = await r.arrayBuffer()
+  if (!window.electronAPI?.writeTempFile) throw new Error('IPC indisponible')
+  const name = url.split('/').pop()?.split('?')[0] ?? 'video.mp4'
+  const w = await window.electronAPI.writeTempFile({ name, bytes })
+  if (!w.ok || !w.path) throw new Error(w.error ?? 'Écriture temp échouée')
+  tempPathCache.set(url, w.path)
+  return w.path
+}
+
 
 // Register a blob into the global blob registry used by ffmpeg-web writeInput().
 // Uses window so the registry is shared regardless of module bundling/chunking.
@@ -268,13 +283,17 @@ export async function resolveContentToLocalPath(item: Pick<ContentItem, 'storage
   }
 
   if (item.file_url) {
-    // If it looks like a real URL (http/https/blob/data), use it directly on web or Electron
-    if (/^(https?|blob|data):/.test(item.file_url)) return item.file_url
+    if (/^(blob|data):/.test(item.file_url)) return item.file_url
 
-    // Legacy items: file_url holds a local path (Electron only) or a bare storage path
-    if (!isWeb) return item.file_url  // Electron: pass local path to FFmpeg binary as-is
+    if (/^https?:/.test(item.file_url)) {
+      // Electron: FFmpeg binary needs a local file — download the HTTPS URL to temp
+      if (!isWeb) return downloadHttpToTemp(item.file_url)
+      // Web: use URL directly (FFmpeg WASM can fetch it or caller handles it)
+      return item.file_url
+    }
 
-    // Web: treat the value as a Supabase storage path and try to download it
+    // Legacy: file_url holds a local path (Electron) or bare storage path (Web)
+    if (!isWeb) return item.file_url
     return downloadToBlobUrl(item.file_url)
   }
 

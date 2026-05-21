@@ -3,12 +3,13 @@
 // fall back to net.fetch JSON API, then HTML regex on net.fetch.
 
 export interface IgStats {
-  username:    string
-  followers:   number
-  following:   number
-  posts:       number
-  total_views: number
-  bio:         string
+  username:        string
+  followers:       number
+  following:       number
+  posts:           number
+  total_views:     number
+  bio:             string
+  profile_pic_url: string
 }
 
 const IG_HDRS = {
@@ -57,11 +58,13 @@ function parseHtml(html: string, fallbackUsername: string): IgStats | null {
   const allViews    = viewMs.length ? viewMs : playMs
   const total_views = allViews.reduce((s, m) => s + parseInt(m[1]), 0)
 
-  const unameM = html.match(/"username":"([^"]+)"/)
+  const unameM   = html.match(/"username":"([^"]+)"/)
+  const picMatch = html.match(/"profile_pic_url(?:_hd)?":"(https:[^"]+)"/)
+  const profile_pic_url = picMatch ? picMatch[1].replace(/\\u002F/g, '/').replace(/\\\//g, '/') : ''
 
   // If we got zero on everything the page was probably a consent/login wall
   if (followers === 0 && following === 0 && posts === 0) return null
-  return { username: unameM?.[1] ?? fallbackUsername, followers, following, posts, bio, total_views }
+  return { username: unameM?.[1] ?? fallbackUsername, followers, following, posts, bio, total_views, profile_pic_url }
 }
 
 // ── Method 1: Hidden BrowserWindow + API fast-path ──────────────────────────
@@ -85,12 +88,13 @@ async function fetchViaBrowser(clean: string): Promise<IgStats | null> {
         return s + (((n['video_view_count'] as number) ?? 0))
       }, 0)
       return {
-        username:    (user['username'] as string) ?? clean,
-        followers:   ((user['edge_followed_by'] as Record<string, number>)?.count) ?? 0,
-        following:   ((user['edge_follow']     as Record<string, number>)?.count) ?? 0,
-        posts:       ((timeline?.['count'] as number) ?? 0),
+        username:        (user['username'] as string) ?? clean,
+        followers:       ((user['edge_followed_by'] as Record<string, number>)?.count) ?? 0,
+        following:       ((user['edge_follow']     as Record<string, number>)?.count) ?? 0,
+        posts:           ((timeline?.['count'] as number) ?? 0),
         total_views,
-        bio:         (user['biography'] as string) ?? '',
+        bio:             (user['biography'] as string) ?? '',
+        profile_pic_url: (user['profile_pic_url'] as string) ?? '',
       }
     } catch { return null }
   }
@@ -121,12 +125,13 @@ async function fetchViaApi(clean: string, base = 'https://www.instagram.com'): P
       return s + ((n['video_view_count'] as number) ?? 0)
     }, 0)
     return {
-      username:    (user['username'] as string) ?? clean,
-      followers:   (user['edge_followed_by'] as Record<string, number>)?.count ?? 0,
-      following:   (user['edge_follow']     as Record<string, number>)?.count ?? 0,
-      posts:       (timeline?.['count'] as number) ?? 0,
+      username:        (user['username'] as string) ?? clean,
+      followers:       (user['edge_followed_by'] as Record<string, number>)?.count ?? 0,
+      following:       (user['edge_follow']     as Record<string, number>)?.count ?? 0,
+      posts:           (timeline?.['count'] as number) ?? 0,
       total_views,
-      bio:         (user['biography'] as string) ?? '',
+      bio:             (user['biography'] as string) ?? '',
+      profile_pic_url: (user['profile_pic_url'] as string) ?? '',
     }
   } catch { return null }
 }

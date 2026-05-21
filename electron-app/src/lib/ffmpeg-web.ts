@@ -8,6 +8,19 @@ import { fetchFile, toBlobURL } from '@ffmpeg/util'
 let _ffmpeg: FFmpeg | null = null
 let _loading: Promise<FFmpeg> | null = null
 
+// Global exec lock — wasm FFmpeg is NOT thread-safe. Serialise all ff.exec()
+// calls so concurrent callers don't corrupt the shared wasm memory.
+let _execTail: Promise<void> = Promise.resolve()
+function withFfmpegLock<T>(fn: () => Promise<T>): Promise<T> {
+  let release!: () => void
+  const prev = _execTail
+  _execTail = new Promise<void>(r => { release = r })
+  return prev.then(fn).then(
+    v  => { release(); return v },
+    e  => { release(); throw e  },
+  )
+}
+
 // Detect WASM-level crashes that corrupt the FFmpeg instance irreversibly
 function isWasmCrash(err: unknown): boolean {
   const msg = String(err instanceof Error ? err.message : err)
@@ -178,107 +191,107 @@ export async function runFfmpegWeb(opts: {
   }
 }
 
+// ── captureFrameAtTime ────────────────────────────────────────────────────────
+// Seeks a <video> element to `t` and draws 64×64 pixels onto a canvas.
+// Returns null if the seek times out (3 s) or fails.
+function captureFrameAtTime(
+  video: HTMLVideoElement,
+  ctx: CanvasRenderingContext2D,
+  t: number,
+): Promise<Uint8ClampedArray | null> {
+  return new Promise(res => {
+    const tid = setTimeout(() => { video.onseeked = null; res(null) }, 3000)
+    video.onseeked = () => {
+      clearTimeout(tid)
+      video.onseeked = null
+      ctx.drawImage(video, 0, 0, 64, 64)
+      res(ctx.getImageData(0, 0, 64, 64).data)
+    }
+    video.currentTime = t
+  })
+}
+
 // ── detectSceneChange ─────────────────────────────────────────────────────────
-// Uses FFmpeg's native scene-change metric (select=gt(scene,...)) for frame-accurate
-// detection of real transitions, instead of manual frame-diff at 2fps.
+// Uses the browser's native video decoder + Canvas API to compare frames.
+// No WASM copy needed — avoids loading the whole file into WASM memory.
+// Returns {ok:false} when no meaningful scene change is found (no fallback cut).
 export async function detectSceneChangeWeb(opts: {
   filePath: string; threshold?: number
 }): Promise<{ ok: boolean; splitTime?: number; duration?: number; error?: string }> {
-  const ff = await getFFmpeg()
-  await ff.deleteFile('detect.mp4').catch(() => {})
+  return new Promise(resolve => {
+    const video = document.createElement('video')
+    video.muted = true
+    video.preload = 'metadata'
+    video.src = opts.filePath
 
-  const logs: string[] = []
-  const logHandler = ({ message }: { message: string }) => logs.push(message)
+    const globalTimeout = setTimeout(() => {
+      video.src = ''
+      resolve({ ok: false, error: 'Timeout chargement vidéo' })
+    }, 25_000)
 
-  try {
-    await writeInput(ff, 'detect.mp4', opts.filePath)
+    video.onloadedmetadata = async () => {
+      const duration = video.duration
+      if (!isFinite(duration) || duration < 1) {
+        clearTimeout(globalTimeout)
+        video.src = ''
+        resolve({ ok: false, error: 'Durée invalide', duration: 0 })
+        return
+      }
 
-    // Step 1: get duration
-    ff.on('log', logHandler)
-    await ff.exec(['-hide_banner', '-i', 'detect.mp4', '-f', 'null', '-']).catch(() => {})
-    ff.off('log', logHandler)
-    const combined = logs.join('\n')
-    const durM = combined.match(/Duration:\s*(\d+):(\d+):(\d+\.?\d*)/)
-    const duration = durM ? parseInt(durM[1]) * 3600 + parseInt(durM[2]) * 60 + parseFloat(durM[3]) : 0
+      const W = 64, H = 64
+      const canvas = document.createElement('canvas')
+      canvas.width = W; canvas.height = H
+      const ctx = canvas.getContext('2d')!
 
-    // Step 2: FFmpeg native scene detection via select + showinfo
-    // scene value ranges 0–1; values ≥ 0.25 reliably indicate a hard cut
-    const sceneLogs: string[] = []
-    const sceneHandler = ({ message }: { message: string }) => sceneLogs.push(message)
-    ff.on('log', sceneHandler)
-    const threshold = opts.threshold ?? 0.25
-    await ff.exec([
-      '-hide_banner', '-i', 'detect.mp4',
-      '-vf', `select=gt(scene\\,${threshold}),showinfo`,
-      '-vsync', 'vfr', '-an', '-f', 'null', '-',
-    ]).catch(() => {})
-    ff.off('log', sceneHandler)
+      // Sample up to 30 timestamps spread across the video
+      const maxSamples = 30
+      const step = duration / maxSamples
+      const times = Array.from({ length: maxSamples }, (_, i) => (i + 0.5) * step)
 
-    // Parse showinfo output: "pts_time:8.541" lines → collect all timestamps
-    const timestamps: number[] = []
-    for (const line of sceneLogs) {
-      const m = line.match(/pts_time:([\d.]+)/)
-      if (m) timestamps.push(parseFloat(m[1]))
+      const frames: Array<{ t: number; data: Uint8ClampedArray }> = []
+      for (const t of times) {
+        const data = await captureFrameAtTime(video, ctx, t)
+        if (data) frames.push({ t, data })
+      }
+
+      clearTimeout(globalTimeout)
+      video.src = ''
+
+      if (frames.length < 4) {
+        resolve({ ok: false, error: 'Pas assez de frames capturées', duration })
+        return
+      }
+
+      // Compute normalised RGB diff between consecutive frames
+      const pixelCount = W * H
+      const threshold = opts.threshold ?? 0.12
+      let maxDiff = 0
+      let bestT = frames[1].t
+
+      for (let i = 1; i < frames.length; i++) {
+        const a = frames[i - 1].data, b = frames[i].data
+        let diff = 0
+        for (let j = 0; j < a.length; j += 4) {
+          diff += Math.abs(b[j] - a[j]) + Math.abs(b[j + 1] - a[j + 1]) + Math.abs(b[j + 2] - a[j + 2])
+        }
+        diff /= pixelCount * 3 * 255
+        if (diff > maxDiff) { maxDiff = diff; bestT = frames[i].t }
+      }
+
+      if (maxDiff < threshold) {
+        resolve({ ok: false, error: 'Aucun changement de scène détecté', duration })
+        return
+      }
+
+      const splitTime = Math.round(Math.min(bestT, duration - 0.033) * 1000) / 1000
+      resolve({ ok: true, splitTime, duration })
     }
 
-    if (timestamps.length === 0) {
-      // No FFmpeg scene change found — try manual frame-diff as last resort
-      const fb = await detectSceneChangeFallback(ff, duration)
-      // If fallback also finds nothing meaningful, propagate the failure
-      return fb
+    video.onerror = () => {
+      clearTimeout(globalTimeout)
+      resolve({ ok: false, error: 'Impossible de charger la vidéo' })
     }
-
-    // Pick the scene change closest to the middle of the video (most likely the intended split)
-    const mid = duration / 2
-    const best = timestamps.reduce((a, b) => Math.abs(a - mid) < Math.abs(b - mid) ? a : b)
-    const splitTime = Math.round(Math.min(best + 0.5, duration - 0.033) * 1000) / 1000
-    return { ok: true, splitTime, duration }
-
-  } catch (err) {
-    if (isWasmCrash(err)) resetFFmpeg()
-    return { ok: false, error: String(err) }
-  } finally {
-    ff.off('log', logHandler)
-    await ff.deleteFile('detect.mp4').catch(() => {})
-  }
-}
-
-// Fallback: manual frame-diff at 10fps with 64×64 frames (more accurate than 2fps/32px)
-async function detectSceneChangeFallback(
-  ff: FFmpeg,
-  duration: number,
-): Promise<{ ok: boolean; splitTime?: number; duration?: number; error?: string }> {
-  await ff.deleteFile('frames.rgb').catch(() => {})
-  try {
-    const FPS = 10, W = 64, H = 64
-    const frameSize = W * H * 3
-    await ff.exec([
-      '-hide_banner', '-i', 'detect.mp4',
-      '-vf', `fps=${FPS},scale=${W}:${H}`,
-      '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-y', 'frames.rgb',
-    ])
-    const raw = await ff.readFile('frames.rgb') as Uint8Array
-    const nFrames = Math.floor(raw.length / frameSize)
-    if (nFrames < 2) return { ok: true, splitTime: duration / 2, duration }
-
-    let maxDiff = 0, maxIdx = 0
-    for (let i = 1; i < nFrames; i++) {
-      const a = raw.subarray((i - 1) * frameSize, i * frameSize)
-      const b = raw.subarray(i * frameSize, (i + 1) * frameSize)
-      let diff = 0
-      for (let j = 0; j < frameSize; j++) diff += Math.abs(a[j] - b[j])
-      diff /= frameSize * 255
-      if (diff > maxDiff) { maxDiff = diff; maxIdx = i }
-    }
-    // Require a meaningful visual change — below this it's just camera movement/grain, not a scene cut
-    if (maxDiff < 0.10) return { ok: false, error: 'No scene change detected', duration }
-    const splitTime = Math.round((maxIdx / FPS) * 1000) / 1000
-    return { ok: true, splitTime, duration }
-  } catch (err) {
-    return { ok: false, splitTime: duration / 2, duration, error: String(err) }
-  } finally {
-    await ff.deleteFile('frames.rgb').catch(() => {})
-  }
+  })
 }
 
 // ── detectBeatDrop ────────────────────────────────────────────────────────────
@@ -424,17 +437,31 @@ export async function runFfmpegRemixWeb(opts: {
 // ── Canvas text renderer (replaces drawtext — not available in this WASM build) ──
 // Extracts the center fraction from FFmpeg position expressions.
 // Expressions always follow the pattern: w*FRAC-text_w/2 or h*FRAC-text_h/2
-// or (w-text_w)/2. We use textAlign='center'/textBaseline='middle' so we
-// only need the center coords — no eval() needed (avoids CSP unsafe-eval blocks).
-function extractCenterFrac(expr: string, dim: 'w' | 'h'): number {
+// Parses FFmpeg drawtext x/y expressions → Canvas draw params.
+// FFmpeg x = LEFT edge of text; y = TOP edge of text.
+// We convert to the Canvas textAlign/textBaseline='middle' equivalents.
+
+// For x: returns { align, x } where x is the Canvas anchor coordinate.
+function getXDrawParams(expr: string, W: number): { align: CanvasTextAlign; x: number } {
   const e = expr.trim()
-  // (w-text_w)/2  or  (h-text_h)/2  → center = 0.5
-  if (/^\(w-text_w\)\/2$/.test(e) || /^\(w\s*\/\s*2\)$/.test(e)) return 0.5
-  if (/^\(h-text_h\)\/2$/.test(e) || /^\(h\s*\/\s*2\)$/.test(e)) return 0.5
-  // w*FRAC… or h*FRAC…
-  if (dim === 'w') { const m = e.match(/^w\s*\*\s*([0-9.]+)/); if (m) return parseFloat(m[1]) }
-  if (dim === 'h') { const m = e.match(/^h\s*\*\s*([0-9.]+)/); if (m) return parseFloat(m[1]) }
-  return 0.5
+  // center: (w-text_w)/2 or (w/2)
+  if (/^\(w-text_w\)\/2$/.test(e) || /^\(w\s*\/\s*2\)$/.test(e)) return { align: 'center', x: W * 0.5 }
+  // right-aligned: w*FRAC-text_w  → Canvas right anchor at W*FRAC
+  const rm = e.match(/^w\s*\*\s*([0-9.]+)\s*-\s*text_w$/)
+  if (rm) return { align: 'right', x: W * parseFloat(rm[1]) }
+  // left-aligned: w*FRAC  → Canvas left anchor at W*FRAC
+  const lm = e.match(/^w\s*\*\s*([0-9.]+)/)
+  if (lm) return { align: 'left', x: W * parseFloat(lm[1]) }
+  return { align: 'center', x: W * 0.5 }
+}
+
+// For y: FFmpeg y = h*FRAC - fontSize/2 → center = H*FRAC (middle baseline).
+function getYCenter(expr: string, H: number): number {
+  const e = expr.trim()
+  if (/^\(h-text_h\)\/2$/.test(e) || /^\(h\s*\/\s*2\)$/.test(e)) return H * 0.5
+  const m = e.match(/^h\s*\*\s*([0-9.]+)/)
+  if (m) return H * parseFloat(m[1])
+  return H * 0.5
 }
 
 // Word-wrap text to fit within maxWidth pixels, returns array of lines
@@ -469,41 +496,33 @@ async function renderTextPNG(
 
   const weight = ov.bold ? 'bold' : 'normal'
   ctx.font = `${weight} ${ov.fontSize}px Arial, sans-serif`
-  ctx.textAlign    = 'center'
   ctx.textBaseline = 'middle'
 
-  const maxWidth  = W * 0.88          // 88% of frame width, 6% padding each side
+  const { align, x: cx } = getXDrawParams(ov.x, W)
+  const cy       = getYCenter(ov.y, H)
+  ctx.textAlign  = align
+
+  const maxWidth  = W * 0.88
   const lineH     = ov.fontSize * 1.25
   const borderPx  = Math.max(3, Math.round(ov.fontSize * 0.09))
   const lines     = wrapText(ctx, ov.text, maxWidth)
-
-  // Center block vertically around cy; shift up so the block is centered
-  const cx       = W * extractCenterFrac(ov.x, 'w')
-  const cy       = H * extractCenterFrac(ov.y, 'h')
-  const blockH   = lines.length * lineH
-  const startY   = cy - blockH / 2 + lineH / 2
+  const blockH    = lines.length * lineH
+  const startY    = cy - blockH / 2 + lineH / 2
 
   const drawLine = (line: string, ly: number, stroke: boolean) => {
-    if (stroke) {
-      ctx.strokeText(line, cx, ly)
-    } else {
-      ctx.fillText(line, cx, ly)
-    }
+    if (stroke) ctx.strokeText(line, cx, ly)
+    else        ctx.fillText(line, cx, ly)
   }
 
-  // Draw stroke pass (border + shadow)
   ctx.strokeStyle = 'rgba(0,0,0,1)'
   ctx.lineWidth   = borderPx * 2
   ctx.lineJoin    = 'round'
   if (ov.shadow !== false) {
     ctx.shadowColor   = 'rgba(0,0,0,0.8)'
-    ctx.shadowOffsetX = 3
-    ctx.shadowOffsetY = 3
-    ctx.shadowBlur    = 6
+    ctx.shadowOffsetX = 3; ctx.shadowOffsetY = 3; ctx.shadowBlur = 6
   }
   lines.forEach((line, i) => drawLine(line, startY + i * lineH, true))
 
-  // Draw fill pass (no shadow — prevent double shadow)
   ctx.shadowColor = 'transparent'
   ctx.fillStyle   = ov.fontColor || 'white'
   lines.forEach((line, i) => drawLine(line, startY + i * lineH, false))
@@ -514,20 +533,167 @@ async function renderTextPNG(
   await ff.writeFile(fileName, new Uint8Array(await blob.arrayBuffer()))
 }
 
-// ── runFfmpegRemixAI (Canvas text → overlay, no drawtext needed) ─────────────
-// splitTime is optional: if omitted (no scene change detected), phase 2 is skipped
-// and the output is just newPhase1Path scaled to the preset with text overlays.
-export async function runFfmpegRemixAIWeb(opts: {
-  newPhase1Path: string
-  originalPath:  string
-  splitTime?:    number   // undefined = no scene change → no phase 2
-  targetDuration?: number // trim output to this duration (matches original length)
-  outputPath:    string
-  preset:        '9:16' | '1:1' | '16:9'
-  textOverlays:  Array<{
-    text: string; x: string; y: string; fontSize: number; fontColor: string
-    startTime: number; endTime: number; bold?: boolean; shadow?: boolean
-  }>
+// ── drawOverlayText ───────────────────────────────────────────────────────────
+// Same rendering logic as renderTextPNG: word-wrap, multi-line, border + shadow.
+function drawOverlayText(
+  ctx: CanvasRenderingContext2D,
+  ov: { text: string; x: string; y: string; fontSize: number; fontColor: string; bold?: boolean; shadow?: boolean },
+  W: number, H: number,
+): void {
+  const weight   = ov.bold ? 'bold' : 'normal'
+  ctx.font       = `${weight} ${ov.fontSize}px Arial, sans-serif`
+  ctx.textBaseline = 'middle'
+
+  const { align, x: cx } = getXDrawParams(ov.x, W)
+  const cy       = getYCenter(ov.y, H)
+  ctx.textAlign  = align
+
+  const maxWidth = W * 0.88
+  const lineH    = ov.fontSize * 1.25
+  const borderPx = Math.max(3, Math.round(ov.fontSize * 0.09))
+  const lines    = wrapText(ctx, ov.text, maxWidth)
+  const blockH   = lines.length * lineH
+  const startY   = cy - blockH / 2 + lineH / 2
+
+  ctx.strokeStyle = 'rgba(0,0,0,1)'
+  ctx.lineWidth   = borderPx * 2
+  ctx.lineJoin    = 'round'
+  if (ov.shadow !== false) {
+    ctx.shadowColor   = 'rgba(0,0,0,0.8)'
+    ctx.shadowOffsetX = 3; ctx.shadowOffsetY = 3; ctx.shadowBlur = 6
+  }
+  lines.forEach((line, i) => ctx.strokeText(line, cx, startY + i * lineH))
+
+  ctx.shadowColor = 'transparent'
+  ctx.fillStyle   = ov.fontColor || 'white'
+  lines.forEach((line, i) => ctx.fillText(line, cx, startY + i * lineH))
+}
+
+// ── remixViaMediaRecorder ─────────────────────────────────────────────────────
+// Records the remix using the browser's hardware video encoder via MediaRecorder.
+// Phase 1: secondary clip video + original audio (0 → splitTime)
+// Phase 2: original clip video + audio (splitTime → end)
+// Text overlays are rendered directly onto the canvas.
+// Returns a Blob in the best supported format (MP4 > WebM H264 > WebM VP9).
+async function remixViaMediaRecorder(opts: {
+  newPhase1Path:  string
+  originalPath:   string
+  splitTime:      number   // 0 = no split, use secondary for full duration
+  targetDuration?: number
+  preset:         '9:16' | '1:1' | '16:9'
+  textOverlays:   Array<{ text: string; x: string; y: string; fontSize: number; fontColor: string; startTime: number; endTime: number; bold?: boolean; shadow?: boolean }>
+}): Promise<{ blob: Blob; mimeType: string }> {
+  const W = opts.preset === '16:9' ? 1920 : 1080
+  const H = opts.preset === '9:16' ? 1920 : 1080
+  const hasSplit = opts.splitTime > 0
+
+  // ── load videos ──────────────────────────────────────────────────────────────
+  const loadVid = (src: string): Promise<HTMLVideoElement> => new Promise((res, rej) => {
+    const v = document.createElement('video')
+    v.muted = true; v.playsInline = true; v.preload = 'auto'; v.src = src
+    v.onloadeddata = () => res(v)
+    v.onerror      = () => rej(new Error('Impossible de charger la vidéo'))
+    setTimeout(() => rej(new Error('Timeout chargement vidéo')), 30_000)
+  })
+  const [secVid, origVid] = await Promise.all([
+    hasSplit ? loadVid(opts.newPhase1Path) : null,
+    loadVid(opts.originalPath),
+  ])
+  const totalDuration = opts.targetDuration ?? origVid.duration
+
+  // ── canvas + capture stream ───────────────────────────────────────────────────
+  const canvas = document.createElement('canvas')
+  canvas.width = W; canvas.height = H
+  const ctx = canvas.getContext('2d', { alpha: false })!
+  const canvasStream: MediaStream = (canvas as any).captureStream(30)
+
+  // ── audio routing ─────────────────────────────────────────────────────────────
+  // Use AudioContext to route origVid's audio to the recorder without playing through speakers.
+  const audioCtx = new AudioContext()
+  const audioDest = audioCtx.createMediaStreamDestination()
+  const audioSrc  = audioCtx.createMediaElementSource(origVid)
+  audioSrc.connect(audioDest)   // → recorder only, not speakers
+  origVid.muted = false          // needed so AudioContext captures it
+
+  const stream = new MediaStream([
+    canvasStream.getVideoTracks()[0],
+    audioDest.stream.getAudioTracks()[0],
+  ])
+
+  // ── MediaRecorder — pick best codec ──────────────────────────────────────────
+  const mimeType = [
+    'video/mp4',
+    'video/webm;codecs=h264,opus',
+    'video/webm;codecs=vp9,opus',
+    'video/webm;codecs=vp8,opus',
+    'video/webm',
+  ].find(m => MediaRecorder.isTypeSupported(m)) ?? 'video/webm'
+
+  const chunks: Blob[] = []
+  const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 5_000_000, audioBitsPerSecond: 128_000 })
+  recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data) }
+  recorder.start(250)
+
+  // ── draw loop ─────────────────────────────────────────────────────────────────
+  let switched = !hasSplit   // already in phase 2 if no split
+  let animId = 0
+
+  const drawFrame = () => {
+    const t = origVid.currentTime
+
+    // Switch from secondary to original 0.2s after splitTime to avoid stray frames
+    if (!switched && t >= opts.splitTime + 0.2) {
+      switched = true
+      secVid?.pause()
+    }
+
+    const source = switched ? origVid : secVid!
+    const vw = source.videoWidth  || W
+    const vh = source.videoHeight || H
+    const scale = Math.min(W / vw, H / vh)
+    const dw = vw * scale, dh = vh * scale
+
+    ctx.fillStyle = '#000'
+    ctx.fillRect(0, 0, W, H)
+    ctx.drawImage(source, (W - dw) / 2, (H - dh) / 2, dw, dh)
+
+    for (const ov of opts.textOverlays) {
+      if (t >= ov.startTime && t <= ov.endTime) drawOverlayText(ctx, ov, W, H)
+    }
+
+    if (!origVid.ended && origVid.currentTime < totalDuration) {
+      animId = requestAnimationFrame(drawFrame)
+    } else {
+      recorder.stop()
+    }
+  }
+
+  // ── seek & play ───────────────────────────────────────────────────────────────
+  const seekTo = (v: HTMLVideoElement, t: number) => new Promise<void>(r => {
+    if (Math.abs(v.currentTime - t) < 0.05) { r(); return }
+    v.onseeked = () => { v.onseeked = null; r() }
+    v.currentTime = t
+  })
+
+  await seekTo(origVid, 0)
+  if (hasSplit && secVid) await seekTo(secVid, 0)
+
+  origVid.play()
+  if (hasSplit && secVid) secVid.play()
+  animId = requestAnimationFrame(drawFrame)
+
+  await new Promise<void>(res => { recorder.onstop = () => res() })
+  cancelAnimationFrame(animId)
+  await audioCtx.close()
+
+  return { blob: new Blob(chunks, { type: recorder.mimeType || mimeType }), mimeType }
+}
+
+// ── runFfmpegRemixAIWasm (WASM fallback) ─────────────────────────────────────
+async function runFfmpegRemixAIWasm(opts: {
+  newPhase1Path: string; originalPath: string; splitTime?: number; targetDuration?: number
+  outputPath: string; preset: '9:16' | '1:1' | '16:9'
+  textOverlays: Array<{ text: string; x: string; y: string; fontSize: number; fontColor: string; startTime: number; endTime: number; bold?: boolean; shadow?: boolean }>
 }): Promise<{ ok: boolean; outputPath?: string; error?: string }> {
   const hasPhase2  = opts.splitTime != null && opts.splitTime > 0
   const overlayFiles = opts.textOverlays.map((_, i) => `ai_ov${i}.png`)
@@ -540,22 +706,15 @@ export async function runFfmpegRemixAIWeb(opts: {
   try {
     await writeInput(ff, 'ai_new1.mp4', opts.newPhase1Path)
     if (hasPhase2) await writeInput(ff, 'ai_orig.mp4', opts.originalPath)
-
     const W    = opts.preset === '16:9' ? 1920 : 1080
     const H    = opts.preset === '9:16' ? 1920 : 1080
     const scl  = `scale=${W}:${H}:force_original_aspect_ratio=decrease,pad=${W}:${H}:-1:-1:color=black,setsar=1`
     const afmt = 'aformat=sample_rates=44100:channel_layouts=stereo'
-
-    // Render each text overlay as a transparent PNG via Canvas API
     for (let i = 0; i < opts.textOverlays.length; i++) {
       await renderTextPNG(ff, opts.textOverlays[i], W, H, overlayFiles[i])
     }
-
-    let chains: string[]
-    let inputArgs: string[]
-
+    let chains: string[], inputArgs: string[]
     if (hasPhase2) {
-      // Phase 1 (new clip) + Phase 2 (original from splitTime)
       const st = opts.splitTime!
       chains = [
         `[0:v]trim=duration=${st},setpts=PTS-STARTPTS,${scl}[v_p1]`,
@@ -567,7 +726,6 @@ export async function runFfmpegRemixAIWeb(opts: {
       ]
       inputArgs = ['-i', 'ai_new1.mp4', '-i', 'ai_orig.mp4']
     } else {
-      // No scene change → use new clip only, trimmed to original duration if known
       const trimFilter = opts.targetDuration ? `trim=duration=${opts.targetDuration},setpts=PTS-STARTPTS,` : ''
       chains = [
         `[0:v]${trimFilter}${scl}[v_merged]`,
@@ -577,24 +735,18 @@ export async function runFfmpegRemixAIWeb(opts: {
       ]
       inputArgs = ['-i', 'ai_new1.mp4']
     }
-
-    // Chain overlay PNGs: [v_merged] → … → [vout]
-    // Each PNG input comes after the video inputs
     const videoInputCount = hasPhase2 ? 2 : 1
     let lastPad = 'v_merged'
     for (let i = 0; i < opts.textOverlays.length; i++) {
-      const ov     = opts.textOverlays[i]
+      const ov = opts.textOverlays[i]
       const outPad = i === opts.textOverlays.length - 1 ? 'vout' : `v_ov${i}`
       chains.push(`[${lastPad}][${videoInputCount + i}:v]overlay=0:0:enable=between(t\\,${ov.startTime}\\,${ov.endTime})[${outPad}]`)
       lastPad = outPad
     }
-    // No overlays → v_merged becomes vout
     if (opts.textOverlays.length === 0) {
       chains[chains.length - 1] = chains[chains.length - 1].replace('[v_merged]', '[vout]').replace('[v_merged][aout]', '[vout][aout]')
     }
-
     for (const f of overlayFiles) inputArgs.push('-i', f)
-
     await ff.exec([
       ...inputArgs,
       '-filter_complex', chains.join(';'),
@@ -603,18 +755,77 @@ export async function runFfmpegRemixAIWeb(opts: {
       '-c:a', 'aac', '-b:a', '128k',
       '-movflags', '+faststart', '-y', 'ai_out.mp4',
     ])
-
     const url = await readOutput(ff, 'ai_out.mp4')
     return { ok: true, outputPath: url }
   } catch (err) {
     if (isWasmCrash(err)) resetFFmpeg()
     const relevant = ffLogs.filter(l => /error|invalid|unknown|cannot|no such/i.test(l)).slice(-3)
-    const detail   = relevant.length ? '\n' + relevant.join('\n') : ''
-    return { ok: false, error: String(err) + detail }
+    return { ok: false, error: String(err) + (relevant.length ? '\n' + relevant.join('\n') : '') }
   } finally {
     ff.off('log', logHandler)
     for (const f of FILES) await ff.deleteFile(f).catch(() => {})
   }
+}
+
+// ── runFfmpegRemixAI (Canvas text → overlay, no drawtext needed) ─────────────
+// Fast path: MediaRecorder with browser hardware encoder.
+// Fallback: WASM FFmpeg (slower, used when MediaRecorder not supported or fails).
+export async function runFfmpegRemixAIWeb(opts: {
+  newPhase1Path: string
+  originalPath:  string
+  splitTime?:    number
+  targetDuration?: number
+  outputPath:    string
+  preset:        '9:16' | '1:1' | '16:9'
+  textOverlays:  Array<{
+    text: string; x: string; y: string; fontSize: number; fontColor: string
+    startTime: number; endTime: number; bold?: boolean; shadow?: boolean
+  }>
+}): Promise<{ ok: boolean; outputPath?: string; error?: string }> {
+  const splitTime = (opts.splitTime != null && !isNaN(opts.splitTime) && opts.splitTime > 0)
+    ? opts.splitTime : 0
+
+  // ── Fast path: hardware encoding via MediaRecorder ────────────────────────
+  if (typeof MediaRecorder !== 'undefined') {
+    try {
+      const { blob, mimeType } = await remixViaMediaRecorder({ ...opts, splitTime })
+
+      // If browser gave us native MP4, return directly
+      if (mimeType.startsWith('video/mp4')) {
+        return { ok: true, outputPath: URL.createObjectURL(blob) }
+      }
+
+      // WebM with H.264 → fast remux to MP4 via WASM (-c copy, no re-encode)
+      if (mimeType.includes('h264')) {
+        try {
+          return await withFfmpegLock(async () => {
+            const ff = await getFFmpeg()
+            await ff.deleteFile('mr_in.webm').catch(() => {})
+            await ff.deleteFile('mr_out.mp4').catch(() => {})
+            await ff.writeFile('mr_in.webm', new Uint8Array(await blob.arrayBuffer()))
+            await ff.exec(['-nostdin', '-i', 'mr_in.webm', '-c', 'copy', '-movflags', '+faststart', '-y', 'mr_out.mp4'])
+            const url = await readOutput(ff, 'mr_out.mp4')
+            await ff.deleteFile('mr_in.webm').catch(() => {})
+            await ff.deleteFile('mr_out.mp4').catch(() => {})
+            return { ok: true, outputPath: url }
+          })
+        } catch {
+          // Remux failed → return WebM blob as-is (GéeLark may accept it)
+          return { ok: true, outputPath: URL.createObjectURL(blob) }
+        }
+      }
+
+      // VP9/VP8 WebM → return as-is (GéeLark generally accepts WebM too)
+      return { ok: true, outputPath: URL.createObjectURL(blob) }
+
+    } catch (err) {
+      console.warn('[remix] MediaRecorder failed, falling back to WASM:', String(err))
+      if (isWasmCrash(err)) resetFFmpeg()
+    }
+  }
+
+  // ── Fallback: WASM FFmpeg ─────────────────────────────────────────────────
+  return withFfmpegLock(() => runFfmpegRemixAIWasm(opts))
 }
 
 // ── runFfmpegTextOverlay ──────────────────────────────────────────────────────
@@ -703,7 +914,19 @@ export async function runFfmpegMetadataWeb(opts: {
   }
 }
 
+// ── seekVideo ─────────────────────────────────────────────────────────────────
+// Seeks a video element to `t` and resolves when the seek completes (or times out).
+function seekVideo(video: HTMLVideoElement, t: number): Promise<boolean> {
+  return new Promise(res => {
+    const tid = setTimeout(() => { video.onseeked = null; res(false) }, 3000)
+    video.onseeked = () => { clearTimeout(tid); video.onseeked = null; res(true) }
+    video.currentTime = t
+  })
+}
+
 // ── extractFrames (for AI vision analysis) ───────────────────────────────────
+// Uses Canvas+Video instead of WASM — avoids loading the full video into WASM memory.
+// Produces JPEG base64 frames identical to the Electron IPC version.
 export async function extractFramesWeb(opts: {
   filePath: string; endTime: number; startTime?: number; fps?: number
 }): Promise<{
@@ -712,45 +935,49 @@ export async function extractFramesWeb(opts: {
   count?: number
   error?: string
 }> {
-  const start      = opts.startTime ?? 0
-  const duration   = opts.endTime - start
+  const start = opts.startTime ?? 0
+  const duration = Math.max(0.1, opts.endTime - start)
   const targetCount = Math.min(8, Math.max(1, Math.ceil(duration)))
-  const frameFiles  = Array.from({ length: targetCount }, (_, i) => `frame_${String(i + 1).padStart(4, '0')}.jpg`)
-  const ff = await getFFmpeg()
-  await ff.deleteFile('frames_in.mp4').catch(() => {})
-  for (const f of frameFiles) await ff.deleteFile(f).catch(() => {})
-  try {
-    await writeInput(ff, 'frames_in.mp4', opts.filePath)
-    const fps = targetCount / duration
-    const seekArgs = start > 0 ? ['-ss', String(start)] : []
-    await ff.exec([
-      ...seekArgs, '-i', 'frames_in.mp4',
-      '-t', String(duration),
-      '-vf', `fps=${fps.toFixed(4)},scale=640:-2`,
-      '-q:v', '5',
-      '-y', 'frame_%04d.jpg',
-    ])
-    const frames: Array<{ index: number; timestamp: number; data: string }> = []
-    const interval = duration / targetCount
-    for (let i = 1; i <= targetCount; i++) {
-      const name = `frame_${String(i).padStart(4, '0')}.jpg`
-      try {
-        const data = await ff.readFile(name) as Uint8Array
-        let binary = ''
-        data.forEach(b => { binary += String.fromCharCode(b) })
-        frames.push({
-          index:     i - 1,
-          timestamp: Math.round((i - 1) * interval * 10) / 10,
-          data:      btoa(binary),
-        })
-      } catch { break }
+
+  return new Promise(resolve => {
+    const video = document.createElement('video')
+    video.muted = true
+    video.preload = 'metadata'
+    video.src = opts.filePath
+
+    const globalTimeout = setTimeout(() => {
+      video.src = ''
+      resolve({ ok: false, error: 'Timeout chargement vidéo pour extraction frames' })
+    }, 30_000)
+
+    video.onloadedmetadata = async () => {
+      const W = 640
+      const H = Math.round(W * (video.videoHeight / (video.videoWidth || 1))) || 360
+      const canvas = document.createElement('canvas')
+      canvas.width = W; canvas.height = H
+      const ctx = canvas.getContext('2d')!
+
+      const interval = duration / targetCount
+      const times = Array.from({ length: targetCount }, (_, i) => start + (i + 0.5) * interval)
+
+      const frames: Array<{ index: number; timestamp: number; data: string }> = []
+      for (let i = 0; i < times.length; i++) {
+        const ok = await seekVideo(video, times[i])
+        if (!ok) continue
+        ctx.drawImage(video, 0, 0, W, H)
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.8)
+        const b64 = dataUrl.split(',')[1] ?? ''
+        if (b64) frames.push({ index: i, timestamp: Math.round(times[i] * 10) / 10, data: b64 })
+      }
+
+      clearTimeout(globalTimeout)
+      video.src = ''
+      resolve({ ok: true, frames, count: frames.length })
     }
-    return { ok: true, frames, count: frames.length }
-  } catch (err) {
-    if (isWasmCrash(err)) resetFFmpeg()
-    return { ok: false, error: String(err) }
-  } finally {
-    await ff.deleteFile('frames_in.mp4').catch(() => {})
-    for (const f of frameFiles) await ff.deleteFile(f).catch(() => {})
-  }
+
+    video.onerror = () => {
+      clearTimeout(globalTimeout)
+      resolve({ ok: false, error: 'Impossible de charger la vidéo pour extraction frames' })
+    }
+  })
 }

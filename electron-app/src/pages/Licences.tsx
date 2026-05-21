@@ -266,7 +266,7 @@ export function Licences({ user: _user }: Props) {
             <div className="space-y-2">
               <label className="text-[12px] text-text2 uppercase tracking-wide">Plan</label>
               <div className="flex gap-2">
-                {['standard', 'pro', 'lifetime'].map(p => (
+                {['standard', 'pro', 'organisation'].map(p => (
                   <button
                     key={p}
                     onClick={() => setPlan(p)}
