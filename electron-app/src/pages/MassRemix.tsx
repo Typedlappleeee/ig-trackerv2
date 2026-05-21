@@ -747,8 +747,8 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                     <p className="text-[11px] font-mono truncate" style={{ color: 'rgba(226,217,243,0.75)' }}>{fileName(pair.originalPath)}</p>
                     <p className="text-[10px] font-mono truncate" style={{ color: 'rgba(236,72,153,0.6)' }}>{fileName(pair.secondaryPath)}</p>
                     {pair.cutSec != null
-                      ? <p className="text-[10px] font-semibold" style={{ color: '#eab308' }}>✂ {pair.cutSec.toFixed(1)}s</p>
-                      : <p className="text-[10px]" style={{ color: 'rgba(148,163,184,0.3)' }}>{splitMode === 'manual' ? `✂ ${manualSplitSec}s (global)` : '🤖 auto'}</p>
+                      ? <p className="text-[10px] font-semibold" style={{ color: '#eab308' }}>{pair.cutSec.toFixed(1)}s</p>
+                      : <p className="text-[10px]" style={{ color: 'rgba(148,163,184,0.3)' }}>{splitMode === 'manual' ? `${manualSplitSec}s (global)` : '🤖 auto'}</p>
                     }
                   </div>
                 </button>
@@ -769,37 +769,11 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                     style={{ display: 'none' }}
                   />
 
-                  {/* ── Split frame preview (before / after cut) ── */}
-                  {selectedPair.cutSec != null && (beforeFrameUrl || afterFrameUrl) && (
-                    <div className="w-full flex gap-3 flex-shrink-0">
-                      {[
-                        { label: 'Avant le cut', url: beforeFrameUrl, time: Math.max(0, selectedPair.cutSec - 0.05) },
-                        { label: 'Après le cut',  url: afterFrameUrl,  time: selectedPair.cutSec },
-                      ].map(({ label, url, time }) => (
-                        <div key={label} className="flex-1 flex flex-col gap-1.5">
-                          <span className="text-[10px] font-semibold text-center" style={{ color: 'rgba(148,163,184,0.55)' }}>{label}</span>
-                          <div className="relative rounded-xl overflow-hidden" style={{
-                            background: '#000',
-                            aspectRatio: preset === '9:16' ? '9/16' : preset === '1:1' ? '1/1' : '16/9',
-                          }}>
-                            {url
-                              ? <img src={url} className="w-full h-full object-contain" />
-                              : <div className="absolute inset-0 flex items-center justify-center">
-                                  <div className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: 'rgba(139,92,246,0.5)', borderTopColor: 'transparent' }} />
-                                </div>
-                            }
-                          </div>
-                          <span className="text-[10px] font-mono text-center" style={{ color: '#eab308' }}>{time.toFixed(3)}s</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
                   {/* ── Main video ── */}
                   <div className="relative rounded-2xl overflow-hidden flex-shrink-0"
                     style={{
                       background: '#000',
-                      maxHeight: selectedPair.cutSec != null ? 'calc(100vh - 420px)' : 'calc(100vh - 300px)',
+                      maxHeight: 'calc(100vh - 300px)',
                       aspectRatio: preset === '9:16' ? '9/16' : preset === '1:1' ? '1/1' : '16/9',
                       maxWidth: preset === '9:16' ? 220 : '100%',
                     }}>
@@ -863,7 +837,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                             }}
                             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-bold transition-all hover:brightness-110"
                             style={{ background: 'rgba(234,179,8,0.18)', border: '1px solid rgba(234,179,8,0.4)', color: '#eab308' }}>
-                            ✂ Couper ici
+                            Couper ici
                           </button>
                         )}
                         {selectedPair.cutSec != null && (
@@ -880,7 +854,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                     {selectedPair.cutSec != null && (
                       <div className="flex items-center gap-2">
                         <span className="text-[11px]" style={{ color: 'rgba(148,163,184,0.5)' }}>Point de coupe :</span>
-                        <span className="text-[13px] font-bold font-mono" style={{ color: '#eab308' }}>✂ {selectedPair.cutSec.toFixed(3)}s</span>
+                        <span className="text-[13px] font-bold font-mono" style={{ color: '#eab308' }}>{selectedPair.cutSec.toFixed(3)}s</span>
                         <span className="text-[10px]" style={{ color: 'rgba(148,163,184,0.35)' }}>← → image par image · Shift ±0.1s · Ctrl ±1s</span>
                       </div>
                     )}
@@ -956,7 +930,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                             <div style={{ width: 3, height: '100%', background: '#eab308', borderRadius: 2, boxShadow: '0 0 10px rgba(234,179,8,0.7)' }} />
                             <div className="absolute -bottom-6 whitespace-nowrap text-[9px] font-bold px-1.5 py-0.5 rounded"
                               style={{ color: '#000', background: '#eab308', transform: 'translateX(-50%)' }}>
-                              ✂ {selectedPair.cutSec.toFixed(3)}s
+                              {selectedPair.cutSec.toFixed(3)}s
                             </div>
                           </div>
                         )}
