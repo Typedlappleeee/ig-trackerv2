@@ -492,7 +492,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                 }
 
                 // ── Step 3: generate per-line overlays inside their zone ──────────
-                // Use rawY clamped to safe bands: top [0.10–0.30], bottom [0.60–0.82]
+                // Randomise position within safe bands: top [0.10–0.30], bottom [0.60–0.82]
                 // Track baseY per item so concurrent stacking works correctly
                 const baseYMap = new Map<number, number>()
                 items.forEach((item, idx) => {
@@ -502,13 +502,12 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
 
                   let baseY: number
                   if (zone === 'top') {
-                    // Mirror original position, clamped to top safe zone
-                    const preferred = Math.max(0.10, Math.min(0.30, item.rawY))
-                    // Push below any concurrent top items already placed
+                    // Random position in top safe zone [0.10, 0.28]
+                    const preferred = 0.10 + Math.random() * 0.18
                     const concurrentEnd = items
                       .slice(0, idx)
                       .filter((_, j) => zones[j] === 'top' && items[j].endTime > item.startTime && items[j].startTime < item.endTime)
-                      .reduce((max, it, _i, _arr) => {
+                      .reduce((max, it) => {
                         const j = items.indexOf(it)
                         const b = baseYMap.get(j) ?? preferred
                         const n = wrapText(it.text, it.fontSize, outW).length
@@ -517,9 +516,8 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                       }, preferred)
                     baseY = concurrentEnd
                   } else {
-                    // Mirror original position, clamped to bottom safe zone
-                    const preferred = Math.max(0.60, Math.min(0.80, item.rawY))
-                    // Stack below any concurrent bottom items already placed
+                    // Random position in bottom safe zone [0.62, 0.80]
+                    const preferred = 0.62 + Math.random() * 0.18
                     const concurrentEnd = items
                       .slice(0, idx)
                       .filter((_, j) => zones[j] === 'bottom' && items[j].endTime > item.startTime && items[j].startTime < item.endTime)
