@@ -1387,12 +1387,38 @@ export async function extractInstagramSessionId(
 // Takes a screenshot of the phone screen and returns it as a base64 PNG data URL.
 // Uses screencap + base64 via shell. Returns null on failure.
 export async function takeScreenshot(bearer: string, phoneId: string): Promise<string | null> {
+  const url  = `${BASE}/shell/execute`
+  const body = { id: phoneId, cmd: 'screencap -p /data/local/tmp/sf_sc.png && base64 /data/local/tmp/sf_sc.png' }
+
   try {
-    const d = await geelarkFetch(
-      'POST', '/shell/execute',
-      { id: phoneId, cmd: 'screencap -p /sdcard/sf_sc.png && base64 -w 0 /sdcard/sf_sc.png' },
-      bearer,
-    )
+    let d: Record<string, unknown>
+
+    if (window.electronAPI?.geelarkRequest) {
+      // Electron: direct IPC call, no timeout issue
+      const result = await window.electronAPI.geelarkRequest({
+        method: 'POST', url,
+        headers: { Authorization: `Bearer ${bearer}` },
+        body,
+      })
+      if (!result.ok) return null
+      d = result.data as Record<string, unknown>
+    } else {
+      // Web: use dedicated screenshot endpoint (25s timeout)
+      const res = await fetch('/api/screenshot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url,
+          headers: { Authorization: `Bearer ${bearer}` },
+          body,
+        }),
+      })
+      if (!res.ok) return null
+      const result = await res.json()
+      if (!result.ok) return null
+      d = result.data as Record<string, unknown>
+    }
+
     if (Number(d['code']) !== 0) return null
     const raw = String((d['data'] as Record<string, unknown>)?.['output'] ?? '').trim()
     if (!raw) return null
