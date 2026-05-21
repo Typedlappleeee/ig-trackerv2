@@ -426,15 +426,12 @@ export function MassRemix({ user }: MassRemixProps) {
           if (!det.ok) addLog(job.id, `❌ Détection échouée: ${det.error ?? 'inconnu'}`)
 
           detDuration = det.duration
-          const minSplit = (det.duration ?? 10) * 0.15
-          if (det.ok && det.splitTime != null && det.splitTime >= minSplit) {
+          if (det.ok && det.splitTime != null) {
             splitTime = Math.min((det.duration ?? 60) - 0.1, Math.round(det.splitTime * 1000) / 1000)
             addLog(job.id, `✅ Scène: splitTime=${splitTime}s, durée=${det.duration ?? '?'}s`)
           } else {
-            // No scene change (or detected too early) — fall back to 40% of duration, capped at 5s
-            const fallback = Math.round(Math.min(5, Math.max(1, (det.duration ?? 10) * 0.40)) * 1000) / 1000
-            splitTime = fallback
-            addLog(job.id, `⚠️ Pas de scène détectée → coupe par défaut à ${fallback}s`)
+            splitTime = undefined
+            addLog(job.id, `⚠️ Pas de scène détectée → vidéo secondaire uniquement`)
           }
 
           // Vérif. décor — si le BACKGROUND/LIEU est le même des 2 côtés du cut → annuler
