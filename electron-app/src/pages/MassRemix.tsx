@@ -71,6 +71,18 @@ function toFileUrl(p: string) {
 }
 function formatSec(s: number) { const m = Math.floor(s / 60); return `${m}:${Math.floor(s % 60).toString().padStart(2, '0')}` }
 
+// Word-overlap similarity: strip non-letter/digit chars (catches emoji vs ASCII variants),
+// lowercase, then count shared words of length > 2 relative to the larger set.
+function textSimilarity(a: string, b: string): number {
+  const words = (s: string) => new Set(
+    s.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, ' ').split(/\s+/).filter(w => w.length > 2)
+  )
+  const wa = words(a), wb = words(b)
+  if (wa.size === 0 && wb.size === 0) return 1
+  const intersection = [...wa].filter(w => wb.has(w)).length
+  return intersection / Math.max(wa.size, wb.size)
+}
+
 function xAlignToExpr(align: string): string {
   if (align === 'right') return 'w*0.96-text_w'
   if (align === 'left')  return 'w*0.04'
@@ -414,12 +426,13 @@ export function MassRemix({ user }: MassRemixProps) {
           if (!det.ok) addLog(job.id, `❌ Détection échouée: ${det.error ?? 'inconnu'}`)
 
           detDuration = det.duration
-          if (det.ok && det.splitTime != null) {
+          const minSplit = (det.duration ?? 10) * 0.15
+          if (det.ok && det.splitTime != null && det.splitTime >= minSplit) {
             splitTime = Math.min((det.duration ?? 60) - 0.1, Math.round(det.splitTime * 1000) / 1000)
             addLog(job.id, `✅ Scène: splitTime=${splitTime}s, durée=${det.duration ?? '?'}s`)
           } else {
-            // No scene change found — fall back to 25% of duration, capped at 3s
-            const fallback = Math.round(Math.min(3, Math.max(0.5, (det.duration ?? 12) * 0.25)) * 1000) / 1000
+            // No scene change (or detected too early) — fall back to 40% of duration, capped at 5s
+            const fallback = Math.round(Math.min(5, Math.max(1, (det.duration ?? 10) * 0.40)) * 1000) / 1000
             splitTime = fallback
             addLog(job.id, `⚠️ Pas de scène détectée → coupe par défaut à ${fallback}s`)
           }
@@ -524,12 +537,15 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                 const outH = preset === '9:16' ? 1920 : 1080
                 const outW = preset === '16:9' ? 1920 : 1080
 
-                // Deduplicate: merge entries with the same text (case-insensitive)
+                // Deduplicate: merge entries whose text is ≥70% similar by word overlap
+                // (catches emoji/ASCII variants like 🇺🇸 vs "us" for the same caption)
                 const parsed = rawParsed.reduce((acc, item) => {
-                  const existing = acc.find(e => e.text.trim().toLowerCase() === item.text.trim().toLowerCase())
+                  const existing = acc.find(e => textSimilarity(e.text, item.text) >= 0.70)
                   if (existing) {
                     existing.startFrame = Math.min(existing.startFrame ?? 0, item.startFrame ?? 0)
                     existing.endFrame   = Math.max(existing.endFrame   ?? frameCount - 1, item.endFrame ?? frameCount - 1)
+                    // Keep the longer/richer text (with emoji etc.)
+                    if (item.text.length > existing.text.length) existing.text = item.text
                   } else {
                     acc.push({ ...item })
                   }
