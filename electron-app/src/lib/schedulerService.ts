@@ -31,7 +31,6 @@ export interface ScheduledPost {
   delay_minutes:   number
   mode:            'seq' | 'random'
   bearer_token:    string
-  program_id:      string | null
   result:          { logs: string[] } | null
   error_msg:       string | null
   created_at:      string
@@ -50,7 +49,6 @@ export interface CreateScheduledPostInput {
   delayMinutes:    number
   mode:            'seq' | 'random'
   bearerToken:     string
-  programId?:      string | null
 }
 
 // ── DB operations ──────────────────────────────────────────────────────────────
@@ -69,7 +67,6 @@ export async function createScheduledPost(input: CreateScheduledPostInput): Prom
     delay_minutes:    input.delayMinutes,
     mode:             input.mode,
     bearer_token:     input.bearerToken,
-    program_id:       input.programId ?? null,
   }).select().single()
   if (error) throw new Error(error.message)
   return data as ScheduledPost
