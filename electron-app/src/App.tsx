@@ -528,6 +528,7 @@ import { TextCopy }          from '@/pages/TextCopy'
 import { Licences }          from '@/pages/Licences'
 import { Support }           from '@/pages/Support'
 import { Community }         from '@/pages/Community'
+import LiveMonitorOverlay    from '@/components/LiveMonitor'
 
 import { FullPageLoader }    from '@/components/ui/Spinner'
 
@@ -699,6 +700,7 @@ function AppContent({ user }: { user: User }) {
     <LicenseContext.Provider value={license}>
     <CreditContext.Provider value={{ balance: creditBalance, loading: creditLoading, refresh: refreshCredits, ownerId: creditOwnerId }}>
       {showBeta && <BetaPopup onClose={dismissBeta} />}
+      <LiveMonitorOverlay bearer={conns.bearer ?? ''} />
       <Layout
         user={user}
         page={page}

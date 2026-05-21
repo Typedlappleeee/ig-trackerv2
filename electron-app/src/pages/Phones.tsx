@@ -4,7 +4,7 @@ import { supabase, type Phone } from '@/lib/supabase'
 import { useOrg } from '@/lib/orgContext'
 import { useConnections } from '@/lib/connections'
 import { canAccessPhoneGroup } from '@/lib/permissions'
-import { fetchAllPhones, geelarkStatusLabel, extractInstagramSessionId, takeScreenshot, stopPhone, type GeelarkPhone } from '@/lib/geelark'
+import { fetchAllPhones, geelarkStatusLabel, extractInstagramSessionId } from '@/lib/geelark'
 import * as poller from '@/lib/phonePoller'
 import { Button }  from '@/components/ui/Button'
 import { Spinner } from '@/components/ui/Spinner'
@@ -19,65 +19,6 @@ const INTERVALS = [
   { label: '2 min', value: 120 },
   { label: '5 min', value: 300 },
 ]
-
-// ── Live phone card (monitoring mode) ───────────────────────────────────────
-function PhoneLiveCard({ phone, bearer, onStopped }: { phone: GeelarkPhone; bearer: string; onStopped: (id: string) => void }) {
-  const [imgSrc, setImgSrc]     = useState<string | null>(null)
-  const [stopping, setStopping] = useState(false)
-  const activeRef               = useRef(true)
-
-  const refresh = useCallback(async () => {
-    if (!activeRef.current) return
-    const src = await takeScreenshot(bearer, phone.id)
-    if (activeRef.current && src) setImgSrc(src)
-  }, [bearer, phone.id])
-
-  useEffect(() => {
-    activeRef.current = true
-    refresh()
-    const t = setInterval(refresh, 3000)
-    return () => { activeRef.current = false; clearInterval(t) }
-  }, [refresh])
-
-  const handleStop = async () => {
-    setStopping(true)
-    activeRef.current = false
-    await stopPhone(bearer, phone.id)
-    onStopped(phone.id)
-  }
-
-  const name = phone.serialName ?? phone.name ?? phone.id
-
-  return (
-    <div className="flex flex-col rounded-2xl overflow-hidden" style={{ background: 'rgba(12,8,28,0.85)', border: '1px solid rgba(139,92,246,0.18)' }}>
-      <div className="relative w-full" style={{ paddingBottom: '177.78%' }}>
-        <div className="absolute inset-0 bg-black flex items-center justify-center">
-          {imgSrc ? (
-            <img src={imgSrc} alt={name} className="w-full h-full object-contain" />
-          ) : (
-            <div className="flex flex-col items-center gap-2">
-              <div className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: 'rgba(139,92,246,0.6)', borderTopColor: 'transparent' }} />
-            </div>
-          )}
-          {imgSrc && (
-            <div className="absolute top-2 left-2 flex items-center gap-1 px-2 py-0.5 rounded-full" style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}>
-              <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-              <span className="text-[10px] font-medium text-green-400">LIVE</span>
-            </div>
-          )}
-        </div>
-      </div>
-      <div className="flex items-center justify-between gap-2 px-3 py-2">
-        <p className="text-xs font-medium truncate" style={{ color: 'rgba(226,232,240,0.9)' }}>{name}</p>
-        <button onClick={handleStop} disabled={stopping}
-          className="flex-shrink-0 px-2 py-1 rounded-lg text-xs font-semibold"
-          style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', color: stopping ? 'rgba(239,68,68,0.4)' : '#f87171' }}>
-          {stopping ? '…' : '⏹'}
-        </button>
-      </div>
-    </div>
-  )
-}
 
 // ── GéeLark status dot ──────────────────────────────────────────────────────
 function StatusDot({ status }: { status: string }) {
@@ -525,9 +466,6 @@ export function Phones({ user }: PhonesProps) {
 
   const [contextMenu, setContextMenu]   = useState<{ phone: Phone; x: number; y: number } | null>(null)
   const [sessionDialog, setSessionDialog] = useState<{ phone: Phone } | null>(null)
-  const [liveMode, setLiveMode]         = useState(false)
-  const [livePhones, setLivePhones]     = useState<GeelarkPhone[]>([])
-  const [liveFetching, setLiveFetching] = useState(false)
 
   // Use the reactive bearer from connections (org-aware), not the poller snapshot.
   // The poller singleton is updated async in App.tsx; reading from it here causes
@@ -569,24 +507,6 @@ export function Phones({ user }: PhonesProps) {
       }
     })
   }, [user.id])
-
-  // ── Live monitoring: fetch running phones when mode is enabled ───────────────
-  useEffect(() => {
-    if (!liveMode || !bearer) return
-    let active = true
-    const load = async () => {
-      setLiveFetching(true)
-      try {
-        const all = await fetchAllPhones(bearer)
-        if (active) setLivePhones(all.filter(p => p.status === 0 || p.status === 2))
-      } catch { /* ignore */ } finally {
-        if (active) setLiveFetching(false)
-      }
-    }
-    load()
-    const t = setInterval(load, 10_000)
-    return () => { active = false; clearInterval(t) }
-  }, [liveMode, bearer])
 
   // ── Countdown ticker (purely cosmetic — based on elapsed time) ─────────────
   useEffect(() => {
@@ -874,15 +794,11 @@ export function Phones({ user }: PhonesProps) {
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setLiveMode(v => !v)}
+              onClick={() => window.dispatchEvent(new CustomEvent('open-live-monitor'))}
               className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold transition-all"
-              style={{
-                background: liveMode ? 'rgba(139,92,246,0.18)' : 'rgba(255,255,255,0.05)',
-                border: liveMode ? '1px solid rgba(139,92,246,0.4)' : '1px solid rgba(255,255,255,0.09)',
-                color: liveMode ? '#c4b5fd' : 'rgba(148,163,184,0.7)',
-              }}
+              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: 'rgba(196,181,253,0.8)' }}
             >
-              <span className={`w-2 h-2 rounded-full ${liveMode ? 'bg-green-400 animate-pulse' : 'bg-gray-500'}`} />
+              <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
               📺 Live
             </button>
             <Button size="sm"
@@ -893,40 +809,6 @@ export function Phones({ user }: PhonesProps) {
             </Button>
           </div>
         </div>
-
-        {/* Live monitoring panel */}
-        {liveMode && (
-          <div className="flex-shrink-0 px-10 py-5" style={{ borderBottom: '1px solid rgba(139,92,246,0.15)', background: 'rgba(12,8,28,0.5)' }}>
-            <div className="flex items-center gap-3 mb-4">
-              <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-              <span className="text-sm font-semibold text-white">Monitoring Live</span>
-              {!liveFetching && (
-                <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: 'rgba(139,92,246,0.12)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.2)' }}>
-                  {livePhones.length} allumé{livePhones.length !== 1 ? 's' : ''}
-                </span>
-              )}
-            </div>
-            {liveFetching ? (
-              <div className="flex items-center gap-2 text-sm" style={{ color: 'rgba(148,163,184,0.5)' }}>
-                <div className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: 'rgba(139,92,246,0.5)', borderTopColor: 'transparent' }} />
-                Chargement…
-              </div>
-            ) : livePhones.length === 0 ? (
-              <p className="text-sm" style={{ color: 'rgba(148,163,184,0.4)' }}>Aucun téléphone allumé en ce moment.</p>
-            ) : (
-              <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', maxHeight: 420, overflowY: 'auto' }}>
-                {livePhones.map(phone => (
-                  <PhoneLiveCard
-                    key={phone.id}
-                    phone={phone}
-                    bearer={bearer}
-                    onStopped={id => setLivePhones(prev => prev.filter(p => p.id !== id))}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-        )}
 
         {/* Scrollable content */}
         <div className="flex-1 overflow-y-auto px-10 pb-10">
