@@ -129,8 +129,8 @@ export default function Monitor({ user }: { user: User }) {
     if (!bearer) return
     try {
       const all = await fetchAllPhones(bearer)
-      // Only show running phones (status 0 or 1 — GéeLark uses 0=running in some docs)
-      setPhones(all.filter(p => p.status === 0 || p.status === 1))
+      // GéeLark: 0=stopped, 1=running, 2=starting, 3=stopping — show 1 and 2
+      setPhones(all.filter(p => p.status === 1 || p.status === 2))
       setError(null)
     } catch (e) {
       setError(String(e))
@@ -206,6 +206,9 @@ export default function Monitor({ user }: { user: User }) {
             <span style={{ fontSize: 48 }}>📱</span>
             <p className="text-base font-medium" style={{ color: 'rgba(148,163,184,0.6)' }}>Aucun téléphone allumé</p>
             <p className="text-sm text-center max-w-xs">Démarre un ou plusieurs téléphones depuis la page Téléphones pour les voir ici.</p>
+            <button onClick={loadPhones} className="mt-2 text-xs px-3 py-1.5 rounded-lg" style={{ background: 'rgba(139,92,246,0.15)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.3)' }}>
+              Réessayer
+            </button>
           </div>
         ) : (
           <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))' }}>
