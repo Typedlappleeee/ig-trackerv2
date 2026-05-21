@@ -689,17 +689,23 @@ ipcMain.handle('detect-scene-change', async (_event, opts: {
         return resolve({ ok: false, times: [], duration, error: 'Vidéo trop courte — positionne le curseur manuellement.' })
       }
 
-      // Adaptive cutoff = 35% of max jump; always pick at least the biggest
       const sorted  = [...valid].sort((a, b) => b.dist - a.dist)
       const maxDist = sorted[0].dist
-      const cutoff  = Math.max(3, maxDist * 0.35)
-      const picked  = sorted.filter(d => d.dist >= cutoff).length > 0
-        ? sorted.filter(d => d.dist >= cutoff)
-        : [sorted[0]]
-      const times = picked.map(d => d.time)
 
-      // Pick the LAST scene change so phase 2 = final scene of the original
-      const best = Math.max(...times)
+      // Require a genuine background/location change: avg RGB must jump ≥ 20 units.
+      // Minor motion, lighting flicker, or camera pan → dist < 20 → not a real scene cut.
+      const SCENE_MIN_DIST = 20
+      console.log('[scene-detect] maxDist=', maxDist.toFixed(1), 'threshold=', SCENE_MIN_DIST)
+
+      if (maxDist < SCENE_MIN_DIST) {
+        return resolve({ ok: false, times: [], duration, error: `Pas de changement de décor significatif (Δ=${maxDist.toFixed(1)} < ${SCENE_MIN_DIST})` })
+      }
+
+      // Among candidates with dist ≥ 70% of max, pick the LAST (= final scene of original)
+      const cutoff = maxDist * 0.70
+      const picked = sorted.filter(d => d.dist >= cutoff)
+      const times  = picked.map(d => d.time)
+      const best   = Math.max(...times)
 
       console.log('[scene-detect] best=', best, 'times=', times, 'maxDist=', maxDist.toFixed(1))
       resolve({ ok: true, times, splitTime: best, duration })

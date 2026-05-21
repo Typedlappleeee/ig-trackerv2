@@ -264,7 +264,9 @@ export async function detectSceneChangeWeb(opts: {
 
       // Compute normalised RGB diff between consecutive frames
       const pixelCount = W * H
-      const threshold = opts.threshold ?? 0.12
+      // Require a big background/location change: threshold 0.30 = 30% avg pixel shift.
+      // Minor motion or lighting changes stay < 0.15, real scene cuts are 0.30+.
+      const threshold = opts.threshold ?? 0.30
       let maxDiff = 0
       let bestT = frames[1].t
 
