@@ -734,32 +734,36 @@ export function Phones({ user }: PhonesProps) {
 
   // ── Filtered view ─────────────────────────────────────────────────────────
   const visible = phones.filter(p => {
-    // Per-member phone-group restriction (org mode only)
     if (role && !canAccessPhoneGroup(role, perms, p.group_name)) return false
     if (filter !== 'all' && p.status !== filter) return false
     if (search) {
       const q = search.toLowerCase()
       return (
         p.phone_name.toLowerCase().includes(q) ||
-        (p.ig_username ?? '').toLowerCase().includes(q) ||
         (p.group_name ?? '').toLowerCase().includes(q) ||
-        (p.serial_no ?? '').toLowerCase().includes(q)
+        (p.serial_no ?? '').toLowerCase().includes(q) ||
+        (p.remark ?? '').toLowerCase().includes(q)
       )
     }
     return true
   })
 
-  const counts = {
-    all:     phones.length,
-    online:  phones.filter(p => p.status === 'online').length,
-    offline: phones.filter(p => p.status === 'offline').length,
-    views:   phones.reduce((s, p) => s + (p.total_views ?? 0), 0),
+  const onlineCount  = phones.filter(p => p.status === 'online').length
+  const offlineCount = phones.filter(p => p.status === 'offline').length
+  const groupCount   = new Set(phones.map(p => p.group_name).filter(Boolean)).size
+
+  function relativeTime(iso: string): string {
+    const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000)
+    if (diff < 60)        return 'il y a < 1 min'
+    if (diff < 3600)      return `il y a ${Math.floor(diff / 60)} min`
+    if (diff < 86400)     return `il y a ${Math.floor(diff / 3600)}h`
+    if (diff < 86400 * 7) return `il y a ${Math.floor(diff / 86400)}j`
+    return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <>
-      {/* Portals — rendered outside the scrollable div so they never cause reflow */}
       {sessionDialog && (
         <SessionDialog
           phone={sessionDialog.phone}
@@ -781,199 +785,232 @@ export function Phones({ user }: PhonesProps) {
 
       <div className="h-full flex flex-col overflow-hidden" onClick={() => setContextMenu(null)}>
 
-        {/* Header */}
-        <div className="flex-shrink-0 px-10 pt-9 pb-7 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        {/* ── Header ───────────────────────────────────────────────────────── */}
+        <div className="flex-shrink-0 px-8 pt-7 pb-5 flex items-start justify-between"
+          style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
           <div>
-            <h1 className="text-[28px] font-black text-white leading-none">Téléphones</h1>
-            <p className="text-[13px] text-text2 mt-0.5 flex items-center gap-2">
-              <span>{phones.length} téléphone{phones.length !== 1 ? 's' : ''}</span>
+            <h1 className="text-[26px] font-black text-white leading-none">Téléphones</h1>
+            <p className="text-[13px] mt-1 flex items-center gap-2" style={{ color: 'rgba(148,163,184,0.6)' }}>
+              Gérez et surveillez vos téléphones connectés
               {lastUpdated && (
-                <span className="text-text2/50">· màj {lastUpdated.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
+                <span style={{ color: 'rgba(148,163,184,0.35)' }}>
+                  · màj {lastUpdated.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                </span>
               )}
             </p>
           </div>
-          <Button size="sm"
-            onClick={syncFromGeelark} loading={syncing}
-            disabled={!bearer}
-            title="Importe / met à jour les téléphones depuis ton compte GéeLark">
-            🔄 Sync GéeLark
-          </Button>
+          <div className="flex items-center gap-3">
+            {/* Auto-refresh toggle */}
+            <div className="flex items-center gap-2 px-3 py-2 rounded-xl"
+              style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <button
+                onClick={() => { const next = !autoRefresh; poller.setEnabled(next); setAutoRefresh(next) }}
+                className={`relative w-7 h-3.5 rounded-full transition-colors flex-shrink-0 ${autoRefresh ? 'bg-ok' : 'bg-surface2'}`}
+              >
+                <span className={`absolute top-0.5 w-2.5 h-2.5 bg-white rounded-full shadow transition-all ${autoRefresh ? 'left-[16px]' : 'left-0.5'}`} />
+              </button>
+              <span className="text-[11px] font-medium" style={{ color: 'rgba(148,163,184,0.6)' }}>Auto</span>
+              {autoRefresh && (
+                <div className="flex items-center gap-1">
+                  {INTERVALS.map(({ label, value }) => (
+                    <button key={value}
+                      onClick={() => changeInterval(value)}
+                      className={`px-2 py-0.5 rounded-md text-[10px] transition-all ${
+                        intervalSec === value ? 'bg-accent/25 text-accent font-semibold' : 'text-text2 hover:text-text'
+                      }`}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {autoRefresh && bearer && (
+                <span className="flex items-center gap-1 text-[10px] text-ok ml-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-ok animate-pulse" />
+                  <Countdown secondsLeft={countdown} />
+                </span>
+              )}
+            </div>
+            <Button size="sm" onClick={syncFromGeelark} loading={syncing} disabled={!bearer}
+              title="Importe / met à jour les téléphones depuis ton compte GéeLark">
+              🔄 Sync GéeLark
+            </Button>
+          </div>
         </div>
 
-        {/* Scrollable content */}
-        <div className="flex-1 overflow-y-auto px-10 pb-10">
-
-          {/* KPI cards */}
-          <div className="grid grid-cols-4 gap-6 mt-8">
-            {([
-              { key: 'all',     label: 'TÉLÉPHONES',  color: '#4f9eff', icon: '📱' },
-              { key: 'online',  label: 'EN LIGNE',     color: '#00ccaa', icon: '✅' },
-              { key: 'offline', label: 'HORS LIGNE',   color: '#5a6882', icon: '📴' },
-              { key: 'views',   label: 'VUES TOTALES', color: '#ffaa2a', icon: '👁' },
-            ] as const).map(({ key, label, color, icon }) => (
-              <button key={key}
-                onClick={() => key !== 'views' && setFilter(key as typeof filter)}
-                className={`rounded-2xl p-6 text-left transition-all ${
-                  key !== 'views' && filter === key ? 'border-accent' : 'hover:border-accent/40'
-                }`}
-                style={{ background: 'rgba(255,255,255,0.03)', border: key !== 'views' && filter === key ? '1px solid var(--color-accent)' : '1px solid rgba(255,255,255,0.07)' }}
-              >
-                <div className="flex items-center gap-2 mb-3">
-                  <span>{icon}</span>
-                  <span className="text-[12px] font-semibold text-text2">{label}</span>
-                </div>
-                <p className="text-3xl font-black" style={{ color }}>
-                  {key === 'views' ? counts.views.toLocaleString('fr-FR') : counts[key]}
-                </p>
-              </button>
-            ))}
-          </div>
-
-          {/* Auto-refresh controls */}
-          <div className="flex items-center gap-4 px-5 py-4 rounded-2xl mt-6" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-            <span className="text-[13px] font-medium text-text">Auto-statut</span>
-
-            <button
-              onClick={() => { const next = !autoRefresh; poller.setEnabled(next); setAutoRefresh(next) }}
-              className={`relative w-8 h-4 rounded-full transition-colors ${autoRefresh ? 'bg-accent' : 'bg-surface2'}`}
-            >
-              <span className={`absolute top-0.5 w-3 h-3 bg-white rounded-full shadow transition-all ${autoRefresh ? 'left-[18px]' : 'left-0.5'}`} />
+        {/* ── Stat cards ───────────────────────────────────────────────────── */}
+        <div className="flex-shrink-0 px-8 pt-5 pb-4 grid grid-cols-4 gap-4">
+          {([
+            { label: 'Total', value: phones.length, sub: 'téléphones', color: '#818cf8', icon: '📱',
+              onClick: () => setFilter('all'), active: filter === 'all' },
+            { label: 'En ligne', value: onlineCount,
+              sub: phones.length ? `${Math.round((onlineCount / phones.length) * 100)}%` : '0%',
+              color: '#00ccaa', icon: '🟢', onClick: () => setFilter('online'), active: filter === 'online' },
+            { label: 'Hors ligne', value: offlineCount,
+              sub: phones.length ? `${Math.round((offlineCount / phones.length) * 100)}%` : '0%',
+              color: '#5a6882', icon: '⚫', onClick: () => setFilter('offline'), active: filter === 'offline' },
+            { label: 'Groupes', value: groupCount, sub: 'groupes actifs', color: '#f59e0b', icon: '👥',
+              onClick: () => {}, active: false },
+          ]).map(card => (
+            <button key={card.label} onClick={card.onClick}
+              className="rounded-2xl p-4 text-left transition-all hover:brightness-110"
+              style={{
+                background: card.active ? `${card.color}14` : 'rgba(255,255,255,0.03)',
+                border: card.active ? `1px solid ${card.color}40` : '1px solid rgba(255,255,255,0.07)',
+              }}>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[11px] font-semibold uppercase tracking-wider"
+                  style={{ color: 'rgba(148,163,184,0.5)' }}>{card.label}</span>
+                <span className="text-base">{card.icon}</span>
+              </div>
+              <p className="text-[28px] font-black leading-none" style={{ color: card.color }}>
+                {card.value}
+              </p>
+              <p className="text-[11px] mt-1" style={{ color: 'rgba(148,163,184,0.4)' }}>{card.sub}</p>
             </button>
+          ))}
+        </div>
 
-            <div className="flex items-center gap-1">
-              {INTERVALS.map(({ label, value }) => (
-                <button key={value}
-                  onClick={() => changeInterval(value)}
-                  disabled={!autoRefresh}
-                  className={`px-3 py-1.5 rounded-lg text-[13px] transition-all disabled:opacity-40 ${
-                    intervalSec === value ? 'bg-accent/20 text-accent' : 'text-text2 hover:text-text'
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-
-            {autoRefresh && bearer && (
-              <>
-                <div className="ml-auto"><Countdown secondsLeft={countdown} /></div>
-                <span className="flex items-center gap-1.5 text-[13px] text-ok">
-                  <span className="w-1.5 h-1.5 rounded-full bg-ok animate-pulse" />Live
-                </span>
-              </>
-            )}
-          </div>
+        {/* ── Scrollable content ────────────────────────────────────────────── */}
+        <div className="flex-1 overflow-y-auto px-8 pb-8">
 
           {/* Warnings */}
           {!bearer && (
-            <div className="px-5 py-4 rounded-2xl mt-6" style={{ background: 'rgba(255,170,42,0.08)', border: '1px solid rgba(255,170,42,0.2)', color: '#ffaa2a' }}>
-              <span className="text-[13px]">⚠ Token GéeLark manquant — configure-le dans <span className="font-semibold">Paramètres</span>.</span>
+            <div className="px-4 py-3 rounded-xl mb-4" style={{ background: 'rgba(255,170,42,0.08)', border: '1px solid rgba(255,170,42,0.2)', color: '#ffaa2a' }}>
+              <span className="text-[13px]">⚠ Token GéeLark manquant — configure-le dans Paramètres.</span>
             </div>
           )}
           {error && (
-            <div className="px-5 py-4 rounded-2xl mt-6 flex justify-between" style={{ background: 'rgba(255,92,110,0.08)', border: '1px solid rgba(255,92,110,0.2)', color: '#ff5c6e' }}>
+            <div className="px-4 py-3 rounded-xl mb-4 flex justify-between items-center" style={{ background: 'rgba(255,92,110,0.08)', border: '1px solid rgba(255,92,110,0.2)', color: '#ff5c6e' }}>
               <span className="text-[13px]">{error}</span>
               <button onClick={() => setError(null)} className="opacity-60 hover:opacity-100 ml-3">✕</button>
             </div>
           )}
           {pollError && (
-            <div className="px-5 py-3 rounded-2xl mt-4 flex justify-between" style={{ background: 'rgba(255,170,42,0.08)', border: '1px solid rgba(255,170,42,0.2)', color: '#ffaa2a' }}>
+            <div className="px-4 py-3 rounded-xl mb-4 flex justify-between items-center" style={{ background: 'rgba(255,170,42,0.08)', border: '1px solid rgba(255,170,42,0.2)', color: '#ffaa2a' }}>
               <span className="text-[13px]">⚠ {pollError}</span>
               <button onClick={() => setPollError(null)} className="opacity-60 hover:opacity-100 ml-3">✕</button>
             </div>
           )}
 
-          {/* Search + filter */}
-          <div className="flex items-center gap-3 mt-6">
-            <input type="text" placeholder="🔍 Rechercher…" value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="flex-1 rounded-xl px-4 py-2.5 text-[13px] focus:outline-none transition-colors"
-              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
-            />
+          {/* Search */}
+          <div className="flex items-center gap-3 mb-4">
+            <div className="flex-1 relative">
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[13px] opacity-40">🔍</span>
+              <input type="text" placeholder="Rechercher téléphone, groupe…" value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="w-full rounded-xl pl-9 pr-4 py-2.5 text-[13px] focus:outline-none"
+                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
+              />
+            </div>
             {(['all', 'online', 'offline'] as const).map(f => (
               <button key={f} onClick={() => setFilter(f)}
-                className={`px-4 py-2.5 rounded-xl text-[13px] font-medium transition-all ${
+                className={`px-3.5 py-2.5 rounded-xl text-[12px] font-medium transition-all flex-shrink-0 ${
                   filter === f ? 'bg-accent/20 text-accent' : 'text-text2 hover:text-text'
                 }`}
-                style={filter === f ? {} : { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}
-              >
-                {f === 'all' ? 'Tous' : f === 'online' ? 'En ligne' : 'Hors ligne'}
+                style={filter === f ? { border: '1px solid rgba(139,92,246,0.3)' } : { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                {f === 'all' ? 'Tous les statuts' : f === 'online' ? '🟢 En ligne' : '⚫ Hors ligne'}
               </button>
             ))}
           </div>
 
           {/* Table */}
-          <div className="mt-6">
-            {loading ? (
-              <div className="flex justify-center py-16"><Spinner size="lg" /></div>
-            ) : phones.length === 0 ? (
-              <div className="rounded-2xl p-10 text-center" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                <p className="text-4xl mb-4">📱</p>
-                <p className="text-base font-bold text-white mb-2">Aucun téléphone synchronisé</p>
-                <p className="text-[13px] text-text2">Clique sur "Sync GéeLark" pour importer tes phones.</p>
+          {loading ? (
+            <div className="flex justify-center py-16"><Spinner size="lg" /></div>
+          ) : phones.length === 0 ? (
+            <div className="rounded-2xl p-10 text-center" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <p className="text-4xl mb-4">📱</p>
+              <p className="text-base font-bold text-white mb-2">Aucun téléphone synchronisé</p>
+              <p className="text-[13px] text-text2">Clique sur "Sync GéeLark" pour importer tes téléphones.</p>
+            </div>
+          ) : (
+            <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)' }}>
+              {/* Table header */}
+              <div className="grid items-center px-5 py-3 text-[11px] font-semibold uppercase tracking-wider"
+                style={{
+                  gridTemplateColumns: '32px 1fr 120px 80px 150px 36px',
+                  borderBottom: '1px solid rgba(255,255,255,0.07)',
+                  background: 'rgba(255,255,255,0.02)',
+                  color: 'rgba(148,163,184,0.5)',
+                }}>
+                <span>#</span>
+                <span>Téléphone</span>
+                <span>Groupe</span>
+                <span>Statut</span>
+                <span>Dernière activité</span>
+                <span />
               </div>
-            ) : (
-              <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                {/* Table Header */}
-                <div className="grid grid-cols-[28px_1fr_100px_150px_120px_80px_90px_70px_110px_36px] px-5 py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.07)', background: 'rgba(255,255,255,0.02)' }}>
-                  {['#', 'Téléphone', 'Groupe', 'Instagram', 'Status IG', 'En ligne', 'Followers', 'Vues', 'Note', ''].map(h => (
-                    <span key={h} className="text-[12px] font-semibold text-text2 uppercase tracking-wider">{h}</span>
+
+              {visible.length === 0 ? (
+                <p className="px-5 py-10 text-center text-[13px] text-text2">Aucun résultat.</p>
+              ) : (
+                <div className="divide-y" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
+                  {visible.map((phone, i) => (
+                    <div key={phone.id}
+                      className="grid items-center px-5 py-3.5 transition-colors hover:bg-white/[0.025] group cursor-default"
+                      style={{ gridTemplateColumns: '32px 1fr 120px 80px 150px 36px' }}
+                      onContextMenu={e => {
+                        e.preventDefault(); e.stopPropagation()
+                        setContextMenu({ phone, x: e.clientX, y: e.clientY })
+                      }}>
+                      {/* # */}
+                      <span className="text-[12px]" style={{ color: 'rgba(148,163,184,0.3)' }}>{i + 1}</span>
+
+                      {/* Phone name */}
+                      <div className="min-w-0 pr-3">
+                        <p className="text-[13px] font-semibold text-white truncate">{phone.phone_name}</p>
+                        {phone.serial_no && (
+                          <p className="text-[10px] font-mono truncate mt-0.5" style={{ color: 'rgba(148,163,184,0.35)' }}>
+                            {phone.serial_no}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Groupe */}
+                      <span className="text-[12px] truncate pr-2" style={{ color: phone.group_name ? 'rgba(196,181,253,0.7)' : 'rgba(148,163,184,0.3)' }}>
+                        {phone.group_name ?? '—'}
+                      </span>
+
+                      {/* Statut */}
+                      <div>
+                        {phone.status === 'online' ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold"
+                            style={{ background: 'rgba(0,204,170,0.12)', color: '#00ccaa', border: '1px solid rgba(0,204,170,0.2)' }}>
+                            <span className="w-1.5 h-1.5 rounded-full bg-ok animate-pulse" />
+                            En ligne
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold"
+                            style={{ background: 'rgba(90,104,130,0.12)', color: '#5a6882', border: '1px solid rgba(90,104,130,0.2)' }}>
+                            <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#5a6882' }} />
+                            Hors ligne
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Dernière activité */}
+                      <span className="text-[12px]" style={{ color: 'rgba(148,163,184,0.5)' }}>
+                        {phone.synced_at ? relativeTime(phone.synced_at) : '—'}
+                      </span>
+
+                      {/* ⋮ on hover */}
+                      <button
+                        onClick={e => { e.stopPropagation(); setContextMenu({ phone, x: e.clientX, y: e.clientY }) }}
+                        className="opacity-0 group-hover:opacity-100 flex items-center justify-center w-7 h-7 rounded-lg transition-all hover:bg-surface2 text-text2 text-base"
+                        title="Plus d'options">
+                        ⋮
+                      </button>
+                    </div>
                   ))}
                 </div>
-                {visible.length === 0 ? (
-                  <p className="px-5 py-10 text-center text-[13px] text-text2">Aucun résultat.</p>
-                ) : (
-                  <div className="divide-y" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
-                    {visible.map((phone, i) => (
-                      <div key={phone.id}
-                        className="grid grid-cols-[28px_1fr_100px_150px_120px_80px_90px_70px_110px_36px] px-5 py-4 transition-colors items-center cursor-default hover:bg-white/[0.02]"
-                        onContextMenu={e => {
-                          e.preventDefault(); e.stopPropagation()
-                          setContextMenu({ phone, x: e.clientX, y: e.clientY })
-                        }}
-                      >
-                        <span className="text-[13px] text-text2">{i + 1}</span>
-                        <div className="min-w-0">
-                          <p className="text-[13px] font-medium text-text truncate">{phone.phone_name}</p>
-                          {phone.serial_no && (
-                            <p className="text-[11px] text-text2 font-mono truncate">{phone.serial_no}</p>
-                          )}
-                        </div>
-                        <span className="text-[13px] text-text2 truncate">{phone.group_name ?? '—'}</span>
-                        <IgCell phone={phone} onSave={saveIgUsername} />
-                        <IgStatusBadge phone={phone} />
-                        <div className="flex items-center gap-1.5" title={phone.status === 'online' ? 'Téléphone en ligne' : 'Téléphone hors ligne'}>
-                          <StatusDot status={phone.status} />
-                        </div>
-                        <span className="text-[13px] text-text">
-                          {phone.followers ? phone.followers.toLocaleString('fr-FR') : '—'}
-                        </span>
-                        <span className="text-[13px] text-text">
-                          {phone.total_views ? phone.total_views.toLocaleString('fr-FR') : '—'}
-                        </span>
-                        <NoteCell phone={phone} onSave={saveRemark} />
-                        {/* ⋮ button */}
-                        <button
-                          onClick={e => { e.stopPropagation(); setContextMenu({ phone, x: e.clientX, y: e.clientY }) }}
-                          className="flex items-center justify-center w-7 h-7 rounded-lg text-text2 hover:bg-surface2 hover:text-text transition-colors text-lg leading-none"
-                          title="Plus d'options"
-                        >
-                          ⋮
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          )}
 
           {!loading && visible.length > 0 && (
-            <p className="text-[12px] text-text2 text-right mt-4">
+            <p className="text-[11px] mt-3 text-right" style={{ color: 'rgba(148,163,184,0.3)' }}>
               {visible.length} téléphone{visible.length > 1 ? 's' : ''}
               {phones.length !== visible.length && ` sur ${phones.length}`}
-              {counts.views > 0 && ` · ${counts.views.toLocaleString('fr-FR')} vues`}
-              {' · '}Clic droit ou ⋮ pour plus d'options
+              {' · '}clic droit pour plus d'options
             </p>
           )}
         </div>

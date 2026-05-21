@@ -70,7 +70,6 @@ const NAV_SECTIONS: NavSection[] = [
     title: 'Principal',
     defaultOpen: true,
     items: [
-      { id: 'dashboard',   label: 'Dashboard',    icon: '📊' },
       { id: 'phones',      label: 'Téléphones',   icon: '📱' },
       { id: 'monitor',     label: 'Monitor Live',  icon: '🖥' },
     ],
@@ -79,7 +78,6 @@ const NAV_SECTIONS: NavSection[] = [
     title: 'Instagram',
     defaultOpen: true,
     items: [
-      { id: 'stats',       label: 'Stats',         icon: '📈' },
       { id: 'posting',     label: 'Posting',       icon: '🚀' },
       { id: 'massposting', label: 'Mass Posting',  icon: '⚡' },
       { id: 'scheduler',   label: 'Programmation', icon: '📅', isNew: true },
