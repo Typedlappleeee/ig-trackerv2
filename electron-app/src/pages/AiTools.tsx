@@ -20,7 +20,7 @@ async function groqCall(apiKey: string, prompt: string, maxTokens = 600): Promis
   const result = await window.electronAPI?.groqRequest({
     apiKey,
     messages: [{ role: 'user', content: prompt }],
-    model: 'llama-3.3-70b-versatile',
+    model: 'llama-3.1-8b-instant',
     maxTokens,
   })
   if (!result?.ok) throw new Error(result?.error ?? 'Erreur Groq')

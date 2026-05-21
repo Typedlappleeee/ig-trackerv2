@@ -470,38 +470,33 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
           ) : (
             <div className="px-3 space-y-1.5">
 
-              {/* Credits card — redesigned */}
+              {/* Credits card */}
               {!credits.loading && (
-                <div className="rounded-xl overflow-hidden"
+                <div className="rounded-xl px-3 py-2 flex items-center gap-2"
                   style={{
-                    background: credits.balance < 10 ? 'rgba(240,61,85,0.06)' : 'linear-gradient(135deg,rgba(139,92,246,0.1),rgba(124,58,237,0.06))',
-                    border: `1px solid ${credits.balance < 10 ? 'rgba(240,61,85,0.2)' : 'rgba(139,92,246,0.3)'}`,
+                    background: credits.balance < 10 ? 'rgba(240,61,85,0.06)' : 'rgba(139,92,246,0.08)',
+                    border: `1px solid ${credits.balance < 10 ? 'rgba(240,61,85,0.2)' : 'rgba(139,92,246,0.22)'}`,
                   }}>
-                  <div className="flex items-start justify-between px-3 pt-3 pb-1">
-                    <div>
-                      <div className="flex items-center gap-1.5 mb-0.5">
-                        <span className="text-[13px]">💎</span>
-                        <span className="text-[10px] font-semibold" style={{ color: 'rgba(196,181,253,0.5)' }}>Crédits</span>
-                      </div>
-                      <p className="text-[18px] font-black tabular-nums leading-none"
-                        style={{ color: credits.balance < 10 ? '#f87171' : '#a78bfa' }}>
-                        {credits.balance.toLocaleString('fr-FR')}
-                      </p>
+                  <span className="text-[12px] flex-shrink-0">💎</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[11px] font-semibold" style={{ color: 'rgba(196,181,253,0.5)' }}>Crédits</span>
                     </div>
-                    <button onClick={() => onNavigate('settings')}
-                      className="text-[10px] font-semibold px-2 py-1 rounded-lg mt-0.5 transition-all hover:brightness-110"
+                    <p className="text-[14px] font-black tabular-nums leading-none"
+                      style={{ color: credits.balance < 10 ? '#f87171' : '#a78bfa' }}>
+                      {credits.balance.toLocaleString('fr-FR')}
+                    </p>
+                  </div>
+                  <div className="flex-shrink-0 flex flex-col items-end gap-1">
+                    <button onClick={() => onNavigate('settings', 'abonnement')}
+                      className="text-[10px] font-semibold px-2 py-0.5 rounded-lg transition-all hover:brightness-110"
                       style={{ background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.25)', color: '#a78bfa' }}>
                       Gérer
                     </button>
-                  </div>
-                  <div className="px-3 pb-1.5">
-                    <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(139,92,246,0.12)' }}>
-                      <div className="h-full rounded-full transition-all"
+                    <div className="w-16 h-1 rounded-full overflow-hidden" style={{ background: 'rgba(139,92,246,0.12)' }}>
+                      <div className="h-full rounded-full"
                         style={{ width: `${Math.min(100, (credits.balance / CREDIT_MAX_DISPLAY) * 100)}%`, background: 'linear-gradient(90deg,#7c3aed,#a78bfa)' }} />
                     </div>
-                    <p className="text-[9px] mt-1" style={{ color: 'rgba(148,163,184,0.35)' }}>
-                      Recharge auto : {CREDIT_AUTO_RECHARGE.toLocaleString('fr-FR')} crédits
-                    </p>
                   </div>
                 </div>
               )}
@@ -535,25 +530,20 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
                 </div>
               </div>
 
-              {/* Settings + Logs + Admin */}
+              {/* Settings + Admin */}
               <div className="space-y-0.5">
-                {[
-                  { id: 'settings' as Page, icon: '⚙', label: 'Paramètres' },
-                  { id: 'community' as Page, icon: '📋', label: 'Logs d\'activité' },
-                ].map(item => (
-                  <button key={item.id} onClick={() => { playNav(); onNavigate(item.id) }}
-                    className={`w-full flex items-center justify-between px-2.5 py-[7px] rounded-xl text-[12px] transition-all ${
-                      page === item.id ? 'sf-nav-active' : 'hover:bg-white/[0.04] text-sb-text hover:text-sb-text-act'
-                    }`}>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm opacity-70">{item.icon}</span>
-                      <span className="font-medium">{item.label}</span>
-                    </div>
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" style={{ opacity: 0.3 }}>
-                      <path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  </button>
-                ))}
+                <button onClick={() => { playNav(); onNavigate('settings') }}
+                  className={`w-full flex items-center justify-between px-2.5 py-[7px] rounded-xl text-[12px] transition-all ${
+                    page === 'settings' ? 'sf-nav-active' : 'hover:bg-white/[0.04] text-sb-text hover:text-sb-text-act'
+                  }`}>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm opacity-70">⚙</span>
+                    <span className="font-medium">Paramètres</span>
+                  </div>
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" style={{ opacity: 0.3 }}>
+                    <path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
                 {license.isSuperAdmin && (
                   <button onClick={() => { playNav(); onNavigate('licences') }}
                     className={`w-full flex items-center gap-2 px-2.5 py-[7px] rounded-xl text-[12px] transition-all ${

@@ -1187,11 +1187,19 @@ ipcMain.handle('groq-request', async (_event, opts: {
         'Authorization': `Bearer ${opts.apiKey}`,
       },
       body: JSON.stringify({
-        model:      opts.model ?? 'llama-3.3-70b-versatile',
+        model:      opts.model ?? 'llama-3.1-8b-instant',
         messages:   opts.messages,
         max_tokens: opts.maxTokens ?? 400,
       }),
     })
+    if (!response.ok) {
+      let errMsg = `Erreur HTTP ${response.status}`
+      try {
+        const errData = await response.json() as { error?: { message?: string } }
+        if (errData?.error?.message) errMsg = errData.error.message
+      } catch {}
+      return { ok: false, error: errMsg }
+    }
     const data = await response.json()
     return { ok: true, data }
   } catch (err: unknown) {

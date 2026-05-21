@@ -132,7 +132,7 @@ export function Posting({ user }: PostingProps) {
       const userContent = `Génère une description Instagram${customPrompt.trim() ? ` (${customPrompt.trim()})` : ''} pour : ${subject}. Réponds uniquement avec la description finale, sans préambule.`
       const r = await window.electronAPI.groqRequest({
         apiKey: groqKey,
-        model: 'llama-3.3-70b-versatile',
+        model: 'llama-3.1-8b-instant',
         maxTokens: 300,
         messages: [
           { role: 'system', content: systemContent },
