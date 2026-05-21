@@ -1382,3 +1382,22 @@ export async function extractInstagramSessionId(
     clearTimeout(timeoutId)
   }
 }
+
+// ── Live screenshot ───────────────────────────────────────────────────────────
+// Takes a screenshot of the phone screen and returns it as a base64 PNG data URL.
+// Uses screencap + base64 via shell. Returns null on failure.
+export async function takeScreenshot(bearer: string, phoneId: string): Promise<string | null> {
+  try {
+    const d = await geelarkFetch(
+      'POST', '/shell/execute',
+      { id: phoneId, cmd: 'screencap -p /sdcard/sf_sc.png && base64 -w 0 /sdcard/sf_sc.png' },
+      bearer,
+    )
+    if (Number(d['code']) !== 0) return null
+    const raw = String((d['data'] as Record<string, unknown>)?.['output'] ?? '').trim()
+    if (!raw) return null
+    return `data:image/png;base64,${raw.replace(/\s+/g, '')}`
+  } catch {
+    return null
+  }
+}

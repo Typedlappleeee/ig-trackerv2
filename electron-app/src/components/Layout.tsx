@@ -43,7 +43,7 @@ function SFLogo({ size = 28 }: { size?: number }) {
 }
 
 export type Page =
-  | 'dashboard' | 'phones'
+  | 'dashboard' | 'phones' | 'monitor'
   | 'stats' | 'posting' | 'massposting' | 'scheduler' | 'bank' | 'aitools' | 'warmup'
   | 'montage' | 'remix' | 'textcopy'
   | 'community' | 'support'
@@ -69,6 +69,7 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { id: 'dashboard',   label: 'Dashboard',    icon: '📊' },
       { id: 'phones',      label: 'Téléphones',   icon: '📱' },
+      { id: 'monitor',     label: 'Monitor Live',  icon: '🖥' },
     ],
   },
   {

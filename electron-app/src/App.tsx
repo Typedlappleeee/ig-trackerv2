@@ -528,6 +528,7 @@ import { TextCopy }          from '@/pages/TextCopy'
 import { Licences }          from '@/pages/Licences'
 import { Support }           from '@/pages/Support'
 import { Community }         from '@/pages/Community'
+import Monitor                from '@/pages/Monitor'
 import { FullPageLoader }    from '@/components/ui/Spinner'
 
 const BETA_KEY = 'scaleflow-v1-seen'
@@ -676,6 +677,7 @@ function AppContent({ user }: { user: User }) {
     switch (page) {
       case 'dashboard':    return <Dashboard   user={user} />
       case 'phones':       return <Phones      user={user} key={refreshTick} />
+      case 'monitor':      return <Monitor     user={user} />
       case 'stats':        return <Stats       user={user} />
       case 'posting':      return <Posting     user={user} />
       case 'massposting':  return <MassPosting user={user} />
