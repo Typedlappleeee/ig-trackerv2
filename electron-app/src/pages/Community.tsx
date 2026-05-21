@@ -648,6 +648,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
   const [newsContent, setNewsContent] = useState('')
   const [newsSending, setNewsSend]    = useState(false)
   const [showNewsForm, setShowNewsForm] = useState(false)
+  const [selectedPost, setSelectedPost] = useState<Message | null>(null)
 
   const loadProfile = useCallback(async () => {
     const { data } = await supabase
@@ -970,8 +971,9 @@ export function Community({ user, onNavigate }: CommunityProps) {
                 <>
                   {/* Featured / pinned card */}
                   {featuredMsg && (
-                    <div className="rounded-2xl overflow-hidden"
-                      style={{ background: 'linear-gradient(135deg,#120840 0%,#07102c 60%,#0a0626 100%)', border: '1px solid rgba(139,92,246,0.4)', boxShadow: '0 8px 40px rgba(0,0,0,0.5)' }}>
+                    <div className="rounded-2xl overflow-hidden cursor-pointer transition-all hover:border-purple-400/60"
+                      style={{ background: 'linear-gradient(135deg,#120840 0%,#07102c 60%,#0a0626 100%)', border: '1px solid rgba(139,92,246,0.4)', boxShadow: '0 8px 40px rgba(0,0,0,0.5)' }}
+                      onClick={() => setSelectedPost(featuredMsg)}>
                       <div className="h-[3px]" style={{ background: 'linear-gradient(90deg,#7c3aed,#ec4899,#3b82f6)' }} />
                       <div className="p-6">
                         <div className="flex items-center gap-2 mb-4">
@@ -1013,7 +1015,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                             </div>
                           </div>
                           <div className="flex items-center gap-3">
-                            <button onClick={() => toggleLike(featuredMsg.id)}
+                            <button onClick={e => { e.stopPropagation(); toggleLike(featuredMsg.id) }}
                               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-semibold transition-all"
                               style={myLikes.has(featuredMsg.id)
                                 ? { background: 'rgba(236,72,153,0.15)', color: '#f472b6', border: '1px solid rgba(236,72,153,0.25)' }
@@ -1025,7 +1027,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                               <span className="tabular-nums">{featuredMsg.view_count}</span>
                             </div>
                             {isAdmin && (
-                              <button onClick={() => deleteMessage(featuredMsg.id)}
+                              <button onClick={e => { e.stopPropagation(); deleteMessage(featuredMsg.id) }}
                                 className="text-[14px] transition-opacity hover:opacity-80"
                                 style={{ color: 'rgba(239,68,68,0.5)' }} title="Supprimer">🗑</button>
                             )}
@@ -1112,9 +1114,10 @@ export function Community({ user, onNavigate }: CommunityProps) {
                       <div className="space-y-2">
                         {newsMessages.slice(1).map(msg => (
                           <div key={msg.id}
-                            className="flex items-start gap-3 p-4 rounded-xl group transition-all cursor-default"
+                            className="flex items-start gap-3 p-4 rounded-xl group transition-all cursor-pointer hover:border-purple-500/30"
                             style={{ background: 'rgba(8,5,20,0.8)', border: '1px solid rgba(139,92,246,0.12)' }}
-                            onMouseEnter={() => trackView(msg.id)}>
+                            onMouseEnter={() => trackView(msg.id)}
+                            onClick={() => setSelectedPost(msg)}>
                             <Avatar url={msg.avatar_url} name={msg.display_name} userId={msg.user_id} size={38} />
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 mb-1 flex-wrap">
@@ -1134,7 +1137,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                                 <span className="font-semibold">{msg.display_name}</span>
                                 <span>·</span>
                                 <span>{timeAgo(msg.created_at)}</span>
-                                <button onClick={() => toggleLike(msg.id)}
+                                <button onClick={e => { e.stopPropagation(); toggleLike(msg.id) }}
                                   className="flex items-center gap-1 transition-colors"
                                   style={{ color: myLikes.has(msg.id) ? '#f472b6' : 'rgba(196,181,253,0.35)' }}>
                                   ❤️ {reactions.get(msg.id) ?? 0}
@@ -1143,7 +1146,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                               </div>
                             </div>
                             {isAdmin && (
-                              <button onClick={() => deleteMessage(msg.id)}
+                              <button onClick={e => { e.stopPropagation(); deleteMessage(msg.id) }}
                                 className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-1"
                                 style={{ color: 'rgba(239,68,68,0.5)', fontSize: 14 }}>🗑</button>
                             )}
@@ -1200,10 +1203,11 @@ export function Community({ user, onNavigate }: CommunityProps) {
                     </div>
                   ))}
                 </div>
-                <button className="w-full py-2 rounded-xl text-[12px] font-semibold transition-all"
-                  style={{ background: 'rgba(88,101,242,0.12)', color: '#93c5fd', border: '1px solid rgba(88,101,242,0.2)' }}>
-                  🎮 Rejoindre Discord
-                </button>
+                <a href="https://t.me/+drqJbwraMag5M2I0" target="_blank" rel="noreferrer"
+                  className="w-full py-2 rounded-xl text-[12px] font-semibold transition-all flex items-center justify-center gap-1.5 hover:brightness-110"
+                  style={{ background: 'rgba(34,150,243,0.12)', color: '#60b8f5', border: '1px solid rgba(34,150,243,0.2)' }}>
+                  ✈️ Rejoindre Telegram
+                </a>
               </div>
             </div>
 
@@ -1597,6 +1601,67 @@ export function Community({ user, onNavigate }: CommunityProps) {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── Post detail modal ─────────────────────────────────────────────────── */}
+      {selectedPost && (
+        <div className="fixed inset-0 z-[9980] flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(12px)' }}
+          onClick={e => e.target === e.currentTarget && setSelectedPost(null)}>
+          <div className="w-full max-w-xl max-h-[85vh] flex flex-col rounded-2xl overflow-hidden anim-scale-in"
+            style={{ background: '#0c0919', border: '1px solid rgba(139,92,246,0.3)', boxShadow: '0 32px 80px rgba(0,0,0,0.7)' }}>
+            {/* Modal header */}
+            <div className="flex-shrink-0 flex items-center justify-between px-5 py-4"
+              style={{ borderBottom: '1px solid rgba(139,92,246,0.12)', background: 'linear-gradient(135deg,rgba(139,92,246,0.1),rgba(236,72,153,0.05))' }}>
+              <div className="flex items-center gap-2.5">
+                <Avatar url={selectedPost.avatar_url} name={selectedPost.display_name} userId={selectedPost.user_id} size={28} />
+                <div>
+                  <p className="text-[12px] font-bold text-white leading-tight">{selectedPost.display_name}</p>
+                  <p className="text-[9.5px] leading-tight" style={{ color: 'rgba(196,181,253,0.4)' }}
+                    title={fullDate(selectedPost.created_at)}>
+                    {timeAgo(selectedPost.created_at)} · {fullDate(selectedPost.created_at)}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {isAdmin && (
+                  <button onClick={() => { deleteMessage(selectedPost.id); setSelectedPost(null) }}
+                    className="text-[13px] opacity-50 hover:opacity-80 transition-opacity"
+                    style={{ color: '#f87171' }}>🗑</button>
+                )}
+                <button onClick={() => setSelectedPost(null)}
+                  className="w-7 h-7 rounded-lg flex items-center justify-center text-sm hover:bg-white/[0.06]"
+                  style={{ color: 'rgba(196,181,253,0.5)' }}>✕</button>
+              </div>
+            </div>
+            {/* Modal body */}
+            <div className="flex-1 overflow-y-auto p-5 space-y-4">
+              {selectedPost.title && (
+                <h2 className="text-[18px] font-black text-white leading-tight">{selectedPost.title}</h2>
+              )}
+              <p className="text-[13.5px] leading-relaxed whitespace-pre-wrap"
+                style={{ color: 'rgba(212,220,240,0.85)' }}>
+                {selectedPost.content}
+              </p>
+              {selectedPost.video_url && <MediaBlock url={selectedPost.video_url} maxHeight={320} />}
+            </div>
+            {/* Modal footer */}
+            <div className="flex-shrink-0 flex items-center justify-between px-5 py-3"
+              style={{ borderTop: '1px solid rgba(139,92,246,0.1)', background: 'rgba(6,4,15,0.6)' }}>
+              <button onClick={() => toggleLike(selectedPost.id)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-semibold transition-all"
+                style={myLikes.has(selectedPost.id)
+                  ? { background: 'rgba(236,72,153,0.15)', color: '#f472b6', border: '1px solid rgba(236,72,153,0.25)' }
+                  : { background: 'rgba(255,255,255,0.05)', color: 'rgba(196,181,253,0.5)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                ❤️ {reactions.get(selectedPost.id) ?? 0} {myLikes.has(selectedPost.id) ? 'Aimé' : "J'aime"}
+              </button>
+              <div className="flex items-center gap-1 text-[11px]" style={{ color: 'rgba(196,181,253,0.3)' }}>
+                <span>👁</span>
+                <span className="tabular-nums">{selectedPost.view_count} vues</span>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
