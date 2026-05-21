@@ -43,8 +43,8 @@ function SFLogo({ size = 28 }: { size?: number }) {
 }
 
 export type Page =
-  | 'dashboard' | 'phones'
-  | 'stats' | 'posting' | 'massposting' | 'scheduler' | 'bank' | 'aitools' | 'warmup'
+  | 'phones'
+  | 'posting' | 'massposting' | 'scheduler' | 'bank' | 'aitools' | 'warmup'
   | 'montage' | 'remix' | 'textcopy'
   | 'community' | 'support'
   | 'settings' | 'licences'
@@ -67,7 +67,6 @@ const NAV_SECTIONS: NavSection[] = [
     title: 'Principal',
     defaultOpen: true,
     items: [
-      { id: 'dashboard',   label: 'Dashboard',    icon: '📊' },
       { id: 'phones',      label: 'Téléphones',   icon: '📱' },
     ],
   },
@@ -75,7 +74,6 @@ const NAV_SECTIONS: NavSection[] = [
     title: 'Instagram',
     defaultOpen: true,
     items: [
-      { id: 'stats',       label: 'Stats',         icon: '📈' },
       { id: 'posting',     label: 'Posting',       icon: '🚀' },
       { id: 'massposting', label: 'Mass Posting',  icon: '⚡' },
       { id: 'scheduler',   label: 'Programmation', icon: '📅', isNew: true },
@@ -145,7 +143,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
     if (orgId === (currentOrg?.id ?? null)) { setOrgMenuOpen(false); return }
     switchOrg(orgId)
     setOrgMenuOpen(false)
-    onNavigate('dashboard')
+    onNavigate('phones')
     toast.show({
       title: orgId ? `Passé à "${orgName}"` : 'Repassé en mode solo',
       kind:  'info',
@@ -597,7 +595,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
               <p className="text-text2/50 text-xs">Contactez un administrateur pour modifier vos droits d'accès.</p>
             </div>
             <button
-              onClick={() => onNavigate('dashboard')}
+              onClick={() => onNavigate('phones')}
               className="px-6 py-2.5 active:scale-95 text-white text-sm font-semibold rounded-xl transition-all btn-sf-primary"
             >
               Retour au Dashboard

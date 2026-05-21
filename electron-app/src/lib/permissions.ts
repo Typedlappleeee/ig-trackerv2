@@ -6,19 +6,19 @@ import type { OrgRole, PermOverrides, PageKey } from './supabase'
 // can edit their profile / see organisation info.
 const ROLE_TABS: Record<OrgRole, Record<PageKey, boolean>> = {
   owner: {
-    dashboard: true, phones: true, stats: true, posting: true, massposting: true, scheduler: true,
+    phones: true, posting: true, massposting: true, scheduler: true,
     bank: true, autocomment: true, warmup: true, aitools: true, montage: true, remix: true, settings: true,
   },
   admin: {
-    dashboard: true, phones: true, stats: true, posting: true, massposting: true, scheduler: true,
+    phones: true, posting: true, massposting: true, scheduler: true,
     bank: true, autocomment: true, warmup: true, aitools: true, montage: true, remix: true, settings: true,
   },
   member: {
-    dashboard: true, phones: true, stats: true, posting: true, massposting: true, scheduler: true,
+    phones: true, posting: true, massposting: true, scheduler: true,
     bank: true, autocomment: true, warmup: true, aitools: true, montage: true, remix: true, settings: false,
   },
   viewer: {
-    dashboard: true, phones: true, stats: true, posting: false, massposting: false, scheduler: false,
+    phones: true, posting: false, massposting: false, scheduler: false,
     bank: true, autocomment: false, warmup: false, aitools: false, montage: false, remix: false, settings: false,
   },
 }
@@ -73,9 +73,7 @@ export const ROLE_LABELS: Record<OrgRole, string> = {
 // Tabs shown in the per-member permission editor.
 // `settings` represents the *Connexions sub-panel* (API keys), not the whole page.
 export const ALL_TABS: { key: PageKey; label: string; icon: string }[] = [
-  { key: 'dashboard',   label: 'Dashboard',                            icon: '📊' },
   { key: 'phones',      label: 'Téléphones',                           icon: '📱' },
-  { key: 'stats',       label: 'Stats',                                icon: '📈' },
   { key: 'posting',     label: 'Posting',                              icon: '🚀' },
   { key: 'massposting', label: 'Mass Posting',                         icon: '⚡' },
   { key: 'bank',        label: 'Banque',                               icon: '🗂' },
