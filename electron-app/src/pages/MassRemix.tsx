@@ -710,17 +710,6 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
               <p className="text-[18px] font-black text-white">Plan des remixes</p>
               <p className="text-[12px]" style={{ color: 'rgba(148,163,184,0.6)' }}>{plannedPairs.length} paires · Cliquez pour prévisualiser et régler le point de coupe</p>
             </div>
-            {/* Global default cut (used for pairs with no per-pair override when mode=manual) */}
-            {splitMode === 'manual' && (
-              <div className="flex items-center gap-2 px-3 py-2 rounded-xl" style={{ background: 'rgba(234,179,8,0.08)', border: '1px solid rgba(234,179,8,0.2)' }}>
-                <span className="text-[12px]" style={{ color: '#eab308' }}>Défaut</span>
-                <input type="number" min={0.1} step={0.1} value={manualSplitSec}
-                  onChange={e => setManualSplitSec(e.target.value)}
-                  className="w-16 rounded-lg px-2 py-1 text-[13px] font-bold text-center focus:outline-none"
-                  style={{ background: 'rgba(234,179,8,0.1)', border: '1px solid rgba(234,179,8,0.25)', color: '#eab308' }} />
-                <span className="text-[11px]" style={{ color: 'rgba(234,179,8,0.6)' }}>sec (paires sans coupe)</span>
-              </div>
-            )}
             <div className="flex items-center gap-3">
               <button onClick={() => setPreviewOpen(false)}
                 className="px-4 py-2 rounded-xl text-[13px] font-semibold transition-all"
