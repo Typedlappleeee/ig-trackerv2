@@ -334,7 +334,7 @@ export function Posting({ user }: PostingProps) {
           <div className="flex items-center justify-between">
             <p className="text-[12px] font-bold text-white uppercase tracking-wide">Comptes</p>
             <span className="text-[11px] font-bold px-2 py-0.5 rounded-full text-white"
-              style={{ background: selectedPhones.size > 0 ? 'linear-gradient(130deg,#7C3AED,#8B5CF6)' : 'rgba(255,255,255,0.07)' }}>
+              style={{ background: selectedPhones.size > 0 ? 'linear-gradient(130deg,#7C3AED,#8B5CF6)' : 'rgba(139,92,246,0.08)' }}>
               {selectedPhones.size}
             </span>
           </div>
@@ -373,7 +373,7 @@ export function Posting({ user }: PostingProps) {
                 <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-black flex-shrink-0 transition-all"
                   style={checked
                     ? { background: 'linear-gradient(135deg,#7C3AED,#8B5CF6)', color: '#fff' }
-                    : { background: 'rgba(255,255,255,0.06)', color: '#6B6B7A' }}
+                    : { background: 'rgba(139,92,246,0.06)', color: '#6B6B7A' }}
                 >
                   {phone.ig_username?.[0]?.toUpperCase() ?? phone.phone_name?.[0]?.toUpperCase() ?? '?'}
                 </div>
@@ -384,7 +384,7 @@ export function Posting({ user }: PostingProps) {
                 <div className="w-4 h-4 rounded flex items-center justify-center flex-shrink-0 transition-all"
                   style={checked
                     ? { background: 'linear-gradient(135deg,#7C3AED,#8B5CF6)' }
-                    : { border: '1px solid rgba(255,255,255,0.15)' }}
+                    : { border: '1px solid rgba(139,92,246,0.15)' }}
                 >
                   {checked && <span className="text-white text-[9px] font-bold leading-none">✓</span>}
                 </div>
@@ -500,7 +500,7 @@ export function Posting({ user }: PostingProps) {
                 <button
                   onClick={() => setWithHashtags(v => !v)}
                   className="relative w-10 h-5 rounded-full transition-colors flex-shrink-0"
-                  style={{ background: withHashtags ? 'linear-gradient(130deg,#7C3AED,#8B5CF6)' : 'rgba(255,255,255,0.08)' }}
+                  style={{ background: withHashtags ? 'linear-gradient(130deg,#7C3AED,#8B5CF6)' : 'rgba(139,92,246,0.08)' }}
                 >
                   <span className={`absolute top-[3px] w-3.5 h-3.5 rounded-full bg-white shadow transition-transform ${withHashtags ? 'translate-x-[19px]' : 'translate-x-[3px]'}`} />
                 </button>
@@ -550,7 +550,7 @@ export function Posting({ user }: PostingProps) {
                   disabled={!canPost}
                   className="flex-[2] py-3 rounded-xl text-[13px] font-black text-white transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
                   style={{
-                    background: canPost ? 'linear-gradient(130deg,#7C3AED,#8B5CF6)' : 'rgba(255,255,255,0.05)',
+                    background: canPost ? 'linear-gradient(130deg,#7C3AED,#8B5CF6)' : 'rgba(139,92,246,0.06)',
                     boxShadow: canPost ? '0 4px 20px -4px rgba(124,58,237,0.5)' : 'none',
                   }}>
                   {posting ? '⏳ En cours…' : `🚀 Lancer — ${selectedPhones.size} compte${selectedPhones.size !== 1 ? 's' : ''}`}

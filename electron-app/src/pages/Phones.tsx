@@ -72,7 +72,7 @@ function IgStatusBadge({ phone }: { phone: Phone }) {
   )
   return (
     <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold"
-      style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#6B6B7A' }}>
+      style={{ background: '#07070B', border: '1px solid rgba(139,92,246,0.15)', color: '#6B6B7A' }}>
       Public
     </span>
   )
@@ -267,7 +267,7 @@ function SessionDialog({
         )}
 
         <div className="rounded-xl px-4 py-3 text-xs text-text2 space-y-1"
-          style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+          style={{ background: '#0E0E16', border: '1px solid rgba(139,92,246,0.12)' }}>
           <p className="font-semibold text-white">Ou manuellement :</p>
           <p>1. Ouvre <span className="text-accent">instagram.com</span> dans Chrome</p>
           <p>2. Appuie sur <span className="text-accent">F12</span> (DevTools)</p>

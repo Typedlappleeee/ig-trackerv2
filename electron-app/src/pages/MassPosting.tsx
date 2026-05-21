@@ -582,7 +582,7 @@ export function MassPosting({ user }: MassPostingProps) {
         <div className="flex items-center gap-2">
           {/* Mode toggle */}
           <div className="flex rounded-xl p-1 gap-0.5"
-            style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(139,92,246,0.12)' }}>
+            style={{ background: '#07070B', border: '1px solid rgba(139,92,246,0.12)' }}>
             {([{ k: 'seq', l: 'Séquentiel' }, { k: 'random', l: 'Aléatoire' }] as const).map(m => (
               <button key={m.k} onClick={() => setMode(m.k)}
                 className="px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-all"
@@ -613,7 +613,7 @@ export function MassPosting({ user }: MassPostingProps) {
             disabled={!canLaunch}
             className="rounded-xl px-4 py-2 text-[12px] font-black text-white transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
             style={{
-              background: canLaunch ? 'linear-gradient(130deg,#7C3AED,#8B5CF6)' : 'rgba(255,255,255,0.05)',
+              background: canLaunch ? 'linear-gradient(130deg,#7C3AED,#8B5CF6)' : 'rgba(139,92,246,0.08)',
               boxShadow: canLaunch ? '0 4px 20px -4px rgba(124,58,237,0.5)' : 'none',
             }}>
             {posting ? '⏳ En cours…' : '⚡ Lancer'}
@@ -639,7 +639,7 @@ export function MassPosting({ user }: MassPostingProps) {
             <div className="flex items-center justify-between">
               <p className="text-[12px] font-bold text-white uppercase tracking-wide">Vidéos</p>
               <span className="text-[11px] font-bold px-2 py-0.5 rounded-full text-white"
-                style={{ background: selectedVideos.length > 0 ? 'linear-gradient(130deg,#7C3AED,#8B5CF6)' : 'rgba(255,255,255,0.07)' }}>
+                style={{ background: selectedVideos.length > 0 ? 'linear-gradient(130deg,#7C3AED,#8B5CF6)' : 'rgba(139,92,246,0.08)' }}>
                 {selectedVideos.length}
               </span>
             </div>
@@ -706,13 +706,13 @@ export function MassPosting({ user }: MassPostingProps) {
             <div className="flex items-center justify-between">
               <p className="text-[12px] font-bold text-white uppercase tracking-wide">Cibles</p>
               <span className="text-[11px] font-bold px-2 py-0.5 rounded-full text-white"
-                style={{ background: selectedPhones.size > 0 ? 'linear-gradient(130deg,#7C3AED,#8B5CF6)' : 'rgba(255,255,255,0.07)' }}>
+                style={{ background: selectedPhones.size > 0 ? 'linear-gradient(130deg,#7C3AED,#8B5CF6)' : 'rgba(139,92,246,0.08)' }}>
                 {selectedPhones.size}
               </span>
             </div>
             {/* Mode toggle */}
             <div className="flex rounded-xl p-0.5 gap-0.5"
-              style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(139,92,246,0.12)' }}>
+              style={{ background: '#07070B', border: '1px solid rgba(139,92,246,0.12)' }}>
               {([{ k: 'phones', l: '📱 Tél.' }, { k: 'groups', l: '👥 Groupes' }] as const).map(m => (
                 <button key={m.k} onClick={() => setPhonePickMode(m.k)}
                   className="flex-1 py-1.5 rounded-lg text-[11px] font-semibold transition-all"
@@ -787,10 +787,10 @@ export function MassPosting({ user }: MassPostingProps) {
                   className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-all ${
                     checked ? '' : 'hover:bg-white/[0.02]'
                   }`}
-                  style={checked ? { background: 'rgba(139,92,246,0.08)', borderBottom: '1px solid rgba(255,255,255,0.04)' } : { borderBottom: '1px solid rgba(255,255,255,0.04)' }}
+                  style={checked ? { background: 'rgba(139,92,246,0.08)', borderBottom: '1px solid rgba(139,92,246,0.08)' } : { borderBottom: '1px solid rgba(139,92,246,0.08)' }}
                 >
                   <div className="w-8 h-8 rounded-full flex items-center justify-center text-[12px] font-black flex-shrink-0"
-                    style={checked ? { background: 'linear-gradient(135deg,#7c3aed,#ec4899)', color: 'white' } : { background: 'rgba(255,255,255,0.06)', color: '#94a3b8' }}>
+                    style={checked ? { background: 'linear-gradient(135deg,#7c3aed,#ec4899)', color: 'white' } : { background: 'rgba(139,92,246,0.08)', color: '#6B6B7A' }}>
                     {phone.ig_username?.[0]?.toUpperCase() ?? phone.phone_name?.[0]?.toUpperCase() ?? '?'}
                   </div>
                   <div className="min-w-0 flex-1">
@@ -838,12 +838,12 @@ export function MassPosting({ user }: MassPostingProps) {
                     className="w-full flex items-center gap-3 px-4 py-4 text-left transition-all"
                     style={checked
                       ? { background: 'rgba(139,92,246,0.1)', borderBottom: '1px solid rgba(139,92,246,0.1)' }
-                      : { borderBottom: '1px solid rgba(255,255,255,0.04)' }}
+                      : { borderBottom: '1px solid rgba(139,92,246,0.08)' }}
                   >
                     <div className="w-10 h-10 rounded-xl flex items-center justify-center text-[18px] flex-shrink-0"
                       style={checked
                         ? { background: 'linear-gradient(135deg,#7c3aed,#ec4899)' }
-                        : { background: 'rgba(255,255,255,0.06)' }}>
+                        : { background: 'rgba(139,92,246,0.08)' }}>
                       👥
                     </div>
                     <div className="min-w-0 flex-1">
