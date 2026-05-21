@@ -519,10 +519,22 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
               const txt = (res.data as { content: Array<{ type: string; text: string }> })?.content?.[0]?.text ?? '[]'
               const m = txt.match(/\[[\s\S]*\]/)
               if (m) {
-                const parsed = JSON.parse(m[0]) as Array<{ text: string; xAlign: string; yPercent: number; fontSizePx: number; fontColor: string; bold?: boolean; startFrame: number; endFrame: number }>
+                const rawParsed = JSON.parse(m[0]) as Array<{ text: string; xAlign: string; yPercent: number; fontSizePx: number; fontColor: string; bold?: boolean; startFrame: number; endFrame: number }>
                 const frameCount = fr.frames!.length
                 const outH = preset === '9:16' ? 1920 : 1080
                 const outW = preset === '16:9' ? 1920 : 1080
+
+                // Deduplicate: merge entries with the same text (case-insensitive)
+                const parsed = rawParsed.reduce((acc, item) => {
+                  const existing = acc.find(e => e.text.trim().toLowerCase() === item.text.trim().toLowerCase())
+                  if (existing) {
+                    existing.startFrame = Math.min(existing.startFrame ?? 0, item.startFrame ?? 0)
+                    existing.endFrame   = Math.max(existing.endFrame   ?? frameCount - 1, item.endFrame ?? frameCount - 1)
+                  } else {
+                    acc.push({ ...item })
+                  }
+                  return acc
+                }, [] as typeof rawParsed)
 
                 // ── Step 1: resolve timing + font for each item ────────────────
                 type TItem = { text: string; xAlign: string; rawY: number; fontSize: number; fontColor: string; bold: boolean; startTime: number; endTime: number }
@@ -532,9 +544,8 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                   const ef = item.endFrame   ?? frameCount - 1
                   const coversAll = (ef - sf + 1) >= frameCount * 0.8
                   const startTime = coversAll ? 0 : Math.round(sf * interval * 10) / 10
-                  const endTime   = coversAll
-                    ? analyzeEnd
-                    : Math.min(analyzeEnd, Math.max(startTime + interval * 2, Math.round((ef + 1) * interval * 10) / 10))
+                  // Always extend endTime well past splitTime so text also shows in Phase 2
+                  const endTime   = 9999
                   return { text: item.text, xAlign: item.xAlign ?? 'center', rawY: (item.yPercent ?? 50) / 100, fontSize, fontColor: item.fontColor ?? 'white', bold: item.bold ?? true, startTime, endTime }
                 })
 
