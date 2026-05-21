@@ -426,12 +426,17 @@ export function MassRemix({ user }: MassRemixProps) {
           if (!det.ok) addLog(job.id, `❌ Détection échouée: ${det.error ?? 'inconnu'}`)
 
           detDuration = det.duration
-          if (det.ok && det.splitTime != null) {
+          // Ignore detected splits that are too early (< 20% of duration, min 2s)
+          // — those are false positives from minor brightness changes, not real scene cuts
+          const minSplit = Math.min(5, Math.max(2, (det.duration ?? 10) * 0.20))
+          if (det.ok && det.splitTime != null && det.splitTime >= minSplit) {
             splitTime = Math.min((det.duration ?? 60) - 0.1, Math.round(det.splitTime * 1000) / 1000)
             addLog(job.id, `✅ Scène: splitTime=${splitTime}s, durée=${det.duration ?? '?'}s`)
           } else {
             splitTime = undefined
-            addLog(job.id, `⚠️ Pas de scène détectée → vidéo secondaire uniquement`)
+            addLog(job.id, det.ok && det.splitTime != null
+              ? `⚠️ Scène trop tôt (${det.splitTime?.toFixed(1)}s < ${minSplit}s min) → secondaire uniquement`
+              : `⚠️ Pas de scène détectée → secondaire uniquement`)
           }
 
           // Vérif. décor — si le BACKGROUND/LIEU est le même des 2 côtés du cut → annuler
