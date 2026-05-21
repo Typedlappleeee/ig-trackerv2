@@ -842,28 +842,106 @@ export function Phones({ user }: PhonesProps) {
         </div>
 
         {/* ── 6 Stat cards ─────────────────────────────────────────────────── */}
-        <div className="flex-shrink-0 px-8 pt-5 pb-4 grid grid-cols-6 gap-3">
-          {([
-            { label: 'TOTAL',           value: String(phones.length),  sub: 'téléphones',    color: '#818cf8', f: 'all'     as const },
-            { label: 'EN LIGNE',        value: String(onlineCount),    sub: phones.length ? `${Math.round((onlineCount/phones.length)*100)}%` : '0%', color: '#00ccaa', f: 'online'  as const },
-            { label: 'HORS LIGNE',      value: String(offlineCount),   sub: phones.length ? `${Math.round((offlineCount/phones.length)*100)}%` : '0%', color: '#5a6882', f: 'offline' as const },
-            { label: 'COMPTES ACTIFS',  value: String(igCount),        sub: 'Instagram',     color: '#e1306c', f: null },
-            { label: 'GROUPES',         value: String(groupCount),     sub: 'groupes actifs',color: '#f59e0b', f: null },
-            { label: 'SYNCHRONISATION', value: phones.length ? `${Math.round((onlineCount/phones.length)*100)}%` : '—', sub: lastUpdated ? `màj ${lastUpdated.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}` : 'À jour', color: '#10b981', f: null },
-          ]).map(card => (
-            <button key={card.label}
-              onClick={() => { if (card.f) setFilter(card.f) }}
-              className={`rounded-2xl p-4 text-left transition-all ${card.f ? 'hover:brightness-110' : 'cursor-default'}`}
-              style={{
-                background: (card.f && filter === card.f) ? `${card.color}14` : 'rgba(255,255,255,0.03)',
-                border: (card.f && filter === card.f) ? `1px solid ${card.color}40` : '1px solid rgba(255,255,255,0.07)',
-              }}>
-              <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'rgba(148,163,184,0.45)' }}>{card.label}</p>
-              <p className="text-[24px] font-black leading-none" style={{ color: card.color }}>{card.value}</p>
-              <p className="text-[10px] mt-1" style={{ color: 'rgba(148,163,184,0.4)' }}>{card.sub}</p>
-            </button>
-          ))}
-        </div>
+        {(() => {
+          const onlinePct  = phones.length ? Math.round((onlineCount  / phones.length) * 100) : 0
+          const offlinePct = phones.length ? Math.round((offlineCount / phones.length) * 100) : 0
+          const syncPct    = onlinePct
+
+          const Sparkline = ({ color, down }: { color: string; down?: boolean }) => (
+            <svg width="72" height="28" viewBox="0 0 72 28" fill="none" className="opacity-80">
+              <defs>
+                <linearGradient id={`sg-${color.replace('#','')}`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={color} stopOpacity="0.25" />
+                  <stop offset="100%" stopColor={color} stopOpacity="0" />
+                </linearGradient>
+              </defs>
+              {down ? (
+                <>
+                  <path d="M0 6 L9 8 L18 5 L27 11 L36 9 L45 16 L54 14 L63 20 L72 22" stroke={color} strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M0 6 L9 8 L18 5 L27 11 L36 9 L45 16 L54 14 L63 20 L72 22 L72 28 L0 28Z" fill={`url(#sg-${color.replace('#','')})`}/>
+                </>
+              ) : (
+                <>
+                  <path d="M0 22 L9 18 L18 20 L27 13 L36 15 L45 9 L54 11 L63 5 L72 3" stroke={color} strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M0 22 L9 18 L18 20 L27 13 L36 15 L45 9 L54 11 L63 5 L72 3 L72 28 L0 28Z" fill={`url(#sg-${color.replace('#','')})`}/>
+                </>
+              )}
+            </svg>
+          )
+
+          const RingIcon = ({ pct, color }: { pct: number; color: string }) => {
+            const r = 16, circ = 2 * Math.PI * r
+            const dash = (pct / 100) * circ
+            return (
+              <svg width="44" height="44" viewBox="0 0 44 44">
+                <circle cx="22" cy="22" r={r} stroke={`${color}22`} strokeWidth="4" fill="none"/>
+                <circle cx="22" cy="22" r={r} stroke={color} strokeWidth="4" fill="none"
+                  strokeDasharray={`${dash} ${circ}`} strokeDashoffset={circ * 0.25}
+                  strokeLinecap="round" style={{ transition: 'stroke-dasharray 0.6s ease' }}/>
+                <text x="22" y="27" textAnchor="middle" fontSize="9" fontWeight="800" fill={color}>✓</text>
+              </svg>
+            )
+          }
+
+          const PhoneIcon = ({ color }: { color: string }) => (
+            <div className="relative flex items-center justify-center w-10 h-10">
+              <div className="absolute inset-0 rounded-xl opacity-20 blur-sm" style={{ background: color }} />
+              <span className="relative text-[22px]">📱</span>
+            </div>
+          )
+
+          const PeopleIcon = ({ color }: { color: string }) => (
+            <svg width="40" height="32" viewBox="0 0 40 32" fill="none" opacity="0.7">
+              <circle cx="14" cy="10" r="5" fill={color} opacity="0.6"/>
+              <path d="M4 28 C4 20 24 20 24 28" fill={color} opacity="0.5"/>
+              <circle cx="26" cy="10" r="4" fill={color} opacity="0.4"/>
+              <path d="M18 28 C20 22 36 22 36 28" fill={color} opacity="0.3"/>
+            </svg>
+          )
+
+          const GridIcon = ({ color }: { color: string }) => (
+            <svg width="36" height="36" viewBox="0 0 36 36" fill="none" opacity="0.7">
+              <rect x="2"  y="2"  width="14" height="14" rx="3" fill={color} opacity="0.6"/>
+              <rect x="20" y="2"  width="14" height="14" rx="3" fill={color} opacity="0.4"/>
+              <rect x="2"  y="20" width="14" height="14" rx="3" fill={color} opacity="0.4"/>
+              <rect x="20" y="20" width="14" height="14" rx="3" fill={color} opacity="0.25"/>
+            </svg>
+          )
+
+          const cards: { label: string; value: string; sub: string; color: string; f: 'all'|'online'|'offline'|null; deco: React.ReactNode }[] = [
+            { label: 'TOTAL',           value: String(phones.length), sub: 'téléphones',    color: '#818cf8', f: 'all',    deco: <PhoneIcon color="#818cf8" /> },
+            { label: 'EN LIGNE',        value: String(onlineCount),   sub: `${onlinePct}%`, color: '#00ccaa', f: 'online', deco: <Sparkline color="#00ccaa" /> },
+            { label: 'HORS LIGNE',      value: String(offlineCount),  sub: `${offlinePct}%`,color: '#f87171', f: 'offline',deco: <Sparkline color="#f87171" down /> },
+            { label: 'COMPTES ACTIFS',  value: String(igCount),       sub: 'Instagram',     color: '#e1306c', f: null,     deco: <PeopleIcon color="#e1306c" /> },
+            { label: 'GROUPES',         value: String(groupCount),    sub: 'groupes actifs',color: '#f59e0b', f: null,     deco: <GridIcon color="#f59e0b" /> },
+            { label: 'SYNCHRONISATION', value: `${syncPct}%`,         sub: lastUpdated ? `màj ${lastUpdated.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}` : 'À jour', color: '#10b981', f: null, deco: <RingIcon pct={syncPct} color="#10b981" /> },
+          ]
+
+          return (
+            <div className="flex-shrink-0 px-8 pt-5 pb-4 grid grid-cols-6 gap-3">
+              {cards.map(card => (
+                <button key={card.label}
+                  onClick={() => { if (card.f) setFilter(card.f) }}
+                  className={`rounded-2xl p-4 text-left transition-all overflow-hidden relative ${card.f ? 'hover:brightness-110' : 'cursor-default'}`}
+                  style={{
+                    background: (card.f && filter === card.f) ? `${card.color}12` : 'rgba(255,255,255,0.03)',
+                    border: (card.f && filter === card.f) ? `1px solid ${card.color}35` : '1px solid rgba(255,255,255,0.07)',
+                  }}>
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'rgba(148,163,184,0.45)' }}>{card.label}</p>
+                      <p className="text-[26px] font-black leading-none" style={{ color: card.color }}>{card.value}</p>
+                      <p className="text-[10px] mt-1.5" style={{ color: 'rgba(148,163,184,0.4)' }}>{card.sub}</p>
+                    </div>
+                    <div className="flex-shrink-0 flex items-center justify-center ml-2 mt-1">
+                      {card.deco}
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )
+        })()}
 
         {/* ── Main area: table + right panel ───────────────────────────────── */}
         <div className="flex-1 flex overflow-hidden">
