@@ -492,32 +492,51 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                 }
 
                 // ── Step 3: generate per-line overlays inside their zone ──────────
-                // Track the lowest used yFrac per zone per concurrent group to avoid line overlap
+                // Use rawY clamped to safe bands: top [0.10–0.30], bottom [0.60–0.82]
+                // Track baseY per item so concurrent stacking works correctly
+                const baseYMap = new Map<number, number>()
                 items.forEach((item, idx) => {
                   const zone   = zones[idx]
                   const lines  = wrapText(item.text, item.fontSize, outW)
                   const stepFr = (item.fontSize * 1.3) / outH
 
-                  // Find the lowest yFrac already used by concurrent items in the same zone
                   let baseY: number
                   if (zone === 'top') {
-                    baseY = 0.07
+                    // Mirror original position, clamped to top safe zone
+                    const preferred = Math.max(0.10, Math.min(0.30, item.rawY))
+                    // Push below any concurrent top items already placed
+                    const concurrentEnd = items
+                      .slice(0, idx)
+                      .filter((_, j) => zones[j] === 'top' && items[j].endTime > item.startTime && items[j].startTime < item.endTime)
+                      .reduce((max, it, _i, _arr) => {
+                        const j = items.indexOf(it)
+                        const b = baseYMap.get(j) ?? preferred
+                        const n = wrapText(it.text, it.fontSize, outW).length
+                        const s = (it.fontSize * 1.3) / outH
+                        return Math.max(max, b + n * s)
+                      }, preferred)
+                    baseY = concurrentEnd
                   } else {
-                    // Start just below any concurrent bottom items
-                    const concurrentBottomMax = items
+                    // Mirror original position, clamped to bottom safe zone
+                    const preferred = Math.max(0.60, Math.min(0.80, item.rawY))
+                    // Stack below any concurrent bottom items already placed
+                    const concurrentEnd = items
                       .slice(0, idx)
                       .filter((_, j) => zones[j] === 'bottom' && items[j].endTime > item.startTime && items[j].startTime < item.endTime)
                       .reduce((max, it) => {
+                        const j = items.indexOf(it)
+                        const b = baseYMap.get(j) ?? preferred
                         const n = wrapText(it.text, it.fontSize, outW).length
-                        const st = (it.fontSize * 1.3) / outH
-                        return Math.max(max, 0.76 + (n - 1) * st)
-                      }, 0.76)
-                    baseY = concurrentBottomMax
+                        const s = (it.fontSize * 1.3) / outH
+                        return Math.max(max, b + n * s)
+                      }, preferred)
+                    baseY = concurrentEnd
                   }
+                  baseYMap.set(idx, baseY)
 
                   lines.forEach((line, li) => {
                     const lineYFrac = zone === 'top'
-                      ? Math.min(0.13, baseY + li * stepFr)
+                      ? Math.min(0.35, baseY + li * stepFr)
                       : Math.min(0.87, baseY + li * stepFr)
                     textOverlays.push({
                       text: line,
