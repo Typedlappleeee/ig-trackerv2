@@ -958,7 +958,7 @@ export function Phones({ user }: PhonesProps) {
                 {visible.length === 0 ? (
                   <p className="px-5 py-10 text-center text-[13px] text-text2">Aucun résultat.</p>
                 ) : (
-                  <div className="divide-y" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
+                  <div>
                     {visible.map((phone, i) => {
                       const col = phoneColor(phone.phone_name)
                       const isSelected = selectedPhone?.id === phone.id
@@ -968,10 +968,10 @@ export function Phones({ user }: PhonesProps) {
                           style={{
                             gridTemplateColumns: COLS,
                             background: isSelected ? 'rgba(139,92,246,0.07)' : undefined,
-                            borderLeft: isSelected ? '2px solid rgba(139,92,246,0.45)' : '2px solid transparent',
+                            borderBottom: i < visible.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
                           }}
-                          onMouseEnter={e => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.025)' }}
-                          onMouseLeave={e => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = '' }}
+                          onMouseEnter={e => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.022)' }}
+                          onMouseLeave={e => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = isSelected ? 'rgba(139,92,246,0.07)' : '' }}
                           onClick={() => setSelectedPhone(isSelected ? null : phone)}
                           onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setContextMenu({ phone, x: e.clientX, y: e.clientY }) }}>
 
@@ -980,9 +980,9 @@ export function Phones({ user }: PhonesProps) {
 
                           {/* Téléphone */}
                           <div className="flex items-center gap-2.5 min-w-0 pr-2">
-                            <div className="w-9 h-9 rounded-xl flex-shrink-0 flex items-center justify-center text-white text-[13px] font-black"
-                              style={{ background: `linear-gradient(135deg, ${col}cc 0%, ${col}55 100%)` }}>
-                              {phone.phone_name.charAt(0).toUpperCase()}
+                            <div className="w-9 h-9 rounded-xl flex-shrink-0 flex items-center justify-center text-[18px]"
+                              style={{ background: `linear-gradient(135deg, ${col}22 0%, ${col}11 100%)`, border: `1px solid ${col}33` }}>
+                              📱
                             </div>
                             <div className="min-w-0">
                               <p className="text-[13px] font-semibold text-white truncate leading-tight">{phone.phone_name}</p>
@@ -1089,9 +1089,9 @@ export function Phones({ user }: PhonesProps) {
                 <div className="px-5 pt-5 pb-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center text-white text-[15px] font-black"
-                        style={{ background: `linear-gradient(135deg, ${col}cc 0%, ${col}55 100%)` }}>
-                        {p.phone_name.charAt(0).toUpperCase()}
+                      <div className="w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center text-[20px]"
+                        style={{ background: `linear-gradient(135deg, ${col}22 0%, ${col}11 100%)`, border: `1px solid ${col}33` }}>
+                        📱
                       </div>
                       <div>
                         <p className="text-[14px] font-bold text-white leading-tight">{p.phone_name}</p>
