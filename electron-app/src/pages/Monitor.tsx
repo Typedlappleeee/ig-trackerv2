@@ -129,8 +129,8 @@ export default function Monitor({ user }: { user: User }) {
     if (!bearer) return
     try {
       const all = await fetchAllPhones(bearer)
-      // GéeLark: 0=stopped, 1=running, 2=starting, 3=stopping — show 1 and 2
-      setPhones(all.filter(p => p.status === 1 || p.status === 2))
+      // GéeLark: 0=running, 1=stopped, 2=starting, 3=stopping — show 0 and 2
+      setPhones(all.filter(p => p.status === 0 || p.status === 2))
       setError(null)
     } catch (e) {
       setError(String(e))

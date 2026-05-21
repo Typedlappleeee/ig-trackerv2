@@ -8,7 +8,7 @@ export interface GeelarkPhone {
   name?:       string | null
   group?:      { name?: string } | null
   groupName?:  string | null
-  status:      number  // 0=stopped/offline, 1=running/online
+  status:      number  // 0=running, 1=stopped, 2=starting, 3=stopping
   remark?:     string | null
 }
 
@@ -59,10 +59,10 @@ export async function fetchAllPhones(bearer: string): Promise<GeelarkPhone[]> {
   return items
 }
 
-// GéeLark: 0=stopped, 1=running, 2=starting, 3=stopping
-// Treat 1 and 2 as online (phone is up or booting)
+// GéeLark: 0=running, 1=stopped, 2=starting, 3=stopping
+// Treat 0 and 2 as online (phone is up or booting)
 export function geelarkStatusLabel(status: number): string {
-  return (status === 1 || status === 2) ? 'online' : 'offline'
+  return (status === 0 || status === 2) ? 'online' : 'offline'
 }
 
 // Stop a single phone (best-effort — never throws).
