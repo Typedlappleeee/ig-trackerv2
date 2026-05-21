@@ -201,9 +201,15 @@ export function MassRemix({ user }: MassRemixProps) {
   const [selectedPairId, setSelectedPairId] = useState<number | null>(null)
   const [vidCurrentTime, setVidCurrentTime] = useState(0)
   const [vidDuration,    setVidDuration]    = useState(0)
-  const vidRef       = useRef<HTMLVideoElement>(null)
-  const timelineRef  = useRef<HTMLDivElement>(null)
-  const draggingRef2 = useRef(false)
+  const [isPlaying,      setIsPlaying]      = useState(false)
+  const [hoverTime,      setHoverTime]      = useState<number | null>(null)
+  const [beforeFrameUrl, setBeforeFrameUrl] = useState<string | null>(null)
+  const [afterFrameUrl,  setAfterFrameUrl]  = useState<string | null>(null)
+  const vidRef        = useRef<HTMLVideoElement>(null)
+  const captureVidRef = useRef<HTMLVideoElement>(null)
+  const timelineRef   = useRef<HTMLDivElement>(null)
+  const draggingRef2  = useRef(false)
+  const captureCanvas = useRef<HTMLCanvasElement | null>(null)
 
   // anthropic key from DB (connections), fallback to localStorage
   const anthropicKey = conns.anthropic || localStorage.getItem('sf_anthropic_key') || ''
@@ -226,6 +232,27 @@ export function MassRemix({ user }: MassRemixProps) {
   useEffect(() => {
     return () => { abortRef.current = true }
   }, [])
+
+  // Keyboard control for cut editor: ←→ frame step, Shift+←→ 0.1s, Space play/pause
+  useEffect(() => {
+    if (!previewOpen) return
+    const FRAME = 1 / 30
+    const onKey = (e: KeyboardEvent) => {
+      const vid = vidRef.current
+      if (!vid || vidDuration <= 0) return
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+      if (e.key === ' ') { e.preventDefault(); vid.paused ? vid.play() : vid.pause(); return }
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return
+      e.preventDefault()
+      vid.pause()
+      const step = e.shiftKey ? 0.1 : e.ctrlKey ? 1 : FRAME
+      const newT = Math.max(0, Math.min(vidDuration, vid.currentTime + (e.key === 'ArrowRight' ? step : -step)))
+      vid.currentTime = newT
+      setVidCurrentTime(newT)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [previewOpen, vidDuration])
 
   function updateJob(id: number, patch: Partial<MassJob>) {
     setJobs(prev => prev.map(j => j.id === id ? { ...j, ...patch } : j))
@@ -298,6 +325,29 @@ export function MassRemix({ user }: MassRemixProps) {
 
   function setCutForPair(id: number, sec: number | undefined) {
     setPlannedPairs(prev => prev.map(p => p.id === id ? { ...p, cutSec: sec } : p))
+    if (sec != null) captureBeforeAfter(sec)
+    else { setBeforeFrameUrl(null); setAfterFrameUrl(null) }
+  }
+
+  function captureBeforeAfter(cutTime: number) {
+    const vid = captureVidRef.current
+    if (!vid || !vid.src) return
+    if (!captureCanvas.current) captureCanvas.current = document.createElement('canvas')
+    const canvas = captureCanvas.current
+    const capFrame = (t: number): Promise<string> => new Promise(resolve => {
+      const onSeeked = () => {
+        vid.removeEventListener('seeked', onSeeked)
+        canvas.width  = vid.videoWidth  || 360
+        canvas.height = vid.videoHeight || 640
+        const ctx = canvas.getContext('2d')
+        ctx?.drawImage(vid, 0, 0, canvas.width, canvas.height)
+        resolve(canvas.toDataURL('image/jpeg', 0.85))
+      }
+      vid.addEventListener('seeked', onSeeked, { once: true })
+      vid.currentTime = Math.max(0, t)
+    })
+    capFrame(Math.max(0, cutTime - 0.05)).then(setBeforeFrameUrl)
+    capFrame(cutTime).then(setAfterFrameUrl)
   }
 
   async function launch(prePlanned?: PlannedPair[]) {
@@ -709,13 +759,49 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
             <div className="flex-1 min-w-0 flex flex-col items-center justify-center gap-5 p-8 overflow-y-auto">
               {selectedPair ? (
                 <>
-                  {/* Video */}
+                  {/* Hidden capture video (same source, seeks independently for frame preview) */}
+                  <video
+                    ref={captureVidRef}
+                    key={'cap-' + selectedPair.originalPath}
+                    src={toFileUrl(selectedPair.originalPath)}
+                    preload="auto"
+                    muted
+                    style={{ display: 'none' }}
+                  />
+
+                  {/* ── Split frame preview (before / after cut) ── */}
+                  {selectedPair.cutSec != null && (beforeFrameUrl || afterFrameUrl) && (
+                    <div className="w-full flex gap-3 flex-shrink-0">
+                      {[
+                        { label: 'Avant le cut', url: beforeFrameUrl, time: Math.max(0, selectedPair.cutSec - 0.05) },
+                        { label: 'Après le cut',  url: afterFrameUrl,  time: selectedPair.cutSec },
+                      ].map(({ label, url, time }) => (
+                        <div key={label} className="flex-1 flex flex-col gap-1.5">
+                          <span className="text-[10px] font-semibold text-center" style={{ color: 'rgba(148,163,184,0.55)' }}>{label}</span>
+                          <div className="relative rounded-xl overflow-hidden" style={{
+                            background: '#000',
+                            aspectRatio: preset === '9:16' ? '9/16' : preset === '1:1' ? '1/1' : '16/9',
+                          }}>
+                            {url
+                              ? <img src={url} className="w-full h-full object-contain" />
+                              : <div className="absolute inset-0 flex items-center justify-center">
+                                  <div className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: 'rgba(139,92,246,0.5)', borderTopColor: 'transparent' }} />
+                                </div>
+                            }
+                          </div>
+                          <span className="text-[10px] font-mono text-center" style={{ color: '#eab308' }}>{time.toFixed(3)}s</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* ── Main video ── */}
                   <div className="relative rounded-2xl overflow-hidden flex-shrink-0"
                     style={{
                       background: '#000',
-                      maxHeight: 'calc(100vh - 300px)',
+                      maxHeight: selectedPair.cutSec != null ? 'calc(100vh - 420px)' : 'calc(100vh - 300px)',
                       aspectRatio: preset === '9:16' ? '9/16' : preset === '1:1' ? '1/1' : '16/9',
-                      maxWidth: preset === '9:16' ? 280 : '100%',
+                      maxWidth: preset === '9:16' ? 220 : '100%',
                     }}>
                     <video
                       ref={vidRef}
@@ -725,119 +811,170 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                       preload="auto"
                       muted
                       onTimeUpdate={() => setVidCurrentTime(vidRef.current?.currentTime ?? 0)}
-                      onLoadedMetadata={() => setVidDuration(vidRef.current?.duration ?? 0)}
+                      onLoadedMetadata={() => {
+                        setVidDuration(vidRef.current?.duration ?? 0)
+                        if (selectedPair.cutSec != null) captureBeforeAfter(selectedPair.cutSec)
+                      }}
+                      onPlay={() => setIsPlaying(true)}
+                      onPause={() => setIsPlaying(false)}
                       onClick={() => { const v = vidRef.current; if (v) v.paused ? v.play() : v.pause() }}
                       style={{ cursor: 'pointer', display: 'block' }}
                     />
-                    {/* Cut line overlay on video */}
                     {selectedPair.cutSec != null && vidDuration > 0 && (
                       <div className="absolute top-0 bottom-0 pointer-events-none"
-                        style={{ left: `${(selectedPair.cutSec / vidDuration) * 100}%`, width: 2, background: 'rgba(234,179,8,0.9)', boxShadow: '0 0 8px rgba(234,179,8,0.6)' }} />
+                        style={{ left: `${(selectedPair.cutSec / vidDuration) * 100}%`, width: 2, background: '#eab308', boxShadow: '0 0 10px rgba(234,179,8,0.8)' }} />
                     )}
-                    {/* Play hint */}
-                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-0 hover:opacity-100 transition-opacity">
-                      <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.5)' }}>
-                        <span className="text-white text-xl ml-1">▶</span>
-                      </div>
-                    </div>
                   </div>
 
-                  {/* Timeline controls */}
-                  <div className="w-full max-w-lg space-y-3 flex-shrink-0">
-                    <div className="flex items-center gap-3">
+                  {/* ── Cut editor ── */}
+                  <div className="w-full flex-shrink-0 space-y-2.5">
+                    {/* Row 1: play controls + cut button */}
+                    <div className="flex items-center gap-2">
+                      {/* Step back 1 frame */}
+                      <button title="Reculer 1 image (←)" onClick={() => {
+                        const v = vidRef.current; if (!v) return; v.pause()
+                        const t = Math.max(0, v.currentTime - 1/30); v.currentTime = t; setVidCurrentTime(t)
+                      }} className="w-8 h-8 rounded-lg flex items-center justify-center text-sm"
+                        style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)', color: 'rgba(148,163,184,0.7)' }}>◁</button>
+                      {/* Play/pause */}
                       <button onClick={() => { const v = vidRef.current; if (v) v.paused ? v.play() : v.pause() }}
-                        className="w-9 h-9 rounded-xl flex items-center justify-center text-[15px] flex-shrink-0"
-                        style={{ background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.3)', color: '#a78bfa' }}>
-                        ▶
+                        className="w-9 h-9 rounded-xl flex items-center justify-center text-[16px] flex-shrink-0"
+                        style={{ background: 'rgba(139,92,246,0.18)', border: '1px solid rgba(139,92,246,0.35)', color: '#a78bfa' }}>
+                        {isPlaying ? '⏸' : '▶'}
                       </button>
-                      <span className="text-[12px] font-mono" style={{ color: 'rgba(148,163,184,0.6)' }}>
-                        {formatSec(vidCurrentTime)} / {formatSec(vidDuration)}
+                      {/* Step forward 1 frame */}
+                      <button title="Avancer 1 image (→)" onClick={() => {
+                        const v = vidRef.current; if (!v) return; v.pause()
+                        const t = Math.min(vidDuration, v.currentTime + 1/30); v.currentTime = t; setVidCurrentTime(t)
+                      }} className="w-8 h-8 rounded-lg flex items-center justify-center text-sm"
+                        style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)', color: 'rgba(148,163,184,0.7)' }}>▷</button>
+
+                      <span className="text-[12px] font-mono tabular-nums" style={{ color: 'rgba(148,163,184,0.7)' }}>
+                        {vidCurrentTime.toFixed(3)}s / {vidDuration.toFixed(3)}s
                       </span>
-                      {vidDuration > 0 && (
-                        <button
-                          onClick={() => {
-                            const sec = Math.round(vidCurrentTime * 10) / 10
-                            setCutForPair(selectedPair.id, sec)
-                            vidRef.current?.pause()
-                          }}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-bold transition-all hover:brightness-110"
-                          style={{ background: 'rgba(234,179,8,0.15)', border: '1px solid rgba(234,179,8,0.3)', color: '#eab308' }}>
-                          ✂ Couper ici
-                        </button>
-                      )}
-                      {selectedPair.cutSec != null && (
-                        <>
-                          <span className="text-[12px] font-bold ml-auto" style={{ color: '#eab308' }}>✂ {selectedPair.cutSec.toFixed(1)}s</span>
+
+                      <div className="ml-auto flex items-center gap-2">
+                        {vidDuration > 0 && (
+                          <button
+                            onClick={() => {
+                              const sec = Math.round(vidCurrentTime * 1000) / 1000
+                              setCutForPair(selectedPair.id, sec)
+                              vidRef.current?.pause()
+                            }}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-bold transition-all hover:brightness-110"
+                            style={{ background: 'rgba(234,179,8,0.18)', border: '1px solid rgba(234,179,8,0.4)', color: '#eab308' }}>
+                            ✂ Couper ici
+                          </button>
+                        )}
+                        {selectedPair.cutSec != null && (
                           <button onClick={() => setCutForPair(selectedPair.id, undefined)}
                             className="text-[11px] px-2 py-1 rounded-lg"
                             style={{ background: 'rgba(239,68,68,0.1)', color: '#f87171', border: '1px solid rgba(239,68,68,0.2)' }}>
-                            ✕ Effacer
+                            ✕
                           </button>
-                        </>
-                      )}
+                        )}
+                      </div>
                     </div>
 
-                    <p className="text-[11px]" style={{ color: 'rgba(148,163,184,0.45)' }}>
-                      Cliquez (ou glissez) sur la barre pour définir le point de coupe ✂
-                    </p>
+                    {/* Row 2: cut time display */}
+                    {selectedPair.cutSec != null && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px]" style={{ color: 'rgba(148,163,184,0.5)' }}>Point de coupe :</span>
+                        <span className="text-[13px] font-bold font-mono" style={{ color: '#eab308' }}>✂ {selectedPair.cutSec.toFixed(3)}s</span>
+                        <span className="text-[10px]" style={{ color: 'rgba(148,163,184,0.35)' }}>← → image par image · Shift ±0.1s · Ctrl ±1s</span>
+                      </div>
+                    )}
 
-                    {/* Timeline bar */}
+                    {/* Row 3: timeline */}
                     <div
                       ref={timelineRef}
-                      className="relative h-10 rounded-xl select-none"
-                      style={{ background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.2)', cursor: vidDuration > 0 ? 'crosshair' : 'default' }}
+                      className="relative select-none"
+                      style={{
+                        height: 52,
+                        background: 'rgba(12,8,28,0.8)',
+                        border: '1px solid rgba(139,92,246,0.25)',
+                        borderRadius: 12,
+                        cursor: vidDuration > 0 ? 'crosshair' : 'default',
+                      }}
                       onMouseDown={e => {
                         if (!timelineRef.current || vidDuration <= 0) return
                         draggingRef2.current = true
                         const rect = timelineRef.current.getBoundingClientRect()
                         const frac = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
-                        const sec = Math.round(frac * vidDuration * 10) / 10
+                        const sec  = Math.round(frac * vidDuration * 1000) / 1000
                         setCutForPair(selectedPair.id, sec)
-                        if (vidRef.current) vidRef.current.currentTime = sec
+                        if (vidRef.current) { vidRef.current.pause(); vidRef.current.currentTime = sec }
+                        setVidCurrentTime(sec)
                       }}
                       onMouseMove={e => {
-                        if (!draggingRef2.current || !timelineRef.current || vidDuration <= 0) return
+                        if (!timelineRef.current || vidDuration <= 0) return
                         const rect = timelineRef.current.getBoundingClientRect()
                         const frac = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
-                        const sec = Math.round(frac * vidDuration * 10) / 10
+                        setHoverTime(frac * vidDuration)
+                        if (!draggingRef2.current) return
+                        const sec = Math.round(frac * vidDuration * 1000) / 1000
                         setCutForPair(selectedPair.id, sec)
-                        if (vidRef.current) vidRef.current.currentTime = sec
+                        if (vidRef.current) { vidRef.current.currentTime = sec }
+                        setVidCurrentTime(sec)
                       }}
                       onMouseUp={() => { draggingRef2.current = false }}
-                      onMouseLeave={() => { draggingRef2.current = false }}>
-                      {/* Playback fill */}
-                      {vidDuration > 0 && (
+                      onMouseLeave={() => { draggingRef2.current = false; setHoverTime(null) }}>
+
+                      {vidDuration > 0 && (<>
+                        {/* Played region */}
                         <div className="absolute top-0 bottom-0 left-0 rounded-xl pointer-events-none"
-                          style={{ width: `${(vidCurrentTime / vidDuration) * 100}%`, background: 'rgba(139,92,246,0.3)' }} />
-                      )}
-                      {/* Cut marker */}
-                      {selectedPair.cutSec != null && vidDuration > 0 && (
-                        <div className="absolute top-0 bottom-0 flex items-center pointer-events-none"
-                          style={{ left: `${(selectedPair.cutSec / vidDuration) * 100}%`, transform: 'translateX(-1px)' }}>
-                          <div style={{ width: 3, height: '100%', background: '#eab308', borderRadius: 2, boxShadow: '0 0 8px rgba(234,179,8,0.6)' }} />
-                          <div className="absolute -top-7 whitespace-nowrap text-[10px] font-bold px-1.5 py-0.5 rounded-md"
-                            style={{ color: '#000', background: '#eab308', transform: 'translateX(-50%)' }}>
-                            ✂ {selectedPair.cutSec.toFixed(1)}s
-                          </div>
+                          style={{ width: `${(vidCurrentTime / vidDuration) * 100}%`, background: 'rgba(139,92,246,0.22)', borderRadius: 11 }} />
+
+                        {/* Tick marks */}
+                        {Array.from({ length: 9 }, (_, i) => i + 1).map(i => (
+                          <div key={i} className="absolute top-3 bottom-3 w-px pointer-events-none"
+                            style={{ left: `${(i / 10) * 100}%`, background: 'rgba(255,255,255,0.07)' }} />
+                        ))}
+
+                        {/* Playhead */}
+                        <div className="absolute top-0 bottom-0 pointer-events-none"
+                          style={{ left: `${(vidCurrentTime / vidDuration) * 100}%`, width: 2, background: 'rgba(167,139,250,0.8)', borderRadius: 2 }}>
+                          <div className="absolute -top-0 left-1/2 -translate-x-1/2 w-2.5 h-2.5 rounded-full"
+                            style={{ background: '#a78bfa', boxShadow: '0 0 6px rgba(167,139,250,0.9)' }} />
                         </div>
-                      )}
-                      {/* Time labels */}
-                      {vidDuration > 0 && (
+
+                        {/* Hover ghost */}
+                        {hoverTime != null && (
+                          <div className="absolute top-0 bottom-0 pointer-events-none"
+                            style={{ left: `${(hoverTime / vidDuration) * 100}%`, width: 1, background: 'rgba(255,255,255,0.25)' }}>
+                            <div className="absolute -top-6 whitespace-nowrap text-[9px] font-mono px-1 py-0.5 rounded"
+                              style={{ background: 'rgba(0,0,0,0.7)', color: '#e2e8f0', transform: 'translateX(-50%)' }}>
+                              {hoverTime.toFixed(3)}s
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Cut marker */}
+                        {selectedPair.cutSec != null && (
+                          <div className="absolute top-0 bottom-0 pointer-events-none"
+                            style={{ left: `${(selectedPair.cutSec / vidDuration) * 100}%`, transform: 'translateX(-1px)' }}>
+                            <div style={{ width: 3, height: '100%', background: '#eab308', borderRadius: 2, boxShadow: '0 0 10px rgba(234,179,8,0.7)' }} />
+                            <div className="absolute -bottom-6 whitespace-nowrap text-[9px] font-bold px-1.5 py-0.5 rounded"
+                              style={{ color: '#000', background: '#eab308', transform: 'translateX(-50%)' }}>
+                              ✂ {selectedPair.cutSec.toFixed(3)}s
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Time labels */}
                         <div className="absolute inset-x-2 inset-y-0 flex items-center justify-between pointer-events-none">
                           {[0, 0.25, 0.5, 0.75, 1].map(f => (
-                            <span key={f} className="text-[9px]" style={{ color: 'rgba(148,163,184,0.35)' }}>
-                              {formatSec(f * vidDuration)}
+                            <span key={f} className="text-[9px] font-mono" style={{ color: 'rgba(148,163,184,0.3)' }}>
+                              {(f * vidDuration).toFixed(1)}s
                             </span>
                           ))}
                         </div>
-                      )}
+                      </>)}
                     </div>
 
-                    {!vidDuration && (
-                      <p className="text-[11px] text-center" style={{ color: 'rgba(148,163,184,0.3)' }}>
-                        Chargement de la vidéo…
-                      </p>
-                    )}
+                    <p className="text-[10px]" style={{ color: 'rgba(148,163,184,0.3)' }}>
+                      Cliquer ou glisser pour positionner · ← → image par image (1/30s) · Shift ±0.1s · Espace play/pause
+                    </p>
                   </div>
                 </>
               ) : (
