@@ -234,11 +234,11 @@ export function Warmup({ user }: WarmupProps) {
 
   if (!bearer) {
     return (
-      <div className="h-full flex flex-col overflow-hidden">
-        <div className="flex-shrink-0 px-10 pt-9 pb-7 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+      <div className="h-full flex flex-col overflow-hidden" style={{ background: '#07070B' }}>
+        <div className="flex-shrink-0 px-8 pt-7 pb-5 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
           <div>
-            <h1 className="text-[28px] font-black text-white leading-none">Automatisation</h1>
-            <p className="text-[13px] text-text2 mt-0.5">Log in · Édition de profil en masse · Warmup</p>
+            <h1 className="text-[22px] font-black text-white leading-none tracking-tight">Automatisation</h1>
+            <p className="text-[12px] mt-1" style={{ color: '#6B6B7A' }}>Log in · Édition de profil en masse · Warmup</p>
           </div>
         </div>
         <div className="flex-1 overflow-y-auto px-10 pb-10 pt-8">
@@ -258,13 +258,13 @@ export function Warmup({ user }: WarmupProps) {
   ]
 
   return (
-    <div className="h-full flex flex-col overflow-hidden">
+    <div className="h-full flex flex-col overflow-hidden" style={{ background: '#07070B' }}>
 
       {/* Header */}
-      <div className="flex-shrink-0 px-10 pt-9 pb-7 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+      <div className="flex-shrink-0 px-8 pt-7 pb-5 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
         <div>
-          <h1 className="text-[28px] font-black text-white leading-none">Automatisation Instagram</h1>
-          <p className="text-[13px] text-text2 mt-0.5">Log in · Édition de profil en masse · Warmup</p>
+          <h1 className="text-[22px] font-black text-white leading-none tracking-tight">Automatisation Instagram</h1>
+          <p className="text-[12px] mt-1" style={{ color: '#6B6B7A' }}>Log in · Édition de profil en masse · Warmup</p>
         </div>
       </div>
 
@@ -273,8 +273,8 @@ export function Warmup({ user }: WarmupProps) {
 
           {/* ── Left: phone selector ─────────────────────────────────────── */}
           <div>
-            <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-              <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+            <div className="rounded-2xl overflow-hidden" style={{ background: '#0E0E16', border: '1px solid rgba(139,92,246,0.12)' }}>
+              <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
                 <p className="text-[15px] font-bold text-white">📱 Téléphones GéeLark</p>
                 <div className="flex items-center gap-2">
                   {selected.size > 0 && (
@@ -284,27 +284,27 @@ export function Warmup({ user }: WarmupProps) {
                     </span>
                   )}
                   <button onClick={selectAll} className="rounded-xl px-3 py-1.5 text-[12px] font-semibold"
-                    style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}>
+                    style={{ background: '#07070B', border: '1px solid rgba(139,92,246,0.18)', color: '#fff' }}>
                     Tout sélectionner
                   </button>
                   <button onClick={loadPhones} className="rounded-xl px-3 py-1.5 text-[12px] font-semibold"
-                    style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}>
+                    style={{ background: '#07070B', border: '1px solid rgba(139,92,246,0.18)', color: '#fff' }}>
                     {loadingPhones ? '↻' : '⟳'} Rafraîchir
                   </button>
                 </div>
               </div>
 
               {phones.length > 0 && (
-                <div className="px-5 py-3 flex gap-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                <div className="px-5 py-3 flex gap-3" style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
                   <input type="text" placeholder="🔍 Rechercher…" value={phoneSearch}
                     onChange={e => setPhoneSearch(e.target.value)}
                     className="flex-1 min-w-0 rounded-xl px-4 py-2.5 text-[13px] placeholder:text-text2 focus:outline-none"
-                    style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
+                    style={{ background: '#07070B', border: '1px solid rgba(139,92,246,0.18)', color: '#fff' }}
                   />
                   {groups.length > 1 && (
                     <select value={groupFilter} onChange={e => setGroupFilter(e.target.value)}
                       className="rounded-xl px-4 py-2.5 text-[13px] focus:outline-none"
-                      style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}>
+                      style={{ background: '#07070B', border: '1px solid rgba(139,92,246,0.18)', color: '#fff' }}>
                       {groups.map(g => <option key={g} value={g} style={{ background: '#0c0e1a' }}>{g}</option>)}
                     </select>
                   )}
@@ -327,7 +327,7 @@ export function Warmup({ user }: WarmupProps) {
                 </div>
               )}
 
-              <div className="divide-y" style={{ borderColor: 'rgba(255,255,255,0.05)' }}>
+              <div className="divide-y" style={{ borderColor: 'rgba(139,92,246,0.08)' }}>
                 {visiblePhones.map(phone => {
                   const online = isOnline(phone)
                   const sel    = selected.has(phone.id)
@@ -336,7 +336,7 @@ export function Warmup({ user }: WarmupProps) {
                       className="w-full px-5 py-3.5 flex items-center gap-3 transition-colors text-left"
                       style={{ background: sel ? 'rgba(139,92,246,0.08)' : 'transparent' }}>
                       <div className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0"
-                        style={{ border: `2px solid ${sel ? '#8b5cf6' : 'rgba(255,255,255,0.15)'}`, background: sel ? '#8b5cf6' : 'transparent' }}>
+                        style={{ border: `2px solid ${sel ? '#8B5CF6' : 'rgba(139,92,246,0.15)'}`, background: sel ? '#8B5CF6' : 'transparent' }}>
                         {sel && <span className="text-[10px] text-white font-black">✓</span>}
                       </div>
                       <div className="flex-1 min-w-0">
@@ -363,9 +363,9 @@ export function Warmup({ user }: WarmupProps) {
 
             {/* ── Inline progress panel ──────────────────────────────────── */}
             {(running || (jobs.length > 0 && (doneCount + errorCount) === jobs.length)) && (
-              <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <div className="rounded-2xl overflow-hidden" style={{ background: '#0E0E16', border: '1px solid rgba(139,92,246,0.12)' }}>
                 {/* Header */}
-                <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
                   <div className="flex items-center gap-3">
                     {running && (
                       <div className="relative w-6 h-6 flex-shrink-0">
@@ -390,7 +390,7 @@ export function Warmup({ user }: WarmupProps) {
                   {!running && (
                     <button onClick={() => setJobs([])}
                       className="rounded-xl px-4 py-2 text-[12px] font-semibold"
-                      style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}>
+                      style={{ background: '#07070B', border: '1px solid rgba(139,92,246,0.18)', color: '#fff' }}>
                       Fermer
                     </button>
                   )}
@@ -411,7 +411,7 @@ export function Warmup({ user }: WarmupProps) {
                 <div className="px-4 pb-4 pt-2 space-y-2 max-h-[50vh] overflow-auto">
                   {jobs.map(job => (
                     <div key={job.phone.id} className="rounded-xl overflow-hidden"
-                      style={{ border: `1px solid ${job.status === 'done' ? 'rgba(52,211,153,0.2)' : job.status === 'error' ? 'rgba(239,68,68,0.2)' : job.status === 'running' ? 'rgba(139,92,246,0.25)' : 'rgba(255,255,255,0.07)'}` }}>
+                      style={{ border: `1px solid ${job.status === 'done' ? 'rgba(52,211,153,0.2)' : job.status === 'error' ? 'rgba(239,68,68,0.2)' : job.status === 'running' ? 'rgba(139,92,246,0.25)' : 'rgba(139,92,246,0.12)'}` }}>
                       <div className="px-4 py-3 flex items-center gap-3"
                         style={{ background: job.status === 'done' ? 'rgba(52,211,153,0.05)' : job.status === 'error' ? 'rgba(239,68,68,0.05)' : job.status === 'running' ? 'rgba(139,92,246,0.08)' : 'transparent' }}>
                         <span className="text-base flex-shrink-0">
@@ -452,7 +452,7 @@ export function Warmup({ user }: WarmupProps) {
             )}
 
             {/* Tab selector */}
-            <div className="flex gap-1 p-1 rounded-2xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+            <div className="flex gap-1 p-1 rounded-2xl" style={{ background: '#0E0E16', border: '1px solid rgba(139,92,246,0.12)' }}>
               {TABS.map(tab => (
                 <button key={tab.id} onClick={() => setActiveTab(tab.id)}
                   className="flex-1 py-2.5 rounded-xl text-[13px] font-bold transition-all"
@@ -467,8 +467,8 @@ export function Warmup({ user }: WarmupProps) {
             {/* ── LOG IN ── */}
             {activeTab === 'login' && (
               <div className="space-y-5">
-                <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                  <div className="px-5 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                <div className="rounded-2xl overflow-hidden" style={{ background: '#0E0E16', border: '1px solid rgba(139,92,246,0.12)' }}>
+                  <div className="px-5 py-4" style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
                     <p className="text-[15px] font-bold text-white">🔑 Identifiants Instagram</p>
                     <p className="text-[12px] text-text2 mt-0.5">
                       Saisis email + mot de passe pour chaque téléphone sélectionné
@@ -480,7 +480,7 @@ export function Warmup({ user }: WarmupProps) {
                       ← Sélectionne des téléphones à gauche
                     </p>
                   ) : (
-                    <div className="divide-y max-h-[400px] overflow-auto" style={{ borderColor: 'rgba(255,255,255,0.05)' }}>
+                    <div className="divide-y max-h-[400px] overflow-auto" style={{ borderColor: 'rgba(139,92,246,0.08)' }}>
                       {selectedPhones.map(phone => {
                         const cred = loginCreds[phone.id] ?? { email: '', password: '', totpSecret: '' }
                         return (
@@ -492,7 +492,7 @@ export function Warmup({ user }: WarmupProps) {
                               value={cred.email}
                               onChange={e => setLoginCred(phone.id, 'email', e.target.value)}
                               className="w-full rounded-xl px-4 py-2.5 text-[13px] placeholder:text-text2 focus:outline-none"
-                              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
+                              style={{ background: '#07070B', border: '1px solid rgba(139,92,246,0.18)', color: '#fff' }}
                             />
                             <input
                               type="password"
@@ -500,7 +500,7 @@ export function Warmup({ user }: WarmupProps) {
                               value={cred.password}
                               onChange={e => setLoginCred(phone.id, 'password', e.target.value)}
                               className="w-full rounded-xl px-4 py-2.5 text-[13px] placeholder:text-text2 focus:outline-none"
-                              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
+                              style={{ background: '#07070B', border: '1px solid rgba(139,92,246,0.18)', color: '#fff' }}
                             />
                             <div className="space-y-1">
                               <input
@@ -510,8 +510,8 @@ export function Warmup({ user }: WarmupProps) {
                                 onChange={e => setLoginCred(phone.id, 'totpSecret', e.target.value)}
                                 className="w-full rounded-xl px-4 py-2.5 text-[13px] placeholder:text-text2 focus:outline-none font-mono"
                                 style={{
-                                  background: cred.totpSecret ? 'rgba(124,58,237,0.08)' : 'rgba(255,255,255,0.03)',
-                                  border: `1px solid ${cred.totpSecret ? 'rgba(139,92,246,0.4)' : 'rgba(255,255,255,0.07)'}`,
+                                  background: cred.totpSecret ? 'rgba(124,58,237,0.08)' : 'rgba(139,92,246,0.05)',
+                                  border: `1px solid ${cred.totpSecret ? 'rgba(139,92,246,0.4)' : 'rgba(139,92,246,0.12)'}`,
                                   color: '#c4b5fd',
                                 }}
                               />
@@ -548,8 +548,8 @@ export function Warmup({ user }: WarmupProps) {
             {/* ── MASS EDIT ── */}
             {activeTab === 'massEdit' && (
               <div className="space-y-5">
-                <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                  <div className="px-5 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                <div className="rounded-2xl overflow-hidden" style={{ background: '#0E0E16', border: '1px solid rgba(139,92,246,0.12)' }}>
+                  <div className="px-5 py-4" style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
                     <p className="text-[15px] font-bold text-white">✏️ Modifications de profil</p>
                     <p className="text-[12px] text-text2 mt-0.5">
                       Appliquées à tous les téléphones sélectionnés · Laisse vide pour ne pas modifier
@@ -561,7 +561,7 @@ export function Warmup({ user }: WarmupProps) {
                       <input type="text" placeholder="Ex: Marie Fitness | Coach Minceur"
                         value={editName} onChange={e => setEditName(e.target.value)}
                         className="w-full rounded-xl px-4 py-2.5 text-[13px] placeholder:text-text2 focus:outline-none"
-                        style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
+                        style={{ background: '#07070B', border: '1px solid rgba(139,92,246,0.18)', color: '#fff' }}
                       />
                     </div>
                     <div>
@@ -572,7 +572,7 @@ export function Warmup({ user }: WarmupProps) {
                           value={editUsername.replace(/^@/, '')}
                           onChange={e => setEditUsername(e.target.value.replace(/^@/, ''))}
                           className="w-full rounded-xl pl-8 pr-4 py-2.5 text-[13px] placeholder:text-text2 focus:outline-none"
-                          style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
+                          style={{ background: '#07070B', border: '1px solid rgba(139,92,246,0.18)', color: '#fff' }}
                         />
                       </div>
                       <p className="text-[11px] mt-1 text-text2">Instagram peut refuser si le pseudo est déjà pris</p>
@@ -582,7 +582,7 @@ export function Warmup({ user }: WarmupProps) {
                       <textarea rows={3} placeholder="Ex: 🏋️ Coach fitness certifiée | -10kg en 90 jours ↓"
                         value={editBio} onChange={e => setEditBio(e.target.value)}
                         className="w-full rounded-xl px-4 py-2.5 text-[13px] placeholder:text-text2 focus:outline-none resize-none"
-                        style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
+                        style={{ background: '#07070B', border: '1px solid rgba(139,92,246,0.18)', color: '#fff' }}
                       />
                       <p className="text-[12px] mt-1 text-text2"
                         style={{ color: editBio.length > 150 ? '#f87171' : undefined }}>
@@ -595,7 +595,7 @@ export function Warmup({ user }: WarmupProps) {
                         <input type="text" placeholder="https://… ou laisser vide"
                           value={editPicUrl} onChange={e => { setEditPicUrl(e.target.value); setEditPicFile(null) }}
                           className="flex-1 rounded-xl px-4 py-2.5 text-[13px] placeholder:text-text2 focus:outline-none"
-                          style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
+                          style={{ background: '#07070B', border: '1px solid rgba(139,92,246,0.18)', color: '#fff' }}
                         />
                         {!isWeb && (
                           <button onClick={async () => {
@@ -603,7 +603,7 @@ export function Warmup({ user }: WarmupProps) {
                             if (p) { setEditPicFile(p); setEditPicUrl('') }
                           }}
                             className="rounded-xl px-4 py-2.5 text-[13px] font-semibold flex-shrink-0"
-                            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}>
+                            style={{ background: '#07070B', border: '1px solid rgba(139,92,246,0.18)', color: '#fff' }}>
                             📂 Fichier
                           </button>
                         )}
@@ -633,8 +633,8 @@ export function Warmup({ user }: WarmupProps) {
             {/* ── WARMUP ── */}
             {activeTab === 'warmup' && (
               <div className="space-y-5">
-                <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                  <div className="px-5 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                <div className="rounded-2xl overflow-hidden" style={{ background: '#0E0E16', border: '1px solid rgba(139,92,246,0.12)' }}>
+                  <div className="px-5 py-4" style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
                     <p className="text-[15px] font-bold text-white">⚙️ Actions de Warmup</p>
                   </div>
                   <div className="p-5 space-y-6">
@@ -646,7 +646,7 @@ export function Warmup({ user }: WarmupProps) {
                             className="py-2.5 rounded-xl text-[13px] font-bold"
                             style={browseMinutes === m
                               ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff' }
-                              : { background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.6)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                              : { background: 'rgba(139,92,246,0.08)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.15)' }}>
                             {m === 0 ? 'Aucune' : `${m} min`}
                           </button>
                         ))}
@@ -664,7 +664,7 @@ export function Warmup({ user }: WarmupProps) {
                           <label key={key} className={`flex items-center gap-3 cursor-pointer ${disabled ? 'opacity-40' : ''}`}>
                             <div onClick={() => !disabled && set(!value)}
                               className="relative flex-shrink-0 w-9 h-5 rounded-full transition-all"
-                              style={{ background: value && !disabled ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                              style={{ background: value && !disabled ? 'linear-gradient(130deg,#7C3AED,#8B5CF6)' : 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.15)' }}>
                               <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${value && !disabled ? 'left-4' : 'left-0.5'}`} />
                             </div>
                             <span className="text-[13px] text-white/80">{label}</span>
@@ -680,7 +680,7 @@ export function Warmup({ user }: WarmupProps) {
                 </div>
 
                 {/* Summary */}
-                <div className="rounded-2xl p-5 space-y-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                <div className="rounded-2xl p-5 space-y-3" style={{ background: '#0E0E16', border: '1px solid rgba(139,92,246,0.12)' }}>
                   <p className="text-[12px] uppercase tracking-wider font-bold text-text2">Résumé</p>
                   <div className="space-y-2">
                     <div className="flex justify-between text-[13px]">

@@ -178,7 +178,7 @@ function Avatar({ url, name, userId, size = 36, onClick }: {
   if (url && !broken) {
     return <img src={url} alt={name} onClick={onClick} className={cls}
       onError={() => setBroken(true)}
-      style={{ ...base, objectFit: 'cover', border: '1.5px solid rgba(255,255,255,0.1)' }} />
+      style={{ ...base, objectFit: 'cover', border: '1.5px solid rgba(139,92,246,0.2)' }} />
   }
   return (
     <div onClick={onClick} className={`flex items-center justify-center font-black select-none ${cls}`}
@@ -218,7 +218,7 @@ function ChatRow({ msg, isOwn, compact, isAdmin, likeCount, liked, onLike, onDel
             )}
             {msg.org_name && !msg.is_admin && (
               <span className="text-[10px] font-semibold px-2 py-[2px] rounded-full"
-                style={{ background: 'rgba(255,255,255,0.05)', color: 'rgba(196,181,253,0.65)', border: '1px solid rgba(139,92,246,0.15)' }}>
+                style={{ background: 'rgba(139,92,246,0.08)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.2)' }}>
                 {msg.org_name}
               </span>
             )}
@@ -296,7 +296,7 @@ function SupportMsgRow({ msg, isAdmin, compact, onDelete }: {
         <div className="inline-block px-3 py-2 rounded-xl max-w-[85%]"
           style={isAdminMsg
             ? { background: 'linear-gradient(135deg,rgba(124,58,237,0.18),rgba(236,72,153,0.1))', border: '1px solid rgba(139,92,246,0.22)' }
-            : { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
+            : { background: '#0E0E16', border: '1px solid rgba(139,92,246,0.12)' }}>
           <p className="text-[13.5px] leading-relaxed break-words"
             style={{ color: isAdminMsg ? 'rgba(230,220,255,0.95)' : 'rgba(212,220,240,0.9)' }}>
             {msg.content}
@@ -365,7 +365,7 @@ function NewsCard({ msg, isAdmin, likeCount, liked, onLike, onView, onDelete }: 
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-semibold transition-all"
             style={liked
               ? { background: 'rgba(236,72,153,0.15)', color: '#f472b6', border: '1px solid rgba(236,72,153,0.25)' }
-              : { background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.5)', border: '1px solid rgba(255,255,255,0.06)' }}>
+              : { background: '#07070B', color: '#6B6B7A', border: '1px solid rgba(139,92,246,0.1)' }}>
             ❤️ <span>{likeCount > 0 ? likeCount : ''} {liked ? 'Aimé' : 'J\'aime'}</span>
           </button>
           <div className="flex items-center gap-1 text-[11px]" style={{ color: 'rgba(196,181,253,0.3)' }}>
@@ -541,7 +541,7 @@ function ProfileModal({ profile, userId, isAdmin, onClose, onSaved }: {
         </div>
         <div className="px-5 pb-5 flex gap-2.5">
           <button onClick={onClose} className="flex-1 py-2.5 rounded-xl text-[12px] font-semibold transition-all"
-            style={{ background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.6)', border: '1px solid rgba(255,255,255,0.07)' }}>
+            style={{ background: 'rgba(139,92,246,0.08)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.15)' }}>
             Annuler
           </button>
           <button onClick={save} disabled={saving || uploading}
@@ -1075,7 +1075,7 @@ export function Community({ user }: CommunityProps) {
                       <span className="text-[10px]" style={{ color: 'rgba(196,181,253,0.3)' }}>{newsContent.length}/2000</span>
                       <div className="flex gap-2">
                         <button onClick={() => { setShowNewsForm(false); setNewsVideo(null) }} className="px-4 py-2 rounded-xl text-[12px] font-semibold"
-                          style={{ background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.6)', border: '1px solid rgba(255,255,255,0.07)' }}>Annuler</button>
+                          style={{ background: 'rgba(139,92,246,0.08)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.15)' }}>Annuler</button>
                         <button onClick={sendNews} disabled={(!newsContent.trim() && !newsVideo) || newsSending}
                           className="px-4 py-2 rounded-xl text-[12px] font-semibold btn-sf-primary disabled:opacity-40">
                           {newsSending ? 'Publication…' : '📢 Publier'}

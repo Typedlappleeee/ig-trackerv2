@@ -565,7 +565,8 @@ export function Bank({ user }: BankProps) {
   return (
     <div
       ref={dropRef}
-      className={`h-full flex flex-col overflow-hidden transition-colors ${dragging ? 'bg-accent/5' : ''}`}
+      className="h-full flex flex-col overflow-hidden transition-colors"
+      style={{ background: dragging ? 'rgba(139,92,246,0.05)' : '#07070B' }}
       onDragOver={onDragOver}
       onDragEnter={onDragEnter}
       onDragLeave={onDragLeave}
@@ -582,28 +583,28 @@ export function Bank({ user }: BankProps) {
       )}
 
       {/* ── Page header ── */}
-      <div className="flex-shrink-0 px-10 pt-9 pb-7 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+      <div className="flex-shrink-0 px-8 pt-7 pb-5 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
         <div>
-          <h1 className="text-[28px] font-black text-white leading-none">Banque de médias</h1>
-          <p className="text-[13px] text-text2 mt-0.5">{items.length} média{items.length !== 1 ? 's' : ''} · glisse-dépose ou importe depuis ton PC</p>
+          <h1 className="text-[22px] font-black text-white leading-none tracking-tight">Banque de médias</h1>
+          <p className="text-[12px] mt-1" style={{ color: '#6B6B7A' }}>{items.length} média{items.length !== 1 ? 's' : ''} · glisse-dépose ou importe depuis ton PC</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <button
             onClick={() => setShowAddModal(true)}
-            className="rounded-xl px-5 py-2.5 text-[13px] font-semibold text-white"
-            style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)' }}>
+            className="rounded-xl px-4 py-2 text-[12px] font-black text-white"
+            style={{ background: 'linear-gradient(130deg,#7C3AED,#8B5CF6)', boxShadow: '0 4px 20px -4px rgba(124,58,237,0.5)' }}>
             + Ajouter un média
           </button>
           <button
             onClick={() => setSelectedIds(new Set(visible.map(i => i.id)))}
-            className="rounded-xl px-5 py-2.5 text-[13px] font-semibold"
-            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}>
+            className="rounded-xl px-4 py-2 text-[12px] font-semibold"
+            style={{ background: '#07070B', border: '1px solid rgba(139,92,246,0.18)', color: '#a78bfa' }}>
             ☑ Tout sélectionner
           </button>
           <button
             onClick={loadItems}
-            className="rounded-xl px-5 py-2.5 text-[13px] font-semibold"
-            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}>
+            className="rounded-xl px-4 py-2 text-[12px] font-semibold"
+            style={{ background: '#07070B', border: '1px solid rgba(139,92,246,0.18)', color: '#6B6B7A' }}>
             ↺ Rafraîchir
           </button>
         </div>
@@ -611,9 +612,9 @@ export function Bank({ user }: BankProps) {
 
       <div className="flex flex-1 min-h-0 overflow-hidden">
         {/* ── Left sidebar: folders ── */}
-        <aside className="w-56 flex-shrink-0 flex flex-col" style={{ borderRight: '1px solid rgba(255,255,255,0.06)' }}>
-          <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-            <p className="text-[12px] font-semibold text-text2 uppercase tracking-widest">Dossiers</p>
+        <aside className="w-56 flex-shrink-0 flex flex-col" style={{ borderRight: '1px solid rgba(139,92,246,0.1)', background: '#07070B' }}>
+          <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
+            <p className="text-[11px] font-bold uppercase tracking-widest" style={{ color: '#6B6B7A' }}>Dossiers</p>
             <button
               onClick={() => setShowNewFolder(v => !v)}
               className="text-text2 hover:text-accent text-lg leading-none transition-colors"
@@ -622,19 +623,19 @@ export function Bank({ user }: BankProps) {
           </div>
 
           {showNewFolder && (
-            <div className="px-3 py-2.5 flex gap-2" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+            <div className="px-3 py-2.5 flex gap-2" style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
               <input
                 autoFocus
                 placeholder="Nom du dossier…"
-                className="flex-1 rounded-xl px-3 py-2 text-[13px] focus:outline-none"
-                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
+                className="flex-1 rounded-xl px-3 py-2 text-[12px] focus:outline-none"
+                style={{ background: '#07070B', border: '1px solid rgba(139,92,246,0.18)', color: '#fff' }}
                 value={newFolderName}
                 onChange={e => setNewFolderName(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') createFolder(); if (e.key === 'Escape') { setShowNewFolder(false); setNewFolderName('') } }}
               />
               <button
                 onClick={createFolder}
-                className="px-3 py-2 text-[13px] font-semibold rounded-xl"
+                className="px-3 py-2 text-[12px] font-semibold rounded-xl"
                 style={{ background: 'rgba(139,92,246,0.2)', color: '#a78bfa' }}>OK</button>
             </div>
           )}
@@ -644,9 +645,11 @@ export function Bank({ user }: BankProps) {
             <button
               onClick={() => setSelectedFolder(null)}
               className={`w-full flex items-center gap-2.5 px-4 py-3 text-left transition-colors ${
-                selectedFolder === null ? 'border-l-2 border-accent pl-[14px]' : 'hover:bg-white/[0.03]'
+                selectedFolder === null ? 'border-l-2 border-accent pl-[14px]' : ''
               }`}
               style={selectedFolder === null ? { background: 'rgba(139,92,246,0.08)' } : {}}
+              onMouseEnter={e => { if (selectedFolder !== null) e.currentTarget.style.background = 'rgba(139,92,246,0.04)' }}
+              onMouseLeave={e => { if (selectedFolder !== null) e.currentTarget.style.background = '' }}
             >
               <span className="text-base flex-shrink-0">🎬</span>
               <span className="text-[13px] font-medium text-text flex-1">Toute la banque</span>
@@ -673,14 +676,14 @@ export function Bank({ user }: BankProps) {
         {/* ── Main area ── */}
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Filter bar */}
-          <div className="flex-shrink-0 px-6 py-3 flex items-center gap-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+          <div className="flex-shrink-0 px-6 py-3 flex items-center gap-3" style={{ borderBottom: '1px solid rgba(139,92,246,0.08)' }}>
             <input
               type="text"
               placeholder="🔍  Rechercher…"
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="flex-1 max-w-sm rounded-xl px-4 py-2.5 text-[13px] placeholder:text-text2 focus:outline-none transition-colors"
-              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
+              className="flex-1 max-w-sm rounded-xl px-4 py-2 text-[12px] placeholder:text-text2 focus:outline-none transition-colors"
+              style={{ background: '#07070B', border: '1px solid rgba(139,92,246,0.18)', color: '#fff' }}
             />
             {/* Type pills */}
             <div className="flex gap-1.5">
@@ -694,26 +697,26 @@ export function Bank({ user }: BankProps) {
                 <button
                   key={t.k}
                   onClick={() => setTypeFilter(t.k)}
-                  className={`px-3 py-1.5 rounded-full text-[12px] font-semibold transition-colors ${
-                    typeFilter === t.k ? 'bg-accent text-white' : 'text-text2 hover:text-text'
-                  }`}
-                  style={typeFilter !== t.k ? { background: 'rgba(255,255,255,0.05)' } : {}}
+                  className="px-3 py-1.5 rounded-full text-[12px] font-semibold transition-all"
+                  style={typeFilter === t.k
+                    ? { background: 'linear-gradient(130deg,#7C3AED,#8B5CF6)', color: '#fff' }
+                    : { background: 'rgba(139,92,246,0.06)', color: '#6B6B7A', border: '1px solid rgba(139,92,246,0.1)' }}
                 >{t.l}</button>
               ))}
             </div>
             <div className="flex-1" />
-            <span className="text-text2 text-[13px]">{visible.length} média{visible.length !== 1 ? 's' : ''}</span>
-            {adding && <span className="text-[13px] text-accent animate-pulse">Ajout…</span>}
+            <span className="text-text2 text-[12px]">{visible.length} média{visible.length !== 1 ? 's' : ''}</span>
+            {adding && <span className="text-[12px] text-accent animate-pulse">Ajout…</span>}
           </div>
 
           {/* Selection toolbar */}
           {selectionMode && (
-            <div className="flex-shrink-0 px-6 py-3 flex items-center gap-3" style={{ background: 'rgba(139,92,246,0.08)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-              <span className="text-[13px] font-bold text-accent">{selectedIds.size} sélectionné{selectedIds.size > 1 ? 's' : ''}</span>
+            <div className="flex-shrink-0 px-6 py-3 flex items-center gap-3" style={{ background: 'rgba(139,92,246,0.06)', borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
+              <span className="text-[12px] font-bold text-accent">{selectedIds.size} sélectionné{selectedIds.size > 1 ? 's' : ''}</span>
               <button
                 onClick={() => setSelectedIds(prev => prev.size === visible.length ? new Set() : new Set(visible.map(i => i.id)))}
-                className="text-[13px] px-3 py-1.5 rounded-xl font-semibold text-text2 hover:text-text transition-colors"
-                style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)' }}>
+                className="text-[12px] px-3 py-1.5 rounded-xl font-semibold transition-colors"
+                style={{ background: '#07070B', border: '1px solid rgba(139,92,246,0.18)', color: '#6B6B7A' }}>
                 {selectedIds.size === visible.length ? '☐ Désélectionner tout' : '☑ Tout sélectionner'}
               </button>
               {selectedIds.size > 0 && (<>
@@ -770,7 +773,7 @@ export function Bank({ user }: BankProps) {
             {loading ? (
               <div className="flex justify-center py-16"><Spinner size="lg" /></div>
             ) : items.length === 0 ? (
-              <div className="rounded-2xl p-10 text-center" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <div className="rounded-2xl p-10 text-center" style={{ background: '#0E0E16', border: '1px solid rgba(139,92,246,0.12)' }}>
                 <p className="text-5xl mb-4">🎬</p>
                 <p className="text-base font-bold text-white mb-2">Banque vide</p>
                 <p className="text-[13px] text-text2">Glisse-dépose tes vidéos ici ou clique sur<br/><span className="text-accent font-medium">+ Ajouter un média</span> en haut à droite.</p>
@@ -799,8 +802,8 @@ export function Bank({ user }: BankProps) {
       {/* ── Context menu ── */}
       {ctxMenu && (
         <div
-          className="fixed z-50 bg-surface border border-border rounded-xl shadow-2xl py-1 min-w-[180px]"
-          style={{ left: ctxMenu.x, top: ctxMenu.y }}
+          className="fixed z-50 rounded-xl shadow-2xl py-1 min-w-[180px]"
+          style={{ left: ctxMenu.x, top: ctxMenu.y, background: '#0E0E16', border: '1px solid rgba(139,92,246,0.2)' }}
           onMouseDown={e => e.stopPropagation()}
         >
           {[
@@ -815,9 +818,12 @@ export function Bank({ user }: BankProps) {
             <button
               key={label}
               onClick={action}
-              className={`w-full text-left px-4 py-2 text-sm transition-colors ${
-                danger ? 'text-danger hover:bg-danger/10' : 'text-text hover:bg-surface2'
+              className={`w-full text-left px-4 py-2 text-[13px] transition-colors ${
+                danger ? 'text-danger' : 'text-text'
               }`}
+              style={{ borderRadius: 0 }}
+              onMouseEnter={e => { e.currentTarget.style.background = danger ? 'rgba(239,68,68,0.08)' : 'rgba(139,92,246,0.08)' }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
             >
               {label}
             </button>
@@ -832,8 +838,8 @@ export function Bank({ user }: BankProps) {
 
       {/* ── Folder action modal ── */}
       {folderModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setFolderModal(null)}>
-          <div className="bg-surface border border-border rounded-2xl p-6 w-80 space-y-4" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => setFolderModal(null)}>
+          <div className="rounded-2xl p-6 w-80 space-y-4" style={{ background: '#0E0E16', border: '1px solid rgba(139,92,246,0.25)' }} onClick={e => e.stopPropagation()}>
             {folderModal.mode === 'delete' ? (<>
               <div>
                 <p className="font-semibold text-text">Supprimer le dossier <span className="text-accent">"{folderModal.name}"</span></p>
@@ -856,12 +862,16 @@ export function Bank({ user }: BankProps) {
               <p className="font-semibold text-text">Déplacer les vidéos de <span className="text-accent">"{folderModal.name}"</span> vers…</p>
               <div className="flex flex-col gap-1 max-h-56 overflow-auto">
                 <button onClick={() => mergeFolderTo(folderModal.name, null)}
-                  className="text-left px-3 py-2 rounded-lg text-sm hover:bg-surface2 text-text2 transition-colors">
+                  className="text-left px-3 py-2 rounded-lg text-sm text-text2 transition-colors"
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(139,92,246,0.08)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                   🎬 Racine (sans dossier)
                 </button>
                 {folders.filter(f => f !== folderModal.name).map(f => (
                   <button key={f} onClick={() => mergeFolderTo(folderModal.name, f)}
-                    className="text-left px-3 py-2 rounded-lg text-sm hover:bg-surface2 text-text transition-colors">
+                    className="text-left px-3 py-2 rounded-lg text-sm text-text transition-colors"
+                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(139,92,246,0.08)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                     📂 {f}
                   </button>
                 ))}
@@ -874,17 +884,21 @@ export function Bank({ user }: BankProps) {
 
       {/* ── Bulk move modal ── */}
       {showBulkMove && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowBulkMove(false)}>
-          <div className="bg-surface border border-border rounded-2xl p-6 w-72 space-y-4" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => setShowBulkMove(false)}>
+          <div className="rounded-2xl p-6 w-72 space-y-4" style={{ background: '#0E0E16', border: '1px solid rgba(139,92,246,0.25)' }} onClick={e => e.stopPropagation()}>
             <p className="font-semibold text-text">Déplacer {selectedIds.size} vidéo{selectedIds.size > 1 ? 's' : ''} vers…</p>
             <div className="flex flex-col gap-1 max-h-64 overflow-auto">
               <button onClick={() => moveSelected(null)}
-                className="text-left px-3 py-2 rounded-lg text-sm hover:bg-surface2 text-text2 transition-colors">
+                className="text-left px-3 py-2 rounded-lg text-sm text-text2 transition-colors"
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(139,92,246,0.08)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                 🎬 Racine (sans dossier)
               </button>
               {folders.map(f => (
                 <button key={f} onClick={() => moveSelected(f)}
-                  className="text-left px-3 py-2 rounded-lg text-sm hover:bg-surface2 text-text transition-colors">
+                  className="text-left px-3 py-2 rounded-lg text-sm text-text transition-colors"
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(139,92,246,0.08)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                   📂 {f}
                 </button>
               ))}
@@ -965,11 +979,12 @@ function FolderRow({ name, count, active, onClick, onRename, onDelete, onMerge, 
   return (
     <div
       className={`flex items-center gap-2.5 px-3 py-2.5 cursor-pointer transition-colors ${
-        active ? 'bg-surface2 border-l-2 border-accent pl-[10px]' : 'hover:bg-surface2'
-      } ${dragOver ? 'bg-accent/20 border-l-2 border-accent pl-[10px]' : ''}`}
+        active ? 'border-l-2 border-accent pl-[10px]' : ''
+      } ${dragOver ? 'border-l-2 border-accent pl-[10px]' : ''}`}
+      style={active ? { background: 'rgba(139,92,246,0.08)' } : dragOver ? { background: 'rgba(139,92,246,0.12)' } : {}}
       onClick={onClick}
-      onMouseEnter={() => setShowActions(true)}
-      onMouseLeave={() => setShowActions(false)}
+      onMouseEnter={e => { setShowActions(true); if (!active && !dragOver) e.currentTarget.style.background = 'rgba(139,92,246,0.04)' }}
+      onMouseLeave={e => { setShowActions(false); if (!active && !dragOver) e.currentTarget.style.background = '' }}
       onDragOver={e => { e.preventDefault(); setDragOver(true) }}
       onDragLeave={() => setDragOver(false)}
       onDrop={e => {
@@ -1056,7 +1071,7 @@ export function VideoThumbnail({ filePath, thumbnailPath, storagePath }: {
   }, [thumbnailPath, storagePath])
 
   if (failed) return (
-    <div className="w-full h-full flex flex-col items-center justify-center bg-surface2 gap-1">
+    <div className="w-full h-full flex flex-col items-center justify-center gap-1" style={{ background: 'rgba(139,92,246,0.08)' }}>
       <span className="text-2xl">⚠️</span>
       <span className="text-[10px] text-text2/50">Indisponible</span>
     </div>
@@ -1064,7 +1079,7 @@ export function VideoThumbnail({ filePath, thumbnailPath, storagePath }: {
 
   // 1. JPEG thumbnail
   if (thumbnailPath) {
-    if (loading || !thumbUrl) return <div className="w-full h-full flex items-center justify-center bg-surface2 text-4xl animate-pulse">🎬</div>
+    if (loading || !thumbUrl) return <div className="w-full h-full flex items-center justify-center text-4xl animate-pulse" style={{ background: 'rgba(139,92,246,0.08)' }}>🎬</div>
     return (
       <img src={thumbUrl} alt=""
         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
@@ -1074,7 +1089,7 @@ export function VideoThumbnail({ filePath, thumbnailPath, storagePath }: {
 
   // 2. Cloud asset (image or video)
   if (storagePath) {
-    if (loading || !videoSrc) return <div className="w-full h-full flex items-center justify-center bg-surface2 text-4xl animate-pulse">🎬</div>
+    if (loading || !videoSrc) return <div className="w-full h-full flex items-center justify-center text-4xl animate-pulse" style={{ background: 'rgba(139,92,246,0.08)' }}>🎬</div>
     if (isImagePath(storagePath)) {
       return (
         <img src={videoSrc} alt=""
@@ -1106,7 +1121,7 @@ export function VideoThumbnail({ filePath, thumbnailPath, storagePath }: {
     return 'localvideo://' + n
   })()
   if (!localUrl || failed) {
-    return <div className="w-full h-full flex items-center justify-center bg-surface2 text-4xl">🎬</div>
+    return <div className="w-full h-full flex items-center justify-center text-4xl" style={{ background: 'rgba(139,92,246,0.08)' }}>🎬</div>
   }
   return (
     <video
@@ -1228,13 +1243,17 @@ function VideoCard({ item, onContextMenu, onPlay, selectionMode, isSelected, onT
     <div
       draggable={!selectionMode}
       onDragStart={e => e.dataTransfer.setData('bank-item-id', item.id)}
-      className={`bg-card border rounded-xl overflow-hidden transition-all group cursor-default select-none ${
-        isSelected ? 'border-accent ring-2 ring-accent/30' : 'border-border hover:border-accent/40'
-      }`}
+      className="rounded-xl overflow-hidden transition-all group cursor-default select-none"
+      style={{
+        background: '#0E0E16',
+        border: isSelected ? '2px solid #8B5CF6' : '1px solid rgba(139,92,246,0.15)',
+        boxShadow: isSelected ? '0 0 0 2px rgba(139,92,246,0.2)' : 'none',
+      }}
       onContextMenu={e => !selectionMode && onContextMenu(e, item)}
     >
       <div
-        className="relative aspect-[9/16] bg-surface2 overflow-hidden cursor-pointer"
+        className="relative aspect-[9/16] overflow-hidden cursor-pointer"
+        style={{ background: 'rgba(139,92,246,0.08)' }}
         onClick={() => selectionMode ? onToggleSelect?.() : (item.file_url || item.storage_path) && onPlay(item)}
       >
         <VideoThumbnail filePath={item.file_url} thumbnailPath={item.thumbnail_path} storagePath={item.storage_path} />
@@ -1289,9 +1308,9 @@ function VideoCard({ item, onContextMenu, onPlay, selectionMode, isSelected, onT
       </div>
       {/* Tags */}
       {item.tags.length > 0 && (
-        <div className="px-2.5 py-2 flex flex-wrap gap-1">
+        <div className="px-2.5 py-2 flex flex-wrap gap-1" style={{ borderTop: '1px solid rgba(139,92,246,0.08)' }}>
           {item.tags.slice(0, 3).map(tag => (
-            <span key={tag} className="text-[10px] bg-surface2 text-text2 px-1.5 py-0.5 rounded-full">#{tag}</span>
+            <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(139,92,246,0.1)', color: '#a78bfa' }}>#{tag}</span>
           ))}
           {item.tags.length > 3 && (
             <span className="text-[10px] text-text2">+{item.tags.length - 3}</span>
@@ -1395,15 +1414,16 @@ export function BankPicker({ user, mode, onSelect, onClose, resolveMode = 'full'
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={onClose}>
       <div
-        className="bg-surface border border-border rounded-2xl w-[880px] max-w-[95vw] h-[80vh] flex flex-col overflow-hidden"
+        className="rounded-2xl w-[880px] max-w-[95vw] h-[80vh] flex flex-col overflow-hidden"
+        style={{ background: '#0E0E16', border: '1px solid rgba(139,92,246,0.2)' }}
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="px-5 py-4 border-b border-border flex items-center gap-4 flex-shrink-0">
+        <div className="px-5 py-4 flex items-center gap-4 flex-shrink-0" style={{ borderBottom: '1px solid rgba(139,92,246,0.12)' }}>
           <div className="flex items-center gap-2.5">
             <span className="text-xl">🗂</span>
-            <h2 className="text-sm font-semibold text-text">Banque de vidéos</h2>
-            <span className="text-xs text-text2">
+            <h2 className="text-[14px] font-bold text-text">Banque de vidéos</h2>
+            <span className="text-[11px] text-text2">
               {mode === 'multi' ? 'Sélection multiple' : 'Sélection unique'}
             </span>
           </div>
@@ -1413,7 +1433,8 @@ export function BankPicker({ user, mode, onSelect, onClose, resolveMode = 'full'
             placeholder="🔍 Rechercher…"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="w-44 bg-bg border border-border rounded-lg px-3 py-1.5 text-xs text-text placeholder:text-text2 focus:border-accent focus:outline-none"
+            className="w-44 rounded-lg px-3 py-1.5 text-[12px] placeholder:text-text2 focus:outline-none"
+            style={{ background: '#07070B', border: '1px solid rgba(139,92,246,0.18)', color: '#fff' }}
           />
           {mode === 'multi' && visible.length > 0 && (
             <button
@@ -1426,8 +1447,8 @@ export function BankPicker({ user, mode, onSelect, onClose, resolveMode = 'full'
                   return next
                 })
               }}
-              className="px-2.5 py-1.5 rounded-lg text-[11px] font-medium text-text2 hover:text-text transition-colors"
-              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}
+              className="px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-colors"
+              style={{ background: '#07070B', border: '1px solid rgba(139,92,246,0.18)', color: '#6B6B7A' }}
               title={selectedFolder ? `Sélectionner tout le dossier "${selectedFolder}"` : 'Sélectionner tout'}
             >
               {visible.every(v => selected.has(v.id)) ? '☐ Désélectionner' : '☑ Tout sélectionner'}
@@ -1441,19 +1462,22 @@ export function BankPicker({ user, mode, onSelect, onClose, resolveMode = 'full'
           <button onClick={onClose} className="text-text2 hover:text-text transition-colors text-xl leading-none">✕</button>
         </div>
         {resolving && (
-          <div className="px-5 py-2 bg-accent/10 border-b border-accent/30 text-accent text-xs flex items-center gap-2">
+          <div className="px-5 py-2 text-accent text-xs flex items-center gap-2" style={{ background: 'rgba(139,92,246,0.08)', borderBottom: '1px solid rgba(139,92,246,0.15)' }}>
             <span className="animate-spin">↻</span><span>📥 Téléchargement depuis le cloud : {resolving}</span>
           </div>
         )}
 
         <div className="flex flex-1 overflow-hidden">
           {/* Sidebar */}
-          <div className="w-44 flex-shrink-0 border-r border-border overflow-auto py-1">
+          <div className="w-44 flex-shrink-0 overflow-auto py-1" style={{ borderRight: '1px solid rgba(139,92,246,0.1)', background: '#07070B' }}>
             <button
               onClick={() => setSelectedFolder(null)}
               className={`w-full flex items-center gap-2 px-3 py-2 text-left transition-colors ${
-                selectedFolder === null ? 'bg-surface2 border-l-2 border-accent pl-[10px]' : 'hover:bg-surface2'
+                selectedFolder === null ? 'border-l-2 border-accent pl-[10px]' : ''
               }`}
+              style={selectedFolder === null ? { background: 'rgba(139,92,246,0.08)' } : {}}
+              onMouseEnter={e => { if (selectedFolder !== null) e.currentTarget.style.background = 'rgba(139,92,246,0.04)' }}
+              onMouseLeave={e => { if (selectedFolder !== null) e.currentTarget.style.background = '' }}
             >
               <span className="text-sm">🎬</span>
               <span className="text-xs text-text flex-1">Toute la banque</span>
@@ -1464,8 +1488,11 @@ export function BankPicker({ user, mode, onSelect, onClose, resolveMode = 'full'
                 key={f}
                 onClick={() => setSelectedFolder(f)}
                 className={`w-full flex items-center gap-2 px-3 py-2 text-left transition-colors ${
-                  selectedFolder === f ? 'bg-surface2 border-l-2 border-accent pl-[10px]' : 'hover:bg-surface2'
+                  selectedFolder === f ? 'border-l-2 border-accent pl-[10px]' : ''
                 }`}
+                style={selectedFolder === f ? { background: 'rgba(139,92,246,0.08)' } : {}}
+                onMouseEnter={e => { if (selectedFolder !== f) e.currentTarget.style.background = 'rgba(139,92,246,0.04)' }}
+                onMouseLeave={e => { if (selectedFolder !== f) e.currentTarget.style.background = '' }}
               >
                 <span className="text-sm">📂</span>
                 <span className="text-xs text-text flex-1 truncate">{f}</span>
@@ -1493,12 +1520,16 @@ export function BankPicker({ user, mode, onSelect, onClose, resolveMode = 'full'
                     <button
                       key={item.id}
                       onClick={() => toggle(item)}
-                      className={`text-left rounded-xl overflow-hidden border-2 transition-all ${
-                        isSelected ? 'border-accent ring-2 ring-accent/30' : 'border-border hover:border-accent/40'
-                      } ${!item.file_url && !item.storage_path ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      className={`text-left rounded-xl overflow-hidden transition-all ${
+                        !item.file_url && !item.storage_path ? 'opacity-50 cursor-not-allowed' : ''
+                      }`}
+                      style={{
+                        border: isSelected ? '2px solid #8B5CF6' : '2px solid rgba(139,92,246,0.15)',
+                        boxShadow: isSelected ? '0 0 0 2px rgba(139,92,246,0.2)' : 'none',
+                      }}
                       disabled={!item.file_url && !item.storage_path}
                     >
-                      <div className="relative aspect-[9/16] bg-surface2">
+                      <div className="relative aspect-[9/16]" style={{ background: 'rgba(139,92,246,0.08)' }}>
                         <VideoThumbnail filePath={item.file_url ?? ''} thumbnailPath={item.thumbnail_path} storagePath={item.storage_path} />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent pointer-events-none" />
                         {isSelected && (

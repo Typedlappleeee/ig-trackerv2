@@ -34,7 +34,7 @@ function CopyButton({ text }: { text: string }) {
   return (
     <button onClick={() => { navigator.clipboard.writeText(text).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000) }) }}
       className="rounded-xl px-4 py-2.5 text-[13px] font-semibold transition-all"
-      style={{ background: copied ? 'rgba(52,211,153,0.12)' : 'rgba(255,255,255,0.06)', color: copied ? '#34d399' : '#e2e8f0', border: `1px solid ${copied ? 'rgba(52,211,153,0.25)' : 'rgba(255,255,255,0.09)'}` }}>
+      style={{ background: copied ? 'rgba(34,197,94,0.12)' : '#07070B', color: copied ? '#22C55E' : '#fff', border: `1px solid ${copied ? 'rgba(34,197,94,0.25)' : 'rgba(139,92,246,0.18)'}` }}>
       {copied ? '✓ Copié' : '📋 Copier'}
     </button>
   )
@@ -44,7 +44,7 @@ function ResultBox({ value, rows = 8 }: { value: string; rows?: number }) {
   return (
     <textarea rows={rows} value={value} readOnly
       className="w-full rounded-xl px-4 py-3 text-[13px] font-mono text-white/80 resize-none focus:outline-none"
-      style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }} />
+      style={{ background: '#07070B', border: '1px solid rgba(139,92,246,0.15)' }} />
   )
 }
 
@@ -52,7 +52,7 @@ function FieldInput({ placeholder, value, onChange, textarea, rows }: {
   placeholder: string; value: string; onChange: (v: string) => void; textarea?: boolean; rows?: number
 }) {
   const cls = "w-full rounded-xl px-4 py-2.5 text-[13px] text-white placeholder:text-text2 focus:outline-none"
-  const style = { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }
+  const style = { background: '#07070B', border: '1px solid rgba(139,92,246,0.18)', color: '#fff' }
   return textarea
     ? <textarea rows={rows ?? 4} placeholder={placeholder} value={value} onChange={e => onChange(e.target.value)} className={cls} style={style} />
     : <input type="text" placeholder={placeholder} value={value} onChange={e => onChange(e.target.value)} className={cls} style={style} />
@@ -62,7 +62,7 @@ function SelectInput({ value, onChange, options }: { value: string; onChange: (v
   return (
     <select value={value} onChange={e => onChange(e.target.value)}
       className="w-full rounded-xl px-4 py-2.5 text-[13px] focus:outline-none"
-      style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}>
+      style={{ background: '#07070B', border: '1px solid rgba(139,92,246,0.18)', color: '#fff' }}>
       {options.map(o => <option key={o} value={o} style={{ background: '#0c0e1a' }}>{o}</option>)}
     </select>
   )
@@ -73,10 +73,10 @@ function ToolShell({ title, icon, children, onBack, error }: {
 }) {
   return (
     <div className="h-full flex flex-col overflow-hidden">
-      <div className="flex-shrink-0 px-10 pt-9 pb-7 flex items-center gap-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+      <div className="flex-shrink-0 px-8 pt-7 pb-5 flex items-center gap-4" style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
         <button onClick={onBack}
           className="rounded-xl px-4 py-2.5 text-[13px] font-semibold flex-shrink-0"
-          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}>
+          style={{ background: '#07070B', border: '1px solid rgba(139,92,246,0.18)', color: '#fff' }}>
           ← Retour
         </button>
         <span className="text-2xl">{icon}</span>
@@ -240,7 +240,7 @@ Format le script comme si c'était prêt à lire face caméra. Inclus les indica
               <button key={d} onClick={() => setDuration(d)} className="flex-1 py-2.5 rounded-xl text-[13px] font-bold"
                 style={duration === d
                   ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff' }
-                  : { background: 'rgba(255,255,255,0.05)', color: 'rgba(196,181,253,0.5)', border: '1px solid rgba(255,255,255,0.07)' }
+                  : { background: '#07070B', color: '#6B6B7A', border: '1px solid rgba(139,92,246,0.1)' }
                 }>{d}</button>
             ))}
           </div>
@@ -441,7 +441,7 @@ Pour chaque langue, format :
               className="px-4 py-2 rounded-xl text-[13px] font-semibold transition-all"
               style={langs.includes(l)
                 ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff' }
-                : { background: 'rgba(255,255,255,0.05)', color: 'rgba(196,181,253,0.5)', border: '1px solid rgba(255,255,255,0.07)' }
+                : { background: '#07070B', color: '#6B6B7A', border: '1px solid rgba(139,92,246,0.1)' }
               }>{l}</button>
           ))}
         </div>
@@ -534,10 +534,10 @@ function ToolCard({ icon, title, desc, tags, locked, onClick }: {
   return (
     <button onClick={onClick}
       className="rounded-2xl p-5 text-left space-y-3 transition-all hover:scale-[1.02] group"
-      style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', opacity: locked ? 0.5 : 1 }}>
+      style={{ background: '#07070B', border: '1px solid rgba(139,92,246,0.15)', opacity: locked ? 0.5 : 1 }}>
       <div className="flex items-start justify-between">
         <div className="w-11 h-11 rounded-xl flex items-center justify-center text-2xl flex-shrink-0"
-          style={{ background: 'linear-gradient(135deg,rgba(124,58,237,0.15),rgba(236,72,153,0.15))', border: '1px solid rgba(255,255,255,0.07)' }}>
+          style={{ background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.2)' }}>
           {icon}
         </div>
         {locked && <span className="text-[11px] px-2 py-0.5 rounded font-bold"
@@ -580,9 +580,9 @@ export function AiTools({ user }: AiToolsProps) {
   if (!conns.groq) {
     return (
       <div className="h-full flex flex-col overflow-hidden">
-        <div className="flex-shrink-0 px-10 pt-9 pb-7 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        <div className="flex-shrink-0 px-8 pt-7 pb-5 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
           <div>
-            <h1 className="text-[28px] font-black text-white leading-none">Outils IA</h1>
+            <h1 className="text-[22px] font-black text-white leading-none tracking-tight">Outils IA</h1>
             <p className="text-[13px] text-text2 mt-0.5">Groq · Claude Vision · FFmpeg</p>
           </div>
         </div>
@@ -625,9 +625,9 @@ export function AiTools({ user }: AiToolsProps) {
     <div className="h-full flex flex-col overflow-hidden">
 
       {/* Header */}
-      <div className="flex-shrink-0 px-10 pt-9 pb-7 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+      <div className="flex-shrink-0 px-8 pt-7 pb-5 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
         <div>
-          <h1 className="text-[28px] font-black text-white leading-none">Outils IA</h1>
+          <h1 className="text-[22px] font-black text-white leading-none tracking-tight">Outils IA</h1>
           <p className="text-[13px] text-text2 mt-0.5">
             {GROQ_TOOLS.length + VISION_TOOLS_META.length + 2} outils · Groq · Claude Vision · FFmpeg
           </p>

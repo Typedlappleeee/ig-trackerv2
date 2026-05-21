@@ -562,54 +562,59 @@ export function MassPosting({ user }: MassPostingProps) {
 
   const withSessions = phones.filter(p => p.ig_sessionid).length
 
+  const MP_INPUT = { background: '#07070B', border: '1px solid rgba(139,92,246,0.18)', color: '#fff' }
+  const canLaunch = !posting && !!bearer && phoneList.length > 0 && selectedVideos.length > 0
+
   return (
-    <div className="h-full flex flex-col overflow-hidden">
-      {/* Page header */}
-      <div className="flex-shrink-0 px-10 pt-9 pb-7 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+    <div className="h-full flex flex-col overflow-hidden" style={{ background: '#07070B' }}>
+      {/* ── Page header ──────────────────────────────────────────────────── */}
+      <div className="flex-shrink-0 px-8 pt-7 pb-5 flex items-center justify-between"
+        style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
         <div>
-          <h1 className="text-[28px] font-black text-white leading-none">Mass Posting</h1>
-          <p className="text-[13px] text-text2 mt-0.5">
-            {phoneList.length} cible{phoneList.length !== 1 ? 's' : ''} · {selectedVideos.length} vidéo{selectedVideos.length !== 1 ? 's' : ''}
-            {withSessions > 0 && <span className="ml-2 text-ok">· {withSessions} session IG</span>}
+          <h1 className="text-[22px] font-black text-white leading-none tracking-tight">Mass Posting</h1>
+          <p className="text-[12px] mt-1 flex items-center gap-2" style={{ color: '#6B6B7A' }}>
+            <span>{phoneList.length} cible{phoneList.length !== 1 ? 's' : ''}</span>
+            <span>·</span>
+            <span>{selectedVideos.length} vidéo{selectedVideos.length !== 1 ? 's' : ''}</span>
+            {withSessions > 0 && <span className="text-ok font-semibold">· {withSessions} session IG</span>}
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           {/* Mode toggle */}
-          <div className="flex rounded-xl p-1 gap-1" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+          <div className="flex rounded-xl p-1 gap-0.5"
+            style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(139,92,246,0.12)' }}>
             {([{ k: 'seq', l: 'Séquentiel' }, { k: 'random', l: 'Aléatoire' }] as const).map(m => (
               <button key={m.k} onClick={() => setMode(m.k)}
-                className="px-4 py-2 rounded-lg text-[13px] font-semibold transition-all"
+                className="px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-all"
                 style={mode === m.k
-                  ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: 'white' }
-                  : { color: 'rgba(148,163,184,0.7)' }}
+                  ? { background: 'linear-gradient(130deg,#7C3AED,#8B5CF6)', color: '#fff' }
+                  : { color: '#6B6B7A' }}
               >{m.l}</button>
             ))}
           </div>
           <button
             onClick={stop}
             disabled={!posting}
-            className="rounded-xl px-5 py-2.5 text-[13px] font-semibold transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+            className="rounded-xl px-4 py-2 text-[12px] font-semibold transition-all disabled:opacity-30 disabled:cursor-not-allowed"
             style={{ background: 'rgba(239,68,68,0.08)', color: '#f87171', border: '1px solid rgba(239,68,68,0.2)' }}
           >
             ⏹ Stopper
           </button>
           <button
             onClick={() => setShowScheduleModal(true)}
-            disabled={posting || !bearer || phoneList.length === 0 || selectedVideos.length === 0}
-            className="rounded-xl px-5 py-2.5 text-[13px] font-semibold transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(37,99,235,0.3)', color: '#60a5fa' }}
+            disabled={!canLaunch}
+            className="rounded-xl px-4 py-2 text-[12px] font-semibold transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+            style={{ background: '#07070B', border: '1px solid rgba(96,165,250,0.3)', color: '#60a5fa' }}
           >
             📅 Programmer
           </button>
           <button
             onClick={post}
-            disabled={posting || !bearer || phoneList.length === 0 || selectedVideos.length === 0}
-            className="rounded-xl px-5 py-2.5 text-[13px] font-black text-white transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
+            disabled={!canLaunch}
+            className="rounded-xl px-4 py-2 text-[12px] font-black text-white transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
             style={{
-              background: posting || !bearer || phoneList.length === 0 || selectedVideos.length === 0
-                ? 'rgba(255,255,255,0.06)' : 'linear-gradient(130deg,#7c3aed,#ec4899)',
-              boxShadow: posting || !bearer || phoneList.length === 0 || selectedVideos.length === 0
-                ? 'none' : '0 4px 20px -4px rgba(124,58,237,0.5)',
+              background: canLaunch ? 'linear-gradient(130deg,#7C3AED,#8B5CF6)' : 'rgba(255,255,255,0.05)',
+              boxShadow: canLaunch ? '0 4px 20px -4px rgba(124,58,237,0.5)' : 'none',
             }}>
             {posting ? '⏳ En cours…' : '⚡ Lancer'}
           </button>
@@ -617,8 +622,8 @@ export function MassPosting({ user }: MassPostingProps) {
       </div>
 
       {!bearer && (
-        <div className="flex-shrink-0 mx-10 mt-6 px-5 py-4 rounded-2xl text-[13px] text-warn"
-          style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)' }}>
+        <div className="flex-shrink-0 mx-8 mt-4 px-4 py-3 rounded-xl text-[12px] text-warn"
+          style={{ background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.2)' }}>
           ⚠ Token GéeLark manquant — configure-le dans Paramètres.
         </div>
       )}
@@ -627,76 +632,64 @@ export function MassPosting({ user }: MassPostingProps) {
       <div className="flex-1 overflow-hidden flex min-h-0">
 
         {/* ── Column 1: Videos ─────────────────────────────────────────────── */}
-        <aside className="w-72 flex-shrink-0 flex flex-col" style={{ borderRight: '1px solid rgba(255,255,255,0.06)', background: '#07090f' }}>
-          <div className="flex-shrink-0 px-5 pt-5 pb-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-            <div className="flex items-center justify-between mb-4">
-              <p className="text-[15px] font-bold text-white">Vidéos</p>
-              <span className="text-[12px] font-semibold px-2.5 py-0.5 rounded-full text-white"
-                style={{ background: selectedVideos.length > 0 ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.07)' }}>
+        <aside className="w-68 flex-shrink-0 flex flex-col"
+          style={{ borderRight: '1px solid rgba(139,92,246,0.1)', background: '#07070B', minWidth: 260, maxWidth: 280 }}>
+          <div className="flex-shrink-0 px-4 pt-4 pb-3 space-y-2.5"
+            style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
+            <div className="flex items-center justify-between">
+              <p className="text-[12px] font-bold text-white uppercase tracking-wide">Vidéos</p>
+              <span className="text-[11px] font-bold px-2 py-0.5 rounded-full text-white"
+                style={{ background: selectedVideos.length > 0 ? 'linear-gradient(130deg,#7C3AED,#8B5CF6)' : 'rgba(255,255,255,0.07)' }}>
                 {selectedVideos.length}
               </span>
             </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => pickLocalFile(-1)}
-                className="flex-1 flex items-center justify-center gap-1.5 rounded-xl px-3 py-2.5 text-[13px] font-semibold transition-colors"
-                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
-              >
-                💾 PC
-              </button>
-              <button
-                onClick={() => setShowBankPicker(true)}
-                className="flex-1 flex items-center justify-center gap-1.5 rounded-xl px-3 py-2.5 text-[13px] font-semibold transition-colors"
-                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
-              >
-                🗂 Banque
-              </button>
-              <button
-                onClick={openFolderPick}
-                className="flex-1 flex items-center justify-center gap-1.5 rounded-xl px-3 py-2.5 text-[13px] font-semibold transition-colors"
-                style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)', color: '#a78bfa' }}
-              >
-                📁 Dossier
-              </button>
+            <div className="flex gap-1.5">
+              <button onClick={() => pickLocalFile(-1)}
+                className="flex-1 flex items-center justify-center gap-1 rounded-lg py-2 text-[11px] font-semibold transition-all"
+                style={MP_INPUT}>💾 PC</button>
+              <button onClick={() => setShowBankPicker(true)}
+                className="flex-1 flex items-center justify-center gap-1 rounded-lg py-2 text-[11px] font-semibold transition-all"
+                style={MP_INPUT}>🗂 Banque</button>
+              <button onClick={openFolderPick}
+                className="flex-1 flex items-center justify-center gap-1 rounded-lg py-2 text-[11px] font-semibold transition-all"
+                style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)', color: '#c4b5fd' }}>
+                📁 Dossier</button>
             </div>
           </div>
           {addingFolder && (
-            <div className="flex-shrink-0 flex items-center gap-3 px-5 py-3"
-              style={{ background: 'rgba(139,92,246,0.08)', borderBottom: '1px solid rgba(139,92,246,0.15)' }}>
-              <svg className="animate-spin w-4 h-4 flex-shrink-0" style={{ color: '#a78bfa' }} viewBox="0 0 24 24" fill="none">
+            <div className="flex-shrink-0 flex items-center gap-3 px-4 py-2.5"
+              style={{ background: 'rgba(139,92,246,0.07)', borderBottom: '1px solid rgba(139,92,246,0.12)' }}>
+              <svg className="animate-spin w-3.5 h-3.5 flex-shrink-0" style={{ color: '#c4b5fd' }} viewBox="0 0 24 24" fill="none">
                 <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="31.4" strokeDashoffset="10" />
               </svg>
-              <p className="text-[12px] font-semibold truncate" style={{ color: '#a78bfa' }}>
-                Ajout de «{addingFolder}» en cours…
+              <p className="text-[11px] font-semibold truncate" style={{ color: '#c4b5fd' }}>
+                Ajout de «{addingFolder}»…
               </p>
             </div>
           )}
           <div className="flex-1 overflow-auto">
             {selectedVideos.length === 0 ? (
-              <div className="px-5 py-10 text-center">
-                <p className="text-3xl mb-3">🎬</p>
-                <p className="text-[13px] font-bold text-white mb-1">Aucune vidéo</p>
-                <p className="text-[12px] text-text2">Ajoute depuis la banque ou le PC</p>
+              <div className="px-4 py-10 text-center">
+                <p className="text-2xl mb-2">🎬</p>
+                <p className="text-[12px] font-bold text-white mb-0.5">Aucune vidéo</p>
+                <p className="text-[11px] text-text2">Ajoute depuis la banque ou le PC</p>
               </div>
             ) : selectedVideos.map((sv, selIdx) => {
               const fp = sv.localPath ?? sv.item.file_url
               return (
-                <div
-                  key={sv.item.id}
-                  className="flex items-center gap-3 px-4 py-3"
-                  style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}
-                >
-                  <div className="w-10 flex-shrink-0 aspect-[9/16] rounded-lg overflow-hidden"
-                    style={{ background: 'rgba(255,255,255,0.05)' }}>
+                <div key={sv.item.id} className="flex items-center gap-2.5 px-3 py-2.5"
+                  style={{ borderBottom: '1px solid rgba(139,92,246,0.06)' }}>
+                  <div className="w-9 flex-shrink-0 aspect-[9/16] rounded-lg overflow-hidden"
+                    style={{ background: 'rgba(139,92,246,0.08)' }}>
                     <VideoThumbnail filePath={fp ?? ''} thumbnailPath={sv.item.thumbnail_path} storagePath={sv.item.storage_path} />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-[12px] font-bold" style={{ color: '#8b5cf6' }}>#{selIdx + 1}</p>
-                    <p className="text-[13px] text-white truncate">{sv.item.title}</p>
+                    <p className="text-[10px] font-bold" style={{ color: '#8B5CF6' }}>#{selIdx + 1}</p>
+                    <p className="text-[12px] text-white truncate">{sv.item.title}</p>
                   </div>
                   <button
                     onClick={() => setSelVideos(prev => prev.filter((_, i) => i !== selIdx))}
-                    className="text-text2 hover:text-danger transition-colors flex-shrink-0 text-[14px]"
+                    className="text-text2 hover:text-danger transition-colors flex-shrink-0 text-[13px]"
                   >✕</button>
                 </div>
               )
@@ -705,24 +698,27 @@ export function MassPosting({ user }: MassPostingProps) {
         </aside>
 
         {/* ── Column 2: Phones ─────────────────────────────────────────────── */}
-        <aside className="w-64 flex-shrink-0 flex flex-col" style={{ borderRight: '1px solid rgba(255,255,255,0.06)', background: '#07090f' }}>
+        <aside className="w-56 flex-shrink-0 flex flex-col"
+          style={{ borderRight: '1px solid rgba(139,92,246,0.1)', background: '#07070B' }}>
           {/* Header + mode toggle */}
-          <div className="flex-shrink-0 px-5 pt-5 pb-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-[15px] font-bold text-white">Cibles</p>
-              <span className="text-[12px] font-semibold px-2.5 py-0.5 rounded-full text-white"
-                style={{ background: selectedPhones.size > 0 ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.07)' }}>
+          <div className="flex-shrink-0 px-4 pt-4 pb-3 space-y-2"
+            style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
+            <div className="flex items-center justify-between">
+              <p className="text-[12px] font-bold text-white uppercase tracking-wide">Cibles</p>
+              <span className="text-[11px] font-bold px-2 py-0.5 rounded-full text-white"
+                style={{ background: selectedPhones.size > 0 ? 'linear-gradient(130deg,#7C3AED,#8B5CF6)' : 'rgba(255,255,255,0.07)' }}>
                 {selectedPhones.size}
               </span>
             </div>
             {/* Mode toggle */}
-            <div className="flex rounded-xl p-1 gap-1 mb-3" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
-              {([{ k: 'phones', l: '📱 Téléphones' }, { k: 'groups', l: '👥 Groupes' }] as const).map(m => (
+            <div className="flex rounded-xl p-0.5 gap-0.5"
+              style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(139,92,246,0.12)' }}>
+              {([{ k: 'phones', l: '📱 Tél.' }, { k: 'groups', l: '👥 Groupes' }] as const).map(m => (
                 <button key={m.k} onClick={() => setPhonePickMode(m.k)}
-                  className="flex-1 py-2 rounded-lg text-[12px] font-semibold transition-all"
+                  className="flex-1 py-1.5 rounded-lg text-[11px] font-semibold transition-all"
                   style={phonePickMode === m.k
-                    ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: 'white' }
-                    : { color: 'rgba(148,163,184,0.7)' }}>
+                    ? { background: 'linear-gradient(130deg,#7C3AED,#8B5CF6)', color: '#fff' }
+                    : { color: '#6B6B7A' }}>
                   {m.l}
                 </button>
               ))}
@@ -731,19 +727,15 @@ export function MassPosting({ user }: MassPostingProps) {
             {/* Phone mode controls */}
             {phonePickMode === 'phones' && (
               <>
-                <select
-                  value={groupFilter}
-                  onChange={e => setGroupFilter(e.target.value)}
-                  className="w-full rounded-xl px-4 py-2.5 text-[13px] focus:outline-none mb-2"
-                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
-                >
-                  {groups.map(g => <option key={g} value={g} style={{ background: '#0d1120', color: '#e2d9f3' }}>{g}</option>)}
+                <select value={groupFilter} onChange={e => setGroupFilter(e.target.value)}
+                  className="w-full rounded-lg px-3 py-1.5 text-[11px] focus:outline-none"
+                  style={MP_INPUT}>
+                  {groups.map(g => <option key={g} value={g} style={{ background: '#0E0E16', color: '#fff' }}>{g}</option>)}
                 </select>
-                <input
-                  type="text" placeholder="Rechercher…" value={phoneSearch}
+                <input type="text" placeholder="🔍 Rechercher…" value={phoneSearch}
                   onChange={e => setPhoneSearch(e.target.value)}
-                  className="w-full rounded-xl px-4 py-2.5 text-[13px] placeholder:text-text2 focus:outline-none"
-                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
+                  className="w-full rounded-lg px-3 py-1.5 text-[11px] focus:outline-none"
+                  style={MP_INPUT}
                 />
               </>
             )}
@@ -760,22 +752,23 @@ export function MassPosting({ user }: MassPostingProps) {
                       return Boolean(p.group_name)
                     }).map(p => p.id)))
                   }}
-                  className="text-[12px] font-semibold text-[#8b5cf6] hover:text-white transition-colors">Tout</button>
+                  className="text-[11px] font-semibold text-accent hover:text-white transition-colors">Tout</button>
                 <button
                   onClick={() => { setSelectedGroups(new Set()); setSelPhones(new Set()) }}
-                  className="text-[12px] text-text2 hover:text-white transition-colors">Aucun</button>
+                  className="text-[11px] text-text2 hover:text-white transition-colors">Aucun</button>
               </div>
             )}
           </div>
 
           {/* Tout / Aucun bar — phones mode only */}
           {phonePickMode === 'phones' && (
-            <div className="flex-shrink-0 px-5 py-2.5 flex gap-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+            <div className="flex-shrink-0 px-4 py-2 flex gap-3"
+              style={{ borderBottom: '1px solid rgba(139,92,246,0.07)' }}>
               <button onClick={() => setSelPhones(new Set(visiblePhones.map(p => p.id)))}
-                className="text-[12px] font-semibold text-[#8b5cf6] hover:text-white transition-colors">Tout</button>
+                className="text-[11px] font-semibold text-accent hover:text-white transition-colors">Tout</button>
               <button onClick={() => setSelPhones(new Set())}
-                className="text-[12px] text-text2 hover:text-white transition-colors">Aucun</button>
-              <span className="ml-auto text-[12px] text-text2">{visiblePhones.length} tel.</span>
+                className="text-[11px] text-text2 hover:text-white transition-colors">Aucun</button>
+              <span className="ml-auto text-[11px] text-text2">{visiblePhones.length} tél.</span>
             </div>
           )}
 
@@ -878,7 +871,7 @@ export function MassPosting({ user }: MassPostingProps) {
             <PostingOptions opts={postingOpts} onChange={o => { setPostingOpts(o); savePostingOpts(o) }} />
 
             {/* Caption card */}
-            <div className="rounded-2xl p-6" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+            <div className="rounded-2xl p-6" style={{ background: '#0E0E16', border: '1px solid rgba(139,92,246,0.12)' }}>
               <div className="flex items-center justify-between mb-4">
                 <p className="text-[15px] font-bold text-white">Description</p>
                 <span className={`text-[12px] font-mono ${caption.length > 2200 ? 'text-danger' : 'text-text2'}`}>
@@ -891,14 +884,14 @@ export function MassPosting({ user }: MassPostingProps) {
                 rows={4}
                 placeholder="Description partagée par tous les téléphones (optionnel)…"
                 className="w-full rounded-xl px-4 py-3 text-[13px] placeholder:text-text2 resize-y focus:outline-none"
-                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
+                style={MP_INPUT}
               />
               <div className="flex items-center gap-2 mt-3">
                 <Button size="sm" variant="secondary" onClick={generateCaption} loading={generating} disabled={!groqKey}>✨ Générer avec IA</Button>
                 <input type="text" value={customPrompt} onChange={e => setCustomPrompt(e.target.value)}
                   placeholder="Prompt personnalisé…"
                   className="flex-1 rounded-xl px-4 py-2.5 text-[13px] placeholder:text-text2 focus:outline-none"
-                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
+                  style={MP_INPUT}
                 />
                 {/* Hashtag toggle — inline, clearly inside the card */}
                 <button
@@ -906,7 +899,7 @@ export function MassPosting({ user }: MassPostingProps) {
                   className="flex items-center gap-2 rounded-xl px-3 py-2.5 transition-all flex-shrink-0"
                   style={withHashtags
                     ? { background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.25)', color: '#a78bfa' }
-                    : { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(148,163,184,0.5)' }}
+                    : { background: '#07070B', border: '1px solid rgba(139,92,246,0.12)', color: '#6B6B7A' }}
                   title="Hashtags"
                 >
                   <span className="text-[12px] font-bold">#</span>
@@ -935,23 +928,23 @@ export function MassPosting({ user }: MassPostingProps) {
                 : null
 
               return (
-                <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                  <div className="px-5 pt-4 pb-3">
+                <div className="rounded-2xl overflow-hidden" style={{ background: '#0E0E16', border: '1px solid rgba(139,92,246,0.12)' }}>
+                  <div className="px-5 pt-4 pb-3" style={{ borderBottom: '1px solid rgba(139,92,246,0.08)' }}>
                     <p className="text-[15px] font-bold text-white">Configuration du posting</p>
                   </div>
 
                   {videoLabel && (
                     <>
-                      <div className="px-5 pb-1.5">
-                        <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'rgba(148,163,184,0.35)' }}>Pool de vidéos</p>
+                      <div className="px-5 pt-3 pb-1.5">
+                        <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#6B6B7A' }}>Pool de vidéos</p>
                       </div>
-                      <div className="flex items-center gap-3 px-5 py-3 mx-3 mb-2 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)' }}>
+                      <div className="flex items-center gap-3 px-5 py-3 mx-3 mb-2 rounded-xl" style={{ background: 'rgba(139,92,246,0.05)', border: '1px solid rgba(139,92,246,0.1)' }}>
                         <span className="text-[18px] flex-shrink-0">📁</span>
                         <span className="flex-1 text-[13px] font-semibold text-white truncate">{videoLabel}</span>
-                        <span className="text-[12px] flex-shrink-0" style={{ color: 'rgba(148,163,184,0.5)' }}>
+                        <span className="text-[12px] flex-shrink-0 text-text2">
                           {selectedVideos.length} vidéo{selectedVideos.length !== 1 ? 's' : ''}
                         </span>
-                        <span className="text-[12px]" style={{ color: 'rgba(148,163,184,0.3)' }}>›</span>
+                        <span className="text-[12px] text-text2">›</span>
                       </div>
                     </>
                   )}
@@ -959,17 +952,17 @@ export function MassPosting({ user }: MassPostingProps) {
                   {phoneLabel && (
                     <>
                       <div className="px-5 pb-1.5">
-                        <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'rgba(148,163,184,0.35)' }}>
+                        <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#6B6B7A' }}>
                           {phonePickMode === 'groups' ? 'Groupe de téléphones' : 'Téléphones'}
                         </p>
                       </div>
-                      <div className="flex items-center gap-3 px-5 py-3 mx-3 mb-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)' }}>
+                      <div className="flex items-center gap-3 px-5 py-3 mx-3 mb-3 rounded-xl" style={{ background: 'rgba(139,92,246,0.05)', border: '1px solid rgba(139,92,246,0.1)' }}>
                         <span className="text-[18px] flex-shrink-0">{phonePickMode === 'groups' ? '👥' : '📱'}</span>
                         <span className="flex-1 text-[13px] font-semibold text-white truncate">
                           {phoneLabel}
-                          {phoneSubLabel && <span className="ml-1.5 font-normal" style={{ color: 'rgba(148,163,184,0.5)' }}>{phoneSubLabel}</span>}
+                          {phoneSubLabel && <span className="ml-1.5 font-normal text-text2">{phoneSubLabel}</span>}
                         </span>
-                        <span className="text-[12px]" style={{ color: 'rgba(148,163,184,0.3)' }}>›</span>
+                        <span className="text-[12px] text-text2">›</span>
                       </div>
                     </>
                   )}
@@ -978,16 +971,17 @@ export function MassPosting({ user }: MassPostingProps) {
             })()}
 
             {/* Assignments card */}
-            <div className="rounded-2xl p-6" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-              <div className="flex items-center justify-between mb-4">
+            <div className="rounded-2xl overflow-hidden" style={{ background: '#0E0E16', border: '1px solid rgba(139,92,246,0.12)' }}>
+              <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: '1px solid rgba(139,92,246,0.08)' }}>
                 <p className="text-[15px] font-bold text-white">Assignations</p>
                 {assignments.length > 0 && (
                   <span className="text-[13px] text-text2">{assignments.length} téléphone(s)</span>
                 )}
               </div>
 
+              <div className="p-6">
               {assignments.length === 0 ? (
-                <div className="rounded-2xl p-10 text-center" style={{ border: '1px dashed rgba(255,255,255,0.08)' }}>
+                <div className="rounded-2xl p-10 text-center" style={{ border: '1px dashed rgba(139,92,246,0.15)' }}>
                   <p className="text-4xl mb-3">📋</p>
                   <p className="text-base font-bold text-white mb-1">Aucune assignation</p>
                   <p className="text-[13px] text-text2">Sélectionne des téléphones et des vidéos pour voir les assignations</p>
@@ -1003,11 +997,11 @@ export function MassPosting({ user }: MassPostingProps) {
                         key={phone.id}
                         className="rounded-2xl p-4 space-y-3 transition-colors"
                         style={{
-                          background: 'rgba(255,255,255,0.02)',
-                          border: ts?.status === 'done'    ? '1px solid rgba(52,211,153,0.3)'
+                          background: '#07070B',
+                          border: ts?.status === 'done'    ? '1px solid rgba(34,197,94,0.3)'
                                 : ts?.status === 'error'   ? '1px solid rgba(239,68,68,0.3)'
-                                : ts?.status === 'posting' ? '1px solid rgba(251,191,36,0.3)'
-                                : '1px solid rgba(255,255,255,0.07)',
+                                : ts?.status === 'posting' ? '1px solid rgba(245,158,11,0.3)'
+                                : '1px solid rgba(139,92,246,0.12)',
                         }}
                       >
                         <div className="flex items-center gap-2">
@@ -1018,27 +1012,27 @@ export function MassPosting({ user }: MassPostingProps) {
                           <div className="min-w-0 flex-1">
                             <p className="text-[13px] font-semibold text-white truncate">{phone.phone_name}</p>
                             {phone.ig_username && (
-                              <p className="text-[12px] text-[#8b5cf6]/80 truncate">@{phone.ig_username}</p>
+                              <p className="text-[12px] truncate" style={{ color: 'rgba(139,92,246,0.8)' }}>@{phone.ig_username}</p>
                             )}
                           </div>
                           <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                            phone.status === 'online' ? 'bg-ok' : 'bg-text2'
+                            phone.status === 'online' ? 'bg-ok' : 'bg-text2/30'
                           }`} />
                         </div>
                         {video ? (
                           <div className="flex items-center gap-2">
                             <div className="w-8 flex-shrink-0 aspect-[9/16] rounded-lg overflow-hidden"
-                              style={{ background: 'rgba(255,255,255,0.05)' }}>
+                              style={{ background: 'rgba(139,92,246,0.08)' }}>
                               <VideoThumbnail filePath={video.localPath ?? video.item.file_url ?? ''} thumbnailPath={video.item.thumbnail_path} storagePath={video.item.storage_path} />
                             </div>
                             <div className="min-w-0 flex-1">
-                              <p className="text-[11px] font-bold" style={{ color: '#8b5cf6' }}>#{videoIndex + 1}</p>
+                              <p className="text-[11px] font-bold" style={{ color: '#8B5CF6' }}>#{videoIndex + 1}</p>
                               <p className="text-[12px] text-text2 truncate">{video.item.title}</p>
                             </div>
                           </div>
                         ) : (
                           <div className="rounded-xl px-3 py-2"
-                            style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                            style={{ background: 'rgba(139,92,246,0.05)', border: '1px solid rgba(139,92,246,0.1)' }}>
                             <span className="text-[12px] text-text2 italic">Aucune vidéo</span>
                           </div>
                         )}
@@ -1049,14 +1043,14 @@ export function MassPosting({ user }: MassPostingProps) {
                               {ts.detail && <span className="opacity-70"> — {ts.detail}</span>}
                             </p>
                             {(ts.status === 'uploading' || ts.status === 'posting') && (
-                              <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
+                              <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(139,92,246,0.1)' }}>
                                 <div className={`h-full rounded-full animate-pulse ${
                                   ts.status === 'uploading' ? 'bg-blue-400 w-2/3' : 'bg-warn w-4/5'
                                 }`} />
                               </div>
                             )}
                             {ts.status === 'done' && (
-                              <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(52,211,153,0.1)' }}>
+                              <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(34,197,94,0.1)' }}>
                                 <div className="h-full bg-ok rounded-full w-full" />
                               </div>
                             )}
@@ -1072,12 +1066,13 @@ export function MassPosting({ user }: MassPostingProps) {
                   })}
                 </div>
               )}
+              </div>
             </div>
 
             {/* Log panel */}
             {logs.length > 0 && (
-              <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                <div className="px-6 py-4 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+              <div className="rounded-2xl overflow-hidden" style={{ background: '#0E0E16', border: '1px solid rgba(139,92,246,0.12)' }}>
+                <div className="px-6 py-4 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(139,92,246,0.08)' }}>
                   <p className="text-[15px] font-bold text-white">Journal</p>
                   {!posting && (
                     <button onClick={() => setLogs([])} className="text-[13px] text-text2 hover:text-white transition-colors">Effacer</button>
@@ -1091,7 +1086,7 @@ export function MassPosting({ user }: MassPostingProps) {
                       l.level === 'warn'  ? 'text-warn'   :
                       'text-text2'
                     }`}>
-                      <span className="text-text2/60 flex-shrink-0">{l.time}</span>
+                      <span className="opacity-40 flex-shrink-0">{l.time}</span>
                       <span>{l.message}</span>
                     </div>
                   ))}
@@ -1107,7 +1102,7 @@ export function MassPosting({ user }: MassPostingProps) {
       {showFolderPick && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => setShowFolderPick(false)}>
           <div className="rounded-2xl overflow-hidden w-80" onClick={e => e.stopPropagation()}
-            style={{ background: '#0d0a1e', border: '1px solid rgba(139,92,246,0.25)' }}>
+            style={{ background: '#0E0E16', border: '1px solid rgba(139,92,246,0.25)' }}>
             <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(139,92,246,0.12)' }}>
               <p className="text-[14px] font-bold text-white">📁 Choisir un dossier</p>
               <button onClick={() => setShowFolderPick(false)} className="text-text2 hover:text-white text-lg leading-none">✕</button>
@@ -1120,8 +1115,11 @@ export function MassPosting({ user }: MassPostingProps) {
               <div className="max-h-80 overflow-y-auto py-2">
                 {bankFolders.map(f => (
                   <button key={f.name} onClick={() => addFolderVideos(f.name)}
-                    className="w-full flex items-center gap-3 px-5 py-3 text-left transition-all hover:bg-white/[0.03]"
-                    style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                    className="w-full flex items-center gap-3 px-5 py-3 text-left transition-all"
+                    style={{ borderBottom: '1px solid rgba(139,92,246,0.07)' }}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'rgba(139,92,246,0.05)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                  >
                     <span className="text-[18px]">📂</span>
                     <span className="flex-1 text-[13px] font-semibold text-white truncate">{f.name}</span>
                     <span className="text-[11px] font-bold px-2 py-0.5 rounded-full"
