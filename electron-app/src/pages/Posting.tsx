@@ -319,59 +319,72 @@ export function Posting({ user }: PostingProps) {
   })
   const fileName = filePath ? filePath.replace(/\\/g, '/').split('/').pop() ?? filePath : null
 
+  const ROW_BORDER = { borderBottom: '1px solid rgba(139,92,246,0.08)' }
+  const INPUT_STYLE = { background: '#07070B', border: '1px solid rgba(139,92,246,0.18)', color: '#fff' }
+  const canPost = !posting && !!bearer && selectedPhones.size > 0 && !!filePath
+
   return (
-    <div className="h-full flex overflow-hidden">
-      {/* Left: phone selector */}
-      <aside className="w-64 flex-shrink-0 flex flex-col" style={{ borderRight: '1px solid rgba(255,255,255,0.06)', background: '#07090f' }}>
+    <div className="h-full flex overflow-hidden" style={{ background: '#07070B' }}>
+      {/* ── Left: phone selector ─────────────────────────────────────────── */}
+      <aside className="w-60 flex-shrink-0 flex flex-col"
+        style={{ borderRight: '1px solid rgba(139,92,246,0.1)', background: '#07070B' }}>
         {/* Sidebar header */}
-        <div className="flex-shrink-0 px-5 pt-6 pb-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-[13px] font-bold text-white">Comptes</p>
-            <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full text-white"
-              style={{ background: selectedPhones.size > 0 ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.07)' }}>
+        <div className="flex-shrink-0 px-4 pt-5 pb-4 space-y-2.5"
+          style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
+          <div className="flex items-center justify-between">
+            <p className="text-[12px] font-bold text-white uppercase tracking-wide">Comptes</p>
+            <span className="text-[11px] font-bold px-2 py-0.5 rounded-full text-white"
+              style={{ background: selectedPhones.size > 0 ? 'linear-gradient(130deg,#7C3AED,#8B5CF6)' : 'rgba(255,255,255,0.07)' }}>
               {selectedPhones.size}
             </span>
           </div>
           <select value={groupFilter} onChange={e => setGroup(e.target.value)}
-            className="w-full rounded-xl px-4 py-2.5 text-[13px] focus:outline-none mb-2"
-            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}>
-            {groups.map(g => <option key={g} value={g} style={{ background: '#0d1120', color: '#e2d9f3' }}>{g}</option>)}
+            className="w-full rounded-xl px-3 py-2 text-[12px] focus:outline-none"
+            style={INPUT_STYLE}>
+            {groups.map(g => <option key={g} value={g} style={{ background: '#0E0E16', color: '#fff' }}>{g}</option>)}
           </select>
           <input
-            type="text" placeholder="Rechercher…" value={phoneSearch}
+            type="text" placeholder="🔍 Rechercher…" value={phoneSearch}
             onChange={e => setPhoneSearch(e.target.value)}
-            className="w-full rounded-xl px-4 py-2.5 text-[13px] placeholder:text-text2 focus:outline-none"
-            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
+            className="w-full rounded-xl px-3 py-2 text-[12px] focus:outline-none"
+            style={INPUT_STYLE}
           />
         </div>
-        <div className="flex-shrink-0 px-5 py-2.5 flex gap-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+        <div className="flex-shrink-0 px-4 py-2 flex gap-3"
+          style={{ borderBottom: '1px solid rgba(139,92,246,0.07)' }}>
           <button onClick={() => setSelPhones(new Set(visiblePhones.map(p => p.id)))}
-            className="text-[12px] font-semibold text-[#8b5cf6] hover:text-white transition-colors">Tout</button>
+            className="text-[11px] font-semibold text-accent hover:text-white transition-colors">Tout</button>
           <button onClick={() => setSelPhones(new Set())}
-            className="text-[12px] text-text2 hover:text-white transition-colors">Aucun</button>
-          <span className="ml-auto text-[12px] text-text2">{visiblePhones.length} tel.</span>
+            className="text-[11px] text-text2 hover:text-white transition-colors">Aucun</button>
+          <span className="ml-auto text-[11px] text-text2">{visiblePhones.length} tél.</span>
         </div>
         <div className="flex-1 overflow-auto">
           {visiblePhones.map(phone => {
             const checked = selectedPhones.has(phone.id)
             return (
               <button key={phone.id} onClick={() => togglePhone(phone.id)}
-                className={`w-full flex items-center gap-3 px-5 py-3 text-left transition-all ${
+                className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-left transition-all ${
                   checked ? '' : 'hover:bg-white/[0.02]'
                 }`}
-                style={checked ? { background: 'rgba(139,92,246,0.08)', borderBottom: '1px solid rgba(255,255,255,0.04)' } : { borderBottom: '1px solid rgba(255,255,255,0.04)' }}
+                style={checked
+                  ? { background: 'rgba(139,92,246,0.1)', ...ROW_BORDER }
+                  : ROW_BORDER}
               >
-                <div className="w-8 h-8 rounded-full flex items-center justify-center text-[12px] font-black flex-shrink-0 transition-all"
-                  style={checked ? { background: 'linear-gradient(135deg,#7c3aed,#ec4899)', color: 'white' } : { background: 'rgba(255,255,255,0.06)', color: '#94a3b8' }}
+                <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-black flex-shrink-0 transition-all"
+                  style={checked
+                    ? { background: 'linear-gradient(135deg,#7C3AED,#8B5CF6)', color: '#fff' }
+                    : { background: 'rgba(255,255,255,0.06)', color: '#6B6B7A' }}
                 >
                   {phone.ig_username?.[0]?.toUpperCase() ?? phone.phone_name?.[0]?.toUpperCase() ?? '?'}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-[13px] font-semibold text-white truncate">{phone.phone_name}</p>
-                  {phone.ig_username && <p className="text-[12px] text-[#8b5cf6]/80 truncate">@{phone.ig_username}</p>}
+                  <p className="text-[12px] font-semibold text-white truncate">{phone.phone_name}</p>
+                  {phone.ig_username && <p className="text-[11px] truncate" style={{ color: 'rgba(139,92,246,0.7)' }}>@{phone.ig_username}</p>}
                 </div>
                 <div className="w-4 h-4 rounded flex items-center justify-center flex-shrink-0 transition-all"
-                  style={checked ? { background: 'linear-gradient(135deg,#7c3aed,#ec4899)', border: 'none' } : { border: '1px solid rgba(255,255,255,0.15)' }}
+                  style={checked
+                    ? { background: 'linear-gradient(135deg,#7C3AED,#8B5CF6)' }
+                    : { border: '1px solid rgba(255,255,255,0.15)' }}
                 >
                   {checked && <span className="text-white text-[9px] font-bold leading-none">✓</span>}
                 </div>
@@ -381,149 +394,146 @@ export function Posting({ user }: PostingProps) {
         </div>
       </aside>
 
-      {/* Right: form */}
+      {/* ── Right: form ──────────────────────────────────────────────────── */}
       <div className="h-full flex flex-col overflow-hidden flex-1">
-        {/* Page header */}
-        <div className="flex-shrink-0 px-10 pt-9 pb-7 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        {/* Header */}
+        <div className="flex-shrink-0 px-8 pt-7 pb-6 flex items-center justify-between"
+          style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
           <div>
-            <h1 className="text-[28px] font-black text-white leading-none">Nouveau post</h1>
-            <p className="text-[13px] text-text2 mt-0.5">Poste un Reel sur tes téléphones GéeLark</p>
+            <h1 className="text-[22px] font-black text-white leading-none tracking-tight">Nouveau post</h1>
+            <p className="text-[12px] mt-1" style={{ color: '#6B6B7A' }}>Poste un Reel sur tes téléphones GéeLark</p>
           </div>
           <button
             onClick={() => { setFilePath(null); setCaption(''); setTopic('') }}
-            className="rounded-xl px-5 py-2.5 text-[13px] font-semibold transition-colors"
-            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
+            className="rounded-xl px-4 py-2 text-[12px] font-semibold transition-all hover:border-accent/40"
+            style={{ background: '#0E0E16', border: '1px solid rgba(139,92,246,0.15)', color: '#A1A1AA' }}
           >
             ↺ Réinitialiser
           </button>
         </div>
 
         {/* Scrollable content */}
-        <div className="flex-1 overflow-y-auto px-10 pb-10">
-          <div className="space-y-6 mt-8">
+        <div className="flex-1 overflow-y-auto px-8 pb-10">
+          <div className="space-y-4 mt-6">
 
             {!bearer && (
-              <div className="px-5 py-4 rounded-2xl text-[13px] text-warn"
-                style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)' }}>
-                ❌ Bearer Token GéeLark manquant — configure-le dans Paramètres
+              <div className="px-4 py-3 rounded-xl text-[12px] text-warn"
+                style={{ background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.2)' }}>
+                ⚠ Bearer Token GéeLark manquant — configure-le dans Paramètres
               </div>
             )}
 
             {/* Main posting card */}
-            <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+            <div className="rounded-2xl overflow-hidden card-glow"
+              style={{ background: '#0E0E16', border: '1px solid rgba(139,92,246,0.12)' }}>
+
               {/* Media row */}
-              <div className="px-6 py-5 flex gap-6" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                {/* 9:16 portrait preview */}
-                <div className="w-[110px] flex-shrink-0">
-                  <div className="w-[110px] h-[196px] rounded-xl overflow-hidden flex items-center justify-center"
-                    style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+              <div className="px-6 py-5 flex gap-5" style={ROW_BORDER}>
+                <div className="w-[90px] flex-shrink-0">
+                  <div className="w-[90px] h-[160px] rounded-xl overflow-hidden flex items-center justify-center"
+                    style={{ background: '#07070B', border: '1px solid rgba(139,92,246,0.15)' }}>
                     {filePath ? (
                       <VideoThumbnail filePath={filePath} />
                     ) : (
-                      <div className="text-center text-text2 text-[13px]">📹<br/>Choisir<br/>une vidéo</div>
+                      <div className="text-center text-text2 text-[11px] space-y-1">
+                        <div className="text-2xl">🎬</div>
+                        <div>Choisir<br/>une vidéo</div>
+                      </div>
                     )}
                   </div>
                 </div>
-                {/* Right column */}
                 <div className="flex-1 min-w-0 flex flex-col justify-center gap-3">
                   <div>
-                    <p className="text-[12px] text-text2 mb-1">Vidéo sélectionnée</p>
-                    <p className="text-[13px] text-white truncate font-medium">{fileName ?? 'Aucune vidéo sélectionnée'}</p>
+                    <p className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: 'rgba(139,92,246,0.5)' }}>Vidéo sélectionnée</p>
+                    <p className="text-[13px] text-white truncate font-semibold">{fileName ?? 'Aucune vidéo sélectionnée'}</p>
                   </div>
                   <div className="flex gap-2 flex-wrap">
-                    <Button size="sm" onClick={() => setShowBankPicker(true)}>📂 Choisir depuis la banque</Button>
-                    <Button variant="secondary" size="sm" onClick={pickLocalFile}>💾 Depuis le PC</Button>
-                    {filePath && (
-                      <Button variant="secondary" size="sm" onClick={() => setFilePath(null)}>✕ Retirer</Button>
-                    )}
+                    <Button size="sm" onClick={() => setShowBankPicker(true)}>📂 Banque</Button>
+                    <Button variant="secondary" size="sm" onClick={pickLocalFile}>💾 PC</Button>
+                    {filePath && <Button variant="secondary" size="sm" onClick={() => setFilePath(null)}>✕</Button>}
                   </div>
                 </div>
               </div>
 
               {/* Description */}
-              <div className="px-6 py-5" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                <div className="flex items-center justify-between mb-3">
-                  <p className="text-[15px] font-bold text-white">Description</p>
-                  <span className={`text-[12px] font-mono ${caption.length > 2200 ? 'text-danger' : 'text-text2'}`}>
+              <div className="px-6 py-5" style={ROW_BORDER}>
+                <div className="flex items-center justify-between mb-2.5">
+                  <p className="text-[13px] font-bold text-white">Description</p>
+                  <span className={`text-[11px] font-mono ${caption.length > 2200 ? 'text-danger' : 'text-text2'}`}>
                     {caption.length} / 2200
                   </span>
                 </div>
                 <textarea
                   value={caption}
                   onChange={e => setCaption(e.target.value)}
-                  rows={5}
+                  rows={4}
                   placeholder="Écris ta description Instagram…"
-                  className="w-full rounded-xl px-4 py-3 text-[13px] placeholder:text-text2 resize-y focus:outline-none"
-                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
+                  className="w-full rounded-xl px-4 py-3 text-[12px] resize-y focus:outline-none"
+                  style={{ ...INPUT_STYLE, lineHeight: 1.6 }}
                 />
-                {/* Generate description row */}
-                <div className="flex gap-2 mt-3">
+                <div className="flex gap-2 mt-2.5">
                   <Button variant="secondary" size="sm" onClick={generateCaption} loading={generating} disabled={!groqKey}>
                     ✨ Générer
                   </Button>
                   <input
-                    type="text"
-                    value={topic}
-                    onChange={e => setTopic(e.target.value)}
+                    type="text" value={topic} onChange={e => setTopic(e.target.value)}
                     placeholder="sujet / niche…"
-                    className="flex-1 rounded-xl px-4 py-2.5 text-[13px] placeholder:text-text2 focus:outline-none"
-                    style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
+                    className="flex-1 rounded-xl px-3 py-2 text-[12px] focus:outline-none"
+                    style={INPUT_STYLE}
                   />
                 </div>
                 <input
-                  type="text"
-                  value={customPrompt}
-                  onChange={e => setCustomPrompt(e.target.value)}
-                  placeholder="Prompt IA (optionnel)"
-                  className="mt-2 w-full rounded-xl px-4 py-2.5 text-[13px] placeholder:text-text2 focus:outline-none"
-                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
+                  type="text" value={customPrompt} onChange={e => setCustomPrompt(e.target.value)}
+                  placeholder="Prompt IA personnalisé (optionnel)"
+                  className="mt-2 w-full rounded-xl px-3 py-2 text-[12px] focus:outline-none"
+                  style={INPUT_STYLE}
                 />
               </div>
 
-              {/* Options */}
-              <div className="px-6 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+              {/* Options + hashtags */}
+              <div className="px-6 py-4" style={ROW_BORDER}>
                 <PostingOptions opts={postingOpts} onChange={setPostingOpts} />
               </div>
-              <div className="px-6 py-4 flex items-center gap-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                <span className="text-base">#️⃣</span>
-                <span className="flex-1 text-[13px] text-white">Avec hashtags</span>
+              <div className="px-6 py-3.5 flex items-center gap-3" style={ROW_BORDER}>
+                <span className="text-sm flex-shrink-0">#️⃣</span>
+                <span className="flex-1 text-[12px] text-white font-medium">Avec hashtags</span>
                 <button
                   onClick={() => setWithHashtags(v => !v)}
-                  className="relative w-11 h-6 rounded-full transition-colors flex-shrink-0"
-                  style={{ background: withHashtags ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.08)' }}
+                  className="relative w-10 h-5 rounded-full transition-colors flex-shrink-0"
+                  style={{ background: withHashtags ? 'linear-gradient(130deg,#7C3AED,#8B5CF6)' : 'rgba(255,255,255,0.08)' }}
                 >
-                  <span className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform ${withHashtags ? 'translate-x-6' : 'translate-x-1'}`} />
+                  <span className={`absolute top-[3px] w-3.5 h-3.5 rounded-full bg-white shadow transition-transform ${withHashtags ? 'translate-x-[19px]' : 'translate-x-[3px]'}`} />
                 </button>
               </div>
 
               {/* Progress + Logs */}
               {(posting || progress > 0) && (
-                <div className="px-6 py-5 space-y-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                <div className="px-6 py-5 space-y-3" style={ROW_BORDER}>
                   <div className="flex items-center justify-between">
-                    <span className="text-[13px] font-semibold text-white">Progression</span>
-                    <span className="text-[13px] font-mono text-text2">{progress}%</span>
+                    <span className="text-[12px] font-semibold text-white">Progression</span>
+                    <span className="text-[12px] font-mono text-text2">{progress}%</span>
                   </div>
-                  <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
+                  <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(139,92,246,0.1)' }}>
                     <div
-                      className={`h-full rounded-full transition-all duration-500 ${progress >= 100 ? 'bg-ok' : ''}`}
-                      style={{ width: `${progress}%`, background: progress >= 100 ? undefined : 'linear-gradient(90deg,#7c3aed,#ec4899)' }}
+                      className="h-full rounded-full transition-all duration-500"
+                      style={{ width: `${progress}%`, background: progress >= 100 ? '#22C55E' : 'linear-gradient(90deg,#7C3AED,#8B5CF6)' }}
                     />
                   </div>
                   <button
                     onClick={() => setShowLogs(v => !v)}
-                    className="text-[12px] text-text2 hover:text-white flex items-center gap-1.5 transition-colors"
+                    className="text-[11px] text-text2 hover:text-white flex items-center gap-1.5 transition-colors"
                   >
-                    <span style={{ transform: showLogs ? 'rotate(90deg)' : 'rotate(0deg)' }} className="inline-block transition-transform">▶</span>
-                    Journal détaillé ({logs.length})
+                    <span style={{ transform: showLogs ? 'rotate(90deg)' : 'rotate(0deg)', display: 'inline-block', transition: 'transform 0.15s' }}>▶</span>
+                    Journal ({logs.length})
                   </button>
                   {showLogs && logs.length > 0 && (
-                    <div className="rounded-xl p-4 max-h-48 overflow-auto font-mono text-[12px] space-y-1"
-                      style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                    <div className="rounded-xl p-3 max-h-40 overflow-auto font-mono text-[11px] space-y-0.5"
+                      style={{ background: '#07070B', border: '1px solid rgba(139,92,246,0.1)' }}>
                       {logs.map((l, i) => (
                         <div key={i} className={`flex gap-2 ${
                           l.level === 'ok' ? 'text-ok' : l.level === 'error' ? 'text-danger' : l.level === 'warn' ? 'text-warn' : 'text-text2'
                         }`}>
-                          <span className="text-text2/60 flex-shrink-0">{l.time}</span>
+                          <span className="flex-shrink-0" style={{ color: '#3D3D55' }}>{l.time}</span>
                           <span>{l.message}</span>
                         </div>
                       ))}
@@ -534,24 +544,22 @@ export function Posting({ user }: PostingProps) {
               )}
 
               {/* Actions */}
-              <div className="px-6 py-5 flex gap-3">
+              <div className="px-6 py-5 flex gap-2.5">
                 <button
                   onClick={post}
-                  disabled={posting || !bearer || selectedPhones.size === 0 || !filePath}
+                  disabled={!canPost}
                   className="flex-[2] py-3 rounded-xl text-[13px] font-black text-white transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
                   style={{
-                    background: posting || !bearer || selectedPhones.size === 0 || !filePath
-                      ? 'rgba(255,255,255,0.06)' : 'linear-gradient(130deg,#7c3aed,#ec4899)',
-                    boxShadow: posting || !bearer || selectedPhones.size === 0 || !filePath
-                      ? 'none' : '0 4px 24px -4px rgba(124,58,237,0.5)',
+                    background: canPost ? 'linear-gradient(130deg,#7C3AED,#8B5CF6)' : 'rgba(255,255,255,0.05)',
+                    boxShadow: canPost ? '0 4px 20px -4px rgba(124,58,237,0.5)' : 'none',
                   }}>
-                  {posting ? `⏳ En cours…` : `⚡ Lancer — ${selectedPhones.size} compte${selectedPhones.size !== 1 ? 's' : ''}`}
+                  {posting ? '⏳ En cours…' : `🚀 Lancer — ${selectedPhones.size} compte${selectedPhones.size !== 1 ? 's' : ''}`}
                 </button>
                 <button
                   onClick={() => setShowScheduleModal(true)}
-                  disabled={posting || !bearer || selectedPhones.size === 0 || !filePath}
+                  disabled={!canPost}
                   className="flex-1 py-3 rounded-xl text-[13px] font-black transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
-                  style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(37,99,235,0.3)', color: '#60a5fa' }}>
+                  style={{ background: '#07070B', border: '1px solid rgba(96,165,250,0.3)', color: '#60a5fa' }}>
                   📅 Programmer
                 </button>
               </div>
