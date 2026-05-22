@@ -28,6 +28,16 @@ async function geelark(bearer: string, path: string, body: unknown) {
   return r.data as Record<string, unknown>
 }
 
+// Avatar color palette — deterministic by name
+const AVATAR_COLORS = [
+  ['#7C3AED','#A855F7'], ['#2563EB','#60A5FA'], ['#059669','#34D399'],
+  ['#D97706','#FBBF24'], ['#DC2626','#F87171'], ['#7C3AED','#EC4899'],
+]
+function avatarGradient(name: string) {
+  const i = (name?.charCodeAt(0) ?? 0) % AVATAR_COLORS.length
+  return `linear-gradient(135deg,${AVATAR_COLORS[i][0]},${AVATAR_COLORS[i][1]})`
+}
+
 export function Posting({ user }: PostingProps) {
   const { currentOrg, role, perms }    = useOrg()
   const credits = useCredits()
@@ -52,9 +62,9 @@ export function Posting({ user }: PostingProps) {
   const [showLogs, setShowLogs]        = useState(false)
   const [showBankPicker, setShowBankPicker] = useState(false)
   const [showScheduleModal, setShowScheduleModal] = useState(false)
+  const [aiExpanded, setAiExpanded]    = useState(false)
   const logEndRef                      = useRef<HTMLDivElement>(null)
 
-  // Persist-aware setters — update both React state and module-level store
   function setSelPhones(v: Set<string> | ((p: Set<string>) => Set<string>)) {
     _setSelPhones(prev => { const next = typeof v === 'function' ? v(prev) : v; setPostingState({ selectedPhones: next }); return next })
   }
@@ -70,7 +80,6 @@ export function Posting({ user }: PostingProps) {
     })
   }
 
-  // Re-sync from store when navigating back (e.g. if another component updated store)
   useEffect(() => {
     const unsub = subscribePosting(() => {
       const st = getPostingState()
@@ -81,7 +90,6 @@ export function Posting({ user }: PostingProps) {
     return unsub
   }, [])
 
-  // bearer + groq from active connection (org or solo)
   const conns = useConnections(user)
   useEffect(() => { if (conns.bearer) setBearer(conns.bearer) }, [conns.bearer])
   useEffect(() => { if (conns.groq)   setGroqKey(conns.groq) },  [conns.groq])
@@ -318,202 +326,460 @@ export function Posting({ user }: PostingProps) {
     return true
   })
   const fileName = filePath ? filePath.replace(/\\/g, '/').split('/').pop() ?? filePath : null
-
   const canPost = !posting && !!bearer && selectedPhones.size > 0 && !!filePath
 
   return (
     <div className="h-full flex overflow-hidden">
-      {/* ── Phone selector sidebar ──────────────────────────────────────────── */}
-      <aside className="w-64 flex-shrink-0 flex flex-col"
-        style={{ borderRight: '1px solid rgba(139,92,246,0.1)', background: '#07070B' }}>
 
-        <div className="flex-shrink-0 px-4 pt-5 pb-3" style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-[12px] font-black uppercase tracking-wider text-text2">Comptes</p>
-            <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${selectedPhones.size > 0 ? 'text-white' : 'text-text2'}`}
-              style={{ background: selectedPhones.size > 0 ? 'linear-gradient(130deg,#7C3AED,#A855F7)' : 'rgba(255,255,255,0.06)' }}>
-              {selectedPhones.size} sél.
-            </span>
+      {/* ── LEFT SIDEBAR ───────────────────────────────────────────────────────── */}
+      <aside className="w-[260px] flex-shrink-0 flex flex-col" style={{
+        background: 'linear-gradient(180deg, #09090F 0%, #07070B 100%)',
+        borderRight: '1px solid rgba(139,92,246,0.1)',
+      }}>
+
+        {/* Sidebar header */}
+        <div className="flex-shrink-0 px-4 pt-5 pb-4">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.25)' }}>
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                  <rect x="1" y="1" width="5" height="5" rx="1.5" fill="#A78BFA"/>
+                  <rect x="8" y="1" width="5" height="5" rx="1.5" fill="#A78BFA" opacity=".5"/>
+                  <rect x="1" y="8" width="5" height="5" rx="1.5" fill="#A78BFA" opacity=".5"/>
+                  <rect x="8" y="8" width="5" height="5" rx="1.5" fill="#A78BFA" opacity=".3"/>
+                </svg>
+              </div>
+              <span className="text-[13px] font-black text-white tracking-tight">Comptes</span>
+            </div>
+            {selectedPhones.size > 0 && (
+              <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full text-white"
+                style={{ background: 'linear-gradient(130deg,#7C3AED,#A855F7)', boxShadow: '0 2px 10px -2px rgba(124,58,237,0.5)' }}>
+                {selectedPhones.size}
+              </span>
+            )}
           </div>
-          <select value={groupFilter} onChange={e => setGroup(e.target.value)}
-            className="w-full rounded-xl px-3 py-2 text-[12px] focus:outline-none mb-2"
-            style={{ background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.15)', color: '#fff' }}>
-            {groups.map(g => <option key={g} value={g} style={{ background: '#0E0E16', color: '#fff' }}>{g}</option>)}
-          </select>
-          <input type="text" placeholder="Rechercher…" value={phoneSearch}
-            onChange={e => setPhoneSearch(e.target.value)}
-            className="sf-search w-full px-3 py-2 text-[12px] rounded-xl" />
+
+          {/* Group select */}
+          {groups.length > 1 && (
+            <div className="relative mb-2.5">
+              <select value={groupFilter} onChange={e => setGroup(e.target.value)}
+                className="w-full appearance-none rounded-xl px-3 py-2 pr-7 text-[12px] focus:outline-none transition-all"
+                style={{ background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.15)', color: '#C4B5FD' }}>
+                {groups.map(g => <option key={g} value={g} style={{ background: '#0E0E16', color: '#fff' }}>{g}</option>)}
+              </select>
+              <svg className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" width="10" height="10" viewBox="0 0 10 10" fill="none">
+                <path d="M2 3.5L5 6.5L8 3.5" stroke="#8B5CF6" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </div>
+          )}
+
+          {/* Search */}
+          <div className="relative">
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <circle cx="5" cy="5" r="3.5" stroke="rgba(139,92,246,0.5)" strokeWidth="1.3"/>
+              <path d="M7.5 7.5L10 10" stroke="rgba(139,92,246,0.5)" strokeWidth="1.3" strokeLinecap="round"/>
+            </svg>
+            <input type="text" placeholder="Rechercher…" value={phoneSearch}
+              onChange={e => setPhoneSearch(e.target.value)}
+              className="w-full pl-8 pr-3 py-2 rounded-xl text-[12px] placeholder:text-text3 focus:outline-none transition-all"
+              style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(139,92,246,0.12)', color: '#E2E8F0' }}
+            />
+          </div>
         </div>
 
-        <div className="flex-shrink-0 px-4 py-2 flex gap-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+        {/* Select all / none */}
+        <div className="flex-shrink-0 flex items-center gap-0 mx-4 mb-2 rounded-xl overflow-hidden"
+          style={{ border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)' }}>
           <button onClick={() => setSelPhones(new Set(visiblePhones.map(p => p.id)))}
-            className="text-[11px] font-semibold text-accent hover:text-white transition-colors">Tout</button>
+            className="flex-1 py-1.5 text-[11px] font-bold text-accent hover:bg-accent/10 transition-colors">
+            Tout
+          </button>
+          <div style={{ width: 1, background: 'rgba(255,255,255,0.06)', height: 20 }} />
           <button onClick={() => setSelPhones(new Set())}
-            className="text-[11px] text-text2 hover:text-white transition-colors">Aucun</button>
-          <span className="ml-auto text-[11px] text-text3">{visiblePhones.length} tél.</span>
+            className="flex-1 py-1.5 text-[11px] text-text2 hover:text-white hover:bg-white/[0.04] transition-colors">
+            Aucun
+          </button>
+          <div style={{ width: 1, background: 'rgba(255,255,255,0.06)', height: 20 }} />
+          <span className="px-3 text-[11px] font-medium" style={{ color: 'rgba(148,163,184,0.4)' }}>
+            {visiblePhones.length}
+          </span>
         </div>
 
-        <div className="flex-1 overflow-auto" style={{ scrollbarWidth: 'none' }}>
-          {visiblePhones.map(phone => {
+        {/* Phone list */}
+        <div className="flex-1 overflow-auto pb-2" style={{ scrollbarWidth: 'none' }}>
+          {visiblePhones.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-32 gap-2">
+              <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+                <rect x="7" y="2" width="14" height="24" rx="3" stroke="rgba(139,92,246,0.3)" strokeWidth="1.5"/>
+                <circle cx="14" cy="22" r="1.5" fill="rgba(139,92,246,0.3)"/>
+              </svg>
+              <p className="text-[11px]" style={{ color: 'rgba(148,163,184,0.3)' }}>Aucun téléphone</p>
+            </div>
+          ) : visiblePhones.map(phone => {
             const checked = selectedPhones.has(phone.id)
+            const initials = (phone.ig_username?.[0] ?? phone.phone_name?.[0] ?? '?').toUpperCase()
             return (
               <button key={phone.id} onClick={() => togglePhone(phone.id)}
-                className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-all ${checked ? '' : 'hover:bg-white/[0.02]'}`}
-                style={{ borderBottom: '1px solid rgba(255,255,255,0.03)', background: checked ? 'rgba(139,92,246,0.08)' : 'transparent' }}>
-                <div className="w-7 h-7 rounded-xl flex items-center justify-center text-[11px] font-black flex-shrink-0 transition-all"
-                  style={checked ? { background: 'linear-gradient(135deg,#7C3AED,#A855F7)', color: '#fff' } : { background: 'rgba(255,255,255,0.05)', color: '#71717A' }}>
-                  {phone.ig_username?.[0]?.toUpperCase() ?? phone.phone_name?.[0]?.toUpperCase() ?? '?'}
+                className="w-full flex items-center gap-3 px-4 py-2.5 text-left transition-all relative"
+                style={{
+                  borderBottom: '1px solid rgba(255,255,255,0.025)',
+                  background: checked ? 'rgba(139,92,246,0.09)' : 'transparent',
+                }}>
+
+                {/* Left accent bar */}
+                {checked && (
+                  <div className="absolute left-0 top-1 bottom-1 w-0.5 rounded-full"
+                    style={{ background: 'linear-gradient(180deg,#7C3AED,#A855F7)' }} />
+                )}
+
+                {/* Avatar */}
+                <div className="w-8 h-8 rounded-xl flex items-center justify-center text-[12px] font-black flex-shrink-0 transition-all"
+                  style={checked
+                    ? { background: avatarGradient(phone.phone_name ?? ''), color: '#fff', boxShadow: '0 2px 8px -2px rgba(124,58,237,0.5)' }
+                    : { background: 'rgba(255,255,255,0.05)', color: 'rgba(148,163,184,0.6)' }}>
+                  {initials}
                 </div>
+
+                {/* Info */}
                 <div className="min-w-0 flex-1">
-                  <p className="text-[12px] font-semibold text-white truncate">{phone.phone_name}</p>
-                  {phone.ig_username && <p className="text-[10px] truncate" style={{ color: '#8B5CF6' }}>@{phone.ig_username}</p>}
+                  <p className={`text-[12px] font-semibold truncate transition-colors ${checked ? 'text-white' : 'text-text2'}`}>
+                    {phone.phone_name}
+                  </p>
+                  {phone.ig_username && (
+                    <p className="text-[10px] truncate" style={{ color: checked ? '#A78BFA' : 'rgba(139,92,246,0.4)' }}>
+                      @{phone.ig_username}
+                    </p>
+                  )}
                 </div>
+
+                {/* Checkbox */}
                 <div className="w-4 h-4 rounded-md flex items-center justify-center flex-shrink-0 transition-all"
-                  style={checked ? { background: 'linear-gradient(135deg,#7C3AED,#A855F7)' } : { border: '1px solid rgba(255,255,255,0.12)' }}>
-                  {checked && <span className="text-white text-[8px] font-bold">✓</span>}
+                  style={checked
+                    ? { background: 'linear-gradient(135deg,#7C3AED,#A855F7)', boxShadow: '0 0 8px rgba(139,92,246,0.4)' }
+                    : { border: '1px solid rgba(255,255,255,0.1)' }}>
+                  {checked && (
+                    <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+                      <path d="M1.5 4L3 5.5L6.5 2" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  )}
                 </div>
               </button>
             )
           })}
         </div>
+
+        {/* Sidebar footer */}
+        <div className="flex-shrink-0 p-4 mt-auto" style={{ borderTop: '1px solid rgba(139,92,246,0.08)' }}>
+          <div className="rounded-xl px-3 py-2.5 flex items-center gap-3"
+            style={{ background: selectedPhones.size > 0 ? 'rgba(139,92,246,0.08)' : 'rgba(255,255,255,0.02)', border: `1px solid ${selectedPhones.size > 0 ? 'rgba(139,92,246,0.2)' : 'rgba(255,255,255,0.05)'}` }}>
+            <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: selectedPhones.size > 0 ? '#22C55E' : 'rgba(148,163,184,0.2)' }} />
+            <p className="text-[12px] font-semibold" style={{ color: selectedPhones.size > 0 ? '#E2E8F0' : 'rgba(148,163,184,0.4)' }}>
+              {selectedPhones.size > 0 ? `${selectedPhones.size} compte${selectedPhones.size > 1 ? 's' : ''} sélectionné${selectedPhones.size > 1 ? 's' : ''}` : 'Aucun sélectionné'}
+            </p>
+          </div>
+        </div>
       </aside>
 
-      {/* ── Main form area ──────────────────────────────────────────────────── */}
-      <div className="h-full flex flex-col overflow-hidden flex-1">
-        <div className="flex-shrink-0 px-8 pt-7 pb-5 flex items-center justify-between"
-          style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
+      {/* ── MAIN FORM ──────────────────────────────────────────────────────────── */}
+      <div className="h-full flex flex-col overflow-hidden flex-1" style={{ background: '#07070B' }}>
+
+        {/* Page header */}
+        <div className="flex-shrink-0 px-8 pt-6 pb-5 flex items-center justify-between"
+          style={{ borderBottom: '1px solid rgba(139,92,246,0.08)' }}>
           <div>
-            <h1 className="text-[20px] font-black text-white leading-none">Nouveau post</h1>
-            <p className="text-[12px] text-text2 mt-0.5">Poste un Reel Instagram sur tes téléphones GéeLark</p>
+            <h1 className="text-[22px] font-black tracking-tight leading-none" style={{
+              background: 'linear-gradient(135deg, #FFFFFF 0%, rgba(196,181,253,0.85) 100%)',
+              WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+            }}>Nouveau post</h1>
+            <p className="text-[12px] mt-1" style={{ color: 'rgba(148,163,184,0.5)' }}>
+              Reel Instagram · GéeLark Cloud
+            </p>
           </div>
           <button onClick={() => { setFilePath(null); setCaption(''); setTopic('') }}
-            className="rounded-xl px-4 py-2 text-[12px] font-semibold transition-all hover:bg-white/[0.04]"
-            style={{ border: '1px solid rgba(255,255,255,0.08)', color: '#A1A1AA' }}>
-            ↺ Réinitialiser
+            className="flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-[12px] font-medium transition-all hover:bg-white/[0.04]"
+            style={{ border: '1px solid rgba(255,255,255,0.07)', color: 'rgba(148,163,184,0.6)' }}>
+            <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+              <path d="M9.5 2A5 5 0 1 0 10 5.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+              <path d="M9.5 0V2.5H7" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            Réinitialiser
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-8 pb-8 pt-6" style={{ scrollbarWidth: 'none' }}>
-          <div className="space-y-4">
+        <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: 'none' }}>
+          <div className="px-8 py-6 space-y-4">
 
+            {/* Warning */}
             {!bearer && (
-              <div className="px-4 py-3 rounded-xl text-[12px] text-warn flex items-center gap-2"
-                style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)' }}>
-                <span>⚠</span> Bearer Token GéeLark manquant — configure-le dans <strong>Paramètres</strong>
+              <div className="flex items-center gap-3 px-4 py-3 rounded-2xl text-[12px]"
+                style={{ background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.2)' }}>
+                <div className="w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(245,158,11,0.15)' }}>
+                  <span style={{ fontSize: 12 }}>⚠</span>
+                </div>
+                <p style={{ color: '#FCD34D' }}>Bearer Token GéeLark manquant — configure-le dans <strong>Paramètres</strong></p>
               </div>
             )}
 
-            {/* ── Video + caption card ────────────────────────────────────── */}
-            <div className="sf-card rounded-2xl overflow-hidden">
+            {/* ── VIDEO SECTION ─────────────────────────────────────────────── */}
+            <div className="rounded-2xl overflow-hidden" style={{
+              background: '#0E0E16',
+              border: '1px solid rgba(139,92,246,0.12)',
+              boxShadow: '0 4px 32px -4px rgba(0,0,0,0.5)',
+            }}>
+              {/* Section label */}
+              <div className="flex items-center gap-2.5 px-5 pt-4 pb-3" style={{ borderBottom: '1px solid rgba(139,92,246,0.08)' }}>
+                <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: 'rgba(139,92,246,0.15)' }}>
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                    <path d="M1 3.5C1 2.67 1.67 2 2.5 2H8L11 5v4.5c0 .83-.67 1.5-1.5 1.5h-7C1.67 11 1 10.33 1 9.5v-6z" stroke="#A78BFA" strokeWidth="1.2" fill="rgba(139,92,246,0.2)"/>
+                    <path d="M4.5 4.5v3l3-1.5-3-1.5z" fill="#A78BFA"/>
+                  </svg>
+                </div>
+                <span className="text-[12px] font-bold text-white">Vidéo</span>
+              </div>
 
-              {/* Video preview + picker */}
-              <div className="flex gap-5 p-5" style={{ borderBottom: '1px solid rgba(139,92,246,0.08)' }}>
-                <div className="w-[100px] flex-shrink-0">
-                  <div className="w-[100px] h-[178px] rounded-xl overflow-hidden flex items-center justify-center relative"
-                    style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${filePath ? 'rgba(139,92,246,0.3)' : 'rgba(255,255,255,0.07)'}` }}>
-                    {filePath ? <VideoThumbnail filePath={filePath} /> : (
-                      <div className="text-center text-text2">
-                        <div className="text-2xl mb-1">🎬</div>
-                        <p className="text-[10px]">Vidéo</p>
+              <div className="flex gap-5 p-5">
+                {/* Phone frame preview */}
+                <div className="flex-shrink-0 relative" style={{ width: 90 }}>
+                  <div className="relative rounded-2xl overflow-hidden" style={{
+                    width: 90, height: 160,
+                    background: filePath ? '#000' : 'linear-gradient(145deg, #111118, #0D0D14)',
+                    border: `1.5px solid ${filePath ? 'rgba(139,92,246,0.4)' : 'rgba(255,255,255,0.07)'}`,
+                    boxShadow: filePath ? '0 0 20px -4px rgba(139,92,246,0.35), inset 0 0 0 1px rgba(255,255,255,0.05)' : 'inset 0 0 0 1px rgba(255,255,255,0.03)',
+                  }}>
+                    {filePath ? (
+                      <VideoThumbnail filePath={filePath} />
+                    ) : (
+                      <div className="flex flex-col items-center justify-center h-full gap-2">
+                        <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.2)' }}>
+                          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                            <path d="M2 5C2 3.9 2.9 3 4 3H9.5L12 5.5V11c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V5z" stroke="rgba(139,92,246,0.6)" strokeWidth="1.2" fill="rgba(139,92,246,0.1)"/>
+                            <path d="M5.5 5.5v3l3-1.5-3-1.5z" fill="rgba(139,92,246,0.6)"/>
+                          </svg>
+                        </div>
+                        <p className="text-[9px] text-center leading-tight" style={{ color: 'rgba(148,163,184,0.3)' }}>9:16<br/>Reel</p>
                       </div>
                     )}
+                    {/* Phone frame top notch */}
+                    <div className="absolute top-1.5 left-1/2 -translate-x-1/2 w-8 h-1 rounded-full" style={{ background: 'rgba(255,255,255,0.08)' }} />
                   </div>
+                  {/* Glow effect when video selected */}
+                  {filePath && (
+                    <div className="absolute inset-0 rounded-2xl pointer-events-none" style={{ boxShadow: '0 0 30px -8px rgba(139,92,246,0.4)' }} />
+                  )}
                 </div>
-                <div className="flex-1 min-w-0 flex flex-col justify-center gap-3">
+
+                {/* File info + pickers */}
+                <div className="flex-1 min-w-0 flex flex-col justify-center gap-4">
                   <div>
-                    <p className="text-[11px] text-text2 mb-1 uppercase tracking-wider font-semibold">Vidéo</p>
-                    <p className="text-[13px] text-white font-semibold truncate">
-                      {fileName ?? <span className="text-text2 font-normal">Aucune vidéo sélectionnée</span>}
+                    <p className="text-[11px] uppercase tracking-widest font-bold mb-1.5" style={{ color: 'rgba(139,92,246,0.6)' }}>Fichier</p>
+                    <p className="text-[13px] font-semibold leading-snug" style={{ color: fileName ? '#E2E8F0' : 'rgba(148,163,184,0.3)' }}>
+                      {fileName ?? 'Aucune vidéo sélectionnée'}
                     </p>
-                  </div>
-                  <div className="flex gap-2 flex-wrap">
-                    <button onClick={() => setShowBankPicker(true)}
-                      className="px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-all hover:opacity-90 active:scale-95"
-                      style={{ background: 'linear-gradient(130deg,#7C3AED,#A855F7)', color: '#fff', boxShadow: '0 2px 12px -3px rgba(124,58,237,0.5)' }}>
-                      📂 Banque
-                    </button>
-                    <button onClick={pickLocalFile}
-                      className="px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-all hover:bg-white/[0.06]"
-                      style={{ border: '1px solid rgba(255,255,255,0.1)', color: '#A1A1AA' }}>
-                      💾 PC
-                    </button>
                     {filePath && (
-                      <button onClick={() => setFilePath(null)}
-                        className="px-3 py-1.5 rounded-lg text-[12px] transition-all hover:bg-white/[0.04]"
-                        style={{ border: '1px solid rgba(239,68,68,0.2)', color: '#EF4444' }}>
-                        ✕
-                      </button>
+                      <p className="text-[10px] mt-0.5" style={{ color: 'rgba(34,197,94,0.7)' }}>● Prêt pour le post</p>
                     )}
                   </div>
+
+                  <div className="flex flex-col gap-2">
+                    <button onClick={() => setShowBankPicker(true)}
+                      className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-[12px] font-bold transition-all hover:opacity-90 active:scale-[0.98]"
+                      style={{ background: 'linear-gradient(130deg,#7C3AED,#A855F7)', color: '#fff', boxShadow: '0 4px 16px -4px rgba(124,58,237,0.5)' }}>
+                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                        <rect x="1" y="1" width="4" height="4" rx="1" fill="white" opacity=".8"/>
+                        <rect x="7" y="1" width="4" height="4" rx="1" fill="white" opacity=".6"/>
+                        <rect x="1" y="7" width="4" height="4" rx="1" fill="white" opacity=".6"/>
+                        <rect x="7" y="7" width="4" height="4" rx="1" fill="white" opacity=".4"/>
+                      </svg>
+                      Depuis la banque
+                    </button>
+                    <div className="flex gap-2">
+                      <button onClick={pickLocalFile}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-[12px] font-semibold transition-all hover:bg-white/[0.06]"
+                        style={{ border: '1px solid rgba(255,255,255,0.09)', color: 'rgba(148,163,184,0.7)' }}>
+                        <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+                          <path d="M5.5 7V1M3 3.5L5.5 1L8 3.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                          <path d="M1 8v1.5C1 10.3 1.7 11 2.5 11h6c.8 0 1.5-.7 1.5-1.5V8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                        </svg>
+                        PC local
+                      </button>
+                      {filePath && (
+                        <button onClick={() => setFilePath(null)}
+                          className="px-3 py-2 rounded-xl text-[12px] transition-all hover:bg-danger/10"
+                          style={{ border: '1px solid rgba(239,68,68,0.2)', color: 'rgba(239,68,68,0.7)' }}>
+                          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                            <path d="M1.5 1.5L8.5 8.5M8.5 1.5L1.5 8.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
+            </div>
 
-              {/* Caption */}
-              <div className="p-5" style={{ borderBottom: '1px solid rgba(139,92,246,0.08)' }}>
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-[13px] font-bold text-white">Description</p>
-                  <span className={`text-[11px] font-mono tabular-nums ${caption.length > 2200 ? 'text-danger' : 'text-text2'}`}>
-                    {caption.length}/2200
-                  </span>
+            {/* ── DESCRIPTION SECTION ───────────────────────────────────────── */}
+            <div className="rounded-2xl overflow-hidden" style={{
+              background: '#0E0E16',
+              border: '1px solid rgba(139,92,246,0.12)',
+              boxShadow: '0 4px 32px -4px rgba(0,0,0,0.5)',
+            }}>
+              <div className="flex items-center justify-between px-5 pt-4 pb-3" style={{ borderBottom: '1px solid rgba(139,92,246,0.08)' }}>
+                <div className="flex items-center gap-2.5">
+                  <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: 'rgba(139,92,246,0.15)' }}>
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                      <path d="M1 2h10M1 5h7M1 8h8M1 11h5" stroke="#A78BFA" strokeWidth="1.2" strokeLinecap="round"/>
+                    </svg>
+                  </div>
+                  <span className="text-[12px] font-bold text-white">Description</span>
                 </div>
+                <span className={`text-[11px] font-mono tabular-nums px-2 py-0.5 rounded-lg ${caption.length > 2200 ? 'text-danger' : 'text-text3'}`}
+                  style={{ background: caption.length > 2200 ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.04)' }}>
+                  {caption.length}/2200
+                </span>
+              </div>
+
+              <div className="p-5 space-y-3">
                 <textarea value={caption} onChange={e => setCaption(e.target.value)} rows={5}
                   placeholder="Écris ta description Instagram…"
-                  className="w-full rounded-xl px-4 py-3 text-[13px] placeholder:text-text3 resize-y sf-input" />
-                <div className="flex gap-2 mt-3">
-                  <button onClick={generateCaption} disabled={!groqKey || generating}
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[12px] font-semibold transition-all disabled:opacity-40"
-                    style={{ background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.25)', color: '#A78BFA' }}>
-                    {generating ? <span className="inline-block w-3 h-3 border-2 border-accent/50 border-t-accent rounded-full animate-spin" /> : '✨'}
-                    {generating ? 'Génération…' : 'Générer via IA'}
+                  className="w-full rounded-xl px-4 py-3 text-[13px] placeholder:text-text3 resize-none focus:outline-none transition-all leading-relaxed"
+                  style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(139,92,246,0.1)', color: '#E2E8F0',
+                    fontFamily: 'inherit' }}
+                  onFocus={e => { e.target.style.borderColor = 'rgba(139,92,246,0.35)'; e.target.style.background = 'rgba(139,92,246,0.04)' }}
+                  onBlur={e => { e.target.style.borderColor = 'rgba(139,92,246,0.1)'; e.target.style.background = 'rgba(255,255,255,0.03)' }}
+                />
+
+                {/* AI Generation */}
+                <div className="rounded-xl overflow-hidden" style={{
+                  border: `1px solid ${aiExpanded ? 'rgba(139,92,246,0.3)' : 'rgba(139,92,246,0.12)'}`,
+                  background: aiExpanded ? 'rgba(139,92,246,0.05)' : 'rgba(139,92,246,0.03)',
+                  transition: 'all 0.2s ease',
+                }}>
+                  {/* AI header toggle */}
+                  <button onClick={() => setAiExpanded(v => !v)}
+                    className="w-full flex items-center justify-between px-4 py-3 transition-all hover:bg-accent/5">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: 'rgba(139,92,246,0.2)', boxShadow: aiExpanded ? '0 0 10px rgba(139,92,246,0.3)' : 'none' }}>
+                        <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+                          <path d="M5.5 1L6.8 4.2H10.2L7.5 6.1L8.5 9.5L5.5 7.5L2.5 9.5L3.5 6.1L0.8 4.2H4.2L5.5 1Z" fill="#A78BFA"/>
+                        </svg>
+                      </div>
+                      <span className="text-[12px] font-bold" style={{ color: '#C4B5FD' }}>Générer avec l'IA</span>
+                      {!groqKey && <span className="text-[10px] px-1.5 py-0.5 rounded-md" style={{ background: 'rgba(245,158,11,0.1)', color: '#FCD34D', border: '1px solid rgba(245,158,11,0.2)' }}>Clé Groq requise</span>}
+                    </div>
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none"
+                      style={{ transform: aiExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', color: 'rgba(139,92,246,0.5)' }}>
+                      <path d="M2 4L6 8L10 4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
                   </button>
-                  <input type="text" value={topic} onChange={e => setTopic(e.target.value)}
-                    placeholder="sujet / niche…" className="flex-1 sf-input rounded-xl px-3 py-2 text-[12px]" />
+
+                  {/* AI controls (expanded) */}
+                  {aiExpanded && (
+                    <div className="px-4 pb-4 space-y-2.5" style={{ borderTop: '1px solid rgba(139,92,246,0.1)' }}>
+                      <div className="pt-3 flex gap-2">
+                        <input type="text" value={topic} onChange={e => setTopic(e.target.value)}
+                          placeholder="Sujet / niche (ex: lifestyle Paris…)"
+                          className="flex-1 px-3 py-2 rounded-xl text-[12px] placeholder:text-text3 focus:outline-none transition-all"
+                          style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(139,92,246,0.15)', color: '#E2E8F0' }}
+                        />
+                        <button onClick={generateCaption} disabled={!groqKey || generating}
+                          className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-[12px] font-bold transition-all disabled:opacity-40 hover:opacity-90 active:scale-95"
+                          style={{ background: 'linear-gradient(130deg,#7C3AED,#A855F7)', color: '#fff', boxShadow: '0 2px 12px -3px rgba(124,58,237,0.5)', minWidth: 90 }}>
+                          {generating ? (
+                            <><span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin inline-block" /> Génère…</>
+                          ) : (
+                            <><span style={{ fontSize: 11 }}>✨</span> Générer</>
+                          )}
+                        </button>
+                      </div>
+                      <input type="text" value={customPrompt} onChange={e => setCustomPrompt(e.target.value)}
+                        placeholder="Instructions supplémentaires (optionnel)…"
+                        className="w-full px-3 py-2 rounded-xl text-[12px] placeholder:text-text3 focus:outline-none transition-all"
+                        style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(139,92,246,0.12)', color: '#E2E8F0' }}
+                      />
+                    </div>
+                  )}
                 </div>
-                <input type="text" value={customPrompt} onChange={e => setCustomPrompt(e.target.value)}
-                  placeholder="Prompt IA personnalisé (optionnel)" className="mt-2 w-full sf-input rounded-xl px-3 py-2 text-[12px]" />
+              </div>
+            </div>
+
+            {/* ── OPTIONS SECTION ───────────────────────────────────────────── */}
+            <div className="rounded-2xl overflow-hidden" style={{
+              background: '#0E0E16',
+              border: '1px solid rgba(139,92,246,0.12)',
+              boxShadow: '0 4px 32px -4px rgba(0,0,0,0.5)',
+            }}>
+              <div className="flex items-center gap-2.5 px-5 pt-4 pb-3" style={{ borderBottom: '1px solid rgba(139,92,246,0.08)' }}>
+                <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: 'rgba(139,92,246,0.15)' }}>
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                    <circle cx="6" cy="6" r="2" stroke="#A78BFA" strokeWidth="1.2"/>
+                    <path d="M6 1v1.5M6 9.5V11M1 6h1.5M9.5 6H11M2.5 2.5l1 1M8.5 8.5l1 1M2.5 9.5l1-1M8.5 3.5l1-1" stroke="#A78BFA" strokeWidth="1.2" strokeLinecap="round"/>
+                  </svg>
+                </div>
+                <span className="text-[12px] font-bold text-white">Options</span>
               </div>
 
-              {/* Options */}
-              <div className="px-5 py-4" style={{ borderBottom: '1px solid rgba(139,92,246,0.08)' }}>
+              <div className="px-5 py-4 space-y-0 divide-y" style={{ '--tw-divide-opacity': '0.03' } as any}>
                 <PostingOptions opts={postingOpts} onChange={setPostingOpts} />
-              </div>
 
-              {/* Hashtags toggle */}
-              <div className="px-5 py-3 flex items-center gap-3" style={{ borderBottom: '1px solid rgba(139,92,246,0.08)' }}>
-                <span className="text-sm">#️⃣</span>
-                <span className="flex-1 text-[13px] text-white">Inclure des hashtags</span>
-                <button onClick={() => setWithHashtags(v => !v)}
-                  className="relative w-10 h-5 rounded-full transition-colors flex-shrink-0"
-                  style={{ background: withHashtags ? 'linear-gradient(130deg,#7C3AED,#A855F7)' : 'rgba(255,255,255,0.08)' }}>
-                  <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${withHashtags ? 'translate-x-5' : 'translate-x-0.5'}`} />
-                </button>
-              </div>
-
-              {/* Progress */}
-              {(posting || progress > 0) && (
-                <div className="p-5 space-y-3" style={{ borderBottom: '1px solid rgba(139,92,246,0.08)' }}>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[12px] font-bold text-white flex items-center gap-2">
-                      {posting && <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />}
-                      Progression
-                    </span>
-                    <span className="text-[13px] font-mono font-bold tabular-nums" style={{ color: progress >= 100 ? '#22C55E' : '#A78BFA' }}>{progress}%</span>
+                {/* Hashtags toggle */}
+                <div className="flex items-center gap-3 py-3">
+                  <div className="w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: withHashtags ? 'rgba(139,92,246,0.15)' : 'rgba(255,255,255,0.04)' }}>
+                    <span style={{ fontSize: 11 }}>#</span>
                   </div>
-                  <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13px] text-white font-medium">Inclure des hashtags</p>
+                    <p className="text-[11px]" style={{ color: 'rgba(148,163,184,0.4)' }}>Ajoute 10–15 hashtags pertinents</p>
+                  </div>
+                  <button onClick={() => setWithHashtags(v => !v)}
+                    className="relative w-11 h-6 rounded-full transition-all flex-shrink-0"
+                    style={{ background: withHashtags ? 'linear-gradient(130deg,#7C3AED,#A855F7)' : 'rgba(255,255,255,0.07)', boxShadow: withHashtags ? '0 0 12px rgba(139,92,246,0.4)' : 'none' }}>
+                    <span className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow-md transition-transform duration-200 ${withHashtags ? 'translate-x-5' : 'translate-x-1'}`} />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* ── PROGRESS / LOGS ───────────────────────────────────────────── */}
+            {(posting || progress > 0) && (
+              <div className="rounded-2xl overflow-hidden" style={{
+                background: '#0E0E16',
+                border: '1px solid rgba(139,92,246,0.15)',
+                boxShadow: posting ? '0 0 30px -8px rgba(139,92,246,0.3)' : 'none',
+              }}>
+                <div className="p-5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      {posting && <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />}
+                      <span className="text-[13px] font-bold text-white">{posting ? 'Publication en cours…' : 'Terminé'}</span>
+                    </div>
+                    <span className="text-[14px] font-black font-mono tabular-nums" style={{ color: progress >= 100 ? '#22C55E' : '#A78BFA' }}>
+                      {progress}%
+                    </span>
+                  </div>
+
+                  {/* Progress bar */}
+                  <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.05)' }}>
                     <div className={`h-full rounded-full transition-all duration-700 ${progress >= 100 ? 'bg-ok' : 'sf-progress-bar'}`}
                       style={{ width: `${progress}%` }} />
                   </div>
+
+                  {/* Logs toggle */}
                   <button onClick={() => setShowLogs(v => !v)}
-                    className="text-[11px] text-text2 hover:text-white flex items-center gap-1.5 transition-colors">
-                    <span className="inline-block transition-transform" style={{ transform: showLogs ? 'rotate(90deg)' : 'none' }}>▶</span>
+                    className="flex items-center gap-1.5 text-[11px] transition-colors hover:text-white"
+                    style={{ color: 'rgba(148,163,184,0.5)' }}>
+                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none"
+                      style={{ transform: showLogs ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }}>
+                      <path d="M3 2l4 3-4 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
                     Logs ({logs.length})
                   </button>
+
                   {showLogs && logs.length > 0 && (
                     <div className="rounded-xl p-3 max-h-48 overflow-auto font-mono text-[11px] space-y-1"
-                      style={{ background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(139,92,246,0.12)' }}>
+                      style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(139,92,246,0.1)' }}>
                       {logs.map((l, i) => (
                         <div key={i} className={`flex gap-2 ${l.level === 'ok' ? 'text-ok' : l.level === 'error' ? 'text-danger' : l.level === 'warn' ? 'text-warn' : 'text-text2'}`}>
-                          <span className="text-text3 flex-shrink-0">{l.time}</span>
+                          <span className="flex-shrink-0" style={{ color: 'rgba(71,85,105,0.8)' }}>{l.time}</span>
                           <span>{l.message}</span>
                         </div>
                       ))}
@@ -521,27 +787,56 @@ export function Posting({ user }: PostingProps) {
                     </div>
                   )}
                 </div>
-              )}
-
-              {/* Action buttons */}
-              <div className="p-5 flex gap-3">
-                <button onClick={post} disabled={!canPost}
-                  className="flex-[2] py-3 rounded-xl text-[13px] font-black text-white transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
-                  style={canPost ? {
-                    background: 'linear-gradient(130deg,#7C3AED,#A855F7)',
-                    boxShadow: '0 4px 24px -4px rgba(124,58,237,0.55)',
-                  } : { background: 'rgba(255,255,255,0.06)' }}>
-                  {posting
-                    ? <span className="flex items-center justify-center gap-2"><span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> En cours…</span>
-                    : `⚡ Lancer — ${selectedPhones.size} compte${selectedPhones.size !== 1 ? 's' : ''}`}
-                </button>
-                <button onClick={() => setShowScheduleModal(true)} disabled={!canPost}
-                  className="flex-1 py-3 rounded-xl text-[13px] font-bold transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
-                  style={{ background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.25)', color: '#60A5FA' }}>
-                  📅 Programmer
-                </button>
               </div>
+            )}
+
+            {/* ── ACTION BUTTONS ────────────────────────────────────────────── */}
+            <div className="pb-2 pt-1 flex gap-3">
+              <button onClick={post} disabled={!canPost}
+                className="flex-[2] py-3.5 rounded-2xl text-[14px] font-black text-white transition-all active:scale-[0.99] disabled:cursor-not-allowed relative overflow-hidden"
+                style={canPost ? {
+                  background: 'linear-gradient(130deg,#6D28D9,#7C3AED,#A855F7)',
+                  boxShadow: '0 6px 30px -6px rgba(124,58,237,0.65), 0 0 0 1px rgba(168,85,247,0.3)',
+                } : {
+                  background: 'rgba(255,255,255,0.04)',
+                  border: '1px solid rgba(255,255,255,0.07)',
+                  opacity: 0.5,
+                }}>
+                {/* Shimmer overlay */}
+                {canPost && (
+                  <div className="absolute inset-0 pointer-events-none" style={{
+                    background: 'linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.08) 50%, transparent 60%)',
+                    backgroundSize: '200% 100%',
+                    animation: 'progressShimmer 3s linear infinite',
+                  }} />
+                )}
+                {posting ? (
+                  <span className="flex items-center justify-center gap-2.5">
+                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin inline-block" />
+                    Publication en cours…
+                  </span>
+                ) : (
+                  <span className="flex items-center justify-center gap-2">
+                    <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+                      <path d="M7.5 1L9.5 6H14.5L10.5 9L12 14L7.5 11L3 14L4.5 9L0.5 6H5.5L7.5 1Z" fill="white"/>
+                    </svg>
+                    Lancer — {selectedPhones.size} compte{selectedPhones.size !== 1 ? 's' : ''}
+                  </span>
+                )}
+              </button>
+
+              <button onClick={() => setShowScheduleModal(true)} disabled={!canPost}
+                className="flex-1 py-3.5 rounded-2xl text-[13px] font-bold transition-all active:scale-[0.99] disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)', color: '#93C5FD' }}>
+                <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                  <rect x="1" y="2" width="11" height="10" rx="2" stroke="currentColor" strokeWidth="1.2"/>
+                  <path d="M4 1v2M9 1v2M1 5h11" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                  <path d="M4 8h1M6.5 8h1M4 10h1" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                </svg>
+                Programmer
+              </button>
             </div>
+
           </div>
         </div>
       </div>
