@@ -8,6 +8,11 @@ import { playNav }   from '@/lib/sounds'
 import { getRecentAccounts, switchToAccount, forgetAccount, type RecentAccount } from '@/lib/recentAccounts'
 import { subscribePosting, getPostingState } from '@/lib/postingStore'
 import { subscribeMassPosting, getMassPostingState } from '@/lib/massPostingStore'
+import {
+  subscribeNotifications, getNotifications, pushNotification,
+  markAllRead, clearNotifications, unreadCount,
+  type AppNotification,
+} from '@/lib/notificationStore'
 import { useLicense } from '@/lib/license'
 import { useCredits } from '@/lib/credits'
 
@@ -97,6 +102,75 @@ const NAV_SECTIONS: NavSection[] = [
   },
 ]
 
+// ── SVG Icon helper ──────────────────────────────────────────────────────────
+function NavIcon({ d, size = 16, color = 'currentColor' }: { d: string; size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d={d}/>
+    </svg>
+  )
+}
+
+// SVG paths
+const ICONS = {
+  chat:      'M17 8h2a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2h-2v4l-4-4H9a1.994 1.994 0 0 1-1.414-.586m0 0L11 14h4a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2v4',
+  phone:     'M12 18h.01M8 21h8a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2z',
+  monitor:   'M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2z',
+  send:      'M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z',
+  zap:       'M13 2L3 14h9l-1 8 10-12h-9l1-8z',
+  calendar:  'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2z',
+  video:     'M15 10l4.553-2.069A1 1 0 0 1 21 8.82v6.36a1 1 0 0 1-1.447.894L15 14M3 8a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8z',
+  flame:     'M12 2c0 6-5 8-5 13a5 5 0 0 0 10 0c0-5-5-7-5-13z',
+  sparkles:  'M9.663 17h4.673M12 3v1m6.364 1.636-.707.707M21 12h-1M4 12H3m3.343-5.657-.707-.707m2.828 9.9a5 5 0 1 1 7.072 0l-.548.547A3.374 3.374 0 0 0 14 18.469V19a2 2 0 1 1-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z',
+  scissors:  'M6 3a3 3 0 1 1 0 6 3 3 0 0 1 0-6zm12 0a3 3 0 1 1 0 6 3 3 0 0 1 0-6zM8.586 12.586l7.07 7.07M15.657 12.586l-7.07 7.07',
+  refresh:   'M4 4v5h.582m15.356 2A8.001 8.001 0 0 0 4.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 0 1-15.357-2m15.357 2H15',
+  edit:      'M11 5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-5m-1.414-9.414a2 2 0 1 1 2.828 2.828L11.828 15H9v-2.828l8.586-8.586z',
+  settings:  'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z',
+  building:  'M19 21V5a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v5m-4 0h4',
+  shield:    'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0 1 12 2.944a11.955 11.955 0 0 1-8.618 3.04A12.02 12.02 0 0 0 3 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z',
+  bell:      'M15 17h5l-1.405-1.405A2.032 2.032 0 0 1 18 14.158V11a6.002 6.002 0 0 0-4-5.659V5a2 2 0 1 0-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 1 1-6 0v-1m6 0H9',
+  chevronDown:  'M19 9l-7 7-7-7',
+  chevronRight: 'M9 18l6-6-6-6',
+} as const
+
+type IconKey = keyof typeof ICONS
+
+// Map page id -> icon key
+const PAGE_ICON: Record<string, IconKey> = {
+  phones:      'phone',
+  monitor:     'monitor',
+  posting:     'send',
+  massposting: 'zap',
+  scheduler:   'calendar',
+  bank:        'video',
+  warmup:      'flame',
+  aitools:     'sparkles',
+  montage:     'scissors',
+  remix:       'refresh',
+  textcopy:    'edit',
+}
+
+// Section label component
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{
+      padding: '10px 12px 4px',
+      fontSize: 11,
+      fontWeight: 600,
+      textTransform: 'uppercase',
+      letterSpacing: '0.08em',
+      color: 'rgba(148,163,184,0.4)',
+    }}>
+      {children}
+    </div>
+  )
+}
+
+// Sidebar divider
+function SidebarDivider() {
+  return <div style={{ height: 1, background: 'rgba(255,255,255,0.07)', margin: '4px 0' }} />
+}
+
 
 export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefresh, children }: LayoutProps) {
   const toast = useToast()
@@ -126,7 +200,12 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
   const license = useLicense()
   const credits = useCredits()
 
-  const [activeTask, setActiveTask] = useState<{ kind: 'single' | 'mass'; progress: number; done: number; total: number } | null>(null)
+  const [activeTask, setActiveTask]     = useState<{ kind: 'single' | 'mass'; progress: number; done: number; total: number } | null>(null)
+  const [notifOpen, setNotifOpen]       = useState(false)
+  const [notifications, setNotifications] = useState<AppNotification[]>([])
+  const [unread, setUnread]             = useState(0)
+  const notifRef                        = useRef<HTMLDivElement>(null)
+  const [breadcrumb, setBreadcrumb]     = useState<string[] | null>(null)
   useEffect(() => {
     const handler = (e: Event) => {
       const val = (e as CustomEvent<string>).detail
@@ -135,6 +214,21 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
     window.addEventListener('sf:sidebar-change', handler)
     return () => window.removeEventListener('sf:sidebar-change', handler)
   }, [])
+
+  // Listen for breadcrumb updates from pages (e.g. Scheduler subviews)
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const val = (e as CustomEvent<string | string[] | null>).detail
+      if (val === null) setBreadcrumb(null)
+      else if (Array.isArray(val)) setBreadcrumb(val)
+      else setBreadcrumb([val])
+    }
+    window.addEventListener('sf:breadcrumb', handler)
+    return () => window.removeEventListener('sf:breadcrumb', handler)
+  }, [])
+
+  // Clear breadcrumb when page changes
+  useEffect(() => { setBreadcrumb(null) }, [page])
 
   useEffect(() => {
     function sync() {
@@ -156,6 +250,68 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
     const u2 = subscribeMassPosting(sync)
     return () => { u1(); u2() }
   }, [])
+
+  // Auto-push notifications when posting jobs finish
+  useEffect(() => {
+    let prevPostingSingle = false
+    let prevPostingMass   = false
+    function sync() {
+      const ps = getPostingState()
+      const ms = getMassPostingState()
+      // Single posting: finished
+      if (prevPostingSingle && !ps.posting) {
+        const errors = ps.logs.filter(l => l.level === 'error').length
+        const ok     = ps.logs.filter(l => l.level === 'ok').length
+        if (ok > 0 || errors > 0) {
+          pushNotification({
+            title: errors === 0 ? 'Post publié' : `Post terminé avec ${errors} erreur${errors > 1 ? 's' : ''}`,
+            body:  errors === 0 ? 'Ton Reel a été posté avec succès.' : `${ok} succès · ${errors} erreur${errors > 1 ? 's' : ''}`,
+            level: errors === 0 ? 'ok' : 'warn',
+          })
+        }
+      }
+      // Mass posting: finished
+      if (prevPostingMass && !ms.posting) {
+        const statuses  = [...ms.taskStatuses.values()]
+        const doneCount = statuses.filter(s => s.status === 'done').length
+        const errCount  = statuses.filter(s => s.status === 'error').length
+        if (doneCount > 0 || errCount > 0) {
+          pushNotification({
+            title: errCount === 0 ? 'Mass Posting terminé' : `Mass Posting: ${errCount} erreur${errCount > 1 ? 's' : ''}`,
+            body:  `${doneCount} succès · ${errCount} erreur${errCount > 1 ? 's' : ''} · ${statuses.length} téléphone${statuses.length > 1 ? 's' : ''}`,
+            level: errCount === 0 ? 'ok' : 'warn',
+          })
+        }
+      }
+      prevPostingSingle = ps.posting
+      prevPostingMass   = ms.posting
+    }
+    const u1 = subscribePosting(sync)
+    const u2 = subscribeMassPosting(sync)
+    return () => { u1(); u2() }
+  }, [])
+
+  // Sync notification store to local state
+  useEffect(() => {
+    function syncNotifs() {
+      setNotifications(getNotifications())
+      setUnread(unreadCount())
+    }
+    syncNotifs()
+    const unsub = subscribeNotifications(syncNotifs)
+    return unsub
+  }, [])
+
+  // Close notif panel on outside click
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
+        setNotifOpen(false)
+      }
+    }
+    if (notifOpen) document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [notifOpen])
 
   function handleSwitchOrg(orgId: string | null, orgName?: string) {
     if (orgId === (currentOrg?.id ?? null)) { setOrgMenuOpen(false); return }
@@ -259,460 +415,616 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
 
   const userInitial = user.email?.[0].toUpperCase() ?? '?'
 
-  return (
-    <div className="h-screen overflow-hidden bg-bg flex">
-
-      {/* ── Sidebar ────────────────────────────────────────────────────────── */}
-      <aside
-        className="flex-shrink-0 flex flex-col relative overflow-hidden transition-all duration-300"
+  // ── Sidebar NavItem ────────────────────────────────────────────────────────
+  const SidebarNavItem = ({
+    id,
+    label,
+    iconKey,
+    beta,
+    isNew,
+  }: {
+    id: Page
+    label: string
+    iconKey: IconKey
+    beta?: boolean
+    isNew?: boolean
+  }) => {
+    const active = page === id
+    return (
+      <button
+        onClick={() => { playNav(); onNavigate(id) }}
+        title={collapsed ? label : undefined}
         style={{
-          width: collapsed ? 60 : 228,
-          background: 'linear-gradient(180deg, #080614 0%, #060412 100%)',
-          borderRight: '1px solid rgba(139,92,246,0.12)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: collapsed ? 0 : 8,
+          width: '100%',
+          height: 34,
+          padding: '0 8px',
+          borderRadius: 8,
+          fontSize: 13,
+          fontWeight: active ? 500 : 400,
+          textAlign: 'left',
+          cursor: 'pointer',
+          border: 'none',
+          borderLeft: active ? '2px solid #8B5CF6' : '2px solid transparent',
+          background: active ? 'rgba(139,92,246,0.1)' : 'transparent',
+          color: active ? '#F1F0F7' : 'rgba(148,163,184,0.65)',
+          transition: 'background 0.15s, color 0.15s',
+          justifyContent: collapsed ? 'center' : 'flex-start',
+          flexShrink: 0,
+          marginBottom: 2,
+        }}
+        onMouseEnter={e => {
+          if (!active) (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.04)'
+        }}
+        onMouseLeave={e => {
+          if (!active) (e.currentTarget as HTMLButtonElement).style.background = 'transparent'
         }}
       >
-        {/* Ambient top glow */}
-        <div
-          className="absolute top-0 left-0 right-0 pointer-events-none"
-          style={{
-            height: 200,
-            background: 'radial-gradient(ellipse 180px 120px at 50% -20px, rgba(139,92,246,0.18) 0%, transparent 70%)',
-          }}
-        />
+        <span style={{ flexShrink: 0, color: active ? '#8B5CF6' : 'rgba(148,163,184,0.5)', display: 'flex' }}>
+          <NavIcon d={ICONS[iconKey]} size={16} />
+        </span>
+        {!collapsed && (
+          <>
+            <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
+            {beta && (
+              <span style={{
+                fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em',
+                padding: '2px 5px', borderRadius: 4,
+                background: 'rgba(139,92,246,0.15)', color: '#a78bfa',
+                border: '1px solid rgba(139,92,246,0.2)', flexShrink: 0,
+              }}>
+                BETA
+              </span>
+            )}
+            {isNew && (
+              <span style={{
+                fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em',
+                padding: '2px 5px', borderRadius: 4,
+                background: 'rgba(16,185,129,0.15)', color: '#34d399',
+                border: '1px solid rgba(52,211,153,0.2)', flexShrink: 0,
+              }}>
+                NEW
+              </span>
+            )}
+          </>
+        )}
+      </button>
+    )
+  }
 
-        {/* ── Logo ──────────────────────────────────────────────────────────── */}
-        <div className="relative z-10 px-4 pt-5 pb-4 flex items-center gap-3" style={{ minHeight: 64 }}>
-          {/* Icon with neon spinning ring */}
-          <div className="relative flex-shrink-0" style={{ width: 36, height: 36 }}>
-            {/* Spinning neon border */}
-            <div
-              className="logo-neon-ring absolute rounded-[15px] pointer-events-none"
-              style={{ inset: '-2px' }}
-            />
-            {/* Soft outer glow */}
-            <div
-              className="absolute pointer-events-none"
-              style={{
-                inset: '-6px',
-                borderRadius: 20,
-                background: 'radial-gradient(circle, rgba(124,58,237,0.3) 0%, transparent 70%)',
-                filter: 'blur(6px)',
-              }}
-            />
-            <div
-              className="w-9 h-9 rounded-[13px] flex items-center justify-center relative z-10"
-              style={{
-                background: 'linear-gradient(145deg, #0d0820 0%, #100626 50%, #160b30 100%)',
-                boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.07)',
-              }}
-            >
-              <SFLogo size={24} />
-            </div>
+  const pageLabels: Record<string, string> = {
+    dashboard:   'Dashboard',
+    phones:      'Téléphones',
+    monitor:     'Monitor Live',
+    stats:       'Statistiques',
+    posting:     'Posting',
+    massposting: 'Mass Posting',
+    scheduler:   'Programmation',
+    bank:        'Banque Vidéos',
+    aitools:     'Outils IA',
+    warmup:      'Warmup',
+    montage:     'Montage',
+    remix:       'Remix Vidéo',
+    textcopy:    'Texte IA',
+    community:   'Communauté',
+    support:     'Support',
+    settings:    'Paramètres',
+    licences:    'Licences',
+  }
+
+  // Suppress unused variable warnings for variables kept for logic parity
+  void groupCount
+  void lastRefreshLabel
+  void phoneCount
+  void onRefresh
+  void openSections
+  void now
+
+  return (
+    <div style={{ height: '100vh', overflow: 'hidden', display: 'flex', background: '#08080E' }}>
+
+      {/* ── Sidebar ──────────────────────────────────────────────────────── */}
+      <aside
+        style={{
+          width: collapsed ? 52 : 220,
+          flexShrink: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          background: '#0A0A12',
+          borderRight: '1px solid rgba(255,255,255,0.07)',
+          transition: 'width 0.25s ease',
+          overflow: 'hidden',
+          position: 'relative',
+        }}
+      >
+        {/* ── Logo area ─────────────────────────────────────────────────── */}
+        <div style={{ height: 56, display: 'flex', alignItems: 'center', gap: 10, padding: '0 10px', flexShrink: 0 }}>
+          {/* Logo box */}
+          <div style={{
+            width: 28, height: 28, borderRadius: 8, flexShrink: 0,
+            background: 'rgba(139,92,246,0.12)',
+            border: '1px solid rgba(139,92,246,0.25)',
+            boxShadow: '0 0 12px rgba(139,92,246,0.2)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <SFLogo size={18} />
           </div>
 
           {!collapsed && (
-            <div className="flex-1 min-w-0">
-              <p className="font-black text-[14.5px] leading-tight tracking-[-0.02em]">
-                <span style={{ color: '#f0eeff' }}>Scale</span>
-                <span className="sf-logo-shimmer">Flow</span>
-              </p>
-              <p className="text-[10px] flex items-center gap-1.5 leading-tight mt-[3px]" style={{ color: '#00ccaa' }}>
-                <span className="relative w-1.5 h-1.5 flex-shrink-0">
-                  <span className="absolute inset-0 rounded-full bg-ok animate-ping opacity-50" />
-                  <span className="absolute inset-0 rounded-full bg-ok" />
-                </span>
-                <span className="font-semibold tracking-wide">Actif</span>
-              </p>
-            </div>
+            <span style={{ flex: 1, fontSize: 14, fontWeight: 700, letterSpacing: '-0.02em', whiteSpace: 'nowrap', overflow: 'hidden' }}>
+              <span style={{ color: '#F1F0F7' }}>Scale</span>
+              <span style={{ background: 'linear-gradient(90deg, #8B5CF6, #A78BFA)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Flow</span>
+            </span>
           )}
+
+          {/* Collapse toggle */}
           <button
             onClick={() => setCollapsed(v => !v)}
-            className="flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-all hover:bg-white/[0.06]"
-            style={{ border: '1px solid rgba(139,92,246,0.2)', color: 'rgba(139,92,246,0.5)', marginLeft: collapsed ? 'auto' : 0 }}
+            style={{
+              width: 22, height: 22, borderRadius: 6,
+              border: '1px solid rgba(255,255,255,0.07)',
+              background: 'transparent',
+              color: 'rgba(148,163,184,0.4)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', flexShrink: 0,
+              marginLeft: collapsed ? 'auto' : 0,
+            }}
             title={collapsed ? 'Déplier' : 'Réduire'}
           >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-              {collapsed
-                ? <path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-                : <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-              }
-            </svg>
+            <NavIcon d={collapsed ? ICONS.chevronRight : ICONS.chevronDown} size={11} />
           </button>
         </div>
 
-        {/* Top divider */}
-        <div
-          className="mx-3 mb-2 relative z-10"
-          style={{ height: 1, background: 'linear-gradient(90deg, transparent, rgba(139,92,246,0.22), transparent)' }}
-        />
+        {/* ── Nav ───────────────────────────────────────────────────────── */}
+        <nav style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '0 6px 8px' }}>
 
-        {/* ── Nav ────────────────────────────────────────────────────────────── */}
-        <nav className="sf-sidebar-nav flex-1 overflow-y-auto overflow-x-hidden pt-1 pb-2 relative z-10">
-
-          {/* Communauté — épinglé en haut */}
-          {!collapsed && (
-            <div className="px-2 pb-2">
-              <button
-                onClick={() => { playNav(); onNavigate('community') }}
-                className={`
-                  relative w-full flex items-center gap-2.5 pl-3 pr-2.5 py-[10px] rounded-xl text-[13px] text-left
-                  transition-all duration-150 active:scale-[0.97]
-                  ${page === 'community' ? 'sf-nav-active' : 'text-sb-text hover:text-sb-text-act'}
-                `}
-                style={page !== 'community' ? {
-                  background: 'linear-gradient(135deg,rgba(139,92,246,0.1),rgba(236,72,153,0.04))',
-                  border: '1px solid rgba(139,92,246,0.2)',
-                } : {}}
-              >
-                <span className="text-[16px] w-5 text-center flex-shrink-0"
-                  style={page === 'community' ? { filter: 'drop-shadow(0 0 6px rgba(167,139,250,0.7))' } : { opacity: 0.8 }}>
-                  💬
-                </span>
-                <span className={`flex-1 ${page === 'community' ? 'font-bold' : 'font-semibold'}`}>Communauté</span>
-                {page !== 'community' && (
-                  <span className="text-[7.5px] font-black px-1.5 py-[3px] rounded-md uppercase tracking-wider flex-shrink-0"
-                    style={{ background: 'linear-gradient(130deg,rgba(139,92,246,0.35),rgba(236,72,153,0.25))', color: '#f0a8ff' }}>
-                    NEW
-                  </span>
-                )}
-              </button>
-            </div>
+          {/* Community — pinned */}
+          {isVisibleTab('community') && (
+            <button
+              onClick={() => { playNav(); onNavigate('community') }}
+              title={collapsed ? 'Communauté' : undefined}
+              style={{
+                display: 'flex', alignItems: 'center', gap: collapsed ? 0 : 8,
+                width: '100%', height: 34, padding: '0 8px', borderRadius: 8,
+                fontSize: 13, fontWeight: page === 'community' ? 500 : 400, textAlign: 'left',
+                cursor: 'pointer', border: 'none',
+                borderLeft: page === 'community' ? '2px solid #8B5CF6' : '2px solid transparent',
+                background: page === 'community' ? 'rgba(139,92,246,0.1)' : 'transparent',
+                color: page === 'community' ? '#F1F0F7' : 'rgba(148,163,184,0.65)',
+                transition: 'background 0.15s, color 0.15s',
+                justifyContent: collapsed ? 'center' : 'flex-start',
+                marginBottom: 2,
+              }}
+              onMouseEnter={e => {
+                if (page !== 'community') (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.04)'
+              }}
+              onMouseLeave={e => {
+                if (page !== 'community') (e.currentTarget as HTMLButtonElement).style.background = 'transparent'
+              }}
+            >
+              <span style={{ flexShrink: 0, color: page === 'community' ? '#8B5CF6' : 'rgba(148,163,184,0.5)', display: 'flex' }}>
+                <NavIcon d={ICONS.chat} size={16} />
+              </span>
+              {!collapsed && (
+                <>
+                  <span style={{ flex: 1 }}>Communauté</span>
+                  {page !== 'community' && (
+                    <span style={{
+                      fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em',
+                      padding: '2px 5px', borderRadius: 4,
+                      background: 'rgba(139,92,246,0.15)', color: '#a78bfa',
+                      border: '1px solid rgba(139,92,246,0.2)', flexShrink: 0,
+                    }}>
+                      NEW
+                    </span>
+                  )}
+                </>
+              )}
+            </button>
           )}
 
-          {/* Séparateur */}
-          {!collapsed && <div className="mx-3 mb-2" style={{ height: 1, background: 'linear-gradient(90deg,transparent,rgba(139,92,246,0.15),transparent)' }} />}
+          <SidebarDivider />
 
-          {NAV_SECTIONS.map(section => {
-            const visibleItems = section.items.filter(it => isVisibleTab(it.id))
-            if (visibleItems.length === 0) return null
-            const isOpen = openSections[section.title]
+          {/* Principal section */}
+          {(() => {
+            const items = NAV_SECTIONS[0].items.filter(it => isVisibleTab(it.id))
+            if (items.length === 0) return null
             return (
-              <div key={section.title} className="mb-3">
-                {/* Section header */}
-                {!collapsed && (
-                  <button onClick={() => toggleSection(section.title)} className="w-full flex items-center gap-2 px-4 py-[7px] text-left group">
-                    <span className="flex-1 text-[10.5px] font-black uppercase tracking-[0.2em]" style={{ color: 'rgba(139,92,246,0.4)' }}>
-                      · {section.title}
-                    </span>
-                    <span className="text-[9px] transition-all duration-200 opacity-40 group-hover:opacity-70"
-                      style={{ color: '#a78bfa', transform: isOpen ? 'rotate(0deg)' : 'rotate(-90deg)', display: 'inline-block' }}>
-                      ▾
-                    </span>
-                  </button>
-                )}
-
-                {(isOpen || collapsed) && (
-                  <div className={collapsed ? 'px-1 space-y-[3px] pb-1' : 'px-2 space-y-[3px] pb-1'}>
-                    {visibleItems.map(item => {
-                      const active = page === item.id
-                      return (
-                        <button
-                          key={item.id}
-                          onClick={() => { playNav(); onNavigate(item.id) }}
-                          title={collapsed ? item.label : undefined}
-                          className={`
-                            relative w-full flex items-center gap-2.5 rounded-xl text-[12.5px] text-left
-                            transition-all duration-150 active:scale-[0.97]
-                            ${collapsed ? 'justify-center px-1.5 py-[10px]' : 'pl-3 pr-2.5 py-[11px]'}
-                            ${active ? 'sf-nav-active' : 'hover:bg-white/[0.04] text-sb-text hover:text-sb-text-act'}
-                          `}
-                        >
-                          <span
-                            className={`text-[15px] ${collapsed ? '' : 'w-5'} text-center flex-shrink-0 transition-all duration-150 ${active ? '' : 'opacity-50'}`}
-                            style={active ? { filter: 'drop-shadow(0 0 6px rgba(167,139,250,0.6))' } : {}}
-                          >
-                            {item.icon}
-                          </span>
-                          {!collapsed && (
-                            <>
-                              <span className={`flex-1 ${active ? 'font-semibold' : 'font-medium'}`}>{item.label}</span>
-                              {item.beta && (
-                                <span className="text-[7px] font-black uppercase px-1.5 py-[3px] rounded-md tracking-[0.12em]"
-                                  style={{ background: 'linear-gradient(130deg,rgba(124,58,237,0.4),rgba(236,72,153,0.4))', color: '#e879f9', border: '1px solid rgba(236,72,153,0.2)' }}>
-                                  BETA
-                                </span>
-                              )}
-                              {item.isNew && (
-                                <span className="text-[7px] font-black uppercase px-1.5 py-[3px] rounded-md tracking-[0.12em]"
-                                  style={{ background: 'linear-gradient(130deg,rgba(16,185,129,0.35),rgba(52,211,153,0.25))', color: '#34d399', border: '1px solid rgba(52,211,153,0.25)' }}>
-                                  NEW
-                                </span>
-                              )}
-                            </>
-                          )}
-                        </button>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
+              <>
+                {!collapsed && <SectionLabel>Principal</SectionLabel>}
+                {items.map(item => (
+                  <SidebarNavItem
+                    key={item.id}
+                    id={item.id}
+                    label={item.label}
+                    iconKey={PAGE_ICON[item.id] ?? 'phone'}
+                    beta={item.beta}
+                    isNew={item.isNew}
+                  />
+                ))}
+              </>
             )
-          })}
+          })()}
+
+          <SidebarDivider />
+
+          {/* Instagram section */}
+          {(() => {
+            const items = NAV_SECTIONS[1].items.filter(it => isVisibleTab(it.id))
+            if (items.length === 0) return null
+            return (
+              <>
+                {!collapsed && <SectionLabel>Instagram</SectionLabel>}
+                {items.map(item => (
+                  <SidebarNavItem
+                    key={item.id}
+                    id={item.id}
+                    label={item.label}
+                    iconKey={PAGE_ICON[item.id] ?? 'send'}
+                    beta={item.beta}
+                    isNew={item.isNew}
+                  />
+                ))}
+              </>
+            )
+          })()}
+
+          <SidebarDivider />
+
+          {/* Creation section */}
+          {(() => {
+            const items = NAV_SECTIONS[2].items.filter(it => isVisibleTab(it.id))
+            if (items.length === 0) return null
+            return (
+              <>
+                {!collapsed && <SectionLabel>Création</SectionLabel>}
+                {items.map(item => (
+                  <SidebarNavItem
+                    key={item.id}
+                    id={item.id}
+                    label={item.label}
+                    iconKey={PAGE_ICON[item.id] ?? 'edit'}
+                    beta={item.beta}
+                    isNew={item.isNew}
+                  />
+                ))}
+              </>
+            )
+          })()}
+
         </nav>
 
-        {/* Fade bottom */}
-        <div className="pointer-events-none flex-shrink-0 h-6 -mt-6 relative z-10"
-          style={{ background: 'linear-gradient(to bottom, transparent, #080614)' }} />
+        {/* ── Bottom section ────────────────────────────────────────────── */}
+        <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', padding: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
 
-        {/* ── Bottom bar ─────────────────────────────────────────────────────── */}
-        <div className="relative z-10 pb-3 pt-0">
-          <div className="mx-3 mb-2" style={{ height: 1, background: 'linear-gradient(90deg, transparent, rgba(139,92,246,0.15), transparent)' }} />
-
-          {collapsed ? (
-            /* Collapsed: just icons */
-            <div className="flex flex-col items-center gap-2 px-1">
-              {!credits.loading && (
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center" title={`${credits.balance.toLocaleString('fr-FR')} crédits`}
-                  style={{ background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.2)' }}>
-                  <span className="text-[13px]">💎</span>
-                </div>
-              )}
-              <button onClick={() => { playNav(); onNavigate('settings') }}
-                className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${page === 'settings' ? 'sf-nav-active' : 'hover:bg-white/[0.05]'}`}>
-                <span className="text-sm opacity-70">⚙</span>
-              </button>
-              <button onClick={() => userMenuOpen ? setUserMenuOpen(false) : openUserMenu()}
-                className="w-8 h-8 rounded-[10px] flex items-center justify-center text-[10px] font-black flex-shrink-0"
-                style={{ background: 'linear-gradient(135deg, #7c3aed, #ec4899)', color: '#fff' }}>
-                {userInitial}
-              </button>
-            </div>
-          ) : (
-            <div className="px-3 space-y-1.5">
-
-              {/* Credits card */}
-              {!credits.loading && (
-                <div className="rounded-xl px-3 py-2 flex items-center gap-2"
-                  style={{
-                    background: credits.balance < 10 ? 'rgba(240,61,85,0.06)' : 'rgba(139,92,246,0.08)',
-                    border: `1px solid ${credits.balance < 10 ? 'rgba(240,61,85,0.2)' : 'rgba(139,92,246,0.22)'}`,
-                  }}>
-                  <span className="text-[12px] flex-shrink-0">💎</span>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[11px] font-semibold" style={{ color: 'rgba(196,181,253,0.5)' }}>Crédits</span>
-                    </div>
-                    <p className="text-[14px] font-black tabular-nums leading-none"
-                      style={{ color: credits.balance < 10 ? '#f87171' : '#a78bfa' }}>
-                      {credits.balance.toLocaleString('fr-FR')}
-                    </p>
-                  </div>
-                  <div className="flex-shrink-0 flex flex-col items-end gap-1">
-                    <button onClick={() => onNavigate('settings', 'abonnement')}
-                      className="text-[10px] font-semibold px-2 py-0.5 rounded-lg transition-all hover:brightness-110"
-                      style={{ background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.25)', color: '#a78bfa' }}>
-                      Gérer
-                    </button>
-                    <div className="w-16 h-1 rounded-full overflow-hidden" style={{ background: 'rgba(139,92,246,0.12)' }}>
-                      <div className="h-full rounded-full"
-                        style={{ width: `${Math.min(100, (credits.balance / CREDIT_MAX_DISPLAY) * 100)}%`, background: 'linear-gradient(90deg,#7c3aed,#a78bfa)' }} />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Phones + Groups cards */}
-              <div className="flex gap-1.5">
-                <div className="flex-1 rounded-xl px-2.5 py-2" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                  <div className="flex items-center gap-1 mb-0.5">
-                    <span className="text-[11px] opacity-60">📱</span>
-                    <span className="text-[9px] font-semibold" style={{ color: 'rgba(148,163,184,0.45)' }}>Téléphones</span>
-                  </div>
-                  <div className="flex items-baseline gap-0.5">
-                    <span className="text-[13px] font-black" style={{ color: '#a78bfa' }}>{phoneCount ?? 0}</span>
-                    <span className="text-[9px]" style={{ color: 'rgba(148,163,184,0.3)' }}>/ {phoneCount ?? 0}</span>
-                  </div>
-                  {lastRefreshLabel && (
-                    <div className="flex items-center gap-1 mt-0.5">
-                      <span className="text-[8px]" style={{ color: 'rgba(148,163,184,0.3)' }}>{lastRefreshLabel}</span>
-                      {onRefresh && (
-                        <button onClick={onRefresh} className="text-[9px] opacity-30 hover:opacity-60 transition-opacity" title="Rafraîchir">↺</button>
-                      )}
-                    </div>
-                  )}
-                </div>
-                <div className="flex-1 rounded-xl px-2.5 py-2" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                  <div className="flex items-center gap-1 mb-0.5">
-                    <span className="text-[11px] opacity-60">👥</span>
-                    <span className="text-[9px] font-semibold" style={{ color: 'rgba(148,163,184,0.45)' }}>Groupes</span>
-                  </div>
-                  <span className="text-[13px] font-black" style={{ color: '#a78bfa' }}>{groupCount ?? '—'}</span>
-                </div>
-              </div>
-
-              {/* Settings + Admin */}
-              <div className="space-y-0.5">
-                <button onClick={() => { playNav(); onNavigate('settings') }}
-                  className={`w-full flex items-center justify-between px-2.5 py-[7px] rounded-xl text-[12px] transition-all ${
-                    page === 'settings' ? 'sf-nav-active' : 'hover:bg-white/[0.04] text-sb-text hover:text-sb-text-act'
-                  }`}>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm opacity-70">⚙</span>
-                    <span className="font-medium">Paramètres</span>
-                  </div>
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" style={{ opacity: 0.3 }}>
-                    <path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                </button>
-                {license.isSuperAdmin && (
-                  <button onClick={() => { playNav(); onNavigate('licences') }}
-                    className={`w-full flex items-center gap-2 px-2.5 py-[7px] rounded-xl text-[12px] transition-all ${
-                      page === 'licences' ? 'sf-nav-active' : 'text-sb-text hover:bg-white/[0.04] hover:text-sb-text-act'
-                    }`}>
-                    <span className="text-sm opacity-70">🛡</span>
-                    <span className="font-medium">Admin</span>
-                  </button>
-                )}
-              </div>
-
-              {/* Org switcher */}
-              <div style={{ padding: 1, borderRadius: 15, background: 'linear-gradient(135deg, rgba(139,92,246,0.55) 0%, rgba(236,72,153,0.3) 60%, rgba(139,92,246,0.35) 100%)' }}>
-                <button ref={orgTriggerRef} onClick={() => orgMenuOpen ? setOrgMenuOpen(false) : openOrgMenu()}
-                  className="w-full flex items-center gap-2.5 px-3 py-[9px] text-[12px] transition-all group"
-                  style={{ background: '#09061a', borderRadius: 14 }}>
-                  <span className="text-[15px] flex-shrink-0 opacity-80">🏢</span>
-                  <div className="flex-1 min-w-0 text-left">
-                    <p className="font-semibold truncate" style={{ color: '#e2d9f3' }}>{currentOrg?.name ?? 'Organisation'}</p>
-                    {license.source === 'own' && (
-                      <p className="text-[9.5px] mt-0.5" style={{ color: license.daysLeft === null ? '#a78bfa' : license.daysLeft <= 7 ? '#fb923c' : 'rgba(107,114,128,0.8)' }}>
-                        {license.daysLeft === null ? '∞ à vie' : `${license.daysLeft}j restants`}
-                      </p>
-                    )}
-                    {license.source === 'org_owner' && <p className="text-[9.5px] mt-0.5 text-blue-400">Via organisation</p>}
-                  </div>
-                  <div className="flex items-center gap-1 flex-shrink-0">
-                    {role && (
-                      <span className="text-[8px] font-black uppercase px-1.5 py-[2px] rounded-md"
-                        style={{ background: 'linear-gradient(130deg,rgba(16,185,129,0.3),rgba(52,211,153,0.2))', color: '#34d399', border: '1px solid rgba(52,211,153,0.2)' }}>
-                        {role === 'admin' ? 'Admin' : role === 'owner' ? 'Owner' : 'Viewer'}
-                      </span>
-                    )}
-                    <span className="text-[10px] opacity-40">▾</span>
-                  </div>
-                </button>
-              </div>
-
-              {/* User strip */}
-              <button onClick={() => userMenuOpen ? setUserMenuOpen(false) : openUserMenu()}
-                className="w-full flex items-center gap-2.5 px-2.5 py-[7px] rounded-xl text-left transition-all hover:bg-white/[0.04] group">
-                <div className="w-7 h-7 rounded-[10px] flex items-center justify-center text-[10px] font-black flex-shrink-0"
-                  style={{ background: 'linear-gradient(135deg, #7c3aed 0%, #ec4899 100%)', boxShadow: '0 2px 8px rgba(124,58,237,0.35)', color: '#fff' }}>
-                  {userInitial}
-                </div>
-                <p className="flex-1 text-[10.5px] font-medium truncate" style={{ color: 'rgba(107,94,138,0.9)' }}>{user.email}</p>
-                <span className="text-[10px] opacity-30">▾</span>
-              </button>
-
-            </div>
-          )}
-        </div>
-      </aside>
-
-      {/* ── Main area (topbar + content) ─────────────────────────────────── */}
-      <div className="flex-1 flex flex-col overflow-hidden relative">
-
-        {/* Ambient background glow */}
-        <div className="absolute top-0 right-0 w-[500px] h-[400px] pointer-events-none" style={{ background: 'radial-gradient(ellipse at top right, rgba(139,92,246,0.05) 0%, transparent 65%)', zIndex: 0 }} />
-
-        {/* ── Topbar ───────────────────────────────────────────────────────── */}
-        <header className="sf-topbar flex-shrink-0 flex items-center gap-4 px-6 h-[54px] relative z-10">
-
-          {/* Page label */}
-          <div className="flex items-center gap-2 min-w-0 flex-shrink-0">
-            <span className="text-[13px] font-semibold text-white/90 truncate max-w-[180px]">
-              {({
-                dashboard:   'Dashboard',
-                phones:      'Téléphones',
-                monitor:     'Monitor Live',
-                stats:       'Statistiques',
-                posting:     'Posting',
-                massposting: 'Mass Posting',
-                scheduler:   'Programmation',
-                bank:        'Banque Vidéos',
-                aitools:     'Outils IA',
-                warmup:      'Warmup',
-                montage:     'Montage',
-                remix:       'Remix Vidéo',
-                textcopy:    'Texte IA',
-                community:   'Communauté',
-                support:     'Support',
-                settings:    'Paramètres',
-                licences:    'Licences',
-              } as Record<string, string>)[page] ?? page}
+          {/* Settings */}
+          <button
+            onClick={() => { playNav(); onNavigate('settings') }}
+            title={collapsed ? 'Paramètres' : undefined}
+            style={{
+              display: 'flex', alignItems: 'center', gap: collapsed ? 0 : 8,
+              width: '100%', height: 34, padding: '0 8px', borderRadius: 8,
+              fontSize: 13, fontWeight: page === 'settings' ? 500 : 400, textAlign: 'left',
+              cursor: 'pointer', border: 'none',
+              borderLeft: page === 'settings' ? '2px solid #8B5CF6' : '2px solid transparent',
+              background: page === 'settings' ? 'rgba(139,92,246,0.1)' : 'transparent',
+              color: page === 'settings' ? '#F1F0F7' : 'rgba(148,163,184,0.65)',
+              transition: 'background 0.15s',
+              justifyContent: collapsed ? 'center' : 'flex-start',
+            }}
+            onMouseEnter={e => {
+              if (page !== 'settings') (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.04)'
+            }}
+            onMouseLeave={e => {
+              if (page !== 'settings') (e.currentTarget as HTMLButtonElement).style.background = 'transparent'
+            }}
+          >
+            <span style={{ flexShrink: 0, color: page === 'settings' ? '#8B5CF6' : 'rgba(148,163,184,0.5)', display: 'flex' }}>
+              <NavIcon d={ICONS.settings} size={16} />
             </span>
-            {activeTask && (
-              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold"
-                style={{ background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.3)', color: '#A78BFA' }}>
-                <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse flex-shrink-0" />
-                {activeTask.kind === 'mass'
-                  ? `${activeTask.done}/${activeTask.total} • ${activeTask.progress}%`
-                  : `${activeTask.progress}%`}
-              </div>
-            )}
-          </div>
+            {!collapsed && <span style={{ flex: 1 }}>Paramètres</span>}
+          </button>
 
-          {/* Search */}
-          <div className="flex-1 max-w-xs relative">
-            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none" style={{ color: '#52525B' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-              <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-            </svg>
-            <input
-              className="sf-search w-full h-8 pl-8 pr-3 text-[12px]"
-              placeholder="Rechercher…"
-              readOnly
-              onClick={() => {}}
-            />
-          </div>
-
-          <div className="flex-1" />
-
-          {/* Live indicator */}
-          <div className="flex items-center gap-2">
-            <div className="sf-live-dot" />
-            <span className="text-[11px] font-medium text-text2">Live</span>
-          </div>
-
-          {/* Subscription expiry warning inline */}
-          {license.source === 'own' && license.daysLeft !== null && license.daysLeft <= 1 && (
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold"
-              style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.35)', color: '#F87171' }}>
-              <span>⚠</span>
-              <span>{license.daysLeft === 0 ? 'Abonnement expiré' : '&lt; 24h restantes'}</span>
-            </div>
+          {/* Admin (super admin only) */}
+          {license.isSuperAdmin && (
+            <button
+              onClick={() => { playNav(); onNavigate('licences') }}
+              title={collapsed ? 'Admin' : undefined}
+              style={{
+                display: 'flex', alignItems: 'center', gap: collapsed ? 0 : 8,
+                width: '100%', height: 34, padding: '0 8px', borderRadius: 8,
+                fontSize: 13, fontWeight: page === 'licences' ? 500 : 400, textAlign: 'left',
+                cursor: 'pointer', border: 'none',
+                borderLeft: page === 'licences' ? '2px solid #8B5CF6' : '2px solid transparent',
+                background: page === 'licences' ? 'rgba(139,92,246,0.1)' : 'transparent',
+                color: page === 'licences' ? '#F1F0F7' : 'rgba(148,163,184,0.65)',
+                transition: 'background 0.15s',
+                justifyContent: collapsed ? 'center' : 'flex-start',
+              }}
+              onMouseEnter={e => {
+                if (page !== 'licences') (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.04)'
+              }}
+              onMouseLeave={e => {
+                if (page !== 'licences') (e.currentTarget as HTMLButtonElement).style.background = 'transparent'
+              }}
+            >
+              <span style={{ flexShrink: 0, color: page === 'licences' ? '#8B5CF6' : 'rgba(148,163,184,0.5)', display: 'flex' }}>
+                <NavIcon d={ICONS.shield} size={16} />
+              </span>
+              {!collapsed && <span style={{ flex: 1 }}>Admin</span>}
+            </button>
           )}
 
-          {/* Credits */}
-          {!credits.loading && (
-            <button onClick={() => onNavigate('settings', 'abonnement')}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-all hover:bg-white/[0.04]"
-              style={{ border: '1px solid rgba(139,92,246,0.18)' }}>
-              <span className="text-[13px]">💎</span>
-              <span className="text-[12px] font-bold tabular-nums" style={{ color: credits.balance < 10 ? '#F87171' : '#A78BFA' }}>
-                {credits.balance.toLocaleString('fr-FR')}
+          {/* Org switcher */}
+          {!collapsed && (
+            <button
+              ref={orgTriggerRef}
+              onClick={() => orgMenuOpen ? setOrgMenuOpen(false) : openOrgMenu()}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                width: '100%', padding: '7px 8px', borderRadius: 8, fontSize: 12, textAlign: 'left',
+                cursor: 'pointer',
+                background: 'rgba(255,255,255,0.025)',
+                border: '1px solid rgba(255,255,255,0.07)',
+                color: '#F1F0F7', transition: 'background 0.15s',
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.05)' }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.025)' }}
+            >
+              <span style={{ color: 'rgba(148,163,184,0.5)', flexShrink: 0, display: 'flex' }}>
+                <NavIcon d={ICONS.building} size={14} />
+              </span>
+              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'rgba(241,240,247,0.8)', fontSize: 12 }}>
+                {currentOrg?.name ?? 'Organisation'}
+              </span>
+              <span style={{ color: 'rgba(148,163,184,0.4)', flexShrink: 0, display: 'flex' }}>
+                <NavIcon d={ICONS.chevronDown} size={12} />
               </span>
             </button>
           )}
 
-          {/* Notifications bell */}
-          <button className="relative w-8 h-8 flex items-center justify-center rounded-lg transition-all hover:bg-white/[0.05]"
-            style={{ border: '1px solid rgba(255,255,255,0.06)' }}>
-            <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} style={{ color: '#71717A' }}>
-              <path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
-            </svg>
+          {/* User row */}
+          <button
+            ref={userTriggerRef}
+            onClick={() => userMenuOpen ? setUserMenuOpen(false) : openUserMenu()}
+            style={{
+              display: 'flex', alignItems: 'center', gap: collapsed ? 0 : 8,
+              width: '100%', padding: collapsed ? '4px 0' : '5px 8px', borderRadius: 8,
+              textAlign: 'left', cursor: 'pointer', border: 'none', background: 'transparent',
+              transition: 'background 0.15s',
+              justifyContent: collapsed ? 'center' : 'flex-start',
+            }}
+            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.04)' }}
+            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}
+          >
+            {/* Avatar pill */}
+            <div style={{
+              width: 28, height: 28, borderRadius: '50%',
+              background: 'linear-gradient(135deg, #7C3AED, #EC4899)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 11, fontWeight: 700, color: '#fff', flexShrink: 0,
+            }}>
+              {userInitial}
+            </div>
+            {!collapsed && (
+              <span style={{ flex: 1, fontSize: 11, color: 'rgba(148,163,184,0.55)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {user.email}
+              </span>
+            )}
           </button>
 
-          {/* User avatar */}
-          <button ref={userTriggerRef} onClick={() => userMenuOpen ? setUserMenuOpen(false) : openUserMenu()}
-            className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-black flex-shrink-0 transition-all hover:scale-105"
-            style={{ background: 'linear-gradient(135deg, #7C3AED, #EC4899)', boxShadow: '0 2px 8px rgba(124,58,237,0.4)', color: '#fff' }}
-            title={user.email}>
-            {userInitial}
-          </button>
+        </div>
+      </aside>
 
+      {/* ── Main area (topbar + content) ──────────────────────────────────── */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
+
+        {/* ── Topbar ──────────────────────────────────────────────────────── */}
+        <header style={{
+          height: 48, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 12, padding: '0 20px',
+          background: 'rgba(8,8,14,0.95)', backdropFilter: 'blur(12px)',
+          borderBottom: '1px solid rgba(255,255,255,0.07)',
+          position: 'relative', zIndex: 10,
+        }}>
+
+          {/* Left: page title + breadcrumb */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, flex: 1 }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#F1F0F7', whiteSpace: 'nowrap' }}>
+              {pageLabels[page] ?? page}
+            </span>
+            {breadcrumb && breadcrumb.map((seg, i) => (
+              <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ color: 'rgba(148,163,184,0.35)', fontSize: 13 }}>/</span>
+                <span style={{
+                  fontSize: 13, fontWeight: 600,
+                  color: i === breadcrumb.length - 1 ? 'rgba(196,181,253,0.85)' : 'rgba(148,163,184,0.55)',
+                  maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}>
+                  {seg}
+                </span>
+              </span>
+            ))}
+          </div>
+
+          {/* Middle: active task pill */}
+          {activeTask && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600,
+              background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.3)',
+              color: '#A78BFA', flexShrink: 0,
+            }}>
+              <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse flex-shrink-0" />
+              {activeTask.kind === 'mass'
+                ? `${activeTask.done}/${activeTask.total} • ${activeTask.progress}%`
+                : `${activeTask.progress}%`}
+            </div>
+          )}
+
+          {/* Right side */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+
+            {/* Subscription expiry warning */}
+            {license.source === 'own' && license.daysLeft !== null && license.daysLeft <= 1 && (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '3px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700,
+                background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.35)', color: '#F87171',
+              }}>
+                <span>{license.daysLeft === 0 ? 'Abonnement expiré' : '< 24h restantes'}</span>
+              </div>
+            )}
+
+            {/* Credits button */}
+            {!credits.loading && (
+              <button
+                onClick={() => onNavigate('settings', 'abonnement')}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 5,
+                  padding: '4px 10px', borderRadius: 6,
+                  border: '1px solid rgba(139,92,246,0.2)', background: 'transparent',
+                  cursor: 'pointer', transition: 'background 0.15s',
+                }}
+                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.04)' }}
+                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#A78BFA" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                </svg>
+                <span style={{ fontSize: 12, fontWeight: 700, color: credits.balance < 10 ? '#F87171' : '#A78BFA', fontVariantNumeric: 'tabular-nums' }}>
+                  {credits.balance.toLocaleString('fr-FR')}
+                </span>
+              </button>
+            )}
+
+            {/* Notification bell */}
+            <div style={{ position: 'relative' }} ref={notifRef}>
+              <button
+                onClick={() => { setNotifOpen(v => !v); if (!notifOpen) markAllRead() }}
+                style={{
+                  width: 32, height: 32, borderRadius: 8,
+                  border: `1px solid ${unread > 0 ? 'rgba(139,92,246,0.3)' : 'rgba(255,255,255,0.07)'}`,
+                  background: 'transparent', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  position: 'relative', transition: 'background 0.15s',
+                }}
+                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.05)' }}
+                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}
+              >
+                <NavIcon d={ICONS.bell} size={15} color={unread > 0 ? '#A78BFA' : 'rgba(148,163,184,0.5)'} />
+                {unread > 0 && (
+                  <span style={{
+                    position: 'absolute', top: -4, right: -4,
+                    minWidth: 16, height: 16, padding: '0 2px', borderRadius: 8,
+                    background: 'linear-gradient(130deg,#7C3AED,#A855F7)', color: '#fff',
+                    fontSize: 9, fontWeight: 800,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    boxShadow: '0 0 8px rgba(139,92,246,0.6)',
+                  }}>
+                    {unread > 9 ? '9+' : unread}
+                  </span>
+                )}
+              </button>
+
+              {/* Notifications panel */}
+              {notifOpen && (
+                <div className="absolute right-0 top-full mt-2 w-80 rounded-2xl overflow-hidden z-50"
+                  style={{ background: '#0E0E16', border: '1px solid rgba(139,92,246,0.2)', boxShadow: '0 16px 48px -8px rgba(0,0,0,0.8), 0 0 0 1px rgba(139,92,246,0.08)' }}>
+
+                  {/* Header */}
+                  <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
+                    <div className="flex items-center gap-2">
+                      <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="#A78BFA" strokeWidth={2}>
+                        <path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+                      </svg>
+                      <span className="text-[13px] font-bold text-white">Notifications</span>
+                      {notifications.length > 0 && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full font-bold" style={{ background: 'rgba(139,92,246,0.15)', color: '#a78bfa' }}>
+                          {notifications.length}
+                        </span>
+                      )}
+                    </div>
+                    {notifications.length > 0 && (
+                      <button onClick={clearNotifications}
+                        className="text-[11px] transition-colors hover:text-white flex items-center gap-1"
+                        style={{ color: 'rgba(148,163,184,0.4)' }}>
+                        <svg width="9" height="9" viewBox="0 0 9 9" fill="none"><path d="M1 2h7M3.5 2V1.5h2V2M2.5 2l.5 6h3l.5-6" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                        Effacer
+                      </button>
+                    )}
+                  </div>
+
+                  {/* List */}
+                  <div className="max-h-80 overflow-y-auto" style={{ scrollbarWidth: 'none' }}>
+                    {notifications.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-12 gap-3">
+                        <div className="w-12 h-12 rounded-2xl flex items-center justify-center"
+                          style={{ background: 'rgba(139,92,246,0.06)', border: '1px dashed rgba(139,92,246,0.15)' }}>
+                          <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="rgba(82,82,91,0.6)" strokeWidth={1.5}>
+                            <path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+                          </svg>
+                        </div>
+                        <p className="text-[12px] font-semibold" style={{ color: 'rgba(148,163,184,0.3)' }}>Aucune notification</p>
+                        <p className="text-[11px] text-center max-w-[180px]" style={{ color: 'rgba(82,82,91,0.6)' }}>
+                          Les résultats de tes posts apparaîtront ici
+                        </p>
+                      </div>
+                    ) : notifications.map(n => {
+                      const iconColor = n.level === 'ok' ? '#22C55E' : n.level === 'error' ? '#EF4444' : n.level === 'warn' ? '#F59E0B' : '#A78BFA'
+                      const iconBg    = n.level === 'ok' ? 'rgba(34,197,94,0.12)' : n.level === 'error' ? 'rgba(239,68,68,0.12)' : n.level === 'warn' ? 'rgba(245,158,11,0.12)' : 'rgba(139,92,246,0.12)'
+                      const Icon = () => {
+                        if (n.level === 'ok')    return <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M2 5.5L4.5 8L9 3" stroke={iconColor} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                        if (n.level === 'error') return <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M2 2L9 9M9 2L2 9" stroke={iconColor} strokeWidth="1.5" strokeLinecap="round"/></svg>
+                        if (n.level === 'warn')  return <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M5.5 1L10 9.5H1L5.5 1Z" stroke={iconColor} strokeWidth="1.2" strokeLinejoin="round"/><path d="M5.5 4.5v2.5M5.5 8.5v.1" stroke={iconColor} strokeWidth="1.2" strokeLinecap="round"/></svg>
+                        return <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><circle cx="5.5" cy="5.5" r="4" stroke={iconColor} strokeWidth="1.2"/><path d="M5.5 3.5v2.5M5.5 7.5v.1" stroke={iconColor} strokeWidth="1.2" strokeLinecap="round"/></svg>
+                      }
+                      return (
+                        <div key={n.id} className="flex items-start gap-3 px-4 py-3 transition-colors hover:bg-white/[0.02]"
+                          style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                          <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5"
+                            style={{ background: iconBg, border: `1px solid ${iconColor}22` }}>
+                            <Icon />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[12px] font-bold text-white leading-snug">{n.title}</p>
+                            {n.body && <p className="text-[11px] mt-0.5 leading-relaxed" style={{ color: 'rgba(148,163,184,0.55)' }}>{n.body}</p>}
+                          </div>
+                          <span className="text-[10px] flex-shrink-0 mt-0.5 tabular-nums" style={{ color: 'rgba(82,82,91,0.7)' }}>{n.time}</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* User avatar */}
+            <button
+              ref={userTriggerRef}
+              onClick={() => userMenuOpen ? setUserMenuOpen(false) : openUserMenu()}
+              style={{
+                width: 28, height: 28, borderRadius: '50%',
+                background: 'linear-gradient(135deg, #7C3AED, #EC4899)',
+                border: 'none', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 11, fontWeight: 700, color: '#fff', flexShrink: 0,
+                boxShadow: '0 2px 8px rgba(124,58,237,0.4)',
+                transition: 'transform 0.15s',
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1.05)' }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)' }}
+              title={user.email}
+            >
+              {userInitial}
+            </button>
+
+          </div>
         </header>
 
-        {/* ── Scrollable content ─────────────────────────────────────────── */}
-        <main className="flex-1 overflow-auto relative bg-bg z-0">
+        {/* ── Scrollable content ────────────────────────────────────────── */}
+        <main style={{ flex: 1, overflow: 'auto', position: 'relative', background: '#08080E', zIndex: 0 }}>
           {/* Org-switch loading overlay */}
           {orgLoading && (
             <div className="absolute inset-0 z-50 bg-bg/85 backdrop-blur-sm flex items-center justify-center">
@@ -733,7 +1045,9 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             <div className="flex flex-col items-center justify-center h-full min-h-[60vh] gap-6 text-center px-8 anim-scale-in">
               <div className="relative">
                 <div className="w-20 h-20 rounded-3xl bg-danger/8 border border-danger/15 flex items-center justify-center">
-                  <span className="text-4xl">🔒</span>
+                  <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="rgba(239,68,68,0.7)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                  </svg>
                 </div>
                 <div className="absolute -inset-3 rounded-[32px] bg-danger/5 -z-10" />
               </div>
@@ -760,7 +1074,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
         </main>
       </div>
 
-      {/* ── Org switcher menu ────────────────────────────────────────────────── */}
+      {/* ── Org switcher menu ─────────────────────────────────────────────── */}
       {orgMenuOpen && orgMenuPos && (
         <>
           <div onClick={() => setOrgMenuOpen(false)} className="fixed inset-0 z-[9998]" style={{ background: 'transparent' }} />
@@ -775,22 +1089,28 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
                 className={`w-full flex items-center gap-2 px-3 py-2 text-[12px] text-left transition-colors ${currentOrg?.id === org.id ? 'text-accent' : 'text-text hover:bg-white/[0.04]'}`}
                 style={currentOrg?.id === org.id ? { background: 'rgba(139,92,246,0.1)' } : {}}
               >
-                <span>🏢</span><span className="truncate flex-1">{org.name}</span>
-                {currentOrg?.id === org.id && <span className="ml-auto text-accent text-xs">✓</span>}
+                <NavIcon d={ICONS.building} size={13} color="currentColor" />
+                <span className="truncate flex-1">{org.name}</span>
+                {currentOrg?.id === org.id && (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="ml-auto text-accent">
+                    <path d="M20 6L9 17l-5-5"/>
+                  </svg>
+                )}
               </button>
             ))}
             <button
               onClick={() => { setOrgMenuOpen(false); onNavigate('settings', 'organization') }}
-              className="w-full px-3 py-2 text-[11px] text-text2 hover:bg-white/[0.04] border-t text-left transition-colors"
+              className="w-full px-3 py-2 text-[11px] text-text2 hover:bg-white/[0.04] border-t text-left transition-colors flex items-center gap-2"
               style={{ borderColor: 'rgba(139,92,246,0.12)' }}
             >
-              ⚙ Gérer les organisations
+              <NavIcon d={ICONS.settings} size={11} color="currentColor" />
+              Gérer les organisations
             </button>
           </div>
         </>
       )}
 
-      {/* ── Active posting progress pill ────────────────────────────────────── */}
+      {/* ── Active posting progress pill ─────────────────────────────────── */}
       {activeTask && (
         <div
           className="fixed bottom-5 right-5 z-[9990] anim-slide-down"
@@ -798,18 +1118,16 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             background: 'rgba(6,3,16,0.96)',
             border: '1px solid rgba(139,92,246,0.3)',
             backdropFilter: 'blur(22px)',
-            borderRadius: 16,
-            padding: '14px 16px',
-            width: 230,
+            borderRadius: 16, padding: '14px 16px', width: 230,
             boxShadow: '0 8px 40px rgba(0,0,0,0.55), 0 0 0 1px rgba(139,92,246,0.08), 0 0 40px -8px rgba(124,58,237,0.25), 0 0 60px -12px rgba(124,58,237,0.4)',
           }}
         >
           <div className="flex items-center gap-2.5 mb-3">
             <div
-              className="w-7 h-7 rounded-lg flex items-center justify-center text-sm flex-shrink-0"
+              className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
               style={{ background: 'linear-gradient(135deg,#7c3aed22,#ec489922)', border: '1px solid rgba(139,92,246,0.25)' }}
             >
-              <span className="animate-pulse">{activeTask.kind === 'mass' ? '⚡' : '🚀'}</span>
+              <NavIcon d={activeTask.kind === 'mass' ? ICONS.zap : ICONS.send} size={14} color="#a78bfa" />
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-[12px] font-semibold text-white leading-tight">
@@ -843,12 +1161,12 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             className="mt-3 w-full text-[11px] font-semibold py-1.5 rounded-lg transition-all hover:opacity-90"
             style={{ background: 'rgba(139,92,246,0.14)', color: '#c4b5fd', border: '1px solid rgba(139,92,246,0.2)' }}
           >
-            Voir les détails →
+            Voir les détails &rarr;
           </button>
         </div>
       )}
 
-      {/* ── User account switcher menu ───────────────────────────────────────── */}
+      {/* ── User account switcher menu ────────────────────────────────────── */}
       {userMenuOpen && userMenuPos && (
         <>
           <div onClick={() => setUserMenuOpen(false)} className="fixed inset-0 z-[9998]" style={{ background: 'transparent' }} />
@@ -901,7 +1219,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
               className="w-full px-3 py-2.5 text-[12px] text-text hover:bg-white/[0.04] border-t text-left transition-colors flex items-center gap-2.5"
               style={{ borderColor: 'rgba(139,92,246,0.12)' }}
             >
-              <span className="w-4 h-4 rounded-full border border-current flex items-center justify-center text-[10px] opacity-60">＋</span>
+              <span className="w-4 h-4 rounded-full border border-current flex items-center justify-center text-[10px] opacity-60">+</span>
               <span>Ajouter un compte</span>
             </button>
             <button
@@ -909,9 +1227,10 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
               className="w-full px-3 py-2.5 text-[12px] text-danger hover:bg-danger/10 border-t text-left transition-colors flex items-center gap-2.5"
               style={{ borderColor: 'rgba(139,92,246,0.12)' }}
             >
-              <span className="flex items-center gap-2">
-                <span>🚪</span><span>Se déconnecter</span>
-              </span>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3h4a3 3 0 0 1 3 3v1"/>
+              </svg>
+              <span>Se déconnecter</span>
             </button>
           </div>
         </>
