@@ -847,27 +847,32 @@ export function Phones({ user }: PhonesProps) {
           const offlinePct = phones.length ? Math.round((offlineCount / phones.length) * 100) : 0
           const syncPct    = onlinePct
 
-          const Sparkline = ({ color, down }: { color: string; down?: boolean }) => (
-            <svg width="72" height="28" viewBox="0 0 72 28" fill="none" className="opacity-80">
-              <defs>
-                <linearGradient id={`sg-${color.replace('#','')}`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={color} stopOpacity="0.25" />
-                  <stop offset="100%" stopColor={color} stopOpacity="0" />
-                </linearGradient>
-              </defs>
-              {down ? (
-                <>
-                  <path d="M0 6 L9 8 L18 5 L27 11 L36 9 L45 16 L54 14 L63 20 L72 22" stroke={color} strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
-                  <path d="M0 6 L9 8 L18 5 L27 11 L36 9 L45 16 L54 14 L63 20 L72 22 L72 28 L0 28Z" fill={`url(#sg-${color.replace('#','')})`}/>
-                </>
-              ) : (
-                <>
-                  <path d="M0 22 L9 18 L18 20 L27 13 L36 15 L45 9 L54 11 L63 5 L72 3" stroke={color} strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
-                  <path d="M0 22 L9 18 L18 20 L27 13 L36 15 L45 9 L54 11 L63 5 L72 3 L72 28 L0 28Z" fill={`url(#sg-${color.replace('#','')})`}/>
-                </>
-              )}
-            </svg>
-          )
+          // Génère un chemin SVG dont le niveau correspond au pourcentage réel
+          const Sparkline = ({ color, pct }: { color: string; pct: number }) => {
+            const W = 72, H = 26
+            const nPts = 9
+            // baseY inversé : 100% → haut (y=2), 0% → bas (y=H-2)
+            const baseY = H - 2 - (pct / 100) * (H - 4)
+            const amp = Math.min(pct, 100 - pct) * 0.06 * H + 1.5 // wobble réduit aux extrêmes
+            const ys = Array.from({ length: nPts }, (_, i) =>
+              Math.max(1, Math.min(H - 1, baseY + Math.sin(i * 1.8 + pct * 0.07) * amp))
+            )
+            const linePts = ys.map((y, i) => `${i === 0 ? 'M' : 'L'}${((i / (nPts - 1)) * W).toFixed(1)},${y.toFixed(1)}`).join(' ')
+            const fillPts = linePts + ` L${W},${H} L0,${H}Z`
+            const gid = `sg${color.replace('#', '')}`
+            return (
+              <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} fill="none" className="opacity-85">
+                <defs>
+                  <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={color} stopOpacity="0.3"/>
+                    <stop offset="100%" stopColor={color} stopOpacity="0"/>
+                  </linearGradient>
+                </defs>
+                <path d={fillPts} fill={`url(#${gid})`}/>
+                <path d={linePts} stroke={color} strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            )
+          }
 
           const RingIcon = ({ pct, color }: { pct: number; color: string }) => {
             const r = 16, circ = 2 * Math.PI * r
@@ -910,8 +915,8 @@ export function Phones({ user }: PhonesProps) {
 
           const cards: { label: string; value: string; sub: string; color: string; f: 'all'|'online'|'offline'|null; deco: React.ReactNode }[] = [
             { label: 'TOTAL',           value: String(phones.length), sub: 'téléphones',    color: '#818cf8', f: 'all',    deco: <PhoneIcon color="#818cf8" /> },
-            { label: 'EN LIGNE',        value: String(onlineCount),   sub: `${onlinePct}%`, color: '#00ccaa', f: 'online', deco: <Sparkline color="#00ccaa" /> },
-            { label: 'HORS LIGNE',      value: String(offlineCount),  sub: `${offlinePct}%`,color: '#f87171', f: 'offline',deco: <Sparkline color="#f87171" down /> },
+            { label: 'EN LIGNE',        value: String(onlineCount),   sub: `${onlinePct}%`, color: '#00ccaa', f: 'online', deco: <Sparkline color="#00ccaa" pct={onlinePct} /> },
+            { label: 'HORS LIGNE',      value: String(offlineCount),  sub: `${offlinePct}%`,color: '#f87171', f: 'offline',deco: <Sparkline color="#f87171" pct={offlinePct} /> },
             { label: 'COMPTES ACTIFS',  value: String(igCount),       sub: 'Instagram',     color: '#e1306c', f: null,     deco: <PeopleIcon color="#e1306c" /> },
             { label: 'GROUPES',         value: String(groupCount),    sub: 'groupes actifs',color: '#f59e0b', f: null,     deco: <GridIcon color="#f59e0b" /> },
             { label: 'SYNCHRONISATION', value: `${syncPct}%`,         sub: lastUpdated ? `màj ${lastUpdated.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}` : 'À jour', color: '#10b981', f: null, deco: <RingIcon pct={syncPct} color="#10b981" /> },
