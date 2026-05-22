@@ -314,6 +314,979 @@ export function Scheduler({ user, onNavigate }: Props) {
   )
 }
 
+// ── Simple post wizard ─────────────────────────────────────────────────────────
+
+type WizardStep = 1 | 2 | 3 | 4
+
+function SimplePostWizard({ user, onBack, onDone }: {
+  user: import('@supabase/supabase-js').User
+  onBack: () => void
+  onDone: () => void
+}) {
+  const { currentOrg } = useOrg()
+  const conns = useConnections(user)
+
+  const [step, setStep]         = useState<WizardStep>(1)
+  const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+
+  // ── Step 1 – Videos ─────────────────────────────────────────────
+  const [videos, setVideos]           = useState<ContentItem[]>([])
+  const [videosLoading, setVideosLoading] = useState(true)
+  const [selectedVideoIds, setSelectedVideoIds] = useState<Set<string>>(new Set())
+  const [videoSearch, setVideoSearch] = useState('')
+  const [videoTab, setVideoTab]       = useState<'bank' | 'folders'>('bank')
+  const [folders, setFolders]         = useState<string[]>([])
+  const [folderFilter, setFolderFilter] = useState<string>('all')
+
+  // ── Step 2 – Phones ─────────────────────────────────────────────
+  const [phones, setPhones]           = useState<Phone[]>([])
+  const [phonesLoading, setPhonesLoading] = useState(true)
+  const [selectedPhoneIds, setSelectedPhoneIds] = useState<Set<string>>(new Set())
+  const [targetTab, setTargetTab]     = useState<'phones' | 'groups'>('phones')
+  const [phoneSearch, setPhoneSearch] = useState('')
+
+  // ── Step 3 – Schedule ────────────────────────────────────────────
+  const [scheduleMode, setScheduleMode] = useState<'ponctuel' | 'recurrent'>('ponctuel')
+  const todayStr = new Date().toISOString().split('T')[0]
+  const defaultTime = (() => {
+    const d = new Date(); d.setHours(d.getHours() + 1, 0, 0, 0)
+    return d.toTimeString().slice(0,5)
+  })()
+  const [scheduleDate, setScheduleDate] = useState(todayStr)
+  const [scheduleTime, setScheduleTime] = useState(defaultTime)
+  const [timezone] = useState(() => Intl.DateTimeFormat().resolvedOptions().timeZone)
+  const [caption, setCaption]         = useState('')
+
+  // Recurrence
+  const [recurrenceType, setRecurrenceType] = useState<'daily' | 'weekly' | 'monthly'>('daily')
+  const [recurrenceDays, setRecurrenceDays] = useState<number[]>([1]) // 0=Sun,...,6=Sat
+  const [recurrenceTime, setRecurrenceTime] = useState(defaultTime)
+  const [recurrenceEndDate, setRecurrenceEndDate] = useState('')
+
+  // ── Load data ────────────────────────────────────────────────────
+  useEffect(() => {
+    async function load() {
+      setVideosLoading(true)
+      let q = supabase.from('content_bank').select('*').order('created_at', { ascending: false })
+      if (currentOrg) q = q.eq('org_id', currentOrg.id)
+      else q = q.eq('user_id', user.id).is('org_id', null)
+      const { data } = await q
+      const items = (data ?? []) as ContentItem[]
+      setVideos(items)
+      const fs = Array.from(new Set(items.map(v => v.folder).filter(Boolean))) as string[]
+      setFolders(fs)
+      setVideosLoading(false)
+    }
+    load()
+  }, [currentOrg?.id, user.id])
+
+  useEffect(() => {
+    async function load() {
+      setPhonesLoading(true)
+      let q = supabase.from('phones').select('*').order('phone_name')
+      if (currentOrg) q = q.eq('org_id', currentOrg.id)
+      else q = q.eq('user_id', user.id).is('org_id', null)
+      const { data } = await q
+      setPhones((data ?? []) as Phone[])
+      setPhonesLoading(false)
+    }
+    load()
+  }, [currentOrg?.id, user.id])
+
+  // ── Derived ──────────────────────────────────────────────────────
+  const filteredVideos = videos.filter(v => {
+    if (folderFilter !== 'all' && v.folder !== folderFilter) return false
+    if (videoSearch) {
+      const q = videoSearch.toLowerCase()
+      return v.title.toLowerCase().includes(q) || (v.notes ?? '').toLowerCase().includes(q)
+    }
+    return true
+  })
+
+  const filteredPhones = phones.filter(p => {
+    if (!phoneSearch) return true
+    const q = phoneSearch.toLowerCase()
+    return p.phone_name.toLowerCase().includes(q) ||
+      (p.ig_username ?? '').toLowerCase().includes(q) ||
+      (p.group_name ?? '').toLowerCase().includes(q)
+  })
+
+  const groups = Array.from(new Set(phones.map(p => p.group_name).filter(Boolean))) as string[]
+  const selectedVideos = videos.filter(v => selectedVideoIds.has(v.id))
+  const selectedPhones = phones.filter(p => selectedPhoneIds.has(p.id))
+
+  function fmtDuration(sec: number | null): string {
+    if (!sec) return '—'
+    const m = Math.floor(sec / 60), s = sec % 60
+    return `${m}:${s.toString().padStart(2,'0')}`
+  }
+
+  function fmtDate(dateStr: string, timeStr: string): string {
+    const d = new Date(`${dateStr}T${timeStr}`)
+    return d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+      + ` à ${timeStr}`
+  }
+
+  // ── Submit ────────────────────────────────────────────────────────
+  async function submit() {
+    if (!conns.bearer) { setSubmitError('Token GéeLark manquant — configure-le dans Paramètres.'); return }
+    setSubmitting(true); setSubmitError(null)
+    try {
+      const scheduledAt = new Date(`${scheduleDate}T${scheduleTime}`)
+      const phoneRecords: ScheduledPhoneRecord[] = selectedPhones.map(p => ({
+        id: p.id, geelark_id: p.geelark_id, phone_name: p.phone_name, ig_username: p.ig_username,
+      }))
+      const videoRecords: ScheduledVideoRecord[] = selectedVideos.map(v => ({
+        token: v.storage_path ?? v.file_url ?? '', title: v.title,
+      }))
+      await createScheduledPost({
+        userId: user.id, orgId: currentOrg?.id ?? null,
+        createdByName: user.email ?? 'Moi',
+        type: 'posting', scheduledAt, phones: phoneRecords,
+        videos: videoRecords, caption, delayMinutes: 0, mode: 'seq',
+        bearerToken: conns.bearer,
+      })
+      onDone()
+    } catch (e) {
+      setSubmitError(e instanceof Error ? e.message : 'Erreur lors de la programmation.')
+      setSubmitting(false)
+    }
+  }
+
+  // ── Stepper ───────────────────────────────────────────────────────
+  const STEPS = [
+    { n: 1, label: 'Contenu',      sub: 'Sélectionne tes vidéos' },
+    { n: 2, label: 'Cibles',       sub: 'Choisis tes téléphones ou groupes' },
+    { n: 3, label: 'Planification',sub: 'Configure la date et la récurrence' },
+  ]
+
+  const canNext =
+    step === 1 ? selectedVideoIds.size > 0 :
+    step === 2 ? selectedPhoneIds.size > 0 :
+    step === 3 ? !!scheduleDate && !!scheduleTime :
+    false
+
+  return (
+    <div className="h-full flex flex-col overflow-hidden" style={{ background: '#07070B' }}>
+
+      {/* ── Sub-header ────────────────────────────────────────────── */}
+      <div className="flex-shrink-0 px-8 pt-5 pb-4 flex items-center justify-between"
+        style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+            style={{ background: 'linear-gradient(135deg,#2563EB,#3B82F6)', boxShadow: '0 4px 12px -2px rgba(37,99,235,0.4)' }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="4" width="18" height="18" rx="2"/>
+              <line x1="16" y1="2" x2="16" y2="6"/>
+              <line x1="8" y1="2" x2="8" y2="6"/>
+              <line x1="3" y1="10" x2="21" y2="10"/>
+            </svg>
+          </div>
+          <div>
+            <h2 className="text-[18px] font-black text-white leading-none">Programmation simple</h2>
+            <p className="text-[11px] mt-0.5" style={{ color: 'rgba(148,163,184,0.45)' }}>
+              Programme ce post à une date et heure précise de façon récurrente.
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick={onBack}
+            className="px-4 py-2 rounded-xl text-[12px] font-semibold transition-all hover:bg-white/[0.04]"
+            style={{ border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(148,163,184,0.55)' }}>
+            Quitter
+          </button>
+          <button
+            className="px-4 py-2 rounded-xl text-[12px] font-semibold transition-all hover:bg-white/[0.04]"
+            style={{ border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(148,163,184,0.55)' }}>
+            Enregistrer le brouillon
+          </button>
+          {step < 4 ? (
+            <button onClick={() => canNext && setStep(s => (s + 1) as WizardStep)} disabled={!canNext}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-[13px] font-bold transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-35"
+              style={{ background: 'linear-gradient(130deg,#7C3AED,#8B5CF6)', color: '#fff', boxShadow: canNext ? '0 4px 16px -4px rgba(124,58,237,0.5)' : 'none' }}>
+              Étape suivante
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 6h7M6.5 3l3 3-3 3" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            </button>
+          ) : (
+            <button onClick={submit} disabled={submitting}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-[13px] font-bold transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-50"
+              style={{ background: 'linear-gradient(130deg,#7C3AED,#8B5CF6)', color: '#fff', boxShadow: '0 4px 16px -4px rgba(124,58,237,0.5)' }}>
+              {submitting ? (
+                <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="white" strokeWidth="3" strokeDasharray="31.4" strokeDashoffset="10"/></svg>
+              ) : (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="4" width="18" height="18" rx="2"/>
+                  <line x1="16" y1="2" x2="16" y2="6"/>
+                  <line x1="8" y1="2" x2="8" y2="6"/>
+                  <line x1="3" y1="10" x2="21" y2="10"/>
+                </svg>
+              )}
+              {submitting ? 'Programmation…' : 'Programmer le post'}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* ── Stepper ───────────────────────────────────────────────── */}
+      <div className="flex-shrink-0 px-8 py-4 flex items-center gap-0"
+        style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+        {STEPS.map((s, i) => {
+          const done    = step > s.n || step === 4
+          const active  = step === s.n
+          const lineClr = done ? '#8B5CF6' : 'rgba(255,255,255,0.08)'
+          return (
+            <div key={s.n} className="flex items-center" style={{ flex: i < STEPS.length - 1 ? '1' : '0' }}>
+              <div className="flex items-center gap-2.5 flex-shrink-0">
+                {/* Circle */}
+                <div className="w-7 h-7 rounded-full flex items-center justify-center text-[12px] font-black transition-all flex-shrink-0"
+                  style={done
+                    ? { background: 'linear-gradient(135deg,#7C3AED,#8B5CF6)', color: '#fff' }
+                    : active
+                    ? { background: 'rgba(139,92,246,0.15)', border: '2px solid #8B5CF6', color: '#C4B5FD' }
+                    : { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(148,163,184,0.35)' }
+                  }>
+                  {done ? (
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                      <path d="M2 6l3 3 5-5" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  ) : s.n}
+                </div>
+                {/* Labels */}
+                <div>
+                  <p className="text-[12px] font-bold leading-none"
+                    style={{ color: done || active ? '#fff' : 'rgba(148,163,184,0.35)' }}>
+                    {s.label}
+                  </p>
+                  <p className="text-[10px] mt-0.5 leading-none"
+                    style={{ color: done || active ? 'rgba(148,163,184,0.5)' : 'rgba(148,163,184,0.25)' }}>
+                    {s.sub}
+                  </p>
+                </div>
+              </div>
+              {/* Connector line */}
+              {i < STEPS.length - 1 && (
+                <div className="flex-1 h-px mx-4" style={{ background: lineClr, transition: 'background 0.3s' }} />
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      {/* ── Content area ──────────────────────────────────────────── */}
+      <div className="flex-1 overflow-hidden">
+
+        {/* ── Step 1: Vidéos ─────────────────────────────────────── */}
+        {step === 1 && (
+          <div className="h-full flex flex-col">
+            <div className="flex-shrink-0 px-8 pt-5 pb-3">
+              <h3 className="text-[16px] font-black text-white">Sélectionne tes vidéos</h3>
+              <p className="text-[12px] mt-0.5" style={{ color: 'rgba(148,163,184,0.45)' }}>Choisis les vidéos que tu souhaites publier.</p>
+            </div>
+
+            {/* Tabs */}
+            <div className="flex-shrink-0 px-8 mb-3">
+              <div className="flex gap-1 p-1 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', width: 'fit-content' }}>
+                {([
+                  { id: 'bank' as const, label: 'Banque vidéos', icon: <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M10 8l6 4-6 4V8z"/></svg> },
+                  { id: 'folders' as const, label: 'Dossiers de la banque', icon: <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> },
+                ]).map(t => (
+                  <button key={t.id} onClick={() => setVideoTab(t.id)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-all"
+                    style={videoTab === t.id
+                      ? { background: 'rgba(139,92,246,0.15)', color: '#C4B5FD', border: '1px solid rgba(139,92,246,0.25)' }
+                      : { color: 'rgba(148,163,184,0.45)' }}>
+                    {t.icon}{t.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Search + filters */}
+            <div className="flex-shrink-0 px-8 mb-3 flex items-center gap-2">
+              <div className="flex-1 relative">
+                <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 opacity-30" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                <input type="text" placeholder="Rechercher une vidéo…" value={videoSearch}
+                  onChange={e => setVideoSearch(e.target.value)}
+                  className="w-full rounded-xl pl-9 pr-4 py-2 text-[13px] focus:outline-none"
+                  style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#e2e8f0' }}
+                />
+              </div>
+              {videoTab === 'folders' && folders.length > 0 && (
+                <div className="relative">
+                  <select value={folderFilter} onChange={e => setFolderFilter(e.target.value)}
+                    className="appearance-none rounded-xl px-3 py-2 pr-7 text-[12px] focus:outline-none cursor-pointer"
+                    style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(148,163,184,0.7)' }}>
+                    <option value="all">Tous les dossiers</option>
+                    {folders.map(f => <option key={f} value={f}>{f}</option>)}
+                  </select>
+                </div>
+              )}
+              <button className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[12px] font-medium flex-shrink-0"
+                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(148,163,184,0.6)' }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/></svg>
+                Filtres
+              </button>
+            </div>
+
+            {/* Video table */}
+            <div className="flex-1 overflow-y-auto px-8 pb-4" style={{ scrollbarWidth: 'none' }}>
+              {videosLoading ? (
+                <div className="flex justify-center py-16"><Spinner size="lg" /></div>
+              ) : filteredVideos.length === 0 ? (
+                <div className="text-center py-16">
+                  <p className="text-[13px] text-text2">Aucune vidéo trouvée.</p>
+                </div>
+              ) : (
+                <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                  {/* Table header */}
+                  <div className="grid items-center px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider"
+                    style={{ gridTemplateColumns: '36px 1fr 90px 120px 36px', borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)', color: 'rgba(148,163,184,0.4)' }}>
+                    <span />
+                    <span>Vidéos ({filteredVideos.length})</span>
+                    <span>Durée</span>
+                    <span>Ajouté le</span>
+                    <span />
+                  </div>
+                  {filteredVideos.map((video, i) => {
+                    const checked = selectedVideoIds.has(video.id)
+                    return (
+                      <div key={video.id}
+                        className="grid items-center px-4 py-3 cursor-pointer group transition-colors hover:bg-white/[0.025]"
+                        style={{ gridTemplateColumns: '36px 1fr 90px 120px 36px', borderBottom: i < filteredVideos.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}
+                        onClick={() => setSelectedVideoIds(prev => {
+                          const next = new Set(prev)
+                          next.has(video.id) ? next.delete(video.id) : next.add(video.id)
+                          return next
+                        })}>
+                        {/* Checkbox */}
+                        <div className="flex items-center justify-center">
+                          <div className="w-4 h-4 rounded flex items-center justify-center transition-all flex-shrink-0"
+                            style={checked
+                              ? { background: '#8B5CF6', border: '1px solid #8B5CF6' }
+                              : { background: 'transparent', border: '1px solid rgba(148,163,184,0.25)' }}>
+                            {checked && <svg width="8" height="8" viewBox="0 0 10 10" fill="none"><path d="M1.5 5l2.5 2.5 5-5" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                          </div>
+                        </div>
+                        {/* Thumbnail + title */}
+                        <div className="flex items-center gap-3 min-w-0 pr-3">
+                          <div className="w-14 h-[38px] rounded-lg overflow-hidden flex-shrink-0 relative"
+                            style={{ background: '#0E0E16', border: checked ? '1px solid rgba(139,92,246,0.4)' : '1px solid rgba(255,255,255,0.06)' }}>
+                            <VideoThumbnail filePath={video.file_url} thumbnailPath={video.thumbnail_path} storagePath={video.storage_path} />
+                            <div className="absolute bottom-0.5 right-0.5 px-1 py-0.5 rounded text-[9px] font-bold" style={{ background: 'rgba(0,0,0,0.7)', color: '#e2e8f0' }}>
+                              {fmtDuration(video.duration)}
+                            </div>
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-[13px] font-semibold text-white truncate">{video.title}</p>
+                            {video.folder && <p className="text-[10px] truncate mt-0.5" style={{ color: 'rgba(148,163,184,0.4)' }}>{video.folder}</p>}
+                          </div>
+                        </div>
+                        {/* Duration */}
+                        <span className="text-[12px]" style={{ color: 'rgba(148,163,184,0.5)' }}>{fmtDuration(video.duration)}</span>
+                        {/* Date */}
+                        <span className="text-[12px]" style={{ color: 'rgba(148,163,184,0.4)' }}>
+                          {new Date(video.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                        </span>
+                        {/* Kebab */}
+                        <div className="opacity-0 group-hover:opacity-60 flex items-center justify-center">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style={{ color: 'rgba(148,163,184,0.6)' }}><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="flex-shrink-0 px-8 py-4 flex items-center justify-between"
+              style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+              <div className="flex items-center gap-3">
+                <span className="text-[13px] font-semibold" style={{ color: selectedVideoIds.size > 0 ? '#C4B5FD' : 'rgba(148,163,184,0.35)' }}>
+                  {selectedVideoIds.size} vidéo{selectedVideoIds.size !== 1 ? 's' : ''} sélectionnée{selectedVideoIds.size !== 1 ? 's' : ''}
+                </span>
+                {selectedVideoIds.size > 0 && (
+                  <button onClick={() => setSelectedVideoIds(new Set())}
+                    className="text-[12px] transition-colors hover:text-white"
+                    style={{ color: 'rgba(148,163,184,0.4)' }}>
+                    Effacer la sélection
+                  </button>
+                )}
+              </div>
+              <button onClick={() => canNext && setStep(2)} disabled={!canNext}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-[13px] font-bold transition-all hover:opacity-90 disabled:opacity-30"
+                style={{ background: 'linear-gradient(130deg,#7C3AED,#8B5CF6)', color: '#fff' }}>
+                Étape suivante
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 6h7M6.5 3l3 3-3 3" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Step 2: Cibles ─────────────────────────────────────── */}
+        {step === 2 && (
+          <div className="h-full flex overflow-hidden">
+
+            {/* Left: phone list */}
+            <div className="flex-1 flex flex-col min-w-0">
+              <div className="flex-shrink-0 px-8 pt-5 pb-3">
+                <h3 className="text-[16px] font-black text-white">Choisis tes cibles</h3>
+                <p className="text-[12px] mt-0.5" style={{ color: 'rgba(148,163,184,0.45)' }}>Sélectionne les téléphones ou groupes qui publieront ce post.</p>
+              </div>
+
+              {/* Tabs */}
+              <div className="flex-shrink-0 px-8 mb-3">
+                <div className="flex gap-1 p-1 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', width: 'fit-content' }}>
+                  {([
+                    { id: 'phones' as const, label: 'Téléphones', icon: <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg> },
+                    { id: 'groups' as const, label: 'Groupes', icon: <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg> },
+                  ]).map(t => (
+                    <button key={t.id} onClick={() => setTargetTab(t.id)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-all"
+                      style={targetTab === t.id
+                        ? { background: 'rgba(139,92,246,0.15)', color: '#C4B5FD', border: '1px solid rgba(139,92,246,0.25)' }
+                        : { color: 'rgba(148,163,184,0.45)' }}>
+                      {t.icon}{t.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Search */}
+              <div className="flex-shrink-0 px-8 mb-3 flex items-center gap-2">
+                <div className="flex-1 relative">
+                  <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 opacity-30" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                  <input type="text" placeholder="Rechercher un téléphone…" value={phoneSearch}
+                    onChange={e => setPhoneSearch(e.target.value)}
+                    className="w-full rounded-xl pl-9 pr-4 py-2 text-[13px] focus:outline-none"
+                    style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#e2e8f0' }}
+                  />
+                </div>
+                <button className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[12px] font-medium flex-shrink-0"
+                  style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(148,163,184,0.6)' }}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/></svg>
+                  Filtres
+                </button>
+              </div>
+
+              {/* Phone list */}
+              <div className="flex-1 overflow-y-auto px-8 pb-4" style={{ scrollbarWidth: 'none' }}>
+                {phonesLoading ? (
+                  <div className="flex justify-center py-16"><Spinner size="lg" /></div>
+                ) : targetTab === 'phones' ? (
+                  <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                    {filteredPhones.length === 0 ? (
+                      <p className="px-5 py-10 text-center text-[13px] text-text2">Aucun téléphone trouvé.</p>
+                    ) : filteredPhones.map((phone, i) => {
+                      const checked = selectedPhoneIds.has(phone.id)
+                      const col = phoneColorWiz(phone.phone_name)
+                      return (
+                        <div key={phone.id}
+                          className="flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors hover:bg-white/[0.025]"
+                          style={{
+                            borderBottom: i < filteredPhones.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
+                            borderLeft: checked ? '2px solid #8B5CF6' : '2px solid transparent',
+                          }}
+                          onClick={() => setSelectedPhoneIds(prev => {
+                            const next = new Set(prev)
+                            next.has(phone.id) ? next.delete(phone.id) : next.add(phone.id)
+                            return next
+                          })}>
+                          {/* Phone icon */}
+                          <div className="w-8 h-8 rounded-xl flex-shrink-0 flex items-center justify-center text-[14px]"
+                            style={{ background: `linear-gradient(135deg,${col}22,${col}11)`, border: `1px solid ${col}30` }}>
+                            📱
+                          </div>
+                          {/* Info */}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[13px] font-semibold text-white truncate">{phone.phone_name}</p>
+                            <p className="text-[10px] truncate mt-0.5" style={{ color: 'rgba(196,181,253,0.6)' }}>
+                              {phone.group_name ?? 'Sans groupe'}
+                            </p>
+                          </div>
+                          {/* Status */}
+                          <div className="flex-shrink-0">
+                            {phone.status === 'online' ? (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                                style={{ background: 'rgba(0,204,170,0.1)', color: '#00ccaa', border: '1px solid rgba(0,204,170,0.15)' }}>
+                                <span className="w-1 h-1 rounded-full bg-ok" />En ligne
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                                style={{ background: 'rgba(71,85,105,0.12)', color: '#64748b', border: '1px solid rgba(71,85,105,0.2)' }}>
+                                <span className="w-1 h-1 rounded-full bg-current" />Hors ligne
+                              </span>
+                            )}
+                          </div>
+                          {/* Checkbox */}
+                          <div className="w-4 h-4 rounded flex items-center justify-center flex-shrink-0 transition-all"
+                            style={checked
+                              ? { background: '#8B5CF6', border: '1px solid #8B5CF6' }
+                              : { background: 'transparent', border: '1px solid rgba(148,163,184,0.22)' }}>
+                            {checked && <svg width="8" height="8" viewBox="0 0 10 10" fill="none"><path d="M1.5 5l2.5 2.5 5-5" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  /* Groups view */
+                  <div className="space-y-2">
+                    {groups.length === 0 ? (
+                      <p className="text-center py-10 text-[13px] text-text2">Aucun groupe trouvé.</p>
+                    ) : groups.filter(g => !phoneSearch || g.toLowerCase().includes(phoneSearch.toLowerCase())).map(group => {
+                      const groupPhones = phones.filter(p => p.group_name === group)
+                      const allChecked  = groupPhones.every(p => selectedPhoneIds.has(p.id))
+                      const someChecked = groupPhones.some(p => selectedPhoneIds.has(p.id))
+                      return (
+                        <div key={group}
+                          className="rounded-xl px-4 py-3 flex items-center gap-3 cursor-pointer transition-all hover:bg-white/[0.03]"
+                          style={{ background: 'rgba(255,255,255,0.02)', border: allChecked ? '1px solid rgba(139,92,246,0.3)' : '1px solid rgba(255,255,255,0.07)' }}
+                          onClick={() => setSelectedPhoneIds(prev => {
+                            const next = new Set(prev)
+                            if (allChecked) groupPhones.forEach(p => next.delete(p.id))
+                            else groupPhones.forEach(p => next.add(p.id))
+                            return next
+                          })}>
+                          <div className="w-9 h-9 rounded-xl flex-shrink-0 flex items-center justify-center"
+                            style={{ background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.2)' }}>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A78BFA" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[13px] font-semibold text-white">{group}</p>
+                            <p className="text-[11px]" style={{ color: 'rgba(148,163,184,0.45)' }}>{groupPhones.length} téléphone{groupPhones.length > 1 ? 's' : ''}</p>
+                          </div>
+                          <div className="w-4 h-4 rounded flex items-center justify-center transition-all"
+                            style={allChecked
+                              ? { background: '#8B5CF6', border: '1px solid #8B5CF6' }
+                              : someChecked
+                              ? { background: 'rgba(139,92,246,0.3)', border: '1px solid rgba(139,92,246,0.5)' }
+                              : { background: 'transparent', border: '1px solid rgba(148,163,184,0.22)' }}>
+                            {(allChecked || someChecked) && <svg width="8" height="8" viewBox="0 0 10 10" fill="none"><path d="M1.5 5l2.5 2.5 5-5" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="flex-shrink-0 px-8 py-4 flex items-center justify-between"
+                style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                <button onClick={() => setStep(1)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-[12px] font-semibold transition-all hover:bg-white/[0.04]"
+                  style={{ border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(148,163,184,0.6)' }}>
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M9.5 6h-7M5.5 9L2.5 6l3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                  Étape précédente
+                </button>
+                <button onClick={() => selectedPhoneIds.size > 0 && setStep(3)} disabled={selectedPhoneIds.size === 0}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-[13px] font-bold transition-all hover:opacity-90 disabled:opacity-30"
+                  style={{ background: 'linear-gradient(130deg,#7C3AED,#8B5CF6)', color: '#fff' }}>
+                  Étape suivante
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 6h7M6.5 3l3 3-3 3" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Right: selected phones panel */}
+            {selectedPhoneIds.size > 0 && (
+              <div className="w-[280px] flex-shrink-0 flex flex-col border-l overflow-hidden"
+                style={{ borderColor: 'rgba(255,255,255,0.07)', background: 'rgba(10,10,20,0.5)' }}>
+                <div className="px-5 pt-5 pb-3 flex items-center justify-between flex-shrink-0"
+                  style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                  <span className="text-[13px] font-bold text-white">{selectedPhoneIds.size} sélectionnés</span>
+                  <button onClick={() => setSelectedPhoneIds(new Set())}
+                    className="text-[11px] transition-colors hover:text-white"
+                    style={{ color: 'rgba(148,163,184,0.4)' }}>
+                    Tout désélectionner
+                  </button>
+                </div>
+                <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2" style={{ scrollbarWidth: 'none' }}>
+                  {selectedPhones.map(p => (
+                    <div key={p.id} className="flex items-center gap-2.5 px-3 py-2 rounded-xl"
+                      style={{ background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.12)' }}>
+                      <div className="w-7 h-7 rounded-lg flex-shrink-0 flex items-center justify-center text-[13px]"
+                        style={{ background: 'rgba(139,92,246,0.1)' }}>📱</div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[12px] font-semibold text-white truncate">{p.phone_name}</p>
+                        <p className="text-[10px] truncate" style={{ color: 'rgba(148,163,184,0.45)' }}>
+                          {p.group_name ?? '—'}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
+                          style={p.status === 'online'
+                            ? { background: 'rgba(0,204,170,0.12)', color: '#00ccaa' }
+                            : { background: 'rgba(71,85,105,0.15)', color: '#64748b' }}>
+                          {p.status === 'online' ? 'En ligne' : 'Hors ligne'}
+                        </span>
+                        <button onClick={() => setSelectedPhoneIds(prev => { const n = new Set(prev); n.delete(p.id); return n })}
+                          className="w-4 h-4 flex items-center justify-center rounded opacity-50 hover:opacity-100 transition-opacity"
+                          style={{ color: 'rgba(148,163,184,0.6)' }}>
+                          <svg width="8" height="8" viewBox="0 0 10 10" fill="none"><path d="M1 1l8 8M9 1L1 9" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Step 3: Planification ───────────────────────────────── */}
+        {step === 3 && (
+          <div className="h-full flex overflow-hidden">
+
+            {/* Left: form */}
+            <div className="flex-1 flex flex-col min-w-0 overflow-y-auto px-8 py-5" style={{ scrollbarWidth: 'none' }}>
+              <h3 className="text-[16px] font-black text-white mb-0.5">Planifie la publication</h3>
+              <p className="text-[12px] mb-5" style={{ color: 'rgba(148,163,184,0.45)' }}>Choisis quand et à quelle fréquence ton post sera publié.</p>
+
+              {/* Mode */}
+              <div className="mb-5">
+                <label className="text-[11px] font-semibold uppercase tracking-wider mb-2.5 block" style={{ color: 'rgba(148,163,184,0.45)' }}>Mode de planification</label>
+                <div className="grid grid-cols-2 gap-3">
+                  {([
+                    { id: 'ponctuel' as const, label: 'Ponctuel', sub: 'Publier à une date et heure précises',
+                      icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> },
+                    { id: 'recurrent' as const, label: 'Récurrent', sub: 'Répéter selon une fréquence',
+                      icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 2v6h-6M3 12a9 9 0 0 1 15-6.7L21 8M3 22v-6h6M21 12a9 9 0 0 1-15 6.7L3 16"/></svg> },
+                  ]).map(m => (
+                    <button key={m.id} onClick={() => setScheduleMode(m.id)}
+                      className="flex items-start gap-3 px-4 py-3.5 rounded-xl text-left transition-all"
+                      style={scheduleMode === m.id
+                        ? { background: 'rgba(139,92,246,0.08)', border: '1.5px solid rgba(139,92,246,0.4)', color: '#C4B5FD' }
+                        : { background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(148,163,184,0.6)' }}>
+                      <div className={`mt-0.5 flex-shrink-0 ${scheduleMode === m.id ? 'text-accent' : ''}`}>{m.icon}</div>
+                      <div>
+                        <p className="text-[13px] font-bold text-white">{m.label}</p>
+                        <p className="text-[11px] mt-0.5" style={{ color: 'rgba(148,163,184,0.5)' }}>{m.sub}</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {scheduleMode === 'ponctuel' ? (
+                <>
+                  {/* Date + Time */}
+                  <div className="mb-5">
+                    <label className="text-[11px] font-semibold uppercase tracking-wider mb-2.5 block" style={{ color: 'rgba(148,163,184,0.45)' }}>Date et heure</label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="flex items-center gap-2.5 px-4 py-3 rounded-xl"
+                        style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(148,163,184,0.5)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                        <input type="date" value={scheduleDate} onChange={e => setScheduleDate(e.target.value)}
+                          className="flex-1 bg-transparent text-[13px] font-semibold text-white focus:outline-none"
+                          min={todayStr}
+                        />
+                      </div>
+                      <div className="flex items-center gap-2.5 px-4 py-3 rounded-xl"
+                        style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(148,163,184,0.5)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                        <input type="time" value={scheduleTime} onChange={e => setScheduleTime(e.target.value)}
+                          className="flex-1 bg-transparent text-[13px] font-semibold text-white focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Timezone */}
+                  <div className="mb-5">
+                    <label className="text-[11px] font-semibold uppercase tracking-wider mb-2.5 block" style={{ color: 'rgba(148,163,184,0.45)' }}>Fuseau horaire</label>
+                    <div className="flex items-center gap-2.5 px-4 py-3 rounded-xl"
+                      style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(148,163,184,0.5)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                      <span className="text-[13px] font-semibold text-white flex-1">{timezone}</span>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* Recurrence type */}
+                  <div className="mb-5">
+                    <label className="text-[11px] font-semibold uppercase tracking-wider mb-2.5 block" style={{ color: 'rgba(148,163,184,0.45)' }}>Fréquence</label>
+                    <div className="flex gap-2">
+                      {([
+                        { id: 'daily' as const, label: 'Quotidien' },
+                        { id: 'weekly' as const, label: 'Hebdomadaire' },
+                        { id: 'monthly' as const, label: 'Mensuel' },
+                      ]).map(r => (
+                        <button key={r.id} onClick={() => setRecurrenceType(r.id)}
+                          className="px-4 py-2 rounded-xl text-[12px] font-semibold transition-all"
+                          style={recurrenceType === r.id
+                            ? { background: 'rgba(139,92,246,0.15)', color: '#C4B5FD', border: '1px solid rgba(139,92,246,0.3)' }
+                            : { background: 'rgba(255,255,255,0.03)', color: 'rgba(148,163,184,0.5)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                          {r.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Weekly days picker */}
+                  {recurrenceType === 'weekly' && (
+                    <div className="mb-5">
+                      <label className="text-[11px] font-semibold uppercase tracking-wider mb-2.5 block" style={{ color: 'rgba(148,163,184,0.45)' }}>Jours de la semaine</label>
+                      <div className="flex gap-2">
+                        {['D','L','M','M','J','V','S'].map((d, i) => {
+                          const active = recurrenceDays.includes(i)
+                          return (
+                            <button key={i} onClick={() => setRecurrenceDays(prev =>
+                              active ? prev.filter(x => x !== i) : [...prev, i]
+                            )}
+                              className="w-9 h-9 rounded-xl text-[12px] font-bold transition-all"
+                              style={active
+                                ? { background: 'rgba(139,92,246,0.2)', color: '#C4B5FD', border: '1px solid rgba(139,92,246,0.4)' }
+                                : { background: 'rgba(255,255,255,0.03)', color: 'rgba(148,163,184,0.4)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                              {d}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Time */}
+                  <div className="mb-5">
+                    <label className="text-[11px] font-semibold uppercase tracking-wider mb-2.5 block" style={{ color: 'rgba(148,163,184,0.45)' }}>Heure de publication</label>
+                    <div className="flex items-center gap-2.5 px-4 py-3 rounded-xl w-48"
+                      style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(148,163,184,0.5)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                      <input type="time" value={recurrenceTime} onChange={e => setRecurrenceTime(e.target.value)}
+                        className="flex-1 bg-transparent text-[13px] font-semibold text-white focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  {/* End date */}
+                  <div className="mb-5">
+                    <label className="text-[11px] font-semibold uppercase tracking-wider mb-2.5 block" style={{ color: 'rgba(148,163,184,0.45)' }}>Date de fin (optionnel)</label>
+                    <div className="flex items-center gap-2.5 px-4 py-3 rounded-xl w-64"
+                      style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(148,163,184,0.5)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                      <input type="date" value={recurrenceEndDate} onChange={e => setRecurrenceEndDate(e.target.value)}
+                        className="flex-1 bg-transparent text-[13px] font-semibold text-white focus:outline-none"
+                        min={todayStr}
+                        placeholder="Indéfini"
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* Caption */}
+              <div className="mb-5">
+                <label className="text-[11px] font-semibold uppercase tracking-wider mb-2.5 block" style={{ color: 'rgba(148,163,184,0.45)' }}>Légende (optionnel)</label>
+                <textarea value={caption} onChange={e => setCaption(e.target.value)}
+                  placeholder="Écris ta légende ici…"
+                  rows={3}
+                  className="w-full rounded-xl px-4 py-3 text-[13px] focus:outline-none resize-none"
+                  style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', color: '#e2e8f0', lineHeight: '1.6' }}
+                />
+              </div>
+
+              {/* Navigation */}
+              <div className="flex items-center justify-between pt-2">
+                <button onClick={() => setStep(2)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-[12px] font-semibold transition-all hover:bg-white/[0.04]"
+                  style={{ border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(148,163,184,0.6)' }}>
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M9.5 6h-7M5.5 9L2.5 6l3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                  Étape précédente
+                </button>
+                <button onClick={() => setStep(4)}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-[13px] font-bold transition-all hover:opacity-90"
+                  style={{ background: 'linear-gradient(130deg,#7C3AED,#8B5CF6)', color: '#fff' }}>
+                  Étape suivante
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 6h7M6.5 3l3 3-3 3" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Right: preview */}
+            <div className="w-[300px] flex-shrink-0 flex flex-col border-l overflow-y-auto px-6 py-5" style={{ borderColor: 'rgba(255,255,255,0.07)', background: 'rgba(10,10,20,0.4)', scrollbarWidth: 'none' }}>
+              <h4 className="text-[13px] font-black text-white mb-4">Aperçu planification</h4>
+
+              {/* Publication time */}
+              <div className="rounded-xl px-4 py-3.5 mb-4" style={{ background: 'rgba(37,99,235,0.06)', border: '1px solid rgba(37,99,235,0.15)' }}>
+                <p className="text-[10px] font-semibold uppercase tracking-wider mb-2.5" style={{ color: 'rgba(96,165,250,0.6)' }}>Le post sera publié :</p>
+                {scheduleDate && scheduleTime ? (
+                  <>
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#60A5FA" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                      <span className="text-[12px] font-semibold text-white">{fmtDate(scheduleDate, scheduleMode === 'ponctuel' ? scheduleTime : recurrenceTime)}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="rgba(148,163,184,0.5)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                      <span className="text-[11px]" style={{ color: 'rgba(148,163,184,0.5)' }}>{timezone}</span>
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-[12px]" style={{ color: 'rgba(148,163,184,0.35)' }}>Sélectionne une date</p>
+                )}
+              </div>
+
+              {/* Recap */}
+              <div className="rounded-xl px-4 py-3.5" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                <p className="text-[10px] font-semibold uppercase tracking-wider mb-3" style={{ color: 'rgba(148,163,184,0.4)' }}>Récapitulatif</p>
+                {[
+                  { label: 'Vidéos',  value: `${selectedVideoIds.size} vidéo${selectedVideoIds.size !== 1 ? 's' : ''}` },
+                  { label: 'Cibles',  value: `${selectedPhoneIds.size} téléphone${selectedPhoneIds.size !== 1 ? 's' : ''}` },
+                  { label: 'Mode',    value: scheduleMode === 'ponctuel' ? 'Ponctuel' : `Récurrent (${recurrenceType === 'daily' ? 'Quotidien' : recurrenceType === 'weekly' ? 'Hebdo' : 'Mensuel'})` },
+                ].map(row => (
+                  <div key={row.label} className="flex items-center justify-between py-1.5"
+                    style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                    <span className="text-[12px]" style={{ color: 'rgba(148,163,184,0.5)' }}>{row.label}</span>
+                    <span className="text-[12px] font-semibold text-white">{row.value}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Bon à savoir */}
+              <div className="mt-4 rounded-xl px-4 py-3.5" style={{ background: 'rgba(37,99,235,0.05)', border: '1px solid rgba(37,99,235,0.12)' }}>
+                <div className="flex items-center gap-2 mb-1.5">
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="5" stroke="#60A5FA" strokeWidth="1.1"/><path d="M6 4v2.5M6 7.5v.5" stroke="#60A5FA" strokeWidth="1.1" strokeLinecap="round"/></svg>
+                  <span className="text-[11px] font-bold" style={{ color: '#60A5FA' }}>Bon à savoir</span>
+                </div>
+                <p className="text-[11px] leading-relaxed" style={{ color: 'rgba(148,163,184,0.5)' }}>
+                  Les posts seront publiés dans l'ordre de la liste des téléphones sélectionnés.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Step 4: Récapitulatif ───────────────────────────────── */}
+        {step === 4 && (
+          <div className="h-full flex overflow-hidden">
+
+            {/* Left: content summary */}
+            <div className="flex-1 flex flex-col min-w-0 overflow-y-auto px-8 py-5" style={{ scrollbarWidth: 'none' }}>
+              <h3 className="text-[16px] font-black text-white mb-0.5">Récapitulatif</h3>
+              <p className="text-[12px] mb-5" style={{ color: 'rgba(148,163,184,0.45)' }}>Vérifie les informations avant de programmer ton post.</p>
+
+              {/* Videos */}
+              <div className="mb-5">
+                <p className="text-[11px] font-semibold uppercase tracking-wider mb-3" style={{ color: 'rgba(148,163,184,0.4)' }}>Contenu</p>
+                <div className="flex gap-2 flex-wrap">
+                  {selectedVideos.map(v => (
+                    <div key={v.id} className="relative w-[90px] h-[62px] rounded-xl overflow-hidden flex-shrink-0"
+                      style={{ border: '1px solid rgba(255,255,255,0.08)' }}>
+                      <VideoThumbnail filePath={v.file_url} thumbnailPath={v.thumbnail_path} storagePath={v.storage_path} />
+                      <div className="absolute bottom-1 right-1 px-1 py-0.5 rounded text-[9px] font-bold" style={{ background: 'rgba(0,0,0,0.75)', color: '#e2e8f0' }}>
+                        {fmtDuration(v.duration)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Phones */}
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wider mb-3" style={{ color: 'rgba(148,163,184,0.4)' }}>Cibles</p>
+                <p className="text-[12px] mb-3" style={{ color: 'rgba(148,163,184,0.5)' }}>{selectedPhoneIds.size} téléphone{selectedPhoneIds.size !== 1 ? 's' : ''} sélectionné{selectedPhoneIds.size !== 1 ? 's' : ''}</p>
+                <div className="space-y-2">
+                  {selectedPhones.map(p => (
+                    <div key={p.id} className="flex items-center gap-3 px-4 py-2.5 rounded-xl"
+                      style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                      <span className="text-[14px]">📱</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[12px] font-semibold text-white truncate">{p.phone_name}</p>
+                        <p className="text-[10px] truncate" style={{ color: 'rgba(196,181,253,0.6)' }}>{p.group_name ?? '—'}</p>
+                      </div>
+                      <span className="text-[9px] font-bold px-2 py-0.5 rounded-full flex-shrink-0"
+                        style={p.status === 'online'
+                          ? { background: 'rgba(0,204,170,0.1)', color: '#00ccaa' }
+                          : { background: 'rgba(71,85,105,0.15)', color: '#64748b' }}>
+                        {p.status === 'online' ? 'En ligne' : 'Hors ligne'}
+                      </span>
+                      <button onClick={() => setSelectedPhoneIds(prev => { const n = new Set(prev); n.delete(p.id); return n })}
+                        className="w-5 h-5 flex items-center justify-center rounded opacity-40 hover:opacity-100 transition-opacity flex-shrink-0"
+                        style={{ color: 'rgba(148,163,184,0.7)' }}>
+                        <svg width="8" height="8" viewBox="0 0 10 10" fill="none"><path d="M1 1l8 8M9 1L1 9" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Error */}
+              {submitError && (
+                <div className="mt-4 px-4 py-3 rounded-xl flex items-start gap-2"
+                  style={{ background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.2)', color: '#f87171' }}>
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="flex-shrink-0 mt-0.5"><circle cx="6" cy="6" r="5" stroke="#f87171" strokeWidth="1.2"/><path d="M6 3.5v3M6 8v.5" stroke="#f87171" strokeWidth="1.2" strokeLinecap="round"/></svg>
+                  <p className="text-[12px]">{submitError}</p>
+                </div>
+              )}
+
+              {/* Footer nav */}
+              <div className="flex items-center justify-between mt-6 pt-4" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                <button onClick={() => setStep(3)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-[12px] font-semibold transition-all hover:bg-white/[0.04]"
+                  style={{ border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(148,163,184,0.6)' }}>
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M9.5 6h-7M5.5 9L2.5 6l3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                  Étape précédente
+                </button>
+                <button onClick={submit} disabled={submitting}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-[13px] font-bold transition-all hover:opacity-90 disabled:opacity-50"
+                  style={{ background: 'linear-gradient(130deg,#7C3AED,#8B5CF6)', color: '#fff', boxShadow: '0 4px 20px -4px rgba(124,58,237,0.5)' }}>
+                  {submitting ? (
+                    <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="white" strokeWidth="3" strokeDasharray="31.4" strokeDashoffset="10"/></svg>
+                  ) : (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                  )}
+                  {submitting ? 'Programmation…' : 'Programmer le post'}
+                </button>
+              </div>
+            </div>
+
+            {/* Right: schedule card */}
+            <div className="w-[300px] flex-shrink-0 flex flex-col border-l overflow-y-auto px-6 py-5" style={{ borderColor: 'rgba(255,255,255,0.07)', background: 'rgba(10,10,20,0.4)', scrollbarWidth: 'none' }}>
+              <h4 className="text-[13px] font-black text-white mb-4">Planification</h4>
+
+              <div className="rounded-xl px-4 py-4 mb-4" style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                {[
+                  { label: 'Mode',       value: scheduleMode === 'ponctuel' ? 'Ponctuel' : 'Récurrent' },
+                  { label: 'Date et heure', value: scheduleDate && scheduleTime ? fmtDate(scheduleDate, scheduleMode === 'ponctuel' ? scheduleTime : recurrenceTime) : '—' },
+                  { label: 'Fuseau horaire', value: timezone },
+                ].map((row, i, arr) => (
+                  <div key={row.label} className="py-2.5" style={{ borderBottom: i < arr.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none' }}>
+                    <p className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'rgba(148,163,184,0.38)' }}>{row.label}</p>
+                    <p className="text-[12px] font-semibold text-white">{row.value}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Ready banner */}
+              <div className="rounded-xl px-4 py-3.5" style={{ background: 'rgba(34,197,94,0.05)', border: '1px solid rgba(34,197,94,0.15)' }}>
+                <div className="flex items-center gap-2 mb-1.5">
+                  <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
+                    style={{ background: 'rgba(34,197,94,0.15)' }}>
+                    <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="#22C55E" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                  </div>
+                  <span className="text-[12px] font-bold" style={{ color: '#22C55E' }}>Prêt à être programmé</span>
+                </div>
+                <p className="text-[11px] leading-relaxed" style={{ color: 'rgba(148,163,184,0.5)' }}>
+                  Ton post sera publié à la date et heure sélectionnées sur les {selectedPhoneIds.size} téléphone{selectedPhoneIds.size !== 1 ? 's' : ''}.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function phoneColorWiz(name: string): string {
+  const palette = ['#6366f1','#8b5cf6','#ec4899','#f59e0b','#10b981','#3b82f6','#ef4444','#14b8a6']
+  let h = 0
+  for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h)
+  return palette[Math.abs(h) % palette.length]
+}
+
 // ── Post card ──────────────────────────────────────────────────────────────────
 
 function PostCard({ post, isOwn, canCancel, isRunning, runLogs, cancelling, onCancel }: {
