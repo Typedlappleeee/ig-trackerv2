@@ -446,117 +446,13 @@ export function MassRemix({ user }: MassRemixProps) {
 
         updateJob(job.id, { splitTime: splitTime ?? 0 })
 
-        // ── 2. AI text detection ─────────────────────────────────────────────
-        type Overlay = { text: string; x: string; y: string; fontSize: number; fontColor: string; bold: boolean; shadow: boolean; startTime: number; endTime: number }
-        let textOverlays: Overlay[] = []
-        let copyTextFromOriginal = false
-
+        // ── 2. Copy text from original onto secondary ────────────────────────
+        const textOverlays: { text: string; x: string; y: string; fontSize: number; fontColor: string; bold: boolean; shadow: boolean; startTime: number; endTime: number }[] = []
+        // Screen blend: bright pixels (text) from original pass through onto secondary.
+        // Always active when toggle is ON — no API key, no OCR needed.
+        const copyTextFromOriginal = aiEnabled
         if (aiEnabled) {
-          if (anthropicKey.trim()) {
-            // ── Anthropic Vision API: detect + recreate text as drawtext overlays ──
-            updateJob(job.id, { status: 'analyzing' })
-            addLog(job.id, '✨ Analyse texte IA (Claude)…')
-            const analyzeEnd = splitTime ?? detDuration ?? 30
-            const fr = await withTimeout(
-              window.electronAPI!.extractFrames!({ filePath: job.originalPath, endTime: analyzeEnd }),
-              180_000, 'extraction frames'
-            )
-            if (fr.ok && fr.frames?.length) {
-              addLog(job.id, `   ${fr.frames.length} frames extraites (jusqu'à ${analyzeEnd.toFixed(1)}s)`)
-              const interval = analyzeEnd / fr.frames.length
-              const frameCount = fr.frames!.length
-              const outH = preset === '9:16' ? 1920 : 1080
-              const outW = preset === '16:9' ? 1920 : 1080
-              type ParsedItem = { text: string; xAlign: string; yPercent: number; fontSizePx: number; fontColor: string; bold?: boolean; startFrame: number; endFrame: number }
-              const imageBlocks = fr.frames.flatMap((f, fi) => [
-                { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: f.data } },
-                { type: 'text', text: `[Frame ${fi} — t=${f.timestamp}s]` },
-              ])
-              const prompt = `These are ${fr.frames.length} frames from a ${analyzeEnd.toFixed(1)}s vertical video (1080×1920).
-Identify EVERY burned-in text overlay (titles, captions, subtitles, watermarks, stickers). Do NOT skip any text.
-
-For EACH text overlay return a JSON object:
-{"text":"exact string","xAlign":"left"|"center"|"right","yPercent":0-100,"fontSizePx":number,"fontColor":"white"|"black"|"#rrggbb","bold":true|false,"startFrame":0,"endFrame":${fr.frames.length - 1}}
-
-Position: 0=top, 100=bottom. Top area → 5-25. Bottom area → 70-92.
-Font size in 1080px wide frame: large heading 80-150px, caption 50-80px, subtitle 36-55px.
-
-Return ONLY a valid JSON array, no explanation. Empty array [] if no text.`
-
-              const res = await withTimeout(
-                window.electronAPI!.anthropicVisionRequest!({
-                  apiKey: anthropicKey.trim(), model: 'claude-haiku-4-5-20251001',
-                  messages: [{ role: 'user', content: [...imageBlocks, { type: 'text', text: prompt }] }],
-                  maxTokens: 2000,
-                }),
-                90_000, 'AI analyse texte'
-              )
-              if (res.ok) {
-                const txt = (res.data as { content: Array<{ type: string; text: string }> })?.content?.[0]?.text ?? '[]'
-                const m = txt.match(/\[[\s\S]*\]/)
-                if (m) {
-                  const parsed = JSON.parse(m[0]) as ParsedItem[]
-                  type TItem = { text: string; xAlign: string; rawY: number; fontSize: number; fontColor: string; bold: boolean; startTime: number; endTime: number }
-                  const items: TItem[] = parsed.map(item => {
-                    const fontSize = Math.round(Math.max(44, Math.min(160, (item.fontSizePx ?? 64) * 1.15)))
-                    const sf = item.startFrame ?? 0
-                    const ef = item.endFrame   ?? frameCount - 1
-                    const coversAll = (ef - sf + 1) >= frameCount * 0.8
-                    const startTime = coversAll ? 0 : Math.round(sf * interval * 10) / 10
-                    const endTime   = coversAll ? analyzeEnd : Math.min(analyzeEnd, Math.max(startTime + interval * 2, Math.round((ef + 1) * interval * 10) / 10))
-                    return { text: item.text, xAlign: item.xAlign ?? 'center', rawY: (item.yPercent ?? 50) / 100, fontSize, fontColor: item.fontColor ?? 'white', bold: item.bold ?? true, startTime, endTime }
-                  })
-                  type Zone = 'top' | 'bottom'
-                  const zones: Zone[] = items.map(it => it.rawY < 0.35 ? 'top' : 'bottom')
-                  for (let i = 1; i < items.length; i++) {
-                    for (let j = 0; j < i; j++) {
-                      const overlap = items[j].endTime > items[i].startTime && items[j].startTime < items[i].endTime
-                      if (overlap && zones[j] === zones[i]) zones[i] = zones[i] === 'bottom' ? 'top' : 'bottom'
-                    }
-                  }
-                  items.forEach((item, idx) => {
-                    const zone   = zones[idx]
-                    const lines  = wrapText(item.text, item.fontSize, outW)
-                    const stepFr = (item.fontSize * 1.3) / outH
-                    let baseY: number
-                    if (zone === 'top') {
-                      baseY = Math.max(0.04, Math.min(0.35, item.rawY))
-                    } else {
-                      const concurrentBottomMax = items.slice(0, idx)
-                        .filter((_, j) => zones[j] === 'bottom' && items[j].endTime > item.startTime && items[j].startTime < item.endTime)
-                        .reduce((max, it) => {
-                          const n = wrapText(it.text, it.fontSize, outW).length
-                          const st = (it.fontSize * 1.3) / outH
-                          return Math.max(max, it.rawY + (n - 1) * st + stepFr)
-                        }, 0.55)
-                      baseY = Math.max(Math.max(0.55, item.rawY), concurrentBottomMax)
-                    }
-                    lines.forEach((line, li) => {
-                      const lineYFrac = zone === 'top'
-                        ? Math.max(0.04, Math.min(0.40, baseY + li * stepFr))
-                        : Math.max(0.55, Math.min(0.93, baseY + li * stepFr))
-                      textOverlays.push({
-                        text: line, x: xAlignToExpr(item.xAlign),
-                        y: `h*${lineYFrac.toFixed(4)}-${Math.round(item.fontSize / 2)}`,
-                        fontSize: item.fontSize, fontColor: item.fontColor, bold: item.bold,
-                        shadow: true, startTime: item.startTime, endTime: item.endTime,
-                      })
-                    })
-                  })
-                  addLog(job.id, `   ${parsed.length} texte(s) → ${textOverlays.length} overlay(s)`)
-                }
-              } else {
-                addLog(job.id, `   Analyse Claude échouée: ${(res as any).error ?? 'inconnu'}`)
-              }
-            }
-          } else {
-            // ── Free: copy text pixels directly from original via FFmpeg lumakey ──
-            // No API key, no OCR — FFmpeg isolates bright pixels (text) from the
-            // top 22% and bottom 34% of the original video and composites them onto
-            // the secondary video. Works for any white/bright text overlay.
-            copyTextFromOriginal = true
-            addLog(job.id, '✨ Copie texte (lumakey) depuis l\'original…')
-          }
+          addLog(job.id, '✨ Copie texte original → phase 1 (screen blend)…')
         }
 
         // ── 3. Generate ──────────────────────────────────────────────────────
@@ -1268,9 +1164,9 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if no text.`
                   </svg>
                   <div>
                     <p style={{ fontSize: 13, fontWeight: 700, letterSpacing: '-0.01em', color: aiEnabled ? '#C4B5FD' : 'rgba(196,181,253,0.55)', lineHeight: 1.2 }}>
-                      Détection texte IA
+                      Utiliser le texte original
                     </p>
-                    <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.45)', marginTop: 1 }}>Claude Vision</p>
+                    <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.45)', marginTop: 1 }}>Copie le texte sur la phase 1</p>
                   </div>
                 </div>
                 {/* Toggle */}
@@ -1280,17 +1176,8 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if no text.`
               </div>
               {aiEnabled && (
                 <p className="sf-anim-slide-up" style={{ marginTop: 10, fontSize: 11, lineHeight: 1.55, color: 'rgba(148,163,184,0.5)' }}>
-                  Analyse et recopie le texte des vidéos automatiquement.
+                  Le texte de la vidéo originale apparaît sur la vidéo secondaire.
                 </p>
-              )}
-              {aiEnabled && !anthropicKey && (
-                <div className="flex items-center gap-1.5" style={{ marginTop: 8 }}>
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-                    <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
-                  </svg>
-                  <p style={{ fontSize: 11, fontWeight: 600, color: '#F59E0B' }}>Clé Anthropic manquante</p>
-                </div>
               )}
             </button>
 
