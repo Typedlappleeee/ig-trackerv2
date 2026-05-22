@@ -1043,9 +1043,8 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
               )}
             </div>
 
-            {/* User avatar */}
+            {/* User avatar — no ref here, ref lives on sidebar row so position is correct */}
             <button
-              ref={userTriggerRef}
               onClick={() => userMenuOpen ? setUserMenuOpen(false) : openUserMenu()}
               style={{
                 width: 28, height: 28, borderRadius: '50%',
