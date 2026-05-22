@@ -460,67 +460,110 @@ export function MassRemix({ user }: MassRemixProps) {
         const textOverlays: { text: string; x: string; y: string; fontSize: number; fontColor: string; bold: boolean; shadow: boolean; startTime: number; endTime: number }[] = []
         const copyTextFromOriginal = false  // screen blend disabled — causes double-video ghost
 
-        if (aiEnabled && anthropicKey.trim() && window.electronAPI) {
-          addLog(job.id, '🤖 Détection texte (Claude Vision)…')
-          try {
-            const totalDur = detDuration ?? 30
-            const framesRes = await withTimeout(
-              window.electronAPI.extractFrames!({ filePath: job.originalPath, startTime: 0.5, endTime: Math.min(4, totalDur) }),
-              20_000, 'extraction frames'
-            )
-            if (framesRes.ok && framesRes.frames && framesRes.frames.length > 0) {
-              const frame = framesRes.frames[0]
-              const visionRes = await withTimeout(
-                window.electronAPI.anthropicVisionRequest!({
-                  apiKey: anthropicKey.trim(),
-                  model: 'claude-haiku-4-5-20251001',
-                  messages: [{ role: 'user', content: [
-                    { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: frame.data } },
-                    { type: 'text', text: 'Look at this video frame and identify any TEXT OVERLAY (caption/subtitle added on top of the video — NOT text physically in the scene). Return a JSON array:\n[{"text":"exact text","x_frac":0.5,"y_frac":0.85,"size":"small|medium|large|xlarge","bold":false}]\nWhere x_frac=horizontal center (0=left,0.5=center,1=right), y_frac=vertical center (0=top,1=bottom). If no overlay text, return []. Return ONLY the JSON array.' },
-                  ]}],
-                  maxTokens: 300,
-                }),
-                20_000, 'Claude Vision'
-              )
-              if (visionRes.ok && visionRes.data) {
-                try {
-                  const raw = (visionRes.data as any)?.content?.[0]?.text ?? ''
-                  const match = raw.match(/\[[\s\S]*\]/)
-                  if (match) {
-                    const parsed: Array<{ text: string; x_frac?: number; y_frac?: number; size?: string; bold?: boolean }> = JSON.parse(match[0])
-                    const textEndTime = splitTime ?? (detDuration ?? 9999)
-                    const fsMap: Record<string, number> = { small: 38, medium: 54, large: 70, xlarge: 86 }
-                    for (const item of parsed) {
-                      if (!item.text?.trim()) continue
-                      const xFrac = item.x_frac ?? 0.5
-                      const yFrac = item.y_frac ?? 0.82
-                      textOverlays.push({
-                        text: item.text.trim(),
-                        x: `w*${xFrac.toFixed(3)}-text_w/2`,
-                        y: `h*${yFrac.toFixed(3)}-text_h/2`,
-                        fontSize: fsMap[item.size ?? 'medium'] ?? 54,
-                        fontColor: 'white',
-                        bold: item.bold ?? false,
-                        shadow: true,
-                        startTime: 0, endTime: textEndTime,
-                      })
-                    }
-                    if (textOverlays.length > 0) {
-                      addLog(job.id, `✅ ${textOverlays.length} texte(s): ${textOverlays.map(t => `"${t.text.slice(0, 25)}"`).join(', ')}`)
-                    } else {
-                      addLog(job.id, '⚠️ Aucun texte overlay détecté')
-                    }
+        if (aiEnabled) {
+          if (!anthropicKey.trim()) {
+            addLog(job.id, '⚠️ Clé Anthropic manquante — texte non copié. Ajoutez-la dans Paramètres → Connexions.')
+          } else {
+            addLog(job.id, '🤖 Détection texte (Claude Vision)…')
+            try {
+              const totalDur = detDuration ?? 30
+              const endSec = Math.min(4, totalDur)
+
+              // Extract a frame (Electron IPC or web Canvas)
+              let frameData: string | null = null
+              if (window.electronAPI) {
+                const fr = await withTimeout(
+                  window.electronAPI.extractFrames!({ filePath: job.originalPath, startTime: 0.5, endTime: endSec }),
+                  20_000, 'extraction frames'
+                )
+                if (fr.ok && fr.frames?.[0]) frameData = fr.frames[0].data
+              } else {
+                const { extractFramesWeb } = await import('@/lib/ffmpeg-web')
+                const fr = await withTimeout(
+                  extractFramesWeb({ filePath: job.originalPath, startTime: 0.5, endTime: endSec }),
+                  20_000, 'extraction frames'
+                )
+                if (fr.ok && fr.frames?.[0]) frameData = fr.frames[0].data
+              }
+
+              if (!frameData) {
+                addLog(job.id, '⚠️ Impossible d\'extraire un frame')
+              } else {
+                const visionMessages = [{ role: 'user', content: [
+                  { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: frameData } },
+                  { type: 'text', text: 'This is a frame from an Instagram video. Identify any TEXT OVERLAY (caption/subtitle/text added on top of the video by the creator — NOT text physically in the scene, not logos, not background text on objects). Return a JSON array:\n[{"text":"exact text content","x_frac":0.5,"y_frac":0.82,"size":"small|medium|large|xlarge","bold":false}]\nWhere x_frac=horizontal center (0=left,0.5=center,1=right), y_frac=vertical center (0=top,1=bottom). If there is no text overlay at all, return []. Return ONLY the JSON array, nothing else.' },
+                ] as unknown[] }]
+
+                let raw = ''
+                if (window.electronAPI) {
+                  const res = await withTimeout(
+                    window.electronAPI.anthropicVisionRequest!({
+                      apiKey: anthropicKey.trim(), model: 'claude-haiku-4-5-20251001',
+                      messages: visionMessages, maxTokens: 400,
+                    }),
+                    25_000, 'Claude Vision'
+                  )
+                  if (res.ok) raw = (res.data as any)?.content?.[0]?.text ?? ''
+                  else addLog(job.id, `⚠️ Claude Vision erreur: ${res.error ?? 'inconnue'}`)
+                } else {
+                  // Web: direct Anthropic API call (requires anthropic-dangerous-direct-browser-access header)
+                  const resp = await fetch('https://api.anthropic.com/v1/messages', {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'x-api-key': anthropicKey.trim(),
+                      'anthropic-version': '2023-06-01',
+                      'anthropic-dangerous-direct-browser-access': 'true',
+                    },
+                    body: JSON.stringify({
+                      model: 'claude-haiku-4-5-20251001', max_tokens: 400,
+                      messages: visionMessages,
+                    }),
+                  })
+                  if (resp.ok) {
+                    const data = await resp.json()
+                    raw = data?.content?.[0]?.text ?? ''
+                  } else {
+                    addLog(job.id, `⚠️ Claude Vision HTTP ${resp.status}`)
                   }
-                } catch {
-                  addLog(job.id, '⚠️ Erreur parsing réponse Claude')
+                }
+
+                if (raw) {
+                  addLog(job.id, `   Claude: ${raw.slice(0, 80)}`)
+                  try {
+                    const match = raw.match(/\[[\s\S]*?\]/)
+                    if (match) {
+                      const parsed: Array<{ text: string; x_frac?: number; y_frac?: number; size?: string; bold?: boolean }> = JSON.parse(match[0])
+                      const textEndTime = splitTime ?? (detDuration ?? 9999)
+                      const fsMap: Record<string, number> = { small: 38, medium: 54, large: 70, xlarge: 86 }
+                      for (const item of parsed) {
+                        if (!item.text?.trim()) continue
+                        const xFrac = item.x_frac ?? 0.5
+                        const yFrac = item.y_frac ?? 0.82
+                        textOverlays.push({
+                          text: item.text.trim(),
+                          x: `w*${xFrac.toFixed(3)}-text_w/2`,
+                          y: `h*${yFrac.toFixed(3)}-text_h/2`,
+                          fontSize: fsMap[item.size ?? 'medium'] ?? 54,
+                          fontColor: 'white', bold: item.bold ?? false, shadow: true,
+                          startTime: 0, endTime: textEndTime,
+                        })
+                      }
+                      if (textOverlays.length > 0) {
+                        addLog(job.id, `✅ ${textOverlays.length} texte(s): ${textOverlays.map(t => `"${t.text.slice(0, 30)}"`).join(', ')}`)
+                      } else {
+                        addLog(job.id, '⚠️ Aucun texte overlay détecté dans la vidéo originale')
+                      }
+                    }
+                  } catch {
+                    addLog(job.id, '⚠️ Erreur parsing réponse Claude — vérifiez les logs')
+                  }
                 }
               }
+            } catch (e) {
+              addLog(job.id, `⚠️ Détection texte ignorée: ${String(e).slice(0, 80)}`)
             }
-          } catch (e) {
-            addLog(job.id, `⚠️ Détection texte ignorée: ${String(e).slice(0, 60)}`)
           }
-        } else if (aiEnabled && !anthropicKey.trim()) {
-          addLog(job.id, '⚠️ Clé Anthropic manquante — texte non copié (ajoutez-la dans Paramètres)')
         }
 
         // ── 3. Generate ──────────────────────────────────────────────────────
