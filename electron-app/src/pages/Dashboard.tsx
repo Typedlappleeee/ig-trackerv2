@@ -322,13 +322,15 @@ export function Dashboard({ user, onNavigate }: DashboardProps) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#07070C', overflow: 'hidden' }}>
       {/* Page header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '24px 28px 20px', borderBottom: '1px solid rgba(255,255,255,0.055)', flexShrink: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '22px 28px 18px', borderBottom: '1px solid rgba(255,255,255,0.055)', flexShrink: 0 }}>
         <div>
-          <h1 style={{ fontSize: 20, fontWeight: 700, color: '#F2F0FF', letterSpacing: '-0.035em', lineHeight: 1.2, margin: 0 }}>Dashboard</h1>
-          <p style={{ fontSize: 12.5, color: 'rgba(148,163,184,0.52)', marginTop: 3, margin: '3px 0 0' }}>
+          <h1 style={{ fontSize: 22, fontWeight: 700, color: '#F2F0FF', letterSpacing: '-0.04em', lineHeight: 1.15, margin: 0 }}>
+            Dashboard
+          </h1>
+          <p style={{ fontSize: 12.5, color: 'rgba(148,163,184,0.45)', marginTop: 4, margin: '4px 0 0' }}>
             {fetchingStats
               ? <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#8B5CF6', display: 'inline-block', animation: 'pulse 1.5s ease-in-out infinite' }} />
+                  <span className="sf-ping-dot" style={{ background: '#8B5CF6' }} />
                   Actualisation des stats…
                 </span>
               : 'Vue d\'ensemble de tes performances'
@@ -336,24 +338,24 @@ export function Dashboard({ user, onNavigate }: DashboardProps) {
           </p>
         </div>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          {/* Range selector tabs */}
-          <div style={{ display: 'flex', gap: 2, padding: '4px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 11 }}>
+          {/* Range selector pills */}
+          <div style={{ display: 'flex', gap: 3, padding: '3px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 10 }}>
             {RANGES.map(({ key, label }) => (
               <button
                 key={key}
                 onClick={() => setRange(key)}
                 style={{
-                  padding: '5px 12px',
-                  borderRadius: 8,
-                  fontSize: 11,
-                  fontWeight: 700,
-                  border: 'none',
+                  height: 30,
+                  padding: '0 12px',
+                  borderRadius: 7,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  border: range === key ? '1px solid rgba(139,92,246,0.25)' : '1px solid transparent',
                   cursor: 'pointer',
                   transition: 'all 160ms',
                   fontFamily: 'inherit',
-                  background: range === key ? 'linear-gradient(130deg,#7C3AED,#A855F7)' : 'transparent',
-                  color: range === key ? '#fff' : 'rgba(148,163,184,0.52)',
-                  boxShadow: range === key ? '0 0 12px -3px rgba(124,58,237,0.6)' : 'none',
+                  background: range === key ? 'rgba(139,92,246,0.15)' : 'rgba(255,255,255,0.06)',
+                  color: range === key ? '#A78BFA' : 'rgba(148,163,184,0.52)',
                 }}
               >
                 {label}
@@ -371,9 +373,8 @@ export function Dashboard({ user, onNavigate }: DashboardProps) {
                   outline: 'none',
                   paddingLeft: 12,
                   paddingRight: 30,
-                  paddingTop: 7,
-                  paddingBottom: 7,
-                  borderRadius: 11,
+                  height: 32,
+                  borderRadius: 9,
                   fontSize: 12,
                   fontWeight: 600,
                   cursor: 'pointer',
@@ -381,6 +382,7 @@ export function Dashboard({ user, onNavigate }: DashboardProps) {
                   border: '1px solid rgba(255,255,255,0.09)',
                   color: '#A78BFA',
                   fontFamily: 'inherit',
+                  transition: 'border-color 150ms',
                 }}
               >
                 <option value="" style={{ background: '#0E0E16', color: '#fff' }}>Tous les comptes</option>
@@ -420,19 +422,65 @@ export function Dashboard({ user, onNavigate }: DashboardProps) {
         )}
 
         {loading ? (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, gap: 12, color: 'rgba(148,163,184,0.4)', height: '100%', minHeight: 300 }}>
-            <div style={{ width: 18, height: 18, border: '2px solid rgba(255,255,255,0.08)', borderTopColor: '#8B5CF6', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
-            <span style={{ fontSize: 13 }}>Chargement...</span>
+          /* ── Skeleton loading state ───────────────────────────────────────── */
+          <div className="sf-anim-slide-up">
+            {/* Skeleton stat cards */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
+              {[0, 1, 2, 3].map(i => (
+                <div key={i} style={{ background: '#0C0C15', border: '1px solid rgba(255,255,255,0.055)', borderRadius: 15, padding: '20px 22px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                    <div className="sf-skeleton" style={{ width: 36, height: 36, borderRadius: 10 }} />
+                    <div className="sf-skeleton" style={{ width: 52, height: 20, borderRadius: 99 }} />
+                  </div>
+                  <div className="sf-skeleton" style={{ width: 72, height: 28, borderRadius: 6, marginBottom: 8 }} />
+                  <div className="sf-skeleton" style={{ width: 110, height: 11, borderRadius: 4 }} />
+                </div>
+              ))}
+            </div>
+            {/* Skeleton chart */}
+            <div style={{ background: '#0C0C15', border: '1px solid rgba(255,255,255,0.055)', borderRadius: 15, padding: '20px 24px', marginBottom: 24 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+                <div>
+                  <div className="sf-skeleton" style={{ width: 140, height: 14, borderRadius: 5, marginBottom: 8 }} />
+                  <div className="sf-skeleton" style={{ width: 200, height: 11, borderRadius: 4 }} />
+                </div>
+              </div>
+              <div className="sf-skeleton" style={{ width: '100%', height: 220, borderRadius: 10 }} />
+            </div>
+            {/* Skeleton phone rows */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 14 }}>
+              <div style={{ background: '#0C0C15', border: '1px solid rgba(255,255,255,0.055)', borderRadius: 15, overflow: 'hidden' }}>
+                <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.055)' }}>
+                  <div className="sf-skeleton" style={{ width: 90, height: 13, borderRadius: 4 }} />
+                </div>
+                <div style={{ padding: '8px 16px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {[0, 1].map(i => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, height: 44, padding: '0 4px' }}>
+                      <div className="sf-skeleton" style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0 }} />
+                      <div style={{ flex: 1 }}>
+                        <div className="sf-skeleton" style={{ width: '55%', height: 13, borderRadius: 4, marginBottom: 5 }} />
+                        <div className="sf-skeleton" style={{ width: '35%', height: 10, borderRadius: 3 }} />
+                      </div>
+                      <div className="sf-skeleton" style={{ width: 48, height: 20, borderRadius: 99 }} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div className="sf-skeleton" style={{ borderRadius: 15, height: 180 }} />
+                <div className="sf-skeleton" style={{ borderRadius: 15, height: 160 }} />
+              </div>
+            </div>
           </div>
         ) : phones.length === 0 ? (
           /* ── Empty / onboarding ─────────────────────────────────────────────── */
-          <div style={{ maxWidth: 520, margin: '64px auto 0', textAlign: 'center' }}>
-            <div style={{ width: 72, height: 72, borderRadius: 20, margin: '0 auto 20px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, rgba(139,92,246,0.2), rgba(168,85,247,0.1))', border: '1px solid rgba(139,92,246,0.25)' }}>
+          <div className="sf-anim-slide-up" style={{ maxWidth: 520, margin: '64px auto 0', textAlign: 'center' }}>
+            <div className="sf-anim-scale-spring" style={{ width: 72, height: 72, borderRadius: 20, margin: '0 auto 20px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, rgba(139,92,246,0.2), rgba(168,85,247,0.1))', border: '1px solid rgba(139,92,246,0.25)' }}>
               <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="rgba(167,139,250,0.8)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
             </div>
-            <h2 style={{ fontSize: 22, fontWeight: 800, color: '#F2F0FF', letterSpacing: '-0.03em', margin: 0 }}>Bienvenue sur ScaleFlow</h2>
+            <h2 className="sf-gradient-text" style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.03em', margin: 0 }}>Bienvenue sur ScaleFlow</h2>
             <p style={{ fontSize: 13, color: 'rgba(148,163,184,0.52)', marginTop: 8 }}>Suis ces étapes pour démarrer et scaler tes comptes Instagram</p>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 28, textAlign: 'left' }}>
               {[
@@ -440,8 +488,8 @@ export function Dashboard({ user, onNavigate }: DashboardProps) {
                 { n: '2', title: 'Sync téléphones', desc: 'Va dans Téléphones et clique "Sync GéeLark"', icon: 'M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z' },
                 { n: '3', title: 'Ajoute Instagram', desc: "Renseigne le nom d'utilisateur IG sur chaque téléphone", icon: 'M16 11.37A4 4 0 1112.63 8 4 4 0 0116 11.37zm1.5-4.87h.01' },
                 { n: '4', title: 'Lance le posting', desc: 'Utilise Posting ou Mass Posting pour publier en masse', icon: 'M22 2L11 13M22 2L15 22l-4-9-9-4 20-7z' },
-              ].map(step => (
-                <div key={step.n} style={{ borderRadius: 11, padding: '16px', display: 'flex', gap: 12, alignItems: 'flex-start', background: '#0C0C15', border: '1px solid rgba(255,255,255,0.055)' }}>
+              ].map((step, idx) => (
+                <div key={step.n} className={`sf-hover-lift sf-anim-slide-up sf-d${(idx + 1) * 50}`} style={{ borderRadius: 12, padding: '16px', display: 'flex', gap: 12, alignItems: 'flex-start', background: '#0C0C15', border: '1px solid rgba(255,255,255,0.055)' }}>
                   <div style={{ width: 26, height: 26, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, flexShrink: 0, marginTop: 1, background: 'linear-gradient(135deg,#7C3AED,#A855F7)', color: '#fff' }}>{step.n}</div>
                   <div>
                     <p style={{ fontSize: 12, fontWeight: 700, color: '#F2F0FF', margin: 0 }}>{step.title}</p>
@@ -452,122 +500,121 @@ export function Dashboard({ user, onNavigate }: DashboardProps) {
             </div>
           </div>
         ) : (
-          <>
+          <div className="sf-anim-slide-up">
             {/* ── Stats grid — 4 cards across ─────────────────────────────────── */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 24 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
 
               {/* Card 1: Téléphones */}
-              <div
-                style={{ background: '#0C0C15', border: '1px solid rgba(255,255,255,0.055)', borderRadius: 15, padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 10, transition: 'all 180ms', cursor: 'default' }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(139,92,246,0.22)'; (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)' }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.055)'; (e.currentTarget as HTMLElement).style.transform = 'translateY(0)' }}
-              >
+              <div className="sf-stat-card sf-anim-slide-up sf-d50">
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(124,58,237,0.12)', border: '1px solid rgba(139,92,246,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(139,92,246,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A78BFA" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
                     </svg>
                   </div>
-                  <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: 'rgba(124,58,237,0.12)', color: '#A78BFA' }}>{kpis.online} actifs</span>
+                  <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: 'rgba(124,58,237,0.12)', color: '#A78BFA', letterSpacing: '0.04em', textTransform: 'uppercase' }}>{kpis.online} actifs</span>
                 </div>
                 <div>
-                  <p style={{ fontSize: 28, fontWeight: 800, color: '#F2F0FF', letterSpacing: '-0.04em', lineHeight: 1, margin: 0 }}>{phones.length}</p>
-                  <p style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(100,116,139,0.38)', marginTop: 6, margin: '6px 0 0' }}>Téléphones actifs</p>
+                  <p className="sf-anim-count-up sf-d100" style={{ fontSize: 30, fontWeight: 800, color: '#F2F0FF', letterSpacing: '-0.04em', lineHeight: 1, margin: 0 }}>{phones.length}</p>
+                  <p style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(100,116,139,0.5)', marginTop: 6, margin: '6px 0 0' }}>Téléphones actifs</p>
                 </div>
               </div>
 
               {/* Card 2: Comptes IG */}
-              <div
-                style={{ background: '#0C0C15', border: '1px solid rgba(255,255,255,0.055)', borderRadius: 15, padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 10, transition: 'all 180ms', cursor: 'default' }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(139,92,246,0.22)'; (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)' }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.055)'; (e.currentTarget as HTMLElement).style.transform = 'translateY(0)' }}
-              >
+              <div className="sf-stat-card sf-anim-slide-up sf-d100">
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#60A5FA" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
                       <rect x="2" y="2" width="20" height="20" rx="5" ry="5" /><path d="M16 11.37A4 4 0 1112.63 8 4 4 0 0116 11.37z" /><line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
                     </svg>
                   </div>
-                  {linkedPhones.length > 0 && <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: 'rgba(59,130,246,0.1)', color: '#60A5FA' }}>liés</span>}
+                  {linkedPhones.length > 0 && (
+                    <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: 'rgba(59,130,246,0.1)', color: '#60A5FA', letterSpacing: '0.04em', textTransform: 'uppercase' }}>liés</span>
+                  )}
                 </div>
                 <div>
-                  <p style={{ fontSize: 28, fontWeight: 800, color: '#F2F0FF', letterSpacing: '-0.04em', lineHeight: 1, margin: 0 }}>{linkedPhones.length}</p>
-                  <p style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(100,116,139,0.38)', marginTop: 6, margin: '6px 0 0' }}>Comptes Instagram</p>
+                  <p className="sf-anim-count-up sf-d150" style={{ fontSize: 30, fontWeight: 800, color: '#F2F0FF', letterSpacing: '-0.04em', lineHeight: 1, margin: 0 }}>{linkedPhones.length}</p>
+                  <p style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(100,116,139,0.5)', marginTop: 6, margin: '6px 0 0' }}>Comptes Instagram</p>
                 </div>
               </div>
 
-              {/* Card 3: Vues totales */}
-              <div
-                style={{ background: '#0C0C15', border: '1px solid rgba(255,255,255,0.055)', borderRadius: 15, padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 10, transition: 'all 180ms', cursor: 'default' }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(139,92,246,0.22)'; (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)' }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.055)'; (e.currentTarget as HTMLElement).style.transform = 'translateY(0)' }}
-              >
+              {/* Card 3: Vues aujourd'hui */}
+              <div className="sf-stat-card sf-anim-slide-up sf-d150">
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4ADE80" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" />
                     </svg>
                   </div>
                   {kpis.delta !== null && (
-                    <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: kpis.delta >= 0 ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)', color: kpis.delta >= 0 ? '#22C55E' : '#EF4444' }}>
+                    <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: kpis.delta >= 0 ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)', color: kpis.delta >= 0 ? '#22C55E' : '#EF4444', letterSpacing: '0.04em' }}>
                       {kpis.delta >= 0 ? '+' : ''}{fmt(kpis.delta)}
                     </span>
                   )}
                 </div>
                 <div>
-                  <p style={{ fontSize: 28, fontWeight: 800, color: '#F2F0FF', letterSpacing: '-0.04em', lineHeight: 1, margin: 0 }}>{fmt(kpis.today)}</p>
-                  <p style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(100,116,139,0.38)', marginTop: 6, margin: '6px 0 0' }}>Vues aujourd'hui</p>
+                  <p className="sf-anim-count-up sf-d200" style={{ fontSize: 30, fontWeight: 800, color: '#F2F0FF', letterSpacing: '-0.04em', lineHeight: 1, margin: 0 }}>{fmt(kpis.today)}</p>
+                  <p style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(100,116,139,0.5)', marginTop: 6, margin: '6px 0 0' }}>Vues aujourd'hui</p>
                 </div>
               </div>
 
-              {/* Card 4: Abonnés / Erreurs */}
-              <div
-                style={{ background: '#0C0C15', border: `1px solid ${kpis.banned > 0 ? 'rgba(239,68,68,0.22)' : 'rgba(255,255,255,0.055)'}`, borderRadius: 15, padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 10, transition: 'all 180ms', cursor: 'default' }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = kpis.banned > 0 ? 'rgba(239,68,68,0.35)' : 'rgba(139,92,246,0.22)'; (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)' }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = kpis.banned > 0 ? 'rgba(239,68,68,0.22)' : 'rgba(255,255,255,0.055)'; (e.currentTarget as HTMLElement).style.transform = 'translateY(0)' }}
+              {/* Card 4: Record de vues / Erreurs */}
+              <div className={`sf-stat-card sf-anim-slide-up sf-d200${kpis.banned > 0 ? ' danger-card' : ''}`}
+                style={{ borderColor: kpis.banned > 0 ? 'rgba(239,68,68,0.22)' : undefined }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div style={{ width: 36, height: 36, borderRadius: 10, background: kpis.banned > 0 ? 'rgba(239,68,68,0.12)' : 'rgba(139,92,246,0.12)', border: `1px solid ${kpis.banned > 0 ? 'rgba(239,68,68,0.2)' : 'rgba(139,92,246,0.2)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 10, background: kpis.banned > 0 ? 'rgba(239,68,68,0.08)' : 'rgba(124,58,237,0.08)', border: `1px solid ${kpis.banned > 0 ? 'rgba(239,68,68,0.15)' : 'rgba(139,92,246,0.15)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={kpis.banned > 0 ? '#F87171' : '#A78BFA'} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 00-3-3.87" /><path d="M16 3.13a4 4 0 010 7.75" />
                     </svg>
                   </div>
-                  {kpis.banned > 0 && <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: 'rgba(239,68,68,0.12)', color: '#EF4444' }}>{kpis.banned} erreur{kpis.banned > 1 ? 's' : ''}</span>}
+                  {kpis.banned > 0 && (
+                    <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: 'rgba(239,68,68,0.12)', color: '#EF4444', letterSpacing: '0.04em' }}>{kpis.banned} erreur{kpis.banned > 1 ? 's' : ''}</span>
+                  )}
                 </div>
                 <div>
-                  <p style={{ fontSize: 28, fontWeight: 800, color: kpis.banned > 0 ? '#F87171' : '#F2F0FF', letterSpacing: '-0.04em', lineHeight: 1, margin: 0 }}>{fmt(kpis.peak)}</p>
-                  <p style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(100,116,139,0.38)', marginTop: 6, margin: '6px 0 0' }}>Record de vues</p>
+                  <p className="sf-anim-count-up sf-d250" style={{ fontSize: 30, fontWeight: 800, color: kpis.banned > 0 ? '#F87171' : '#F2F0FF', letterSpacing: '-0.04em', lineHeight: 1, margin: 0 }}>{fmt(kpis.peak)}</p>
+                  <p style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(100,116,139,0.5)', marginTop: 6, margin: '6px 0 0' }}>Record de vues</p>
                 </div>
               </div>
             </div>
 
-            {/* ── Chart section ────────────────────────────────────────────────── */}
-            <div style={{ background: '#0C0C15', border: '1px solid rgba(255,255,255,0.055)', borderRadius: 15, padding: '20px 24px', marginBottom: 24 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+            {/* ── Chart section — glassmorphism card ───────────────────────────── */}
+            <div style={{ position: 'relative', background: '#0C0C15', border: '1px solid rgba(255,255,255,0.055)', borderRadius: 15, padding: '20px 24px', marginBottom: 24, overflow: 'hidden' }}>
+              {/* Subtle top gradient line */}
+              <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1, background: 'linear-gradient(90deg, transparent, rgba(139,92,246,0.3), transparent)', pointerEvents: 'none' }} />
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
                 <div>
-                  <p style={{ fontSize: 14, fontWeight: 700, color: '#F2F0FF', letterSpacing: '-0.02em', margin: 0 }}>Évolution des vues</p>
-                  <p style={{ fontSize: 12, color: 'rgba(148,163,184,0.5)', marginTop: 2, margin: '2px 0 0' }}>
-                    Historique des performances Instagram
+                  <p style={{ fontSize: 14, fontWeight: 700, color: '#F2F0FF', letterSpacing: '-0.025em', margin: 0 }}>Évolution des vues</p>
+                  <p style={{ fontSize: 12, color: 'rgba(148,163,184,0.45)', marginTop: 3, margin: '3px 0 0' }}>
+                    Total vues
                     {selPhone && <span style={{ color: '#A78BFA', marginLeft: 6 }}>· @{selPhone.ig_username}</span>}
+                    <span style={{ marginLeft: 8, padding: '1px 7px', borderRadius: 99, background: 'rgba(139,92,246,0.1)', color: '#A78BFA', fontSize: 11, fontWeight: 600 }}>
+                      {RANGES.find(r => r.key === range)?.label}
+                    </span>
                   </p>
                 </div>
                 {selPhone && (
                   <button
                     onClick={() => setSelPhone(null)}
-                    style={{ fontSize: 12, color: 'rgba(167,139,250,0.7)', background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.18)', borderRadius: 8, padding: '4px 10px', cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 5 }}
+                    style={{ fontSize: 12, color: 'rgba(167,139,250,0.7)', background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.18)', borderRadius: 8, padding: '4px 10px', cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 5, transition: 'all 140ms' }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(139,92,246,0.14)'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(139,92,246,0.32)' }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(139,92,246,0.08)'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(139,92,246,0.18)' }}
                   >
                     <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
                     Réinitialiser
                   </button>
                 )}
               </div>
-              {loadingChart ? (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 220 }}>
-                  <div style={{ width: 18, height: 18, border: '2px solid rgba(255,255,255,0.08)', borderTopColor: '#8B5CF6', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
-                </div>
-              ) : (
-                <LineChart data={chartData} height={220} color="#8B5CF6" />
-              )}
+              <div style={{ paddingTop: 16 }}>
+                {loadingChart ? (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 220 }}>
+                    <div style={{ width: 18, height: 18, border: '2px solid rgba(255,255,255,0.08)', borderTopColor: '#8B5CF6', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+                  </div>
+                ) : (
+                  <LineChart data={chartData} height={220} color="#8B5CF6" />
+                )}
+              </div>
             </div>
 
             {/* ── Bottom split: phone list left, activity right ─────────────────── */}
@@ -575,38 +622,66 @@ export function Dashboard({ user, onNavigate }: DashboardProps) {
 
               {/* Phone list */}
               <div style={{ background: '#0C0C15', border: '1px solid rgba(255,255,255,0.055)', borderRadius: 15, overflow: 'hidden' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.055)' }}>
-                  <p style={{ fontSize: 13, fontWeight: 700, color: '#F2F0FF', margin: 0 }}>Téléphones</p>
-                  <button onClick={() => onNavigate?.('phones')} style={{ fontSize: 12, color: '#A78BFA', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 500, fontFamily: 'inherit' }}>Voir tout →</button>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', borderBottom: '1px solid rgba(255,255,255,0.055)' }}>
+                  <p style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(100,116,139,0.5)', margin: 0 }}>Téléphones</p>
+                  <button
+                    onClick={() => onNavigate?.('phones')}
+                    style={{ fontSize: 12, color: '#A78BFA', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 4, opacity: 0.8, transition: 'opacity 140ms' }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = '1' }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = '0.8' }}
+                  >
+                    Voir tout
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
+                  </button>
                 </div>
-                <div style={{ maxHeight: 280, overflowY: 'auto' }}>
+                <div style={{ maxHeight: 300, overflowY: 'auto', padding: '6px 8px' }}>
                   {phones.slice(0, 8).map(phone => {
-                    const statusColor = phone.ig_status === 'active' ? '#22C55E' : phone.ig_status === 'error' ? '#EF4444' : phone.ig_status === 'rate_limited' ? '#F59E0B' : 'rgba(100,116,139,0.4)'
-                    const statusLabel = phone.ig_status === 'active' ? 'Actif' : phone.ig_status === 'error' ? 'Erreur' : phone.ig_status === 'rate_limited' ? 'Limité' : 'Inconnu'
+                    const isActive = phone.ig_status === 'active'
+                    const statusColor = isActive ? '#22C55E' : phone.ig_status === 'error' ? '#EF4444' : phone.ig_status === 'rate_limited' ? '#F59E0B' : 'rgba(100,116,139,0.4)'
+                    const statusLabel = isActive ? 'Actif' : phone.ig_status === 'error' ? 'Erreur' : phone.ig_status === 'rate_limited' ? 'Limité' : 'Inconnu'
+                    const isSelected = selPhone?.id === phone.id
                     return (
                       <div
                         key={phone.id}
                         onClick={() => setSelPhone(phone.ig_username ? phone : null)}
-                        style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 20px', borderBottom: '1px solid rgba(255,255,255,0.04)', cursor: 'pointer', transition: 'background 120ms', background: selPhone?.id === phone.id ? 'rgba(255,255,255,0.03)' : '' }}
-                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.025)' }}
-                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = selPhone?.id === phone.id ? 'rgba(255,255,255,0.03)' : '' }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 10,
+                          height: 44,
+                          padding: '0 12px',
+                          borderRadius: 9,
+                          cursor: 'pointer',
+                          transition: 'background 120ms, border-color 120ms',
+                          background: isSelected ? 'rgba(124,58,237,0.08)' : 'transparent',
+                          border: isSelected ? '1px solid rgba(139,92,246,0.15)' : '1px solid transparent',
+                        }}
+                        onMouseEnter={e => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.03)' }}
+                        onMouseLeave={e => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = 'transparent' }}
                       >
-                        {/* Status dot */}
-                        <div style={{ width: 7, height: 7, borderRadius: '50%', background: statusColor, flexShrink: 0, boxShadow: phone.ig_status === 'active' ? `0 0 6px ${statusColor}` : undefined }} />
+                        {/* Status dot — ping for online */}
+                        {isActive
+                          ? <span className="sf-ping-dot" style={{ flexShrink: 0 }} />
+                          : <div style={{ width: 8, height: 8, borderRadius: '50%', background: statusColor, flexShrink: 0 }} />
+                        }
                         {/* Info */}
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <p style={{ fontSize: 13, fontWeight: 600, color: '#F2F0FF', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', margin: 0 }}>{phone.phone_name}</p>
-                          {phone.ig_username && <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.52)', marginTop: 1, margin: '1px 0 0' }}>@{phone.ig_username}</p>}
+                          {phone.ig_username && (
+                            <p style={{ fontSize: 10.5, color: 'rgba(148,163,184,0.45)', marginTop: 1, margin: '1px 0 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>@{phone.ig_username}</p>
+                          )}
                         </div>
                         {/* Followers */}
-                        {(phone.followers ?? 0) > 0 && <p style={{ fontSize: 12, color: 'rgba(196,181,253,0.6)', fontWeight: 500, flexShrink: 0, margin: 0 }}>{fmt(phone.followers ?? 0)}</p>}
-                        {/* Status badge */}
-                        <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 99, background: `${statusColor}18`, color: statusColor, flexShrink: 0 }}>{statusLabel}</span>
+                        {(phone.followers ?? 0) > 0 && (
+                          <p style={{ fontSize: 12, color: 'rgba(196,181,253,0.6)', fontWeight: 600, flexShrink: 0, margin: 0 }}>{fmt(phone.followers ?? 0)}</p>
+                        )}
+                        {/* IG status badge */}
+                        <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 99, background: `${statusColor}18`, color: statusColor, flexShrink: 0, letterSpacing: '0.03em' }}>{statusLabel}</span>
                       </div>
                     )
                   })}
                   {phones.length > 8 && (
-                    <p style={{ textAlign: 'center', fontSize: 11, color: 'rgba(148,163,184,0.4)', padding: '10px 0' }}>+{phones.length - 8} autres</p>
+                    <p style={{ textAlign: 'center', fontSize: 11, color: 'rgba(148,163,184,0.35)', padding: '10px 0 4px' }}>+{phones.length - 8} autres</p>
                   )}
                 </div>
               </div>
@@ -614,28 +689,27 @@ export function Dashboard({ user, onNavigate }: DashboardProps) {
               {/* Right column */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
-                {/* IG status breakdown */}
-                <div style={{ background: '#0C0C15', border: '1px solid rgba(255,255,255,0.055)', borderRadius: 15, padding: '18px 20px' }}>
-                  <p style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(100,116,139,0.38)', marginBottom: 14, margin: '0 0 14px' }}>Statut Instagram</p>
-                  {[
-                    { label: 'Actifs', count: phones.filter(p => p.ig_status === 'active').length, color: '#22C55E' },
-                    { label: 'Erreurs', count: phones.filter(p => p.ig_status === 'error').length, color: '#EF4444' },
-                    { label: 'Limités', count: phones.filter(p => p.ig_status === 'rate_limited').length, color: '#F59E0B' },
-                    { label: 'Inconnus', count: phones.filter(p => !p.ig_status).length, color: 'rgba(100,116,139,0.4)' },
-                  ].map(({ label, count, color }) => (
-                    <div key={label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <div style={{ width: 6, height: 6, borderRadius: '50%', background: color }} />
-                        <span style={{ fontSize: 13, color: 'rgba(196,181,253,0.72)' }}>{label}</span>
+                {/* IG status breakdown — 2x2 mini cards */}
+                <div style={{ background: '#0C0C15', border: '1px solid rgba(255,255,255,0.055)', borderRadius: 15, padding: '16px 18px' }}>
+                  <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(100,116,139,0.5)', marginBottom: 12, margin: '0 0 12px' }}>Statut Instagram</p>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                    {[
+                      { label: 'Actifs', count: phones.filter(p => p.ig_status === 'active').length, color: '#22C55E', bg: 'rgba(34,197,94,0.07)' },
+                      { label: 'Erreurs', count: phones.filter(p => p.ig_status === 'error').length, color: '#EF4444', bg: 'rgba(239,68,68,0.07)' },
+                      { label: 'Limités', count: phones.filter(p => p.ig_status === 'rate_limited').length, color: '#F59E0B', bg: 'rgba(245,158,11,0.07)' },
+                      { label: 'Inconnus', count: phones.filter(p => !p.ig_status).length, color: 'rgba(100,116,139,0.6)', bg: 'rgba(100,116,139,0.05)' },
+                    ].map(({ label, count, color, bg }) => (
+                      <div key={label} style={{ background: bg, borderRadius: 9, padding: '10px 12px', borderLeft: `2px solid ${color}` }}>
+                        <p style={{ fontSize: 18, fontWeight: 800, color: '#F2F0FF', letterSpacing: '-0.03em', margin: 0, lineHeight: 1 }}>{count}</p>
+                        <p style={{ fontSize: 10, color: 'rgba(148,163,184,0.5)', marginTop: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em' }}>{label}</p>
                       </div>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: '#F2F0FF' }}>{count}</span>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
 
                 {/* Actions rapides */}
-                <div style={{ background: '#0C0C15', border: '1px solid rgba(255,255,255,0.055)', borderRadius: 15, padding: '18px 20px' }}>
-                  <p style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(100,116,139,0.38)', marginBottom: 12, margin: '0 0 12px' }}>Actions rapides</p>
+                <div style={{ background: '#0C0C15', border: '1px solid rgba(255,255,255,0.055)', borderRadius: 15, padding: '16px 18px' }}>
+                  <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(100,116,139,0.5)', marginBottom: 10, margin: '0 0 10px' }}>Actions rapides</p>
                   {[
                     { label: 'Poster un Reel', page: 'posting', icon: 'M22 2L11 13M22 2L15 22l-4-9-9-4 20-7z' },
                     { label: 'Mass Posting', page: 'massposting', icon: 'M13 10V3L4 14h7v7l9-11h-7z' },
@@ -644,15 +718,17 @@ export function Dashboard({ user, onNavigate }: DashboardProps) {
                     <button
                       key={page}
                       onClick={() => onNavigate?.(page as any)}
-                      style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10, background: 'rgba(255,255,255,0)', border: '1px solid rgba(255,255,255,0.06)', cursor: 'pointer', marginBottom: 8, transition: 'all 140ms', fontFamily: 'inherit' }}
-                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(139,92,246,0.08)'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(139,92,246,0.22)' }}
-                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0)'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.06)' }}
+                      style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, height: 42, padding: '0 14px', borderRadius: 10, background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(139,92,246,0.15)', cursor: 'pointer', marginBottom: 8, transition: 'all 150ms', fontFamily: 'inherit' }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(124,58,237,0.14)'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(139,92,246,0.28)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 0 18px -6px rgba(124,58,237,0.35)' }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(124,58,237,0.08)'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(139,92,246,0.15)'; (e.currentTarget as HTMLElement).style.boxShadow = 'none' }}
                     >
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="rgba(167,139,250,0.6)" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-                        <path d={icon} />
-                      </svg>
-                      <span style={{ fontSize: 13, fontWeight: 500, color: 'rgba(196,181,253,0.72)', flex: 1, textAlign: 'left' }}>{label}</span>
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="rgba(100,116,139,0.35)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <div style={{ width: 28, height: 28, borderRadius: 7, background: 'rgba(139,92,246,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#A78BFA" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                          <path d={icon} />
+                        </svg>
+                      </div>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: 'rgba(196,181,253,0.8)', flex: 1, textAlign: 'left' }}>{label}</span>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="rgba(139,92,246,0.4)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M9 18l6-6-6-6" />
                       </svg>
                     </button>
@@ -660,7 +736,7 @@ export function Dashboard({ user, onNavigate }: DashboardProps) {
                 </div>
               </div>
             </div>
-          </>
+          </div>
         )}
       </div>
     </div>
