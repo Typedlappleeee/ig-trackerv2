@@ -811,7 +811,7 @@ export function Phones({ user }: PhonesProps) {
           <div className="flex items-center gap-2">
             {/* Auto-refresh */}
             <div className="flex items-center gap-2 px-3 py-2 rounded-xl"
-              style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+              style={{ background: '#0E0E16', border: '1px solid rgba(139,92,246,0.12)' }}>
               <button
                 onClick={() => { const next = !autoRefresh; poller.setEnabled(next); setAutoRefresh(next) }}
                 className={`relative w-7 h-3.5 rounded-full transition-colors flex-shrink-0 ${autoRefresh ? 'bg-ok' : 'bg-surface2'}`}
@@ -1014,7 +1014,7 @@ export function Phones({ user }: PhonesProps) {
             {loading ? (
               <div className="flex justify-center py-16"><Spinner size="lg" /></div>
             ) : phones.length === 0 ? (
-              <div className="rounded-2xl p-10 text-center" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <div className="rounded-2xl p-10 text-center" style={{ background: '#0E0E16', border: '1px solid rgba(139,92,246,0.12)' }}>
                 <p className="text-4xl mb-4">📱</p>
                 <p className="text-base font-bold text-white mb-2">Aucun téléphone synchronisé</p>
                 <p className="text-[13px] text-text2">Clique sur "Sync GéeLark" pour importer tes téléphones.</p>
