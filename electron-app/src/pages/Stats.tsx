@@ -303,11 +303,11 @@ export function Stats({ user }: StatsProps) {
 
       {/* ── Page header ───────────────────────────────────────────────────── */}
       <div
-        className="flex-shrink-0 px-10 pt-9 pb-7 flex items-center justify-between"
+        className="flex-shrink-0 px-8 pt-7 pb-5 flex items-center justify-between"
         style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}
       >
         <div>
-          <h1 className="text-[28px] font-black text-white leading-none">Statistiques Instagram</h1>
+          <h1 className="text-[20px] font-black text-white leading-none">Statistiques Instagram</h1>
           <p className="text-[13px] text-text2 mt-0.5">
             {phones.length} compte{phones.length !== 1 ? 's' : ''} liés · Vues, followers, vidéos
           </p>
@@ -422,7 +422,7 @@ export function Stats({ user }: StatsProps) {
             <div className="flex items-center justify-center h-full">
               <div
                 className="rounded-2xl px-14 py-12 text-center"
-                style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}
+                style={{ background: '#0E0E16', border: '1px solid rgba(255,255,255,0.07)' }}
               >
                 <div
                   className="w-14 h-14 rounded-2xl mx-auto mb-5 flex items-center justify-center"
@@ -445,7 +445,7 @@ export function Stats({ user }: StatsProps) {
               {/* ── Instagram-style profile header ──────────────────────── */}
               <div
                 className="rounded-2xl overflow-hidden"
-                style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}
+                style={{ background: '#0E0E16', border: '1px solid rgba(255,255,255,0.07)' }}
               >
                 {/* Gradient banner */}
                 <div
@@ -551,7 +551,7 @@ export function Stats({ user }: StatsProps) {
                 <div
                   className="rounded-2xl p-5 relative overflow-hidden transition-transform duration-200 hover:-translate-y-0.5"
                   style={{
-                    background: 'rgba(255,255,255,0.03)',
+                    background: '#0E0E16',
                     border: '1px solid rgba(255,255,255,0.07)',
                     boxShadow: '0 4px 24px -8px rgba(245,158,11,0.25)',
                   }}
@@ -570,7 +570,7 @@ export function Stats({ user }: StatsProps) {
               ) : !loadError ? (
                 <div
                   className="rounded-2xl p-8 text-center"
-                  style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}
+                  style={{ background: '#0E0E16', border: '1px solid rgba(255,255,255,0.07)' }}
                 >
                   <p className="text-[13px] text-text2">Impossible de charger les stats — compte privé ou Instagram indisponible.</p>
                 </div>
@@ -595,7 +595,7 @@ export function Stats({ user }: StatsProps) {
                   {/* Sort tabs */}
                   <div
                     className="flex items-center gap-1 p-1 rounded-xl"
-                    style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}
+                    style={{ background: '#0E0E16', border: '1px solid rgba(255,255,255,0.07)' }}
                   >
                     {([
                       { key: 'recent', label: 'Récent'    },
@@ -632,7 +632,7 @@ export function Stats({ user }: StatsProps) {
                 ) : videos.length === 0 ? (
                   <div
                     className="rounded-2xl p-10 text-center"
-                    style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}
+                    style={{ background: '#0E0E16', border: '1px solid rgba(255,255,255,0.07)' }}
                   >
                     <div className="text-5xl mb-4">🎥</div>
                     <p className="text-base font-bold text-white">Aucune vidéo</p>
