@@ -557,7 +557,7 @@ electron.ipcMain.handle("detect-scene-change", async (_event, opts) => {
     ], { maxBuffer: 5 * 1024 * 1024, timeout: FFMPEG_TIMEOUT, killSignal: "SIGKILL" }, (err, _stdout, stderr) => {
       if (err) console.log("[scene-detect] ffmpeg error:", err.message.split("\n")[0]);
       const durM = (stderr ?? "").match(/Duration:\s*(\d+):(\d+):(\d+\.?\d*)/);
-      const duration = durM ? parseInt(durM[1]) * 3600 + parseInt(durM[2]) * 60 + parseFloat(durM[3]) : 0;
+      const duration = durM ? parseInt(durM[1]) * 3600 + parseInt(durM[2]) * 60 + parseFloat(durM[3]) : null;
       let rawBuf = null;
       try {
         rawBuf = node_fs.readFileSync(rawFile);
@@ -831,6 +831,7 @@ electron.ipcMain.handle("run-ffmpeg-remix-ai", async (_event, opts) => {
   let args;
   if (!splitTime) {
     const origHasAudio = await hasAudioStream(ffmpegBin, opts.originalPath);
+    const durArgs = opts.targetDuration != null && opts.targetDuration > 0 ? ["-t", String(opts.targetDuration)] : [];
     if (origHasAudio) {
       args = [
         "-nostdin",
@@ -851,7 +852,7 @@ electron.ipcMain.handle("run-ffmpeg-remix-ai", async (_event, opts) => {
         "aac",
         "-b:a",
         "128k",
-        ...opts.targetDuration != null ? ["-t", String(opts.targetDuration)] : [],
+        ...durArgs,
         "-y",
         opts.outputPath
       ];
@@ -864,14 +865,14 @@ electron.ipcMain.handle("run-ffmpeg-remix-ai", async (_event, opts) => {
         `setpts=PTS-STARTPTS,${vfPhase1}`,
         ...commonOutputFlags,
         "-an",
-        ...opts.targetDuration != null ? ["-t", String(opts.targetDuration)] : [],
+        ...durArgs,
         "-y",
         opts.outputPath
       ];
     }
   } else {
     const secDuration = await getVideoDuration(ffmpegBin, opts.newPhase1Path);
-    const effectiveSplit = secDuration != null && secDuration < splitTime + 0.2 ? Math.max(0.5, secDuration - 0.2) : splitTime;
+    const effectiveSplit = secDuration != null && secDuration > 0 && secDuration < splitTime + 0.2 ? Math.max(0.5, secDuration - 0.2) : splitTime;
     const origHasAudio = await hasAudioStream(ffmpegBin, opts.originalPath);
     let filterComplex;
     let mapArgs;
@@ -916,7 +917,6 @@ electron.ipcMain.handle("run-ffmpeg-remix-ai", async (_event, opts) => {
       ...mapArgs,
       ...commonOutputFlags,
       ...audioEncArgs,
-      ...opts.targetDuration != null ? ["-t", String(opts.targetDuration)] : [],
       "-y",
       opts.outputPath
     ];

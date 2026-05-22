@@ -392,9 +392,10 @@ export function MassRemix({ user }: MassRemixProps) {
           )
           if (!det.ok) addLog(job.id, `❌ Détection échouée: ${det.error ?? 'inconnu'}`)
 
-          detDuration = det.duration
-          splitTime = det.ok && det.splitTime != null
-            ? Math.min((det.duration ?? 60) - 0.1, Math.round(det.splitTime * 1000) / 1000)
+          // Treat duration=0 as unknown (scene detection returns 0 when it can't parse duration)
+          detDuration = (det.duration != null && det.duration > 0) ? det.duration : undefined
+          splitTime = det.ok && det.splitTime != null && detDuration != null
+            ? Math.min(detDuration - 0.1, Math.round(det.splitTime * 1000) / 1000)
             : undefined
 
           addLog(job.id, det.ok
@@ -597,8 +598,9 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
           outputPath = tmp.path
         }
 
-        // Trim output to original video duration so secondary doesn't run long
-        const targetDuration = detDuration ?? undefined
+        // Trim output to original video duration so secondary doesn't run long.
+        // Only set if duration is known and positive — 0 would make FFmpeg output an empty file.
+        const targetDuration = (detDuration != null && detDuration > 0) ? detDuration : undefined
 
         const gen = await withTimeout(
           window.electronAPI!.runFfmpegRemixAI!({

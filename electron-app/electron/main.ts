@@ -646,7 +646,7 @@ ipcMain.handle('detect-scene-change', async (_event, opts: {
       const durM = (stderr ?? '').match(/Duration:\s*(\d+):(\d+):(\d+\.?\d*)/)
       const duration = durM
         ? parseInt(durM[1]) * 3600 + parseInt(durM[2]) * 60 + parseFloat(durM[3])
-        : 0
+        : null
 
       let rawBuf: Buffer | null = null
       try { rawBuf = readFileSync(rawFile) } catch { /* ignore */ }
@@ -979,6 +979,9 @@ ipcMain.handle('run-ffmpeg-remix-ai', async (_event, opts: {
   if (!splitTime) {
     // No valid split point — encode secondary video with original audio track
     const origHasAudio = await hasAudioStream(ffmpegBin, opts.originalPath)
+    // Guard: only apply -t if targetDuration is a real positive number (0 = unknown, would empty the output)
+    const durArgs = (opts.targetDuration != null && opts.targetDuration > 0)
+      ? ['-t', String(opts.targetDuration)] : []
     if (origHasAudio) {
       args = [
         '-nostdin',
@@ -988,7 +991,7 @@ ipcMain.handle('run-ffmpeg-remix-ai', async (_event, opts: {
         '-map', '[vout]', '-map', '[aout]',
         ...commonOutputFlags,
         '-c:a', 'aac', '-b:a', '128k',
-        ...(opts.targetDuration != null ? ['-t', String(opts.targetDuration)] : []),
+        ...durArgs,
         '-y', opts.outputPath,
       ]
     } else {
@@ -998,14 +1001,14 @@ ipcMain.handle('run-ffmpeg-remix-ai', async (_event, opts: {
         '-vf', `setpts=PTS-STARTPTS,${vfPhase1}`,
         ...commonOutputFlags,
         '-an',
-        ...(opts.targetDuration != null ? ['-t', String(opts.targetDuration)] : []),
+        ...durArgs,
         '-y', opts.outputPath,
       ]
     }
   } else {
     // Probe secondary duration — if shorter than splitTime, clamp so concat doesn't stall
     const secDuration = await getVideoDuration(ffmpegBin, opts.newPhase1Path)
-    const effectiveSplit = (secDuration != null && secDuration < splitTime + 0.2)
+    const effectiveSplit = (secDuration != null && secDuration > 0 && secDuration < splitTime + 0.2)
       ? Math.max(0.5, secDuration - 0.2)
       : splitTime
 
@@ -1043,6 +1046,8 @@ ipcMain.handle('run-ffmpeg-remix-ai', async (_event, opts: {
       audioEncArgs = ['-an']
     }
 
+    // No -t on output: the concat filter naturally terminates when both inputs end.
+    // Adding -t targetDuration here caused empty outputs when duration was 0/unknown.
     args = [
       '-nostdin',
       '-t', String(effectiveSplit), '-i', opts.newPhase1Path,  // [0] secondary up to effectiveSplit
@@ -1052,7 +1057,6 @@ ipcMain.handle('run-ffmpeg-remix-ai', async (_event, opts: {
       ...mapArgs,
       ...commonOutputFlags,
       ...audioEncArgs,
-      ...(opts.targetDuration != null ? ['-t', String(opts.targetDuration)] : []),
       '-y', opts.outputPath,
     ]
   }
