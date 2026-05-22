@@ -319,61 +319,58 @@ export function Posting({ user }: PostingProps) {
   })
   const fileName = filePath ? filePath.replace(/\\/g, '/').split('/').pop() ?? filePath : null
 
+  const canPost = !posting && !!bearer && selectedPhones.size > 0 && !!filePath
+
   return (
     <div className="h-full flex overflow-hidden">
-      {/* Left: phone selector */}
-      <aside className="w-64 flex-shrink-0 flex flex-col" style={{ borderRight: '1px solid rgba(255,255,255,0.06)', background: '#07090f' }}>
-        {/* Sidebar header */}
-        <div className="flex-shrink-0 px-5 pt-6 pb-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+      {/* ── Phone selector sidebar ──────────────────────────────────────────── */}
+      <aside className="w-64 flex-shrink-0 flex flex-col"
+        style={{ borderRight: '1px solid rgba(139,92,246,0.1)', background: '#07070B' }}>
+
+        <div className="flex-shrink-0 px-4 pt-5 pb-3" style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
           <div className="flex items-center justify-between mb-3">
-            <p className="text-[13px] font-bold text-white">Comptes</p>
-            <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full text-white"
-              style={{ background: selectedPhones.size > 0 ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.07)' }}>
-              {selectedPhones.size}
+            <p className="text-[12px] font-black uppercase tracking-wider text-text2">Comptes</p>
+            <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${selectedPhones.size > 0 ? 'text-white' : 'text-text2'}`}
+              style={{ background: selectedPhones.size > 0 ? 'linear-gradient(130deg,#7C3AED,#A855F7)' : 'rgba(255,255,255,0.06)' }}>
+              {selectedPhones.size} sél.
             </span>
           </div>
           <select value={groupFilter} onChange={e => setGroup(e.target.value)}
-            className="w-full rounded-xl px-4 py-2.5 text-[13px] focus:outline-none mb-2"
-            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}>
-            {groups.map(g => <option key={g} value={g} style={{ background: '#0d1120', color: '#e2d9f3' }}>{g}</option>)}
+            className="w-full rounded-xl px-3 py-2 text-[12px] focus:outline-none mb-2"
+            style={{ background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.15)', color: '#fff' }}>
+            {groups.map(g => <option key={g} value={g} style={{ background: '#0E0E16', color: '#fff' }}>{g}</option>)}
           </select>
-          <input
-            type="text" placeholder="Rechercher…" value={phoneSearch}
+          <input type="text" placeholder="Rechercher…" value={phoneSearch}
             onChange={e => setPhoneSearch(e.target.value)}
-            className="w-full rounded-xl px-4 py-2.5 text-[13px] placeholder:text-text2 focus:outline-none"
-            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
-          />
+            className="sf-search w-full px-3 py-2 text-[12px] rounded-xl" />
         </div>
-        <div className="flex-shrink-0 px-5 py-2.5 flex gap-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+
+        <div className="flex-shrink-0 px-4 py-2 flex gap-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
           <button onClick={() => setSelPhones(new Set(visiblePhones.map(p => p.id)))}
-            className="text-[12px] font-semibold text-[#8b5cf6] hover:text-white transition-colors">Tout</button>
+            className="text-[11px] font-semibold text-accent hover:text-white transition-colors">Tout</button>
           <button onClick={() => setSelPhones(new Set())}
-            className="text-[12px] text-text2 hover:text-white transition-colors">Aucun</button>
-          <span className="ml-auto text-[12px] text-text2">{visiblePhones.length} tel.</span>
+            className="text-[11px] text-text2 hover:text-white transition-colors">Aucun</button>
+          <span className="ml-auto text-[11px] text-text3">{visiblePhones.length} tél.</span>
         </div>
-        <div className="flex-1 overflow-auto">
+
+        <div className="flex-1 overflow-auto" style={{ scrollbarWidth: 'none' }}>
           {visiblePhones.map(phone => {
             const checked = selectedPhones.has(phone.id)
             return (
               <button key={phone.id} onClick={() => togglePhone(phone.id)}
-                className={`w-full flex items-center gap-3 px-5 py-3 text-left transition-all ${
-                  checked ? '' : 'hover:bg-white/[0.02]'
-                }`}
-                style={checked ? { background: 'rgba(139,92,246,0.08)', borderBottom: '1px solid rgba(255,255,255,0.04)' } : { borderBottom: '1px solid rgba(255,255,255,0.04)' }}
-              >
-                <div className="w-8 h-8 rounded-full flex items-center justify-center text-[12px] font-black flex-shrink-0 transition-all"
-                  style={checked ? { background: 'linear-gradient(135deg,#7c3aed,#ec4899)', color: 'white' } : { background: 'rgba(255,255,255,0.06)', color: '#94a3b8' }}
-                >
+                className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-all ${checked ? '' : 'hover:bg-white/[0.02]'}`}
+                style={{ borderBottom: '1px solid rgba(255,255,255,0.03)', background: checked ? 'rgba(139,92,246,0.08)' : 'transparent' }}>
+                <div className="w-7 h-7 rounded-xl flex items-center justify-center text-[11px] font-black flex-shrink-0 transition-all"
+                  style={checked ? { background: 'linear-gradient(135deg,#7C3AED,#A855F7)', color: '#fff' } : { background: 'rgba(255,255,255,0.05)', color: '#71717A' }}>
                   {phone.ig_username?.[0]?.toUpperCase() ?? phone.phone_name?.[0]?.toUpperCase() ?? '?'}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-[13px] font-semibold text-white truncate">{phone.phone_name}</p>
-                  {phone.ig_username && <p className="text-[12px] text-[#8b5cf6]/80 truncate">@{phone.ig_username}</p>}
+                  <p className="text-[12px] font-semibold text-white truncate">{phone.phone_name}</p>
+                  {phone.ig_username && <p className="text-[10px] truncate" style={{ color: '#8B5CF6' }}>@{phone.ig_username}</p>}
                 </div>
-                <div className="w-4 h-4 rounded flex items-center justify-center flex-shrink-0 transition-all"
-                  style={checked ? { background: 'linear-gradient(135deg,#7c3aed,#ec4899)', border: 'none' } : { border: '1px solid rgba(255,255,255,0.15)' }}
-                >
-                  {checked && <span className="text-white text-[9px] font-bold leading-none">✓</span>}
+                <div className="w-4 h-4 rounded-md flex items-center justify-center flex-shrink-0 transition-all"
+                  style={checked ? { background: 'linear-gradient(135deg,#7C3AED,#A855F7)' } : { border: '1px solid rgba(255,255,255,0.12)' }}>
+                  {checked && <span className="text-white text-[8px] font-bold">✓</span>}
                 </div>
               </button>
             )
@@ -381,149 +378,142 @@ export function Posting({ user }: PostingProps) {
         </div>
       </aside>
 
-      {/* Right: form */}
+      {/* ── Main form area ──────────────────────────────────────────────────── */}
       <div className="h-full flex flex-col overflow-hidden flex-1">
-        {/* Page header */}
-        <div className="flex-shrink-0 px-10 pt-9 pb-7 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        <div className="flex-shrink-0 px-8 pt-7 pb-5 flex items-center justify-between"
+          style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
           <div>
-            <h1 className="text-[28px] font-black text-white leading-none">Nouveau post</h1>
-            <p className="text-[13px] text-text2 mt-0.5">Poste un Reel sur tes téléphones GéeLark</p>
+            <h1 className="text-[20px] font-black text-white leading-none">Nouveau post</h1>
+            <p className="text-[12px] text-text2 mt-0.5">Poste un Reel Instagram sur tes téléphones GéeLark</p>
           </div>
-          <button
-            onClick={() => { setFilePath(null); setCaption(''); setTopic('') }}
-            className="rounded-xl px-5 py-2.5 text-[13px] font-semibold transition-colors"
-            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
-          >
+          <button onClick={() => { setFilePath(null); setCaption(''); setTopic('') }}
+            className="rounded-xl px-4 py-2 text-[12px] font-semibold transition-all hover:bg-white/[0.04]"
+            style={{ border: '1px solid rgba(255,255,255,0.08)', color: '#A1A1AA' }}>
             ↺ Réinitialiser
           </button>
         </div>
 
-        {/* Scrollable content */}
-        <div className="flex-1 overflow-y-auto px-10 pb-10">
-          <div className="space-y-6 mt-8">
+        <div className="flex-1 overflow-y-auto px-8 pb-8 pt-6" style={{ scrollbarWidth: 'none' }}>
+          <div className="space-y-4">
 
             {!bearer && (
-              <div className="px-5 py-4 rounded-2xl text-[13px] text-warn"
-                style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)' }}>
-                ❌ Bearer Token GéeLark manquant — configure-le dans Paramètres
+              <div className="px-4 py-3 rounded-xl text-[12px] text-warn flex items-center gap-2"
+                style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)' }}>
+                <span>⚠</span> Bearer Token GéeLark manquant — configure-le dans <strong>Paramètres</strong>
               </div>
             )}
 
-            {/* Main posting card */}
-            <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-              {/* Media row */}
-              <div className="px-6 py-5 flex gap-6" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                {/* 9:16 portrait preview */}
-                <div className="w-[110px] flex-shrink-0">
-                  <div className="w-[110px] h-[196px] rounded-xl overflow-hidden flex items-center justify-center"
-                    style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                    {filePath ? (
-                      <VideoThumbnail filePath={filePath} />
-                    ) : (
-                      <div className="text-center text-text2 text-[13px]">📹<br/>Choisir<br/>une vidéo</div>
+            {/* ── Video + caption card ────────────────────────────────────── */}
+            <div className="sf-card rounded-2xl overflow-hidden">
+
+              {/* Video preview + picker */}
+              <div className="flex gap-5 p-5" style={{ borderBottom: '1px solid rgba(139,92,246,0.08)' }}>
+                <div className="w-[100px] flex-shrink-0">
+                  <div className="w-[100px] h-[178px] rounded-xl overflow-hidden flex items-center justify-center relative"
+                    style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${filePath ? 'rgba(139,92,246,0.3)' : 'rgba(255,255,255,0.07)'}` }}>
+                    {filePath ? <VideoThumbnail filePath={filePath} /> : (
+                      <div className="text-center text-text2">
+                        <div className="text-2xl mb-1">🎬</div>
+                        <p className="text-[10px]">Vidéo</p>
+                      </div>
                     )}
                   </div>
                 </div>
-                {/* Right column */}
                 <div className="flex-1 min-w-0 flex flex-col justify-center gap-3">
                   <div>
-                    <p className="text-[12px] text-text2 mb-1">Vidéo sélectionnée</p>
-                    <p className="text-[13px] text-white truncate font-medium">{fileName ?? 'Aucune vidéo sélectionnée'}</p>
+                    <p className="text-[11px] text-text2 mb-1 uppercase tracking-wider font-semibold">Vidéo</p>
+                    <p className="text-[13px] text-white font-semibold truncate">
+                      {fileName ?? <span className="text-text2 font-normal">Aucune vidéo sélectionnée</span>}
+                    </p>
                   </div>
                   <div className="flex gap-2 flex-wrap">
-                    <Button size="sm" onClick={() => setShowBankPicker(true)}>📂 Choisir depuis la banque</Button>
-                    <Button variant="secondary" size="sm" onClick={pickLocalFile}>💾 Depuis le PC</Button>
+                    <button onClick={() => setShowBankPicker(true)}
+                      className="px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-all hover:opacity-90 active:scale-95"
+                      style={{ background: 'linear-gradient(130deg,#7C3AED,#A855F7)', color: '#fff', boxShadow: '0 2px 12px -3px rgba(124,58,237,0.5)' }}>
+                      📂 Banque
+                    </button>
+                    <button onClick={pickLocalFile}
+                      className="px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-all hover:bg-white/[0.06]"
+                      style={{ border: '1px solid rgba(255,255,255,0.1)', color: '#A1A1AA' }}>
+                      💾 PC
+                    </button>
                     {filePath && (
-                      <Button variant="secondary" size="sm" onClick={() => setFilePath(null)}>✕ Retirer</Button>
+                      <button onClick={() => setFilePath(null)}
+                        className="px-3 py-1.5 rounded-lg text-[12px] transition-all hover:bg-white/[0.04]"
+                        style={{ border: '1px solid rgba(239,68,68,0.2)', color: '#EF4444' }}>
+                        ✕
+                      </button>
                     )}
                   </div>
                 </div>
               </div>
 
-              {/* Description */}
-              <div className="px-6 py-5" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                <div className="flex items-center justify-between mb-3">
-                  <p className="text-[15px] font-bold text-white">Description</p>
-                  <span className={`text-[12px] font-mono ${caption.length > 2200 ? 'text-danger' : 'text-text2'}`}>
-                    {caption.length} / 2200
+              {/* Caption */}
+              <div className="p-5" style={{ borderBottom: '1px solid rgba(139,92,246,0.08)' }}>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-[13px] font-bold text-white">Description</p>
+                  <span className={`text-[11px] font-mono tabular-nums ${caption.length > 2200 ? 'text-danger' : 'text-text2'}`}>
+                    {caption.length}/2200
                   </span>
                 </div>
-                <textarea
-                  value={caption}
-                  onChange={e => setCaption(e.target.value)}
-                  rows={5}
+                <textarea value={caption} onChange={e => setCaption(e.target.value)} rows={5}
                   placeholder="Écris ta description Instagram…"
-                  className="w-full rounded-xl px-4 py-3 text-[13px] placeholder:text-text2 resize-y focus:outline-none"
-                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
-                />
-                {/* Generate description row */}
+                  className="w-full rounded-xl px-4 py-3 text-[13px] placeholder:text-text3 resize-y sf-input" />
                 <div className="flex gap-2 mt-3">
-                  <Button variant="secondary" size="sm" onClick={generateCaption} loading={generating} disabled={!groqKey}>
-                    ✨ Générer
-                  </Button>
-                  <input
-                    type="text"
-                    value={topic}
-                    onChange={e => setTopic(e.target.value)}
-                    placeholder="sujet / niche…"
-                    className="flex-1 rounded-xl px-4 py-2.5 text-[13px] placeholder:text-text2 focus:outline-none"
-                    style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
-                  />
+                  <button onClick={generateCaption} disabled={!groqKey || generating}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[12px] font-semibold transition-all disabled:opacity-40"
+                    style={{ background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.25)', color: '#A78BFA' }}>
+                    {generating ? <span className="inline-block w-3 h-3 border-2 border-accent/50 border-t-accent rounded-full animate-spin" /> : '✨'}
+                    {generating ? 'Génération…' : 'Générer via IA'}
+                  </button>
+                  <input type="text" value={topic} onChange={e => setTopic(e.target.value)}
+                    placeholder="sujet / niche…" className="flex-1 sf-input rounded-xl px-3 py-2 text-[12px]" />
                 </div>
-                <input
-                  type="text"
-                  value={customPrompt}
-                  onChange={e => setCustomPrompt(e.target.value)}
-                  placeholder="Prompt IA (optionnel)"
-                  className="mt-2 w-full rounded-xl px-4 py-2.5 text-[13px] placeholder:text-text2 focus:outline-none"
-                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
-                />
+                <input type="text" value={customPrompt} onChange={e => setCustomPrompt(e.target.value)}
+                  placeholder="Prompt IA personnalisé (optionnel)" className="mt-2 w-full sf-input rounded-xl px-3 py-2 text-[12px]" />
               </div>
 
               {/* Options */}
-              <div className="px-6 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+              <div className="px-5 py-4" style={{ borderBottom: '1px solid rgba(139,92,246,0.08)' }}>
                 <PostingOptions opts={postingOpts} onChange={setPostingOpts} />
               </div>
-              <div className="px-6 py-4 flex items-center gap-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                <span className="text-base">#️⃣</span>
-                <span className="flex-1 text-[13px] text-white">Avec hashtags</span>
-                <button
-                  onClick={() => setWithHashtags(v => !v)}
-                  className="relative w-11 h-6 rounded-full transition-colors flex-shrink-0"
-                  style={{ background: withHashtags ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.08)' }}
-                >
-                  <span className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform ${withHashtags ? 'translate-x-6' : 'translate-x-1'}`} />
+
+              {/* Hashtags toggle */}
+              <div className="px-5 py-3 flex items-center gap-3" style={{ borderBottom: '1px solid rgba(139,92,246,0.08)' }}>
+                <span className="text-sm">#️⃣</span>
+                <span className="flex-1 text-[13px] text-white">Inclure des hashtags</span>
+                <button onClick={() => setWithHashtags(v => !v)}
+                  className="relative w-10 h-5 rounded-full transition-colors flex-shrink-0"
+                  style={{ background: withHashtags ? 'linear-gradient(130deg,#7C3AED,#A855F7)' : 'rgba(255,255,255,0.08)' }}>
+                  <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${withHashtags ? 'translate-x-5' : 'translate-x-0.5'}`} />
                 </button>
               </div>
 
-              {/* Progress + Logs */}
+              {/* Progress */}
               {(posting || progress > 0) && (
-                <div className="px-6 py-5 space-y-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                <div className="p-5 space-y-3" style={{ borderBottom: '1px solid rgba(139,92,246,0.08)' }}>
                   <div className="flex items-center justify-between">
-                    <span className="text-[13px] font-semibold text-white">Progression</span>
-                    <span className="text-[13px] font-mono text-text2">{progress}%</span>
+                    <span className="text-[12px] font-bold text-white flex items-center gap-2">
+                      {posting && <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />}
+                      Progression
+                    </span>
+                    <span className="text-[13px] font-mono font-bold tabular-nums" style={{ color: progress >= 100 ? '#22C55E' : '#A78BFA' }}>{progress}%</span>
                   </div>
-                  <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
-                    <div
-                      className={`h-full rounded-full transition-all duration-500 ${progress >= 100 ? 'bg-ok' : ''}`}
-                      style={{ width: `${progress}%`, background: progress >= 100 ? undefined : 'linear-gradient(90deg,#7c3aed,#ec4899)' }}
-                    />
+                  <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
+                    <div className={`h-full rounded-full transition-all duration-700 ${progress >= 100 ? 'bg-ok' : 'sf-progress-bar'}`}
+                      style={{ width: `${progress}%` }} />
                   </div>
-                  <button
-                    onClick={() => setShowLogs(v => !v)}
-                    className="text-[12px] text-text2 hover:text-white flex items-center gap-1.5 transition-colors"
-                  >
-                    <span style={{ transform: showLogs ? 'rotate(90deg)' : 'rotate(0deg)' }} className="inline-block transition-transform">▶</span>
-                    Journal détaillé ({logs.length})
+                  <button onClick={() => setShowLogs(v => !v)}
+                    className="text-[11px] text-text2 hover:text-white flex items-center gap-1.5 transition-colors">
+                    <span className="inline-block transition-transform" style={{ transform: showLogs ? 'rotate(90deg)' : 'none' }}>▶</span>
+                    Logs ({logs.length})
                   </button>
                   {showLogs && logs.length > 0 && (
-                    <div className="rounded-xl p-4 max-h-48 overflow-auto font-mono text-[12px] space-y-1"
-                      style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                    <div className="rounded-xl p-3 max-h-48 overflow-auto font-mono text-[11px] space-y-1"
+                      style={{ background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(139,92,246,0.12)' }}>
                       {logs.map((l, i) => (
-                        <div key={i} className={`flex gap-2 ${
-                          l.level === 'ok' ? 'text-ok' : l.level === 'error' ? 'text-danger' : l.level === 'warn' ? 'text-warn' : 'text-text2'
-                        }`}>
-                          <span className="text-text2/60 flex-shrink-0">{l.time}</span>
+                        <div key={i} className={`flex gap-2 ${l.level === 'ok' ? 'text-ok' : l.level === 'error' ? 'text-danger' : l.level === 'warn' ? 'text-warn' : 'text-text2'}`}>
+                          <span className="text-text3 flex-shrink-0">{l.time}</span>
                           <span>{l.message}</span>
                         </div>
                       ))}
@@ -533,30 +523,25 @@ export function Posting({ user }: PostingProps) {
                 </div>
               )}
 
-              {/* Actions */}
-              <div className="px-6 py-5 flex gap-3">
-                <button
-                  onClick={post}
-                  disabled={posting || !bearer || selectedPhones.size === 0 || !filePath}
+              {/* Action buttons */}
+              <div className="p-5 flex gap-3">
+                <button onClick={post} disabled={!canPost}
                   className="flex-[2] py-3 rounded-xl text-[13px] font-black text-white transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
-                  style={{
-                    background: posting || !bearer || selectedPhones.size === 0 || !filePath
-                      ? 'rgba(255,255,255,0.06)' : 'linear-gradient(130deg,#7c3aed,#ec4899)',
-                    boxShadow: posting || !bearer || selectedPhones.size === 0 || !filePath
-                      ? 'none' : '0 4px 24px -4px rgba(124,58,237,0.5)',
-                  }}>
-                  {posting ? `⏳ En cours…` : `⚡ Lancer — ${selectedPhones.size} compte${selectedPhones.size !== 1 ? 's' : ''}`}
+                  style={canPost ? {
+                    background: 'linear-gradient(130deg,#7C3AED,#A855F7)',
+                    boxShadow: '0 4px 24px -4px rgba(124,58,237,0.55)',
+                  } : { background: 'rgba(255,255,255,0.06)' }}>
+                  {posting
+                    ? <span className="flex items-center justify-center gap-2"><span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> En cours…</span>
+                    : `⚡ Lancer — ${selectedPhones.size} compte${selectedPhones.size !== 1 ? 's' : ''}`}
                 </button>
-                <button
-                  onClick={() => setShowScheduleModal(true)}
-                  disabled={posting || !bearer || selectedPhones.size === 0 || !filePath}
-                  className="flex-1 py-3 rounded-xl text-[13px] font-black transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
-                  style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(37,99,235,0.3)', color: '#60a5fa' }}>
+                <button onClick={() => setShowScheduleModal(true)} disabled={!canPost}
+                  className="flex-1 py-3 rounded-xl text-[13px] font-bold transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
+                  style={{ background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.25)', color: '#60A5FA' }}>
                   📅 Programmer
                 </button>
               </div>
             </div>
-
           </div>
         </div>
       </div>

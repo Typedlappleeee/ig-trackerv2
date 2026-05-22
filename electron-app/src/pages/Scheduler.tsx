@@ -192,11 +192,17 @@ export function Scheduler({ user }: Props) {
     <div className="h-full flex flex-col overflow-hidden">
 
       {/* Page header */}
-      <div className="flex-shrink-0 px-10 pt-9 pb-7" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-        <div className="flex items-center justify-between mb-6">
+      <div className="flex-shrink-0 px-8 pt-7 pb-5" style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
+        <div className="flex items-center justify-between mb-4">
           <div>
-            <h1 className="text-[28px] font-black text-white leading-none">Programmation</h1>
-            <p className="text-[13px] text-text2 mt-0.5">Posts automatiques — exécutés même application fermée</p>
+            <h1 className="text-[20px] font-black text-white leading-none">Programmation</h1>
+            <p className="text-[12px] text-text2 mt-0.5">Posts automatiques — exécutés même app fermée</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="px-3 py-1 rounded-lg text-[11px] font-bold"
+              style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.2)', color: '#22C55E' }}>
+              {pending.length} en attente
+            </div>
           </div>
         </div>
 
@@ -226,19 +232,19 @@ export function Scheduler({ user }: Props) {
       </div>
 
       {/* Post list */}
-      <div className="flex-1 overflow-y-auto px-10 pb-10">
-        <div className="space-y-4 mt-6">
+      <div className="flex-1 overflow-y-auto px-8 pb-8" style={{ scrollbarWidth: 'none' }}>
+        <div className="space-y-3 mt-5">
           {loading ? (
             <div className="flex items-center justify-center py-20">
               <Spinner size="lg" />
             </div>
           ) : shown.length === 0 ? (
-            <div className="rounded-2xl p-10 text-center mt-4" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
-              <p className="text-5xl mb-4">{tab === 'pending' ? '📅' : '🕐'}</p>
-              <p className="text-base font-bold text-white mb-2">
+            <div className="rounded-2xl p-10 text-center mt-4 sf-card">
+              <p className="text-4xl mb-3">{tab === 'pending' ? '📅' : '🕐'}</p>
+              <p className="text-[15px] font-bold text-white mb-2">
                 {tab === 'pending' ? 'Aucun post programmé' : 'Aucun historique'}
               </p>
-              <p className="text-[13px] text-text2">
+              <p className="text-[12px] text-text2">
                 {tab === 'pending'
                   ? 'Programme un post depuis Posting ou Mass Posting.'
                   : 'Les posts exécutés apparaîtront ici.'}
@@ -301,8 +307,8 @@ function PostCard({ post, isOwn, canCancel, isRunning, runLogs, cancelling, onCa
   const allLogs = runLogs ?? (post.result?.logs ?? [])
 
   return (
-    <div className="rounded-2xl overflow-hidden"
-      style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${borderColor}`, boxShadow: `0 4px 20px ${glowColor}` }}>
+    <div className="rounded-2xl overflow-hidden transition-all hover:scale-[1.002]"
+      style={{ background: '#0E0E16', border: `1px solid ${borderColor}`, boxShadow: `0 4px 20px ${glowColor}` }}>
 
       {/* Top accent line */}
       <div className="h-[2.5px]" style={{
