@@ -430,67 +430,107 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
     isNew?: boolean
   }) => {
     const active = page === id
+    const [hovered, setHovered] = useState(false)
+    const [pressed, setPressed] = useState(false)
     return (
-      <button
-        onClick={() => { playNav(); onNavigate(id) }}
-        title={collapsed ? label : undefined}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: collapsed ? 0 : 8,
-          width: '100%',
-          height: 34,
-          padding: '0 8px',
-          borderRadius: 8,
-          fontSize: 13,
-          fontWeight: active ? 500 : 400,
-          textAlign: 'left',
-          cursor: 'pointer',
-          border: 'none',
-          borderLeft: active ? '2px solid #8B5CF6' : '2px solid transparent',
-          background: active ? 'rgba(139,92,246,0.1)' : 'transparent',
-          color: active ? '#F1F0F7' : 'rgba(148,163,184,0.65)',
-          transition: 'background 0.15s, color 0.15s',
-          justifyContent: collapsed ? 'center' : 'flex-start',
-          flexShrink: 0,
-          marginBottom: 2,
-        }}
-        onMouseEnter={e => {
-          if (!active) (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.04)'
-        }}
-        onMouseLeave={e => {
-          if (!active) (e.currentTarget as HTMLButtonElement).style.background = 'transparent'
-        }}
-      >
-        <span style={{ flexShrink: 0, color: active ? '#8B5CF6' : 'rgba(148,163,184,0.5)', display: 'flex' }}>
-          <NavIcon d={ICONS[iconKey]} size={16} />
-        </span>
-        {!collapsed && (
-          <>
-            <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
-            {beta && (
-              <span style={{
-                fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em',
-                padding: '2px 5px', borderRadius: 4,
-                background: 'rgba(139,92,246,0.15)', color: '#a78bfa',
-                border: '1px solid rgba(139,92,246,0.2)', flexShrink: 0,
-              }}>
-                BETA
-              </span>
-            )}
-            {isNew && (
-              <span style={{
-                fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em',
-                padding: '2px 5px', borderRadius: 4,
-                background: 'rgba(16,185,129,0.15)', color: '#34d399',
-                border: '1px solid rgba(52,211,153,0.2)', flexShrink: 0,
-              }}>
-                NEW
-              </span>
-            )}
-          </>
+      <div style={{ position: 'relative', marginBottom: 2 }}>
+        <button
+          onClick={() => { playNav(); onNavigate(id) }}
+          onMouseEnter={() => setHovered(true)}
+          onMouseLeave={() => { setHovered(false); setPressed(false) }}
+          onMouseDown={() => setPressed(true)}
+          onMouseUp={() => setPressed(false)}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: collapsed ? 0 : 8,
+            width: '100%',
+            height: 34,
+            padding: '0 8px',
+            borderRadius: 8,
+            fontSize: 13,
+            fontWeight: active ? 500 : 400,
+            textAlign: 'left',
+            cursor: 'pointer',
+            border: 'none',
+            background: active
+              ? 'rgba(139,92,246,0.1)'
+              : hovered ? 'rgba(255,255,255,0.045)' : 'transparent',
+            color: active ? '#F1F0F7' : hovered ? 'rgba(241,240,247,0.88)' : 'rgba(148,163,184,0.65)',
+            transition: 'background 140ms ease, color 140ms ease',
+            transform: pressed ? 'scale(0.965)' : 'scale(1)',
+            justifyContent: collapsed ? 'center' : 'flex-start',
+            flexShrink: 0,
+            position: 'relative',
+            outline: 'none',
+          }}
+        >
+          {/* Active animated indicator bar */}
+          {active && (
+            <span style={{
+              position: 'absolute',
+              left: 0, top: 7, bottom: 7,
+              width: 2,
+              borderRadius: '0 2px 2px 0',
+              background: 'linear-gradient(180deg, #A78BFA, #7C3AED)',
+              boxShadow: '0 0 10px rgba(139,92,246,0.8)',
+              animation: 'sf-nav-active 0.22s cubic-bezier(0.22,1,0.36,1) both',
+            }} />
+          )}
+          <span style={{
+            flexShrink: 0,
+            display: 'flex',
+            color: active ? '#8B5CF6' : hovered ? 'rgba(196,181,253,0.65)' : 'rgba(148,163,184,0.45)',
+            transition: 'color 140ms ease',
+          }}>
+            <NavIcon d={ICONS[iconKey]} size={16} />
+          </span>
+          {!collapsed && (
+            <>
+              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
+              {beta && (
+                <span style={{
+                  fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em',
+                  padding: '2px 5px', borderRadius: 4,
+                  background: 'rgba(139,92,246,0.15)', color: '#a78bfa',
+                  border: '1px solid rgba(139,92,246,0.2)', flexShrink: 0,
+                }}>BETA</span>
+              )}
+              {isNew && (
+                <span style={{
+                  fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em',
+                  padding: '2px 5px', borderRadius: 4,
+                  background: 'rgba(16,185,129,0.15)', color: '#34d399',
+                  border: '1px solid rgba(52,211,153,0.2)', flexShrink: 0,
+                }}>NEW</span>
+              )}
+            </>
+          )}
+        </button>
+        {/* Floating tooltip when sidebar is collapsed */}
+        {collapsed && hovered && (
+          <div style={{
+            position: 'fixed',
+            left: 60,
+            top: 'auto',
+            transform: 'translateY(-50%)',
+            background: '#1A1A2E',
+            border: '1px solid rgba(139,92,246,0.28)',
+            borderRadius: 7,
+            padding: '5px 11px',
+            fontSize: 12,
+            fontWeight: 500,
+            color: '#F2F0FF',
+            whiteSpace: 'nowrap',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.55), 0 0 0 1px rgba(139,92,246,0.06)',
+            zIndex: 9999,
+            pointerEvents: 'none',
+            animation: 'sf-slide-left 0.16s cubic-bezier(0.22,1,0.36,1) both',
+          }}>
+            {label}
+          </div>
         )}
-      </button>
+      </div>
     )
   }
 
@@ -532,9 +572,9 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
           flexShrink: 0,
           display: 'flex',
           flexDirection: 'column',
-          background: '#0A0A12',
-          borderRight: '1px solid rgba(255,255,255,0.07)',
-          transition: 'width 0.25s ease',
+          background: 'linear-gradient(180deg, #0B0B15 0%, #080810 100%)',
+          borderRight: '1px solid rgba(255,255,255,0.065)',
+          transition: 'width 0.28s cubic-bezier(0.4,0,0.2,1)',
           overflow: 'hidden',
           position: 'relative',
         }}
@@ -824,9 +864,12 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
         {/* ── Topbar ──────────────────────────────────────────────────────── */}
         <header style={{
           height: 48, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 12, padding: '0 20px',
-          background: 'rgba(8,8,14,0.95)', backdropFilter: 'blur(12px)',
+          background: 'rgba(7,7,12,0.92)',
+          backdropFilter: 'blur(20px) saturate(1.3)',
+          WebkitBackdropFilter: 'blur(20px) saturate(1.3)',
           borderBottom: '1px solid rgba(255,255,255,0.07)',
           position: 'relative', zIndex: 10,
+          boxShadow: '0 1px 0 rgba(139,92,246,0.04)',
         }}>
 
           {/* Left: page title + breadcrumb */}
@@ -1067,7 +1110,11 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
               </button>
             </div>
           ) : (
-            <div key={page} className="anim-page h-full">
+            <div
+              key={page}
+              className="h-full"
+              style={{ animation: 'sf-slide-up 0.26s cubic-bezier(0.22,1,0.36,1) both' }}
+            >
               {children}
             </div>
           )}
