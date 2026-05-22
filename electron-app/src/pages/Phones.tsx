@@ -63,8 +63,12 @@ function Countdown({ secondsLeft }: { secondsLeft: number }) {
   const m = Math.floor(secondsLeft / 60)
   const s = secondsLeft % 60
   return (
-    <span style={{ fontSize: 12, color: 'rgba(196,181,253,0.72)', fontVariantNumeric: 'tabular-nums' }}>
-      ↻ {m > 0 ? `${m}m ` : ''}{s.toString().padStart(2, '0')}s
+    <span style={{ fontSize: 12, color: 'rgba(196,181,253,0.72)', fontVariantNumeric: 'tabular-nums', fontFamily: 'monospace' }}>
+      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ display: 'inline', verticalAlign: 'middle', marginRight: 3 }}>
+        <path d="M9 5A4 4 0 1 1 6.5 1.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+        <path d="M6 1l1.5 1.5L6 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+      </svg>
+      {m > 0 ? `${m}m ` : ''}{s.toString().padStart(2, '0')}s
     </span>
   )
 }
@@ -445,10 +449,8 @@ function IgCell({ phone, onSave }: { phone: Phone; onSave: (id: string, u: strin
       <input
         ref={ref} value={value} onChange={e => setValue(e.target.value)}
         onKeyDown={onKey} onBlur={save} disabled={saving}
-        style={{
-          width: 112, background: '#111120', border: '1px solid #8B5CF6',
-          borderRadius: 6, padding: '2px 6px', fontSize: 13, color: '#F2F0FF', outline: 'none',
-        }}
+        className="sf-input"
+        style={{ width: 112, padding: '2px 6px', fontSize: 13, borderColor: '#8B5CF6' }}
       />
     </div>
   )
@@ -496,10 +498,8 @@ function NoteCell({ phone, onSave }: { phone: Phone; onSave: (id: string, v: str
     <input
       ref={ref} value={value} onChange={e => setValue(e.target.value)}
       onKeyDown={onKey} onBlur={save} disabled={saving}
-      style={{
-        width: '100%', background: '#111120', border: '1px solid #8B5CF6',
-        borderRadius: 6, padding: '2px 6px', fontSize: 13, color: '#F2F0FF', outline: 'none',
-      }}
+      className="sf-input"
+      style={{ width: '100%', padding: '2px 6px', fontSize: 13, borderColor: '#8B5CF6' }}
       placeholder="Note…"
     />
   )
