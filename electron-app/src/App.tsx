@@ -675,7 +675,7 @@ function AppContent({ user }: { user: User }) {
 
   const content = (() => {
     switch (page) {
-      case 'dashboard':    return <Dashboard   user={user} />
+      case 'dashboard':    return <Dashboard   user={user} onNavigate={p => handleNavigate(p as Page)} />
       case 'phones':       return <Phones      user={user} key={refreshTick} />
       case 'monitor':      return <Monitor     user={user} />
       case 'stats':        return <Stats       user={user} />

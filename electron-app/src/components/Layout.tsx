@@ -471,7 +471,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
                 className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${page === 'settings' ? 'sf-nav-active' : 'hover:bg-white/[0.05]'}`}>
                 <span className="text-sm opacity-70">⚙</span>
               </button>
-              <button ref={userTriggerRef} onClick={() => userMenuOpen ? setUserMenuOpen(false) : openUserMenu()}
+              <button onClick={() => userMenuOpen ? setUserMenuOpen(false) : openUserMenu()}
                 className="w-8 h-8 rounded-[10px] flex items-center justify-center text-[10px] font-black flex-shrink-0"
                 style={{ background: 'linear-gradient(135deg, #7c3aed, #ec4899)', color: '#fff' }}>
                 {userInitial}
@@ -593,7 +593,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
               </div>
 
               {/* User strip */}
-              <button ref={userTriggerRef} onClick={() => userMenuOpen ? setUserMenuOpen(false) : openUserMenu()}
+              <button onClick={() => userMenuOpen ? setUserMenuOpen(false) : openUserMenu()}
                 className="w-full flex items-center gap-2.5 px-2.5 py-[7px] rounded-xl text-left transition-all hover:bg-white/[0.04] group">
                 <div className="w-7 h-7 rounded-[10px] flex items-center justify-center text-[10px] font-black flex-shrink-0"
                   style={{ background: 'linear-gradient(135deg, #7c3aed 0%, #ec4899 100%)', boxShadow: '0 2px 8px rgba(124,58,237,0.35)', color: '#fff' }}>
@@ -608,65 +608,157 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
         </div>
       </aside>
 
-      {/* ── Main content ────────────────────────────────────────────────────── */}
-      <main className="flex-1 overflow-auto relative bg-bg">
-        <div className="absolute top-0 right-0 w-96 h-96 pointer-events-none" style={{ background: 'radial-gradient(ellipse at top right, rgba(139,92,246,0.06) 0%, transparent 70%)', zIndex: 0 }} />
-        {/* Subscription expiry warning */}
-        {license.source === 'own' && license.daysLeft !== null && license.daysLeft <= 1 && (
-          <div
-            className="fixed top-3 right-4 z-[9997] flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold animate-pulse"
-            style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.5)', color: '#f87171', boxShadow: '0 0 16px rgba(239,68,68,0.25)' }}
-          >
-            <span>🔴</span>
-            <span>{license.daysLeft === 0 ? 'Abonnement expiré !' : 'Abonnement expire dans moins de 24h !'}</span>
-          </div>
-        )}
+      {/* ── Main area (topbar + content) ─────────────────────────────────── */}
+      <div className="flex-1 flex flex-col overflow-hidden relative">
 
-        {/* Org-switch loading overlay */}
-        {orgLoading && (
-          <div className="absolute inset-0 z-50 bg-bg/85 backdrop-blur-sm flex items-center justify-center">
-            <div className="flex flex-col items-center gap-4 anim-scale-in">
-              <div className="w-12 h-12 rounded-2xl bg-accent/10 border border-accent/20 flex items-center justify-center">
-                <svg className="animate-spin w-5 h-5 text-accent" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-20" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3"/>
-                  <path className="opacity-80" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
-                </svg>
-              </div>
-              <p className="text-xs text-text2 font-medium tracking-wide">Chargement du contexte…</p>
-            </div>
-          </div>
-        )}
+        {/* Ambient background glow */}
+        <div className="absolute top-0 right-0 w-[500px] h-[400px] pointer-events-none" style={{ background: 'radial-gradient(ellipse at top right, rgba(139,92,246,0.05) 0%, transparent 65%)', zIndex: 0 }} />
 
-        {/* Permission denied */}
-        {!orgLoading && !isVisibleTab(page) && page !== 'settings' ? (
-          <div className="flex flex-col items-center justify-center h-full min-h-[60vh] gap-6 text-center px-8 anim-scale-in">
-            <div className="relative">
-              <div className="w-20 h-20 rounded-3xl bg-danger/8 border border-danger/15 flex items-center justify-center">
-                <span className="text-4xl">🔒</span>
+        {/* ── Topbar ───────────────────────────────────────────────────────── */}
+        <header className="sf-topbar flex-shrink-0 flex items-center gap-4 px-6 h-[54px] relative z-10">
+
+          {/* Page label */}
+          <div className="flex items-center gap-2 min-w-0 flex-shrink-0">
+            <span className="text-[13px] font-semibold text-white/90 truncate max-w-[180px]">
+              {({
+                dashboard:   'Dashboard',
+                phones:      'Téléphones',
+                monitor:     'Monitor Live',
+                stats:       'Statistiques',
+                posting:     'Posting',
+                massposting: 'Mass Posting',
+                scheduler:   'Programmation',
+                bank:        'Banque Vidéos',
+                aitools:     'Outils IA',
+                warmup:      'Warmup',
+                montage:     'Montage',
+                remix:       'Remix Vidéo',
+                textcopy:    'Texte IA',
+                community:   'Communauté',
+                support:     'Support',
+                settings:    'Paramètres',
+                licences:    'Licences',
+              } as Record<string, string>)[page] ?? page}
+            </span>
+            {activeTask && (
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold"
+                style={{ background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.3)', color: '#A78BFA' }}>
+                <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse flex-shrink-0" />
+                {activeTask.kind === 'mass'
+                  ? `${activeTask.done}/${activeTask.total} • ${activeTask.progress}%`
+                  : `${activeTask.progress}%`}
               </div>
-              <div className="absolute -inset-3 rounded-[32px] bg-danger/5 -z-10" />
+            )}
+          </div>
+
+          {/* Search */}
+          <div className="flex-1 max-w-xs relative">
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none" style={{ color: '#52525B' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+            </svg>
+            <input
+              className="sf-search w-full h-8 pl-8 pr-3 text-[12px]"
+              placeholder="Rechercher…"
+              readOnly
+              onClick={() => {}}
+            />
+          </div>
+
+          <div className="flex-1" />
+
+          {/* Live indicator */}
+          <div className="flex items-center gap-2">
+            <div className="sf-live-dot" />
+            <span className="text-[11px] font-medium text-text2">Live</span>
+          </div>
+
+          {/* Subscription expiry warning inline */}
+          {license.source === 'own' && license.daysLeft !== null && license.daysLeft <= 1 && (
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold"
+              style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.35)', color: '#F87171' }}>
+              <span>⚠</span>
+              <span>{license.daysLeft === 0 ? 'Abonnement expiré' : '&lt; 24h restantes'}</span>
             </div>
-            <div className="space-y-2.5 max-w-sm">
-              <h2 className="text-2xl font-bold text-text">Accès refusé</h2>
-              <p className="text-text2 text-sm leading-relaxed">
-                Vous n'avez pas la permission d'accéder à cet onglet dans l'organisation{' '}
-                <strong className="text-text font-semibold">"{currentOrg?.name}"</strong>.
-              </p>
-              <p className="text-text2/50 text-xs">Contactez un administrateur pour modifier vos droits d'accès.</p>
-            </div>
-            <button
-              onClick={() => onNavigate('dashboard')}
-              className="px-6 py-2.5 active:scale-95 text-white text-sm font-semibold rounded-xl transition-all btn-sf-primary"
-            >
-              Retour au Dashboard
+          )}
+
+          {/* Credits */}
+          {!credits.loading && (
+            <button onClick={() => onNavigate('settings', 'abonnement')}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-all hover:bg-white/[0.04]"
+              style={{ border: '1px solid rgba(139,92,246,0.18)' }}>
+              <span className="text-[13px]">💎</span>
+              <span className="text-[12px] font-bold tabular-nums" style={{ color: credits.balance < 10 ? '#F87171' : '#A78BFA' }}>
+                {credits.balance.toLocaleString('fr-FR')}
+              </span>
             </button>
-          </div>
-        ) : (
-          <div key={page} className="anim-page h-full">
-            {children}
-          </div>
-        )}
-      </main>
+          )}
+
+          {/* Notifications bell */}
+          <button className="relative w-8 h-8 flex items-center justify-center rounded-lg transition-all hover:bg-white/[0.05]"
+            style={{ border: '1px solid rgba(255,255,255,0.06)' }}>
+            <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} style={{ color: '#71717A' }}>
+              <path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+            </svg>
+          </button>
+
+          {/* User avatar */}
+          <button ref={userTriggerRef} onClick={() => userMenuOpen ? setUserMenuOpen(false) : openUserMenu()}
+            className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-black flex-shrink-0 transition-all hover:scale-105"
+            style={{ background: 'linear-gradient(135deg, #7C3AED, #EC4899)', boxShadow: '0 2px 8px rgba(124,58,237,0.4)', color: '#fff' }}
+            title={user.email}>
+            {userInitial}
+          </button>
+
+        </header>
+
+        {/* ── Scrollable content ─────────────────────────────────────────── */}
+        <main className="flex-1 overflow-auto relative bg-bg z-0">
+          {/* Org-switch loading overlay */}
+          {orgLoading && (
+            <div className="absolute inset-0 z-50 bg-bg/85 backdrop-blur-sm flex items-center justify-center">
+              <div className="flex flex-col items-center gap-4 anim-scale-in">
+                <div className="w-12 h-12 rounded-2xl bg-accent/10 border border-accent/20 flex items-center justify-center">
+                  <svg className="animate-spin w-5 h-5 text-accent" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-20" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3"/>
+                    <path className="opacity-80" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                  </svg>
+                </div>
+                <p className="text-xs text-text2 font-medium tracking-wide">Chargement du contexte…</p>
+              </div>
+            </div>
+          )}
+
+          {/* Permission denied */}
+          {!orgLoading && !isVisibleTab(page) && page !== 'settings' ? (
+            <div className="flex flex-col items-center justify-center h-full min-h-[60vh] gap-6 text-center px-8 anim-scale-in">
+              <div className="relative">
+                <div className="w-20 h-20 rounded-3xl bg-danger/8 border border-danger/15 flex items-center justify-center">
+                  <span className="text-4xl">🔒</span>
+                </div>
+                <div className="absolute -inset-3 rounded-[32px] bg-danger/5 -z-10" />
+              </div>
+              <div className="space-y-2.5 max-w-sm">
+                <h2 className="text-2xl font-bold text-text">Accès refusé</h2>
+                <p className="text-text2 text-sm leading-relaxed">
+                  Vous n'avez pas la permission d'accéder à cet onglet dans l'organisation{' '}
+                  <strong className="text-text font-semibold">"{currentOrg?.name}"</strong>.
+                </p>
+                <p className="text-text2/50 text-xs">Contactez un administrateur pour modifier vos droits d'accès.</p>
+              </div>
+              <button
+                onClick={() => onNavigate('dashboard')}
+                className="px-6 py-2.5 active:scale-95 text-white text-sm font-semibold rounded-xl transition-all btn-sf-primary"
+              >
+                Retour au Dashboard
+              </button>
+            </div>
+          ) : (
+            <div key={page} className="anim-page h-full">
+              {children}
+            </div>
+          )}
+        </main>
+      </div>
 
       {/* ── Org switcher menu ────────────────────────────────────────────────── */}
       {orgMenuOpen && orgMenuPos && (
