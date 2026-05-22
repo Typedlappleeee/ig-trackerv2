@@ -58,8 +58,15 @@ export function Scheduler({ user, onNavigate }: Props) {
   const [cancelling, setCancelling] = useState<string | null>(null)
   const [runningPost, setRunningPost] = useState<string | null>(null)
   const [runLogs, setRunLogs]       = useState<{ id: string; msgs: string[] } | null>(null)
+  const [view, setView]             = useState<'list' | 'create'>('list')
   const timersRef                   = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
   const runningRef                  = useRef<Set<string>>(new Set())
+
+  // Breadcrumb in topbar
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('sf:breadcrumb', { detail: view === 'create' ? 'Créer un post' : null }))
+    return () => { window.dispatchEvent(new CustomEvent('sf:breadcrumb', { detail: null })) }
+  }, [view])
 
   function canCancel(post: ScheduledPost) {
     if (post.user_id === user.id) return true
@@ -143,6 +150,10 @@ export function Scheduler({ user, onNavigate }: Props) {
   const pending = posts.filter(p => p.status === 'pending' || p.status === 'running')
   const history = posts.filter(p => p.status === 'done' || p.status === 'failed' || p.status === 'cancelled')
   const shown   = tab === 'pending' ? pending : history
+
+  if (view === 'create') {
+    return <CreatePostView onBack={() => setView('list')} onNavigate={onNavigate} />
+  }
 
   return (
     <div className="h-full flex flex-col overflow-hidden" style={{ background: '#07070B' }}>
@@ -242,7 +253,7 @@ export function Scheduler({ user, onNavigate }: Props) {
                 : 'Les posts exécutés apparaîtront ici.'}
             </p>
             {tab === 'pending' && (
-              <button onClick={() => onNavigate?.('posting')}
+              <button onClick={() => setView('create')}
                 className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-[13px] font-bold transition-all hover:opacity-90 active:scale-[0.98]"
                 style={{ background: 'linear-gradient(130deg,#7C3AED,#A855F7)', color: '#fff', boxShadow: '0 4px 20px -4px rgba(124,58,237,0.5)' }}>
                 <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
@@ -484,5 +495,176 @@ function Chip({ icon, label }: { icon: React.ReactNode; label: string }) {
       <span style={{ color: 'rgba(96,165,250,0.6)' }}>{icon}</span>
       <span>{label}</span>
     </span>
+  )
+}
+
+// ── Create post subview ────────────────────────────────────────────────────────
+
+function CreatePostView({ onBack, onNavigate }: { onBack: () => void; onNavigate?: (page: string) => void }) {
+  return (
+    <div className="h-full flex flex-col overflow-hidden" style={{ background: '#07070B' }}>
+
+      {/* Header */}
+      <div className="flex-shrink-0 px-8 pt-6 pb-5 flex items-center justify-between"
+        style={{ borderBottom: '1px solid rgba(139,92,246,0.08)' }}>
+        <div>
+          <h1 className="text-[22px] font-black tracking-tight leading-none" style={{
+            background: 'linear-gradient(135deg,#FFFFFF 0%,rgba(196,181,253,0.85) 100%)',
+            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+          }}>Créer un post</h1>
+          <p className="text-[12px] mt-1" style={{ color: 'rgba(148,163,184,0.5)' }}>
+            Choisis le mode de publication qui te convient
+          </p>
+        </div>
+        <button onClick={onBack}
+          className="flex items-center gap-2 px-4 py-2 rounded-xl text-[13px] font-semibold transition-all hover:bg-white/[0.05]"
+          style={{ border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(148,163,184,0.6)' }}>
+          <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+            <path d="M1.5 1.5L9.5 9.5M9.5 1.5L1.5 9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+          </svg>
+          Annuler
+        </button>
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-8 py-7" style={{ scrollbarWidth: 'none' }}>
+
+        {/* Two option cards */}
+        <div className="grid grid-cols-2 gap-5 mb-8">
+
+          {/* Mass Posting card */}
+          <div className="rounded-2xl overflow-hidden flex flex-col" style={{
+            background: 'linear-gradient(145deg,#0E0E16 0%,#11101C 100%)',
+            border: '1px solid rgba(139,92,246,0.2)',
+            boxShadow: '0 8px 40px -8px rgba(124,58,237,0.2)',
+          }}>
+            <div className="flex-1 px-8 pt-8 pb-6 flex flex-col items-center text-center">
+              {/* Icon */}
+              <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-5"
+                style={{ background: 'linear-gradient(135deg,#7C3AED,#A855F7)', boxShadow: '0 8px 24px -4px rgba(124,58,237,0.5)' }}>
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                </svg>
+              </div>
+              <h2 className="text-[20px] font-black text-white mb-2">Via Mass Posting</h2>
+              <p className="text-[13px] leading-relaxed mb-6" style={{ color: 'rgba(148,163,184,0.6)' }}>
+                Programme ce post comme un scénario<br/>dans Mass Posting avec plusieurs téléphones<br/>et options avancées.
+              </p>
+              {/* Features */}
+              <div className="w-full space-y-2.5 mb-6 text-left">
+                {['Scénarios multi-téléphones', 'Rotation des contenus', 'Filtres et conditions', 'Suivi des exécutions'].map(f => (
+                  <div key={f} className="flex items-center gap-2.5">
+                    <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
+                      style={{ background: 'rgba(139,92,246,0.2)', border: '1px solid rgba(139,92,246,0.3)' }}>
+                      <svg width="9" height="9" viewBox="0 0 9 9" fill="none">
+                        <path d="M1.5 4.5L3.5 6.5L7.5 2.5" stroke="#A78BFA" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </div>
+                    <span className="text-[13px]" style={{ color: 'rgba(226,232,240,0.8)' }}>{f}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            {/* CTA */}
+            <div className="px-6 pb-6">
+              <button onClick={() => onNavigate?.('massposting')}
+                className="w-full py-3.5 rounded-xl text-[14px] font-black text-white flex items-center justify-center gap-2 transition-all hover:opacity-90 active:scale-[0.98]"
+                style={{ background: 'linear-gradient(130deg,#7C3AED,#A855F7)', boxShadow: '0 4px 20px -4px rgba(124,58,237,0.55)' }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                </svg>
+                Aller à Mass Posting
+              </button>
+            </div>
+          </div>
+
+          {/* Simple scheduling card */}
+          <div className="rounded-2xl overflow-hidden flex flex-col" style={{
+            background: 'linear-gradient(145deg,#0E0E16 0%,#0F1420 100%)',
+            border: '1px solid rgba(37,99,235,0.2)',
+            boxShadow: '0 8px 40px -8px rgba(37,99,235,0.15)',
+          }}>
+            <div className="flex-1 px-8 pt-8 pb-6 flex flex-col items-center text-center">
+              {/* Icon */}
+              <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-5"
+                style={{ background: 'linear-gradient(135deg,#2563EB,#3B82F6)', boxShadow: '0 8px 24px -4px rgba(37,99,235,0.4)' }}>
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/>
+                  <line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                </svg>
+              </div>
+              <h2 className="text-[20px] font-black text-white mb-2">Programmation simple</h2>
+              <p className="text-[13px] leading-relaxed mb-6" style={{ color: 'rgba(148,163,184,0.6)' }}>
+                Programme ce post à une date et heure précise.<br/>Idéal pour un planning ponctuel ou récurrent.
+              </p>
+              {/* Features */}
+              <div className="w-full space-y-2.5 mb-6 text-left">
+                {['Ponctuel ou récurrent', 'Tous les jours / Semaines / Mois', 'Heure précise', 'Répétitions automatiques'].map(f => (
+                  <div key={f} className="flex items-center gap-2.5">
+                    <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
+                      style={{ background: 'rgba(37,99,235,0.2)', border: '1px solid rgba(37,99,235,0.3)' }}>
+                      <svg width="9" height="9" viewBox="0 0 9 9" fill="none">
+                        <path d="M1.5 4.5L3.5 6.5L7.5 2.5" stroke="#60A5FA" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </div>
+                    <span className="text-[13px]" style={{ color: 'rgba(226,232,240,0.8)' }}>{f}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            {/* CTA */}
+            <div className="px-6 pb-6">
+              <button onClick={onBack}
+                className="w-full py-3.5 rounded-xl text-[14px] font-black text-white flex items-center justify-center gap-2 transition-all hover:opacity-90 active:scale-[0.98]"
+                style={{ background: 'linear-gradient(130deg,#1D4ED8,#2563EB,#3B82F6)', boxShadow: '0 4px 20px -4px rgba(37,99,235,0.5)' }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/>
+                  <line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                </svg>
+                Aller à la programmation
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Comparison section */}
+        <div>
+          <h3 className="text-[15px] font-black text-white mb-4">Quelle différence ?</h3>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex items-start gap-4 p-4 rounded-2xl"
+              style={{ background: '#0E0E16', border: '1px solid rgba(139,92,246,0.1)' }}>
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                style={{ background: 'rgba(139,92,246,0.15)' }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#A78BFA" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                </svg>
+              </div>
+              <div>
+                <p className="text-[13px] font-bold text-white mb-1">Mass Posting</p>
+                <p className="text-[12px] leading-relaxed" style={{ color: 'rgba(148,163,184,0.5)' }}>
+                  Idéal pour des campagnes à grande échelle avec rotation de contenus et contrôle avancé sur plusieurs appareils.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start gap-4 p-4 rounded-2xl"
+              style={{ background: '#0E0E16', border: '1px solid rgba(37,99,235,0.1)' }}>
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                style={{ background: 'rgba(37,99,235,0.15)' }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#60A5FA" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/>
+                  <line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                </svg>
+              </div>
+              <div>
+                <p className="text-[13px] font-bold text-white mb-1">Programmation simple</p>
+                <p className="text-[12px] leading-relaxed" style={{ color: 'rgba(148,163,184,0.5)' }}>
+                  Idéal pour planifier un post unique ou récurrent automatiquement sans configuration avancée.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
   )
 }

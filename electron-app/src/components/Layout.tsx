@@ -136,6 +136,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
   const [notifications, setNotifications] = useState<AppNotification[]>([])
   const [unread, setUnread]             = useState(0)
   const notifRef                        = useRef<HTMLDivElement>(null)
+  const [breadcrumb, setBreadcrumb]     = useState<string | null>(null)
   useEffect(() => {
     const handler = (e: Event) => {
       const val = (e as CustomEvent<string>).detail
@@ -144,6 +145,16 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
     window.addEventListener('sf:sidebar-change', handler)
     return () => window.removeEventListener('sf:sidebar-change', handler)
   }, [])
+
+  // Listen for breadcrumb updates from pages (e.g. Scheduler subviews)
+  useEffect(() => {
+    const handler = (e: Event) => setBreadcrumb((e as CustomEvent<string | null>).detail)
+    window.addEventListener('sf:breadcrumb', handler)
+    return () => window.removeEventListener('sf:breadcrumb', handler)
+  }, [])
+
+  // Clear breadcrumb when page changes
+  useEffect(() => { setBreadcrumb(null) }, [page])
 
   useEffect(() => {
     function sync() {
@@ -653,27 +664,39 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
 
           {/* Page label */}
           <div className="flex items-center gap-2 min-w-0 flex-shrink-0">
-            <span className="text-[13px] font-semibold text-white/90 truncate max-w-[180px]">
-              {({
-                dashboard:   'Dashboard',
-                phones:      'Téléphones',
-                monitor:     'Monitor Live',
-                stats:       'Statistiques',
-                posting:     'Posting',
-                massposting: 'Mass Posting',
-                scheduler:   'Programmation',
-                bank:        'Banque Vidéos',
-                aitools:     'Outils IA',
-                warmup:      'Warmup',
-                montage:     'Montage',
-                remix:       'Remix Vidéo',
-                textcopy:    'Texte IA',
-                community:   'Communauté',
-                support:     'Support',
-                settings:    'Paramètres',
-                licences:    'Licences',
-              } as Record<string, string>)[page] ?? page}
-            </span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[13px] font-semibold text-white/90 truncate max-w-[160px]">
+                {({
+                  dashboard:   'Dashboard',
+                  phones:      'Téléphones',
+                  monitor:     'Monitor Live',
+                  stats:       'Statistiques',
+                  posting:     'Posting',
+                  massposting: 'Mass Posting',
+                  scheduler:   'Programmation',
+                  bank:        'Banque Vidéos',
+                  aitools:     'Outils IA',
+                  warmup:      'Warmup',
+                  montage:     'Montage',
+                  remix:       'Remix Vidéo',
+                  textcopy:    'Texte IA',
+                  community:   'Communauté',
+                  support:     'Support',
+                  settings:    'Paramètres',
+                  licences:    'Licences',
+                } as Record<string, string>)[page] ?? page}
+              </span>
+              {breadcrumb && (
+                <>
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ color: 'rgba(148,163,184,0.3)', flexShrink: 0 }}>
+                    <path d="M4 2l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                  <span className="text-[13px] font-semibold truncate max-w-[160px]" style={{ color: 'rgba(196,181,253,0.85)' }}>
+                    {breadcrumb}
+                  </span>
+                </>
+              )}
+            </div>
             {activeTask && (
               <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold"
                 style={{ background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.3)', color: '#A78BFA' }}>
