@@ -59,130 +59,38 @@ html, body, #root {
   inherits: false;
 }
 
-/* Stage fade helpers */
-@keyframes sp-fade-in  { from { opacity:0 } to { opacity:1 } }
-@keyframes sp-fade-out { from { opacity:1 } to { opacity:0 } }
-@keyframes sp-slide-up { from { opacity:0; transform:translateY(22px) } to { opacity:1; transform:translateY(0) } }
-@keyframes sp-scale-in { from { opacity:0; transform:scale(0.7) } to { opacity:1; transform:scale(1) } }
+/* ── Splash screen — single continuous timeline ──────────────────────────────── */
 
-/* Stage 1 – Emergence */
-@keyframes sp-logo-emerge {
-  0%   { opacity:0; transform:scale(0.5) translateY(16px); filter:brightness(0); }
-  40%  { opacity:0.5; transform:scale(0.85) translateY(6px); filter:brightness(0.4); }
-  75%  { opacity:1; transform:scale(1.05) translateY(-4px); filter:brightness(1.2); }
-  100% { opacity:1; transform:scale(1) translateY(0); filter:brightness(1); }
+/* Ambient glow blooms from center */
+@keyframes sp-glow-in {
+  0%   { opacity:0; transform:translate(-50%,-52%) scale(0.3); }
+  100% { opacity:1; transform:translate(-50%,-52%) scale(1); }
 }
-@keyframes sp-glow-emerge {
-  0%   { opacity:0; transform:scale(0.2); }
-  100% { opacity:1; transform:scale(1); }
+/* Subtle breathing during hold */
+@keyframes sp-glow-breathe {
+  0%,100% { opacity:0.7; }
+  50%     { opacity:1; }
 }
-@keyframes sp-neon-floor {
-  0%   { opacity:0; width:40px; filter:blur(30px); }
-  100% { opacity:1; width:220px; filter:blur(24px); }
-}
-@keyframes sp-title-emerge {
-  0%   { opacity:0; letter-spacing:0.6em; }
-  100% { opacity:1; letter-spacing:-0.03em; }
-}
-
-/* Stage 2 – Connexion */
-@keyframes sp-orbit-in {
-  0%   { opacity:0; transform:rotate(var(--start-angle)) translateX(var(--r)) rotate(calc(-1 * var(--start-angle))) scale(0); }
-  40%  { opacity:1; transform:rotate(var(--start-angle)) translateX(var(--r)) rotate(calc(-1 * var(--start-angle))) scale(1.15); }
-  100% { opacity:1; transform:rotate(var(--end-angle))   translateX(var(--r)) rotate(calc(-1 * var(--end-angle)))   scale(1); }
-}
-@keyframes sp-line-draw {
-  from { stroke-dashoffset: 120; opacity:0; }
-  to   { stroke-dashoffset: 0;   opacity:0.55; }
-}
-@keyframes sp-pulse-conn {
-  0%,100% { box-shadow: 0 0 12px 4px var(--c); }
-  50%     { box-shadow: 0 0 22px 10px var(--c); }
-}
-
-/* Stage 3 – Accélération */
-@keyframes sp-ray-shoot {
-  0%   { opacity:0;   transform:rotate(var(--a)) translateX(0) scaleX(0); transform-origin:left center; }
-  15%  { opacity:1; }
-  80%  { opacity:0.6; transform:rotate(var(--a)) translateX(0) scaleX(1); transform-origin:left center; }
-  100% { opacity:0;   transform:rotate(var(--a)) translateX(0) scaleX(1.1); transform-origin:left center; }
-}
-@keyframes sp-logo-pulse-accel {
-  0%,100% { box-shadow: 0 0 30px 8px #7c3aed88, 0 0 60px 20px #7c3aed33; }
-  50%     { box-shadow: 0 0 60px 20px #a855f7cc, 0 0 120px 50px #7c3aed55; }
-}
-@keyframes sp-center-burst {
-  0%   { opacity:1; transform:scale(0.8); }
-  60%  { opacity:0.6; transform:scale(2); }
-  100% { opacity:0; transform:scale(3); }
-}
-
-/* Stage 4 – Ouverture */
-@keyframes sp-door-left  { from { transform:translateX(0) } to { transform:translateX(-55%) } }
-@keyframes sp-door-right { from { transform:translateX(0) } to { transform:translateX(55%) } }
-@keyframes sp-door-glow  {
-  0%   { opacity:0; height:0; }
-  30%  { opacity:1; height:100%; }
-  100% { opacity:1; height:100%; filter:brightness(1.4); }
-}
-@keyframes sp-door-logo-in {
-  from { opacity:0; transform:scale(0.6); }
-  to   { opacity:1; transform:scale(1); }
-}
-@keyframes sp-door-title {
-  from { opacity:0; transform:translateY(12px); }
-  to   { opacity:1; transform:translateY(0); }
-}
-
-/* Stage 5 – Révélation */
-@keyframes sp-ui-slide-up {
-  0%   { opacity:0; transform:translateY(50px) scale(0.96); }
+/* Logo rises from below with spring */
+@keyframes sp-logo-in {
+  0%   { opacity:0; transform:translateY(32px) scale(0.78); }
+  55%  { opacity:1; transform:translateY(-5px) scale(1.04); }
   100% { opacity:1; transform:translateY(0) scale(1); }
 }
-@keyframes sp-ui-glow {
-  0%,100% { box-shadow: 0 0 60px 20px rgba(124,58,237,0.15); }
-  50%     { box-shadow: 0 0 80px 30px rgba(124,58,237,0.28); }
+/* Text slides up */
+@keyframes sp-text-in {
+  from { opacity:0; transform:translateY(18px); }
+  to   { opacity:1; transform:translateY(0); }
 }
-
-/* Stage 6 – Prêt à Performer */
-@keyframes sp-ready-logo {
-  0%   { opacity:0; transform:scale(1.3) translateX(-20px); }
-  100% { opacity:1; transform:scale(1) translateX(0); }
+/* Word fades + rises */
+@keyframes sp-word-in {
+  from { opacity:0; transform:translateY(10px); }
+  to   { opacity:1; transform:translateY(0); }
 }
-@keyframes sp-ready-title {
-  0%   { opacity:0; transform:translateX(30px); }
-  100% { opacity:1; transform:translateX(0); }
-}
-@keyframes sp-ready-tagline {
-  0%   { opacity:0; transform:translateY(10px); }
-  100% { opacity:1; transform:translateY(0); }
-}
-@keyframes sp-wave {
-  0%   { transform:translateX(-100%) scaleY(1); }
-  100% { transform:translateX(100%) scaleY(1.3); }
-}
-@keyframes sp-ready-bg {
-  0%   { opacity:0; }
-  100% { opacity:1; }
-}
-
-/* Global fade-out overlay */
-@keyframes sp-global-out {
-  0%   { opacity:1; }
-  100% { opacity:0; }
-}
-.sp-fade-out { animation: sp-global-out 0.7s ease-out forwards; }
-
-/* Orbit spin helper used in stage 2 */
-@keyframes sp-orbit-cw  { from { transform:rotate(0deg) }   to { transform:rotate(360deg) } }
-@keyframes sp-orbit-ccw { from { transform:rotate(0deg) }   to { transform:rotate(-360deg) } }
-
-/* Progress bar for bottom */
+/* Progress bar */
 @keyframes sp-progress {
-  0%   { width:0%; }
-  100% { width:100%; }
-}
-.sp-progress-bar { animation: sp-progress var(--dur,7.5s) linear 0.2s both; }
+  from { width:0%; }
+  to   { width:100%; }
 
 /* ── Page & element entrance animations ─────────────────────────────────────── */
 @keyframes page-fade-in {
