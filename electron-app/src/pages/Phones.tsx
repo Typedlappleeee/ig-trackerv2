@@ -904,15 +904,12 @@ export function Phones({ user }: PhonesProps) {
 
         {/* ── Header ───────────────────────────────────────────────────────── */}
         <div style={{
-          flexShrink: 0, padding: '28px 32px 20px',
+          flexShrink: 0, padding: '14px 32px 12px',
           borderBottom: '1px solid rgba(255,255,255,0.055)',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
           <div>
-            <h1 style={{ fontSize: 24, fontWeight: 800, color: '#F2F0FF', margin: 0, letterSpacing: '-0.4px' }}>Téléphones</h1>
-            <p style={{ fontSize: 13, color: 'rgba(148,163,184,0.52)', margin: '4px 0 0' }}>
-              Gérez et surveillez tous vos téléphones connectés
-            </p>
+            <h1 style={{ fontSize: 16, fontWeight: 700, color: '#F2F0FF', margin: 0, letterSpacing: '-0.3px' }}>Téléphones</h1>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {/* Auto-refresh control */}
@@ -973,6 +970,9 @@ export function Phones({ user }: PhonesProps) {
           </div>
         </div>
 
+        {/* ── Main scrollable area (cards + table scroll together) ─────────── */}
+        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+
         {/* ── Summary cards ─────────────────────────────────────────────────── */}
         {(() => {
           const onlinePct = phones.length ? Math.round((onlineCount / phones.length) * 100) : 0
@@ -1025,9 +1025,8 @@ export function Phones({ user }: PhonesProps) {
           const staggerClasses = ['sf-d50', 'sf-d100', 'sf-d150', 'sf-d200']
           return (
             <div style={{
-              flexShrink: 0, padding: '16px 32px',
+              padding: '16px 32px 12px',
               display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10,
-              borderBottom: '1px solid rgba(255,255,255,0.055)',
             }}>
               {summaryCards.map((card, ci) => (
                 <button
@@ -1062,10 +1061,10 @@ export function Phones({ user }: PhonesProps) {
         })()}
 
         {/* ── Main area ────────────────────────────────────────────────────── */}
-        <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+        <div style={{ flex: 1, display: 'flex' }}>
 
           {/* Table area */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: '20px 32px 32px', minWidth: 0 }}>
+          <div style={{ flex: 1, padding: '4px 32px 32px', minWidth: 0 }}>
 
             {/* Alerts */}
             {!bearer && (
@@ -1523,6 +1522,7 @@ export function Phones({ user }: PhonesProps) {
           })()}
         </div>
       </div>
+      </div>{/* end scrollable wrapper */}
     </>
   )
 }
