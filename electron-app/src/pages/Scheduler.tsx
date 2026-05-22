@@ -107,9 +107,10 @@ function IconBan({ size = 14, color = 'currentColor' }: { size?: number; color?:
   )
 }
 
-function IconRefresh({ size = 15, color = 'currentColor' }: { size?: number; color?: string }) {
+function IconRefresh({ size = 15, color = 'currentColor', spinning = false }: { size?: number; color?: string; spinning?: boolean }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"
+      style={spinning ? { animation: 'spin 0.75s linear infinite' } : undefined}>
       <path d="M13.5 8A5.5 5.5 0 1 1 8 2.5c1.8 0 3.4.87 4.4 2.2" stroke={color} strokeWidth="1.4" strokeLinecap="round" />
       <path d="M12.5 2v2.5H10" stroke={color} strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
@@ -201,23 +202,27 @@ function IconChevron({ size = 12, color = 'currentColor', rotated = false }: { s
   )
 }
 
+function IconClose({ size = 12, color = 'currentColor' }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M2 2l8 8M10 2l-8 8" stroke={color} strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+  )
+}
+
 // ── Status pill ────────────────────────────────────────────────────────────────
 
 function StatusPill({ status }: { status: ScheduleStatus }) {
-  const cfg: Record<ScheduleStatus, { bg: string; color: string; icon: JSX.Element }> = {
-    pending:   { bg: 'rgba(245,158,11,0.12)',  color: '#F59E0B', icon: <IconClock  size={12} color="#F59E0B" /> },
-    running:   { bg: 'rgba(139,92,246,0.12)',  color: '#8B5CF6', icon: <IconSpinner size={12} color="#8B5CF6" /> },
-    done:      { bg: 'rgba(34,197,94,0.12)',   color: '#22C55E', icon: <IconCheck  size={12} color="#22C55E" /> },
-    failed:    { bg: 'rgba(239,68,68,0.12)',   color: '#EF4444', icon: <IconX      size={12} color="#EF4444" /> },
-    cancelled: { bg: 'rgba(148,163,184,0.08)', color: 'rgba(148,163,184,0.52)', icon: <IconBan size={12} color="rgba(148,163,184,0.52)" /> },
+  const cfg: Record<ScheduleStatus, { cls: string; icon: JSX.Element }> = {
+    pending:   { cls: 'sf-badge sf-badge-warn',   icon: <IconClock   size={11} color="#F59E0B" /> },
+    running:   { cls: 'sf-badge sf-badge-accent',  icon: <IconSpinner size={11} color="#8B5CF6" /> },
+    done:      { cls: 'sf-badge sf-badge-ok',      icon: <IconCheck   size={11} color="#22C55E" /> },
+    failed:    { cls: 'sf-badge sf-badge-danger',  icon: <IconX       size={11} color="#EF4444" /> },
+    cancelled: { cls: 'sf-badge sf-badge-muted',   icon: <IconBan     size={11} color="rgba(148,163,184,0.52)" /> },
   }
-  const { bg, color, icon } = cfg[status]
+  const { cls, icon } = cfg[status]
   return (
-    <span style={{
-      display: 'inline-flex', alignItems: 'center', gap: 5,
-      background: bg, color, borderRadius: 6,
-      padding: '3px 9px', fontSize: 11, fontWeight: 600, letterSpacing: '0.01em',
-    }}>
+    <span className={cls} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
       {icon}
       {STATUS_LABEL[status]}
     </span>
@@ -252,6 +257,96 @@ function StatChip({ icon, label }: { icon: JSX.Element; label: string }) {
       {icon}
       {label}
     </span>
+  )
+}
+
+// ── Terminal log panel ─────────────────────────────────────────────────────────
+
+function TerminalLogs({ logs, onClose }: { logs: string[]; onClose: () => void }) {
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+    }
+  }, [logs])
+
+  function lineColor(msg: string): string {
+    const m = msg.trim()
+    if (
+      m.startsWith('✓') || m.startsWith('[OK]') ||
+      m.toLowerCase().includes('success') || m.toLowerCase().includes('done')
+    ) return '#4ade80'
+    if (
+      m.startsWith('✗') || m.startsWith('[ERR]') ||
+      m.toLowerCase().includes('error') || m.toLowerCase().includes('failed') ||
+      m.startsWith('❌')
+    ) return '#f87171'
+    if (m.startsWith('✅')) return '#4ade80'
+    return 'rgba(148,163,184,0.65)'
+  }
+
+  return (
+    <div style={{
+      marginTop: 12,
+      background: '#050508',
+      border: '1px solid rgba(255,255,255,0.07)',
+      borderRadius: 12,
+      padding: '14px 18px',
+    }}>
+      {/* Header */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        marginBottom: 10,
+      }}>
+        <span style={{
+          display: 'inline-flex', alignItems: 'center', gap: 6,
+          fontSize: 11, fontWeight: 700, letterSpacing: '0.06em',
+          color: 'rgba(148,163,184,0.52)', textTransform: 'uppercase',
+        }}>
+          <span style={{
+            width: 6, height: 6, borderRadius: '50%',
+            background: '#4ade80',
+            boxShadow: '0 0 6px #4ade80',
+            display: 'inline-block',
+            animation: 'pulse 1.4s ease-in-out infinite',
+          }} />
+          Logs en direct
+        </span>
+        <button
+          onClick={onClose}
+          className="sf-btn sf-btn-ghost sf-btn-sm sf-btn-icon"
+          style={{ width: 22, height: 22 }}
+        >
+          <IconClose size={10} color="rgba(148,163,184,0.52)" />
+        </button>
+      </div>
+
+      {/* Log lines */}
+      <div
+        ref={scrollRef}
+        style={{
+          maxHeight: 260, overflowY: 'auto', scrollbarWidth: 'thin',
+          scrollbarColor: 'rgba(124,58,237,0.3) transparent',
+        }}
+      >
+        {logs.map((msg, i) => (
+          <div key={i} style={{
+            fontFamily: 'ui-monospace, monospace',
+            fontSize: 12,
+            lineHeight: 1.7,
+            color: lineColor(msg),
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-word',
+          }}>
+            <span style={{ color: 'rgba(148,163,184,0.25)', userSelect: 'none', marginRight: 8 }}>
+              {String(i + 1).padStart(2, '0')}
+            </span>
+            {msg}
+          </div>
+        ))}
+      </div>
+    </div>
   )
 }
 
@@ -383,47 +478,44 @@ export function Scheduler({ user }: Props) {
       <div style={{
         flexShrink: 0,
         padding: '28px 32px 0',
-        borderBottom: '1px solid rgba(255,255,255,0.055)',
+        borderBottom: '1px solid rgba(255,255,255,0.06)',
       }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 }}>
+        <div className="sf-anim-slide-up" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 }}>
           <div>
-            <h1 style={{ fontSize: 20, fontWeight: 800, color: '#F2F0FF', margin: 0, lineHeight: 1 }}>
+            <h1 style={{
+              fontSize: 22, fontWeight: 700, color: '#F2F0FF',
+              margin: 0, lineHeight: 1, letterSpacing: '-0.04em',
+            }}>
               Programmation
             </h1>
-            <p style={{ fontSize: 12, color: 'rgba(148,163,184,0.52)', marginTop: 5, marginBottom: 0 }}>
-              Posts automatiques — exécutés même app fermée
+            <p style={{ fontSize: 12.5, color: 'rgba(148,163,184,0.52)', marginTop: 6, marginBottom: 0 }}>
+              {posts.length} tâche{posts.length !== 1 ? 's' : ''}
             </p>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {pending.length > 0 && (
-              <span style={{
-                display: 'inline-flex', alignItems: 'center', gap: 5,
-                background: 'rgba(34,197,94,0.1)', color: '#22C55E',
-                border: '1px solid rgba(34,197,94,0.2)', borderRadius: 8,
-                padding: '4px 10px', fontSize: 11, fontWeight: 700,
-              }}>
+              <span className="sf-badge sf-badge-ok" style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
                 <IconClock size={11} color="#22C55E" />
                 {pending.length} en attente
               </span>
             )}
             <button
               onClick={reload}
-              style={{
-                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                gap: 6, padding: '6px 14px',
-                background: '#111120', border: '1px solid rgba(255,255,255,0.09)',
-                borderRadius: 8, cursor: 'pointer', color: 'rgba(196,181,253,0.72)',
-                fontSize: 12, fontWeight: 600, transition: 'all 0.15s',
-              }}
+              className="sf-btn sf-btn-ghost sf-btn-sm sf-btn-icon"
+              title="Actualiser"
             >
-              <IconRefresh size={13} color="rgba(196,181,253,0.72)" />
-              Actualiser
+              <IconRefresh size={14} color="rgba(196,181,253,0.72)" spinning={loading} />
             </button>
           </div>
         </div>
 
-        {/* ── Tabs ─────────────────────────────────────────────────────────── */}
-        <div style={{ display: 'flex', gap: 0 }}>
+        {/* ── Tabs — underline style ────────────────────────────────────────── */}
+        <div style={{
+          display: 'flex', gap: 0,
+          borderBottom: '1px solid rgba(255,255,255,0.06)',
+          marginBottom: 0,
+        }}>
           {([
             { id: 'pending' as TabFilter, label: 'En attente', count: pending.length },
             { id: 'history' as TabFilter, label: 'Historique',  count: history.length },
@@ -434,14 +526,21 @@ export function Scheduler({ user }: Props) {
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 8,
                 padding: '10px 18px',
-                background: tab === t.id ? '#111120' : 'transparent',
+                background: 'transparent',
                 border: 'none',
                 borderBottom: tab === t.id ? '2px solid #7C3AED' : '2px solid transparent',
                 cursor: 'pointer',
-                color: tab === t.id ? '#F2F0FF' : 'rgba(148,163,184,0.52)',
-                fontSize: 13, fontWeight: tab === t.id ? 700 : 500,
-                transition: 'all 0.15s',
+                color: tab === t.id ? '#F2F0FF' : 'rgba(148,163,184,0.45)',
+                fontSize: 13, fontWeight: tab === t.id ? 600 : 500,
+                transition: 'color 0.15s, border-color 0.15s',
                 marginBottom: -1,
+                outline: 'none',
+              }}
+              onMouseEnter={e => {
+                if (tab !== t.id) (e.currentTarget as HTMLButtonElement).style.color = 'rgba(196,181,253,0.7)'
+              }}
+              onMouseLeave={e => {
+                if (tab !== t.id) (e.currentTarget as HTMLButtonElement).style.color = 'rgba(148,163,184,0.45)'
               }}
             >
               {t.label}
@@ -450,6 +549,7 @@ export function Scheduler({ user }: Props) {
                   background: tab === t.id ? 'rgba(139,92,246,0.22)' : 'rgba(255,255,255,0.05)',
                   color: tab === t.id ? '#A78BFA' : 'rgba(148,163,184,0.4)',
                   borderRadius: 20, padding: '1px 7px', fontSize: 11, fontWeight: 700,
+                  transition: 'background 0.15s, color 0.15s',
                 }}>
                   {t.count}
                 </span>
@@ -462,35 +562,62 @@ export function Scheduler({ user }: Props) {
       {/* ── Post list ─────────────────────────────────────────────────────────── */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '20px 32px 32px', scrollbarWidth: 'none' }}>
         {loading ? (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', paddingTop: 80 }}>
-            <Spinner size="lg" />
+          /* ── Skeleton loading ─────────────────────────────────────────────── */
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {[0, 1, 2, 3].map(i => (
+              <div
+                key={i}
+                className="sf-skeleton"
+                style={{
+                  height: 80,
+                  borderRadius: 12,
+                  opacity: 1 - i * 0.15,
+                }}
+              />
+            ))}
           </div>
         ) : shown.length === 0 ? (
           /* ── Empty state ──────────────────────────────────────────────────── */
-          <div style={{
+          <div className="sf-anim-scale-spring" style={{
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
             padding: '60px 24px', textAlign: 'center',
             background: '#0C0C15', border: '1px solid rgba(255,255,255,0.055)',
-            borderRadius: 15, marginTop: 8,
+            borderRadius: 16, marginTop: 8,
           }}>
-            <span style={{ color: 'rgba(139,92,246,0.35)', marginBottom: 18 }}>
-              <IconCalendar size={48} color="rgba(139,92,246,0.35)" />
-            </span>
+            <div style={{
+              width: 64, height: 64,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'rgba(124,58,237,0.06)',
+              border: '1px dashed rgba(139,92,246,0.2)',
+              borderRadius: 16,
+              marginBottom: 18,
+            }}>
+              <IconCalendar size={32} color="rgba(139,92,246,0.45)" />
+            </div>
             <p style={{ fontSize: 15, fontWeight: 700, color: '#F2F0FF', margin: 0 }}>
               {tab === 'pending' ? 'Aucune tâche programmée' : 'Aucun historique'}
             </p>
-            <p style={{ fontSize: 12, color: 'rgba(148,163,184,0.52)', marginTop: 8, marginBottom: 0 }}>
+            <p style={{ fontSize: 13, color: 'rgba(148,163,184,0.52)', marginTop: 8, marginBottom: 0 }}>
               {tab === 'pending'
                 ? 'Programme un post depuis Posting ou Mass Posting.'
                 : 'Les posts exécutés apparaîtront ici.'}
             </p>
+            {tab === 'pending' && (
+              <button
+                className="sf-btn sf-btn-primary sf-btn-sm"
+                style={{ marginTop: 20 }}
+              >
+                Planifier un post
+              </button>
+            )}
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {shown.map(post => (
+            {shown.map((post, index) => (
               <PostCard
                 key={post.id}
                 post={post}
+                index={index}
                 isOwn={post.user_id === user.id}
                 canCancel={canCancel(post)}
                 isRunning={runningPost === post.id}
@@ -532,8 +659,9 @@ export function Scheduler({ user }: Props) {
 
 // ── Post card ──────────────────────────────────────────────────────────────────
 
-function PostCard({ post, isOwn, canCancel, isRunning, runLogs, cancelling, onCancel }: {
+function PostCard({ post, index, isOwn, canCancel, isRunning, runLogs, cancelling, onCancel }: {
   post: ScheduledPost
+  index: number
   isOwn: boolean
   canCancel: boolean
   isRunning: boolean
@@ -546,27 +674,32 @@ function PostCard({ post, isOwn, canCancel, isRunning, runLogs, cancelling, onCa
   const isPending   = post.status === 'pending'
   const allLogs = runLogs ?? (post.result?.logs ?? [])
 
-  const accentColor =
-    post.status === 'done'      ? '#22C55E'
-    : post.status === 'failed'  ? '#EF4444'
-    : post.status === 'running' ? '#8B5CF6'
-    : post.status === 'cancelled' ? 'rgba(148,163,184,0.2)'
-    : '#7C3AED'
+  const statusColor =
+    post.status === 'done'        ? '#22C55E'
+    : post.status === 'failed'   ? '#EF4444'
+    : post.status === 'running'  ? '#8B5CF6'
+    : post.status === 'cancelled'? 'rgba(148,163,184,0.2)'
+    : '#F59E0B'  // pending → amber
+
+  // Stagger delay classes — cap at index 4 (sf-d250 max for 5 items)
+  const delayMap = ['sf-d50', 'sf-d100', 'sf-d150', 'sf-d200', 'sf-d250']
+  const staggerClass = `sf-anim-slide-up ${delayMap[Math.min(index, delayMap.length - 1)]}`
 
   return (
     <div
+      className={staggerClass}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
-        background: hovered ? 'rgba(124,58,237,0.04)' : '#0C0C15',
-        border: '1px solid rgba(255,255,255,0.055)',
-        borderLeft: `3px solid ${accentColor}`,
-        borderRadius: 11,
-        padding: '14px 18px',
-        transition: 'background 0.15s, border-color 0.15s',
+        background: hovered ? 'rgba(124,58,237,0.035)' : '#0C0C15',
+        border: `1px solid ${hovered ? 'rgba(139,92,246,0.18)' : 'rgba(255,255,255,0.055)'}`,
+        borderLeft: `3px solid ${statusColor}`,
+        borderRadius: 12,
+        padding: '16px 18px',
+        transition: 'background 0.18s ease, border-color 0.18s ease',
       }}
     >
-      {/* ── Row 1: status + type + title ──────────────────────────────────── */}
+      {/* ── Row 1: status + type + user — right: actions ──────────────────── */}
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
           <StatusPill status={post.status} />
@@ -597,17 +730,12 @@ function PostCard({ post, isOwn, canCancel, isRunning, runLogs, cancelling, onCa
           <button
             onClick={onCancel}
             disabled={cancelling}
+            className="sf-btn sf-btn-danger sf-btn-sm"
             style={{
               flexShrink: 0,
               display: 'inline-flex', alignItems: 'center', gap: 5,
-              padding: '5px 12px',
-              background: cancelling ? 'rgba(239,68,68,0.05)' : 'rgba(239,68,68,0.08)',
-              color: '#EF4444',
-              border: '1px solid rgba(239,68,68,0.18)',
-              borderRadius: 8, cursor: cancelling ? 'not-allowed' : 'pointer',
-              fontSize: 12, fontWeight: 600,
               opacity: cancelling ? 0.5 : 1,
-              transition: 'all 0.15s',
+              cursor: cancelling ? 'not-allowed' : 'pointer',
             }}
           >
             <IconX size={11} color="#EF4444" />
@@ -617,7 +745,7 @@ function PostCard({ post, isOwn, canCancel, isRunning, runLogs, cancelling, onCa
       </div>
 
       {/* ── Row 2: scheduled time + time until ─────────────────────────────── */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 10, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10, flexWrap: 'wrap' }}>
         <span style={{
           display: 'inline-flex', alignItems: 'center', gap: 5,
           color: '#A78BFA', fontSize: 12, fontWeight: 600,
@@ -626,7 +754,11 @@ function PostCard({ post, isOwn, canCancel, isRunning, runLogs, cancelling, onCa
           {fmtScheduledTime(post.scheduled_at)}
         </span>
         {isPending && (
-          <span style={{ fontSize: 12, color: 'rgba(148,163,184,0.52)' }}>
+          <span style={{
+            fontSize: 12, color: 'rgba(148,163,184,0.52)',
+            borderLeft: '1px solid rgba(255,255,255,0.08)',
+            paddingLeft: 10,
+          }}>
             {timeUntil(post.scheduled_at)}
           </span>
         )}
@@ -697,42 +829,24 @@ function PostCard({ post, isOwn, canCancel, isRunning, runLogs, cancelling, onCa
         </div>
       )}
 
-      {/* ── Run logs ──────────────────────────────────────────────────────── */}
+      {/* ── Run logs — terminal panel ──────────────────────────────────────── */}
       {allLogs.length > 0 && (
         <div style={{ marginTop: 12 }}>
-          <button
-            onClick={() => setShowLogs(v => !v)}
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: 6,
-              background: 'none', border: 'none', cursor: 'pointer',
-              color: 'rgba(139,92,246,0.8)', fontSize: 12, fontWeight: 600, padding: 0,
-            }}
-          >
-            <IconChevron size={11} color="rgba(139,92,246,0.8)" rotated={showLogs} />
-            {showLogs ? 'Masquer' : 'Afficher'} les logs ({allLogs.length})
-          </button>
-          {showLogs && (
-            <div style={{
-              marginTop: 8,
-              background: '#07070C', border: '1px solid rgba(255,255,255,0.08)',
-              borderRadius: 11, padding: '12px 14px',
-              fontFamily: 'monospace', fontSize: 12,
-              overflowY: 'auto', maxHeight: 300,
-              scrollbarWidth: 'thin',
-            }}>
-              {allLogs.map((msg, i) => (
-                <p key={i} style={{
-                  margin: '1px 0', lineHeight: 1.6,
-                  color: msg.startsWith('❌') || msg.toLowerCase().startsWith('error')
-                    ? '#EF4444'
-                    : msg.startsWith('✅') || msg.toLowerCase().startsWith('success')
-                    ? '#22C55E'
-                    : 'rgba(196,181,253,0.72)',
-                }}>
-                  {msg}
-                </p>
-              ))}
-            </div>
+          {!showLogs ? (
+            <button
+              onClick={() => setShowLogs(true)}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                background: 'none', border: 'none', cursor: 'pointer',
+                color: 'rgba(139,92,246,0.8)', fontSize: 12, fontWeight: 600, padding: 0,
+                transition: 'color 0.12s',
+              }}
+            >
+              <IconChevron size={11} color="rgba(139,92,246,0.8)" rotated={false} />
+              Afficher les logs ({allLogs.length})
+            </button>
+          ) : (
+            <TerminalLogs logs={allLogs} onClose={() => setShowLogs(false)} />
           )}
         </div>
       )}
