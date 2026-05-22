@@ -216,71 +216,119 @@ function FlameOverlay() {
   )
 }
 
-// ── Splash screen ────────────────────────────────────────────────────────────
-const SPLASH_DURATION = 3800
+// ── Splash screen ─────────────────────────────────────────────────────────────
+const SPLASH_DURATION = 4200
 
 function SplashScreen({ onDone }: { onDone: () => void }) {
-  const [gone, setGone] = useState(false)
-  const doneRef         = useRef(false)
+  const [fading, setFading] = useState(false)
+  const doneRef             = useRef(false)
+
+  useEffect(() => { playSplash() }, [])
 
   useEffect(() => {
-    playSplash()
-    const t1 = setTimeout(() => setGone(true), SPLASH_DURATION - 700)
-    const t2 = setTimeout(() => { if (!doneRef.current) { doneRef.current = true; onDone() } }, SPLASH_DURATION)
+    const t1 = setTimeout(() => setFading(true), SPLASH_DURATION)
+    const t2 = setTimeout(() => {
+      if (!doneRef.current) { doneRef.current = true; onDone() }
+    }, SPLASH_DURATION + 620)
     return () => { clearTimeout(t1); clearTimeout(t2) }
   }, [onDone])
 
   return (
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 9999, overflow: 'hidden',
-      background: '#030307',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      opacity: gone ? 0 : 1,
-      transition: 'opacity 0.7s ease-out',
-      pointerEvents: gone ? 'none' : 'all',
-    }}>
-
-      {/* Centered background glow — fills the screen with a subtle violet bloom */}
+    <div
+      className={fading ? 'sf-fade-out' : ''}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 9999,
+        background: '#020205',
+        display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+        pointerEvents: fading ? 'none' : 'all',
+        overflow: 'hidden',
+      }}
+    >
+      {/* Deep centered glow — the only atmospheric element */}
       <div style={{
-        position: 'absolute', inset: 0,
-        background: 'radial-gradient(ellipse 60% 55% at 50% 48%, rgba(109,40,217,0.28) 0%, rgba(76,29,149,0.10) 50%, transparent 100%)',
-        animation: 'sp-enter 1.6s ease-out both',
+        position: 'absolute', inset: 0, pointerEvents: 'none',
+        background: 'radial-gradient(ellipse 70% 60% at 50% 50%, rgba(109,40,217,0.22) 0%, rgba(76,29,149,0.09) 45%, transparent 75%)',
+        animation: 'sf-bg-breathe 4s ease-in-out 0.8s infinite',
       }} />
 
-      {/* Single block — logo + name + tagline move as one */}
+      {/* Subtle noise texture overlay */}
       <div style={{
-        position: 'relative',
-        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 28,
-        animation: 'sp-enter 0.9s cubic-bezier(0.22,1,0.36,1) both',
-      }}>
+        position: 'absolute', inset: 0, pointerEvents: 'none',
+        opacity: 0.025,
+        backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 256 256\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'n\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.9\' numOctaves=\'4\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23n)\'/%3E%3C/svg%3E")',
+      }} />
 
-        {/* Logo */}
-        <div style={{
-          width: 120, height: 120, borderRadius: 30, flexShrink: 0,
-          background: 'linear-gradient(145deg, #0f0b22, #130828, #1a0d36)',
-          boxShadow: '0 0 0 1px rgba(139,92,246,0.25), 0 0 60px 16px rgba(109,40,217,0.35), 0 24px 48px rgba(0,0,0,0.7)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
-          <ScaleFlowLogoSVG size={82} />
+      {/* ── Logo + wordmark block ── */}
+      <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 32, animation: 'sp-enter 0.95s cubic-bezier(0.22,1,0.36,1) 0.25s both' }}>
+
+        {/* Logo box */}
+        <div style={{ position: 'relative', width: 104, height: 104, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {/* Outer glow halo */}
+          <div style={{
+            position: 'absolute', inset: -20, borderRadius: '50%', pointerEvents: 'none',
+            background: 'radial-gradient(circle, rgba(124,58,237,0.4) 0%, transparent 65%)',
+            filter: 'blur(16px)',
+          }} />
+          {/* Rotating arc 1 */}
+          <svg style={{ position: 'absolute', top: '50%', left: '50%', overflow: 'visible', pointerEvents: 'none', animation: 'sf-orbit-cw 6s linear infinite' }} width="0" height="0">
+            <circle cx="0" cy="0" r="62" stroke="rgba(139,92,246,0.5)" strokeWidth="1.5" fill="none"
+              strokeDasharray="80 310" strokeLinecap="round"/>
+          </svg>
+          {/* Rotating arc 2 */}
+          <svg style={{ position: 'absolute', top: '50%', left: '50%', overflow: 'visible', pointerEvents: 'none', animation: 'sf-orbit-ccw 10s linear infinite' }} width="0" height="0">
+            <circle cx="0" cy="0" r="72" stroke="rgba(167,139,250,0.28)" strokeWidth="1" fill="none"
+              strokeDasharray="55 400" strokeLinecap="round"/>
+          </svg>
+
+          {/* Logo background */}
+          <div style={{
+            width: 96, height: 96, borderRadius: 26,
+            background: 'linear-gradient(145deg, #0d0820 0%, #12082e 50%, #190d3a 100%)',
+            boxShadow: '0 0 0 1px rgba(139,92,246,0.3), 0 0 0 4px rgba(139,92,246,0.06), 0 20px 48px rgba(0,0,0,0.75)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            position: 'relative', zIndex: 1,
+          }}>
+            <ScaleFlowLogoSVG size={64} draw />
+          </div>
         </div>
 
-        {/* Text */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-          {/* Name */}
-          <div style={{ display: 'flex', alignItems: 'baseline' }}>
-            <span style={{ fontSize: 50, fontWeight: 900, color: '#f4f0ff', letterSpacing: '-2px', fontFamily: 'Inter,system-ui,sans-serif', lineHeight: 1 }}>Scale</span>
-            <span style={{ fontSize: 50, fontWeight: 900, letterSpacing: '-2px', fontFamily: 'Inter,system-ui,sans-serif', lineHeight: 1, background: 'linear-gradient(130deg,#a78bfa,#ec4899)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Flow</span>
+        {/* Wordmark */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
+            <span style={{
+              fontSize: 46, fontWeight: 900, color: '#f2f0ff',
+              letterSpacing: '-2px', fontFamily: 'Inter,system-ui,sans-serif', lineHeight: 1,
+            }}>Scale</span>
+            <span style={{
+              fontSize: 46, fontWeight: 900, letterSpacing: '-2px',
+              fontFamily: 'Inter,system-ui,sans-serif', lineHeight: 1,
+              background: 'linear-gradient(130deg, #a78bfa 20%, #ec4899 100%)',
+              WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+            }}>Flow</span>
           </div>
 
           {/* Divider */}
-          <div style={{ width: 64, height: 1, background: 'linear-gradient(90deg, transparent, rgba(167,139,250,0.5), transparent)' }} />
+          <div style={{ width: 48, height: 1, background: 'linear-gradient(90deg, transparent, rgba(139,92,246,0.45), transparent)' }} />
 
           {/* Tagline */}
-          <span style={{ fontSize: 12, fontWeight: 500, color: 'rgba(196,181,253,0.45)', letterSpacing: '0.18em', textTransform: 'uppercase' }}>
+          <span style={{
+            fontSize: 11, fontWeight: 500,
+            color: 'rgba(167,139,250,0.38)',
+            letterSpacing: '0.22em', textTransform: 'uppercase',
+            fontFamily: 'Inter,system-ui,sans-serif',
+          }}>
             Automatise · Planifie · Développe
           </span>
         </div>
       </div>
+
+      {/* Bottom progress line */}
+      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 2, background: 'rgba(255,255,255,0.025)' }}>
+        <div className="sf-bar" style={{ height: '100%', background: 'linear-gradient(90deg, transparent, #7c3aed, #a855f7, #ec4899, transparent)', borderRadius: 2 }} />
+      </div>
+
+
     </div>
   )
 }
@@ -371,8 +419,7 @@ import { TextCopy }          from '@/pages/TextCopy'
 import { Licences }          from '@/pages/Licences'
 import { Support }           from '@/pages/Support'
 import { Community }         from '@/pages/Community'
-import LiveMonitorOverlay    from '@/components/LiveMonitor'
-
+import Monitor                from '@/pages/Monitor'
 import { FullPageLoader }    from '@/components/ui/Spinner'
 
 const BETA_KEY = 'scaleflow-v1-seen'
@@ -380,7 +427,7 @@ const BETA_KEY = 'scaleflow-v1-seen'
 function AppContent({ user }: { user: User }) {
   const { currentOrg, myOrgs, loading: orgLoading, loadError: orgLoadError } = useOrg()
   const conns = useConnections(user)
-  const [page, setPage]                     = useState<Page>('dashboard')
+  const [page, setPage]                     = useState<Page>('community')
   const [settingsPanel, setSettingsPanel]   = useState<string | undefined>(undefined)
   const [onboarding, setOnboarding]         = useState<boolean | null>(null)
   const [showBeta, setShowBeta]             = useState(false)
@@ -521,10 +568,11 @@ function AppContent({ user }: { user: User }) {
     switch (page) {
       case 'dashboard':    return <Dashboard   user={user} onNavigate={p => handleNavigate(p as Page)} />
       case 'phones':       return <Phones      user={user} key={refreshTick} />
-
+      case 'monitor':      return <Monitor     user={user} />
+      case 'stats':        return <Stats       user={user} />
       case 'posting':      return <Posting     user={user} />
       case 'massposting':  return <MassPosting user={user} />
-      case 'scheduler':    return <Scheduler   user={user} onNavigate={p => handleNavigate(p as Page)} />
+      case 'scheduler':    return <Scheduler   user={user} />
       case 'bank':         return <Bank        user={user} />
       case 'warmup':       return <Warmup      user={user} />
       case 'montage':      return <Montage     user={user} />
@@ -542,7 +590,6 @@ function AppContent({ user }: { user: User }) {
     <LicenseContext.Provider value={license}>
     <CreditContext.Provider value={{ balance: creditBalance, loading: creditLoading, refresh: refreshCredits, ownerId: creditOwnerId }}>
       {showBeta && <BetaPopup onClose={dismissBeta} />}
-      <LiveMonitorOverlay bearer={conns.bearer ?? ''} />
       <Layout
         user={user}
         page={page}

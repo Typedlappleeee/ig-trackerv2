@@ -86,6 +86,7 @@ interface ElectronAPI {
   runFfmpegRemixAI: (opts: {
     newPhase1Path: string; originalPath: string; splitTime?: number; targetDuration?: number
     outputPath: string; preset: '9:16' | '1:1' | '16:9'
+    copyTextFromOriginal?: boolean
     textOverlays: AiTextOverlay[]
   }) => Promise<{ ok: boolean; outputPath?: string; error?: string; command?: string }>
   readVideoMetadata: (opts: { filePath: string }) =>

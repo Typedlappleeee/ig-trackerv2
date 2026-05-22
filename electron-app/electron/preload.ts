@@ -114,6 +114,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     outputPath:      string
     preset:          '9:16' | '1:1' | '16:9'
     targetDuration?: number
+    copyTextFromOriginal?: boolean
     textOverlays:  Array<{
       text: string; x: string; y: string
       fontSize: number; fontColor: string
@@ -121,6 +122,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
       bold?: boolean; shadow?: boolean
     }>
   }) => ipcRenderer.invoke('run-ffmpeg-remix-ai', opts),
+
+  // Tesseract OCR on base64 frames (free, local, no API key needed)
+  runTesseractOcr: (opts: {
+    frames: Array<{ data: string; timestamp: number }>
+    frameWidth?: number
+    frameHeight?: number
+  }) => ipcRenderer.invoke('run-tesseract-ocr', opts),
 
   // Read video metadata (title, encoder, creation_time, etc.)
   readVideoMetadata: (opts: { filePath: string }) =>

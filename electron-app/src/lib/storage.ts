@@ -37,12 +37,20 @@ function scopeFolder(scope: UploadScope): string {
 // Returns null if extraction fails (e.g. unsupported codec) or times out.
 // Hard timeout = 8s so a hung decoder doesn't block the upload pipeline forever.
 export async function generateThumbnail(videoBlob: Blob, atSeconds = 0.5): Promise<Blob | null> {
+  // Try multiple seek times — some videos have black frames at the start
+  const seekTimes = [atSeconds, 1.5, 2.5, 0.1]
+  for (const t of seekTimes) {
+    const result = await _tryCapture(videoBlob, t)
+    if (result) return result
+  }
+  return null
+}
+
+function _tryCapture(videoBlob: Blob, atSeconds: number): Promise<Blob | null> {
   return new Promise(resolve => {
     const v = document.createElement('video')
     v.muted = true
     v.playsInline = true
-    // 'auto' is needed: 'metadata' is too lazy and seek often never resolves
-    // for short videos. We compensate elsewhere (sequential uploads + timeout).
     v.preload = 'auto'
     const url = URL.createObjectURL(videoBlob)
     v.src = url
@@ -59,7 +67,7 @@ export async function generateThumbnail(videoBlob: Blob, atSeconds = 0.5): Promi
       cleanup()
       resolve(out)
     }
-    const timeoutId = setTimeout(() => finish(null), 8000)
+    const timeoutId = setTimeout(() => finish(null), 12000)
 
     v.onloadedmetadata = () => { v.currentTime = Math.min(atSeconds, Math.max(0, (v.duration || 1) - 0.1)) }
     v.onseeked = () => {
@@ -67,7 +75,6 @@ export async function generateThumbnail(videoBlob: Blob, atSeconds = 0.5): Promi
         const c = document.createElement('canvas')
         const w = v.videoWidth || 720
         const h = v.videoHeight || 1280
-        // Smaller target = less RAM and faster encode
         const maxSide = 480
         const ratio = Math.min(1, maxSide / Math.max(w, h))
         c.width  = Math.round(w * ratio)
@@ -75,6 +82,9 @@ export async function generateThumbnail(videoBlob: Blob, atSeconds = 0.5): Promi
         const ctx = c.getContext('2d')
         if (!ctx) return finish(null)
         ctx.drawImage(v, 0, 0, c.width, c.height)
+        // Check if frame is actually black — if so, signal failure to try next seek time
+        const px = ctx.getImageData(c.width >> 1, c.height >> 1, 1, 1).data
+        if (px[0] < 8 && px[1] < 8 && px[2] < 8) { finish(null); return }
         c.toBlob(b => finish(b), 'image/jpeg', 0.78)
       } catch {
         finish(null)

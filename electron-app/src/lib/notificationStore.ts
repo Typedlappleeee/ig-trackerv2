@@ -1,53 +1,49 @@
-export type NotifLevel = 'ok' | 'error' | 'warn' | 'info'
-
 export interface AppNotification {
-  id:      string
-  title:   string
-  body?:   string
-  level:   NotifLevel
-  time:    string   // HH:MM
-  read:    boolean
+  id: string
+  title: string
+  body?: string
+  level: 'ok' | 'warn' | 'error' | 'info'
+  time: string
 }
 
-const MAX = 50
+type Listener = () => void
 
-const state = {
-  items: [] as AppNotification[],
+let notifications: AppNotification[] = []
+let unread = 0
+const listeners = new Set<Listener>()
+
+function notify() {
+  listeners.forEach(l => l())
 }
 
-const subs = new Set<() => void>()
-function notify() { subs.forEach(cb => cb()) }
-
-export function subscribeNotifications(cb: () => void): () => void {
-  subs.add(cb)
-  return () => { subs.delete(cb) }
+export function subscribeNotifications(fn: Listener): () => void {
+  listeners.add(fn)
+  return () => listeners.delete(fn)
 }
 
-export function getNotifications() {
-  return [...state.items]
+export function getNotifications(): AppNotification[] {
+  return notifications
 }
 
-export function pushNotification(n: Omit<AppNotification, 'id' | 'time' | 'read'>) {
-  const item: AppNotification = {
-    ...n,
-    id:   crypto.randomUUID(),
-    time: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
-    read: false,
-  }
-  state.items = [item, ...state.items].slice(0, MAX)
+export function unreadCount(): number {
+  return unread
+}
+
+export function pushNotification(n: Omit<AppNotification, 'id' | 'time'>) {
+  const now = new Date()
+  const time = now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+  notifications = [{ ...n, id: `${Date.now()}-${Math.random()}`, time }, ...notifications].slice(0, 50)
+  unread++
   notify()
 }
 
 export function markAllRead() {
-  state.items = state.items.map(i => ({ ...i, read: true }))
+  unread = 0
   notify()
 }
 
 export function clearNotifications() {
-  state.items = []
+  notifications = []
+  unread = 0
   notify()
-}
-
-export function unreadCount() {
-  return state.items.filter(i => !i.read).length
 }

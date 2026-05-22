@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, type CSSProperties } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/Button'
@@ -31,7 +31,7 @@ const THEME_COLORS: Record<string, string> = {
 
 // ── Shared toggle row ────────────────────────────────────────────────────────
 function ToggleRow({
-  checked, onChange, title, sub, accent,
+  checked, onChange, title, sub, accent: _accent,
 }: {
   checked: boolean
   onChange: (v: boolean) => void
@@ -40,21 +40,93 @@ function ToggleRow({
   accent?: boolean
 }) {
   return (
-    <label className="flex items-center gap-3 cursor-pointer group">
-      {/* Custom toggle pill */}
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }} onClick={() => onChange(!checked)}>
       <div
-        className={`relative flex-shrink-0 w-10 h-5 rounded-full transition-all duration-200 ${
-          checked ? (accent ? 'bg-accent' : 'bg-accent/80') : 'bg-surface3 border border-border'
-        }`}
-        onClick={() => onChange(!checked)}
+        className={`sf-toggle-track ${checked ? 'on' : 'off'}`}
+        onClick={e => { e.stopPropagation(); onChange(!checked) }}
       >
-        <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${checked ? 'translate-x-5' : 'translate-x-0'}`} />
+        <span className="sf-toggle-thumb" />
       </div>
-      <div className="flex-1 select-none" onClick={() => onChange(!checked)}>
-        <p className={`text-[13px] font-medium transition-colors ${checked ? 'text-text' : 'text-text2'}`}>{title}</p>
-        <p className="text-[12px] text-text2/70 mt-0.5">{sub}</p>
+      <div style={{ flex: 1, userSelect: 'none' }}>
+        <p style={{ fontSize: 13, fontWeight: 500, color: checked ? '#F2F0FF' : 'rgba(196,181,253,0.72)', margin: 0, transition: 'color 140ms ease' }}>{title}</p>
+        <p style={{ fontSize: 12, color: 'rgba(148,163,184,0.5)', marginTop: 2, marginBottom: 0 }}>{sub}</p>
       </div>
-    </label>
+    </div>
+  )
+}
+
+// ── Premium nav item with glow bar ────────────────────────────────────────────
+function NavItem({ active, icon, label, onClick, S }: {
+  active: boolean; icon: JSX.Element; label: string; onClick: () => void
+  S: { text: string; text3: string; accent: string; accent3: string; surface2: string }
+}) {
+  const [hovered, setHovered] = useState(false)
+  const [pressed, setPressed] = useState(false)
+
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => { setHovered(false); setPressed(false) }}
+      onMouseDown={() => setPressed(true)}
+      onMouseUp={() => setPressed(false)}
+      style={{
+        position: 'relative', display: 'flex', alignItems: 'center', gap: 9,
+        height: 36, padding: '0 12px',
+        borderRadius: 8, fontSize: 13, fontWeight: active ? 500 : 400,
+        textAlign: 'left', border: 'none', cursor: 'pointer',
+        background: active ? 'rgba(139,92,246,0.1)' : hovered ? 'rgba(255,255,255,0.04)' : 'transparent',
+        color: active ? '#F2F0FF' : hovered ? 'rgba(241,240,247,0.85)' : S.text3,
+        transition: 'background 140ms ease, color 140ms ease',
+        transform: pressed ? 'scale(0.97)' : 'scale(1)',
+        width: '100%',
+      }}
+    >
+      {active && (
+        <span style={{
+          position: 'absolute', left: 0, top: 7, bottom: 7, width: 2,
+          background: 'linear-gradient(180deg,#A78BFA,#7C3AED)',
+          boxShadow: '0 0 8px rgba(139,92,246,0.7)',
+          borderRadius: 2,
+        }} />
+      )}
+      <span style={{ color: active ? S.accent3 : hovered ? 'rgba(167,139,250,0.8)' : 'currentColor', display: 'flex', alignItems: 'center', transition: 'color 140ms ease' }}>
+        {icon}
+      </span>
+      {label}
+    </button>
+  )
+}
+
+// ── Sub-tab underline button ───────────────────────────────────────────────────
+function SubTabBtn({ active, icon, label, onClick, S }: {
+  active: boolean; icon: JSX.Element; label: string; onClick: () => void
+  S: { text: string; text3: string; accent: string; accent3: string }
+}) {
+  const [hovered, setHovered] = useState(false)
+
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 7,
+        padding: '0 14px', height: 40, fontSize: 13,
+        fontWeight: active ? 600 : 400,
+        color: active ? '#F2F0FF' : hovered ? 'rgba(196,181,253,0.7)' : 'rgba(148,163,184,0.45)',
+        background: 'transparent', border: 'none',
+        borderBottom: active ? '2px solid #7C3AED' : '2px solid transparent',
+        marginBottom: -1, cursor: 'pointer',
+        transition: 'color 120ms ease, border-color 120ms ease',
+        flexShrink: 0,
+      }}
+    >
+      <span style={{ color: active ? S.accent3 : hovered ? 'rgba(167,139,250,0.7)' : 'currentColor', display: 'flex', alignItems: 'center', transition: 'color 120ms ease' }}>
+        {icon}
+      </span>
+      {label}
+    </button>
   )
 }
 
@@ -70,6 +142,77 @@ const GEN_SIDEBAR: { id: GeneralTab; label: string; icon: string }[] = [
   { id: 'securite',      label: 'Sécurité',        icon: '🔒' },
   { id: 'avance',        label: 'Avancé',          icon: '⚙️' },
 ]
+
+// SVG icons for main nav panels
+const NAV_ICONS: Record<string, JSX.Element> = {
+  general: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/>
+      <path d="M12 2v2m0 16v2M2 12h2m16 0h2"/>
+    </svg>
+  ),
+  profile: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+    </svg>
+  ),
+  connexions: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+    </svg>
+  ),
+  organization: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/>
+      <line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/>
+    </svg>
+  ),
+  admin: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+    </svg>
+  ),
+  abonnement: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/>
+    </svg>
+  ),
+}
+
+// SVG icons for general sub-tabs
+const GEN_ICONS: Record<GeneralTab, JSX.Element> = {
+  apparence: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+    </svg>
+  ),
+  sons: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>
+    </svg>
+  ),
+  notifications: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+    </svg>
+  ),
+  langue: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+    </svg>
+  ),
+  securite: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+    </svg>
+  ),
+  avance: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/>
+    </svg>
+  ),
+}
 
 export function Settings({ user, initialPanel, initialTab }: SettingsProps) {
   const { role, perms, currentOrg } = useOrg()
@@ -309,561 +452,695 @@ export function Settings({ user, initialPanel, initialTab }: SettingsProps) {
   const sectionTitle = 'text-[15px] font-bold text-white'
   const sectionSub   = 'text-[12px] mt-0.5 mb-4'
 
-  function SelectRow({ label, sub, value, onChange, options }: {
-    label: string; sub: string; value: string
+  function SelectRow({ label, sub, value, onChange, options, first }: {
+    label: string; sub: string; value: string; first?: boolean
     onChange: (v: string) => void; options: { value: string; label: string }[]
   }) {
     return (
-      <div className="flex items-center justify-between py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderTop: first ? 'none' : '1px solid rgba(255,255,255,0.04)' }}>
         <div>
-          <p className="text-[13px] font-medium text-text">{label}</p>
-          <p className="text-[11px] text-text2 mt-0.5">{sub}</p>
+          <p style={{ fontSize: 13, fontWeight: 500, color: '#F2F0FF', margin: 0 }}>{label}</p>
+          <p style={{ fontSize: 12, color: 'rgba(148,163,184,0.5)', marginTop: 2, marginBottom: 0 }}>{sub}</p>
         </div>
-        <div className="relative flex-shrink-0">
-          <select value={value} onChange={e => onChange(e.target.value)}
-            className="appearance-none rounded-xl px-3 py-2 pr-7 text-[12px] font-medium focus:outline-none cursor-pointer"
-            style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', color: '#e2e8f0' }}>
+        <div style={{ position: 'relative', flexShrink: 0 }}>
+          <select value={value} onChange={e => onChange(e.target.value)} className="sf-input"
+            style={{ appearance: 'none', padding: '7px 28px 7px 10px', fontSize: 12, fontWeight: 500, cursor: 'pointer', minWidth: 130 }}>
             {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
-          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] opacity-40 pointer-events-none">▼</span>
+          <span style={{ position: 'absolute', right: 9, top: '50%', transform: 'translateY(-50%)', fontSize: 9, color: 'rgba(148,163,184,0.4)', pointerEvents: 'none' }}>▼</span>
         </div>
       </div>
     )
   }
 
-  function SettingToggle({ label, sub, checked, onChange }: {
-    label: string; sub: string; checked: boolean; onChange: (v: boolean) => void
+  function SettingToggle({ label, sub, checked, onChange, first }: {
+    label: string; sub: string; checked: boolean; onChange: (v: boolean) => void; first?: boolean
   }) {
     return (
-      <div className="flex items-center justify-between py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-        <div className="flex-1 pr-4">
-          <p className="text-[13px] font-medium text-text">{label}</p>
-          <p className="text-[11px] text-text2 mt-0.5">{sub}</p>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderTop: first ? 'none' : '1px solid rgba(255,255,255,0.04)' }}>
+        <div style={{ flex: 1, paddingRight: 16 }}>
+          <p style={{ fontSize: 13, fontWeight: 500, color: '#F2F0FF', margin: 0 }}>{label}</p>
+          <p style={{ fontSize: 12, color: 'rgba(148,163,184,0.5)', marginTop: 2, marginBottom: 0 }}>{sub}</p>
         </div>
-        <button onClick={() => onChange(!checked)}
-          className={`relative flex-shrink-0 w-10 h-5 rounded-full transition-all ${checked ? 'bg-accent' : 'bg-white/10'}`}>
-          <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${checked ? 'left-[22px]' : 'left-0.5'}`} />
-        </button>
+        <div
+          className={`sf-toggle-track ${checked ? 'on' : 'off'}`}
+          onClick={() => onChange(!checked)}
+        >
+          <span className="sf-toggle-thumb" />
+        </div>
       </div>
     )
   }
 
+  // Design tokens
+  const S = {
+    base: '#07070C',
+    surface: '#0C0C15',
+    surface2: '#111120',
+    surface3: '#17172A',
+    border: 'rgba(255,255,255,0.055)',
+    border2: 'rgba(255,255,255,0.09)',
+    borderAccent: 'rgba(139,92,246,0.22)',
+    accent: '#7C3AED',
+    accent2: '#8B5CF6',
+    accent3: '#A78BFA',
+    text: '#F2F0FF',
+    text2: 'rgba(196,181,253,0.72)',
+    text3: 'rgba(148,163,184,0.52)',
+  }
+
+  const cardSt = {
+    background: S.surface,
+    border: `1px solid ${S.border}`,
+    borderRadius: 15,
+    padding: '20px 24px',
+    marginBottom: 0,
+  }
+
+  const cardTitleSt: CSSProperties = {
+    fontSize: 13, fontWeight: 700, color: S.text, marginBottom: 4, marginTop: 0,
+  }
+
+  const cardSubSt: CSSProperties = {
+    fontSize: 11, color: S.text3, marginTop: 0, marginBottom: 14,
+  }
+
+  const mainNavItems = [
+    { k: 'general' as Panel,      l: 'Général' },
+    { k: 'profile' as Panel,      l: 'Profil' },
+    ...(canSeeConnexions ? [{ k: 'connexions' as Panel, l: 'Connexions' }] : []),
+    { k: 'organization' as Panel, l: 'Équipe' },
+    ...(license.isSuperAdmin ? [{ k: 'admin' as Panel, l: 'Admin' }] : []),
+    { k: 'abonnement' as Panel,   l: 'Plan' },
+  ]
+
   if (loading) return (
-    <div className="h-full flex flex-col overflow-hidden">
-      <div className="flex-shrink-0 px-10 pt-9 pb-7" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-        <h1 className="text-[28px] font-black text-white leading-none">Paramètres</h1>
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: S.base }}>
+      <div style={{ padding: '32px 40px 28px', borderBottom: `1px solid ${S.border}` }}>
+        <h1 style={{ fontSize: 26, fontWeight: 900, color: S.text, margin: 0, lineHeight: 1 }}>Paramètres</h1>
       </div>
-      <div className="flex-1 flex items-center justify-center">
-        <p className="text-[13px] text-text2">Chargement…</p>
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <p style={{ fontSize: 13, color: S.text3 }}>Chargement…</p>
       </div>
     </div>
   )
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="h-full flex flex-col overflow-hidden">
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: S.base }}>
 
       {/* Header */}
-      <div className="flex-shrink-0 px-8 pt-7 pb-5 flex items-center justify-between"
-        style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+      <div style={{
+        flexShrink: 0, padding: '24px 32px 20px',
+        borderBottom: `1px solid ${S.border}`,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      }}>
         <div>
-          <h1 className="text-[26px] font-black text-white leading-none">Paramètres</h1>
-          <p className="text-[13px] mt-0.5" style={{ color: 'rgba(148,163,184,0.6)' }}>Personnalise ton expérience ScaleFlow</p>
+          <h1 style={{ fontSize: 24, fontWeight: 800, color: S.text, margin: 0, lineHeight: 1.1, letterSpacing: '-0.3px' }}>Paramètres</h1>
+          <p style={{ fontSize: 13, color: S.text3, margin: '4px 0 0' }}>Personnalise ton expérience ScaleFlow</p>
         </div>
-        <div className="flex items-center gap-3">
-          {saved && <span className="text-[13px] text-ok font-medium">✓ Sauvegardé</span>}
-          <button onClick={panel === 'profile' ? saveProfile : panel === 'connexions' ? saveConnexions : save}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          {saved && (
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#22C55E', fontWeight: 500 }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              Sauvegardé
+            </span>
+          )}
+          <button
+            onClick={panel === 'profile' ? saveProfile : panel === 'connexions' ? saveConnexions : save}
             disabled={saving}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-[13px] font-bold text-white disabled:opacity-50 transition-all hover:brightness-110"
-            style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)', boxShadow: '0 4px 20px -6px rgba(124,58,237,0.5)' }}>
-            <span>💾</span>
+            className="sf-btn sf-btn-primary"
+            style={{ display: 'flex', alignItems: 'center', gap: 7, opacity: saving ? 0.6 : 1 }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
+            </svg>
             {saving ? 'Sauvegarde…' : 'Sauvegarder'}
           </button>
         </div>
       </div>
 
-      {/* Top tab navigation */}
-      <div className="flex-shrink-0 px-8 flex gap-1" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-        {([
-          { k: 'general',      l: 'Général',      icon: '⚙️' },
-          { k: 'profile',      l: 'Profil',       icon: '👤' },
-          ...(canSeeConnexions ? [{ k: 'connexions' as const, l: 'Connexions', icon: '🔌' }] : []),
-          { k: 'organization', l: 'Organisation', icon: '🏢' },
-          ...(license.isSuperAdmin ? [{ k: 'admin' as const, l: 'Admin', icon: '🛡' }] : []),
-          { k: 'abonnement' as const, l: 'Abonnement', icon: '💳' },
-        ] as const).map(t => (
-          <button key={t.k} onClick={() => setPanel(t.k)}
-            className={`flex items-center gap-1.5 px-4 py-3.5 text-[13px] font-semibold border-b-2 transition-colors -mb-px ${
-              panel === t.k ? 'border-accent text-accent' : 'border-transparent text-text2 hover:text-text'
-            }`}>
-            <span className="text-[13px]">{t.icon}</span>
-            {t.l}
-          </button>
-        ))}
-      </div>
+      {/* Two-column layout */}
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
 
-      {/* Content */}
-      <div className="flex-1 overflow-hidden flex">
+        {/* Left sidebar — main panels */}
+        <div style={{
+          width: 200, flexShrink: 0, overflowY: 'auto',
+          background: S.base,
+          borderRight: `1px solid ${S.border}`,
+          padding: '16px 10px',
+          display: 'flex', flexDirection: 'column', gap: 2,
+        }}>
+          <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: S.text3, padding: '0 8px', marginBottom: 8 }}>Navigation</p>
+          {mainNavItems.map(item => {
+            const active = panel === item.k
+            return (
+              <NavItem key={item.k} active={active} icon={NAV_ICONS[item.k]} label={item.l} onClick={() => setPanel(item.k)} S={S} />
+            )
+          })}
 
-        {/* ── Général: left sidebar + main ─────────────────────────────────── */}
-        {panel === 'general' && (
-          <>
-            {/* Left sidebar */}
-            <div className="w-[200px] flex-shrink-0 overflow-y-auto p-4 space-y-1"
-              style={{ borderRight: '1px solid rgba(255,255,255,0.06)' }}>
-              {GEN_SIDEBAR.map(item => (
-                <button key={item.id} onClick={() => setGenTab(item.id)}
-                  className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[13px] font-medium text-left transition-all ${
-                    genTab === item.id ? 'text-white' : 'text-text2 hover:text-text hover:bg-white/[0.04]'
-                  }`}
-                  style={genTab === item.id ? { background: 'rgba(139,92,246,0.15)', color: '#a78bfa' } : {}}>
-                  <span className="text-[14px]">{item.icon}</span>
-                  {item.label}
-                </button>
-              ))}
+          {/* Help section */}
+          <div style={{ marginTop: 'auto', paddingTop: 20, borderTop: `1px solid ${S.border}` }}>
+            <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: S.text3, padding: '0 8px', marginBottom: 8 }}>Support</p>
+            <a href="https://t.me/justquentin" target="_blank" rel="noreferrer" style={{
+              display: 'flex', alignItems: 'center', gap: 7,
+              padding: '7px 10px', borderRadius: 8, fontSize: 12,
+              color: S.accent3, textDecoration: 'none', fontWeight: 500,
+            }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              Voir le guide
+            </a>
+            <a href="https://t.me/justquentin" target="_blank" rel="noreferrer" style={{
+              display: 'flex', alignItems: 'center', gap: 7,
+              padding: '7px 10px', borderRadius: 8, fontSize: 12,
+              color: S.accent3, textDecoration: 'none', fontWeight: 500,
+            }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              Contacter le support
+            </a>
+          </div>
+        </div>
 
-              {/* Besoin d'aide */}
-              <div className="mt-6 pt-4" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                <p className="text-[11px] font-bold text-text2 uppercase tracking-wider px-3 mb-2">Besoin d'aide ?</p>
-                <p className="text-[11px] text-text2/60 px-3 mb-3 leading-relaxed">Consulte notre guide ou contacte le support, nous sommes là pour toi.</p>
-                <a href="https://t.me/justquentin" target="_blank" rel="noreferrer"
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium text-accent hover:underline">
-                  📄 Voir le guide
-                </a>
-                <a href="https://t.me/justquentin" target="_blank" rel="noreferrer"
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium text-accent hover:underline">
-                  🎧 Contacter le support →
-                </a>
+        {/* Right content area */}
+        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+
+          {/* ── GÉNÉRAL panel ───────────────────────────────────────────── */}
+          {panel === 'general' && (
+            <>
+              {/* Sub-tab bar */}
+              <div style={{
+                flexShrink: 0, display: 'flex', gap: 0,
+                borderBottom: '1px solid rgba(255,255,255,0.06)',
+                padding: '0 28px',
+              }}>
+                {GEN_SIDEBAR.map(item => {
+                  const active = genTab === item.id
+                  return (
+                    <SubTabBtn key={item.id} active={active} icon={GEN_ICONS[item.id]} label={item.label} onClick={() => setGenTab(item.id)} S={S} />
+                  )
+                })}
               </div>
-            </div>
 
-            {/* Main content */}
-            <div className="flex-1 overflow-y-auto px-8 py-6">
+              {/* Tab content */}
+              <div style={{ flex: 1, overflowY: 'auto', padding: '28px 32px' }}>
 
-              {/* ── APPARENCE ─────────────────────────────────────────────── */}
-              {genTab === 'apparence' && (
-                <div className="max-w-2xl space-y-6">
-                  <div>
-                    <h2 className={sectionTitle}>Apparence</h2>
-                    <p className={sectionSub} style={{ color: 'rgba(148,163,184,0.55)' }}>Personnalise l'apparence de ton interface.</p>
-                  </div>
-
-                  {/* Thème de couleur */}
-                  <div className={card} style={cardStyle}>
+                {/* ── APPARENCE ─────────────────────────────────────────── */}
+                {genTab === 'apparence' && (
+                  <div className="sf-anim-slide-up" style={{ maxWidth: 640, display: 'flex', flexDirection: 'column', gap: 20 }}>
                     <div>
-                      <h3 className="text-[14px] font-bold text-white">Thème de couleur</h3>
-                      <p className="text-[11px] text-text2 mt-0.5">Cette couleur sera utilisée pour les accents et éléments interactifs.</p>
+                      <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0 }}>Apparence</h2>
+                      <p style={{ fontSize: 13, color: S.text3, margin: '4px 0 0' }}>Personnalise l'apparence de ton interface.</p>
                     </div>
-                    <div className="grid grid-cols-4 gap-3">
-                      {THEMES.map(t => (
-                        <button key={t} onClick={() => { handleTheme(t); handleSwatchClick() }}
-                          className="relative flex flex-col items-center gap-2 p-3 rounded-xl transition-all hover:brightness-110"
-                          style={{
-                            background: theme === t ? `${THEME_COLORS[t]}15` : 'rgba(255,255,255,0.04)',
-                            border: theme === t ? `1px solid ${THEME_COLORS[t]}50` : '1px solid rgba(255,255,255,0.07)',
+
+                    {/* Thème de couleur */}
+                    <div style={cardSt}>
+                      <div style={{ marginBottom: 14 }}>
+                        <h3 style={cardTitleSt}>Thème de couleur</h3>
+                        <p style={cardSubSt}>Cette couleur sera utilisée pour les accents et éléments interactifs.</p>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+                        {THEMES.map(t => (
+                          <button key={t} onClick={() => { handleTheme(t); handleSwatchClick() }} style={{
+                            position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 7,
+                            padding: '12px 8px', borderRadius: 11, cursor: 'pointer', transition: 'all 0.15s',
+                            background: theme === t ? `${THEME_COLORS[t]}18` : 'rgba(255,255,255,0.03)',
+                            border: theme === t ? `1px solid ${THEME_COLORS[t]}55` : `1px solid ${S.border}`,
                           }}>
-                          {theme === t && (
-                            <span className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-accent flex items-center justify-center text-[9px] text-white font-black">✓</span>
-                          )}
-                          <div className="w-7 h-7 rounded-full" style={{ background: THEME_COLORS[t] }} />
-                          <span className="text-[11px] font-medium text-text2">{t}</span>
-                        </button>
-                      ))}
-                    </div>
-                    {pixelUnlocked && (
-                      <div className="px-3 py-2 rounded-xl text-[12px] text-text2" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                        🎮 Mode Pixel débloqué — clique encore 7 fois sur un thème pour activer
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Toggles + dropdowns */}
-                  <div className={card} style={cardStyle}>
-                    <SettingToggle label="Mode sombre" sub="Active ou désactive le thème sombre."
-                      checked={darkMode} onChange={v => { setDarkMode(v); localStorage.setItem('sf-dark', v ? '1' : '0'); applyAppearanceCSS({ dark: v }) }} />
-                    <SettingToggle label="Animations UI" sub="Active ou désactive les animations et transitions."
-                      checked={animationsOn} onChange={v => { setAnimationsOn(v); localStorage.setItem('sf-animations', v ? '1' : '0'); applyAppearanceCSS({ anim: v }) }} />
-                    <SettingToggle label="Effets de flou (Glassmorphism)" sub="Active ou désactive les effets de flou."
-                      checked={glassOn} onChange={v => { setGlassOn(v); localStorage.setItem('sf-glass', v ? '1' : '0'); applyAppearanceCSS({ glass: v }) }} />
-                    <SelectRow label="Coins arrondis" sub="Ajuste l'arrondi des éléments de l'interface."
-                      value={roundedCorners} onChange={v => { setRoundedCorners(v); applyAppearanceCSS({ rounded: v }) }}
-                      options={[{ value: 'aucun', label: 'Aucun' }, { value: 'petit', label: 'Petit' }, { value: 'moyen', label: 'Moyen' }, { value: 'grand', label: 'Grand' }]} />
-                    <SelectRow label="Police d'interface" sub="Choisis la police utilisée dans l'interface."
-                      value={fontFamily} onChange={v => { setFontFamily(v); applyAppearanceCSS({ fontFam: v }) }}
-                      options={[{ value: 'inter', label: 'Inter' }, { value: 'system', label: 'System UI' }, { value: 'mono', label: 'Monospace' }]} />
-                    <SelectRow label="Taille de la police" sub="Ajuste la taille du texte global."
-                      value={fontSize} onChange={v => { setFontSize(v); applyAppearanceCSS({ fs: v }) }}
-                      options={[{ value: 'petite', label: 'Petite' }, { value: 'moyenne', label: 'Moyenne' }, { value: 'grande', label: 'Grande' }]} />
-                    <SelectRow label="Densité d'affichage" sub="Choisis la densité des éléments à l'écran."
-                      value={density} onChange={v => { setDensity(v); applyAppearanceCSS({ density: v }) }}
-                      options={[{ value: 'compact', label: 'Compact' }, { value: 'confortable', label: 'Confortable' }, { value: 'spacieux', label: 'Spacieux' }]} />
-                    <SelectRow label="Barre latérale" sub="Affiche ou masque la barre latérale."
-                      value={sidebarMode} onChange={v => { setSidebarMode(v); localStorage.setItem('sf-sidebar', v); applyAppearanceCSS({ sidebar: v }) }}
-                      options={[{ value: 'etendue', label: 'Étendue' }, { value: 'reduite', label: 'Réduite' }, { value: 'masquee', label: 'Masquée' }]} />
-                  </div>
-
-                  {/* Aperçu */}
-                  <div className={card} style={cardStyle}>
-                    <div>
-                      <h3 className="text-[14px] font-bold text-white">Aperçu</h3>
-                      <p className="text-[11px] text-text2 mt-0.5">Voici un aperçu de ton interface avec ces paramètres.</p>
-                    </div>
-                    <div className="rounded-xl overflow-hidden" style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.06)', height: '100px' }}>
-                      <div className="flex h-full">
-                        <div className="w-10 h-full flex flex-col items-center pt-2 gap-1.5" style={{ background: 'rgba(0,0,0,0.3)' }}>
-                          <div className="w-5 h-5 rounded" style={{ background: 'var(--color-accent, #4f9eff)', opacity: 0.8 }} />
-                          {[1,2,3,4].map(i => <div key={i} className="w-4 h-1.5 rounded-sm" style={{ background: 'rgba(255,255,255,0.1)' }} />)}
-                        </div>
-                        <div className="flex-1 p-2 grid grid-cols-3 gap-1.5 content-start">
-                          {[1,2,3,4,5,6].map(i => (
-                            <div key={i} className="h-6 rounded" style={{ background: i === 2 ? `var(--color-accent, #4f9eff)22` : 'rgba(255,255,255,0.06)', border: i === 2 ? `1px solid var(--color-accent, #4f9eff)40` : '1px solid rgba(255,255,255,0.06)' }} />
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* ── SONS ──────────────────────────────────────────────────── */}
-              {genTab === 'sons' && (
-                <div className="max-w-2xl space-y-6">
-                  <div>
-                    <h2 className={sectionTitle}>Sons</h2>
-                    <p className={sectionSub} style={{ color: 'rgba(148,163,184,0.55)' }}>Gère les sons et la musique d'ambiance de l'application.</p>
-                  </div>
-                  <div className={card} style={cardStyle}>
-                    <SettingToggle label="Sons de navigation" sub="Joue un son lors des changements de page."
-                      checked={notifySound} onChange={v => setNotifySound(v)} />
-                    <SettingToggle label="Musique d'ambiance" sub="Joue une musique en fond lors de l'utilisation de l'app."
-                      checked={musicOn} onChange={v => { setMusicOn(v); setMusicEnabled(v) }} />
-                  </div>
-                  {musicOn && (
-                    <div className={card} style={cardStyle}>
-                      <h3 className="text-[13px] font-bold text-white">Piste musicale</h3>
-                      <div className="flex flex-wrap gap-2">
-                        {TRACKS.map((tr, i) => (
-                          <button key={i} onClick={() => { setMusicTrackS(i); setTrack(i) }}
-                            className="flex items-center gap-2 px-4 py-2 rounded-xl text-[13px] font-medium transition-all"
-                            style={musicTrack === i ? { background: 'rgba(139,92,246,0.2)', border: '1px solid rgba(139,92,246,0.4)', color: '#a78bfa' } : { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)', color: 'rgba(148,163,184,0.7)' }}>
-                            <span>{musicTrack === i ? '▶' : '▷'}</span> {tr.name}
+                            {theme === t && (
+                              <span style={{
+                                position: 'absolute', top: 6, right: 6, width: 14, height: 14, borderRadius: '50%',
+                                background: THEME_COLORS[t], display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                fontSize: 8, color: '#fff', fontWeight: 900,
+                              }}>
+                                <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                              </span>
+                            )}
+                            <div style={{ width: 26, height: 26, borderRadius: '50%', background: THEME_COLORS[t] }} />
+                            <span style={{ fontSize: 11, fontWeight: 500, color: S.text2 }}>{t}</span>
                           </button>
                         ))}
                       </div>
-                      <div className="space-y-2 pt-2">
-                        <div className="flex justify-between">
-                          <p className="text-[13px] font-medium text-text">Volume</p>
-                          <p className="text-[13px] font-bold text-accent">{Math.round(musicVol * 100)}%</p>
+                      {pixelUnlocked && (
+                        <div style={{ padding: '8px 12px', borderRadius: 8, fontSize: 12, color: S.text3, background: 'rgba(255,255,255,0.04)', border: `1px solid ${S.border}`, marginTop: 10 }}>
+                          Mode Pixel débloqué — clique encore 7 fois sur un thème pour activer
                         </div>
-                        <input type="range" min={0} max={1} step={0.05} value={musicVol}
-                          onChange={e => { const v = parseFloat(e.target.value); setMusicVol(v); setVolume(v) }}
-                          className="w-full accent-accent" />
+                      )}
+                    </div>
+
+                    {/* Toggles + dropdowns */}
+                    <div style={cardSt}>
+                      <SettingToggle first label="Mode sombre" sub="Active ou désactive le thème sombre."
+                        checked={darkMode} onChange={v => { setDarkMode(v); localStorage.setItem('sf-dark', v ? '1' : '0'); applyAppearanceCSS({ dark: v }) }} />
+                      <SettingToggle label="Animations UI" sub="Active ou désactive les animations et transitions."
+                        checked={animationsOn} onChange={v => { setAnimationsOn(v); localStorage.setItem('sf-animations', v ? '1' : '0'); applyAppearanceCSS({ anim: v }) }} />
+                      <SettingToggle label="Effets de flou (Glassmorphism)" sub="Active ou désactive les effets de flou."
+                        checked={glassOn} onChange={v => { setGlassOn(v); localStorage.setItem('sf-glass', v ? '1' : '0'); applyAppearanceCSS({ glass: v }) }} />
+                      <SelectRow label="Coins arrondis" sub="Ajuste l'arrondi des éléments de l'interface."
+                        value={roundedCorners} onChange={v => { setRoundedCorners(v); applyAppearanceCSS({ rounded: v }) }}
+                        options={[{ value: 'aucun', label: 'Aucun' }, { value: 'petit', label: 'Petit' }, { value: 'moyen', label: 'Moyen' }, { value: 'grand', label: 'Grand' }]} />
+                      <SelectRow label="Police d'interface" sub="Choisis la police utilisée dans l'interface."
+                        value={fontFamily} onChange={v => { setFontFamily(v); applyAppearanceCSS({ fontFam: v }) }}
+                        options={[{ value: 'inter', label: 'Inter' }, { value: 'system', label: 'System UI' }, { value: 'mono', label: 'Monospace' }]} />
+                      <SelectRow label="Taille de la police" sub="Ajuste la taille du texte global."
+                        value={fontSize} onChange={v => { setFontSize(v); applyAppearanceCSS({ fs: v }) }}
+                        options={[{ value: 'petite', label: 'Petite' }, { value: 'moyenne', label: 'Moyenne' }, { value: 'grande', label: 'Grande' }]} />
+                      <SelectRow label="Densité d'affichage" sub="Choisis la densité des éléments à l'écran."
+                        value={density} onChange={v => { setDensity(v); applyAppearanceCSS({ density: v }) }}
+                        options={[{ value: 'compact', label: 'Compact' }, { value: 'confortable', label: 'Confortable' }, { value: 'spacieux', label: 'Spacieux' }]} />
+                      <SelectRow label="Barre latérale" sub="Affiche ou masque la barre latérale."
+                        value={sidebarMode} onChange={v => { setSidebarMode(v); localStorage.setItem('sf-sidebar', v); applyAppearanceCSS({ sidebar: v }) }}
+                        options={[{ value: 'etendue', label: 'Étendue' }, { value: 'reduite', label: 'Réduite' }, { value: 'masquee', label: 'Masquée' }]} />
+                    </div>
+
+                    {/* Aperçu */}
+                    <div style={cardSt}>
+                      <div style={{ marginBottom: 12 }}>
+                        <h3 style={cardTitleSt}>Aperçu</h3>
+                        <p style={cardSubSt}>Voici un aperçu de ton interface avec ces paramètres.</p>
+                      </div>
+                      <div style={{ borderRadius: 11, overflow: 'hidden', background: 'rgba(0,0,0,0.3)', border: `1px solid ${S.border}`, height: 100 }}>
+                        <div style={{ display: 'flex', height: '100%' }}>
+                          <div style={{ width: 40, height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 8, gap: 6, background: 'rgba(0,0,0,0.3)' }}>
+                            <div style={{ width: 20, height: 20, borderRadius: 4, background: 'var(--color-accent, #4f9eff)', opacity: 0.8 }} />
+                            {[1,2,3,4].map(i => <div key={i} style={{ width: 16, height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.1)' }} />)}
+                          </div>
+                          <div style={{ flex: 1, padding: 8, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, alignContent: 'start' }}>
+                            {[1,2,3,4,5,6].map(i => (
+                              <div key={i} style={{ height: 24, borderRadius: 6, background: i === 2 ? `var(--color-accent, #4f9eff)22` : 'rgba(255,255,255,0.06)', border: i === 2 ? `1px solid var(--color-accent, #4f9eff)40` : `1px solid ${S.border}` }} />
+                            ))}
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  )}
-                </div>
-              )}
+                  </div>
+                )}
 
-              {/* ── NOTIFICATIONS ─────────────────────────────────────────── */}
-              {genTab === 'notifications' && (
-                <div className="max-w-2xl space-y-6">
-                  <div>
-                    <h2 className={sectionTitle}>Notifications</h2>
-                    <p className={sectionSub} style={{ color: 'rgba(148,163,184,0.55)' }}>Choisis comment et quand tu souhaites être notifié.</p>
-                  </div>
-                  <div className={card} style={cardStyle}>
-                    <h3 className="text-[13px] font-bold text-white pb-1">In-app</h3>
-                    <SettingToggle label="Notifications popup" sub="Affiche une notification en haut à droite lors d'actions importantes."
-                      checked={notifyPopup} onChange={v => setNotifyPopup(v)} />
-                    <SettingToggle label="Alertes d'erreurs" sub="Affiche les erreurs critiques de manière visible."
-                      checked={notifyErrors} onChange={v => setNotifyErrors(v)} />
-                    <SettingToggle label="Mises à jour & nouveautés" sub="Informe lors des nouvelles versions ou fonctionnalités."
-                      checked={notifyUpdates} onChange={v => setNotifyUpdates(v)} />
-                  </div>
-                  <div className={card} style={cardStyle}>
-                    <h3 className="text-[13px] font-bold text-white pb-1">Système</h3>
-                    <SettingToggle
-                      label="Notifications bureau"
-                      sub="Envoie des notifications natives du système d'exploitation."
-                      checked={notifyDesktop}
-                      onChange={async v => {
-                        if (v && 'Notification' in window) {
-                          const perm = await Notification.requestPermission()
-                          setNotifyDesktop(perm === 'granted')
-                        } else {
-                          setNotifyDesktop(false)
-                        }
-                      }}
-                    />
-                    {notifyDesktop && (
-                      <button onClick={() => new Notification('ScaleFlow', { body: 'Les notifications bureau sont actives ✓', icon: '/icon.png' })}
-                        className="text-[12px] text-accent hover:underline">
-                        Tester une notification →
-                      </button>
+                {/* ── SONS ──────────────────────────────────────────────── */}
+                {genTab === 'sons' && (
+                  <div className="sf-anim-slide-up" style={{ maxWidth: 640, display: 'flex', flexDirection: 'column', gap: 20 }}>
+                    <div>
+                      <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0 }}>Sons</h2>
+                      <p style={{ fontSize: 13, color: S.text3, margin: '4px 0 0' }}>Gère les sons et la musique d'ambiance de l'application.</p>
+                    </div>
+                    <div style={cardSt}>
+                      <SettingToggle first label="Sons de navigation" sub="Joue un son lors des changements de page."
+                        checked={notifySound} onChange={v => setNotifySound(v)} />
+                      <SettingToggle label="Musique d'ambiance" sub="Joue une musique en fond lors de l'utilisation de l'app."
+                        checked={musicOn} onChange={v => { setMusicOn(v); setMusicEnabled(v) }} />
+                    </div>
+                    {musicOn && (
+                      <div style={cardSt}>
+                        <h3 style={cardTitleSt}>Piste musicale</h3>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
+                          {TRACKS.map((tr, i) => (
+                            <button key={i} onClick={() => { setMusicTrackS(i); setTrack(i) }} style={{
+                              display: 'flex', alignItems: 'center', gap: 8,
+                              padding: '7px 14px', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: 'pointer',
+                              ...(musicTrack === i
+                                ? { background: 'rgba(139,92,246,0.18)', border: `1px solid ${S.borderAccent}`, color: S.accent3 }
+                                : { background: 'rgba(255,255,255,0.04)', border: `1px solid ${S.border}`, color: S.text3 }),
+                            }}>
+                              <svg width="11" height="11" viewBox="0 0 24 24" fill={musicTrack === i ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <polygon points="5 3 19 12 5 21 5 3"/>
+                              </svg>
+                              {tr.name}
+                            </button>
+                          ))}
+                        </div>
+                        <div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                            <p style={{ fontSize: 13, fontWeight: 500, color: S.text, margin: 0 }}>Volume</p>
+                            <p style={{ fontSize: 13, fontWeight: 700, color: S.accent3, margin: 0 }}>{Math.round(musicVol * 100)}%</p>
+                          </div>
+                          <input type="range" min={0} max={1} step={0.05} value={musicVol}
+                            onChange={e => { const v = parseFloat(e.target.value); setMusicVol(v); setVolume(v) }}
+                            style={{ width: '100%', accentColor: S.accent }} />
+                        </div>
+                      </div>
                     )}
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* ── LANGUE & RÉGION ────────────────────────────────────────── */}
-              {genTab === 'langue' && (
-                <div className="max-w-2xl space-y-6">
-                  <div>
-                    <h2 className={sectionTitle}>Langue & région</h2>
-                    <p className={sectionSub} style={{ color: 'rgba(148,163,184,0.55)' }}>Personnalise la langue et les paramètres régionaux.</p>
+                {/* ── NOTIFICATIONS ─────────────────────────────────────── */}
+                {genTab === 'notifications' && (
+                  <div className="sf-anim-slide-up" style={{ maxWidth: 640, display: 'flex', flexDirection: 'column', gap: 20 }}>
+                    <div>
+                      <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0 }}>Notifications</h2>
+                      <p style={{ fontSize: 13, color: S.text3, margin: '4px 0 0' }}>Choisis comment et quand tu souhaites être notifié.</p>
+                    </div>
+                    <div style={cardSt}>
+                      <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: S.text3, margin: '0 0 14px' }}>In-app</h3>
+                      <SettingToggle first label="Notifications popup" sub="Affiche une notification en haut à droite lors d'actions importantes."
+                        checked={notifyPopup} onChange={v => setNotifyPopup(v)} />
+                      <SettingToggle label="Alertes d'erreurs" sub="Affiche les erreurs critiques de manière visible."
+                        checked={notifyErrors} onChange={v => setNotifyErrors(v)} />
+                      <SettingToggle label="Mises à jour & nouveautés" sub="Informe lors des nouvelles versions ou fonctionnalités."
+                        checked={notifyUpdates} onChange={v => setNotifyUpdates(v)} />
+                    </div>
+                    <div style={cardSt}>
+                      <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: S.text3, margin: '0 0 14px' }}>Système</h3>
+                      <SettingToggle first
+                        label="Notifications bureau"
+                        sub="Envoie des notifications natives du système d'exploitation."
+                        checked={notifyDesktop}
+                        onChange={async v => {
+                          if (v && 'Notification' in window) {
+                            const perm = await Notification.requestPermission()
+                            setNotifyDesktop(perm === 'granted')
+                          } else {
+                            setNotifyDesktop(false)
+                          }
+                        }}
+                      />
+                      {notifyDesktop && (
+                        <button onClick={() => new Notification('ScaleFlow', { body: 'Les notifications bureau sont actives', icon: '/icon.png' })}
+                          style={{ marginTop: 10, fontSize: 12, color: S.accent3, background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>
+                          Tester une notification
+                        </button>
+                      )}
+                    </div>
                   </div>
-                  <div className={card} style={cardStyle}>
-                    <SelectRow label="Langue de l'interface" sub="La langue utilisée dans toute l'application."
-                      value={lang} onChange={v => setLang(v)}
-                      options={[{ value: 'fr', label: '🇫🇷 Français' }, { value: 'en', label: '🇬🇧 English' }]} />
-                    <SelectRow label="Format de date" sub="Comment les dates sont affichées dans l'interface."
-                      value={dateFormat} onChange={v => setDateFormat(v)}
-                      options={[{ value: 'dd/mm/yyyy', label: 'JJ/MM/AAAA' }, { value: 'mm/dd/yyyy', label: 'MM/JJ/AAAA' }, { value: 'yyyy-mm-dd', label: 'AAAA-MM-JJ' }]} />
-                    <SelectRow label="Fuseau horaire" sub="Utilisé pour afficher les dates et heures locales."
-                      value={timezone} onChange={v => setTimezone(v)}
-                      options={[
-                        { value: 'Europe/Paris',    label: 'Paris (UTC+1/+2)' },
-                        { value: 'Europe/London',   label: 'Londres (UTC+0/+1)' },
-                        { value: 'America/New_York',label: 'New York (UTC-5/-4)' },
-                        { value: 'America/Los_Angeles', label: 'Los Angeles (UTC-8/-7)' },
-                        { value: 'Asia/Dubai',      label: 'Dubaï (UTC+4)' },
-                        { value: 'UTC',             label: 'UTC' },
-                      ]} />
-                  </div>
-                  <div className="px-4 py-3 rounded-xl text-[12px] text-text2 flex items-start gap-2"
-                    style={{ background: 'rgba(255,170,42,0.07)', border: '1px solid rgba(255,170,42,0.2)' }}>
-                    <span className="text-warn text-[14px] flex-shrink-0">ℹ</span>
-                    Certains paramètres régionaux nécessitent un rechargement de l'application pour prendre effet.
-                  </div>
-                </div>
-              )}
+                )}
 
-              {/* ── SÉCURITÉ ──────────────────────────────────────────────── */}
-              {genTab === 'securite' && (
-                <div className="max-w-2xl space-y-6">
-                  <div>
-                    <h2 className={sectionTitle}>Sécurité</h2>
-                    <p className={sectionSub} style={{ color: 'rgba(148,163,184,0.55)' }}>Gère la sécurité et l'accès à ton compte.</p>
+                {/* ── LANGUE & RÉGION ────────────────────────────────────── */}
+                {genTab === 'langue' && (
+                  <div className="sf-anim-slide-up" style={{ maxWidth: 640, display: 'flex', flexDirection: 'column', gap: 20 }}>
+                    <div>
+                      <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0 }}>Langue & région</h2>
+                      <p style={{ fontSize: 13, color: S.text3, margin: '4px 0 0' }}>Personnalise la langue et les paramètres régionaux.</p>
+                    </div>
+                    <div style={cardSt}>
+                      <SelectRow first label="Langue de l'interface" sub="La langue utilisée dans toute l'application."
+                        value={lang} onChange={v => setLang(v)}
+                        options={[{ value: 'fr', label: 'Français' }, { value: 'en', label: 'English' }]} />
+                      <SelectRow label="Format de date" sub="Comment les dates sont affichées dans l'interface."
+                        value={dateFormat} onChange={v => setDateFormat(v)}
+                        options={[{ value: 'dd/mm/yyyy', label: 'JJ/MM/AAAA' }, { value: 'mm/dd/yyyy', label: 'MM/JJ/AAAA' }, { value: 'yyyy-mm-dd', label: 'AAAA-MM-JJ' }]} />
+                      <SelectRow label="Fuseau horaire" sub="Utilisé pour afficher les dates et heures locales."
+                        value={timezone} onChange={v => setTimezone(v)}
+                        options={[
+                          { value: 'Europe/Paris',    label: 'Paris (UTC+1/+2)' },
+                          { value: 'Europe/London',   label: 'Londres (UTC+0/+1)' },
+                          { value: 'America/New_York',label: 'New York (UTC-5/-4)' },
+                          { value: 'America/Los_Angeles', label: 'Los Angeles (UTC-8/-7)' },
+                          { value: 'Asia/Dubai',      label: 'Dubaï (UTC+4)' },
+                          { value: 'UTC',             label: 'UTC' },
+                        ]} />
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '12px 16px', borderRadius: 11, background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.2)' }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginTop: 1, flexShrink: 0 }}>
+                        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                      </svg>
+                      <p style={{ fontSize: 12, color: S.text2, margin: 0 }}>Certains paramètres régionaux nécessitent un rechargement de l'application pour prendre effet.</p>
+                    </div>
                   </div>
+                )}
 
-                  {/* Session info */}
-                  <div className={card} style={cardStyle}>
-                    <h3 className="text-[13px] font-bold text-white">Session active</h3>
-                    <div className="space-y-2">
+                {/* ── SÉCURITÉ ──────────────────────────────────────────── */}
+                {genTab === 'securite' && (
+                  <div className="sf-anim-slide-up" style={{ maxWidth: 640, display: 'flex', flexDirection: 'column', gap: 20 }}>
+                    <div>
+                      <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0 }}>Sécurité</h2>
+                      <p style={{ fontSize: 13, color: S.text3, margin: '4px 0 0' }}>Gère la sécurité et l'accès à ton compte.</p>
+                    </div>
+
+                    {/* Session info */}
+                    <div style={cardSt}>
+                      <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: S.text3, margin: '0 0 14px' }}>Session active</h3>
                       {[
                         { label: 'Compte',       value: user.email ?? '—' },
                         { label: 'Connecté le',  value: user.created_at ? new Date(user.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : '—' },
                         { label: 'ID session',   value: user.id.slice(0, 8) + '…' },
                       ].map(row => (
-                        <div key={row.label} className="flex justify-between py-2" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                          <span className="text-[12px] text-text2">{row.label}</span>
-                          <span className="text-[12px] font-medium text-text font-mono">{row.value}</span>
+                        <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 0', borderBottom: `1px solid ${S.border}` }}>
+                          <span style={{ fontSize: 12, color: S.text3 }}>{row.label}</span>
+                          <span style={{ fontSize: 12, fontWeight: 500, color: S.text, fontFamily: 'ui-monospace, monospace' }}>{row.value}</span>
                         </div>
                       ))}
                     </div>
-                  </div>
 
-                  {/* Options */}
-                  <div className={card} style={cardStyle}>
-                    <SettingToggle label="Authentification à deux facteurs (2FA)"
-                      sub="Ajoute une couche de sécurité supplémentaire à ton compte."
-                      checked={twoFA} onChange={v => setTwoFA(v)} />
-                    <SelectRow label="Déconnexion automatique" sub="Se déconnecte automatiquement après une période d'inactivité."
-                      value={sessionTimeout} onChange={v => setSessionTimeout(v)}
-                      options={[
-                        { value: 'jamais',  label: 'Jamais' },
-                        { value: '1h',      label: 'Après 1 heure' },
-                        { value: '8h',      label: 'Après 8 heures' },
-                        { value: '24h',     label: 'Après 24 heures' },
-                      ]} />
-                  </div>
+                    {/* Options */}
+                    <div style={cardSt}>
+                      <SettingToggle first label="Authentification à deux facteurs (2FA)"
+                        sub="Ajoute une couche de sécurité supplémentaire à ton compte."
+                        checked={twoFA} onChange={v => setTwoFA(v)} />
+                      <SelectRow label="Déconnexion automatique" sub="Se déconnecte automatiquement après une période d'inactivité."
+                        value={sessionTimeout} onChange={v => setSessionTimeout(v)}
+                        options={[
+                          { value: 'jamais',  label: 'Jamais' },
+                          { value: '1h',      label: 'Après 1 heure' },
+                          { value: '8h',      label: 'Après 8 heures' },
+                          { value: '24h',     label: 'Après 24 heures' },
+                        ]} />
+                    </div>
 
-                  {/* Actions */}
-                  <div className={card} style={cardStyle}>
-                    <h3 className="text-[13px] font-bold text-white pb-1">Actions de compte</h3>
-                    <div className="space-y-2">
-                      <button
-                        onClick={async () => { await supabase.auth.signOut() }}
-                        className="w-full flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-medium text-left transition-all hover:bg-white/[0.06]"
-                        style={{ color: 'rgba(148,163,184,0.8)' }}>
-                        <span>🔒</span> Déconnexion
-                      </button>
-                      <button
-                        onClick={async () => {
-                          const { error } = await supabase.auth.resetPasswordForEmail(user.email ?? '')
-                          if (!error) setError(null)
-                        }}
-                        className="w-full flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-medium text-left transition-all hover:bg-white/[0.06]"
-                        style={{ color: 'rgba(148,163,184,0.8)' }}>
-                        <span>🔑</span> Envoyer un email de réinitialisation de mot de passe
-                      </button>
+                    {/* Actions */}
+                    <div style={cardSt}>
+                      <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: S.text3, margin: '0 0 14px' }}>Actions de compte</h3>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <button
+                          onClick={async () => { await supabase.auth.signOut() }}
+                          className="sf-btn sf-btn-danger sf-btn-sm"
+                          style={{ display: 'flex', alignItems: 'center', gap: 9, textAlign: 'left', width: '100%' }}>
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                          Déconnexion
+                        </button>
+                        <button
+                          onClick={async () => {
+                            const { error } = await supabase.auth.resetPasswordForEmail(user.email ?? '')
+                            if (!error) setError(null)
+                          }}
+                          className="sf-btn sf-btn-ghost sf-btn-sm"
+                          style={{ display: 'flex', alignItems: 'center', gap: 9, textAlign: 'left', width: '100%' }}>
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                          Envoyer un email de réinitialisation de mot de passe
+                        </button>
+                      </div>
                     </div>
                   </div>
+                )}
+
+                {/* ── AVANCÉ ────────────────────────────────────────────── */}
+                {genTab === 'avance' && (
+                  <div className="sf-anim-slide-up" style={{ maxWidth: 640, display: 'flex', flexDirection: 'column', gap: 20 }}>
+                    <div>
+                      <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0 }}>Avancé</h2>
+                      <p style={{ fontSize: 13, color: S.text3, margin: '4px 0 0' }}>Options avancées pour les utilisateurs expérimentés.</p>
+                    </div>
+
+                    <div style={cardSt}>
+                      <SettingToggle first label="Mode développeur" sub="Affiche des informations de débogage supplémentaires dans l'interface."
+                        checked={devMode} onChange={v => setDevMode(v)} />
+                    </div>
+
+                    {devMode && (
+                      <div style={{ borderRadius: 11, padding: 16, fontFamily: 'ui-monospace, monospace', fontSize: 11, lineHeight: 1.7, background: 'rgba(0,0,0,0.4)', border: `1px solid ${S.border}`, color: S.text3 }}>
+                        <p style={{ margin: 0 }}>user_id: {user.id}</p>
+                        <p style={{ margin: 0 }}>email: {user.email}</p>
+                        <p style={{ margin: 0 }}>org: {currentOrg?.id ?? 'solo'}</p>
+                        <p style={{ margin: 0 }}>role: {role ?? 'n/a'}</p>
+                        <p style={{ margin: 0 }}>app_version: 2.0.0</p>
+                        <p style={{ margin: 0 }}>electron: {typeof window !== 'undefined' && (window as any).electronAPI ? 'oui' : 'non'}</p>
+                      </div>
+                    )}
+
+                    <div style={cardSt}>
+                      <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: S.text3, margin: '0 0 14px' }}>Données & cache</h3>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <button
+                          onClick={() => {
+                            const keys = Object.keys(localStorage).filter(k => k.startsWith('sf-') || k.startsWith('notify') || k === 'theme')
+                            keys.forEach(k => localStorage.removeItem(k))
+                            window.location.reload()
+                          }}
+                          className="sf-btn sf-btn-ghost sf-btn-sm"
+                          style={{ display: 'flex', alignItems: 'center', gap: 9, textAlign: 'left', width: '100%' }}>
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                          Vider le cache local
+                        </button>
+                        <button
+                          onClick={() => {
+                            const data = {
+                              user: { id: user.id, email: user.email },
+                              settings: Object.fromEntries(
+                                Object.entries(localStorage).filter(([k]) => k.startsWith('sf-') || k.startsWith('notify') || k === 'theme')
+                              ),
+                              exported_at: new Date().toISOString(),
+                            }
+                            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+                            const url  = URL.createObjectURL(blob)
+                            const a    = document.createElement('a'); a.href = url
+                            a.download = `scaleflow-settings-${new Date().toISOString().slice(0,10)}.json`
+                            a.click(); URL.revokeObjectURL(url)
+                          }}
+                          className="sf-btn sf-btn-ghost sf-btn-sm"
+                          style={{ display: 'flex', alignItems: 'center', gap: 9, textAlign: 'left', width: '100%' }}>
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                          Exporter mes paramètres (JSON)
+                        </button>
+                        {!resetConfirm ? (
+                          <button onClick={() => setResetConfirm(true)}
+                            className="sf-btn sf-btn-danger sf-btn-sm"
+                            style={{ display: 'flex', alignItems: 'center', gap: 9, textAlign: 'left', width: '100%' }}>
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                            Réinitialiser tous les paramètres
+                          </button>
+                        ) : (
+                          <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                            <button onClick={() => { localStorage.clear(); window.location.reload() }}
+                              className="sf-btn sf-btn-danger"
+                              style={{ flex: 1 }}>
+                              Confirmer la réinitialisation
+                            </button>
+                            <button onClick={() => setResetConfirm(false)}
+                              className="sf-btn sf-btn-secondary sf-btn-sm">
+                              Annuler
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div style={{ textAlign: 'center', paddingTop: 8 }}>
+                      <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.3)', margin: 0 }}>ScaleFlow v2.0.0 · Electron · React · Supabase</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+
+          {/* ── Other panels ─────────────────────────────────────────────── */}
+          {panel !== 'general' && (
+            <div style={{ flex: 1, overflowY: 'auto', padding: '28px 32px' }}>
+
+              {/* Profil */}
+              {panel === 'profile' && (
+                <div className="sf-anim-slide-up" style={{ maxWidth: 560, display: 'flex', flexDirection: 'column', gap: 20 }}>
+                  <div>
+                    <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0 }}>Profil</h2>
+                    <p style={{ fontSize: 13, color: S.text3, margin: '4px 0 0' }}>Informations de ton compte ScaleFlow.</p>
+                  </div>
+
+                  {/* Avatar card */}
+                  <div style={{ ...cardSt, display: 'flex', alignItems: 'center', gap: 16 }}>
+                    <div style={{
+                      width: 52, height: 52, borderRadius: '50%', flexShrink: 0,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: 'linear-gradient(135deg, #7C3AED, #EC4899)',
+                      fontSize: 18, fontWeight: 700, color: '#fff',
+                      boxShadow: '0 0 0 3px rgba(139,92,246,0.18)',
+                    }}>
+                      {(displayName || profileName || user.email || '?').charAt(0).toUpperCase()}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <p style={{ fontSize: 15, fontWeight: 700, color: S.text, margin: 0 }}>{displayName || profileName || 'Utilisateur'}</p>
+                      <p style={{ fontSize: 12, color: S.text3, margin: '3px 0 6px' }}>{user.email}</p>
+                      <span className={`sf-badge ${role === 'owner' ? 'sf-badge-accent' : role === 'admin' ? 'sf-badge-accent' : 'sf-badge-muted'}`}>
+                        {role === 'owner' ? 'Propriétaire' : role === 'admin' ? 'Admin' : role === 'member' ? 'Membre' : 'Solo'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Form */}
+                  <div style={{ ...cardSt, display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    <h3 style={cardTitleSt}>Informations personnelles</h3>
+                    <div>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: 'rgba(148,163,184,0.65)', marginBottom: 6, display: 'block', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Email</label>
+                      <input type="email" className="sf-input" value={profileEmail} onChange={e => setProfileEmail(e.target.value)} style={{ width: '100%' }} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: 'rgba(148,163,184,0.65)', marginBottom: 6, display: 'block', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Nom complet</label>
+                      <input className="sf-input" placeholder="Jean Dupont" value={profileName} onChange={e => setProfileName(e.target.value)} style={{ width: '100%' }} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: 'rgba(148,163,184,0.65)', marginBottom: 6, display: 'block', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Pseudo</label>
+                      <input className="sf-input" placeholder="@jean" value={displayName} onChange={e => setDisplayName(e.target.value)} style={{ width: '100%' }} />
+                    </div>
+                  </div>
+
+                  {/* Danger zone */}
+                  <div style={{ ...cardSt, background: 'rgba(239,68,68,0.03)', border: '1px solid rgba(239,68,68,0.15)' }}>
+                    <h3 style={{ ...cardTitleSt, color: '#EF4444', marginBottom: 12 }}>Zone dangereuse</h3>
+                    <p style={{ fontSize: 12, color: 'rgba(148,163,184,0.5)', marginBottom: 14, marginTop: 0 }}>Ces actions sont irréversibles. Procède avec prudence.</p>
+                    <button
+                      onClick={async () => { await supabase.auth.signOut() }}
+                      className="sf-btn sf-btn-danger sf-btn-sm"
+                      style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                      Se déconnecter
+                    </button>
+                  </div>
+
+                  {error && <p style={{ fontSize: 12, color: '#EF4444', margin: 0 }}>{error}</p>}
                 </div>
               )}
 
-              {/* ── AVANCÉ ────────────────────────────────────────────────── */}
-              {genTab === 'avance' && (
-                <div className="max-w-2xl space-y-6">
+              {/* Connexions */}
+              {panel === 'connexions' && canSeeConnexions && (
+                <div className="sf-anim-slide-up" style={{ maxWidth: 560, display: 'flex', flexDirection: 'column', gap: 20 }}>
                   <div>
-                    <h2 className={sectionTitle}>Avancé</h2>
-                    <p className={sectionSub} style={{ color: 'rgba(148,163,184,0.55)' }}>Options avancées pour les utilisateurs expérimentés.</p>
+                    <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0 }}>Connexions</h2>
+                    <p style={{ fontSize: 13, color: S.text3, margin: '4px 0 0' }}>Clés API et tokens de connexion aux services externes.</p>
                   </div>
 
-                  <div className={card} style={cardStyle}>
-                    <SettingToggle label="Mode développeur" sub="Affiche des informations de débogage supplémentaires dans l'interface."
-                      checked={devMode} onChange={v => setDevMode(v)} />
+                  {/* Org/solo notice */}
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 11, fontSize: 12,
+                    ...(currentOrg
+                      ? { background: 'rgba(139,92,246,0.08)', border: `1px solid ${S.borderAccent}`, color: S.accent3 }
+                      : { background: 'rgba(255,255,255,0.04)', border: `1px solid ${S.border}`, color: S.text3 }),
+                  }}>
+                    {currentOrg
+                      ? <><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg><span>Organisation — <strong>{currentOrg.name}</strong>{!canEditOrgConnexions && <span style={{ color: '#F59E0B' }}> · Lecture seule</span>}</span></>
+                      : <><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg><span>Mode solo — ces clés sont privées à ton compte</span></>}
                   </div>
 
-                  {devMode && (
-                    <div className="rounded-xl p-4 space-y-1 font-mono text-[11px]"
-                      style={{ background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(148,163,184,0.6)' }}>
-                      <p>user_id: {user.id}</p>
-                      <p>email: {user.email}</p>
-                      <p>org: {currentOrg?.id ?? 'solo'}</p>
-                      <p>role: {role ?? 'n/a'}</p>
-                      <p>app_version: 2.0.0</p>
-                      <p>electron: {typeof window !== 'undefined' && (window as any).electronAPI ? 'oui' : 'non'}</p>
+                  <div style={{ ...cardSt, display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    <h3 style={cardTitleSt}>GéeLark</h3>
+                    <div>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: 'rgba(148,163,184,0.65)', marginBottom: 6, display: 'block', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Bearer Token</label>
+                      <input type="password" className="sf-input" placeholder="Bearer …" value={bearer} onChange={e => setBearer(e.target.value)} disabled={!!currentOrg && !canEditOrgConnexions} style={{ width: '100%' }} />
                     </div>
-                  )}
-
-                  <div className={card} style={cardStyle}>
-                    <h3 className="text-[13px] font-bold text-white pb-1">Données & cache</h3>
-                    <div className="space-y-2">
-                      <button
-                        onClick={() => {
-                          const keys = Object.keys(localStorage).filter(k => k.startsWith('sf-') || k.startsWith('notify') || k === 'theme')
-                          keys.forEach(k => localStorage.removeItem(k))
-                          window.location.reload()
-                        }}
-                        className="w-full flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-medium text-left transition-all hover:bg-white/[0.06]"
-                        style={{ color: 'rgba(148,163,184,0.8)' }}>
-                        <span>🗑</span> Vider le cache local
-                      </button>
-                      <button
-                        onClick={() => {
-                          const data = {
-                            user: { id: user.id, email: user.email },
-                            settings: Object.fromEntries(
-                              Object.entries(localStorage).filter(([k]) => k.startsWith('sf-') || k.startsWith('notify') || k === 'theme')
-                            ),
-                            exported_at: new Date().toISOString(),
-                          }
-                          const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-                          const url  = URL.createObjectURL(blob)
-                          const a    = document.createElement('a'); a.href = url
-                          a.download = `scaleflow-settings-${new Date().toISOString().slice(0,10)}.json`
-                          a.click(); URL.revokeObjectURL(url)
-                        }}
-                        className="w-full flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-medium text-left transition-all hover:bg-white/[0.06]"
-                        style={{ color: 'rgba(148,163,184,0.8)' }}>
-                        <span>📥</span> Exporter mes paramètres (JSON)
-                      </button>
-                      {!resetConfirm ? (
-                        <button onClick={() => setResetConfirm(true)}
-                          className="w-full flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-medium text-left transition-all hover:bg-danger/10 text-danger">
-                          <span>⚠️</span> Réinitialiser tous les paramètres
-                        </button>
-                      ) : (
-                        <div className="flex gap-2">
-                          <button onClick={() => {
-                            localStorage.clear(); window.location.reload()
-                          }}
-                            className="flex-1 py-2.5 rounded-xl text-[13px] font-bold text-white text-center"
-                            style={{ background: 'rgba(239,68,68,0.2)', border: '1px solid rgba(239,68,68,0.4)' }}>
-                            Confirmer la réinitialisation
-                          </button>
-                          <button onClick={() => setResetConfirm(false)}
-                            className="px-4 py-2.5 rounded-xl text-[13px] text-text2 hover:text-text"
-                            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                            Annuler
-                          </button>
-                        </div>
-                      )}
+                    <div>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: 'rgba(148,163,184,0.65)', marginBottom: 6, display: 'block', textTransform: 'uppercase', letterSpacing: '0.06em' }}>URL Proxy (optionnel)</label>
+                      <input className="sf-input" placeholder="http://proxy:8080" value={proxyUrl} onChange={e => setProxyUrl(e.target.value)} disabled={!!currentOrg && !canEditOrgConnexions} style={{ width: '100%' }} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: 'rgba(148,163,184,0.65)', marginBottom: 6, display: 'block', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Session ID Instagram</label>
+                      <input type="password" className="sf-input" placeholder="sessionid=…" value={igSession} onChange={e => setIgSession(e.target.value)} disabled={!!currentOrg && !canEditOrgConnexions} style={{ width: '100%' }} />
                     </div>
                   </div>
 
-                  <div className="text-center pt-2">
-                    <p className="text-[11px] text-text2/40">ScaleFlow v2.0.0 · Electron · React · Supabase</p>
+                  <div style={{ ...cardSt, display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    <h3 style={cardTitleSt}>Clés API IA</h3>
+                    <div>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: 'rgba(148,163,184,0.65)', marginBottom: 6, display: 'block', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Groq API Key</label>
+                      <input type="password" className="sf-input" placeholder="gsk_…" value={groqKey} onChange={e => setGroqKey(e.target.value)} disabled={!!currentOrg && !canEditOrgConnexions} style={{ width: '100%' }} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: 'rgba(148,163,184,0.65)', marginBottom: 6, display: 'block', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Anthropic API Key</label>
+                      <input type="password" className="sf-input" placeholder="sk-ant-…" value={anthropicKey} onChange={e => setAnthropicKey(e.target.value)} disabled={!!currentOrg && !canEditOrgConnexions} style={{ width: '100%' }} />
+                    </div>
                   </div>
+                  {error && <p style={{ fontSize: 12, color: '#EF4444', margin: 0 }}>{error}</p>}
                 </div>
+              )}
+
+              {/* Organisation */}
+              {panel === 'organization' && <OrganizationPanel user={user} />}
+
+              {/* Admin */}
+              {panel === 'admin' && license.isSuperAdmin && <AdminPanel user={user} />}
+
+              {/* Abonnement */}
+              {panel === 'abonnement' && <SubscriptionPanel />}
+
+              {error && panel !== 'profile' && panel !== 'connexions' && (
+                <div style={{ marginTop: 16, padding: '10px 14px', borderRadius: 11, fontSize: 12, color: '#EF4444', maxWidth: 560, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>{error}</div>
               )}
             </div>
-          </>
-        )}
-
-        {/* ── Autres panels (scrollable) ──────────────────────────────────── */}
-        {panel !== 'general' && (
-          <div className="flex-1 overflow-y-auto px-8 py-6">
-
-            {/* Profil */}
-            {panel === 'profile' && (
-              <div className="max-w-xl space-y-5">
-                <div>
-                  <h2 className={sectionTitle}>Profil</h2>
-                  <p className="text-[12px] mt-0.5 mb-4" style={{ color: 'rgba(148,163,184,0.55)' }}>Informations de ton compte ScaleFlow.</p>
-                </div>
-                {/* Avatar placeholder */}
-                <div className="flex items-center gap-4 p-5 rounded-2xl" style={cardStyle}>
-                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-white text-[22px] font-black flex-shrink-0"
-                    style={{ background: 'linear-gradient(135deg,#7c3aed,#ec4899)' }}>
-                    {(displayName || profileName || user.email || '?').charAt(0).toUpperCase()}
-                  </div>
-                  <div>
-                    <p className="text-[15px] font-bold text-white">{displayName || profileName || 'Utilisateur'}</p>
-                    <p className="text-[12px] text-text2">{user.email}</p>
-                  </div>
-                </div>
-                <div className={`${card} !space-y-4`} style={cardStyle}>
-                  <Input label="Email" type="email" value={profileEmail} onChange={e => setProfileEmail(e.target.value)} />
-                  <Input label="Nom complet" placeholder="Jean Dupont" value={profileName} onChange={e => setProfileName(e.target.value)} />
-                  <Input label="Pseudo (visible par l'équipe)" placeholder="@jean" value={displayName} onChange={e => setDisplayName(e.target.value)} />
-                </div>
-                {error && <p className="text-[12px] text-danger">{error}</p>}
-              </div>
-            )}
-
-            {/* Connexions */}
-            {panel === 'connexions' && canSeeConnexions && (
-              <div className="max-w-xl space-y-5">
-                <div>
-                  <h2 className={sectionTitle}>Connexions</h2>
-                  <p className="text-[12px] mt-0.5 mb-4" style={{ color: 'rgba(148,163,184,0.55)' }}>Clés API et tokens de connexion aux services externes.</p>
-                </div>
-                <div className="px-4 py-3 rounded-xl text-[12px] flex items-center gap-2"
-                  style={currentOrg ? { background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.3)', color: '#a78bfa' } : { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', color: 'rgba(148,163,184,0.7)' }}>
-                  {currentOrg ? <><span>🏢</span><span>Organisation — <strong>{currentOrg.name}</strong>{!canEditOrgConnexions && <span className="text-warn"> · Lecture seule</span>}</span></> : <><span>👤</span><span>Mode solo — ces clés sont privées à ton compte</span></>}
-                </div>
-                <div className={`${card} !space-y-4`} style={cardStyle}>
-                  <h3 className="text-[13px] font-bold text-white">GéeLark</h3>
-                  <Input label="Bearer Token" type="password" placeholder="Bearer …" value={bearer} onChange={e => setBearer(e.target.value)} disabled={!!currentOrg && !canEditOrgConnexions} />
-                  <Input label="URL Proxy (optionnel)" placeholder="http://proxy:8080" value={proxyUrl} onChange={e => setProxyUrl(e.target.value)} disabled={!!currentOrg && !canEditOrgConnexions} />
-                  <Input label="Session ID Instagram" type="password" placeholder="sessionid=…" value={igSession} onChange={e => setIgSession(e.target.value)} disabled={!!currentOrg && !canEditOrgConnexions} />
-                </div>
-                <div className={`${card} !space-y-4`} style={cardStyle}>
-                  <h3 className="text-[13px] font-bold text-white">Clés API IA</h3>
-                  <Input label="Groq API Key" type="password" placeholder="gsk_…" value={groqKey} onChange={e => setGroqKey(e.target.value)} disabled={!!currentOrg && !canEditOrgConnexions} />
-                  <Input label="Anthropic API Key" type="password" placeholder="sk-ant-…" value={anthropicKey} onChange={e => setAnthropicKey(e.target.value)} disabled={!!currentOrg && !canEditOrgConnexions} />
-                </div>
-                {error && <p className="text-[12px] text-danger">{error}</p>}
-              </div>
-            )}
-
-            {/* Organisation */}
-            {panel === 'organization' && <OrganizationPanel user={user} />}
-
-            {/* Admin */}
-            {panel === 'admin' && license.isSuperAdmin && <AdminPanel user={user} />}
-
-            {/* Abonnement */}
-            {panel === 'abonnement' && <SubscriptionPanel />}
-
-            {error && panel !== 'profile' && panel !== 'connexions' && (
-              <div className="mt-4 px-4 py-3 rounded-xl text-[12px] text-danger max-w-xl"
-                style={{ background: 'rgba(255,92,110,0.08)', border: '1px solid rgba(255,92,110,0.2)' }}>{error}</div>
-            )}
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   )
@@ -1116,10 +1393,10 @@ function SubscriptionPanel() {
     }
   }
 
-  const statusColor = license.daysLeft === null ? '#34d399'
-    : license.daysLeft <= 1  ? '#f87171'
-    : license.daysLeft <= 7  ? '#fb923c'
-    : '#34d399'
+  const statusColor = license.daysLeft === null ? '#22C55E'
+    : license.daysLeft <= 1  ? '#EF4444'
+    : license.daysLeft <= 7  ? '#F59E0B'
+    : '#22C55E'
 
   const statusLabel = !license.valid ? 'Inactif'
     : license.source === 'org_owner' ? 'Via organisation'
@@ -1168,9 +1445,9 @@ function SubscriptionPanel() {
               <button
                 onClick={copy}
                 className="px-4 py-2.5 rounded-xl text-[13px] font-semibold transition-all flex-shrink-0"
-                style={{ background: copied ? 'rgba(52,211,153,0.12)' : 'rgba(139,92,246,0.1)', color: copied ? '#34d399' : '#a78bfa', border: `1px solid ${copied ? 'rgba(52,211,153,0.25)' : 'rgba(139,92,246,0.2)'}` }}
+                style={{ background: copied ? 'rgba(34,197,94,0.12)' : 'rgba(139,92,246,0.1)', color: copied ? '#22C55E' : '#a78bfa', border: `1px solid ${copied ? 'rgba(34,197,94,0.25)' : 'rgba(139,92,246,0.2)'}` }}
               >
-                {copied ? '✓ Copié' : 'Copier'}
+                {copied ? 'Copié' : 'Copier'}
               </button>
             </div>
           </div>
@@ -1179,7 +1456,7 @@ function SubscriptionPanel() {
 
       {/* Activate a license key */}
       <div className="rounded-2xl p-6 space-y-4" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(139,92,246,0.18)' }}>
-        <p className="text-[15px] font-bold text-white mb-4">🔑 Activer une clé</p>
+        <p className="text-[15px] font-bold text-white mb-4">Activer une clé</p>
         <form onSubmit={handleActivateKey} className="flex gap-2">
           <input
             value={newKey}
@@ -1194,7 +1471,7 @@ function SubscriptionPanel() {
             type="submit"
             disabled={keyLoading || !newKey.trim()}
             className="rounded-xl px-5 py-2.5 text-[13px] font-semibold text-white disabled:opacity-40 transition-all"
-            style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)' }}
+            style={{ background: 'linear-gradient(135deg,#7C3AED,#6D28D9)' }}
           >{keyLoading ? '…' : 'Activer'}</button>
         </form>
         {keyResult && (
@@ -1204,11 +1481,11 @@ function SubscriptionPanel() {
 
       {/* Credits */}
       <div className="rounded-2xl p-6 space-y-5" style={{ background: 'rgba(139,92,246,0.04)', border: '1px solid rgba(139,92,246,0.2)' }}>
-        <p className="text-[15px] font-bold text-white mb-4">💎 Crédits</p>
+        <p className="text-[15px] font-bold text-white mb-4">Crédits</p>
 
         <div className="flex items-center justify-between">
           <span className="text-[13px] text-text2">Solde actuel</span>
-          <span className="text-3xl font-black" style={{ color: creditBalance < 10 ? '#f87171' : '#a78bfa' }}>
+          <span className="text-3xl font-black" style={{ color: creditBalance < 10 ? '#EF4444' : '#a78bfa' }}>
             {creditBalance.toLocaleString('fr-FR')}
           </span>
         </div>
@@ -1222,17 +1499,24 @@ function SubscriptionPanel() {
 
         <div className="rounded-xl p-4 space-y-2" style={{ background: 'rgba(0,0,0,0.2)' }}>
           <p className="text-[12px] font-bold uppercase tracking-wider text-text2 mb-3">Coût des opérations</p>
-          <div className="flex justify-between"><span className="text-[13px] text-text2">🚀 Posting</span><span className="text-[13px] text-text font-semibold">1 crédit / tél.</span></div>
-          <div className="flex justify-between"><span className="text-[13px] text-text2">⚡ Mass Posting</span><span className="text-[13px] text-text font-semibold">2 crédits / tél.</span></div>
-          <div className="flex justify-between"><span className="text-[13px] text-text2">✂ Montage vidéo</span><span className="text-[13px] text-text font-semibold">1 crédit</span></div>
-          <div className="flex justify-between"><span className="text-[13px] text-text2">🔀 Remix vidéo</span><span className="text-[13px] text-text font-semibold">2 crédits</span></div>
+          {[
+            ['Posting', '1 crédit / tél.'],
+            ['Mass Posting', '2 crédits / tél.'],
+            ['Montage vidéo', '1 crédit'],
+            ['Remix vidéo', '2 crédits'],
+          ].map(([op, cost]) => (
+            <div key={op} className="flex justify-between">
+              <span className="text-[13px] text-text2">{op}</span>
+              <span className="text-[13px] text-text font-semibold">{cost}</span>
+            </div>
+          ))}
         </div>
 
         <div className="rounded-xl p-4" style={{ background: 'rgba(0,0,0,0.2)' }}>
           <p className="text-[12px] font-bold uppercase tracking-wider text-text2 mb-3">Téléphones GéeLark</p>
           <div className="flex justify-between">
             <span className="text-[13px] text-text2">Maximum autorisé</span>
-            <span className="text-[13px] font-semibold" style={{ color: maxPhones === '∞' ? '#34d399' : '#a78bfa' }}>{maxPhones}</span>
+            <span className="text-[13px] font-semibold" style={{ color: maxPhones === '∞' ? '#22C55E' : '#a78bfa' }}>{maxPhones}</span>
           </div>
         </div>
 
@@ -1252,13 +1536,13 @@ function SubscriptionPanel() {
               type="submit"
               disabled={codeLoading || !creditCode.trim()}
               className="px-5 py-2.5 rounded-xl text-[13px] font-bold text-white transition-all disabled:opacity-40"
-              style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)' }}
+              style={{ background: 'linear-gradient(135deg,#7C3AED,#6D28D9)' }}
             >
               {codeLoading ? '…' : 'Activer'}
             </button>
           </form>
           {codeResult && (
-            <p className="text-[13px]" style={{ color: codeResult.ok ? '#34d399' : '#f87171' }}>{codeResult.text}</p>
+            <p className="text-[13px]" style={{ color: codeResult.ok ? '#22C55E' : '#EF4444' }}>{codeResult.text}</p>
           )}
         </div>
       </div>
@@ -1280,7 +1564,7 @@ function SubscriptionPanel() {
             <ul className="space-y-1.5 flex-1">
               {['2 500 crédits / mois', '50 téléphones max', 'Toutes les fonctionnalités', 'Mass Posting — 10 comptes', 'Support 24/7'].map(f => (
                 <li key={f} className="flex items-start gap-2 text-[12px] text-text2">
-                  <span className="mt-px flex-shrink-0" style={{ color: '#60a5fa' }}>✓</span>{f}
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginTop: 2, flexShrink: 0 }}><polyline points="20 6 9 17 4 12"/></svg>{f}
                 </li>
               ))}
             </ul>
@@ -1293,7 +1577,7 @@ function SubscriptionPanel() {
 
           {/* Pro */}
           <div className="rounded-2xl p-5 space-y-4 flex flex-col relative overflow-hidden" style={{ background: 'linear-gradient(145deg,rgba(236,72,153,0.08),rgba(124,58,237,0.08))', border: '1px solid rgba(236,72,153,0.4)' }}>
-            <div className="absolute top-2.5 right-2.5 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider" style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff' }}>
+            <div className="absolute top-2.5 right-2.5 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider" style={{ background: 'linear-gradient(135deg,#7c3aed,#ec4899)', color: '#fff' }}>
               Populaire
             </div>
             <div>
@@ -1306,21 +1590,21 @@ function SubscriptionPanel() {
             <ul className="space-y-1.5 flex-1">
               {['5 500 crédits / mois', '200 téléphones max', 'Toutes les fonctionnalités', 'Mass Posting illimité', 'Support 24/7'].map(f => (
                 <li key={f} className="flex items-start gap-2 text-[12px] text-text2">
-                  <span className="mt-px flex-shrink-0" style={{ color: '#f472b6' }}>✓</span>{f}
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#f472b6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginTop: 2, flexShrink: 0 }}><polyline points="20 6 9 17 4 12"/></svg>{f}
                 </li>
               ))}
             </ul>
             <a href="https://t.me/justquentin" target="_blank" rel="noreferrer"
               className="block w-full py-2.5 rounded-xl text-[12px] font-bold text-center text-white transition-all"
-              style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)', boxShadow: '0 2px 16px -4px rgba(236,72,153,0.4)' }}>
+              style={{ background: 'linear-gradient(135deg,#7c3aed,#ec4899)', boxShadow: '0 2px 16px -4px rgba(236,72,153,0.4)' }}>
               Obtenir →
             </a>
           </div>
 
           {/* Organisation */}
-          <div className="rounded-2xl p-5 space-y-4 flex flex-col" style={{ background: 'rgba(52,211,153,0.05)', border: '1px solid rgba(52,211,153,0.2)' }}>
+          <div className="rounded-2xl p-5 space-y-4 flex flex-col" style={{ background: 'rgba(34,197,94,0.05)', border: '1px solid rgba(34,197,94,0.2)' }}>
             <div>
-              <p className="text-[12px] font-black uppercase tracking-wider" style={{ color: '#34d399' }}>Organisation</p>
+              <p className="text-[12px] font-black uppercase tracking-wider" style={{ color: '#22C55E' }}>Organisation</p>
               <div className="flex items-baseline gap-1 mt-1.5">
                 <span className="text-2xl font-black text-white">149,99$</span>
                 <span className="text-[12px] text-text2">/ mois</span>
@@ -1329,13 +1613,13 @@ function SubscriptionPanel() {
             <ul className="space-y-1.5 flex-1">
               {['11 000 crédits / mois', 'Téléphones illimités', 'Toutes les fonctionnalités', 'Mass Posting illimité', 'Support 24/7 prioritaire', 'Proposition d\'ajouts'].map(f => (
                 <li key={f} className="flex items-start gap-2 text-[12px] text-text2">
-                  <span className="mt-px flex-shrink-0" style={{ color: '#34d399' }}>✓</span>{f}
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#22C55E" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginTop: 2, flexShrink: 0 }}><polyline points="20 6 9 17 4 12"/></svg>{f}
                 </li>
               ))}
             </ul>
             <a href="https://t.me/justquentin" target="_blank" rel="noreferrer"
               className="block w-full py-2.5 rounded-xl text-[12px] font-bold text-center text-white transition-all hover:brightness-110"
-              style={{ background: 'rgba(52,211,153,0.2)', border: '1px solid rgba(52,211,153,0.35)' }}>
+              style={{ background: 'rgba(34,197,94,0.2)', border: '1px solid rgba(34,197,94,0.35)' }}>
               Obtenir →
             </a>
           </div>
