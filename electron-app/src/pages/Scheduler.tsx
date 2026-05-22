@@ -501,6 +501,14 @@ function SimplePostWizard({ user, onBack, onDone }: {
             style={{ border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(148,163,184,0.55)' }}>
             Enregistrer le brouillon
           </button>
+          {step > 1 && (
+            <button onClick={() => setStep(s => (s - 1) as WizardStep)}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-[12px] font-semibold transition-all hover:bg-white/[0.04]"
+              style={{ border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(148,163,184,0.6)' }}>
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M9.5 6h-7M5.5 9L2.5 6l3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              Étape précédente
+            </button>
+          )}
           {step < 4 ? (
             <button onClick={() => canNext && setStep(s => (s + 1) as WizardStep)} disabled={!canNext}
               className="flex items-center gap-2 px-4 py-2 rounded-xl text-[13px] font-bold transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-35"
@@ -700,7 +708,7 @@ function SimplePostWizard({ user, onBack, onDone }: {
             </div>
 
             {/* Footer */}
-            <div className="flex-shrink-0 px-8 py-4 flex items-center justify-between"
+            <div className="flex-shrink-0 px-8 py-4 flex items-center"
               style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
               <div className="flex items-center gap-3">
                 <span className="text-[13px] font-semibold" style={{ color: selectedVideoIds.size > 0 ? '#C4B5FD' : 'rgba(148,163,184,0.35)' }}>
@@ -714,12 +722,6 @@ function SimplePostWizard({ user, onBack, onDone }: {
                   </button>
                 )}
               </div>
-              <button onClick={() => canNext && setStep(2)} disabled={!canNext}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-[13px] font-bold transition-all hover:opacity-90 disabled:opacity-30"
-                style={{ background: 'linear-gradient(130deg,#7C3AED,#8B5CF6)', color: '#fff' }}>
-                Étape suivante
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 6h7M6.5 3l3 3-3 3" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-              </button>
             </div>
           </div>
         )}
@@ -872,22 +874,6 @@ function SimplePostWizard({ user, onBack, onDone }: {
                 )}
               </div>
 
-              {/* Footer */}
-              <div className="flex-shrink-0 px-8 py-4 flex items-center justify-between"
-                style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                <button onClick={() => setStep(1)}
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-[12px] font-semibold transition-all hover:bg-white/[0.04]"
-                  style={{ border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(148,163,184,0.6)' }}>
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M9.5 6h-7M5.5 9L2.5 6l3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                  Étape précédente
-                </button>
-                <button onClick={() => selectedPhoneIds.size > 0 && setStep(3)} disabled={selectedPhoneIds.size === 0}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-[13px] font-bold transition-all hover:opacity-90 disabled:opacity-30"
-                  style={{ background: 'linear-gradient(130deg,#7C3AED,#8B5CF6)', color: '#fff' }}>
-                  Étape suivante
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 6h7M6.5 3l3 3-3 3" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                </button>
-              </div>
             </div>
 
             {/* Right: selected phones panel */}
@@ -1088,21 +1074,6 @@ function SimplePostWizard({ user, onBack, onDone }: {
                 />
               </div>
 
-              {/* Navigation */}
-              <div className="flex items-center justify-between pt-2">
-                <button onClick={() => setStep(2)}
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-[12px] font-semibold transition-all hover:bg-white/[0.04]"
-                  style={{ border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(148,163,184,0.6)' }}>
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M9.5 6h-7M5.5 9L2.5 6l3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                  Étape précédente
-                </button>
-                <button onClick={() => setStep(4)}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-[13px] font-bold transition-all hover:opacity-90"
-                  style={{ background: 'linear-gradient(130deg,#7C3AED,#8B5CF6)', color: '#fff' }}>
-                  Étape suivante
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 6h7M6.5 3l3 3-3 3" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                </button>
-              </div>
             </div>
 
             {/* Right: preview */}
@@ -1221,25 +1192,6 @@ function SimplePostWizard({ user, onBack, onDone }: {
                 </div>
               )}
 
-              {/* Footer nav */}
-              <div className="flex items-center justify-between mt-6 pt-4" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                <button onClick={() => setStep(3)}
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-[12px] font-semibold transition-all hover:bg-white/[0.04]"
-                  style={{ border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(148,163,184,0.6)' }}>
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M9.5 6h-7M5.5 9L2.5 6l3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                  Étape précédente
-                </button>
-                <button onClick={submit} disabled={submitting}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-[13px] font-bold transition-all hover:opacity-90 disabled:opacity-50"
-                  style={{ background: 'linear-gradient(130deg,#7C3AED,#8B5CF6)', color: '#fff', boxShadow: '0 4px 20px -4px rgba(124,58,237,0.5)' }}>
-                  {submitting ? (
-                    <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="white" strokeWidth="3" strokeDasharray="31.4" strokeDashoffset="10"/></svg>
-                  ) : (
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                  )}
-                  {submitting ? 'Programmation…' : 'Programmer le post'}
-                </button>
-              </div>
             </div>
 
             {/* Right: schedule card */}
