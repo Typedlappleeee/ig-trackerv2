@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, type CSSProperties } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/Button'
@@ -452,12 +452,12 @@ export function Settings({ user, initialPanel, initialTab }: SettingsProps) {
   const sectionTitle = 'text-[15px] font-bold text-white'
   const sectionSub   = 'text-[12px] mt-0.5 mb-4'
 
-  function SelectRow({ label, sub, value, onChange, options }: {
-    label: string; sub: string; value: string
+  function SelectRow({ label, sub, value, onChange, options, first }: {
+    label: string; sub: string; value: string; first?: boolean
     onChange: (v: string) => void; options: { value: string; label: string }[]
   }) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderTop: first ? 'none' : '1px solid rgba(255,255,255,0.04)' }}>
         <div>
           <p style={{ fontSize: 13, fontWeight: 500, color: '#F2F0FF', margin: 0 }}>{label}</p>
           <p style={{ fontSize: 12, color: 'rgba(148,163,184,0.5)', marginTop: 2, marginBottom: 0 }}>{sub}</p>
@@ -473,11 +473,11 @@ export function Settings({ user, initialPanel, initialTab }: SettingsProps) {
     )
   }
 
-  function SettingToggle({ label, sub, checked, onChange }: {
-    label: string; sub: string; checked: boolean; onChange: (v: boolean) => void
+  function SettingToggle({ label, sub, checked, onChange, first }: {
+    label: string; sub: string; checked: boolean; onChange: (v: boolean) => void; first?: boolean
   }) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderTop: first ? 'none' : '1px solid rgba(255,255,255,0.04)' }}>
         <div style={{ flex: 1, paddingRight: 16 }}>
           <p style={{ fontSize: 13, fontWeight: 500, color: '#F2F0FF', margin: 0 }}>{label}</p>
           <p style={{ fontSize: 12, color: 'rgba(148,163,184,0.5)', marginTop: 2, marginBottom: 0 }}>{sub}</p>
@@ -517,11 +517,11 @@ export function Settings({ user, initialPanel, initialTab }: SettingsProps) {
     marginBottom: 0,
   }
 
-  const cardTitleSt: React.CSSProperties = {
+  const cardTitleSt: CSSProperties = {
     fontSize: 13, fontWeight: 700, color: S.text, marginBottom: 4, marginTop: 0,
   }
 
-  const cardSubSt: React.CSSProperties = {
+  const cardSubSt: CSSProperties = {
     fontSize: 11, color: S.text3, marginTop: 0, marginBottom: 14,
   }
 
@@ -688,7 +688,7 @@ export function Settings({ user, initialPanel, initialTab }: SettingsProps) {
 
                     {/* Toggles + dropdowns */}
                     <div style={cardSt}>
-                      <SettingToggle label="Mode sombre" sub="Active ou désactive le thème sombre."
+                      <SettingToggle first label="Mode sombre" sub="Active ou désactive le thème sombre."
                         checked={darkMode} onChange={v => { setDarkMode(v); localStorage.setItem('sf-dark', v ? '1' : '0'); applyAppearanceCSS({ dark: v }) }} />
                       <SettingToggle label="Animations UI" sub="Active ou désactive les animations et transitions."
                         checked={animationsOn} onChange={v => { setAnimationsOn(v); localStorage.setItem('sf-animations', v ? '1' : '0'); applyAppearanceCSS({ anim: v }) }} />
@@ -742,7 +742,7 @@ export function Settings({ user, initialPanel, initialTab }: SettingsProps) {
                       <p style={{ fontSize: 13, color: S.text3, margin: '4px 0 0' }}>Gère les sons et la musique d'ambiance de l'application.</p>
                     </div>
                     <div style={cardSt}>
-                      <SettingToggle label="Sons de navigation" sub="Joue un son lors des changements de page."
+                      <SettingToggle first label="Sons de navigation" sub="Joue un son lors des changements de page."
                         checked={notifySound} onChange={v => setNotifySound(v)} />
                       <SettingToggle label="Musique d'ambiance" sub="Joue une musique en fond lors de l'utilisation de l'app."
                         checked={musicOn} onChange={v => { setMusicOn(v); setMusicEnabled(v) }} />
@@ -789,7 +789,7 @@ export function Settings({ user, initialPanel, initialTab }: SettingsProps) {
                     </div>
                     <div style={cardSt}>
                       <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: S.text3, margin: '0 0 14px' }}>In-app</h3>
-                      <SettingToggle label="Notifications popup" sub="Affiche une notification en haut à droite lors d'actions importantes."
+                      <SettingToggle first label="Notifications popup" sub="Affiche une notification en haut à droite lors d'actions importantes."
                         checked={notifyPopup} onChange={v => setNotifyPopup(v)} />
                       <SettingToggle label="Alertes d'erreurs" sub="Affiche les erreurs critiques de manière visible."
                         checked={notifyErrors} onChange={v => setNotifyErrors(v)} />
@@ -798,7 +798,7 @@ export function Settings({ user, initialPanel, initialTab }: SettingsProps) {
                     </div>
                     <div style={cardSt}>
                       <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: S.text3, margin: '0 0 14px' }}>Système</h3>
-                      <SettingToggle
+                      <SettingToggle first
                         label="Notifications bureau"
                         sub="Envoie des notifications natives du système d'exploitation."
                         checked={notifyDesktop}
@@ -829,7 +829,7 @@ export function Settings({ user, initialPanel, initialTab }: SettingsProps) {
                       <p style={{ fontSize: 13, color: S.text3, margin: '4px 0 0' }}>Personnalise la langue et les paramètres régionaux.</p>
                     </div>
                     <div style={cardSt}>
-                      <SelectRow label="Langue de l'interface" sub="La langue utilisée dans toute l'application."
+                      <SelectRow first label="Langue de l'interface" sub="La langue utilisée dans toute l'application."
                         value={lang} onChange={v => setLang(v)}
                         options={[{ value: 'fr', label: 'Français' }, { value: 'en', label: 'English' }]} />
                       <SelectRow label="Format de date" sub="Comment les dates sont affichées dans l'interface."
@@ -880,7 +880,7 @@ export function Settings({ user, initialPanel, initialTab }: SettingsProps) {
 
                     {/* Options */}
                     <div style={cardSt}>
-                      <SettingToggle label="Authentification à deux facteurs (2FA)"
+                      <SettingToggle first label="Authentification à deux facteurs (2FA)"
                         sub="Ajoute une couche de sécurité supplémentaire à ton compte."
                         checked={twoFA} onChange={v => setTwoFA(v)} />
                       <SelectRow label="Déconnexion automatique" sub="Se déconnecte automatiquement après une période d'inactivité."
@@ -928,7 +928,7 @@ export function Settings({ user, initialPanel, initialTab }: SettingsProps) {
                     </div>
 
                     <div style={cardSt}>
-                      <SettingToggle label="Mode développeur" sub="Affiche des informations de débogage supplémentaires dans l'interface."
+                      <SettingToggle first label="Mode développeur" sub="Affiche des informations de débogage supplémentaires dans l'interface."
                         checked={devMode} onChange={v => setDevMode(v)} />
                     </div>
 
@@ -1015,7 +1015,7 @@ export function Settings({ user, initialPanel, initialTab }: SettingsProps) {
 
               {/* Profil */}
               {panel === 'profile' && (
-                <div style={{ maxWidth: 560, display: 'flex', flexDirection: 'column', gap: 20 }}>
+                <div className="sf-anim-slide-up" style={{ maxWidth: 560, display: 'flex', flexDirection: 'column', gap: 20 }}>
                   <div>
                     <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0 }}>Profil</h2>
                     <p style={{ fontSize: 13, color: S.text3, margin: '4px 0 0' }}>Informations de ton compte ScaleFlow.</p>
@@ -1024,32 +1024,60 @@ export function Settings({ user, initialPanel, initialTab }: SettingsProps) {
                   {/* Avatar card */}
                   <div style={{ ...cardSt, display: 'flex', alignItems: 'center', gap: 16 }}>
                     <div style={{
-                      width: 54, height: 54, borderRadius: '50%', flexShrink: 0,
+                      width: 52, height: 52, borderRadius: '50%', flexShrink: 0,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      background: 'linear-gradient(135deg, #7C3AED, #6D28D9)',
-                      fontSize: 22, fontWeight: 800, color: '#fff',
+                      background: 'linear-gradient(135deg, #7C3AED, #EC4899)',
+                      fontSize: 18, fontWeight: 700, color: '#fff',
+                      boxShadow: '0 0 0 3px rgba(139,92,246,0.18)',
                     }}>
                       {(displayName || profileName || user.email || '?').charAt(0).toUpperCase()}
                     </div>
-                    <div>
+                    <div style={{ flex: 1 }}>
                       <p style={{ fontSize: 15, fontWeight: 700, color: S.text, margin: 0 }}>{displayName || profileName || 'Utilisateur'}</p>
-                      <p style={{ fontSize: 12, color: S.text3, margin: '3px 0 0' }}>{user.email}</p>
+                      <p style={{ fontSize: 12, color: S.text3, margin: '3px 0 6px' }}>{user.email}</p>
+                      <span className={`sf-badge ${role === 'owner' ? 'sf-badge-accent' : role === 'admin' ? 'sf-badge-accent' : 'sf-badge-muted'}`}>
+                        {role === 'owner' ? 'Propriétaire' : role === 'admin' ? 'Admin' : role === 'member' ? 'Membre' : 'Solo'}
+                      </span>
                     </div>
                   </div>
 
                   {/* Form */}
                   <div style={{ ...cardSt, display: 'flex', flexDirection: 'column', gap: 16 }}>
-                    <Input label="Email" type="email" value={profileEmail} onChange={e => setProfileEmail(e.target.value)} />
-                    <Input label="Nom complet" placeholder="Jean Dupont" value={profileName} onChange={e => setProfileName(e.target.value)} />
-                    <Input label="Pseudo (visible par l'équipe)" placeholder="@jean" value={displayName} onChange={e => setDisplayName(e.target.value)} />
+                    <h3 style={cardTitleSt}>Informations personnelles</h3>
+                    <div>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: 'rgba(148,163,184,0.65)', marginBottom: 6, display: 'block', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Email</label>
+                      <input type="email" className="sf-input" value={profileEmail} onChange={e => setProfileEmail(e.target.value)} style={{ width: '100%' }} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: 'rgba(148,163,184,0.65)', marginBottom: 6, display: 'block', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Nom complet</label>
+                      <input className="sf-input" placeholder="Jean Dupont" value={profileName} onChange={e => setProfileName(e.target.value)} style={{ width: '100%' }} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: 'rgba(148,163,184,0.65)', marginBottom: 6, display: 'block', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Pseudo</label>
+                      <input className="sf-input" placeholder="@jean" value={displayName} onChange={e => setDisplayName(e.target.value)} style={{ width: '100%' }} />
+                    </div>
                   </div>
+
+                  {/* Danger zone */}
+                  <div style={{ ...cardSt, background: 'rgba(239,68,68,0.03)', border: '1px solid rgba(239,68,68,0.15)' }}>
+                    <h3 style={{ ...cardTitleSt, color: '#EF4444', marginBottom: 12 }}>Zone dangereuse</h3>
+                    <p style={{ fontSize: 12, color: 'rgba(148,163,184,0.5)', marginBottom: 14, marginTop: 0 }}>Ces actions sont irréversibles. Procède avec prudence.</p>
+                    <button
+                      onClick={async () => { await supabase.auth.signOut() }}
+                      className="sf-btn sf-btn-danger sf-btn-sm"
+                      style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                      Se déconnecter
+                    </button>
+                  </div>
+
                   {error && <p style={{ fontSize: 12, color: '#EF4444', margin: 0 }}>{error}</p>}
                 </div>
               )}
 
               {/* Connexions */}
               {panel === 'connexions' && canSeeConnexions && (
-                <div style={{ maxWidth: 560, display: 'flex', flexDirection: 'column', gap: 20 }}>
+                <div className="sf-anim-slide-up" style={{ maxWidth: 560, display: 'flex', flexDirection: 'column', gap: 20 }}>
                   <div>
                     <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0 }}>Connexions</h2>
                     <p style={{ fontSize: 13, color: S.text3, margin: '4px 0 0' }}>Clés API et tokens de connexion aux services externes.</p>
@@ -1068,16 +1096,31 @@ export function Settings({ user, initialPanel, initialTab }: SettingsProps) {
                   </div>
 
                   <div style={{ ...cardSt, display: 'flex', flexDirection: 'column', gap: 16 }}>
-                    <h3 style={{ fontSize: 13, fontWeight: 600, color: S.text, margin: 0 }}>GéeLark</h3>
-                    <Input label="Bearer Token" type="password" placeholder="Bearer …" value={bearer} onChange={e => setBearer(e.target.value)} disabled={!!currentOrg && !canEditOrgConnexions} />
-                    <Input label="URL Proxy (optionnel)" placeholder="http://proxy:8080" value={proxyUrl} onChange={e => setProxyUrl(e.target.value)} disabled={!!currentOrg && !canEditOrgConnexions} />
-                    <Input label="Session ID Instagram" type="password" placeholder="sessionid=…" value={igSession} onChange={e => setIgSession(e.target.value)} disabled={!!currentOrg && !canEditOrgConnexions} />
+                    <h3 style={cardTitleSt}>GéeLark</h3>
+                    <div>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: 'rgba(148,163,184,0.65)', marginBottom: 6, display: 'block', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Bearer Token</label>
+                      <input type="password" className="sf-input" placeholder="Bearer …" value={bearer} onChange={e => setBearer(e.target.value)} disabled={!!currentOrg && !canEditOrgConnexions} style={{ width: '100%' }} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: 'rgba(148,163,184,0.65)', marginBottom: 6, display: 'block', textTransform: 'uppercase', letterSpacing: '0.06em' }}>URL Proxy (optionnel)</label>
+                      <input className="sf-input" placeholder="http://proxy:8080" value={proxyUrl} onChange={e => setProxyUrl(e.target.value)} disabled={!!currentOrg && !canEditOrgConnexions} style={{ width: '100%' }} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: 'rgba(148,163,184,0.65)', marginBottom: 6, display: 'block', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Session ID Instagram</label>
+                      <input type="password" className="sf-input" placeholder="sessionid=…" value={igSession} onChange={e => setIgSession(e.target.value)} disabled={!!currentOrg && !canEditOrgConnexions} style={{ width: '100%' }} />
+                    </div>
                   </div>
 
                   <div style={{ ...cardSt, display: 'flex', flexDirection: 'column', gap: 16 }}>
-                    <h3 style={{ fontSize: 13, fontWeight: 600, color: S.text, margin: 0 }}>Clés API IA</h3>
-                    <Input label="Groq API Key" type="password" placeholder="gsk_…" value={groqKey} onChange={e => setGroqKey(e.target.value)} disabled={!!currentOrg && !canEditOrgConnexions} />
-                    <Input label="Anthropic API Key" type="password" placeholder="sk-ant-…" value={anthropicKey} onChange={e => setAnthropicKey(e.target.value)} disabled={!!currentOrg && !canEditOrgConnexions} />
+                    <h3 style={cardTitleSt}>Clés API IA</h3>
+                    <div>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: 'rgba(148,163,184,0.65)', marginBottom: 6, display: 'block', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Groq API Key</label>
+                      <input type="password" className="sf-input" placeholder="gsk_…" value={groqKey} onChange={e => setGroqKey(e.target.value)} disabled={!!currentOrg && !canEditOrgConnexions} style={{ width: '100%' }} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: 'rgba(148,163,184,0.65)', marginBottom: 6, display: 'block', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Anthropic API Key</label>
+                      <input type="password" className="sf-input" placeholder="sk-ant-…" value={anthropicKey} onChange={e => setAnthropicKey(e.target.value)} disabled={!!currentOrg && !canEditOrgConnexions} style={{ width: '100%' }} />
+                    </div>
                   </div>
                   {error && <p style={{ fontSize: 12, color: '#EF4444', margin: 0 }}>{error}</p>}
                 </div>
