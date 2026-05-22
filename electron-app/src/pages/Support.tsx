@@ -415,8 +415,8 @@ function UserSupport({ user }: { user: User }) {
   if (view === 'create') {
     return (
       <div className="h-full flex flex-col overflow-hidden">
-        <div className="flex-shrink-0 px-10 pt-9 pb-7" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-          <h1 className="text-[28px] font-black text-white leading-none">Support</h1>
+        <div className="flex-shrink-0 px-8 pt-7 pb-5" style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
+          <h1 className="text-[20px] font-black text-white leading-none">Support</h1>
         </div>
         <div className="flex-1 overflow-y-auto px-10 pb-10 mt-8">
           <CreateTicketForm
@@ -434,8 +434,8 @@ function UserSupport({ user }: { user: User }) {
   if (view === 'thread' && active) {
     return (
       <div className="h-full flex flex-col overflow-hidden">
-        <div className="flex-shrink-0 px-10 pt-9 pb-7" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-          <h1 className="text-[28px] font-black text-white leading-none">Support</h1>
+        <div className="flex-shrink-0 px-8 pt-7 pb-5" style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
+          <h1 className="text-[20px] font-black text-white leading-none">Support</h1>
         </div>
         <div className="flex-1 overflow-y-auto px-10 pb-10 mt-8">
           <ThreadView
@@ -453,9 +453,9 @@ function UserSupport({ user }: { user: User }) {
   return (
     <div className="h-full flex flex-col overflow-hidden">
       {/* Page header */}
-      <div className="flex-shrink-0 px-10 pt-9 pb-7 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+      <div className="flex-shrink-0 px-8 pt-7 pb-5 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
         <div>
-          <h1 className="text-[28px] font-black text-white leading-none">Support</h1>
+          <h1 className="text-[20px] font-black text-white leading-none">Support</h1>
           <p className="text-[13px] text-text2 mt-0.5">Besoin d'aide ? Créez un ticket et notre équipe vous répondra.</p>
         </div>
         <button
@@ -561,8 +561,8 @@ function AdminSupport({ user }: { user: User }) {
   if (active) {
     return (
       <div className="h-full flex flex-col overflow-hidden">
-        <div className="flex-shrink-0 px-10 pt-9 pb-7" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-          <h1 className="text-[28px] font-black text-white leading-none">Support Admin</h1>
+        <div className="flex-shrink-0 px-8 pt-7 pb-5" style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
+          <h1 className="text-[20px] font-black text-white leading-none">Support Admin</h1>
         </div>
         <div className="flex-1 overflow-y-auto px-10 pb-10 mt-8">
           <ThreadView
@@ -580,9 +580,9 @@ function AdminSupport({ user }: { user: User }) {
   return (
     <div className="h-full flex flex-col overflow-hidden">
       {/* Page header */}
-      <div className="flex-shrink-0 px-10 pt-9 pb-7 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+      <div className="flex-shrink-0 px-8 pt-7 pb-5 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
         <div>
-          <h1 className="text-[28px] font-black text-white leading-none">Tickets support</h1>
+          <h1 className="text-[20px] font-black text-white leading-none">Tickets support</h1>
           <p className="text-[13px] text-text2 mt-0.5">{tickets.length} ticket(s) au total</p>
         </div>
         <button
@@ -638,7 +638,7 @@ function AdminSupport({ user }: { user: User }) {
             <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
               <table className="w-full">
                 <thead>
-                  <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)' }}>
+                  <tr style={{ borderBottom: '1px solid rgba(139,92,246,0.1)', background: 'rgba(255,255,255,0.02)' }}>
                     <th className="text-left px-5 py-3.5 text-[12px] font-semibold text-text2 uppercase tracking-wide">Sujet</th>
                     <th className="text-left px-5 py-3.5 text-[12px] font-semibold text-text2 uppercase tracking-wide">Email</th>
                     <th className="text-left px-5 py-3.5 text-[12px] font-semibold text-text2 uppercase tracking-wide">Orga</th>

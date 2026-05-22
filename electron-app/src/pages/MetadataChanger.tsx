@@ -209,14 +209,14 @@ export function MetadataChanger({ user, onBack }: MetadataChangerProps) {
 
       <div className="h-full flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="flex-shrink-0 px-10 pt-9 pb-7 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        <div className="flex-shrink-0 px-8 pt-7 pb-5 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
           <div className="flex items-center gap-3">
             <button onClick={onBack} className="rounded-xl px-4 py-2.5 text-[13px] font-semibold"
               style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}>
               ← Retour
             </button>
             <div>
-              <h1 className="text-[28px] font-black text-white leading-none">Changeur de Métadonnées</h1>
+              <h1 className="text-[20px] font-black text-white leading-none">Changeur de Métadonnées</h1>
               <p className="text-[13px] text-text2 mt-0.5">
                 Supprime toutes les métadonnées · Nouveau timestamp aléatoire · Copie sans ré-encodage
               </p>
@@ -264,7 +264,7 @@ export function MetadataChanger({ user, onBack }: MetadataChangerProps) {
           {/* Metadata table */}
           {(phase === 'ready' || phase === 'done') && (
             <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-              <div className="px-4 py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+              <div className="px-4 py-3" style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
                 <div className="grid grid-cols-[140px_1fr_1fr] gap-2 text-[9px] uppercase tracking-wider font-black"
                   style={{ color: 'rgba(196,181,253,0.35)' }}>
                   <span>Champ</span>
