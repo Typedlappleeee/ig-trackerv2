@@ -528,33 +528,34 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                 }
 
                 // ── Step 3: generate per-line overlays inside their zone ──────────
-                // Track the lowest used yFrac per zone per concurrent group to avoid line overlap
+                // Use the AI's rawY as the base so text lands near where it actually was.
+                // Clamp to safe screen margins and avoid overlap with concurrent items.
                 items.forEach((item, idx) => {
                   const zone   = zones[idx]
                   const lines  = wrapText(item.text, item.fontSize, outW)
                   const stepFr = (item.fontSize * 1.3) / outH
 
-                  // Find the lowest yFrac already used by concurrent items in the same zone
                   let baseY: number
                   if (zone === 'top') {
-                    baseY = 0.07
+                    // Use AI position, clamped to top-safe zone (4%-35%)
+                    baseY = Math.max(0.04, Math.min(0.35, item.rawY))
                   } else {
-                    // Start just below any concurrent bottom items
+                    // Use AI position, but push down past any concurrent bottom items
                     const concurrentBottomMax = items
                       .slice(0, idx)
                       .filter((_, j) => zones[j] === 'bottom' && items[j].endTime > item.startTime && items[j].startTime < item.endTime)
                       .reduce((max, it) => {
                         const n = wrapText(it.text, it.fontSize, outW).length
                         const st = (it.fontSize * 1.3) / outH
-                        return Math.max(max, 0.76 + (n - 1) * st)
-                      }, 0.76)
-                    baseY = concurrentBottomMax
+                        return Math.max(max, it.rawY + (n - 1) * st + stepFr)
+                      }, 0.55)
+                    baseY = Math.max(Math.max(0.55, item.rawY), concurrentBottomMax)
                   }
 
                   lines.forEach((line, li) => {
                     const lineYFrac = zone === 'top'
-                      ? Math.min(0.13, baseY + li * stepFr)
-                      : Math.min(0.87, baseY + li * stepFr)
+                      ? Math.max(0.04, Math.min(0.40, baseY + li * stepFr))
+                      : Math.max(0.55, Math.min(0.93, baseY + li * stepFr))
                     textOverlays.push({
                       text: line,
                       x: xAlignToExpr(item.xAlign),

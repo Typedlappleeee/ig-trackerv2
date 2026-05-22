@@ -861,6 +861,19 @@ function hasAudioStream(ffmpegBin: string, filePath: string): Promise<boolean> {
   })
 }
 
+// ── Helper: get video duration in seconds (null if undetectable) ──────────────
+function getVideoDuration(ffmpegBin: string, filePath: string): Promise<number | null> {
+  return new Promise(resolve => {
+    execFile(ffmpegBin, ['-nostdin', '-hide_banner', '-i', filePath],
+      { timeout: 8000, killSignal: 'SIGKILL' },
+      (_err, _stdout, stderr) => {
+        const m = (stderr ?? '').match(/Duration:\s*(\d+):(\d+):([\d.]+)/)
+        resolve(m ? parseInt(m[1]) * 3600 + parseInt(m[2]) * 60 + parseFloat(m[3]) : null)
+      }
+    )
+  })
+}
+
 // ── IPC: FFmpeg remix with AI-detected drawtext overlays ─────────────────────
 ipcMain.handle('run-ffmpeg-remix-ai', async (_event, opts: {
   newPhase1Path:   string
@@ -964,17 +977,38 @@ ipcMain.handle('run-ffmpeg-remix-ai', async (_event, opts: {
   let args: string[]
 
   if (!splitTime) {
-    // No valid split point — re-encode secondary clip, trimmed to original duration
-    args = [
-      '-nostdin',
-      '-i', opts.newPhase1Path,
-      '-vf', `setpts=PTS-STARTPTS,${vfPhase1}`,
-      ...commonOutputFlags,
-      '-an',
-      ...(opts.targetDuration != null ? ['-t', String(opts.targetDuration)] : []),
-      '-y', opts.outputPath,
-    ]
+    // No valid split point — encode secondary video with original audio track
+    const origHasAudio = await hasAudioStream(ffmpegBin, opts.originalPath)
+    if (origHasAudio) {
+      args = [
+        '-nostdin',
+        '-i', opts.newPhase1Path,               // [0] secondary (video)
+        '-i', opts.originalPath,                 // [1] original (audio only)
+        '-filter_complex', `[0:v]setpts=PTS-STARTPTS,${vfPhase1}[vout];[1:a]${afmt}[aout]`,
+        '-map', '[vout]', '-map', '[aout]',
+        ...commonOutputFlags,
+        '-c:a', 'aac', '-b:a', '128k',
+        ...(opts.targetDuration != null ? ['-t', String(opts.targetDuration)] : []),
+        '-y', opts.outputPath,
+      ]
+    } else {
+      args = [
+        '-nostdin',
+        '-i', opts.newPhase1Path,
+        '-vf', `setpts=PTS-STARTPTS,${vfPhase1}`,
+        ...commonOutputFlags,
+        '-an',
+        ...(opts.targetDuration != null ? ['-t', String(opts.targetDuration)] : []),
+        '-y', opts.outputPath,
+      ]
+    }
   } else {
+    // Probe secondary duration — if shorter than splitTime, clamp so concat doesn't stall
+    const secDuration = await getVideoDuration(ffmpegBin, opts.newPhase1Path)
+    const effectiveSplit = (secDuration != null && secDuration < splitTime + 0.2)
+      ? Math.max(0.5, secDuration - 0.2)
+      : splitTime
+
     // Probe original for audio so we don't hang on a missing audio stream
     const origHasAudio = await hasAudioStream(ffmpegBin, opts.originalPath)
 
@@ -983,9 +1017,9 @@ ipcMain.handle('run-ffmpeg-remix-ai', async (_event, opts: {
     let audioEncArgs: string[]
 
     // Input layout:
-    //  [0] secondary  — read up to splitTime via -t (avoids last-frame freeze)
+    //  [0] secondary  — read up to effectiveSplit via -t (avoids last-frame freeze)
     //  [1] original   — full file, used for audio atrim
-    //  [2] original   — fast-seeked to splitTime via -ss (clean timestamps, no trim filter needed)
+    //  [2] original   — fast-seeked to effectiveSplit via -ss (clean timestamps, no trim filter needed)
     // Using -ss before input (fast seek) instead of trim= filter eliminates timestamp
     // discontinuities that caused frozen frames in the concat output.
     if (origHasAudio) {
@@ -993,8 +1027,8 @@ ipcMain.handle('run-ffmpeg-remix-ai', async (_event, opts: {
         `[0:v]setpts=PTS-STARTPTS,${vfPhase1}[v_p1]`,
         `[2:v]setpts=PTS-STARTPTS,${scl}[v_p2]`,
         `[1:a]asplit=2[ao1][ao2]`,
-        `[ao1]atrim=end=${splitTime},asetpts=PTS-STARTPTS,${afmt}[a_p1]`,
-        `[ao2]atrim=start=${splitTime},asetpts=PTS-STARTPTS,${afmt}[a_p2]`,
+        `[ao1]atrim=end=${effectiveSplit},asetpts=PTS-STARTPTS,${afmt}[a_p1]`,
+        `[ao2]atrim=start=${effectiveSplit},asetpts=PTS-STARTPTS,${afmt}[a_p2]`,
         `[v_p1][a_p1][v_p2][a_p2]concat=n=2:v=1:a=1[vout][aout]`,
       ].join(';')
       mapArgs      = ['-map', '[vout]', '-map', '[aout]']
@@ -1011,13 +1045,14 @@ ipcMain.handle('run-ffmpeg-remix-ai', async (_event, opts: {
 
     args = [
       '-nostdin',
-      '-t', String(splitTime), '-i', opts.newPhase1Path,  // [0] secondary up to splitTime
-      '-i', opts.originalPath,                              // [1] full original (audio)
-      '-ss', String(splitTime), '-i', opts.originalPath,   // [2] original fast-seeked (video phase 2)
+      '-t', String(effectiveSplit), '-i', opts.newPhase1Path,  // [0] secondary up to effectiveSplit
+      '-i', opts.originalPath,                                   // [1] full original (audio)
+      '-ss', String(effectiveSplit), '-i', opts.originalPath,   // [2] original fast-seeked (video phase 2)
       '-filter_complex', filterComplex,
       ...mapArgs,
       ...commonOutputFlags,
       ...audioEncArgs,
+      ...(opts.targetDuration != null ? ['-t', String(opts.targetDuration)] : []),
       '-y', opts.outputPath,
     ]
   }

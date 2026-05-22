@@ -595,8 +595,9 @@ async function remixViaMediaRecorder(opts: {
     v.onerror      = () => rej(new Error('Impossible de charger la vidéo'))
     setTimeout(() => rej(new Error('Timeout chargement vidéo')), 30_000)
   })
+  // Always load secondary — it's the main visual source regardless of split
   const [secVid, origVid] = await Promise.all([
-    hasSplit ? loadVid(opts.newPhase1Path) : null,
+    loadVid(opts.newPhase1Path),
     loadVid(opts.originalPath),
   ])
   const totalDuration = opts.targetDuration ?? origVid.duration
@@ -635,19 +636,23 @@ async function remixViaMediaRecorder(opts: {
   recorder.start(250)
 
   // ── draw loop ─────────────────────────────────────────────────────────────────
-  let switched = !hasSplit   // already in phase 2 if no split
+  // Phase 1 (0 → splitTime): draw secondary video
+  // Phase 2 (splitTime → end): draw original video
+  // When no split: secondary plays for full duration
+  let switched = false
   let animId = 0
 
   const drawFrame = () => {
     const t = origVid.currentTime
 
-    // Switch from secondary to original 0.2s after splitTime to avoid stray frames
-    if (!switched && t >= opts.splitTime + 0.2) {
+    // Switch from secondary to original at splitTime (with 0.2s grace)
+    if (!switched && hasSplit && t >= opts.splitTime + 0.2) {
       switched = true
-      secVid?.pause()
+      secVid.pause()
     }
 
-    const source = switched ? origVid : secVid!
+    // Draw secondary during phase 1, original during phase 2
+    const source = switched ? origVid : secVid
     const vw = source.videoWidth  || W
     const vh = source.videoHeight || H
     const scale = Math.min(W / vw, H / vh)
@@ -676,10 +681,10 @@ async function remixViaMediaRecorder(opts: {
   })
 
   await seekTo(origVid, 0)
-  if (hasSplit && secVid) await seekTo(secVid, 0)
+  await seekTo(secVid, 0)
 
   origVid.play()
-  if (hasSplit && secVid) secVid.play()
+  secVid.play()
   animId = requestAnimationFrame(drawFrame)
 
   await new Promise<void>(res => { recorder.onstop = () => res() })
