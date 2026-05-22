@@ -53,13 +53,13 @@ interface MassJob extends PlannedPair {
 }
 
 const STATUS_LABEL: Record<MassJob['status'], string> = {
-  pending:    '⏳ En attente',
-  detecting:  '🔍 Détection…',
-  analyzing:  '✨ IA texte…',
-  generating: '⚙ FFmpeg…',
-  uploading:  '☁ Upload…',
-  done:       '✅ Terminé',
-  error:      '❌ Erreur',
+  pending:    'En attente',
+  detecting:  'Détection…',
+  analyzing:  'IA texte…',
+  generating: 'FFmpeg…',
+  uploading:  'Upload…',
+  done:       'Terminé',
+  error:      'Erreur',
 }
 
 function fileName(p: string) { return p.replace(/\\/g, '/').split('/').pop() ?? p }
@@ -107,60 +107,96 @@ function VideoListPanel({
   label: string; paths: string[]; accent: string; loading?: boolean
   onAddBank: () => void; onAddPC: () => void; onAddFolder: () => void; onRemove: (i: number) => void
 }) {
+  const isPink = accent === '#EC4899' || accent === '#ec4899'
+  const accentDim = isPink ? 'rgba(236,72,153,0.05)' : 'rgba(124,58,237,0.05)'
+  const accentBorder = isPink ? 'rgba(236,72,153,0.12)' : 'rgba(139,92,246,0.12)'
+  const accentDash = isPink ? 'rgba(236,72,153,0.18)' : 'rgba(139,92,246,0.18)'
+
   return (
     <div className="flex flex-col h-full min-h-0">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2.5">
-          <div className="w-1.5 h-5 rounded-full flex-shrink-0" style={{ background: accent }} />
-          <p className="text-[14px] font-bold text-white">{label}</p>
-        </div>
-        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full"
-          style={{ background: `${accent}20`, color: accent }}>
+      {/* Panel header */}
+      <div className="flex items-center gap-3 mb-4 flex-shrink-0">
+        <div style={{ width: 4, height: 22, borderRadius: 3, background: accent, flexShrink: 0 }} />
+        <p style={{ fontSize: 13, fontWeight: 700, color: '#F2F0FF', letterSpacing: '-0.02em', flex: 1 }}>{label}</p>
+        <span style={{
+          fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20,
+          background: `${accent}1A`, color: accent, border: `1px solid ${accent}30`,
+        }}>
           {paths.length} vidéo{paths.length !== 1 ? 's' : ''}
         </span>
       </div>
 
+      {/* Add buttons row */}
       <div className="flex gap-2 mb-3 flex-shrink-0">
-        <button onClick={onAddBank}
-          className="flex-1 rounded-xl py-2 text-[12px] font-semibold transition-all hover:brightness-110"
-          style={{ background: `${accent}15`, color: accent, border: `1px solid ${accent}28` }}>
-          🗂 Banque
+        {/* Banque */}
+        <button onClick={onAddBank} className="sf-btn sf-btn-secondary sf-btn-sm" style={{ flex: 1, justifyContent: 'center' }}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" />
+            <rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" />
+          </svg>
+          Banque
         </button>
-        <button onClick={onAddFolder}
-          className="flex-1 rounded-xl py-2 text-[12px] font-semibold transition-all hover:brightness-110"
-          style={{ background: 'rgba(139,92,246,0.08)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.2)' }}>
-          📁 Dossier
+        {/* Dossier */}
+        <button onClick={onAddFolder} className="sf-btn sf-btn-secondary sf-btn-sm" style={{ flex: 1, justifyContent: 'center' }}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+          </svg>
+          Dossier
         </button>
-        <button onClick={onAddPC}
-          className="flex-1 rounded-xl py-2 text-[12px] font-semibold transition-all"
-          style={{ background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.7)', border: '1px solid rgba(255,255,255,0.07)' }}>
-          💾 PC
+        {/* PC */}
+        <button onClick={onAddPC} className="sf-btn sf-btn-secondary sf-btn-sm" style={{ flex: 1, justifyContent: 'center' }}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="16 16 12 12 8 16" /><line x1="12" y1="12" x2="12" y2="21" />
+            <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3" />
+          </svg>
+          PC
         </button>
       </div>
 
+      {/* Loading indicator */}
       {loading && (
         <div className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 mb-2 flex-shrink-0"
           style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)' }}>
-          <svg className="animate-spin w-4 h-4 flex-shrink-0" style={{ color: '#a78bfa' }} viewBox="0 0 24 24" fill="none">
-            <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="31.4" strokeDashoffset="10" />
-          </svg>
-          <p className="text-[12px] font-semibold" style={{ color: '#a78bfa' }}>Ajout du dossier en cours…</p>
+          <div className="sf-spinner" style={{ width: 14, height: 14, flexShrink: 0 }} />
+          <p style={{ fontSize: 12, fontWeight: 600, color: '#A78BFA' }}>Ajout du dossier en cours…</p>
         </div>
       )}
-      <div className="flex-1 min-h-0 overflow-y-auto space-y-1.5">
+
+      {/* Video list */}
+      <div className="flex-1 min-h-0 overflow-y-auto" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {paths.length === 0 ? (
-          <div className="h-full flex items-center justify-center rounded-xl text-[12px]"
-            style={{ border: `1px dashed ${accent}20`, color: 'rgba(196,181,253,0.3)', minHeight: 72 }}>
-            Aucune vidéo ajoutée
+          <div style={{
+            flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            border: `1px dashed ${accentDash}`, borderRadius: 9, minHeight: 80, gap: 8,
+          }}>
+            {isPink ? (
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={accent} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.35 }}>
+                <rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" />
+                <rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" />
+              </svg>
+            ) : (
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={accent} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.35 }}>
+                <rect x="2" y="2" width="20" height="20" rx="2.18" /><line x1="7" y1="2" x2="7" y2="22" />
+                <line x1="17" y1="2" x2="17" y2="22" /><line x1="2" y1="12" x2="22" y2="12" />
+                <line x1="2" y1="7" x2="7" y2="7" /><line x1="2" y1="17" x2="7" y2="17" />
+                <line x1="17" y1="17" x2="22" y2="17" /><line x1="17" y1="7" x2="22" y2="7" />
+              </svg>
+            )}
+            <span style={{ fontSize: 11, color: 'rgba(148,163,184,0.38)' }}>Aucune vidéo ajoutée</span>
           </div>
         ) : paths.map((p, i) => (
-          <div key={i} className="group flex items-center gap-2.5 rounded-xl px-3 py-2"
-            style={{ background: `${accent}07`, border: `1px solid ${accent}15` }}>
-            <span className="text-[11px] font-black w-4 text-center flex-shrink-0 opacity-50"
-              style={{ color: accent }}>{i + 1}</span>
-            <span className="text-[12px] font-mono truncate flex-1" style={{ color: 'rgba(226,217,243,0.6)' }}>{fileName(p)}</span>
+          <div key={i} className="group flex items-center gap-2.5"
+            style={{ background: accentDim, border: `1px solid ${accentBorder}`, borderRadius: 9, padding: '8px 12px' }}>
+            <span style={{ fontSize: 10, fontWeight: 900, width: 16, textAlign: 'center', flexShrink: 0, color: accent, opacity: 0.7 }}>{i + 1}</span>
+            <span style={{ fontSize: 11, fontFamily: 'monospace', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'rgba(226,217,243,0.62)' }}>{fileName(p)}</span>
             <button onClick={() => onRemove(i)}
-              className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-[11px] text-danger/60 hover:text-danger">✕</button>
+              className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+              style={{ color: 'rgba(239,68,68,0.55)', lineHeight: 1, background: 'none', border: 'none', cursor: 'pointer', padding: 2 }}
+              aria-label="Supprimer">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
           </div>
         ))}
       </div>
@@ -628,36 +664,47 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
     <>
       {/* ── Preview plan modal ── */}
       {previewOpen && !running && (
-        <div className="fixed inset-0 z-50 flex flex-col" style={{ background: 'rgba(3,1,8,0.97)' }}>
+        <div className="fixed inset-0 z-50 flex flex-col" style={{ background: 'rgba(2,2,5,0.96)', backdropFilter: 'blur(20px)' }}>
           {/* Header */}
-          <div className="flex-shrink-0 flex items-center justify-between px-8 py-4"
-            style={{ borderBottom: '1px solid rgba(139,92,246,0.2)', background: 'rgba(12,8,28,0.9)' }}>
+          <div className="flex-shrink-0 flex items-center justify-between"
+            style={{ background: 'rgba(10,10,18,0.95)', borderBottom: '1px solid rgba(255,255,255,0.07)', padding: '16px 28px' }}>
             <div>
-              <p className="text-[18px] font-black text-white">Plan des remixes</p>
-              <p className="text-[12px]" style={{ color: 'rgba(148,163,184,0.6)' }}>{plannedPairs.length} paires · Cliquez pour prévisualiser et régler le point de coupe</p>
+              <p style={{ fontSize: 17, fontWeight: 700, color: '#F2F0FF', letterSpacing: '-0.03em' }}>Plan des remixes</p>
+              <p style={{ fontSize: 12, color: 'rgba(148,163,184,0.52)', marginTop: 2 }}>
+                {plannedPairs.length} paires — cliquez pour prévisualiser et régler le point de coupe
+              </p>
             </div>
-            {/* Global default cut (used for pairs with no per-pair override when mode=manual) */}
             {splitMode === 'manual' && (
-              <div className="flex items-center gap-2 px-3 py-2 rounded-xl" style={{ background: 'rgba(234,179,8,0.08)', border: '1px solid rgba(234,179,8,0.2)' }}>
-                <span className="text-[12px]" style={{ color: '#eab308' }}>✂ Défaut</span>
+              <div className="flex items-center gap-2 px-3 py-2 rounded-xl"
+                style={{ background: 'rgba(234,179,8,0.08)', border: '1px solid rgba(234,179,8,0.2)' }}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#eab308" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="6" cy="6" r="3" /><circle cx="18" cy="18" r="3" />
+                  <line x1="20" y1="4" x2="8.12" y2="15.88" /><line x1="14.47" y1="14.48" x2="20" y2="20" />
+                  <line x1="8.12" y1="8.12" x2="12" y2="12" />
+                </svg>
+                <span style={{ fontSize: 12, color: '#eab308' }}>Défaut</span>
                 <input type="number" min={0.1} step={0.1} value={manualSplitSec}
                   onChange={e => setManualSplitSec(e.target.value)}
-                  className="w-16 rounded-lg px-2 py-1 text-[13px] font-bold text-center focus:outline-none"
-                  style={{ background: 'rgba(234,179,8,0.1)', border: '1px solid rgba(234,179,8,0.25)', color: '#eab308' }} />
-                <span className="text-[11px]" style={{ color: 'rgba(234,179,8,0.6)' }}>sec (paires sans coupe)</span>
+                  className="sf-input"
+                  style={{ width: 60, padding: '3px 8px', fontSize: 13, fontWeight: 700, textAlign: 'center', color: '#eab308', background: 'rgba(234,179,8,0.1)', border: '1px solid rgba(234,179,8,0.25)' }} />
+                <span style={{ fontSize: 11, color: 'rgba(234,179,8,0.6)' }}>sec</span>
               </div>
             )}
             <div className="flex items-center gap-3">
-              <button onClick={() => setPreviewOpen(false)}
-                className="px-4 py-2 rounded-xl text-[13px] font-semibold transition-all"
-                style={{ background: 'rgba(255,255,255,0.05)', color: 'rgba(196,181,253,0.7)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                ✕ Fermer
+              <button onClick={() => setPreviewOpen(false)} className="sf-btn sf-btn-ghost sf-btn-sm">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+                Fermer
               </button>
               <button
                 onClick={() => { setPreviewOpen(false); launch(plannedPairs) }}
-                className="px-6 py-2.5 rounded-xl text-[14px] font-bold transition-all"
-                style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff', boxShadow: '0 4px 20px rgba(124,58,237,0.4)' }}>
-                ⚡ Lancer {plannedPairs.length} remix
+                className="sf-btn sf-btn-primary"
+                style={{ padding: '9px 20px', fontSize: 14, fontWeight: 700 }}>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+                </svg>
+                Lancer {plannedPairs.length} remix
               </button>
             </div>
           </div>
@@ -665,24 +712,40 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
           {/* Body */}
           <div className="flex-1 min-h-0 flex overflow-hidden">
             {/* Left: pair list */}
-            <div className="w-64 flex-shrink-0 overflow-y-auto" style={{ borderRight: '1px solid rgba(139,92,246,0.12)', background: 'rgba(8,5,20,0.7)' }}>
+            <div style={{ width: 260, flexShrink: 0, overflowY: 'auto', borderRight: '1px solid rgba(139,92,246,0.12)', background: 'rgba(7,7,12,0.8)' }}>
               {plannedPairs.map(pair => (
                 <button key={pair.id}
                   onClick={() => { setSelectedPairId(pair.id); setVidCurrentTime(0); setVidDuration(0) }}
-                  className="w-full text-left px-4 py-3 flex items-start gap-3 transition-all"
                   style={{
+                    width: '100%', textAlign: 'left', padding: '12px 16px',
+                    display: 'flex', alignItems: 'flex-start', gap: 10,
                     borderBottom: '1px solid rgba(139,92,246,0.07)',
-                    borderLeft: selectedPairId === pair.id ? '3px solid #7c3aed' : '3px solid transparent',
-                    background: selectedPairId === pair.id ? 'rgba(139,92,246,0.12)' : 'transparent',
+                    borderLeft: selectedPairId === pair.id ? '3px solid #7C3AED' : '3px solid transparent',
+                    background: selectedPairId === pair.id ? 'rgba(139,92,246,0.1)' : 'transparent',
+                    cursor: 'pointer', transition: 'background 0.15s',
                   }}>
-                  <span className="text-[11px] font-black pt-0.5 flex-shrink-0" style={{ color: 'rgba(139,92,246,0.55)' }}>#{pair.id + 1}</span>
-                  <div className="flex-1 min-w-0 space-y-0.5">
-                    <p className="text-[11px] font-mono truncate" style={{ color: 'rgba(226,217,243,0.75)' }}>{fileName(pair.originalPath)}</p>
-                    <p className="text-[10px] font-mono truncate" style={{ color: 'rgba(236,72,153,0.6)' }}>{fileName(pair.secondaryPath)}</p>
-                    {pair.cutSec != null
-                      ? <p className="text-[10px] font-semibold" style={{ color: '#eab308' }}>✂ {pair.cutSec.toFixed(1)}s</p>
-                      : <p className="text-[10px]" style={{ color: 'rgba(148,163,184,0.3)' }}>{splitMode === 'manual' ? `✂ ${manualSplitSec}s (global)` : '🤖 auto'}</p>
-                    }
+                  <span style={{
+                    fontSize: 10, fontWeight: 900, flexShrink: 0, paddingTop: 2,
+                    background: 'rgba(139,92,246,0.15)', color: '#A78BFA',
+                    border: '1px solid rgba(139,92,246,0.25)', borderRadius: 5,
+                    padding: '1px 5px',
+                  }}>{pair.id + 1}</span>
+                  <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <p style={{ fontSize: 11, fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'rgba(196,181,253,0.75)' }}>{fileName(pair.originalPath)}</p>
+                    <p style={{ fontSize: 10, fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'rgba(236,72,153,0.6)' }}>{fileName(pair.secondaryPath)}</p>
+                    {pair.cutSec != null ? (
+                      <p style={{ fontSize: 10, fontWeight: 600, color: '#F59E0B', display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="6" cy="6" r="3" /><circle cx="18" cy="18" r="3" />
+                          <line x1="20" y1="4" x2="8.12" y2="15.88" />
+                        </svg>
+                        {pair.cutSec.toFixed(1)}s
+                      </p>
+                    ) : (
+                      <p style={{ fontSize: 10, color: 'rgba(148,163,184,0.3)' }}>
+                        {splitMode === 'manual' ? `${manualSplitSec}s (global)` : 'auto'}
+                      </p>
+                    )}
                   </div>
                 </button>
               ))}
@@ -699,6 +762,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                       maxHeight: 'calc(100vh - 300px)',
                       aspectRatio: preset === '9:16' ? '9/16' : preset === '1:1' ? '1/1' : '16/9',
                       maxWidth: preset === '9:16' ? 280 : '100%',
+                      border: '1px solid rgba(255,255,255,0.07)',
                     }}>
                     <video
                       ref={vidRef}
@@ -715,25 +779,29 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                     {/* Cut line overlay on video */}
                     {selectedPair.cutSec != null && vidDuration > 0 && (
                       <div className="absolute top-0 bottom-0 pointer-events-none"
-                        style={{ left: `${(selectedPair.cutSec / vidDuration) * 100}%`, width: 2, background: 'rgba(234,179,8,0.9)', boxShadow: '0 0 8px rgba(234,179,8,0.6)' }} />
+                        style={{ left: `${(selectedPair.cutSec / vidDuration) * 100}%`, width: 2, background: 'rgba(245,158,11,0.9)', boxShadow: '0 0 8px rgba(245,158,11,0.6)' }} />
                     )}
-                    {/* Play hint */}
+                    {/* Play hint overlay */}
                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-0 hover:opacity-100 transition-opacity">
-                      <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.5)' }}>
-                        <span className="text-white text-xl ml-1">▶</span>
+                      <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="white" style={{ marginLeft: 3 }}>
+                          <polygon points="5,3 19,12 5,21" />
+                        </svg>
                       </div>
                     </div>
                   </div>
 
                   {/* Timeline controls */}
-                  <div className="w-full max-w-lg space-y-3 flex-shrink-0">
+                  <div style={{ width: '100%', maxWidth: 520, display: 'flex', flexDirection: 'column', gap: 12, flexShrink: 0 }}>
                     <div className="flex items-center gap-3">
+                      {/* Play/pause */}
                       <button onClick={() => { const v = vidRef.current; if (v) v.paused ? v.play() : v.pause() }}
-                        className="w-9 h-9 rounded-xl flex items-center justify-center text-[15px] flex-shrink-0"
-                        style={{ background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.3)', color: '#a78bfa' }}>
-                        ▶
+                        style={{ width: 36, height: 36, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.3)', color: '#A78BFA', cursor: 'pointer' }}>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+                          <polygon points="5,3 19,12 5,21" />
+                        </svg>
                       </button>
-                      <span className="text-[12px] font-mono" style={{ color: 'rgba(148,163,184,0.6)' }}>
+                      <span style={{ fontSize: 12, fontFamily: 'monospace', color: 'rgba(148,163,184,0.6)' }}>
                         {formatSec(vidCurrentTime)} / {formatSec(vidDuration)}
                       </span>
                       {vidDuration > 0 && (
@@ -743,32 +811,43 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                             setCutForPair(selectedPair.id, sec)
                             vidRef.current?.pause()
                           }}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-bold transition-all hover:brightness-110"
-                          style={{ background: 'rgba(234,179,8,0.15)', border: '1px solid rgba(234,179,8,0.3)', color: '#eab308' }}>
-                          ✂ Couper ici
+                          className="flex items-center gap-1.5"
+                          style={{ padding: '5px 12px', borderRadius: 10, fontSize: 12, fontWeight: 700, background: 'rgba(245,158,11,0.13)', border: '1px solid rgba(245,158,11,0.28)', color: '#F59E0B', cursor: 'pointer', transition: 'filter 0.15s' }}>
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="6" cy="6" r="3" /><circle cx="18" cy="18" r="3" />
+                            <line x1="20" y1="4" x2="8.12" y2="15.88" /><line x1="14.47" y1="14.48" x2="20" y2="20" />
+                            <line x1="8.12" y1="8.12" x2="12" y2="12" />
+                          </svg>
+                          Couper ici
                         </button>
                       )}
                       {selectedPair.cutSec != null && (
                         <>
-                          <span className="text-[12px] font-bold ml-auto" style={{ color: '#eab308' }}>✂ {selectedPair.cutSec.toFixed(1)}s</span>
+                          <span style={{ fontSize: 12, fontWeight: 700, color: '#F59E0B', marginLeft: 'auto' }}>{selectedPair.cutSec.toFixed(1)}s</span>
                           <button onClick={() => setCutForPair(selectedPair.id, undefined)}
-                            className="text-[11px] px-2 py-1 rounded-lg"
-                            style={{ background: 'rgba(239,68,68,0.1)', color: '#f87171', border: '1px solid rgba(239,68,68,0.2)' }}>
-                            ✕ Effacer
+                            style={{ fontSize: 11, padding: '3px 8px', borderRadius: 7, background: 'rgba(239,68,68,0.1)', color: '#f87171', border: '1px solid rgba(239,68,68,0.2)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                            </svg>
+                            Effacer
                           </button>
                         </>
                       )}
                     </div>
 
-                    <p className="text-[11px]" style={{ color: 'rgba(148,163,184,0.45)' }}>
-                      Cliquez (ou glissez) sur la barre pour définir le point de coupe ✂
+                    <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.42)' }}>
+                      Cliquez ou glissez sur la barre pour définir le point de coupe
                     </p>
 
                     {/* Timeline bar */}
                     <div
                       ref={timelineRef}
-                      className="relative h-10 rounded-xl select-none"
-                      style={{ background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.2)', cursor: vidDuration > 0 ? 'crosshair' : 'default' }}
+                      className="relative select-none"
+                      style={{
+                        height: 44, borderRadius: 12,
+                        background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.18)',
+                        cursor: vidDuration > 0 ? 'crosshair' : 'default',
+                      }}
                       onMouseDown={e => {
                         if (!timelineRef.current || vidDuration <= 0) return
                         draggingRef2.current = true
@@ -791,16 +870,19 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                       {/* Playback fill */}
                       {vidDuration > 0 && (
                         <div className="absolute top-0 bottom-0 left-0 rounded-xl pointer-events-none"
-                          style={{ width: `${(vidCurrentTime / vidDuration) * 100}%`, background: 'rgba(139,92,246,0.3)' }} />
+                          style={{ width: `${(vidCurrentTime / vidDuration) * 100}%`, background: 'rgba(139,92,246,0.25)' }} />
                       )}
                       {/* Cut marker */}
                       {selectedPair.cutSec != null && vidDuration > 0 && (
                         <div className="absolute top-0 bottom-0 flex items-center pointer-events-none"
                           style={{ left: `${(selectedPair.cutSec / vidDuration) * 100}%`, transform: 'translateX(-1px)' }}>
-                          <div style={{ width: 3, height: '100%', background: '#eab308', borderRadius: 2, boxShadow: '0 0 8px rgba(234,179,8,0.6)' }} />
-                          <div className="absolute -top-7 whitespace-nowrap text-[10px] font-bold px-1.5 py-0.5 rounded-md"
-                            style={{ color: '#000', background: '#eab308', transform: 'translateX(-50%)' }}>
-                            ✂ {selectedPair.cutSec.toFixed(1)}s
+                          <div style={{ width: 3, height: '100%', background: '#F59E0B', borderRadius: 2, boxShadow: '0 0 8px rgba(245,158,11,0.6)' }} />
+                          <div style={{
+                            position: 'absolute', top: -28, whiteSpace: 'nowrap', fontSize: 9, fontWeight: 700,
+                            padding: '2px 6px', borderRadius: 5, color: '#000', background: '#F59E0B', transform: 'translateX(-50%)',
+                            fontFamily: 'monospace',
+                          }}>
+                            {selectedPair.cutSec.toFixed(1)}s
                           </div>
                         </div>
                       )}
@@ -808,7 +890,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                       {vidDuration > 0 && (
                         <div className="absolute inset-x-2 inset-y-0 flex items-center justify-between pointer-events-none">
                           {[0, 0.25, 0.5, 0.75, 1].map(f => (
-                            <span key={f} className="text-[9px]" style={{ color: 'rgba(148,163,184,0.35)' }}>
+                            <span key={f} style={{ fontSize: 9, fontFamily: 'monospace', color: 'rgba(148,163,184,0.35)' }}>
                               {formatSec(f * vidDuration)}
                             </span>
                           ))}
@@ -817,16 +899,21 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                     </div>
 
                     {!vidDuration && (
-                      <p className="text-[11px] text-center" style={{ color: 'rgba(148,163,184,0.3)' }}>
+                      <p style={{ fontSize: 11, textAlign: 'center', color: 'rgba(148,163,184,0.3)' }}>
                         Chargement de la vidéo…
                       </p>
                     )}
                   </div>
                 </>
               ) : (
-                <div className="text-center space-y-3 opacity-40">
-                  <div className="text-6xl">🎬</div>
-                  <p className="text-[14px]" style={{ color: 'rgba(196,181,253,0.6)' }}>Sélectionnez un remix pour le prévisualiser</p>
+                <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, opacity: 0.38 }}>
+                  <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="rgba(196,181,253,0.6)" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="2" y="2" width="20" height="20" rx="2.18" /><line x1="7" y1="2" x2="7" y2="22" />
+                    <line x1="17" y1="2" x2="17" y2="22" /><line x1="2" y1="12" x2="22" y2="12" />
+                    <line x1="2" y1="7" x2="7" y2="7" /><line x1="2" y1="17" x2="7" y2="17" />
+                    <line x1="17" y1="17" x2="22" y2="17" /><line x1="17" y1="7" x2="22" y2="7" />
+                  </svg>
+                  <p style={{ fontSize: 14, color: 'rgba(196,181,253,0.6)' }}>Sélectionnez un remix pour le prévisualiser</p>
                 </div>
               )}
             </div>
@@ -836,54 +923,70 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
 
       {/* ── Progress modal ── */}
       {running && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-6" style={{ background: 'rgba(3,1,8,0.92)', backdropFilter: 'blur(8px)' }}>
-          <div className="w-full max-w-md rounded-2xl overflow-hidden" style={{ background: 'rgba(12,8,28,0.98)', border: '1px solid rgba(139,92,246,0.3)', boxShadow: '0 0 60px rgba(124,58,237,0.25)' }}>
-            <div className="px-6 py-5" style={{ borderBottom: '1px solid rgba(139,92,246,0.15)', background: 'linear-gradient(135deg,rgba(124,58,237,0.12),rgba(236,72,153,0.06))' }}>
+        <div className="sf-modal-bg fixed inset-0 z-50 flex items-center justify-center p-6">
+          <div style={{
+            width: '100%', maxWidth: 440, borderRadius: 20, overflow: 'hidden',
+            background: '#0C0C15', border: '1px solid rgba(139,92,246,0.25)',
+            boxShadow: '0 0 60px rgba(124,58,237,0.2)',
+          }}>
+            {/* Modal header */}
+            <div style={{ padding: '18px 24px', borderBottom: '1px solid rgba(139,92,246,0.13)', background: 'linear-gradient(135deg,rgba(124,58,237,0.1),rgba(236,72,153,0.05))' }}>
               <div className="flex items-center gap-3">
-                <div className="relative w-10 h-10 flex-shrink-0">
-                  <div className="absolute inset-0 rounded-full animate-ping opacity-30" style={{ background: 'linear-gradient(135deg,#7c3aed,#ec4899)' }} />
-                  <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.3)' }}>
+                <div style={{ position: 'relative', width: 40, height: 40, flexShrink: 0 }}>
+                  <span className="sf-ping-dot" style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: 'linear-gradient(135deg,#7C3AED,#EC4899)', opacity: 0.3 }} />
+                  <div style={{ width: 40, height: 40, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.3)' }}>
                     <Spinner size="sm" />
                   </div>
                 </div>
                 <div>
-                  <p className="text-[15px] font-black text-white">Génération en parallèle…</p>
-                  <p className="text-[13px] text-text2">
+                  <p style={{ fontSize: 15, fontWeight: 800, color: '#F2F0FF', letterSpacing: '-0.02em' }}>Génération en cours…</p>
+                  <p style={{ fontSize: 12, color: 'rgba(196,181,253,0.52)', marginTop: 2 }}>
                     {runningCount} en cours · {doneCount} terminée(s) · {errorCount} erreur(s)
                   </p>
                 </div>
               </div>
             </div>
 
-            <div className="px-6 py-5 space-y-4">
-              <div className="flex items-center justify-between text-[13px] mb-1">
-                <span className="text-text2">{doneCount + errorCount} / {jobs.length}</span>
-                <span className="font-bold" style={{ color: '#a78bfa' }}>{progress}%</span>
-                <span className="text-text2">{runningCount} actives</span>
+            {/* Modal body */}
+            <div style={{ padding: '18px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {/* Progress stats */}
+              <div className="flex items-center justify-between" style={{ fontSize: 12 }}>
+                <span style={{ color: 'rgba(196,181,253,0.52)' }}>{doneCount + errorCount} / {jobs.length}</span>
+                <span style={{ fontWeight: 700, color: '#A78BFA' }}>{progress}%</span>
+                <span style={{ color: 'rgba(196,181,253,0.52)' }}>{runningCount} actives</span>
               </div>
-              <div className="h-2.5 rounded-full overflow-hidden" style={{ background: 'rgba(139,92,246,0.12)' }}>
-                <div className="h-full rounded-full transition-all duration-500"
-                  style={{ width: `${progress}%`, background: 'linear-gradient(90deg,#7c3aed,#ec4899)' }} />
-              </div>
-
-              <div className="space-y-1.5 max-h-52 overflow-auto">
-                {jobs.map(job => (
-                  <div key={job.id} className="flex items-center gap-3 px-3 py-2 rounded-xl"
-                    style={{ background: job.status === 'done' ? 'rgba(52,211,153,0.06)' : job.status === 'error' ? 'rgba(239,68,68,0.06)' : job.status === 'pending' ? 'transparent' : 'rgba(139,92,246,0.06)' }}>
-                    <span className="w-5 text-[12px] font-bold flex-shrink-0 text-center text-text2">#{job.id + 1}</span>
-                    <span className="flex-1 text-[12px] font-mono truncate text-text2">{fileName(job.originalPath)}</span>
-                    <span className="text-[11px] font-semibold flex-shrink-0"
-                      style={{ color: job.status === 'done' ? '#34d399' : job.status === 'error' ? '#f87171' : job.status === 'pending' ? 'rgba(196,181,253,0.3)' : '#a78bfa' }}>
-                      {STATUS_LABEL[job.status]}
-                    </span>
-                  </div>
-                ))}
+              {/* Progress bar */}
+              <div style={{ height: 6, borderRadius: 999, overflow: 'hidden', background: 'rgba(139,92,246,0.12)' }}>
+                <div style={{ height: '100%', borderRadius: 999, transition: 'width 0.5s', width: `${progress}%`, background: 'linear-gradient(90deg,#7C3AED,#EC4899)' }} />
               </div>
 
+              {/* Job list */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 208, overflowY: 'auto' }}>
+                {jobs.map(job => {
+                  const statusColor = job.status === 'done' ? '#22C55E' : job.status === 'error' ? '#EF4444' : job.status === 'pending' ? 'rgba(196,181,253,0.28)' : '#A78BFA'
+                  const rowBg = job.status === 'done' ? 'rgba(34,197,94,0.05)' : job.status === 'error' ? 'rgba(239,68,68,0.05)' : job.status === 'pending' ? 'transparent' : 'rgba(139,92,246,0.05)'
+                  const leftBorder = job.status === 'done' ? '#22C55E' : job.status === 'error' ? '#EF4444' : job.status === 'pending' ? 'rgba(255,255,255,0.07)' : '#7C3AED'
+                  return (
+                    <div key={job.id} className="flex items-center gap-3"
+                      style={{ background: rowBg, borderRadius: 9, padding: '7px 10px', borderLeft: `3px solid ${leftBorder}` }}>
+                      <span style={{ width: 20, fontSize: 10, fontWeight: 700, textAlign: 'center', flexShrink: 0, color: 'rgba(196,181,253,0.5)', fontFamily: 'monospace' }}>#{job.id + 1}</span>
+                      <span style={{ flex: 1, fontSize: 11, fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'rgba(196,181,253,0.52)' }}>{fileName(job.originalPath)}</span>
+                      <span style={{ fontSize: 10, fontWeight: 600, flexShrink: 0, color: statusColor }}>
+                        {STATUS_LABEL[job.status]}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* Cancel */}
               <button onClick={() => { abortRef.current = true; setRunning(false) }}
-                className="w-full py-2.5 rounded-xl text-[13px] font-semibold"
-                style={{ background: 'rgba(239,68,68,0.08)', color: '#f87171', border: '1px solid rgba(239,68,68,0.2)' }}>
-                ✕ Annuler la génération
+                className="sf-btn sf-btn-danger sf-btn-sm"
+                style={{ width: '100%', justifyContent: 'center', padding: '9px 16px' }}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+                Annuler la génération
               </button>
             </div>
           </div>
@@ -892,36 +995,59 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
 
       {/* ── Done summary modal ── */}
       {!running && jobs.length > 0 && (doneCount + errorCount) === jobs.length && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-6" style={{ background: 'rgba(3,1,8,0.88)', backdropFilter: 'blur(6px)' }}>
-          <div className="w-full max-w-md rounded-2xl overflow-hidden" style={{ background: 'rgba(12,8,28,0.98)', border: `1px solid ${errorCount === 0 ? 'rgba(52,211,153,0.3)' : 'rgba(251,191,36,0.3)'}` }}>
-            <div className="px-6 py-6 space-y-5">
-              <div className="text-center space-y-2">
-                <div className="text-5xl">{errorCount === 0 ? '✅' : '⚠️'}</div>
-                <p className="text-[20px] font-black text-white">
+        <div className="sf-modal-bg fixed inset-0 z-50 flex items-center justify-center p-6">
+          <div className="sf-modal sf-anim-scale-spring" style={{ maxWidth: 440, width: '100%', border: `1px solid ${errorCount === 0 ? 'rgba(34,197,94,0.28)' : 'rgba(245,158,11,0.28)'}` }}>
+            <div className="sf-modal-body" style={{ padding: '28px 24px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+              {/* Status icon */}
+              <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+                {errorCount === 0 ? (
+                  <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#22C55E" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                  </div>
+                ) : (
+                  <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                      <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
+                    </svg>
+                  </div>
+                )}
+                <p style={{ fontSize: 19, fontWeight: 800, color: '#F2F0FF', letterSpacing: '-0.03em' }}>
                   {errorCount === 0 ? 'Tous les remixes générés !' : `${doneCount} / ${jobs.length} terminés`}
                 </p>
-                {errorCount > 0 && <p className="text-[13px]" style={{ color: '#fbbf24' }}>{errorCount} erreur(s)</p>}
+                {errorCount > 0 && <p style={{ fontSize: 13, color: '#F59E0B' }}>{errorCount} erreur(s)</p>}
               </div>
-              <div className="space-y-2 max-h-72 overflow-auto">
+
+              {/* Job details */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 288, overflowY: 'auto' }}>
                 {jobs.map(job => (
-                  <details key={job.id} className="rounded-xl overflow-hidden"
-                    style={{ background: job.status === 'done' ? 'rgba(52,211,153,0.06)' : 'rgba(239,68,68,0.06)', border: `1px solid ${job.status === 'done' ? 'rgba(52,211,153,0.15)' : 'rgba(239,68,68,0.2)'}` }}
+                  <details key={job.id}
+                    style={{ borderRadius: 11, overflow: 'hidden', background: job.status === 'done' ? 'rgba(34,197,94,0.05)' : 'rgba(239,68,68,0.05)', border: `1px solid ${job.status === 'done' ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.18)'}` }}
                     open={job.status === 'error'}>
-                    <summary className="flex items-center gap-3 px-4 py-2.5 cursor-pointer list-none">
-                      <span className="text-base flex-shrink-0">{job.status === 'done' ? '✅' : '❌'}</span>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[13px] font-mono truncate text-white/70">{fileName(job.originalPath)}</p>
-                        {job.error && <p className="text-[11px] font-semibold" style={{ color: '#f87171' }}>{job.error}</p>}
+                    <summary className="flex items-center gap-3 cursor-pointer list-none" style={{ padding: '9px 14px' }}>
+                      {job.status === 'done' ? (
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#22C55E" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      ) : (
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                          <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                        </svg>
+                      )}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ fontSize: 12, fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'rgba(255,255,255,0.68)' }}>{fileName(job.originalPath)}</p>
+                        {job.error && <p style={{ fontSize: 11, fontWeight: 600, color: '#f87171', marginTop: 1 }}>{job.error}</p>}
                       </div>
                       {job.logs.length > 0 && (
-                        <span className="text-[10px] flex-shrink-0" style={{ color: 'rgba(196,181,253,0.4)' }}>▼ logs</span>
+                        <span style={{ fontSize: 9, color: 'rgba(196,181,253,0.38)', flexShrink: 0 }}>logs</span>
                       )}
                     </summary>
                     {job.logs.length > 0 && (
-                      <div className="px-4 pb-3 space-y-0.5 border-t" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+                      <div style={{ padding: '0 14px 10px', borderTop: '1px solid rgba(255,255,255,0.055)', display: 'flex', flexDirection: 'column', gap: 2 }}>
                         {job.logs.map((line, i) => (
-                          <p key={i} className="text-[10px] font-mono break-all leading-snug"
-                            style={{ color: line.startsWith('❌') ? '#f87171' : line.startsWith('✅') ? '#34d399' : line.startsWith('⚠️') ? '#fbbf24' : 'rgba(196,181,253,0.55)' }}>
+                          <p key={i} style={{ fontSize: 10, fontFamily: 'monospace', wordBreak: 'break-all', lineHeight: 1.4, color: line.startsWith('❌') ? '#f87171' : line.startsWith('✅') ? '#34d399' : line.startsWith('⚠️') ? '#fbbf24' : 'rgba(196,181,253,0.52)' }}>
                             {line}
                           </p>
                         ))}
@@ -930,7 +1056,10 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                   </details>
                 ))}
               </div>
-              <Button onClick={() => { setJobs([]); setRunning(false) }} className="w-full">Fermer</Button>
+
+              <button onClick={() => { setJobs([]); setRunning(false) }} className="sf-btn sf-btn-secondary" style={{ width: '100%', justifyContent: 'center' }}>
+                Fermer
+              </button>
             </div>
           </div>
         </div>
@@ -949,30 +1078,52 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
 
       {/* Folder quick-pick modal */}
       {folderTarget !== null && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
+        <div className="fixed inset-0 z-50 flex items-center justify-center"
+          style={{ background: 'rgba(2,2,5,0.82)', backdropFilter: 'blur(12px)' }}
           onClick={() => setFolderTarget(null)}>
-          <div className="rounded-2xl overflow-hidden w-80" onClick={e => e.stopPropagation()}
-            style={{ background: '#0d0a1e', border: '1px solid rgba(139,92,246,0.25)' }}>
-            <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(139,92,246,0.12)' }}>
-              <p className="text-[14px] font-bold text-white">
-                📁 {folderTarget === 'orig' ? 'Dossier — Originales' : 'Dossier — Phase 1'}
-              </p>
-              <button onClick={() => setFolderTarget(null)} className="text-text2 hover:text-white text-lg leading-none">✕</button>
+          <div style={{ borderRadius: 15, overflow: 'hidden', width: 320, background: '#0C0C15', border: '1px solid rgba(139,92,246,0.22)' }}
+            onClick={e => e.stopPropagation()}>
+            {/* Folder modal header */}
+            <div className="flex items-center justify-between" style={{ padding: '14px 18px', borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
+              <div className="flex items-center gap-2.5">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#A78BFA" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                </svg>
+                <p style={{ fontSize: 13, fontWeight: 700, color: '#F2F0FF' }}>
+                  {folderTarget === 'orig' ? 'Dossier — Originales' : 'Dossier — Phase 1'}
+                </p>
+              </div>
+              <button onClick={() => setFolderTarget(null)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(196,181,253,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 4 }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
             </div>
             {folderLoading ? (
-              <div className="py-10 text-center text-text2 text-[13px]">Chargement…</div>
+              <div style={{ padding: '36px 0', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+                <div className="sf-spinner" style={{ width: 22, height: 22 }} />
+                <span style={{ fontSize: 13, color: 'rgba(196,181,253,0.45)' }}>Chargement…</span>
+              </div>
             ) : folderList.length === 0 ? (
-              <div className="py-10 text-center text-text2 text-[13px]">Aucun dossier dans la banque</div>
+              <div style={{ padding: '36px 0', textAlign: 'center', fontSize: 13, color: 'rgba(196,181,253,0.38)' }}>Aucun dossier dans la banque</div>
             ) : (
-              <div className="max-h-80 overflow-y-auto py-2">
+              <div style={{ maxHeight: 320, overflowY: 'auto', padding: '6px 0' }}>
                 {folderList.map(f => (
                   <button key={f.name} onClick={() => addFolderVideos(f.name)}
-                    className="w-full flex items-center gap-3 px-5 py-3 text-left transition-all hover:bg-white/[0.03]"
-                    style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                    <span className="text-[18px]">📂</span>
-                    <span className="flex-1 text-[13px] font-semibold text-white truncate">{f.name}</span>
-                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full"
-                      style={{ background: 'rgba(139,92,246,0.12)', color: '#a78bfa' }}>
+                    style={{
+                      width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 18px',
+                      textAlign: 'left', borderBottom: '1px solid rgba(255,255,255,0.04)',
+                      background: 'transparent', border: 'none', borderBottomWidth: 1, borderBottomStyle: 'solid', borderBottomColor: 'rgba(255,255,255,0.04)',
+                      cursor: 'pointer', transition: 'background 0.12s',
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.03)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(196,181,253,0.45)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                    </svg>
+                    <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: '#F2F0FF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
+                    <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 12, background: 'rgba(139,92,246,0.12)', color: '#A78BFA', border: '1px solid rgba(139,92,246,0.2)' }}>
                       {f.count} vid.
                     </span>
                   </button>
@@ -983,42 +1134,83 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
         </div>
       )}
 
+      {/* ── Main page ── */}
       <div className="h-full flex flex-col overflow-hidden">
 
         {/* Header */}
-        <div className="flex-shrink-0 px-8 pt-7 pb-4 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
-          <div>
-            <h1 className="text-[20px] font-black text-white leading-none">Mass Remix</h1>
-            <p className="text-[13px] text-text2 mt-1">Génère des remixes vidéo en masse avec FFmpeg + IA</p>
+        <div className="flex-shrink-0 flex items-center justify-between"
+          style={{ padding: '18px 28px 14px', borderBottom: '1px solid rgba(255,255,255,0.055)' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div className="flex items-center gap-3">
+              {/* Page icon */}
+              <div style={{ width: 32, height: 32, borderRadius: 9, background: 'rgba(124,58,237,0.14)', border: '1px solid rgba(139,92,246,0.22)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#A78BFA" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polygon points="23 7 16 12 23 17 23 7" /><rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
+                </svg>
+              </div>
+              <h1 style={{ fontSize: 20, fontWeight: 700, color: '#F2F0FF', letterSpacing: '-0.04em', lineHeight: 1 }}>Remix Vidéo</h1>
+            </div>
+            {/* Workflow pills */}
+            <div className="flex items-center gap-1.5">
+              {[
+                { label: 'Vidéo originale' },
+                { arrow: true },
+                { label: 'IA texte' },
+                { arrow: true },
+                { label: 'Phase 1' },
+              ].map((item, i) =>
+                'arrow' in item ? (
+                  <svg key={i} width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="rgba(148,163,184,0.3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
+                  </svg>
+                ) : (
+                  <span key={i} style={{
+                    fontSize: 11, padding: '3px 9px', borderRadius: 6,
+                    background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)',
+                    color: 'rgba(196,181,253,0.6)',
+                  }}>{item.label}</span>
+                )
+              )}
+            </div>
           </div>
+
+          {/* Header actions */}
           <div className="flex items-center gap-2">
             <button
               onClick={openPreview} disabled={!canLaunch}
-              className="flex items-center gap-2 px-4 py-3 rounded-xl text-[14px] font-bold transition-all disabled:opacity-40"
-              style={{ background: canLaunch ? 'rgba(139,92,246,0.15)' : 'rgba(255,255,255,0.04)', color: canLaunch ? '#a78bfa' : 'rgba(255,255,255,0.2)', border: '1px solid rgba(139,92,246,0.25)' }}>
-              <span>👁</span>
-              <span>Plan</span>
+              className="sf-btn sf-btn-ghost sf-btn-sm"
+              style={{ opacity: canLaunch ? 1 : 0.4, pointerEvents: canLaunch ? 'auto' : 'none' }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" />
+              </svg>
+              Aperçu Plan
             </button>
             <button
               onClick={() => launch()} disabled={!canLaunch}
-              className="flex items-center gap-2.5 px-6 py-3 rounded-xl text-[14px] font-bold transition-all disabled:opacity-40"
-              style={{ background: canLaunch ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.06)', color: '#fff', boxShadow: canLaunch ? '0 4px 20px rgba(124,58,237,0.4)' : 'none' }}>
-              <span>⚡</span>
-              <span>Lancer {copies} remix</span>
+              className="sf-btn sf-btn-primary"
+              style={{
+                opacity: canLaunch ? 1 : 0.4, pointerEvents: canLaunch ? 'auto' : 'none',
+                boxShadow: canLaunch ? '0 4px 20px rgba(124,58,237,0.38)' : 'none',
+              }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+              </svg>
+              Lancer {copies} remix{copies !== 1 ? 's' : ''}
             </button>
           </div>
         </div>
 
         {/* Body — 2 columns */}
-        <div className="flex-1 min-h-0 flex gap-6 px-10 py-8">
+        <div className="flex-1 min-h-0 flex gap-5" style={{ padding: '20px 24px' }}>
 
           {/* LEFT — video pickers */}
-          <div className="flex-1 min-w-0 flex flex-col gap-5">
-            <div className="flex-1 min-h-0 rounded-2xl p-6" style={{ background: 'rgba(139,92,246,0.04)', border: '1px solid rgba(139,92,246,0.15)' }}>
+          <div className="flex-1 min-w-0 flex flex-col gap-4">
+            {/* Originals panel */}
+            <div className="flex-1 min-h-0" style={{ background: '#0C0C15', border: '1px solid rgba(255,255,255,0.055)', borderRadius: 15, padding: '18px 20px' }}>
               <VideoListPanel
                 label="Vidéos originales"
                 paths={originals}
-                accent="#8b5cf6"
+                accent="#8B5CF6"
                 loading={addingTarget === 'orig'}
                 onAddBank={() => setShowBankOrig(true)}
                 onAddFolder={() => openFolderPick('orig')}
@@ -1026,11 +1218,12 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                 onRemove={i => setOriginals(prev => prev.filter((_, j) => j !== i))}
               />
             </div>
-            <div className="flex-1 min-h-0 rounded-2xl p-6" style={{ background: 'rgba(236,72,153,0.04)', border: '1px solid rgba(236,72,153,0.15)' }}>
+            {/* Phase 1 panel */}
+            <div className="flex-1 min-h-0" style={{ background: '#0C0C15', border: '1px solid rgba(255,255,255,0.055)', borderRadius: 15, padding: '18px 20px' }}>
               <VideoListPanel
                 label="Nouvelles Phase 1"
                 paths={secondaries}
-                accent="#ec4899"
+                accent="#EC4899"
                 loading={addingTarget === 'sec'}
                 onAddBank={() => setShowBankSec(true)}
                 onAddFolder={() => openFolderPick('sec')}
@@ -1041,132 +1234,188 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
           </div>
 
           {/* RIGHT — settings panel */}
-          <div className="w-72 flex-shrink-0 flex flex-col gap-3">
+          <div style={{ width: 280, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
 
-            {/* Copies */}
-            <div className="rounded-2xl p-4" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-              <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: 'rgba(148,163,184,0.5)' }}>Nombre de copies</p>
-              <div className="flex items-center gap-3 mb-2">
+            {/* Card 1 — Copies counter */}
+            <div style={{ background: '#0C0C15', border: '1px solid rgba(255,255,255,0.055)', borderRadius: 15, padding: '18px 20px' }}>
+              <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(148,163,184,0.45)', marginBottom: 12 }}>Copies</p>
+              <div className="flex items-center gap-3" style={{ marginBottom: 10 }}>
                 <button onClick={() => setCopies(c => Math.max(1, c - 1))}
-                  className="w-8 h-8 rounded-xl text-[16px] font-black flex items-center justify-center transition-all hover:bg-white/[0.07]"
-                  style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(196,181,253,0.7)' }}>−</button>
+                  style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(196,181,253,0.7)', fontSize: 16, fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'background 0.12s' }}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.1)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.06)')}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                </button>
                 <input type="number" min={1} max={200} value={copies}
                   onChange={e => setCopies(Math.max(1, Math.min(200, Number(e.target.value))))}
-                  className="flex-1 py-1 text-[26px] font-black text-white text-center focus:outline-none"
-                  style={{ background: 'transparent', border: 'none' }} />
+                  style={{ flex: 1, padding: '2px 0', fontSize: 26, fontWeight: 900, color: '#F2F0FF', textAlign: 'center', background: 'transparent', border: 'none', outline: 'none' }} />
                 <button onClick={() => setCopies(c => Math.min(200, c + 1))}
-                  className="w-8 h-8 rounded-xl text-[16px] font-black flex items-center justify-center transition-all hover:bg-white/[0.07]"
-                  style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(196,181,253,0.7)' }}>+</button>
+                  style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(196,181,253,0.7)', fontSize: 16, fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'background 0.12s' }}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.1)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.06)')}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                </button>
               </div>
               <input type="range" min={1} max={50} value={Math.min(copies, 50)}
-                onChange={e => setCopies(Number(e.target.value))} className="w-full" />
+                onChange={e => setCopies(Number(e.target.value))} style={{ width: '100%' }} />
               {originals.length > 0 && secondaries.length > 0 && (
-                <p className="text-[11px] mt-1.5" style={{ color: 'rgba(148,163,184,0.45)' }}>
-                  🔀 {originals.length} orig × {secondaries.length} sec → <span style={{ color: '#a78bfa' }}>{copies} vidéos</span>
+                <p style={{ fontSize: 11, marginTop: 8, color: 'rgba(148,163,184,0.45)' }}>
+                  {originals.length} orig × {secondaries.length} sec{' '}
+                  <span style={{ color: '#A78BFA', fontWeight: 600 }}>→ {copies} vidéo{copies !== 1 ? 's' : ''}</span>
                 </p>
               )}
             </div>
 
-            {/* AI Detection — prominent, before format */}
+            {/* Card 2 — IA Detection toggle */}
             <button
               onClick={() => setAiEnabled(v => !v)}
-              className="rounded-2xl p-4 text-left transition-all w-full"
               style={{
-                background: aiEnabled ? 'rgba(124,58,237,0.12)' : 'rgba(255,255,255,0.03)',
-                border: `1px solid ${aiEnabled ? 'rgba(139,92,246,0.45)' : 'rgba(255,255,255,0.07)'}`,
-                boxShadow: aiEnabled ? '0 0 20px rgba(124,58,237,0.12)' : 'none',
+                background: aiEnabled ? 'rgba(124,58,237,0.08)' : 'rgba(255,255,255,0.025)',
+                border: `1px solid ${aiEnabled ? 'rgba(139,92,246,0.3)' : 'rgba(255,255,255,0.07)'}`,
+                boxShadow: aiEnabled ? '0 0 20px rgba(124,58,237,0.1)' : 'none',
+                borderRadius: 15, padding: '14px 18px', textAlign: 'left', width: '100%', cursor: 'pointer',
+                transition: 'background 0.2s, border-color 0.2s, box-shadow 0.2s',
               }}>
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="text-[16px]">✨</span>
+                <div className="flex items-center gap-2.5">
+                  {/* Sparkles SVG */}
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={aiEnabled ? '#A78BFA' : 'rgba(196,181,253,0.4)'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 2L9.5 9.5 2 12l7.5 2.5L12 22l2.5-7.5L22 12l-7.5-2.5z" />
+                    <path d="M5 5l1 2 1-2-1-2z" /><path d="M19 19l1 2 1-2-1-2z" />
+                  </svg>
                   <div>
-                    <p className="text-[13px] font-bold leading-tight" style={{ color: aiEnabled ? '#c4b5fd' : 'rgba(196,181,253,0.6)' }}>
+                    <p style={{ fontSize: 13, fontWeight: 700, letterSpacing: '-0.01em', color: aiEnabled ? '#C4B5FD' : 'rgba(196,181,253,0.55)', lineHeight: 1.2 }}>
                       Détection texte IA
                     </p>
-                    <p className="text-[11px] leading-tight" style={{ color: 'rgba(148,163,184,0.45)' }}>Claude Vision</p>
+                    <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.45)', marginTop: 1 }}>Claude Vision</p>
                   </div>
                 </div>
-                <div className="w-10 h-[22px] rounded-full relative flex-shrink-0 transition-all"
-                  style={{ background: aiEnabled ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.1)' }}>
-                  <span className={`absolute top-[3px] w-4 h-4 rounded-full bg-white shadow transition-transform ${aiEnabled ? 'translate-x-5' : 'translate-x-[3px]'}`} />
+                {/* Toggle */}
+                <div className={`sf-toggle-track ${aiEnabled ? 'on' : 'off'}`} style={{ flexShrink: 0 }}>
+                  <span className="sf-toggle-thumb" />
                 </div>
               </div>
               {aiEnabled && (
-                <p className="mt-2 text-[11px] leading-relaxed" style={{ color: 'rgba(148,163,184,0.5)' }}>
+                <p className="sf-anim-slide-up" style={{ marginTop: 10, fontSize: 11, lineHeight: 1.55, color: 'rgba(148,163,184,0.5)' }}>
                   Analyse et recopie le texte des vidéos automatiquement.
                 </p>
               )}
               {aiEnabled && !anthropicKey && (
-                <p className="mt-1.5 text-[11px] font-semibold" style={{ color: '#fbbf24' }}>⚠ Clé Anthropic manquante</p>
+                <div className="flex items-center gap-1.5" style={{ marginTop: 8 }}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                    <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
+                  </svg>
+                  <p style={{ fontSize: 11, fontWeight: 600, color: '#F59E0B' }}>Clé Anthropic manquante</p>
+                </div>
               )}
             </button>
 
-            {/* Split mode */}
-            <div className="rounded-2xl p-4 space-y-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-              <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'rgba(148,163,184,0.5)' }}>Point de coupe Phase 2</p>
+            {/* Card 3 — Point de coupe */}
+            <div style={{ background: '#0C0C15', border: '1px solid rgba(255,255,255,0.055)', borderRadius: 15, padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(148,163,184,0.45)' }}>Coupe Phase 2</p>
               <div className="flex gap-2">
+                {/* Auto */}
                 <button onClick={() => setSplitMode('auto')}
-                  className="flex-1 py-2 rounded-xl text-[13px] font-bold transition-all"
-                  style={splitMode === 'auto'
-                    ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff', boxShadow: '0 2px 10px rgba(124,58,237,0.3)' }
-                    : { background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.5)', border: '1px solid rgba(255,255,255,0.07)' }
-                  }>🤖 Auto</button>
+                  className="flex items-center justify-center gap-1.5 flex-1"
+                  style={{
+                    padding: '8px 10px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s',
+                    ...(splitMode === 'auto'
+                      ? { background: 'linear-gradient(135deg,#7C3AED,#6D28D9)', color: '#fff', border: '1px solid transparent' }
+                      : { background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.45)', border: '1px solid rgba(255,255,255,0.07)' })
+                  }}>
+                  {/* Brain/chip icon */}
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                    <circle cx="12" cy="12" r="4" /><line x1="12" y1="2" x2="12" y2="8" /><line x1="12" y1="16" x2="12" y2="22" />
+                    <line x1="2" y1="12" x2="8" y2="12" /><line x1="16" y1="12" x2="22" y2="12" />
+                  </svg>
+                  Auto
+                </button>
+                {/* Manuel */}
                 <button
                   onClick={() => { setSplitMode('manual'); if (canLaunch) openPreview() }}
-                  className="flex-1 py-2 rounded-xl text-[13px] font-bold transition-all"
-                  style={splitMode === 'manual'
-                    ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff', boxShadow: '0 2px 10px rgba(124,58,237,0.3)' }
-                    : { background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.5)', border: '1px solid rgba(255,255,255,0.07)' }
-                  }>✂️ Manuel</button>
+                  className="flex items-center justify-center gap-1.5 flex-1"
+                  style={{
+                    padding: '8px 10px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s',
+                    ...(splitMode === 'manual'
+                      ? { background: 'linear-gradient(135deg,#7C3AED,#6D28D9)', color: '#fff', border: '1px solid transparent' }
+                      : { background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.45)', border: '1px solid rgba(255,255,255,0.07)' })
+                  }}>
+                  {/* Scissors icon */}
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="6" cy="6" r="3" /><circle cx="18" cy="18" r="3" />
+                    <line x1="20" y1="4" x2="8.12" y2="15.88" /><line x1="14.47" y1="14.48" x2="20" y2="20" />
+                    <line x1="8.12" y1="8.12" x2="12" y2="12" />
+                  </svg>
+                  Manuel
+                </button>
               </div>
-              {splitMode === 'manual'
-                ? <p className="text-[11px] leading-relaxed" style={{ color: 'rgba(148,163,184,0.45)' }}>
-                    Définissez le point de coupe par vidéo dans l'aperçu.
-                  </p>
-                : <p className="text-[11px] leading-relaxed" style={{ color: 'rgba(148,163,184,0.45)' }}>
-                    Détecte automatiquement la scène de changement.
-                  </p>
-              }
+              <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.45)', lineHeight: 1.5 }}>
+                {splitMode === 'manual'
+                  ? 'Définissez le point de coupe par vidéo dans l\'aperçu.'
+                  : 'Détecte automatiquement la scène de changement.'}
+              </p>
             </div>
 
-            {/* Format */}
-            <div className="rounded-2xl p-4" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-              <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: 'rgba(148,163,184,0.5)' }}>Format de sortie</p>
+            {/* Card 4 — Format de sortie */}
+            <div style={{ background: '#0C0C15', border: '1px solid rgba(255,255,255,0.055)', borderRadius: 15, padding: '14px 18px' }}>
+              <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(148,163,184,0.45)', marginBottom: 10 }}>Format</p>
               <div className="flex gap-2">
                 {(['9:16', '1:1', '16:9'] as Preset[]).map(p => (
                   <button key={p} onClick={() => setPreset(p)}
-                    className="flex-1 py-2 rounded-xl text-[13px] font-bold transition-all"
-                    style={preset === p
-                      ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff', boxShadow: '0 2px 10px rgba(124,58,237,0.3)' }
-                      : { background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.5)', border: '1px solid rgba(255,255,255,0.07)' }
-                    }>{p}</button>
+                    style={{
+                      flex: 1, padding: '7px 4px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s', textAlign: 'center',
+                      ...(preset === p
+                        ? { background: 'rgba(139,92,246,0.15)', color: '#A78BFA', border: '1px solid rgba(139,92,246,0.3)' }
+                        : { background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.38)', border: '1px solid rgba(255,255,255,0.07)' })
+                    }}>{p}</button>
                 ))}
               </div>
             </div>
 
-            {/* Export */}
-            <div className="rounded-2xl p-4 space-y-2.5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-              <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'rgba(148,163,184,0.5)' }}>Destination</p>
+            {/* Card 5 — Destination */}
+            <div style={{ background: '#0C0C15', border: '1px solid rgba(255,255,255,0.055)', borderRadius: 15, padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(148,163,184,0.45)' }}>Destination</p>
               <div className="flex gap-2">
-                {(['bank', 'folder'] as ExportMode[]).map(m => (
-                  <button key={m} onClick={() => setExportMode(m)}
-                    className="flex-1 py-2 rounded-xl text-[12px] font-bold transition-all"
-                    style={exportMode === m
-                      ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff' }
-                      : { background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.5)', border: '1px solid rgba(255,255,255,0.07)' }
-                    }>
-                    {m === 'bank' ? '☁ Banque' : '💾 Dossier'}
-                  </button>
-                ))}
+                {/* Banque */}
+                <button onClick={() => setExportMode('bank')}
+                  className="flex items-center justify-center gap-1.5 flex-1"
+                  style={{
+                    padding: '8px 6px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s',
+                    ...(exportMode === 'bank'
+                      ? { background: 'rgba(124,58,237,0.12)', color: '#A78BFA', border: '1px solid rgba(139,92,246,0.3)' }
+                      : { background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.42)', border: '1px solid rgba(255,255,255,0.07)' })
+                  }}>
+                  {/* Cloud icon */}
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z" />
+                  </svg>
+                  Banque
+                </button>
+                {/* Dossier local */}
+                <button onClick={() => setExportMode('folder')}
+                  className="flex items-center justify-center gap-1.5 flex-1"
+                  style={{
+                    padding: '8px 6px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s',
+                    ...(exportMode === 'folder'
+                      ? { background: 'rgba(124,58,237,0.12)', color: '#A78BFA', border: '1px solid rgba(139,92,246,0.3)' }
+                      : { background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.42)', border: '1px solid rgba(255,255,255,0.07)' })
+                  }}>
+                  {/* Folder icon */}
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                  </svg>
+                  Dossier local
+                </button>
               </div>
+
               {exportMode === 'bank' && (
-                <div className="space-y-2">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
                   {bankFolders.length > 0 && (
                     <select
                       value={bankFolders.includes(bankFolder) ? bankFolder : ''}
                       onChange={e => setBankFolder(e.target.value)}
-                      className="w-full rounded-xl px-3 py-2 text-[12px] focus:outline-none"
-                      style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2d9f3' }}>
+                      style={{ width: '100%', borderRadius: 8, padding: '7px 10px', fontSize: 12, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2d9f3', outline: 'none' }}>
                       <option value="" style={{ background: '#0c0919', color: '#e2d9f3' }}>— Racine (sans dossier)</option>
                       {bankFolders.map(f => <option key={f} value={f} style={{ background: '#0c0919', color: '#e2d9f3' }}>{f}</option>)}
                     </select>
@@ -1174,18 +1423,21 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                   <input type="text"
                     placeholder={bankFolders.length > 0 ? 'Ou nouveau dossier…' : 'Dossier (optionnel)'}
                     value={bankFolder} onChange={e => setBankFolder(e.target.value)}
-                    className="w-full rounded-xl px-3 py-2 text-[12px] focus:outline-none placeholder:opacity-30"
-                    style={{ background: 'rgba(255,255,255,0.05)', border: `1px solid ${bankFolder.trim() ? 'rgba(139,92,246,0.5)' : 'rgba(255,255,255,0.09)'}`, color: '#e2d9f3' }} />
+                    className="sf-input"
+                    style={{ borderColor: bankFolder.trim() ? 'rgba(139,92,246,0.5)' : undefined }} />
                 </div>
               )}
               {exportMode === 'folder' && (
-                <div className="space-y-2">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
                   <button onClick={async () => { const f = await window.electronAPI?.pickOutputFolder?.(); if (f) setOutputFolder(f) }}
-                    className="w-full rounded-xl px-3 py-2 text-[12px] font-semibold"
-                    style={{ background: 'rgba(139,92,246,0.1)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.2)' }}>
-                    📁 Choisir un dossier…
+                    className="flex items-center justify-center gap-2"
+                    style={{ width: '100%', borderRadius: 8, padding: '7px 12px', fontSize: 12, fontWeight: 600, background: 'rgba(139,92,246,0.08)', color: '#A78BFA', border: '1px solid rgba(139,92,246,0.18)', cursor: 'pointer' }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                    </svg>
+                    Choisir un dossier…
                   </button>
-                  {outputFolder && <p className="text-[11px] font-mono truncate" style={{ color: 'rgba(148,163,184,0.45)' }}>{outputFolder}</p>}
+                  {outputFolder && <p style={{ fontSize: 10, fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'rgba(148,163,184,0.42)' }}>{outputFolder}</p>}
                 </div>
               )}
             </div>
