@@ -59,38 +59,11 @@ html, body, #root {
   inherits: false;
 }
 
-/* ── Splash screen — single continuous timeline ──────────────────────────────── */
-
-/* Ambient glow blooms from center */
-@keyframes sp-glow-in {
-  0%   { opacity:0; transform:translate(-50%,-52%) scale(0.3); }
-  100% { opacity:1; transform:translate(-50%,-52%) scale(1); }
+/* ── Splash screen ───────────────────────────────────────────────────────────── */
+@keyframes sp-enter {
+  from { opacity:0; transform:translateY(16px) scale(0.94); }
+  to   { opacity:1; transform:translateY(0)    scale(1);    }
 }
-/* Subtle breathing during hold */
-@keyframes sp-glow-breathe {
-  0%,100% { opacity:0.7; }
-  50%     { opacity:1; }
-}
-/* Logo rises from below with spring */
-@keyframes sp-logo-in {
-  0%   { opacity:0; transform:translateY(32px) scale(0.78); }
-  55%  { opacity:1; transform:translateY(-5px) scale(1.04); }
-  100% { opacity:1; transform:translateY(0) scale(1); }
-}
-/* Text slides up */
-@keyframes sp-text-in {
-  from { opacity:0; transform:translateY(18px); }
-  to   { opacity:1; transform:translateY(0); }
-}
-/* Word fades + rises */
-@keyframes sp-word-in {
-  from { opacity:0; transform:translateY(10px); }
-  to   { opacity:1; transform:translateY(0); }
-}
-/* Progress bar */
-@keyframes sp-progress {
-  from { width:0%; }
-  to   { width:100%; }
 
 /* ── Page & element entrance animations ─────────────────────────────────────── */
 @keyframes page-fade-in {

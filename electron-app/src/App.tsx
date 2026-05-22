@@ -216,8 +216,8 @@ function FlameOverlay() {
   )
 }
 
-// ── Splash screen — single continuous CSS timeline ───────────────────────────
-const SPLASH_DURATION = 5800
+// ── Splash screen ────────────────────────────────────────────────────────────
+const SPLASH_DURATION = 3800
 
 function SplashScreen({ onDone }: { onDone: () => void }) {
   const [gone, setGone] = useState(false)
@@ -225,7 +225,7 @@ function SplashScreen({ onDone }: { onDone: () => void }) {
 
   useEffect(() => {
     playSplash()
-    const t1 = setTimeout(() => setGone(true), SPLASH_DURATION - 700)
+    const t1 = setTimeout(() => setGone(true), SPLASH_DURATION - 600)
     const t2 = setTimeout(() => { if (!doneRef.current) { doneRef.current = true; onDone() } }, SPLASH_DURATION)
     return () => { clearTimeout(t1); clearTimeout(t2) }
   }, [onDone])
@@ -234,66 +234,49 @@ function SplashScreen({ onDone }: { onDone: () => void }) {
     <div style={{
       position: 'fixed', inset: 0, zIndex: 9999,
       background: '#030307',
-      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
       opacity: gone ? 0 : 1,
-      transition: 'opacity 0.7s ease-out',
+      transition: 'opacity 0.6s ease-out',
       pointerEvents: gone ? 'none' : 'all',
     }}>
 
-      {/* Ambient glow */}
+      {/* Glow */}
       <div style={{
         position: 'absolute', top: '50%', left: '50%',
-        width: 520, height: 330, borderRadius: '50%',
-        background: 'radial-gradient(ellipse, rgba(124,58,237,0.42) 0%, rgba(88,28,220,0.18) 40%, transparent 70%)',
-        filter: 'blur(55px)',
-        animation: 'sp-glow-in 2.2s ease-out 0.1s both',
-        opacity: 0,
+        transform: 'translate(-50%, -50%)',
+        width: 480, height: 300, borderRadius: '50%',
+        background: 'radial-gradient(ellipse, rgba(124,58,237,0.38) 0%, transparent 70%)',
+        filter: 'blur(60px)',
+        animation: 'sp-enter 1.2s ease-out both',
       }} />
 
-      {/* Logo box */}
-      <div style={{ marginBottom: 30, animation: 'sp-logo-in 1.05s cubic-bezier(0.22,1,0.36,1) 0.35s both', opacity: 0 }}>
-        <div style={{ position: 'relative', width: 108, height: 108 }}>
+      {/* Logo + text as one block */}
+      <div style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 26,
+        animation: 'sp-enter 0.85s cubic-bezier(0.22,1,0.36,1) both',
+      }}>
+        {/* Logo */}
+        <div style={{ position: 'relative', width: 100, height: 100 }}>
           <div style={{
-            position: 'absolute', inset: 0, borderRadius: 26,
+            position: 'absolute', inset: 0, borderRadius: 24,
             background: 'linear-gradient(145deg, #0d0820, #100626, #160b30)',
-            boxShadow: '0 0 55px 14px rgba(124,58,237,0.32), 0 24px 48px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.07)',
+            boxShadow: '0 0 50px 12px rgba(124,58,237,0.32), 0 20px 40px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.07)',
           }} />
           <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <ScaleFlowLogoSVG size={76} />
+            <ScaleFlowLogoSVG size={70} />
           </div>
         </div>
-      </div>
 
-      {/* Name */}
-      <div style={{ animation: 'sp-text-in 0.75s cubic-bezier(0.22,1,0.36,1) 1.1s both', opacity: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'baseline' }}>
-          <span style={{ fontSize: 44, fontWeight: 900, color: '#f0eeff', letterSpacing: '-1.5px', fontFamily: 'Inter,system-ui,sans-serif', lineHeight: 1 }}>Scale</span>
-          <span style={{ fontSize: 44, fontWeight: 900, letterSpacing: '-1.5px', fontFamily: 'Inter,system-ui,sans-serif', lineHeight: 1, background: 'linear-gradient(130deg,#8b5cf6 30%,#ec4899 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Flow</span>
+        {/* Name + tagline */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 9 }}>
+          <div style={{ display: 'flex', alignItems: 'baseline' }}>
+            <span style={{ fontSize: 42, fontWeight: 900, color: '#f0eeff', letterSpacing: '-1.5px', fontFamily: 'Inter,system-ui,sans-serif', lineHeight: 1 }}>Scale</span>
+            <span style={{ fontSize: 42, fontWeight: 900, letterSpacing: '-1.5px', fontFamily: 'Inter,system-ui,sans-serif', lineHeight: 1, background: 'linear-gradient(130deg,#8b5cf6 30%,#ec4899 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Flow</span>
+          </div>
+          <span style={{ fontSize: 12, fontWeight: 400, color: 'rgba(196,181,253,0.45)', letterSpacing: '0.12em' }}>
+            Automatise. Planifie. Développe.
+          </span>
         </div>
-      </div>
-
-      {/* Tagline */}
-      <div style={{ marginTop: 11, display: 'flex', gap: 10 }}>
-        {[
-          { w: 'Automatise.', c: 'rgba(167,139,250,0.85)', d: 1.75 },
-          { w: 'Planifie.',   c: 'rgba(129,140,248,0.7)',  d: 1.90 },
-          { w: 'Développe.',  c: 'rgba(196,181,253,0.5)',  d: 2.05 },
-        ].map(({ w, c, d }) => (
-          <span key={w} style={{
-            fontSize: 13, fontWeight: 500, color: c,
-            animation: `sp-word-in 0.5s ease-out ${d}s both`,
-            opacity: 0, display: 'inline-block',
-          }}>{w}</span>
-        ))}
-      </div>
-
-      {/* Progress bar */}
-      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 1, background: 'rgba(255,255,255,0.05)' }}>
-        <div style={{
-          height: '100%',
-          background: 'linear-gradient(90deg, #3b82f6, #8b5cf6, #ec4899)',
-          animation: `sp-progress ${SPLASH_DURATION / 1000}s linear 0.1s both`,
-        }} />
       </div>
     </div>
   )
