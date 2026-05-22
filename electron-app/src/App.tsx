@@ -225,56 +225,59 @@ function SplashScreen({ onDone }: { onDone: () => void }) {
 
   useEffect(() => {
     playSplash()
-    const t1 = setTimeout(() => setGone(true), SPLASH_DURATION - 600)
+    const t1 = setTimeout(() => setGone(true), SPLASH_DURATION - 700)
     const t2 = setTimeout(() => { if (!doneRef.current) { doneRef.current = true; onDone() } }, SPLASH_DURATION)
     return () => { clearTimeout(t1); clearTimeout(t2) }
   }, [onDone])
 
   return (
     <div style={{
-      position: 'fixed', inset: 0, zIndex: 9999,
+      position: 'fixed', inset: 0, zIndex: 9999, overflow: 'hidden',
       background: '#030307',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       opacity: gone ? 0 : 1,
-      transition: 'opacity 0.6s ease-out',
+      transition: 'opacity 0.7s ease-out',
       pointerEvents: gone ? 'none' : 'all',
     }}>
 
-      {/* Glow */}
+      {/* Centered background glow — fills the screen with a subtle violet bloom */}
       <div style={{
-        position: 'absolute', top: '50%', left: '50%',
-        transform: 'translate(-50%, -50%)',
-        width: 480, height: 300, borderRadius: '50%',
-        background: 'radial-gradient(ellipse, rgba(124,58,237,0.38) 0%, transparent 70%)',
-        filter: 'blur(60px)',
-        animation: 'sp-enter 1.2s ease-out both',
+        position: 'absolute', inset: 0,
+        background: 'radial-gradient(ellipse 60% 55% at 50% 48%, rgba(109,40,217,0.28) 0%, rgba(76,29,149,0.10) 50%, transparent 100%)',
+        animation: 'sp-enter 1.6s ease-out both',
       }} />
 
-      {/* Logo + text as one block */}
+      {/* Single block — logo + name + tagline move as one */}
       <div style={{
-        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 26,
-        animation: 'sp-enter 0.85s cubic-bezier(0.22,1,0.36,1) both',
+        position: 'relative',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 28,
+        animation: 'sp-enter 0.9s cubic-bezier(0.22,1,0.36,1) both',
       }}>
+
         {/* Logo */}
-        <div style={{ position: 'relative', width: 100, height: 100 }}>
-          <div style={{
-            position: 'absolute', inset: 0, borderRadius: 24,
-            background: 'linear-gradient(145deg, #0d0820, #100626, #160b30)',
-            boxShadow: '0 0 50px 12px rgba(124,58,237,0.32), 0 20px 40px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.07)',
-          }} />
-          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <ScaleFlowLogoSVG size={70} />
-          </div>
+        <div style={{
+          width: 120, height: 120, borderRadius: 30, flexShrink: 0,
+          background: 'linear-gradient(145deg, #0f0b22, #130828, #1a0d36)',
+          boxShadow: '0 0 0 1px rgba(139,92,246,0.25), 0 0 60px 16px rgba(109,40,217,0.35), 0 24px 48px rgba(0,0,0,0.7)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <ScaleFlowLogoSVG size={82} />
         </div>
 
-        {/* Name + tagline */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 9 }}>
+        {/* Text */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+          {/* Name */}
           <div style={{ display: 'flex', alignItems: 'baseline' }}>
-            <span style={{ fontSize: 42, fontWeight: 900, color: '#f0eeff', letterSpacing: '-1.5px', fontFamily: 'Inter,system-ui,sans-serif', lineHeight: 1 }}>Scale</span>
-            <span style={{ fontSize: 42, fontWeight: 900, letterSpacing: '-1.5px', fontFamily: 'Inter,system-ui,sans-serif', lineHeight: 1, background: 'linear-gradient(130deg,#8b5cf6 30%,#ec4899 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Flow</span>
+            <span style={{ fontSize: 50, fontWeight: 900, color: '#f4f0ff', letterSpacing: '-2px', fontFamily: 'Inter,system-ui,sans-serif', lineHeight: 1 }}>Scale</span>
+            <span style={{ fontSize: 50, fontWeight: 900, letterSpacing: '-2px', fontFamily: 'Inter,system-ui,sans-serif', lineHeight: 1, background: 'linear-gradient(130deg,#a78bfa,#ec4899)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Flow</span>
           </div>
-          <span style={{ fontSize: 12, fontWeight: 400, color: 'rgba(196,181,253,0.45)', letterSpacing: '0.12em' }}>
-            Automatise. Planifie. Développe.
+
+          {/* Divider */}
+          <div style={{ width: 64, height: 1, background: 'linear-gradient(90deg, transparent, rgba(167,139,250,0.5), transparent)' }} />
+
+          {/* Tagline */}
+          <span style={{ fontSize: 12, fontWeight: 500, color: 'rgba(196,181,253,0.45)', letterSpacing: '0.18em', textTransform: 'uppercase' }}>
+            Automatise · Planifie · Développe
           </span>
         </div>
       </div>
