@@ -456,13 +456,71 @@ export function MassRemix({ user }: MassRemixProps) {
 
         updateJob(job.id, { splitTime: splitTime ?? 0 })
 
-        // ── 2. Copy text from original onto secondary ────────────────────────
+        // ── 2. Detect text from original via Claude Vision → re-render as overlay ──
         const textOverlays: { text: string; x: string; y: string; fontSize: number; fontColor: string; bold: boolean; shadow: boolean; startTime: number; endTime: number }[] = []
-        // Screen blend: bright pixels (text) from original pass through onto secondary.
-        // Always active when toggle is ON — no API key, no OCR needed.
-        const copyTextFromOriginal = aiEnabled
-        if (aiEnabled) {
-          addLog(job.id, '✨ Copie texte original → phase 1 (screen blend)…')
+        const copyTextFromOriginal = false  // screen blend disabled — causes double-video ghost
+
+        if (aiEnabled && anthropicKey.trim() && window.electronAPI) {
+          addLog(job.id, '🤖 Détection texte (Claude Vision)…')
+          try {
+            const totalDur = detDuration ?? 30
+            const framesRes = await withTimeout(
+              window.electronAPI.extractFrames!({ filePath: job.originalPath, startTime: 0.5, endTime: Math.min(4, totalDur) }),
+              20_000, 'extraction frames'
+            )
+            if (framesRes.ok && framesRes.frames && framesRes.frames.length > 0) {
+              const frame = framesRes.frames[0]
+              const visionRes = await withTimeout(
+                window.electronAPI.anthropicVisionRequest!({
+                  apiKey: anthropicKey.trim(),
+                  model: 'claude-haiku-4-5-20251001',
+                  messages: [{ role: 'user', content: [
+                    { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: frame.data } },
+                    { type: 'text', text: 'Look at this video frame and identify any TEXT OVERLAY (caption/subtitle added on top of the video — NOT text physically in the scene). Return a JSON array:\n[{"text":"exact text","x_frac":0.5,"y_frac":0.85,"size":"small|medium|large|xlarge","bold":false}]\nWhere x_frac=horizontal center (0=left,0.5=center,1=right), y_frac=vertical center (0=top,1=bottom). If no overlay text, return []. Return ONLY the JSON array.' },
+                  ]}],
+                  maxTokens: 300,
+                }),
+                20_000, 'Claude Vision'
+              )
+              if (visionRes.ok && visionRes.data) {
+                try {
+                  const raw = (visionRes.data as any)?.content?.[0]?.text ?? ''
+                  const match = raw.match(/\[[\s\S]*\]/)
+                  if (match) {
+                    const parsed: Array<{ text: string; x_frac?: number; y_frac?: number; size?: string; bold?: boolean }> = JSON.parse(match[0])
+                    const textEndTime = splitTime ?? (detDuration ?? 9999)
+                    const fsMap: Record<string, number> = { small: 38, medium: 54, large: 70, xlarge: 86 }
+                    for (const item of parsed) {
+                      if (!item.text?.trim()) continue
+                      const xFrac = item.x_frac ?? 0.5
+                      const yFrac = item.y_frac ?? 0.82
+                      textOverlays.push({
+                        text: item.text.trim(),
+                        x: `w*${xFrac.toFixed(3)}-text_w/2`,
+                        y: `h*${yFrac.toFixed(3)}-text_h/2`,
+                        fontSize: fsMap[item.size ?? 'medium'] ?? 54,
+                        fontColor: 'white',
+                        bold: item.bold ?? false,
+                        shadow: true,
+                        startTime: 0, endTime: textEndTime,
+                      })
+                    }
+                    if (textOverlays.length > 0) {
+                      addLog(job.id, `✅ ${textOverlays.length} texte(s): ${textOverlays.map(t => `"${t.text.slice(0, 25)}"`).join(', ')}`)
+                    } else {
+                      addLog(job.id, '⚠️ Aucun texte overlay détecté')
+                    }
+                  }
+                } catch {
+                  addLog(job.id, '⚠️ Erreur parsing réponse Claude')
+                }
+              }
+            }
+          } catch (e) {
+            addLog(job.id, `⚠️ Détection texte ignorée: ${String(e).slice(0, 60)}`)
+          }
+        } else if (aiEnabled && !anthropicKey.trim()) {
+          addLog(job.id, '⚠️ Clé Anthropic manquante — texte non copié (ajoutez-la dans Paramètres)')
         }
 
         // ── 3. Generate ──────────────────────────────────────────────────────
@@ -1206,9 +1264,9 @@ export function MassRemix({ user }: MassRemixProps) {
                   </svg>
                   <div>
                     <p style={{ fontSize: 13, fontWeight: 700, letterSpacing: '-0.01em', color: aiEnabled ? '#C4B5FD' : 'rgba(196,181,253,0.55)', lineHeight: 1.2 }}>
-                      Utiliser le texte original
+                      Copier le texte original
                     </p>
-                    <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.45)', marginTop: 1 }}>Copie le texte sur la phase 1</p>
+                    <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.45)', marginTop: 1 }}>Claude Vision · clé Anthropic requise</p>
                   </div>
                 </div>
                 {/* Toggle */}
@@ -1218,7 +1276,7 @@ export function MassRemix({ user }: MassRemixProps) {
               </div>
               {aiEnabled && (
                 <p className="sf-anim-slide-up" style={{ marginTop: 10, fontSize: 11, lineHeight: 1.55, color: 'rgba(148,163,184,0.5)' }}>
-                  Le texte de la vidéo originale apparaît sur la vidéo secondaire.
+                  Claude Haiku analyse la vidéo originale et recopie le texte détecté sur la phase 1.
                 </p>
               )}
             </button>
