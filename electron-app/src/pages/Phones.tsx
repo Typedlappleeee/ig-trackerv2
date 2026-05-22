@@ -32,12 +32,10 @@ function StatusDot({ status }: { status: string }) {
       fontSize: 11, fontWeight: 600,
       color: online ? '#22C55E' : 'rgba(148,163,184,0.52)',
     }}>
-      <span style={{
-        width: 6, height: 6, borderRadius: '50%',
-        background: online ? '#22C55E' : 'rgba(148,163,184,0.35)',
-        flexShrink: 0,
-        boxShadow: online ? '0 0 6px rgba(34,197,94,0.6)' : 'none',
-      }} />
+      {online
+        ? <span className="sf-ping-dot" style={{ background: '#22C55E' }} />
+        : <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'rgba(148,163,184,0.25)', display: 'inline-block' }} />
+      }
       {online ? 'En ligne' : 'Hors ligne'}
     </span>
   )
@@ -47,29 +45,17 @@ function StatusDot({ status }: { status: string }) {
 function IgStatusBadge({ phone }: { phone: Phone }) {
   if (!phone.ig_username) return <span style={{ fontSize: 13, color: 'rgba(148,163,184,0.35)' }}>—</span>
 
-  const pill = (dot: string, label: string, bg: string, text: string, border: string) => (
-    <span style={{
-      display: 'inline-flex', alignItems: 'center', gap: 5,
-      padding: '3px 9px', borderRadius: 20,
-      background: bg, border: `1px solid ${border}`,
-      fontSize: 11, fontWeight: 600, color: text,
-    }}>
-      <span style={{ width: 6, height: 6, borderRadius: '50%', background: dot, flexShrink: 0 }} />
-      {label}
-    </span>
-  )
-
   if (phone.ig_status === 'active')
-    return pill('#22C55E', 'IG OK', 'rgba(34,197,94,0.12)', '#22C55E', 'rgba(34,197,94,0.2)')
+    return <span className="sf-badge sf-badge-ok">IG OK</span>
   if (phone.ig_status === 'expired')
-    return pill('#EF4444', 'Expiré', 'rgba(239,68,68,0.12)', '#EF4444', 'rgba(239,68,68,0.2)')
+    return <span className="sf-badge sf-badge-danger">Expiré</span>
   if (phone.ig_status === 'error')
-    return pill('#EF4444', 'Erreur', 'rgba(239,68,68,0.12)', '#EF4444', 'rgba(239,68,68,0.2)')
+    return <span className="sf-badge sf-badge-danger">Erreur</span>
   if (phone.ig_status === 'rate_limited')
-    return pill('#F59E0B', 'Limité', 'rgba(245,158,11,0.12)', '#F59E0B', 'rgba(245,158,11,0.2)')
+    return <span className="sf-badge sf-badge-warn">Limité</span>
   if (phone.ig_sessionid)
-    return pill('#8B5CF6', 'Session', 'rgba(139,92,246,0.12)', '#A78BFA', 'rgba(139,92,246,0.22)')
-  return pill('rgba(148,163,184,0.35)', 'Public', 'rgba(148,163,184,0.06)', 'rgba(148,163,184,0.52)', 'rgba(148,163,184,0.13)')
+    return <span className="sf-badge sf-badge-accent">Session</span>
+  return <span className="sf-badge sf-badge-muted">Public</span>
 }
 
 // ── Countdown display ────────────────────────────────────────────────────────
