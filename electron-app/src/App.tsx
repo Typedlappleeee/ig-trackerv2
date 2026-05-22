@@ -676,7 +676,7 @@ function AppContent({ user }: { user: User }) {
 
   const content = (() => {
     switch (page) {
-      case 'dashboard':    return <Dashboard   user={user} />
+      case 'dashboard':    return <Dashboard   user={user} onNavigate={p => handleNavigate(p as Page)} />
       case 'phones':       return <Phones      user={user} key={refreshTick} />
 
       case 'posting':      return <Posting     user={user} />
@@ -689,7 +689,7 @@ function AppContent({ user }: { user: User }) {
       case 'textcopy':     return <TextCopy    user={user} />
       case 'aitools':      return <AiTools     user={user} />
       case 'settings':     return <Settings    user={user} initialPanel={settingsPanel as any} />
-      case 'community':    return <Community    user={user} />
+      case 'community':    return <Community    user={user} onNavigate={handleNavigate} />
       case 'support':      return <Support      user={user} />
       case 'licences':     return <Licences    user={user} />
     }

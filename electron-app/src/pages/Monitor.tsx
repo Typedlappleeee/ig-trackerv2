@@ -46,8 +46,8 @@ function PhoneCard({
 
   return (
     <div
-      className="flex flex-col rounded-2xl overflow-hidden"
-      style={{ background: 'rgba(12,8,28,0.85)', border: '1px solid rgba(139,92,246,0.18)' }}
+      className="flex flex-col rounded-2xl overflow-hidden transition-all hover:border-accent/30"
+      style={{ background: '#0E0E16', border: '1px solid rgba(139,92,246,0.15)', boxShadow: '0 4px 24px rgba(0,0,0,0.4)' }}
     >
       {/* Screenshot area — 9:16 ratio */}
       <div className="relative w-full" style={{ paddingBottom: '177.78%' /* 9:16 */ }}>
@@ -166,12 +166,12 @@ export default function Monitor({ user }: { user: User }) {
         style={{ borderBottom: '1px solid rgba(139,92,246,0.12)' }}>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-            <h1 className="text-lg font-bold" style={{ color: '#e2e8f0' }}>Monitor</h1>
+            <div className="sf-live-dot" />
+            <h1 className="text-[18px] font-black text-white">Monitor Live</h1>
           </div>
           {!fetching && (
-            <span className="text-xs px-2 py-0.5 rounded-full font-medium"
-              style={{ background: 'rgba(139,92,246,0.12)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.2)' }}>
+            <span className="text-[11px] px-2.5 py-0.5 rounded-full font-bold"
+              style={{ background: 'rgba(34,197,94,0.1)', color: '#22C55E', border: '1px solid rgba(34,197,94,0.2)' }}>
               {phones.length} allumé{phones.length > 1 ? 's' : ''}
             </span>
           )}

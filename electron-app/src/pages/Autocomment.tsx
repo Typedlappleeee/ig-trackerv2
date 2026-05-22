@@ -238,15 +238,15 @@ export function Autocomment({ user }: AutocommentProps) {
     <div className="h-full flex flex-col overflow-hidden">
 
       {/* Header */}
-      <div className="flex-shrink-0 px-10 pt-9 pb-7 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+      <div className="flex-shrink-0 px-8 pt-7 pb-5 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
         <div>
-          <h1 className="text-[28px] font-black text-white leading-none">Auto-Commentaires</h1>
+          <h1 className="text-[20px] font-black text-white leading-none">Auto-Commentaires</h1>
           <p className="text-[13px] text-text2 mt-0.5">Réponse IA ou manuelle aux commentaires Instagram</p>
         </div>
       </div>
 
       {/* Account chips bar */}
-      <div className="flex-shrink-0 px-6 py-3 flex items-center gap-2 overflow-x-auto" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+      <div className="flex-shrink-0 px-6 py-3 flex items-center gap-2 overflow-x-auto" style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
         {phones.length === 0 ? (
           <p className="text-[13px] text-text2">Aucun compte Instagram lié — va dans Téléphones d'abord.</p>
         ) : phones.map((p, i) => {
@@ -281,7 +281,7 @@ export function Autocomment({ user }: AutocommentProps) {
 
         {/* ── Left: post list ──────────────────────────────────────────────── */}
         <aside className="w-[300px] flex-shrink-0 flex flex-col overflow-hidden" style={{ borderRight: '1px solid rgba(255,255,255,0.06)' }}>
-          <div className="px-5 py-3.5 flex items-center gap-2" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+          <div className="px-5 py-3.5 flex items-center gap-2" style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
             <p className="text-[13px] font-bold text-white flex-1">
               {selectedPhone ? `@${selectedPhone.ig_username}` : 'Sélectionne un compte'}
             </p>
@@ -295,7 +295,7 @@ export function Autocomment({ user }: AutocommentProps) {
           </div>
 
           {/* Filters */}
-          <div className="px-4 py-2.5 flex gap-1.5" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+          <div className="px-4 py-2.5 flex gap-1.5" style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
             {([
               { k: 'all',     l: 'Tous'        },
               { k: 'replied', l: '✓ Commentés' },
@@ -360,7 +360,7 @@ export function Autocomment({ user }: AutocommentProps) {
             </div>
           ) : (
             <>
-              <div className="flex-shrink-0 px-6 py-3.5 flex items-center gap-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+              <div className="flex-shrink-0 px-6 py-3.5 flex items-center gap-3" style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
                 <h2 className="text-[15px] font-bold text-white">💬 Commentaires</h2>
                 <span className="text-[13px] text-text2">{comments.length}</span>
                 <button onClick={() => loadComments(selectedPost)} className="ml-auto text-text2 hover:text-white text-[15px] transition-colors">⟳</button>

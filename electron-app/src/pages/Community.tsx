@@ -84,12 +84,13 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import type { User } from '@supabase/supabase-js'
+import type { Page } from '@/components/Layout'
 import { supabase }   from '@/lib/supabase'
 import { useOrg }     from '@/lib/orgContext'
 import { useLicense } from '@/lib/license'
 import { Spinner }    from '@/components/ui/Spinner'
 
-interface CommunityProps { user: User }
+interface CommunityProps { user: User; onNavigate?: (page: Page) => void }
 type Channel = 'news' | 'chat' | 'support'
 
 interface Message {
@@ -172,13 +173,12 @@ function Avatar({ url, name, userId, size = 36, onClick }: {
   const base: React.CSSProperties = { width: size, height: size, borderRadius: r, flexShrink: 0 }
   const cls = onClick ? 'cursor-pointer hover:opacity-90 transition-opacity' : ''
 
-  // Reset broken state if URL changes (e.g. after re-upload)
   useEffect(() => { setBroken(false) }, [url])
 
   if (url && !broken) {
     return <img src={url} alt={name} onClick={onClick} className={cls}
       onError={() => setBroken(true)}
-      style={{ ...base, objectFit: 'cover', border: '1.5px solid rgba(139,92,246,0.2)' }} />
+      style={{ ...base, objectFit: 'cover', border: '1.5px solid rgba(255,255,255,0.1)' }} />
   }
   return (
     <div onClick={onClick} className={`flex items-center justify-center font-black select-none ${cls}`}
@@ -218,7 +218,7 @@ function ChatRow({ msg, isOwn, compact, isAdmin, likeCount, liked, onLike, onDel
             )}
             {msg.org_name && !msg.is_admin && (
               <span className="text-[10px] font-semibold px-2 py-[2px] rounded-full"
-                style={{ background: 'rgba(139,92,246,0.08)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.2)' }}>
+                style={{ background: 'rgba(255,255,255,0.05)', color: 'rgba(196,181,253,0.65)', border: '1px solid rgba(139,92,246,0.15)' }}>
                 {msg.org_name}
               </span>
             )}
@@ -296,82 +296,12 @@ function SupportMsgRow({ msg, isAdmin, compact, onDelete }: {
         <div className="inline-block px-3 py-2 rounded-xl max-w-[85%]"
           style={isAdminMsg
             ? { background: 'linear-gradient(135deg,rgba(124,58,237,0.18),rgba(236,72,153,0.1))', border: '1px solid rgba(139,92,246,0.22)' }
-            : { background: '#0E0E16', border: '1px solid rgba(139,92,246,0.12)' }}>
+            : { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
           <p className="text-[13.5px] leading-relaxed break-words"
             style={{ color: isAdminMsg ? 'rgba(230,220,255,0.95)' : 'rgba(212,220,240,0.9)' }}>
             {msg.content}
           </p>
           {msg.video_url && <MediaBlock url={msg.video_url} maxHeight={240} />}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ── News card ──────────────────────────────────────────────────────────────────
-
-function NewsCard({ msg, isAdmin, likeCount, liked, onLike, onView, onDelete }: {
-  msg: Message; isAdmin: boolean
-  likeCount: number; liked: boolean; onLike: (id: string) => void; onView: (id: string) => void
-  onDelete: (id: string) => void
-}) {
-  const [expanded, setExpanded] = useState(false)
-  const isLong = msg.content.length > 280
-  const shown  = !isLong || expanded ? msg.content : msg.content.slice(0, 280) + '…'
-
-  useEffect(() => { onView(msg.id) }, [msg.id])
-  return (
-    <div className="rounded-2xl overflow-hidden transition-all hover:border-purple-500/30 group"
-      style={{ background: 'rgba(8,5,20,0.8)', border: '1px solid rgba(139,92,246,0.18)', boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}>
-      <div className="h-[3px]" style={{ background: 'linear-gradient(90deg,#7c3aed,#ec4899)' }} />
-      <div className="p-5">
-        <div className="flex items-start gap-3 mb-4">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
-            style={{ background: 'linear-gradient(135deg,rgba(139,92,246,0.2),rgba(236,72,153,0.1))', border: '1px solid rgba(139,92,246,0.2)' }}>
-            📢
-          </div>
-          <div className="flex-1 min-w-0">
-            {msg.title && <p className="text-base font-black text-white leading-tight mb-1">{msg.title}</p>}
-            <div className="flex items-center gap-2 flex-wrap">
-              <div className="flex items-center gap-1.5">
-                <Avatar url={msg.avatar_url} name={msg.display_name} userId={msg.user_id} size={18} />
-                <span className="text-[11px] font-semibold" style={{ color: '#c4b5fd' }}>{msg.display_name}</span>
-              </div>
-              <span className="text-[9px] font-black px-1.5 py-[2px] rounded-full uppercase tracking-wide"
-                style={{ background: 'linear-gradient(130deg,rgba(124,58,237,0.35),rgba(236,72,153,0.2))', color: '#f0a8ff', border: '1px solid rgba(236,72,153,0.2)' }}>
-                Admin
-              </span>
-              {msg.org_name && !msg.is_admin && <span className="text-[10px]" style={{ color: 'rgba(196,181,253,0.45)' }}>{msg.org_name}</span>}
-              <span className="ml-auto text-[10px]" style={{ color: 'rgba(196,181,253,0.35)' }} title={fullDate(msg.created_at)}>
-                {timeAgo(msg.created_at)}
-              </span>
-              {isAdmin && (
-                <button onClick={() => onDelete(msg.id)}
-                  className="opacity-0 group-hover:opacity-100 transition-opacity text-[12px]"
-                  style={{ color: 'rgba(239,68,68,0.6)' }}>🗑</button>
-              )}
-            </div>
-          </div>
-        </div>
-        <p className="text-[13.5px] leading-relaxed whitespace-pre-wrap" style={{ color: 'rgba(212,220,240,0.85)' }}>{shown}</p>
-        {isLong && (
-          <button onClick={() => setExpanded(v => !v)} className="mt-2 text-[11px] font-semibold" style={{ color: '#a78bfa' }}>
-            {expanded ? '▲ Réduire' : '▼ Lire la suite'}
-          </button>
-        )}
-        {msg.video_url && <div className="mt-3"><MediaBlock url={msg.video_url} maxHeight={320} /></div>}
-        <div className="flex items-center gap-3 mt-4 pt-3" style={{ borderTop: '1px solid rgba(139,92,246,0.08)' }}>
-          <button onClick={() => onLike(msg.id)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-semibold transition-all"
-            style={liked
-              ? { background: 'rgba(236,72,153,0.15)', color: '#f472b6', border: '1px solid rgba(236,72,153,0.25)' }
-              : { background: '#07070B', color: '#6B6B7A', border: '1px solid rgba(139,92,246,0.1)' }}>
-            ❤️ <span>{likeCount > 0 ? likeCount : ''} {liked ? 'Aimé' : 'J\'aime'}</span>
-          </button>
-          <div className="flex items-center gap-1 text-[11px]" style={{ color: 'rgba(196,181,253,0.3)' }}>
-            <span>👁</span>
-            <span className="tabular-nums">{msg.view_count}</span>
-          </div>
         </div>
       </div>
     </div>
@@ -541,7 +471,7 @@ function ProfileModal({ profile, userId, isAdmin, onClose, onSaved }: {
         </div>
         <div className="px-5 pb-5 flex gap-2.5">
           <button onClick={onClose} className="flex-1 py-2.5 rounded-xl text-[12px] font-semibold transition-all"
-            style={{ background: 'rgba(139,92,246,0.08)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.15)' }}>
+            style={{ background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.6)', border: '1px solid rgba(255,255,255,0.07)' }}>
             Annuler
           </button>
           <button onClick={save} disabled={saving || uploading}
@@ -682,9 +612,9 @@ function SetupScreen({ onRetry }: { onRetry: () => void }) {
 
 // ── Main component ─────────────────────────────────────────────────────────────
 
-export function Community({ user }: CommunityProps) {
+export function Community({ user, onNavigate }: CommunityProps) {
   const { currentOrg } = useOrg()
-  useLicense() // keep context warm
+  useLicense()
 
   const [isAdmin, setIsAdmin]       = useState(false)
   const [tab, setTab]               = useState<Channel>('news')
@@ -718,6 +648,7 @@ export function Community({ user }: CommunityProps) {
   const [newsContent, setNewsContent] = useState('')
   const [newsSending, setNewsSend]    = useState(false)
   const [showNewsForm, setShowNewsForm] = useState(false)
+  const [selectedPost, setSelectedPost] = useState<Message | null>(null)
 
   const loadProfile = useCallback(async () => {
     const { data } = await supabase
@@ -811,14 +742,11 @@ export function Community({ user }: CommunityProps) {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'community_messages' }, payload => {
         const msg = payload.new as Message
         setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg])
-        // Notifications (only for messages from others)
         if (msg.user_id !== user.id && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
           const body = msg.content.slice(0, 80) + (msg.content.length > 80 ? '…' : '')
           if (msg.channel === 'support' && !msg.is_admin && isAdminRef.current) {
-            // Admin: new ticket message received
             new Notification(`🎫 Nouveau ticket — ${msg.display_name}`, { body, silent: false })
           } else if (msg.channel === 'support' && msg.is_admin && msg.thread_user_id === user.id) {
-            // User: admin replied to their ticket
             new Notification('💬 Réponse à ton ticket', { body: `ScaleFlow Admin : ${body}`, silent: false })
           }
         }
@@ -859,7 +787,7 @@ export function Community({ user }: CommunityProps) {
     const videoFile = chatVideo; setChatVideo(null)
     const localVideoUrl = videoFile ? URL.createObjectURL(videoFile) : null
     const optId = crypto.randomUUID()
-    const opt: Message = { id: optId, user_id: user.id, content: content || '', display_name: profile.display_name, avatar_url: profile.avatar_url, org_name: currentOrg?.name ?? null, channel: 'chat', title: null, is_admin: isAdmin, thread_user_id: null, video_url: localVideoUrl, created_at: new Date().toISOString() }
+    const opt: Message = { id: optId, user_id: user.id, content: content || '', display_name: profile.display_name, avatar_url: profile.avatar_url, org_name: currentOrg?.name ?? null, channel: 'chat', title: null, is_admin: isAdmin, thread_user_id: null, video_url: localVideoUrl, view_count: 0, created_at: new Date().toISOString() }
     setMessages(prev => [...prev, opt])
     const video_url = videoFile ? await uploadVideo(videoFile) : null
     const { error, data } = await supabase.from('community_messages').insert({ user_id: user.id, content: content || '', display_name: profile.display_name, avatar_url: profile.avatar_url, org_name: currentOrg?.name ?? null, channel: 'chat', title: null, is_admin: isAdmin, thread_user_id: null, video_url }).select().single()
@@ -877,7 +805,7 @@ export function Community({ user }: CommunityProps) {
     const videoFile = newsVideo; setNewsVideo(null)
     const localVideoUrl = videoFile ? URL.createObjectURL(videoFile) : null
     const optId = crypto.randomUUID()
-    const opt: Message = { id: optId, user_id: user.id, content: content || '', display_name: profile.display_name, avatar_url: profile.avatar_url, org_name: currentOrg?.name ?? null, channel: 'news', title: newsTitle.trim() || null, is_admin: true, thread_user_id: null, video_url: localVideoUrl, created_at: new Date().toISOString() }
+    const opt: Message = { id: optId, user_id: user.id, content: content || '', display_name: profile.display_name, avatar_url: profile.avatar_url, org_name: currentOrg?.name ?? null, channel: 'news', title: newsTitle.trim() || null, is_admin: true, thread_user_id: null, video_url: localVideoUrl, view_count: 0, created_at: new Date().toISOString() }
     setMessages(prev => [...prev, opt])
     const video_url = videoFile ? await uploadVideo(videoFile) : null
     const { error, data } = await supabase.from('community_messages').insert({ user_id: user.id, content: content || '', display_name: profile.display_name, avatar_url: profile.avatar_url, org_name: currentOrg?.name ?? null, channel: 'news', title: newsTitle.trim() || null, is_admin: true, thread_user_id: null, video_url }).select().single()
@@ -898,7 +826,7 @@ export function Community({ user }: CommunityProps) {
     const localVideoUrl = videoFile ? URL.createObjectURL(videoFile) : null
     const threadId = isAdmin ? selectedThread! : user.id
     const optId = crypto.randomUUID()
-    const opt: Message = { id: optId, user_id: user.id, content: content || '', display_name: profile.display_name, avatar_url: profile.avatar_url, org_name: currentOrg?.name ?? null, channel: 'support', title: null, is_admin: isAdmin, thread_user_id: threadId, video_url: localVideoUrl, created_at: new Date().toISOString() }
+    const opt: Message = { id: optId, user_id: user.id, content: content || '', display_name: profile.display_name, avatar_url: profile.avatar_url, org_name: currentOrg?.name ?? null, channel: 'support', title: null, is_admin: isAdmin, thread_user_id: threadId, video_url: localVideoUrl, view_count: 0, created_at: new Date().toISOString() }
     setMessages(prev => [...prev, opt])
     const video_url = videoFile ? await uploadVideo(videoFile) : null
     const { error, data } = await supabase.from('community_messages').insert({ user_id: user.id, content: content || '', display_name: profile.display_name, avatar_url: profile.avatar_url, org_name: currentOrg?.name ?? null, channel: 'support', title: null, is_admin: isAdmin, thread_user_id: threadId, video_url }).select().single()
@@ -946,168 +874,415 @@ export function Community({ user }: CommunityProps) {
     ? supportMessages.filter(m => (m.thread_user_id ?? m.user_id) === selectedThread)
     : []
 
+  // Sidebar computed data
+  const uniqueUserCount = new Set(messages.map(m => m.user_id)).size
+  const actMap = new Map<string, { display_name: string; avatar_url: string | null; user_id: string; count: number }>()
+  for (const m of messages) {
+    if (!m.is_admin) {
+      const ex = actMap.get(m.user_id)
+      if (ex) ex.count++
+      else actMap.set(m.user_id, { display_name: m.display_name, avatar_url: m.avatar_url, user_id: m.user_id, count: 1 })
+    }
+  }
+  const topMembers = Array.from(actMap.values()).sort((a, b) => b.count - a.count).slice(0, 5)
+
+  const featuredMsg = newsMessages[0] ?? null
   const [g1, g2] = gradientForId(user.id)
 
   return (
     <div className="h-full flex flex-col overflow-hidden" style={{ background: '#06040f' }}>
 
-      {/* Header */}
-      <div className="flex-shrink-0"
-        style={{ borderBottom: '1px solid rgba(139,92,246,0.12)', background: 'rgba(8,5,20,0.9)', backdropFilter: 'blur(12px)' }}>
-        <div className="flex items-center justify-between px-5 py-3">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl flex items-center justify-center"
-              style={{ background: 'linear-gradient(135deg,rgba(139,92,246,0.25),rgba(236,72,153,0.12))', border: '1px solid rgba(139,92,246,0.25)' }}>
-              <span className="text-base">💬</span>
-            </div>
-            <div>
-              <p className="text-[14px] font-black text-white leading-tight">Communauté</p>
-              <p className="text-[10px] leading-tight" style={{ color: 'rgba(196,181,253,0.4)' }}>
-                {tab === 'news' ? `${newsMessages.length} actualité${newsMessages.length > 1 ? 's' : ''}` :
-                 tab === 'chat' ? `${chatMessages.length} message${chatMessages.length > 1 ? 's' : ''}` :
-                 isAdmin ? `${threadList.length} ticket${threadList.length > 1 ? 's' : ''}` :
-                 `${myThreadMessages.length} message${myThreadMessages.length > 1 ? 's' : ''}`}
-              </p>
-            </div>
-          </div>
-          <button onClick={() => setShowProfile(true)}
-            className="flex items-center gap-2.5 pl-2.5 pr-3 py-2 rounded-xl transition-all hover:bg-white/[0.04] group"
-            style={{ border: '1px solid rgba(139,92,246,0.12)' }}>
-            <Avatar url={profile.avatar_url} name={profile.display_name || '?'} userId={user.id} size={28} />
-            <div className="text-left">
-              <p className="text-[11.5px] font-semibold leading-tight" style={{ color: profile.display_name ? 'white' : 'rgba(196,181,253,0.4)' }}>
-                {profile.display_name || 'Définir pseudo'}
-              </p>
-              {currentOrg && <p className="text-[9.5px] leading-tight" style={{ color: 'rgba(139,92,246,0.7)' }}>{currentOrg.name}</p>}
-            </div>
-            <span className="text-[10px] opacity-0 group-hover:opacity-50 transition-opacity ml-1" style={{ color: '#a78bfa' }}>✏</span>
-          </button>
+      {/* ── Header ───────────────────────────────────────────────────────────── */}
+      <div className="flex-shrink-0 flex items-center justify-between px-6 py-4"
+        style={{ borderBottom: '1px solid rgba(139,92,246,0.12)', background: 'rgba(8,5,20,0.95)', backdropFilter: 'blur(12px)' }}>
+        <div>
+          <h1 className="text-[18px] font-black text-white leading-tight">Communauté</h1>
+          <p className="text-[11px] mt-0.5" style={{ color: 'rgba(196,181,253,0.4)' }}>
+            Rejoignez la communauté ScaleFlow
+          </p>
         </div>
-
-        {isMuted && (
-          <div className="mx-5 mb-3 px-4 py-2 rounded-xl flex items-center gap-2"
-            style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)' }}>
-            <span className="text-sm">🔇</span>
-            <p className="text-[11px]" style={{ color: 'rgba(251,191,36,0.8)' }}>
-              Tu es muté jusqu'au <strong>
-                {new Date(mutedUntil!).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}
-              </strong>
+        <button onClick={() => setShowProfile(true)}
+          className="flex items-center gap-2.5 pl-2.5 pr-3 py-2 rounded-xl transition-all hover:bg-white/[0.04] group"
+          style={{ border: '1px solid rgba(139,92,246,0.12)' }}>
+          <Avatar url={profile.avatar_url} name={profile.display_name || '?'} userId={user.id} size={28} />
+          <div className="text-left">
+            <p className="text-[11.5px] font-semibold leading-tight"
+              style={{ color: profile.display_name ? 'white' : 'rgba(196,181,253,0.4)' }}>
+              {profile.display_name || 'Définir pseudo'}
             </p>
+            {currentOrg && <p className="text-[9.5px] leading-tight" style={{ color: 'rgba(139,92,246,0.7)' }}>{currentOrg.name}</p>}
           </div>
-        )}
-
-        <div className="flex px-5 gap-1 pb-0">
-          {([
-            { id: 'news'    as Channel, label: 'Actualités ScaleFlow', icon: '📢' },
-            { id: 'chat'    as Channel, label: 'Discussion',           icon: '💬' },
-            { id: 'support' as Channel, label: 'Support',              icon: '🎫' },
-          ]).map(t => (
-            <button key={t.id} onClick={() => {
-                setTab(t.id)
-                if (t.id === 'support') setLastSeenSupportAt(new Date().toISOString())
-              }}
-              className="flex items-center gap-1.5 px-4 py-2.5 text-[12.5px] font-bold transition-all relative"
-              style={tab === t.id
-                ? { color: '#c4b5fd', borderBottom: '2px solid #8b5cf6', marginBottom: -1 }
-                : { color: 'rgba(196,181,253,0.35)', borderBottom: '2px solid transparent', marginBottom: -1 }}>
-              <span className="text-[14px]">{t.icon}</span>
-              <span>{t.label}</span>
-              {t.id === 'support' && !isAdmin && tab !== 'support' &&
-                myThreadMessages.some(m => m.is_admin && new Date(m.created_at) > new Date(lastSeenSupportAt)) && (
-                <span className="w-2 h-2 rounded-full flex-shrink-0"
-                  style={{ background: '#ec4899', boxShadow: '0 0 6px #ec4899' }} />
-              )}
-            </button>
-          ))}
-        </div>
+          <span className="text-[10px] opacity-0 group-hover:opacity-50 transition-opacity ml-1" style={{ color: '#a78bfa' }}>✏</span>
+        </button>
       </div>
 
-      {/* NEWS TAB */}
+      {/* ── Muted banner ─────────────────────────────────────────────────────── */}
+      {isMuted && (
+        <div className="flex-shrink-0 mx-5 mt-3 px-4 py-2 rounded-xl flex items-center gap-2"
+          style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)' }}>
+          <span className="text-sm">🔇</span>
+          <p className="text-[11px]" style={{ color: 'rgba(251,191,36,0.8)' }}>
+            Tu es muté jusqu'au <strong>
+              {new Date(mutedUntil!).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}
+            </strong>
+          </p>
+        </div>
+      )}
+
+      {/* ── Tabs ─────────────────────────────────────────────────────────────── */}
+      <div className="flex-shrink-0 flex px-5 gap-1"
+        style={{ borderBottom: '1px solid rgba(139,92,246,0.1)', background: 'rgba(8,5,20,0.7)' }}>
+        {([
+          { id: 'news'    as Channel, label: 'Actualités ScaleFlow', icon: '📢' },
+          { id: 'chat'    as Channel, label: 'Discussion',           icon: '💬' },
+          { id: 'support' as Channel, label: 'Support',              icon: '🎫' },
+        ]).map(t => (
+          <button key={t.id} onClick={() => {
+              setTab(t.id)
+              if (t.id === 'support') setLastSeenSupportAt(new Date().toISOString())
+            }}
+            className="flex items-center gap-1.5 px-4 py-2.5 text-[12.5px] font-bold transition-all relative"
+            style={tab === t.id
+              ? { color: '#c4b5fd', borderBottom: '2px solid #8b5cf6', marginBottom: -1 }
+              : { color: 'rgba(196,181,253,0.35)', borderBottom: '2px solid transparent', marginBottom: -1 }}>
+            <span className="text-[14px]">{t.icon}</span>
+            <span>{t.label}</span>
+            {t.id === 'support' && !isAdmin && tab !== 'support' &&
+              myThreadMessages.some(m => m.is_admin && new Date(m.created_at) > new Date(lastSeenSupportAt)) && (
+              <span className="w-2 h-2 rounded-full flex-shrink-0"
+                style={{ background: '#ec4899', boxShadow: '0 0 6px #ec4899' }} />
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* ── NEWS TAB ─────────────────────────────────────────────────────────── */}
       {tab === 'news' && (
-        <div ref={listRef} className="flex-1 overflow-y-auto">
-          {isAdmin && (
-            <div className="px-5 pt-5">
-              {!showNewsForm ? (
-                <button onClick={() => setShowNewsForm(true)}
-                  className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl text-left transition-all group"
-                  style={{ background: 'rgba(139,92,246,0.07)', border: '1px dashed rgba(139,92,246,0.3)' }}>
-                  <div className="w-8 h-8 rounded-xl flex items-center justify-center text-base flex-shrink-0"
-                    style={{ background: 'linear-gradient(135deg,rgba(139,92,246,0.2),rgba(236,72,153,0.1))', border: '1px solid rgba(139,92,246,0.25)' }}>📢</div>
-                  <div>
-                    <p className="text-[12.5px] font-semibold text-white group-hover:text-accent transition-colors">Publier une actualité</p>
-                    <p className="text-[10px]" style={{ color: 'rgba(196,181,253,0.4)' }}>Visible par tous les membres</p>
-                  </div>
-                  <span className="ml-auto text-[10px] font-black px-2 py-1 rounded-lg"
-                    style={{ background: 'linear-gradient(130deg,rgba(124,58,237,0.35),rgba(236,72,153,0.2))', color: '#f0a8ff' }}>ADMIN</span>
-                </button>
+        <div className="flex flex-1 overflow-hidden">
+
+          {/* Main feed */}
+          <div ref={listRef} className="flex-1 overflow-y-auto">
+            <div className="p-5 space-y-4 max-w-3xl">
+              {loading ? (
+                <div className="flex items-center justify-center py-20">
+                  <Spinner size="lg" />
+                </div>
               ) : (
-                <div className="rounded-2xl overflow-hidden"
-                  style={{ background: 'rgba(8,5,20,0.9)', border: '1px solid rgba(139,92,246,0.3)' }}>
-                  <div className="px-4 py-3 flex items-center justify-between"
-                    style={{ borderBottom: '1px solid rgba(139,92,246,0.12)', background: 'linear-gradient(135deg,rgba(139,92,246,0.1),rgba(236,72,153,0.05))' }}>
-                    <div className="flex items-center gap-2"><span>📢</span><p className="text-[12px] font-black text-white">Nouvelle actualité</p></div>
-                    <button onClick={() => setShowNewsForm(false)} style={{ color: 'rgba(196,181,253,0.4)' }}>✕</button>
-                  </div>
-                  <div className="p-4 space-y-3">
-                    <input type="text" value={newsTitle} onChange={e => setNewsTitle(e.target.value)}
-                      placeholder="Titre (optionnel)…" className="w-full rounded-xl px-3.5 py-2.5 text-sm font-bold text-white outline-none sf-input" />
-                    <textarea value={newsContent} onChange={e => setNewsContent(e.target.value)}
-                      placeholder="Contenu…" rows={4} maxLength={2000}
-                      className="w-full rounded-xl px-3.5 py-2.5 text-sm text-white outline-none resize-none sf-input" />
-                    {newsVideo ? (
-                      <div className="flex items-center gap-2 px-3 py-2 rounded-lg"
-                        style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)' }}>
-                        <span className="text-sm">📎</span>
-                        <span className="text-[11px] flex-1 truncate" style={{ color: '#c4b5fd' }}>{newsVideo.name}</span>
-                        <button onClick={() => setNewsVideo(null)} className="text-[11px]" style={{ color: 'rgba(239,68,68,0.6)' }}>✕</button>
-                      </div>
-                    ) : (
-                      <button onClick={() => newsVideoRef.current?.click()}
-                        className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left transition-all"
-                        style={{ background: 'rgba(139,92,246,0.04)', border: '1px dashed rgba(139,92,246,0.2)', color: 'rgba(196,181,253,0.5)' }}>
-                        <span className="text-sm">📎</span>
-                        <span className="text-[11px]">Joindre une vidéo (optionnel)</span>
-                      </button>
-                    )}
-                    <input ref={newsVideoRef} type="file" accept="image/*,video/*" className="hidden"
-                      onChange={e => { if (e.target.files?.[0]) { setNewsVideo(e.target.files[0]); e.target.value = '' } }} />
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px]" style={{ color: 'rgba(196,181,253,0.3)' }}>{newsContent.length}/2000</span>
-                      <div className="flex gap-2">
-                        <button onClick={() => { setShowNewsForm(false); setNewsVideo(null) }} className="px-4 py-2 rounded-xl text-[12px] font-semibold"
-                          style={{ background: 'rgba(139,92,246,0.08)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.15)' }}>Annuler</button>
-                        <button onClick={sendNews} disabled={(!newsContent.trim() && !newsVideo) || newsSending}
-                          className="px-4 py-2 rounded-xl text-[12px] font-semibold btn-sf-primary disabled:opacity-40">
-                          {newsSending ? 'Publication…' : '📢 Publier'}
-                        </button>
+                <>
+                  {/* Featured / pinned card */}
+                  {featuredMsg && (
+                    <div className="rounded-2xl overflow-hidden cursor-pointer transition-all hover:border-purple-400/60"
+                      style={{ background: 'linear-gradient(135deg,#120840 0%,#07102c 60%,#0a0626 100%)', border: '1px solid rgba(139,92,246,0.4)', boxShadow: '0 8px 40px rgba(0,0,0,0.5)' }}
+                      onClick={() => setSelectedPost(featuredMsg)}>
+                      <div className="h-[3px]" style={{ background: 'linear-gradient(90deg,#7c3aed,#ec4899,#3b82f6)' }} />
+                      <div className="p-6">
+                        <div className="flex items-center gap-2 mb-4">
+                          <span className="text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full"
+                            style={{ background: 'linear-gradient(130deg,rgba(124,58,237,0.45),rgba(236,72,153,0.3))', color: '#f0a8ff', border: '1px solid rgba(236,72,153,0.3)' }}>
+                            📌 Épinglé
+                          </span>
+                          <span className="text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full"
+                            style={{ background: 'rgba(139,92,246,0.15)', color: '#c4b5fd', border: '1px solid rgba(139,92,246,0.25)' }}>
+                            Actualités ScaleFlow
+                          </span>
+                        </div>
+                        {featuredMsg.title && (
+                          <h2 className="text-[22px] font-black text-white leading-tight mb-3">
+                            {featuredMsg.title}
+                          </h2>
+                        )}
+                        <p className="text-[13.5px] leading-relaxed whitespace-pre-wrap mb-5"
+                          style={{ color: 'rgba(212,220,240,0.8)' }}>
+                          {featuredMsg.content.length > 240
+                            ? featuredMsg.content.slice(0, 240) + '…'
+                            : featuredMsg.content}
+                        </p>
+                        {featuredMsg.video_url && (
+                          <div className="mb-5"><MediaBlock url={featuredMsg.video_url} maxHeight={260} /></div>
+                        )}
+                        <div className="flex items-center justify-between pt-4"
+                          style={{ borderTop: '1px solid rgba(139,92,246,0.12)' }}>
+                          <div className="flex items-center gap-2.5">
+                            <Avatar url={featuredMsg.avatar_url} name={featuredMsg.display_name} userId={featuredMsg.user_id} size={24} />
+                            <div>
+                              <span className="text-[11.5px] font-semibold" style={{ color: '#c4b5fd' }}>
+                                {featuredMsg.display_name}
+                              </span>
+                              <span className="text-[10px] ml-2" style={{ color: 'rgba(196,181,253,0.35)' }}
+                                title={fullDate(featuredMsg.created_at)}>
+                                {timeAgo(featuredMsg.created_at)}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <button onClick={e => { e.stopPropagation(); toggleLike(featuredMsg.id) }}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-semibold transition-all"
+                              style={myLikes.has(featuredMsg.id)
+                                ? { background: 'rgba(236,72,153,0.15)', color: '#f472b6', border: '1px solid rgba(236,72,153,0.25)' }
+                                : { background: 'rgba(255,255,255,0.05)', color: 'rgba(196,181,253,0.5)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                              ❤️ {reactions.get(featuredMsg.id) ?? 0}
+                            </button>
+                            <div className="flex items-center gap-1 text-[11px]" style={{ color: 'rgba(196,181,253,0.3)' }}>
+                              <span>👁</span>
+                              <span className="tabular-nums">{featuredMsg.view_count}</span>
+                            </div>
+                            {isAdmin && (
+                              <button onClick={e => { e.stopPropagation(); deleteMessage(featuredMsg.id) }}
+                                className="text-[14px] transition-opacity hover:opacity-80"
+                                style={{ color: 'rgba(239,68,68,0.5)' }} title="Supprimer">🗑</button>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </div>
+                  )}
+
+                  {/* Admin: new post button or form */}
+                  {isAdmin && !showNewsForm && (
+                    <button onClick={() => setShowNewsForm(true)}
+                      className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all hover:border-purple-500/40"
+                      style={{ background: 'rgba(139,92,246,0.05)', border: '1px dashed rgba(139,92,246,0.3)' }}>
+                      <div className="w-7 h-7 rounded-lg flex items-center justify-center text-sm flex-shrink-0"
+                        style={{ background: 'rgba(139,92,246,0.15)' }}>📢</div>
+                      <span className="text-[12.5px] font-semibold" style={{ color: 'rgba(196,181,253,0.55)' }}>
+                        + Nouvelle publication
+                      </span>
+                      <span className="ml-auto text-[9px] font-black px-2 py-0.5 rounded-lg"
+                        style={{ background: 'rgba(124,58,237,0.25)', color: '#f0a8ff' }}>ADMIN</span>
+                    </button>
+                  )}
+
+                  {isAdmin && showNewsForm && (
+                    <div className="rounded-2xl overflow-hidden"
+                      style={{ background: 'rgba(8,5,20,0.9)', border: '1px solid rgba(139,92,246,0.3)' }}>
+                      <div className="px-4 py-3 flex items-center justify-between"
+                        style={{ borderBottom: '1px solid rgba(139,92,246,0.12)', background: 'linear-gradient(135deg,rgba(139,92,246,0.1),rgba(236,72,153,0.05))' }}>
+                        <div className="flex items-center gap-2">
+                          <span>📢</span>
+                          <p className="text-[12px] font-black text-white">Nouvelle publication</p>
+                        </div>
+                        <button onClick={() => setShowNewsForm(false)} style={{ color: 'rgba(196,181,253,0.4)' }}>✕</button>
+                      </div>
+                      <div className="p-4 space-y-3">
+                        <input type="text" value={newsTitle} onChange={e => setNewsTitle(e.target.value)}
+                          placeholder="Titre (optionnel)…"
+                          className="w-full rounded-xl px-3.5 py-2.5 text-sm font-bold text-white outline-none sf-input" />
+                        <textarea value={newsContent} onChange={e => setNewsContent(e.target.value)}
+                          placeholder="Contenu…" rows={4} maxLength={2000}
+                          className="w-full rounded-xl px-3.5 py-2.5 text-sm text-white outline-none resize-none sf-input" />
+                        {newsVideo ? (
+                          <div className="flex items-center gap-2 px-3 py-2 rounded-lg"
+                            style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)' }}>
+                            <span className="text-sm">📎</span>
+                            <span className="text-[11px] flex-1 truncate" style={{ color: '#c4b5fd' }}>{newsVideo.name}</span>
+                            <button onClick={() => setNewsVideo(null)} className="text-[11px]" style={{ color: 'rgba(239,68,68,0.6)' }}>✕</button>
+                          </div>
+                        ) : (
+                          <button onClick={() => newsVideoRef.current?.click()}
+                            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left transition-all"
+                            style={{ background: 'rgba(139,92,246,0.04)', border: '1px dashed rgba(139,92,246,0.2)', color: 'rgba(196,181,253,0.5)' }}>
+                            <span className="text-sm">📎</span>
+                            <span className="text-[11px]">Joindre une image / vidéo (optionnel)</span>
+                          </button>
+                        )}
+                        <input ref={newsVideoRef} type="file" accept="image/*,video/*" className="hidden"
+                          onChange={e => { if (e.target.files?.[0]) { setNewsVideo(e.target.files[0]); e.target.value = '' } }} />
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px]" style={{ color: 'rgba(196,181,253,0.3)' }}>{newsContent.length}/2000</span>
+                          <div className="flex gap-2">
+                            <button onClick={() => { setShowNewsForm(false); setNewsVideo(null) }}
+                              className="px-4 py-2 rounded-xl text-[12px] font-semibold"
+                              style={{ background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.6)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                              Annuler
+                            </button>
+                            <button onClick={sendNews} disabled={(!newsContent.trim() && !newsVideo) || newsSending}
+                              className="px-4 py-2 rounded-xl text-[12px] font-semibold btn-sf-primary disabled:opacity-40">
+                              {newsSending ? 'Publication…' : '📢 Publier'}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Post list — all except featured */}
+                  {newsMessages.length > 1 && (
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <h2 className="text-[13px] font-black text-white">Dernières publications</h2>
+                      </div>
+                      <div className="space-y-2">
+                        {newsMessages.slice(1).map(msg => (
+                          <div key={msg.id}
+                            className="flex items-start gap-3 p-4 rounded-xl group transition-all cursor-pointer hover:border-purple-500/30"
+                            style={{ background: 'rgba(8,5,20,0.8)', border: '1px solid rgba(139,92,246,0.12)' }}
+                            onMouseEnter={() => trackView(msg.id)}
+                            onClick={() => setSelectedPost(msg)}>
+                            <Avatar url={msg.avatar_url} name={msg.display_name} userId={msg.user_id} size={38} />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                <span className="text-[9px] font-black uppercase tracking-wide px-1.5 py-[2px] rounded-full flex-shrink-0"
+                                  style={{ background: 'linear-gradient(130deg,rgba(124,58,237,0.3),rgba(236,72,153,0.2))', color: '#f0a8ff', border: '1px solid rgba(236,72,153,0.2)' }}>
+                                  Actualités
+                                </span>
+                                {msg.title && (
+                                  <p className="text-[13px] font-bold text-white truncate">{msg.title}</p>
+                                )}
+                              </div>
+                              <p className="text-[12px] mb-2 line-clamp-2 leading-relaxed"
+                                style={{ color: 'rgba(196,181,253,0.5)' }}>
+                                {msg.content}
+                              </p>
+                              <div className="flex items-center gap-3 text-[10px]" style={{ color: 'rgba(196,181,253,0.35)' }}>
+                                <span className="font-semibold">{msg.display_name}</span>
+                                <span>·</span>
+                                <span>{timeAgo(msg.created_at)}</span>
+                                <button onClick={e => { e.stopPropagation(); toggleLike(msg.id) }}
+                                  className="flex items-center gap-1 transition-colors"
+                                  style={{ color: myLikes.has(msg.id) ? '#f472b6' : 'rgba(196,181,253,0.35)' }}>
+                                  ❤️ {reactions.get(msg.id) ?? 0}
+                                </button>
+                                <span className="flex items-center gap-1">👁 {msg.view_count}</span>
+                              </div>
+                            </div>
+                            {isAdmin && (
+                              <button onClick={e => { e.stopPropagation(); deleteMessage(msg.id) }}
+                                className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-1"
+                                style={{ color: 'rgba(239,68,68,0.5)', fontSize: 14 }}>🗑</button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {newsMessages.length === 0 && !isAdmin && (
+                    <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
+                      <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl"
+                        style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.12)' }}>📢</div>
+                      <div className="space-y-1">
+                        <p className="font-bold text-white">Aucune actualité</p>
+                        <p className="text-sm" style={{ color: 'rgba(196,181,253,0.4)' }}>
+                          Les admins publieront bientôt des actualités.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </div>
-          )}
-          <div className="p-5 space-y-4">
-            {loading ? <div className="flex items-center justify-center py-12"><Spinner size="lg" /></div>
-            : newsMessages.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16 gap-4 text-center">
-                <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl"
-                  style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.12)' }}>📢</div>
-                <div className="space-y-1">
-                  <p className="font-bold text-white">Aucune actualité</p>
-                  <p className="text-sm" style={{ color: 'rgba(196,181,253,0.4)' }}>
-                    {isAdmin ? 'Publie la première actualité !' : 'Les admins publieront bientôt des actualités.'}
+          </div>
+
+          {/* ── Right sidebar ─────────────────────────────────────────────────── */}
+          <div className="w-[240px] flex-shrink-0 overflow-y-auto p-4 space-y-4"
+            style={{ borderLeft: '1px solid rgba(139,92,246,0.1)', background: 'rgba(8,5,20,0.5)' }}>
+
+            {/* About */}
+            <div className="rounded-xl overflow-hidden"
+              style={{ background: 'rgba(139,92,246,0.05)', border: '1px solid rgba(139,92,246,0.15)' }}>
+              <div className="px-4 py-3"
+                style={{ borderBottom: '1px solid rgba(139,92,246,0.1)', background: 'rgba(139,92,246,0.07)' }}>
+                <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: '#a78bfa' }}>
+                  À propos
+                </p>
+              </div>
+              <div className="p-4 space-y-3">
+                <p className="text-[11.5px] leading-relaxed" style={{ color: 'rgba(196,181,253,0.5)' }}>
+                  La communauté officielle ScaleFlow — échangez, partagez et évoluez ensemble.
+                </p>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { label: 'Membres', value: uniqueUserCount > 0 ? uniqueUserCount : '—' },
+                    { label: 'En ligne', value: '🟢' },
+                    { label: 'Posts', value: newsMessages.length },
+                  ].map(s => (
+                    <div key={s.label} className="rounded-lg p-2 text-center"
+                      style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.1)' }}>
+                      <p className="text-[14px] font-black text-white">{s.value}</p>
+                      <p className="text-[9px] mt-0.5" style={{ color: 'rgba(196,181,253,0.4)' }}>{s.label}</p>
+                    </div>
+                  ))}
+                </div>
+                <a href="https://t.me/+drqJbwraMag5M2I0" target="_blank" rel="noreferrer"
+                  className="w-full py-2 rounded-xl text-[12px] font-semibold transition-all flex items-center justify-center gap-1.5 hover:brightness-110"
+                  style={{ background: 'rgba(34,150,243,0.12)', color: '#60b8f5', border: '1px solid rgba(34,150,243,0.2)' }}>
+                  ✈️ Rejoindre Telegram
+                </a>
+              </div>
+            </div>
+
+            {/* Top members */}
+            {topMembers.length > 0 && (
+              <div className="rounded-xl overflow-hidden"
+                style={{ background: 'rgba(139,92,246,0.05)', border: '1px solid rgba(139,92,246,0.15)' }}>
+                <div className="px-4 py-3"
+                  style={{ borderBottom: '1px solid rgba(139,92,246,0.1)', background: 'rgba(139,92,246,0.07)' }}>
+                  <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: '#a78bfa' }}>
+                    Membres les plus actifs
                   </p>
                 </div>
+                <div className="p-3 space-y-2">
+                  {topMembers.map((m, i) => (
+                    <div key={m.user_id} className="flex items-center gap-2 py-1">
+                      <span className="text-[11px] font-black w-5 text-center flex-shrink-0"
+                        style={{ color: i === 0 ? '#fbbf24' : i === 1 ? '#94a3b8' : i === 2 ? '#b45309' : 'rgba(196,181,253,0.25)' }}>
+                        {i + 1}
+                      </span>
+                      <Avatar url={m.avatar_url} name={m.display_name} userId={m.user_id} size={24} />
+                      <span className="flex-1 text-[11px] font-semibold text-white truncate">
+                        {m.display_name || 'Anonyme'}
+                      </span>
+                      <span className="text-[10px] tabular-nums flex-shrink-0"
+                        style={{ color: 'rgba(196,181,253,0.3)' }}>
+                        {m.count}
+                      </span>
+                    </div>
+                  ))}
+                  <button className="w-full mt-1 py-1.5 rounded-lg text-[11px] font-semibold transition-all"
+                    style={{ background: 'transparent', color: 'rgba(196,181,253,0.35)', border: '1px solid rgba(139,92,246,0.1)' }}>
+                    Voir le classement →
+                  </button>
+                </div>
               </div>
-            ) : newsMessages.map(msg => <NewsCard key={msg.id} msg={msg} isAdmin={isAdmin}
-                likeCount={reactions.get(msg.id) ?? 0} liked={myLikes.has(msg.id)}
-                onLike={toggleLike} onView={trackView} onDelete={deleteMessage} />)}
+            )}
+
+            {/* Help section */}
+            <div className="rounded-xl overflow-hidden"
+              style={{ background: 'rgba(139,92,246,0.05)', border: '1px solid rgba(139,92,246,0.15)' }}>
+              <div className="px-4 py-3"
+                style={{ borderBottom: '1px solid rgba(139,92,246,0.1)', background: 'rgba(139,92,246,0.07)' }}>
+                <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: '#a78bfa' }}>
+                  Besoin d'aide ?
+                </p>
+              </div>
+              <div className="p-3 space-y-2">
+                <button onClick={() => onNavigate?.('support')}
+                  className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left transition-all hover:bg-purple-500/10"
+                  style={{ background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(139,92,246,0.18)' }}>
+                  <span className="text-base flex-shrink-0">🎫</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[12px] font-semibold text-white leading-tight">Ouvrir un ticket</p>
+                    <p className="text-[9.5px] mt-0.5" style={{ color: 'rgba(196,181,253,0.4)' }}>Support ScaleFlow</p>
+                  </div>
+                  <span className="text-[10px] flex-shrink-0" style={{ color: 'rgba(196,181,253,0.3)' }}>→</span>
+                </button>
+                <button onClick={() => setTab('support')}
+                  className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left transition-all hover:bg-purple-500/10"
+                  style={{ background: 'rgba(139,92,246,0.05)', border: '1px solid rgba(139,92,246,0.12)' }}>
+                  <span className="text-base flex-shrink-0">❓</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[12px] font-semibold text-white leading-tight">Voir la FAQ</p>
+                    <p className="text-[9.5px] mt-0.5" style={{ color: 'rgba(196,181,253,0.4)' }}>Questions fréquentes</p>
+                  </div>
+                  <span className="text-[10px] flex-shrink-0" style={{ color: 'rgba(196,181,253,0.3)' }}>→</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
 
-      {/* CHAT TAB */}
+      {/* ── CHAT TAB ─────────────────────────────────────────────────────────── */}
       {tab === 'chat' && (
         <>
           <div ref={listRef} className="flex-1 overflow-y-auto px-5 py-4">
@@ -1209,7 +1384,7 @@ export function Community({ user }: CommunityProps) {
         </>
       )}
 
-      {/* SUPPORT TAB */}
+      {/* ── SUPPORT TAB ──────────────────────────────────────────────────────── */}
       {tab === 'support' && (
         <div className="flex-1 flex overflow-hidden">
           {isAdmin ? (
@@ -1419,11 +1594,74 @@ export function Community({ user }: CommunityProps) {
                         </button>
                       </div>
                     </div>
+                    <input ref={chatVideoRef} type="file" accept="image/*,video/*" className="hidden"
+                      onChange={e => { if (e.target.files?.[0]) { setChatVideo(e.target.files[0]); e.target.value = '' } }} />
                   </>
                 )}
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── Post detail modal ─────────────────────────────────────────────────── */}
+      {selectedPost && (
+        <div className="fixed inset-0 z-[9980] flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(12px)' }}
+          onClick={e => e.target === e.currentTarget && setSelectedPost(null)}>
+          <div className="w-full max-w-xl max-h-[85vh] flex flex-col rounded-2xl overflow-hidden anim-scale-in"
+            style={{ background: '#0c0919', border: '1px solid rgba(139,92,246,0.3)', boxShadow: '0 32px 80px rgba(0,0,0,0.7)' }}>
+            {/* Modal header */}
+            <div className="flex-shrink-0 flex items-center justify-between px-5 py-4"
+              style={{ borderBottom: '1px solid rgba(139,92,246,0.12)', background: 'linear-gradient(135deg,rgba(139,92,246,0.1),rgba(236,72,153,0.05))' }}>
+              <div className="flex items-center gap-2.5">
+                <Avatar url={selectedPost.avatar_url} name={selectedPost.display_name} userId={selectedPost.user_id} size={28} />
+                <div>
+                  <p className="text-[12px] font-bold text-white leading-tight">{selectedPost.display_name}</p>
+                  <p className="text-[9.5px] leading-tight" style={{ color: 'rgba(196,181,253,0.4)' }}
+                    title={fullDate(selectedPost.created_at)}>
+                    {timeAgo(selectedPost.created_at)} · {fullDate(selectedPost.created_at)}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {isAdmin && (
+                  <button onClick={() => { deleteMessage(selectedPost.id); setSelectedPost(null) }}
+                    className="text-[13px] opacity-50 hover:opacity-80 transition-opacity"
+                    style={{ color: '#f87171' }}>🗑</button>
+                )}
+                <button onClick={() => setSelectedPost(null)}
+                  className="w-7 h-7 rounded-lg flex items-center justify-center text-sm hover:bg-white/[0.06]"
+                  style={{ color: 'rgba(196,181,253,0.5)' }}>✕</button>
+              </div>
+            </div>
+            {/* Modal body */}
+            <div className="flex-1 overflow-y-auto p-5 space-y-4">
+              {selectedPost.title && (
+                <h2 className="text-[18px] font-black text-white leading-tight">{selectedPost.title}</h2>
+              )}
+              <p className="text-[13.5px] leading-relaxed whitespace-pre-wrap"
+                style={{ color: 'rgba(212,220,240,0.85)' }}>
+                {selectedPost.content}
+              </p>
+              {selectedPost.video_url && <MediaBlock url={selectedPost.video_url} maxHeight={320} />}
+            </div>
+            {/* Modal footer */}
+            <div className="flex-shrink-0 flex items-center justify-between px-5 py-3"
+              style={{ borderTop: '1px solid rgba(139,92,246,0.1)', background: 'rgba(6,4,15,0.6)' }}>
+              <button onClick={() => toggleLike(selectedPost.id)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-semibold transition-all"
+                style={myLikes.has(selectedPost.id)
+                  ? { background: 'rgba(236,72,153,0.15)', color: '#f472b6', border: '1px solid rgba(236,72,153,0.25)' }
+                  : { background: 'rgba(255,255,255,0.05)', color: 'rgba(196,181,253,0.5)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                ❤️ {reactions.get(selectedPost.id) ?? 0} {myLikes.has(selectedPost.id) ? 'Aimé' : "J'aime"}
+              </button>
+              <div className="flex items-center gap-1 text-[11px]" style={{ color: 'rgba(196,181,253,0.3)' }}>
+                <span>👁</span>
+                <span className="tabular-nums">{selectedPost.view_count} vues</span>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

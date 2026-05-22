@@ -20,7 +20,7 @@ async function groqCall(apiKey: string, prompt: string, maxTokens = 600): Promis
   const result = await window.electronAPI?.groqRequest({
     apiKey,
     messages: [{ role: 'user', content: prompt }],
-    model: 'llama-3.3-70b-versatile',
+    model: 'llama-3.1-8b-instant',
     maxTokens,
   })
   if (!result?.ok) throw new Error(result?.error ?? 'Erreur Groq')
@@ -32,38 +32,61 @@ async function groqCall(apiKey: string, prompt: string, maxTokens = 600): Promis
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false)
   return (
-    <button onClick={() => { navigator.clipboard.writeText(text).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000) }) }}
-      className="rounded-xl px-4 py-2.5 text-[13px] font-semibold transition-all"
-      style={{ background: copied ? 'rgba(34,197,94,0.12)' : '#07070B', color: copied ? '#22C55E' : '#fff', border: `1px solid ${copied ? 'rgba(34,197,94,0.25)' : 'rgba(139,92,246,0.18)'}` }}>
-      {copied ? '✓ Copié' : '📋 Copier'}
+    <button
+      onClick={() => { navigator.clipboard.writeText(text).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000) }) }}
+      className="rounded-xl px-4 py-2.5 text-[12px] font-bold font-mono uppercase tracking-wider transition-all flex items-center gap-2"
+      style={{
+        background: copied ? 'rgba(34,197,94,0.1)' : 'rgba(139,92,246,0.08)',
+        color: copied ? '#22C55E' : '#a78bfa',
+        border: `1px solid ${copied ? 'rgba(34,197,94,0.25)' : 'rgba(139,92,246,0.2)'}`,
+      }}>
+      <span>{copied ? '✓' : '⎘'}</span>
+      <span>{copied ? 'COPIÉ' : 'COPIER'}</span>
     </button>
   )
 }
 
 function ResultBox({ value, rows = 8 }: { value: string; rows?: number }) {
   return (
-    <textarea rows={rows} value={value} readOnly
-      className="w-full rounded-xl px-4 py-3 text-[13px] font-mono text-white/80 resize-none focus:outline-none"
-      style={{ background: '#07070B', border: '1px solid rgba(139,92,246,0.15)' }} />
+    <div className="relative rounded-2xl overflow-hidden"
+      style={{ background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(139,92,246,0.15)' }}>
+      {/* Terminal header */}
+      <div className="flex items-center gap-2 px-4 py-2.5" style={{ borderBottom: '1px solid rgba(139,92,246,0.1)', background: 'rgba(139,92,246,0.04)' }}>
+        <div className="flex gap-1.5">
+          <div className="w-2.5 h-2.5 rounded-full" style={{ background: 'rgba(239,68,68,0.5)' }} />
+          <div className="w-2.5 h-2.5 rounded-full" style={{ background: 'rgba(245,158,11,0.5)' }} />
+          <div className="w-2.5 h-2.5 rounded-full" style={{ background: 'rgba(34,197,94,0.5)' }} />
+        </div>
+        <span className="text-[10px] font-mono text-text3 uppercase tracking-widest ml-2">Output IA</span>
+        <div className="ml-auto">
+          <div className="w-1.5 h-1.5 rounded-full sf-live-dot" style={{ position: 'relative' }} />
+        </div>
+      </div>
+      <textarea
+        rows={rows}
+        value={value}
+        readOnly
+        className="w-full px-5 py-4 text-[12px] font-mono resize-none focus:outline-none leading-relaxed"
+        style={{ background: 'transparent', color: '#c4b5fd' }}
+      />
+    </div>
   )
 }
 
 function FieldInput({ placeholder, value, onChange, textarea, rows }: {
   placeholder: string; value: string; onChange: (v: string) => void; textarea?: boolean; rows?: number
 }) {
-  const cls = "w-full rounded-xl px-4 py-2.5 text-[13px] text-white placeholder:text-text2 focus:outline-none"
-  const style = { background: '#07070B', border: '1px solid rgba(139,92,246,0.18)', color: '#fff' }
+  const cls = "sf-search w-full rounded-xl px-4 py-2.5 text-[13px] font-mono"
   return textarea
-    ? <textarea rows={rows ?? 4} placeholder={placeholder} value={value} onChange={e => onChange(e.target.value)} className={cls} style={style} />
-    : <input type="text" placeholder={placeholder} value={value} onChange={e => onChange(e.target.value)} className={cls} style={style} />
+    ? <textarea rows={rows ?? 4} placeholder={placeholder} value={value} onChange={e => onChange(e.target.value)} className={cls} />
+    : <input type="text" placeholder={placeholder} value={value} onChange={e => onChange(e.target.value)} className={cls} />
 }
 
 function SelectInput({ value, onChange, options }: { value: string; onChange: (v: string) => void; options: string[] }) {
   return (
     <select value={value} onChange={e => onChange(e.target.value)}
-      className="w-full rounded-xl px-4 py-2.5 text-[13px] focus:outline-none"
-      style={{ background: '#07070B', border: '1px solid rgba(139,92,246,0.18)', color: '#fff' }}>
-      {options.map(o => <option key={o} value={o} style={{ background: '#0c0e1a' }}>{o}</option>)}
+      className="sf-search w-full rounded-xl px-4 py-2.5 text-[13px] font-mono focus:outline-none">
+      {options.map(o => <option key={o} value={o} style={{ background: '#0E0E16' }}>{o}</option>)}
     </select>
   )
 }
@@ -72,26 +95,48 @@ function ToolShell({ title, icon, children, onBack, error }: {
   title: string; icon: string; children: React.ReactNode; onBack: () => void; error?: string | null
 }) {
   return (
-    <div className="h-full flex flex-col overflow-hidden">
-      <div className="flex-shrink-0 px-8 pt-7 pb-5 flex items-center gap-4" style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
-        <button onClick={onBack}
-          className="rounded-xl px-4 py-2.5 text-[13px] font-semibold flex-shrink-0"
-          style={{ background: '#07070B', border: '1px solid rgba(139,92,246,0.18)', color: '#fff' }}>
-          ← Retour
-        </button>
-        <span className="text-2xl">{icon}</span>
-        <h1 className="text-[22px] font-black text-white leading-none">{title}</h1>
+    <div className="h-full flex flex-col overflow-hidden bg-bg anim-page">
+      {/* Header */}
+      <div className="flex-shrink-0 px-8 pt-8 pb-6 sf-topbar">
+        <div className="flex items-center gap-4">
+          <button onClick={onBack}
+            className="rounded-xl px-4 py-2.5 text-[12px] font-bold font-mono uppercase tracking-wider flex-shrink-0 transition-all"
+            style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)', color: '#a78bfa' }}>
+            ← Retour
+          </button>
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
+            style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.2), rgba(236,72,153,0.1))', border: '1px solid rgba(139,92,246,0.3)' }}>
+            {icon}
+          </div>
+          <div>
+            <h1 className="text-[20px] font-black text-text leading-none">{title}</h1>
+            <p className="text-[11px] text-text3 font-mono mt-0.5 uppercase tracking-widest">Outils IA — Studio</p>
+          </div>
+        </div>
       </div>
-      <div className="flex-1 overflow-y-auto px-10 pb-10 pt-8">
-        <div className="max-w-2xl space-y-5">
+
+      <div className="flex-1 overflow-y-auto px-8 pb-10 pt-7">
+        <div className="max-w-2xl space-y-4">
           {error && (
-            <div className="rounded-xl px-4 py-3" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#f87171' }}>
-              <p className="text-[13px]">{error}</p>
+            <div className="rounded-xl px-4 py-3 flex items-center gap-3"
+              style={{ background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.2)' }}>
+              <span className="text-danger text-sm flex-shrink-0">⚠</span>
+              <p className="text-[12px] font-mono text-danger">{error}</p>
             </div>
           )}
           {children}
         </div>
       </div>
+    </div>
+  )
+}
+
+// ── Form section wrapper ───────────────────────────────────────────────────────
+function FormSection({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="sf-card rounded-2xl p-5 space-y-3">
+      <p className="text-[10px] uppercase tracking-widest font-bold text-text3 font-mono">{label}</p>
+      {children}
     </div>
   )
 }
@@ -116,13 +161,15 @@ function StratConcurrente({ groqKey, onBack }: { groqKey: string; onBack: () => 
   }
 
   return (
-    <ToolShell title="Stratégie Concurrente" icon="🔍" onBack={onBack} error={error}>
-      <p className="text-[13px] text-text2">Entre un pseudo concurrent ou une niche pour obtenir une stratégie complète.</p>
-      <FieldInput placeholder="@concurrent ou niche (ex: fitness, crypto)" value={handle} onChange={setHandle} />
-      <div className="flex gap-2">
-        <Button onClick={run} loading={loading} disabled={!handle.trim()}>🔍 Analyser</Button>
-        {result && <CopyButton text={result} />}
-      </div>
+    <ToolShell title="Stratégie Niche" icon="🔍" onBack={onBack} error={error}>
+      <FormSection label="Niche ou compte concurrent">
+        <p className="text-[12px] text-text2 font-mono">Entre un pseudo concurrent ou une niche pour une stratégie complète.</p>
+        <FieldInput placeholder="@concurrent ou niche (ex: fitness, crypto)" value={handle} onChange={setHandle} />
+        <div className="flex gap-2.5">
+          <Button onClick={run} loading={loading} disabled={!handle.trim()}>🔍 Analyser la niche</Button>
+          {result && <CopyButton text={result} />}
+        </div>
+      </FormSection>
       {result && <ResultBox value={result} rows={12} />}
     </ToolShell>
   )
@@ -149,15 +196,17 @@ function CaptionsVirales({ groqKey, onBack }: { groqKey: string; onBack: () => v
 
   return (
     <ToolShell title="Captions Virales" icon="💬" onBack={onBack} error={error}>
-      <p className="text-[13px] text-text2">Génère une caption complète avec hook, corps, CTA et hashtags.</p>
-      <div className="grid grid-cols-2 gap-3">
-        <FieldInput placeholder="Sujet du post" value={subject} onChange={setSubject} />
-        <SelectInput value={tone} onChange={setTone} options={TONES} />
-      </div>
-      <div className="flex gap-2">
-        <Button onClick={run} loading={loading} disabled={!subject.trim()}>✨ Générer</Button>
-        {result && <CopyButton text={result} />}
-      </div>
+      <FormSection label="Configuration de la caption">
+        <p className="text-[12px] text-text2 font-mono">Hook + corps + CTA + 15 hashtags générés automatiquement.</p>
+        <div className="grid grid-cols-2 gap-3">
+          <FieldInput placeholder="Sujet du post" value={subject} onChange={setSubject} />
+          <SelectInput value={tone} onChange={setTone} options={TONES} />
+        </div>
+        <div className="flex gap-2.5">
+          <Button onClick={run} loading={loading} disabled={!subject.trim()}>✨ Générer la caption</Button>
+          {result && <CopyButton text={result} />}
+        </div>
+      </FormSection>
       {result && <ResultBox value={result} rows={10} />}
     </ToolShell>
   )
@@ -187,12 +236,14 @@ function Planificateur({ groqKey, onBack, userId }: { groqKey: string; onBack: (
 
   return (
     <ToolShell title="Planificateur 7 Jours" icon="📅" onBack={onBack} error={error}>
-      <p className="text-[13px] text-text2">Calendrier éditorial complet sur 7 jours pour ta niche.</p>
-      <FieldInput placeholder="Niche (fitness, crypto, lifestyle…)" value={niche} onChange={setNiche} />
-      <div className="flex gap-2">
-        <Button onClick={run} loading={loading} disabled={!niche.trim()}>📅 Planifier</Button>
-        {result && <CopyButton text={result} />}
-      </div>
+      <FormSection label="Niche éditoriale">
+        <p className="text-[12px] text-text2 font-mono">Calendrier éditorial complet — 7 jours avec heures, types et idées.</p>
+        <FieldInput placeholder="Niche (fitness, crypto, lifestyle…)" value={niche} onChange={setNiche} />
+        <div className="flex gap-2.5">
+          <Button onClick={run} loading={loading} disabled={!niche.trim()}>📅 Générer le planning</Button>
+          {result && <CopyButton text={result} />}
+        </div>
+      </FormSection>
       {result && <ResultBox value={result} rows={14} />}
     </ToolShell>
   )
@@ -230,30 +281,33 @@ Format le script comme si c'était prêt à lire face caméra. Inclus les indica
 
   return (
     <ToolShell title="Script Reel Complet" icon="🎬" onBack={onBack} error={error}>
-      <p className="text-[13px] text-text2">Génère un script complet prêt à lire face caméra — hook, corps, CTA avec timings.</p>
-      <FieldInput placeholder="Sujet de ta vidéo" value={subject} onChange={setSubject} />
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <p className="text-[12px] uppercase tracking-wider font-bold mb-2 text-text2">Durée</p>
-          <div className="flex gap-2">
-            {['15s', '30s', '60s'].map(d => (
-              <button key={d} onClick={() => setDuration(d)} className="flex-1 py-2.5 rounded-xl text-[13px] font-bold"
-                style={duration === d
-                  ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff' }
-                  : { background: '#07070B', color: '#6B6B7A', border: '1px solid rgba(139,92,246,0.1)' }
-                }>{d}</button>
-            ))}
+      <FormSection label="Paramètres du Reel">
+        <p className="text-[12px] text-text2 font-mono">Script prêt à lire face caméra — hook, corps, CTA avec timings précis.</p>
+        <FieldInput placeholder="Sujet de ta vidéo" value={subject} onChange={setSubject} />
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <p className="text-[10px] uppercase tracking-widest font-bold mb-2.5 text-text3 font-mono">Durée cible</p>
+            <div className="flex gap-2">
+              {['15s', '30s', '60s'].map(d => (
+                <button key={d} onClick={() => setDuration(d)}
+                  className="flex-1 py-2.5 rounded-xl text-[12px] font-bold font-mono transition-all"
+                  style={duration === d
+                    ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff', boxShadow: '0 2px 14px -4px rgba(124,58,237,0.5)' }
+                    : { background: 'rgba(139,92,246,0.06)', color: 'rgba(139,92,246,0.5)', border: '1px solid rgba(139,92,246,0.12)' }
+                  }>{d}</button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <p className="text-[10px] uppercase tracking-widest font-bold mb-2.5 text-text3 font-mono">Ton</p>
+            <SelectInput value={tone} onChange={setTone} options={TONES} />
           </div>
         </div>
-        <div>
-          <p className="text-[12px] uppercase tracking-wider font-bold mb-2 text-text2">Ton</p>
-          <SelectInput value={tone} onChange={setTone} options={TONES} />
+        <div className="flex gap-2.5">
+          <Button onClick={run} loading={loading} disabled={!subject.trim()}>🎬 Générer le script</Button>
+          {result && <CopyButton text={result} />}
         </div>
-      </div>
-      <div className="flex gap-2">
-        <Button onClick={run} loading={loading} disabled={!subject.trim()}>🎬 Générer le script</Button>
-        {result && <CopyButton text={result} />}
-      </div>
+      </FormSection>
       {result && <ResultBox value={result} rows={14} />}
     </ToolShell>
   )
@@ -295,12 +349,14 @@ Chaque hook doit faire maximum 2 lignes. Format :
 
   return (
     <ToolShell title="3 Hooks A/B/C" icon="🪝" onBack={onBack} error={error}>
-      <p className="text-[13px] text-text2">Génère 3 hooks radicalement différents pour tester lequel performe le mieux.</p>
-      <FieldInput placeholder="Sujet de ta vidéo" value={subject} onChange={setSubject} />
-      <div className="flex gap-2">
-        <Button onClick={run} loading={loading} disabled={!subject.trim()}>🪝 Générer les hooks</Button>
-        {result && <CopyButton text={result} />}
-      </div>
+      <FormSection label="Sujet de ta vidéo">
+        <p className="text-[12px] text-text2 font-mono">3 styles radicalement différents — trouve celui qui performe le mieux.</p>
+        <FieldInput placeholder="Sujet de ta vidéo" value={subject} onChange={setSubject} />
+        <div className="flex gap-2.5">
+          <Button onClick={run} loading={loading} disabled={!subject.trim()}>🪝 Générer les hooks</Button>
+          {result && <CopyButton text={result} />}
+        </div>
+      </FormSection>
       {result && <ResultBox value={result} rows={12} />}
     </ToolShell>
   )
@@ -339,16 +395,18 @@ Réponds avec :
 
   return (
     <ToolShell title="Bio Optimizer" icon="👤" onBack={onBack} error={error}>
-      <p className="text-[13px] text-text2">Réécrit ta bio Instagram pour maximiser les conversions selon ton objectif.</p>
-      <FieldInput placeholder="Ta bio actuelle (colle-la ici)" value={bio} onChange={setBio} textarea rows={3} />
-      <div className="grid grid-cols-2 gap-3">
-        <FieldInput placeholder="Niche / domaine" value={niche} onChange={setNiche} />
-        <SelectInput value={goal} onChange={setGoal} options={['Followers', 'Ventes', 'Trafic lien bio', 'DMs', 'Notoriété']} />
-      </div>
-      <div className="flex gap-2">
-        <Button onClick={run} loading={loading} disabled={!bio.trim()}>👤 Optimiser la bio</Button>
-        {result && <CopyButton text={result} />}
-      </div>
+      <FormSection label="Bio et objectif">
+        <p className="text-[12px] text-text2 font-mono">Réécrit ta bio pour maximiser les conversions selon ton objectif.</p>
+        <FieldInput placeholder="Ta bio actuelle (colle-la ici)" value={bio} onChange={setBio} textarea rows={3} />
+        <div className="grid grid-cols-2 gap-3">
+          <FieldInput placeholder="Niche / domaine" value={niche} onChange={setNiche} />
+          <SelectInput value={goal} onChange={setGoal} options={['Followers', 'Ventes', 'Trafic lien bio', 'DMs', 'Notoriété']} />
+        </div>
+        <div className="flex gap-2.5">
+          <Button onClick={run} loading={loading} disabled={!bio.trim()}>👤 Optimiser la bio</Button>
+          {result && <CopyButton text={result} />}
+        </div>
+      </FormSection>
       {result && <ResultBox value={result} rows={10} />}
     </ToolShell>
   )
@@ -382,13 +440,15 @@ Commentaire 2 → [réponse]
 
   return (
     <ToolShell title="Réponses Commentaires" icon="💬" onBack={onBack} error={error}>
-      <p className="text-[13px] text-text2">Colle jusqu'à 20 commentaires (un par ligne), l'IA génère une réponse personnalisée pour chacun.</p>
-      <FieldInput placeholder={"Commentaire 1\nCommentaire 2\nCommentaire 3…"} value={comments} onChange={setComments} textarea rows={5} />
-      <SelectInput value={tone} onChange={setTone} options={['Sympathique', 'Professionnel', 'Humoristique', 'Motivant', 'Mystérieux']} />
-      <div className="flex gap-2">
-        <Button onClick={run} loading={loading} disabled={!comments.trim()}>💬 Générer les réponses</Button>
-        {result && <CopyButton text={result} />}
-      </div>
+      <FormSection label="Commentaires à traiter">
+        <p className="text-[12px] text-text2 font-mono">Jusqu'à 20 commentaires (un par ligne) — réponse personnalisée pour chacun.</p>
+        <FieldInput placeholder={"Commentaire 1\nCommentaire 2\nCommentaire 3…"} value={comments} onChange={setComments} textarea rows={5} />
+        <SelectInput value={tone} onChange={setTone} options={['Sympathique', 'Professionnel', 'Humoristique', 'Motivant', 'Mystérieux']} />
+        <div className="flex gap-2.5">
+          <Button onClick={run} loading={loading} disabled={!comments.trim()}>💬 Générer les réponses</Button>
+          {result && <CopyButton text={result} />}
+        </div>
+      </FormSection>
       {result && <ResultBox value={result} rows={10} />}
     </ToolShell>
   )
@@ -431,25 +491,27 @@ Pour chaque langue, format :
 
   return (
     <ToolShell title="Traducteur Multi-Marché" icon="🌍" onBack={onBack} error={error}>
-      <p className="text-[13px] text-text2">Adapte ta caption pour plusieurs marchés avec hashtags locaux — pas juste une traduction.</p>
-      <FieldInput placeholder="Colle ta caption française ici…" value={caption} onChange={setCaption} textarea rows={4} />
-      <div>
-        <p className="text-[12px] uppercase tracking-wider font-bold mb-3 text-text2">Langues cibles</p>
-        <div className="flex flex-wrap gap-2">
-          {LANG_OPTIONS.map(l => (
-            <button key={l} onClick={() => toggleLang(l)}
-              className="px-4 py-2 rounded-xl text-[13px] font-semibold transition-all"
-              style={langs.includes(l)
-                ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff' }
-                : { background: '#07070B', color: '#6B6B7A', border: '1px solid rgba(139,92,246,0.1)' }
-              }>{l}</button>
-          ))}
+      <FormSection label="Caption et marchés cibles">
+        <p className="text-[12px] text-text2 font-mono">Adaptation culturelle + hashtags locaux — pas juste une traduction.</p>
+        <FieldInput placeholder="Colle ta caption française ici…" value={caption} onChange={setCaption} textarea rows={4} />
+        <div>
+          <p className="text-[10px] uppercase tracking-widest font-bold mb-2.5 text-text3 font-mono">Langues cibles</p>
+          <div className="flex flex-wrap gap-2">
+            {LANG_OPTIONS.map(l => (
+              <button key={l} onClick={() => toggleLang(l)}
+                className="px-3.5 py-2 rounded-xl text-[12px] font-semibold font-mono transition-all"
+                style={langs.includes(l)
+                  ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff', boxShadow: '0 2px 12px -4px rgba(124,58,237,0.5)' }
+                  : { background: 'rgba(139,92,246,0.06)', color: 'rgba(139,92,246,0.5)', border: '1px solid rgba(139,92,246,0.12)' }
+                }>{l}</button>
+            ))}
+          </div>
         </div>
-      </div>
-      <div className="flex gap-2">
-        <Button onClick={run} loading={loading} disabled={!caption.trim() || !langs.length}>🌍 Traduire & adapter</Button>
-        {result && <CopyButton text={result} />}
-      </div>
+        <div className="flex gap-2.5">
+          <Button onClick={run} loading={loading} disabled={!caption.trim() || !langs.length}>🌍 Traduire & adapter</Button>
+          {result && <CopyButton text={result} />}
+        </div>
+      </FormSection>
       {result && <ResultBox value={result} rows={14} />}
     </ToolShell>
   )
@@ -495,67 +557,90 @@ Produis une analyse complète :
 
   return (
     <ToolShell title="Analyse Concurrent" icon="🕵️" onBack={onBack} error={error}>
-      <p className="text-[13px] text-text2">Analyse complète d'un concurrent — ce qu'il fait bien, les gaps à exploiter et un plan d'action.</p>
-      <div className="grid grid-cols-2 gap-3">
-        <FieldInput placeholder="@concurrent ou compte" value={handle} onChange={setHandle} />
-        <FieldInput placeholder="Niche (optionnel)" value={niche} onChange={setNiche} />
-      </div>
-      <div className="flex gap-2">
-        <Button onClick={run} loading={loading} disabled={!handle.trim()}>🕵️ Analyser</Button>
-        {result && <CopyButton text={result} />}
-      </div>
+      <FormSection label="Compte à analyser">
+        <p className="text-[12px] text-text2 font-mono">Gaps, formules de hooks, plan d'action — pour dépasser un concurrent.</p>
+        <div className="grid grid-cols-2 gap-3">
+          <FieldInput placeholder="@concurrent ou compte" value={handle} onChange={setHandle} />
+          <FieldInput placeholder="Niche (optionnel)" value={niche} onChange={setNiche} />
+        </div>
+        <div className="flex gap-2.5">
+          <Button onClick={run} loading={loading} disabled={!handle.trim()}>🕵️ Analyser le concurrent</Button>
+          {result && <CopyButton text={result} />}
+        </div>
+      </FormSection>
       {result && <ResultBox value={result} rows={14} />}
     </ToolShell>
   )
 }
 
-// ── Hub ───────────────────────────────────────────────────────────────────────
+// ── Hub tool metadata ─────────────────────────────────────────────────────────
 const GROQ_TOOLS: { id: GroqToolId; icon: string; title: string; desc: string; tags: string[] }[] = [
-  { id: 'script',     icon: '🎬', title: 'Script Reel',          desc: 'Script complet prêt à lire — hook, corps, CTA avec timings.',       tags: ['Script', 'Hook', 'CTA'] },
-  { id: 'hooks',      icon: '🪝', title: '3 Hooks A/B/C',        desc: '3 hooks radicalement différents pour tester le meilleur.',          tags: ['A/B Test', 'Hook', 'Copywriting'] },
-  { id: 'caption',    icon: '💬', title: 'Captions Virales',      desc: 'Caption complète : hook, corps, CTA et 15 hashtags.',               tags: ['Caption', 'Hashtags'] },
-  { id: 'bio',        icon: '👤', title: 'Bio Optimizer',         desc: 'Réécrit ta bio pour maximiser follows, ventes ou trafic.',          tags: ['Bio', 'Profil', 'SEO'] },
-  { id: 'replies',    icon: '💬', title: 'Réponses Commentaires', desc: 'Réponses personnalisées pour 20 commentaires en un clic.',          tags: ['Engagement', 'Commentaires'] },
+  { id: 'script',     icon: '🎬', title: 'Script Reel',           desc: 'Script complet prêt à lire — hook, corps, CTA avec timings.',       tags: ['Script', 'Hook', 'CTA'] },
+  { id: 'hooks',      icon: '🪝', title: '3 Hooks A/B/C',         desc: '3 hooks radicalement différents pour tester le meilleur.',          tags: ['A/B Test', 'Hook', 'Copywriting'] },
+  { id: 'caption',    icon: '💬', title: 'Captions Virales',       desc: 'Caption complète : hook, corps, CTA et 15 hashtags.',               tags: ['Caption', 'Hashtags'] },
+  { id: 'bio',        icon: '👤', title: 'Bio Optimizer',          desc: 'Réécrit ta bio pour maximiser follows, ventes ou trafic.',          tags: ['Bio', 'Profil', 'SEO'] },
+  { id: 'replies',    icon: '💬', title: 'Réponses Commentaires',  desc: 'Réponses personnalisées pour 20 commentaires en un clic.',          tags: ['Engagement', 'Commentaires'] },
   { id: 'translate',  icon: '🌍', title: 'Traducteur Multi-Marché',desc: 'Adapte ta caption pour EN/ES/PT/DE/IT avec hashtags locaux.',       tags: ['International', 'Traduction'] },
-  { id: 'competitor', icon: '🕵️', title: 'Analyse Concurrent',   desc: 'Gaps, formules de hooks, plan d\'action pour dépasser un compte.',  tags: ['Concurrent', 'Stratégie'] },
-  { id: 'strat',      icon: '🔍', title: 'Stratégie Niche',       desc: 'Fréquence, heures, hashtags et idées Reels pour une niche.',        tags: ['Niche', 'Planning'] },
-  { id: 'plan',       icon: '📅', title: 'Planificateur 7 Jours', desc: 'Calendrier éditorial complet sur 7 jours avec heures et idées.',    tags: ['Calendrier', 'Contenu'] },
+  { id: 'competitor', icon: '🕵️', title: 'Analyse Concurrent',    desc: 'Gaps, formules de hooks, plan d\'action pour dépasser un compte.',  tags: ['Concurrent', 'Stratégie'] },
+  { id: 'strat',      icon: '🔍', title: 'Stratégie Niche',        desc: 'Fréquence, heures, hashtags et idées Reels pour une niche.',        tags: ['Niche', 'Planning'] },
+  { id: 'plan',       icon: '📅', title: 'Planificateur 7 Jours',  desc: 'Calendrier éditorial complet sur 7 jours avec heures et idées.',    tags: ['Calendrier', 'Contenu'] },
 ]
 
 const VISION_TOOLS_META: { id: VisionToolId; icon: string; title: string; desc: string; tags: string[]; needsAnthopic: boolean }[] = [
-  { id: 'vision-score',     icon: '🔥', title: 'Score Viral',          desc: 'Note 1-10 sur 5 critères : hook, rétention, texte, thumbnail, dynamisme.', tags: ['Vidéo', 'Score', 'Claude'], needsAnthopic: true },
-  { id: 'vision-structure', icon: '🧬', title: 'Structure Virale',      desc: 'Décompose la timeline d\'une vidéo : hook, valeur, CTA, transitions.',      tags: ['Vidéo', 'Timeline', 'Claude'], needsAnthopic: true },
-  { id: 'vision-thumb',     icon: '🖼', title: 'Audit Thumbnail',       desc: 'Score contraste, lisibilité, émotion, couleurs + corrections prioritaires.', tags: ['Image', 'CTR', 'Claude'], needsAnthopic: true },
+  { id: 'vision-score',     icon: '🔥', title: 'Score Viral',     desc: 'Note 1-10 sur 5 critères : hook, rétention, texte, thumbnail, dynamisme.', tags: ['Vidéo', 'Score', 'Claude'], needsAnthopic: true },
+  { id: 'vision-structure', icon: '🧬', title: 'Structure Virale', desc: 'Décompose la timeline d\'une vidéo : hook, valeur, CTA, transitions.',      tags: ['Vidéo', 'Timeline', 'Claude'], needsAnthopic: true },
+  { id: 'vision-thumb',     icon: '🖼', title: 'Audit Thumbnail',  desc: 'Score contraste, lisibilité, émotion, couleurs + corrections prioritaires.',  tags: ['Image', 'CTR', 'Claude'], needsAnthopic: true },
 ]
 
+// ── Premium tool card ─────────────────────────────────────────────────────────
 function ToolCard({ icon, title, desc, tags, locked, onClick }: {
   icon: string; title: string; desc: string; tags: string[]; locked?: boolean; onClick: () => void
 }) {
   return (
     <button onClick={onClick}
-      className="rounded-2xl p-5 text-left space-y-3 transition-all hover:scale-[1.02] group"
-      style={{ background: '#07070B', border: '1px solid rgba(139,92,246,0.15)', opacity: locked ? 0.5 : 1 }}>
-      <div className="flex items-start justify-between">
-        <div className="w-11 h-11 rounded-xl flex items-center justify-center text-2xl flex-shrink-0"
-          style={{ background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.2)' }}>
+      className="sf-card rounded-2xl p-4 text-left space-y-3 transition-all card-lift group"
+      style={{ opacity: locked ? 0.55 : 1 }}>
+      <div className="flex items-start justify-between gap-2">
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0 transition-all group-hover:scale-110"
+          style={{ background: 'linear-gradient(135deg,rgba(124,58,237,0.18),rgba(168,85,247,0.08))', border: '1px solid rgba(139,92,246,0.2)' }}>
           {icon}
         </div>
-        {locked && <span className="text-[11px] px-2 py-0.5 rounded font-bold"
-          style={{ background: 'rgba(251,191,36,0.1)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.2)' }}>
-          Clé Anthropic requise
-        </span>}
+        {locked && (
+          <span className="text-[9px] px-2 py-1 rounded-lg font-bold font-mono uppercase tracking-wider flex-shrink-0"
+            style={{ background: 'rgba(245,158,11,0.08)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.18)' }}>
+            Clé Anthropic
+          </span>
+        )}
       </div>
       <div>
-        <p className="text-[13px] font-bold text-white group-hover:text-purple-300 transition-colors">{title}</p>
-        <p className="text-[12px] mt-1 leading-relaxed text-text2">{desc}</p>
+        <p className="text-[13px] font-bold text-text group-hover:text-accent-glow transition-colors">{title}</p>
+        <p className="text-[11px] mt-1 leading-relaxed text-text2">{desc}</p>
       </div>
       <div className="flex flex-wrap gap-1.5">
         {tags.map(t => (
-          <span key={t} className="text-[11px] px-2 py-0.5 rounded-full font-semibold"
-            style={{ background: 'rgba(139,92,246,0.1)', color: 'rgba(196,181,253,0.6)' }}>{t}</span>
+          <span key={t} className="text-[9px] px-2 py-0.5 rounded-full font-bold font-mono uppercase tracking-wider"
+            style={{ background: 'rgba(139,92,246,0.08)', color: 'rgba(167,139,250,0.6)', border: '1px solid rgba(139,92,246,0.12)' }}>
+            {t}
+          </span>
         ))}
       </div>
     </button>
+  )
+}
+
+// ── Section header ────────────────────────────────────────────────────────────
+function SectionHeader({ label, badge }: { label: string; badge?: string }) {
+  return (
+    <div className="flex items-center gap-3 mb-4">
+      <p className="text-[10px] uppercase tracking-widest font-black text-text3 font-mono">{label}</p>
+      {badge && (
+        <span className="text-[9px] font-bold font-mono px-2 py-0.5 rounded-md uppercase tracking-wider"
+          style={{ background: 'rgba(245,158,11,0.08)', color: 'rgba(245,158,11,0.7)', border: '1px solid rgba(245,158,11,0.15)' }}>
+          {badge}
+        </span>
+      )}
+      <div className="flex-1 h-px" style={{ background: 'linear-gradient(90deg, rgba(139,92,246,0.2), transparent)' }} />
+    </div>
   )
 }
 
@@ -566,11 +651,18 @@ export function AiTools({ user }: AiToolsProps) {
 
   if (conns.loading) {
     return (
-      <div className="h-full flex flex-col overflow-hidden">
+      <div className="h-full flex flex-col overflow-hidden bg-bg anim-page">
         <div className="flex-1 flex items-center justify-center">
-          <div className="flex items-center gap-3">
-            <div className="animate-spin w-5 h-5 rounded-full border-2 border-accent border-t-transparent" />
-            <span className="text-[13px] text-text2">Chargement des connexions…</span>
+          <div className="flex flex-col items-center gap-4">
+            <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl relative overflow-hidden"
+              style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.15), rgba(236,72,153,0.08))', border: '1px solid rgba(139,92,246,0.2)' }}>
+              <span className="relative z-10">✨</span>
+              <div className="absolute inset-0 animate-pulse rounded-2xl" style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.1), rgba(236,72,153,0.06))' }} />
+            </div>
+            <div className="text-center">
+              <p className="text-[13px] font-bold text-text2">Chargement des outils IA…</p>
+              <p className="text-[11px] text-text3 font-mono mt-1">Connexion au studio</p>
+            </div>
           </div>
         </div>
       </div>
@@ -579,18 +671,28 @@ export function AiTools({ user }: AiToolsProps) {
 
   if (!conns.groq) {
     return (
-      <div className="h-full flex flex-col overflow-hidden">
-        <div className="flex-shrink-0 px-8 pt-7 pb-5 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
-          <div>
-            <h1 className="text-[22px] font-black text-white leading-none tracking-tight">Outils IA</h1>
-            <p className="text-[13px] text-text2 mt-0.5">Groq · Claude Vision · FFmpeg</p>
+      <div className="h-full flex flex-col overflow-hidden bg-bg anim-page">
+        <div className="flex-shrink-0 px-8 pt-8 pb-6 sf-topbar">
+          <div className="flex items-center gap-4">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl"
+              style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.2), rgba(236,72,153,0.1))', border: '1px solid rgba(139,92,246,0.25)' }}>
+              ✨
+            </div>
+            <div>
+              <h1 className="text-[22px] font-black text-text leading-none">Outils IA</h1>
+              <p className="text-[12px] text-text3 font-mono mt-0.5 tracking-widest uppercase">AI Creative Studio</p>
+            </div>
           </div>
         </div>
-        <div className="flex-1 overflow-y-auto px-10 pb-10 pt-8">
-          <div className="max-w-lg rounded-2xl p-6" style={{ background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.2)' }}>
-            <p className="text-[15px] font-bold text-warn mb-2">⚠ Clé Groq API manquante</p>
-            <p className="text-[13px] text-text2 mb-1">Va dans <strong className="text-white">Paramètres → Connexions → Clés API</strong> et colle ta clé Groq.</p>
-            <p className="text-[12px] text-text2">Gratuit sur <span className="text-accent">groq.com</span> → API Keys → Create</p>
+        <div className="flex-1 overflow-y-auto px-8 pb-10 pt-8">
+          <div className="max-w-lg sf-card rounded-2xl p-6 border border-warn/20" style={{ background: 'rgba(245,158,11,0.04)' }}>
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center text-base"
+                style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)' }}>⚠</div>
+              <p className="text-[14px] font-bold text-warn">Clé Groq API manquante</p>
+            </div>
+            <p className="text-[13px] text-text2 mb-2">Va dans <strong className="text-text">Paramètres → Connexions → Clés API</strong> et colle ta clé Groq.</p>
+            <p className="text-[11px] font-mono" style={{ color: 'rgba(139,92,246,0.6)' }}>Gratuit sur groq.com → API Keys → Create</p>
           </div>
         </div>
       </div>
@@ -620,53 +722,91 @@ export function AiTools({ user }: AiToolsProps) {
   if (active === 'translate')  return <ContentTranslator groqKey={conns.groq} onBack={back} />
   if (active === 'competitor') return <CompetitorAnalysis groqKey={conns.groq} onBack={back} />
 
-  // Hub
+  // ── Hub ───────────────────────────────────────────────────────────────────
+  const totalTools = GROQ_TOOLS.length + VISION_TOOLS_META.length + 2
   return (
-    <div className="h-full flex flex-col overflow-hidden">
+    <div className="h-full flex flex-col overflow-hidden bg-bg anim-page">
 
       {/* Header */}
-      <div className="flex-shrink-0 px-8 pt-7 pb-5 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
-        <div>
-          <h1 className="text-[22px] font-black text-white leading-none tracking-tight">Outils IA</h1>
-          <p className="text-[13px] text-text2 mt-0.5">
-            {GROQ_TOOLS.length + VISION_TOOLS_META.length + 2} outils · Groq · Claude Vision · FFmpeg
-          </p>
-        </div>
-      </div>
-
-      <div className="flex-1 overflow-y-auto px-10 pb-10">
-        <div className="pt-8 space-y-8">
-
-          {/* Vidéo */}
-          <div>
-            <p className="text-[12px] uppercase tracking-widest font-black mb-4 text-text2">Vidéo</p>
-            <div className="grid grid-cols-3 gap-4">
-              <ToolCard icon="🏷" title="Changeur de Métadonnées"
-                desc="Supprime toutes les métadonnées et injecte un timestamp aléatoire." tags={['FFmpeg', 'Instant', 'Stream copy']}
-                onClick={() => setActive('metadata')} />
-              <ToolCard icon="✍" title="Texte IA — Dupliquer"
-                desc="Ajoute un texte sur tes vidéos avec plusieurs positions différentes pour créer des copies uniques." tags={['FFmpeg', 'Canvas', 'Mass']}
-                onClick={() => setActive('textcopy')} />
+      <div className="flex-shrink-0 px-8 pt-8 pb-6 sf-topbar">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            {/* Glowing icon */}
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl relative overflow-hidden"
+              style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.22), rgba(236,72,153,0.12))', border: '1px solid rgba(139,92,246,0.3)' }}>
+              <span className="relative z-10">✨</span>
+              <div className="absolute inset-0 anim-glow rounded-2xl" />
+            </div>
+            <div>
+              <h1 className="text-[26px] font-black leading-none sf-text-gradient">Outils IA</h1>
+              <p className="text-[12px] text-text3 font-mono mt-1 tracking-widest uppercase">AI Creative Studio</p>
             </div>
           </div>
 
-          {/* Groq IA */}
+          {/* Stats */}
+          <div className="flex items-center gap-3">
+            <div className="sf-card rounded-xl px-4 py-2.5 flex items-center gap-2.5">
+              <span className="text-base">⚡</span>
+              <div>
+                <p className="text-[11px] font-mono text-text3 uppercase tracking-wider">Outils actifs</p>
+                <p className="text-[15px] font-black text-accent leading-none">{totalTools}</p>
+              </div>
+            </div>
+            <div className="sf-card rounded-xl px-4 py-2.5 flex items-center gap-2.5">
+              <span className="text-base">🤖</span>
+              <div>
+                <p className="text-[11px] font-mono text-text3 uppercase tracking-wider">Moteur</p>
+                <p className="text-[13px] font-bold text-text leading-none">Groq + Claude</p>
+              </div>
+            </div>
+            {!conns.anthropic && (
+              <div className="rounded-xl px-4 py-2.5 flex items-center gap-2" style={{ background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.15)' }}>
+                <span className="text-warn text-sm">⚠</span>
+                <p className="text-[11px] font-mono" style={{ color: 'rgba(245,158,11,0.75)' }}>Clé Anthropic manquante</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-8 pb-10">
+        <div className="pt-7 space-y-8 max-w-6xl">
+
+          {/* ── Vidéo section ── */}
           <div>
-            <p className="text-[12px] uppercase tracking-widest font-black mb-4 text-text2">Groq IA — Texte & Stratégie</p>
-            <div className="grid grid-cols-3 gap-4">
+            <SectionHeader label="Traitement Vidéo" badge="FFmpeg" />
+            <div className="grid grid-cols-3 gap-4 anim-stagger">
+              <ToolCard
+                icon="🏷"
+                title="Changeur de Métadonnées"
+                desc="Supprime toutes les métadonnées et injecte un timestamp aléatoire."
+                tags={['FFmpeg', 'Stream copy', 'Instant']}
+                onClick={() => setActive('metadata')}
+              />
+              <ToolCard
+                icon="✍"
+                title="Texte IA — Dupliquer"
+                desc="Ajoute un texte sur tes vidéos avec plusieurs positions pour créer des copies uniques."
+                tags={['FFmpeg', 'Canvas', 'Mass']}
+                onClick={() => setActive('textcopy')}
+              />
+            </div>
+          </div>
+
+          {/* ── Groq IA section ── */}
+          <div>
+            <SectionHeader label="Groq IA — Texte & Stratégie" badge="Llama 3.1" />
+            <div className="grid grid-cols-3 gap-4 anim-stagger">
               {GROQ_TOOLS.map(t => (
                 <ToolCard key={t.id} {...t} onClick={() => setActive(t.id)} />
               ))}
             </div>
           </div>
 
-          {/* Vision IA */}
+          {/* ── Vision IA section ── */}
           <div>
-            <p className="text-[12px] uppercase tracking-widest font-black mb-4 text-text2">
-              Claude Vision — Analyse Vidéo & Image
-              {!conns.anthropic && <span className="ml-2 text-warn/70 normal-case">⚠ Clé Anthropic manquante</span>}
-            </p>
-            <div className="grid grid-cols-3 gap-4">
+            <SectionHeader label="Claude Vision — Analyse Vidéo & Image" badge="Claude" />
+            <div className="grid grid-cols-3 gap-4 anim-stagger">
               {VISION_TOOLS_META.map(t => (
                 <ToolCard key={t.id} {...t} locked={!conns.anthropic} onClick={() => setActive(t.id)} />
               ))}

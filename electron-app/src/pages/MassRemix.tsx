@@ -1140,9 +1140,9 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
       <div className="h-full flex flex-col overflow-hidden">
 
         {/* Header */}
-        <div className="flex-shrink-0 px-10 pt-9 pb-6 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        <div className="flex-shrink-0 px-8 pt-7 pb-4 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
           <div>
-            <h1 className="text-[28px] font-black text-white leading-none">Mass Remix</h1>
+            <h1 className="text-[20px] font-black text-white leading-none">Mass Remix</h1>
             <p className="text-[13px] text-text2 mt-1">Génère des remixes vidéo en masse avec FFmpeg + IA</p>
           </div>
           <div className="flex items-center gap-2">

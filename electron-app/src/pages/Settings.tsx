@@ -58,53 +58,113 @@ function ToggleRow({
   )
 }
 
-type GeneralTab = 'apparence' | 'sons'
+type GeneralTab = 'apparence' | 'sons' | 'notifications' | 'langue' | 'securite' | 'avance'
 type Panel = 'general' | 'profile' | 'connexions' | 'organization' | 'admin' | 'abonnement'
-interface SettingsProps { user: User; initialPanel?: Panel }
+interface SettingsProps { user: User; initialPanel?: Panel; initialTab?: GeneralTab }
 
-export function Settings({ user, initialPanel }: SettingsProps) {
+const GEN_SIDEBAR: { id: GeneralTab; label: string; icon: string }[] = [
+  { id: 'apparence',     label: 'Apparence',       icon: '🎨' },
+  { id: 'sons',          label: 'Sons',            icon: '🔊' },
+  { id: 'notifications', label: 'Notifications',   icon: '🔔' },
+  { id: 'langue',        label: 'Langue & région', icon: '🌐' },
+  { id: 'securite',      label: 'Sécurité',        icon: '🔒' },
+  { id: 'avance',        label: 'Avancé',          icon: '⚙️' },
+]
+
+export function Settings({ user, initialPanel, initialTab }: SettingsProps) {
   const { role, perms, currentOrg } = useOrg()
   const license = useLicense()
-  const canSeeConnexions = role ? canSeeTab(role, perms, 'settings') : true
+  const canSeeConnexions     = role ? canSeeTab(role, perms, 'settings') : true
   const canEditOrgConnexions = role === 'owner' || role === 'admin'
-  const [panel, setPanel]     = useState<Panel>(() => {
+
+  const [panel, setPanel]   = useState<Panel>(() => {
     const p = initialPanel ?? 'general'
     return p === 'connexions' && !canSeeConnexions ? 'general' : p
   })
-  const mountedRef             = useRef(false)
-  const [genTab, setGenTab]   = useState<GeneralTab>('apparence')
-  const [saving, setSaving]   = useState(false)
-  const [saved, setSaved]     = useState(false)
+  const mountedRef           = useRef(false)
+  const [genTab, setGenTab] = useState<GeneralTab>(initialTab ?? 'apparence')
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved]   = useState(false)
   const [loading, setLoading] = useState(true)
-  const [error, setError]     = useState<string | null>(null)
+  const [error, setError]   = useState<string | null>(null)
 
-  // Apparence
-  const [theme, setTheme]     = useState('Bleu')
+  // ── Apparence ──────────────────────────────────────────────────────────────
+  const [theme, setTheme]               = useState('Bleu')
   const [pixelUnlocked, setPixelUnlocked] = useState(false)
   const [swatchClicks, setSwatchClicks] = useState<{ count: number; first: number }>({ count: 0, first: 0 })
+  const [darkMode, setDarkMode]         = useState(true)
+  const [roundedCorners, setRoundedCorners] = useState('moyen')
+  const [animationsOn, setAnimationsOn] = useState(true)
+  const [glassOn, setGlassOn]           = useState(true)
+  const [fontFamily, setFontFamily]     = useState('inter')
+  const [fontSize, setFontSize]         = useState('moyenne')
+  const [density, setDensity]           = useState('confortable')
+  const [sidebarMode, setSidebarMode]   = useState('etendue')
 
-  // Notifications
-  const [notifyPopup, setNotifyPopup] = useState(true)
-  const [notifySound, setNotifySound] = useState(true)
+  // ── Sons ──────────────────────────────────────────────────────────────────
   const [musicOn, setMusicOn]         = useState(isMusicEnabled)
   const [musicVol, setMusicVol]       = useState(getVolume)
   const [musicTrack, setMusicTrackS]  = useState(getTrack)
+  const [notifySound, setNotifySound] = useState(true)
 
-  // Profil
+  // ── Notifications ─────────────────────────────────────────────────────────
+  const [notifyPopup, setNotifyPopup]   = useState(true)
+  const [notifyDesktop, setNotifyDesktop] = useState(false)
+  const [notifyUpdates, setNotifyUpdates] = useState(true)
+  const [notifyErrors, setNotifyErrors] = useState(true)
+
+  // ── Langue ───────────────────────────────────────────────────────────────
+  const [lang, setLang]             = useState('fr')
+  const [dateFormat, setDateFormat] = useState('dd/mm/yyyy')
+  const [timezone, setTimezone]     = useState('Europe/Paris')
+
+  // ── Sécurité ──────────────────────────────────────────────────────────────
+  const [twoFA, setTwoFA]           = useState(false)
+  const [sessionTimeout, setSessionTimeout] = useState('jamais')
+
+  // ── Avancé ────────────────────────────────────────────────────────────────
+  const [devMode, setDevMode]       = useState(false)
+  const [resetConfirm, setResetConfirm] = useState(false)
+
+  // ── Profil ────────────────────────────────────────────────────────────────
   const [profileEmail, setProfileEmail] = useState(user.email ?? '')
   const [profileName, setProfileName]   = useState('')
   const [displayName, setDisplayName]   = useState('')
 
-  // Connexions
-  const [bearer, setBearer]         = useState('')
-  const [groqKey, setGroqKey]       = useState('')
+  // ── Connexions ────────────────────────────────────────────────────────────
+  const [bearer, setBearer]             = useState('')
+  const [groqKey, setGroqKey]           = useState('')
   const [anthropicKey, setAnthropicKey] = useState('')
-  const [proxyUrl, setProxyUrl]     = useState('')
-  const [igSession, setIgSession]   = useState('')
+  const [proxyUrl, setProxyUrl]         = useState('')
+  const [igSession, setIgSession]       = useState('')
 
-  useEffect(() => {
-    if (initialPanel) setPanel(initialPanel)
-  }, [initialPanel])
+  useEffect(() => { if (initialPanel) setPanel(initialPanel) }, [initialPanel])
+  useEffect(() => { if (initialTab)   setGenTab(initialTab)  }, [initialTab])
+
+  function applyAppearanceCSS(opts: {
+    rounded?: string; fontFam?: string; fs?: string; anim?: boolean; dark?: boolean
+    glass?: boolean; density?: string; sidebar?: string
+  }) {
+    const html = document.documentElement
+    // Font family
+    const ffMap: Record<string,string> = { inter: "'Inter', sans-serif", system: 'system-ui, sans-serif', mono: 'ui-monospace, monospace' }
+    const ff = opts.fontFam ?? fontFamily
+    document.body.style.fontFamily = ffMap[ff] ?? "'Inter', sans-serif"
+    // data-* attributes drive CSS overrides in index.css
+    html.setAttribute('data-fontsize', opts.fs ?? fontSize)
+    html.setAttribute('data-rounded',  opts.rounded ?? roundedCorners)
+    html.setAttribute('data-density',  opts.density ?? density)
+    html.setAttribute('data-theme',    (opts.dark ?? darkMode) ? 'dark' : 'light')
+    html.setAttribute('data-glass',    (opts.glass ?? glassOn) ? 'on' : 'off')
+    // Animations
+    const anim = opts.anim ?? animationsOn
+    if (anim) html.classList.remove('no-animations')
+    else       html.classList.add('no-animations')
+    // Sidebar via custom event (Layout.tsx listens)
+    if (opts.sidebar !== undefined) {
+      window.dispatchEvent(new CustomEvent('sf:sidebar-change', { detail: opts.sidebar }))
+    }
+  }
 
   // Load saved values
   useEffect(() => {
@@ -112,14 +172,29 @@ export function Settings({ user, initialPanel }: SettingsProps) {
     mountedRef.current = true
 
     const storedTheme = localStorage.getItem('theme') || 'Bleu'
-    setTheme(storedTheme)
-    applyTheme(storedTheme)
+    setTheme(storedTheme); applyTheme(storedTheme)
     setPixelUnlocked(localStorage.getItem('pixel-unlocked') === '1')
 
-    const storedNotifyPopup = localStorage.getItem('notify-popup')
-    const storedNotifySound = localStorage.getItem('notify-sound')
-    if (storedNotifyPopup !== null) setNotifyPopup(storedNotifyPopup === '1')
-    if (storedNotifySound !== null) setNotifySound(storedNotifySound === '1')
+    const ls = (k: string, fallback: string) => localStorage.getItem(k) ?? fallback
+    const lb = (k: string, fallback: boolean) => { const v = localStorage.getItem(k); return v !== null ? v === '1' : fallback }
+
+    const r  = ls('sf-rounded',  'moyen');     setRoundedCorners(r)
+    const an = lb('sf-animations', true);      setAnimationsOn(an)
+    const gl = lb('sf-glass',      true);      setGlassOn(gl)
+    const ff = ls('sf-font',      'inter');    setFontFamily(ff)
+    const fs = ls('sf-fontsize',  'moyenne');  setFontSize(fs)
+    const de = ls('sf-density',   'confortable'); setDensity(de)
+    const sb = ls('sf-sidebar',   'etendue');  setSidebarMode(sb)
+    const dk = lb('sf-dark',       true);      setDarkMode(dk)
+    setNotifyPopup(lb('notify-popup', true))
+    setNotifySound(lb('notify-sound', true))
+    setNotifyUpdates(lb('sf-notify-updates', true))
+    setNotifyErrors(lb('sf-notify-errors',  true))
+    setLang(ls('sf-lang', 'fr'))
+    setDateFormat(ls('sf-date-format', 'dd/mm/yyyy'))
+    setTimezone(ls('sf-timezone', 'Europe/Paris'))
+    setDevMode(lb('sf-dev-mode', false))
+    applyAppearanceCSS({ rounded: r, fontFam: ff, fs, anim: an, dark: dk, glass: gl, density: de })
 
     async function loadAll() {
       setLoading(true)
@@ -133,23 +208,18 @@ export function Settings({ user, initialPanel }: SettingsProps) {
           })(),
           supabase.from('profiles').select('full_name, display_name, email').eq('id', user.id).maybeSingle(),
         ])
-
         const d = configRes.data as any
         if (d) {
-          setBearer(d.bearer_token       ?? '')
-          setGroqKey(d.groq_api_key      ?? '')
-          setAnthropicKey(d.anthropic_api_key ?? '')
-          setProxyUrl(d.proxy            ?? '')
-          setIgSession(d.ig_sessionid    ?? '')
+          setBearer(d.bearer_token ?? ''); setGroqKey(d.groq_api_key ?? '')
+          setAnthropicKey(d.anthropic_api_key ?? ''); setProxyUrl(d.proxy ?? '')
+          setIgSession(d.ig_sessionid ?? '')
           setProfileEmail((d.profile_email as string) ?? user.email ?? '')
         }
         if (profileRes.data) {
-          setProfileName(profileRes.data.full_name    ?? '')
+          setProfileName(profileRes.data.full_name ?? '')
           setDisplayName(profileRes.data.display_name ?? '')
         }
-      } finally {
-        setLoading(false)
-      }
+      } finally { setLoading(false) }
     }
     loadAll()
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -162,9 +232,7 @@ export function Settings({ user, initialPanel }: SettingsProps) {
   }
 
   function handleTheme(t: string) {
-    setTheme(t)
-    localStorage.setItem('theme', t)
-    applyTheme(t)
+    setTheme(t); localStorage.setItem('theme', t); applyTheme(t)
   }
 
   function handleSwatchClick() {
@@ -172,97 +240,112 @@ export function Settings({ user, initialPanel }: SettingsProps) {
     setSwatchClicks(prev => {
       const reset = now - prev.first > 4000
       const next  = { count: reset ? 1 : prev.count + 1, first: reset ? now : prev.first }
-      if (next.count >= 7) {
-        localStorage.setItem('pixel-unlocked', '1')
-        setPixelUnlocked(true)
-      }
+      if (next.count >= 7) { localStorage.setItem('pixel-unlocked', '1'); setPixelUnlocked(true) }
       return next
     })
   }
 
   async function save() {
-    setSaving(true)
-    setError(null)
+    setSaving(true); setError(null)
     try {
-      localStorage.setItem('notify-popup', notifyPopup ? '1' : '0')
-      localStorage.setItem('notify-sound', notifySound ? '1' : '0')
+      // Persist all appearance / notification / language settings
+      const set = (k: string, v: string) => localStorage.setItem(k, v)
+      const setb = (k: string, v: boolean) => localStorage.setItem(k, v ? '1' : '0')
+      set('sf-rounded', roundedCorners); set('sf-font', fontFamily); set('sf-fontsize', fontSize)
+      set('sf-density', density);        set('sf-sidebar', sidebarMode)
+      setb('sf-dark', darkMode);         setb('sf-animations', animationsOn)
+      setb('sf-glass', glassOn);         setb('notify-popup', notifyPopup)
+      setb('notify-sound', notifySound); setb('sf-notify-updates', notifyUpdates)
+      setb('sf-notify-errors', notifyErrors); set('sf-lang', lang)
+      set('sf-date-format', dateFormat); set('sf-timezone', timezone)
+      setb('sf-dev-mode', devMode)
+      applyAppearanceCSS({})
       const { error: e } = await supabase.from('app_config').upsert({
-        user_id: user.id,
-        theme,
-        updated_at: new Date().toISOString(),
+        user_id: user.id, theme, updated_at: new Date().toISOString(),
       }, { onConflict: 'user_id' })
       if (e) throw e
-      setSaved(true)
-      setTimeout(() => setSaved(false), 2000)
-    } catch (e: any) {
-      setError(e.message ?? 'Erreur inconnue')
-    } finally {
-      setSaving(false)
-    }
+      setSaved(true); setTimeout(() => setSaved(false), 2500)
+    } catch (e: any) { setError(e.message ?? 'Erreur inconnue') } finally { setSaving(false) }
   }
 
-  // but they're additionally written to the org's org_config row by saveConnexions.
   async function saveConnexions() {
-    setSaving(true)
-    setError(null)
+    setSaving(true); setError(null)
     try {
-      if (!canEditOrgConnexions) {
-        throw new Error('Seuls les admins peuvent modifier les connexions.')
-      }
-
+      if (!canEditOrgConnexions) throw new Error('Seuls les admins peuvent modifier les connexions.')
       if (currentOrg) {
         const { error: e } = await supabase.from('org_config').upsert({
-          org_id:        currentOrg.id,
-          bearer_token:  bearer,
-          groq_api_key:  groqKey,
-          anthropic_api_key: anthropicKey,
-          proxy:         proxyUrl,
-          ig_sessionid:  igSession,
-          updated_at:    new Date().toISOString(),
+          org_id: currentOrg.id, bearer_token: bearer, groq_api_key: groqKey,
+          anthropic_api_key: anthropicKey, proxy: proxyUrl, ig_sessionid: igSession,
+          updated_at: new Date().toISOString(),
         }, { onConflict: 'org_id' })
         if (e) throw e
       } else {
         const { error: e } = await supabase.from('app_config').upsert({
-          user_id:       user.id,
-          bearer_token:  bearer,
-          groq_api_key:  groqKey,
-          anthropic_api_key: anthropicKey,
-          proxy:         proxyUrl,
-          ig_sessionid:  igSession,
-          updated_at:    new Date().toISOString(),
+          user_id: user.id, bearer_token: bearer, groq_api_key: groqKey,
+          anthropic_api_key: anthropicKey, proxy: proxyUrl, ig_sessionid: igSession,
+          updated_at: new Date().toISOString(),
         }, { onConflict: 'user_id' })
         if (e) throw e
       }
-
-      notifyConnectionsChanged()
-      setSaved(true)
-      setTimeout(() => setSaved(false), 2000)
-    } catch (e: any) {
-      setError(e.message ?? 'Erreur inconnue')
-    } finally {
-      setSaving(false)
-    }
+      notifyConnectionsChanged(); setSaved(true); setTimeout(() => setSaved(false), 2500)
+    } catch (e: any) { setError(e.message ?? 'Erreur inconnue') } finally { setSaving(false) }
   }
 
   async function saveProfile() {
-    setSaving(true)
-    setError(null)
+    setSaving(true); setError(null)
     try {
       const { error: e } = await supabase.from('profiles').upsert({
-        id:           user.id,
-        email:        user.email ?? '',
-        full_name:    profileName,
-        display_name: displayName,
-        updated_at:   new Date().toISOString(),
+        id: user.id, email: user.email ?? '', full_name: profileName,
+        display_name: displayName, updated_at: new Date().toISOString(),
       }, { onConflict: 'id' })
       if (e) throw e
-      setSaved(true)
-      setTimeout(() => setSaved(false), 2000)
-    } catch (e: any) {
-      setError(e.message ?? 'Erreur inconnue')
-    } finally {
-      setSaving(false)
-    }
+      setSaved(true); setTimeout(() => setSaved(false), 2500)
+    } catch (e: any) { setError(e.message ?? 'Erreur inconnue') } finally { setSaving(false) }
+  }
+
+  // ── Shared helpers ─────────────────────────────────────────────────────────
+  const card = 'rounded-2xl p-5 space-y-4'
+  const cardStyle = { background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }
+  const sectionTitle = 'text-[15px] font-bold text-white'
+  const sectionSub   = 'text-[12px] mt-0.5 mb-4'
+
+  function SelectRow({ label, sub, value, onChange, options }: {
+    label: string; sub: string; value: string
+    onChange: (v: string) => void; options: { value: string; label: string }[]
+  }) {
+    return (
+      <div className="flex items-center justify-between py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+        <div>
+          <p className="text-[13px] font-medium text-text">{label}</p>
+          <p className="text-[11px] text-text2 mt-0.5">{sub}</p>
+        </div>
+        <div className="relative flex-shrink-0">
+          <select value={value} onChange={e => onChange(e.target.value)}
+            className="appearance-none rounded-xl px-3 py-2 pr-7 text-[12px] font-medium focus:outline-none cursor-pointer"
+            style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', color: '#e2e8f0' }}>
+            {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] opacity-40 pointer-events-none">▼</span>
+        </div>
+      </div>
+    )
+  }
+
+  function SettingToggle({ label, sub, checked, onChange }: {
+    label: string; sub: string; checked: boolean; onChange: (v: boolean) => void
+  }) {
+    return (
+      <div className="flex items-center justify-between py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+        <div className="flex-1 pr-4">
+          <p className="text-[13px] font-medium text-text">{label}</p>
+          <p className="text-[11px] text-text2 mt-0.5">{sub}</p>
+        </div>
+        <button onClick={() => onChange(!checked)}
+          className={`relative flex-shrink-0 w-10 h-5 rounded-full transition-all ${checked ? 'bg-accent' : 'bg-white/10'}`}>
+          <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${checked ? 'left-[22px]' : 'left-0.5'}`} />
+        </button>
+      </div>
+    )
   }
 
   if (loading) return (
@@ -276,235 +359,510 @@ export function Settings({ user, initialPanel }: SettingsProps) {
     </div>
   )
 
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="h-full flex flex-col overflow-hidden">
 
-      {/* Page header */}
-      <div className="flex-shrink-0 px-10 pt-9 pb-7 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+      {/* Header */}
+      <div className="flex-shrink-0 px-8 pt-7 pb-5 flex items-center justify-between"
+        style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
         <div>
-          <h1 className="text-[28px] font-black text-white leading-none">Paramètres</h1>
-          <p className="text-[13px] text-text2 mt-0.5">Personnalise ton expérience</p>
+          <h1 className="text-[26px] font-black text-white leading-none">Paramètres</h1>
+          <p className="text-[13px] mt-0.5" style={{ color: 'rgba(148,163,184,0.6)' }}>Personnalise ton expérience ScaleFlow</p>
         </div>
-        {panel === 'general' && (
-          <div className="flex items-center gap-4">
-            {saved && <span className="text-[13px] text-ok">✓ Sauvegardé</span>}
-            <button
-              onClick={save}
-              disabled={saving}
-              className="rounded-xl px-5 py-2.5 text-[13px] font-semibold text-white disabled:opacity-50"
-              style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)' }}
-            >
-              {saving ? 'Sauvegarde…' : '💾 Sauvegarder'}
-            </button>
-          </div>
-        )}
+        <div className="flex items-center gap-3">
+          {saved && <span className="text-[13px] text-ok font-medium">✓ Sauvegardé</span>}
+          <button onClick={panel === 'profile' ? saveProfile : panel === 'connexions' ? saveConnexions : save}
+            disabled={saving}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-[13px] font-bold text-white disabled:opacity-50 transition-all hover:brightness-110"
+            style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)', boxShadow: '0 4px 20px -6px rgba(124,58,237,0.5)' }}>
+            <span>💾</span>
+            {saving ? 'Sauvegarde…' : 'Sauvegarder'}
+          </button>
+        </div>
       </div>
 
-      {/* Tab navigation */}
-      <div className="flex-shrink-0 px-10 pt-5 pb-0 flex gap-1" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+      {/* Top tab navigation */}
+      <div className="flex-shrink-0 px-8 flex gap-1" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
         {([
-          { k: 'general',      l: '⚙ Général'       },
-          { k: 'profile',      l: '👤 Profil'        },
-          ...(canSeeConnexions ? [{ k: 'connexions' as const, l: '🔌 Connexions' }] : []),
-          { k: 'organization', l: '🏢 Organisation'  },
-          ...(license.isSuperAdmin ? [{ k: 'admin' as const, l: '🛡 Admin' }] : []),
-          { k: 'abonnement' as const, l: '💳 Abonnement' },
+          { k: 'general',      l: 'Général',      icon: '⚙️' },
+          { k: 'profile',      l: 'Profil',       icon: '👤' },
+          ...(canSeeConnexions ? [{ k: 'connexions' as const, l: 'Connexions', icon: '🔌' }] : []),
+          { k: 'organization', l: 'Organisation', icon: '🏢' },
+          ...(license.isSuperAdmin ? [{ k: 'admin' as const, l: 'Admin', icon: '🛡' }] : []),
+          { k: 'abonnement' as const, l: 'Abonnement', icon: '💳' },
         ] as const).map(t => (
-          <button
-            key={t.k}
-            onClick={() => setPanel(t.k)}
-            className={`px-4 py-2.5 text-[13px] font-semibold border-b-2 transition-colors -mb-px ${
+          <button key={t.k} onClick={() => setPanel(t.k)}
+            className={`flex items-center gap-1.5 px-4 py-3.5 text-[13px] font-semibold border-b-2 transition-colors -mb-px ${
               panel === t.k ? 'border-accent text-accent' : 'border-transparent text-text2 hover:text-text'
-            }`}
-          >
+            }`}>
+            <span className="text-[13px]">{t.icon}</span>
             {t.l}
           </button>
         ))}
       </div>
 
-      {/* Scrollable content */}
-      <div className="flex-1 overflow-y-auto px-10 pb-10">
+      {/* Content */}
+      <div className="flex-1 overflow-hidden flex">
 
+        {/* ── Général: left sidebar + main ─────────────────────────────────── */}
         {panel === 'general' && (
-          <div className="mt-8 space-y-6 max-w-2xl">
-
-            {/* Sub-tabs */}
-            <div className="flex gap-2">
-              {(['apparence', 'sons'] as GeneralTab[]).map(t => (
-                <button
-                  key={t}
-                  onClick={() => setGenTab(t)}
-                  className={`px-4 py-2.5 rounded-xl text-[13px] font-medium capitalize transition-all ${
-                    genTab === t ? 'text-white' : 'text-text2 hover:text-text'
+          <>
+            {/* Left sidebar */}
+            <div className="w-[200px] flex-shrink-0 overflow-y-auto p-4 space-y-1"
+              style={{ borderRight: '1px solid rgba(255,255,255,0.06)' }}>
+              {GEN_SIDEBAR.map(item => (
+                <button key={item.id} onClick={() => setGenTab(item.id)}
+                  className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[13px] font-medium text-left transition-all ${
+                    genTab === item.id ? 'text-white' : 'text-text2 hover:text-text hover:bg-white/[0.04]'
                   }`}
-                  style={genTab === t ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)' } : { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}
-                >
-                  {t}
+                  style={genTab === item.id ? { background: 'rgba(139,92,246,0.15)', color: '#a78bfa' } : {}}>
+                  <span className="text-[14px]">{item.icon}</span>
+                  {item.label}
                 </button>
               ))}
+
+              {/* Besoin d'aide */}
+              <div className="mt-6 pt-4" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                <p className="text-[11px] font-bold text-text2 uppercase tracking-wider px-3 mb-2">Besoin d'aide ?</p>
+                <p className="text-[11px] text-text2/60 px-3 mb-3 leading-relaxed">Consulte notre guide ou contacte le support, nous sommes là pour toi.</p>
+                <a href="https://t.me/justquentin" target="_blank" rel="noreferrer"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium text-accent hover:underline">
+                  📄 Voir le guide
+                </a>
+                <a href="https://t.me/justquentin" target="_blank" rel="noreferrer"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium text-accent hover:underline">
+                  🎧 Contacter le support →
+                </a>
+              </div>
             </div>
 
-            {genTab === 'apparence' && (
-              <div className="rounded-2xl p-6 space-y-5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                <h2 className="text-[15px] font-bold text-white">Thème de couleur</h2>
-                <div className="flex flex-wrap gap-3">
-                  {THEMES.map(t => (
-                    <button
-                      key={t}
-                      onClick={() => { handleTheme(t); handleSwatchClick() }}
-                      className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-medium border transition-all ${
-                        theme === t
-                          ? 'border-accent bg-accent/10 text-accent'
-                          : 'border-border bg-surface2 text-text2 hover:border-accent/40'
-                      }`}
-                    >
-                      <span
-                        className="w-3 h-3 rounded-full"
-                        style={{ background: THEME_COLORS[t] }}
-                      />
-                      {t}
-                    </button>
-                  ))}
-                </div>
-                {pixelUnlocked && (
-                  <div className="px-4 py-3 rounded-xl text-[13px] text-text2" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                    🎮 Mode Pixel débloqué
-                  </div>
-                )}
-              </div>
-            )}
+            {/* Main content */}
+            <div className="flex-1 overflow-y-auto px-8 py-6">
 
-            {genTab === 'sons' && (
-              <div className="rounded-2xl p-6 space-y-6" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                <h2 className="text-[15px] font-bold text-white mb-4">Sons & Notifications</h2>
-                <ToggleRow
-                  checked={notifyPopup}
-                  onChange={v => setNotifyPopup(v)}
-                  title="Notifications popup"
-                  sub="Affiche une notification en haut à droite lors d'actions importantes"
-                />
-                <ToggleRow
-                  checked={notifySound}
-                  onChange={v => setNotifySound(v)}
-                  title="Sons de navigation"
-                  sub="Joue un son lors des changements de page"
-                />
-                <ToggleRow
-                  checked={musicOn}
-                  onChange={v => { setMusicOn(v); setMusicEnabled(v) }}
-                  title="Musique d'ambiance"
-                  sub="Joue une musique en fond lors de l'utilisation de l'app"
-                  accent
-                />
-                {musicOn && (
-                  <div className="space-y-5 pt-2 border-t" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
-                    <div className="space-y-3">
-                      <p className="text-[13px] font-medium text-text">Track</p>
+              {/* ── APPARENCE ─────────────────────────────────────────────── */}
+              {genTab === 'apparence' && (
+                <div className="max-w-2xl space-y-6">
+                  <div>
+                    <h2 className={sectionTitle}>Apparence</h2>
+                    <p className={sectionSub} style={{ color: 'rgba(148,163,184,0.55)' }}>Personnalise l'apparence de ton interface.</p>
+                  </div>
+
+                  {/* Thème de couleur */}
+                  <div className={card} style={cardStyle}>
+                    <div>
+                      <h3 className="text-[14px] font-bold text-white">Thème de couleur</h3>
+                      <p className="text-[11px] text-text2 mt-0.5">Cette couleur sera utilisée pour les accents et éléments interactifs.</p>
+                    </div>
+                    <div className="grid grid-cols-4 gap-3">
+                      {THEMES.map(t => (
+                        <button key={t} onClick={() => { handleTheme(t); handleSwatchClick() }}
+                          className="relative flex flex-col items-center gap-2 p-3 rounded-xl transition-all hover:brightness-110"
+                          style={{
+                            background: theme === t ? `${THEME_COLORS[t]}15` : 'rgba(255,255,255,0.04)',
+                            border: theme === t ? `1px solid ${THEME_COLORS[t]}50` : '1px solid rgba(255,255,255,0.07)',
+                          }}>
+                          {theme === t && (
+                            <span className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-accent flex items-center justify-center text-[9px] text-white font-black">✓</span>
+                          )}
+                          <div className="w-7 h-7 rounded-full" style={{ background: THEME_COLORS[t] }} />
+                          <span className="text-[11px] font-medium text-text2">{t}</span>
+                        </button>
+                      ))}
+                    </div>
+                    {pixelUnlocked && (
+                      <div className="px-3 py-2 rounded-xl text-[12px] text-text2" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                        🎮 Mode Pixel débloqué — clique encore 7 fois sur un thème pour activer
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Toggles + dropdowns */}
+                  <div className={card} style={cardStyle}>
+                    <SettingToggle label="Mode sombre" sub="Active ou désactive le thème sombre."
+                      checked={darkMode} onChange={v => { setDarkMode(v); localStorage.setItem('sf-dark', v ? '1' : '0'); applyAppearanceCSS({ dark: v }) }} />
+                    <SettingToggle label="Animations UI" sub="Active ou désactive les animations et transitions."
+                      checked={animationsOn} onChange={v => { setAnimationsOn(v); localStorage.setItem('sf-animations', v ? '1' : '0'); applyAppearanceCSS({ anim: v }) }} />
+                    <SettingToggle label="Effets de flou (Glassmorphism)" sub="Active ou désactive les effets de flou."
+                      checked={glassOn} onChange={v => { setGlassOn(v); localStorage.setItem('sf-glass', v ? '1' : '0'); applyAppearanceCSS({ glass: v }) }} />
+                    <SelectRow label="Coins arrondis" sub="Ajuste l'arrondi des éléments de l'interface."
+                      value={roundedCorners} onChange={v => { setRoundedCorners(v); applyAppearanceCSS({ rounded: v }) }}
+                      options={[{ value: 'aucun', label: 'Aucun' }, { value: 'petit', label: 'Petit' }, { value: 'moyen', label: 'Moyen' }, { value: 'grand', label: 'Grand' }]} />
+                    <SelectRow label="Police d'interface" sub="Choisis la police utilisée dans l'interface."
+                      value={fontFamily} onChange={v => { setFontFamily(v); applyAppearanceCSS({ fontFam: v }) }}
+                      options={[{ value: 'inter', label: 'Inter' }, { value: 'system', label: 'System UI' }, { value: 'mono', label: 'Monospace' }]} />
+                    <SelectRow label="Taille de la police" sub="Ajuste la taille du texte global."
+                      value={fontSize} onChange={v => { setFontSize(v); applyAppearanceCSS({ fs: v }) }}
+                      options={[{ value: 'petite', label: 'Petite' }, { value: 'moyenne', label: 'Moyenne' }, { value: 'grande', label: 'Grande' }]} />
+                    <SelectRow label="Densité d'affichage" sub="Choisis la densité des éléments à l'écran."
+                      value={density} onChange={v => { setDensity(v); applyAppearanceCSS({ density: v }) }}
+                      options={[{ value: 'compact', label: 'Compact' }, { value: 'confortable', label: 'Confortable' }, { value: 'spacieux', label: 'Spacieux' }]} />
+                    <SelectRow label="Barre latérale" sub="Affiche ou masque la barre latérale."
+                      value={sidebarMode} onChange={v => { setSidebarMode(v); localStorage.setItem('sf-sidebar', v); applyAppearanceCSS({ sidebar: v }) }}
+                      options={[{ value: 'etendue', label: 'Étendue' }, { value: 'reduite', label: 'Réduite' }, { value: 'masquee', label: 'Masquée' }]} />
+                  </div>
+
+                  {/* Aperçu */}
+                  <div className={card} style={cardStyle}>
+                    <div>
+                      <h3 className="text-[14px] font-bold text-white">Aperçu</h3>
+                      <p className="text-[11px] text-text2 mt-0.5">Voici un aperçu de ton interface avec ces paramètres.</p>
+                    </div>
+                    <div className="rounded-xl overflow-hidden" style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.06)', height: '100px' }}>
+                      <div className="flex h-full">
+                        <div className="w-10 h-full flex flex-col items-center pt-2 gap-1.5" style={{ background: 'rgba(0,0,0,0.3)' }}>
+                          <div className="w-5 h-5 rounded" style={{ background: 'var(--color-accent, #4f9eff)', opacity: 0.8 }} />
+                          {[1,2,3,4].map(i => <div key={i} className="w-4 h-1.5 rounded-sm" style={{ background: 'rgba(255,255,255,0.1)' }} />)}
+                        </div>
+                        <div className="flex-1 p-2 grid grid-cols-3 gap-1.5 content-start">
+                          {[1,2,3,4,5,6].map(i => (
+                            <div key={i} className="h-6 rounded" style={{ background: i === 2 ? `var(--color-accent, #4f9eff)22` : 'rgba(255,255,255,0.06)', border: i === 2 ? `1px solid var(--color-accent, #4f9eff)40` : '1px solid rgba(255,255,255,0.06)' }} />
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ── SONS ──────────────────────────────────────────────────── */}
+              {genTab === 'sons' && (
+                <div className="max-w-2xl space-y-6">
+                  <div>
+                    <h2 className={sectionTitle}>Sons</h2>
+                    <p className={sectionSub} style={{ color: 'rgba(148,163,184,0.55)' }}>Gère les sons et la musique d'ambiance de l'application.</p>
+                  </div>
+                  <div className={card} style={cardStyle}>
+                    <SettingToggle label="Sons de navigation" sub="Joue un son lors des changements de page."
+                      checked={notifySound} onChange={v => setNotifySound(v)} />
+                    <SettingToggle label="Musique d'ambiance" sub="Joue une musique en fond lors de l'utilisation de l'app."
+                      checked={musicOn} onChange={v => { setMusicOn(v); setMusicEnabled(v) }} />
+                  </div>
+                  {musicOn && (
+                    <div className={card} style={cardStyle}>
+                      <h3 className="text-[13px] font-bold text-white">Piste musicale</h3>
                       <div className="flex flex-wrap gap-2">
                         {TRACKS.map((tr, i) => (
-                          <button
-                            key={i}
-                            onClick={() => { setMusicTrackS(i); setTrack(i) }}
-                            className={`px-4 py-2 rounded-xl text-[13px] font-medium transition-all ${
-                              musicTrack === i ? 'text-white' : 'text-text2 hover:text-text'
-                            }`}
-                            style={musicTrack === i ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)' } : { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}
-                          >
-                            {tr.name}
+                          <button key={i} onClick={() => { setMusicTrackS(i); setTrack(i) }}
+                            className="flex items-center gap-2 px-4 py-2 rounded-xl text-[13px] font-medium transition-all"
+                            style={musicTrack === i ? { background: 'rgba(139,92,246,0.2)', border: '1px solid rgba(139,92,246,0.4)', color: '#a78bfa' } : { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)', color: 'rgba(148,163,184,0.7)' }}>
+                            <span>{musicTrack === i ? '▶' : '▷'}</span> {tr.name}
                           </button>
                         ))}
                       </div>
+                      <div className="space-y-2 pt-2">
+                        <div className="flex justify-between">
+                          <p className="text-[13px] font-medium text-text">Volume</p>
+                          <p className="text-[13px] font-bold text-accent">{Math.round(musicVol * 100)}%</p>
+                        </div>
+                        <input type="range" min={0} max={1} step={0.05} value={musicVol}
+                          onChange={e => { const v = parseFloat(e.target.value); setMusicVol(v); setVolume(v) }}
+                          className="w-full accent-accent" />
+                      </div>
                     </div>
+                  )}
+                </div>
+              )}
+
+              {/* ── NOTIFICATIONS ─────────────────────────────────────────── */}
+              {genTab === 'notifications' && (
+                <div className="max-w-2xl space-y-6">
+                  <div>
+                    <h2 className={sectionTitle}>Notifications</h2>
+                    <p className={sectionSub} style={{ color: 'rgba(148,163,184,0.55)' }}>Choisis comment et quand tu souhaites être notifié.</p>
+                  </div>
+                  <div className={card} style={cardStyle}>
+                    <h3 className="text-[13px] font-bold text-white pb-1">In-app</h3>
+                    <SettingToggle label="Notifications popup" sub="Affiche une notification en haut à droite lors d'actions importantes."
+                      checked={notifyPopup} onChange={v => setNotifyPopup(v)} />
+                    <SettingToggle label="Alertes d'erreurs" sub="Affiche les erreurs critiques de manière visible."
+                      checked={notifyErrors} onChange={v => setNotifyErrors(v)} />
+                    <SettingToggle label="Mises à jour & nouveautés" sub="Informe lors des nouvelles versions ou fonctionnalités."
+                      checked={notifyUpdates} onChange={v => setNotifyUpdates(v)} />
+                  </div>
+                  <div className={card} style={cardStyle}>
+                    <h3 className="text-[13px] font-bold text-white pb-1">Système</h3>
+                    <SettingToggle
+                      label="Notifications bureau"
+                      sub="Envoie des notifications natives du système d'exploitation."
+                      checked={notifyDesktop}
+                      onChange={async v => {
+                        if (v && 'Notification' in window) {
+                          const perm = await Notification.requestPermission()
+                          setNotifyDesktop(perm === 'granted')
+                        } else {
+                          setNotifyDesktop(false)
+                        }
+                      }}
+                    />
+                    {notifyDesktop && (
+                      <button onClick={() => new Notification('ScaleFlow', { body: 'Les notifications bureau sont actives ✓', icon: '/icon.png' })}
+                        className="text-[12px] text-accent hover:underline">
+                        Tester une notification →
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* ── LANGUE & RÉGION ────────────────────────────────────────── */}
+              {genTab === 'langue' && (
+                <div className="max-w-2xl space-y-6">
+                  <div>
+                    <h2 className={sectionTitle}>Langue & région</h2>
+                    <p className={sectionSub} style={{ color: 'rgba(148,163,184,0.55)' }}>Personnalise la langue et les paramètres régionaux.</p>
+                  </div>
+                  <div className={card} style={cardStyle}>
+                    <SelectRow label="Langue de l'interface" sub="La langue utilisée dans toute l'application."
+                      value={lang} onChange={v => setLang(v)}
+                      options={[{ value: 'fr', label: '🇫🇷 Français' }, { value: 'en', label: '🇬🇧 English' }]} />
+                    <SelectRow label="Format de date" sub="Comment les dates sont affichées dans l'interface."
+                      value={dateFormat} onChange={v => setDateFormat(v)}
+                      options={[{ value: 'dd/mm/yyyy', label: 'JJ/MM/AAAA' }, { value: 'mm/dd/yyyy', label: 'MM/JJ/AAAA' }, { value: 'yyyy-mm-dd', label: 'AAAA-MM-JJ' }]} />
+                    <SelectRow label="Fuseau horaire" sub="Utilisé pour afficher les dates et heures locales."
+                      value={timezone} onChange={v => setTimezone(v)}
+                      options={[
+                        { value: 'Europe/Paris',    label: 'Paris (UTC+1/+2)' },
+                        { value: 'Europe/London',   label: 'Londres (UTC+0/+1)' },
+                        { value: 'America/New_York',label: 'New York (UTC-5/-4)' },
+                        { value: 'America/Los_Angeles', label: 'Los Angeles (UTC-8/-7)' },
+                        { value: 'Asia/Dubai',      label: 'Dubaï (UTC+4)' },
+                        { value: 'UTC',             label: 'UTC' },
+                      ]} />
+                  </div>
+                  <div className="px-4 py-3 rounded-xl text-[12px] text-text2 flex items-start gap-2"
+                    style={{ background: 'rgba(255,170,42,0.07)', border: '1px solid rgba(255,170,42,0.2)' }}>
+                    <span className="text-warn text-[14px] flex-shrink-0">ℹ</span>
+                    Certains paramètres régionaux nécessitent un rechargement de l'application pour prendre effet.
+                  </div>
+                </div>
+              )}
+
+              {/* ── SÉCURITÉ ──────────────────────────────────────────────── */}
+              {genTab === 'securite' && (
+                <div className="max-w-2xl space-y-6">
+                  <div>
+                    <h2 className={sectionTitle}>Sécurité</h2>
+                    <p className={sectionSub} style={{ color: 'rgba(148,163,184,0.55)' }}>Gère la sécurité et l'accès à ton compte.</p>
+                  </div>
+
+                  {/* Session info */}
+                  <div className={card} style={cardStyle}>
+                    <h3 className="text-[13px] font-bold text-white">Session active</h3>
                     <div className="space-y-2">
-                      <p className="text-[13px] font-medium text-text">Volume — {Math.round(musicVol * 100)}%</p>
-                      <input
-                        type="range" min={0} max={1} step={0.05}
-                        value={musicVol}
-                        onChange={e => { const v = parseFloat(e.target.value); setMusicVol(v); setVolume(v) }}
-                        className="w-full accent-accent"
-                      />
+                      {[
+                        { label: 'Compte',       value: user.email ?? '—' },
+                        { label: 'Connecté le',  value: user.created_at ? new Date(user.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : '—' },
+                        { label: 'ID session',   value: user.id.slice(0, 8) + '…' },
+                      ].map(row => (
+                        <div key={row.label} className="flex justify-between py-2" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                          <span className="text-[12px] text-text2">{row.label}</span>
+                          <span className="text-[12px] font-medium text-text font-mono">{row.value}</span>
+                        </div>
+                      ))}
                     </div>
                   </div>
-                )}
+
+                  {/* Options */}
+                  <div className={card} style={cardStyle}>
+                    <SettingToggle label="Authentification à deux facteurs (2FA)"
+                      sub="Ajoute une couche de sécurité supplémentaire à ton compte."
+                      checked={twoFA} onChange={v => setTwoFA(v)} />
+                    <SelectRow label="Déconnexion automatique" sub="Se déconnecte automatiquement après une période d'inactivité."
+                      value={sessionTimeout} onChange={v => setSessionTimeout(v)}
+                      options={[
+                        { value: 'jamais',  label: 'Jamais' },
+                        { value: '1h',      label: 'Après 1 heure' },
+                        { value: '8h',      label: 'Après 8 heures' },
+                        { value: '24h',     label: 'Après 24 heures' },
+                      ]} />
+                  </div>
+
+                  {/* Actions */}
+                  <div className={card} style={cardStyle}>
+                    <h3 className="text-[13px] font-bold text-white pb-1">Actions de compte</h3>
+                    <div className="space-y-2">
+                      <button
+                        onClick={async () => { await supabase.auth.signOut() }}
+                        className="w-full flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-medium text-left transition-all hover:bg-white/[0.06]"
+                        style={{ color: 'rgba(148,163,184,0.8)' }}>
+                        <span>🔒</span> Déconnexion
+                      </button>
+                      <button
+                        onClick={async () => {
+                          const { error } = await supabase.auth.resetPasswordForEmail(user.email ?? '')
+                          if (!error) setError(null)
+                        }}
+                        className="w-full flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-medium text-left transition-all hover:bg-white/[0.06]"
+                        style={{ color: 'rgba(148,163,184,0.8)' }}>
+                        <span>🔑</span> Envoyer un email de réinitialisation de mot de passe
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ── AVANCÉ ────────────────────────────────────────────────── */}
+              {genTab === 'avance' && (
+                <div className="max-w-2xl space-y-6">
+                  <div>
+                    <h2 className={sectionTitle}>Avancé</h2>
+                    <p className={sectionSub} style={{ color: 'rgba(148,163,184,0.55)' }}>Options avancées pour les utilisateurs expérimentés.</p>
+                  </div>
+
+                  <div className={card} style={cardStyle}>
+                    <SettingToggle label="Mode développeur" sub="Affiche des informations de débogage supplémentaires dans l'interface."
+                      checked={devMode} onChange={v => setDevMode(v)} />
+                  </div>
+
+                  {devMode && (
+                    <div className="rounded-xl p-4 space-y-1 font-mono text-[11px]"
+                      style={{ background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(148,163,184,0.6)' }}>
+                      <p>user_id: {user.id}</p>
+                      <p>email: {user.email}</p>
+                      <p>org: {currentOrg?.id ?? 'solo'}</p>
+                      <p>role: {role ?? 'n/a'}</p>
+                      <p>app_version: 2.0.0</p>
+                      <p>electron: {typeof window !== 'undefined' && (window as any).electronAPI ? 'oui' : 'non'}</p>
+                    </div>
+                  )}
+
+                  <div className={card} style={cardStyle}>
+                    <h3 className="text-[13px] font-bold text-white pb-1">Données & cache</h3>
+                    <div className="space-y-2">
+                      <button
+                        onClick={() => {
+                          const keys = Object.keys(localStorage).filter(k => k.startsWith('sf-') || k.startsWith('notify') || k === 'theme')
+                          keys.forEach(k => localStorage.removeItem(k))
+                          window.location.reload()
+                        }}
+                        className="w-full flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-medium text-left transition-all hover:bg-white/[0.06]"
+                        style={{ color: 'rgba(148,163,184,0.8)' }}>
+                        <span>🗑</span> Vider le cache local
+                      </button>
+                      <button
+                        onClick={() => {
+                          const data = {
+                            user: { id: user.id, email: user.email },
+                            settings: Object.fromEntries(
+                              Object.entries(localStorage).filter(([k]) => k.startsWith('sf-') || k.startsWith('notify') || k === 'theme')
+                            ),
+                            exported_at: new Date().toISOString(),
+                          }
+                          const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+                          const url  = URL.createObjectURL(blob)
+                          const a    = document.createElement('a'); a.href = url
+                          a.download = `scaleflow-settings-${new Date().toISOString().slice(0,10)}.json`
+                          a.click(); URL.revokeObjectURL(url)
+                        }}
+                        className="w-full flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-medium text-left transition-all hover:bg-white/[0.06]"
+                        style={{ color: 'rgba(148,163,184,0.8)' }}>
+                        <span>📥</span> Exporter mes paramètres (JSON)
+                      </button>
+                      {!resetConfirm ? (
+                        <button onClick={() => setResetConfirm(true)}
+                          className="w-full flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-medium text-left transition-all hover:bg-danger/10 text-danger">
+                          <span>⚠️</span> Réinitialiser tous les paramètres
+                        </button>
+                      ) : (
+                        <div className="flex gap-2">
+                          <button onClick={() => {
+                            localStorage.clear(); window.location.reload()
+                          }}
+                            className="flex-1 py-2.5 rounded-xl text-[13px] font-bold text-white text-center"
+                            style={{ background: 'rgba(239,68,68,0.2)', border: '1px solid rgba(239,68,68,0.4)' }}>
+                            Confirmer la réinitialisation
+                          </button>
+                          <button onClick={() => setResetConfirm(false)}
+                            className="px-4 py-2.5 rounded-xl text-[13px] text-text2 hover:text-text"
+                            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                            Annuler
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="text-center pt-2">
+                    <p className="text-[11px] text-text2/40">ScaleFlow v2.0.0 · Electron · React · Supabase</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        {/* ── Autres panels (scrollable) ──────────────────────────────────── */}
+        {panel !== 'general' && (
+          <div className="flex-1 overflow-y-auto px-8 py-6">
+
+            {/* Profil */}
+            {panel === 'profile' && (
+              <div className="max-w-xl space-y-5">
+                <div>
+                  <h2 className={sectionTitle}>Profil</h2>
+                  <p className="text-[12px] mt-0.5 mb-4" style={{ color: 'rgba(148,163,184,0.55)' }}>Informations de ton compte ScaleFlow.</p>
+                </div>
+                {/* Avatar placeholder */}
+                <div className="flex items-center gap-4 p-5 rounded-2xl" style={cardStyle}>
+                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-white text-[22px] font-black flex-shrink-0"
+                    style={{ background: 'linear-gradient(135deg,#7c3aed,#ec4899)' }}>
+                    {(displayName || profileName || user.email || '?').charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <p className="text-[15px] font-bold text-white">{displayName || profileName || 'Utilisateur'}</p>
+                    <p className="text-[12px] text-text2">{user.email}</p>
+                  </div>
+                </div>
+                <div className={`${card} !space-y-4`} style={cardStyle}>
+                  <Input label="Email" type="email" value={profileEmail} onChange={e => setProfileEmail(e.target.value)} />
+                  <Input label="Nom complet" placeholder="Jean Dupont" value={profileName} onChange={e => setProfileName(e.target.value)} />
+                  <Input label="Pseudo (visible par l'équipe)" placeholder="@jean" value={displayName} onChange={e => setDisplayName(e.target.value)} />
+                </div>
+                {error && <p className="text-[12px] text-danger">{error}</p>}
               </div>
             )}
-          </div>
-        )}
 
-        {/* ── Profil ─────────────────────────────────────────────────────────── */}
-        {panel === 'profile' && (
-          <div className="mt-8 max-w-2xl">
-            <div className="rounded-2xl p-6 space-y-5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-              <h2 className="text-[15px] font-bold text-white mb-4">Mon Profil</h2>
-              <Input label="Email" type="email" placeholder="contact@example.com" value={profileEmail} onChange={e => setProfileEmail(e.target.value)} />
-              <Input label="Nom complet" placeholder="Jean Dupont" value={profileName} onChange={e => setProfileName(e.target.value)} />
-              <Input label="Pseudo (visible par l'équipe)" placeholder="@jean" value={displayName} onChange={e => setDisplayName(e.target.value)} />
-              <div className="flex items-center gap-4 pt-2">
-                <Button onClick={saveProfile} loading={saving}>💾 Sauvegarder le profil</Button>
-                {saved && <span className="text-[13px] text-ok">✓ Sauvegardé</span>}
+            {/* Connexions */}
+            {panel === 'connexions' && canSeeConnexions && (
+              <div className="max-w-xl space-y-5">
+                <div>
+                  <h2 className={sectionTitle}>Connexions</h2>
+                  <p className="text-[12px] mt-0.5 mb-4" style={{ color: 'rgba(148,163,184,0.55)' }}>Clés API et tokens de connexion aux services externes.</p>
+                </div>
+                <div className="px-4 py-3 rounded-xl text-[12px] flex items-center gap-2"
+                  style={currentOrg ? { background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.3)', color: '#a78bfa' } : { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', color: 'rgba(148,163,184,0.7)' }}>
+                  {currentOrg ? <><span>🏢</span><span>Organisation — <strong>{currentOrg.name}</strong>{!canEditOrgConnexions && <span className="text-warn"> · Lecture seule</span>}</span></> : <><span>👤</span><span>Mode solo — ces clés sont privées à ton compte</span></>}
+                </div>
+                <div className={`${card} !space-y-4`} style={cardStyle}>
+                  <h3 className="text-[13px] font-bold text-white">GéeLark</h3>
+                  <Input label="Bearer Token" type="password" placeholder="Bearer …" value={bearer} onChange={e => setBearer(e.target.value)} disabled={!!currentOrg && !canEditOrgConnexions} />
+                  <Input label="URL Proxy (optionnel)" placeholder="http://proxy:8080" value={proxyUrl} onChange={e => setProxyUrl(e.target.value)} disabled={!!currentOrg && !canEditOrgConnexions} />
+                  <Input label="Session ID Instagram" type="password" placeholder="sessionid=…" value={igSession} onChange={e => setIgSession(e.target.value)} disabled={!!currentOrg && !canEditOrgConnexions} />
+                </div>
+                <div className={`${card} !space-y-4`} style={cardStyle}>
+                  <h3 className="text-[13px] font-bold text-white">Clés API IA</h3>
+                  <Input label="Groq API Key" type="password" placeholder="gsk_…" value={groqKey} onChange={e => setGroqKey(e.target.value)} disabled={!!currentOrg && !canEditOrgConnexions} />
+                  <Input label="Anthropic API Key" type="password" placeholder="sk-ant-…" value={anthropicKey} onChange={e => setAnthropicKey(e.target.value)} disabled={!!currentOrg && !canEditOrgConnexions} />
+                </div>
+                {error && <p className="text-[12px] text-danger">{error}</p>}
               </div>
-            </div>
+            )}
+
+            {/* Organisation */}
+            {panel === 'organization' && <OrganizationPanel user={user} />}
+
+            {/* Admin */}
+            {panel === 'admin' && license.isSuperAdmin && <AdminPanel user={user} />}
+
+            {/* Abonnement */}
+            {panel === 'abonnement' && <SubscriptionPanel />}
+
+            {error && panel !== 'profile' && panel !== 'connexions' && (
+              <div className="mt-4 px-4 py-3 rounded-xl text-[12px] text-danger max-w-xl"
+                style={{ background: 'rgba(255,92,110,0.08)', border: '1px solid rgba(255,92,110,0.2)' }}>{error}</div>
+            )}
           </div>
-        )}
-
-        {/* ── Organisation ────────────────────────────────────────────────────── */}
-        {panel === 'organization' && (
-          <div className="mt-8">
-            <OrganizationPanel user={user} />
-          </div>
-        )}
-
-        {/* ── Connexions ─────────────────────────────────────────────────────── */}
-        {panel === 'connexions' && canSeeConnexions && (
-          <div className="mt-8 max-w-2xl space-y-6">
-            <div className={`px-5 py-3 rounded-xl text-[13px] flex items-center gap-2 ${
-              currentOrg ? 'bg-accent/10 border border-accent/30 text-accent' : 'text-text2'
-            }`}
-              style={!currentOrg ? { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' } : {}}
-            >
-              {currentOrg
-                ? <><span>🏢</span><span>Mode organisation — <strong>{currentOrg.name}</strong>{!canEditOrgConnexions && <span className="text-warn"> · Lecture seule (admin requis)</span>}</span></>
-                : <><span>👤</span><span>Mode solo — ces clés sont privées à votre compte</span></>
-              }
-            </div>
-
-            <div className="rounded-2xl p-6 space-y-5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-              <h2 className="text-[15px] font-bold text-white mb-4">Connexions GéeLark</h2>
-              <Input label="Bearer Token GéeLark" type="password" placeholder="Bearer …" value={bearer} onChange={e => setBearer(e.target.value)} disabled={!!currentOrg && !canEditOrgConnexions} />
-              <Input label="URL Proxy (optionnel)" placeholder="http://…" value={proxyUrl} onChange={e => setProxyUrl(e.target.value)} disabled={!!currentOrg && !canEditOrgConnexions} />
-              <Input label="Session ID Instagram" type="password" placeholder="sessionid=…" value={igSession} onChange={e => setIgSession(e.target.value)} disabled={!!currentOrg && !canEditOrgConnexions} />
-              <div className="flex items-center gap-4 pt-2">
-                <Button onClick={saveConnexions} loading={saving} disabled={!!currentOrg && !canEditOrgConnexions}>💾 Sauvegarder</Button>
-                {saved && <span className="text-[13px] text-ok">✓ Sauvegardé</span>}
-              </div>
-            </div>
-
-            <div className="rounded-2xl p-6 space-y-5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-              <h2 className="text-[15px] font-bold text-white mb-4">Clés API</h2>
-              <Input label="Groq API Key" type="password" placeholder="gsk_…" value={groqKey} onChange={e => setGroqKey(e.target.value)} disabled={!!currentOrg && !canEditOrgConnexions} />
-              <Input label="Anthropic API Key" type="password" placeholder="sk-ant-…" value={anthropicKey} onChange={e => setAnthropicKey(e.target.value)} disabled={!!currentOrg && !canEditOrgConnexions} />
-              <Button onClick={saveConnexions} loading={saving} disabled={!!currentOrg && !canEditOrgConnexions} className="w-full">💾 Sauvegarder les clés API</Button>
-            </div>
-          </div>
-        )}
-
-        {/* ── Admin ───────────────────────────────────────────────────────────── */}
-        {panel === 'admin' && license.isSuperAdmin && (
-          <div className="mt-8">
-            <AdminPanel user={user} />
-          </div>
-        )}
-
-        {/* ── Abonnement ──────────────────────────────────────────────────────── */}
-        {panel === 'abonnement' && (
-          <div className="mt-8">
-            <SubscriptionPanel />
-          </div>
-        )}
-
-        {/* Error bar */}
-        {error && (
-          <div className="mt-6 px-5 py-4 rounded-xl text-[13px] text-danger max-w-2xl" style={{ background: 'rgba(255,92,110,0.08)', border: '1px solid rgba(255,92,110,0.2)' }}>{error}</div>
         )}
       </div>
     </div>

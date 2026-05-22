@@ -33,7 +33,7 @@ function ScoreBar({ score, label, comment }: { score: number; label: string; com
 function ToolShell({ title, icon, children, onBack }: { title: string; icon: string; children: React.ReactNode; onBack: () => void }) {
   return (
     <div className="h-full flex flex-col overflow-hidden">
-      <div className="flex-shrink-0 px-10 pt-9 pb-7 flex items-center gap-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+      <div className="flex-shrink-0 px-8 pt-7 pb-5 flex items-center gap-4" style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
         <button onClick={onBack}
           className="rounded-xl px-4 py-2.5 text-[13px] font-semibold flex-shrink-0"
           style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}>
