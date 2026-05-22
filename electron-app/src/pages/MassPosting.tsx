@@ -562,224 +562,359 @@ export function MassPosting({ user }: MassPostingProps) {
 
   const withSessions = phones.filter(p => p.ig_sessionid).length
 
+  // Live progress stats
+  const totalTasks = assignments.length
+  const doneTasks  = [...taskStatuses.values()].filter(s => s.status === 'done').length
+  const errorTasks = [...taskStatuses.values()].filter(s => s.status === 'error').length
+  const activeTasks = [...taskStatuses.values()].filter(s => s.status === 'uploading' || s.status === 'posting').length
+  const progressPct = totalTasks > 0 ? Math.round(((doneTasks + errorTasks) / totalTasks) * 100) : 0
+  const canLaunch = !posting && !!bearer && phoneList.length > 0 && selectedVideos.length > 0
+
   return (
-    <div className="h-full flex flex-col overflow-hidden">
-      {/* Page header */}
-      <div className="flex-shrink-0 px-10 pt-9 pb-7 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-        <div>
-          <h1 className="text-[28px] font-black text-white leading-none">Mass Posting</h1>
-          <p className="text-[13px] text-text2 mt-0.5">
-            {phoneList.length} cible{phoneList.length !== 1 ? 's' : ''} · {selectedVideos.length} vidéo{selectedVideos.length !== 1 ? 's' : ''}
-            {withSessions > 0 && <span className="ml-2 text-ok">· {withSessions} session IG</span>}
-          </p>
+    <div className="anim-page h-full flex flex-col overflow-hidden" style={{ background: '#07070B' }}>
+
+      {/* ── Top header bar ──────────────────────────────────────────────────── */}
+      <header className="flex-shrink-0 px-8 pt-7 pb-5 flex items-start justify-between gap-6"
+        style={{ borderBottom: '1px solid rgba(139,92,246,0.10)', background: 'rgba(7,7,11,0.95)' }}>
+
+        {/* Left: title + status */}
+        <div className="flex items-start gap-4 min-w-0">
+          {/* Glow icon */}
+          <div className="flex-shrink-0 w-11 h-11 rounded-xl flex items-center justify-center mt-0.5"
+            style={{ background: 'linear-gradient(135deg,rgba(124,58,237,0.25),rgba(168,85,247,0.12))', border: '1px solid rgba(139,92,246,0.25)', boxShadow: '0 0 20px -6px rgba(139,92,246,0.5)' }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+            </svg>
+          </div>
+          <div>
+            <div className="flex items-center gap-3 mb-1">
+              <h1 className="text-[22px] font-black text-white tracking-tight leading-none">Mass Posting</h1>
+              {/* Status badge */}
+              {posting ? (
+                <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider"
+                  style={{ background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.35)', color: '#a78bfa' }}>
+                  <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
+                  En cours
+                </span>
+              ) : (
+                <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider"
+                  style={{ background: 'rgba(82,82,91,0.15)', border: '1px solid rgba(82,82,91,0.25)', color: '#71717a' }}>
+                  <span className="w-1.5 h-1.5 rounded-full bg-text3" />
+                  Idle
+                </span>
+              )}
+            </div>
+            <p className="text-[13px] text-text2 leading-none flex items-center gap-3">
+              <span>{phoneList.length} cible{phoneList.length !== 1 ? 's' : ''}</span>
+              <span className="text-text3">·</span>
+              <span>{selectedVideos.length} vidéo{selectedVideos.length !== 1 ? 's' : ''}</span>
+              {withSessions > 0 && (
+                <>
+                  <span className="text-text3">·</span>
+                  <span className="text-ok">{withSessions} session IG</span>
+                </>
+              )}
+              {posting && totalTasks > 0 && (
+                <>
+                  <span className="text-text3">·</span>
+                  <span className="text-accent font-semibold">{doneTasks}/{totalTasks} terminé{doneTasks !== 1 ? 's' : ''}</span>
+                </>
+              )}
+            </p>
+          </div>
         </div>
-        <div className="flex items-center gap-3">
-          {/* Mode toggle */}
-          <div className="flex rounded-xl p-1 gap-1" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+
+        {/* Right: mode toggle + action buttons */}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {/* Assignment mode */}
+          <div className="flex rounded-lg p-0.5 gap-0.5"
+            style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
             {([{ k: 'seq', l: 'Séquentiel' }, { k: 'random', l: 'Aléatoire' }] as const).map(m => (
               <button key={m.k} onClick={() => setMode(m.k)}
-                className="px-4 py-2 rounded-lg text-[13px] font-semibold transition-all"
+                className="px-3 py-2 rounded-md text-[12px] font-semibold transition-all"
                 style={mode === m.k
-                  ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: 'white' }
-                  : { color: 'rgba(148,163,184,0.7)' }}
-              >{m.l}</button>
+                  ? { background: 'rgba(139,92,246,0.2)', color: '#c4b5fd', border: '1px solid rgba(139,92,246,0.3)' }
+                  : { color: '#52525b' }}>
+                {m.l}
+              </button>
             ))}
           </div>
-          <button
-            onClick={stop}
-            disabled={!posting}
-            className="rounded-xl px-5 py-2.5 text-[13px] font-semibold transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-            style={{ background: 'rgba(239,68,68,0.08)', color: '#f87171', border: '1px solid rgba(239,68,68,0.2)' }}
-          >
-            ⏹ Stopper
-          </button>
+
+          {/* Schedule button */}
           <button
             onClick={() => setShowScheduleModal(true)}
             disabled={posting || !bearer || phoneList.length === 0 || selectedVideos.length === 0}
-            className="rounded-xl px-5 py-2.5 text-[13px] font-semibold transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(37,99,235,0.3)', color: '#60a5fa' }}
-          >
-            📅 Programmer
+            className="flex items-center gap-2 rounded-lg px-4 py-2 text-[13px] font-semibold transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+            style={{ background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.2)', color: '#60a5fa' }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            Programmer
           </button>
+
+          {/* Stop button */}
+          <button
+            onClick={stop}
+            disabled={!posting}
+            className="flex items-center gap-2 rounded-lg px-4 py-2 text-[13px] font-semibold transition-all disabled:opacity-25 disabled:cursor-not-allowed"
+            style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', color: '#f87171' }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
+            Stopper
+          </button>
+
+          {/* Launch button */}
           <button
             onClick={post}
-            disabled={posting || !bearer || phoneList.length === 0 || selectedVideos.length === 0}
-            className="rounded-xl px-5 py-2.5 text-[13px] font-black text-white transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
-            style={{
-              background: posting || !bearer || phoneList.length === 0 || selectedVideos.length === 0
-                ? 'rgba(255,255,255,0.06)' : 'linear-gradient(130deg,#7c3aed,#ec4899)',
-              boxShadow: posting || !bearer || phoneList.length === 0 || selectedVideos.length === 0
-                ? 'none' : '0 4px 20px -4px rgba(124,58,237,0.5)',
-            }}>
-            {posting ? '⏳ En cours…' : '⚡ Lancer'}
+            disabled={!canLaunch}
+            className="flex items-center gap-2 rounded-lg px-5 py-2 text-[13px] font-black text-white transition-all active:scale-[0.97] disabled:opacity-35 disabled:cursor-not-allowed"
+            style={canLaunch ? {
+              background: 'linear-gradient(130deg,#7c3aed 0%,#a855f7 100%)',
+              boxShadow: '0 4px 24px -4px rgba(139,92,246,0.6), inset 0 1px 0 rgba(255,255,255,0.12)',
+            } : { background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}>
+            {posting ? (
+              <>
+                <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
+                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="31.4" strokeDashoffset="10" />
+                </svg>
+                En cours…
+              </>
+            ) : (
+              <>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                Lancer
+              </>
+            )}
           </button>
         </div>
-      </div>
+      </header>
 
+      {/* Warning: no bearer */}
       {!bearer && (
-        <div className="flex-shrink-0 mx-10 mt-6 px-5 py-4 rounded-2xl text-[13px] text-warn"
-          style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)' }}>
-          ⚠ Token GéeLark manquant — configure-le dans Paramètres.
+        <div className="flex-shrink-0 mx-8 mt-4 flex items-center gap-3 px-4 py-3 rounded-xl text-[13px] text-warn"
+          style={{ background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.2)' }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          Token GéeLark manquant — configure-le dans Paramètres.
         </div>
       )}
 
-      {/* 3-column body */}
-      <div className="flex-1 overflow-hidden flex min-h-0">
+      {/* ── Live progress bar (only while posting) ───────────────────────── */}
+      {posting && totalTasks > 0 && (
+        <div className="flex-shrink-0 mx-8 mt-4 rounded-xl p-4"
+          style={{ background: '#0E0E16', border: '1px solid rgba(139,92,246,0.18)' }}>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-4">
+              <span className="text-[13px] font-bold text-white">{doneTasks + errorTasks}/{totalTasks}</span>
+              <div className="flex items-center gap-2">
+                {activeTasks > 0 && (
+                  <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold"
+                    style={{ background: 'rgba(245,158,11,0.12)', color: '#f59e0b' }}>
+                    <span className="w-1.5 h-1.5 rounded-full bg-warn animate-pulse" />
+                    {activeTasks} actif{activeTasks !== 1 ? 's' : ''}
+                  </span>
+                )}
+                {doneTasks > 0 && (
+                  <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold"
+                    style={{ background: 'rgba(34,197,94,0.1)', color: '#22c55e' }}>
+                    {doneTasks} ok
+                  </span>
+                )}
+                {errorTasks > 0 && (
+                  <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold"
+                    style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444' }}>
+                    {errorTasks} err
+                  </span>
+                )}
+              </div>
+            </div>
+            <span className="text-[13px] font-mono font-bold text-accent">{progressPct}%</span>
+          </div>
+          <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
+            <div className="sf-progress-bar h-full transition-all duration-700" style={{ width: `${progressPct}%` }} />
+          </div>
+        </div>
+      )}
 
-        {/* ── Column 1: Videos ─────────────────────────────────────────────── */}
-        <aside className="w-72 flex-shrink-0 flex flex-col" style={{ borderRight: '1px solid rgba(255,255,255,0.06)', background: '#07090f' }}>
-          <div className="flex-shrink-0 px-5 pt-5 pb-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+      {/* ── 3-column body ────────────────────────────────────────────────── */}
+      <div className="flex-1 overflow-hidden flex min-h-0 mt-0">
+
+        {/* ── COL 1: Videos ────────────────────────────────────────────────── */}
+        <aside className="w-72 flex-shrink-0 flex flex-col"
+          style={{ borderRight: '1px solid rgba(139,92,246,0.08)', background: 'rgba(14,14,22,0.6)' }}>
+
+          {/* Video panel header */}
+          <div className="flex-shrink-0 px-5 pt-5 pb-4"
+            style={{ borderBottom: '1px solid rgba(139,92,246,0.08)' }}>
             <div className="flex items-center justify-between mb-4">
-              <p className="text-[15px] font-bold text-white">Vidéos</p>
-              <span className="text-[12px] font-semibold px-2.5 py-0.5 rounded-full text-white"
-                style={{ background: selectedVideos.length > 0 ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.07)' }}>
+              <div className="flex items-center gap-2">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+                <p className="text-[14px] font-bold text-white">Vidéos</p>
+              </div>
+              <span className="min-w-[22px] h-[22px] flex items-center justify-center text-[11px] font-black rounded-full"
+                style={selectedVideos.length > 0
+                  ? { background: 'linear-gradient(130deg,#7c3aed,#a855f7)', color: 'white' }
+                  : { background: 'rgba(255,255,255,0.07)', color: '#52525b' }}>
                 {selectedVideos.length}
               </span>
             </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => pickLocalFile(-1)}
-                className="flex-1 flex items-center justify-center gap-1.5 rounded-xl px-3 py-2.5 text-[13px] font-semibold transition-colors"
-                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
-              >
-                💾 PC
+            <div className="flex gap-1.5">
+              <button onClick={() => pickLocalFile(-1)}
+                className="flex-1 flex items-center justify-center gap-1 rounded-lg px-2 py-2 text-[12px] font-semibold transition-colors hover:bg-white/[0.04]"
+                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#a1a1aa' }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                PC
               </button>
-              <button
-                onClick={() => setShowBankPicker(true)}
-                className="flex-1 flex items-center justify-center gap-1.5 rounded-xl px-3 py-2.5 text-[13px] font-semibold transition-colors"
-                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
-              >
-                🗂 Banque
+              <button onClick={() => setShowBankPicker(true)}
+                className="flex-1 flex items-center justify-center gap-1 rounded-lg px-2 py-2 text-[12px] font-semibold transition-colors hover:bg-white/[0.04]"
+                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#a1a1aa' }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                Banque
               </button>
-              <button
-                onClick={openFolderPick}
-                className="flex-1 flex items-center justify-center gap-1.5 rounded-xl px-3 py-2.5 text-[13px] font-semibold transition-colors"
-                style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)', color: '#a78bfa' }}
-              >
-                📁 Dossier
+              <button onClick={openFolderPick}
+                className="flex-1 flex items-center justify-center gap-1 rounded-lg px-2 py-2 text-[12px] font-semibold transition-colors"
+                style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)', color: '#a78bfa' }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                Dossier
               </button>
             </div>
           </div>
+
+          {/* Adding folder loader */}
           {addingFolder && (
-            <div className="flex-shrink-0 flex items-center gap-3 px-5 py-3"
-              style={{ background: 'rgba(139,92,246,0.08)', borderBottom: '1px solid rgba(139,92,246,0.15)' }}>
-              <svg className="animate-spin w-4 h-4 flex-shrink-0" style={{ color: '#a78bfa' }} viewBox="0 0 24 24" fill="none">
+            <div className="flex-shrink-0 flex items-center gap-3 px-5 py-2.5"
+              style={{ background: 'rgba(139,92,246,0.06)', borderBottom: '1px solid rgba(139,92,246,0.12)' }}>
+              <svg className="animate-spin w-3.5 h-3.5 flex-shrink-0" style={{ color: '#a78bfa' }} viewBox="0 0 24 24" fill="none">
                 <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="31.4" strokeDashoffset="10" />
               </svg>
-              <p className="text-[12px] font-semibold truncate" style={{ color: '#a78bfa' }}>
-                Ajout de «{addingFolder}» en cours…
+              <p className="text-[11px] font-semibold truncate" style={{ color: '#a78bfa' }}>
+                Ajout «{addingFolder}»…
               </p>
             </div>
           )}
+
+          {/* Video list */}
           <div className="flex-1 overflow-auto">
             {selectedVideos.length === 0 ? (
-              <div className="px-5 py-10 text-center">
-                <p className="text-3xl mb-3">🎬</p>
-                <p className="text-[13px] font-bold text-white mb-1">Aucune vidéo</p>
-                <p className="text-[12px] text-text2">Ajoute depuis la banque ou le PC</p>
-              </div>
-            ) : selectedVideos.map((sv, selIdx) => {
-              const fp = sv.localPath ?? sv.item.file_url
-              return (
-                <div
-                  key={sv.item.id}
-                  className="flex items-center gap-3 px-4 py-3"
-                  style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}
-                >
-                  <div className="w-10 flex-shrink-0 aspect-[9/16] rounded-lg overflow-hidden"
-                    style={{ background: 'rgba(255,255,255,0.05)' }}>
-                    <VideoThumbnail filePath={fp ?? ''} thumbnailPath={sv.item.thumbnail_path} storagePath={sv.item.storage_path} />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[12px] font-bold" style={{ color: '#8b5cf6' }}>#{selIdx + 1}</p>
-                    <p className="text-[13px] text-white truncate">{sv.item.title}</p>
-                  </div>
-                  <button
-                    onClick={() => setSelVideos(prev => prev.filter((_, i) => i !== selIdx))}
-                    className="text-text2 hover:text-danger transition-colors flex-shrink-0 text-[14px]"
-                  >✕</button>
+              <div className="flex flex-col items-center justify-center h-full px-5 py-10 text-center">
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-4"
+                  style={{ background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.12)' }}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#52525b" strokeWidth="1.5"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
                 </div>
-              )
-            })}
+                <p className="text-[13px] font-bold text-white mb-1">Aucune vidéo</p>
+                <p className="text-[12px] text-text3 max-w-[160px] leading-relaxed">Ajoute depuis la banque, un dossier ou ton PC</p>
+              </div>
+            ) : (
+              <div className="py-2">
+                {selectedVideos.map((sv, selIdx) => {
+                  const fp = sv.localPath ?? sv.item.file_url
+                  return (
+                    <div key={sv.item.id}
+                      className="group flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-white/[0.02]"
+                      style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                      {/* Thumbnail */}
+                      <div className="w-9 flex-shrink-0 aspect-[9/16] rounded-lg overflow-hidden"
+                        style={{ background: 'rgba(255,255,255,0.06)' }}>
+                        <VideoThumbnail filePath={fp ?? ''} thumbnailPath={sv.item.thumbnail_path} storagePath={sv.item.storage_path} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[10px] font-black tracking-widest uppercase mb-0.5"
+                          style={{ color: '#7c3aed' }}>#{selIdx + 1}</p>
+                        <p className="text-[12px] font-semibold text-white truncate leading-tight">{sv.item.title}</p>
+                        {sv.item.folder && (
+                          <p className="text-[10px] text-text3 truncate">{sv.item.folder}</p>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => setSelVideos(prev => prev.filter((_, i) => i !== selIdx))}
+                        className="opacity-0 group-hover:opacity-100 w-5 h-5 flex items-center justify-center rounded transition-all text-text3 hover:text-danger flex-shrink-0">
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
         </aside>
 
-        {/* ── Column 2: Phones ─────────────────────────────────────────────── */}
-        <aside className="w-64 flex-shrink-0 flex flex-col" style={{ borderRight: '1px solid rgba(255,255,255,0.06)', background: '#07090f' }}>
-          {/* Header + mode toggle */}
-          <div className="flex-shrink-0 px-5 pt-5 pb-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-[15px] font-bold text-white">Cibles</p>
-              <span className="text-[12px] font-semibold px-2.5 py-0.5 rounded-full text-white"
-                style={{ background: selectedPhones.size > 0 ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.07)' }}>
+        {/* ── COL 2: Phones / Groups ───────────────────────────────────────── */}
+        <aside className="w-64 flex-shrink-0 flex flex-col"
+          style={{ borderRight: '1px solid rgba(139,92,246,0.08)', background: 'rgba(14,14,22,0.6)' }}>
+
+          {/* Phone panel header */}
+          <div className="flex-shrink-0 px-5 pt-5 pb-4"
+            style={{ borderBottom: '1px solid rgba(139,92,246,0.08)' }}>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="2"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+                <p className="text-[14px] font-bold text-white">Cibles</p>
+              </div>
+              <span className="min-w-[22px] h-[22px] flex items-center justify-center text-[11px] font-black rounded-full"
+                style={selectedPhones.size > 0
+                  ? { background: 'linear-gradient(130deg,#7c3aed,#a855f7)', color: 'white' }
+                  : { background: 'rgba(255,255,255,0.07)', color: '#52525b' }}>
                 {selectedPhones.size}
               </span>
             </div>
-            {/* Mode toggle */}
-            <div className="flex rounded-xl p-1 gap-1 mb-3" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
-              {([{ k: 'phones', l: '📱 Téléphones' }, { k: 'groups', l: '👥 Groupes' }] as const).map(m => (
+
+            {/* Mode toggle: phones / groups */}
+            <div className="flex rounded-lg p-0.5 gap-0.5 mb-3"
+              style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+              {([{ k: 'phones', l: 'Téléphones' }, { k: 'groups', l: 'Groupes' }] as const).map(m => (
                 <button key={m.k} onClick={() => setPhonePickMode(m.k)}
-                  className="flex-1 py-2 rounded-lg text-[12px] font-semibold transition-all"
+                  className="flex-1 py-1.5 rounded-md text-[11px] font-semibold transition-all"
                   style={phonePickMode === m.k
-                    ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: 'white' }
-                    : { color: 'rgba(148,163,184,0.7)' }}>
+                    ? { background: 'rgba(139,92,246,0.2)', color: '#c4b5fd', border: '1px solid rgba(139,92,246,0.3)' }
+                    : { color: '#52525b' }}>
                   {m.l}
                 </button>
               ))}
             </div>
 
-            {/* Phone mode controls */}
+            {/* Phone filters */}
             {phonePickMode === 'phones' && (
-              <>
-                <select
-                  value={groupFilter}
-                  onChange={e => setGroupFilter(e.target.value)}
-                  className="w-full rounded-xl px-4 py-2.5 text-[13px] focus:outline-none mb-2"
-                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
-                >
+              <div className="space-y-2">
+                <select value={groupFilter} onChange={e => setGroupFilter(e.target.value)}
+                  className="w-full rounded-lg px-3 py-2 text-[12px] focus:outline-none"
+                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)', color: '#e2e8f0' }}>
                   {groups.map(g => <option key={g} value={g} style={{ background: '#0d1120', color: '#e2d9f3' }}>{g}</option>)}
                 </select>
-                <input
-                  type="text" placeholder="Rechercher…" value={phoneSearch}
-                  onChange={e => setPhoneSearch(e.target.value)}
-                  className="w-full rounded-xl px-4 py-2.5 text-[13px] placeholder:text-text2 focus:outline-none"
-                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
-                />
-              </>
+                <div className="relative">
+                  <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-text3 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                  <input type="text" placeholder="Rechercher…" value={phoneSearch}
+                    onChange={e => setPhoneSearch(e.target.value)}
+                    className="w-full rounded-lg pl-8 pr-3 py-2 text-[12px] placeholder:text-text3 focus:outline-none"
+                    style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)', color: '#e2e8f0' }}
+                  />
+                </div>
+              </div>
             )}
-
-            {/* Group mode: quick-select all / none */}
             {phonePickMode === 'groups' && (
               <div className="flex gap-3">
-                <button
-                  onClick={() => {
-                    const realGroups = groups.filter(g => g !== 'Tous')
-                    setSelectedGroups(new Set(realGroups))
-                    setSelPhones(new Set(phones.filter(p => {
-                      if (role && !canAccessPhoneGroup(role, perms, p.group_name)) return false
-                      return Boolean(p.group_name)
-                    }).map(p => p.id)))
-                  }}
-                  className="text-[12px] font-semibold text-[#8b5cf6] hover:text-white transition-colors">Tout</button>
-                <button
-                  onClick={() => { setSelectedGroups(new Set()); setSelPhones(new Set()) }}
-                  className="text-[12px] text-text2 hover:text-white transition-colors">Aucun</button>
+                <button onClick={() => {
+                  const realGroups = groups.filter(g => g !== 'Tous')
+                  setSelectedGroups(new Set(realGroups))
+                  setSelPhones(new Set(phones.filter(p => {
+                    if (role && !canAccessPhoneGroup(role, perms, p.group_name)) return false
+                    return Boolean(p.group_name)
+                  }).map(p => p.id)))
+                }} className="text-[12px] font-semibold text-accent hover:text-white transition-colors">Tout</button>
+                <button onClick={() => { setSelectedGroups(new Set()); setSelPhones(new Set()) }}
+                  className="text-[12px] text-text3 hover:text-white transition-colors">Aucun</button>
               </div>
             )}
           </div>
 
-          {/* Tout / Aucun bar — phones mode only */}
+          {/* Phones mode: select all/none bar */}
           {phonePickMode === 'phones' && (
-            <div className="flex-shrink-0 px-5 py-2.5 flex gap-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+            <div className="flex-shrink-0 px-5 py-2 flex gap-4 items-center"
+              style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
               <button onClick={() => setSelPhones(new Set(visiblePhones.map(p => p.id)))}
-                className="text-[12px] font-semibold text-[#8b5cf6] hover:text-white transition-colors">Tout</button>
+                className="text-[11px] font-semibold text-accent hover:text-white transition-colors">Tout</button>
               <button onClick={() => setSelPhones(new Set())}
-                className="text-[12px] text-text2 hover:text-white transition-colors">Aucun</button>
-              <span className="ml-auto text-[12px] text-text2">{visiblePhones.length} tel.</span>
+                className="text-[11px] text-text3 hover:text-white transition-colors">Aucun</button>
+              <span className="ml-auto text-[11px] text-text3">{visiblePhones.length} disp.</span>
             </div>
           )}
 
-          {/* ── List body ── */}
+          {/* Phone / group list */}
           <div className="flex-1 overflow-auto">
 
             {/* Phones mode */}
@@ -788,34 +923,40 @@ export function MassPosting({ user }: MassPostingProps) {
               const asgn = assignments.find(a => a.phone.id === phone.id)
               const ts = taskStatuses.get(phone.id)
               return (
-                <button
-                  key={phone.id}
-                  onClick={() => togglePhone(phone.id)}
-                  className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-all ${
-                    checked ? '' : 'hover:bg-white/[0.02]'
-                  }`}
-                  style={checked ? { background: 'rgba(139,92,246,0.08)', borderBottom: '1px solid rgba(255,255,255,0.04)' } : { borderBottom: '1px solid rgba(255,255,255,0.04)' }}
-                >
+                <button key={phone.id} onClick={() => togglePhone(phone.id)}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-left transition-all hover:bg-white/[0.02]"
+                  style={checked
+                    ? { background: 'rgba(139,92,246,0.07)', borderBottom: '1px solid rgba(139,92,246,0.08)' }
+                    : { borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                  {/* Avatar */}
                   <div className="w-8 h-8 rounded-full flex items-center justify-center text-[12px] font-black flex-shrink-0"
-                    style={checked ? { background: 'linear-gradient(135deg,#7c3aed,#ec4899)', color: 'white' } : { background: 'rgba(255,255,255,0.06)', color: '#94a3b8' }}>
+                    style={checked
+                      ? { background: 'linear-gradient(135deg,#7c3aed,#a855f7)', color: 'white' }
+                      : { background: 'rgba(255,255,255,0.06)', color: '#52525b' }}>
                     {phone.ig_username?.[0]?.toUpperCase() ?? phone.phone_name?.[0]?.toUpperCase() ?? '?'}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-[13px] font-semibold text-white truncate">{phone.phone_name}</p>
-                    {phone.ig_username && <p className="text-[12px] text-[#8b5cf6]/80 truncate">@{phone.ig_username}</p>}
+                    <p className="text-[12px] font-semibold text-white truncate leading-tight">{phone.phone_name}</p>
+                    {phone.ig_username && (
+                      <p className="text-[11px] truncate" style={{ color: 'rgba(139,92,246,0.7)' }}>@{phone.ig_username}</p>
+                    )}
                     {ts && ts.status !== 'idle' && (
-                      <p className={`text-[11px] ${STATUS_COLOR[ts.status]}`}>{STATUS_LABEL[ts.status]}</p>
+                      <p className={`text-[10px] font-semibold ${STATUS_COLOR[ts.status]}`}>{STATUS_LABEL[ts.status]}</p>
                     )}
                   </div>
                   {asgn?.video && (
-                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-lg flex-shrink-0"
-                      style={{ background: 'rgba(139,92,246,0.12)', color: '#a78bfa' }}>
-                      #{(asgn.videoIndex + 1)}
+                    <span className="text-[10px] font-black px-1.5 py-0.5 rounded-md flex-shrink-0"
+                      style={{ background: 'rgba(139,92,246,0.12)', color: '#7c3aed' }}>
+                      #{asgn.videoIndex + 1}
                     </span>
                   )}
-                  <div className="w-4 h-4 rounded flex items-center justify-center flex-shrink-0"
-                    style={checked ? { background: 'linear-gradient(135deg,#7c3aed,#ec4899)', border: 'none' } : { border: '1px solid rgba(255,255,255,0.15)' }}>
-                    {checked && <span className="text-white text-[9px] font-bold leading-none">✓</span>}
+                  <div className="w-4 h-4 rounded-[4px] flex items-center justify-center flex-shrink-0 transition-all"
+                    style={checked
+                      ? { background: 'linear-gradient(135deg,#7c3aed,#a855f7)' }
+                      : { border: '1px solid rgba(255,255,255,0.12)' }}>
+                    {checked && (
+                      <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    )}
                   </div>
                 </button>
               )
@@ -825,63 +966,74 @@ export function MassPosting({ user }: MassPostingProps) {
             {phonePickMode === 'groups' && (() => {
               const realGroups = groups.filter(g => g !== 'Tous')
               if (realGroups.length === 0) return (
-                <div className="px-5 py-10 text-center">
-                  <p className="text-3xl mb-3">👥</p>
+                <div className="flex flex-col items-center justify-center h-full px-5 py-10 text-center">
+                  <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-4"
+                    style={{ background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.12)' }}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#52525b" strokeWidth="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                  </div>
                   <p className="text-[13px] font-bold text-white mb-1">Aucun groupe</p>
-                  <p className="text-[12px] text-text2">Assigne des groupes à tes téléphones</p>
+                  <p className="text-[12px] text-text3">Assigne des groupes à tes téléphones</p>
                 </div>
               )
-              return realGroups.map(g => {
-                const inGroup = phones.filter(p => {
-                  if (role && !canAccessPhoneGroup(role, perms, p.group_name)) return false
-                  return p.group_name === g
-                })
-                const checked = selectedGroups.has(g)
-                const selCount = inGroup.filter(p => selectedPhones.has(p.id)).length
-                return (
-                  <button
-                    key={g}
-                    onClick={() => toggleGroup(g)}
-                    className="w-full flex items-center gap-3 px-4 py-4 text-left transition-all"
-                    style={checked
-                      ? { background: 'rgba(139,92,246,0.1)', borderBottom: '1px solid rgba(139,92,246,0.1)' }
-                      : { borderBottom: '1px solid rgba(255,255,255,0.04)' }}
-                  >
-                    <div className="w-10 h-10 rounded-xl flex items-center justify-center text-[18px] flex-shrink-0"
-                      style={checked
-                        ? { background: 'linear-gradient(135deg,#7c3aed,#ec4899)' }
-                        : { background: 'rgba(255,255,255,0.06)' }}>
-                      👥
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[13px] font-bold text-white truncate">{g}</p>
-                      <p className="text-[11px]" style={{ color: checked ? '#a78bfa' : 'rgba(148,163,184,0.5)' }}>
-                        {checked ? `${selCount} / ${inGroup.length} sélectionnés` : `${inGroup.length} téléphone${inGroup.length !== 1 ? 's' : ''}`}
-                      </p>
-                    </div>
-                    <div className="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0"
-                      style={checked ? { background: 'linear-gradient(135deg,#7c3aed,#ec4899)' } : { border: '1px solid rgba(255,255,255,0.15)' }}>
-                      {checked && <span className="text-white text-[10px] font-bold">✓</span>}
-                    </div>
-                  </button>
-                )
-              })
+              return (
+                <div className="py-2">
+                  {realGroups.map(g => {
+                    const inGroup = phones.filter(p => {
+                      if (role && !canAccessPhoneGroup(role, perms, p.group_name)) return false
+                      return p.group_name === g
+                    })
+                    const checked = selectedGroups.has(g)
+                    const selCount = inGroup.filter(p => selectedPhones.has(p.id)).length
+                    return (
+                      <button key={g} onClick={() => toggleGroup(g)}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-left transition-all hover:bg-white/[0.02]"
+                        style={checked
+                          ? { background: 'rgba(139,92,246,0.08)', borderBottom: '1px solid rgba(139,92,246,0.08)' }
+                          : { borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                        <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                          style={checked
+                            ? { background: 'linear-gradient(135deg,#7c3aed,#a855f7)' }
+                            : { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={checked ? 'white' : '#52525b'} strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[13px] font-bold text-white truncate">{g}</p>
+                          <p className="text-[11px]" style={{ color: checked ? '#a78bfa' : '#52525b' }}>
+                            {checked ? `${selCount}/${inGroup.length} sel.` : `${inGroup.length} téléphone${inGroup.length !== 1 ? 's' : ''}`}
+                          </p>
+                        </div>
+                        <div className="w-4 h-4 rounded-[4px] flex items-center justify-center flex-shrink-0 transition-all"
+                          style={checked
+                            ? { background: 'linear-gradient(135deg,#7c3aed,#a855f7)' }
+                            : { border: '1px solid rgba(255,255,255,0.12)' }}>
+                          {checked && (
+                            <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                          )}
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              )
             })()}
           </div>
         </aside>
 
-        {/* ── Column 3: Assignments + Caption + Logs ───────────────────────── */}
-        <div className="flex-1 overflow-y-auto px-8 pb-10">
-          <div className="space-y-6 mt-8">
+        {/* ── COL 3: Config + Queue + Logs ─────────────────────────────────── */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="px-8 py-7 space-y-5 max-w-4xl">
 
             {/* Posting options */}
             <PostingOptions opts={postingOpts} onChange={o => { setPostingOpts(o); savePostingOpts(o) }} />
 
             {/* Caption card */}
-            <div className="rounded-2xl p-6" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+            <div className="sf-card p-5">
               <div className="flex items-center justify-between mb-4">
-                <p className="text-[15px] font-bold text-white">Description</p>
-                <span className={`text-[12px] font-mono ${caption.length > 2200 ? 'text-danger' : 'text-text2'}`}>
+                <div className="flex items-center gap-2">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                  <p className="text-[14px] font-bold text-white">Description</p>
+                </div>
+                <span className={`text-[12px] font-mono ${caption.length > 2200 ? 'text-danger' : 'text-text3'}`}>
                   {caption.length}/2200
                 </span>
               </div>
@@ -890,243 +1042,231 @@ export function MassPosting({ user }: MassPostingProps) {
                 onChange={e => setCaption(e.target.value)}
                 rows={4}
                 placeholder="Description partagée par tous les téléphones (optionnel)…"
-                className="w-full rounded-xl px-4 py-3 text-[13px] placeholder:text-text2 resize-y focus:outline-none"
-                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
+                className="w-full rounded-xl px-4 py-3 text-[13px] placeholder:text-text3 resize-y focus:outline-none transition-colors"
+                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', color: '#e2e8f0' }}
               />
               <div className="flex items-center gap-2 mt-3">
-                <Button size="sm" variant="secondary" onClick={generateCaption} loading={generating} disabled={!groqKey}>✨ Générer avec IA</Button>
+                <Button size="sm" variant="secondary" onClick={generateCaption} loading={generating} disabled={!groqKey}>
+                  ✨ IA
+                </Button>
                 <input type="text" value={customPrompt} onChange={e => setCustomPrompt(e.target.value)}
                   placeholder="Prompt personnalisé…"
-                  className="flex-1 rounded-xl px-4 py-2.5 text-[13px] placeholder:text-text2 focus:outline-none"
-                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
+                  className="flex-1 rounded-xl px-3 py-2 text-[12px] placeholder:text-text3 focus:outline-none"
+                  style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', color: '#e2e8f0' }}
                 />
-                {/* Hashtag toggle — inline, clearly inside the card */}
                 <button
                   onClick={() => setWithHashtags(v => !v)}
-                  className="flex items-center gap-2 rounded-xl px-3 py-2.5 transition-all flex-shrink-0"
+                  title="Inclure des hashtags"
+                  className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-[12px] font-bold transition-all flex-shrink-0"
                   style={withHashtags
-                    ? { background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.25)', color: '#a78bfa' }
-                    : { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(148,163,184,0.5)' }}
-                  title="Hashtags"
-                >
-                  <span className="text-[12px] font-bold">#</span>
+                    ? { background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.3)', color: '#a78bfa' }
+                    : { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', color: '#52525b' }}>
+                  #
                 </button>
               </div>
             </div>
 
-            {/* Configuration summary card */}
-            {(selectedVideos.length > 0 || selectedPhones.size > 0) && (() => {
-              // Video pool label
-              const folders = [...new Set(selectedVideos.map(sv => sv.item.folder).filter(Boolean))]
-              const videoLabel = folders.length === 1
-                ? folders[0]!
-                : selectedVideos.length > 0
-                  ? `${selectedVideos.length} vidéo${selectedVideos.length !== 1 ? 's' : ''} sélectionnée${selectedVideos.length !== 1 ? 's' : ''}`
-                  : null
-
-              // Phone pool label
-              const phoneLabel = phonePickMode === 'groups' && selectedGroups.size > 0
-                ? `${selectedGroups.size} groupe${selectedGroups.size !== 1 ? 's' : ''} sélectionné${selectedGroups.size !== 1 ? 's' : ''}`
-                : selectedPhones.size > 0
-                  ? `${selectedPhones.size} téléphone${selectedPhones.size !== 1 ? 's' : ''} sélectionné${selectedPhones.size !== 1 ? 's' : ''}`
-                  : null
-              const phoneSubLabel = phonePickMode === 'groups' && selectedGroups.size > 0 && selectedPhones.size > 0
-                ? `(${selectedPhones.size} téléphones)`
-                : null
-
-              return (
-                <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                  <div className="px-5 pt-4 pb-3">
-                    <p className="text-[15px] font-bold text-white">Configuration du posting</p>
-                  </div>
-
-                  {videoLabel && (
-                    <>
-                      <div className="px-5 pb-1.5">
-                        <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'rgba(148,163,184,0.35)' }}>Pool de vidéos</p>
-                      </div>
-                      <div className="flex items-center gap-3 px-5 py-3 mx-3 mb-2 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)' }}>
-                        <span className="text-[18px] flex-shrink-0">📁</span>
-                        <span className="flex-1 text-[13px] font-semibold text-white truncate">{videoLabel}</span>
-                        <span className="text-[12px] flex-shrink-0" style={{ color: 'rgba(148,163,184,0.5)' }}>
-                          {selectedVideos.length} vidéo{selectedVideos.length !== 1 ? 's' : ''}
-                        </span>
-                        <span className="text-[12px]" style={{ color: 'rgba(148,163,184,0.3)' }}>›</span>
-                      </div>
-                    </>
-                  )}
-
-                  {phoneLabel && (
-                    <>
-                      <div className="px-5 pb-1.5">
-                        <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'rgba(148,163,184,0.35)' }}>
-                          {phonePickMode === 'groups' ? 'Groupe de téléphones' : 'Téléphones'}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-3 px-5 py-3 mx-3 mb-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)' }}>
-                        <span className="text-[18px] flex-shrink-0">{phonePickMode === 'groups' ? '👥' : '📱'}</span>
-                        <span className="flex-1 text-[13px] font-semibold text-white truncate">
-                          {phoneLabel}
-                          {phoneSubLabel && <span className="ml-1.5 font-normal" style={{ color: 'rgba(148,163,184,0.5)' }}>{phoneSubLabel}</span>}
-                        </span>
-                        <span className="text-[12px]" style={{ color: 'rgba(148,163,184,0.3)' }}>›</span>
-                      </div>
-                    </>
-                  )}
+            {/* Assignments — live queue table */}
+            <div className="sf-card overflow-hidden">
+              <div className="px-5 py-4 flex items-center justify-between"
+                style={{ borderBottom: '1px solid rgba(139,92,246,0.08)' }}>
+                <div className="flex items-center gap-2">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                  <p className="text-[14px] font-bold text-white">File d'attente</p>
                 </div>
-              )
-            })()}
-
-            {/* Assignments card */}
-            <div className="rounded-2xl p-6" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-              <div className="flex items-center justify-between mb-4">
-                <p className="text-[15px] font-bold text-white">Assignations</p>
                 {assignments.length > 0 && (
-                  <span className="text-[13px] text-text2">{assignments.length} téléphone(s)</span>
+                  <span className="text-[12px] text-text3">{assignments.length} tâche{assignments.length !== 1 ? 's' : ''}</span>
                 )}
               </div>
 
               {assignments.length === 0 ? (
-                <div className="rounded-2xl p-10 text-center" style={{ border: '1px dashed rgba(255,255,255,0.08)' }}>
-                  <p className="text-4xl mb-3">📋</p>
-                  <p className="text-base font-bold text-white mb-1">Aucune assignation</p>
-                  <p className="text-[13px] text-text2">Sélectionne des téléphones et des vidéos pour voir les assignations</p>
-                  <p className="text-[12px] text-text2 mt-1">Chaque téléphone est automatiquement assigné à une vidéo (rotation)</p>
+                <div className="flex flex-col items-center justify-center py-14 text-center">
+                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
+                    style={{ background: 'rgba(139,92,246,0.06)', border: '1px dashed rgba(139,92,246,0.2)' }}>
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#52525b" strokeWidth="1.5"><path d="M12 5v14M5 12h14"/></svg>
+                  </div>
+                  <p className="text-[14px] font-bold text-white mb-1">File vide</p>
+                  <p className="text-[12px] text-text3 max-w-[260px] leading-relaxed">Sélectionne des téléphones et des vidéos — chaque téléphone recevra automatiquement une vidéo (rotation).</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 xl:grid-cols-3 gap-4">
-                  {assignments.map(({ phone, video, videoIndex }) => {
-                    const ts = taskStatuses.get(phone.id)
-                    const statusColor = ts ? STATUS_COLOR[ts.status] : ''
-                    return (
-                      <div
-                        key={phone.id}
-                        className="rounded-2xl p-4 space-y-3 transition-colors"
-                        style={{
-                          background: 'rgba(255,255,255,0.02)',
-                          border: ts?.status === 'done'    ? '1px solid rgba(52,211,153,0.3)'
-                                : ts?.status === 'error'   ? '1px solid rgba(239,68,68,0.3)'
-                                : ts?.status === 'posting' ? '1px solid rgba(251,191,36,0.3)'
-                                : '1px solid rgba(255,255,255,0.07)',
-                        }}
-                      >
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-full flex items-center justify-center text-[12px] font-bold flex-shrink-0"
-                            style={{ background: 'rgba(139,92,246,0.15)', color: '#a78bfa' }}>
-                            {phone.ig_username?.[0]?.toUpperCase() ?? phone.phone_name?.[0]?.toUpperCase() ?? '?'}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="text-[13px] font-semibold text-white truncate">{phone.phone_name}</p>
-                            {phone.ig_username && (
-                              <p className="text-[12px] text-[#8b5cf6]/80 truncate">@{phone.ig_username}</p>
-                            )}
-                          </div>
-                          <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                            phone.status === 'online' ? 'bg-ok' : 'bg-text2'
-                          }`} />
-                        </div>
-                        {video ? (
-                          <div className="flex items-center gap-2">
-                            <div className="w-8 flex-shrink-0 aspect-[9/16] rounded-lg overflow-hidden"
-                              style={{ background: 'rgba(255,255,255,0.05)' }}>
-                              <VideoThumbnail filePath={video.localPath ?? video.item.file_url ?? ''} thumbnailPath={video.item.thumbnail_path} storagePath={video.item.storage_path} />
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <p className="text-[11px] font-bold" style={{ color: '#8b5cf6' }}>#{videoIndex + 1}</p>
-                              <p className="text-[12px] text-text2 truncate">{video.item.title}</p>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="rounded-xl px-3 py-2"
-                            style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                            <span className="text-[12px] text-text2 italic">Aucune vidéo</span>
-                          </div>
-                        )}
-                        {ts && ts.status !== 'idle' && (
-                          <div className="space-y-1.5">
-                            <p className={`text-[12px] font-medium ${statusColor}`}>
-                              {STATUS_LABEL[ts.status]}
-                              {ts.detail && <span className="opacity-70"> — {ts.detail}</span>}
-                            </p>
-                            {(ts.status === 'uploading' || ts.status === 'posting') && (
-                              <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
-                                <div className={`h-full rounded-full animate-pulse ${
-                                  ts.status === 'uploading' ? 'bg-blue-400 w-2/3' : 'bg-warn w-4/5'
-                                }`} />
+                <div className="overflow-x-auto">
+                  <table className="w-full text-[12px]">
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                        <th className="text-left px-5 py-2.5 text-[10px] font-bold uppercase tracking-widest text-text3">#</th>
+                        <th className="text-left px-3 py-2.5 text-[10px] font-bold uppercase tracking-widest text-text3">Téléphone</th>
+                        <th className="text-left px-3 py-2.5 text-[10px] font-bold uppercase tracking-widest text-text3">Vidéo</th>
+                        <th className="text-right px-5 py-2.5 text-[10px] font-bold uppercase tracking-widest text-text3">Statut</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {assignments.map(({ phone, video, videoIndex }, rowIdx) => {
+                        const ts = taskStatuses.get(phone.id)
+                        const status = ts?.status ?? 'idle'
+                        const statusBg: Record<string, string> = {
+                          idle:      'rgba(82,82,91,0.15)',
+                          pending:   'rgba(82,82,91,0.15)',
+                          uploading: 'rgba(96,165,250,0.12)',
+                          posting:   'rgba(245,158,11,0.12)',
+                          done:      'rgba(34,197,94,0.12)',
+                          error:     'rgba(239,68,68,0.12)',
+                        }
+                        const statusFg: Record<string, string> = {
+                          idle:      '#52525b',
+                          pending:   '#71717a',
+                          uploading: '#60a5fa',
+                          posting:   '#f59e0b',
+                          done:      '#22c55e',
+                          error:     '#ef4444',
+                        }
+                        const rowBg = ts?.status === 'done'    ? 'rgba(34,197,94,0.02)'
+                                    : ts?.status === 'error'   ? 'rgba(239,68,68,0.02)'
+                                    : ts?.status === 'posting' ? 'rgba(245,158,11,0.02)'
+                                    : ts?.status === 'uploading' ? 'rgba(96,165,250,0.02)'
+                                    : 'transparent'
+                        return (
+                          <tr key={phone.id}
+                            style={{ background: rowBg, borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                            <td className="px-5 py-3 text-text3 font-mono">{rowIdx + 1}</td>
+                            <td className="px-3 py-3">
+                              <div className="flex items-center gap-2.5">
+                                <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-black flex-shrink-0"
+                                  style={{ background: 'rgba(139,92,246,0.12)', color: '#a78bfa' }}>
+                                  {phone.ig_username?.[0]?.toUpperCase() ?? phone.phone_name?.[0]?.toUpperCase() ?? '?'}
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="font-semibold text-white truncate max-w-[120px]">{phone.phone_name}</p>
+                                  {phone.ig_username && (
+                                    <p className="text-[10px] truncate max-w-[120px]" style={{ color: 'rgba(139,92,246,0.6)' }}>@{phone.ig_username}</p>
+                                  )}
+                                </div>
                               </div>
-                            )}
-                            {ts.status === 'done' && (
-                              <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(52,211,153,0.1)' }}>
-                                <div className="h-full bg-ok rounded-full w-full" />
+                            </td>
+                            <td className="px-3 py-3">
+                              {video ? (
+                                <div className="flex items-center gap-2">
+                                  <div className="w-6 flex-shrink-0 aspect-[9/16] rounded overflow-hidden"
+                                    style={{ background: 'rgba(255,255,255,0.06)' }}>
+                                    <VideoThumbnail filePath={video.localPath ?? video.item.file_url ?? ''} thumbnailPath={video.item.thumbnail_path} storagePath={video.item.storage_path} />
+                                  </div>
+                                  <div className="min-w-0">
+                                    <span className="text-[10px] font-bold mr-1.5" style={{ color: '#7c3aed' }}>#{videoIndex + 1}</span>
+                                    <span className="text-text2 truncate max-w-[120px] inline-block align-middle">{video.item.title}</span>
+                                  </div>
+                                </div>
+                              ) : (
+                                <span className="text-text3 italic">—</span>
+                              )}
+                            </td>
+                            <td className="px-5 py-3 text-right">
+                              <div className="inline-flex flex-col items-end gap-1">
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap"
+                                  style={{ background: statusBg[status], color: statusFg[status] }}>
+                                  {STATUS_LABEL[status]}
+                                </span>
+                                {ts?.detail && (
+                                  <span className="text-[10px] text-text3 max-w-[120px] truncate">{ts.detail}</span>
+                                )}
+                                {(status === 'uploading' || status === 'posting') && (
+                                  <div className="w-16 h-1 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
+                                    <div className="sf-progress-bar h-full" style={{ width: status === 'uploading' ? '60%' : '80%' }} />
+                                  </div>
+                                )}
                               </div>
-                            )}
-                            {ts.status === 'error' && (
-                              <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(239,68,68,0.1)' }}>
-                                <div className="h-full bg-danger rounded-full w-full" />
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </div>
 
-            {/* Log panel */}
+            {/* Log viewer */}
             {logs.length > 0 && (
-              <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                <div className="px-6 py-4 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                  <p className="text-[15px] font-bold text-white">Journal</p>
+              <div className="sf-card overflow-hidden">
+                <div className="px-5 py-3.5 flex items-center justify-between"
+                  style={{ borderBottom: '1px solid rgba(139,92,246,0.08)' }}>
+                  <div className="flex items-center gap-2">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                    <p className="text-[13px] font-bold text-white">Journal</p>
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+                      style={{ background: 'rgba(139,92,246,0.12)', color: '#7c3aed' }}>
+                      {logs.length}
+                    </span>
+                  </div>
                   {!posting && (
-                    <button onClick={() => setLogs([])} className="text-[13px] text-text2 hover:text-white transition-colors">Effacer</button>
+                    <button onClick={() => setLogs([])}
+                      className="text-[11px] text-text3 hover:text-white transition-colors flex items-center gap-1">
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                      Effacer
+                    </button>
                   )}
                 </div>
-                <div className="px-6 py-4 max-h-48 overflow-auto font-mono text-[12px] space-y-1">
-                  {logs.map((l, i) => (
-                    <div key={i} className={`flex gap-3 ${
-                      l.level === 'ok'    ? 'text-ok'    :
-                      l.level === 'error' ? 'text-danger' :
-                      l.level === 'warn'  ? 'text-warn'   :
-                      'text-text2'
-                    }`}>
-                      <span className="text-text2/60 flex-shrink-0">{l.time}</span>
-                      <span>{l.message}</span>
-                    </div>
-                  ))}
-                  <div ref={logEndRef} />
+                <div className="px-5 py-4 max-h-52 overflow-auto"
+                  style={{ background: 'rgba(0,0,0,0.3)' }}>
+                  <div className="font-mono text-[11px] space-y-1">
+                    {logs.map((l, i) => (
+                      <div key={i} className="flex gap-3 leading-relaxed">
+                        <span className="flex-shrink-0 text-text3 tabular-nums">{l.time}</span>
+                        <span className={
+                          l.level === 'ok'    ? 'text-ok'     :
+                          l.level === 'error' ? 'text-danger'  :
+                          l.level === 'warn'  ? 'text-warn'    :
+                          'text-text2'
+                        }>{l.message}</span>
+                      </div>
+                    ))}
+                    <div ref={logEndRef} />
+                  </div>
                 </div>
               </div>
             )}
+
           </div>
         </div>
       </div>
 
-      {/* Folder quick-pick modal */}
+      {/* ── Folder picker modal ───────────────────────────────────────────── */}
       {showFolderPick && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => setShowFolderPick(false)}>
-          <div className="rounded-2xl overflow-hidden w-80" onClick={e => e.stopPropagation()}
-            style={{ background: '#0d0a1e', border: '1px solid rgba(139,92,246,0.25)' }}>
-            <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(139,92,246,0.12)' }}>
-              <p className="text-[14px] font-bold text-white">📁 Choisir un dossier</p>
-              <button onClick={() => setShowFolderPick(false)} className="text-text2 hover:text-white text-lg leading-none">✕</button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+          onClick={() => setShowFolderPick(false)}>
+          <div className="rounded-2xl overflow-hidden w-80 anim-scale-in"
+            onClick={e => e.stopPropagation()}
+            style={{ background: '#0E0E16', border: '1px solid rgba(139,92,246,0.25)', boxShadow: '0 24px 80px -12px rgba(0,0,0,0.8)' }}>
+            <div className="px-5 py-4 flex items-center justify-between"
+              style={{ borderBottom: '1px solid rgba(139,92,246,0.12)' }}>
+              <div className="flex items-center gap-2">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                <p className="text-[14px] font-bold text-white">Choisir un dossier</p>
+              </div>
+              <button onClick={() => setShowFolderPick(false)}
+                className="w-7 h-7 flex items-center justify-center rounded-lg text-text3 hover:text-white transition-colors"
+                style={{ background: 'rgba(255,255,255,0.05)' }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
             </div>
             {folderLoading ? (
-              <div className="py-10 text-center text-text2 text-[13px]">Chargement…</div>
+              <div className="py-12 flex items-center justify-center gap-3">
+                <svg className="animate-spin w-4 h-4 text-accent" viewBox="0 0 24 24" fill="none">
+                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="31.4" strokeDashoffset="10"/>
+                </svg>
+                <span className="text-[13px] text-text3">Chargement…</span>
+              </div>
             ) : bankFolders.length === 0 ? (
-              <div className="py-10 text-center text-text2 text-[13px]">Aucun dossier dans la banque</div>
+              <div className="py-12 text-center text-[13px] text-text3">Aucun dossier dans la banque</div>
             ) : (
-              <div className="max-h-80 overflow-y-auto py-2">
+              <div className="max-h-80 overflow-y-auto py-1">
                 {bankFolders.map(f => (
                   <button key={f.name} onClick={() => addFolderVideos(f.name)}
-                    className="w-full flex items-center gap-3 px-5 py-3 text-left transition-all hover:bg-white/[0.03]"
+                    className="w-full flex items-center gap-3 px-5 py-3 text-left transition-all hover:bg-white/[0.04]"
                     style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                    <span className="text-[18px]">📂</span>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.5"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
                     <span className="flex-1 text-[13px] font-semibold text-white truncate">{f.name}</span>
-                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full"
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
                       style={{ background: 'rgba(139,92,246,0.12)', color: '#a78bfa' }}>
-                      {f.count} vid.
+                      {f.count}
                     </span>
                   </button>
                 ))}
