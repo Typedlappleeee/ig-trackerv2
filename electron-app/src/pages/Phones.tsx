@@ -22,50 +22,54 @@ const INTERVALS = [
 
 // ── GéeLark status dot ──────────────────────────────────────────────────────
 function StatusDot({ status }: { status: string }) {
+  const online = status === 'online'
   return (
-    <span className={`inline-block w-2 h-2 rounded-full ${status === 'online' ? 'bg-ok' : 'bg-text2'}`} />
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 6,
+      padding: '3px 9px', borderRadius: 20,
+      background: online ? 'rgba(34,197,94,0.10)' : 'rgba(148,163,184,0.07)',
+      border: online ? '1px solid rgba(34,197,94,0.22)' : '1px solid rgba(148,163,184,0.13)',
+      fontSize: 11, fontWeight: 600,
+      color: online ? '#22C55E' : 'rgba(148,163,184,0.52)',
+    }}>
+      <span style={{
+        width: 6, height: 6, borderRadius: '50%',
+        background: online ? '#22C55E' : 'rgba(148,163,184,0.35)',
+        flexShrink: 0,
+        boxShadow: online ? '0 0 6px rgba(34,197,94,0.6)' : 'none',
+      }} />
+      {online ? 'En ligne' : 'Hors ligne'}
+    </span>
   )
 }
 
 // ── IG Status badge ─────────────────────────────────────────────────────────
 function IgStatusBadge({ phone }: { phone: Phone }) {
-  if (!phone.ig_username) return <span className="text-[13px] text-text2">—</span>
-  if (phone.ig_status === 'active') return (
-    <span className="inline-flex items-center gap-1">
-      <span className="w-2 h-2 rounded-full bg-ok animate-pulse flex-shrink-0" />
-      <span className="text-[12px] text-ok font-semibold">IG OK</span>
+  if (!phone.ig_username) return <span style={{ fontSize: 13, color: 'rgba(148,163,184,0.35)' }}>—</span>
+
+  const pill = (dot: string, label: string, bg: string, text: string, border: string) => (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 5,
+      padding: '3px 9px', borderRadius: 20,
+      background: bg, border: `1px solid ${border}`,
+      fontSize: 11, fontWeight: 600, color: text,
+    }}>
+      <span style={{ width: 6, height: 6, borderRadius: '50%', background: dot, flexShrink: 0 }} />
+      {label}
     </span>
   )
-  if (phone.ig_status === 'expired') return (
-    <span className="inline-flex items-center gap-1" title="Session Instagram expirée — re-login requis">
-      <span className="w-2 h-2 rounded-full bg-danger flex-shrink-0" />
-      <span className="text-[12px] text-danger font-semibold">Session expirée</span>
-    </span>
-  )
-  if (phone.ig_status === 'error') return (
-    <span className="inline-flex items-center gap-1">
-      <span className="w-2 h-2 rounded-full bg-danger flex-shrink-0" />
-      <span className="text-[12px] text-danger font-semibold">Erreur</span>
-    </span>
-  )
-  if (phone.ig_status === 'rate_limited') return (
-    <span className="inline-flex items-center gap-1">
-      <span className="w-2 h-2 rounded-full bg-warn flex-shrink-0" />
-      <span className="text-[12px] text-warn font-semibold">Limité</span>
-    </span>
-  )
-  if (phone.ig_sessionid) return (
-    <span className="inline-flex items-center gap-1">
-      <span className="w-2 h-2 rounded-full bg-accent flex-shrink-0" />
-      <span className="text-[12px] text-accent font-semibold">Session</span>
-    </span>
-  )
-  return (
-    <span className="inline-flex items-center gap-1">
-      <span className="w-2 h-2 rounded-full bg-text2/40 flex-shrink-0" />
-      <span className="text-[12px] text-text2">Public</span>
-    </span>
-  )
+
+  if (phone.ig_status === 'active')
+    return pill('#22C55E', 'IG OK', 'rgba(34,197,94,0.12)', '#22C55E', 'rgba(34,197,94,0.2)')
+  if (phone.ig_status === 'expired')
+    return pill('#EF4444', 'Expiré', 'rgba(239,68,68,0.12)', '#EF4444', 'rgba(239,68,68,0.2)')
+  if (phone.ig_status === 'error')
+    return pill('#EF4444', 'Erreur', 'rgba(239,68,68,0.12)', '#EF4444', 'rgba(239,68,68,0.2)')
+  if (phone.ig_status === 'rate_limited')
+    return pill('#F59E0B', 'Limité', 'rgba(245,158,11,0.12)', '#F59E0B', 'rgba(245,158,11,0.2)')
+  if (phone.ig_sessionid)
+    return pill('#8B5CF6', 'Session', 'rgba(139,92,246,0.12)', '#A78BFA', 'rgba(139,92,246,0.22)')
+  return pill('rgba(148,163,184,0.35)', 'Public', 'rgba(148,163,184,0.06)', 'rgba(148,163,184,0.52)', 'rgba(148,163,184,0.13)')
 }
 
 // ── Countdown display ────────────────────────────────────────────────────────
@@ -73,7 +77,7 @@ function Countdown({ secondsLeft }: { secondsLeft: number }) {
   const m = Math.floor(secondsLeft / 60)
   const s = secondsLeft % 60
   return (
-    <span className="text-[13px] text-text2 tabular-nums">
+    <span style={{ fontSize: 12, color: 'rgba(196,181,253,0.72)', fontVariantNumeric: 'tabular-nums' }}>
       ↻ {m > 0 ? `${m}m ` : ''}{s.toString().padStart(2, '0')}s
     </span>
   )
@@ -207,100 +211,164 @@ function SessionDialog({
 
   const busy = testing || saving
 
+  const inputBorderColor = testResult === 'ok' ? '#22C55E' : testResult === 'fail' ? '#EF4444' : 'rgba(255,255,255,0.09)'
+
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ background: 'rgba(0,0,0,0.7)' }}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 50,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: 'rgba(2,2,5,0.85)', backdropFilter: 'blur(4px)',
+      }}
       onClick={e => { if (e.target === e.currentTarget) onClose() }}
     >
-      <div className="bg-card border border-border rounded-xl p-6 w-[480px] shadow-2xl space-y-4">
-        <div>
-          <h2 className="text-lg font-bold text-text">Session ID Instagram</h2>
-          {phone.ig_username && (
-            <p className="text-sm text-accent mt-0.5">@{phone.ig_username}</p>
-          )}
+      <div style={{
+        background: '#0C0C15',
+        border: '1px solid rgba(255,255,255,0.09)',
+        borderRadius: 16,
+        padding: 24,
+        width: 480,
+        maxWidth: '90vw',
+        boxShadow: '0 24px 64px rgba(0,0,0,0.6)',
+        display: 'flex', flexDirection: 'column', gap: 16,
+      }}>
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+          <div>
+            <h2 style={{ fontSize: 16, fontWeight: 700, color: '#F2F0FF', margin: 0 }}>Session ID Instagram</h2>
+            {phone.ig_username && (
+              <p style={{ fontSize: 12, color: '#8B5CF6', margin: '4px 0 0' }}>@{phone.ig_username}</p>
+            )}
+          </div>
+          <button onClick={onClose} style={{
+            width: 28, height: 28, borderRadius: 8,
+            background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+            color: 'rgba(196,181,253,0.72)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14,
+          }}>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+            </svg>
+          </button>
         </div>
 
         {/* Auto-extract via GéeLark shell */}
         {phone.geelark_id && bearer && (
-          <div className="bg-surface border border-border rounded-lg p-3 space-y-2">
-            <div className="flex items-center justify-between">
+          <div style={{
+            background: '#111120', border: '1px solid rgba(255,255,255,0.09)',
+            borderRadius: 11, padding: 12, display: 'flex', flexDirection: 'column', gap: 8,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
-                <p className="text-xs font-semibold text-text">🤖 Extraction automatique</p>
-                <p className="text-[10px] text-text2">Récupère le sessionid directement depuis le téléphone GéeLark (max 3 min)</p>
+                <p style={{ fontSize: 12, fontWeight: 600, color: '#F2F0FF', margin: 0 }}>Extraction automatique</p>
+                <p style={{ fontSize: 10, color: 'rgba(148,163,184,0.52)', margin: '2px 0 0' }}>Récupère le sessionid directement depuis le téléphone GéeLark (max 3 min)</p>
               </div>
-              <div className="flex gap-2">
+              <div style={{ display: 'flex', gap: 6 }}>
                 {extracting && (
                   <Button size="sm" variant="secondary" onClick={cancelExtract}>
-                    🛑 Annuler
+                    Annuler
                   </Button>
                 )}
                 <Button size="sm" onClick={extractFromPhone} loading={extracting} disabled={extracting}>
-                  {extracting ? 'Extraction…' : '⚡ Extraire'}
+                  {extracting ? 'Extraction…' : 'Extraire'}
                 </Button>
               </div>
             </div>
             {extractLogs.length > 0 && (
-              <div className="bg-bg rounded p-2 max-h-40 overflow-auto space-y-0.5">
+              <div style={{
+                background: '#07070C', borderRadius: 8, padding: 8,
+                maxHeight: 160, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2,
+              }}>
                 {extractLogs.map((l, i) => (
-                  <p key={i} className={`text-[10px] font-mono ${l.startsWith('✅') ? 'text-ok' : l.startsWith('❌') || l.startsWith('🛑') ? 'text-danger' : l.startsWith('⚠️') ? 'text-warn' : 'text-text2'}`}>{l}</p>
+                  <p key={i} style={{
+                    fontSize: 10, fontFamily: 'monospace', margin: 0,
+                    color: l.startsWith('✅') ? '#22C55E' : l.startsWith('❌') || l.startsWith('🛑') ? '#EF4444' : l.startsWith('⚠️') ? '#F59E0B' : 'rgba(148,163,184,0.52)',
+                  }}>{l}</p>
                 ))}
                 <div ref={logsEndRef} />
               </div>
             )}
-            {extractError && <p className="text-[11px] text-danger">{extractError}</p>}
+            {extractError && <p style={{ fontSize: 11, color: '#EF4444', margin: 0 }}>{extractError}</p>}
           </div>
         )}
 
-        <div className="bg-surface border border-border rounded-lg px-4 py-3 text-xs text-text2 space-y-1">
-          <p className="font-semibold text-text">Ou manuellement :</p>
-          <p>1. Ouvre <span className="text-accent">instagram.com</span> dans Chrome</p>
-          <p>2. Appuie sur <span className="text-accent">F12</span> (DevTools)</p>
-          <p>3. Va dans <span className="text-accent">Application → Cookies → instagram.com</span></p>
-          <p>4. Trouve le cookie <span className="text-accent font-mono">sessionid</span> et copie sa valeur</p>
+        {/* Manual instructions */}
+        <div style={{
+          background: '#111120', border: '1px solid rgba(255,255,255,0.09)',
+          borderRadius: 11, padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 3,
+        }}>
+          <p style={{ fontSize: 11, fontWeight: 600, color: '#F2F0FF', margin: 0 }}>Ou manuellement :</p>
+          {[
+            <>1. Ouvre <span style={{ color: '#8B5CF6' }}>instagram.com</span> dans Chrome</>,
+            <>2. Appuie sur <span style={{ color: '#8B5CF6' }}>F12</span> (DevTools)</>,
+            <>3. Va dans <span style={{ color: '#8B5CF6' }}>Application → Cookies → instagram.com</span></>,
+            <>4. Trouve le cookie <span style={{ color: '#8B5CF6', fontFamily: 'monospace' }}>sessionid</span> et copie sa valeur</>,
+          ].map((t, i) => (
+            <p key={i} style={{ fontSize: 11, color: 'rgba(148,163,184,0.52)', margin: 0 }}>{t}</p>
+          ))}
         </div>
 
-        <div className="space-y-2">
-          <label className="text-xs font-medium text-text2">Session ID</label>
-          <div className="relative">
+        {/* Session input */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <label style={{ fontSize: 11, fontWeight: 500, color: 'rgba(196,181,253,0.72)' }}>Session ID</label>
+          <div style={{ position: 'relative' }}>
             <input
               ref={inputRef}
               type="password"
               value={value}
               onChange={e => handleChange(e.target.value)}
               placeholder="Colle ton sessionid ici…"
-              className={`w-full bg-surface border rounded-lg px-3 py-2 text-sm text-text placeholder:text-text2 focus:outline-none font-mono pr-8 transition-colors ${
-                testResult === 'ok'   ? 'border-ok' :
-                testResult === 'fail' ? 'border-danger' :
-                'border-border focus:border-accent'
-              }`}
+              style={{
+                width: '100%', boxSizing: 'border-box',
+                background: '#111120', border: `1px solid ${inputBorderColor}`,
+                borderRadius: 8, padding: '9px 36px 9px 12px',
+                fontSize: 13, color: '#F2F0FF', outline: 'none',
+                fontFamily: 'monospace', transition: 'border-color 0.2s',
+              }}
             />
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm pointer-events-none">
-              {testing          ? <span className="animate-spin inline-block text-accent">↻</span> :
-               testResult === 'ok'   ? <span className="text-ok">✓</span> :
-               testResult === 'fail' ? <span className="text-danger">✗</span> : null}
+            <span style={{
+              position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
+              fontSize: 13, pointerEvents: 'none',
+            }}>
+              {testing ? (
+                <svg style={{ animation: 'spin 1s linear infinite' }} width="13" height="13" viewBox="0 0 13 13" fill="none">
+                  <circle cx="6.5" cy="6.5" r="5" stroke="#8B5CF6" strokeWidth="1.5" strokeDasharray="10 20" strokeLinecap="round"/>
+                </svg>
+              ) : testResult === 'ok' ? (
+                <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                  <path d="M2 7l3 3 6-6" stroke="#22C55E" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              ) : testResult === 'fail' ? (
+                <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                  <path d="M2 2l9 9M11 2L2 11" stroke="#EF4444" strokeWidth="1.8" strokeLinecap="round"/>
+                </svg>
+              ) : null}
             </span>
           </div>
           {testResult === 'ok' && detectedUser && (
-            <p className="text-xs text-text2">
-              Compte : <span className="text-accent font-semibold">@{detectedUser}</span>
+            <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.52)', margin: 0 }}>
+              Compte : <span style={{ color: '#8B5CF6', fontWeight: 600 }}>@{detectedUser}</span>
               {phone.ig_username && phone.ig_username !== detectedUser && (
-                <span className="ml-1 text-warn">· différent de @{phone.ig_username} — sera mis à jour</span>
+                <span style={{ color: '#F59E0B', marginLeft: 4 }}>· différent de @{phone.ig_username} — sera mis à jour</span>
               )}
             </p>
           )}
-          {testResult === 'fail' && <p className="text-xs text-danger">❌ Session invalide ou expirée — vérifie que tu as copié la bonne valeur.</p>}
+          {testResult === 'fail' && <p style={{ fontSize: 11, color: '#EF4444', margin: 0 }}>Session invalide ou expirée — vérifie que tu as copié la bonne valeur.</p>}
           {testResult === 'idle' && value.trim().length > 10 && !testing && (
-            <p className="text-xs text-text2">Test automatique en cours…</p>
+            <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.52)', margin: 0 }}>Test automatique en cours…</p>
           )}
         </div>
 
-        <div className="flex items-center gap-3 justify-end pt-2">
-          <button onClick={onClose} disabled={busy} className="text-sm text-text2 hover:text-text px-3 py-1.5 rounded transition-colors disabled:opacity-40">
+        {/* Footer */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'flex-end', paddingTop: 4 }}>
+          <button onClick={onClose} disabled={busy} style={{
+            fontSize: 13, color: 'rgba(196,181,253,0.72)', background: 'none', border: 'none',
+            cursor: busy ? 'not-allowed' : 'pointer', padding: '7px 12px', borderRadius: 8,
+            opacity: busy ? 0.4 : 1, transition: 'color 0.15s',
+          }}>
             Annuler
           </button>
           <Button size="sm" onClick={save} loading={busy} disabled={!value.trim()}>
-            {testing ? '🔍 Vérification…' : saving ? '💾 Sauvegarde…' : testResult === 'ok' ? '💾 Sauvegarder' : '🔍 Tester & Sauvegarder'}
+            {testing ? 'Vérification…' : saving ? 'Sauvegarde…' : testResult === 'ok' ? 'Sauvegarder' : 'Tester & Sauvegarder'}
           </Button>
         </div>
       </div>
@@ -330,14 +398,19 @@ function ContextMenu({
   const left = Math.min(x, window.innerWidth - 210)
   const top  = Math.min(y, window.innerHeight - 230)
 
-  const item = (icon: string, label: string, onClick: () => void, danger = false) => (
+  const item = (icon: React.ReactNode, label: string, onClick: () => void, danger = false) => (
     <button
       onClick={() => { onClick(); onClose() }}
-      className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left rounded transition-colors ${
-        danger ? 'hover:bg-danger/10 text-danger' : 'hover:bg-surface2 text-text'
-      }`}
+      style={{
+        width: '100%', display: 'flex', alignItems: 'center', gap: 8,
+        padding: '7px 12px', fontSize: 13, textAlign: 'left', borderRadius: 6,
+        background: 'none', border: 'none', cursor: 'pointer',
+        color: danger ? '#EF4444' : '#F2F0FF', transition: 'background 0.12s',
+      }}
+      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = danger ? 'rgba(239,68,68,0.10)' : 'rgba(255,255,255,0.06)' }}
+      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'none' }}
     >
-      <span className="w-4 text-center">{icon}</span>
+      <span style={{ width: 16, display: 'flex', justifyContent: 'center' }}>{icon}</span>
       <span>{label}</span>
     </button>
   )
@@ -345,16 +418,35 @@ function ContextMenu({
   return (
     <div
       ref={menuRef}
-      className="fixed z-50 bg-card border border-border rounded-xl shadow-2xl py-1 w-52"
-      style={{ left, top }}
+      style={{
+        position: 'fixed', zIndex: 50,
+        background: '#0C0C15', border: '1px solid rgba(255,255,255,0.09)',
+        borderRadius: 11, boxShadow: '0 16px 48px rgba(0,0,0,0.6)',
+        padding: '4px 0', width: 208,
+        left, top,
+      }}
     >
-      <div className="px-3 py-1.5 border-b border-border mb-1">
-        <p className="text-xs font-semibold text-text truncate">{phone.phone_name}</p>
-        {phone.ig_username && <p className="text-[10px] text-accent">@{phone.ig_username}</p>}
+      <div style={{ padding: '6px 12px 8px', borderBottom: '1px solid rgba(255,255,255,0.055)', marginBottom: 4 }}>
+        <p style={{ fontSize: 12, fontWeight: 600, color: '#F2F0FF', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phone.phone_name}</p>
+        {phone.ig_username && <p style={{ fontSize: 10, color: '#8B5CF6', margin: '1px 0 0' }}>@{phone.ig_username}</p>}
       </div>
-      {item('🔑', 'Session ID', onSession)}
-      {phone.ig_username && item('✂️', 'Délier Instagram', onUnlink)}
-      {canDelete && <><div className="border-t border-border my-1" />{item('🗑', 'Supprimer', onDelete, true)}</>}
+      {item(
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x="1.5" y="5.5" width="10" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.4"/><path d="M4.5 5.5V4a2 2 0 0 1 4 0v1.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>,
+        'Session ID', onSession
+      )}
+      {phone.ig_username && item(
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 6.5C2 4 4 2 6.5 2s4.5 2 4.5 4.5S9 11 6.5 11" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/><path d="M2 11l4-4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>,
+        'Délier Instagram', onUnlink
+      )}
+      {canDelete && (
+        <>
+          <div style={{ borderTop: '1px solid rgba(255,255,255,0.055)', margin: '4px 0' }} />
+          {item(
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 3.5h9M5 3.5V2h3v1.5M4.5 3.5l.5 7h3l.5-7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>,
+            'Supprimer', onDelete, true
+          )}
+        </>
+      )}
     </div>
   )
 }
@@ -381,24 +473,33 @@ function IgCell({ phone, onSave }: { phone: Phone; onSave: (id: string, u: strin
   }
 
   if (editing) return (
-    <div className="flex items-center gap-1">
-      <span className="text-[13px] text-text2">@</span>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+      <span style={{ fontSize: 13, color: 'rgba(196,181,253,0.72)' }}>@</span>
       <input
         ref={ref} value={value} onChange={e => setValue(e.target.value)}
         onKeyDown={onKey} onBlur={save} disabled={saving}
-        className="w-28 bg-surface border border-accent rounded px-1 py-0.5 text-[13px] text-text focus:outline-none"
+        style={{
+          width: 112, background: '#111120', border: '1px solid #8B5CF6',
+          borderRadius: 6, padding: '2px 6px', fontSize: 13, color: '#F2F0FF', outline: 'none',
+        }}
       />
     </div>
   )
 
   return (
-    <button onClick={() => setEditing(true)} className="text-[13px] text-left group flex items-center gap-1.5 min-w-0" title="Cliquer pour éditer">
+    <button
+      onClick={() => setEditing(true)}
+      style={{ fontSize: 13, textAlign: 'left', display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', minWidth: 0, padding: 0 }}
+      title="Cliquer pour éditer"
+    >
       {phone.ig_username ? (
-        <span className="text-accent truncate">@{phone.ig_username}</span>
+        <span style={{ color: '#8B5CF6', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>@{phone.ig_username}</span>
       ) : (
-        <span className="text-text2 italic">+ ajouter</span>
+        <span style={{ color: 'rgba(148,163,184,0.35)', fontStyle: 'italic' }}>+ ajouter</span>
       )}
-      <span className="opacity-0 group-hover:opacity-40 text-text2 text-[11px] flex-shrink-0">✎</span>
+      <svg width="11" height="11" viewBox="0 0 11 11" fill="none" style={{ opacity: 0, flexShrink: 0, transition: 'opacity 0.15s' }} className="edit-pencil">
+        <path d="M7.5 1.5l2 2-6 6H1.5v-2l6-6z" stroke="rgba(148,163,184,0.52)" strokeWidth="1.2" strokeLinejoin="round"/>
+      </svg>
     </button>
   )
 }
@@ -428,19 +529,25 @@ function NoteCell({ phone, onSave }: { phone: Phone; onSave: (id: string, v: str
     <input
       ref={ref} value={value} onChange={e => setValue(e.target.value)}
       onKeyDown={onKey} onBlur={save} disabled={saving}
-      className="w-full bg-surface border border-accent rounded px-1 py-0.5 text-[13px] text-text focus:outline-none"
+      style={{
+        width: '100%', background: '#111120', border: '1px solid #8B5CF6',
+        borderRadius: 6, padding: '2px 6px', fontSize: 13, color: '#F2F0FF', outline: 'none',
+      }}
       placeholder="Note…"
     />
   )
 
   return (
-    <button onClick={() => setEditing(true)} className="text-[13px] text-left group flex items-center gap-1.5 min-w-0 w-full" title="Cliquer pour éditer">
+    <button
+      onClick={() => setEditing(true)}
+      style={{ fontSize: 13, textAlign: 'left', display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', minWidth: 0, width: '100%', padding: 0 }}
+      title="Cliquer pour éditer"
+    >
       {phone.remark ? (
-        <span className="text-text2 truncate">{phone.remark}</span>
+        <span style={{ color: 'rgba(196,181,253,0.72)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phone.remark}</span>
       ) : (
-        <span className="text-text2/40 italic">+ note</span>
+        <span style={{ color: 'rgba(148,163,184,0.25)', fontStyle: 'italic' }}>+ note</span>
       )}
-      <span className="opacity-0 group-hover:opacity-40 text-text2 text-[11px] flex-shrink-0">✎</span>
     </button>
   )
 }
@@ -773,7 +880,32 @@ export function Phones({ user }: PhonesProps) {
     return palette[Math.abs(h) % palette.length]
   }
 
-  const COLS = '36px 1fr 130px 160px 90px 130px 110px'
+  const COLS = '40px 1fr 130px 170px 130px 110px 120px'
+
+  // ── small icon action button ──────────────────────────────────────────────
+  const ActionBtn = ({
+    onClick, title, children, danger,
+  }: { onClick: () => void; title: string; children: React.ReactNode; danger?: boolean }) => {
+    const [hovered, setHovered] = useState(false)
+    return (
+      <button
+        onClick={onClick}
+        title={title}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        style={{
+          width: 28, height: 28, borderRadius: 6,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: hovered ? (danger ? 'rgba(239,68,68,0.15)' : 'rgba(124,58,237,0.15)') : 'rgba(255,255,255,0.06)',
+          border: '1px solid rgba(255,255,255,0.1)',
+          color: hovered ? (danger ? '#EF4444' : '#A78BFA') : 'rgba(148,163,184,0.52)',
+          cursor: 'pointer', transition: 'all 0.15s', flexShrink: 0,
+        }}
+      >
+        {children}
+      </button>
+    )
+  }
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -797,150 +929,163 @@ export function Phones({ user }: PhonesProps) {
         />
       )}
 
-      <div className="h-full flex flex-col overflow-hidden" onClick={() => setContextMenu(null)}>
+      <div
+        style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#07070C' }}
+        onClick={() => setContextMenu(null)}
+      >
 
         {/* ── Header ───────────────────────────────────────────────────────── */}
-        <div className="flex-shrink-0 px-8 pt-7 pb-5 flex items-center justify-between"
-          style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        <div style={{
+          flexShrink: 0, padding: '28px 32px 20px',
+          borderBottom: '1px solid rgba(255,255,255,0.055)',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        }}>
           <div>
-            <h1 className="text-[26px] font-black text-white leading-none">Téléphones</h1>
-            <p className="text-[13px] mt-1" style={{ color: 'rgba(148,163,184,0.55)' }}>
+            <h1 style={{ fontSize: 24, fontWeight: 800, color: '#F2F0FF', margin: 0, letterSpacing: '-0.4px' }}>Téléphones</h1>
+            <p style={{ fontSize: 13, color: 'rgba(148,163,184,0.52)', margin: '4px 0 0' }}>
               Gérez et surveillez tous vos téléphones connectés
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            {/* Auto-refresh */}
-            <div className="flex items-center gap-2 px-3 py-2 rounded-xl"
-              style={{ background: '#0E0E16', border: '1px solid rgba(139,92,246,0.12)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {/* Auto-refresh control */}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              padding: '8px 12px', borderRadius: 8,
+              background: '#0C0C15', border: '1px solid rgba(139,92,246,0.22)',
+            }}>
               <button
                 onClick={() => { const next = !autoRefresh; poller.setEnabled(next); setAutoRefresh(next) }}
-                className={`relative w-7 h-3.5 rounded-full transition-colors flex-shrink-0 ${autoRefresh ? 'bg-ok' : 'bg-surface2'}`}
+                style={{
+                  position: 'relative', width: 28, height: 15, borderRadius: 9,
+                  background: autoRefresh ? '#22C55E' : 'rgba(148,163,184,0.2)',
+                  flexShrink: 0, border: 'none', cursor: 'pointer', padding: 0,
+                  transition: 'background 0.2s',
+                }}
               >
-                <span className={`absolute top-0.5 w-2.5 h-2.5 bg-white rounded-full shadow transition-all ${autoRefresh ? 'left-[16px]' : 'left-0.5'}`} />
+                <span style={{
+                  position: 'absolute', top: 2.5, width: 10, height: 10,
+                  background: 'white', borderRadius: '50%', boxShadow: '0 1px 3px rgba(0,0,0,0.4)',
+                  transition: 'left 0.2s', left: autoRefresh ? 15 : 2.5,
+                }} />
               </button>
-              <span className="text-[11px] font-medium" style={{ color: 'rgba(148,163,184,0.6)' }}>Auto</span>
+              <span style={{ fontSize: 11, fontWeight: 500, color: 'rgba(148,163,184,0.52)' }}>Auto</span>
               {autoRefresh && (
-                <div className="flex items-center gap-1">
+                <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
                   {INTERVALS.map(({ label, value }) => (
                     <button key={value} onClick={() => changeInterval(value)}
-                      className={`px-2 py-0.5 rounded-md text-[10px] transition-all ${
-                        intervalSec === value ? 'bg-accent/25 text-accent font-semibold' : 'text-text2 hover:text-text'
-                      }`}>{label}</button>
+                      style={{
+                        padding: '2px 7px', borderRadius: 5, fontSize: 10, border: 'none', cursor: 'pointer',
+                        background: intervalSec === value ? 'rgba(139,92,246,0.22)' : 'none',
+                        color: intervalSec === value ? '#A78BFA' : 'rgba(148,163,184,0.52)',
+                        fontWeight: intervalSec === value ? 700 : 400,
+                        transition: 'all 0.12s',
+                      }}>{label}</button>
                   ))}
                 </div>
               )}
               {autoRefresh && bearer && <Countdown secondsLeft={countdown} />}
             </div>
+
+            {/* Sync button */}
             <button
               onClick={syncFromGeelark} disabled={!bearer || syncing}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl text-[13px] font-semibold transition-all hover:brightness-110 disabled:opacity-40"
-              style={{ background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.3)', color: '#a78bfa' }}>
-              <span className={syncing ? 'animate-spin inline-block' : ''}>🔄</span>
+              style={{
+                display: 'flex', alignItems: 'center', gap: 7,
+                padding: '9px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600,
+                background: 'rgba(124,58,237,0.15)', border: '1px solid rgba(139,92,246,0.3)',
+                color: '#A78BFA', cursor: (!bearer || syncing) ? 'not-allowed' : 'pointer',
+                opacity: (!bearer || syncing) ? 0.5 : 1, transition: 'all 0.15s',
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ flexShrink: 0, animation: syncing ? 'spin 1s linear infinite' : 'none' }}>
+                <path d="M12 7A5 5 0 1 1 9.5 2.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+                <path d="M9 1l1.5 1.5L9 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
               Sync GéeLark
             </button>
           </div>
         </div>
 
-        {/* ── 6 Stat cards ─────────────────────────────────────────────────── */}
+        {/* ── Summary cards ─────────────────────────────────────────────────── */}
         {(() => {
-          const onlinePct  = phones.length ? Math.round((onlineCount  / phones.length) * 100) : 0
-          const offlinePct = phones.length ? Math.round((offlineCount / phones.length) * 100) : 0
-          const syncPct    = onlinePct
+          const onlinePct = phones.length ? Math.round((onlineCount / phones.length) * 100) : 0
+          const igActivePct = phones.length ? Math.round((igCount / phones.length) * 100) : 0
 
-          // Génère un chemin SVG dont le niveau correspond au pourcentage réel
-          const Sparkline = ({ color, pct }: { color: string; pct: number }) => {
-            const W = 72, H = 26
-            const nPts = 9
-            // baseY inversé : 100% → haut (y=2), 0% → bas (y=H-2)
-            const baseY = H - 2 - (pct / 100) * (H - 4)
-            const amp = Math.min(pct, 100 - pct) * 0.06 * H + 1.5 // wobble réduit aux extrêmes
-            const ys = Array.from({ length: nPts }, (_, i) =>
-              Math.max(1, Math.min(H - 1, baseY + Math.sin(i * 1.8 + pct * 0.07) * amp))
-            )
-            const linePts = ys.map((y, i) => `${i === 0 ? 'M' : 'L'}${((i / (nPts - 1)) * W).toFixed(1)},${y.toFixed(1)}`).join(' ')
-            const fillPts = linePts + ` L${W},${H} L0,${H}Z`
-            const gid = `sg${color.replace('#', '')}`
-            return (
-              <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} fill="none" className="opacity-85">
-                <defs>
-                  <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={color} stopOpacity="0.3"/>
-                    <stop offset="100%" stopColor={color} stopOpacity="0"/>
-                  </linearGradient>
-                </defs>
-                <path d={fillPts} fill={`url(#${gid})`}/>
-                <path d={linePts} stroke={color} strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            )
-          }
-
-          const RingIcon = ({ pct, color }: { pct: number; color: string }) => {
-            const r = 16, circ = 2 * Math.PI * r
-            const dash = (pct / 100) * circ
-            return (
-              <svg width="44" height="44" viewBox="0 0 44 44">
-                <circle cx="22" cy="22" r={r} stroke={`${color}22`} strokeWidth="4" fill="none"/>
-                <circle cx="22" cy="22" r={r} stroke={color} strokeWidth="4" fill="none"
-                  strokeDasharray={`${dash} ${circ}`} strokeDashoffset={circ * 0.25}
-                  strokeLinecap="round" style={{ transition: 'stroke-dasharray 0.6s ease' }}/>
-                <text x="22" y="27" textAnchor="middle" fontSize="9" fontWeight="800" fill={color}>✓</text>
-              </svg>
-            )
-          }
-
-          const PhoneIcon = ({ color }: { color: string }) => (
-            <div className="relative flex items-center justify-center w-10 h-10">
-              <div className="absolute inset-0 rounded-xl opacity-20 blur-sm" style={{ background: color }} />
-              <span className="relative text-[22px]">📱</span>
-            </div>
-          )
-
-          const PeopleIcon = ({ color }: { color: string }) => (
-            <svg width="40" height="32" viewBox="0 0 40 32" fill="none" opacity="0.7">
-              <circle cx="14" cy="10" r="5" fill={color} opacity="0.6"/>
-              <path d="M4 28 C4 20 24 20 24 28" fill={color} opacity="0.5"/>
-              <circle cx="26" cy="10" r="4" fill={color} opacity="0.4"/>
-              <path d="M18 28 C20 22 36 22 36 28" fill={color} opacity="0.3"/>
-            </svg>
-          )
-
-          const GridIcon = ({ color }: { color: string }) => (
-            <svg width="36" height="36" viewBox="0 0 36 36" fill="none" opacity="0.7">
-              <rect x="2"  y="2"  width="14" height="14" rx="3" fill={color} opacity="0.6"/>
-              <rect x="20" y="2"  width="14" height="14" rx="3" fill={color} opacity="0.4"/>
-              <rect x="2"  y="20" width="14" height="14" rx="3" fill={color} opacity="0.4"/>
-              <rect x="20" y="20" width="14" height="14" rx="3" fill={color} opacity="0.25"/>
-            </svg>
-          )
-
-          const cards: { label: string; value: string; sub: string; color: string; f: 'all'|'online'|'offline'|null; deco: React.ReactNode }[] = [
-            { label: 'TOTAL',           value: String(phones.length), sub: 'téléphones',    color: '#818cf8', f: 'all',    deco: <PhoneIcon color="#818cf8" /> },
-            { label: 'EN LIGNE',        value: String(onlineCount),   sub: `${onlinePct}%`, color: '#00ccaa', f: 'online', deco: <Sparkline color="#00ccaa" pct={onlinePct} /> },
-            { label: 'HORS LIGNE',      value: String(offlineCount),  sub: `${offlinePct}%`,color: '#f87171', f: 'offline',deco: <Sparkline color="#f87171" pct={offlinePct} /> },
-            { label: 'COMPTES ACTIFS',  value: String(igCount),       sub: 'Instagram',     color: '#e1306c', f: null,     deco: <PeopleIcon color="#e1306c" /> },
-            { label: 'GROUPES',         value: String(groupCount),    sub: 'groupes actifs',color: '#f59e0b', f: null,     deco: <GridIcon color="#f59e0b" /> },
-            { label: 'SYNCHRONISATION', value: `${syncPct}%`,         sub: lastUpdated ? `màj ${lastUpdated.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}` : 'À jour', color: '#10b981', f: null, deco: <RingIcon pct={syncPct} color="#10b981" /> },
+          const summaryCards = [
+            {
+              label: 'Total', value: phones.length, sub: 'téléphones',
+              color: '#8B5CF6', f: 'all' as const,
+              icon: (
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                  <rect x="5" y="1" width="10" height="18" rx="2.5" stroke="currentColor" strokeWidth="1.5"/>
+                  <circle cx="10" cy="15.5" r="1" fill="currentColor"/>
+                </svg>
+              ),
+            },
+            {
+              label: 'En ligne', value: onlineCount, sub: `${onlinePct}% actifs`,
+              color: '#22C55E', f: 'online' as const,
+              icon: (
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                  <circle cx="10" cy="10" r="3" fill="currentColor"/>
+                  <circle cx="10" cy="10" r="6.5" stroke="currentColor" strokeWidth="1.5" strokeDasharray="2 2"/>
+                </svg>
+              ),
+            },
+            {
+              label: 'Hors ligne', value: offlineCount, sub: `${100 - onlinePct}% inactifs`,
+              color: 'rgba(148,163,184,0.52)', f: 'offline' as const,
+              icon: (
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                  <circle cx="10" cy="10" r="6.5" stroke="currentColor" strokeWidth="1.5"/>
+                  <path d="M7 7l6 6M13 7l-6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                </svg>
+              ),
+            },
+            {
+              label: 'Comptes IG', value: igCount, sub: `${igActivePct}% configurés`,
+              color: '#E1306C', f: null,
+              icon: (
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                  <rect x="3" y="3" width="14" height="14" rx="4" stroke="currentColor" strokeWidth="1.5"/>
+                  <circle cx="10" cy="10" r="3" stroke="currentColor" strokeWidth="1.5"/>
+                  <circle cx="14" cy="6" r="1" fill="currentColor"/>
+                </svg>
+              ),
+            },
           ]
 
           return (
-            <div className="flex-shrink-0 px-8 pt-5 pb-4 grid grid-cols-6 gap-3">
-              {cards.map(card => (
-                <button key={card.label}
+            <div style={{
+              flexShrink: 0, padding: '16px 32px',
+              display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10,
+              borderBottom: '1px solid rgba(255,255,255,0.055)',
+            }}>
+              {summaryCards.map(card => (
+                <button
+                  key={card.label}
                   onClick={() => { if (card.f) setFilter(card.f) }}
-                  className={`rounded-2xl p-4 text-left transition-all overflow-hidden relative ${card.f ? 'hover:brightness-110' : 'cursor-default'}`}
                   style={{
-                    background: (card.f && filter === card.f) ? `${card.color}12` : 'rgba(255,255,255,0.03)',
-                    border: (card.f && filter === card.f) ? `1px solid ${card.color}35` : '1px solid rgba(255,255,255,0.07)',
+                    background: (card.f && filter === card.f) ? `rgba(124,58,237,0.08)` : '#0C0C15',
+                    border: (card.f && filter === card.f) ? '1px solid rgba(139,92,246,0.22)' : '1px solid rgba(255,255,255,0.055)',
+                    borderRadius: 11, padding: '14px 16px',
+                    display: 'flex', alignItems: 'center', gap: 14,
+                    cursor: card.f ? 'pointer' : 'default',
+                    transition: 'all 0.15s', textAlign: 'left',
+                  }}
+                >
+                  <div style={{
+                    width: 40, height: 40, borderRadius: 10, flexShrink: 0,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: `${card.color}14`,
+                    color: card.color,
                   }}>
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'rgba(148,163,184,0.45)' }}>{card.label}</p>
-                      <p className="text-[26px] font-black leading-none" style={{ color: card.color }}>{card.value}</p>
-                      <p className="text-[10px] mt-1.5" style={{ color: 'rgba(148,163,184,0.4)' }}>{card.sub}</p>
-                    </div>
-                    <div className="flex-shrink-0 flex items-center justify-center ml-2 mt-1">
-                      {card.deco}
-                    </div>
+                    {card.icon}
+                  </div>
+                  <div>
+                    <p style={{ fontSize: 22, fontWeight: 800, color: '#F2F0FF', margin: 0, lineHeight: 1 }}>{card.value}</p>
+                    <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.52)', margin: '4px 0 0' }}>{card.label}</p>
+                    <p style={{ fontSize: 10, color: `${card.color}99`, margin: '1px 0 0' }}>{card.sub}</p>
                   </div>
                 </button>
               ))}
@@ -948,214 +1093,245 @@ export function Phones({ user }: PhonesProps) {
           )
         })()}
 
-        {/* ── Main area: table + right panel ───────────────────────────────── */}
-        <div className="flex-1 flex overflow-hidden">
+        {/* ── Main area ────────────────────────────────────────────────────── */}
+        <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
 
-          {/* Scrollable table area */}
-          <div className="flex-1 overflow-y-auto px-8 pb-8 min-w-0">
+          {/* Table area */}
+          <div style={{ flex: 1, overflowY: 'auto', padding: '20px 32px 32px', minWidth: 0 }}>
 
-            {/* Warnings */}
+            {/* Alerts */}
             {!bearer && (
-              <div className="px-4 py-3 rounded-xl mb-4" style={{ background: 'rgba(255,170,42,0.08)', border: '1px solid rgba(255,170,42,0.2)', color: '#ffaa2a' }}>
-                <span className="text-[13px]">⚠ Token GéeLark manquant — configure-le dans Paramètres.</span>
+              <div style={{
+                padding: '10px 14px', borderRadius: 8, marginBottom: 12,
+                background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)',
+                color: '#F59E0B', fontSize: 13, display: 'flex', alignItems: 'center', gap: 8,
+              }}>
+                <svg width="15" height="15" viewBox="0 0 15 15" fill="none" style={{ flexShrink: 0 }}>
+                  <path d="M7.5 1L14 13.5H1L7.5 1z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/>
+                  <path d="M7.5 6v3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+                  <circle cx="7.5" cy="11" r="0.7" fill="currentColor"/>
+                </svg>
+                Token GéeLark manquant — configure-le dans Paramètres.
               </div>
             )}
             {error && (
-              <div className="px-4 py-3 rounded-xl mb-4 flex justify-between items-center" style={{ background: 'rgba(255,92,110,0.08)', border: '1px solid rgba(255,92,110,0.2)', color: '#ff5c6e' }}>
-                <span className="text-[13px]">{error}</span>
-                <button onClick={() => setError(null)} className="opacity-60 hover:opacity-100 ml-3">✕</button>
+              <div style={{
+                padding: '10px 14px', borderRadius: 8, marginBottom: 12,
+                background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)',
+                color: '#EF4444', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+              }}>
+                <span>{error}</span>
+                <button onClick={() => setError(null)} style={{ background: 'none', border: 'none', color: '#EF4444', cursor: 'pointer', opacity: 0.6, padding: 0, fontSize: 14 }}>
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
+                </button>
               </div>
             )}
             {pollError && (
-              <div className="px-4 py-3 rounded-xl mb-4 flex justify-between items-center" style={{ background: 'rgba(255,170,42,0.08)', border: '1px solid rgba(255,170,42,0.2)', color: '#ffaa2a' }}>
-                <span className="text-[13px]">⚠ {pollError}</span>
-                <button onClick={() => setPollError(null)} className="opacity-60 hover:opacity-100 ml-3">✕</button>
+              <div style={{
+                padding: '10px 14px', borderRadius: 8, marginBottom: 12,
+                background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)',
+                color: '#F59E0B', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+              }}>
+                <span>{pollError}</span>
+                <button onClick={() => setPollError(null)} style={{ background: 'none', border: 'none', color: '#F59E0B', cursor: 'pointer', opacity: 0.6, padding: 0 }}>
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
+                </button>
               </div>
             )}
 
-            {/* Search + filters row */}
-            <div className="flex items-center gap-2 mb-4 mt-1">
-              <div className="flex-1 relative">
-                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[13px] opacity-35">🔍</span>
-                <input type="text" placeholder="Rechercher téléphone, compte, proxy, groupe…" value={search}
+            {/* Toolbar */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+              {/* Search */}
+              <div style={{ flex: 1, position: 'relative' }}>
+                <span style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'rgba(148,163,184,0.35)', pointerEvents: 'none' }}>
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.4"/>
+                    <path d="M9.5 9.5l3 3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+                  </svg>
+                </span>
+                <input
+                  type="text"
+                  placeholder="Rechercher téléphone, compte, groupe…"
+                  value={search}
                   onChange={e => setSearch(e.target.value)}
-                  className="w-full rounded-xl pl-9 pr-4 py-2.5 text-[13px] focus:outline-none"
-                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
+                  style={{
+                    width: '100%', boxSizing: 'border-box',
+                    background: '#0C0C15', border: '1px solid rgba(255,255,255,0.09)',
+                    borderRadius: 8, paddingLeft: 34, paddingRight: 14, paddingTop: 9, paddingBottom: 9,
+                    fontSize: 13, color: '#F2F0FF', outline: 'none',
+                  }}
                 />
               </div>
-              {/* Group dropdown */}
-              <div className="relative flex-shrink-0">
-                <select value={groupFilter} onChange={e => setGroupFilter(e.target.value)}
-                  className="appearance-none rounded-xl px-3 py-2.5 pr-7 text-[12px] font-medium focus:outline-none cursor-pointer"
-                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: 'rgba(148,163,184,0.75)' }}>
+
+              {/* Group filter */}
+              <div style={{ position: 'relative', flexShrink: 0 }}>
+                <select
+                  value={groupFilter}
+                  onChange={e => setGroupFilter(e.target.value)}
+                  style={{
+                    appearance: 'none', background: '#0C0C15',
+                    border: '1px solid rgba(255,255,255,0.09)', borderRadius: 8,
+                    padding: '9px 28px 9px 12px', fontSize: 12, fontWeight: 500,
+                    color: 'rgba(196,181,253,0.72)', cursor: 'pointer', outline: 'none',
+                  }}
+                >
                   <option value="all">Tous les groupes</option>
                   {groups.map(g => <option key={g} value={g}>{g}</option>)}
                 </select>
-                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] opacity-40 pointer-events-none">▼</span>
+                <span style={{ position: 'absolute', right: 9, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: 'rgba(148,163,184,0.4)', fontSize: 9 }}>▼</span>
               </div>
-              {/* Status dropdown */}
-              <div className="relative flex-shrink-0">
-                <select value={filter} onChange={e => setFilter(e.target.value as 'all'|'online'|'offline')}
-                  className="appearance-none rounded-xl px-3 py-2.5 pr-7 text-[12px] font-medium focus:outline-none cursor-pointer"
-                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: 'rgba(148,163,184,0.75)' }}>
+
+              {/* Status filter */}
+              <div style={{ position: 'relative', flexShrink: 0 }}>
+                <select
+                  value={filter}
+                  onChange={e => setFilter(e.target.value as 'all' | 'online' | 'offline')}
+                  style={{
+                    appearance: 'none', background: '#0C0C15',
+                    border: '1px solid rgba(255,255,255,0.09)', borderRadius: 8,
+                    padding: '9px 28px 9px 12px', fontSize: 12, fontWeight: 500,
+                    color: 'rgba(196,181,253,0.72)', cursor: 'pointer', outline: 'none',
+                  }}
+                >
                   <option value="all">Tous les statuts</option>
                   <option value="online">En ligne</option>
                   <option value="offline">Hors ligne</option>
                 </select>
-                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] opacity-40 pointer-events-none">▼</span>
+                <span style={{ position: 'absolute', right: 9, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: 'rgba(148,163,184,0.4)', fontSize: 9 }}>▼</span>
               </div>
-              <button className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-[12px] font-medium flex-shrink-0"
-                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: 'rgba(148,163,184,0.7)' }}>
-                <span className="text-[11px]">⚡</span> Filtres
+
+              {/* Sync button */}
+              <button
+                onClick={syncFromGeelark}
+                disabled={!bearer || syncing}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  padding: '9px 14px', borderRadius: 8, fontSize: 13, fontWeight: 600,
+                  background: '#7C3AED', border: 'none', color: 'white',
+                  cursor: (!bearer || syncing) ? 'not-allowed' : 'pointer',
+                  opacity: (!bearer || syncing) ? 0.5 : 1,
+                  flexShrink: 0, transition: 'opacity 0.15s',
+                }}
+              >
+                <svg width="13" height="13" viewBox="0 0 13 13" fill="none" style={{ animation: syncing ? 'spin 1s linear infinite' : 'none' }}>
+                  <path d="M11 6.5A4.5 4.5 0 1 1 8.5 2.5" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+                  <path d="M8 1.5l1.5 1.5L8 4.5" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                {syncing ? 'Sync…' : 'Sync'}
               </button>
             </div>
 
             {/* Table */}
             {loading ? (
-              <div className="flex justify-center py-16"><Spinner size="lg" /></div>
+              <div style={{ display: 'flex', justifyContent: 'center', padding: '64px 0' }}>
+                <Spinner size="lg" />
+              </div>
             ) : phones.length === 0 ? (
-              <div className="rounded-2xl p-10 text-center" style={{ background: '#0E0E16', border: '1px solid rgba(139,92,246,0.12)' }}>
-                <p className="text-4xl mb-4">📱</p>
-                <p className="text-base font-bold text-white mb-2">Aucun téléphone synchronisé</p>
-                <p className="text-[13px] text-text2">Clique sur "Sync GéeLark" pour importer tes téléphones.</p>
+              /* Empty state */
+              <div style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                padding: '72px 32px', textAlign: 'center',
+                background: '#0C0C15', border: '1px solid rgba(255,255,255,0.055)', borderRadius: 15,
+              }}>
+                <div style={{
+                  width: 64, height: 64, borderRadius: 16, marginBottom: 20,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: 'rgba(124,58,237,0.10)', border: '1px solid rgba(139,92,246,0.22)',
+                  color: '#8B5CF6',
+                }}>
+                  <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+                    <rect x="6" y="1" width="16" height="26" rx="3.5" stroke="currentColor" strokeWidth="1.8"/>
+                    <circle cx="14" cy="22" r="1.5" fill="currentColor"/>
+                    <path d="M10 5h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                  </svg>
+                </div>
+                <p style={{ fontSize: 16, fontWeight: 700, color: '#F2F0FF', margin: '0 0 8px' }}>Aucun téléphone configuré</p>
+                <p style={{ fontSize: 13, color: 'rgba(148,163,184,0.52)', margin: '0 0 24px', maxWidth: 320 }}>
+                  Synchronisez depuis GéeLark pour importer vos téléphones et commencer le suivi.
+                </p>
+                <button
+                  onClick={syncFromGeelark}
+                  disabled={!bearer || syncing}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 8,
+                    padding: '10px 20px', borderRadius: 8, fontSize: 13, fontWeight: 600,
+                    background: '#7C3AED', border: 'none', color: 'white',
+                    cursor: (!bearer || syncing) ? 'not-allowed' : 'pointer',
+                    opacity: (!bearer || syncing) ? 0.5 : 1,
+                  }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <path d="M12 7A5 5 0 1 1 9.5 2.5" stroke="white" strokeWidth="1.6" strokeLinecap="round"/>
+                    <path d="M9 1l1.5 1.5L9 4" stroke="white" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                  Sync GéeLark
+                </button>
               </div>
             ) : (
-              <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                {/* Header */}
-                <div className="grid items-center px-4 py-3 text-[10px] font-semibold uppercase tracking-wider select-none"
-                  style={{
-                    gridTemplateColumns: COLS,
-                    borderBottom: '1px solid rgba(255,255,255,0.07)',
-                    background: 'rgba(255,255,255,0.02)',
-                    color: 'rgba(148,163,184,0.45)',
-                  }}>
+              <div style={{
+                background: '#0C0C15', border: '1px solid rgba(255,255,255,0.055)',
+                borderRadius: 11, overflow: 'hidden',
+              }}>
+                {/* Table header */}
+                <div style={{
+                  display: 'grid', gridTemplateColumns: COLS,
+                  alignItems: 'center', padding: '10px 16px',
+                  borderBottom: '1px solid rgba(255,255,255,0.055)',
+                  background: 'rgba(255,255,255,0.018)',
+                  fontSize: 10, fontWeight: 600, textTransform: 'uppercase',
+                  letterSpacing: '0.07em', color: 'rgba(148,163,184,0.45)',
+                  userSelect: 'none',
+                }}>
                   <span>#</span>
                   <span>Téléphone</span>
                   <span>Groupe</span>
                   <span>Compte Instagram</span>
-                  <span>Statut</span>
-                  <span>Dernière activité</span>
+                  <span>Géelark</span>
+                  <span>IG Status</span>
                   <span>Actions</span>
                 </div>
 
                 {visible.length === 0 ? (
-                  <p className="px-5 py-10 text-center text-[13px] text-text2">Aucun résultat.</p>
+                  <p style={{ padding: '40px 20px', textAlign: 'center', fontSize: 13, color: 'rgba(148,163,184,0.52)', margin: 0 }}>
+                    Aucun résultat pour cette recherche.
+                  </p>
                 ) : (
-                  <div>
-                    {visible.map((phone, i) => {
-                      const col = phoneColor(phone.phone_name)
-                      const isSelected = selectedPhone?.id === phone.id
-                      return (
-                        <div key={phone.id}
-                          className="grid items-center px-4 py-3 cursor-pointer group transition-colors"
-                          style={{
-                            gridTemplateColumns: COLS,
-                            background: isSelected ? 'rgba(139,92,246,0.07)' : undefined,
-                            borderBottom: i < visible.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
-                          }}
-                          onMouseEnter={e => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.022)' }}
-                          onMouseLeave={e => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = isSelected ? 'rgba(139,92,246,0.07)' : '' }}
-                          onClick={() => setSelectedPhone(isSelected ? null : phone)}
-                          onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setContextMenu({ phone, x: e.clientX, y: e.clientY }) }}>
-
-                          {/* # */}
-                          <span className="text-[12px]" style={{ color: 'rgba(148,163,184,0.3)' }}>{i + 1}</span>
-
-                          {/* Téléphone */}
-                          <div className="flex items-center gap-2.5 min-w-0 pr-2">
-                            <div className="w-9 h-9 rounded-xl flex-shrink-0 flex items-center justify-center text-[18px]"
-                              style={{ background: `linear-gradient(135deg, ${col}22 0%, ${col}11 100%)`, border: `1px solid ${col}33` }}>
-                              📱
-                            </div>
-                            <div className="min-w-0">
-                              <p className="text-[13px] font-semibold text-white truncate leading-tight">{phone.phone_name}</p>
-                              <p className="text-[10px] font-mono truncate mt-0.5" style={{ color: 'rgba(148,163,184,0.35)' }}>
-                                {phone.serial_no ? `ID: ${phone.serial_no}` : phone.geelark_id ? `GL: ${phone.geelark_id}` : '—'}
-                              </p>
-                            </div>
-                          </div>
-
-                          {/* Groupe */}
-                          <div className="min-w-0 pr-2">
-                            {phone.group_name ? (
-                              <>
-                                <p className="text-[12px] truncate font-medium" style={{ color: 'rgba(196,181,253,0.8)' }}>{phone.group_name}</p>
-                                <p className="text-[10px]" style={{ color: 'rgba(148,163,184,0.35)' }}>
-                                  {phones.filter(p2 => p2.group_name === phone.group_name).length} tél.
-                                </p>
-                              </>
-                            ) : (
-                              <span className="text-[12px]" style={{ color: 'rgba(148,163,184,0.3)' }}>—</span>
-                            )}
-                          </div>
-
-                          {/* Compte Instagram */}
-                          <div className="min-w-0 pr-2">
-                            {phone.ig_username ? (
-                              <div className="flex items-center gap-2">
-                                <div className="w-6 h-6 rounded-full flex-shrink-0 flex items-center justify-center text-white text-[9px] font-bold"
-                                  style={{ background: 'linear-gradient(135deg,#833ab4,#fd1d1d,#fcb045)' }}>
-                                  {phone.ig_username.charAt(0).toUpperCase()}
-                                </div>
-                                <div className="min-w-0">
-                                  <p className="text-[12px] text-accent truncate">@{phone.ig_username}</p>
-                                  {phone.followers ? (
-                                    <p className="text-[10px]" style={{ color: 'rgba(148,163,184,0.4)' }}>
-                                      {phone.followers >= 1000 ? `${(phone.followers/1000).toFixed(1)}K` : phone.followers} abonnés
-                                    </p>
-                                  ) : null}
-                                </div>
-                              </div>
-                            ) : (
-                              <span className="text-[12px]" style={{ color: 'rgba(148,163,184,0.3)' }}>—</span>
-                            )}
-                          </div>
-
-                          {/* Statut */}
-                          <div>
-                            {phone.status === 'online' ? (
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold"
-                                style={{ background: 'rgba(0,204,170,0.12)', color: '#00ccaa', border: '1px solid rgba(0,204,170,0.2)' }}>
-                                <span className="w-1.5 h-1.5 rounded-full bg-ok animate-pulse" />
-                                En ligne
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold"
-                                style={{ background: 'rgba(90,104,130,0.12)', color: '#5a6882', border: '1px solid rgba(90,104,130,0.2)' }}>
-                                <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#5a6882' }} />
-                                Hors ligne
-                              </span>
-                            )}
-                          </div>
-
-                          {/* Dernière activité */}
-                          <span className="text-[11px]" style={{ color: 'rgba(148,163,184,0.5)' }}>
-                            {phone.synced_at ? relativeTime(phone.synced_at) : '—'}
-                          </span>
-
-                          {/* Actions */}
-                          <div className="flex items-center gap-0.5" onClick={e => e.stopPropagation()}>
-                            <button onClick={() => poller.pollNow()}
-                              className="opacity-0 group-hover:opacity-55 hover:!opacity-100 w-7 h-7 rounded-lg flex items-center justify-center transition-all hover:bg-white/10 text-[13px]"
-                              title="Actualiser">🔄</button>
-                            <button onClick={() => setSelectedPhone(isSelected ? null : phone)}
-                              className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all hover:bg-white/10 text-[13px] ${isSelected ? 'opacity-100 text-accent' : 'opacity-0 group-hover:opacity-55 hover:!opacity-100'}`}
-                              title="Voir les détails">👁</button>
-                            <button onClick={e => setContextMenu({ phone, x: e.clientX, y: e.clientY })}
-                              className="opacity-0 group-hover:opacity-55 hover:!opacity-100 w-7 h-7 rounded-lg flex items-center justify-center transition-all hover:bg-white/10 text-text2 text-base"
-                              title="Plus d'options">⋮</button>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
+                  visible.map((phone, i) => {
+                    const col = phoneColor(phone.phone_name)
+                    const isSelected = selectedPhone?.id === phone.id
+                    return (
+                      <PhoneRow
+                        key={phone.id}
+                        phone={phone}
+                        index={i}
+                        isSelected={isSelected}
+                        isLast={i === visible.length - 1}
+                        col={col}
+                        phones={phones}
+                        COLS={COLS}
+                        relativeTime={relativeTime}
+                        setSelectedPhone={setSelectedPhone}
+                        setContextMenu={setContextMenu}
+                        setSessionDialog={setSessionDialog}
+                        saveIgUsername={saveIgUsername}
+                        saveRemark={saveRemark}
+                        unlinkIg={unlinkIg}
+                        deletePhone={deletePhone}
+                        canDelete={canDelete}
+                        ActionBtn={ActionBtn}
+                      />
+                    )
+                  })
                 )}
               </div>
             )}
 
             {!loading && visible.length > 0 && (
-              <p className="text-[11px] mt-3" style={{ color: 'rgba(148,163,184,0.3)' }}>
-                Afficher 1 à {visible.length} sur {phones.length} téléphone{phones.length > 1 ? 's' : ''}
+              <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.3)', marginTop: 10 }}>
+                {visible.length} sur {phones.length} téléphone{phones.length > 1 ? 's' : ''}
+                {lastUpdated && (
+                  <span> · mis à jour {lastUpdated.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
+                )}
               </p>
             )}
           </div>
@@ -1165,59 +1341,95 @@ export function Phones({ user }: PhonesProps) {
             const p = selectedPhone
             const col = phoneColor(p.phone_name)
             return (
-              <div className="w-[320px] flex-shrink-0 border-l overflow-y-auto"
-                style={{ borderColor: 'rgba(255,255,255,0.07)', background: 'rgba(10,10,20,0.6)' }}>
-
+              <div style={{
+                width: 300, flexShrink: 0,
+                borderLeft: '1px solid rgba(255,255,255,0.055)',
+                background: '#0C0C15', overflowY: 'auto',
+              }}>
                 {/* Panel header */}
-                <div className="px-5 pt-5 pb-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center text-[20px]"
-                        style={{ background: `linear-gradient(135deg, ${col}22 0%, ${col}11 100%)`, border: `1px solid ${col}33` }}>
-                        📱
+                <div style={{ padding: '18px 18px 14px', borderBottom: '1px solid rgba(255,255,255,0.055)' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div style={{
+                        width: 40, height: 40, borderRadius: 11, flexShrink: 0,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        background: `linear-gradient(135deg, ${col}22, ${col}11)`,
+                        border: `1px solid ${col}33`, color: col,
+                      }}>
+                        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                          <rect x="4" y="1" width="10" height="16" rx="2.5" stroke="currentColor" strokeWidth="1.5"/>
+                          <circle cx="9" cy="14" r="0.8" fill="currentColor"/>
+                        </svg>
                       </div>
                       <div>
-                        <p className="text-[14px] font-bold text-white leading-tight">{p.phone_name}</p>
-                        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                          {p.status === 'online' ? (
-                            <span className="text-[11px] font-semibold" style={{ color: '#00ccaa' }}>● En ligne</span>
-                          ) : (
-                            <span className="text-[11px] font-semibold" style={{ color: '#5a6882' }}>● Hors ligne</span>
-                          )}
+                        <p style={{ fontSize: 14, fontWeight: 700, color: '#F2F0FF', margin: 0, lineHeight: 1.2 }}>{p.phone_name}</p>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
+                          <StatusDot status={p.status ?? 'offline'} />
                           {p.group_name && (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold"
-                              style={{ background: 'rgba(139,92,246,0.12)', color: 'rgba(167,139,250,0.8)', border: '1px solid rgba(139,92,246,0.2)' }}>
+                            <span style={{
+                              fontSize: 10, padding: '2px 6px', borderRadius: 4, fontWeight: 600,
+                              background: 'rgba(139,92,246,0.12)', color: '#A78BFA',
+                              border: '1px solid rgba(139,92,246,0.22)',
+                            }}>
                               {p.group_name}
                             </span>
                           )}
                         </div>
                       </div>
                     </div>
-                    <button onClick={() => setSelectedPhone(null)}
-                      className="w-6 h-6 rounded-lg flex items-center justify-center text-text2 hover:text-text hover:bg-white/10 transition-all text-[13px] flex-shrink-0 mt-0.5">
-                      ✕
+                    <button
+                      onClick={() => setSelectedPhone(null)}
+                      style={{
+                        width: 26, height: 26, borderRadius: 6, flexShrink: 0,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)',
+                        color: 'rgba(148,163,184,0.52)', cursor: 'pointer',
+                      }}
+                    >
+                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                        <path d="M1 1l8 8M9 1L1 9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+                      </svg>
                     </button>
                   </div>
-                  {/* Quick action buttons */}
-                  <div className="flex items-center gap-1.5">
-                    {[{ icon: '↗', label: 'Ouvrir' }, { icon: '🔄', label: 'Redémarrer' }, { icon: '⟳', label: 'Sync' }].map(a => (
-                      <button key={a.label}
-                        className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[11px] font-medium transition-all hover:brightness-110"
-                        style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: 'rgba(148,163,184,0.8)' }}>
-                        <span>{a.icon}</span><span>{a.label}</span>
+                  {/* Quick actions */}
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    {[
+                      { label: 'Session', icon: <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="1.5" y="5" width="9" height="6.5" rx="1.2" stroke="currentColor" strokeWidth="1.3"/><path d="M4 5V3.5a2 2 0 0 1 4 0V5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>, action: () => setSessionDialog({ phone: p }) },
+                      { label: 'Sync', icon: <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M10.5 6A4.5 4.5 0 1 1 8 2.2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/><path d="M7.5 1l1.5 1.5L7.5 4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>, action: () => poller.pollNow() },
+                    ].map(a => (
+                      <button key={a.label} onClick={a.action}
+                        style={{
+                          flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                          padding: '6px 0', borderRadius: 7, fontSize: 11, fontWeight: 500,
+                          background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)',
+                          color: 'rgba(196,181,253,0.72)', cursor: 'pointer', transition: 'all 0.15s',
+                        }}
+                      >
+                        {a.icon}{a.label}
                       </button>
                     ))}
                     <button
                       onClick={e => { e.stopPropagation(); setContextMenu({ phone: p, x: e.clientX, y: e.clientY }) }}
-                      className="w-8 py-1.5 rounded-lg flex items-center justify-center transition-all hover:bg-white/10 text-text2 text-base"
-                      style={{ border: '1px solid rgba(255,255,255,0.09)' }}>⋮</button>
+                      style={{
+                        width: 32, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        borderRadius: 7, background: 'rgba(255,255,255,0.05)',
+                        border: '1px solid rgba(255,255,255,0.09)',
+                        color: 'rgba(148,163,184,0.52)', cursor: 'pointer',
+                      }}
+                    >
+                      <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                        <circle cx="6.5" cy="2" r="1" fill="currentColor"/>
+                        <circle cx="6.5" cy="6.5" r="1" fill="currentColor"/>
+                        <circle cx="6.5" cy="11" r="1" fill="currentColor"/>
+                      </svg>
+                    </button>
                   </div>
                 </div>
 
-                {/* Informations */}
-                <div className="px-5 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                  <p className="text-[11px] font-semibold uppercase tracking-wider mb-3" style={{ color: 'rgba(148,163,184,0.45)' }}>Informations</p>
-                  <div className="space-y-2.5">
+                {/* Info rows */}
+                <div style={{ padding: '14px 18px', borderBottom: '1px solid rgba(255,255,255,0.055)' }}>
+                  <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'rgba(148,163,184,0.35)', margin: '0 0 10px' }}>Informations</p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     {[
                       { label: 'Modèle',       value: p.phone_name },
                       { label: 'Serial',       value: p.serial_no ?? '—' },
@@ -1225,45 +1437,52 @@ export function Phones({ user }: PhonesProps) {
                       { label: 'Groupe',       value: p.group_name ?? '—' },
                       { label: 'Dernier sync', value: p.synced_at ? relativeTime(p.synced_at) : '—' },
                     ].map(row => (
-                      <div key={row.label} className="flex items-center justify-between gap-2">
-                        <span className="text-[12px] flex-shrink-0" style={{ color: 'rgba(148,163,184,0.5)' }}>{row.label}</span>
-                        <span className="text-[12px] font-medium text-text truncate text-right max-w-[170px]">{row.value}</span>
+                      <div key={row.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                        <span style={{ fontSize: 11, color: 'rgba(148,163,184,0.45)', flexShrink: 0 }}>{row.label}</span>
+                        <span style={{ fontSize: 11, fontWeight: 500, color: '#F2F0FF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 160, textAlign: 'right' }}>{row.value}</span>
                       </div>
                     ))}
                   </div>
                 </div>
 
-                {/* Compte Instagram */}
+                {/* Instagram section */}
                 {p.ig_username && (
-                  <div className="px-5 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                    <p className="text-[11px] font-semibold uppercase tracking-wider mb-3" style={{ color: 'rgba(148,163,184,0.45)' }}>Compte Instagram</p>
-                    <div className="flex items-center gap-2.5 mb-3">
-                      <div className="w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center text-white text-[12px] font-bold"
-                        style={{ background: 'linear-gradient(135deg,#833ab4,#fd1d1d,#fcb045)' }}>
+                  <div style={{ padding: '14px 18px', borderBottom: '1px solid rgba(255,255,255,0.055)' }}>
+                    <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'rgba(148,163,184,0.35)', margin: '0 0 10px' }}>Compte Instagram</p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                      <div style={{
+                        width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        color: 'white', fontSize: 13, fontWeight: 700,
+                        background: 'linear-gradient(135deg, #833ab4, #fd1d1d, #fcb045)',
+                      }}>
                         {p.ig_username.charAt(0).toUpperCase()}
                       </div>
                       <div>
-                        <p className="text-[13px] font-semibold text-accent">@{p.ig_username}</p>
+                        <p style={{ fontSize: 13, fontWeight: 600, color: '#8B5CF6', margin: 0 }}>@{p.ig_username}</p>
                         {(p.followers || p.following) ? (
-                          <p className="text-[10px]" style={{ color: 'rgba(148,163,184,0.5)' }}>
-                            {p.followers ? `${p.followers >= 1000 ? `${(p.followers/1000).toFixed(1)}K` : p.followers} abonnés` : ''}
+                          <p style={{ fontSize: 10, color: 'rgba(148,163,184,0.45)', margin: '2px 0 0' }}>
+                            {p.followers ? `${p.followers >= 1000 ? `${(p.followers / 1000).toFixed(1)}K` : p.followers} abonnés` : ''}
                             {p.followers && p.following ? ' · ' : ''}
                             {p.following ? `${p.following} suivi(s)` : ''}
                           </p>
                         ) : null}
                       </div>
                     </div>
-                    <div className="space-y-1.5">
-                      <div className="flex justify-between">
-                        <span className="text-[12px]" style={{ color: 'rgba(148,163,184,0.5)' }}>Statut</span>
-                        <span className={`text-[12px] font-semibold ${p.ig_status === 'active' ? 'text-ok' : p.ig_status === 'expired' || p.ig_status === 'error' ? 'text-danger' : 'text-text2'}`}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ fontSize: 11, color: 'rgba(148,163,184,0.45)' }}>Statut</span>
+                        <span style={{
+                          fontSize: 11, fontWeight: 600,
+                          color: p.ig_status === 'active' ? '#22C55E' : (p.ig_status === 'expired' || p.ig_status === 'error') ? '#EF4444' : 'rgba(148,163,184,0.52)',
+                        }}>
                           {p.ig_status === 'active' ? 'Actif' : p.ig_status === 'expired' ? 'Expiré' : p.ig_status === 'error' ? 'Erreur' : 'Non configuré'}
                         </span>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-[12px]" style={{ color: 'rgba(148,163,184,0.5)' }}>Session</span>
-                        <span className={`text-[12px] font-semibold ${p.ig_sessionid ? 'text-ok' : 'text-text2'}`}>
-                          {p.ig_sessionid ? 'Configurée ✓' : 'Non configurée'}
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ fontSize: 11, color: 'rgba(148,163,184,0.45)' }}>Session</span>
+                        <span style={{ fontSize: 11, fontWeight: 600, color: p.ig_sessionid ? '#22C55E' : 'rgba(148,163,184,0.52)' }}>
+                          {p.ig_sessionid ? 'Configurée' : 'Non configurée'}
                         </span>
                       </div>
                     </div>
@@ -1271,35 +1490,203 @@ export function Phones({ user }: PhonesProps) {
                 )}
 
                 {/* Actions rapides */}
-                <div className="px-5 py-4">
-                  <p className="text-[11px] font-semibold uppercase tracking-wider mb-2.5" style={{ color: 'rgba(148,163,184,0.45)' }}>Actions rapides</p>
-                  <div className="space-y-1">
-                    <button onClick={() => setSessionDialog({ phone: p })}
-                      className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[12px] font-medium text-left transition-all hover:bg-white/[0.06]"
-                      style={{ color: 'rgba(148,163,184,0.8)' }}>
-                      <span>🔑</span> Session ID Instagram
+                <div style={{ padding: '14px 18px' }}>
+                  <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'rgba(148,163,184,0.35)', margin: '0 0 8px' }}>Actions rapides</p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <button onClick={() => setSessionDialog({ phone: p })} style={{
+                      width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px',
+                      borderRadius: 7, fontSize: 12, fontWeight: 500, textAlign: 'left',
+                      background: 'none', border: 'none', color: 'rgba(196,181,253,0.72)', cursor: 'pointer',
+                      transition: 'background 0.12s',
+                    }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.05)' }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'none' }}
+                    >
+                      <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x="1.5" y="5.5" width="10" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.4"/><path d="M4.5 5.5V4a2 2 0 0 1 4 0v1.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
+                      Session ID Instagram
                     </button>
                     {p.ig_username && (
-                      <button onClick={() => { unlinkIg(p.id); setSelectedPhone(null) }}
-                        className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[12px] font-medium text-left transition-all hover:bg-white/[0.06]"
-                        style={{ color: 'rgba(148,163,184,0.8)' }}>
-                        <span>✂️</span> Délier Instagram
+                      <button onClick={() => { unlinkIg(p.id); setSelectedPhone(null) }} style={{
+                        width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px',
+                        borderRadius: 7, fontSize: 12, fontWeight: 500, textAlign: 'left',
+                        background: 'none', border: 'none', color: 'rgba(196,181,253,0.72)', cursor: 'pointer',
+                        transition: 'background 0.12s',
+                      }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.05)' }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'none' }}
+                      >
+                        <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 6.5C2 4 4 2 6.5 2s4.5 2 4.5 4.5S9 11 6.5 11" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/><path d="M2 11l4-4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
+                        Délier Instagram
                       </button>
                     )}
                     {canDelete && (
-                      <button onClick={() => { deletePhone(p.id); setSelectedPhone(null) }}
-                        className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[12px] font-medium text-left transition-all hover:bg-danger/10 text-danger">
-                        <span>🗑</span> Supprimer
+                      <button onClick={() => { deletePhone(p.id); setSelectedPhone(null) }} style={{
+                        width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px',
+                        borderRadius: 7, fontSize: 12, fontWeight: 500, textAlign: 'left',
+                        background: 'none', border: 'none', color: '#EF4444', cursor: 'pointer',
+                        transition: 'background 0.12s',
+                      }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.08)' }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'none' }}
+                      >
+                        <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 3.5h9M5 3.5V2h3v1.5M4.5 3.5l.5 7h3l.5-7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                        Supprimer
                       </button>
                     )}
                   </div>
                 </div>
-
               </div>
             )
           })()}
         </div>
       </div>
     </>
+  )
+}
+
+// ── PhoneRow sub-component (keeps hover state local) ─────────────────────────
+function PhoneRow({
+  phone, index, isSelected, isLast, col, phones, COLS,
+  relativeTime, setSelectedPhone, setContextMenu, setSessionDialog,
+  saveIgUsername, saveRemark, unlinkIg, deletePhone, canDelete, ActionBtn,
+}: {
+  phone: Phone; index: number; isSelected: boolean; isLast: boolean; col: string
+  phones: Phone[]; COLS: string
+  relativeTime: (iso: string) => string
+  setSelectedPhone: (p: Phone | null) => void
+  setContextMenu: (v: { phone: Phone; x: number; y: number } | null) => void
+  setSessionDialog: (v: { phone: Phone } | null) => void
+  saveIgUsername: (id: string, u: string) => Promise<void>
+  saveRemark: (id: string, v: string) => Promise<void>
+  unlinkIg: (id: string) => Promise<void>
+  deletePhone: (id: string) => Promise<void>
+  canDelete: boolean
+  ActionBtn: React.ComponentType<{ onClick: () => void; title: string; children: React.ReactNode; danger?: boolean }>
+}) {
+  const [hovered, setHovered] = useState(false)
+
+  const rowBg = isSelected
+    ? 'rgba(124,58,237,0.07)'
+    : hovered
+    ? 'rgba(124,58,237,0.04)'
+    : 'transparent'
+
+  return (
+    <div
+      style={{
+        display: 'grid', gridTemplateColumns: COLS,
+        alignItems: 'center', padding: '11px 16px',
+        background: rowBg,
+        borderBottom: isLast ? 'none' : '1px solid rgba(255,255,255,0.04)',
+        borderLeft: isSelected ? '2px solid #7C3AED' : '2px solid transparent',
+        transition: 'background 0.12s',
+        cursor: 'pointer',
+      }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onClick={() => setSelectedPhone(isSelected ? null : phone)}
+      onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setContextMenu({ phone, x: e.clientX, y: e.clientY }) }}
+    >
+      {/* # */}
+      <span style={{ fontSize: 11, color: 'rgba(148,163,184,0.3)', fontVariantNumeric: 'tabular-nums' }}>{index + 1}</span>
+
+      {/* Téléphone */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, paddingRight: 8 }}>
+        <div style={{
+          width: 34, height: 34, borderRadius: 9, flexShrink: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: `linear-gradient(135deg, ${col}22, ${col}0d)`,
+          border: `1px solid ${col}2e`, color: col,
+        }}>
+          <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+            <rect x="3" y="1" width="9" height="13" rx="2" stroke="currentColor" strokeWidth="1.4"/>
+            <circle cx="7.5" cy="11.5" r="0.7" fill="currentColor"/>
+          </svg>
+        </div>
+        <div style={{ minWidth: 0 }}>
+          <p style={{ fontSize: 13, fontWeight: 600, color: '#F2F0FF', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.3 }}>
+            {phone.phone_name}
+          </p>
+          <p style={{ fontSize: 10, fontFamily: 'monospace', color: 'rgba(148,163,184,0.35)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {phone.serial_no ? `SN: ${phone.serial_no}` : phone.geelark_id ? `GL: ${phone.geelark_id}` : '—'}
+          </p>
+        </div>
+      </div>
+
+      {/* Groupe */}
+      <div style={{ minWidth: 0, paddingRight: 8 }}>
+        {phone.group_name ? (
+          <>
+            <p style={{ fontSize: 12, fontWeight: 500, color: 'rgba(196,181,253,0.72)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phone.group_name}</p>
+            <p style={{ fontSize: 10, color: 'rgba(148,163,184,0.35)', margin: 0 }}>
+              {phones.filter(p2 => p2.group_name === phone.group_name).length} tél.
+            </p>
+          </>
+        ) : (
+          <span style={{ fontSize: 12, color: 'rgba(148,163,184,0.25)' }}>—</span>
+        )}
+      </div>
+
+      {/* Compte Instagram */}
+      <div style={{ minWidth: 0, paddingRight: 8 }}>
+        {phone.ig_username ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{
+              width: 24, height: 24, borderRadius: '50%', flexShrink: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: 'white', fontSize: 9, fontWeight: 700,
+              background: 'linear-gradient(135deg, #833ab4, #fd1d1d, #fcb045)',
+            }}>
+              {phone.ig_username.charAt(0).toUpperCase()}
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <p style={{ fontSize: 12, color: '#8B5CF6', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>@{phone.ig_username}</p>
+              {phone.followers ? (
+                <p style={{ fontSize: 10, color: 'rgba(148,163,184,0.4)', margin: 0 }}>
+                  {phone.followers >= 1000 ? `${(phone.followers / 1000).toFixed(1)}K` : phone.followers} abonnés
+                </p>
+              ) : null}
+            </div>
+          </div>
+        ) : (
+          <span style={{ fontSize: 12, color: 'rgba(148,163,184,0.25)' }}>—</span>
+        )}
+      </div>
+
+      {/* GéeLark status */}
+      <div><StatusDot status={phone.status ?? 'offline'} /></div>
+
+      {/* IG Status */}
+      <div><IgStatusBadge phone={phone} /></div>
+
+      {/* Actions */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }} onClick={e => e.stopPropagation()}>
+        <ActionBtn onClick={() => poller.pollNow()} title="Actualiser">
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+            <path d="M11 6.5A4.5 4.5 0 1 1 8.5 2.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+            <path d="M8 1.5l1.5 1.5L8 4.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </ActionBtn>
+        <ActionBtn onClick={() => setSelectedPhone(isSelected ? null : phone)} title="Voir les détails">
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+            <ellipse cx="6.5" cy="6.5" rx="5" ry="3" stroke="currentColor" strokeWidth="1.4"/>
+            <circle cx="6.5" cy="6.5" r="1.5" fill="currentColor"/>
+          </svg>
+        </ActionBtn>
+        <ActionBtn onClick={() => setSessionDialog({ phone })} title="Session ID">
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+            <rect x="1.5" y="5.5" width="10" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.4"/>
+            <path d="M4.5 5.5V4a2 2 0 0 1 4 0v1.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+          </svg>
+        </ActionBtn>
+        {canDelete && (
+          <ActionBtn onClick={() => deletePhone(phone.id)} title="Supprimer" danger>
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+              <path d="M2 3.5h9M5 3.5V2h3v1.5M4.5 3.5l.5 7h3l.5-7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </ActionBtn>
+        )}
+      </div>
+    </div>
   )
 }
