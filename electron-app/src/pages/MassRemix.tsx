@@ -211,7 +211,8 @@ export function MassRemix({ user }: MassRemixProps) {
   const [originals,    setOriginals]    = useState<string[]>([])
   const [secondaries,  setSecondaries]  = useState<string[]>([])
   const [preset,       setPreset]       = useState<Preset>('9:16')
-  const [aiEnabled,    setAiEnabled]    = useState(false)
+  const [aiEnabled,    setAiEnabled]    = useState(() => localStorage.getItem('sf_remix_ai') === '1')
+  const [manualText,   setManualText]   = useState(() => localStorage.getItem('sf_remix_manual_text') ?? '')
   const [exportMode,   setExportMode]   = useState<ExportMode>('bank')
   const [outputFolder, setOutputFolder] = useState<string | null>(null)
   const [bankFolder,   setBankFolder]   = useState<string>('')
@@ -460,53 +461,87 @@ export function MassRemix({ user }: MassRemixProps) {
         const textOverlays: { text: string; x: string; y: string; fontSize: number; fontColor: string; bold: boolean; shadow: boolean; startTime: number; endTime: number }[] = []
         const copyTextFromOriginal = false  // screen blend disabled — causes double-video ghost
 
-        if (aiEnabled) {
+        // Manual text always applied first (instant, no API needed)
+        if (aiEnabled && manualText.trim()) {
+          const textEndTime = splitTime ?? (detDuration ?? 9999)
+          textOverlays.push({
+            text: manualText.trim(),
+            x: '(w-text_w)/2', y: 'h*0.82-text_h/2',
+            fontSize: 54, fontColor: 'white', bold: false, shadow: true,
+            startTime: 0, endTime: textEndTime,
+          })
+          addLog(job.id, `✏️ Texte manuel: "${manualText.trim().slice(0, 60)}"`)
+        }
+
+        if (aiEnabled && !manualText.trim()) {
           if (!anthropicKey.trim()) {
-            addLog(job.id, '⚠️ Clé Anthropic manquante — texte non copié. Ajoutez-la dans Paramètres → Connexions.')
+            addLog(job.id, '⚠️ Clé Anthropic manquante — activez-la dans Paramètres → Connexions (ou utilisez le texte manuel ci-dessous)')
           } else {
-            addLog(job.id, '🤖 Détection texte (Claude Vision)…')
+            addLog(job.id, '🤖 Analyse texte (Claude Vision)…')
             try {
               const totalDur = detDuration ?? 30
-              const endSec = Math.min(4, totalDur)
 
-              // Extract a frame (Electron IPC or web Canvas)
-              let frameData: string | null = null
+              // ── Extract 3 frames spread over the first 4 seconds ──────────────
+              const frames: string[] = []
+              const endSec = Math.min(4, totalDur)
               if (window.electronAPI) {
                 const fr = await withTimeout(
-                  window.electronAPI.extractFrames!({ filePath: job.originalPath, startTime: 0.5, endTime: endSec }),
-                  20_000, 'extraction frames'
+                  window.electronAPI.extractFrames!({ filePath: job.originalPath, startTime: 0.3, endTime: endSec }),
+                  20_000, 'frames'
                 )
-                if (fr.ok && fr.frames?.[0]) frameData = fr.frames[0].data
+                if (fr.ok) for (const f of fr.frames ?? []) frames.push(f.data)
               } else {
                 const { extractFramesWeb } = await import('@/lib/ffmpeg-web')
                 const fr = await withTimeout(
-                  extractFramesWeb({ filePath: job.originalPath, startTime: 0.5, endTime: endSec }),
-                  20_000, 'extraction frames'
+                  extractFramesWeb({ filePath: job.originalPath, startTime: 0.3, endTime: endSec }),
+                  20_000, 'frames'
                 )
-                if (fr.ok && fr.frames?.[0]) frameData = fr.frames[0].data
+                if (fr.ok) for (const f of fr.frames ?? []) frames.push(f.data)
               }
+              addLog(job.id, `   ${frames.length} frame(s) extraits`)
 
-              if (!frameData) {
-                addLog(job.id, '⚠️ Impossible d\'extraire un frame')
+              if (frames.length === 0) {
+                addLog(job.id, '⚠️ Impossible d\'extraire des frames de la vidéo originale')
               } else {
-                const visionMessages = [{ role: 'user', content: [
-                  { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: frameData } },
-                  { type: 'text', text: 'This is a frame from an Instagram video. Identify any TEXT OVERLAY (caption/subtitle/text added on top of the video by the creator — NOT text physically in the scene, not logos, not background text on objects). Return a JSON array:\n[{"text":"exact text content","x_frac":0.5,"y_frac":0.82,"size":"small|medium|large|xlarge","bold":false}]\nWhere x_frac=horizontal center (0=left,0.5=center,1=right), y_frac=vertical center (0=top,1=bottom). If there is no text overlay at all, return []. Return ONLY the JSON array, nothing else.' },
-                ] as unknown[] }]
+                // ── Build multi-image message for best text detection ────────────
+                // Use up to 3 frames — more context = better text reading
+                const imgContent = frames.slice(0, 3).flatMap(data => ([
+                  { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data } },
+                ] as unknown[]))
 
+                const visionMessages = [{
+                  role: 'user',
+                  content: [
+                    ...imgContent,
+                    {
+                      type: 'text',
+                      text: `These are frames from an Instagram/TikTok video. I need to know if there is any TEXT OVERLAY added by the creator (a caption, POV text, subtitle, or any text displayed on screen).
+
+If you see text overlay(s), return ONLY a JSON array like this:
+[{"text": "exact text here", "yPos": 0.80}]
+Where yPos is 0=top, 0.5=center, 1.0=bottom.
+
+If there are multiple text lines, include each as a separate object.
+If there is NO text overlay at all, return exactly: []
+
+Return ONLY the JSON array. Nothing else.`,
+                    } as unknown,
+                  ],
+                }]
+
+                // ── Call Anthropic (Electron IPC or direct browser fetch) ────────
                 let raw = ''
                 if (window.electronAPI) {
                   const res = await withTimeout(
                     window.electronAPI.anthropicVisionRequest!({
                       apiKey: anthropicKey.trim(), model: 'claude-haiku-4-5-20251001',
-                      messages: visionMessages, maxTokens: 400,
+                      messages: visionMessages, maxTokens: 500,
                     }),
-                    25_000, 'Claude Vision'
+                    30_000, 'Claude Vision'
                   )
                   if (res.ok) raw = (res.data as any)?.content?.[0]?.text ?? ''
-                  else addLog(job.id, `⚠️ Claude Vision erreur: ${res.error ?? 'inconnue'}`)
+                  else addLog(job.id, `⚠️ Anthropic API erreur: ${String(res.error).slice(0, 100)}`)
                 } else {
-                  // Web: direct Anthropic API call (requires anthropic-dangerous-direct-browser-access header)
                   const resp = await fetch('https://api.anthropic.com/v1/messages', {
                     method: 'POST',
                     headers: {
@@ -516,52 +551,48 @@ export function MassRemix({ user }: MassRemixProps) {
                       'anthropic-dangerous-direct-browser-access': 'true',
                     },
                     body: JSON.stringify({
-                      model: 'claude-haiku-4-5-20251001', max_tokens: 400,
+                      model: 'claude-haiku-4-5-20251001', max_tokens: 500,
                       messages: visionMessages,
                     }),
                   })
-                  if (resp.ok) {
-                    const data = await resp.json()
-                    raw = data?.content?.[0]?.text ?? ''
-                  } else {
-                    addLog(job.id, `⚠️ Claude Vision HTTP ${resp.status}`)
-                  }
+                  if (resp.ok) { const d = await resp.json(); raw = d?.content?.[0]?.text ?? '' }
+                  else addLog(job.id, `⚠️ Anthropic HTTP ${resp.status}: ${await resp.text().catch(() => '')}`)
                 }
 
-                if (raw) {
-                  addLog(job.id, `   Claude: ${raw.slice(0, 80)}`)
-                  try {
-                    const match = raw.match(/\[[\s\S]*?\]/)
-                    if (match) {
-                      const parsed: Array<{ text: string; x_frac?: number; y_frac?: number; size?: string; bold?: boolean }> = JSON.parse(match[0])
-                      const textEndTime = splitTime ?? (detDuration ?? 9999)
-                      const fsMap: Record<string, number> = { small: 38, medium: 54, large: 70, xlarge: 86 }
-                      for (const item of parsed) {
-                        if (!item.text?.trim()) continue
-                        const xFrac = item.x_frac ?? 0.5
-                        const yFrac = item.y_frac ?? 0.82
-                        textOverlays.push({
-                          text: item.text.trim(),
-                          x: `w*${xFrac.toFixed(3)}-text_w/2`,
-                          y: `h*${yFrac.toFixed(3)}-text_h/2`,
-                          fontSize: fsMap[item.size ?? 'medium'] ?? 54,
-                          fontColor: 'white', bold: item.bold ?? false, shadow: true,
-                          startTime: 0, endTime: textEndTime,
-                        })
-                      }
-                      if (textOverlays.length > 0) {
-                        addLog(job.id, `✅ ${textOverlays.length} texte(s): ${textOverlays.map(t => `"${t.text.slice(0, 30)}"`).join(', ')}`)
-                      } else {
-                        addLog(job.id, '⚠️ Aucun texte overlay détecté dans la vidéo originale')
-                      }
+                addLog(job.id, `   Réponse Claude: "${raw.slice(0, 120)}"`)
+
+                // ── Parse response ───────────────────────────────────────────────
+                try {
+                  const match = raw.match(/\[[\s\S]*?\]/)
+                  if (!match) {
+                    addLog(job.id, '⚠️ Réponse Claude non parseable — pas de tableau JSON trouvé')
+                  } else {
+                    const parsed: Array<{ text: string; yPos?: number }> = JSON.parse(match[0])
+                    const textEndTime = splitTime ?? (detDuration ?? 9999)
+                    for (const item of parsed) {
+                      if (!item.text?.trim()) continue
+                      const yFrac = Math.max(0.05, Math.min(0.95, item.yPos ?? 0.80))
+                      textOverlays.push({
+                        text: item.text.trim(),
+                        x: '(w-text_w)/2',
+                        y: `h*${yFrac.toFixed(3)}-text_h/2`,
+                        fontSize: 54,
+                        fontColor: 'white', bold: false, shadow: true,
+                        startTime: 0, endTime: textEndTime,
+                      })
                     }
-                  } catch {
-                    addLog(job.id, '⚠️ Erreur parsing réponse Claude — vérifiez les logs')
+                    if (textOverlays.length > 0) {
+                      addLog(job.id, `✅ ${textOverlays.length} texte(s) détecté(s): ${textOverlays.map(t => `"${t.text.slice(0, 40)}"`).join(' | ')}`)
+                    } else {
+                      addLog(job.id, '⚠️ Claude: aucun texte overlay dans cette vidéo originale')
+                    }
                   }
+                } catch (pe) {
+                  addLog(job.id, `⚠️ Parsing JSON échoué: ${String(pe).slice(0, 60)}`)
                 }
               }
             } catch (e) {
-              addLog(job.id, `⚠️ Détection texte ignorée: ${String(e).slice(0, 80)}`)
+              addLog(job.id, `⚠️ Détection texte erreur: ${String(e).slice(0, 100)}`)
             }
           }
         }
@@ -1290,7 +1321,7 @@ export function MassRemix({ user }: MassRemixProps) {
 
             {/* Card 2 — IA Detection toggle */}
             <button
-              onClick={() => setAiEnabled(v => !v)}
+              onClick={() => setAiEnabled(v => { const next = !v; localStorage.setItem('sf_remix_ai', next ? '1' : '0'); return next })}
               style={{
                 background: aiEnabled ? 'rgba(124,58,237,0.08)' : 'rgba(255,255,255,0.025)',
                 border: `1px solid ${aiEnabled ? 'rgba(139,92,246,0.3)' : 'rgba(255,255,255,0.07)'}`,
@@ -1318,11 +1349,39 @@ export function MassRemix({ user }: MassRemixProps) {
                 </div>
               </div>
               {aiEnabled && (
-                <p className="sf-anim-slide-up" style={{ marginTop: 10, fontSize: 11, lineHeight: 1.55, color: 'rgba(148,163,184,0.5)' }}>
-                  Claude Haiku analyse la vidéo originale et recopie le texte détecté sur la phase 1.
+                <p className="sf-anim-slide-up" style={{ marginTop: 10, fontSize: 11, lineHeight: 1.55, color: anthropicKey.trim() ? 'rgba(52,211,153,0.7)' : '#fbbf24' }}>
+                  {anthropicKey.trim()
+                    ? '✅ Clé Anthropic — Claude va lire et réécrire le texte automatiquement.'
+                    : '⚠️ Clé Anthropic manquante → utilisez le texte manuel ci-dessous.'}
                 </p>
               )}
             </button>
+
+            {/* Texte manuel — fallback si pas de clé Anthropic */}
+            {aiEnabled && (
+              <div className="sf-anim-slide-up" style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <p style={{ fontSize: 11, fontWeight: 700, color: 'rgba(148,163,184,0.55)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                  Texte manuel (prioritaire sur Vision)
+                </p>
+                <textarea
+                  value={manualText}
+                  onChange={e => { setManualText(e.target.value); localStorage.setItem('sf_remix_manual_text', e.target.value) }}
+                  placeholder="Laissez vide pour utiliser Claude Vision…"
+                  rows={2}
+                  style={{
+                    width: '100%', resize: 'none', background: 'rgba(255,255,255,0.04)',
+                    border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8,
+                    padding: '8px 10px', fontSize: 13, color: '#F2F0FF',
+                    fontFamily: 'inherit', lineHeight: 1.4, outline: 'none',
+                  }}
+                />
+                <p style={{ fontSize: 10, color: 'rgba(148,163,184,0.38)', lineHeight: 1.4 }}>
+                  {manualText.trim()
+                    ? '✏️ Ce texte sera ajouté sur toutes les vidéos (Vision désactivée).'
+                    : 'Rempli → texte fixe sur toutes les vidéos. Vide → Claude Vision détecte le texte automatiquement.'}
+                </p>
+              </div>
+            )}
 
             {/* Card 3 — Point de coupe */}
             <div style={{ background: '#0C0C15', border: '1px solid rgba(255,255,255,0.055)', borderRadius: 15, padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: 10 }}>
