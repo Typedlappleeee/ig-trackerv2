@@ -449,50 +449,39 @@ export function MassRemix({ user }: MassRemixProps) {
         // ── 2. AI text detection ─────────────────────────────────────────────
         type Overlay = { text: string; x: string; y: string; fontSize: number; fontColor: string; bold: boolean; shadow: boolean; startTime: number; endTime: number }
         let textOverlays: Overlay[] = []
+        let copyTextFromOriginal = false
 
         if (aiEnabled) {
-          updateJob(job.id, { status: 'analyzing' })
-          addLog(job.id, anthropicKey.trim() ? '✨ Analyse texte IA (Claude)…' : '✨ Analyse texte OCR (Tesseract)…')
-          const analyzeEnd = splitTime ?? detDuration ?? 30
-          const fr = await withTimeout(
-            window.electronAPI!.extractFrames!({ filePath: job.originalPath, endTime: analyzeEnd }),
-            180_000, 'extraction frames'
-          )
-          if (fr.ok && fr.frames?.length) {
-            addLog(job.id, `   ${fr.frames.length} frames extraites (jusqu'à ${analyzeEnd.toFixed(1)}s)`)
-            const interval = analyzeEnd / fr.frames.length
-            const frameCount = fr.frames!.length
-            const outH = preset === '9:16' ? 1920 : 1080
-            const outW = preset === '16:9' ? 1920 : 1080
-
-            type ParsedItem = { text: string; xAlign: string; yPercent: number; fontSizePx: number; fontColor: string; bold?: boolean; startFrame: number; endFrame: number }
-            let parsed: ParsedItem[] = []
-
-            if (anthropicKey.trim()) {
-              // ── Anthropic Vision API (better accuracy, requires key) ──────────
+          if (anthropicKey.trim()) {
+            // ── Anthropic Vision API: detect + recreate text as drawtext overlays ──
+            updateJob(job.id, { status: 'analyzing' })
+            addLog(job.id, '✨ Analyse texte IA (Claude)…')
+            const analyzeEnd = splitTime ?? detDuration ?? 30
+            const fr = await withTimeout(
+              window.electronAPI!.extractFrames!({ filePath: job.originalPath, endTime: analyzeEnd }),
+              180_000, 'extraction frames'
+            )
+            if (fr.ok && fr.frames?.length) {
+              addLog(job.id, `   ${fr.frames.length} frames extraites (jusqu'à ${analyzeEnd.toFixed(1)}s)`)
+              const interval = analyzeEnd / fr.frames.length
+              const frameCount = fr.frames!.length
+              const outH = preset === '9:16' ? 1920 : 1080
+              const outW = preset === '16:9' ? 1920 : 1080
+              type ParsedItem = { text: string; xAlign: string; yPercent: number; fontSizePx: number; fontColor: string; bold?: boolean; startFrame: number; endFrame: number }
               const imageBlocks = fr.frames.flatMap((f, fi) => [
                 { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: f.data } },
                 { type: 'text', text: `[Frame ${fi} — t=${f.timestamp}s]` },
               ])
               const prompt = `These are ${fr.frames.length} frames from a ${analyzeEnd.toFixed(1)}s vertical video (1080×1920).
-Your job: identify EVERY burned-in text overlay visible anywhere in the frames (titles, captions, subtitles, watermarks, stickers, any readable text). Do NOT skip any text, even partial.
+Identify EVERY burned-in text overlay (titles, captions, subtitles, watermarks, stickers). Do NOT skip any text.
 
 For EACH text overlay return a JSON object:
 {"text":"exact string","xAlign":"left"|"center"|"right","yPercent":0-100,"fontSizePx":number,"fontColor":"white"|"black"|"#rrggbb","bold":true|false,"startFrame":0,"endFrame":${fr.frames.length - 1}}
 
-Position (yPercent): 0=top edge, 100=bottom edge. Be precise — match where text actually appears.
-- Text clearly in top area → 5-25
-- Text clearly in bottom area → 70-92
-- Text in middle → 40-60 (only if it truly is centered)
+Position: 0=top, 100=bottom. Top area → 5-25. Bottom area → 70-92.
+Font size in 1080px wide frame: large heading 80-150px, caption 50-80px, subtitle 36-55px.
 
-Font size (fontSizePx): size of the text AS IT APPEARS in a 1080px wide frame.
-- Very large heading → 80-150px
-- Normal caption → 50-80px
-- Small subtitle → 36-55px
-
-startFrame/endFrame: first and last frame index where this text is visible.
-
-Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.`
+Return ONLY a valid JSON array, no explanation. Empty array [] if no text.`
 
               const res = await withTimeout(
                 window.electronAPI!.anthropicVisionRequest!({
@@ -505,92 +494,68 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
               if (res.ok) {
                 const txt = (res.data as { content: Array<{ type: string; text: string }> })?.content?.[0]?.text ?? '[]'
                 const m = txt.match(/\[[\s\S]*\]/)
-                if (m) parsed = JSON.parse(m[0]) as ParsedItem[]
+                if (m) {
+                  const parsed = JSON.parse(m[0]) as ParsedItem[]
+                  type TItem = { text: string; xAlign: string; rawY: number; fontSize: number; fontColor: string; bold: boolean; startTime: number; endTime: number }
+                  const items: TItem[] = parsed.map(item => {
+                    const fontSize = Math.round(Math.max(44, Math.min(160, (item.fontSizePx ?? 64) * 1.15)))
+                    const sf = item.startFrame ?? 0
+                    const ef = item.endFrame   ?? frameCount - 1
+                    const coversAll = (ef - sf + 1) >= frameCount * 0.8
+                    const startTime = coversAll ? 0 : Math.round(sf * interval * 10) / 10
+                    const endTime   = coversAll ? analyzeEnd : Math.min(analyzeEnd, Math.max(startTime + interval * 2, Math.round((ef + 1) * interval * 10) / 10))
+                    return { text: item.text, xAlign: item.xAlign ?? 'center', rawY: (item.yPercent ?? 50) / 100, fontSize, fontColor: item.fontColor ?? 'white', bold: item.bold ?? true, startTime, endTime }
+                  })
+                  type Zone = 'top' | 'bottom'
+                  const zones: Zone[] = items.map(it => it.rawY < 0.35 ? 'top' : 'bottom')
+                  for (let i = 1; i < items.length; i++) {
+                    for (let j = 0; j < i; j++) {
+                      const overlap = items[j].endTime > items[i].startTime && items[j].startTime < items[i].endTime
+                      if (overlap && zones[j] === zones[i]) zones[i] = zones[i] === 'bottom' ? 'top' : 'bottom'
+                    }
+                  }
+                  items.forEach((item, idx) => {
+                    const zone   = zones[idx]
+                    const lines  = wrapText(item.text, item.fontSize, outW)
+                    const stepFr = (item.fontSize * 1.3) / outH
+                    let baseY: number
+                    if (zone === 'top') {
+                      baseY = Math.max(0.04, Math.min(0.35, item.rawY))
+                    } else {
+                      const concurrentBottomMax = items.slice(0, idx)
+                        .filter((_, j) => zones[j] === 'bottom' && items[j].endTime > item.startTime && items[j].startTime < item.endTime)
+                        .reduce((max, it) => {
+                          const n = wrapText(it.text, it.fontSize, outW).length
+                          const st = (it.fontSize * 1.3) / outH
+                          return Math.max(max, it.rawY + (n - 1) * st + stepFr)
+                        }, 0.55)
+                      baseY = Math.max(Math.max(0.55, item.rawY), concurrentBottomMax)
+                    }
+                    lines.forEach((line, li) => {
+                      const lineYFrac = zone === 'top'
+                        ? Math.max(0.04, Math.min(0.40, baseY + li * stepFr))
+                        : Math.max(0.55, Math.min(0.93, baseY + li * stepFr))
+                      textOverlays.push({
+                        text: line, x: xAlignToExpr(item.xAlign),
+                        y: `h*${lineYFrac.toFixed(4)}-${Math.round(item.fontSize / 2)}`,
+                        fontSize: item.fontSize, fontColor: item.fontColor, bold: item.bold,
+                        shadow: true, startTime: item.startTime, endTime: item.endTime,
+                      })
+                    })
+                  })
+                  addLog(job.id, `   ${parsed.length} texte(s) → ${textOverlays.length} overlay(s)`)
+                }
               } else {
                 addLog(job.id, `   Analyse Claude échouée: ${(res as any).error ?? 'inconnu'}`)
               }
-            } else {
-              // ── Tesseract OCR (free, local, no API key) ───────────────────────
-              const ocr = await withTimeout(
-                window.electronAPI!.runTesseractOcr!({ frames: fr.frames, frameWidth: 640, frameHeight: 360 }),
-                120_000, 'Tesseract OCR'
-              )
-              if (ocr.ok && ocr.boxes?.length) {
-                parsed = (ocr.boxes as ParsedItem[])
-              } else if (!ocr.ok) {
-                addLog(job.id, `   OCR échoué: ${(ocr as any).error ?? 'inconnu'}`)
-              }
-            }
-
-            if (parsed.length > 0) {
-              // ── Step 1: resolve timing + font for each item ──────────────────
-              type TItem = { text: string; xAlign: string; rawY: number; fontSize: number; fontColor: string; bold: boolean; startTime: number; endTime: number }
-              const items: TItem[] = parsed.map(item => {
-                const fontSize = Math.round(Math.max(44, Math.min(160, (item.fontSizePx ?? 64) * 1.15)))
-                const sf = item.startFrame ?? 0
-                const ef = item.endFrame   ?? frameCount - 1
-                const coversAll = (ef - sf + 1) >= frameCount * 0.8
-                const startTime = coversAll ? 0 : Math.round(sf * interval * 10) / 10
-                const endTime   = coversAll
-                  ? analyzeEnd
-                  : Math.min(analyzeEnd, Math.max(startTime + interval * 2, Math.round((ef + 1) * interval * 10) / 10))
-                return { text: item.text, xAlign: item.xAlign ?? 'center', rawY: (item.yPercent ?? 50) / 100, fontSize, fontColor: item.fontColor ?? 'white', bold: item.bold ?? true, startTime, endTime }
-              })
-
-              // ── Step 2: assign zones (top / bottom) to avoid face + overlaps ─
-              type Zone = 'top' | 'bottom'
-              const zones: Zone[] = items.map(it => it.rawY < 0.35 ? 'top' : 'bottom')
-              for (let i = 1; i < items.length; i++) {
-                for (let j = 0; j < i; j++) {
-                  const overlap = items[j].endTime > items[i].startTime && items[j].startTime < items[i].endTime
-                  if (overlap && zones[j] === zones[i]) zones[i] = zones[i] === 'bottom' ? 'top' : 'bottom'
-                }
-              }
-
-              // ── Step 3: generate per-line overlays inside their zone ──────────
-              items.forEach((item, idx) => {
-                const zone   = zones[idx]
-                const lines  = wrapText(item.text, item.fontSize, outW)
-                const stepFr = (item.fontSize * 1.3) / outH
-
-                let baseY: number
-                if (zone === 'top') {
-                  baseY = Math.max(0.04, Math.min(0.35, item.rawY))
-                } else {
-                  const concurrentBottomMax = items
-                    .slice(0, idx)
-                    .filter((_, j) => zones[j] === 'bottom' && items[j].endTime > item.startTime && items[j].startTime < item.endTime)
-                    .reduce((max, it) => {
-                      const n = wrapText(it.text, it.fontSize, outW).length
-                      const st = (it.fontSize * 1.3) / outH
-                      return Math.max(max, it.rawY + (n - 1) * st + stepFr)
-                    }, 0.55)
-                  baseY = Math.max(Math.max(0.55, item.rawY), concurrentBottomMax)
-                }
-
-                lines.forEach((line, li) => {
-                  const lineYFrac = zone === 'top'
-                    ? Math.max(0.04, Math.min(0.40, baseY + li * stepFr))
-                    : Math.max(0.55, Math.min(0.93, baseY + li * stepFr))
-                  textOverlays.push({
-                    text: line,
-                    x: xAlignToExpr(item.xAlign),
-                    y: `h*${lineYFrac.toFixed(4)}-${Math.round(item.fontSize / 2)}`,
-                    fontSize: item.fontSize,
-                    fontColor: item.fontColor,
-                    bold: item.bold,
-                    shadow: true,
-                    startTime: item.startTime,
-                    endTime:   item.endTime,
-                  })
-                })
-              })
-              addLog(job.id, `   ${parsed.length} texte(s) → ${textOverlays.length} overlay(s): ${textOverlays.map(o => `"${o.text}"@${o.fontSize}px`).join(', ')}`)
-            } else if (parsed.length === 0) {
-              addLog(job.id, '   Aucun texte détecté dans les frames')
             }
           } else {
-            addLog(job.id, `   Extraction frames échouée: ${fr.ok ? 'aucune frame' : (fr as any).error ?? 'inconnu'}`)
+            // ── Free: copy text pixels directly from original via FFmpeg lumakey ──
+            // No API key, no OCR — FFmpeg isolates bright pixels (text) from the
+            // top 22% and bottom 34% of the original video and composites them onto
+            // the secondary video. Works for any white/bright text overlay.
+            copyTextFromOriginal = true
+            addLog(job.id, '✨ Copie texte (lumakey) depuis l\'original…')
           }
         }
 
@@ -622,6 +587,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
             originalPath:  job.originalPath,
             splitTime, outputPath, preset,
             textOverlays,
+            copyTextFromOriginal,
             targetDuration,
           }),
           360_000, 'FFmpeg'

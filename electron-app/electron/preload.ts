@@ -114,6 +114,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     outputPath:      string
     preset:          '9:16' | '1:1' | '16:9'
     targetDuration?: number
+    copyTextFromOriginal?: boolean
     textOverlays:  Array<{
       text: string; x: string; y: string
       fontSize: number; fontColor: string
