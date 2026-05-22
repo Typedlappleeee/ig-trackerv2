@@ -562,98 +562,258 @@ export function Bank({ user }: BankProps) {
     setCtxMenu({ item, x: e.clientX, y: e.clientY })
   }, [])
 
+  // View mode state (grid / list)
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+
   return (
     <div
       ref={dropRef}
-      className={`h-full flex flex-col overflow-hidden transition-colors ${dragging ? 'bg-accent/5' : ''}`}
+      className={`h-full flex flex-col overflow-hidden anim-page transition-colors ${dragging ? 'ring-2 ring-inset ring-accent/40' : ''}`}
+      style={{ background: '#07070B' }}
       onDragOver={onDragOver}
       onDragEnter={onDragEnter}
       onDragLeave={onDragLeave}
       onDrop={onDrop}
     >
-      {/* Drag overlay */}
+      {/* ── Global drag overlay ── */}
       {dragging && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
-          <div className="border-2 border-dashed border-accent rounded-2xl px-16 py-10 bg-bg/90 backdrop-blur text-center space-y-3">
-            <p className="text-4xl">🎬</p>
-            <p className="text-lg font-semibold text-accent">Dépose la vidéo ici</p>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none">
+          <div
+            className="flex flex-col items-center gap-4 px-20 py-14 rounded-3xl"
+            style={{
+              background: 'rgba(7,7,11,0.92)',
+              border: '2px dashed #8B5CF6',
+              boxShadow: '0 0 60px -10px rgba(139,92,246,0.6)',
+              backdropFilter: 'blur(24px)',
+            }}
+          >
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#8B5CF6" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+            <p className="text-[15px] font-bold text-white">Dépose tes fichiers ici</p>
+            <p className="text-[12px]" style={{ color: '#A1A1AA' }}>Vidéos, photos, GIFs, audio</p>
           </div>
         </div>
       )}
 
-      {/* ── Page header ── */}
-      <div className="flex-shrink-0 px-10 pt-9 pb-7 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-        <div>
-          <h1 className="text-[28px] font-black text-white leading-none">Banque de médias</h1>
-          <p className="text-[13px] text-text2 mt-0.5">{items.length} média{items.length !== 1 ? 's' : ''} · glisse-dépose ou importe depuis ton PC</p>
-        </div>
+      {/* ── Header ── */}
+      <header
+        className="flex-shrink-0 px-8 pt-7 pb-5 flex items-center justify-between gap-4"
+        style={{ borderBottom: '1px solid rgba(139,92,246,0.12)' }}
+      >
+        {/* Title + badge */}
         <div className="flex items-center gap-3">
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="rounded-xl px-5 py-2.5 text-[13px] font-semibold text-white"
-            style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)' }}>
-            + Ajouter un média
-          </button>
-          <button
-            onClick={() => setSelectedIds(new Set(visible.map(i => i.id)))}
-            className="rounded-xl px-5 py-2.5 text-[13px] font-semibold"
-            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}>
-            ☑ Tout sélectionner
-          </button>
-          <button
-            onClick={loadItems}
-            className="rounded-xl px-5 py-2.5 text-[13px] font-semibold"
-            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}>
-            ↺ Rafraîchir
-          </button>
+          <div>
+            <h1 className="text-[22px] font-black text-white leading-none tracking-tight">Banque Vidéos</h1>
+            <p className="text-[12px] mt-0.5" style={{ color: '#52525B' }}>
+              Bibliothèque de médias · glisse-dépose ou importe
+            </p>
+          </div>
+          <span
+            className="px-2.5 py-0.5 rounded-full text-[11px] font-bold"
+            style={{ background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.3)', color: '#A78BFA' }}
+          >
+            {items.length}
+          </span>
         </div>
-      </div>
 
-      <div className="flex flex-1 min-h-0 overflow-hidden">
-        {/* ── Left sidebar: folders ── */}
-        <aside className="w-56 flex-shrink-0 flex flex-col" style={{ borderRight: '1px solid rgba(255,255,255,0.06)' }}>
-          <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-            <p className="text-[12px] font-semibold text-text2 uppercase tracking-widest">Dossiers</p>
+        {/* Search + controls */}
+        <div className="flex items-center gap-2 flex-1 max-w-lg">
+          <div className="relative flex-1">
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#52525B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <input
+              type="text"
+              placeholder="Rechercher…"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="sf-search w-full pl-9 pr-4 py-2 text-[13px]"
+            />
+          </div>
+        </div>
+
+        {/* Right controls */}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {/* View toggle */}
+          <div
+            className="flex rounded-lg overflow-hidden"
+            style={{ border: '1px solid rgba(139,92,246,0.18)', background: '#0E0E16' }}
+          >
             <button
-              onClick={() => setShowNewFolder(v => !v)}
-              className="text-text2 hover:text-accent text-lg leading-none transition-colors"
-              title="Nouveau dossier"
-            >+</button>
+              onClick={() => setViewMode('grid')}
+              className="px-2.5 py-1.5 transition-colors"
+              style={viewMode === 'grid' ? { background: 'rgba(139,92,246,0.25)', color: '#A78BFA' } : { color: '#52525B' }}
+              title="Grille"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+              </svg>
+            </button>
+            <button
+              onClick={() => setViewMode('list')}
+              className="px-2.5 py-1.5 transition-colors"
+              style={viewMode === 'list' ? { background: 'rgba(139,92,246,0.25)', color: '#A78BFA' } : { color: '#52525B' }}
+              title="Liste"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/>
+                <line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
+              </svg>
+            </button>
           </div>
 
+          <button
+            onClick={loadItems}
+            className="px-3 py-2 rounded-lg text-[12px] font-medium transition-colors"
+            style={{ background: '#0E0E16', border: '1px solid rgba(139,92,246,0.18)', color: '#A1A1AA' }}
+            title="Rafraîchir"
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+            </svg>
+          </button>
+
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="btn-sf-primary px-4 py-2 rounded-lg text-[13px] font-semibold flex items-center gap-1.5"
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Ajouter
+          </button>
+        </div>
+      </header>
+
+      {/* ── Toolbar (type filters + select-all + count) ── */}
+      <div
+        className="flex-shrink-0 px-8 py-2.5 flex items-center gap-3"
+        style={{ borderBottom: '1px solid rgba(139,92,246,0.08)' }}
+      >
+        {/* Select-all checkbox */}
+        <button
+          onClick={() => setSelectedIds(prev => prev.size === visible.length ? new Set() : new Set(visible.map(i => i.id)))}
+          className="flex items-center gap-1.5 text-[12px] font-medium transition-colors px-2 py-1 rounded"
+          style={{ color: selectedIds.size === visible.length && visible.length > 0 ? '#A78BFA' : '#52525B' }}
+          title="Tout sélectionner / désélectionner"
+        >
+          <div
+            className="w-4 h-4 rounded flex items-center justify-center flex-shrink-0 transition-all"
+            style={selectedIds.size === visible.length && visible.length > 0
+              ? { background: '#8B5CF6', border: '1px solid #8B5CF6' }
+              : { background: 'transparent', border: '1px solid rgba(139,92,246,0.3)' }}
+          >
+            {selectedIds.size > 0 && <svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"><polyline points="2,6 5,9 10,3"/></svg>}
+          </div>
+          <span className="hidden sm:inline">Tout</span>
+        </button>
+
+        <div style={{ width: '1px', height: '16px', background: 'rgba(139,92,246,0.15)' }} />
+
+        {/* Type pills */}
+        <div className="flex gap-1">
+          {([
+            { k: 'all',   l: 'Tous'  },
+            { k: 'video', l: 'Vidéo' },
+            { k: 'photo', l: 'Photo' },
+            { k: 'gif',   l: 'GIF'   },
+            { k: 'audio', l: 'Audio' },
+          ] as const).map(t => (
+            <button
+              key={t.k}
+              onClick={() => setTypeFilter(t.k)}
+              className="px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all"
+              style={typeFilter === t.k
+                ? { background: 'rgba(139,92,246,0.2)', color: '#A78BFA', border: '1px solid rgba(139,92,246,0.4)' }
+                : { background: 'transparent', color: '#52525B', border: '1px solid transparent' }}
+            >{t.l}</button>
+          ))}
+        </div>
+
+        <div className="flex-1" />
+
+        <span className="text-[12px]" style={{ color: '#52525B' }}>
+          {visible.length} élément{visible.length !== 1 ? 's' : ''}
+        </span>
+        {adding && (
+          <span className="flex items-center gap-1.5 text-[12px]" style={{ color: '#A78BFA' }}>
+            <span className="animate-spin inline-block">↻</span> Upload…
+          </span>
+        )}
+      </div>
+
+      {/* ── Body: sidebar + main ── */}
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+
+        {/* ── Folder sidebar ── */}
+        <aside
+          className="w-52 flex-shrink-0 flex flex-col overflow-hidden"
+          style={{ borderRight: '1px solid rgba(139,92,246,0.1)' }}
+        >
+          {/* Sidebar header */}
+          <div
+            className="px-4 py-3 flex items-center justify-between flex-shrink-0"
+            style={{ borderBottom: '1px solid rgba(139,92,246,0.08)' }}
+          >
+            <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#52525B' }}>Dossiers</span>
+            <button
+              onClick={() => setShowNewFolder(v => !v)}
+              className="w-5 h-5 rounded flex items-center justify-center transition-colors"
+              style={{ color: '#52525B' }}
+              title="Nouveau dossier"
+              onMouseEnter={e => (e.currentTarget.style.color = '#A78BFA')}
+              onMouseLeave={e => (e.currentTarget.style.color = '#52525B')}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </button>
+          </div>
+
+          {/* New folder input */}
           {showNewFolder && (
-            <div className="px-3 py-2.5 flex gap-2" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+            <div
+              className="px-3 py-2 flex gap-1.5 flex-shrink-0"
+              style={{ borderBottom: '1px solid rgba(139,92,246,0.08)' }}
+            >
               <input
                 autoFocus
                 placeholder="Nom du dossier…"
-                className="flex-1 rounded-xl px-3 py-2 text-[13px] focus:outline-none"
-                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
+                className="sf-search flex-1 px-2.5 py-1.5 text-[12px]"
                 value={newFolderName}
                 onChange={e => setNewFolderName(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') createFolder(); if (e.key === 'Escape') { setShowNewFolder(false); setNewFolderName('') } }}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') createFolder()
+                  if (e.key === 'Escape') { setShowNewFolder(false); setNewFolderName('') }
+                }}
               />
               <button
                 onClick={createFolder}
-                className="px-3 py-2 text-[13px] font-semibold rounded-xl"
-                style={{ background: 'rgba(139,92,246,0.2)', color: '#a78bfa' }}>OK</button>
+                className="px-2 py-1 rounded-md text-[11px] font-semibold"
+                style={{ background: 'rgba(139,92,246,0.2)', color: '#A78BFA', border: '1px solid rgba(139,92,246,0.35)' }}
+              >OK</button>
             </div>
           )}
 
-          <div className="flex-1 overflow-auto py-1">
-            {/* All videos */}
+          {/* Folder list */}
+          <div className="flex-1 overflow-y-auto py-1">
+            {/* All items */}
             <button
               onClick={() => setSelectedFolder(null)}
-              className={`w-full flex items-center gap-2.5 px-4 py-3 text-left transition-colors ${
-                selectedFolder === null ? 'border-l-2 border-accent pl-[14px]' : 'hover:bg-white/[0.03]'
-              }`}
-              style={selectedFolder === null ? { background: 'rgba(139,92,246,0.08)' } : {}}
+              className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-all group"
+              style={selectedFolder === null
+                ? { background: 'rgba(139,92,246,0.1)', borderLeft: '2px solid #8B5CF6', paddingLeft: '10px' }
+                : { borderLeft: '2px solid transparent' }}
             >
-              <span className="text-base flex-shrink-0">🎬</span>
-              <span className="text-[13px] font-medium text-text flex-1">Toute la banque</span>
-              <span className="text-[12px] text-text2 flex-shrink-0">{items.length}</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={selectedFolder === null ? '#A78BFA' : '#52525B'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+              </svg>
+              <span className="text-[13px] font-medium flex-1" style={{ color: selectedFolder === null ? '#FFFFFF' : '#A1A1AA' }}>
+                Toute la banque
+              </span>
+              <span
+                className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0"
+                style={{ background: 'rgba(139,92,246,0.1)', color: '#A78BFA' }}
+              >{items.length}</span>
             </button>
 
-            {/* Folder list */}
             {folders.map(f => (
               <FolderRow
                 key={f}
@@ -670,115 +830,146 @@ export function Bank({ user }: BankProps) {
           </div>
         </aside>
 
-        {/* ── Main area ── */}
-        <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Filter bar */}
-          <div className="flex-shrink-0 px-6 py-3 flex items-center gap-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-            <input
-              type="text"
-              placeholder="🔍  Rechercher…"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="flex-1 max-w-sm rounded-xl px-4 py-2.5 text-[13px] placeholder:text-text2 focus:outline-none transition-colors"
-              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
-            />
-            {/* Type pills */}
-            <div className="flex gap-1.5">
-              {([
-                { k: 'all',   l: 'Tous'  },
-                { k: 'video', l: 'Vidéo' },
-                { k: 'photo', l: 'Photo' },
-                { k: 'gif',   l: 'GIF'   },
-                { k: 'audio', l: 'Audio' },
-              ] as const).map(t => (
-                <button
-                  key={t.k}
-                  onClick={() => setTypeFilter(t.k)}
-                  className={`px-3 py-1.5 rounded-full text-[12px] font-semibold transition-colors ${
-                    typeFilter === t.k ? 'bg-accent text-white' : 'text-text2 hover:text-text'
-                  }`}
-                  style={typeFilter !== t.k ? { background: 'rgba(255,255,255,0.05)' } : {}}
-                >{t.l}</button>
-              ))}
-            </div>
-            <div className="flex-1" />
-            <span className="text-text2 text-[13px]">{visible.length} média{visible.length !== 1 ? 's' : ''}</span>
-            {adding && <span className="text-[13px] text-accent animate-pulse">Ajout…</span>}
-          </div>
+        {/* ── Main content area ── */}
+        <main className="flex-1 flex flex-col overflow-hidden">
 
-          {/* Selection toolbar */}
+          {/* ── Selection bar (bottom-ish, shown as top banner when active) ── */}
           {selectionMode && (
-            <div className="flex-shrink-0 px-6 py-3 flex items-center gap-3" style={{ background: 'rgba(139,92,246,0.08)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-              <span className="text-[13px] font-bold text-accent">{selectedIds.size} sélectionné{selectedIds.size > 1 ? 's' : ''}</span>
+            <div
+              className="flex-shrink-0 px-6 py-2.5 flex items-center gap-3"
+              style={{ background: 'rgba(139,92,246,0.08)', borderBottom: '1px solid rgba(139,92,246,0.2)' }}
+            >
+              <div
+                className="w-2 h-2 rounded-full flex-shrink-0"
+                style={{ background: '#8B5CF6', boxShadow: '0 0 8px rgba(139,92,246,0.8)' }}
+              />
+              <span className="text-[13px] font-bold" style={{ color: '#A78BFA' }}>
+                {selectedIds.size} sélectionné{selectedIds.size > 1 ? 's' : ''}
+              </span>
               <button
                 onClick={() => setSelectedIds(prev => prev.size === visible.length ? new Set() : new Set(visible.map(i => i.id)))}
-                className="text-[13px] px-3 py-1.5 rounded-xl font-semibold text-text2 hover:text-text transition-colors"
-                style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)' }}>
-                {selectedIds.size === visible.length ? '☐ Désélectionner tout' : '☑ Tout sélectionner'}
+                className="text-[12px] px-2.5 py-1 rounded-md font-medium transition-colors"
+                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: '#A1A1AA' }}
+              >
+                {selectedIds.size === visible.length ? 'Désélectionner tout' : 'Tout sélectionner'}
               </button>
-              {selectedIds.size > 0 && (<>
-                <button onClick={() => setShowBulkMove(true)}
-                  className="text-[13px] px-3 py-1.5 rounded-xl font-semibold"
-                  style={{ background: 'rgba(139,92,246,0.15)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.3)' }}>
-                  📂 Déplacer ({selectedIds.size})
-                </button>
-                <button onClick={deleteSelected}
-                  className="text-[13px] px-3 py-1.5 rounded-xl font-semibold"
-                  style={{ background: 'rgba(239,68,68,0.12)', color: '#f87171', border: '1px solid rgba(239,68,68,0.25)' }}>
-                  🗑 Supprimer ({selectedIds.size})
-                </button>
-              </>)}
+              <button
+                onClick={() => setShowBulkMove(true)}
+                className="text-[12px] px-2.5 py-1 rounded-md font-semibold transition-colors flex items-center gap-1.5"
+                style={{ background: 'rgba(139,92,246,0.15)', color: '#A78BFA', border: '1px solid rgba(139,92,246,0.3)' }}
+              >
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                </svg>
+                Déplacer ({selectedIds.size})
+              </button>
+              <button
+                onClick={deleteSelected}
+                className="text-[12px] px-2.5 py-1 rounded-md font-semibold transition-colors flex items-center gap-1.5"
+                style={{ background: 'rgba(239,68,68,0.1)', color: '#F87171', border: '1px solid rgba(239,68,68,0.25)' }}
+              >
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/>
+                </svg>
+                Supprimer ({selectedIds.size})
+              </button>
               <div className="flex-1" />
-              <button onClick={exitSelection} className="text-[13px] text-text2 hover:text-text px-2 transition-colors">✕ Annuler</button>
+              <button
+                onClick={exitSelection}
+                className="text-[12px] transition-colors px-2 py-1 rounded"
+                style={{ color: '#52525B' }}
+                onMouseEnter={e => (e.currentTarget.style.color = '#A1A1AA')}
+                onMouseLeave={e => (e.currentTarget.style.color = '#52525B')}
+              >✕ Annuler</button>
             </div>
           )}
 
-          {/* Migration notice */}
+          {/* ── Notices ── */}
           {needsMigration && (
-            <div className="mx-6 mt-5 rounded-2xl p-5 flex items-start gap-3" style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.25)' }}>
-              <span className="text-xl flex-shrink-0">⚠</span>
+            <div
+              className="mx-6 mt-4 rounded-xl p-4 flex items-start gap-3 flex-shrink-0"
+              style={{ background: 'rgba(251,191,36,0.07)', border: '1px solid rgba(251,191,36,0.22)' }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FBBF24" strokeWidth="2" strokeLinecap="round" className="flex-shrink-0 mt-0.5">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+              </svg>
               <div className="flex-1 min-w-0">
-                <p className="text-[13px] font-semibold text-warn">Migration requise — colonne "folder" manquante</p>
-                <p className="text-[12px] text-text2 mt-1">Colle ce SQL dans Supabase → SQL Editor → Run :</p>
-                <code className="text-[12px] font-mono text-text2 block mt-1">{MIGRATION_SQL.trim()}</code>
+                <p className="text-[13px] font-semibold" style={{ color: '#FBBF24' }}>Migration requise — colonne "folder" manquante</p>
+                <p className="text-[11px] mt-0.5" style={{ color: '#A1A1AA' }}>Colle ce SQL dans Supabase → SQL Editor → Run :</p>
+                <code className="text-[11px] font-mono block mt-1" style={{ color: '#A1A1AA' }}>{MIGRATION_SQL.trim()}</code>
               </div>
               <button
                 onClick={() => { navigator.clipboard.writeText(MIGRATION_SQL); setSqlCopied(true); setTimeout(() => setSqlCopied(false), 2000) }}
-                className="px-3 py-2 rounded-xl text-[12px] font-semibold flex-shrink-0"
-                style={{ background: 'rgba(251,191,36,0.15)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.3)' }}>
-                {sqlCopied ? '✓ Copié' : '📋 Copier'}
+                className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold flex-shrink-0 transition-colors"
+                style={{ background: 'rgba(251,191,36,0.12)', color: '#FBBF24', border: '1px solid rgba(251,191,36,0.28)' }}
+              >
+                {sqlCopied ? '✓ Copié' : 'Copier'}
               </button>
             </div>
           )}
 
           {error && (
-            <div className="mx-6 mt-5 px-5 py-3 rounded-2xl flex items-center gap-3" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
-              <span className="text-[13px] text-danger flex-1">{error}</span>
-              <button onClick={() => setError(null)} className="text-danger hover:text-text">✕</button>
+            <div
+              className="mx-6 mt-4 px-4 py-3 rounded-xl flex items-center gap-3 flex-shrink-0"
+              style={{ background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.2)' }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#F87171" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              <span className="text-[13px] flex-1" style={{ color: '#F87171' }}>{error}</span>
+              <button onClick={() => setError(null)} style={{ color: '#F87171' }} className="hover:opacity-70 transition-opacity">✕</button>
             </div>
           )}
 
           {uploadStatus && (
-            <div className="mx-6 mt-5 px-5 py-3 rounded-2xl flex items-center gap-3" style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)' }}>
-              <span className="animate-spin text-accent">↻</span>
-              <span className="text-[13px] text-accent">{uploadStatus}</span>
+            <div
+              className="mx-6 mt-4 px-4 py-3 rounded-xl flex items-center gap-3 flex-shrink-0"
+              style={{ background: 'rgba(139,92,246,0.07)', border: '1px solid rgba(139,92,246,0.2)' }}
+            >
+              <span className="animate-spin" style={{ color: '#A78BFA' }}>↻</span>
+              <span className="text-[13px]" style={{ color: '#A78BFA' }}>{uploadStatus}</span>
             </div>
           )}
 
-          {/* Content */}
-          <div className="flex-1 overflow-y-auto px-6 pb-8 pt-6">
+          {/* ── Scrollable content ── */}
+          <div className="flex-1 overflow-y-auto px-6 py-5">
             {loading ? (
-              <div className="flex justify-center py-16"><Spinner size="lg" /></div>
+              <div className="flex justify-center py-20"><Spinner size="lg" /></div>
+
             ) : items.length === 0 ? (
-              <div className="rounded-2xl p-10 text-center" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                <p className="text-5xl mb-4">🎬</p>
-                <p className="text-base font-bold text-white mb-2">Banque vide</p>
-                <p className="text-[13px] text-text2">Glisse-dépose tes vidéos ici ou clique sur<br/><span className="text-accent font-medium">+ Ajouter un média</span> en haut à droite.</p>
+              /* Empty state */
+              <div className="flex flex-col items-center justify-center py-24 text-center">
+                <div
+                  className="w-20 h-20 rounded-2xl flex items-center justify-center mb-6"
+                  style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.18)' }}
+                >
+                  <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#8B5CF6" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+                    <polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+                  </svg>
+                </div>
+                <h2 className="text-[16px] font-bold text-white mb-2">Banque vide</h2>
+                <p className="text-[13px] max-w-xs" style={{ color: '#A1A1AA' }}>
+                  Glisse-dépose tes vidéos ici ou clique sur
+                </p>
+                <button
+                  onClick={() => setShowAddModal(true)}
+                  className="btn-sf-primary mt-5 px-5 py-2.5 rounded-xl text-[13px] font-semibold"
+                >
+                  + Ajouter un média
+                </button>
               </div>
+
             ) : visible.length === 0 ? (
-              <p className="text-center py-8 text-text2 text-[13px]">Aucun résultat.</p>
-            ) : (
-              <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
+              <div className="flex flex-col items-center justify-center py-20 text-center">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#52525B" strokeWidth="1.5" strokeLinecap="round" className="mb-3">
+                  <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                </svg>
+                <p className="text-[14px] font-medium text-white">Aucun résultat</p>
+                <p className="text-[12px] mt-1" style={{ color: '#52525B' }}>Essaie d'autres mots-clés ou filtres</p>
+              </div>
+
+            ) : viewMode === 'grid' ? (
+              /* ── Grid view ── */
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3">
                 {visible.map(item => (
                   <VideoCard
                     key={item.id}
@@ -791,37 +982,143 @@ export function Bank({ user }: BankProps) {
                   />
                 ))}
               </div>
+
+            ) : (
+              /* ── List view ── */
+              <div className="sf-card overflow-hidden">
+                {/* List header */}
+                <div
+                  className="grid gap-3 px-4 py-2 text-[10px] font-bold uppercase tracking-widest"
+                  style={{ gridTemplateColumns: '40px 1fr 80px 100px 32px', color: '#52525B', borderBottom: '1px solid rgba(139,92,246,0.1)' }}
+                >
+                  <span />
+                  <span>Nom</span>
+                  <span>Durée</span>
+                  <span>Tags</span>
+                  <span />
+                </div>
+                {visible.map((item, idx) => (
+                  <div
+                    key={item.id}
+                    className="grid gap-3 px-4 py-2.5 items-center group cursor-default transition-colors"
+                    style={{
+                      gridTemplateColumns: '40px 1fr 80px 100px 32px',
+                      borderBottom: idx < visible.length - 1 ? '1px solid rgba(139,92,246,0.07)' : 'none',
+                      background: selectedIds.has(item.id) ? 'rgba(139,92,246,0.06)' : undefined,
+                    }}
+                    onMouseEnter={e => { if (!selectedIds.has(item.id)) e.currentTarget.style.background = 'rgba(139,92,246,0.04)' }}
+                    onMouseLeave={e => { if (!selectedIds.has(item.id)) e.currentTarget.style.background = 'transparent' }}
+                    onContextMenu={e => !selectionMode && openCtx(e, item)}
+                  >
+                    {/* Thumbnail */}
+                    <div
+                      className="w-9 h-9 rounded-lg overflow-hidden flex-shrink-0 cursor-pointer relative"
+                      style={{ background: '#0E0E16', border: '1px solid rgba(139,92,246,0.15)' }}
+                      onClick={() => selectionMode ? toggleSelection(item.id) : (item.file_url || item.storage_path) && setPlayingItem(item)}
+                    >
+                      <VideoThumbnail filePath={item.file_url} thumbnailPath={item.thumbnail_path} storagePath={item.storage_path} />
+                      {/* Checkbox overlay when selected */}
+                      {isSelected(item) && (
+                        <div className="absolute inset-0 flex items-center justify-center" style={{ background: 'rgba(139,92,246,0.7)' }}>
+                          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"><polyline points="2,6 5,9 10,3"/></svg>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Name */}
+                    <div className="min-w-0">
+                      <p className="text-[13px] font-medium text-white truncate">{item.title}</p>
+                      {item.notes && <p className="text-[11px] truncate mt-0.5" style={{ color: '#52525B' }}>{item.notes}</p>}
+                    </div>
+
+                    {/* Duration */}
+                    <span className="text-[12px]" style={{ color: '#52525B' }}>
+                      {item.duration ? formatDuration(item.duration) : '—'}
+                    </span>
+
+                    {/* Tags */}
+                    <div className="flex gap-1 overflow-hidden">
+                      {item.tags.slice(0, 2).map(tag => (
+                        <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: 'rgba(139,92,246,0.12)', color: '#A78BFA' }}>#{tag}</span>
+                      ))}
+                    </div>
+
+                    {/* Actions */}
+                    <button
+                      className="w-6 h-6 rounded-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                      style={{ background: 'rgba(139,92,246,0.1)', color: '#A78BFA' }}
+                      onClick={e => { e.stopPropagation(); openCtx(e, item) }}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
+                    </button>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
-        </div>
+        </main>
       </div>
 
-      {/* ── Context menu ── */}
+      {/* ── Premium context menu ── */}
       {ctxMenu && (
         <div
-          className="fixed z-50 bg-surface border border-border rounded-xl shadow-2xl py-1 min-w-[180px]"
-          style={{ left: ctxMenu.x, top: ctxMenu.y }}
+          className="fixed z-[60] rounded-xl py-1.5 min-w-[188px] shadow-2xl"
+          style={{
+            left: ctxMenu.x,
+            top: ctxMenu.y,
+            background: '#0E0E16',
+            border: '1px solid rgba(139,92,246,0.2)',
+            boxShadow: '0 16px 48px -8px rgba(0,0,0,0.7), 0 0 0 1px rgba(0,0,0,0.5)',
+          }}
           onMouseDown={e => e.stopPropagation()}
         >
           {[
-            { label: '✏️ Renommer',          action: () => { setRenameItem(ctxMenu.item); setCtxMenu(null) } },
-            { label: '📂 Déplacer vers…',    action: () => { setMoveItem(ctxMenu.item); setCtxMenu(null) } },
-            { label: '🏷 Modifier les tags', action: () => { setTagsItem(ctxMenu.item); setCtxMenu(null) } },
-            ...(ctxMenu.item.file_url && !ctxMenu.item.storage_path ? [
-              { label: '☁ Uploader vers le cloud', action: () => { reuploadItem(ctxMenu.item); setCtxMenu(null) } },
-            ] : []),
-            { label: '🗑 Supprimer',         action: () => deleteItem(ctxMenu.item.id), danger: true },
-          ].map(({ label, action, danger }) => (
+            {
+              icon: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>,
+              label: 'Renommer',
+              action: () => { setRenameItem(ctxMenu.item); setCtxMenu(null) }
+            },
+            {
+              icon: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>,
+              label: 'Déplacer vers…',
+              action: () => { setMoveItem(ctxMenu.item); setCtxMenu(null) }
+            },
+            {
+              icon: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>,
+              label: 'Modifier les tags',
+              action: () => { setTagsItem(ctxMenu.item); setCtxMenu(null) }
+            },
+            ...(ctxMenu.item.file_url && !ctxMenu.item.storage_path ? [{
+              icon: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>,
+              label: 'Uploader vers le cloud',
+              action: () => { reuploadItem(ctxMenu.item); setCtxMenu(null) }
+            }] : []),
+          ].map(({ icon, label, action }) => (
             <button
               key={label}
               onClick={action}
-              className={`w-full text-left px-4 py-2 text-sm transition-colors ${
-                danger ? 'text-danger hover:bg-danger/10' : 'text-text hover:bg-surface2'
-              }`}
+              className="w-full text-left px-3.5 py-2 text-[13px] flex items-center gap-2.5 transition-colors"
+              style={{ color: '#A1A1AA' }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(139,92,246,0.08)'; e.currentTarget.style.color = '#FFFFFF' }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#A1A1AA' }}
             >
+              <span style={{ color: '#8B5CF6' }}>{icon}</span>
               {label}
             </button>
           ))}
+          <div style={{ height: '1px', background: 'rgba(139,92,246,0.12)', margin: '4px 0' }} />
+          <button
+            onClick={() => deleteItem(ctxMenu.item.id)}
+            className="w-full text-left px-3.5 py-2 text-[13px] flex items-center gap-2.5 transition-colors"
+            style={{ color: '#F87171' }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.08)' }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/>
+            </svg>
+            Supprimer
+          </button>
         </div>
       )}
 
@@ -832,41 +1129,78 @@ export function Bank({ user }: BankProps) {
 
       {/* ── Folder action modal ── */}
       {folderModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setFolderModal(null)}>
-          <div className="bg-surface border border-border rounded-2xl p-6 w-80 space-y-4" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => setFolderModal(null)}>
+          <div
+            className="rounded-2xl p-6 w-80 space-y-4"
+            style={{ background: '#0E0E16', border: '1px solid rgba(139,92,246,0.2)', boxShadow: '0 24px 64px -16px rgba(0,0,0,0.8)' }}
+            onClick={e => e.stopPropagation()}
+          >
             {folderModal.mode === 'delete' ? (<>
               <div>
-                <p className="font-semibold text-text">Supprimer le dossier <span className="text-accent">"{folderModal.name}"</span></p>
-                <p className="text-xs text-text2 mt-1">
+                <p className="font-semibold text-white text-[14px]">
+                  Supprimer le dossier <span style={{ color: '#A78BFA' }}>"{folderModal.name}"</span>
+                </p>
+                <p className="text-[12px] mt-1" style={{ color: '#A1A1AA' }}>
                   {items.filter(i => (i as unknown as {folder?:string}).folder === folderModal.name).length} vidéo(s) dans ce dossier.
                 </p>
               </div>
               <div className="flex flex-col gap-2">
-                <Button onClick={() => deleteFolder(folderModal.name, false)} className="w-full">
-                  📤 Supprimer le dossier, garder les vidéos (→ racine)
-                </Button>
-                <button onClick={() => deleteFolder(folderModal.name, true)}
-                  className="w-full py-2 rounded-xl text-sm font-semibold"
-                  style={{ background: 'rgba(239,68,68,0.12)', color: '#f87171', border: '1px solid rgba(239,68,68,0.25)' }}>
-                  🗑 Supprimer le dossier ET ses vidéos
+                <button
+                  onClick={() => deleteFolder(folderModal.name, false)}
+                  className="w-full py-2.5 rounded-xl text-[13px] font-semibold text-white transition-colors"
+                  style={{ background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.3)' }}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(139,92,246,0.25)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'rgba(139,92,246,0.15)')}
+                >
+                  Supprimer le dossier, garder les vidéos
                 </button>
-                <Button variant="secondary" onClick={() => setFolderModal(null)} className="w-full">Annuler</Button>
+                <button
+                  onClick={() => deleteFolder(folderModal.name, true)}
+                  className="w-full py-2.5 rounded-xl text-[13px] font-semibold transition-colors"
+                  style={{ background: 'rgba(239,68,68,0.1)', color: '#F87171', border: '1px solid rgba(239,68,68,0.25)' }}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(239,68,68,0.18)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'rgba(239,68,68,0.1)')}
+                >
+                  Supprimer le dossier ET ses vidéos
+                </button>
+                <button
+                  onClick={() => setFolderModal(null)}
+                  className="w-full py-2.5 rounded-xl text-[13px] font-medium transition-colors"
+                  style={{ background: 'rgba(255,255,255,0.04)', color: '#A1A1AA', border: '1px solid rgba(255,255,255,0.07)' }}
+                >Annuler</button>
               </div>
             </>) : (<>
-              <p className="font-semibold text-text">Déplacer les vidéos de <span className="text-accent">"{folderModal.name}"</span> vers…</p>
+              <p className="font-semibold text-white text-[14px]">
+                Déplacer les vidéos de <span style={{ color: '#A78BFA' }}>"{folderModal.name}"</span> vers…
+              </p>
               <div className="flex flex-col gap-1 max-h-56 overflow-auto">
-                <button onClick={() => mergeFolderTo(folderModal.name, null)}
-                  className="text-left px-3 py-2 rounded-lg text-sm hover:bg-surface2 text-text2 transition-colors">
-                  🎬 Racine (sans dossier)
+                <button
+                  onClick={() => mergeFolderTo(folderModal.name, null)}
+                  className="text-left px-3 py-2 rounded-lg text-[13px] transition-colors"
+                  style={{ color: '#A1A1AA' }}
+                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(139,92,246,0.08)'; e.currentTarget.style.color = '#fff' }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#A1A1AA' }}
+                >
+                  Racine (sans dossier)
                 </button>
                 {folders.filter(f => f !== folderModal.name).map(f => (
-                  <button key={f} onClick={() => mergeFolderTo(folderModal.name, f)}
-                    className="text-left px-3 py-2 rounded-lg text-sm hover:bg-surface2 text-text transition-colors">
-                    📂 {f}
+                  <button
+                    key={f}
+                    onClick={() => mergeFolderTo(folderModal.name, f)}
+                    className="text-left px-3 py-2 rounded-lg text-[13px] transition-colors"
+                    style={{ color: '#A1A1AA' }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(139,92,246,0.08)'; e.currentTarget.style.color = '#fff' }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#A1A1AA' }}
+                  >
+                    {f}
                   </button>
                 ))}
               </div>
-              <Button variant="secondary" onClick={() => setFolderModal(null)} className="w-full">Annuler</Button>
+              <button
+                onClick={() => setFolderModal(null)}
+                className="w-full py-2.5 rounded-xl text-[13px] font-medium transition-colors"
+                style={{ background: 'rgba(255,255,255,0.04)', color: '#A1A1AA', border: '1px solid rgba(255,255,255,0.07)' }}
+              >Annuler</button>
             </>)}
           </div>
         </div>
@@ -874,22 +1208,43 @@ export function Bank({ user }: BankProps) {
 
       {/* ── Bulk move modal ── */}
       {showBulkMove && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowBulkMove(false)}>
-          <div className="bg-surface border border-border rounded-2xl p-6 w-72 space-y-4" onClick={e => e.stopPropagation()}>
-            <p className="font-semibold text-text">Déplacer {selectedIds.size} vidéo{selectedIds.size > 1 ? 's' : ''} vers…</p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => setShowBulkMove(false)}>
+          <div
+            className="rounded-2xl p-6 w-72 space-y-4"
+            style={{ background: '#0E0E16', border: '1px solid rgba(139,92,246,0.2)', boxShadow: '0 24px 64px -16px rgba(0,0,0,0.8)' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <p className="font-semibold text-white text-[14px]">
+              Déplacer {selectedIds.size} vidéo{selectedIds.size > 1 ? 's' : ''} vers…
+            </p>
             <div className="flex flex-col gap-1 max-h-64 overflow-auto">
-              <button onClick={() => moveSelected(null)}
-                className="text-left px-3 py-2 rounded-lg text-sm hover:bg-surface2 text-text2 transition-colors">
-                🎬 Racine (sans dossier)
+              <button
+                onClick={() => moveSelected(null)}
+                className="text-left px-3 py-2 rounded-lg text-[13px] transition-colors"
+                style={{ color: '#A1A1AA' }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(139,92,246,0.08)'; e.currentTarget.style.color = '#fff' }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#A1A1AA' }}
+              >
+                Racine (sans dossier)
               </button>
               {folders.map(f => (
-                <button key={f} onClick={() => moveSelected(f)}
-                  className="text-left px-3 py-2 rounded-lg text-sm hover:bg-surface2 text-text transition-colors">
-                  📂 {f}
+                <button
+                  key={f}
+                  onClick={() => moveSelected(f)}
+                  className="text-left px-3 py-2 rounded-lg text-[13px] transition-colors"
+                  style={{ color: '#A1A1AA' }}
+                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(139,92,246,0.08)'; e.currentTarget.style.color = '#fff' }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#A1A1AA' }}
+                >
+                  {f}
                 </button>
               ))}
             </div>
-            <Button variant="secondary" className="w-full" onClick={() => setShowBulkMove(false)}>Annuler</Button>
+            <button
+              onClick={() => setShowBulkMove(false)}
+              className="w-full py-2.5 rounded-xl text-[13px] font-medium"
+              style={{ background: 'rgba(255,255,255,0.04)', color: '#A1A1AA', border: '1px solid rgba(255,255,255,0.07)' }}
+            >Annuler</button>
           </div>
         </div>
       )}
@@ -903,29 +1258,18 @@ export function Bank({ user }: BankProps) {
         />
       )}
       {renameItem && (
-        <RenameModal
-          item={renameItem}
-          onSave={renameItemSave}
-          onClose={() => setRenameItem(null)}
-        />
+        <RenameModal item={renameItem} onSave={renameItemSave} onClose={() => setRenameItem(null)} />
       )}
       {moveItem && (
-        <MoveModal
-          item={moveItem}
-          folders={folders}
-          onSave={moveItemSave}
-          onClose={() => setMoveItem(null)}
-        />
+        <MoveModal item={moveItem} folders={folders} onSave={moveItemSave} onClose={() => setMoveItem(null)} />
       )}
       {tagsItem && (
-        <TagsModal
-          item={tagsItem}
-          onSave={saveTagsSave}
-          onClose={() => setTagsItem(null)}
-        />
+        <TagsModal item={tagsItem} onSave={saveTagsSave} onClose={() => setTagsItem(null)} />
       )}
     </div>
   )
+
+  function isSelected(item: ContentItem) { return selectedIds.has(item.id) }
 }
 
 // ── Folder row with inline rename ────────────────────────────────────────────
@@ -946,10 +1290,10 @@ function FolderRow({ name, count, active, onClick, onRename, onDelete, onMerge, 
 
   if (editing) {
     return (
-      <div className="flex items-center gap-1 px-2 py-1.5">
+      <div className="flex items-center gap-1.5 px-3 py-1.5">
         <input
           autoFocus
-          className="flex-1 bg-bg border border-accent rounded px-2 py-0.5 text-xs text-text focus:outline-none"
+          className="sf-search flex-1 px-2 py-1 text-[12px]"
           value={val}
           onChange={e => setVal(e.target.value)}
           onKeyDown={e => {
@@ -957,16 +1301,25 @@ function FolderRow({ name, count, active, onClick, onRename, onDelete, onMerge, 
             if (e.key === 'Escape') { setVal(name); setEditing(false) }
           }}
         />
-        <button onClick={() => { onRename(val.trim()); setEditing(false) }} className="text-ok text-xs">✓</button>
+        <button
+          onClick={() => { onRename(val.trim()); setEditing(false) }}
+          className="text-[11px] font-bold px-1.5 py-1 rounded"
+          style={{ color: '#A78BFA', background: 'rgba(139,92,246,0.12)' }}
+        >✓</button>
       </div>
     )
   }
 
   return (
     <div
-      className={`flex items-center gap-2.5 px-3 py-2.5 cursor-pointer transition-colors ${
-        active ? 'bg-surface2 border-l-2 border-accent pl-[10px]' : 'hover:bg-surface2'
-      } ${dragOver ? 'bg-accent/20 border-l-2 border-accent pl-[10px]' : ''}`}
+      className="flex items-center gap-2 px-3 py-2.5 cursor-pointer transition-all group"
+      style={
+        dragOver
+          ? { background: 'rgba(139,92,246,0.15)', borderLeft: '2px solid #8B5CF6', paddingLeft: '10px' }
+          : active
+          ? { background: 'rgba(139,92,246,0.08)', borderLeft: '2px solid #8B5CF6', paddingLeft: '10px' }
+          : { borderLeft: '2px solid transparent' }
+      }
       onClick={onClick}
       onMouseEnter={() => setShowActions(true)}
       onMouseLeave={() => setShowActions(false)}
@@ -979,28 +1332,55 @@ function FolderRow({ name, count, active, onClick, onRename, onDelete, onMerge, 
         if (itemId) onDropItem(itemId)
       }}
     >
-      <span className="text-base flex-shrink-0">{dragOver ? '📥' : '📂'}</span>
-      <span className="text-xs font-medium text-text flex-1 truncate">{name}</span>
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={active || dragOver ? '#A78BFA' : '#52525B'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
+        {dragOver
+          ? <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></>
+          : <><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></>
+        }
+      </svg>
+      <span
+        className="text-[12px] font-medium flex-1 truncate"
+        style={{ color: active ? '#FFFFFF' : '#A1A1AA' }}
+      >{name}</span>
+
       {showActions ? (
         <div className="flex gap-0.5 flex-shrink-0">
           <button
             onClick={e => { e.stopPropagation(); setEditing(true) }}
-            className="text-text2 hover:text-accent text-xs px-0.5"
+            className="w-5 h-5 rounded flex items-center justify-center transition-colors"
+            style={{ color: '#52525B' }}
+            onMouseEnter={e => (e.currentTarget.style.color = '#A78BFA')}
+            onMouseLeave={e => (e.currentTarget.style.color = '#52525B')}
             title="Renommer"
-          >✏️</button>
+          >
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </button>
           <button
             onClick={e => { e.stopPropagation(); onMerge() }}
-            className="text-text2 hover:text-accent text-xs px-0.5"
+            className="w-5 h-5 rounded flex items-center justify-center transition-colors"
+            style={{ color: '#52525B' }}
+            onMouseEnter={e => (e.currentTarget.style.color = '#A78BFA')}
+            onMouseLeave={e => (e.currentTarget.style.color = '#52525B')}
             title="Déplacer vers…"
-          >📂</button>
+          >
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+          </button>
           <button
             onClick={e => { e.stopPropagation(); onDelete() }}
-            className="text-text2 hover:text-danger text-xs px-0.5"
+            className="w-5 h-5 rounded flex items-center justify-center transition-colors"
+            style={{ color: '#52525B' }}
+            onMouseEnter={e => (e.currentTarget.style.color = '#F87171')}
+            onMouseLeave={e => (e.currentTarget.style.color = '#52525B')}
             title="Supprimer"
-          >🗑</button>
+          >
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg>
+          </button>
         </div>
       ) : (
-        <span className="text-[10px] text-text2 flex-shrink-0">{count}</span>
+        <span
+          className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0"
+          style={{ background: 'rgba(139,92,246,0.08)', color: '#52525B' }}
+        >{count}</span>
       )}
     </div>
   )
@@ -1228,73 +1608,127 @@ function VideoCard({ item, onContextMenu, onPlay, selectionMode, isSelected, onT
     <div
       draggable={!selectionMode}
       onDragStart={e => e.dataTransfer.setData('bank-item-id', item.id)}
-      className={`bg-card border rounded-xl overflow-hidden transition-all group cursor-default select-none ${
-        isSelected ? 'border-accent ring-2 ring-accent/30' : 'border-border hover:border-accent/40'
-      }`}
+      className="group cursor-default select-none rounded-xl overflow-hidden transition-all"
+      style={{
+        background: '#0E0E16',
+        border: isSelected ? '1px solid #8B5CF6' : '1px solid rgba(139,92,246,0.12)',
+        boxShadow: isSelected ? '0 0 0 2px rgba(139,92,246,0.25)' : undefined,
+        transform: undefined,
+      }}
       onContextMenu={e => !selectionMode && onContextMenu(e, item)}
     >
+      {/* Thumbnail area */}
       <div
-        className="relative aspect-[9/16] bg-surface2 overflow-hidden cursor-pointer"
+        className="relative overflow-hidden cursor-pointer"
+        style={{ aspectRatio: '9/16' }}
         onClick={() => selectionMode ? onToggleSelect?.() : (item.file_url || item.storage_path) && onPlay(item)}
       >
         <VideoThumbnail filePath={item.file_url} thumbnailPath={item.thumbnail_path} storagePath={item.storage_path} />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
 
-        {/* Checkbox — top-left, always visible on hover or when selected */}
+        {/* Gradient overlay */}
+        <div
+          className="absolute inset-0 pointer-events-none transition-opacity"
+          style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, transparent 50%, rgba(0,0,0,0.15) 100%)' }}
+        />
+
+        {/* Hover scale effect */}
+        <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
+          style={{ background: 'rgba(139,92,246,0.06)' }} />
+
+        {/* Checkbox — top-left */}
         <button
-          className={`absolute top-2 left-2 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all z-10 ${
-            isSelected
-              ? 'bg-accent border-accent opacity-100'
-              : 'border-white/70 bg-black/50 opacity-0 group-hover:opacity-100'
-          }`}
+          className="absolute top-2 left-2 z-10 w-5 h-5 rounded-md flex items-center justify-center transition-all"
+          style={isSelected
+            ? { background: '#8B5CF6', border: '1px solid #8B5CF6', opacity: 1 }
+            : { background: 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.3)', opacity: 0 }
+          }
           onClick={e => { e.stopPropagation(); onToggleSelect?.() }}
           title={isSelected ? 'Désélectionner' : 'Sélectionner'}
         >
-          {isSelected && <span className="text-white text-xs font-bold leading-none">✓</span>}
+          {isSelected && (
+            <svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round">
+              <polyline points="2,6 5,9 10,3"/>
+            </svg>
+          )}
         </button>
 
-        {/* Play button on hover (hidden in selection mode) */}
+        {/* Show checkbox on hover (css approach via group) */}
+        {!isSelected && (
+          <button
+            className="absolute top-2 left-2 z-10 w-5 h-5 rounded-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all"
+            style={{ background: 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.35)' }}
+            onClick={e => { e.stopPropagation(); onToggleSelect?.() }}
+          />
+        )}
+
+        {/* Play button on hover */}
         {!selectionMode && (
           <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-            <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
-              <span className="text-white text-xl ml-1">▶</span>
+            <div
+              className="w-11 h-11 rounded-full flex items-center justify-center"
+              style={{ background: 'rgba(139,92,246,0.75)', backdropFilter: 'blur(8px)', boxShadow: '0 0 20px rgba(139,92,246,0.5)' }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="white" style={{ marginLeft: '2px' }}>
+                <polygon points="5,3 19,12 5,21"/>
+              </svg>
             </div>
           </div>
         )}
 
-        {/* Duration — top right */}
+        {/* Duration badge — top right */}
         {item.duration && (
-          <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-sm rounded px-1.5 py-0.5 text-[10px] text-white group-hover:opacity-0 transition-opacity pointer-events-none">
+          <div
+            className="absolute top-2 right-2 rounded px-1.5 py-0.5 text-[10px] font-semibold text-white pointer-events-none transition-opacity group-hover:opacity-0"
+            style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)' }}
+          >
             {formatDuration(item.duration)}
           </div>
         )}
-        {/* Used count badge */}
+
+        {/* Menu button — top right on hover */}
+        {!selectionMode && (
+          <button
+            className="absolute top-2 right-2 w-6 h-6 rounded-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10"
+            style={{ background: 'rgba(0,0,0,0.65)', color: '#fff', backdropFilter: 'blur(4px)' }}
+            onClick={e => { e.stopPropagation(); onContextMenu(e, item) }}
+            title="Options"
+            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(139,92,246,0.6)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'rgba(0,0,0,0.65)')}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+              <circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/>
+            </svg>
+          </button>
+        )}
+
+        {/* Used count */}
         {item.used_count > 0 && (
-          <div className="absolute bottom-8 right-2 bg-accent/90 rounded-full px-1.5 py-0.5 text-[10px] text-bg font-bold pointer-events-none">
+          <div
+            className="absolute bottom-8 right-2 rounded-full px-1.5 py-0.5 text-[9px] font-bold pointer-events-none"
+            style={{ background: 'rgba(139,92,246,0.85)', color: '#fff' }}
+          >
             {item.used_count}×
           </div>
         )}
-        {/* Title */}
-        <div className="absolute bottom-0 left-0 right-0 p-2.5 pointer-events-none">
-          <p className="text-xs font-semibold text-white truncate leading-tight">{item.title}</p>
+
+        {/* Title at bottom */}
+        <div className="absolute bottom-0 left-0 right-0 px-2.5 pb-2.5 pointer-events-none">
+          <p className="text-[11px] font-semibold text-white truncate leading-tight">{item.title}</p>
         </div>
-        {/* ⋮ menu button on hover (hidden in selection mode) */}
-        {!selectionMode && (
-          <button
-            className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/70 text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white/20"
-            onClick={e => { e.stopPropagation(); onContextMenu(e, item) }}
-            title="Options"
-          >⋮</button>
-        )}
       </div>
-      {/* Tags */}
+
+      {/* Tags row */}
       {item.tags.length > 0 && (
-        <div className="px-2.5 py-2 flex flex-wrap gap-1">
+        <div className="px-2.5 py-2 flex flex-wrap gap-1" style={{ borderTop: '1px solid rgba(139,92,246,0.08)' }}>
           {item.tags.slice(0, 3).map(tag => (
-            <span key={tag} className="text-[10px] bg-surface2 text-text2 px-1.5 py-0.5 rounded-full">#{tag}</span>
+            <span
+              key={tag}
+              className="text-[9px] px-1.5 py-0.5 rounded font-medium"
+              style={{ background: 'rgba(139,92,246,0.1)', color: '#A78BFA' }}
+            >#{tag}</span>
           ))}
           {item.tags.length > 3 && (
-            <span className="text-[10px] text-text2">+{item.tags.length - 3}</span>
+            <span className="text-[9px]" style={{ color: '#52525B' }}>+{item.tags.length - 3}</span>
           )}
         </div>
       )}
