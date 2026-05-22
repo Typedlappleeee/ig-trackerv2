@@ -30,8 +30,12 @@ import {
   loadScheduledPosts, cancelScheduledPost, claimScheduledPost,
   executeScheduledPost, finishScheduledPost, fmtScheduledTime, timeUntil,
   type ScheduledPost, type ScheduleStatus,
+  createScheduledPost, type ScheduledPhoneRecord, type ScheduledVideoRecord,
 } from '@/lib/schedulerService'
 import { Spinner } from '@/components/ui/Spinner'
+import { useConnections } from '@/lib/connections'
+import { type ContentItem, type Phone } from '@/lib/supabase'
+import { VideoThumbnail } from '@/pages/Bank'
 
 interface Props { user: User; onNavigate?: (page: string) => void }
 
@@ -58,13 +62,17 @@ export function Scheduler({ user, onNavigate }: Props) {
   const [cancelling, setCancelling] = useState<string | null>(null)
   const [runningPost, setRunningPost] = useState<string | null>(null)
   const [runLogs, setRunLogs]       = useState<{ id: string; msgs: string[] } | null>(null)
-  const [view, setView]             = useState<'list' | 'create'>('list')
+  const [view, setView]             = useState<'list' | 'create' | 'simple'>('list')
   const timersRef                   = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
   const runningRef                  = useRef<Set<string>>(new Set())
 
   // Breadcrumb in topbar
   useEffect(() => {
-    window.dispatchEvent(new CustomEvent('sf:breadcrumb', { detail: view === 'create' ? 'Créer un post' : null }))
+    const detail =
+      view === 'create' ? ['Créer un post'] :
+      view === 'simple' ? ['Créer un post', 'Programmation simple'] :
+      null
+    window.dispatchEvent(new CustomEvent('sf:breadcrumb', { detail }))
     return () => { window.dispatchEvent(new CustomEvent('sf:breadcrumb', { detail: null })) }
   }, [view])
 
@@ -152,7 +160,10 @@ export function Scheduler({ user, onNavigate }: Props) {
   const shown   = tab === 'pending' ? pending : history
 
   if (view === 'create') {
-    return <CreatePostView onBack={() => setView('list')} onNavigate={onNavigate} />
+    return <CreatePostView onBack={() => setView('list')} onNavigate={onNavigate} onSimple={() => setView('simple')} />
+  }
+  if (view === 'simple') {
+    return <SimplePostWizard user={user} onBack={() => setView('create')} onDone={() => setView('list')} />
   }
 
   return (
@@ -500,7 +511,7 @@ function Chip({ icon, label }: { icon: React.ReactNode; label: string }) {
 
 // ── Create post subview ────────────────────────────────────────────────────────
 
-function CreatePostView({ onBack, onNavigate }: { onBack: () => void; onNavigate?: (page: string) => void }) {
+function CreatePostView({ onBack, onNavigate, onSimple }: { onBack: () => void; onNavigate?: (page: string) => void; onSimple?: () => void }) {
   return (
     <div className="h-full flex flex-col overflow-hidden" style={{ background: '#07070B' }}>
 
@@ -613,7 +624,7 @@ function CreatePostView({ onBack, onNavigate }: { onBack: () => void; onNavigate
             </div>
             {/* CTA */}
             <div className="px-6 pb-6">
-              <button onClick={onBack}
+              <button onClick={() => onSimple?.()}
                 className="w-full py-3.5 rounded-xl text-[14px] font-black text-white flex items-center justify-center gap-2 transition-all hover:opacity-90 active:scale-[0.98]"
                 style={{ background: 'linear-gradient(130deg,#1D4ED8,#2563EB,#3B82F6)', boxShadow: '0 4px 20px -4px rgba(37,99,235,0.5)' }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

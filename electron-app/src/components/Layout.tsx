@@ -136,7 +136,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
   const [notifications, setNotifications] = useState<AppNotification[]>([])
   const [unread, setUnread]             = useState(0)
   const notifRef                        = useRef<HTMLDivElement>(null)
-  const [breadcrumb, setBreadcrumb]     = useState<string | null>(null)
+  const [breadcrumb, setBreadcrumb]     = useState<string[] | null>(null)
   useEffect(() => {
     const handler = (e: Event) => {
       const val = (e as CustomEvent<string>).detail
@@ -148,7 +148,12 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
 
   // Listen for breadcrumb updates from pages (e.g. Scheduler subviews)
   useEffect(() => {
-    const handler = (e: Event) => setBreadcrumb((e as CustomEvent<string | null>).detail)
+    const handler = (e: Event) => {
+      const val = (e as CustomEvent<string | string[] | null>).detail
+      if (val === null) setBreadcrumb(null)
+      else if (Array.isArray(val)) setBreadcrumb(val)
+      else setBreadcrumb([val])
+    }
     window.addEventListener('sf:breadcrumb', handler)
     return () => window.removeEventListener('sf:breadcrumb', handler)
   }, [])
@@ -686,16 +691,17 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
                   licences:    'Licences',
                 } as Record<string, string>)[page] ?? page}
               </span>
-              {breadcrumb && (
-                <>
+              {breadcrumb && breadcrumb.map((seg, i) => (
+                <span key={i} className="flex items-center gap-1.5 min-w-0">
                   <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ color: 'rgba(148,163,184,0.3)', flexShrink: 0 }}>
                     <path d="M4 2l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
-                  <span className="text-[13px] font-semibold truncate max-w-[160px]" style={{ color: 'rgba(196,181,253,0.85)' }}>
-                    {breadcrumb}
+                  <span className="text-[13px] font-semibold truncate max-w-[160px]"
+                    style={{ color: i === breadcrumb.length - 1 ? 'rgba(196,181,253,0.85)' : 'rgba(148,163,184,0.55)' }}>
+                    {seg}
                   </span>
-                </>
-              )}
+                </span>
+              ))}
             </div>
             {activeTask && (
               <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold"
