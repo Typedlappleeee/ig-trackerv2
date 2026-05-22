@@ -320,346 +320,347 @@ export function Dashboard({ user, onNavigate }: DashboardProps) {
 
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
-    <div className="h-full flex flex-col overflow-hidden">
-      <div className="flex-1 overflow-y-auto px-8 pb-10 pt-7">
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#07070C', overflow: 'hidden' }}>
+      {/* Page header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '24px 28px 20px', borderBottom: '1px solid rgba(255,255,255,0.055)', flexShrink: 0 }}>
+        <div>
+          <h1 style={{ fontSize: 20, fontWeight: 700, color: '#F2F0FF', letterSpacing: '-0.035em', lineHeight: 1.2, margin: 0 }}>Dashboard</h1>
+          <p style={{ fontSize: 12.5, color: 'rgba(148,163,184,0.52)', marginTop: 3, margin: '3px 0 0' }}>
+            {fetchingStats
+              ? <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#8B5CF6', display: 'inline-block', animation: 'pulse 1.5s ease-in-out infinite' }} />
+                  Actualisation des stats…
+                </span>
+              : 'Vue d\'ensemble de tes performances'
+            }
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          {/* Range selector tabs */}
+          <div style={{ display: 'flex', gap: 2, padding: '4px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 11 }}>
+            {RANGES.map(({ key, label }) => (
+              <button
+                key={key}
+                onClick={() => setRange(key)}
+                style={{
+                  padding: '5px 12px',
+                  borderRadius: 8,
+                  fontSize: 11,
+                  fontWeight: 700,
+                  border: 'none',
+                  cursor: 'pointer',
+                  transition: 'all 160ms',
+                  fontFamily: 'inherit',
+                  background: range === key ? 'linear-gradient(130deg,#7C3AED,#A855F7)' : 'transparent',
+                  color: range === key ? '#fff' : 'rgba(148,163,184,0.52)',
+                  boxShadow: range === key ? '0 0 12px -3px rgba(124,58,237,0.6)' : 'none',
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {/* Account selector */}
+          {linkedPhones.length > 0 && (
+            <div style={{ position: 'relative' }}>
+              <select
+                value={selPhone?.id ?? ''}
+                onChange={e => setSelPhone(linkedPhones.find(p => p.id === e.target.value) ?? null)}
+                style={{
+                  appearance: 'none',
+                  outline: 'none',
+                  paddingLeft: 12,
+                  paddingRight: 30,
+                  paddingTop: 7,
+                  paddingBottom: 7,
+                  borderRadius: 11,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  background: 'rgba(255,255,255,0.05)',
+                  border: '1px solid rgba(255,255,255,0.09)',
+                  color: '#A78BFA',
+                  fontFamily: 'inherit',
+                }}
+              >
+                <option value="" style={{ background: '#0E0E16', color: '#fff' }}>Tous les comptes</option>
+                {linkedPhones.map(p => (
+                  <option key={p.id} value={p.id} style={{ background: '#0E0E16', color: '#fff' }}>
+                    {p.ig_username ? `@${p.ig_username}` : p.phone_name}
+                  </option>
+                ))}
+              </select>
+              <svg style={{ position: 'absolute', right: 9, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="rgba(148,163,184,0.5)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M6 9l6 6 6-6" />
+              </svg>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Scrollable body */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px' }}>
 
         {/* Schema migration notice */}
         {schemaMissing && (
-          <div className="mb-6 rounded-xl p-4 flex items-start gap-3"
-            style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)' }}>
-            <span className="text-xl flex-shrink-0 mt-0.5">⚠</span>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-warn">Table <code className="font-mono text-xs">views_history</code> introuvable</p>
-              <p className="text-xs text-text2 mt-1">Va dans <strong className="text-text">Supabase → SQL Editor</strong>, colle le SQL et clique <strong className="text-text">Run</strong>.</p>
+          <div style={{ marginBottom: 20, borderRadius: 11, padding: '14px 16px', display: 'flex', alignItems: 'flex-start', gap: 12, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)' }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}>
+              <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
+            </svg>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{ fontSize: 13, fontWeight: 600, color: '#F59E0B', margin: 0 }}>Table <code style={{ fontFamily: 'monospace', fontSize: 11 }}>views_history</code> introuvable</p>
+              <p style={{ fontSize: 12, color: 'rgba(196,181,253,0.72)', marginTop: 4, margin: '4px 0 0' }}>Va dans <strong style={{ color: '#F2F0FF' }}>Supabase → SQL Editor</strong>, colle le SQL et clique <strong style={{ color: '#F2F0FF' }}>Run</strong>.</p>
               <button
                 onClick={() => { navigator.clipboard.writeText(SCHEMA_V3_SQL); setSqlCopied(true); setTimeout(() => setSqlCopied(false), 2000) }}
-                className="mt-2 px-3 py-1 text-xs font-semibold rounded-lg transition-all"
-                style={{ background: 'rgba(245,158,11,0.2)', border: '1px solid rgba(245,158,11,0.4)', color: '#FCD34D' }}>
-                {sqlCopied ? '✓ Copié !' : '📋 Copier le SQL'}
+                style={{ marginTop: 8, padding: '4px 12px', fontSize: 12, fontWeight: 600, borderRadius: 8, cursor: 'pointer', background: 'rgba(245,158,11,0.2)', border: '1px solid rgba(245,158,11,0.4)', color: '#FCD34D', fontFamily: 'inherit', transition: 'all 140ms' }}>
+                {sqlCopied ? 'Copié !' : 'Copier le SQL'}
               </button>
             </div>
           </div>
         )}
 
         {loading ? (
-          <div className="flex justify-center py-32"><Spinner /></div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, gap: 12, color: 'rgba(148,163,184,0.4)', height: '100%', minHeight: 300 }}>
+            <div style={{ width: 18, height: 18, border: '2px solid rgba(255,255,255,0.08)', borderTopColor: '#8B5CF6', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+            <span style={{ fontSize: 13 }}>Chargement...</span>
+          </div>
         ) : phones.length === 0 ? (
           /* ── Empty / onboarding ─────────────────────────────────────────────── */
-          <div className="max-w-xl mx-auto mt-16 text-center space-y-8">
-            <div>
-              <div className="w-20 h-20 rounded-3xl mx-auto flex items-center justify-center mb-5"
-                style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.2), rgba(168,85,247,0.1))', border: '1px solid rgba(139,92,246,0.25)' }}>
-                <span className="text-4xl">🚀</span>
-              </div>
-              <h2 className="text-2xl font-black text-white">Bienvenue sur ScaleFlow</h2>
-              <p className="text-sm text-text2 mt-2">Suis ces étapes pour démarrer et scaler tes comptes Instagram</p>
+          <div style={{ maxWidth: 520, margin: '64px auto 0', textAlign: 'center' }}>
+            <div style={{ width: 72, height: 72, borderRadius: 20, margin: '0 auto 20px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, rgba(139,92,246,0.2), rgba(168,85,247,0.1))', border: '1px solid rgba(139,92,246,0.25)' }}>
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="rgba(167,139,250,0.8)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
             </div>
-            <div className="grid grid-cols-2 gap-3 text-left">
+            <h2 style={{ fontSize: 22, fontWeight: 800, color: '#F2F0FF', letterSpacing: '-0.03em', margin: 0 }}>Bienvenue sur ScaleFlow</h2>
+            <p style={{ fontSize: 13, color: 'rgba(148,163,184,0.52)', marginTop: 8 }}>Suis ces étapes pour démarrer et scaler tes comptes Instagram</p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 28, textAlign: 'left' }}>
               {[
-                { n: '1', icon: '🔑', title: 'Bearer Token', desc: 'Configure ton token GéeLark dans Paramètres → Connexions' },
-                { n: '2', icon: '📱', title: 'Sync téléphones', desc: 'Va dans Téléphones et clique "Sync GéeLark"' },
-                { n: '3', icon: '📷', title: 'Ajoute Instagram', desc: 'Renseigne le nom d\'utilisateur IG sur chaque téléphone' },
-                { n: '4', icon: '⚡', title: 'Lance le posting', desc: 'Utilise Posting ou Mass Posting pour publier en masse' },
+                { n: '1', title: 'Bearer Token', desc: 'Configure ton token GéeLark dans Paramètres → Connexions', icon: 'M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z' },
+                { n: '2', title: 'Sync téléphones', desc: 'Va dans Téléphones et clique "Sync GéeLark"', icon: 'M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z' },
+                { n: '3', title: 'Ajoute Instagram', desc: "Renseigne le nom d'utilisateur IG sur chaque téléphone", icon: 'M16 11.37A4 4 0 1112.63 8 4 4 0 0116 11.37zm1.5-4.87h.01' },
+                { n: '4', title: 'Lance le posting', desc: 'Utilise Posting ou Mass Posting pour publier en masse', icon: 'M22 2L11 13M22 2L15 22l-4-9-9-4 20-7z' },
               ].map(step => (
-                <div key={step.n} className="rounded-xl p-4 flex gap-3 items-start sf-card">
-                  <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-black flex-shrink-0 mt-0.5"
-                    style={{ background: 'linear-gradient(135deg,#7C3AED,#A855F7)', color: '#fff' }}>{step.n}</div>
+                <div key={step.n} style={{ borderRadius: 11, padding: '16px', display: 'flex', gap: 12, alignItems: 'flex-start', background: '#0C0C15', border: '1px solid rgba(255,255,255,0.055)' }}>
+                  <div style={{ width: 26, height: 26, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, flexShrink: 0, marginTop: 1, background: 'linear-gradient(135deg,#7C3AED,#A855F7)', color: '#fff' }}>{step.n}</div>
                   <div>
-                    <p className="text-xs font-bold text-white">{step.icon} {step.title}</p>
-                    <p className="text-[11px] text-text2 mt-1 leading-relaxed">{step.desc}</p>
+                    <p style={{ fontSize: 12, fontWeight: 700, color: '#F2F0FF', margin: 0 }}>{step.title}</p>
+                    <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.52)', marginTop: 4, lineHeight: 1.5 }}>{step.desc}</p>
                   </div>
                 </div>
               ))}
             </div>
           </div>
         ) : (
-          <div className="space-y-5">
+          <>
+            {/* ── Stats grid — 4 cards across ─────────────────────────────────── */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 24 }}>
 
-            {/* ── Header row ─────────────────────────────────────────────────── */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
+              {/* Card 1: Téléphones */}
+              <div
+                style={{ background: '#0C0C15', border: '1px solid rgba(255,255,255,0.055)', borderRadius: 15, padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 10, transition: 'all 180ms', cursor: 'default' }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(139,92,246,0.22)'; (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)' }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.055)'; (e.currentTarget as HTMLElement).style.transform = 'translateY(0)' }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(124,58,237,0.12)', border: '1px solid rgba(139,92,246,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A78BFA" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: 'rgba(124,58,237,0.12)', color: '#A78BFA' }}>{kpis.online} actifs</span>
+                </div>
                 <div>
-                  <h1 className="text-[22px] font-black text-white leading-none">Dashboard</h1>
-                  <p className="text-[12px] text-text2 mt-0.5">
-                    {fetchingStats
-                      ? <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />Actualisation des stats…</span>
-                      : `${phones.length} téléphone${phones.length > 1 ? 's' : ''} · ${linkedPhones.length} compte${linkedPhones.length > 1 ? 's' : ''} IG`}
-                  </p>
+                  <p style={{ fontSize: 28, fontWeight: 800, color: '#F2F0FF', letterSpacing: '-0.04em', lineHeight: 1, margin: 0 }}>{phones.length}</p>
+                  <p style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(100,116,139,0.38)', marginTop: 6, margin: '6px 0 0' }}>Téléphones actifs</p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
-                {/* Range pills */}
-                <div className="flex gap-0.5 p-1 rounded-xl" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                  {RANGES.map(({ key, label }) => (
-                    <button key={key} onClick={() => setRange(key)}
-                      className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all ${
-                        range === key ? 'text-white' : 'text-text2 hover:text-text'
-                      }`}
-                      style={range === key ? { background: 'linear-gradient(130deg,#7C3AED,#A855F7)', boxShadow: '0 0 12px -3px rgba(124,58,237,0.6)' } : {}}>
-                      {label}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Account selector */}
-                {linkedPhones.length > 0 && (
-                  <div className="relative">
-                    <select
-                      value={selPhone?.id ?? ''}
-                      onChange={e => setSelPhone(linkedPhones.find(p => p.id === e.target.value) ?? null)}
-                      className="appearance-none outline-none pl-3 pr-8 py-2 rounded-xl text-[12px] font-semibold cursor-pointer"
-                      style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#A78BFA' }}>
-                      <option value="" style={{ background: '#0E0E16', color: '#fff' }}>Tous les comptes</option>
-                      {linkedPhones.map(p => (
-                        <option key={p.id} value={p.id} style={{ background: '#0E0E16', color: '#fff' }}>
-                          {p.ig_username ? `@${p.ig_username}` : p.phone_name}
-                        </option>
-                      ))}
-                    </select>
-                    <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[9px] pointer-events-none text-text2">▾</span>
+              {/* Card 2: Comptes IG */}
+              <div
+                style={{ background: '#0C0C15', border: '1px solid rgba(255,255,255,0.055)', borderRadius: 15, padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 10, transition: 'all 180ms', cursor: 'default' }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(139,92,246,0.22)'; (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)' }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.055)'; (e.currentTarget as HTMLElement).style.transform = 'translateY(0)' }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#60A5FA" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="2" y="2" width="20" height="20" rx="5" ry="5" /><path d="M16 11.37A4 4 0 1112.63 8 4 4 0 0116 11.37z" /><line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
+                    </svg>
                   </div>
-                )}
+                  {linkedPhones.length > 0 && <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: 'rgba(59,130,246,0.1)', color: '#60A5FA' }}>liés</span>}
+                </div>
+                <div>
+                  <p style={{ fontSize: 28, fontWeight: 800, color: '#F2F0FF', letterSpacing: '-0.04em', lineHeight: 1, margin: 0 }}>{linkedPhones.length}</p>
+                  <p style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(100,116,139,0.38)', marginTop: 6, margin: '6px 0 0' }}>Comptes Instagram</p>
+                </div>
+              </div>
+
+              {/* Card 3: Vues totales */}
+              <div
+                style={{ background: '#0C0C15', border: '1px solid rgba(255,255,255,0.055)', borderRadius: 15, padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 10, transition: 'all 180ms', cursor: 'default' }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(139,92,246,0.22)'; (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)' }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.055)'; (e.currentTarget as HTMLElement).style.transform = 'translateY(0)' }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4ADE80" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" />
+                    </svg>
+                  </div>
+                  {kpis.delta !== null && (
+                    <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: kpis.delta >= 0 ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)', color: kpis.delta >= 0 ? '#22C55E' : '#EF4444' }}>
+                      {kpis.delta >= 0 ? '+' : ''}{fmt(kpis.delta)}
+                    </span>
+                  )}
+                </div>
+                <div>
+                  <p style={{ fontSize: 28, fontWeight: 800, color: '#F2F0FF', letterSpacing: '-0.04em', lineHeight: 1, margin: 0 }}>{fmt(kpis.today)}</p>
+                  <p style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(100,116,139,0.38)', marginTop: 6, margin: '6px 0 0' }}>Vues aujourd'hui</p>
+                </div>
+              </div>
+
+              {/* Card 4: Abonnés / Erreurs */}
+              <div
+                style={{ background: '#0C0C15', border: `1px solid ${kpis.banned > 0 ? 'rgba(239,68,68,0.22)' : 'rgba(255,255,255,0.055)'}`, borderRadius: 15, padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 10, transition: 'all 180ms', cursor: 'default' }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = kpis.banned > 0 ? 'rgba(239,68,68,0.35)' : 'rgba(139,92,246,0.22)'; (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)' }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = kpis.banned > 0 ? 'rgba(239,68,68,0.22)' : 'rgba(255,255,255,0.055)'; (e.currentTarget as HTMLElement).style.transform = 'translateY(0)' }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 10, background: kpis.banned > 0 ? 'rgba(239,68,68,0.12)' : 'rgba(139,92,246,0.12)', border: `1px solid ${kpis.banned > 0 ? 'rgba(239,68,68,0.2)' : 'rgba(139,92,246,0.2)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={kpis.banned > 0 ? '#F87171' : '#A78BFA'} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 00-3-3.87" /><path d="M16 3.13a4 4 0 010 7.75" />
+                    </svg>
+                  </div>
+                  {kpis.banned > 0 && <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: 'rgba(239,68,68,0.12)', color: '#EF4444' }}>{kpis.banned} erreur{kpis.banned > 1 ? 's' : ''}</span>}
+                </div>
+                <div>
+                  <p style={{ fontSize: 28, fontWeight: 800, color: kpis.banned > 0 ? '#F87171' : '#F2F0FF', letterSpacing: '-0.04em', lineHeight: 1, margin: 0 }}>{fmt(kpis.peak)}</p>
+                  <p style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(100,116,139,0.38)', marginTop: 6, margin: '6px 0 0' }}>Record de vues</p>
+                </div>
               </div>
             </div>
 
-            {/* ── 6 KPI cards ────────────────────────────────────────────────── */}
-            <div className="grid grid-cols-3 gap-3">
-              {/* Vues aujourd'hui */}
-              {(() => {
-                const deltaPct = kpis.delta !== null && kpis.today > 0
-                  ? Math.round((kpis.delta / Math.max(kpis.today - kpis.delta, 1)) * 100)
-                  : null
-                return (
-                  <div className="sf-card rounded-2xl p-5 col-span-1 relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-24 h-24 pointer-events-none"
-                      style={{ background: 'radial-gradient(ellipse at top right, rgba(139,92,246,0.15) 0%, transparent 70%)' }} />
-                    <div className="flex items-start justify-between mb-3">
-                      <p className="text-[11px] font-semibold uppercase tracking-widest text-text2">Vues aujourd'hui</p>
-                      <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
-                        style={{ background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.2)' }}>
-                        <span className="text-base">👁</span>
-                      </div>
-                    </div>
-                    <p className="text-[36px] font-black text-white leading-none anim-number-pop" key={kpis.today}>
-                      {fmt(kpis.today)}
-                    </p>
-                    {kpis.delta !== null && (
-                      <div className={`flex items-center gap-1 mt-2 text-[11px] font-semibold ${kpis.delta >= 0 ? 'text-ok' : 'text-danger'}`}>
-                        <span>{kpis.delta >= 0 ? '▲' : '▼'}</span>
-                        <span>{fmt(Math.abs(kpis.delta))} vs hier</span>
-                        {deltaPct !== null && <span className="font-normal text-text2">({deltaPct >= 0 ? '+' : ''}{deltaPct}%)</span>}
-                      </div>
-                    )}
-                  </div>
-                )
-              })()}
-
-              {/* Record */}
-              <div className="sf-card rounded-2xl p-5 relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-20 h-20 pointer-events-none"
-                  style={{ background: 'radial-gradient(ellipse at top right, rgba(168,85,247,0.12) 0%, transparent 70%)' }} />
-                <div className="flex items-start justify-between mb-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-widest text-text2">Record</p>
-                  <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.2)' }}>
-                    <span className="text-base">🏆</span>
-                  </div>
-                </div>
-                <p className="text-[28px] font-black text-white leading-none">{fmt(kpis.peak)}</p>
-                <p className="text-[11px] text-text2 mt-2">Meilleur jour sur la période</p>
-              </div>
-
-              {/* Moyenne */}
-              <div className="sf-card rounded-2xl p-5 relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-20 h-20 pointer-events-none"
-                  style={{ background: 'radial-gradient(ellipse at top right, rgba(59,130,246,0.1) 0%, transparent 70%)' }} />
-                <div className="flex items-start justify-between mb-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-widest text-text2">Moyenne/jour</p>
-                  <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)' }}>
-                    <span className="text-base">📈</span>
-                  </div>
-                </div>
-                <p className="text-[28px] font-black text-white leading-none">{fmt(kpis.avg)}</p>
-                <p className="text-[11px] text-text2 mt-2">Vues gagnées par jour actif</p>
-              </div>
-
-              {/* Téléphones */}
-              <div className="sf-card rounded-2xl p-5 relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-20 h-20 pointer-events-none"
-                  style={{ background: 'radial-gradient(ellipse at top right, rgba(34,197,94,0.1) 0%, transparent 70%)' }} />
-                <div className="flex items-start justify-between mb-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-widest text-text2">Téléphones</p>
-                  <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.2)' }}>
-                    <span className="text-base">📱</span>
-                  </div>
-                </div>
-                <div className="flex items-baseline gap-1.5">
-                  <p className="text-[28px] font-black text-white leading-none">{kpis.online}</p>
-                  <p className="text-[14px] font-semibold text-text2">/ {phones.length}</p>
-                </div>
-                <p className="text-[11px] text-ok mt-2">actifs en ligne</p>
-              </div>
-
-              {/* Bannis */}
-              <div className="sf-card rounded-2xl p-5 relative overflow-hidden"
-                style={kpis.banned > 0 ? { borderColor: 'rgba(239,68,68,0.25)', background: 'rgba(239,68,68,0.04)' } : {}}>
-                <div className="flex items-start justify-between mb-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-widest text-text2">Erreurs</p>
-                  <div className="w-8 h-8 rounded-xl flex items-center justify-center"
-                    style={{ background: kpis.banned > 0 ? 'rgba(239,68,68,0.15)' : 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)' }}>
-                    <span className="text-base">🚫</span>
-                  </div>
-                </div>
-                <p className="text-[28px] font-black leading-none" style={{ color: kpis.banned > 0 ? '#F87171' : '#fff' }}>
-                  {kpis.banned}
-                </p>
-                <p className="text-[11px] mt-2" style={{ color: kpis.banned > 0 ? '#F87171' : '#52525B' }}>
-                  {kpis.banned > 0 ? 'compte(s) en erreur ⚠' : 'aucun problème'}
-                </p>
-              </div>
-
-              {/* Comptes IG / vidéos */}
-              <div className="sf-card rounded-2xl p-5 relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-20 h-20 pointer-events-none"
-                  style={{ background: 'radial-gradient(ellipse at top right, rgba(251,191,36,0.1) 0%, transparent 70%)' }} />
-                <div className="flex items-start justify-between mb-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-widest text-text2">
-                    {selPhone ? 'Vidéos' : 'Comptes IG'}
-                  </p>
-                  <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'rgba(251,191,36,0.1)', border: '1px solid rgba(251,191,36,0.2)' }}>
-                    <span className="text-base">{selPhone ? '🎥' : '📷'}</span>
-                  </div>
-                </div>
-                <p className="text-[28px] font-black text-white leading-none">
-                  {selPhone ? fmt(kpis.videos) : linkedPhones.length}
-                </p>
-                <p className="text-[11px] text-text2 mt-2">
-                  {selPhone ? `vidéos postées sur @${selPhone.ig_username}` : 'comptes Instagram liés'}
-                </p>
-              </div>
-            </div>
-
-            {/* ── Chart card ─────────────────────────────────────────────────── */}
-            <div className="sf-card rounded-2xl p-6">
-              <div className="flex items-center justify-between mb-5">
+            {/* ── Chart section ────────────────────────────────────────────────── */}
+            <div style={{ background: '#0C0C15', border: '1px solid rgba(255,255,255,0.055)', borderRadius: 15, padding: '20px 24px', marginBottom: 24 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
                 <div>
-                  <h3 className="text-[14px] font-bold text-white">Tendances des vues</h3>
-                  <p className="text-[11px] text-text2 mt-0.5">Vues gagnées par jour · {range === '24h' ? '24 dernières heures' : range === '7d' ? '7 derniers jours' : range === '30d' ? '30 derniers jours' : 'Tout l\'historique'}</p>
+                  <p style={{ fontSize: 14, fontWeight: 700, color: '#F2F0FF', letterSpacing: '-0.02em', margin: 0 }}>Évolution des vues</p>
+                  <p style={{ fontSize: 12, color: 'rgba(148,163,184,0.5)', marginTop: 2, margin: '2px 0 0' }}>
+                    Historique des performances Instagram
+                    {selPhone && <span style={{ color: '#A78BFA', marginLeft: 6 }}>· @{selPhone.ig_username}</span>}
+                  </p>
                 </div>
                 {selPhone && (
-                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg"
-                    style={{ background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.2)' }}>
-                    <span className="text-[11px] font-semibold" style={{ color: '#A78BFA' }}>@{selPhone.ig_username}</span>
-                    <button onClick={() => setSelPhone(null)} className="text-text2 hover:text-text transition-colors text-xs ml-1">✕</button>
-                  </div>
+                  <button
+                    onClick={() => setSelPhone(null)}
+                    style={{ fontSize: 12, color: 'rgba(167,139,250,0.7)', background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.18)', borderRadius: 8, padding: '4px 10px', cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 5 }}
+                  >
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                    Réinitialiser
+                  </button>
                 )}
               </div>
               {loadingChart ? (
-                <div className="flex items-center justify-center" style={{ height: 240 }}><Spinner /></div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 220 }}>
+                  <div style={{ width: 18, height: 18, border: '2px solid rgba(255,255,255,0.08)', borderTopColor: '#8B5CF6', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+                </div>
               ) : (
-                <LineChart data={chartData} height={240} />
+                <LineChart data={chartData} height={220} color="#8B5CF6" />
               )}
             </div>
 
-            {/* ── Quick actions + Phone overview ─────────────────────────────── */}
-            <div className="grid grid-cols-3 gap-4">
+            {/* ── Bottom split: phone list left, activity right ─────────────────── */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 14 }}>
 
-              {/* Quick actions */}
-              <div className="sf-card rounded-2xl p-5">
-                <h3 className="text-[12px] font-bold uppercase tracking-wider text-text2 mb-4">Actions rapides</h3>
-                <div className="space-y-2">
-                  {[
-                    { icon: '🚀', label: 'Nouveau Post', sub: 'Publier sur des comptes', page: 'posting', color: '#8B5CF6' },
-                    { icon: '⚡', label: 'Mass Posting', sub: 'Lancer une campagne', page: 'massposting', color: '#A855F7' },
-                    { icon: '📅', label: 'Programmer', sub: 'Planifier des posts', page: 'scheduler', color: '#3B82F6' },
-                    { icon: '🔥', label: 'Warmup', sub: 'Chauffer les comptes', page: 'warmup', color: '#F59E0B' },
-                  ].map(action => (
-                    <button key={action.page}
-                      onClick={() => onNavigate?.(action.page)}
-                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all hover:scale-[1.01] active:scale-[0.99] group"
-                      style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                      <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 transition-all group-hover:scale-110"
-                        style={{ background: `${action.color}18`, border: `1px solid ${action.color}30` }}>
-                        <span className="text-sm">{action.icon}</span>
-                      </div>
-                      <div className="text-left min-w-0 flex-1">
-                        <p className="text-[12px] font-semibold text-white">{action.label}</p>
-                        <p className="text-[10px] text-text2">{action.sub}</p>
-                      </div>
-                      <span className="text-text2 text-xs opacity-0 group-hover:opacity-100 transition-opacity">→</span>
-                    </button>
-                  ))}
+              {/* Phone list */}
+              <div style={{ background: '#0C0C15', border: '1px solid rgba(255,255,255,0.055)', borderRadius: 15, overflow: 'hidden' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.055)' }}>
+                  <p style={{ fontSize: 13, fontWeight: 700, color: '#F2F0FF', margin: 0 }}>Téléphones</p>
+                  <button onClick={() => onNavigate?.('phones')} style={{ fontSize: 12, color: '#A78BFA', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 500, fontFamily: 'inherit' }}>Voir tout →</button>
                 </div>
-              </div>
-
-              {/* Phone status overview */}
-              <div className="sf-card rounded-2xl p-5 col-span-2">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-[12px] font-bold uppercase tracking-wider text-text2">État des téléphones</h3>
-                  <button onClick={() => onNavigate?.('phones')} className="text-[11px] font-semibold transition-all hover:opacity-80"
-                    style={{ color: '#8B5CF6' }}>Voir tout →</button>
-                </div>
-                <div className="space-y-1.5 max-h-52 overflow-y-auto" style={{ scrollbarWidth: 'none' }}>
+                <div style={{ maxHeight: 280, overflowY: 'auto' }}>
                   {phones.slice(0, 8).map(phone => {
-                    const statusColor = phone.ig_status === 'active' ? '#22C55E' : phone.ig_status === 'error' ? '#EF4444' : phone.ig_status === 'rate_limited' ? '#F59E0B' : '#71717A'
+                    const statusColor = phone.ig_status === 'active' ? '#22C55E' : phone.ig_status === 'error' ? '#EF4444' : phone.ig_status === 'rate_limited' ? '#F59E0B' : 'rgba(100,116,139,0.4)'
                     const statusLabel = phone.ig_status === 'active' ? 'Actif' : phone.ig_status === 'error' ? 'Erreur' : phone.ig_status === 'rate_limited' ? 'Limité' : 'Inconnu'
                     return (
-                      <div key={phone.id}
-                        onClick={() => { setSelPhone(phone.ig_username ? phone : null) }}
-                        className={`flex items-center gap-3 px-3 py-2 rounded-xl cursor-pointer transition-all hover:bg-white/[0.04] ${selPhone?.id === phone.id ? 'bg-white/[0.05]' : ''}`}>
-                        <div className="w-7 h-7 rounded-lg flex items-center justify-center text-xs flex-shrink-0"
-                          style={{ background: `${statusColor}18`, border: `1px solid ${statusColor}30` }}>
-                          📱
+                      <div
+                        key={phone.id}
+                        onClick={() => setSelPhone(phone.ig_username ? phone : null)}
+                        style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 20px', borderBottom: '1px solid rgba(255,255,255,0.04)', cursor: 'pointer', transition: 'background 120ms', background: selPhone?.id === phone.id ? 'rgba(255,255,255,0.03)' : '' }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.025)' }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = selPhone?.id === phone.id ? 'rgba(255,255,255,0.03)' : '' }}
+                      >
+                        {/* Status dot */}
+                        <div style={{ width: 7, height: 7, borderRadius: '50%', background: statusColor, flexShrink: 0, boxShadow: phone.ig_status === 'active' ? `0 0 6px ${statusColor}` : undefined }} />
+                        {/* Info */}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{ fontSize: 13, fontWeight: 600, color: '#F2F0FF', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', margin: 0 }}>{phone.phone_name}</p>
+                          {phone.ig_username && <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.52)', marginTop: 1, margin: '1px 0 0' }}>@{phone.ig_username}</p>}
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[12px] font-semibold text-white truncate">{phone.phone_name}</p>
-                          {phone.ig_username && <p className="text-[10px] text-text2 truncate">@{phone.ig_username}</p>}
-                        </div>
-                        <div className="flex items-center gap-1.5 flex-shrink-0">
-                          <span className="relative w-1.5 h-1.5 rounded-full" style={{ background: statusColor }}>
-                            {phone.ig_status === 'active' && (
-                              <span className="absolute inset-0 rounded-full animate-ping opacity-40" style={{ background: statusColor }} />
-                            )}
-                          </span>
-                          <span className="text-[10px] font-medium" style={{ color: statusColor }}>{statusLabel}</span>
-                        </div>
+                        {/* Followers */}
+                        {(phone.followers ?? 0) > 0 && <p style={{ fontSize: 12, color: 'rgba(196,181,253,0.6)', fontWeight: 500, flexShrink: 0, margin: 0 }}>{fmt(phone.followers ?? 0)}</p>}
+                        {/* Status badge */}
+                        <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 99, background: `${statusColor}18`, color: statusColor, flexShrink: 0 }}>{statusLabel}</span>
                       </div>
                     )
                   })}
                   {phones.length > 8 && (
-                    <p className="text-center text-[11px] text-text2 pt-1">+{phones.length - 8} autres</p>
+                    <p style={{ textAlign: 'center', fontSize: 11, color: 'rgba(148,163,184,0.4)', padding: '10px 0' }}>+{phones.length - 8} autres</p>
                   )}
                 </div>
               </div>
-            </div>
 
-            {/* ── Account chips ───────────────────────────────────────────────── */}
-            {!selPhone && linkedPhones.length > 1 && (
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] mb-3 text-text3">· Filtrer par compte</p>
-                <div className="flex flex-wrap gap-2">
-                  {linkedPhones.map(phone => {
-                    const dotColor = phone.ig_status === 'active' ? '#22C55E' : phone.ig_status === 'error' ? '#EF4444' : phone.ig_status === 'rate_limited' ? '#F59E0B' : '#71717A'
-                    return (
-                      <button key={phone.id} onClick={() => setSelPhone(phone)}
-                        className="flex items-center gap-2 px-3 py-1.5 rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98]"
-                        style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                        <span className="relative w-2 h-2 rounded-full flex-shrink-0" style={{ background: dotColor }}>
-                          {phone.ig_status === 'active' && (
-                            <span className="absolute inset-0 rounded-full animate-ping opacity-40" style={{ background: dotColor }} />
-                          )}
-                        </span>
-                        <span className="text-[11px] font-semibold text-text">
-                          @{phone.ig_username ?? phone.phone_name}
-                        </span>
-                      </button>
-                    )
-                  })}
+              {/* Right column */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+                {/* IG status breakdown */}
+                <div style={{ background: '#0C0C15', border: '1px solid rgba(255,255,255,0.055)', borderRadius: 15, padding: '18px 20px' }}>
+                  <p style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(100,116,139,0.38)', marginBottom: 14, margin: '0 0 14px' }}>Statut Instagram</p>
+                  {[
+                    { label: 'Actifs', count: phones.filter(p => p.ig_status === 'active').length, color: '#22C55E' },
+                    { label: 'Erreurs', count: phones.filter(p => p.ig_status === 'error').length, color: '#EF4444' },
+                    { label: 'Limités', count: phones.filter(p => p.ig_status === 'rate_limited').length, color: '#F59E0B' },
+                    { label: 'Inconnus', count: phones.filter(p => !p.ig_status).length, color: 'rgba(100,116,139,0.4)' },
+                  ].map(({ label, count, color }) => (
+                    <div key={label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{ width: 6, height: 6, borderRadius: '50%', background: color }} />
+                        <span style={{ fontSize: 13, color: 'rgba(196,181,253,0.72)' }}>{label}</span>
+                      </div>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: '#F2F0FF' }}>{count}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Actions rapides */}
+                <div style={{ background: '#0C0C15', border: '1px solid rgba(255,255,255,0.055)', borderRadius: 15, padding: '18px 20px' }}>
+                  <p style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(100,116,139,0.38)', marginBottom: 12, margin: '0 0 12px' }}>Actions rapides</p>
+                  {[
+                    { label: 'Poster un Reel', page: 'posting', icon: 'M22 2L11 13M22 2L15 22l-4-9-9-4 20-7z' },
+                    { label: 'Mass Posting', page: 'massposting', icon: 'M13 10V3L4 14h7v7l9-11h-7z' },
+                    { label: 'Programmer', page: 'scheduler', icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z' },
+                  ].map(({ label, page, icon }) => (
+                    <button
+                      key={page}
+                      onClick={() => onNavigate?.(page as any)}
+                      style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10, background: 'rgba(255,255,255,0)', border: '1px solid rgba(255,255,255,0.06)', cursor: 'pointer', marginBottom: 8, transition: 'all 140ms', fontFamily: 'inherit' }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(139,92,246,0.08)'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(139,92,246,0.22)' }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0)'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.06)' }}
+                    >
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="rgba(167,139,250,0.6)" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                        <path d={icon} />
+                      </svg>
+                      <span style={{ fontSize: 13, fontWeight: 500, color: 'rgba(196,181,253,0.72)', flex: 1, textAlign: 'left' }}>{label}</span>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="rgba(100,116,139,0.35)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M9 18l6-6-6-6" />
+                      </svg>
+                    </button>
+                  ))}
                 </div>
               </div>
-            )}
-
-          </div>
+            </div>
+          </>
         )}
       </div>
     </div>
