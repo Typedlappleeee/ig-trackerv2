@@ -1066,36 +1066,15 @@ ipcMain.handle('run-ffmpeg-remix-ai', async (_event, opts: {
     return `drawtext=${parts.join(':')}`
   }).join(',')
 
-  const copyText   = opts.copyTextFromOriginal === true
-  // When copyTextFromOriginal, text comes via lumakey overlay — don't also drawtext
+  const copyText = opts.copyTextFromOriginal === true
+  // When copyTextFromOriginal, text comes via screen-blend — don't also drawtext
   const vfPhase1 = (!copyText && opts.textOverlays.length > 0) ? `${scl},${drawtextChain}` : scl
-
-  // FFmpeg lumakey filter to isolate bright text pixels from a video stream.
-  // threshold=0 + tolerance=0.55: make pixels with luma < 0.55 transparent → keeps white/yellow text,
-  // hides dark backgrounds. softness=0.1 gives a soft blend edge.
-  // Must be preceded by format=rgba so the alpha plane is writable.
-  const lumaKeyFilter = 'format=rgba,lumakey=threshold=0:tolerance=0.55:softness=0.1'
-
-  // Build text-zone overlay filter: take top 22% and bottom 34% of [src] stream,
-  // apply lumakey, overlay on [base] stream. Returns filter lines and output label.
-  function buildTextZoneOverlay(srcLabel: string, baseLabel: string, outLabel: string): string[] {
-    return [
-      `[${srcLabel}]split=2[_tz_a][_tz_b]`,
-      `[_tz_a]crop=iw:ih*0.22:0:0[_tz_top_raw]`,
-      `[_tz_b]crop=iw:ih*0.34:0:ih*0.66[_tz_bot_raw]`,
-      `[_tz_top_raw]${lumaKeyFilter}[_tz_top]`,
-      `[_tz_bot_raw]${lumaKeyFilter}[_tz_bot]`,
-      `[${baseLabel}][_tz_top]overlay=0:0:format=auto[_tz_w1]`,
-      `[_tz_w1][_tz_bot]overlay=0:main_h-overlay_h:format=auto[${outLabel}]`,
-    ]
-  }
 
   // Validate splitTime — undefined/NaN/0 means we can't concat, so just re-encode phase1 alone
   const splitTime = (opts.splitTime != null && !isNaN(opts.splitTime) && opts.splitTime > 0)
     ? opts.splitTime
     : null
 
-  // Common output flags (WITHOUT the output path — must be last)
   const commonOutputFlags = [
     '-c:v', 'libx264', '-preset', 'fast', '-crf', '20',
     '-r', '30', '-fps_mode', 'cfr',
@@ -1113,35 +1092,35 @@ ipcMain.handle('run-ffmpeg-remix-ai', async (_event, opts: {
       ? ['-t', String(opts.targetDuration)] : []
 
     if (copyText) {
-      // ── Copy text zones from original via lumakey ────────────────────────────
+      // ── Screen-blend original onto secondary so bright pixels (text) show through ──
+      // blend=all_mode=screen: C = 1-(1-A)(1-B)
+      //   white text (B≈1)  → C≈1 (text visible) ✓
+      //   dark bg   (B≈0)   → C≈A (secondary shows) ✓
       // Inputs: [0]=secondary, [1]=original (video+audio)
-      const filterLines: string[] = [
-        `[0:v]setpts=PTS-STARTPTS,${scl}[sec_sc]`,
-        `[1:v]setpts=PTS-STARTPTS,${scl}[orig_sc]`,
-        ...buildTextZoneOverlay('orig_sc', 'sec_sc', 'vout'),
+      const fc = origHasAudio
+        ? [
+            `[0:v]setpts=PTS-STARTPTS,${scl}[_sec]`,
+            `[1:v]setpts=PTS-STARTPTS,${scl}[_orig]`,
+            `[_sec]format=gbrp[_sec_rgb];[_orig]format=gbrp[_orig_rgb];[_sec_rgb][_orig_rgb]blend=all_mode=screen[_blended];[_blended]format=yuv420p[vout]`,
+            `[1:a]${afmt}[aout]`,
+          ].join(';')
+        : [
+            `[0:v]setpts=PTS-STARTPTS,${scl}[_sec]`,
+            `[1:v]setpts=PTS-STARTPTS,${scl}[_orig]`,
+            `[_sec]format=gbrp[_sec_rgb];[_orig]format=gbrp[_orig_rgb];[_sec_rgb][_orig_rgb]blend=all_mode=screen[_blended];[_blended]format=yuv420p[vout]`,
+          ].join(';')
+      args = [
+        '-nostdin',
+        '-i', opts.newPhase1Path,
+        '-i', opts.originalPath,
+        '-filter_complex', fc,
+        '-map', '[vout]',
+        ...(origHasAudio ? ['-map', '[aout]'] : []),
+        ...commonOutputFlags,
+        ...(origHasAudio ? ['-c:a', 'aac', '-b:a', '128k'] : ['-an']),
+        ...durArgs,
+        '-y', opts.outputPath,
       ]
-      if (origHasAudio) {
-        filterLines.push(`[1:a]${afmt}[aout]`)
-        args = [
-          '-nostdin',
-          '-i', opts.newPhase1Path,
-          '-i', opts.originalPath,
-          '-filter_complex', filterLines.join(';'),
-          '-map', '[vout]', '-map', '[aout]',
-          ...commonOutputFlags, '-c:a', 'aac', '-b:a', '128k',
-          ...durArgs, '-y', opts.outputPath,
-        ]
-      } else {
-        args = [
-          '-nostdin',
-          '-i', opts.newPhase1Path,
-          '-i', opts.originalPath,
-          '-filter_complex', filterLines.join(';'),
-          '-map', '[vout]',
-          ...commonOutputFlags, '-an',
-          ...durArgs, '-y', opts.outputPath,
-        ]
-      }
     } else if (origHasAudio) {
       args = [
         '-nostdin',
@@ -1166,7 +1145,6 @@ ipcMain.handle('run-ffmpeg-remix-ai', async (_event, opts: {
       ]
     }
   } else {
-    // Probe secondary duration — if shorter than splitTime, clamp so concat doesn't stall
     const secDuration = await getVideoDuration(ffmpegBin, opts.newPhase1Path)
     const effectiveSplit = (secDuration != null && secDuration > 0 && secDuration < splitTime + 0.2)
       ? Math.max(0.5, secDuration - 0.2)
@@ -1179,32 +1157,30 @@ ipcMain.handle('run-ffmpeg-remix-ai', async (_event, opts: {
     let audioEncArgs: string[]
 
     // Input layout:
-    //  [0] secondary  — read up to effectiveSplit via -t
-    //  [1] original   — full file (audio + text overlay source for phase1)
-    //  [2] original   — fast-seeked to effectiveSplit (phase2 video)
+    //  [0] secondary — read up to effectiveSplit via -t
+    //  [1] original  — full file (audio + phase1 text source via trim)
+    //  [2] original  — fast-seeked to effectiveSplit (phase2 video)
     if (copyText) {
-      // Phase1: secondary scaled + text zones from original trimmed to effectiveSplit
-      const textLines = [
-        `[0:v]setpts=PTS-STARTPTS,${scl}[sec_p1]`,
-        `[1:v]trim=end=${effectiveSplit},setpts=PTS-STARTPTS,${scl}[orig_p1_sc]`,
-        ...buildTextZoneOverlay('orig_p1_sc', 'sec_p1', 'v_p1'),
+      // Phase1: screen-blend secondary with trimmed original → text pixels show through
+      const fc: string[] = [
+        `[0:v]setpts=PTS-STARTPTS,${scl}[_sec_p1]`,
+        `[1:v]trim=end=${effectiveSplit},setpts=PTS-STARTPTS,${scl}[_orig_p1]`,
+        `[_sec_p1]format=gbrp[_s1_rgb];[_orig_p1]format=gbrp[_o1_rgb];[_s1_rgb][_o1_rgb]blend=all_mode=screen[_b1];[_b1]format=yuv420p[v_p1]`,
+        `[2:v]setpts=PTS-STARTPTS,${scl}[v_p2]`,
       ]
-      // Phase2: original seeked (already starts at effectiveSplit)
-      textLines.push(`[2:v]setpts=PTS-STARTPTS,${scl}[v_p2]`)
-
       if (origHasAudio) {
-        textLines.push(
+        fc.push(
           `[1:a]asplit=2[ao1][ao2]`,
           `[ao1]atrim=end=${effectiveSplit},asetpts=PTS-STARTPTS,${afmt}[a_p1]`,
           `[ao2]atrim=start=${effectiveSplit},asetpts=PTS-STARTPTS,${afmt}[a_p2]`,
           `[v_p1][a_p1][v_p2][a_p2]concat=n=2:v=1:a=1[vout][aout]`,
         )
-        filterComplex = textLines.join(';')
+        filterComplex = fc.join(';')
         mapArgs      = ['-map', '[vout]', '-map', '[aout]']
         audioEncArgs = ['-c:a', 'aac', '-b:a', '128k']
       } else {
-        textLines.push(`[v_p1][v_p2]concat=n=2:v=1:a=0[vout]`)
-        filterComplex = textLines.join(';')
+        fc.push(`[v_p1][v_p2]concat=n=2:v=1:a=0[vout]`)
+        filterComplex = fc.join(';')
         mapArgs      = ['-map', '[vout]']
         audioEncArgs = ['-an']
       }
