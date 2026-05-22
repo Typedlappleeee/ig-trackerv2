@@ -92,6 +92,11 @@ interface ElectronAPI {
     Promise<{ ok: boolean; metadata?: Record<string, string>; duration?: number; error?: string }>
   runFfmpegMetadata: (opts: { inputPath: string; outputPath: string; metadata: Record<string, string> }) =>
     Promise<{ ok: boolean; outputPath?: string; command?: string; error?: string }>
+  runTesseractOcr: (opts: {
+    frames: Array<{ data: string; timestamp: number }>
+    frameWidth?: number
+    frameHeight?: number
+  }) => Promise<{ ok: boolean; boxes?: Array<{ text: string; xAlign: string; yPercent: number; fontSizePx: number; fontColor: string; bold: boolean; startFrame: number; endFrame: number }>; error?: string }>
 }
 
 declare global {

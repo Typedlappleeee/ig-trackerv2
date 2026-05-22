@@ -122,6 +122,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     }>
   }) => ipcRenderer.invoke('run-ffmpeg-remix-ai', opts),
 
+  // Tesseract OCR on base64 frames (free, local, no API key needed)
+  runTesseractOcr: (opts: {
+    frames: Array<{ data: string; timestamp: number }>
+    frameWidth?: number
+    frameHeight?: number
+  }) => ipcRenderer.invoke('run-tesseract-ocr', opts),
+
   // Read video metadata (title, encoder, creation_time, etc.)
   readVideoMetadata: (opts: { filePath: string }) =>
     ipcRenderer.invoke('read-video-metadata', opts),

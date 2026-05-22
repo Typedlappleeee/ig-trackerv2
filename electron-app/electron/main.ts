@@ -851,6 +851,114 @@ ipcMain.handle('anthropic-vision-request', async (_event, opts: {
   }
 })
 
+// ── IPC: Tesseract OCR on base64 frames (free, local, no API key) ────────────
+ipcMain.handle('run-tesseract-ocr', async (_event, opts: {
+  frames: Array<{ data: string; timestamp: number }>
+  frameWidth?: number
+  frameHeight?: number
+}) => {
+  try {
+    const { createWorker } = await import('tesseract.js')
+    const worker = await createWorker('eng', 1, {
+      logger: () => { /* suppress logs */ },
+      errorHandler: () => { /* suppress uncaught throws */ },
+    })
+
+    type WordResult = { text: string; confidence: number; bbox: { x0: number; y0: number; x1: number; y1: number } }
+    type TextBox = { text: string; xAlign: string; yPercent: number; fontSizePx: number; fontColor: string; bold: boolean; startFrame: number; endFrame: number }
+
+    const frameResults: Array<{ fi: number; words: WordResult[] }> = []
+
+    for (let fi = 0; fi < opts.frames.length; fi++) {
+      try {
+        const buf = Buffer.from(opts.frames[fi].data, 'base64')
+        const { data } = await worker.recognize(buf)
+        const goodWords = (data.words as WordResult[]).filter(w => w.confidence > 50 && w.text.trim().length > 1)
+        if (goodWords.length) frameResults.push({ fi, words: goodWords })
+      } catch {
+        // Skip unreadable frames
+      }
+    }
+
+    await worker.terminate()
+
+    if (!frameResults.length) return { ok: true, boxes: [] }
+
+    // Group words into text lines using y-proximity within each frame,
+    // then merge identical/similar lines across consecutive frames
+    const fw = opts.frameWidth  ?? 640
+    const fh = opts.frameHeight ?? 360
+
+    type LineGroup = { text: string; yPercent: number; xAlign: string; fontSizePx: number; firstFrame: number; lastFrame: number }
+    const lines: LineGroup[] = []
+
+    for (const { fi, words } of frameResults) {
+      // Cluster words into lines by y-center proximity (within 15% of height)
+      const clusters: WordResult[][] = []
+      for (const w of words) {
+        const yc = (w.bbox.y0 + w.bbox.y1) / 2
+        const existing = clusters.find(c => {
+          const cyc = c.reduce((s, x) => s + (x.bbox.y0 + x.bbox.y1) / 2, 0) / c.length
+          return Math.abs(yc - cyc) < fh * 0.1
+        })
+        if (existing) existing.push(w)
+        else clusters.push([w])
+      }
+
+      for (const cluster of clusters) {
+        // Sort words left-to-right
+        cluster.sort((a, b) => a.bbox.x0 - b.bbox.x0)
+        const lineText = cluster.map(w => w.text).join(' ').trim()
+        if (lineText.length < 2) continue
+
+        const ys = cluster.flatMap(w => [w.bbox.y0, w.bbox.y1])
+        const xs = cluster.flatMap(w => [w.bbox.x0, w.bbox.x1])
+        const yMin = Math.min(...ys), yMax = Math.max(...ys)
+        const xMin = Math.min(...xs), xMax = Math.max(...xs)
+        const yCenter = (yMin + yMax) / 2
+        const yPercent = Math.round((yCenter / fh) * 100)
+        const lineH = yMax - yMin
+        const xCenter = (xMin + xMax) / 2
+        const xAlign = xCenter < fw * 0.35 ? 'left' : xCenter > fw * 0.65 ? 'right' : 'center'
+
+        // Try to merge with an existing line (same text, close y, recent frame)
+        const existing = lines.find(l =>
+          l.text.toLowerCase() === lineText.toLowerCase() &&
+          Math.abs(l.yPercent - yPercent) < 10 &&
+          fi - l.lastFrame <= 3
+        )
+        if (existing) {
+          existing.lastFrame = fi
+        } else {
+          lines.push({
+            text: lineText,
+            yPercent,
+            xAlign,
+            fontSizePx: Math.round(Math.max(36, Math.min(150, lineH * (1080 / fh) * 1.1))),
+            firstFrame: fi,
+            lastFrame: fi,
+          })
+        }
+      }
+    }
+
+    const boxes: TextBox[] = lines.map(l => ({
+      text: l.text,
+      xAlign: l.xAlign,
+      yPercent: l.yPercent,
+      fontSizePx: l.fontSizePx,
+      fontColor: 'white',
+      bold: true,
+      startFrame: l.firstFrame,
+      endFrame: l.lastFrame,
+    }))
+
+    return { ok: true, boxes }
+  } catch (err: unknown) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+})
+
 // ── Helper: probe whether a video file has at least one audio stream ─────────
 function hasAudioStream(ffmpegBin: string, filePath: string): Promise<boolean> {
   return new Promise(resolve => {
