@@ -217,30 +217,11 @@ function FlameOverlay() {
 }
 
 // ── Splash screen ─────────────────────────────────────────────────────────────
-const SPLASH_DURATION = 3600
-
-// Pre-computed burst particles (angle → px/py offset in px)
-const ORBITERS = [
-  { r: 92,  dur: 3.6, delay: 0,     cw: true,  col: '#60a5fa', size: 7 },
-  { r: 92,  dur: 3.6, delay: -1.8,  cw: true,  col: '#818cf8', size: 5 },
-  { r: 125, dur: 5.4, delay: 0,     cw: false, col: '#a855f7', size: 6 },
-  { r: 125, dur: 5.4, delay: -1.8,  cw: false, col: '#ec4899', size: 5 },
-  { r: 125, dur: 5.4, delay: -3.6,  cw: false, col: '#f472b6', size: 4 },
-  { r: 158, dur: 7.8, delay: 0,     cw: true,  col: '#34d399', size: 5 },
-  { r: 158, dur: 7.8, delay: -3.9,  cw: true,  col: '#2563eb', size: 6 },
-]
-
-const STATUS_MSGS = [
-  'Initialisation des modules…',
-  'Connexion sécurisée…',
-  'Chargement de l\'interface…',
-  'ScaleFlow est prêt ✓',
-]
+const SPLASH_DURATION = 4200
 
 function SplashScreen({ onDone }: { onDone: () => void }) {
-  const [fading, setFading]       = useState(false)
-  const [statusIdx, setStatusIdx] = useState(0)
-  const doneRef                   = useRef(false)
+  const [fading, setFading] = useState(false)
+  const doneRef             = useRef(false)
 
   useEffect(() => { playSplash() }, [])
 
@@ -252,192 +233,102 @@ function SplashScreen({ onDone }: { onDone: () => void }) {
     return () => { clearTimeout(t1); clearTimeout(t2) }
   }, [onDone])
 
-  useEffect(() => {
-    const timers = [800, 1700, 2600].map((ms, i) => setTimeout(() => setStatusIdx(i + 1), ms))
-    return () => timers.forEach(clearTimeout)
-  }, [])
-
   return (
     <div
       className={fading ? 'sf-fade-out' : ''}
       style={{
         position: 'fixed', inset: 0, zIndex: 9999,
-        background: '#030307',
+        background: '#020205',
         display: 'flex', flexDirection: 'column',
         alignItems: 'center', justifyContent: 'center',
         pointerEvents: fading ? 'none' : 'all',
         overflow: 'hidden',
       }}
     >
-      {/* ── Deep purple radial glow ── */}
+      {/* Deep centered glow — the only atmospheric element */}
       <div style={{
         position: 'absolute', inset: 0, pointerEvents: 'none',
-        background: 'radial-gradient(ellipse 65% 55% at 50% 44%, #1e0b3a55 0%, #2d1b6920 40%, transparent 70%)',
-        animation: 'sf-bg-breathe 3s ease-in-out 1s infinite',
+        background: 'radial-gradient(ellipse 70% 60% at 50% 50%, rgba(109,40,217,0.22) 0%, rgba(76,29,149,0.09) 45%, transparent 75%)',
+        animation: 'sf-bg-breathe 4s ease-in-out 0.8s infinite',
       }} />
 
-      {/* ── Aurora background blobs ── */}
-      {[
-        { col: 'rgba(37,99,235,0.13)',   size: 440, x: -160, y: -200, anim: 'sf-blob-a 15s ease-in-out infinite' },
-        { col: 'rgba(124,58,237,0.10)',  size: 380, x: 100,  y: 80,   anim: 'sf-blob-b 19s ease-in-out -7s infinite' },
-        { col: 'rgba(236,72,153,0.07)',  size: 320, x: -50,  y: 130,  anim: 'sf-blob-c 12s ease-in-out -4s infinite' },
-      ].map((b, i) => (
-        <div key={i} style={{
-          position: 'absolute', pointerEvents: 'none',
-          width: b.size, height: b.size * 0.65,
-          left: `calc(50% + ${b.x}px)`, top: `calc(50% + ${b.y}px)`,
-          transform: 'translate(-50%,-50%)',
-          borderRadius: '50%',
-          background: `radial-gradient(circle, ${b.col} 0%, transparent 70%)`,
-          filter: 'blur(55px)',
-          animation: b.anim,
-        }} />
-      ))}
+      {/* Subtle noise texture overlay */}
+      <div style={{
+        position: 'absolute', inset: 0, pointerEvents: 'none',
+        opacity: 0.025,
+        backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 256 256\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'n\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.9\' numOctaves=\'4\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23n)\'/%3E%3C/svg%3E")',
+      }} />
 
-      {/* ── Logo area ── */}
-      <div style={{ position: 'relative', width: 120, height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 44, overflow: 'visible' }}>
+      {/* ── Logo + wordmark block ── */}
+      <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 32, animation: 'sp-enter 0.95s cubic-bezier(0.22,1,0.36,1) 0.25s both' }}>
 
-        {/* Looping pulse rings */}
-        {[
-          { delay: 0,    col: 'rgba(96,165,250,0.6)' },
-          { delay: 0.85, col: 'rgba(124,58,237,0.45)' },
-          { delay: 1.7,  col: 'rgba(236,72,153,0.35)' },
-        ].map((ring, i) => (
-          <div key={`pr-${i}`} style={{
-            position: 'absolute', top: '50%', left: '50%',
-            width: 148, height: 148, marginLeft: -74, marginTop: -74,
-            borderRadius: '50%', border: `1.5px solid ${ring.col}`,
-            pointerEvents: 'none',
-            animation: `sf-pulse-ring 2.6s ease-out ${ring.delay}s infinite`,
+        {/* Logo box */}
+        <div style={{ position: 'relative', width: 104, height: 104, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {/* Outer glow halo */}
+          <div style={{
+            position: 'absolute', inset: -20, borderRadius: '50%', pointerEvents: 'none',
+            background: 'radial-gradient(circle, rgba(124,58,237,0.4) 0%, transparent 65%)',
+            filter: 'blur(16px)',
           }} />
-        ))}
+          {/* Rotating arc 1 */}
+          <svg style={{ position: 'absolute', top: '50%', left: '50%', overflow: 'visible', pointerEvents: 'none', animation: 'sf-orbit-cw 6s linear infinite' }} width="0" height="0">
+            <circle cx="0" cy="0" r="62" stroke="rgba(139,92,246,0.5)" strokeWidth="1.5" fill="none"
+              strokeDasharray="80 310" strokeLinecap="round"/>
+          </svg>
+          {/* Rotating arc 2 */}
+          <svg style={{ position: 'absolute', top: '50%', left: '50%', overflow: 'visible', pointerEvents: 'none', animation: 'sf-orbit-ccw 10s linear infinite' }} width="0" height="0">
+            <circle cx="0" cy="0" r="72" stroke="rgba(167,139,250,0.28)" strokeWidth="1" fill="none"
+              strokeDasharray="55 400" strokeLinecap="round"/>
+          </svg>
 
-        {/* Comet arcs — rotating partial SVG strokes with glow */}
-        <svg style={{ position: 'absolute', top: '50%', left: '50%', overflow: 'visible', pointerEvents: 'none', animation: 'sf-orbit-cw 5.5s linear infinite' }} width="0" height="0">
-          <defs>
-            <filter id="hg-a" x="-80%" y="-80%" width="260%" height="260%">
-              <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="b"/>
-              <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-            </filter>
-          </defs>
-          <circle cx="0" cy="0" r="106" stroke="#60a5fa" strokeWidth="3" fill="none"
-            strokeDasharray="170 497" strokeLinecap="round" filter="url(#hg-a)" strokeOpacity="0.9"/>
-        </svg>
-
-        <svg style={{ position: 'absolute', top: '50%', left: '50%', overflow: 'visible', pointerEvents: 'none', animation: 'sf-orbit-ccw 9s linear -1.5s infinite' }} width="0" height="0">
-          <defs>
-            <filter id="hg-b" x="-80%" y="-80%" width="260%" height="260%">
-              <feGaussianBlur in="SourceGraphic" stdDeviation="3.5" result="b"/>
-              <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-            </filter>
-          </defs>
-          <circle cx="0" cy="0" r="132" stroke="#a855f7" strokeWidth="2.5" fill="none"
-            strokeDasharray="145 685" strokeLinecap="round" filter="url(#hg-b)" strokeOpacity="0.75"/>
-        </svg>
-
-        <svg style={{ position: 'absolute', top: '50%', left: '50%', overflow: 'visible', pointerEvents: 'none', animation: 'sf-orbit-cw 13s linear -4s infinite' }} width="0" height="0">
-          <defs>
-            <filter id="hg-c" x="-80%" y="-80%" width="260%" height="260%">
-              <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="b"/>
-              <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-            </filter>
-          </defs>
-          <circle cx="0" cy="0" r="161" stroke="#ec4899" strokeWidth="2" fill="none"
-            strokeDasharray="125 887" strokeLinecap="round" filter="url(#hg-c)" strokeOpacity="0.6"/>
-        </svg>
-
-        {/* Orbiting neon dots */}
-        {ORBITERS.map((o, i) => (
-          <div key={`orb-${i}`} style={{
-            position: 'absolute', top: '50%', left: '50%',
-            width: o.r * 2, height: o.r * 2,
-            marginLeft: -o.r, marginTop: -o.r,
-            borderRadius: '50%', pointerEvents: 'none',
-            animation: `sf-orbit-${o.cw ? 'cw' : 'ccw'} ${o.dur}s linear ${o.delay}s infinite`,
+          {/* Logo background */}
+          <div style={{
+            width: 96, height: 96, borderRadius: 26,
+            background: 'linear-gradient(145deg, #0d0820 0%, #12082e 50%, #190d3a 100%)',
+            boxShadow: '0 0 0 1px rgba(139,92,246,0.3), 0 0 0 4px rgba(139,92,246,0.06), 0 20px 48px rgba(0,0,0,0.75)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            position: 'relative', zIndex: 1,
           }}>
-            <div style={{
-              position: 'absolute',
-              top: -o.size / 2, left: '50%', transform: 'translateX(-50%)',
-              width: o.size, height: o.size, borderRadius: '50%',
-              background: o.col,
-              boxShadow: `0 0 ${o.size * 2}px ${o.size}px ${o.col}88, 0 0 ${o.size * 5}px ${o.size * 2}px ${o.col}44`,
-            }} />
+            <ScaleFlowLogoSVG size={64} draw />
           </div>
-        ))}
+        </div>
 
-        {/* ScaleFlow S logo — rounded square with spinning neon border */}
-        <div className="sf-logo-anim" style={{ position: 'relative', width: 110, height: 110, zIndex: 2 }}>
-          {/* Spinning neon border — faster on splash */}
-          <div className="logo-neon-ring" style={{
-            position: 'absolute', inset: -3, borderRadius: 28, pointerEvents: 'none',
-            animationDuration: '2.2s',
-          }} />
-          {/* Outer ambient glow */}
-          <div style={{
-            position: 'absolute', inset: -18, borderRadius: 38, pointerEvents: 'none',
-            background: 'radial-gradient(circle, rgba(124,58,237,0.35) 0%, transparent 70%)',
-            filter: 'blur(12px)',
-          }} />
-          {/* Dark background square */}
-          <div style={{
-            position: 'absolute', inset: 0, borderRadius: 26,
-            background: 'linear-gradient(145deg, #0d0820 0%, #100626 50%, #160b30 100%)',
-            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.07)',
-          }} />
-          {/* S logo */}
-          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <ScaleFlowLogoSVG size={80} draw />
+        {/* Wordmark */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
+            <span style={{
+              fontSize: 46, fontWeight: 900, color: '#f2f0ff',
+              letterSpacing: '-2px', fontFamily: 'Inter,system-ui,sans-serif', lineHeight: 1,
+            }}>Scale</span>
+            <span style={{
+              fontSize: 46, fontWeight: 900, letterSpacing: '-2px',
+              fontFamily: 'Inter,system-ui,sans-serif', lineHeight: 1,
+              background: 'linear-gradient(130deg, #a78bfa 20%, #ec4899 100%)',
+              WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+            }}>Flow</span>
           </div>
+
+          {/* Divider */}
+          <div style={{ width: 48, height: 1, background: 'linear-gradient(90deg, transparent, rgba(139,92,246,0.45), transparent)' }} />
+
+          {/* Tagline */}
+          <span style={{
+            fontSize: 11, fontWeight: 500,
+            color: 'rgba(167,139,250,0.38)',
+            letterSpacing: '0.22em', textTransform: 'uppercase',
+            fontFamily: 'Inter,system-ui,sans-serif',
+          }}>
+            Automatise · Planifie · Développe
+          </span>
         </div>
       </div>
 
-      {/* ── ScaleFlow title ── */}
-      <div style={{ display: 'flex', alignItems: 'baseline', marginBottom: 14 }}>
-        <span className="sf-word-left" style={{
-          fontSize: 42, fontWeight: 900, color: '#f0eeff',
-          letterSpacing: '-1.5px', fontFamily: 'Inter, system-ui, sans-serif',
-          lineHeight: 1,
-        }}>Scale</span>
-        <span className="sf-word-right" style={{
-          fontSize: 42, fontWeight: 900, letterSpacing: '-1.5px',
-          fontFamily: 'Inter, system-ui, sans-serif', lineHeight: 1,
-          background: 'linear-gradient(130deg, #8b5cf6 30%, #ec4899 100%)',
-          WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-        }}>Flow</span>
+      {/* Bottom progress line */}
+      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 2, background: 'rgba(255,255,255,0.025)' }}>
+        <div className="sf-bar" style={{ height: '100%', background: 'linear-gradient(90deg, transparent, #7c3aed, #a855f7, #ec4899, transparent)', borderRadius: 2 }} />
       </div>
 
-      {/* ── Tagline ── */}
-      <div className="sf-tagline" style={{
-        fontSize: 11, color: '#4a3f7a', letterSpacing: '0.22em',
-        textTransform: 'uppercase', fontFamily: 'Inter, system-ui, sans-serif',
-        marginBottom: 64,
-      }}>
-        Automatise ta croissance
-      </div>
 
-      {/* ── Status text ── */}
-      <div key={statusIdx} style={{
-        position: 'absolute', bottom: 42,
-        fontSize: 10, color: '#2a1f48', letterSpacing: '0.12em',
-        fontFamily: 'monospace', textTransform: 'uppercase',
-        transition: 'opacity 0.4s',
-        opacity: fading ? 0 : 1,
-        animation: 'sf-arrow-in 0.4s ease-out',
-      }}>
-        {STATUS_MSGS[statusIdx]}
-      </div>
-
-      {/* ── Progress bar ── */}
-      <div style={{
-        position: 'absolute', bottom: 0, left: 0, right: 0,
-        height: 2, background: '#0d0a1a',
-      }}>
-        <div className="sf-bar" style={{
-          height: '100%',
-          background: 'linear-gradient(90deg, #3b82f6, #8b5cf6, #ec4899)',
-          borderRadius: 2,
-        }} />
-      </div>
     </div>
   )
 }
