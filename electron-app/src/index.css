@@ -599,6 +599,86 @@ button, a, input, select, textarea {
   z-index: -1;
 }
 
+/* ══════════════════════════════════════════════════════════════════════════════
+   Settings — data-attribute driven CSS overrides
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+/* Animations off */
+html.no-animations *,
+html.no-animations *::before,
+html.no-animations *::after {
+  transition: none !important;
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+}
+
+/* Font size: zoom on body (Electron/Chromium supporte zoom) */
+html[data-fontsize="petite"] body  { zoom: 0.88; }
+html[data-fontsize="grande"]  body { zoom: 1.13; }
+
+/* Rounded corners: override Tailwind's rounded-* classes */
+html[data-rounded="aucun"] .rounded,
+html[data-rounded="aucun"] .rounded-sm,
+html[data-rounded="aucun"] .rounded-md,
+html[data-rounded="aucun"] .rounded-lg,
+html[data-rounded="aucun"] .rounded-xl,
+html[data-rounded="aucun"] .rounded-2xl,
+html[data-rounded="aucun"] .rounded-3xl { border-radius: 0 !important; }
+html[data-rounded="aucun"] .rounded-full { border-radius: 2px !important; }
+
+html[data-rounded="petit"] .rounded-lg   { border-radius: 3px  !important; }
+html[data-rounded="petit"] .rounded-xl   { border-radius: 5px  !important; }
+html[data-rounded="petit"] .rounded-2xl  { border-radius: 7px  !important; }
+html[data-rounded="petit"] .rounded-3xl  { border-radius: 10px !important; }
+
+html[data-rounded="grand"] .rounded-lg   { border-radius: 16px !important; }
+html[data-rounded="grand"] .rounded-xl   { border-radius: 22px !important; }
+html[data-rounded="grand"] .rounded-2xl  { border-radius: 30px !important; }
+html[data-rounded="grand"] .rounded-3xl  { border-radius: 40px !important; }
+
+/* Density: compact */
+html[data-density="compact"] .px-8  { padding-left: 1.25rem !important; padding-right: 1.25rem !important; }
+html[data-density="compact"] .px-6  { padding-left: 1rem    !important; padding-right: 1rem    !important; }
+html[data-density="compact"] .px-5  { padding-left: 0.75rem !important; padding-right: 0.75rem !important; }
+html[data-density="compact"] .pt-7  { padding-top:    0.75rem !important; }
+html[data-density="compact"] .pb-5  { padding-bottom: 0.5rem  !important; }
+html[data-density="compact"] .pt-5  { padding-top:    0.5rem  !important; }
+html[data-density="compact"] .py-3  { padding-top: 0.35rem !important; padding-bottom: 0.35rem !important; }
+html[data-density="compact"] .py-4  { padding-top: 0.5rem  !important; padding-bottom: 0.5rem  !important; }
+html[data-density="compact"] .gap-4 { gap: 0.5rem   !important; }
+html[data-density="compact"] .gap-3 { gap: 0.375rem !important; }
+html[data-density="compact"] .gap-6 { gap: 0.75rem  !important; }
+html[data-density="compact"] .space-y-6 > * + * { margin-top: 0.75rem !important; }
+html[data-density="compact"] .space-y-4 > * + * { margin-top: 0.5rem  !important; }
+
+/* Density: spacieux */
+html[data-density="spacieux"] .px-8 { padding-left: 3rem !important; padding-right: 3rem !important; }
+html[data-density="spacieux"] .px-6 { padding-left: 2rem !important; padding-right: 2rem !important; }
+html[data-density="spacieux"] .pt-7 { padding-top:    2.5rem !important; }
+html[data-density="spacieux"] .pb-5 { padding-bottom: 2rem   !important; }
+html[data-density="spacieux"] .pt-5 { padding-top:    2rem   !important; }
+html[data-density="spacieux"] .py-3 { padding-top: 0.9rem !important; padding-bottom: 0.9rem !important; }
+html[data-density="spacieux"] .gap-4 { gap: 1.5rem !important; }
+html[data-density="spacieux"] .gap-3 { gap: 1rem   !important; }
+html[data-density="spacieux"] .space-y-4 > * + * { margin-top: 1.5rem !important; }
+
+/* Glassmorphism off */
+html[data-glass="off"] * {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* Dark/Light mode — invert trick (works great in Electron/Chromium) */
+html[data-theme="light"] body {
+  filter: invert(1) hue-rotate(180deg);
+  background: #fff;
+}
+html[data-theme="light"] img,
+html[data-theme="light"] video,
+html[data-theme="light"] canvas { filter: invert(1) hue-rotate(180deg); }
+
+/* ══════════════════════════════════════════════════════════════════════════════ */
+
 /* ── Stat card premium ──────────────────────────────────────────────────────── */
 .stat-card {
   background: linear-gradient(135deg, rgba(139,92,246,0.07) 0%, rgba(8,5,20,0.9) 100%);
