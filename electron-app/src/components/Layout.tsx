@@ -100,7 +100,10 @@ const NAV_SECTIONS: NavSection[] = [
 
 export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefresh, children }: LayoutProps) {
   const toast = useToast()
-  const [collapsed, setCollapsed]         = useState(false)
+  const [collapsed, setCollapsed]         = useState(() => {
+    const v = localStorage.getItem('sf-sidebar')
+    return v === 'reduite' || v === 'masquee'
+  })
   const [groupCount, setGroupCount]       = useState<number | null>(null)
   const [openSections, setOpenSections] = useState<Record<string, boolean>>(() => {
     try {
@@ -124,6 +127,15 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
   const credits = useCredits()
 
   const [activeTask, setActiveTask] = useState<{ kind: 'single' | 'mass'; progress: number; done: number; total: number } | null>(null)
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const val = (e as CustomEvent<string>).detail
+      setCollapsed(val === 'reduite' || val === 'masquee')
+    }
+    window.addEventListener('sf:sidebar-change', handler)
+    return () => window.removeEventListener('sf:sidebar-change', handler)
+  }, [])
+
   useEffect(() => {
     function sync() {
       const ps = getPostingState()

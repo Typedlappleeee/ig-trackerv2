@@ -143,19 +143,27 @@ export function Settings({ user, initialPanel, initialTab }: SettingsProps) {
 
   function applyAppearanceCSS(opts: {
     rounded?: string; fontFam?: string; fs?: string; anim?: boolean; dark?: boolean
+    glass?: boolean; density?: string; sidebar?: string
   }) {
-    const radMap: Record<string,string> = { aucun: '0px', petit: '6px', moyen: '12px', grand: '20px' }
-    const r = opts.rounded ?? roundedCorners
-    document.documentElement.style.setProperty('--radius-settings', radMap[r] ?? '12px')
+    const html = document.documentElement
+    // Font family
     const ffMap: Record<string,string> = { inter: "'Inter', sans-serif", system: 'system-ui, sans-serif', mono: 'ui-monospace, monospace' }
     const ff = opts.fontFam ?? fontFamily
     document.body.style.fontFamily = ffMap[ff] ?? "'Inter', sans-serif"
-    const fsMap: Record<string,string> = { petite: '12px', moyenne: '14px', grande: '16px' }
-    const fs = opts.fs ?? fontSize
-    document.documentElement.style.setProperty('--font-size-base', fsMap[fs] ?? '14px')
+    // data-* attributes drive CSS overrides in index.css
+    html.setAttribute('data-fontsize', opts.fs ?? fontSize)
+    html.setAttribute('data-rounded',  opts.rounded ?? roundedCorners)
+    html.setAttribute('data-density',  opts.density ?? density)
+    html.setAttribute('data-theme',    (opts.dark ?? darkMode) ? 'dark' : 'light')
+    html.setAttribute('data-glass',    (opts.glass ?? glassOn) ? 'on' : 'off')
+    // Animations
     const anim = opts.anim ?? animationsOn
-    if (anim) document.documentElement.classList.remove('no-animations')
-    else       document.documentElement.classList.add('no-animations')
+    if (anim) html.classList.remove('no-animations')
+    else       html.classList.add('no-animations')
+    // Sidebar via custom event (Layout.tsx listens)
+    if (opts.sidebar !== undefined) {
+      window.dispatchEvent(new CustomEvent('sf:sidebar-change', { detail: opts.sidebar }))
+    }
   }
 
   // Load saved values
@@ -186,7 +194,7 @@ export function Settings({ user, initialPanel, initialTab }: SettingsProps) {
     setDateFormat(ls('sf-date-format', 'dd/mm/yyyy'))
     setTimezone(ls('sf-timezone', 'Europe/Paris'))
     setDevMode(lb('sf-dev-mode', false))
-    applyAppearanceCSS({ rounded: r, fontFam: ff, fs, anim: an, dark: dk })
+    applyAppearanceCSS({ rounded: r, fontFam: ff, fs, anim: an, dark: dk, glass: gl, density: de })
 
     async function loadAll() {
       setLoading(true)
@@ -472,11 +480,11 @@ export function Settings({ user, initialPanel, initialTab }: SettingsProps) {
                   {/* Toggles + dropdowns */}
                   <div className={card} style={cardStyle}>
                     <SettingToggle label="Mode sombre" sub="Active ou désactive le thème sombre."
-                      checked={darkMode} onChange={v => setDarkMode(v)} />
+                      checked={darkMode} onChange={v => { setDarkMode(v); localStorage.setItem('sf-dark', v ? '1' : '0'); applyAppearanceCSS({ dark: v }) }} />
                     <SettingToggle label="Animations UI" sub="Active ou désactive les animations et transitions."
-                      checked={animationsOn} onChange={v => { setAnimationsOn(v); applyAppearanceCSS({ anim: v }) }} />
+                      checked={animationsOn} onChange={v => { setAnimationsOn(v); localStorage.setItem('sf-animations', v ? '1' : '0'); applyAppearanceCSS({ anim: v }) }} />
                     <SettingToggle label="Effets de flou (Glassmorphism)" sub="Active ou désactive les effets de flou."
-                      checked={glassOn} onChange={v => setGlassOn(v)} />
+                      checked={glassOn} onChange={v => { setGlassOn(v); localStorage.setItem('sf-glass', v ? '1' : '0'); applyAppearanceCSS({ glass: v }) }} />
                     <SelectRow label="Coins arrondis" sub="Ajuste l'arrondi des éléments de l'interface."
                       value={roundedCorners} onChange={v => { setRoundedCorners(v); applyAppearanceCSS({ rounded: v }) }}
                       options={[{ value: 'aucun', label: 'Aucun' }, { value: 'petit', label: 'Petit' }, { value: 'moyen', label: 'Moyen' }, { value: 'grand', label: 'Grand' }]} />
@@ -487,10 +495,10 @@ export function Settings({ user, initialPanel, initialTab }: SettingsProps) {
                       value={fontSize} onChange={v => { setFontSize(v); applyAppearanceCSS({ fs: v }) }}
                       options={[{ value: 'petite', label: 'Petite' }, { value: 'moyenne', label: 'Moyenne' }, { value: 'grande', label: 'Grande' }]} />
                     <SelectRow label="Densité d'affichage" sub="Choisis la densité des éléments à l'écran."
-                      value={density} onChange={v => setDensity(v)}
+                      value={density} onChange={v => { setDensity(v); applyAppearanceCSS({ density: v }) }}
                       options={[{ value: 'compact', label: 'Compact' }, { value: 'confortable', label: 'Confortable' }, { value: 'spacieux', label: 'Spacieux' }]} />
                     <SelectRow label="Barre latérale" sub="Affiche ou masque la barre latérale."
-                      value={sidebarMode} onChange={v => setSidebarMode(v)}
+                      value={sidebarMode} onChange={v => { setSidebarMode(v); localStorage.setItem('sf-sidebar', v); applyAppearanceCSS({ sidebar: v }) }}
                       options={[{ value: 'etendue', label: 'Étendue' }, { value: 'reduite', label: 'Réduite' }, { value: 'masquee', label: 'Masquée' }]} />
                   </div>
 
