@@ -461,12 +461,6 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
           {collapsed ? (
             /* Collapsed: just icons */
             <div className="flex flex-col items-center gap-2 px-1">
-              {!credits.loading && (
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center" title={`${credits.balance.toLocaleString('fr-FR')} crédits`}
-                  style={{ background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.2)' }}>
-                  <span className="text-[13px]">💎</span>
-                </div>
-              )}
               <button onClick={() => { playNav(); onNavigate('settings') }}
                 className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${page === 'settings' ? 'sf-nav-active' : 'hover:bg-white/[0.05]'}`}>
                 <span className="text-sm opacity-70">⚙</span>
@@ -479,37 +473,6 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             </div>
           ) : (
             <div className="px-3 space-y-1.5">
-
-              {/* Credits card */}
-              {!credits.loading && (
-                <div className="rounded-xl px-3 py-2 flex items-center gap-2"
-                  style={{
-                    background: credits.balance < 10 ? 'rgba(240,61,85,0.06)' : 'rgba(139,92,246,0.08)',
-                    border: `1px solid ${credits.balance < 10 ? 'rgba(240,61,85,0.2)' : 'rgba(139,92,246,0.22)'}`,
-                  }}>
-                  <span className="text-[12px] flex-shrink-0">💎</span>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[11px] font-semibold" style={{ color: 'rgba(196,181,253,0.5)' }}>Crédits</span>
-                    </div>
-                    <p className="text-[14px] font-black tabular-nums leading-none"
-                      style={{ color: credits.balance < 10 ? '#f87171' : '#a78bfa' }}>
-                      {credits.balance.toLocaleString('fr-FR')}
-                    </p>
-                  </div>
-                  <div className="flex-shrink-0 flex flex-col items-end gap-1">
-                    <button onClick={() => onNavigate('settings', 'abonnement')}
-                      className="text-[10px] font-semibold px-2 py-0.5 rounded-lg transition-all hover:brightness-110"
-                      style={{ background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.25)', color: '#a78bfa' }}>
-                      Gérer
-                    </button>
-                    <div className="w-16 h-1 rounded-full overflow-hidden" style={{ background: 'rgba(139,92,246,0.12)' }}>
-                      <div className="h-full rounded-full"
-                        style={{ width: `${Math.min(100, (credits.balance / CREDIT_MAX_DISPLAY) * 100)}%`, background: 'linear-gradient(90deg,#7c3aed,#a78bfa)' }} />
-                    </div>
-                  </div>
-                </div>
-              )}
 
               {/* Phones + Groups cards */}
               <div className="flex gap-1.5">
