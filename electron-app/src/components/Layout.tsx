@@ -8,6 +8,11 @@ import { playNav }   from '@/lib/sounds'
 import { getRecentAccounts, switchToAccount, forgetAccount, type RecentAccount } from '@/lib/recentAccounts'
 import { subscribePosting, getPostingState } from '@/lib/postingStore'
 import { subscribeMassPosting, getMassPostingState } from '@/lib/massPostingStore'
+import {
+  subscribeNotifications, getNotifications, pushNotification,
+  markAllRead, clearNotifications, unreadCount,
+  type AppNotification,
+} from '@/lib/notificationStore'
 import { useLicense } from '@/lib/license'
 import { useCredits } from '@/lib/credits'
 
@@ -126,7 +131,11 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
   const license = useLicense()
   const credits = useCredits()
 
-  const [activeTask, setActiveTask] = useState<{ kind: 'single' | 'mass'; progress: number; done: number; total: number } | null>(null)
+  const [activeTask, setActiveTask]     = useState<{ kind: 'single' | 'mass'; progress: number; done: number; total: number } | null>(null)
+  const [notifOpen, setNotifOpen]       = useState(false)
+  const [notifications, setNotifications] = useState<AppNotification[]>([])
+  const [unread, setUnread]             = useState(0)
+  const notifRef                        = useRef<HTMLDivElement>(null)
   useEffect(() => {
     const handler = (e: Event) => {
       const val = (e as CustomEvent<string>).detail
@@ -156,6 +165,68 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
     const u2 = subscribeMassPosting(sync)
     return () => { u1(); u2() }
   }, [])
+
+  // Auto-push notifications when posting jobs finish
+  useEffect(() => {
+    let prevPostingSingle = false
+    let prevPostingMass   = false
+    function sync() {
+      const ps = getPostingState()
+      const ms = getMassPostingState()
+      // Single posting: finished
+      if (prevPostingSingle && !ps.posting) {
+        const errors = ps.logs.filter(l => l.level === 'error').length
+        const ok     = ps.logs.filter(l => l.level === 'ok').length
+        if (ok > 0 || errors > 0) {
+          pushNotification({
+            title: errors === 0 ? 'Post publié' : `Post terminé avec ${errors} erreur${errors > 1 ? 's' : ''}`,
+            body:  errors === 0 ? 'Ton Reel a été posté avec succès.' : `${ok} succès · ${errors} erreur${errors > 1 ? 's' : ''}`,
+            level: errors === 0 ? 'ok' : 'warn',
+          })
+        }
+      }
+      // Mass posting: finished
+      if (prevPostingMass && !ms.posting) {
+        const statuses  = [...ms.taskStatuses.values()]
+        const doneCount = statuses.filter(s => s.status === 'done').length
+        const errCount  = statuses.filter(s => s.status === 'error').length
+        if (doneCount > 0 || errCount > 0) {
+          pushNotification({
+            title: errCount === 0 ? 'Mass Posting terminé' : `Mass Posting: ${errCount} erreur${errCount > 1 ? 's' : ''}`,
+            body:  `${doneCount} succès · ${errCount} erreur${errCount > 1 ? 's' : ''} · ${statuses.length} téléphone${statuses.length > 1 ? 's' : ''}`,
+            level: errCount === 0 ? 'ok' : 'warn',
+          })
+        }
+      }
+      prevPostingSingle = ps.posting
+      prevPostingMass   = ms.posting
+    }
+    const u1 = subscribePosting(sync)
+    const u2 = subscribeMassPosting(sync)
+    return () => { u1(); u2() }
+  }, [])
+
+  // Sync notification store to local state
+  useEffect(() => {
+    function syncNotifs() {
+      setNotifications(getNotifications())
+      setUnread(unreadCount())
+    }
+    syncNotifs()
+    const unsub = subscribeNotifications(syncNotifs)
+    return unsub
+  }, [])
+
+  // Close notif panel on outside click
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
+        setNotifOpen(false)
+      }
+    }
+    if (notifOpen) document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [notifOpen])
 
   function handleSwitchOrg(orgId: string | null, orgName?: string) {
     if (orgId === (currentOrg?.id ?? null)) { setOrgMenuOpen(false); return }
@@ -644,12 +715,94 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
           )}
 
           {/* Notifications bell */}
-          <button className="relative w-8 h-8 flex items-center justify-center rounded-lg transition-all hover:bg-white/[0.05]"
-            style={{ border: '1px solid rgba(255,255,255,0.06)' }}>
-            <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} style={{ color: '#71717A' }}>
-              <path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
-            </svg>
-          </button>
+          <div className="relative" ref={notifRef}>
+            <button
+              onClick={() => { setNotifOpen(v => !v); if (!notifOpen) markAllRead() }}
+              className="relative w-8 h-8 flex items-center justify-center rounded-lg transition-all hover:bg-white/[0.05]"
+              style={{ border: `1px solid ${unread > 0 ? 'rgba(139,92,246,0.3)' : 'rgba(255,255,255,0.06)'}` }}>
+              <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+                style={{ color: unread > 0 ? '#A78BFA' : '#71717A' }}>
+                <path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+              </svg>
+              {unread > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-0.5 rounded-full flex items-center justify-center text-[9px] font-black text-white"
+                  style={{ background: 'linear-gradient(130deg,#7C3AED,#A855F7)', boxShadow: '0 0 8px rgba(139,92,246,0.6)' }}>
+                  {unread > 9 ? '9+' : unread}
+                </span>
+              )}
+            </button>
+
+            {/* Dropdown panel */}
+            {notifOpen && (
+              <div className="absolute right-0 top-full mt-2 w-80 rounded-2xl overflow-hidden z-50"
+                style={{ background: '#0E0E16', border: '1px solid rgba(139,92,246,0.2)', boxShadow: '0 16px 48px -8px rgba(0,0,0,0.8), 0 0 0 1px rgba(139,92,246,0.08)' }}>
+
+                {/* Header */}
+                <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
+                  <div className="flex items-center gap-2">
+                    <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="#A78BFA" strokeWidth={2}>
+                      <path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+                    </svg>
+                    <span className="text-[13px] font-bold text-white">Notifications</span>
+                    {notifications.length > 0 && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full font-bold" style={{ background: 'rgba(139,92,246,0.15)', color: '#a78bfa' }}>
+                        {notifications.length}
+                      </span>
+                    )}
+                  </div>
+                  {notifications.length > 0 && (
+                    <button onClick={clearNotifications}
+                      className="text-[11px] transition-colors hover:text-white flex items-center gap-1"
+                      style={{ color: 'rgba(148,163,184,0.4)' }}>
+                      <svg width="9" height="9" viewBox="0 0 9 9" fill="none"><path d="M1 2h7M3.5 2V1.5h2V2M2.5 2l.5 6h3l.5-6" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      Effacer
+                    </button>
+                  )}
+                </div>
+
+                {/* List */}
+                <div className="max-h-80 overflow-y-auto" style={{ scrollbarWidth: 'none' }}>
+                  {notifications.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-12 gap-3">
+                      <div className="w-12 h-12 rounded-2xl flex items-center justify-center"
+                        style={{ background: 'rgba(139,92,246,0.06)', border: '1px dashed rgba(139,92,246,0.15)' }}>
+                        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="rgba(82,82,91,0.6)" strokeWidth={1.5}>
+                          <path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+                        </svg>
+                      </div>
+                      <p className="text-[12px] font-semibold" style={{ color: 'rgba(148,163,184,0.3)' }}>Aucune notification</p>
+                      <p className="text-[11px] text-center max-w-[180px]" style={{ color: 'rgba(82,82,91,0.6)' }}>
+                        Les résultats de tes posts apparaîtront ici
+                      </p>
+                    </div>
+                  ) : notifications.map(n => {
+                    const iconColor = n.level === 'ok' ? '#22C55E' : n.level === 'error' ? '#EF4444' : n.level === 'warn' ? '#F59E0B' : '#A78BFA'
+                    const iconBg    = n.level === 'ok' ? 'rgba(34,197,94,0.12)' : n.level === 'error' ? 'rgba(239,68,68,0.12)' : n.level === 'warn' ? 'rgba(245,158,11,0.12)' : 'rgba(139,92,246,0.12)'
+                    const Icon = () => {
+                      if (n.level === 'ok')    return <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M2 5.5L4.5 8L9 3" stroke={iconColor} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      if (n.level === 'error') return <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M2 2L9 9M9 2L2 9" stroke={iconColor} strokeWidth="1.5" strokeLinecap="round"/></svg>
+                      if (n.level === 'warn')  return <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M5.5 1L10 9.5H1L5.5 1Z" stroke={iconColor} strokeWidth="1.2" strokeLinejoin="round"/><path d="M5.5 4.5v2.5M5.5 8.5v.1" stroke={iconColor} strokeWidth="1.2" strokeLinecap="round"/></svg>
+                      return <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><circle cx="5.5" cy="5.5" r="4" stroke={iconColor} strokeWidth="1.2"/><path d="M5.5 3.5v2.5M5.5 7.5v.1" stroke={iconColor} strokeWidth="1.2" strokeLinecap="round"/></svg>
+                    }
+                    return (
+                      <div key={n.id} className="flex items-start gap-3 px-4 py-3 transition-colors hover:bg-white/[0.02]"
+                        style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                        <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5"
+                          style={{ background: iconBg, border: `1px solid ${iconColor}22` }}>
+                          <Icon />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[12px] font-bold text-white leading-snug">{n.title}</p>
+                          {n.body && <p className="text-[11px] mt-0.5 leading-relaxed" style={{ color: 'rgba(148,163,184,0.55)' }}>{n.body}</p>}
+                        </div>
+                        <span className="text-[10px] flex-shrink-0 mt-0.5 tabular-nums" style={{ color: 'rgba(82,82,91,0.7)' }}>{n.time}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* User avatar */}
           <button ref={userTriggerRef} onClick={() => userMenuOpen ? setUserMenuOpen(false) : openUserMenu()}
