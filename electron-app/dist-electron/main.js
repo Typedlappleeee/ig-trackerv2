@@ -1,4 +1,196 @@
-"use strict";Object.defineProperty(exports,Symbol.toStringTag,{value:"Module"});const l=require("electron"),N=require("node:url"),_=require("node:fs"),D=require("node:os"),R=require("node:child_process"),Q=require("node:https"),v=require("node:path");var G=typeof document<"u"?document.currentScript:null;const j=v.dirname(N.fileURLToPath(typeof document>"u"?require("url").pathToFileURL(__filename).href:G&&G.tagName.toUpperCase()==="SCRIPT"&&G.src||new URL("main.js",document.baseURI).href));process.env.APP_ROOT=v.join(j,"..");function C(){const e=`ffmpeg${process.platform==="win32"?".exe":""}`;if(l.app.isPackaged)return v.join(process.resourcesPath,e);const t=process.env.APP_ROOT??v.join(j,".."),s=[v.join(t,"node_modules","ffmpeg-static",e),v.join(t,"..","node_modules","ffmpeg-static",e),v.join(j,"..","node_modules","ffmpeg-static",e)];for(const n of s)if(_.existsSync(n))return console.log("[ffmpeg] using:",n),n;return console.warn("[ffmpeg] binary not found in node_modules, falling back to PATH"),e}const H=process.env.VITE_DEV_SERVER_URL,V=v.join(process.env.APP_ROOT,"dist");let k=null;l.protocol.registerSchemesAsPrivileged([{scheme:"localvideo",privileges:{standard:!0,secure:!0,bypassCSP:!0,supportFetchAPI:!0,stream:!0,corsEnabled:!0}}]);let M=null;function Y(){return(!M||M.isDestroyed())&&(M=new l.BrowserWindow({show:!1,width:1280,height:900,webPreferences:{nodeIntegration:!1,contextIsolation:!1,webSecurity:!0,sandbox:!1}}),M.webContents.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"),M.on("closed",()=>{M=null})),M}l.ipcMain.handle("fetch-instagram-html",async(f,e)=>{const t="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",s="936619743392459",n=`https://www.instagram.com/api/v1/users/web_profile_info/?username=${encodeURIComponent(e)}`,a=`https://www.instagram.com/${encodeURIComponent(e)}/`;async function c(){var u,h;const o=await l.session.defaultSession.cookies.get({domain:".instagram.com"});return((u=o.find(p=>p.name==="csrftoken"))==null?void 0:u.value)??((h=o.find(p=>p.name==="csrftoken"))==null?void 0:h.value)}async function i(o){try{const u=await l.session.defaultSession.fetch(n,{headers:{"User-Agent":t,"X-IG-App-ID":s,"X-CSRFToken":o,Referer:a,Origin:"https://www.instagram.com",Accept:"*/*","Accept-Language":"fr-FR,fr;q=0.9,en;q=0.8"}});if(console.log(`[IG] API ${e}: ${u.status}`),u.ok)return await u.json();if(u.status===401||u.status===403){const h=await l.session.defaultSession.cookies.get({domain:".instagram.com"});await Promise.all(h.flatMap(p=>[l.session.defaultSession.cookies.remove("https://www.instagram.com",p.name),l.session.defaultSession.cookies.remove("https://instagram.com",p.name)]))}}catch(u){console.log("[IG] callApi error:",String(u))}return null}let r=await c();if(r){const o=await i(r);if(o)return{ok:!0,apiJson:o}}console.log("[IG] No cookies — seeding via profile page fetch...");try{await l.session.defaultSession.fetch(a,{headers:{"User-Agent":t,Accept:"text/html,application/xhtml+xml,*/*;q=0.8","Accept-Language":"fr-FR,fr;q=0.9,en;q=0.8","Accept-Encoding":"gzip, deflate, br"},redirect:"follow"})}catch(o){console.log("[IG] Seed fetch error:",String(o))}if(r=await c(),r){const o=await i(r);if(o)return{ok:!0,apiJson:o}}console.log("[IG] Trying homepage seed...");try{await l.session.defaultSession.fetch("https://www.instagram.com/",{headers:{"User-Agent":t,Accept:"text/html,application/xhtml+xml,*/*;q=0.8","Accept-Language":"fr-FR,fr;q=0.9,en;q=0.8"},redirect:"follow"})}catch(o){console.log("[IG] Homepage seed error:",String(o))}if(r=await c(),r){const o=await i(r);if(o)return{ok:!0,apiJson:o}}console.log("[IG] All fetch attempts failed — falling back to hidden browser");const d=Y();return new Promise(o=>{let u=!1,h=0;const p=S=>{u||(u=!0,d.webContents.removeListener("did-stop-loading",w),clearTimeout(T),o(S))},T=setTimeout(()=>p({ok:!1,error:"timeout"}),4e4),m=async()=>{if(u||d.isDestroyed())return;const S=await c();if(S){const g=await i(S);if(g){p({ok:!0,apiJson:g});return}}try{const g=await d.webContents.executeJavaScript("({ url: location.href, html: document.documentElement.innerHTML.slice(0, 200000) })");p({ok:!0,...g})}catch(g){p({ok:!1,error:String(g)})}},w=async()=>{if(u||d.isDestroyed())return;if(h++,h>8){p({ok:!1,error:"too many navigations"});return}if(await new Promise(x=>setTimeout(x,2e3)),u||d.isDestroyed())return;const S=d.webContents.getURL();if(S.includes("/accounts/login")||S.includes("/challenge/")){p({ok:!1,error:"login required"});return}if(await d.webContents.executeJavaScript(`
+"use strict";
+Object.defineProperty(exports, Symbol.toStringTag, { value: "Module" });
+const electron = require("electron");
+const node_url = require("node:url");
+const node_fs = require("node:fs");
+const os = require("node:os");
+const node_child_process = require("node:child_process");
+const https = require("node:https");
+const path = require("node:path");
+var _documentCurrentScript = typeof document !== "undefined" ? document.currentScript : null;
+const __dirname$1 = path.dirname(node_url.fileURLToPath(typeof document === "undefined" ? require("url").pathToFileURL(__filename).href : _documentCurrentScript && _documentCurrentScript.tagName.toUpperCase() === "SCRIPT" && _documentCurrentScript.src || new URL("main.js", document.baseURI).href));
+process.env.APP_ROOT = path.join(__dirname$1, "..");
+function getFfmpegBin() {
+  const ext = process.platform === "win32" ? ".exe" : "";
+  const bin = `ffmpeg${ext}`;
+  if (electron.app.isPackaged) {
+    return path.join(process.resourcesPath, bin);
+  }
+  const appRoot = process.env.APP_ROOT ?? path.join(__dirname$1, "..");
+  const candidates = [
+    path.join(appRoot, "node_modules", "ffmpeg-static", bin),
+    path.join(appRoot, "..", "node_modules", "ffmpeg-static", bin),
+    path.join(__dirname$1, "..", "node_modules", "ffmpeg-static", bin)
+  ];
+  for (const p of candidates) {
+    if (node_fs.existsSync(p)) {
+      console.log("[ffmpeg] using:", p);
+      return p;
+    }
+  }
+  console.warn("[ffmpeg] binary not found in node_modules, falling back to PATH");
+  return bin;
+}
+const VITE_DEV_SERVER_URL = process.env["VITE_DEV_SERVER_URL"];
+const RENDERER_DIST = path.join(process.env.APP_ROOT, "dist");
+let win = null;
+electron.protocol.registerSchemesAsPrivileged([
+  {
+    scheme: "localvideo",
+    privileges: {
+      standard: true,
+      secure: true,
+      bypassCSP: true,
+      supportFetchAPI: true,
+      stream: true,
+      corsEnabled: true
+    }
+  }
+]);
+let _igBrowser = null;
+function getIgBrowser() {
+  if (!_igBrowser || _igBrowser.isDestroyed()) {
+    _igBrowser = new electron.BrowserWindow({
+      show: false,
+      width: 1280,
+      height: 900,
+      webPreferences: { nodeIntegration: false, contextIsolation: false, webSecurity: true, sandbox: false }
+    });
+    _igBrowser.webContents.setUserAgent(
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+    );
+    _igBrowser.on("closed", () => {
+      _igBrowser = null;
+    });
+  }
+  return _igBrowser;
+}
+electron.ipcMain.handle("fetch-instagram-html", async (_event, username) => {
+  const IG_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
+  const IG_APP_ID = "936619743392459";
+  const apiUrl = `https://www.instagram.com/api/v1/users/web_profile_info/?username=${encodeURIComponent(username)}`;
+  const profileUrl = `https://www.instagram.com/${encodeURIComponent(username)}/`;
+  async function getCsrf() {
+    var _a, _b;
+    const cookies = await electron.session.defaultSession.cookies.get({ domain: ".instagram.com" });
+    return ((_a = cookies.find((c) => c.name === "csrftoken")) == null ? void 0 : _a.value) ?? ((_b = cookies.find((c) => c.name === "csrftoken")) == null ? void 0 : _b.value);
+  }
+  async function callApi(csrftoken) {
+    try {
+      const res = await electron.session.defaultSession.fetch(apiUrl, {
+        headers: {
+          "User-Agent": IG_UA,
+          "X-IG-App-ID": IG_APP_ID,
+          "X-CSRFToken": csrftoken,
+          "Referer": profileUrl,
+          "Origin": "https://www.instagram.com",
+          "Accept": "*/*",
+          "Accept-Language": "fr-FR,fr;q=0.9,en;q=0.8"
+        }
+      });
+      console.log(`[IG] API ${username}: ${res.status}`);
+      if (res.ok) return await res.json();
+      if (res.status === 401 || res.status === 403) {
+        const all = await electron.session.defaultSession.cookies.get({ domain: ".instagram.com" });
+        await Promise.all(all.flatMap((c) => [
+          electron.session.defaultSession.cookies.remove("https://www.instagram.com", c.name),
+          electron.session.defaultSession.cookies.remove("https://instagram.com", c.name)
+        ]));
+      }
+    } catch (e) {
+      console.log("[IG] callApi error:", String(e));
+    }
+    return null;
+  }
+  let csrf = await getCsrf();
+  if (csrf) {
+    const json = await callApi(csrf);
+    if (json) return { ok: true, apiJson: json };
+  }
+  console.log("[IG] No cookies — seeding via profile page fetch...");
+  try {
+    await electron.session.defaultSession.fetch(profileUrl, {
+      headers: {
+        "User-Agent": IG_UA,
+        "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
+        "Accept-Language": "fr-FR,fr;q=0.9,en;q=0.8",
+        "Accept-Encoding": "gzip, deflate, br"
+      },
+      redirect: "follow"
+    });
+  } catch (e) {
+    console.log("[IG] Seed fetch error:", String(e));
+  }
+  csrf = await getCsrf();
+  if (csrf) {
+    const json = await callApi(csrf);
+    if (json) return { ok: true, apiJson: json };
+  }
+  console.log("[IG] Trying homepage seed...");
+  try {
+    await electron.session.defaultSession.fetch("https://www.instagram.com/", {
+      headers: {
+        "User-Agent": IG_UA,
+        "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
+        "Accept-Language": "fr-FR,fr;q=0.9,en;q=0.8"
+      },
+      redirect: "follow"
+    });
+  } catch (e) {
+    console.log("[IG] Homepage seed error:", String(e));
+  }
+  csrf = await getCsrf();
+  if (csrf) {
+    const json = await callApi(csrf);
+    if (json) return { ok: true, apiJson: json };
+  }
+  console.log("[IG] All fetch attempts failed — falling back to hidden browser");
+  const browser = getIgBrowser();
+  return new Promise((resolve) => {
+    let settled = false;
+    let loadCount = 0;
+    const finish = (result) => {
+      if (settled) return;
+      settled = true;
+      browser.webContents.removeListener("did-stop-loading", onLoad);
+      clearTimeout(globalTimer);
+      resolve(result);
+    };
+    const globalTimer = setTimeout(() => finish({ ok: false, error: "timeout" }), 4e4);
+    const tryApiThenHtml = async () => {
+      if (settled || browser.isDestroyed()) return;
+      const c = await getCsrf();
+      if (c) {
+        const json = await callApi(c);
+        if (json) {
+          finish({ ok: true, apiJson: json });
+          return;
+        }
+      }
+      try {
+        const data = await browser.webContents.executeJavaScript(
+          `({ url: location.href, html: document.documentElement.innerHTML.slice(0, 200000) })`
+        );
+        finish({ ok: true, ...data });
+      } catch (e) {
+        finish({ ok: false, error: String(e) });
+      }
+    };
+    const onLoad = async () => {
+      if (settled || browser.isDestroyed()) return;
+      loadCount++;
+      if (loadCount > 8) {
+        finish({ ok: false, error: "too many navigations" });
+        return;
+      }
+      await new Promise((r) => setTimeout(r, 2e3));
+      if (settled || browser.isDestroyed()) return;
+      const currentUrl = browser.webContents.getURL();
+      if (currentUrl.includes("/accounts/login") || currentUrl.includes("/challenge/")) {
+        finish({ ok: false, error: "login required" });
+        return;
+      }
+      const accepted = await browser.webContents.executeJavaScript(`
         (() => {
           const byAttr = document.querySelector('[data-cookiebanner="accept_button"]')
             || document.querySelector('[data-testid="cookie-policy-manage-dialog-accept-button"]')
@@ -12,10 +204,1104 @@
           if (btn) { btn.click(); return true }
           return false
         })()
-      `).catch(()=>!1)){if(await new Promise(b=>setTimeout(b,4e3)),u)return;if(!d.webContents.getURL().includes(`/${e}`)){d.loadURL(a);return}}else if(!S.includes(`/${e}`)){d.loadURL(a);return}await m()};d.webContents.on("did-stop-loading",w),d.loadURL(a,{extraHeaders:`Accept: text/html,application/xhtml+xml,*/*;q=0.8\r
-Accept-Language: fr-FR,fr;q=0.9\r
-`}).catch(S=>p({ok:!1,error:String(S)}))})});const O=new Map;function $(f,e,t="GET",s,n){return new Promise((a,c)=>{const i=new URL(f),r=O.get(e),d=r?`sessionid=${e}; csrftoken=${r}`:`sessionid=${e}`,o={hostname:i.hostname,path:i.pathname+i.search,method:t,headers:{"User-Agent":"Instagram 269.0.0.18.75 Android (28/9; 240dpi; 1080x1920; samsung; SM-G960F; starlte; qcom; en_US; 314665256)","X-IG-App-ID":"936619743392459","X-ASBD-ID":"198387","Accept-Language":"fr-FR,fr;q=0.9",Cookie:d,...r?{"X-CSRFToken":r}:{},...n??{},...s?{"Content-Type":"application/x-www-form-urlencoded","Content-Length":String(Buffer.byteLength(s))}:{}}},u=Q.request(o,h=>{const p=[],T=h.headers["set-cookie"]??[];for(const m of T){const w=m.match(/csrftoken=([^;]+)/);w&&w[1]&&w[1]!=="missing"&&O.set(e,w[1])}h.on("data",m=>p.push(m)),h.on("end",()=>{try{const w=Buffer.concat(p).toString("utf-8").replace(/:(\s*)(\d{16,})/g,':$1"$2"');a({status:h.statusCode??0,data:JSON.parse(w)})}catch{a({status:h.statusCode??0,data:null})}}),h.on("error",c)});u.on("error",c),u.setTimeout(15e3,()=>{u.destroy(new Error("timeout"))}),s&&u.write(s),u.end()})}function J(f,e){if(f===401)return!0;const t=e;if(!t)return!1;const s=String(t.message??"").toLowerCase();return!!(s==="login_required"||s==="checkpoint_required"||t.logout_reason)}l.ipcMain.handle("fetch-instagram-by-session",async(f,e)=>{var t,s,n,a,c;try{let i=null;const r=await $("https://i.instagram.com/api/v1/accounts/current_user/",e.sessionid);if(J(r.status,r.data))return{ok:!1,error:"session_expired"};if(r.status===200&&r.data&&(i=((t=r.data.user)==null?void 0:t.pk)??null),!i){const g=await $(`https://i.instagram.com/api/v1/users/web_profile_info/?username=${encodeURIComponent(e.username)}`,e.sessionid);if(g.status===200&&g.data){const x=(s=g.data.data)==null?void 0:s.user;i=(x==null?void 0:x.id)??null}}if(!i)return{ok:!1,error:"could_not_get_user_id"};const d=await $(`https://i.instagram.com/api/v1/users/${i}/info/`,e.sessionid);let o=0,u=0,h=0,p="";if(d.status===200&&d.data){const g=d.data.user;g&&(o=g.follower_count??0,u=g.following_count??0,h=g.media_count??0,p=g.biography??"")}const T=await $("https://i.instagram.com/api/v1/clips/user/",e.sessionid,"POST",`target_user_id=${i}&page_size=20&include_feed_video=true`),m=[];if(T.status===200&&T.data){const g=T.data.items??[];for(const x of g){const b=x.media;if(!b)continue;const U=((n=b.image_versions2)==null?void 0:n.candidates)??[],A=b.video_versions??[];m.push({id:String(b.pk??""),shortcode:b.code??"",views:b.play_count??b.view_count??0,likes:b.like_count??0,comments:b.comment_count??0,thumbnail:((a=U[0])==null?void 0:a.url)??"",video_url:((c=A[0])==null?void 0:c.url)??"",timestamp:b.taken_at?new Date(b.taken_at*1e3).toISOString():""})}}let w=0,S=0;return await Promise.all(m.map(async g=>{if(!g.thumbnail){S++;return}const x=g.thumbnail,b=[{"User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",Accept:"image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8","Accept-Language":"en-US,en;q=0.9",Referer:"https://www.instagram.com/","sec-fetch-dest":"image","sec-fetch-mode":"no-cors","sec-fetch-site":"cross-site"},{"User-Agent":"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",Accept:"image/*,*/*;q=0.8"},{"User-Agent":"Instagram 312.0.0.32.116 Android (33/13; 420dpi; 1080x2206; samsung; SM-S911B; dm3q; qcom; en_US; 558678421)",Accept:"image/*"}];for(const U of b)try{const A=await l.net.fetch(x,{method:"GET",headers:U,redirect:"follow"});if(A.ok){const W=Buffer.from(await A.arrayBuffer());if(W.length>0){const q=A.headers.get("content-type")??"image/jpeg";g.thumbnail=`data:${q};base64,${W.toString("base64")}`,w++;return}}}catch{}console.log("[thumb] all retries failed:",x.slice(0,100)),S++})),console.log(`[fetch-instagram-by-session] thumbnails: ${w} ok, ${S} failed of ${m.length}`),{ok:!0,username:e.username,followers:o,following:u,posts:h,bio:p,total_views:m.reduce((g,x)=>g+x.views,0),videos:m}}catch(i){return{ok:!1,error:i instanceof Error?i.message:String(i)}}});l.ipcMain.handle("geelark-request",async(f,e)=>{try{const t=e.body?JSON.stringify(e.body):void 0;let s;if(e.url.includes("instagram.com")){const a={...e.headers};e.body&&(a["Content-Type"]="application/json"),s=await l.session.defaultSession.fetch(e.url,{method:e.method,headers:a,body:t})}else{const{Referer:a,referer:c,Origin:i,origin:r,...d}=e.headers??{},o={"Content-Type":"application/json",...d};s=await l.net.fetch(e.url,{method:e.method,headers:o,body:t,referrerPolicy:"no-referrer"})}let n;if(e.isText)n=await s.text();else{const a=await s.text();try{const c=a.replace(/:(\s*)(\d{16,})/g,':$1"$2"');n=JSON.parse(c)}catch{n=null}}return{ok:!0,status:s.status,data:n}}catch(t){return{ok:!1,error:t instanceof Error?t.message:String(t)}}});l.ipcMain.handle("pick-video-file",async()=>{if(!k)return null;const f=await l.dialog.showOpenDialog(k,{title:"Sélectionner une vidéo",filters:[{name:"Vidéos",extensions:["mp4","mov","avi","mkv","webm"]}],properties:["openFile"]});return f.canceled||f.filePaths.length===0?null:f.filePaths[0]});l.ipcMain.handle("upload-video-geelark",async(f,e)=>{try{const s=await(await l.net.fetch("https://openapi.geelark.com/open/v1/upload/getUrl",{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${e.bearer}`},body:JSON.stringify({fileType:"mp4"})})).json();if(s.code!==0)return{ok:!1,error:`GéeLark upload URL: ${s.msg??s.message??`code ${s.code}`}`};const n=s.data??{},a=n.uploadUrl,c=n.resourceUrl;if(!a||!c)return{ok:!1,error:"Réponse upload GéeLark invalide"};const i=_.readFileSync(e.filePath),r=await l.net.fetch(a,{method:"PUT",body:i});return r.status<200||r.status>=300?{ok:!1,error:`Upload échoué (HTTP ${r.status})`}:{ok:!0,token:c}}catch(t){return{ok:!1,error:t instanceof Error?t.message:String(t)}}});const F=50*1e3,ee=110*1e3;l.ipcMain.handle("run-ffmpeg",async(f,e)=>{const t=C(),s=e.preset==="9:16"?"scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:-1:-1:color=black":e.preset==="1:1"?"scale=1080:1080:force_original_aspect_ratio=decrease,pad=1080:1080:-1:-1:color=black":"scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:-1:-1:color=black",n=[],a=[],c=e.clips.length;e.clips.forEach((o,u)=>{const h=o.trimEnd>0?o.trimEnd:999999;n.push("-ss",String(o.trimStart),"-to",String(h),"-i",o.filePath),a.push(`[${u}:v]${s},setsar=1[v${u}];[${u}:a]aformat=sample_rates=44100:channel_layouts=stereo[a${u}]`)});const i=e.clips.map((o,u)=>`[v${u}][a${u}]`).join("");a.push(`${i}concat=n=${c}:v=1:a=1[vout][aout]`);const r=["-nostdin",...n,"-filter_complex",a.join(";"),"-map","[vout]","-map","[aout]","-c:v","libx264","-preset","fast","-crf","23","-c:a","aac","-b:a","128k","-movflags","+faststart","-y",e.outputPath],d=`ffmpeg ${r.map(o=>o.includes(" ")?`"${o}"`:o).join(" ")}`;return new Promise(o=>{R.execFile(t,r,{maxBuffer:100*1024*1024,timeout:F,killSignal:"SIGKILL"},u=>{o(u?{ok:!1,error:u.message,command:d}:{ok:!0,outputPath:e.outputPath,command:d})})})});l.ipcMain.handle("detect-scene-change",async(f,e)=>{const t=C(),s=2,n=32,a=32,c=n*a*3,i=v.join(D.tmpdir(),`sf-det-${Date.now()}`),r=v.join(i,"frames.rgb");try{_.mkdirSync(i,{recursive:!0})}catch{}return new Promise(d=>{R.execFile(t,["-nostdin","-hide_banner","-i",e.filePath,"-vf",`fps=${s},scale=${n}:${a}`,"-f","rawvideo","-pix_fmt","rgb24","-y",r],{maxBuffer:5*1024*1024,timeout:F,killSignal:"SIGKILL"},(o,u,h)=>{o&&console.log("[scene-detect] ffmpeg error:",o.message.split(`
-`)[0]);const p=(h??"").match(/Duration:\s*(\d+):(\d+):(\d+\.?\d*)/),T=p?parseInt(p[1])*3600+parseInt(p[2])*60+parseFloat(p[3]):0;let m=null;try{m=_.readFileSync(r)}catch{}try{_.rmSync(i,{recursive:!0})}catch{}if(!m||m.length<c*2){const y=o?o.message.split(`
-`)[0]:"fichier vide";return d({ok:!1,times:[],duration:T,error:`FFmpeg n'a pas pu lire la vidéo : ${y}`})}const w=Math.floor(m.length/c);console.log("[scene-detect] frames read:",w,"duration:",T);const S=[];for(let y=0;y<w;y++){const P=y*c;let E=0,L=0,B=0;for(let I=0;I<n*a;I++)E+=m[P+I*3],L+=m[P+I*3+1],B+=m[P+I*3+2];S.push([E/(n*a),L/(n*a),B/(n*a)])}const g=S.slice(1).map(([y,P,E],L)=>{const[B,I,Z]=S[L];return{time:Math.round((L+1)/s*10)/10,dist:Math.sqrt((y-B)**2+(P-I)**2+(E-Z)**2)}});console.log("[scene-detect] diffs:",g.map(y=>`t=${y.time}s Δ=${y.dist.toFixed(1)}`).join(" | "));const x=g.filter(y=>y.time>.4);if(!x.length)return d({ok:!1,times:[],duration:T,error:"Vidéo trop courte — positionne le curseur manuellement."});const b=[...x].sort((y,P)=>P.dist-y.dist),U=b[0].dist,A=Math.max(3,U*.35),q=(b.filter(y=>y.dist>=A).length>0?b.filter(y=>y.dist>=A):[b[0]]).map(y=>y.time),K=T/2,z=q.reduce((y,P)=>Math.abs(P-K)<Math.abs(y-K)?P:y);console.log("[scene-detect] best=",z,"maxDist=",U.toFixed(1)),d({ok:!0,times:q,splitTime:z,duration:T})})})});l.ipcMain.handle("run-ffmpeg-remix",async(f,e)=>{const t=C(),s=e.preset==="16:9"?1920:1080,n=e.preset==="9:16"?1920:1080,a=`scale=${s}:${n}:force_original_aspect_ratio=decrease,pad=${s}:${n}:-1:-1:color=black,setsar=1`,c="aformat=sample_rates=44100:channel_layouts=stereo";let i;if(e.textBlend>0){const o=Math.min(.5,Math.max(.1,e.textBlend));i=["[1:v]split=2[ov_a][ov_b]","[1:a]asplit=2[ao1][ao2]",`[0:v]trim=duration=${e.splitTime},setpts=PTS-STARTPTS,${a}[v_new]`,`[ov_a]trim=end=${e.splitTime},setpts=PTS-STARTPTS,${a},lumakey=threshold=0:tolerance=${o}:softness=0.05[text_key]`,"[v_new][text_key]overlay=format=auto[v_blended]",`[ov_b]trim=start=${e.splitTime},setpts=PTS-STARTPTS,${a}[v_p2]`,`[ao1]atrim=end=${e.splitTime},asetpts=PTS-STARTPTS,${c}[a_p1]`,`[ao2]atrim=start=${e.splitTime},asetpts=PTS-STARTPTS,${c}[a_p2]`,"[v_blended][a_p1][v_p2][a_p2]concat=n=2:v=1:a=1[vout][aout]"].join(";")}else i=[`[0:v]trim=duration=${e.splitTime},setpts=PTS-STARTPTS,${a}[v_p1]`,`[1:v]trim=start=${e.splitTime},setpts=PTS-STARTPTS,${a}[v_p2]`,"[1:a]asplit=2[ao1][ao2]",`[ao1]atrim=end=${e.splitTime},asetpts=PTS-STARTPTS,${c}[a_p1]`,`[ao2]atrim=start=${e.splitTime},asetpts=PTS-STARTPTS,${c}[a_p2]`,"[v_p1][a_p1][v_p2][a_p2]concat=n=2:v=1:a=1[vout][aout]"].join(";");const r=["-nostdin","-i",e.newPhase1Path,"-i",e.originalPath,"-filter_complex",i,"-map","[vout]","-map","[aout]","-c:v","libx264","-preset","fast","-crf","23","-c:a","aac","-b:a","128k","-movflags","+faststart","-y",e.outputPath],d=`ffmpeg ${r.map(o=>o.includes(" ")?`"${o}"`:o).join(" ")}`;return new Promise(o=>{R.execFile(t,r,{maxBuffer:200*1024*1024,timeout:F,killSignal:"SIGKILL"},u=>{o(u?{ok:!1,error:u.message,command:d}:{ok:!0,outputPath:e.outputPath,command:d})})})});l.ipcMain.handle("extract-frames",async(f,e)=>{const t=C(),s=v.join(D.tmpdir(),`sf-frames-${Date.now()}`),n=Math.max(0,e.startTime??0),a=Math.max(.1,e.endTime-n);try{_.mkdirSync(s,{recursive:!0});const i=Math.min(8,Math.max(1,Math.ceil(a)))/a,r=v.join(s,"frame_%04d.jpg");await new Promise((h,p)=>{R.execFile(t,["-nostdin","-ss",String(n),"-i",e.filePath,"-t",String(a),"-vf",`fps=${i.toFixed(4)},scale=640:-2`,"-q:v","5","-y",r],{maxBuffer:200*1024*1024,timeout:F,killSignal:"SIGKILL"},T=>{T?p(T):h()})});const d=_.readdirSync(s).filter(h=>h.endsWith(".jpg")).sort(),o=a/(d.length||1),u=d.map((h,p)=>({index:p,timestamp:Math.round((n+p*o)*10)/10,data:_.readFileSync(v.join(s,h)).toString("base64")}));try{_.rmSync(s,{recursive:!0})}catch{}return{ok:!0,frames:u,count:u.length}}catch(c){try{_.rmSync(s,{recursive:!0})}catch{}return{ok:!1,frames:[],error:c instanceof Error?c.message:String(c)}}});l.ipcMain.handle("anthropic-vision-request",async(f,e)=>{try{const t=await l.net.fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json","x-api-key":e.apiKey,"anthropic-version":"2023-06-01"},body:JSON.stringify({model:e.model??"claude-haiku-4-5-20251001",max_tokens:e.maxTokens??2e3,messages:e.messages})}),s=await t.json();return t.ok?{ok:!0,data:s}:{ok:!1,error:JSON.stringify(s)}}catch(t){return{ok:!1,error:t instanceof Error?t.message:String(t)}}});function te(f,e){return new Promise(t=>{R.execFile(f,["-nostdin","-hide_banner","-i",e],{timeout:8e3,killSignal:"SIGKILL"},(s,n,a)=>t(/Audio:/.test(a??"")))})}l.ipcMain.handle("run-ffmpeg-remix-ai",async(f,e)=>{const t=C(),s=e.preset==="16:9"?1920:1080,n=e.preset==="9:16"?1920:1080,a=`scale=${s}:${n}:force_original_aspect_ratio=decrease,pad=${s}:${n}:-1:-1:color=black,setsar=1`,c="aformat=sample_rates=44100:channel_layouts=stereo";function i(m=!1){return(process.platform==="win32"?m?["C:\\Windows\\Fonts\\arialbd.ttf","C:\\Windows\\Fonts\\Arial Bold.ttf","C:\\Windows\\Fonts\\arial.ttf","C:\\Windows\\Fonts\\segoeui.ttf"]:["C:\\Windows\\Fonts\\arial.ttf","C:\\Windows\\Fonts\\segoeui.ttf"]:process.platform==="darwin"?m?["/Library/Fonts/Arial Bold.ttf","/System/Library/Fonts/Supplemental/Arial Bold.ttf","/System/Library/Fonts/Helvetica.ttc","/Library/Fonts/Arial.ttf"]:["/System/Library/Fonts/Helvetica.ttc","/Library/Fonts/Arial.ttf","/System/Library/Fonts/Supplemental/Arial.ttf"]:m?["/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf","/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf","/usr/share/fonts/truetype/ubuntu/Ubuntu-B.ttf"]:["/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf","/usr/share/fonts/truetype/ubuntu/Ubuntu-R.ttf","/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"]).find(S=>_.existsSync(S))??null}function r(m){return m.replace(/\\/g,"\\\\").replace(/'/g,"\\'").replace(/:/g,"\\:").replace(/\[/g,"\\[").replace(/\]/g,"\\]").replace(/%/g,"%%")}const d=e.textOverlays.map(m=>{const w=i(m.bold),S=Math.max(3,Math.round(m.fontSize*.07)),g=[`text='${r(m.text)}'`];w&&g.push(`fontfile='${w}'`);const x=`'max(0,min(h-text_h,${m.y}))'`;return g.push(`x=${m.x}`,`y=${x}`,`fontsize=${m.fontSize}`,`fontcolor=${m.fontColor}`,`borderw=${S}`,"bordercolor=black@1.0",`enable='between(t,${m.startTime},${m.endTime})'`),m.shadow!==!1&&g.push("shadowx=4:shadowy=4:shadowcolor=black@0.7"),`drawtext=${g.join(":")}`}).join(","),o=e.textOverlays.length>0?`${a},${d}`:a,u=e.splitTime!=null&&!isNaN(e.splitTime)&&e.splitTime>0?e.splitTime:null,h=["-c:v","libx264","-preset","ultrafast","-crf","23","-r","30","-movflags","+faststart","-avoid_negative_ts","make_zero","-max_muxing_queue_size","9999"];let p;if(!u)p=["-nostdin","-i",e.newPhase1Path,"-vf",`fps=30,${o}`,...h,"-an",...e.targetDuration!=null?["-t",String(e.targetDuration)]:[],"-y",e.outputPath];else{const m=await te(t,e.originalPath);let w,S,g;m?(w=[`[0:v]fps=30,setpts=PTS-STARTPTS,${o}[v_p1]`,`[1:v]trim=start=${u},fps=30,setpts=PTS-STARTPTS,${a}[v_p2]`,"[1:a]asplit=2[ao1][ao2]",`[ao1]atrim=end=${u},asetpts=PTS-STARTPTS,${c}[a_p1]`,`[ao2]atrim=start=${u},asetpts=PTS-STARTPTS,${c}[a_p2]`,"[v_p1][a_p1][v_p2][a_p2]concat=n=2:v=1:a=1[vout][aout]"].join(";"),S=["-map","[vout]","-map","[aout]"],g=["-c:a","aac","-b:a","128k"]):(w=[`[0:v]fps=30,setpts=PTS-STARTPTS,${o}[v_p1]`,`[1:v]trim=start=${u},fps=30,setpts=PTS-STARTPTS,${a}[v_p2]`,"[v_p1][v_p2]concat=n=2:v=1:a=0[vout]"].join(";"),S=["-map","[vout]"],g=["-an"]),p=["-nostdin","-t",String(u),"-i",e.newPhase1Path,"-i",e.originalPath,"-filter_complex",w,...S,...h,...g,"-y",e.outputPath]}const T=`ffmpeg ${p.map(m=>m.includes(" ")?`"${m}"`:m).join(" ")}`;return new Promise(m=>{R.execFile(t,p,{maxBuffer:200*1024*1024,timeout:ee,killSignal:"SIGKILL"},w=>{m(w?{ok:!1,error:w.message,command:T}:{ok:!0,outputPath:e.outputPath,command:T})})})});l.ipcMain.handle("pick-output-file",async(f,e)=>{if(!k)return null;const t=await l.dialog.showSaveDialog(k,{title:"Enregistrer le montage",defaultPath:e.defaultName,filters:[{name:"Vidéo MP4",extensions:["mp4"]}]});return t.canceled?null:t.filePath});l.ipcMain.handle("pick-any-file",async(f,e)=>{if(!k)return null;const t=await l.dialog.showOpenDialog(k,{title:"Choisir un fichier",properties:["openFile"],filters:(e==null?void 0:e.filters)??[{name:"Tous les fichiers",extensions:["*"]}]});return t.canceled?null:t.filePaths[0]});l.ipcMain.handle("pick-output-folder",async()=>{if(!k)return null;const f=await l.dialog.showOpenDialog(k,{title:"Choisir le dossier de sortie",properties:["openDirectory","createDirectory"]});return f.canceled?null:f.filePaths[0]});l.ipcMain.handle("read-video-metadata",async(f,e)=>{const t=C();return new Promise(s=>{R.execFile(t,["-hide_banner","-i",e.filePath],{encoding:"utf8"},(n,a,c)=>{const i=c||"",r={},d=i.match(/Metadata:\s*([\s\S]*?)(?=\n\s*(Duration|Stream|Input|$))/m);if(d)for(const h of d[1].split(`
-`)){const p=h.match(/^\s+(\w[\w\s]*?)\s*:\s*(.+)$/);p&&(r[p[1].trim()]=p[2].trim())}const o=i.match(/Duration:\s*(\d+):(\d+):([\d.]+)/),u=o?parseInt(o[1])*3600+parseInt(o[2])*60+parseFloat(o[3]):void 0;s({ok:!0,metadata:r,duration:u})})})});l.ipcMain.handle("run-ffmpeg-metadata",async(f,e)=>{const t=C(),s=["-nostdin","-hide_banner","-i",e.inputPath,"-map_metadata","-1"];for(const[n,a]of Object.entries(e.metadata))a&&s.push("-metadata",`${n}=${a}`);return s.push("-c","copy","-movflags","+faststart","-y",e.outputPath),new Promise(n=>{const a=[t,...s].join(" ");R.execFile(t,s,{encoding:"utf8",timeout:F,killSignal:"SIGKILL"},(c,i,r)=>{n(c?{ok:!1,command:a,error:r.split(`
-`).filter(Boolean).pop()??c.message}:{ok:!0,outputPath:e.outputPath,command:a})})})});l.ipcMain.handle("fetch-image",async(f,e)=>{const t=[{"User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",Accept:"image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8","Accept-Language":"en-US,en;q=0.9",Referer:"https://www.instagram.com/","sec-fetch-dest":"image","sec-fetch-mode":"no-cors","sec-fetch-site":"cross-site"},{"User-Agent":"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",Accept:"image/*,*/*;q=0.8"},{"User-Agent":"Instagram 312.0.0.32.116 Android (33/13; 420dpi; 1080x2206; samsung; SM-S911B; dm3q; qcom; en_US; 558678421)",Accept:"image/*"}];for(const s of t)try{const n={...s,...e.headers??{}},a=await l.net.fetch(e.url,{method:"GET",headers:n,redirect:"follow"});if(a.ok){const c=Buffer.from(await a.arrayBuffer());if(c.length>0)return{ok:!0,dataUrl:`data:${a.headers.get("content-type")??"image/jpeg"};base64,${c.toString("base64")}`}}}catch{}return{ok:!1,error:"all_strategies_failed"}});l.ipcMain.handle("groq-request",async(f,e)=>{try{return{ok:!0,data:await(await l.net.fetch("https://api.groq.com/openai/v1/chat/completions",{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${e.apiKey}`},body:JSON.stringify({model:e.model??"llama-3.3-70b-versatile",messages:e.messages,max_tokens:e.maxTokens??400})})).json()}}catch(t){return{ok:!1,error:t instanceof Error?t.message:String(t)}}});l.ipcMain.handle("fetch-ig-comments",async(f,e)=>{const t=n=>{const a=[n.comments,n.preview_comments];for(const c of a)if(Array.isArray(c)&&c.length>0)return c.map(i=>{const r=i;return r.node&&typeof r.node=="object"?r.node:r});return[]},s=n=>n.map(a=>{var c,i;return{pk:String(a.pk??a.id??""),text:String(a.text??""),username:String(((c=a.user)==null?void 0:c.username)??((i=a.owner)==null?void 0:i.username)??""),timestamp:a.created_at?new Date(a.created_at*1e3).toISOString():"",likeCount:a.comment_like_count??0}});try{let n=`https://i.instagram.com/api/v1/media/${e.mediaId}/comments/?can_support_threading=true&permalink_enabled=false`;e.maxId&&(n+=`&max_id=${e.maxId}`);let a=await $(n,e.sessionid);console.log("[fetch-ig-comments] A i.instagram threading status=",a.status,"mediaId=",e.mediaId);let c=a.status===200&&a.data?t(a.data):[];if(c.length===0){const i=`https://i.instagram.com/api/v1/media/${e.mediaId}/comments/${e.maxId?`?max_id=${e.maxId}`:""}`,r=await $(i,e.sessionid);console.log("[fetch-ig-comments] B i.instagram simple status=",r.status,"keys=",r.data?Object.keys(r.data).slice(0,12):null),r.status===200&&r.data&&(c=t(r.data)),r.status===200&&(a=r)}if(c.length===0){const i=`https://www.instagram.com/api/v1/media/${e.mediaId}/comments/${e.maxId?`?max_id=${e.maxId}`:""}`,r=await $(i,e.sessionid);console.log("[fetch-ig-comments] C www.instagram status=",r.status,"keys=",r.data?Object.keys(r.data).slice(0,12):null),r.status===200&&r.data&&(c=t(r.data)),r.status===200&&(a=r)}if(c.length===0&&a.status===200){const i=JSON.stringify(a.data).slice(0,400);console.log("[fetch-ig-comments] no comments extracted. preview=",i)}return{ok:!0,comments:s(c),hasMore:!!(a.data??{}).next_max_id}}catch(n){return{ok:!1,error:n instanceof Error?n.message:String(n)}}});l.ipcMain.handle("post-ig-comment",async(f,e)=>{try{O.get(e.sessionid)||await $("https://i.instagram.com/api/v1/accounts/current_user/",e.sessionid);const s=decodeURIComponent(e.sessionid).match(/^(\d+)/),n=s?s[1]:"",a=[`comment_text=${encodeURIComponent(e.text)}`,"containermodule=self_comments_v2_feed_contextual_self_profile",n?`_uid=${n}`:"",n?`_uuid=${n}`:""].filter(Boolean).join("&"),c=()=>$(`https://i.instagram.com/api/v1/media/${e.mediaId}/comment/`,e.sessionid,"POST",a);let i=await c();if(console.log("[post-ig-comment] status=",i.status,"mediaId=",e.mediaId),i.status===403){O.delete(e.sessionid),await $("https://i.instagram.com/api/v1/accounts/current_user/",e.sessionid);const r=await $(`https://www.instagram.com/api/v1/web/comments/${e.mediaId}/add/`,e.sessionid,"POST",`comment_text=${encodeURIComponent(e.text)}`,{"X-Requested-With":"XMLHttpRequest",Referer:"https://www.instagram.com/"});if(console.log("[post-ig-comment] retry www. status=",r.status),r.status===200)return{ok:!0};i=await c(),console.log("[post-ig-comment] retry i. status=",i.status)}if(i.status!==200){const r=J(i.status,i.data),d=i.data?JSON.stringify(i.data).slice(0,200):"";return{ok:!1,sessionExpired:r,error:`HTTP ${i.status}${d?" — "+d:""}`}}return{ok:!0}}catch(t){return{ok:!1,error:t instanceof Error?t.message:String(t)}}});function X(){k=new l.BrowserWindow({width:1280,height:800,minWidth:960,minHeight:600,backgroundColor:"#080b14",show:!1,webPreferences:{preload:(()=>{const f=v.join(j,"preload.mjs");if(_.existsSync(f))return f;const e=v.join(j,"preload.js");return _.existsSync(e)?e:void 0})(),contextIsolation:!0,nodeIntegration:!1,sandbox:!1,webSecurity:!1},titleBarStyle:"default",frame:!0}),k.webContents.setWindowOpenHandler(({url:f})=>(l.shell.openExternal(f),{action:"deny"})),k.once("ready-to-show",()=>{k==null||k.show(),k==null||k.maximize()}),H?(k.loadURL(H),k.webContents.openDevTools()):k.loadFile(v.join(V,"index.html"))}l.ipcMain.handle("read-local-video",async(f,e)=>{try{if(!_.existsSync(e))return{ok:!1,error:"not found"};const t=_.statSync(e),s=25*1024*1024,n=v.extname(e).toLowerCase(),a=n===".mp4"?"video/mp4":n===".mov"?"video/quicktime":n===".webm"?"video/webm":n===".mkv"?"video/x-matroska":n===".avi"?"video/x-msvideo":"video/mp4";if(t.size>s)return new Promise(i=>{const r=[],d=_.createReadStream(e,{start:0,end:s-1});d.on("data",o=>r.push(o)),d.on("end",()=>{const o=Buffer.concat(r).toString("base64");i({ok:!0,dataUrl:`data:${a};base64,${o}`})}),d.on("error",o=>i({ok:!1,error:o.message}))});const c=_.readFileSync(e);return{ok:!0,dataUrl:`data:${a};base64,${c.toString("base64")}`}}catch(t){return{ok:!1,error:t instanceof Error?t.message:String(t)}}});l.ipcMain.handle("fetch-ig-video",async(f,e)=>{if(!e.url)return{ok:!1,error:"no url"};const t=[{"User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",Accept:"video/mp4,video/*;q=0.9,*/*;q=0.8","Accept-Language":"en-US,en;q=0.9",Referer:"https://www.instagram.com/"},{"User-Agent":"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Version/17.0 Mobile/15E148 Safari/604.1",Accept:"video/*"},{"User-Agent":"Instagram 312.0.0.32.116 Android",Accept:"video/*"}];for(const s of t)try{const n=await l.net.fetch(e.url,{method:"GET",headers:s,redirect:"follow"});if(!n.ok)continue;const a=Buffer.from(await n.arrayBuffer());if(a.length===0)continue;const c=v.join(D.tmpdir(),"ig-tracker-cache");_.mkdirSync(c,{recursive:!0});const i=v.join(c,`ig-${Date.now()}.mp4`);return _.writeFileSync(i,a),{ok:!0,path:i,size:a.length}}catch{}return{ok:!1,error:"all retries failed"}});l.ipcMain.handle("read-file-bytes",async(f,e)=>{try{if(!_.existsSync(e))return{ok:!1,error:"not found"};const t=_.readFileSync(e);return{ok:!0,bytes:t.buffer.slice(t.byteOffset,t.byteOffset+t.byteLength),size:t.byteLength}}catch(t){return{ok:!1,error:t instanceof Error?t.message:String(t)}}});l.ipcMain.handle("write-temp-file",async(f,e)=>{try{const t=v.join(D.tmpdir(),"ig-tracker-cache");_.mkdirSync(t,{recursive:!0});const s=e.name.replace(/[\\/]/g,"_").slice(-200),n=v.join(t,`${Date.now()}-${s}`);return _.writeFileSync(n,Buffer.from(e.bytes)),{ok:!0,path:n}}catch(t){return{ok:!1,error:t instanceof Error?t.message:String(t)}}});l.app.on("window-all-closed",()=>{process.platform!=="darwin"&&(l.app.quit(),k=null)});l.app.on("activate",()=>{l.BrowserWindow.getAllWindows().length===0&&X()});l.app.whenReady().then(()=>{l.protocol.handle("localvideo",async f=>{try{const e=new URL(f.url);let t=decodeURIComponent(e.pathname);if(process.platform==="win32"&&/^\/[A-Za-z]:/.test(t)&&(t=t.slice(1)),!_.existsSync(t))return new Response("Not found",{status:404});const s=N.pathToFileURL(t).toString(),n=new Headers,a=f.headers.get("range");return a&&n.set("range",a),await l.net.fetch(s,{headers:n,bypassCustomProtocolHandlers:!0})}catch(e){return console.error("[localvideo]",e),new Response(`Error: ${e}`,{status:500})}}),X()});exports.RENDERER_DIST=V;exports.VITE_DEV_SERVER_URL=H;
+      `).catch(() => false);
+      if (accepted) {
+        await new Promise((r) => setTimeout(r, 4e3));
+        if (settled) return;
+        const afterUrl = browser.webContents.getURL();
+        if (!afterUrl.includes(`/${username}`)) {
+          browser.loadURL(profileUrl);
+          return;
+        }
+      } else if (!currentUrl.includes(`/${username}`)) {
+        browser.loadURL(profileUrl);
+        return;
+      }
+      await tryApiThenHtml();
+    };
+    browser.webContents.on("did-stop-loading", onLoad);
+    browser.loadURL(profileUrl, {
+      extraHeaders: "Accept: text/html,application/xhtml+xml,*/*;q=0.8\r\nAccept-Language: fr-FR,fr;q=0.9\r\n"
+    }).catch((err) => finish({ ok: false, error: String(err) }));
+  });
+});
+const _csrfCache = /* @__PURE__ */ new Map();
+function igSessionFetch(url, sessionid, method = "GET", body, extraHeaders) {
+  return new Promise((resolve, reject) => {
+    const parsed = new URL(url);
+    const csrf = _csrfCache.get(sessionid);
+    const cookie = csrf ? `sessionid=${sessionid}; csrftoken=${csrf}` : `sessionid=${sessionid}`;
+    const reqOpts = {
+      hostname: parsed.hostname,
+      path: parsed.pathname + parsed.search,
+      method,
+      headers: {
+        "User-Agent": "Instagram 269.0.0.18.75 Android (28/9; 240dpi; 1080x1920; samsung; SM-G960F; starlte; qcom; en_US; 314665256)",
+        "X-IG-App-ID": "936619743392459",
+        "X-ASBD-ID": "198387",
+        "Accept-Language": "fr-FR,fr;q=0.9",
+        "Cookie": cookie,
+        ...csrf ? { "X-CSRFToken": csrf } : {},
+        ...extraHeaders ?? {},
+        ...body ? { "Content-Type": "application/x-www-form-urlencoded", "Content-Length": String(Buffer.byteLength(body)) } : {}
+      }
+    };
+    const req = https.request(reqOpts, (res) => {
+      const chunks = [];
+      const setCookieHeader = res.headers["set-cookie"] ?? [];
+      for (const c of setCookieHeader) {
+        const m = c.match(/csrftoken=([^;]+)/);
+        if (m && m[1] && m[1] !== "missing") _csrfCache.set(sessionid, m[1]);
+      }
+      res.on("data", (c) => chunks.push(c));
+      res.on("end", () => {
+        try {
+          const raw = Buffer.concat(chunks).toString("utf-8");
+          const safe = raw.replace(/:(\s*)(\d{16,})/g, ':$1"$2"');
+          resolve({ status: res.statusCode ?? 0, data: JSON.parse(safe) });
+        } catch {
+          resolve({ status: res.statusCode ?? 0, data: null });
+        }
+      });
+      res.on("error", reject);
+    });
+    req.on("error", reject);
+    req.setTimeout(15e3, () => {
+      req.destroy(new Error("timeout"));
+    });
+    if (body) req.write(body);
+    req.end();
+  });
+}
+function isSessionDead(status, data) {
+  if (status === 401) return true;
+  const d = data;
+  if (!d) return false;
+  const msg = String(d["message"] ?? "").toLowerCase();
+  if (msg === "login_required") return true;
+  if (msg === "checkpoint_required") return true;
+  if (d["logout_reason"]) return true;
+  return false;
+}
+electron.ipcMain.handle("fetch-instagram-by-session", async (_event, opts) => {
+  var _a, _b, _c, _d, _e;
+  try {
+    let userId = null;
+    const curR = await igSessionFetch("https://i.instagram.com/api/v1/accounts/current_user/", opts.sessionid);
+    if (isSessionDead(curR.status, curR.data)) return { ok: false, error: "session_expired" };
+    if (curR.status === 200 && curR.data) {
+      userId = ((_a = curR.data["user"]) == null ? void 0 : _a["pk"]) ?? null;
+    }
+    if (!userId) {
+      const profR = await igSessionFetch(
+        `https://i.instagram.com/api/v1/users/web_profile_info/?username=${encodeURIComponent(opts.username)}`,
+        opts.sessionid
+      );
+      if (profR.status === 200 && profR.data) {
+        const pUser = (_b = profR.data["data"]) == null ? void 0 : _b["user"];
+        userId = (pUser == null ? void 0 : pUser["id"]) ?? null;
+      }
+    }
+    if (!userId) return { ok: false, error: "could_not_get_user_id" };
+    const infoR = await igSessionFetch(`https://i.instagram.com/api/v1/users/${userId}/info/`, opts.sessionid);
+    let followers = 0, following = 0, posts = 0, bio = "";
+    if (infoR.status === 200 && infoR.data) {
+      const u = infoR.data["user"];
+      if (u) {
+        followers = u["follower_count"] ?? 0;
+        following = u["following_count"] ?? 0;
+        posts = u["media_count"] ?? 0;
+        bio = u["biography"] ?? "";
+      }
+    }
+    const clipsR = await igSessionFetch(
+      "https://i.instagram.com/api/v1/clips/user/",
+      opts.sessionid,
+      "POST",
+      `target_user_id=${userId}&page_size=20&include_feed_video=true`
+    );
+    const videos = [];
+    if (clipsR.status === 200 && clipsR.data) {
+      const items = clipsR.data["items"] ?? [];
+      for (const item of items) {
+        const media = item["media"];
+        if (!media) continue;
+        const candidates = ((_c = media["image_versions2"]) == null ? void 0 : _c["candidates"]) ?? [];
+        const vVersions = media["video_versions"] ?? [];
+        videos.push({
+          id: String(media["pk"] ?? ""),
+          shortcode: media["code"] ?? "",
+          views: media["play_count"] ?? media["view_count"] ?? 0,
+          likes: media["like_count"] ?? 0,
+          comments: media["comment_count"] ?? 0,
+          thumbnail: ((_d = candidates[0]) == null ? void 0 : _d["url"]) ?? "",
+          video_url: ((_e = vVersions[0]) == null ? void 0 : _e["url"]) ?? "",
+          timestamp: media["taken_at"] ? new Date(media["taken_at"] * 1e3).toISOString() : ""
+        });
+      }
+    }
+    let thumbOk = 0, thumbFail = 0;
+    await Promise.all(videos.map(async (v) => {
+      if (!v.thumbnail) {
+        thumbFail++;
+        return;
+      }
+      const url = v.thumbnail;
+      const headerSets = [
+        // 1. Browser-like, with Referer = instagram.com
+        {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+          "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+          "Accept-Language": "en-US,en;q=0.9",
+          "Referer": "https://www.instagram.com/",
+          "sec-fetch-dest": "image",
+          "sec-fetch-mode": "no-cors",
+          "sec-fetch-site": "cross-site"
+        },
+        // 2. No Referer (CDN sometimes wants none)
+        {
+          "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+          "Accept": "image/*,*/*;q=0.8"
+        },
+        // 3. Mobile IG app UA
+        {
+          "User-Agent": "Instagram 312.0.0.32.116 Android (33/13; 420dpi; 1080x2206; samsung; SM-S911B; dm3q; qcom; en_US; 558678421)",
+          "Accept": "image/*"
+        }
+      ];
+      for (const headers of headerSets) {
+        try {
+          const res = await electron.net.fetch(url, { method: "GET", headers, redirect: "follow" });
+          if (res.ok) {
+            const buf = Buffer.from(await res.arrayBuffer());
+            if (buf.length > 0) {
+              const ct = res.headers.get("content-type") ?? "image/jpeg";
+              v.thumbnail = `data:${ct};base64,${buf.toString("base64")}`;
+              thumbOk++;
+              return;
+            }
+          }
+        } catch (e) {
+        }
+      }
+      console.log("[thumb] all retries failed:", url.slice(0, 100));
+      thumbFail++;
+    }));
+    console.log(`[fetch-instagram-by-session] thumbnails: ${thumbOk} ok, ${thumbFail} failed of ${videos.length}`);
+    return {
+      ok: true,
+      username: opts.username,
+      followers,
+      following,
+      posts,
+      bio,
+      total_views: videos.reduce((s, v) => s + v.views, 0),
+      videos
+    };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+electron.ipcMain.handle("geelark-request", async (_event, opts) => {
+  try {
+    const reqBody = opts.body ? JSON.stringify(opts.body) : void 0;
+    let response;
+    if (opts.url.includes("instagram.com")) {
+      const igHeaders = { ...opts.headers };
+      if (opts.body) igHeaders["Content-Type"] = "application/json";
+      response = await electron.session.defaultSession.fetch(opts.url, {
+        method: opts.method,
+        headers: igHeaders,
+        body: reqBody
+      });
+    } else {
+      const { Referer: _r, referer: _r2, Origin: _o, origin: _o2, ...safeHeaders } = opts.headers ?? {};
+      const reqHeaders = { "Content-Type": "application/json", ...safeHeaders };
+      response = await electron.net.fetch(opts.url, {
+        method: opts.method,
+        headers: reqHeaders,
+        body: reqBody,
+        referrerPolicy: "no-referrer"
+      });
+    }
+    let data;
+    if (opts.isText) {
+      data = await response.text();
+    } else {
+      const raw = await response.text();
+      try {
+        const safe = raw.replace(/:(\s*)(\d{16,})/g, ':$1"$2"');
+        data = JSON.parse(safe);
+      } catch {
+        data = null;
+      }
+    }
+    return { ok: true, status: response.status, data };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+electron.ipcMain.handle("pick-video-file", async () => {
+  if (!win) return null;
+  const result = await electron.dialog.showOpenDialog(win, {
+    title: "Sélectionner une vidéo",
+    filters: [{ name: "Vidéos", extensions: ["mp4", "mov", "avi", "mkv", "webm"] }],
+    properties: ["openFile"]
+  });
+  if (result.canceled || result.filePaths.length === 0) return null;
+  return result.filePaths[0];
+});
+electron.ipcMain.handle("upload-video-geelark", async (_event, opts) => {
+  try {
+    const urlRes = await electron.net.fetch("https://openapi.geelark.com/open/v1/upload/getUrl", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${opts.bearer}`
+      },
+      body: JSON.stringify({ fileType: "mp4" })
+    });
+    const urlData = await urlRes.json();
+    if (urlData["code"] !== 0) {
+      const msg = urlData["msg"] ?? urlData["message"] ?? `code ${urlData["code"]}`;
+      return { ok: false, error: `GéeLark upload URL: ${msg}` };
+    }
+    const data = urlData["data"] ?? {};
+    const uploadUrl = data["uploadUrl"];
+    const resourceUrl = data["resourceUrl"];
+    if (!uploadUrl || !resourceUrl) return { ok: false, error: "Réponse upload GéeLark invalide" };
+    const fileBytes = node_fs.readFileSync(opts.filePath);
+    const uploadRes = await electron.net.fetch(uploadUrl, {
+      method: "PUT",
+      body: fileBytes
+    });
+    if (uploadRes.status < 200 || uploadRes.status >= 300) {
+      return { ok: false, error: `Upload échoué (HTTP ${uploadRes.status})` };
+    }
+    return { ok: true, token: resourceUrl };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+const FFMPEG_TIMEOUT = 50 * 1e3;
+const FFMPEG_REMIX_TIMEOUT = 340 * 1e3;
+electron.ipcMain.handle("run-ffmpeg", async (_event, opts) => {
+  const ffmpegBin = getFfmpegBin();
+  const scale = opts.preset === "9:16" ? "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:-1:-1:color=black" : opts.preset === "1:1" ? "scale=1080:1080:force_original_aspect_ratio=decrease,pad=1080:1080:-1:-1:color=black" : "scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:-1:-1:color=black";
+  const inputs = [];
+  const filterParts = [];
+  const n = opts.clips.length;
+  opts.clips.forEach((c, i) => {
+    const end = c.trimEnd > 0 ? c.trimEnd : 999999;
+    inputs.push("-ss", String(c.trimStart), "-to", String(end), "-i", c.filePath);
+    filterParts.push(`[${i}:v]${scale},setsar=1[v${i}];[${i}:a]aformat=sample_rates=44100:channel_layouts=stereo[a${i}]`);
+  });
+  const concatIn = opts.clips.map((_, i) => `[v${i}][a${i}]`).join("");
+  filterParts.push(`${concatIn}concat=n=${n}:v=1:a=1[vout][aout]`);
+  const args = [
+    "-nostdin",
+    ...inputs,
+    "-filter_complex",
+    filterParts.join(";"),
+    "-map",
+    "[vout]",
+    "-map",
+    "[aout]",
+    "-c:v",
+    "libx264",
+    "-preset",
+    "fast",
+    "-crf",
+    "23",
+    "-c:a",
+    "aac",
+    "-b:a",
+    "128k",
+    "-movflags",
+    "+faststart",
+    "-y",
+    opts.outputPath
+  ];
+  const command = `ffmpeg ${args.map((a) => a.includes(" ") ? `"${a}"` : a).join(" ")}`;
+  return new Promise((resolve) => {
+    node_child_process.execFile(ffmpegBin, args, { maxBuffer: 100 * 1024 * 1024, timeout: FFMPEG_TIMEOUT, killSignal: "SIGKILL" }, (err) => {
+      if (err) resolve({ ok: false, error: err.message, command });
+      else resolve({ ok: true, outputPath: opts.outputPath, command });
+    });
+  });
+});
+electron.ipcMain.handle("detect-scene-change", async (_event, opts) => {
+  const ffmpegBin = getFfmpegBin();
+  const FPS = 2, W = 32, H = 32;
+  const frameSize = W * H * 3;
+  const tmpDir = path.join(os.tmpdir(), `sf-det-${Date.now()}`);
+  const rawFile = path.join(tmpDir, "frames.rgb");
+  try {
+    node_fs.mkdirSync(tmpDir, { recursive: true });
+  } catch {
+  }
+  return new Promise((resolve) => {
+    node_child_process.execFile(ffmpegBin, [
+      "-nostdin",
+      "-hide_banner",
+      "-i",
+      opts.filePath,
+      "-vf",
+      `fps=${FPS},scale=${W}:${H}`,
+      "-f",
+      "rawvideo",
+      "-pix_fmt",
+      "rgb24",
+      "-y",
+      rawFile
+    ], { maxBuffer: 5 * 1024 * 1024, timeout: FFMPEG_TIMEOUT, killSignal: "SIGKILL" }, (err, _stdout, stderr) => {
+      if (err) console.log("[scene-detect] ffmpeg error:", err.message.split("\n")[0]);
+      const durM = (stderr ?? "").match(/Duration:\s*(\d+):(\d+):(\d+\.?\d*)/);
+      const duration = durM ? parseInt(durM[1]) * 3600 + parseInt(durM[2]) * 60 + parseFloat(durM[3]) : 0;
+      let rawBuf = null;
+      try {
+        rawBuf = node_fs.readFileSync(rawFile);
+      } catch {
+      }
+      try {
+        node_fs.rmSync(tmpDir, { recursive: true });
+      } catch {
+      }
+      if (!rawBuf || rawBuf.length < frameSize * 2) {
+        const msg = err ? err.message.split("\n")[0] : "fichier vide";
+        return resolve({ ok: false, times: [], duration, error: `FFmpeg n'a pas pu lire la vidéo : ${msg}` });
+      }
+      const totalFrames = Math.floor(rawBuf.length / frameSize);
+      console.log("[scene-detect] frames read:", totalFrames, "duration:", duration);
+      const avgs = [];
+      for (let i = 0; i < totalFrames; i++) {
+        const off = i * frameSize;
+        let r = 0, g = 0, b = 0;
+        for (let p = 0; p < W * H; p++) {
+          r += rawBuf[off + p * 3];
+          g += rawBuf[off + p * 3 + 1];
+          b += rawBuf[off + p * 3 + 2];
+        }
+        avgs.push([r / (W * H), g / (W * H), b / (W * H)]);
+      }
+      const diffs = avgs.slice(1).map(([r2, g2, b2], i) => {
+        const [r1, g1, b1] = avgs[i];
+        return {
+          time: Math.round((i + 1) / FPS * 10) / 10,
+          dist: Math.sqrt((r2 - r1) ** 2 + (g2 - g1) ** 2 + (b2 - b1) ** 2)
+        };
+      });
+      console.log("[scene-detect] diffs:", diffs.map((d) => `t=${d.time}s Δ=${d.dist.toFixed(1)}`).join(" | "));
+      const valid = diffs.filter((d) => d.time > 0.4);
+      if (!valid.length) {
+        return resolve({ ok: false, times: [], duration, error: "Vidéo trop courte — positionne le curseur manuellement." });
+      }
+      const sorted = [...valid].sort((a, b) => b.dist - a.dist);
+      const maxDist = sorted[0].dist;
+      const cutoff = Math.max(3, maxDist * 0.35);
+      const picked = sorted.filter((d) => d.dist >= cutoff).length > 0 ? sorted.filter((d) => d.dist >= cutoff) : [sorted[0]];
+      const times = picked.map((d) => d.time);
+      const best = Math.max(...times);
+      console.log("[scene-detect] best=", best, "times=", times, "maxDist=", maxDist.toFixed(1));
+      resolve({ ok: true, times, splitTime: best, duration });
+    });
+  });
+});
+electron.ipcMain.handle("run-ffmpeg-remix", async (_event, opts) => {
+  const ffmpegBin = getFfmpegBin();
+  const W = opts.preset === "16:9" ? 1920 : 1080;
+  const H = opts.preset === "9:16" ? 1920 : 1080;
+  const scl = `scale=${W}:${H}:force_original_aspect_ratio=decrease,pad=${W}:${H}:-1:-1:color=black,setsar=1`;
+  const afmt = "aformat=sample_rates=44100:channel_layouts=stereo";
+  let filterComplex;
+  if (opts.textBlend > 0) {
+    const lkTol = Math.min(0.5, Math.max(0.1, opts.textBlend));
+    filterComplex = [
+      `[1:v]split=2[ov_a][ov_b]`,
+      `[1:a]asplit=2[ao1][ao2]`,
+      `[0:v]trim=duration=${opts.splitTime},setpts=PTS-STARTPTS,${scl}[v_new]`,
+      `[ov_a]trim=end=${opts.splitTime},setpts=PTS-STARTPTS,${scl},lumakey=threshold=0:tolerance=${lkTol}:softness=0.05[text_key]`,
+      `[v_new][text_key]overlay=format=auto[v_blended]`,
+      `[ov_b]trim=start=${opts.splitTime},setpts=PTS-STARTPTS,${scl}[v_p2]`,
+      `[ao1]atrim=end=${opts.splitTime},asetpts=PTS-STARTPTS,${afmt}[a_p1]`,
+      `[ao2]atrim=start=${opts.splitTime},asetpts=PTS-STARTPTS,${afmt}[a_p2]`,
+      `[v_blended][a_p1][v_p2][a_p2]concat=n=2:v=1:a=1[vout][aout]`
+    ].join(";");
+  } else {
+    filterComplex = [
+      `[0:v]trim=duration=${opts.splitTime},setpts=PTS-STARTPTS,${scl}[v_p1]`,
+      `[1:v]trim=start=${opts.splitTime},setpts=PTS-STARTPTS,${scl}[v_p2]`,
+      `[1:a]asplit=2[ao1][ao2]`,
+      `[ao1]atrim=end=${opts.splitTime},asetpts=PTS-STARTPTS,${afmt}[a_p1]`,
+      `[ao2]atrim=start=${opts.splitTime},asetpts=PTS-STARTPTS,${afmt}[a_p2]`,
+      `[v_p1][a_p1][v_p2][a_p2]concat=n=2:v=1:a=1[vout][aout]`
+    ].join(";");
+  }
+  const args = [
+    "-nostdin",
+    "-i",
+    opts.newPhase1Path,
+    "-i",
+    opts.originalPath,
+    "-filter_complex",
+    filterComplex,
+    "-map",
+    "[vout]",
+    "-map",
+    "[aout]",
+    "-c:v",
+    "libx264",
+    "-preset",
+    "fast",
+    "-crf",
+    "23",
+    "-c:a",
+    "aac",
+    "-b:a",
+    "128k",
+    "-movflags",
+    "+faststart",
+    "-y",
+    opts.outputPath
+  ];
+  const command = `ffmpeg ${args.map((a) => a.includes(" ") ? `"${a}"` : a).join(" ")}`;
+  return new Promise((resolve) => {
+    node_child_process.execFile(ffmpegBin, args, { maxBuffer: 200 * 1024 * 1024, timeout: FFMPEG_TIMEOUT, killSignal: "SIGKILL" }, (err) => {
+      if (err) resolve({ ok: false, error: err.message, command });
+      else resolve({ ok: true, outputPath: opts.outputPath, command });
+    });
+  });
+});
+electron.ipcMain.handle("extract-frames", async (_event, opts) => {
+  const ffmpegBin = getFfmpegBin();
+  const tmpDir = path.join(os.tmpdir(), `sf-frames-${Date.now()}`);
+  const startTime = Math.max(0, opts.startTime ?? 0);
+  const duration = Math.max(0.1, opts.endTime - startTime);
+  try {
+    node_fs.mkdirSync(tmpDir, { recursive: true });
+    const targetCount = Math.min(8, Math.max(1, Math.ceil(duration)));
+    const fps = targetCount / duration;
+    const framePattern = path.join(tmpDir, "frame_%04d.jpg");
+    await new Promise((resolve, reject) => {
+      node_child_process.execFile(ffmpegBin, [
+        "-nostdin",
+        "-ss",
+        String(startTime),
+        // fast seek BEFORE -i → jump directly to keyframe
+        "-i",
+        opts.filePath,
+        "-t",
+        String(duration),
+        // duration from startTime, not absolute endTime
+        "-vf",
+        `fps=${fps.toFixed(4)},scale=640:-2`,
+        "-q:v",
+        "5",
+        "-y",
+        framePattern
+      ], { maxBuffer: 200 * 1024 * 1024, timeout: FFMPEG_TIMEOUT, killSignal: "SIGKILL" }, (err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+    const files = node_fs.readdirSync(tmpDir).filter((f) => f.endsWith(".jpg")).sort();
+    const interval = duration / (files.length || 1);
+    const frames = files.map((f, i) => ({
+      index: i,
+      timestamp: Math.round((startTime + i * interval) * 10) / 10,
+      data: node_fs.readFileSync(path.join(tmpDir, f)).toString("base64")
+    }));
+    try {
+      node_fs.rmSync(tmpDir, { recursive: true });
+    } catch {
+    }
+    return { ok: true, frames, count: frames.length };
+  } catch (err) {
+    try {
+      node_fs.rmSync(tmpDir, { recursive: true });
+    } catch {
+    }
+    return { ok: false, frames: [], error: err instanceof Error ? err.message : String(err) };
+  }
+});
+electron.ipcMain.handle("anthropic-vision-request", async (_event, opts) => {
+  try {
+    const response = await electron.net.fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": opts.apiKey,
+        "anthropic-version": "2023-06-01"
+      },
+      body: JSON.stringify({
+        model: opts.model ?? "claude-haiku-4-5-20251001",
+        max_tokens: opts.maxTokens ?? 2e3,
+        messages: opts.messages
+      })
+    });
+    const data = await response.json();
+    if (!response.ok) return { ok: false, error: JSON.stringify(data) };
+    return { ok: true, data };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+function hasAudioStream(ffmpegBin, filePath) {
+  return new Promise((resolve) => {
+    node_child_process.execFile(
+      ffmpegBin,
+      ["-nostdin", "-hide_banner", "-i", filePath],
+      { timeout: 8e3, killSignal: "SIGKILL" },
+      (_err, _stdout, stderr) => resolve(/Audio:/.test(stderr ?? ""))
+    );
+  });
+}
+function getVideoDuration(ffmpegBin, filePath) {
+  return new Promise((resolve) => {
+    node_child_process.execFile(
+      ffmpegBin,
+      ["-nostdin", "-hide_banner", "-i", filePath],
+      { timeout: 8e3, killSignal: "SIGKILL" },
+      (_err, _stdout, stderr) => {
+        const m = (stderr ?? "").match(/Duration:\s*(\d+):(\d+):([\d.]+)/);
+        resolve(m ? parseInt(m[1]) * 3600 + parseInt(m[2]) * 60 + parseFloat(m[3]) : null);
+      }
+    );
+  });
+}
+electron.ipcMain.handle("run-ffmpeg-remix-ai", async (_event, opts) => {
+  const ffmpegBin = getFfmpegBin();
+  const W = opts.preset === "16:9" ? 1920 : 1080;
+  const H = opts.preset === "9:16" ? 1920 : 1080;
+  const scl = `scale=${W}:${H}:force_original_aspect_ratio=decrease,pad=${W}:${H}:-1:-1:color=black,setsar=1`;
+  const afmt = "aformat=sample_rates=44100:channel_layouts=stereo";
+  function findFont(bold = false) {
+    const candidates = process.platform === "win32" ? bold ? ["C:\\Windows\\Fonts\\arialbd.ttf", "C:\\Windows\\Fonts\\Arial Bold.ttf", "C:\\Windows\\Fonts\\arial.ttf", "C:\\Windows\\Fonts\\segoeui.ttf"] : ["C:\\Windows\\Fonts\\arial.ttf", "C:\\Windows\\Fonts\\segoeui.ttf"] : process.platform === "darwin" ? bold ? ["/Library/Fonts/Arial Bold.ttf", "/System/Library/Fonts/Supplemental/Arial Bold.ttf", "/System/Library/Fonts/Helvetica.ttc", "/Library/Fonts/Arial.ttf"] : ["/System/Library/Fonts/Helvetica.ttc", "/Library/Fonts/Arial.ttf", "/System/Library/Fonts/Supplemental/Arial.ttf"] : bold ? ["/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf", "/usr/share/fonts/truetype/ubuntu/Ubuntu-B.ttf"] : ["/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "/usr/share/fonts/truetype/ubuntu/Ubuntu-R.ttf", "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"];
+    return candidates.find((f) => node_fs.existsSync(f)) ?? null;
+  }
+  function escText(t) {
+    return t.replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/:/g, "\\:").replace(/\[/g, "\\[").replace(/\]/g, "\\]").replace(/%/g, "%%");
+  }
+  function hasEmoji(t) {
+    return /[\u{1F000}-\u{1FFFF}]|[\u{2600}-\u{27BF}]|[\u{1F300}-\u{1F9FF}]|\u{FE0F}/u.test(t);
+  }
+  const EMOJI_FONT = "/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf";
+  const drawtextChain = opts.textOverlays.map((ov) => {
+    const useEmoji = hasEmoji(ov.text) && node_fs.existsSync(EMOJI_FONT);
+    const fontFile = useEmoji ? EMOJI_FONT : findFont(ov.bold);
+    const borderPx = Math.max(3, Math.round(ov.fontSize * 0.07));
+    const parts = [`text='${escText(ov.text)}'`];
+    if (fontFile) parts.push(`fontfile='${fontFile}'`);
+    const ySafe = `'max(4,min(h-text_h-8,${ov.y}))'`;
+    parts.push(
+      `x=${ov.x}`,
+      `y=${ySafe}`,
+      `fontsize=${ov.fontSize}`,
+      `fontcolor=${ov.fontColor}`,
+      `borderw=${borderPx}`,
+      `bordercolor=black@1.0`,
+      `enable='between(t,${ov.startTime},${ov.endTime})'`
+    );
+    if (ov.shadow !== false) parts.push(`shadowx=4:shadowy=4:shadowcolor=black@0.7`);
+    return `drawtext=${parts.join(":")}`;
+  }).join(",");
+  const vfPhase1 = opts.textOverlays.length > 0 ? `${scl},${drawtextChain}` : scl;
+  const splitTime = opts.splitTime != null && !isNaN(opts.splitTime) && opts.splitTime > 0 ? opts.splitTime : null;
+  const commonOutputFlags = [
+    "-c:v",
+    "libx264",
+    "-preset",
+    "fast",
+    "-crf",
+    "20",
+    "-r",
+    "30",
+    "-fps_mode",
+    "cfr",
+    // force constant 30 fps output
+    "-pix_fmt",
+    "yuv420p",
+    "-movflags",
+    "+faststart",
+    "-avoid_negative_ts",
+    "make_zero",
+    "-max_muxing_queue_size",
+    "9999"
+  ];
+  let args;
+  if (!splitTime) {
+    const origHasAudio = await hasAudioStream(ffmpegBin, opts.originalPath);
+    if (origHasAudio) {
+      args = [
+        "-nostdin",
+        "-i",
+        opts.newPhase1Path,
+        // [0] secondary (video)
+        "-i",
+        opts.originalPath,
+        // [1] original (audio only)
+        "-filter_complex",
+        `[0:v]setpts=PTS-STARTPTS,${vfPhase1}[vout];[1:a]${afmt}[aout]`,
+        "-map",
+        "[vout]",
+        "-map",
+        "[aout]",
+        ...commonOutputFlags,
+        "-c:a",
+        "aac",
+        "-b:a",
+        "128k",
+        ...opts.targetDuration != null ? ["-t", String(opts.targetDuration)] : [],
+        "-y",
+        opts.outputPath
+      ];
+    } else {
+      args = [
+        "-nostdin",
+        "-i",
+        opts.newPhase1Path,
+        "-vf",
+        `setpts=PTS-STARTPTS,${vfPhase1}`,
+        ...commonOutputFlags,
+        "-an",
+        ...opts.targetDuration != null ? ["-t", String(opts.targetDuration)] : [],
+        "-y",
+        opts.outputPath
+      ];
+    }
+  } else {
+    const secDuration = await getVideoDuration(ffmpegBin, opts.newPhase1Path);
+    const effectiveSplit = secDuration != null && secDuration < splitTime + 0.2 ? Math.max(0.5, secDuration - 0.2) : splitTime;
+    const origHasAudio = await hasAudioStream(ffmpegBin, opts.originalPath);
+    let filterComplex;
+    let mapArgs;
+    let audioEncArgs;
+    if (origHasAudio) {
+      filterComplex = [
+        `[0:v]setpts=PTS-STARTPTS,${vfPhase1}[v_p1]`,
+        `[2:v]setpts=PTS-STARTPTS,${scl}[v_p2]`,
+        `[1:a]asplit=2[ao1][ao2]`,
+        `[ao1]atrim=end=${effectiveSplit},asetpts=PTS-STARTPTS,${afmt}[a_p1]`,
+        `[ao2]atrim=start=${effectiveSplit},asetpts=PTS-STARTPTS,${afmt}[a_p2]`,
+        `[v_p1][a_p1][v_p2][a_p2]concat=n=2:v=1:a=1[vout][aout]`
+      ].join(";");
+      mapArgs = ["-map", "[vout]", "-map", "[aout]"];
+      audioEncArgs = ["-c:a", "aac", "-b:a", "128k"];
+    } else {
+      filterComplex = [
+        `[0:v]setpts=PTS-STARTPTS,${vfPhase1}[v_p1]`,
+        `[2:v]setpts=PTS-STARTPTS,${scl}[v_p2]`,
+        `[v_p1][v_p2]concat=n=2:v=1:a=0[vout]`
+      ].join(";");
+      mapArgs = ["-map", "[vout]"];
+      audioEncArgs = ["-an"];
+    }
+    args = [
+      "-nostdin",
+      "-t",
+      String(effectiveSplit),
+      "-i",
+      opts.newPhase1Path,
+      // [0] secondary up to effectiveSplit
+      "-i",
+      opts.originalPath,
+      // [1] full original (audio)
+      "-ss",
+      String(effectiveSplit),
+      "-i",
+      opts.originalPath,
+      // [2] original fast-seeked (video phase 2)
+      "-filter_complex",
+      filterComplex,
+      ...mapArgs,
+      ...commonOutputFlags,
+      ...audioEncArgs,
+      ...opts.targetDuration != null ? ["-t", String(opts.targetDuration)] : [],
+      "-y",
+      opts.outputPath
+    ];
+  }
+  const command = `ffmpeg ${args.map((a) => a.includes(" ") ? `"${a}"` : a).join(" ")}`;
+  return new Promise((resolve) => {
+    node_child_process.execFile(ffmpegBin, args, { maxBuffer: 200 * 1024 * 1024, timeout: FFMPEG_REMIX_TIMEOUT, killSignal: "SIGKILL" }, (err) => {
+      if (err) resolve({ ok: false, error: err.message, command });
+      else resolve({ ok: true, outputPath: opts.outputPath, command });
+    });
+  });
+});
+electron.ipcMain.handle("pick-output-file", async (_event, opts) => {
+  if (!win) return null;
+  const result = await electron.dialog.showSaveDialog(win, {
+    title: "Enregistrer le montage",
+    defaultPath: opts.defaultName,
+    filters: [{ name: "Vidéo MP4", extensions: ["mp4"] }]
+  });
+  return result.canceled ? null : result.filePath;
+});
+electron.ipcMain.handle("pick-any-file", async (_event, opts) => {
+  if (!win) return null;
+  const result = await electron.dialog.showOpenDialog(win, {
+    title: "Choisir un fichier",
+    properties: ["openFile"],
+    filters: (opts == null ? void 0 : opts.filters) ?? [{ name: "Tous les fichiers", extensions: ["*"] }]
+  });
+  return result.canceled ? null : result.filePaths[0];
+});
+electron.ipcMain.handle("pick-output-folder", async () => {
+  if (!win) return null;
+  const result = await electron.dialog.showOpenDialog(win, {
+    title: "Choisir le dossier de sortie",
+    properties: ["openDirectory", "createDirectory"]
+  });
+  return result.canceled ? null : result.filePaths[0];
+});
+electron.ipcMain.handle("read-video-metadata", async (_event, opts) => {
+  const ffmpegBin = getFfmpegBin();
+  return new Promise((resolve) => {
+    node_child_process.execFile(ffmpegBin, ["-hide_banner", "-i", opts.filePath], { encoding: "utf8" }, (_err, _stdout, stderr) => {
+      const combined = stderr || "";
+      const meta = {};
+      const metaBlock = combined.match(/Metadata:\s*([\s\S]*?)(?=\n\s*(Duration|Stream|Input|$))/m);
+      if (metaBlock) {
+        for (const line of metaBlock[1].split("\n")) {
+          const m = line.match(/^\s+(\w[\w\s]*?)\s*:\s*(.+)$/);
+          if (m) meta[m[1].trim()] = m[2].trim();
+        }
+      }
+      const durMatch = combined.match(/Duration:\s*(\d+):(\d+):([\d.]+)/);
+      const duration = durMatch ? parseInt(durMatch[1]) * 3600 + parseInt(durMatch[2]) * 60 + parseFloat(durMatch[3]) : void 0;
+      resolve({ ok: true, metadata: meta, duration });
+    });
+  });
+});
+electron.ipcMain.handle("run-ffmpeg-metadata", async (_event, opts) => {
+  const ffmpegBin = getFfmpegBin();
+  const args = ["-nostdin", "-hide_banner", "-i", opts.inputPath, "-map_metadata", "-1"];
+  for (const [k, v] of Object.entries(opts.metadata)) {
+    if (v) {
+      args.push("-metadata", `${k}=${v}`);
+    }
+  }
+  args.push("-c", "copy", "-movflags", "+faststart", "-y", opts.outputPath);
+  return new Promise((resolve) => {
+    const command = [ffmpegBin, ...args].join(" ");
+    node_child_process.execFile(ffmpegBin, args, { encoding: "utf8", timeout: FFMPEG_TIMEOUT, killSignal: "SIGKILL" }, (err, _stdout, stderr) => {
+      if (err) resolve({ ok: false, command, error: stderr.split("\n").filter(Boolean).pop() ?? err.message });
+      else resolve({ ok: true, outputPath: opts.outputPath, command });
+    });
+  });
+});
+electron.ipcMain.handle("fetch-image", async (_event, opts) => {
+  const headerSets = [
+    {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+      "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+      "Accept-Language": "en-US,en;q=0.9",
+      "Referer": "https://www.instagram.com/",
+      "sec-fetch-dest": "image",
+      "sec-fetch-mode": "no-cors",
+      "sec-fetch-site": "cross-site"
+    },
+    {
+      "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+      "Accept": "image/*,*/*;q=0.8"
+    },
+    {
+      "User-Agent": "Instagram 312.0.0.32.116 Android (33/13; 420dpi; 1080x2206; samsung; SM-S911B; dm3q; qcom; en_US; 558678421)",
+      "Accept": "image/*"
+    }
+  ];
+  for (const headers of headerSets) {
+    try {
+      const merged = { ...headers, ...opts.headers ?? {} };
+      const res = await electron.net.fetch(opts.url, { method: "GET", headers: merged, redirect: "follow" });
+      if (res.ok) {
+        const buf = Buffer.from(await res.arrayBuffer());
+        if (buf.length > 0) {
+          const ct = res.headers.get("content-type") ?? "image/jpeg";
+          return { ok: true, dataUrl: `data:${ct};base64,${buf.toString("base64")}` };
+        }
+      }
+    } catch {
+    }
+  }
+  return { ok: false, error: "all_strategies_failed" };
+});
+electron.ipcMain.handle("groq-request", async (_event, opts) => {
+  var _a;
+  try {
+    const response = await electron.net.fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${opts.apiKey}`
+      },
+      body: JSON.stringify({
+        model: opts.model ?? "llama-3.1-8b-instant",
+        messages: opts.messages,
+        max_tokens: opts.maxTokens ?? 400
+      })
+    });
+    if (!response.ok) {
+      let errMsg = `Erreur HTTP ${response.status}`;
+      try {
+        const errData = await response.json();
+        if ((_a = errData == null ? void 0 : errData.error) == null ? void 0 : _a.message) errMsg = errData.error.message;
+      } catch {
+      }
+      return { ok: false, error: errMsg };
+    }
+    const data = await response.json();
+    return { ok: true, data };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+electron.ipcMain.handle("fetch-ig-comments", async (_event, opts) => {
+  const extractComments = (data) => {
+    const candidates = [data["comments"], data["preview_comments"]];
+    for (const c of candidates) {
+      if (Array.isArray(c) && c.length > 0) {
+        return c.map((item) => {
+          const obj = item;
+          if (obj["node"] && typeof obj["node"] === "object") return obj["node"];
+          return obj;
+        });
+      }
+    }
+    return [];
+  };
+  const mapComments = (raw) => raw.map((c) => {
+    var _a, _b;
+    return {
+      pk: String(c["pk"] ?? c["id"] ?? ""),
+      text: String(c["text"] ?? ""),
+      username: String(((_a = c["user"]) == null ? void 0 : _a["username"]) ?? ((_b = c["owner"]) == null ? void 0 : _b["username"]) ?? ""),
+      timestamp: c["created_at"] ? new Date(c["created_at"] * 1e3).toISOString() : "",
+      likeCount: c["comment_like_count"] ?? 0
+    };
+  });
+  try {
+    let url = `https://i.instagram.com/api/v1/media/${opts.mediaId}/comments/?can_support_threading=true&permalink_enabled=false`;
+    if (opts.maxId) url += `&max_id=${opts.maxId}`;
+    let res = await igSessionFetch(url, opts.sessionid);
+    console.log("[fetch-ig-comments] A i.instagram threading status=", res.status, "mediaId=", opts.mediaId);
+    let raw = res.status === 200 && res.data ? extractComments(res.data) : [];
+    if (raw.length === 0) {
+      const url2 = `https://i.instagram.com/api/v1/media/${opts.mediaId}/comments/${opts.maxId ? `?max_id=${opts.maxId}` : ""}`;
+      const res2 = await igSessionFetch(url2, opts.sessionid);
+      console.log("[fetch-ig-comments] B i.instagram simple status=", res2.status, "keys=", res2.data ? Object.keys(res2.data).slice(0, 12) : null);
+      if (res2.status === 200 && res2.data) raw = extractComments(res2.data);
+      if (res2.status === 200) res = res2;
+    }
+    if (raw.length === 0) {
+      const url3 = `https://www.instagram.com/api/v1/media/${opts.mediaId}/comments/${opts.maxId ? `?max_id=${opts.maxId}` : ""}`;
+      const res3 = await igSessionFetch(url3, opts.sessionid);
+      console.log("[fetch-ig-comments] C www.instagram status=", res3.status, "keys=", res3.data ? Object.keys(res3.data).slice(0, 12) : null);
+      if (res3.status === 200 && res3.data) raw = extractComments(res3.data);
+      if (res3.status === 200) res = res3;
+    }
+    if (raw.length === 0 && res.status === 200) {
+      const preview = JSON.stringify(res.data).slice(0, 400);
+      console.log("[fetch-ig-comments] no comments extracted. preview=", preview);
+    }
+    return { ok: true, comments: mapComments(raw), hasMore: !!(res.data ?? {})["next_max_id"] };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+electron.ipcMain.handle("post-ig-comment", async (_event, opts) => {
+  try {
+    if (!_csrfCache.get(opts.sessionid)) {
+      await igSessionFetch("https://i.instagram.com/api/v1/accounts/current_user/", opts.sessionid);
+    }
+    const decoded = decodeURIComponent(opts.sessionid);
+    const uidMatch = decoded.match(/^(\d+)/);
+    const uid = uidMatch ? uidMatch[1] : "";
+    const body = [
+      `comment_text=${encodeURIComponent(opts.text)}`,
+      `containermodule=self_comments_v2_feed_contextual_self_profile`,
+      uid ? `_uid=${uid}` : "",
+      uid ? `_uuid=${uid}` : ""
+    ].filter(Boolean).join("&");
+    const tryPost = () => igSessionFetch(
+      `https://i.instagram.com/api/v1/media/${opts.mediaId}/comment/`,
+      opts.sessionid,
+      "POST",
+      body
+    );
+    let res = await tryPost();
+    console.log("[post-ig-comment] status=", res.status, "mediaId=", opts.mediaId);
+    if (res.status === 403) {
+      _csrfCache.delete(opts.sessionid);
+      await igSessionFetch("https://i.instagram.com/api/v1/accounts/current_user/", opts.sessionid);
+      const res2 = await igSessionFetch(
+        `https://www.instagram.com/api/v1/web/comments/${opts.mediaId}/add/`,
+        opts.sessionid,
+        "POST",
+        `comment_text=${encodeURIComponent(opts.text)}`,
+        { "X-Requested-With": "XMLHttpRequest", "Referer": "https://www.instagram.com/" }
+      );
+      console.log("[post-ig-comment] retry www. status=", res2.status);
+      if (res2.status === 200) return { ok: true };
+      res = await tryPost();
+      console.log("[post-ig-comment] retry i. status=", res.status);
+    }
+    if (res.status !== 200) {
+      const dead = isSessionDead(res.status, res.data);
+      const detail = res.data ? JSON.stringify(res.data).slice(0, 200) : "";
+      return { ok: false, sessionExpired: dead, error: `HTTP ${res.status}${detail ? " — " + detail : ""}` };
+    }
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+function createWindow() {
+  win = new electron.BrowserWindow({
+    width: 1280,
+    height: 800,
+    minWidth: 960,
+    minHeight: 600,
+    backgroundColor: "#080b14",
+    show: false,
+    webPreferences: {
+      preload: (() => {
+        const p = path.join(__dirname$1, "preload.mjs");
+        if (node_fs.existsSync(p)) return p;
+        const p2 = path.join(__dirname$1, "preload.js");
+        return node_fs.existsSync(p2) ? p2 : void 0;
+      })(),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
+      // Allow file:// URLs in <video>/<img> regardless of renderer origin (dev = localhost).
+      // Safe for a local desktop app — the renderer never loads untrusted external content.
+      webSecurity: false
+    },
+    titleBarStyle: "default",
+    frame: true
+  });
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    electron.shell.openExternal(url);
+    return { action: "deny" };
+  });
+  win.once("ready-to-show", () => {
+    win == null ? void 0 : win.show();
+    win == null ? void 0 : win.maximize();
+  });
+  if (VITE_DEV_SERVER_URL) {
+    win.loadURL(VITE_DEV_SERVER_URL);
+    win.webContents.openDevTools();
+  } else {
+    win.loadFile(path.join(RENDERER_DIST, "index.html"));
+  }
+}
+electron.ipcMain.handle("read-local-video", async (_event, filePath) => {
+  try {
+    if (!node_fs.existsSync(filePath)) return { ok: false, error: "not found" };
+    const stat = node_fs.statSync(filePath);
+    const MAX = 25 * 1024 * 1024;
+    const ext = path.extname(filePath).toLowerCase();
+    const mime = ext === ".mp4" ? "video/mp4" : ext === ".mov" ? "video/quicktime" : ext === ".webm" ? "video/webm" : ext === ".mkv" ? "video/x-matroska" : ext === ".avi" ? "video/x-msvideo" : "video/mp4";
+    if (stat.size > MAX) {
+      return new Promise((resolve) => {
+        const chunks = [];
+        const stream = node_fs.createReadStream(filePath, { start: 0, end: MAX - 1 });
+        stream.on("data", (c) => chunks.push(c));
+        stream.on("end", () => {
+          const b64 = Buffer.concat(chunks).toString("base64");
+          resolve({ ok: true, dataUrl: `data:${mime};base64,${b64}` });
+        });
+        stream.on("error", (e) => resolve({ ok: false, error: e.message }));
+      });
+    }
+    const buf = node_fs.readFileSync(filePath);
+    return { ok: true, dataUrl: `data:${mime};base64,${buf.toString("base64")}` };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+electron.ipcMain.handle("fetch-ig-video", async (_event, opts) => {
+  if (!opts.url) return { ok: false, error: "no url" };
+  const headerSets = [
+    {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+      "Accept": "video/mp4,video/*;q=0.9,*/*;q=0.8",
+      "Accept-Language": "en-US,en;q=0.9",
+      "Referer": "https://www.instagram.com/"
+    },
+    { "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Version/17.0 Mobile/15E148 Safari/604.1", "Accept": "video/*" },
+    { "User-Agent": "Instagram 312.0.0.32.116 Android", "Accept": "video/*" }
+  ];
+  for (const headers of headerSets) {
+    try {
+      const res = await electron.net.fetch(opts.url, { method: "GET", headers, redirect: "follow" });
+      if (!res.ok) continue;
+      const buf = Buffer.from(await res.arrayBuffer());
+      if (buf.length === 0) continue;
+      const dir = path.join(os.tmpdir(), "ig-tracker-cache");
+      node_fs.mkdirSync(dir, { recursive: true });
+      const out = path.join(dir, `ig-${Date.now()}.mp4`);
+      node_fs.writeFileSync(out, buf);
+      return { ok: true, path: out, size: buf.length };
+    } catch {
+    }
+  }
+  return { ok: false, error: "all retries failed" };
+});
+electron.ipcMain.handle("read-file-bytes", async (_event, filePath) => {
+  try {
+    if (!node_fs.existsSync(filePath)) return { ok: false, error: "not found" };
+    const buf = node_fs.readFileSync(filePath);
+    return { ok: true, bytes: buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength), size: buf.byteLength };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+electron.ipcMain.handle("write-temp-file", async (_event, opts) => {
+  try {
+    const dir = path.join(os.tmpdir(), "ig-tracker-cache");
+    node_fs.mkdirSync(dir, { recursive: true });
+    const safeName = opts.name.replace(/[\\/]/g, "_").slice(-200);
+    const out = path.join(dir, `${Date.now()}-${safeName}`);
+    node_fs.writeFileSync(out, Buffer.from(opts.bytes));
+    return { ok: true, path: out };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+});
+electron.app.on("window-all-closed", () => {
+  if (process.platform !== "darwin") {
+    electron.app.quit();
+    win = null;
+  }
+});
+electron.app.on("activate", () => {
+  if (electron.BrowserWindow.getAllWindows().length === 0) createWindow();
+});
+electron.app.whenReady().then(() => {
+  electron.protocol.handle("localvideo", async (request) => {
+    try {
+      const u = new URL(request.url);
+      let filePath = decodeURIComponent(u.pathname);
+      if (process.platform === "win32" && /^\/[A-Za-z]:/.test(filePath)) {
+        filePath = filePath.slice(1);
+      }
+      if (!node_fs.existsSync(filePath)) {
+        return new Response("Not found", { status: 404 });
+      }
+      const fileUrl = node_url.pathToFileURL(filePath).toString();
+      const fwdHeaders = new Headers();
+      const range = request.headers.get("range");
+      if (range) fwdHeaders.set("range", range);
+      return await electron.net.fetch(fileUrl, { headers: fwdHeaders, bypassCustomProtocolHandlers: true });
+    } catch (err) {
+      console.error("[localvideo]", err);
+      return new Response(`Error: ${err}`, { status: 500 });
+    }
+  });
+  createWindow();
+});
+exports.RENDERER_DIST = RENDERER_DIST;
+exports.VITE_DEV_SERVER_URL = VITE_DEV_SERVER_URL;
