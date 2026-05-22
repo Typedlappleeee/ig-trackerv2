@@ -681,7 +681,7 @@ function AppContent({ user }: { user: User }) {
 
       case 'posting':      return <Posting     user={user} />
       case 'massposting':  return <MassPosting user={user} />
-      case 'scheduler':    return <Scheduler   user={user} />
+      case 'scheduler':    return <Scheduler   user={user} onNavigate={p => handleNavigate(p as Page)} />
       case 'bank':         return <Bank        user={user} />
       case 'warmup':       return <Warmup      user={user} />
       case 'montage':      return <Montage     user={user} />
