@@ -581,6 +581,7 @@ async function remixViaMediaRecorder(opts: {
   splitTime:      number   // 0 = no split, use secondary for full duration
   targetDuration?: number
   preset:         '9:16' | '1:1' | '16:9'
+  copyTextFromOriginal?: boolean
   textOverlays:   Array<{ text: string; x: string; y: string; fontSize: number; fontColor: string; startTime: number; endTime: number; bold?: boolean; shadow?: boolean }>
 }): Promise<{ blob: Blob; mimeType: string }> {
   const W = opts.preset === '16:9' ? 1920 : 1080
@@ -662,6 +663,19 @@ async function remixViaMediaRecorder(opts: {
     ctx.fillRect(0, 0, W, H)
     ctx.drawImage(source, (W - dw) / 2, (H - dh) / 2, dw, dh)
 
+    // Screen-blend original onto secondary during phase 1 to copy text.
+    // Canvas globalCompositeOperation='screen' is C = 1-(1-A)(1-B), same as FFmpeg blend=screen.
+    // White text pixels (B≈1) → show through; dark background (B≈0) → secondary shows.
+    if (opts.copyTextFromOriginal && !switched) {
+      const ovw = origVid.videoWidth || W
+      const ovh = origVid.videoHeight || H
+      const oscale = Math.min(W / ovw, H / ovh)
+      const odw = ovw * oscale, odh = ovh * oscale
+      ctx.globalCompositeOperation = 'screen'
+      ctx.drawImage(origVid, (W - odw) / 2, (H - odh) / 2, odw, odh)
+      ctx.globalCompositeOperation = 'source-over'
+    }
+
     for (const ov of opts.textOverlays) {
       if (t >= ov.startTime && t <= ov.endTime) drawOverlayText(ctx, ov, W, H)
     }
@@ -698,9 +712,11 @@ async function remixViaMediaRecorder(opts: {
 async function runFfmpegRemixAIWasm(opts: {
   newPhase1Path: string; originalPath: string; splitTime?: number; targetDuration?: number
   outputPath: string; preset: '9:16' | '1:1' | '16:9'
+  copyTextFromOriginal?: boolean
   textOverlays: Array<{ text: string; x: string; y: string; fontSize: number; fontColor: string; startTime: number; endTime: number; bold?: boolean; shadow?: boolean }>
 }): Promise<{ ok: boolean; outputPath?: string; error?: string }> {
   const hasPhase2  = opts.splitTime != null && opts.splitTime > 0
+  const copyText   = opts.copyTextFromOriginal === true
   const overlayFiles = opts.textOverlays.map((_, i) => `ai_ov${i}.png`)
   const FILES = ['ai_orig.mp4', 'ai_new1.mp4', 'ai_out.mp4', ...overlayFiles]
   const ff = await getFFmpeg()
@@ -710,7 +726,7 @@ async function runFfmpegRemixAIWasm(opts: {
   ff.on('log', logHandler)
   try {
     await writeInput(ff, 'ai_new1.mp4', opts.newPhase1Path)
-    if (hasPhase2) await writeInput(ff, 'ai_orig.mp4', opts.originalPath)
+    if (hasPhase2 || copyText) await writeInput(ff, 'ai_orig.mp4', opts.originalPath)
     const W    = opts.preset === '16:9' ? 1920 : 1080
     const H    = opts.preset === '9:16' ? 1920 : 1080
     const scl  = `scale=${W}:${H}:force_original_aspect_ratio=decrease,pad=${W}:${H}:-1:-1:color=black,setsar=1`
@@ -721,13 +737,43 @@ async function runFfmpegRemixAIWasm(opts: {
     let chains: string[], inputArgs: string[]
     if (hasPhase2) {
       const st = opts.splitTime!
+      if (copyText) {
+        // Screen-blend secondary with original during phase 1 to copy text
+        // [0]=secondary, [1]=original (for audio + phase 2 + phase 1 blend)
+        chains = [
+          `[0:v]trim=duration=${st},setpts=PTS-STARTPTS,${scl}[_sec_p1]`,
+          `[1:v]split=2[_orig_p1_src][_orig_p2_src]`,
+          `[_orig_p1_src]trim=end=${st},setpts=PTS-STARTPTS,${scl}[_orig_p1]`,
+          `[_sec_p1]format=gbrp[_s1_rgb];[_orig_p1]format=gbrp[_o1_rgb];[_s1_rgb][_o1_rgb]blend=all_mode=screen[_b1];[_b1]format=yuv420p[v_p1]`,
+          `[_orig_p2_src]trim=start=${st},setpts=PTS-STARTPTS,${scl}[v_p2]`,
+          `[1:a]asplit=2[ao1][ao2]`,
+          `[ao1]atrim=end=${st},asetpts=PTS-STARTPTS,${afmt}[a_p1]`,
+          `[ao2]atrim=start=${st},asetpts=PTS-STARTPTS,${afmt}[a_p2]`,
+          `[v_p1][a_p1][v_p2][a_p2]concat=n=2:v=1:a=1[v_merged][aout]`,
+        ]
+      } else {
+        chains = [
+          `[0:v]trim=duration=${st},setpts=PTS-STARTPTS,${scl}[v_p1]`,
+          `[1:v]trim=start=${st},setpts=PTS-STARTPTS,${scl}[v_p2]`,
+          `[1:a]asplit=2[ao1][ao2]`,
+          `[ao1]atrim=end=${st},asetpts=PTS-STARTPTS,${afmt}[a_p1]`,
+          `[ao2]atrim=start=${st},asetpts=PTS-STARTPTS,${afmt}[a_p2]`,
+          `[v_p1][a_p1][v_p2][a_p2]concat=n=2:v=1:a=1[v_merged][aout]`,
+        ]
+      }
+      inputArgs = ['-i', 'ai_new1.mp4', '-i', 'ai_orig.mp4']
+    } else if (copyText) {
+      // No split, screen-blend secondary with original for full duration
+      // [0]=secondary, [1]=original (audio + text source)
+      const trimSec = opts.targetDuration ? `trim=duration=${opts.targetDuration},setpts=PTS-STARTPTS,` : ''
+      const trimOrig = opts.targetDuration ? `trim=duration=${opts.targetDuration},setpts=PTS-STARTPTS,` : ''
       chains = [
-        `[0:v]trim=duration=${st},setpts=PTS-STARTPTS,${scl}[v_p1]`,
-        `[1:v]trim=start=${st},setpts=PTS-STARTPTS,${scl}[v_p2]`,
-        `[1:a]asplit=2[ao1][ao2]`,
-        `[ao1]atrim=end=${st},asetpts=PTS-STARTPTS,${afmt}[a_p1]`,
-        `[ao2]atrim=start=${st},asetpts=PTS-STARTPTS,${afmt}[a_p2]`,
-        `[v_p1][a_p1][v_p2][a_p2]concat=n=2:v=1:a=1[v_merged][aout]`,
+        `[0:v]${trimSec}${scl}[_sec]`,
+        `[1:v]${trimOrig}${scl}[_orig]`,
+        `[_sec]format=gbrp[_sec_rgb];[_orig]format=gbrp[_orig_rgb];[_sec_rgb][_orig_rgb]blend=all_mode=screen[_blended];[_blended]format=yuv420p[v_merged]`,
+        opts.targetDuration
+          ? `[1:a]atrim=duration=${opts.targetDuration},asetpts=PTS-STARTPTS,${afmt}[aout]`
+          : `[1:a]${afmt}[aout]`,
       ]
       inputArgs = ['-i', 'ai_new1.mp4', '-i', 'ai_orig.mp4']
     } else {
@@ -740,7 +786,7 @@ async function runFfmpegRemixAIWasm(opts: {
       ]
       inputArgs = ['-i', 'ai_new1.mp4']
     }
-    const videoInputCount = hasPhase2 ? 2 : 1
+    const videoInputCount = (hasPhase2 || copyText) ? 2 : 1
     let lastPad = 'v_merged'
     for (let i = 0; i < opts.textOverlays.length; i++) {
       const ov = opts.textOverlays[i]
@@ -782,6 +828,7 @@ export async function runFfmpegRemixAIWeb(opts: {
   targetDuration?: number
   outputPath:    string
   preset:        '9:16' | '1:1' | '16:9'
+  copyTextFromOriginal?: boolean
   textOverlays:  Array<{
     text: string; x: string; y: string; fontSize: number; fontColor: string
     startTime: number; endTime: number; bold?: boolean; shadow?: boolean
@@ -793,7 +840,7 @@ export async function runFfmpegRemixAIWeb(opts: {
   // ── Fast path: hardware encoding via MediaRecorder ────────────────────────
   if (typeof MediaRecorder !== 'undefined') {
     try {
-      const { blob, mimeType } = await remixViaMediaRecorder({ ...opts, splitTime })
+      const { blob, mimeType } = await remixViaMediaRecorder({ ...opts, splitTime, copyTextFromOriginal: opts.copyTextFromOriginal })
 
       // If browser gave us native MP4, return directly
       if (mimeType.startsWith('video/mp4')) {
@@ -830,7 +877,7 @@ export async function runFfmpegRemixAIWeb(opts: {
   }
 
   // ── Fallback: WASM FFmpeg ─────────────────────────────────────────────────
-  return withFfmpegLock(() => runFfmpegRemixAIWasm(opts))
+  return withFfmpegLock(() => runFfmpegRemixAIWasm({ ...opts, copyTextFromOriginal: opts.copyTextFromOriginal }))
 }
 
 // ── runFfmpegTextOverlay ──────────────────────────────────────────────────────

@@ -5,7 +5,7 @@ import { Spinner } from '@/components/ui/Spinner'
 import { BankPicker } from './Bank'
 import { playSuccess, playError } from '@/lib/sounds'
 import { supabase } from '@/lib/supabase'
-import { uploadVideoFromPath, type UploadScope } from '@/lib/storage'
+import { uploadVideoFromPath, uploadVideoFromBlob, type UploadScope } from '@/lib/storage'
 import { useOrg } from '@/lib/orgContext'
 import { useConnections } from '@/lib/connections'
 
@@ -386,10 +386,20 @@ export function MassRemix({ user }: MassRemixProps) {
           addLog(job.id, `✂️ Coupe manuelle: ${splitTime != null ? splitTime + 's' : 'désactivée'}`)
         } else {
           addLog(job.id, '🔍 Détection scène…')
-          const det = await withTimeout(
-            window.electronAPI!.detectSceneChange!({ filePath: job.originalPath }),
-            60_000, 'détection scène'
-          )
+          const isElectron = !!window.electronAPI
+          let det: { ok: boolean; splitTime?: number; duration?: number; error?: string }
+          if (isElectron) {
+            det = await withTimeout(
+              window.electronAPI!.detectSceneChange!({ filePath: job.originalPath }),
+              60_000, 'détection scène'
+            )
+          } else {
+            const { detectSceneChangeWeb } = await import('@/lib/ffmpeg-web')
+            det = await withTimeout(
+              detectSceneChangeWeb({ filePath: job.originalPath }),
+              60_000, 'détection scène'
+            )
+          }
           if (!det.ok) addLog(job.id, `❌ Détection échouée: ${det.error ?? 'inconnu'}`)
 
           // Treat duration=0 as unknown (scene detection returns 0 when it can't parse duration)
@@ -404,7 +414,7 @@ export function MassRemix({ user }: MassRemixProps) {
 
           // Vérif. décor — si le BACKGROUND/LIEU est le même des 2 côtés du cut → annuler
           // On vérifie seulement le fond, pas la personne (plus fiable)
-          if (splitTime != null && anthropicKey.trim()) {
+          if (splitTime != null && anthropicKey.trim() && isElectron) {
             try {
               const totalDur = det.duration ?? 60
               const phase2Start = Math.min(splitTime + 0.5, totalDur - 0.5)
@@ -460,34 +470,54 @@ export function MassRemix({ user }: MassRemixProps) {
         addLog(job.id, `⚙️ FFmpeg — splitTime=${splitTime != null ? splitTime + 's' : 'null'}, preset=${preset}, overlays=${textOverlays.length}`)
 
         const outName = `remix_${String(job.id + 1).padStart(3, '0')}.mp4`
-        let outputPath: string
-        if (folder) {
-          outputPath = folder.replace(/\\/g, '/') + '/' + outName
-        } else {
-          const tmp = await window.electronAPI!.writeTempFile!({ name: outName, bytes: new ArrayBuffer(0) })
-          if (!tmp.ok || !tmp.path) {
-            addLog(job.id, '❌ Impossible de créer le fichier temporaire')
-            updateJob(job.id, { status: 'error', error: 'Impossible de créer le fichier temp' })
-            return
-          }
-          outputPath = tmp.path
-        }
 
         // Trim output to original video duration so secondary doesn't run long.
         // Only set if duration is known and positive — 0 would make FFmpeg output an empty file.
         const targetDuration = (detDuration != null && detDuration > 0) ? detDuration : undefined
 
-        const gen = await withTimeout(
-          window.electronAPI!.runFfmpegRemixAI!({
-            newPhase1Path: job.secondaryPath,
-            originalPath:  job.originalPath,
-            splitTime, outputPath, preset,
-            textOverlays,
-            copyTextFromOriginal,
-            targetDuration,
-          }),
-          360_000, 'FFmpeg'
-        )
+        let gen: { ok: boolean; outputPath?: string; error?: string; command?: string }
+        let outputPath: string
+
+        if (window.electronAPI) {
+          // ── Electron path: write temp file → IPC FFmpeg ────────────────────
+          if (folder) {
+            outputPath = folder.replace(/\\/g, '/') + '/' + outName
+          } else {
+            const tmp = await window.electronAPI.writeTempFile!({ name: outName, bytes: new ArrayBuffer(0) })
+            if (!tmp.ok || !tmp.path) {
+              addLog(job.id, '❌ Impossible de créer le fichier temporaire')
+              updateJob(job.id, { status: 'error', error: 'Impossible de créer le fichier temp' })
+              return
+            }
+            outputPath = tmp.path
+          }
+          gen = await withTimeout(
+            window.electronAPI.runFfmpegRemixAI!({
+              newPhase1Path: job.secondaryPath,
+              originalPath:  job.originalPath,
+              splitTime, outputPath, preset,
+              textOverlays,
+              copyTextFromOriginal,
+              targetDuration,
+            }),
+            360_000, 'FFmpeg'
+          )
+        } else {
+          // ── Web path: WASM / MediaRecorder FFmpeg ──────────────────────────
+          outputPath = outName  // placeholder; actual URL returned in gen.outputPath
+          const { runFfmpegRemixAIWeb } = await import('@/lib/ffmpeg-web')
+          gen = await withTimeout(
+            runFfmpegRemixAIWeb({
+              newPhase1Path: job.secondaryPath,
+              originalPath:  job.originalPath,
+              splitTime, outputPath, preset,
+              textOverlays,
+              copyTextFromOriginal,
+              targetDuration,
+            }),
+            360_000, 'FFmpeg'
+          )
+        }
 
         if (gen.command) addLog(job.id, `   cmd: ${gen.command}`)
 
@@ -498,16 +528,28 @@ export function MassRemix({ user }: MassRemixProps) {
           return
         }
         addLog(job.id, '✅ FFmpeg OK')
-        updateJob(job.id, { outputPath: gen.outputPath ?? outputPath })
+        const finalPath = gen.outputPath ?? outputPath
+        updateJob(job.id, { outputPath: finalPath })
 
         // ── 4. Upload to bank if needed ──────────────────────────────────────
         if (exportMode === 'bank') {
           updateJob(job.id, { status: 'uploading' })
           addLog(job.id, '☁️ Upload banque…')
-          const up = await withTimeout(
-            uploadVideoFromPath(gen.outputPath ?? outputPath, scope),
-            90_000, 'upload'
-          )
+          let up: { storagePath: string; thumbnailPath: string | null }
+          if (window.electronAPI) {
+            up = await withTimeout(
+              uploadVideoFromPath(finalPath, scope),
+              90_000, 'upload'
+            )
+          } else {
+            // Web: fetch the blob URL → Blob → upload directly
+            const resp = await fetch(finalPath)
+            const blob = await resp.blob()
+            up = await withTimeout(
+              uploadVideoFromBlob(blob, outName, scope),
+              90_000, 'upload'
+            )
+          }
           await supabase.from('content_bank').insert({
             user_id: user.id, org_id: currentOrg?.id ?? null,
             title: `Remix ${String(job.id + 1).padStart(3, '0')} — ${fileName(job.originalPath)}`,
