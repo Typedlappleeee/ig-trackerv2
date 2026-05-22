@@ -216,227 +216,331 @@ function FlameOverlay() {
   )
 }
 
-// ── Splash screen ─────────────────────────────────────────────────────────────
-const SPLASH_DURATION = 3600
+// ── Splash screen — 6-stage cinematic animation ───────────────────────────────
+const SPLASH_DURATION = 8200
 
-// Pre-computed burst particles (angle → px/py offset in px)
-const ORBITERS = [
-  { r: 92,  dur: 3.6, delay: 0,     cw: true,  col: '#60a5fa', size: 7 },
-  { r: 92,  dur: 3.6, delay: -1.8,  cw: true,  col: '#818cf8', size: 5 },
-  { r: 125, dur: 5.4, delay: 0,     cw: false, col: '#a855f7', size: 6 },
-  { r: 125, dur: 5.4, delay: -1.8,  cw: false, col: '#ec4899', size: 5 },
-  { r: 125, dur: 5.4, delay: -3.6,  cw: false, col: '#f472b6', size: 4 },
-  { r: 158, dur: 7.8, delay: 0,     cw: true,  col: '#34d399', size: 5 },
-  { r: 158, dur: 7.8, delay: -3.9,  cw: true,  col: '#2563eb', size: 6 },
+// Feature icons for Stage 2 connexion
+const SP_FEATURES = [
+  { angle: 315, label: 'Posting',    color: '#8b5cf6',
+    icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M10 8l6 4-6 4V8z"/></svg> },
+  { angle: 45,  label: 'Automatise', color: '#60a5fa',
+    icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg> },
+  { angle: 135, label: 'Communauté', color: '#ec4899',
+    icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg> },
+  { angle: 225, label: 'Planifie',   color: '#a855f7',
+    icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> },
 ]
 
-const STATUS_MSGS = [
-  'Initialisation des modules…',
-  'Connexion sécurisée…',
-  'Chargement de l\'interface…',
-  'ScaleFlow est prêt ✓',
-]
+// 12 acceleration rays at different angles
+const SP_RAYS = [0,30,60,90,120,150,180,210,240,270,300,330].map((a, i) => ({
+  angle: a, delay: i * 0.04,
+  color: ['#7c3aed','#60a5fa','#a855f7','#ec4899','#3b82f6','#8b5cf6'][i % 6],
+  length: 220 + (i % 3) * 60, width: i % 2 === 0 ? 2 : 1.5,
+}))
+
+function SplashLogoBox({ size = 110, spin = true }: { size?: number; spin?: boolean }) {
+  return (
+    <div style={{ position: 'relative', width: size, height: size }}>
+      {spin && <div className="logo-neon-ring" style={{ position:'absolute', inset:-3, borderRadius:Math.round(size*0.24), animationDuration:'2.2s' }} />}
+      <div style={{ position:'absolute', inset:-size*0.16, borderRadius:size*0.35, background:'radial-gradient(circle,rgba(124,58,237,0.4) 0%,transparent 70%)', filter:'blur(14px)' }} />
+      <div style={{ position:'absolute', inset:0, borderRadius:Math.round(size*0.24), background:'linear-gradient(145deg,#0d0820 0%,#100626 50%,#160b30 100%)', boxShadow:'inset 0 1px 0 rgba(255,255,255,0.07)' }} />
+      <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
+        <ScaleFlowLogoSVG size={Math.round(size * 0.73)} />
+      </div>
+    </div>
+  )
+}
 
 function SplashScreen({ onDone }: { onDone: () => void }) {
-  const [fading, setFading]       = useState(false)
-  const [statusIdx, setStatusIdx] = useState(0)
-  const doneRef                   = useRef(false)
+  const [stage, setStage]   = useState(1)
+  const [fading, setFading] = useState(false)
+  const doneRef             = useRef(false)
 
   useEffect(() => { playSplash() }, [])
 
   useEffect(() => {
-    const t1 = setTimeout(() => setFading(true), SPLASH_DURATION)
-    const t2 = setTimeout(() => {
-      if (!doneRef.current) { doneRef.current = true; onDone() }
-    }, SPLASH_DURATION + 620)
-    return () => { clearTimeout(t1); clearTimeout(t2) }
+    const schedule: [number, () => void][] = [
+      [1500, () => setStage(2)],
+      [2900, () => setStage(3)],
+      [4000, () => setStage(4)],
+      [5100, () => setStage(5)],
+      [6300, () => setStage(6)],
+      [7500, () => setFading(true)],
+      [8200, () => { if (!doneRef.current) { doneRef.current = true; onDone() } }],
+    ]
+    const timers = schedule.map(([ms, fn]) => setTimeout(fn, ms))
+    return () => timers.forEach(clearTimeout)
   }, [onDone])
 
-  useEffect(() => {
-    const timers = [800, 1700, 2600].map((ms, i) => setTimeout(() => setStatusIdx(i + 1), ms))
-    return () => timers.forEach(clearTimeout)
-  }, [])
+  const BG = '#030307'
 
   return (
-    <div
-      className={fading ? 'sf-fade-out' : ''}
-      style={{
-        position: 'fixed', inset: 0, zIndex: 9999,
-        background: '#030307',
-        display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'center',
-        pointerEvents: fading ? 'none' : 'all',
-        overflow: 'hidden',
-      }}
-    >
-      {/* ── Deep purple radial glow ── */}
-      <div style={{
-        position: 'absolute', inset: 0, pointerEvents: 'none',
-        background: 'radial-gradient(ellipse 65% 55% at 50% 44%, #1e0b3a55 0%, #2d1b6920 40%, transparent 70%)',
-        animation: 'sf-bg-breathe 3s ease-in-out 1s infinite',
-      }} />
+    <div className={fading ? 'sp-fade-out' : ''}
+      style={{ position:'fixed', inset:0, zIndex:9999, background:BG, overflow:'hidden', pointerEvents: fading ? 'none' : 'all' }}>
 
-      {/* ── Aurora background blobs ── */}
-      {[
-        { col: 'rgba(37,99,235,0.13)',   size: 440, x: -160, y: -200, anim: 'sf-blob-a 15s ease-in-out infinite' },
-        { col: 'rgba(124,58,237,0.10)',  size: 380, x: 100,  y: 80,   anim: 'sf-blob-b 19s ease-in-out -7s infinite' },
-        { col: 'rgba(236,72,153,0.07)',  size: 320, x: -50,  y: 130,  anim: 'sf-blob-c 12s ease-in-out -4s infinite' },
-      ].map((b, i) => (
-        <div key={i} style={{
-          position: 'absolute', pointerEvents: 'none',
-          width: b.size, height: b.size * 0.65,
-          left: `calc(50% + ${b.x}px)`, top: `calc(50% + ${b.y}px)`,
-          transform: 'translate(-50%,-50%)',
-          borderRadius: '50%',
-          background: `radial-gradient(circle, ${b.col} 0%, transparent 70%)`,
-          filter: 'blur(55px)',
-          animation: b.anim,
-        }} />
-      ))}
-
-      {/* ── Logo area ── */}
-      <div style={{ position: 'relative', width: 120, height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 44, overflow: 'visible' }}>
-
-        {/* Looping pulse rings */}
-        {[
-          { delay: 0,    col: 'rgba(96,165,250,0.6)' },
-          { delay: 0.85, col: 'rgba(124,58,237,0.45)' },
-          { delay: 1.7,  col: 'rgba(236,72,153,0.35)' },
-        ].map((ring, i) => (
-          <div key={`pr-${i}`} style={{
-            position: 'absolute', top: '50%', left: '50%',
-            width: 148, height: 148, marginLeft: -74, marginTop: -74,
-            borderRadius: '50%', border: `1.5px solid ${ring.col}`,
-            pointerEvents: 'none',
-            animation: `sf-pulse-ring 2.6s ease-out ${ring.delay}s infinite`,
-          }} />
-        ))}
-
-        {/* Comet arcs — rotating partial SVG strokes with glow */}
-        <svg style={{ position: 'absolute', top: '50%', left: '50%', overflow: 'visible', pointerEvents: 'none', animation: 'sf-orbit-cw 5.5s linear infinite' }} width="0" height="0">
-          <defs>
-            <filter id="hg-a" x="-80%" y="-80%" width="260%" height="260%">
-              <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="b"/>
-              <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-            </filter>
-          </defs>
-          <circle cx="0" cy="0" r="106" stroke="#60a5fa" strokeWidth="3" fill="none"
-            strokeDasharray="170 497" strokeLinecap="round" filter="url(#hg-a)" strokeOpacity="0.9"/>
-        </svg>
-
-        <svg style={{ position: 'absolute', top: '50%', left: '50%', overflow: 'visible', pointerEvents: 'none', animation: 'sf-orbit-ccw 9s linear -1.5s infinite' }} width="0" height="0">
-          <defs>
-            <filter id="hg-b" x="-80%" y="-80%" width="260%" height="260%">
-              <feGaussianBlur in="SourceGraphic" stdDeviation="3.5" result="b"/>
-              <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-            </filter>
-          </defs>
-          <circle cx="0" cy="0" r="132" stroke="#a855f7" strokeWidth="2.5" fill="none"
-            strokeDasharray="145 685" strokeLinecap="round" filter="url(#hg-b)" strokeOpacity="0.75"/>
-        </svg>
-
-        <svg style={{ position: 'absolute', top: '50%', left: '50%', overflow: 'visible', pointerEvents: 'none', animation: 'sf-orbit-cw 13s linear -4s infinite' }} width="0" height="0">
-          <defs>
-            <filter id="hg-c" x="-80%" y="-80%" width="260%" height="260%">
-              <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="b"/>
-              <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-            </filter>
-          </defs>
-          <circle cx="0" cy="0" r="161" stroke="#ec4899" strokeWidth="2" fill="none"
-            strokeDasharray="125 887" strokeLinecap="round" filter="url(#hg-c)" strokeOpacity="0.6"/>
-        </svg>
-
-        {/* Orbiting neon dots */}
-        {ORBITERS.map((o, i) => (
-          <div key={`orb-${i}`} style={{
-            position: 'absolute', top: '50%', left: '50%',
-            width: o.r * 2, height: o.r * 2,
-            marginLeft: -o.r, marginTop: -o.r,
-            borderRadius: '50%', pointerEvents: 'none',
-            animation: `sf-orbit-${o.cw ? 'cw' : 'ccw'} ${o.dur}s linear ${o.delay}s infinite`,
-          }}>
-            <div style={{
-              position: 'absolute',
-              top: -o.size / 2, left: '50%', transform: 'translateX(-50%)',
-              width: o.size, height: o.size, borderRadius: '50%',
-              background: o.col,
-              boxShadow: `0 0 ${o.size * 2}px ${o.size}px ${o.col}88, 0 0 ${o.size * 5}px ${o.size * 2}px ${o.col}44`,
-            }} />
+      {/* ── Stage 1 – ÉMERGENCE ─────────────────────────────────── */}
+      {stage === 1 && (
+        <div style={{ position:'absolute', inset:0, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', animation:'sp-fade-in 0.4s ease-out' }}>
+          {/* Deep radial glow behind logo */}
+          <div style={{ position:'absolute', top:'50%', left:'50%', transform:'translate(-50%,-55%)', width:500, height:300, borderRadius:'50%', background:'radial-gradient(ellipse,rgba(88,28,220,0.55) 0%,rgba(60,10,130,0.25) 40%,transparent 70%)', filter:'blur(40px)', animation:'sp-glow-emerge 1.4s ease-out both' }} />
+          {/* Neon floor glow */}
+          <div style={{ position:'absolute', top:'calc(50% + 80px)', left:'50%', transform:'translateX(-50%)', height:12, background:'linear-gradient(90deg,transparent,#7c3aed,#a855f7,#7c3aed,transparent)', borderRadius:99, animation:'sp-neon-floor 1.2s ease-out 0.2s both' }} />
+          {/* Logo */}
+          <div style={{ animation:'sp-logo-emerge 1.2s cubic-bezier(.22,1,.36,1) 0.1s both', marginBottom:44 }}>
+            <SplashLogoBox size={120} />
           </div>
-        ))}
-
-        {/* ScaleFlow S logo — rounded square with spinning neon border */}
-        <div className="sf-logo-anim" style={{ position: 'relative', width: 110, height: 110, zIndex: 2 }}>
-          {/* Spinning neon border — faster on splash */}
-          <div className="logo-neon-ring" style={{
-            position: 'absolute', inset: -3, borderRadius: 28, pointerEvents: 'none',
-            animationDuration: '2.2s',
-          }} />
-          {/* Outer ambient glow */}
-          <div style={{
-            position: 'absolute', inset: -18, borderRadius: 38, pointerEvents: 'none',
-            background: 'radial-gradient(circle, rgba(124,58,237,0.35) 0%, transparent 70%)',
-            filter: 'blur(12px)',
-          }} />
-          {/* Dark background square */}
-          <div style={{
-            position: 'absolute', inset: 0, borderRadius: 26,
-            background: 'linear-gradient(145deg, #0d0820 0%, #100626 50%, #160b30 100%)',
-            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.07)',
-          }} />
-          {/* S logo */}
-          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <ScaleFlowLogoSVG size={80} draw />
+          {/* Title */}
+          <div style={{ display:'flex', alignItems:'baseline', gap:0, animation:'sp-title-emerge 0.8s ease-out 0.7s both', opacity:0 }}>
+            <span style={{ fontSize:44, fontWeight:900, color:'#f0eeff', letterSpacing:'-1.5px', fontFamily:'Inter,system-ui,sans-serif', lineHeight:1 }}>Scale</span>
+            <span style={{ fontSize:44, fontWeight:900, letterSpacing:'-1.5px', fontFamily:'Inter,system-ui,sans-serif', lineHeight:1, background:'linear-gradient(130deg,#8b5cf6 30%,#ec4899 100%)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' }}>Flow</span>
           </div>
         </div>
-      </div>
+      )}
 
-      {/* ── ScaleFlow title ── */}
-      <div style={{ display: 'flex', alignItems: 'baseline', marginBottom: 14 }}>
-        <span className="sf-word-left" style={{
-          fontSize: 42, fontWeight: 900, color: '#f0eeff',
-          letterSpacing: '-1.5px', fontFamily: 'Inter, system-ui, sans-serif',
-          lineHeight: 1,
-        }}>Scale</span>
-        <span className="sf-word-right" style={{
-          fontSize: 42, fontWeight: 900, letterSpacing: '-1.5px',
-          fontFamily: 'Inter, system-ui, sans-serif', lineHeight: 1,
-          background: 'linear-gradient(130deg, #8b5cf6 30%, #ec4899 100%)',
-          WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-        }}>Flow</span>
-      </div>
+      {/* ── Stage 2 – CONNEXION ──────────────────────────────────── */}
+      {stage === 2 && (
+        <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', animation:'sp-fade-in 0.4s ease-out' }}>
+          {/* BG glow */}
+          <div style={{ position:'absolute', top:'50%', left:'50%', transform:'translate(-50%,-50%)', width:600, height:600, borderRadius:'50%', background:'radial-gradient(circle,rgba(88,28,220,0.18) 0%,transparent 65%)', filter:'blur(30px)' }} />
 
-      {/* ── Tagline ── */}
-      <div className="sf-tagline" style={{
-        fontSize: 11, color: '#4a3f7a', letterSpacing: '0.22em',
-        textTransform: 'uppercase', fontFamily: 'Inter, system-ui, sans-serif',
-        marginBottom: 64,
-      }}>
-        Automatise ta croissance
-      </div>
+          {/* SVG orbit lines */}
+          <svg style={{ position:'absolute', top:'50%', left:'50%', overflow:'visible', pointerEvents:'none' }} width="0" height="0">
+            {SP_FEATURES.map((f, i) => {
+              const rad = (f.angle - 90) * Math.PI / 180
+              const R = 148
+              const x2 = Math.cos(rad) * R, y2 = Math.sin(rad) * R
+              return (
+                <line key={i} x1="0" y1="0" x2={x2} y2={y2}
+                  stroke={f.color} strokeWidth="1" strokeDasharray="120" strokeDashoffset="120" strokeOpacity="0.5"
+                  style={{ animation:`sp-line-draw 0.6s ease-out ${i * 0.15}s both` }} />
+              )
+            })}
+          </svg>
 
-      {/* ── Status text ── */}
-      <div key={statusIdx} style={{
-        position: 'absolute', bottom: 42,
-        fontSize: 10, color: '#2a1f48', letterSpacing: '0.12em',
-        fontFamily: 'monospace', textTransform: 'uppercase',
-        transition: 'opacity 0.4s',
-        opacity: fading ? 0 : 1,
-        animation: 'sf-arrow-in 0.4s ease-out',
-      }}>
-        {STATUS_MSGS[statusIdx]}
-      </div>
+          {/* Orbit rings */}
+          {[148, 148].map((r, i) => (
+            <div key={i} style={{ position:'absolute', width:r*2, height:r*2, borderRadius:'50%', border:`1px solid rgba(139,92,246,${0.12 - i*0.04})`, top:'50%', left:'50%', transform:'translate(-50%,-50%)' }} />
+          ))}
 
-      {/* ── Progress bar ── */}
-      <div style={{
-        position: 'absolute', bottom: 0, left: 0, right: 0,
-        height: 2, background: '#0d0a1a',
-      }}>
-        <div className="sf-bar" style={{
-          height: '100%',
-          background: 'linear-gradient(90deg, #3b82f6, #8b5cf6, #ec4899)',
-          borderRadius: 2,
-        }} />
+          {/* Feature icons */}
+          {SP_FEATURES.map((f, i) => {
+            const rad = (f.angle - 90) * Math.PI / 180
+            const R = 148
+            const x = Math.cos(rad) * R, y = Math.sin(rad) * R
+            return (
+              <div key={i} style={{
+                position:'absolute', top:'50%', left:'50%',
+                transform:`translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`,
+                animation:`sp-scale-in 0.5s cubic-bezier(.22,1,.36,1) ${0.15 + i*0.12}s both`,
+              }}>
+                <div style={{
+                  width:46, height:46, borderRadius:14, display:'flex', alignItems:'center', justifyContent:'center',
+                  background:`linear-gradient(135deg,${f.color}22,${f.color}11)`,
+                  border:`1px solid ${f.color}55`,
+                  boxShadow:`0 0 18px 4px ${f.color}44`,
+                  color: f.color,
+                  animation:`sp-pulse-conn 2s ease-in-out ${i*0.3}s infinite`,
+                  ['--c' as string]: f.color + '44',
+                }}>
+                  {f.icon}
+                </div>
+                <p style={{ textAlign:'center', fontSize:9, fontWeight:700, color:'rgba(196,181,253,0.6)', marginTop:5, letterSpacing:'0.05em', textTransform:'uppercase' }}>{f.label}</p>
+              </div>
+            )
+          })}
+
+          {/* Center logo */}
+          <div style={{ position:'relative', zIndex:10 }}>
+            <SplashLogoBox size={110} />
+          </div>
+        </div>
+      )}
+
+      {/* ── Stage 3 – ACCÉLÉRATION ───────────────────────────────── */}
+      {stage === 3 && (
+        <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', animation:'sp-fade-in 0.3s ease-out' }}>
+          {/* Background intensification */}
+          <div style={{ position:'absolute', inset:0, background:'radial-gradient(ellipse 80% 80% at 50% 50%,rgba(88,28,220,0.35) 0%,transparent 70%)', animation:'sp-glow-emerge 0.5s ease-out both' }} />
+
+          {/* Neon rays */}
+          {SP_RAYS.map((ray, i) => (
+            <div key={i} style={{
+              position:'absolute', top:'50%', left:'50%',
+              transformOrigin:'left center',
+              height: ray.width,
+              width: ray.length,
+              background:`linear-gradient(90deg,${ray.color},${ray.color}88,transparent)`,
+              borderRadius:99,
+              filter:`blur(${i%3===0?1.5:0.8}px)`,
+              boxShadow:`0 0 6px 1px ${ray.color}66`,
+              animation:`sp-ray-shoot 1.1s ease-out ${ray.delay}s both`,
+              ['--a' as string]: `${ray.angle}deg`,
+            }} />
+          ))}
+
+          {/* Center burst ring */}
+          <div style={{ position:'absolute', top:'50%', left:'50%', width:180, height:180, marginLeft:-90, marginTop:-90, borderRadius:'50%', border:'2px solid rgba(139,92,246,0.8)', animation:'sp-center-burst 0.9s ease-out both' }} />
+          <div style={{ position:'absolute', top:'50%', left:'50%', width:100, height:100, marginLeft:-50, marginTop:-50, borderRadius:'50%', border:'1.5px solid rgba(168,85,247,0.9)', animation:'sp-center-burst 0.9s ease-out 0.15s both' }} />
+
+          {/* Logo center glow */}
+          <div style={{ position:'relative', zIndex:10, animation:`sp-logo-pulse-accel 0.8s ease-in-out infinite` }}>
+            <SplashLogoBox size={110} />
+          </div>
+
+          {/* Speed lines caption */}
+          <div style={{ position:'absolute', bottom:80, left:'50%', transform:'translateX(-50%)', whiteSpace:'nowrap', fontSize:11, fontWeight:700, letterSpacing:'0.35em', textTransform:'uppercase', color:'rgba(139,92,246,0.55)', animation:'sp-fade-in 0.5s ease-out 0.3s both', opacity:0 }}>
+            Accélération
+          </div>
+        </div>
+      )}
+
+      {/* ── Stage 4 – OUVERTURE ──────────────────────────────────── */}
+      {stage === 4 && (
+        <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', animation:'sp-fade-in 0.35s ease-out' }}>
+          {/* BG glow */}
+          <div style={{ position:'absolute', top:'50%', left:'50%', transform:'translate(-50%,-50%)', width:500, height:500, borderRadius:'50%', background:'radial-gradient(circle,rgba(88,28,220,0.22) 0%,transparent 65%)', filter:'blur(50px)' }} />
+
+          {/* Door frame */}
+          <div style={{ position:'relative', width:260, height:340, overflow:'visible' }}>
+            {/* Neon door outline */}
+            <div style={{ position:'absolute', inset:0, border:'2px solid rgba(139,92,246,0.7)', borderRadius:12, boxShadow:'0 0 20px 4px rgba(139,92,246,0.4), inset 0 0 30px rgba(139,92,246,0.1)', animation:'sp-door-logo-in 0.5s ease-out both' }} />
+
+            {/* Left door panel */}
+            <div style={{ position:'absolute', top:0, left:0, width:'50%', height:'100%', background:'linear-gradient(90deg,rgba(5,2,20,0.95),rgba(10,4,30,0.9))', borderRadius:'12px 0 0 12px', animation:'sp-door-left 0.8s cubic-bezier(.22,1,.36,1) 0.3s both', transformOrigin:'left center' }}>
+              <div style={{ position:'absolute', right:0, top:0, bottom:0, width:1, background:'linear-gradient(180deg,transparent,#7c3aed,#a855f7,transparent)', animation:'sp-door-glow 0.8s ease-out 0.3s both' }} />
+            </div>
+            {/* Right door panel */}
+            <div style={{ position:'absolute', top:0, right:0, width:'50%', height:'100%', background:'linear-gradient(270deg,rgba(5,2,20,0.95),rgba(10,4,30,0.9))', borderRadius:'0 12px 12px 0', animation:'sp-door-right 0.8s cubic-bezier(.22,1,.36,1) 0.3s both', transformOrigin:'right center' }}>
+              <div style={{ position:'absolute', left:0, top:0, bottom:0, width:1, background:'linear-gradient(180deg,transparent,#a855f7,#7c3aed,transparent)', animation:'sp-door-glow 0.8s ease-out 0.3s both' }} />
+            </div>
+
+            {/* Light burst from door center */}
+            <div style={{ position:'absolute', top:'50%', left:'50%', transform:'translate(-50%,-50%)', width:200, height:200, borderRadius:'50%', background:'radial-gradient(circle,rgba(139,92,246,0.6) 0%,rgba(88,28,220,0.15) 40%,transparent 70%)', filter:'blur(20px)', animation:'sp-door-glow 0.7s ease-out 0.5s both', opacity:0 }} />
+
+            {/* Logo in door center */}
+            <div style={{ position:'absolute', top:'50%', left:'50%', transform:'translate(-50%,-50%)', zIndex:10, animation:'sp-door-logo-in 0.5s cubic-bezier(.22,1,.36,1) 0.1s both' }}>
+              <SplashLogoBox size={100} />
+            </div>
+          </div>
+
+          {/* "Enter the cockpit" */}
+          <div style={{ position:'absolute', bottom:90, left:'50%', transform:'translateX(-50%)', whiteSpace:'nowrap', fontSize:11, fontWeight:700, letterSpacing:'0.35em', textTransform:'uppercase', color:'rgba(196,181,253,0.5)', animation:'sp-door-title 0.5s ease-out 0.6s both', opacity:0 }}>
+            Bienvenue dans ton cockpit
+          </div>
+        </div>
+      )}
+
+      {/* ── Stage 5 – RÉVÉLATION ─────────────────────────────────── */}
+      {stage === 5 && (
+        <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', animation:'sp-fade-in 0.4s ease-out' }}>
+          {/* BG */}
+          <div style={{ position:'absolute', inset:0, background:'radial-gradient(ellipse 70% 60% at 50% 45%,rgba(60,20,140,0.25) 0%,transparent 70%)', filter:'blur(20px)' }} />
+
+          {/* App window mockup */}
+          <div style={{
+            width:480, borderRadius:16, overflow:'hidden',
+            background:'linear-gradient(145deg,#08080F,#0B0B14)',
+            border:'1px solid rgba(139,92,246,0.2)',
+            boxShadow:'0 0 80px 20px rgba(124,58,237,0.18), 0 40px 80px rgba(0,0,0,0.8)',
+            animation:'sp-ui-slide-up 0.8s cubic-bezier(.22,1,.36,1) 0.1s both, sp-ui-glow 2s ease-in-out 0.9s infinite',
+          }}>
+            {/* Window titlebar */}
+            <div style={{ height:40, background:'rgba(255,255,255,0.03)', borderBottom:'1px solid rgba(255,255,255,0.07)', display:'flex', alignItems:'center', justifyContent:'space-between', padding:'0 16px' }}>
+              <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                <div style={{ width:26, height:26, borderRadius:8, background:'linear-gradient(135deg,#7c3aed,#a855f7)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                  <ScaleFlowLogoSVG size={18} />
+                </div>
+                <span style={{ fontSize:12, fontWeight:700, color:'rgba(255,255,255,0.85)' }}>ScaleFlow</span>
+                <span style={{ fontSize:10, color:'rgba(34,197,94,0.8)', background:'rgba(34,197,94,0.1)', border:'1px solid rgba(34,197,94,0.2)', borderRadius:99, padding:'2px 7px', fontWeight:600 }}>● Live</span>
+              </div>
+              <div style={{ display:'flex', gap:6 }}>
+                {['#ef4444','#f59e0b','#22c55e'].map((c,i) => <div key={i} style={{ width:10, height:10, borderRadius:'50%', background:c, opacity:0.6 }} />)}
+              </div>
+            </div>
+            {/* App content */}
+            <div style={{ display:'flex', height:220 }}>
+              {/* Sidebar */}
+              <div style={{ width:130, background:'rgba(0,0,0,0.4)', borderRight:'1px solid rgba(255,255,255,0.05)', padding:'12px 0' }}>
+                {['Tableau de bord','Téléphones','Posting','Mass Posting','Banque vidéos','Programmation','Warmup','Outils IA'].map((item, i) => (
+                  <div key={i} style={{ padding:'6px 12px', fontSize:10, color: i===0 ? '#C4B5FD' : 'rgba(148,163,184,0.45)', fontWeight: i===0 ? 700 : 400, background: i===0 ? 'rgba(139,92,246,0.12)' : 'transparent', borderLeft: i===0 ? '2px solid #8B5CF6' : '2px solid transparent', display:'flex', alignItems:'center', gap:6 }}>
+                    <div style={{ width:5, height:5, borderRadius:'50%', background: i===0 ? '#8B5CF6' : 'rgba(148,163,184,0.2)' }} />
+                    {item}
+                  </div>
+                ))}
+              </div>
+              {/* Main */}
+              <div style={{ flex:1, padding:'14px 16px' }}>
+                <p style={{ fontSize:14, fontWeight:800, color:'rgba(255,255,255,0.9)', marginBottom:4 }}>Bienvenue sur ScaleFlow 🔥</p>
+                <p style={{ fontSize:9, color:'rgba(148,163,184,0.5)', marginBottom:12 }}>Prêt à faire passer ta gestion de contenu au niveau supérieur ?</p>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6, marginBottom:12 }}>
+                  {[['312','Téléphones','En ligne','#00ccaa'],['24','Postes programmés','Aujourd\'hui','#60a5fa'],['1 248','Vidéos','Dans la banque','#a855f7']].map(([v,l,s,c],i) => (
+                    <div key={i} style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.07)', borderRadius:8, padding:'8px 10px' }}>
+                      <p style={{ fontSize:16, fontWeight:900, color: c as string, lineHeight:1 }}>{v}</p>
+                      <p style={{ fontSize:8, color:'rgba(148,163,184,0.7)', marginTop:2 }}>{l}</p>
+                      <p style={{ fontSize:8, color: c as string, marginTop:1 }}>{s}</p>
+                    </div>
+                  ))}
+                </div>
+                <p style={{ fontSize:9, fontWeight:600, color:'rgba(148,163,184,0.4)', marginBottom:6, textTransform:'uppercase', letterSpacing:'0.1em' }}>Activité récente</p>
+                {[['Post Instagram','Programmé'],['Mass Posting','Terminé'],['Remix vidéo','Terminé']].map(([a,s],i) => (
+                  <div key={i} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'4px 0', borderBottom:'1px solid rgba(255,255,255,0.04)' }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                      <div style={{ width:18, height:18, borderRadius:5, background:['rgba(139,92,246,0.2)','rgba(37,99,235,0.2)','rgba(239,68,68,0.2)'][i], display:'flex', alignItems:'center', justifyContent:'center' }}>
+                        <div style={{ width:6, height:6, borderRadius:1, background:['#a78bfa','#60a5fa','#f87171'][i] }} />
+                      </div>
+                      <span style={{ fontSize:9, color:'rgba(226,232,240,0.7)', fontWeight:600 }}>{a}</span>
+                    </div>
+                    <span style={{ fontSize:8, color:s==='Terminé'?'#34d399':'#60a5fa', background:s==='Terminé'?'rgba(52,211,153,0.1)':'rgba(96,165,250,0.1)', borderRadius:99, padding:'2px 6px' }}>{s}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Caption */}
+          <div style={{ position:'absolute', bottom:60, left:'50%', transform:'translateX(-50%)', whiteSpace:'nowrap', fontSize:11, fontWeight:600, letterSpacing:'0.2em', textTransform:'uppercase', color:'rgba(196,181,253,0.45)', animation:'sp-fade-in 0.5s ease-out 0.5s both', opacity:0 }}>
+            Ton interface. Ton cockpit.
+          </div>
+        </div>
+      )}
+
+      {/* ── Stage 6 – PRÊT À PERFORMER ───────────────────────────── */}
+      {stage === 6 && (
+        <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', animation:'sp-ready-bg 0.5s ease-out both' }}>
+          {/* Wave background */}
+          <div style={{ position:'absolute', inset:0, overflow:'hidden', pointerEvents:'none' }}>
+            {[0,1,2].map(i => (
+              <div key={i} style={{ position:'absolute', bottom: -80 + i*60, left:'-10%', right:'-10%', height:120, background:`linear-gradient(90deg,transparent,${['rgba(124,58,237,0.15)','rgba(168,85,247,0.1)','rgba(96,165,250,0.08)'][i]},transparent)`, borderRadius:'50%', filter:'blur(30px)', animation:`sp-wave ${3+i*0.7}s ease-in-out ${i*0.4}s infinite alternate` }} />
+            ))}
+          </div>
+          {/* Deep glow */}
+          <div style={{ position:'absolute', top:'50%', left:'50%', transform:'translate(-50%,-50%)', width:700, height:400, borderRadius:'50%', background:'radial-gradient(ellipse,rgba(88,28,220,0.2) 0%,transparent 70%)', filter:'blur(40px)' }} />
+
+          {/* Content */}
+          <div style={{ display:'flex', alignItems:'center', gap:48, zIndex:10 }}>
+            {/* Logo */}
+            <div style={{ animation:'sp-ready-logo 0.7s cubic-bezier(.22,1,.36,1) both', flexShrink:0 }}>
+              <SplashLogoBox size={96} />
+            </div>
+            {/* Text */}
+            <div style={{ animation:'sp-ready-title 0.7s cubic-bezier(.22,1,.36,1) 0.1s both', opacity:0 }}>
+              <div style={{ display:'flex', alignItems:'baseline', gap:0, marginBottom:8 }}>
+                <span style={{ fontSize:52, fontWeight:900, color:'#f0eeff', letterSpacing:'-2px', fontFamily:'Inter,system-ui,sans-serif', lineHeight:1 }}>Scale</span>
+                <span style={{ fontSize:52, fontWeight:900, letterSpacing:'-2px', fontFamily:'Inter,system-ui,sans-serif', lineHeight:1, background:'linear-gradient(130deg,#8b5cf6 30%,#ec4899 100%)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' }}>Flow</span>
+              </div>
+              <div style={{ animation:'sp-ready-tagline 0.6s ease-out 0.35s both', opacity:0 }}>
+                {['Automatise.','Planifie.','Développe.'].map((w, i) => (
+                  <span key={i} style={{ fontSize:16, fontWeight:600, color: i===0?'#a78bfa':i===1?'#818cf8':'rgba(196,181,253,0.6)', marginRight:10, animation:`sp-fade-in 0.4s ease-out ${0.5+i*0.12}s both`, display:'inline-block', opacity:0 }}>{w}</span>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Progress bar (all stages) ────────────────────────────── */}
+      <div style={{ position:'absolute', bottom:0, left:0, right:0, height:2, background:'rgba(255,255,255,0.04)' }}>
+        <div className="sp-progress-bar" style={{ height:'100%', background:'linear-gradient(90deg,#3b82f6,#8b5cf6,#ec4899)', borderRadius:2, ['--dur' as string]:`${SPLASH_DURATION / 1000}s` }} />
       </div>
     </div>
   )
