@@ -31,7 +31,7 @@ const THEME_COLORS: Record<string, string> = {
 
 // ── Shared toggle row ────────────────────────────────────────────────────────
 function ToggleRow({
-  checked, onChange, title, sub, accent,
+  checked, onChange, title, sub, accent: _accent,
 }: {
   checked: boolean
   onChange: (v: boolean) => void
@@ -40,28 +40,93 @@ function ToggleRow({
   accent?: boolean
 }) {
   return (
-    <label className="flex items-center gap-3 cursor-pointer group">
-      {/* Custom toggle pill */}
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }} onClick={() => onChange(!checked)}>
       <div
-        style={{
-          position: 'relative', flexShrink: 0, width: 40, height: 20, borderRadius: 999,
-          transition: 'all 0.2s',
-          background: checked ? 'linear-gradient(135deg, #7C3AED, #6D28D9)' : 'rgba(255,255,255,0.08)',
-          border: checked ? 'none' : '1px solid rgba(255,255,255,0.1)',
-        }}
-        onClick={() => onChange(!checked)}
+        className={`sf-toggle-track ${checked ? 'on' : 'off'}`}
+        onClick={e => { e.stopPropagation(); onChange(!checked) }}
       >
+        <span className="sf-toggle-thumb" />
+      </div>
+      <div style={{ flex: 1, userSelect: 'none' }}>
+        <p style={{ fontSize: 13, fontWeight: 500, color: checked ? '#F2F0FF' : 'rgba(196,181,253,0.72)', margin: 0, transition: 'color 140ms ease' }}>{title}</p>
+        <p style={{ fontSize: 12, color: 'rgba(148,163,184,0.5)', marginTop: 2, marginBottom: 0 }}>{sub}</p>
+      </div>
+    </div>
+  )
+}
+
+// ── Premium nav item with glow bar ────────────────────────────────────────────
+function NavItem({ active, icon, label, onClick, S }: {
+  active: boolean; icon: JSX.Element; label: string; onClick: () => void
+  S: { text: string; text3: string; accent: string; accent3: string; surface2: string }
+}) {
+  const [hovered, setHovered] = useState(false)
+  const [pressed, setPressed] = useState(false)
+
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => { setHovered(false); setPressed(false) }}
+      onMouseDown={() => setPressed(true)}
+      onMouseUp={() => setPressed(false)}
+      style={{
+        position: 'relative', display: 'flex', alignItems: 'center', gap: 9,
+        height: 36, padding: '0 12px',
+        borderRadius: 8, fontSize: 13, fontWeight: active ? 500 : 400,
+        textAlign: 'left', border: 'none', cursor: 'pointer',
+        background: active ? 'rgba(139,92,246,0.1)' : hovered ? 'rgba(255,255,255,0.04)' : 'transparent',
+        color: active ? '#F2F0FF' : hovered ? 'rgba(241,240,247,0.85)' : S.text3,
+        transition: 'background 140ms ease, color 140ms ease',
+        transform: pressed ? 'scale(0.97)' : 'scale(1)',
+        width: '100%',
+      }}
+    >
+      {active && (
         <span style={{
-          position: 'absolute', top: 2, left: checked ? 22 : 2, width: 16, height: 16,
-          borderRadius: '50%', background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.4)',
-          transition: 'left 0.2s',
+          position: 'absolute', left: 0, top: 7, bottom: 7, width: 2,
+          background: 'linear-gradient(180deg,#A78BFA,#7C3AED)',
+          boxShadow: '0 0 8px rgba(139,92,246,0.7)',
+          borderRadius: 2,
         }} />
-      </div>
-      <div style={{ flex: 1, userSelect: 'none' }} onClick={() => onChange(!checked)}>
-        <p style={{ fontSize: 13, fontWeight: 500, color: checked ? '#F2F0FF' : 'rgba(148,163,184,0.7)', margin: 0 }}>{title}</p>
-        <p style={{ fontSize: 12, color: 'rgba(148,163,184,0.45)', marginTop: 2, marginBottom: 0 }}>{sub}</p>
-      </div>
-    </label>
+      )}
+      <span style={{ color: active ? S.accent3 : hovered ? 'rgba(167,139,250,0.8)' : 'currentColor', display: 'flex', alignItems: 'center', transition: 'color 140ms ease' }}>
+        {icon}
+      </span>
+      {label}
+    </button>
+  )
+}
+
+// ── Sub-tab underline button ───────────────────────────────────────────────────
+function SubTabBtn({ active, icon, label, onClick, S }: {
+  active: boolean; icon: JSX.Element; label: string; onClick: () => void
+  S: { text: string; text3: string; accent: string; accent3: string }
+}) {
+  const [hovered, setHovered] = useState(false)
+
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 7,
+        padding: '0 14px', height: 40, fontSize: 13,
+        fontWeight: active ? 600 : 400,
+        color: active ? '#F2F0FF' : hovered ? 'rgba(196,181,253,0.7)' : 'rgba(148,163,184,0.45)',
+        background: 'transparent', border: 'none',
+        borderBottom: active ? '2px solid #7C3AED' : '2px solid transparent',
+        marginBottom: -1, cursor: 'pointer',
+        transition: 'color 120ms ease, border-color 120ms ease',
+        flexShrink: 0,
+      }}
+    >
+      <span style={{ color: active ? S.accent3 : hovered ? 'rgba(167,139,250,0.7)' : 'currentColor', display: 'flex', alignItems: 'center', transition: 'color 120ms ease' }}>
+        {icon}
+      </span>
+      {label}
+    </button>
   )
 }
 
@@ -392,18 +457,14 @@ export function Settings({ user, initialPanel, initialTab }: SettingsProps) {
     onChange: (v: string) => void; options: { value: string; label: string }[]
   }) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
         <div>
           <p style={{ fontSize: 13, fontWeight: 500, color: '#F2F0FF', margin: 0 }}>{label}</p>
-          <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.52)', marginTop: 2, marginBottom: 0 }}>{sub}</p>
+          <p style={{ fontSize: 12, color: 'rgba(148,163,184,0.5)', marginTop: 2, marginBottom: 0 }}>{sub}</p>
         </div>
         <div style={{ position: 'relative', flexShrink: 0 }}>
-          <select value={value} onChange={e => onChange(e.target.value)}
-            style={{
-              appearance: 'none', background: '#111120', border: '1px solid rgba(255,255,255,0.09)',
-              borderRadius: 8, padding: '7px 28px 7px 10px', fontSize: 12, fontWeight: 500,
-              color: '#F2F0FF', outline: 'none', cursor: 'pointer',
-            }}>
+          <select value={value} onChange={e => onChange(e.target.value)} className="sf-input"
+            style={{ appearance: 'none', padding: '7px 28px 7px 10px', fontSize: 12, fontWeight: 500, cursor: 'pointer', minWidth: 130 }}>
             {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
           <span style={{ position: 'absolute', right: 9, top: '50%', transform: 'translateY(-50%)', fontSize: 9, color: 'rgba(148,163,184,0.4)', pointerEvents: 'none' }}>▼</span>
@@ -416,23 +477,17 @@ export function Settings({ user, initialPanel, initialTab }: SettingsProps) {
     label: string; sub: string; checked: boolean; onChange: (v: boolean) => void
   }) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
         <div style={{ flex: 1, paddingRight: 16 }}>
           <p style={{ fontSize: 13, fontWeight: 500, color: '#F2F0FF', margin: 0 }}>{label}</p>
-          <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.52)', marginTop: 2, marginBottom: 0 }}>{sub}</p>
+          <p style={{ fontSize: 12, color: 'rgba(148,163,184,0.5)', marginTop: 2, marginBottom: 0 }}>{sub}</p>
         </div>
-        <button onClick={() => onChange(!checked)} style={{
-          position: 'relative', flexShrink: 0, width: 40, height: 20, borderRadius: 999,
-          border: checked ? 'none' : '1px solid rgba(255,255,255,0.1)',
-          background: checked ? 'linear-gradient(135deg, #7C3AED, #6D28D9)' : 'rgba(255,255,255,0.08)',
-          cursor: 'pointer', transition: 'all 0.2s',
-        }}>
-          <span style={{
-            position: 'absolute', top: 2, width: 16, height: 16, borderRadius: '50%',
-            background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.4)',
-            left: checked ? 22 : 2, transition: 'left 0.2s',
-          }} />
-        </button>
+        <div
+          className={`sf-toggle-track ${checked ? 'on' : 'off'}`}
+          onClick={() => onChange(!checked)}
+        >
+          <span className="sf-toggle-thumb" />
+        </div>
       </div>
     )
   }
@@ -459,6 +514,15 @@ export function Settings({ user, initialPanel, initialTab }: SettingsProps) {
     border: `1px solid ${S.border}`,
     borderRadius: 15,
     padding: '20px 24px',
+    marginBottom: 0,
+  }
+
+  const cardTitleSt: React.CSSProperties = {
+    fontSize: 13, fontWeight: 700, color: S.text, marginBottom: 4, marginTop: 0,
+  }
+
+  const cardSubSt: React.CSSProperties = {
+    fontSize: 11, color: S.text3, marginTop: 0, marginBottom: 14,
   }
 
   const mainNavItems = [
@@ -505,14 +569,8 @@ export function Settings({ user, initialPanel, initialTab }: SettingsProps) {
           <button
             onClick={panel === 'profile' ? saveProfile : panel === 'connexions' ? saveConnexions : save}
             disabled={saving}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 7,
-              padding: '9px 18px', borderRadius: 8,
-              background: 'linear-gradient(135deg, #7C3AED, #6D28D9)',
-              color: '#fff', fontWeight: 600, fontSize: 13,
-              border: 'none', cursor: saving ? 'not-allowed' : 'pointer',
-              opacity: saving ? 0.6 : 1, transition: 'opacity 0.15s',
-            }}>
+            className="sf-btn sf-btn-primary"
+            style={{ display: 'flex', alignItems: 'center', gap: 7, opacity: saving ? 0.6 : 1 }}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
             </svg>
@@ -536,23 +594,7 @@ export function Settings({ user, initialPanel, initialTab }: SettingsProps) {
           {mainNavItems.map(item => {
             const active = panel === item.k
             return (
-              <button key={item.k} onClick={() => setPanel(item.k)} style={{
-                display: 'flex', alignItems: 'center', gap: 9,
-                height: 36, padding: '0 10px 0 12px',
-                borderRadius: 8, fontSize: 13, fontWeight: active ? 600 : 400,
-                textAlign: 'left', border: 'none', cursor: 'pointer',
-                background: active ? S.surface2 : 'transparent',
-                color: active ? S.text : S.text3,
-                borderLeft: active ? `2px solid ${S.accent}` : '2px solid transparent',
-                transition: 'all 0.15s',
-              }}
-              onMouseEnter={e => { if (!active) { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.04)'; (e.currentTarget as HTMLButtonElement).style.color = S.text } }}
-              onMouseLeave={e => { if (!active) { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; (e.currentTarget as HTMLButtonElement).style.color = S.text3 } }}>
-                <span style={{ color: active ? S.accent3 : 'currentColor', display: 'flex', alignItems: 'center' }}>
-                  {NAV_ICONS[item.k]}
-                </span>
-                {item.l}
-              </button>
+              <NavItem key={item.k} active={active} icon={NAV_ICONS[item.k]} label={item.l} onClick={() => setPanel(item.k)} S={S} />
             )
           })}
 
@@ -587,25 +629,13 @@ export function Settings({ user, initialPanel, initialTab }: SettingsProps) {
               {/* Sub-tab bar */}
               <div style={{
                 flexShrink: 0, display: 'flex', gap: 0,
-                borderBottom: `1px solid ${S.border}`,
+                borderBottom: '1px solid rgba(255,255,255,0.06)',
                 padding: '0 28px',
               }}>
                 {GEN_SIDEBAR.map(item => {
                   const active = genTab === item.id
                   return (
-                    <button key={item.id} onClick={() => setGenTab(item.id)} style={{
-                      display: 'flex', alignItems: 'center', gap: 7,
-                      padding: '12px 14px', fontSize: 13, fontWeight: active ? 600 : 400,
-                      color: active ? S.text : S.text3,
-                      background: 'transparent', border: 'none',
-                      borderBottom: active ? `2px solid ${S.accent}` : '2px solid transparent',
-                      marginBottom: -1, cursor: 'pointer', transition: 'all 0.15s',
-                    }}>
-                      <span style={{ color: active ? S.accent3 : 'currentColor', display: 'flex', alignItems: 'center' }}>
-                        {GEN_ICONS[item.id]}
-                      </span>
-                      {item.label}
-                    </button>
+                    <SubTabBtn key={item.id} active={active} icon={GEN_ICONS[item.id]} label={item.label} onClick={() => setGenTab(item.id)} S={S} />
                   )
                 })}
               </div>
@@ -615,7 +645,7 @@ export function Settings({ user, initialPanel, initialTab }: SettingsProps) {
 
                 {/* ── APPARENCE ─────────────────────────────────────────── */}
                 {genTab === 'apparence' && (
-                  <div style={{ maxWidth: 640, display: 'flex', flexDirection: 'column', gap: 20 }}>
+                  <div className="sf-anim-slide-up" style={{ maxWidth: 640, display: 'flex', flexDirection: 'column', gap: 20 }}>
                     <div>
                       <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0 }}>Apparence</h2>
                       <p style={{ fontSize: 13, color: S.text3, margin: '4px 0 0' }}>Personnalise l'apparence de ton interface.</p>
@@ -624,8 +654,8 @@ export function Settings({ user, initialPanel, initialTab }: SettingsProps) {
                     {/* Thème de couleur */}
                     <div style={cardSt}>
                       <div style={{ marginBottom: 14 }}>
-                        <h3 style={{ fontSize: 13, fontWeight: 600, color: S.text, margin: 0 }}>Thème de couleur</h3>
-                        <p style={{ fontSize: 11, color: S.text3, margin: '3px 0 0' }}>Cette couleur sera utilisée pour les accents et éléments interactifs.</p>
+                        <h3 style={cardTitleSt}>Thème de couleur</h3>
+                        <p style={cardSubSt}>Cette couleur sera utilisée pour les accents et éléments interactifs.</p>
                       </div>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
                         {THEMES.map(t => (
@@ -684,8 +714,8 @@ export function Settings({ user, initialPanel, initialTab }: SettingsProps) {
                     {/* Aperçu */}
                     <div style={cardSt}>
                       <div style={{ marginBottom: 12 }}>
-                        <h3 style={{ fontSize: 13, fontWeight: 600, color: S.text, margin: 0 }}>Aperçu</h3>
-                        <p style={{ fontSize: 11, color: S.text3, margin: '3px 0 0' }}>Voici un aperçu de ton interface avec ces paramètres.</p>
+                        <h3 style={cardTitleSt}>Aperçu</h3>
+                        <p style={cardSubSt}>Voici un aperçu de ton interface avec ces paramètres.</p>
                       </div>
                       <div style={{ borderRadius: 11, overflow: 'hidden', background: 'rgba(0,0,0,0.3)', border: `1px solid ${S.border}`, height: 100 }}>
                         <div style={{ display: 'flex', height: '100%' }}>
@@ -706,7 +736,7 @@ export function Settings({ user, initialPanel, initialTab }: SettingsProps) {
 
                 {/* ── SONS ──────────────────────────────────────────────── */}
                 {genTab === 'sons' && (
-                  <div style={{ maxWidth: 640, display: 'flex', flexDirection: 'column', gap: 20 }}>
+                  <div className="sf-anim-slide-up" style={{ maxWidth: 640, display: 'flex', flexDirection: 'column', gap: 20 }}>
                     <div>
                       <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0 }}>Sons</h2>
                       <p style={{ fontSize: 13, color: S.text3, margin: '4px 0 0' }}>Gère les sons et la musique d'ambiance de l'application.</p>
@@ -719,7 +749,7 @@ export function Settings({ user, initialPanel, initialTab }: SettingsProps) {
                     </div>
                     {musicOn && (
                       <div style={cardSt}>
-                        <h3 style={{ fontSize: 13, fontWeight: 600, color: S.text, margin: '0 0 12px' }}>Piste musicale</h3>
+                        <h3 style={cardTitleSt}>Piste musicale</h3>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
                           {TRACKS.map((tr, i) => (
                             <button key={i} onClick={() => { setMusicTrackS(i); setTrack(i) }} style={{
@@ -752,13 +782,13 @@ export function Settings({ user, initialPanel, initialTab }: SettingsProps) {
 
                 {/* ── NOTIFICATIONS ─────────────────────────────────────── */}
                 {genTab === 'notifications' && (
-                  <div style={{ maxWidth: 640, display: 'flex', flexDirection: 'column', gap: 20 }}>
+                  <div className="sf-anim-slide-up" style={{ maxWidth: 640, display: 'flex', flexDirection: 'column', gap: 20 }}>
                     <div>
                       <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0 }}>Notifications</h2>
                       <p style={{ fontSize: 13, color: S.text3, margin: '4px 0 0' }}>Choisis comment et quand tu souhaites être notifié.</p>
                     </div>
                     <div style={cardSt}>
-                      <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: S.text3, margin: '0 0 12px' }}>In-app</h3>
+                      <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: S.text3, margin: '0 0 14px' }}>In-app</h3>
                       <SettingToggle label="Notifications popup" sub="Affiche une notification en haut à droite lors d'actions importantes."
                         checked={notifyPopup} onChange={v => setNotifyPopup(v)} />
                       <SettingToggle label="Alertes d'erreurs" sub="Affiche les erreurs critiques de manière visible."
@@ -767,7 +797,7 @@ export function Settings({ user, initialPanel, initialTab }: SettingsProps) {
                         checked={notifyUpdates} onChange={v => setNotifyUpdates(v)} />
                     </div>
                     <div style={cardSt}>
-                      <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: S.text3, margin: '0 0 12px' }}>Système</h3>
+                      <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: S.text3, margin: '0 0 14px' }}>Système</h3>
                       <SettingToggle
                         label="Notifications bureau"
                         sub="Envoie des notifications natives du système d'exploitation."
@@ -793,7 +823,7 @@ export function Settings({ user, initialPanel, initialTab }: SettingsProps) {
 
                 {/* ── LANGUE & RÉGION ────────────────────────────────────── */}
                 {genTab === 'langue' && (
-                  <div style={{ maxWidth: 640, display: 'flex', flexDirection: 'column', gap: 20 }}>
+                  <div className="sf-anim-slide-up" style={{ maxWidth: 640, display: 'flex', flexDirection: 'column', gap: 20 }}>
                     <div>
                       <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0 }}>Langue & région</h2>
                       <p style={{ fontSize: 13, color: S.text3, margin: '4px 0 0' }}>Personnalise la langue et les paramètres régionaux.</p>
@@ -827,7 +857,7 @@ export function Settings({ user, initialPanel, initialTab }: SettingsProps) {
 
                 {/* ── SÉCURITÉ ──────────────────────────────────────────── */}
                 {genTab === 'securite' && (
-                  <div style={{ maxWidth: 640, display: 'flex', flexDirection: 'column', gap: 20 }}>
+                  <div className="sf-anim-slide-up" style={{ maxWidth: 640, display: 'flex', flexDirection: 'column', gap: 20 }}>
                     <div>
                       <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0 }}>Sécurité</h2>
                       <p style={{ fontSize: 13, color: S.text3, margin: '4px 0 0' }}>Gère la sécurité et l'accès à ton compte.</p>
@@ -835,7 +865,7 @@ export function Settings({ user, initialPanel, initialTab }: SettingsProps) {
 
                     {/* Session info */}
                     <div style={cardSt}>
-                      <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: S.text3, margin: '0 0 12px' }}>Session active</h3>
+                      <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: S.text3, margin: '0 0 14px' }}>Session active</h3>
                       {[
                         { label: 'Compte',       value: user.email ?? '—' },
                         { label: 'Connecté le',  value: user.created_at ? new Date(user.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : '—' },
@@ -865,11 +895,12 @@ export function Settings({ user, initialPanel, initialTab }: SettingsProps) {
 
                     {/* Actions */}
                     <div style={cardSt}>
-                      <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: S.text3, margin: '0 0 12px' }}>Actions de compte</h3>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: S.text3, margin: '0 0 14px' }}>Actions de compte</h3>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                         <button
                           onClick={async () => { await supabase.auth.signOut() }}
-                          style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '9px 12px', borderRadius: 8, fontSize: 13, fontWeight: 500, textAlign: 'left', border: 'none', cursor: 'pointer', background: 'rgba(239,68,68,0.08)', color: '#EF4444', width: '100%' }}>
+                          className="sf-btn sf-btn-danger sf-btn-sm"
+                          style={{ display: 'flex', alignItems: 'center', gap: 9, textAlign: 'left', width: '100%' }}>
                           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
                           Déconnexion
                         </button>
@@ -878,7 +909,8 @@ export function Settings({ user, initialPanel, initialTab }: SettingsProps) {
                             const { error } = await supabase.auth.resetPasswordForEmail(user.email ?? '')
                             if (!error) setError(null)
                           }}
-                          style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '9px 12px', borderRadius: 8, fontSize: 13, fontWeight: 500, textAlign: 'left', border: 'none', cursor: 'pointer', background: 'transparent', color: S.text3, width: '100%' }}>
+                          className="sf-btn sf-btn-ghost sf-btn-sm"
+                          style={{ display: 'flex', alignItems: 'center', gap: 9, textAlign: 'left', width: '100%' }}>
                           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
                           Envoyer un email de réinitialisation de mot de passe
                         </button>
@@ -889,7 +921,7 @@ export function Settings({ user, initialPanel, initialTab }: SettingsProps) {
 
                 {/* ── AVANCÉ ────────────────────────────────────────────── */}
                 {genTab === 'avance' && (
-                  <div style={{ maxWidth: 640, display: 'flex', flexDirection: 'column', gap: 20 }}>
+                  <div className="sf-anim-slide-up" style={{ maxWidth: 640, display: 'flex', flexDirection: 'column', gap: 20 }}>
                     <div>
                       <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0 }}>Avancé</h2>
                       <p style={{ fontSize: 13, color: S.text3, margin: '4px 0 0' }}>Options avancées pour les utilisateurs expérimentés.</p>
@@ -912,15 +944,16 @@ export function Settings({ user, initialPanel, initialTab }: SettingsProps) {
                     )}
 
                     <div style={cardSt}>
-                      <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: S.text3, margin: '0 0 12px' }}>Données & cache</h3>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: S.text3, margin: '0 0 14px' }}>Données & cache</h3>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                         <button
                           onClick={() => {
                             const keys = Object.keys(localStorage).filter(k => k.startsWith('sf-') || k.startsWith('notify') || k === 'theme')
                             keys.forEach(k => localStorage.removeItem(k))
                             window.location.reload()
                           }}
-                          style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '9px 12px', borderRadius: 8, fontSize: 13, fontWeight: 500, textAlign: 'left', border: 'none', cursor: 'pointer', background: 'transparent', color: S.text3, width: '100%' }}>
+                          className="sf-btn sf-btn-ghost sf-btn-sm"
+                          style={{ display: 'flex', alignItems: 'center', gap: 9, textAlign: 'left', width: '100%' }}>
                           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
                           Vider le cache local
                         </button>
@@ -939,24 +972,27 @@ export function Settings({ user, initialPanel, initialTab }: SettingsProps) {
                             a.download = `scaleflow-settings-${new Date().toISOString().slice(0,10)}.json`
                             a.click(); URL.revokeObjectURL(url)
                           }}
-                          style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '9px 12px', borderRadius: 8, fontSize: 13, fontWeight: 500, textAlign: 'left', border: 'none', cursor: 'pointer', background: 'transparent', color: S.text3, width: '100%' }}>
+                          className="sf-btn sf-btn-ghost sf-btn-sm"
+                          style={{ display: 'flex', alignItems: 'center', gap: 9, textAlign: 'left', width: '100%' }}>
                           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                           Exporter mes paramètres (JSON)
                         </button>
                         {!resetConfirm ? (
                           <button onClick={() => setResetConfirm(true)}
-                            style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '9px 12px', borderRadius: 8, fontSize: 13, fontWeight: 500, textAlign: 'left', border: 'none', cursor: 'pointer', background: 'rgba(239,68,68,0.08)', color: '#EF4444', width: '100%' }}>
+                            className="sf-btn sf-btn-danger sf-btn-sm"
+                            style={{ display: 'flex', alignItems: 'center', gap: 9, textAlign: 'left', width: '100%' }}>
                             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
                             Réinitialiser tous les paramètres
                           </button>
                         ) : (
                           <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
                             <button onClick={() => { localStorage.clear(); window.location.reload() }}
-                              style={{ flex: 1, padding: '9px 0', borderRadius: 8, fontSize: 13, fontWeight: 700, color: '#fff', border: 'none', cursor: 'pointer', background: 'rgba(239,68,68,0.2)' }}>
+                              className="sf-btn sf-btn-danger"
+                              style={{ flex: 1 }}>
                               Confirmer la réinitialisation
                             </button>
                             <button onClick={() => setResetConfirm(false)}
-                              style={{ padding: '9px 16px', borderRadius: 8, fontSize: 13, color: S.text3, border: `1px solid ${S.border}`, cursor: 'pointer', background: 'rgba(255,255,255,0.04)' }}>
+                              className="sf-btn sf-btn-secondary sf-btn-sm">
                               Annuler
                             </button>
                           </div>
