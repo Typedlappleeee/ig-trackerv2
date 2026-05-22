@@ -14,11 +14,14 @@ import { PLAN_MAX_PHONES } from '@/lib/credits'
 interface PhonesProps { user: User }
 
 const INTERVALS = [
-  { label: '30 s',  value: 30  },
+  { label: '30s',   value: 30  },
   { label: '1 min', value: 60  },
   { label: '2 min', value: 120 },
   { label: '5 min', value: 300 },
+  { label: '30 min',value: 1800},
 ]
+
+const PER_PAGE = 10
 
 // ── GéeLark status dot ──────────────────────────────────────────────────────
 function StatusDot({ status }: { status: string }) {
@@ -468,6 +471,8 @@ export function Phones({ user }: PhonesProps) {
   const [sessionDialog, setSessionDialog] = useState<{ phone: Phone } | null>(null)
   const [selectedPhone, setSelectedPhone] = useState<Phone | null>(null)
   const [groupFilter, setGroupFilter]     = useState<string>('all')
+  const [selectedIds, setSelectedIds]     = useState<Set<string>>(new Set())
+  const [currentPage, setCurrentPage]     = useState(1)
 
   // Use the reactive bearer from connections (org-aware), not the poller snapshot.
   // The poller singleton is updated async in App.tsx; reading from it here causes
@@ -757,6 +762,26 @@ export function Phones({ user }: PhonesProps) {
   const igCount      = phones.filter(p => p.ig_username).length
   const groups       = Array.from(new Set(phones.map(p => p.group_name).filter(Boolean))) as string[]
 
+  const totalPages    = Math.max(1, Math.ceil(visible.length / PER_PAGE))
+  const paginated     = visible.slice((currentPage - 1) * PER_PAGE, currentPage * PER_PAGE)
+  const allPageSelected = paginated.length > 0 && paginated.every(p => selectedIds.has(p.id))
+
+  function toggleSelectAll() {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (allPageSelected) paginated.forEach(p => next.delete(p.id))
+      else paginated.forEach(p => next.add(p.id))
+      return next
+    })
+  }
+  function toggleSelect(id: string) {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
   function relativeTime(iso: string): string {
     const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000)
     if (diff < 60)        return 'il y a < 1 min'
@@ -773,7 +798,7 @@ export function Phones({ user }: PhonesProps) {
     return palette[Math.abs(h) % palette.length]
   }
 
-  const COLS = '36px 1fr 130px 160px 90px 130px 110px'
+  const COLS = '44px 1fr 150px 190px 110px 150px 80px'
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -800,17 +825,17 @@ export function Phones({ user }: PhonesProps) {
       <div className="h-full flex flex-col overflow-hidden" onClick={() => setContextMenu(null)}>
 
         {/* ── Header ───────────────────────────────────────────────────────── */}
-        <div className="flex-shrink-0 px-8 pt-7 pb-5 flex items-center justify-between"
+        <div className="flex-shrink-0 px-8 pt-6 pb-4 flex items-center justify-between"
           style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
           <div>
-            <h1 className="text-[26px] font-black text-white leading-none">Téléphones</h1>
-            <p className="text-[13px] mt-1" style={{ color: 'rgba(148,163,184,0.55)' }}>
+            <h1 className="text-[24px] font-black text-white leading-none">Téléphones</h1>
+            <p className="text-[12px] mt-0.5" style={{ color: 'rgba(148,163,184,0.45)' }}>
               Gérez et surveillez tous vos téléphones connectés
             </p>
           </div>
           <div className="flex items-center gap-2">
-            {/* Auto-refresh */}
-            <div className="flex items-center gap-2 px-3 py-2 rounded-xl"
+            {/* Auto-refresh pill */}
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl"
               style={{ background: '#0E0E16', border: '1px solid rgba(139,92,246,0.12)' }}>
               <button
                 onClick={() => { const next = !autoRefresh; poller.setEnabled(next); setAutoRefresh(next) }}
@@ -818,25 +843,31 @@ export function Phones({ user }: PhonesProps) {
               >
                 <span className={`absolute top-0.5 w-2.5 h-2.5 bg-white rounded-full shadow transition-all ${autoRefresh ? 'left-[16px]' : 'left-0.5'}`} />
               </button>
-              <span className="text-[11px] font-medium" style={{ color: 'rgba(148,163,184,0.6)' }}>Auto</span>
+              <span className="text-[11px] font-medium" style={{ color: 'rgba(148,163,184,0.6)' }}>Sync auto</span>
               {autoRefresh && (
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-0.5">
                   {INTERVALS.map(({ label, value }) => (
                     <button key={value} onClick={() => changeInterval(value)}
-                      className={`px-2 py-0.5 rounded-md text-[10px] transition-all ${
-                        intervalSec === value ? 'bg-accent/25 text-accent font-semibold' : 'text-text2 hover:text-text'
+                      className={`px-1.5 py-0.5 rounded text-[10px] transition-all ${
+                        intervalSec === value
+                          ? 'bg-accent/20 text-accent font-bold'
+                          : 'text-text2 hover:text-text'
                       }`}>{label}</button>
                   ))}
                 </div>
               )}
               {autoRefresh && bearer && <Countdown secondsLeft={countdown} />}
             </div>
+
+            {/* Sync GéeLark button */}
             <button
               onClick={syncFromGeelark} disabled={!bearer || syncing}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl text-[13px] font-semibold transition-all hover:brightness-110 disabled:opacity-40"
-              style={{ background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.3)', color: '#a78bfa' }}>
-              <span className={syncing ? 'animate-spin inline-block' : ''}>🔄</span>
-              Sync GéeLark
+              className="relative overflow-hidden flex items-center gap-2 px-4 py-1.5 rounded-xl text-[13px] font-semibold transition-all hover:brightness-110 disabled:opacity-40"
+              style={{ background: 'linear-gradient(135deg,#7C3AED,#8B5CF6)', color: '#fff', boxShadow: '0 0 16px rgba(139,92,246,0.3)' }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={syncing ? 'animate-spin' : ''}>
+                <path d="M21 2v6h-6M3 12a9 9 0 0 1 15-6.7L21 8M3 22v-6h6M21 12a9 9 0 0 1-15 6.7L3 16"/>
+              </svg>
+              Sync GeeLark
             </button>
           </div>
         </div>
@@ -847,24 +878,22 @@ export function Phones({ user }: PhonesProps) {
           const offlinePct = phones.length ? Math.round((offlineCount / phones.length) * 100) : 0
           const syncPct    = onlinePct
 
-          // Génère un chemin SVG dont le niveau correspond au pourcentage réel
           const Sparkline = ({ color, pct }: { color: string; pct: number }) => {
-            const W = 72, H = 26
+            const W = 64, H = 24
             const nPts = 9
-            // baseY inversé : 100% → haut (y=2), 0% → bas (y=H-2)
             const baseY = H - 2 - (pct / 100) * (H - 4)
-            const amp = Math.min(pct, 100 - pct) * 0.06 * H + 1.5 // wobble réduit aux extrêmes
-            const ys = Array.from({ length: nPts }, (_, i) =>
+            const amp   = Math.min(pct, 100 - pct) * 0.06 * H + 1.5
+            const ys    = Array.from({ length: nPts }, (_, i) =>
               Math.max(1, Math.min(H - 1, baseY + Math.sin(i * 1.8 + pct * 0.07) * amp))
             )
             const linePts = ys.map((y, i) => `${i === 0 ? 'M' : 'L'}${((i / (nPts - 1)) * W).toFixed(1)},${y.toFixed(1)}`).join(' ')
             const fillPts = linePts + ` L${W},${H} L0,${H}Z`
             const gid = `sg${color.replace('#', '')}`
             return (
-              <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} fill="none" className="opacity-85">
+              <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} fill="none" className="opacity-80">
                 <defs>
                   <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={color} stopOpacity="0.3"/>
+                    <stop offset="0%" stopColor={color} stopOpacity="0.25"/>
                     <stop offset="100%" stopColor={color} stopOpacity="0"/>
                   </linearGradient>
                 </defs>
@@ -875,72 +904,57 @@ export function Phones({ user }: PhonesProps) {
           }
 
           const RingIcon = ({ pct, color }: { pct: number; color: string }) => {
-            const r = 16, circ = 2 * Math.PI * r
+            const r = 14, circ = 2 * Math.PI * r
             const dash = (pct / 100) * circ
             return (
-              <svg width="44" height="44" viewBox="0 0 44 44">
-                <circle cx="22" cy="22" r={r} stroke={`${color}22`} strokeWidth="4" fill="none"/>
-                <circle cx="22" cy="22" r={r} stroke={color} strokeWidth="4" fill="none"
+              <svg width="36" height="36" viewBox="0 0 36 36">
+                <circle cx="18" cy="18" r={r} stroke={`${color}22`} strokeWidth="3.5" fill="none"/>
+                <circle cx="18" cy="18" r={r} stroke={color} strokeWidth="3.5" fill="none"
                   strokeDasharray={`${dash} ${circ}`} strokeDashoffset={circ * 0.25}
                   strokeLinecap="round" style={{ transition: 'stroke-dasharray 0.6s ease' }}/>
-                <text x="22" y="27" textAnchor="middle" fontSize="9" fontWeight="800" fill={color}>✓</text>
               </svg>
             )
           }
 
-          const PhoneIcon = ({ color }: { color: string }) => (
-            <div className="relative flex items-center justify-center w-10 h-10">
-              <div className="absolute inset-0 rounded-xl opacity-20 blur-sm" style={{ background: color }} />
-              <span className="relative text-[22px]">📱</span>
-            </div>
-          )
-
-          const PeopleIcon = ({ color }: { color: string }) => (
-            <svg width="40" height="32" viewBox="0 0 40 32" fill="none" opacity="0.7">
-              <circle cx="14" cy="10" r="5" fill={color} opacity="0.6"/>
-              <path d="M4 28 C4 20 24 20 24 28" fill={color} opacity="0.5"/>
-              <circle cx="26" cy="10" r="4" fill={color} opacity="0.4"/>
-              <path d="M18 28 C20 22 36 22 36 28" fill={color} opacity="0.3"/>
-            </svg>
-          )
-
-          const GridIcon = ({ color }: { color: string }) => (
-            <svg width="36" height="36" viewBox="0 0 36 36" fill="none" opacity="0.7">
-              <rect x="2"  y="2"  width="14" height="14" rx="3" fill={color} opacity="0.6"/>
-              <rect x="20" y="2"  width="14" height="14" rx="3" fill={color} opacity="0.4"/>
-              <rect x="2"  y="20" width="14" height="14" rx="3" fill={color} opacity="0.4"/>
-              <rect x="20" y="20" width="14" height="14" rx="3" fill={color} opacity="0.25"/>
-            </svg>
-          )
-
           const cards: { label: string; value: string; sub: string; color: string; f: 'all'|'online'|'offline'|null; deco: React.ReactNode }[] = [
-            { label: 'TOTAL',           value: String(phones.length), sub: 'téléphones',    color: '#818cf8', f: 'all',    deco: <PhoneIcon color="#818cf8" /> },
-            { label: 'EN LIGNE',        value: String(onlineCount),   sub: `${onlinePct}%`, color: '#00ccaa', f: 'online', deco: <Sparkline color="#00ccaa" pct={onlinePct} /> },
-            { label: 'HORS LIGNE',      value: String(offlineCount),  sub: `${offlinePct}%`,color: '#f87171', f: 'offline',deco: <Sparkline color="#f87171" pct={offlinePct} /> },
-            { label: 'COMPTES ACTIFS',  value: String(igCount),       sub: 'Instagram',     color: '#e1306c', f: null,     deco: <PeopleIcon color="#e1306c" /> },
-            { label: 'GROUPES',         value: String(groupCount),    sub: 'groupes actifs',color: '#f59e0b', f: null,     deco: <GridIcon color="#f59e0b" /> },
-            { label: 'SYNCHRONISATION', value: `${syncPct}%`,         sub: lastUpdated ? `màj ${lastUpdated.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}` : 'À jour', color: '#10b981', f: null, deco: <RingIcon pct={syncPct} color="#10b981" /> },
+            {
+              label: 'TOTAL', value: String(phones.length), sub: 'téléphones', color: '#818cf8', f: 'all',
+              deco: <svg width="36" height="36" viewBox="0 0 36 36" fill="none" opacity="0.7"><rect x="10" y="2" width="16" height="32" rx="3" stroke="#818cf8" strokeWidth="1.8"/><rect x="14" y="6" width="8" height="4" rx="1" fill="#818cf8" opacity="0.4"/><circle cx="18" cy="28" r="1.5" fill="#818cf8" opacity="0.6"/></svg>,
+            },
+            { label: 'EN LIGNE',  value: String(onlineCount),  sub: `${onlinePct}%`,  color: '#00ccaa', f: 'online',  deco: <Sparkline color="#00ccaa" pct={onlinePct}  /> },
+            { label: 'HORS LIGNE',value: String(offlineCount), sub: `${offlinePct}%`, color: '#f87171', f: 'offline', deco: <Sparkline color="#f87171" pct={offlinePct} /> },
+            {
+              label: 'COMPTES ACTIFS', value: String(igCount), sub: 'Instagram', color: '#e1306c', f: null,
+              deco: <svg width="40" height="28" viewBox="0 0 40 28" fill="none" opacity="0.65"><circle cx="13" cy="9" r="5" fill="#e1306c" opacity="0.6"/><path d="M3 26 C3 18 23 18 23 26" fill="#e1306c" opacity="0.45"/><circle cx="26" cy="9" r="4" fill="#e1306c" opacity="0.35"/><path d="M19 26 C21 20 37 20 37 26" fill="#e1306c" opacity="0.25"/></svg>,
+            },
+            {
+              label: 'GROUPES', value: String(groupCount), sub: 'groupes actifs', color: '#f59e0b', f: null,
+              deco: <svg width="32" height="32" viewBox="0 0 32 32" fill="none" opacity="0.7"><rect x="1" y="1" width="13" height="13" rx="3" fill="#f59e0b" opacity="0.6"/><rect x="18" y="1" width="13" height="13" rx="3" fill="#f59e0b" opacity="0.4"/><rect x="1" y="18" width="13" height="13" rx="3" fill="#f59e0b" opacity="0.4"/><rect x="18" y="18" width="13" height="13" rx="3" fill="#f59e0b" opacity="0.2"/></svg>,
+            },
+            {
+              label: 'SYNCHRONISATION', value: `${syncPct}%`,
+              sub: lastUpdated ? `màj ${lastUpdated.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}` : 'À jour',
+              color: '#10b981', f: null, deco: <RingIcon pct={syncPct} color="#10b981" />,
+            },
           ]
 
           return (
-            <div className="flex-shrink-0 px-8 pt-5 pb-4 grid grid-cols-6 gap-3">
+            <div className="flex-shrink-0 px-8 pt-4 pb-3 grid grid-cols-6 gap-3">
               {cards.map(card => (
                 <button key={card.label}
-                  onClick={() => { if (card.f) setFilter(card.f) }}
-                  className={`rounded-2xl p-4 text-left transition-all overflow-hidden relative ${card.f ? 'hover:brightness-110' : 'cursor-default'}`}
+                  onClick={() => { if (card.f) { setFilter(card.f); setCurrentPage(1) } }}
+                  className={`rounded-xl px-4 py-3 text-left transition-all overflow-hidden ${card.f ? 'hover:brightness-110' : 'cursor-default'}`}
                   style={{
-                    background: (card.f && filter === card.f) ? `${card.color}12` : 'rgba(255,255,255,0.03)',
-                    border: (card.f && filter === card.f) ? `1px solid ${card.color}35` : '1px solid rgba(255,255,255,0.07)',
+                    background: (card.f && filter === card.f) ? `${card.color}10` : 'rgba(255,255,255,0.025)',
+                    border: (card.f && filter === card.f) ? `1px solid ${card.color}30` : '1px solid rgba(255,255,255,0.06)',
                   }}>
-                  <div className="flex items-start justify-between">
+                  <div className="flex items-center justify-between">
                     <div className="flex-1 min-w-0">
-                      <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'rgba(148,163,184,0.45)' }}>{card.label}</p>
-                      <p className="text-[26px] font-black leading-none" style={{ color: card.color }}>{card.value}</p>
-                      <p className="text-[10px] mt-1.5" style={{ color: 'rgba(148,163,184,0.4)' }}>{card.sub}</p>
+                      <p className="text-[9px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'rgba(148,163,184,0.4)' }}>{card.label}</p>
+                      <p className="text-[22px] font-black leading-none" style={{ color: card.color }}>{card.value}</p>
+                      <p className="text-[10px] mt-1" style={{ color: 'rgba(148,163,184,0.38)' }}>{card.sub}</p>
                     </div>
-                    <div className="flex-shrink-0 flex items-center justify-center ml-2 mt-1">
-                      {card.deco}
-                    </div>
+                    <div className="flex-shrink-0 ml-1">{card.deco}</div>
                   </div>
                 </button>
               ))}
@@ -952,61 +966,66 @@ export function Phones({ user }: PhonesProps) {
         <div className="flex-1 flex overflow-hidden">
 
           {/* Scrollable table area */}
-          <div className="flex-1 overflow-y-auto px-8 pb-8 min-w-0">
+          <div className="flex-1 overflow-y-auto px-8 pb-8 min-w-0 flex flex-col">
 
             {/* Warnings */}
             {!bearer && (
-              <div className="px-4 py-3 rounded-xl mb-4" style={{ background: 'rgba(255,170,42,0.08)', border: '1px solid rgba(255,170,42,0.2)', color: '#ffaa2a' }}>
+              <div className="px-4 py-3 rounded-xl mb-3 mt-1" style={{ background: 'rgba(255,170,42,0.08)', border: '1px solid rgba(255,170,42,0.2)', color: '#ffaa2a' }}>
                 <span className="text-[13px]">⚠ Token GéeLark manquant — configure-le dans Paramètres.</span>
               </div>
             )}
             {error && (
-              <div className="px-4 py-3 rounded-xl mb-4 flex justify-between items-center" style={{ background: 'rgba(255,92,110,0.08)', border: '1px solid rgba(255,92,110,0.2)', color: '#ff5c6e' }}>
+              <div className="px-4 py-3 rounded-xl mb-3 mt-1 flex justify-between items-center" style={{ background: 'rgba(255,92,110,0.08)', border: '1px solid rgba(255,92,110,0.2)', color: '#ff5c6e' }}>
                 <span className="text-[13px]">{error}</span>
                 <button onClick={() => setError(null)} className="opacity-60 hover:opacity-100 ml-3">✕</button>
               </div>
             )}
             {pollError && (
-              <div className="px-4 py-3 rounded-xl mb-4 flex justify-between items-center" style={{ background: 'rgba(255,170,42,0.08)', border: '1px solid rgba(255,170,42,0.2)', color: '#ffaa2a' }}>
+              <div className="px-4 py-3 rounded-xl mb-3 mt-1 flex justify-between items-center" style={{ background: 'rgba(255,170,42,0.08)', border: '1px solid rgba(255,170,42,0.2)', color: '#ffaa2a' }}>
                 <span className="text-[13px]">⚠ {pollError}</span>
                 <button onClick={() => setPollError(null)} className="opacity-60 hover:opacity-100 ml-3">✕</button>
               </div>
             )}
 
             {/* Search + filters row */}
-            <div className="flex items-center gap-2 mb-4 mt-1">
+            <div className="flex items-center gap-2 mb-3 mt-1">
               <div className="flex-1 relative">
-                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[13px] opacity-35">🔍</span>
+                <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 opacity-30" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+                </svg>
                 <input type="text" placeholder="Rechercher téléphone, compte, proxy, groupe…" value={search}
-                  onChange={e => setSearch(e.target.value)}
+                  onChange={e => { setSearch(e.target.value); setCurrentPage(1) }}
                   className="w-full rounded-xl pl-9 pr-4 py-2.5 text-[13px] focus:outline-none"
-                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
+                  style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#e2e8f0' }}
                 />
               </div>
-              {/* Group dropdown */}
               <div className="relative flex-shrink-0">
-                <select value={groupFilter} onChange={e => setGroupFilter(e.target.value)}
+                <select value={groupFilter} onChange={e => { setGroupFilter(e.target.value); setCurrentPage(1) }}
                   className="appearance-none rounded-xl px-3 py-2.5 pr-7 text-[12px] font-medium focus:outline-none cursor-pointer"
-                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: 'rgba(148,163,184,0.75)' }}>
+                  style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(148,163,184,0.7)' }}>
                   <option value="all">Tous les groupes</option>
                   {groups.map(g => <option key={g} value={g}>{g}</option>)}
                 </select>
-                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] opacity-40 pointer-events-none">▼</span>
+                <span className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none opacity-40">
+                  <svg width="8" height="8" viewBox="0 0 10 10" fill="currentColor"><path d="M0 3l5 4 5-4z"/></svg>
+                </span>
               </div>
-              {/* Status dropdown */}
               <div className="relative flex-shrink-0">
-                <select value={filter} onChange={e => setFilter(e.target.value as 'all'|'online'|'offline')}
+                <select value={filter} onChange={e => { setFilter(e.target.value as 'all'|'online'|'offline'); setCurrentPage(1) }}
                   className="appearance-none rounded-xl px-3 py-2.5 pr-7 text-[12px] font-medium focus:outline-none cursor-pointer"
-                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: 'rgba(148,163,184,0.75)' }}>
+                  style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(148,163,184,0.7)' }}>
                   <option value="all">Tous les statuts</option>
                   <option value="online">En ligne</option>
                   <option value="offline">Hors ligne</option>
                 </select>
-                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] opacity-40 pointer-events-none">▼</span>
+                <span className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none opacity-40">
+                  <svg width="8" height="8" viewBox="0 0 10 10" fill="currentColor"><path d="M0 3l5 4 5-4z"/></svg>
+                </span>
               </div>
               <button className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-[12px] font-medium flex-shrink-0"
-                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: 'rgba(148,163,184,0.7)' }}>
-                <span className="text-[11px]">⚡</span> Filtres
+                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(148,163,184,0.65)' }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/></svg>
+                Filtres
               </button>
             </div>
 
@@ -1017,20 +1036,34 @@ export function Phones({ user }: PhonesProps) {
               <div className="rounded-2xl p-10 text-center" style={{ background: '#0E0E16', border: '1px solid rgba(139,92,246,0.12)' }}>
                 <p className="text-4xl mb-4">📱</p>
                 <p className="text-base font-bold text-white mb-2">Aucun téléphone synchronisé</p>
-                <p className="text-[13px] text-text2">Clique sur "Sync GéeLark" pour importer tes téléphones.</p>
+                <p className="text-[13px] text-text2">Clique sur "Sync GeeLark" pour importer tes téléphones.</p>
               </div>
             ) : (
-              <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                {/* Header */}
-                <div className="grid items-center px-4 py-3 text-[10px] font-semibold uppercase tracking-wider select-none"
+              <div className="flex-1 rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                {/* Table header */}
+                <div className="grid items-center px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider select-none"
                   style={{
                     gridTemplateColumns: COLS,
                     borderBottom: '1px solid rgba(255,255,255,0.07)',
                     background: 'rgba(255,255,255,0.02)',
-                    color: 'rgba(148,163,184,0.45)',
+                    color: 'rgba(148,163,184,0.4)',
                   }}>
-                  <span>#</span>
-                  <span>Téléphone</span>
+                  {/* Checkbox */}
+                  <div className="flex items-center justify-center" onClick={e => e.stopPropagation()}>
+                    <button
+                      onClick={toggleSelectAll}
+                      className="w-4 h-4 rounded flex items-center justify-center transition-all"
+                      style={{
+                        background: allPageSelected ? '#8B5CF6' : 'transparent',
+                        border: allPageSelected ? '1px solid #8B5CF6' : '1px solid rgba(148,163,184,0.25)',
+                      }}>
+                      {allPageSelected && <svg width="8" height="8" viewBox="0 0 10 10" fill="none"><path d="M1.5 5l2.5 2.5 5-5" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                    </button>
+                  </div>
+                  <span className="flex items-center gap-1">
+                    Téléphone
+                    <svg width="10" height="10" viewBox="0 0 10 14" fill="none" opacity="0.4"><path d="M5 1v12M1 4l4-3 4 3M1 10l4 3 4-3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                  </span>
                   <span>Groupe</span>
                   <span>Compte Instagram</span>
                   <span>Statut</span>
@@ -1042,35 +1075,58 @@ export function Phones({ user }: PhonesProps) {
                   <p className="px-5 py-10 text-center text-[13px] text-text2">Aucun résultat.</p>
                 ) : (
                   <div>
-                    {visible.map((phone, i) => {
-                      const col = phoneColor(phone.phone_name)
-                      const isSelected = selectedPhone?.id === phone.id
+                    {paginated.map((phone, i) => {
+                      const col       = phoneColor(phone.phone_name)
+                      const isDetail  = selectedPhone?.id === phone.id
+                      const isChecked = selectedIds.has(phone.id)
+                      const absIdx    = (currentPage - 1) * PER_PAGE + i + 1
                       return (
                         <div key={phone.id}
                           className="grid items-center px-4 py-3 cursor-pointer group transition-colors"
                           style={{
                             gridTemplateColumns: COLS,
-                            background: isSelected ? 'rgba(139,92,246,0.07)' : undefined,
-                            borderBottom: i < visible.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
+                            background: isDetail ? 'rgba(139,92,246,0.07)' : isChecked ? 'rgba(139,92,246,0.04)' : undefined,
+                            borderBottom: i < paginated.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
                           }}
-                          onMouseEnter={e => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.022)' }}
-                          onMouseLeave={e => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = isSelected ? 'rgba(139,92,246,0.07)' : '' }}
-                          onClick={() => setSelectedPhone(isSelected ? null : phone)}
+                          onMouseEnter={e => { if (!isDetail && !isChecked) (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.02)' }}
+                          onMouseLeave={e => { if (!isDetail && !isChecked) (e.currentTarget as HTMLElement).style.background = '' }}
+                          onClick={() => setSelectedPhone(isDetail ? null : phone)}
                           onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setContextMenu({ phone, x: e.clientX, y: e.clientY }) }}>
 
-                          {/* # */}
-                          <span className="text-[12px]" style={{ color: 'rgba(148,163,184,0.3)' }}>{i + 1}</span>
+                          {/* Checkbox / row # */}
+                          <div className="flex items-center justify-center" onClick={e => e.stopPropagation()}>
+                            <div className="relative w-5 h-5 flex items-center justify-center">
+                              <span className="group-hover:hidden text-[11px] tabular-nums" style={{ color: 'rgba(148,163,184,0.28)' }}>{absIdx}</span>
+                              <button
+                                onClick={() => toggleSelect(phone.id)}
+                                className="hidden group-hover:flex absolute inset-0 items-center justify-center rounded transition-all"
+                                style={{
+                                  background: isChecked ? '#8B5CF6' : 'transparent',
+                                  border: isChecked ? '1px solid #8B5CF6' : '1px solid rgba(148,163,184,0.3)',
+                                }}>
+                                {isChecked && <svg width="8" height="8" viewBox="0 0 10 10" fill="none"><path d="M1.5 5l2.5 2.5 5-5" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                              </button>
+                              {isChecked && (
+                                <button
+                                  onClick={() => toggleSelect(phone.id)}
+                                  className="flex absolute inset-0 items-center justify-center rounded"
+                                  style={{ background: '#8B5CF6', border: '1px solid #8B5CF6' }}>
+                                  <svg width="8" height="8" viewBox="0 0 10 10" fill="none"><path d="M1.5 5l2.5 2.5 5-5" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                </button>
+                              )}
+                            </div>
+                          </div>
 
                           {/* Téléphone */}
                           <div className="flex items-center gap-2.5 min-w-0 pr-2">
-                            <div className="w-9 h-9 rounded-xl flex-shrink-0 flex items-center justify-center text-[18px]"
-                              style={{ background: `linear-gradient(135deg, ${col}22 0%, ${col}11 100%)`, border: `1px solid ${col}33` }}>
+                            <div className="w-8 h-8 rounded-xl flex-shrink-0 flex items-center justify-center text-[16px]"
+                              style={{ background: `linear-gradient(135deg, ${col}22 0%, ${col}11 100%)`, border: `1px solid ${col}30` }}>
                               📱
                             </div>
                             <div className="min-w-0">
                               <p className="text-[13px] font-semibold text-white truncate leading-tight">{phone.phone_name}</p>
-                              <p className="text-[10px] font-mono truncate mt-0.5" style={{ color: 'rgba(148,163,184,0.35)' }}>
-                                {phone.serial_no ? `ID: ${phone.serial_no}` : phone.geelark_id ? `GL: ${phone.geelark_id}` : '—'}
+                              <p className="text-[10px] font-mono truncate mt-0.5" style={{ color: 'rgba(148,163,184,0.32)' }}>
+                                ID: {phone.serial_no ?? phone.geelark_id ?? '—'}
                               </p>
                             </div>
                           </div>
@@ -1079,13 +1135,13 @@ export function Phones({ user }: PhonesProps) {
                           <div className="min-w-0 pr-2">
                             {phone.group_name ? (
                               <>
-                                <p className="text-[12px] truncate font-medium" style={{ color: 'rgba(196,181,253,0.8)' }}>{phone.group_name}</p>
-                                <p className="text-[10px]" style={{ color: 'rgba(148,163,184,0.35)' }}>
+                                <p className="text-[12px] truncate font-medium" style={{ color: 'rgba(196,181,253,0.75)' }}>{phone.group_name}</p>
+                                <p className="text-[10px]" style={{ color: 'rgba(148,163,184,0.32)' }}>
                                   {phones.filter(p2 => p2.group_name === phone.group_name).length} tél.
                                 </p>
                               </>
                             ) : (
-                              <span className="text-[12px]" style={{ color: 'rgba(148,163,184,0.3)' }}>—</span>
+                              <span className="text-[12px]" style={{ color: 'rgba(148,163,184,0.25)' }}>—</span>
                             )}
                           </div>
 
@@ -1098,16 +1154,14 @@ export function Phones({ user }: PhonesProps) {
                                   {phone.ig_username.charAt(0).toUpperCase()}
                                 </div>
                                 <div className="min-w-0">
-                                  <p className="text-[12px] text-accent truncate">@{phone.ig_username}</p>
-                                  {phone.followers ? (
-                                    <p className="text-[10px]" style={{ color: 'rgba(148,163,184,0.4)' }}>
-                                      {phone.followers >= 1000 ? `${(phone.followers/1000).toFixed(1)}K` : phone.followers} abonnés
-                                    </p>
-                                  ) : null}
+                                  {phone.remark && (
+                                    <p className="text-[12px] font-medium truncate leading-tight" style={{ color: 'rgba(226,232,240,0.85)' }}>{phone.remark}</p>
+                                  )}
+                                  <p className={`text-[11px] truncate ${phone.remark ? 'mt-0' : ''}`} style={{ color: '#a78bfa' }}>@{phone.ig_username}</p>
                                 </div>
                               </div>
                             ) : (
-                              <span className="text-[12px]" style={{ color: 'rgba(148,163,184,0.3)' }}>—</span>
+                              <span className="text-[12px]" style={{ color: 'rgba(148,163,184,0.25)' }}>—</span>
                             )}
                           </div>
 
@@ -1115,35 +1169,31 @@ export function Phones({ user }: PhonesProps) {
                           <div>
                             {phone.status === 'online' ? (
                               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold"
-                                style={{ background: 'rgba(0,204,170,0.12)', color: '#00ccaa', border: '1px solid rgba(0,204,170,0.2)' }}>
+                                style={{ background: 'rgba(0,204,170,0.1)', color: '#00ccaa', border: '1px solid rgba(0,204,170,0.18)' }}>
                                 <span className="w-1.5 h-1.5 rounded-full bg-ok animate-pulse" />
                                 En ligne
                               </span>
                             ) : (
                               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold"
-                                style={{ background: 'rgba(90,104,130,0.12)', color: '#5a6882', border: '1px solid rgba(90,104,130,0.2)' }}>
-                                <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#5a6882' }} />
+                                style={{ background: 'rgba(71,85,105,0.12)', color: '#64748b', border: '1px solid rgba(71,85,105,0.2)' }}>
+                                <span className="w-1.5 h-1.5 rounded-full bg-current" />
                                 Hors ligne
                               </span>
                             )}
                           </div>
 
                           {/* Dernière activité */}
-                          <span className="text-[11px]" style={{ color: 'rgba(148,163,184,0.5)' }}>
+                          <span className="text-[11px]" style={{ color: 'rgba(148,163,184,0.45)' }}>
                             {phone.synced_at ? relativeTime(phone.synced_at) : '—'}
                           </span>
 
                           {/* Actions */}
                           <div className="flex items-center gap-0.5" onClick={e => e.stopPropagation()}>
-                            <button onClick={() => poller.pollNow()}
-                              className="opacity-0 group-hover:opacity-55 hover:!opacity-100 w-7 h-7 rounded-lg flex items-center justify-center transition-all hover:bg-white/10 text-[13px]"
-                              title="Actualiser">🔄</button>
-                            <button onClick={() => setSelectedPhone(isSelected ? null : phone)}
-                              className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all hover:bg-white/10 text-[13px] ${isSelected ? 'opacity-100 text-accent' : 'opacity-0 group-hover:opacity-55 hover:!opacity-100'}`}
-                              title="Voir les détails">👁</button>
                             <button onClick={e => setContextMenu({ phone, x: e.clientX, y: e.clientY })}
-                              className="opacity-0 group-hover:opacity-55 hover:!opacity-100 w-7 h-7 rounded-lg flex items-center justify-center transition-all hover:bg-white/10 text-text2 text-base"
-                              title="Plus d'options">⋮</button>
+                              className="opacity-0 group-hover:opacity-60 hover:!opacity-100 w-7 h-7 rounded-lg flex items-center justify-center transition-all hover:bg-white/10 text-text2"
+                              title="Plus d'options">
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
+                            </button>
                           </div>
                         </div>
                       )
@@ -1153,10 +1203,49 @@ export function Phones({ user }: PhonesProps) {
               </div>
             )}
 
+            {/* ── Pagination ───────────────────────────────────────────────── */}
             {!loading && visible.length > 0 && (
-              <p className="text-[11px] mt-3" style={{ color: 'rgba(148,163,184,0.3)' }}>
-                Afficher 1 à {visible.length} sur {phones.length} téléphone{phones.length > 1 ? 's' : ''}
-              </p>
+              <div className="flex items-center justify-between mt-3 flex-shrink-0">
+                <p className="text-[11px]" style={{ color: 'rgba(148,163,184,0.35)' }}>
+                  Affichage de {Math.min((currentPage - 1) * PER_PAGE + 1, visible.length)} à {Math.min(currentPage * PER_PAGE, visible.length)} sur {visible.length} téléphone{visible.length > 1 ? 's' : ''}
+                </p>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="w-7 h-7 rounded-lg flex items-center justify-center text-[12px] transition-all disabled:opacity-20 hover:bg-white/10"
+                    style={{ color: 'rgba(148,163,184,0.7)' }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M15 18l-6-6 6-6"/></svg>
+                  </button>
+                  {Array.from({ length: totalPages }, (_, i) => i + 1)
+                    .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+                    .reduce<(number | '...')[]>((acc, p, idx, arr) => {
+                      if (idx > 0 && typeof arr[idx - 1] === 'number' && (p as number) - (arr[idx - 1] as number) > 1) acc.push('...')
+                      acc.push(p)
+                      return acc
+                    }, [])
+                    .map((p, idx) =>
+                      p === '...' ? (
+                        <span key={`e${idx}`} className="w-7 h-7 flex items-center justify-center text-[11px]" style={{ color: 'rgba(148,163,184,0.3)' }}>…</span>
+                      ) : (
+                        <button key={p}
+                          onClick={() => setCurrentPage(p as number)}
+                          className="w-7 h-7 rounded-lg flex items-center justify-center text-[12px] font-medium transition-all"
+                          style={currentPage === p ? { background: '#8B5CF6', color: '#fff' } : { color: 'rgba(148,163,184,0.6)', background: 'transparent' }}>
+                          {p}
+                        </button>
+                      )
+                    )}
+                  <button
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    className="w-7 h-7 rounded-lg flex items-center justify-center text-[12px] transition-all disabled:opacity-20 hover:bg-white/10"
+                    style={{ color: 'rgba(148,163,184,0.7)' }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M9 18l6-6-6-6"/></svg>
+                  </button>
+                  <span className="ml-2 text-[11px]" style={{ color: 'rgba(148,163,184,0.3)' }}>{PER_PAGE} / page</span>
+                </div>
+              </div>
             )}
           </div>
 
@@ -1165,15 +1254,15 @@ export function Phones({ user }: PhonesProps) {
             const p = selectedPhone
             const col = phoneColor(p.phone_name)
             return (
-              <div className="w-[320px] flex-shrink-0 border-l overflow-y-auto"
-                style={{ borderColor: 'rgba(255,255,255,0.07)', background: 'rgba(10,10,20,0.6)' }}>
+              <div className="w-[300px] flex-shrink-0 border-l overflow-y-auto"
+                style={{ borderColor: 'rgba(255,255,255,0.07)', background: 'rgba(10,10,20,0.5)' }}>
 
                 {/* Panel header */}
                 <div className="px-5 pt-5 pb-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center text-[20px]"
-                        style={{ background: `linear-gradient(135deg, ${col}22 0%, ${col}11 100%)`, border: `1px solid ${col}33` }}>
+                        style={{ background: `linear-gradient(135deg, ${col}22 0%, ${col}11 100%)`, border: `1px solid ${col}30` }}>
                         📱
                       </div>
                       <div>
@@ -1194,29 +1283,30 @@ export function Phones({ user }: PhonesProps) {
                       </div>
                     </div>
                     <button onClick={() => setSelectedPhone(null)}
-                      className="w-6 h-6 rounded-lg flex items-center justify-center text-text2 hover:text-text hover:bg-white/10 transition-all text-[13px] flex-shrink-0 mt-0.5">
-                      ✕
+                      className="w-6 h-6 rounded-lg flex items-center justify-center text-text2 hover:text-text hover:bg-white/10 transition-all flex-shrink-0 mt-0.5">
+                      <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M1 1l10 10M11 1L1 11"/></svg>
                     </button>
                   </div>
-                  {/* Quick action buttons */}
                   <div className="flex items-center gap-1.5">
-                    {[{ icon: '↗', label: 'Ouvrir' }, { icon: '🔄', label: 'Redémarrer' }, { icon: '⟳', label: 'Sync' }].map(a => (
+                    {[{ icon: '↗', label: 'Ouvrir' }, { icon: '⟳', label: 'Sync' }].map(a => (
                       <button key={a.label}
                         className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-[11px] font-medium transition-all hover:brightness-110"
-                        style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: 'rgba(148,163,184,0.8)' }}>
+                        style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(148,163,184,0.8)' }}>
                         <span>{a.icon}</span><span>{a.label}</span>
                       </button>
                     ))}
                     <button
                       onClick={e => { e.stopPropagation(); setContextMenu({ phone: p, x: e.clientX, y: e.clientY }) }}
-                      className="w-8 py-1.5 rounded-lg flex items-center justify-center transition-all hover:bg-white/10 text-text2 text-base"
-                      style={{ border: '1px solid rgba(255,255,255,0.09)' }}>⋮</button>
+                      className="w-8 py-1.5 rounded-lg flex items-center justify-center transition-all hover:bg-white/10 text-text2"
+                      style={{ border: '1px solid rgba(255,255,255,0.08)' }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
+                    </button>
                   </div>
                 </div>
 
                 {/* Informations */}
                 <div className="px-5 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                  <p className="text-[11px] font-semibold uppercase tracking-wider mb-3" style={{ color: 'rgba(148,163,184,0.45)' }}>Informations</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider mb-3" style={{ color: 'rgba(148,163,184,0.4)' }}>Informations</p>
                   <div className="space-y-2.5">
                     {[
                       { label: 'Modèle',       value: p.phone_name },
@@ -1226,8 +1316,8 @@ export function Phones({ user }: PhonesProps) {
                       { label: 'Dernier sync', value: p.synced_at ? relativeTime(p.synced_at) : '—' },
                     ].map(row => (
                       <div key={row.label} className="flex items-center justify-between gap-2">
-                        <span className="text-[12px] flex-shrink-0" style={{ color: 'rgba(148,163,184,0.5)' }}>{row.label}</span>
-                        <span className="text-[12px] font-medium text-text truncate text-right max-w-[170px]">{row.value}</span>
+                        <span className="text-[12px] flex-shrink-0" style={{ color: 'rgba(148,163,184,0.45)' }}>{row.label}</span>
+                        <span className="text-[12px] font-medium text-text truncate text-right max-w-[160px]">{row.value}</span>
                       </div>
                     ))}
                   </div>
@@ -1236,7 +1326,7 @@ export function Phones({ user }: PhonesProps) {
                 {/* Compte Instagram */}
                 {p.ig_username && (
                   <div className="px-5 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                    <p className="text-[11px] font-semibold uppercase tracking-wider mb-3" style={{ color: 'rgba(148,163,184,0.45)' }}>Compte Instagram</p>
+                    <p className="text-[10px] font-semibold uppercase tracking-wider mb-3" style={{ color: 'rgba(148,163,184,0.4)' }}>Compte Instagram</p>
                     <div className="flex items-center gap-2.5 mb-3">
                       <div className="w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center text-white text-[12px] font-bold"
                         style={{ background: 'linear-gradient(135deg,#833ab4,#fd1d1d,#fcb045)' }}>
@@ -1272,7 +1362,7 @@ export function Phones({ user }: PhonesProps) {
 
                 {/* Actions rapides */}
                 <div className="px-5 py-4">
-                  <p className="text-[11px] font-semibold uppercase tracking-wider mb-2.5" style={{ color: 'rgba(148,163,184,0.45)' }}>Actions rapides</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider mb-2.5" style={{ color: 'rgba(148,163,184,0.4)' }}>Actions rapides</p>
                   <div className="space-y-1">
                     <button onClick={() => setSessionDialog({ phone: p })}
                       className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[12px] font-medium text-left transition-all hover:bg-white/[0.06]"
