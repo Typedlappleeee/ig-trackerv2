@@ -46,14 +46,6 @@ interface Props { user: User }
 
 type TabFilter = 'pending' | 'history'
 
-const STATUS_ICON: Record<ScheduleStatus, string> = {
-  pending:   '⏳',
-  running:   '🔄',
-  done:      '✅',
-  failed:    '❌',
-  cancelled: '🚫',
-}
-
 const STATUS_LABEL: Record<ScheduleStatus, string> = {
   pending:   'En attente',
   running:   'En cours',
@@ -65,6 +57,202 @@ const STATUS_LABEL: Record<ScheduleStatus, string> = {
 const TYPE_LABEL: Record<string, string> = {
   posting:      'Posting',
   mass_posting: 'Mass Posting',
+}
+
+// ── SVG icon components ────────────────────────────────────────────────────────
+
+function IconClock({ size = 14, color = 'currentColor' }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="8" cy="8" r="6.5" stroke={color} strokeWidth="1.4" />
+      <path d="M8 5v3.5l2 1.5" stroke={color} strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+function IconSpinner({ size = 14, color = 'currentColor' }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"
+      style={{ animation: 'spin 0.9s linear infinite' }}>
+      <circle cx="8" cy="8" r="6" stroke={color} strokeWidth="1.5" strokeDasharray="28" strokeDashoffset="10" strokeLinecap="round" />
+      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+    </svg>
+  )
+}
+
+function IconCheck({ size = 14, color = 'currentColor' }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="8" cy="8" r="6.5" stroke={color} strokeWidth="1.4" />
+      <path d="M5.5 8.5l2 2 3-3.5" stroke={color} strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+function IconX({ size = 14, color = 'currentColor' }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="8" cy="8" r="6.5" stroke={color} strokeWidth="1.4" />
+      <path d="M5.5 5.5l5 5M10.5 5.5l-5 5" stroke={color} strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+function IconBan({ size = 14, color = 'currentColor' }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="8" cy="8" r="6.5" stroke={color} strokeWidth="1.4" />
+      <path d="M4.5 11.5l7-7" stroke={color} strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+function IconRefresh({ size = 15, color = 'currentColor' }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M13.5 8A5.5 5.5 0 1 1 8 2.5c1.8 0 3.4.87 4.4 2.2" stroke={color} strokeWidth="1.4" strokeLinecap="round" />
+      <path d="M12.5 2v2.5H10" stroke={color} strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+function IconCalendar({ size = 48, color = 'currentColor' }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="6" y="10" width="36" height="32" rx="4" stroke={color} strokeWidth="2" />
+      <path d="M6 20h36" stroke={color} strokeWidth="2" strokeLinecap="round" />
+      <path d="M16 6v8M32 6v8" stroke={color} strokeWidth="2" strokeLinecap="round" />
+      <rect x="14" y="26" width="6" height="6" rx="1.5" fill={color} opacity="0.4" />
+      <rect x="28" y="26" width="6" height="6" rx="1.5" fill={color} opacity="0.4" />
+    </svg>
+  )
+}
+
+function IconPhone({ size = 12, color = 'currentColor' }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="3" y="1" width="8" height="12" rx="2" stroke={color} strokeWidth="1.3" />
+      <circle cx="7" cy="11" r="0.8" fill={color} />
+    </svg>
+  )
+}
+
+function IconVideo({ size = 12, color = 'currentColor' }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="1" y="3" width="8" height="8" rx="1.5" stroke={color} strokeWidth="1.3" />
+      <path d="M9 5.5l4-2v7l-4-2V5.5z" stroke={color} strokeWidth="1.3" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+function IconTime({ size = 12, color = 'currentColor' }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="7" cy="7" r="5.5" stroke={color} strokeWidth="1.3" />
+      <path d="M7 4.5V7l1.5 1.5" stroke={color} strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+function IconArrowRight({ size = 12, color = 'currentColor' }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M2 6h8M7 3l3 3-3 3" stroke={color} strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+function IconShuffle({ size = 12, color = 'currentColor' }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M1 3h2c1.5 0 2.5 1.5 3 3s1.5 3 3 3h2" stroke={color} strokeWidth="1.2" strokeLinecap="round" />
+      <path d="M1 9h2c1.5 0 2.5-1.5 3-3" stroke={color} strokeWidth="1.2" strokeLinecap="round" />
+      <path d="M9 1l2 2-2 2M9 7l2 2-2 2" stroke={color} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+function IconInfo({ size = 15, color = 'currentColor' }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="8" cy="8" r="6.5" stroke={color} strokeWidth="1.4" />
+      <path d="M8 7v5" stroke={color} strokeWidth="1.4" strokeLinecap="round" />
+      <circle cx="8" cy="4.5" r="0.8" fill={color} />
+    </svg>
+  )
+}
+
+function IconUser({ size = 12, color = 'currentColor' }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="6" cy="4" r="2.5" stroke={color} strokeWidth="1.2" />
+      <path d="M1 11c0-2.2 2.2-4 5-4s5 1.8 5 4" stroke={color} strokeWidth="1.2" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+function IconChevron({ size = 12, color = 'currentColor', rotated = false }: { size?: number; color?: string; rotated?: boolean }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg"
+      style={{ transform: rotated ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.18s ease' }}>
+      <path d="M4 2l4 4-4 4" stroke={color} strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+// ── Status pill ────────────────────────────────────────────────────────────────
+
+function StatusPill({ status }: { status: ScheduleStatus }) {
+  const cfg: Record<ScheduleStatus, { bg: string; color: string; icon: JSX.Element }> = {
+    pending:   { bg: 'rgba(245,158,11,0.12)',  color: '#F59E0B', icon: <IconClock  size={12} color="#F59E0B" /> },
+    running:   { bg: 'rgba(139,92,246,0.12)',  color: '#8B5CF6', icon: <IconSpinner size={12} color="#8B5CF6" /> },
+    done:      { bg: 'rgba(34,197,94,0.12)',   color: '#22C55E', icon: <IconCheck  size={12} color="#22C55E" /> },
+    failed:    { bg: 'rgba(239,68,68,0.12)',   color: '#EF4444', icon: <IconX      size={12} color="#EF4444" /> },
+    cancelled: { bg: 'rgba(148,163,184,0.08)', color: 'rgba(148,163,184,0.52)', icon: <IconBan size={12} color="rgba(148,163,184,0.52)" /> },
+  }
+  const { bg, color, icon } = cfg[status]
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 5,
+      background: bg, color, borderRadius: 6,
+      padding: '3px 9px', fontSize: 11, fontWeight: 600, letterSpacing: '0.01em',
+    }}>
+      {icon}
+      {STATUS_LABEL[status]}
+    </span>
+  )
+}
+
+// ── Type badge ─────────────────────────────────────────────────────────────────
+
+function TypeBadge({ type }: { type: string }) {
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center',
+      background: 'rgba(124,58,237,0.10)', color: '#A78BFA',
+      border: '1px solid rgba(139,92,246,0.22)', borderRadius: 6,
+      padding: '3px 9px', fontSize: 11, fontWeight: 600,
+    }}>
+      {TYPE_LABEL[type] ?? type}
+    </span>
+  )
+}
+
+// ── Stat chip ──────────────────────────────────────────────────────────────────
+
+function StatChip({ icon, label }: { icon: JSX.Element; label: string }) {
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 5,
+      background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.72)',
+      border: '1px solid rgba(255,255,255,0.055)', borderRadius: 6,
+      padding: '3px 9px', fontSize: 12,
+    }}>
+      {icon}
+      {label}
+    </span>
+  )
 }
 
 export function Scheduler({ user }: Props) {
@@ -189,40 +377,80 @@ export function Scheduler({ user }: Props) {
   const shown   = tab === 'pending' ? pending : history
 
   return (
-    <div className="h-full flex flex-col overflow-hidden">
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#07070C' }}>
 
-      {/* Page header */}
-      <div className="flex-shrink-0 px-8 pt-7 pb-5" style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
-        <div className="flex items-center justify-between mb-4">
+      {/* ── Page header ───────────────────────────────────────────────────────── */}
+      <div style={{
+        flexShrink: 0,
+        padding: '28px 32px 0',
+        borderBottom: '1px solid rgba(255,255,255,0.055)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 }}>
           <div>
-            <h1 className="text-[20px] font-black text-white leading-none">Programmation</h1>
-            <p className="text-[12px] text-text2 mt-0.5">Posts automatiques — exécutés même app fermée</p>
+            <h1 style={{ fontSize: 20, fontWeight: 800, color: '#F2F0FF', margin: 0, lineHeight: 1 }}>
+              Programmation
+            </h1>
+            <p style={{ fontSize: 12, color: 'rgba(148,163,184,0.52)', marginTop: 5, marginBottom: 0 }}>
+              Posts automatiques — exécutés même app fermée
+            </p>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="px-3 py-1 rounded-lg text-[11px] font-bold"
-              style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.2)', color: '#22C55E' }}>
-              {pending.length} en attente
-            </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {pending.length > 0 && (
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', gap: 5,
+                background: 'rgba(34,197,94,0.1)', color: '#22C55E',
+                border: '1px solid rgba(34,197,94,0.2)', borderRadius: 8,
+                padding: '4px 10px', fontSize: 11, fontWeight: 700,
+              }}>
+                <IconClock size={11} color="#22C55E" />
+                {pending.length} en attente
+              </span>
+            )}
+            <button
+              onClick={reload}
+              style={{
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                gap: 6, padding: '6px 14px',
+                background: '#111120', border: '1px solid rgba(255,255,255,0.09)',
+                borderRadius: 8, cursor: 'pointer', color: 'rgba(196,181,253,0.72)',
+                fontSize: 12, fontWeight: 600, transition: 'all 0.15s',
+              }}
+            >
+              <IconRefresh size={13} color="rgba(196,181,253,0.72)" />
+              Actualiser
+            </button>
           </div>
         </div>
 
-        {/* Tab switcher */}
-        <div className="flex gap-1 p-1 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+        {/* ── Tabs ─────────────────────────────────────────────────────────── */}
+        <div style={{ display: 'flex', gap: 0 }}>
           {([
             { id: 'pending' as TabFilter, label: 'En attente', count: pending.length },
             { id: 'history' as TabFilter, label: 'Historique',  count: history.length },
           ]).map(t => (
-            <button key={t.id} onClick={() => setTab(t.id)}
-              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-[13px] font-bold transition-all"
-              style={tab === t.id
-                ? { background: 'linear-gradient(130deg,#2563eb,#7c3aed)', color: 'white' }
-                : { color: 'rgba(148,163,184,0.5)' }}>
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 8,
+                padding: '10px 18px',
+                background: tab === t.id ? '#111120' : 'transparent',
+                border: 'none',
+                borderBottom: tab === t.id ? '2px solid #7C3AED' : '2px solid transparent',
+                cursor: 'pointer',
+                color: tab === t.id ? '#F2F0FF' : 'rgba(148,163,184,0.52)',
+                fontSize: 13, fontWeight: tab === t.id ? 700 : 500,
+                transition: 'all 0.15s',
+                marginBottom: -1,
+              }}
+            >
               {t.label}
               {t.count > 0 && (
-                <span className="text-[11px] font-black px-1.5 py-0.5 rounded-full"
-                  style={tab === t.id
-                    ? { background: 'rgba(255,255,255,0.2)', color: 'white' }
-                    : { background: 'rgba(139,92,246,0.15)', color: '#a78bfa' }}>
+                <span style={{
+                  background: tab === t.id ? 'rgba(139,92,246,0.22)' : 'rgba(255,255,255,0.05)',
+                  color: tab === t.id ? '#A78BFA' : 'rgba(148,163,184,0.4)',
+                  borderRadius: 20, padding: '1px 7px', fontSize: 11, fontWeight: 700,
+                }}>
                   {t.count}
                 </span>
               )}
@@ -231,49 +459,70 @@ export function Scheduler({ user }: Props) {
         </div>
       </div>
 
-      {/* Post list */}
-      <div className="flex-1 overflow-y-auto px-8 pb-8" style={{ scrollbarWidth: 'none' }}>
-        <div className="space-y-3 mt-5">
-          {loading ? (
-            <div className="flex items-center justify-center py-20">
-              <Spinner size="lg" />
-            </div>
-          ) : shown.length === 0 ? (
-            <div className="rounded-2xl p-10 text-center mt-4 sf-card">
-              <p className="text-4xl mb-3">{tab === 'pending' ? '📅' : '🕐'}</p>
-              <p className="text-[15px] font-bold text-white mb-2">
-                {tab === 'pending' ? 'Aucun post programmé' : 'Aucun historique'}
-              </p>
-              <p className="text-[12px] text-text2">
-                {tab === 'pending'
-                  ? 'Programme un post depuis Posting ou Mass Posting.'
-                  : 'Les posts exécutés apparaîtront ici.'}
-              </p>
-            </div>
-          ) : shown.map(post => (
-            <PostCard
-              key={post.id}
-              post={post}
-              isOwn={post.user_id === user.id}
-              canCancel={canCancel(post)}
-              isRunning={runningPost === post.id}
-              runLogs={runLogs?.id === post.id ? runLogs.msgs : null}
-              cancelling={cancelling === post.id}
-              onCancel={() => cancel(post.id)}
-            />
-          ))}
-        </div>
+      {/* ── Post list ─────────────────────────────────────────────────────────── */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '20px 32px 32px', scrollbarWidth: 'none' }}>
+        {loading ? (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', paddingTop: 80 }}>
+            <Spinner size="lg" />
+          </div>
+        ) : shown.length === 0 ? (
+          /* ── Empty state ──────────────────────────────────────────────────── */
+          <div style={{
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            padding: '60px 24px', textAlign: 'center',
+            background: '#0C0C15', border: '1px solid rgba(255,255,255,0.055)',
+            borderRadius: 15, marginTop: 8,
+          }}>
+            <span style={{ color: 'rgba(139,92,246,0.35)', marginBottom: 18 }}>
+              <IconCalendar size={48} color="rgba(139,92,246,0.35)" />
+            </span>
+            <p style={{ fontSize: 15, fontWeight: 700, color: '#F2F0FF', margin: 0 }}>
+              {tab === 'pending' ? 'Aucune tâche programmée' : 'Aucun historique'}
+            </p>
+            <p style={{ fontSize: 12, color: 'rgba(148,163,184,0.52)', marginTop: 8, marginBottom: 0 }}>
+              {tab === 'pending'
+                ? 'Programme un post depuis Posting ou Mass Posting.'
+                : 'Les posts exécutés apparaîtront ici.'}
+            </p>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {shown.map(post => (
+              <PostCard
+                key={post.id}
+                post={post}
+                isOwn={post.user_id === user.id}
+                canCancel={canCancel(post)}
+                isRunning={runningPost === post.id}
+                runLogs={runLogs?.id === post.id ? runLogs.msgs : null}
+                cancelling={cancelling === post.id}
+                onCancel={() => cancel(post.id)}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Info banner */}
-      <div className="flex-shrink-0 px-10 py-4" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-        <div className="flex items-start gap-3 px-5 py-4 rounded-2xl"
-          style={{ background: 'rgba(37,99,235,0.06)', border: '1px solid rgba(37,99,235,0.12)' }}>
-          <span className="text-base mt-0.5 flex-shrink-0">💡</span>
-          <p className="text-[13px] leading-relaxed text-text2">
-            Les posts sont exécutés <strong className="text-white/70">automatiquement</strong> à l'heure choisie.
-            Si l'app est ouverte, elle s'en charge. Sinon, la <strong className="text-white/70">Supabase Edge Function</strong> prend le relais.
-            La vidéo est uploadée au moment de la programmation.
+      {/* ── Info banner ───────────────────────────────────────────────────────── */}
+      <div style={{
+        flexShrink: 0, padding: '12px 32px 16px',
+        borderTop: '1px solid rgba(255,255,255,0.04)',
+      }}>
+        <div style={{
+          display: 'flex', alignItems: 'flex-start', gap: 10,
+          padding: '12px 16px',
+          background: 'rgba(124,58,237,0.05)', border: '1px solid rgba(139,92,246,0.12)',
+          borderRadius: 11,
+        }}>
+          <span style={{ flexShrink: 0, marginTop: 1 }}>
+            <IconInfo size={14} color="rgba(139,92,246,0.7)" />
+          </span>
+          <p style={{ fontSize: 12, lineHeight: 1.6, color: 'rgba(196,181,253,0.72)', margin: 0 }}>
+            Les posts sont exécutés{' '}
+            <strong style={{ color: 'rgba(242,240,255,0.7)' }}>automatiquement</strong>{' '}
+            à l'heure choisie. Si l'app est ouverte, elle s'en charge. Sinon, la{' '}
+            <strong style={{ color: 'rgba(242,240,255,0.7)' }}>Supabase Edge Function</strong>{' '}
+            prend le relais. La vidéo est uploadée au moment de la programmation.
           </p>
         </div>
       </div>
@@ -293,157 +542,213 @@ function PostCard({ post, isOwn, canCancel, isRunning, runLogs, cancelling, onCa
   onCancel: () => void
 }) {
   const [showLogs, setShowLogs] = useState(false)
+  const [hovered, setHovered]   = useState(false)
   const isPending   = post.status === 'pending'
-  const borderColor = post.status === 'done'      ? 'rgba(52,211,153,0.2)'
-                    : post.status === 'failed'     ? 'rgba(239,68,68,0.2)'
-                    : post.status === 'cancelled'  ? 'rgba(255,255,255,0.06)'
-                    : post.status === 'running'    ? 'rgba(251,191,36,0.25)'
-                    : 'rgba(37,99,235,0.2)'
-  const glowColor   = post.status === 'done'      ? 'rgba(52,211,153,0.06)'
-                    : post.status === 'failed'     ? 'rgba(239,68,68,0.05)'
-                    : post.status === 'running'    ? 'rgba(251,191,36,0.05)'
-                    : 'rgba(37,99,235,0.05)'
-
   const allLogs = runLogs ?? (post.result?.logs ?? [])
 
+  const accentColor =
+    post.status === 'done'      ? '#22C55E'
+    : post.status === 'failed'  ? '#EF4444'
+    : post.status === 'running' ? '#8B5CF6'
+    : post.status === 'cancelled' ? 'rgba(148,163,184,0.2)'
+    : '#7C3AED'
+
   return (
-    <div className="rounded-2xl overflow-hidden transition-all hover:scale-[1.002]"
-      style={{ background: '#0E0E16', border: `1px solid ${borderColor}`, boxShadow: `0 4px 20px ${glowColor}` }}>
+    <div
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        background: hovered ? 'rgba(124,58,237,0.04)' : '#0C0C15',
+        border: '1px solid rgba(255,255,255,0.055)',
+        borderLeft: `3px solid ${accentColor}`,
+        borderRadius: 11,
+        padding: '14px 18px',
+        transition: 'background 0.15s, border-color 0.15s',
+      }}
+    >
+      {/* ── Row 1: status + type + title ──────────────────────────────────── */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
+          <StatusPill status={post.status} />
+          <TypeBadge type={post.type} />
 
-      {/* Top accent line */}
-      <div className="h-[2.5px]" style={{
-        background: post.status === 'done'     ? 'linear-gradient(90deg,#34d399,#059669)'
-                  : post.status === 'failed'   ? 'linear-gradient(90deg,#ef4444,#dc2626)'
-                  : post.status === 'running'  ? 'linear-gradient(90deg,#fbbf24,#f59e0b)'
-                  : post.status === 'cancelled'? 'rgba(255,255,255,0.08)'
-                  : 'linear-gradient(90deg,#2563eb,#7c3aed)'
-      }} />
+          {post.created_by_name && (
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+              background: isOwn ? 'rgba(139,92,246,0.1)' : 'rgba(255,255,255,0.04)',
+              color: isOwn ? '#A78BFA' : 'rgba(196,181,253,0.5)',
+              border: `1px solid ${isOwn ? 'rgba(139,92,246,0.2)' : 'rgba(255,255,255,0.055)'}`,
+              borderRadius: 6, padding: '3px 8px', fontSize: 11, fontWeight: 500,
+            }}>
+              <IconUser size={11} color={isOwn ? '#A78BFA' : 'rgba(196,181,253,0.5)'} />
+              {isOwn ? 'Moi' : post.created_by_name}
+            </span>
+          )}
 
-      <div className="px-6 py-5">
-        {/* Row 1: type + status + time */}
-        <div className="flex items-start gap-4">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
-            style={{ background: 'rgba(37,99,235,0.1)', border: '1px solid rgba(37,99,235,0.15)' }}>
-            {post.type === 'mass_posting' ? '⚡' : '🚀'}
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-[15px] font-black text-white">{TYPE_LABEL[post.type]}</span>
-              {post.created_by_name && (
-                <span className="text-[12px] px-2.5 py-0.5 rounded-full font-semibold"
-                  style={{ background: isOwn ? 'rgba(139,92,246,0.12)' : 'rgba(255,255,255,0.05)', color: isOwn ? '#a78bfa' : 'rgba(196,181,253,0.5)' }}>
-                  {isOwn ? '👤 Moi' : `👤 ${post.created_by_name}`}
-                </span>
-              )}
-              <span className="text-[12px] font-bold px-2.5 py-0.5 rounded-full"
-                style={{
-                  background: post.status === 'done'     ? 'rgba(52,211,153,0.12)'
-                            : post.status === 'failed'   ? 'rgba(239,68,68,0.12)'
-                            : post.status === 'running'  ? 'rgba(251,191,36,0.12)'
-                            : post.status === 'cancelled'? 'rgba(255,255,255,0.05)'
-                            : 'rgba(37,99,235,0.12)',
-                  color: post.status === 'done'     ? '#34d399'
-                       : post.status === 'failed'   ? '#f87171'
-                       : post.status === 'running'  ? '#fbbf24'
-                       : post.status === 'cancelled'? 'rgba(196,181,253,0.4)'
-                       : '#60a5fa',
-                }}>
-                {STATUS_ICON[post.status]} {STATUS_LABEL[post.status]}
-              </span>
-              {isRunning && <Spinner size="sm" />}
-            </div>
-            <div className="flex items-center gap-3 mt-1.5 flex-wrap">
-              <span className="text-[13px] font-semibold" style={{ color: '#60a5fa' }}>
-                🕐 {fmtScheduledTime(post.scheduled_at)}
-              </span>
-              {isPending && (
-                <span className="text-[12px] text-text2">
-                  {timeUntil(post.scheduled_at)}
-                </span>
-              )}
-            </div>
-          </div>
-
-          {isPending && canCancel && (
-            <button onClick={onCancel} disabled={cancelling}
-              className="flex-shrink-0 rounded-xl px-4 py-2 text-[13px] font-semibold transition-all disabled:opacity-50"
-              style={{ background: 'rgba(239,68,68,0.1)', color: '#f87171', border: '1px solid rgba(239,68,68,0.2)' }}>
-              {cancelling ? '…' : 'Annuler'}
-            </button>
+          {isRunning && (
+            <span style={{ display: 'inline-flex', alignItems: 'center' }}>
+              <Spinner size="sm" />
+            </span>
           )}
         </div>
 
-        {/* Row 2: stats chips */}
-        <div className="flex items-center gap-2 mt-4 flex-wrap">
-          <Chip icon="📱" label={`${post.phones.length} téléphone${post.phones.length > 1 ? 's' : ''}`} />
-          <Chip icon="🎬" label={`${post.videos.length} vidéo${post.videos.length > 1 ? 's' : ''}`} />
-          {post.delay_minutes > 0 && <Chip icon="⏱" label={`${post.delay_minutes} min entre comptes`} />}
-          {post.type === 'mass_posting' && <Chip icon={post.mode === 'random' ? '🔀' : '➡'} label={post.mode === 'random' ? 'Aléatoire' : 'Séquentiel'} />}
-        </div>
-
-        {/* Caption preview */}
-        {post.caption && (
-          <p className="mt-3 text-[13px] leading-relaxed line-clamp-2 text-text2 italic">
-            "{post.caption.slice(0, 120)}{post.caption.length > 120 ? '…' : ''}"
-          </p>
+        {/* Cancel button */}
+        {isPending && canCancel && (
+          <button
+            onClick={onCancel}
+            disabled={cancelling}
+            style={{
+              flexShrink: 0,
+              display: 'inline-flex', alignItems: 'center', gap: 5,
+              padding: '5px 12px',
+              background: cancelling ? 'rgba(239,68,68,0.05)' : 'rgba(239,68,68,0.08)',
+              color: '#EF4444',
+              border: '1px solid rgba(239,68,68,0.18)',
+              borderRadius: 8, cursor: cancelling ? 'not-allowed' : 'pointer',
+              fontSize: 12, fontWeight: 600,
+              opacity: cancelling ? 0.5 : 1,
+              transition: 'all 0.15s',
+            }}
+          >
+            <IconX size={11} color="#EF4444" />
+            {cancelling ? 'Annulation…' : 'Annuler'}
+          </button>
         )}
+      </div>
 
-        {/* Phones list */}
-        <div className="mt-3 flex flex-wrap gap-1.5">
+      {/* ── Row 2: scheduled time + time until ─────────────────────────────── */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 10, flexWrap: 'wrap' }}>
+        <span style={{
+          display: 'inline-flex', alignItems: 'center', gap: 5,
+          color: '#A78BFA', fontSize: 12, fontWeight: 600,
+        }}>
+          <IconClock size={12} color="#A78BFA" />
+          {fmtScheduledTime(post.scheduled_at)}
+        </span>
+        {isPending && (
+          <span style={{ fontSize: 12, color: 'rgba(148,163,184,0.52)' }}>
+            {timeUntil(post.scheduled_at)}
+          </span>
+        )}
+      </div>
+
+      {/* ── Row 3: stat chips ─────────────────────────────────────────────── */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
+        <StatChip
+          icon={<IconPhone size={11} color="rgba(196,181,253,0.72)" />}
+          label={`${post.phones.length} téléphone${post.phones.length !== 1 ? 's' : ''}`}
+        />
+        <StatChip
+          icon={<IconVideo size={11} color="rgba(196,181,253,0.72)" />}
+          label={`${post.videos.length} vidéo${post.videos.length !== 1 ? 's' : ''}`}
+        />
+        {post.delay_minutes > 0 && (
+          <StatChip
+            icon={<IconTime size={11} color="rgba(196,181,253,0.72)" />}
+            label={`${post.delay_minutes} min entre comptes`}
+          />
+        )}
+        {post.type === 'mass_posting' && (
+          <StatChip
+            icon={post.mode === 'random'
+              ? <IconShuffle size={11} color="rgba(196,181,253,0.72)" />
+              : <IconArrowRight size={11} color="rgba(196,181,253,0.72)" />}
+            label={post.mode === 'random' ? 'Aléatoire' : 'Séquentiel'}
+          />
+        )}
+      </div>
+
+      {/* ── Caption preview ───────────────────────────────────────────────── */}
+      {post.caption && (
+        <p style={{
+          marginTop: 10, marginBottom: 0,
+          fontSize: 12, lineHeight: 1.6,
+          color: 'rgba(148,163,184,0.52)',
+          fontStyle: 'italic',
+          display: '-webkit-box',
+          WebkitLineClamp: 2,
+          WebkitBoxOrient: 'vertical',
+          overflow: 'hidden',
+        }}>
+          "{post.caption.slice(0, 120)}{post.caption.length > 120 ? '…' : ''}"
+        </p>
+      )}
+
+      {/* ── Phone tags ────────────────────────────────────────────────────── */}
+      {post.phones.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 10 }}>
           {post.phones.slice(0, 6).map(p => (
-            <span key={p.id} className="text-[12px] px-2.5 py-0.5 rounded-full"
-              style={{ background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.6)', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <span key={p.id} style={{
+              background: 'rgba(255,255,255,0.03)', color: 'rgba(196,181,253,0.6)',
+              border: '1px solid rgba(255,255,255,0.055)', borderRadius: 5,
+              padding: '2px 8px', fontSize: 11,
+            }}>
               {p.ig_username ?? p.phone_name}
             </span>
           ))}
           {post.phones.length > 6 && (
-            <span className="text-[12px] px-2.5 py-0.5 rounded-full"
-              style={{ background: 'rgba(139,92,246,0.1)', color: '#a78bfa' }}>
+            <span style={{
+              background: 'rgba(124,58,237,0.1)', color: '#A78BFA',
+              borderRadius: 5, padding: '2px 8px', fontSize: 11,
+            }}>
               +{post.phones.length - 6} autres
             </span>
           )}
         </div>
+      )}
 
-        {/* Logs */}
-        {allLogs.length > 0 && (
-          <div className="mt-4">
-            <button onClick={() => setShowLogs(v => !v)}
-              className="text-[12px] font-semibold flex items-center gap-1.5 transition-colors"
-              style={{ color: 'rgba(139,92,246,0.8)' }}>
-              <span style={{ transform: showLogs ? 'rotate(90deg)' : 'rotate(0deg)' }} className="inline-block transition-transform">▶</span>
-              {showLogs ? 'Masquer' : 'Voir'} les logs ({allLogs.length})
-            </button>
-            {showLogs && (
-              <div className="mt-2 rounded-xl p-4 space-y-1 max-h-40 overflow-y-auto"
-                style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)' }}>
-                {allLogs.map((msg, i) => (
-                  <p key={i} className="text-[12px] leading-relaxed font-mono"
-                    style={{ color: msg.startsWith('❌') ? '#f87171' : msg.startsWith('✅') ? '#34d399' : 'rgba(196,181,253,0.6)' }}>
-                    {msg}
-                  </p>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+      {/* ── Run logs ──────────────────────────────────────────────────────── */}
+      {allLogs.length > 0 && (
+        <div style={{ marginTop: 12 }}>
+          <button
+            onClick={() => setShowLogs(v => !v)}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              background: 'none', border: 'none', cursor: 'pointer',
+              color: 'rgba(139,92,246,0.8)', fontSize: 12, fontWeight: 600, padding: 0,
+            }}
+          >
+            <IconChevron size={11} color="rgba(139,92,246,0.8)" rotated={showLogs} />
+            {showLogs ? 'Masquer' : 'Afficher'} les logs ({allLogs.length})
+          </button>
+          {showLogs && (
+            <div style={{
+              marginTop: 8,
+              background: '#07070C', border: '1px solid rgba(255,255,255,0.08)',
+              borderRadius: 11, padding: '12px 14px',
+              fontFamily: 'monospace', fontSize: 12,
+              overflowY: 'auto', maxHeight: 300,
+              scrollbarWidth: 'thin',
+            }}>
+              {allLogs.map((msg, i) => (
+                <p key={i} style={{
+                  margin: '1px 0', lineHeight: 1.6,
+                  color: msg.startsWith('❌') || msg.toLowerCase().startsWith('error')
+                    ? '#EF4444'
+                    : msg.startsWith('✅') || msg.toLowerCase().startsWith('success')
+                    ? '#22C55E'
+                    : 'rgba(196,181,253,0.72)',
+                }}>
+                  {msg}
+                </p>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
-        {/* Error */}
-        {post.error_msg && post.status === 'failed' && (
-          <p className="mt-3 text-[13px] px-4 py-3 rounded-xl"
-            style={{ background: 'rgba(239,68,68,0.08)', color: '#f87171', border: '1px solid rgba(239,68,68,0.12)' }}>
-            ❌ {post.error_msg}
-          </p>
-        )}
-      </div>
+      {/* ── Error message ─────────────────────────────────────────────────── */}
+      {post.error_msg && post.status === 'failed' && (
+        <p style={{
+          marginTop: 10, marginBottom: 0,
+          fontSize: 12, lineHeight: 1.6,
+          padding: '8px 12px',
+          background: 'rgba(239,68,68,0.07)', color: '#EF4444',
+          border: '1px solid rgba(239,68,68,0.14)', borderRadius: 8,
+        }}>
+          {post.error_msg}
+        </p>
+      )}
     </div>
-  )
-}
-
-function Chip({ icon, label }: { icon: string; label: string }) {
-  return (
-    <span className="flex items-center gap-1.5 text-[12px] px-2.5 py-1 rounded-full"
-      style={{ background: 'rgba(37,99,235,0.08)', color: 'rgba(147,197,253,0.8)', border: '1px solid rgba(37,99,235,0.12)' }}>
-      <span>{icon}</span><span>{label}</span>
-    </span>
   )
 }
