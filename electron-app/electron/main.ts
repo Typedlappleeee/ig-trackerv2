@@ -1012,7 +1012,7 @@ ipcMain.handle('run-ffmpeg-remix-ai', async (_event, opts: {
     if (origHasAudio) {
       filterComplex = [
         `[0:v]setpts=PTS-STARTPTS,${vfPhase1}[v_p1]`,
-        `[2:v]setpts=PTS-STARTPTS,${vfPhase1}[v_p2]`,
+        `[2:v]setpts=PTS-STARTPTS,${scl}[v_p2]`,
         `[1:a]asplit=2[ao1][ao2]`,
         `[ao1]atrim=end=${splitTime},asetpts=PTS-STARTPTS,${afmt}[a_p1]`,
         `[ao2]atrim=start=${splitTime},asetpts=PTS-STARTPTS,${afmt}[a_p2]`,
@@ -1023,7 +1023,7 @@ ipcMain.handle('run-ffmpeg-remix-ai', async (_event, opts: {
     } else {
       filterComplex = [
         `[0:v]setpts=PTS-STARTPTS,${vfPhase1}[v_p1]`,
-        `[2:v]setpts=PTS-STARTPTS,${vfPhase1}[v_p2]`,
+        `[2:v]setpts=PTS-STARTPTS,${scl}[v_p2]`,
         `[v_p1][v_p2]concat=n=2:v=1:a=0[vout]`,
       ].join(';')
       mapArgs      = ['-map', '[vout]']
