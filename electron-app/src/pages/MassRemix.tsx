@@ -435,7 +435,7 @@ export function MassRemix({ user }: MassRemixProps) {
           detDuration = det.duration
           // Ignore detected splits that are too early (< 20% of duration, min 2s)
           // — those are false positives from minor brightness changes, not real scene cuts
-          const minSplit = Math.min(5, Math.max(2, (det.duration ?? 10) * 0.20))
+          const minSplit = 2.0
           if (det.ok && det.splitTime != null && det.splitTime >= minSplit) {
             splitTime = Math.min((det.duration ?? 60) - 0.1, Math.round(det.splitTime * 1000) / 1000)
             addLog(job.id, `✅ Scène: splitTime=${splitTime}s, durée=${det.duration ?? '?'}s`)
@@ -587,9 +587,10 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                 })
 
                 // ── Step 2: assign zones (top / bottom) to avoid face + overlaps ─
-                // Base zone from original position: top if rawY < 0.35, else bottom
+                // Always place text in the bottom zone regardless of its position
+                // in the original — top placements on the secondary video look off.
                 type Zone = 'top' | 'bottom'
-                const zones: Zone[] = items.map(it => it.rawY < 0.35 ? 'top' : 'bottom')
+                const zones: Zone[] = items.map(_ => 'bottom' as Zone)
                 // Conflict resolution: if two temporally-concurrent items share a zone → flip the later one
                 for (let i = 1; i < items.length; i++) {
                   for (let j = 0; j < i; j++) {
@@ -624,7 +625,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                     baseY = concurrentEnd
                   } else {
                     // Random position in bottom safe zone [0.62, 0.80]
-                    const preferred = 0.62 + Math.random() * 0.18
+                    const preferred = 0.72 + Math.random() * 0.10
                     const concurrentEnd = items
                       .slice(0, idx)
                       .filter((_, j) => zones[j] === 'bottom' && items[j].endTime > item.startTime && items[j].startTime < item.endTime)

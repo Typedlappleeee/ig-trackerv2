@@ -273,7 +273,7 @@ export async function detectSceneChangeWeb(opts: {
       }
       // Require a big background/location change: threshold 0.30 = 30% avg pixel shift.
       // Minor motion or lighting changes stay < 0.15, real scene cuts are 0.30+.
-      const threshold = opts.threshold ?? 0.30
+      const threshold = opts.threshold ?? 0.25
 
       // Find the FIRST consecutive-frame transition above threshold (the first
       // scene change), not the global maximum — the cut must land on the first
