@@ -842,8 +842,25 @@ export async function runFfmpegRemixAIWeb(opts: {
         }
       }
 
-      // VP9/VP8 WebM → return as-is (GéeLark generally accepts WebM too)
-      return { ok: true, outputPath: URL.createObjectURL(blob) }
+      // VP9/VP8 WebM → must transcode to H.264 MP4 for Instagram compatibility
+      try {
+        return await withFfmpegLock(async () => {
+          const ff = await getFFmpeg()
+          await ff.deleteFile('mr_in.webm').catch(() => {})
+          await ff.deleteFile('mr_out.mp4').catch(() => {})
+          await ff.writeFile('mr_in.webm', new Uint8Array(await blob.arrayBuffer()))
+          await ff.exec(['-nostdin', '-i', 'mr_in.webm',
+            '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23',
+            '-c:a', 'aac', '-b:a', '128k',
+            '-movflags', '+faststart', '-y', 'mr_out.mp4'])
+          const url = await readOutput(ff, 'mr_out.mp4')
+          await ff.deleteFile('mr_in.webm').catch(() => {})
+          await ff.deleteFile('mr_out.mp4').catch(() => {})
+          return { ok: true, outputPath: url }
+        })
+      } catch {
+        return { ok: true, outputPath: URL.createObjectURL(blob) }
+      }
 
     } catch (err) {
       console.warn('[remix] MediaRecorder failed, falling back to WASM:', String(err))
