@@ -243,9 +243,8 @@ export async function detectSceneChangeWeb(opts: {
       canvas.width = W; canvas.height = H
       const ctx = canvas.getContext('2d')!
 
-      // Sample densely (~every 0.35s) so the FIRST scene change is caught early
-      // and not skipped/quantised late by a coarse grid. Capped for very long clips.
-      const maxSamples = Math.max(12, Math.min(160, Math.ceil(duration / 0.35)))
+      // Sample up to 30 timestamps spread across the video
+      const maxSamples = 30
       const step = duration / maxSamples
       const times = Array.from({ length: maxSamples }, (_, i) => (i + 0.5) * step)
 
@@ -272,17 +271,15 @@ export async function detectSceneChangeWeb(opts: {
         }
         return diff / (pixelCount * 3 * 255)
       }
-      // Scene-cut sensitivity: 0.18 ≈ 18% avg pixel shift. Lower than before so
-      // genuine scene changes aren't missed; minor motion/pan/lighting stays under it.
-      const threshold = opts.threshold ?? 0.18
+      // Require a big background/location change: threshold 0.30 = 30% avg pixel shift.
+      // Minor motion or lighting changes stay < 0.15, real scene cuts are 0.30+.
+      const threshold = opts.threshold ?? 0.30
 
       // Find the FIRST consecutive-frame transition above threshold (the first
       // scene change), not the global maximum — the cut must land on the first
-      // moment the original video changes scene. Skip the very first 0.3s to
-      // avoid decode artifacts on the opening frames.
+      // moment the original video changes scene.
       let firstIdx = -1
       for (let i = 1; i < frames.length; i++) {
-        if (frames[i].t < 0.3) continue
         if (frameDiff(frames[i - 1].data, frames[i].data) > threshold) { firstIdx = i; break }
       }
 
