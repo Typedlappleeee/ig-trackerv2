@@ -244,26 +244,12 @@ export function buildWebAPI() {
     // ── Upload video to GéeLark ─────────────────────────────────────────────
     async uploadVideoGeelark(opts: { bearer: string; filePath: string }) {
       try {
-        // Extract storage path from Supabase signed URL or use as-is
-        const supabaseMatch = opts.filePath.match(/\/object\/sign\/([^/?]+)\/(.+?)(?:\?|$)/)
-        if (supabaseMatch) {
-          // Route through server-side proxy (avoids browser CORS + memory issues)
-          const r = await fetch('/api/geelark-upload', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              storagePath: decodeURIComponent(supabaseMatch[2]),
-              bucket: supabaseMatch[1],
-              bearer: opts.bearer,
-            }),
-          })
-          return await r.json() as { ok: boolean; token?: string; error?: string }
-        }
-
-        // Fallback: blob/data URL — load in browser and upload directly
+        // Always upload directly from browser to avoid Vercel serverless timeout
+        // which truncates videos to ~2 seconds on slow connections.
+        // 1. Fetch video bytes (works for blob:, https:, Supabase signed URLs)
         const bytes = await fetchFileBytes(opts.filePath)
-        const ext = opts.filePath.split('.').pop()?.toLowerCase() ?? 'mp4'
 
+        // 2. Get GéeLark presigned upload URL
         const urlRes = await fetch('/api/gx', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -271,24 +257,46 @@ export function buildWebAPI() {
             method: 'POST',
             url: 'https://openapi.geelark.com/open/v1/upload/getUrl',
             headers: { Authorization: `Bearer ${opts.bearer}` },
-            body: { fileType: ext },
+            body: { fileType: 'mp4' },
           }),
         })
         const urlData = await urlRes.json() as Record<string, unknown>
-        if (!urlData.ok) return { ok: false, error: 'Upload URL failed' }
-        const payload = (urlData.data as Record<string, unknown>)
-        const apiResp = payload?.['data'] as Record<string, unknown>
-        if (!apiResp) return { ok: false, error: 'No upload data from GéeLark' }
-        const uploadUrl = apiResp['uploadUrl'] as string
-        const token     = apiResp['token'] as string
-        if (!uploadUrl || !token) return { ok: false, error: 'Missing uploadUrl or token' }
+        if (!urlData.ok) return { ok: false, error: 'GéeLark upload URL failed' }
+        const apiResp = ((urlData.data as Record<string, unknown>)?.['data'] ?? urlData.data) as Record<string, unknown>
+        const uploadUrl  = apiResp?.['uploadUrl']   as string | undefined
+        const resourceUrl = apiResp?.['resourceUrl'] as string | undefined
+        const token      = resourceUrl ?? apiResp?.['token'] as string | undefined
+        if (!uploadUrl || !token) return { ok: false, error: 'Missing uploadUrl/token from GéeLark. Keys: ' + Object.keys(apiResp ?? {}).join(',') }
 
-        const putRes = await fetch(uploadUrl, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'video/mp4' },
-          body: bytes.buffer as ArrayBuffer,
-        })
-        if (!putRes.ok) return { ok: false, error: `S3 PUT failed: ${putRes.status}` }
+        // 3. PUT bytes directly to S3 (no server hop → no timeout truncation)
+        let putRes = await fetch(uploadUrl, { method: 'PUT', body: bytes.buffer as ArrayBuffer })
+        if (!putRes.ok) {
+          // Retry with explicit Content-Type (some presigned URLs require it)
+          putRes = await fetch(uploadUrl, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'video/mp4' },
+            body: bytes.buffer as ArrayBuffer,
+          })
+        }
+        if (!putRes.ok) {
+          // CORS fallback: route through server proxy
+          const r = await fetch('/api/geelark-upload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              storagePath: (() => {
+                const m = opts.filePath.match(/\/object\/sign\/([^/?]+)\/(.+?)(?:\?|$)/)
+                return m ? decodeURIComponent(m[2]) : opts.filePath
+              })(),
+              bucket: (() => {
+                const m = opts.filePath.match(/\/object\/sign\/([^/?]+)\//)
+                return m ? m[1] : 'content'
+              })(),
+              bearer: opts.bearer,
+            }),
+          })
+          return await r.json() as { ok: boolean; token?: string; error?: string }
+        }
 
         return { ok: true, token }
       } catch (err) {

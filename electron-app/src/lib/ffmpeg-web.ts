@@ -620,7 +620,7 @@ async function remixViaMediaRecorder(opts: {
     loadVid(opts.newPhase1Path),
     loadVid(opts.originalPath),
   ])
-  const totalDuration = opts.targetDuration ?? origVid.duration
+  const totalDuration = (opts.targetDuration && opts.targetDuration > 1) ? opts.targetDuration : origVid.duration
 
   // ── canvas + capture stream ───────────────────────────────────────────────────
   const canvas = document.createElement('canvas')

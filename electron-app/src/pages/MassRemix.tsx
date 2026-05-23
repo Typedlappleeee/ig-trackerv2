@@ -707,8 +707,10 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
           outputPath = tmp.path
         }
 
-        // Trim output to original video duration so secondary doesn't run long
-        const targetDuration = detDuration ?? undefined
+        // Trim output to original video duration so secondary doesn't run long.
+        // Guard against 0 / NaN from failed detection — pass undefined so the
+        // video element's own .duration is used instead (avoids immediate stop).
+        const targetDuration = (detDuration != null && detDuration > 1) ? detDuration : undefined
 
         const gen = await withTimeout(
           window.electronAPI!.runFfmpegRemixAI!({
