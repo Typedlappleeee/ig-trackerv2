@@ -220,11 +220,12 @@ export function MassRemix({ user }: MassRemixProps) {
   const [playbackRate,   setPlaybackRate]   = useState(1)
   const [beforeFrameUrl, setBeforeFrameUrl] = useState<string | null>(null)
   const [afterFrameUrl,  setAfterFrameUrl]  = useState<string | null>(null)
-  const vidRef        = useRef<HTMLVideoElement>(null)
-  const captureVidRef = useRef<HTMLVideoElement>(null)
-  const timelineRef   = useRef<HTMLDivElement>(null)
-  const draggingRef2  = useRef(false)
-  const captureCanvas = useRef<HTMLCanvasElement | null>(null)
+  const vidRef           = useRef<HTMLVideoElement>(null)
+  const captureVidRef    = useRef<HTMLVideoElement>(null)   // original
+  const captureSecVidRef = useRef<HTMLVideoElement>(null)   // secondary
+  const timelineRef      = useRef<HTMLDivElement>(null)
+  const draggingRef2     = useRef(false)
+  const captureCanvas    = useRef<HTMLCanvasElement | null>(null)
 
   // anthropic key from DB (connections), fallback to localStorage
   const anthropicKey = conns.anthropic || localStorage.getItem('sf_anthropic_key') || ''
@@ -362,24 +363,29 @@ export function MassRemix({ user }: MassRemixProps) {
   }
 
   function captureBeforeAfter(cutTime: number) {
-    const vid = captureVidRef.current
-    if (!vid || !vid.src) return
     if (!captureCanvas.current) captureCanvas.current = document.createElement('canvas')
     const canvas = captureCanvas.current
-    const capFrame = (t: number): Promise<string> => new Promise(resolve => {
-      const onSeeked = () => {
-        canvas.width  = vid.videoWidth  || 360
-        canvas.height = vid.videoHeight || 640
-        canvas.getContext('2d')?.drawImage(vid, 0, 0, canvas.width, canvas.height)
-        resolve(canvas.toDataURL('image/jpeg', 0.9))
-      }
-      vid.addEventListener('seeked', onSeeked, { once: true })
-      vid.currentTime = Math.max(0, t)
-    })
-    // Sequential seeks — parallel seeks race on currentTime and corrupt each other
-    capFrame(Math.max(0, cutTime - 1 / 30))
-      .then(url => { setBeforeFrameUrl(url); return capFrame(cutTime) })
-      .then(setAfterFrameUrl)
+
+    const capFrom = (vid: HTMLVideoElement | null, t: number): Promise<string | null> => {
+      if (!vid || !vid.src) return Promise.resolve(null)
+      return new Promise(resolve => {
+        const onSeeked = () => {
+          canvas.width  = vid.videoWidth  || 360
+          canvas.height = vid.videoHeight || 640
+          canvas.getContext('2d')?.drawImage(vid, 0, 0, canvas.width, canvas.height)
+          resolve(canvas.toDataURL('image/jpeg', 0.9))
+        }
+        vid.addEventListener('seeked', onSeeked, { once: true })
+        vid.currentTime = Math.max(0, t)
+      })
+    }
+
+    // Before = last frame of SECONDARY (phase 1) at the cut moment
+    // After  = first frame of ORIGINAL  (phase 2) at the cut moment
+    // Sequential to avoid concurrent-seek corruption on the shared canvas
+    capFrom(captureSecVidRef.current, cutTime)
+      .then(url => { if (url) setBeforeFrameUrl(url); return capFrom(captureVidRef.current, cutTime) })
+      .then(url => { if (url) setAfterFrameUrl(url) })
   }
 
   async function launch(prePlanned?: PlannedPair[]) {
@@ -812,15 +818,9 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
             <div className="flex-1 min-w-0 flex flex-col items-center justify-center gap-5 p-8 overflow-y-auto">
               {selectedPair ? (
                 <>
-                  {/* Hidden capture video (same source, seeks independently for frame preview) */}
-                  <video
-                    ref={captureVidRef}
-                    key={'cap-' + selectedPair.originalPath}
-                    src={toFileUrl(selectedPair.originalPath)}
-                    preload="auto"
-                    muted
-                    style={{ display: 'none' }}
-                  />
+                  {/* Hidden capture videos — seek independently to grab frames */}
+                  <video ref={captureVidRef}    key={'cap-orig-' + selectedPair.originalPath}  src={toFileUrl(selectedPair.originalPath)}  preload="auto" muted style={{ display: 'none' }} />
+                  <video ref={captureSecVidRef} key={'cap-sec-'  + selectedPair.secondaryPath} src={toFileUrl(selectedPair.secondaryPath)} preload="auto" muted style={{ display: 'none' }} />
 
                   {/* ── Main video ── */}
                   <div className="relative rounded-2xl overflow-hidden flex-shrink-0"
@@ -921,25 +921,40 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
 
                     {/* ── Before / After frames ── */}
                     {selectedPair.cutSec != null && (beforeFrameUrl || afterFrameUrl) && (
-                      <div className="flex gap-2">
-                        {/* Before frame */}
-                        <div className="flex-1 rounded-xl overflow-hidden relative" style={{ background: '#000', border: '1px solid rgba(139,92,246,0.2)', aspectRatio: preset === '9:16' ? '9/16' : preset === '1:1' ? '1/1' : '16/9', maxHeight: 160 }}>
-                          {beforeFrameUrl && <img src={beforeFrameUrl} alt="avant" className="w-full h-full object-contain" />}
-                          <div className="absolute bottom-0 left-0 right-0 px-2 py-1 text-center" style={{ background: 'linear-gradient(0deg,rgba(0,0,0,0.75),transparent)', fontSize: 9, color: 'rgba(196,181,253,0.8)', fontWeight: 700 }}>
-                            ← AVANT &nbsp; {(selectedPair.cutSec - 1/30).toFixed(3)}s
+                      <div>
+                        <p className="text-[9px] font-bold uppercase tracking-widest mb-1.5 text-center" style={{ color: 'rgba(148,163,184,0.4)' }}>
+                          Aperçu de la coupe à <span style={{ color: '#eab308' }}>{selectedPair.cutSec.toFixed(3)}s</span>
+                        </p>
+                        <div className="flex gap-2 items-stretch">
+                          {/* Phase 1 — secondary */}
+                          <div className="flex-1 rounded-xl overflow-hidden relative" style={{ background: '#000', border: '2px solid rgba(236,72,153,0.45)', aspectRatio: preset === '9:16' ? '9/16' : preset === '1:1' ? '1/1' : '16/9', maxHeight: 180 }}>
+                            {beforeFrameUrl
+                              ? <img src={beforeFrameUrl} alt="phase1" className="w-full h-full object-contain" />
+                              : <div className="w-full h-full flex items-center justify-center" style={{ color: 'rgba(148,163,184,0.3)', fontSize: 11 }}>chargement…</div>}
+                            <div className="absolute top-0 left-0 right-0 px-2 py-1" style={{ background: 'linear-gradient(180deg,rgba(0,0,0,0.8),transparent)' }}>
+                              <p style={{ fontSize: 8, fontWeight: 800, color: '#ec4899', letterSpacing: '0.08em' }}>PHASE 1 — SECONDAIRE</p>
+                              <p style={{ fontSize: 7, color: 'rgba(236,72,153,0.7)', fontFamily: 'monospace' }}>jusqu'à {selectedPair.cutSec.toFixed(3)}s</p>
+                            </div>
                           </div>
-                        </div>
-                        {/* Cut line */}
-                        <div className="flex flex-col items-center justify-center gap-1 flex-shrink-0">
-                          <div style={{ width: 3, height: 60, background: 'linear-gradient(180deg,transparent,#eab308,transparent)', borderRadius: 2 }} />
-                          <span style={{ fontSize: 9, fontWeight: 800, color: '#eab308', letterSpacing: '0.05em' }}>CUT</span>
-                          <div style={{ width: 3, height: 60, background: 'linear-gradient(180deg,transparent,#eab308,transparent)', borderRadius: 2 }} />
-                        </div>
-                        {/* After frame */}
-                        <div className="flex-1 rounded-xl overflow-hidden relative" style={{ background: '#000', border: '1px solid rgba(234,179,8,0.3)', aspectRatio: preset === '9:16' ? '9/16' : preset === '1:1' ? '1/1' : '16/9', maxHeight: 160 }}>
-                          {afterFrameUrl && <img src={afterFrameUrl} alt="après" className="w-full h-full object-contain" />}
-                          <div className="absolute bottom-0 left-0 right-0 px-2 py-1 text-center" style={{ background: 'linear-gradient(0deg,rgba(0,0,0,0.75),transparent)', fontSize: 9, color: '#eab308', fontWeight: 700 }}>
-                            APRÈS → &nbsp; {selectedPair.cutSec.toFixed(3)}s
+
+                          {/* Cut divider */}
+                          <div className="flex flex-col items-center justify-center gap-0.5 flex-shrink-0 px-0.5">
+                            <div style={{ width: 2, flex: 1, background: 'linear-gradient(180deg,transparent,#eab308)', borderRadius: 2, minHeight: 30 }} />
+                            <div className="rounded px-1 py-0.5" style={{ background: '#eab308' }}>
+                              <span style={{ fontSize: 8, fontWeight: 900, color: '#000', letterSpacing: '0.05em' }}>✂</span>
+                            </div>
+                            <div style={{ width: 2, flex: 1, background: 'linear-gradient(180deg,#eab308,transparent)', borderRadius: 2, minHeight: 30 }} />
+                          </div>
+
+                          {/* Phase 2 — original */}
+                          <div className="flex-1 rounded-xl overflow-hidden relative" style={{ background: '#000', border: '2px solid rgba(139,92,246,0.45)', aspectRatio: preset === '9:16' ? '9/16' : preset === '1:1' ? '1/1' : '16/9', maxHeight: 180 }}>
+                            {afterFrameUrl
+                              ? <img src={afterFrameUrl} alt="phase2" className="w-full h-full object-contain" />
+                              : <div className="w-full h-full flex items-center justify-center" style={{ color: 'rgba(148,163,184,0.3)', fontSize: 11 }}>chargement…</div>}
+                            <div className="absolute top-0 left-0 right-0 px-2 py-1" style={{ background: 'linear-gradient(180deg,rgba(0,0,0,0.8),transparent)' }}>
+                              <p style={{ fontSize: 8, fontWeight: 800, color: '#a78bfa', letterSpacing: '0.08em' }}>PHASE 2 — ORIGINALE</p>
+                              <p style={{ fontSize: 7, color: 'rgba(167,139,250,0.7)', fontFamily: 'monospace' }}>reprend à {selectedPair.cutSec.toFixed(3)}s</p>
+                            </div>
                           </div>
                         </div>
                       </div>
