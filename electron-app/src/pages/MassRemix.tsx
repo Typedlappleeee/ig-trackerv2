@@ -599,15 +599,25 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                 })
 
                 // ── Step 2: assign zones (top / bottom) to avoid face + overlaps ─
-                // Always place text in the bottom zone regardless of its position
-                // in the original — top placements on the secondary video look off.
                 type Zone = 'top' | 'bottom'
                 const zones: Zone[] = items.map(_ => 'bottom' as Zone)
-                // Conflict resolution: if two temporally-concurrent items share a zone → flip the later one
+                // Conflict resolution: two concurrent items in the same zone.
+                // Assign based on rawY so vertical order is preserved:
+                // the item with the smaller rawY (higher on screen) → top zone,
+                // the item with the larger rawY (lower on screen)   → bottom zone.
+                // This guarantees paragraph 1 (higher) stays above paragraph 2 (lower).
                 for (let i = 1; i < items.length; i++) {
                   for (let j = 0; j < i; j++) {
                     const overlap = items[j].endTime > items[i].startTime && items[j].startTime < items[i].endTime
-                    if (overlap && zones[j] === zones[i]) zones[i] = zones[i] === 'bottom' ? 'top' : 'bottom'
+                    if (overlap && zones[j] === zones[i]) {
+                      if (items[j].rawY <= items[i].rawY) {
+                        zones[j] = 'top'
+                        zones[i] = 'bottom'
+                      } else {
+                        zones[j] = 'bottom'
+                        zones[i] = 'top'
+                      }
+                    }
                   }
                 }
 
