@@ -92,6 +92,30 @@ import { Spinner }    from '@/components/ui/Spinner'
 
 interface CommunityProps { user: User; onNavigate?: (page: Page) => void }
 type Channel = 'news' | 'chat' | 'support'
+type Tab = 'news' | 'topics' | 'support'
+
+interface Topic {
+  id: string
+  name: string
+  description: string | null
+  emoji: string
+  created_by: string
+  is_private: boolean
+  created_at: string
+}
+
+interface TopicMessage {
+  id: string
+  topic_id: string
+  user_id: string
+  content: string
+  display_name: string
+  avatar_url: string | null
+  org_name: string | null
+  is_admin: boolean
+  video_url: string | null
+  created_at: string
+}
 
 interface Message {
   id: string
@@ -486,6 +510,103 @@ function ProfileModal({ profile, userId, isAdmin, onClose, onSaved }: {
   )
 }
 
+// ── Create Topic modal ─────────────────────────────────────────────────────────
+
+const TOPIC_EMOJIS = ['💬','📢','🚀','💡','📈','🎯','🎨','🎬','🎵','🤝','💪','🧠','🔥','⚡','🌟','👑','🏆','📸','💻','🎮','🌍','💰','📊','🎭','🌈','🏄','🎸','🍕','⚽','🎲']
+
+function CreateTopicModal({ onClose, onCreate }: {
+  onClose: () => void
+  onCreate: (topic: { name: string; description: string; emoji: string }) => Promise<void>
+}) {
+  const [name, setName]     = useState('')
+  const [desc, setDesc]     = useState('')
+  const [emoji, setEmoji]   = useState('💬')
+  const [saving, setSaving] = useState(false)
+
+  async function submit() {
+    if (!name.trim()) return
+    setSaving(true)
+    await onCreate({ name: name.trim(), description: desc.trim(), emoji })
+    setSaving(false)
+  }
+
+  return (
+    <div className="fixed inset-0 z-[9980] flex items-center justify-center"
+      style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(10px)' }}
+      onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="w-full max-w-[360px] mx-4 rounded-2xl overflow-hidden anim-scale-in"
+        style={{ background: '#0c0919', border: '1px solid rgba(139,92,246,0.3)', boxShadow: '0 32px 80px rgba(0,0,0,0.7)' }}>
+        <div className="flex items-center justify-between px-5 py-4"
+          style={{ borderBottom: '1px solid rgba(139,92,246,0.12)', background: 'linear-gradient(135deg,rgba(139,92,246,0.09),rgba(236,72,153,0.04))' }}>
+          <div>
+            <p className="font-black text-white text-[15px]">Créer une communauté</p>
+            <p className="text-[10px] mt-0.5" style={{ color: 'rgba(196,181,253,0.45)' }}>Visible par tous les membres</p>
+          </div>
+          <button onClick={onClose} className="w-7 h-7 rounded-lg flex items-center justify-center text-sm hover:bg-white/[0.06]"
+            style={{ color: 'rgba(196,181,253,0.5)' }}>✕</button>
+        </div>
+        <div className="p-5 space-y-4">
+          {/* Emoji picker */}
+          <div>
+            <label className="text-[10px] uppercase tracking-[0.15em] font-black block mb-2" style={{ color: 'rgba(139,92,246,0.6)' }}>Icône</label>
+            <div className="flex flex-wrap gap-1.5">
+              {TOPIC_EMOJIS.map(e => (
+                <button key={e} onClick={() => setEmoji(e)}
+                  className="w-8 h-8 rounded-lg text-[17px] flex items-center justify-center transition-all"
+                  style={emoji === e
+                    ? { background: 'rgba(139,92,246,0.35)', border: '1.5px solid rgba(139,92,246,0.7)' }
+                    : { background: 'rgba(255,255,255,0.04)', border: '1.5px solid transparent' }}>
+                  {e}
+                </button>
+              ))}
+            </div>
+          </div>
+          {/* Name */}
+          <div>
+            <label className="text-[10px] uppercase tracking-[0.15em] font-black block mb-1.5" style={{ color: 'rgba(139,92,246,0.6)' }}>Nom *</label>
+            <input type="text" value={name} onChange={e => setName(e.target.value)}
+              placeholder="Ex: Growth Hacks, Créas IG…" maxLength={40}
+              className="w-full rounded-xl px-3.5 py-2.5 text-sm text-white outline-none sf-input" />
+            <div className="flex justify-end mt-1">
+              <span className="text-[9px]" style={{ color: 'rgba(196,181,253,0.25)' }}>{name.length}/40</span>
+            </div>
+          </div>
+          {/* Description */}
+          <div>
+            <label className="text-[10px] uppercase tracking-[0.15em] font-black block mb-1.5" style={{ color: 'rgba(139,92,246,0.6)' }}>Description</label>
+            <textarea value={desc} onChange={e => setDesc(e.target.value)}
+              placeholder="De quoi parle cette communauté ?" maxLength={140} rows={2}
+              className="w-full rounded-xl px-3.5 py-2.5 text-sm text-white outline-none resize-none sf-input" />
+            <div className="flex justify-end mt-1">
+              <span className="text-[9px]" style={{ color: 'rgba(196,181,253,0.25)' }}>{desc.length}/140</span>
+            </div>
+          </div>
+          {/* Preview */}
+          <div className="rounded-xl p-3 flex items-center gap-3"
+            style={{ background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.12)' }}>
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
+              style={{ background: 'rgba(139,92,246,0.15)' }}>{emoji}</div>
+            <div className="min-w-0">
+              <p className="text-[13px] font-black text-white truncate">{name || 'Nom de la communauté'}</p>
+              <p className="text-[10px] truncate" style={{ color: 'rgba(196,181,253,0.4)' }}>{desc || 'Description…'}</p>
+            </div>
+          </div>
+        </div>
+        <div className="px-5 pb-5 flex gap-2.5">
+          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl text-[12px] font-semibold transition-all"
+            style={{ background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.6)', border: '1px solid rgba(255,255,255,0.07)' }}>
+            Annuler
+          </button>
+          <button onClick={submit} disabled={!name.trim() || saving}
+            className="flex-1 py-2.5 rounded-xl text-[12px] font-semibold transition-all btn-sf-primary disabled:opacity-40">
+            {saving ? 'Création…' : '✨ Créer'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Setup screen ───────────────────────────────────────────────────────────────
 
 const SETUP_SQL = `-- 1. Messages
@@ -570,7 +691,52 @@ $$;
 -- Policies Storage (dans SQL Editor) :
 -- CREATE POLICY "community_select" ON storage.objects FOR SELECT USING (bucket_id = 'community');
 -- CREATE POLICY "community_insert" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'community' AND auth.role() = 'authenticated');
--- CREATE POLICY "community_delete" ON storage.objects FOR DELETE USING (bucket_id = 'community' AND auth.uid()::text = (storage.foldername(name))[1]);`
+-- CREATE POLICY "community_delete" ON storage.objects FOR DELETE USING (bucket_id = 'community' AND auth.uid()::text = (storage.foldername(name))[1]);
+
+-- 8. Topics (communautés)
+CREATE TABLE IF NOT EXISTS community_topics (
+  id          uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  name        text NOT NULL CHECK (char_length(name) <= 40),
+  description text CHECK (description IS NULL OR char_length(description) <= 140),
+  emoji       text NOT NULL DEFAULT '💬',
+  created_by  uuid REFERENCES auth.users NOT NULL,
+  is_private  boolean NOT NULL DEFAULT false,
+  created_at  timestamptz DEFAULT now()
+);
+ALTER TABLE community_topics ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "topics_read"   ON community_topics FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "topics_insert" ON community_topics FOR INSERT WITH CHECK (auth.uid() = created_by);
+CREATE POLICY "topics_delete" ON community_topics FOR DELETE USING (auth.uid() = created_by OR EXISTS (SELECT 1 FROM platform_admins WHERE user_id = auth.uid()));
+
+-- 9. Topic members
+CREATE TABLE IF NOT EXISTS community_topic_members (
+  topic_id  uuid REFERENCES community_topics ON DELETE CASCADE NOT NULL,
+  user_id   uuid REFERENCES auth.users NOT NULL,
+  joined_at timestamptz DEFAULT now(),
+  PRIMARY KEY (topic_id, user_id)
+);
+ALTER TABLE community_topic_members ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "topic_members_read"   ON community_topic_members FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "topic_members_insert" ON community_topic_members FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "topic_members_delete" ON community_topic_members FOR DELETE USING (auth.uid() = user_id);
+
+-- 10. Topic messages
+CREATE TABLE IF NOT EXISTS topic_messages (
+  id           uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  topic_id     uuid REFERENCES community_topics ON DELETE CASCADE NOT NULL,
+  user_id      uuid REFERENCES auth.users NOT NULL,
+  content      text NOT NULL CHECK (char_length(content) <= 2000),
+  display_name text NOT NULL DEFAULT '',
+  avatar_url   text,
+  org_name     text,
+  is_admin     boolean NOT NULL DEFAULT false,
+  video_url    text,
+  created_at   timestamptz DEFAULT now()
+);
+ALTER TABLE topic_messages ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "topic_messages_read"   ON topic_messages FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "topic_messages_insert" ON topic_messages FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "topic_messages_delete" ON topic_messages FOR DELETE USING (auth.uid() = user_id OR EXISTS (SELECT 1 FROM platform_admins WHERE user_id = auth.uid()));`
 
 function SetupScreen({ onRetry }: { onRetry: () => void }) {
   const [copied, setCopied] = useState(false)
@@ -617,8 +783,26 @@ export function Community({ user, onNavigate }: CommunityProps) {
   useLicense()
 
   const [isAdmin, setIsAdmin]       = useState(false)
-  const [tab, setTab]               = useState<Channel>('news')
+  const [tab, setTab]               = useState<Tab>('news')
   const [lastSeenSupportAt, setLastSeenSupportAt] = useState<string>(new Date().toISOString())
+
+  // Topics state
+  const [topics, setTopics]               = useState<Topic[]>([])
+  const [joinedTopicIds, setJoinedTopicIds] = useState<Set<string>>(new Set())
+  const [memberCounts, setMemberCounts]   = useState<Map<string, number>>(new Map())
+  const [topicLastMsg, setTopicLastMsg]   = useState<Map<string, { content: string; at: string }>>(new Map())
+  const [selectedTopic, setSelectedTopic] = useState<Topic | null>(null)
+  const [topicsView, setTopicsView]       = useState<'list' | 'chat'>('list')
+  const [topicMessages, setTopicMessages] = useState<TopicMessage[]>([])
+  const [topicDraft, setTopicDraft]       = useState('')
+  const [topicSending, setTopicSend]      = useState(false)
+  const [topicVideo, setTopicVideo]       = useState<File | null>(null)
+  const [showCreateTopic, setShowCreateTopic] = useState(false)
+  const [topicSearch, setTopicSearch]     = useState('')
+  const topicRef      = useRef<HTMLTextAreaElement>(null)
+  const topicVideoRef = useRef<HTMLInputElement>(null)
+  const topicBottomRef = useRef<HTMLDivElement>(null)
+  const topicListRef   = useRef<HTMLDivElement>(null)
   const [messages, setMessages]     = useState<Message[]>([])
   const [loading, setLoading]       = useState(true)
   const [needsSetup, setNeedsSetup] = useState(false)
@@ -833,6 +1017,149 @@ export function Community({ user, onNavigate }: CommunityProps) {
     setChatSend(false)
   }
 
+  // ── Topics load ────────────────────────────────────────────────────────────
+
+  const loadTopics = useCallback(async () => {
+    const { data } = await supabase.from('community_topics').select('*').order('created_at', { ascending: true })
+    if (data) setTopics(data as Topic[])
+  }, [])
+
+  const loadTopicMeta = useCallback(async () => {
+    const { data: members } = await supabase.from('community_topic_members').select('topic_id, user_id')
+    if (members) {
+      const counts = new Map<string, number>()
+      const joined = new Set<string>()
+      for (const m of members) {
+        counts.set(m.topic_id, (counts.get(m.topic_id) ?? 0) + 1)
+        if (m.user_id === user.id) joined.add(m.topic_id)
+      }
+      setMemberCounts(counts)
+      setJoinedTopicIds(joined)
+    }
+    const { data: lastMsgs } = await supabase.from('topic_messages').select('topic_id, content, created_at').order('created_at', { ascending: false }).limit(200)
+    if (lastMsgs) {
+      const map = new Map<string, { content: string; at: string }>()
+      for (const m of lastMsgs) {
+        if (!map.has(m.topic_id)) map.set(m.topic_id, { content: m.content, at: m.created_at })
+      }
+      setTopicLastMsg(map)
+    }
+  }, [user.id])
+
+  const loadTopicMessages = useCallback(async (topicId: string) => {
+    const { data } = await supabase.from('topic_messages').select('*').eq('topic_id', topicId).order('created_at', { ascending: true }).limit(300)
+    if (data) setTopicMessages(data as TopicMessage[])
+  }, [])
+
+  async function joinTopic(topicId: string) {
+    setJoinedTopicIds(prev => new Set([...prev, topicId]))
+    setMemberCounts(prev => { const m = new Map(prev); m.set(topicId, (m.get(topicId) ?? 0) + 1); return m })
+    await supabase.from('community_topic_members').insert({ topic_id: topicId, user_id: user.id })
+  }
+
+  async function leaveTopic(topicId: string) {
+    setJoinedTopicIds(prev => { const s = new Set(prev); s.delete(topicId); return s })
+    setMemberCounts(prev => { const m = new Map(prev); m.set(topicId, Math.max(0, (m.get(topicId) ?? 1) - 1)); return m })
+    await supabase.from('community_topic_members').delete().eq('topic_id', topicId).eq('user_id', user.id)
+  }
+
+  async function createTopic({ name, description, emoji }: { name: string; description: string; emoji: string }) {
+    if (!requirePseudo()) return
+    const { data, error } = await supabase.from('community_topics')
+      .insert({ name, description: description || null, emoji, created_by: user.id })
+      .select().single()
+    if (!error && data) {
+      setTopics(prev => [...prev, data as Topic])
+      setShowCreateTopic(false)
+      await joinTopic(data.id)
+    }
+  }
+
+  async function deleteTopic(topicId: string) {
+    setTopics(prev => prev.filter(t => t.id !== topicId))
+    if (selectedTopic?.id === topicId) { setTopicsView('list'); setSelectedTopic(null) }
+    await supabase.from('topic_messages').delete().eq('topic_id', topicId)
+    await supabase.from('community_topic_members').delete().eq('topic_id', topicId)
+    await supabase.from('community_topics').delete().eq('id', topicId)
+  }
+
+  async function sendTopicMessage() {
+    if (!requirePseudo() || isMuted || !selectedTopic) return
+    const content = topicDraft.trim()
+    if (!content && !topicVideo) return
+    if (topicSending) return
+    setTopicSend(true); setTopicDraft('')
+    const videoFile = topicVideo; setTopicVideo(null)
+    const localUrl = videoFile ? URL.createObjectURL(videoFile) : null
+    const optId = crypto.randomUUID()
+    const opt: TopicMessage = { id: optId, topic_id: selectedTopic.id, user_id: user.id, content: content || '', display_name: profile.display_name, avatar_url: profile.avatar_url, org_name: currentOrg?.name ?? null, is_admin: isAdmin, video_url: localUrl, created_at: new Date().toISOString() }
+    setTopicMessages(prev => [...prev, opt])
+    const video_url = videoFile ? await uploadVideo(videoFile) : null
+    const { error, data } = await supabase.from('topic_messages')
+      .insert({ topic_id: selectedTopic.id, user_id: user.id, content: content || '', display_name: profile.display_name, avatar_url: profile.avatar_url, org_name: currentOrg?.name ?? null, is_admin: isAdmin, video_url })
+      .select().single()
+    if (error) { setTopicMessages(prev => prev.filter(m => m.id !== optId)); setTopicDraft(content) }
+    else if (data) setTopicMessages(prev => prev.map(m => m.id === optId ? data as TopicMessage : m))
+    setTopicSend(false)
+    topicRef.current?.focus()
+  }
+
+  async function deleteTopicMessage(id: string) {
+    setTopicMessages(prev => prev.filter(m => m.id !== id))
+    await supabase.from('topic_messages').delete().eq('id', id)
+  }
+
+  useEffect(() => { loadTopics() }, [loadTopics])
+  useEffect(() => { loadTopicMeta() }, [loadTopicMeta])
+
+  useEffect(() => {
+    if (!selectedTopic) return
+    loadTopicMessages(selectedTopic.id)
+  }, [selectedTopic, loadTopicMessages])
+
+  useEffect(() => {
+    if (!selectedTopic) return
+    setTimeout(() => topicBottomRef.current?.scrollIntoView({ behavior: 'instant' as any }), 50)
+  }, [selectedTopic])
+
+  useEffect(() => {
+    if (topicMessages.length === 0 || !selectedTopic) return
+    const el = topicListRef.current
+    if (!el) return
+    if (el.scrollHeight - el.scrollTop - el.clientHeight < 200)
+      topicBottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [topicMessages, selectedTopic])
+
+  // Real-time for topic messages
+  useEffect(() => {
+    if (!selectedTopic) return
+    const ch = supabase.channel(`topic-${selectedTopic.id}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'topic_messages', filter: `topic_id=eq.${selectedTopic.id}` }, payload => {
+        const msg = payload.new as TopicMessage
+        setTopicMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg])
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'topic_messages' }, payload => {
+        setTopicMessages(prev => prev.filter(m => m.id !== (payload.old as any).id))
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(ch) }
+  }, [selectedTopic?.id])
+
+  // Real-time for topics list
+  useEffect(() => {
+    const ch = supabase.channel('community-topics-list')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'community_topics' }, payload => {
+        setTopics(prev => prev.some(t => t.id === (payload.new as Topic).id) ? prev : [...prev, payload.new as Topic])
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'community_topics' }, payload => {
+        setTopics(prev => prev.filter(t => t.id !== (payload.old as any).id))
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(ch) }
+  }, [])
+
+  // ── Messages ───────────────────────────────────────────────────────────────
+
   async function deleteMessage(id: string) {
     setMessages(prev => prev.filter(m => m.id !== id))
     await supabase.from('community_messages').delete().eq('id', id)
@@ -931,9 +1258,9 @@ export function Community({ user, onNavigate }: CommunityProps) {
       <div className="flex-shrink-0 flex px-5 gap-1"
         style={{ borderBottom: '1px solid rgba(139,92,246,0.1)', background: 'rgba(8,5,20,0.7)' }}>
         {([
-          { id: 'news'    as Channel, label: 'Actualités ScaleFlow', icon: '📢' },
-          { id: 'chat'    as Channel, label: 'Discussion',           icon: '💬' },
-          { id: 'support' as Channel, label: 'Support',              icon: '🎫' },
+          { id: 'news'    as Tab, label: 'Actualités', icon: '📢' },
+          { id: 'topics'  as Tab, label: 'Communautés', icon: '🌐' },
+          { id: 'support' as Tab, label: 'Support',     icon: '🎫' },
         ]).map(t => (
           <button key={t.id} onClick={() => {
               setTab(t.id)
@@ -1280,105 +1607,289 @@ export function Community({ user, onNavigate }: CommunityProps) {
         </div>
       )}
 
-      {/* ── CHAT TAB ─────────────────────────────────────────────────────────── */}
-      {tab === 'chat' && (
+      {/* ── TOPICS TAB ───────────────────────────────────────────────────────── */}
+      {tab === 'topics' && (
         <>
-          <div ref={listRef} className="flex-1 overflow-y-auto px-5 py-4">
-            {loading ? (
-              <div className="flex items-center justify-center h-full">
-                <div className="flex flex-col items-center gap-3">
-                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center"
-                    style={{ background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.2)' }}>
-                    <Spinner size="md" />
+          {topicsView === 'list' ? (
+            <div className="flex-1 overflow-y-auto">
+              <div className="p-5 max-w-3xl">
+                {/* Header row */}
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h2 className="text-[16px] font-black text-white">Communautés</h2>
+                    <p className="text-[10px] mt-0.5" style={{ color: 'rgba(196,181,253,0.4)' }}>{topics.length} communauté{topics.length !== 1 ? 's' : ''}</p>
                   </div>
-                  <p className="text-sm" style={{ color: 'rgba(196,181,253,0.4)' }}>Chargement…</p>
+                  <button onClick={() => { if (!requirePseudo()) return; setShowCreateTopic(true) }}
+                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-[12px] font-semibold transition-all btn-sf-primary">
+                    <span>+</span> Créer
+                  </button>
                 </div>
-              </div>
-            ) : chatMessages.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full gap-4">
-                <div className="w-20 h-20 rounded-3xl flex items-center justify-center text-4xl"
-                  style={{ background: 'linear-gradient(135deg,rgba(139,92,246,0.12),rgba(236,72,153,0.06))', border: '1px solid rgba(139,92,246,0.15)' }}>💬</div>
-                <div className="text-center space-y-1.5">
-                  <p className="text-base font-black text-white">Aucun message pour l'instant</p>
-                  <p className="text-sm" style={{ color: 'rgba(196,181,253,0.4)' }}>Sois le premier à écrire !</p>
+
+                {/* Search */}
+                <div className="relative mb-5">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[13px]" style={{ color: 'rgba(196,181,253,0.3)' }}>🔍</span>
+                  <input type="text" value={topicSearch} onChange={e => setTopicSearch(e.target.value)}
+                    placeholder="Rechercher une communauté…"
+                    className="w-full rounded-xl pl-9 pr-4 py-2.5 text-sm text-white outline-none sf-input" />
                 </div>
-              </div>
-            ) : (
-              <>
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="flex-1 h-px" style={{ background: 'rgba(139,92,246,0.1)' }} />
-                  <span className="text-[10px] font-semibold px-2" style={{ color: 'rgba(196,181,253,0.3)' }}>Début de la discussion</span>
-                  <div className="flex-1 h-px" style={{ background: 'rgba(139,92,246,0.1)' }} />
-                </div>
-                {chatMessages.map((msg, i) => {
-                  const prev    = chatMessages[i - 1]
-                  const compact = prev?.user_id === msg.user_id &&
-                    new Date(msg.created_at).getTime() - new Date(prev.created_at).getTime() < 5 * 60 * 1000
-                  return <ChatRow key={msg.id} msg={msg} isOwn={msg.user_id === user.id} compact={compact}
-                    isAdmin={isAdmin} likeCount={reactions.get(msg.id) ?? 0} liked={myLikes.has(msg.id)}
-                    onLike={toggleLike} onDelete={deleteMessage}
-                    onMute={(uid, name) => { setMuteTarget({ id: uid, name }); setShowMuteModal(true) }} />
-                })}
-                <div ref={bottomRef} className="h-1" />
-              </>
-            )}
-          </div>
-          <div className="flex-shrink-0 px-4 py-3"
-            style={{ borderTop: '1px solid rgba(139,92,246,0.1)', background: 'rgba(6,4,15,0.95)' }}>
-            {isMuted ? (
-              <div className="flex items-center gap-2 px-4 py-3 rounded-xl"
-                style={{ background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.15)' }}>
-                <span>🔇</span>
-                <p className="text-[12px]" style={{ color: 'rgba(251,191,36,0.7)' }}>Tu es muté — impossible d'envoyer des messages.</p>
-              </div>
-            ) : (
-              <>
-                <div className="flex items-center gap-2 mb-2 px-1">
-                  <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: `linear-gradient(135deg,${g1},${g2})` }} />
-                  <span className="text-[10px]" style={{ color: 'rgba(196,181,253,0.35)' }}>
-                    Tu écris en tant que{' '}
-                    <strong style={{ color: profile.display_name ? 'rgba(196,181,253,0.6)' : '#a78bfa' }}>
-                      {profile.display_name || '→ définis ton pseudo d\'abord'}
-                    </strong>
-                    {currentOrg && profile.display_name && <span style={{ color: 'rgba(139,92,246,0.6)' }}> · {currentOrg.name}</span>}
-                  </span>
-                </div>
-                {chatVideo && (
-                  <div className="flex items-center gap-2 mb-2 px-1 py-1.5 rounded-lg"
-                    style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)' }}>
-                    <span className="text-sm">📎</span>
-                    <span className="text-[11px] flex-1 truncate" style={{ color: '#c4b5fd' }}>{chatVideo.name}</span>
-                    <button onClick={() => setChatVideo(null)} className="text-[11px]" style={{ color: 'rgba(239,68,68,0.6)' }}>✕</button>
+
+                {topics.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
+                    <div className="w-20 h-20 rounded-3xl flex items-center justify-center text-4xl"
+                      style={{ background: 'linear-gradient(135deg,rgba(139,92,246,0.12),rgba(236,72,153,0.06))', border: '1px solid rgba(139,92,246,0.15)' }}>🌐</div>
+                    <div className="space-y-1.5">
+                      <p className="text-base font-black text-white">Aucune communauté</p>
+                      <p className="text-sm" style={{ color: 'rgba(196,181,253,0.4)' }}>Sois le premier à créer une communauté !</p>
+                    </div>
+                    <button onClick={() => { if (!requirePseudo()) return; setShowCreateTopic(true) }}
+                      className="px-5 py-2.5 rounded-xl text-sm font-semibold btn-sf-primary">
+                      ✨ Créer la première communauté
+                    </button>
                   </div>
+                ) : (() => {
+                  const filtered = topics.filter(t =>
+                    !topicSearch || t.name.toLowerCase().includes(topicSearch.toLowerCase()) || (t.description ?? '').toLowerCase().includes(topicSearch.toLowerCase())
+                  )
+                  const joined  = filtered.filter(t => joinedTopicIds.has(t.id))
+                  const others  = filtered.filter(t => !joinedTopicIds.has(t.id))
+
+                  function TopicCard({ t }: { t: Topic }) {
+                    const members = memberCounts.get(t.id) ?? 0
+                    const last    = topicLastMsg.get(t.id)
+                    const isJoined = joinedTopicIds.has(t.id)
+                    const canDelete = isAdmin || t.created_by === user.id
+                    return (
+                      <div className="relative group flex flex-col gap-3 p-4 rounded-2xl cursor-pointer transition-all hover:border-purple-500/40"
+                        style={{ background: isJoined ? 'rgba(139,92,246,0.08)' : 'rgba(8,5,20,0.8)', border: `1px solid ${isJoined ? 'rgba(139,92,246,0.25)' : 'rgba(139,92,246,0.1)'}` }}
+                        onClick={() => { setSelectedTopic(t); setTopicsView('chat') }}>
+                        <div className="flex items-start gap-3">
+                          <div className="w-11 h-11 rounded-xl flex items-center justify-center text-2xl flex-shrink-0"
+                            style={{ background: isJoined ? 'rgba(139,92,246,0.2)' : 'rgba(139,92,246,0.08)' }}>{t.emoji}</div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-0.5">
+                              <p className="text-[13.5px] font-black text-white truncate">{t.name}</p>
+                              {isJoined && <span className="text-[8px] font-black px-1.5 py-[2px] rounded-full flex-shrink-0"
+                                style={{ background: 'rgba(139,92,246,0.2)', color: '#c4b5fd' }}>REJOINT</span>}
+                            </div>
+                            {t.description && (
+                              <p className="text-[11.5px] leading-relaxed line-clamp-2" style={{ color: 'rgba(196,181,253,0.5)' }}>{t.description}</p>
+                            )}
+                          </div>
+                          {canDelete && (
+                            <button onClick={e => { e.stopPropagation(); deleteTopic(t.id) }}
+                              className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-lg text-[12px]"
+                              style={{ color: 'rgba(239,68,68,0.6)' }} title="Supprimer">🗑</button>
+                          )}
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3 text-[10px]" style={{ color: 'rgba(196,181,253,0.35)' }}>
+                            <span>👥 {members} membre{members !== 1 ? 's' : ''}</span>
+                            {last && <><span>·</span><span className="truncate max-w-[140px]">{last.content.slice(0, 35)}{last.content.length > 35 ? '…' : ''}</span><span>·</span><span>{timeAgo(last.at)}</span></>}
+                          </div>
+                          <button onClick={e => {
+                              e.stopPropagation()
+                              if (isJoined) leaveTopic(t.id)
+                              else joinTopic(t.id)
+                            }}
+                            className="flex-shrink-0 px-3 py-1 rounded-lg text-[11px] font-bold transition-all"
+                            style={isJoined
+                              ? { background: 'rgba(239,68,68,0.1)', color: 'rgba(252,165,165,0.7)', border: '1px solid rgba(239,68,68,0.15)' }
+                              : { background: 'rgba(139,92,246,0.15)', color: '#c4b5fd', border: '1px solid rgba(139,92,246,0.25)' }}>
+                            {isJoined ? 'Quitter' : '+ Rejoindre'}
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  }
+
+                  return (
+                    <div className="space-y-5">
+                      {joined.length > 0 && (
+                        <div>
+                          <p className="text-[9px] uppercase tracking-widest font-black mb-3 px-0.5" style={{ color: 'rgba(139,92,246,0.5)' }}>Mes communautés</p>
+                          <div className="space-y-2">
+                            {joined.map(t => <TopicCard key={t.id} t={t} />)}
+                          </div>
+                        </div>
+                      )}
+                      {others.length > 0 && (
+                        <div>
+                          <p className="text-[9px] uppercase tracking-widest font-black mb-3 px-0.5" style={{ color: 'rgba(139,92,246,0.5)' }}>
+                            {joined.length > 0 ? 'Découvrir' : 'Toutes les communautés'}
+                          </p>
+                          <div className="space-y-2">
+                            {others.map(t => <TopicCard key={t.id} t={t} />)}
+                          </div>
+                        </div>
+                      )}
+                      {filtered.length === 0 && topicSearch && (
+                        <div className="flex flex-col items-center py-12 gap-2 text-center">
+                          <p className="text-[13px] font-bold text-white">Aucun résultat pour « {topicSearch} »</p>
+                          <button onClick={() => { setTopicSearch(''); setShowCreateTopic(true) }}
+                            className="text-[11px] mt-1" style={{ color: '#a78bfa' }}>
+                            Créer cette communauté →
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })()}
+              </div>
+            </div>
+          ) : (
+            /* ── Topic chat view ── */
+            <>
+              {/* Topic header */}
+              <div className="flex-shrink-0 flex items-center gap-3 px-4 py-2.5"
+                style={{ borderBottom: '1px solid rgba(139,92,246,0.12)', background: 'rgba(8,5,20,0.7)' }}>
+                <button onClick={() => { setTopicsView('list'); setSelectedTopic(null) }}
+                  className="w-8 h-8 rounded-xl flex items-center justify-center transition-all hover:bg-white/[0.06]"
+                  style={{ color: '#a78bfa', border: '1px solid rgba(139,92,246,0.2)' }}>←</button>
+                <div className="w-8 h-8 rounded-xl flex items-center justify-center text-lg flex-shrink-0"
+                  style={{ background: 'rgba(139,92,246,0.15)' }}>{selectedTopic?.emoji}</div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[13px] font-black text-white leading-tight">{selectedTopic?.name}</p>
+                  <p className="text-[9px]" style={{ color: 'rgba(196,181,253,0.4)' }}>
+                    {memberCounts.get(selectedTopic?.id ?? '') ?? 0} membre{(memberCounts.get(selectedTopic?.id ?? '') ?? 0) !== 1 ? 's' : ''}
+                  </p>
+                </div>
+                {selectedTopic && (
+                  joinedTopicIds.has(selectedTopic.id) ? (
+                    <button onClick={() => leaveTopic(selectedTopic.id)}
+                      className="px-3 py-1.5 rounded-xl text-[11px] font-semibold transition-all"
+                      style={{ background: 'rgba(239,68,68,0.08)', color: 'rgba(252,165,165,0.7)', border: '1px solid rgba(239,68,68,0.15)' }}>
+                      Quitter
+                    </button>
+                  ) : (
+                    <button onClick={() => joinTopic(selectedTopic.id)}
+                      className="px-3 py-1.5 rounded-xl text-[11px] font-semibold transition-all btn-sf-primary">
+                      + Rejoindre
+                    </button>
+                  )
                 )}
-                <div className="flex items-end gap-3">
-                  <Avatar url={profile.avatar_url} name={profile.display_name || '?'} userId={user.id} size={32} />
-                  <div className="flex-1 flex items-end gap-2 rounded-xl px-3.5 py-2.5"
-                    style={{ background: 'rgba(139,92,246,0.07)', border: '1px solid rgba(139,92,246,0.2)' }}>
-                    <textarea ref={chatRef} value={chatDraft} onChange={e => setChatDraft(e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat() } }}
-                      onInput={e => { const el = e.currentTarget; el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 120) + 'px' }}
-                      placeholder={profile.display_name ? 'Écrire un message… (⏎ pour envoyer)' : 'Clique sur ton avatar pour définir ton pseudo…'}
-                      rows={1} maxLength={1000}
-                      className="flex-1 bg-transparent text-[13px] text-white resize-none outline-none leading-relaxed"
-                      style={{ minHeight: 22, maxHeight: 120 }} />
-                    <button onClick={() => chatVideoRef.current?.click()} title="Joindre une vidéo"
-                      className="flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-all active:scale-90"
-                      style={{ color: chatVideo ? '#a78bfa' : 'rgba(196,181,253,0.35)', background: chatVideo ? 'rgba(139,92,246,0.15)' : 'transparent' }}>
-                      <span className="text-[15px]">📎</span>
-                    </button>
-                    <button onClick={sendChat} disabled={(!chatDraft.trim() && !chatVideo) || chatSending}
-                      className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-white transition-all disabled:opacity-30 active:scale-90"
-                      style={{ background: 'linear-gradient(135deg,#7c3aed,#ec4899)', boxShadow: '0 2px 12px rgba(124,58,237,0.4)' }}>
-                      {chatSending ? <Spinner size="sm" /> : <span className="text-sm leading-none">↑</span>}
-                    </button>
+              </div>
+
+              {/* Messages */}
+              <div ref={topicListRef} className="flex-1 overflow-y-auto px-5 py-4">
+                {topicMessages.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full gap-4">
+                    <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl"
+                      style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.12)' }}>
+                      {selectedTopic?.emoji}
+                    </div>
+                    <div className="text-center space-y-1">
+                      <p className="font-bold text-white">Début de {selectedTopic?.name}</p>
+                      <p className="text-sm" style={{ color: 'rgba(196,181,253,0.4)' }}>Sois le premier à écrire ici !</p>
+                    </div>
                   </div>
-                </div>
-                <input ref={chatVideoRef} type="file" accept="image/*,video/*" className="hidden"
-                  onChange={e => { if (e.target.files?.[0]) { setChatVideo(e.target.files[0]); e.target.value = '' } }} />
-              </>
-            )}
-          </div>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="flex-1 h-px" style={{ background: 'rgba(139,92,246,0.1)' }} />
+                      <span className="text-[10px] font-semibold px-2" style={{ color: 'rgba(196,181,253,0.3)' }}>Début de la discussion</span>
+                      <div className="flex-1 h-px" style={{ background: 'rgba(139,92,246,0.1)' }} />
+                    </div>
+                    {topicMessages.map((msg, i) => {
+                      const prev    = topicMessages[i - 1]
+                      const compact = prev?.user_id === msg.user_id &&
+                        new Date(msg.created_at).getTime() - new Date(prev.created_at).getTime() < 5 * 60 * 1000
+                      return (
+                        <div key={msg.id} className={`flex gap-3 group ${compact ? 'mt-[2px]' : 'mt-4'}`}>
+                          <div style={{ width: 34, flexShrink: 0 }}>
+                            {!compact && <Avatar url={msg.avatar_url} name={msg.display_name} userId={msg.user_id} size={34} />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            {!compact && (
+                              <div className="flex items-center gap-2 mb-[3px] flex-wrap">
+                                <span className="text-[13px] font-bold" style={{ color: msg.user_id === user.id ? '#c4b5fd' : '#e8e0ff' }}>
+                                  {msg.display_name || 'Anonyme'}
+                                </span>
+                                {msg.is_admin && (
+                                  <span className="text-[8px] font-black uppercase px-1.5 py-[2px] rounded-full"
+                                    style={{ background: 'linear-gradient(130deg,rgba(124,58,237,0.35),rgba(236,72,153,0.25))', color: '#f0a8ff', border: '1px solid rgba(236,72,153,0.25)' }}>
+                                    ⭐ Admin
+                                  </span>
+                                )}
+                                {msg.user_id === user.id && !msg.is_admin && (
+                                  <span className="text-[8px] font-black uppercase px-1.5 py-[2px] rounded-full"
+                                    style={{ background: 'rgba(139,92,246,0.2)', color: '#a78bfa' }}>Moi</span>
+                                )}
+                                <span className="ml-auto text-[10px] opacity-0 group-hover:opacity-60 transition-opacity tabular-nums"
+                                  style={{ color: 'rgba(196,181,253,0.5)' }}>{timeAgo(msg.created_at)}</span>
+                              </div>
+                            )}
+                            <div className="flex items-end gap-1.5">
+                              <div className="flex-1 min-w-0">
+                                <p className="text-[13.5px] leading-relaxed break-words" style={{ color: 'rgba(212,220,240,0.9)' }}>{msg.content}</p>
+                                {msg.video_url && <MediaBlock url={msg.video_url} maxHeight={260} />}
+                              </div>
+                              {(isAdmin || msg.user_id === user.id) && (
+                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 pb-0.5">
+                                  {compact && <span className="text-[9px] tabular-nums mr-1" style={{ color: 'rgba(196,181,253,0.35)' }}>{timeAgo(msg.created_at)}</span>}
+                                  <button onClick={() => deleteTopicMessage(msg.id)}
+                                    className="w-5 h-5 flex items-center justify-center rounded text-[11px]"
+                                    style={{ color: 'rgba(239,68,68,0.6)' }}>🗑</button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                    <div ref={topicBottomRef} className="h-1" />
+                  </>
+                )}
+              </div>
+
+              {/* Input */}
+              <div className="flex-shrink-0 px-4 py-3"
+                style={{ borderTop: '1px solid rgba(139,92,246,0.1)', background: 'rgba(6,4,15,0.95)' }}>
+                {isMuted ? (
+                  <div className="flex items-center gap-2 px-4 py-3 rounded-xl"
+                    style={{ background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.15)' }}>
+                    <span>🔇</span>
+                    <p className="text-[12px]" style={{ color: 'rgba(251,191,36,0.7)' }}>Tu es muté.</p>
+                  </div>
+                ) : (
+                  <>
+                    {topicVideo && (
+                      <div className="flex items-center gap-2 mb-2 px-1 py-1.5 rounded-lg"
+                        style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)' }}>
+                        <span className="text-sm">📎</span>
+                        <span className="text-[11px] flex-1 truncate" style={{ color: '#c4b5fd' }}>{topicVideo.name}</span>
+                        <button onClick={() => setTopicVideo(null)} className="text-[11px]" style={{ color: 'rgba(239,68,68,0.6)' }}>✕</button>
+                      </div>
+                    )}
+                    <div className="flex items-end gap-3">
+                      <Avatar url={profile.avatar_url} name={profile.display_name || '?'} userId={user.id} size={32} />
+                      <div className="flex-1 flex items-end gap-2 rounded-xl px-3.5 py-2.5"
+                        style={{ background: 'rgba(139,92,246,0.07)', border: '1px solid rgba(139,92,246,0.2)' }}>
+                        <textarea ref={topicRef} value={topicDraft} onChange={e => setTopicDraft(e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendTopicMessage() } }}
+                          onInput={e => { const el = e.currentTarget; el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 120) + 'px' }}
+                          placeholder={profile.display_name ? `Écrire dans ${selectedTopic?.name}… (⏎)` : 'Définis ton pseudo d\'abord…'}
+                          rows={1} maxLength={1000}
+                          className="flex-1 bg-transparent text-[13px] text-white resize-none outline-none leading-relaxed"
+                          style={{ minHeight: 22, maxHeight: 120 }} />
+                        <button onClick={() => topicVideoRef.current?.click()}
+                          className="flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-all"
+                          style={{ color: topicVideo ? '#a78bfa' : 'rgba(196,181,253,0.35)', background: topicVideo ? 'rgba(139,92,246,0.15)' : 'transparent' }}>
+                          <span className="text-[15px]">📎</span>
+                        </button>
+                        <button onClick={sendTopicMessage} disabled={(!topicDraft.trim() && !topicVideo) || topicSending}
+                          className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-white transition-all disabled:opacity-30 active:scale-90"
+                          style={{ background: 'linear-gradient(135deg,#7c3aed,#ec4899)', boxShadow: '0 2px 12px rgba(124,58,237,0.4)' }}>
+                          {topicSending ? <Spinner size="sm" /> : <span className="text-sm leading-none">↑</span>}
+                        </button>
+                      </div>
+                    </div>
+                    <input ref={topicVideoRef} type="file" accept="image/*,video/*" className="hidden"
+                      onChange={e => { if (e.target.files?.[0]) { setTopicVideo(e.target.files[0]); e.target.value = '' } }} />
+                  </>
+                )}
+              </div>
+            </>
+          )}
         </>
       )}
 
@@ -1667,6 +2178,12 @@ export function Community({ user, onNavigate }: CommunityProps) {
         <ProfileModal profile={profile} userId={user.id} isAdmin={isAdmin}
           onClose={() => setShowProfile(false)}
           onSaved={p => { setProfile(p); setShowProfile(false) }} />
+      )}
+
+      {showCreateTopic && (
+        <CreateTopicModal
+          onClose={() => setShowCreateTopic(false)}
+          onCreate={createTopic} />
       )}
 
       {showMuteModal && muteTarget && (
