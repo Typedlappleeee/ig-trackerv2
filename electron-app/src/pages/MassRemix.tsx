@@ -433,9 +433,9 @@ export function MassRemix({ user }: MassRemixProps) {
           if (!det.ok) addLog(job.id, `❌ Détection échouée: ${det.error ?? 'inconnu'}`)
 
           detDuration = det.duration
-          // Ignore detected splits that are too early (< 20% of duration, min 2s)
-          // — those are false positives from minor brightness changes, not real scene cuts
-          const minSplit = Math.min(5, Math.max(2, (det.duration ?? 10) * 0.20))
+          // Honour the scene change wherever it lands — only guard against the
+          // very first frames (< 0.8s) which are decode artifacts, not real cuts.
+          const minSplit = 0.8
           if (det.ok && det.splitTime != null && det.splitTime >= minSplit) {
             splitTime = Math.min((det.duration ?? 60) - 0.1, Math.round(det.splitTime * 1000) / 1000)
             addLog(job.id, `✅ Scène: splitTime=${splitTime}s, durée=${det.duration ?? '?'}s`)
