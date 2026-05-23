@@ -1232,6 +1232,15 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                         <p className="text-[13px] font-mono truncate text-white/70">{fileName(job.originalPath)}</p>
                         {job.error && <p className="text-[11px] font-semibold" style={{ color: '#f87171' }}>{job.error}</p>}
                       </div>
+                      {job.status === 'done' && job.outputPath?.startsWith('blob:') && (
+                        <a href={job.outputPath}
+                          download={`remix_${String(job.id + 1).padStart(3, '0')}.mp4`}
+                          onClick={e => e.stopPropagation()}
+                          className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all"
+                          style={{ background: 'rgba(52,211,153,0.15)', color: '#34d399', border: '1px solid rgba(52,211,153,0.25)', textDecoration: 'none' }}>
+                          ⬇ MP4
+                        </a>
+                      )}
                       {job.logs.length > 0 && (
                         <span className="text-[10px] flex-shrink-0" style={{ color: 'rgba(196,181,253,0.4)' }}>▼ logs</span>
                       )}

@@ -167,11 +167,21 @@ export async function uploadVideoFromBlob(
 
 // Upload a local video by absolute path (for the file picker / re-upload flows).
 // Reads the bytes via Electron IPC, then delegates to uploadVideoFromBlob.
+// On web, also accepts blob: URLs directly (fetch → upload).
 export async function uploadVideoFromPath(
   filePath: string,
   scope: UploadScope,
   onProgress?: (phase: UploadPhase) => void,
 ): Promise<UploadResult> {
+  // Web: blob URL produced by FFmpeg WASM — fetch it directly
+  if (filePath.startsWith('blob:') || filePath.startsWith('http')) {
+    onProgress?.('reading')
+    const resp = await fetch(filePath)
+    if (!resp.ok) throw new Error('Lecture blob échouée')
+    const blob = await resp.blob()
+    return uploadVideoFromBlob(blob, filePath, scope, onProgress)
+  }
+
   if (!window.electronAPI?.readFileBytes) throw new Error('IPC indisponible')
 
   onProgress?.('reading')
