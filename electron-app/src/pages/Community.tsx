@@ -712,17 +712,15 @@ export function Community({ user, onNavigate }: CommunityProps) {
   }
 
   useEffect(() => {
-    supabase.from('platform_admins').select('user_id').eq('user_id', user.id).maybeSingle()
+    void supabase.from('platform_admins').select('user_id').eq('user_id', user.id).maybeSingle()
       .then(({ data }) => setIsAdmin(!!data))
-      .catch(() => {})
   }, [user.id])
 
   useEffect(() => {
-    supabase.from('community_mutes').select('muted_until')
+    void supabase.from('community_mutes').select('muted_until')
       .eq('user_id', user.id).gt('muted_until', new Date().toISOString())
       .order('muted_until', { ascending: false }).limit(1).maybeSingle()
       .then(({ data }) => setMutedUntil(data?.muted_until ?? null))
-      .catch(() => {})
   }, [user.id])
 
   useEffect(() => { isAdminRef.current = isAdmin }, [isAdmin])

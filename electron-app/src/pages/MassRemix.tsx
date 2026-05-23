@@ -187,7 +187,8 @@ export function MassRemix({ user }: MassRemixProps) {
   const [originals,    setOriginals]    = useState<string[]>([])
   const [secondaries,  setSecondaries]  = useState<string[]>([])
   const [preset,       setPreset]       = useState<Preset>('9:16')
-  const [aiEnabled,    setAiEnabled]    = useState(false)
+  const [aiEnabled,    setAiEnabled]    = useState(() => localStorage.getItem('sf_remix_ai') === '1')
+  const [manualText,   setManualText]   = useState(() => localStorage.getItem('sf_remix_manual_text') ?? '')
   const [exportMode,   setExportMode]   = useState<ExportMode>('bank')
   const [outputFolder, setOutputFolder] = useState<string | null>(null)
   const [bankFolder,   setBankFolder]   = useState<string>('')
@@ -229,6 +230,12 @@ export function MassRemix({ user }: MassRemixProps) {
   const [jobs,        setJobs]        = useState<MassJob[]>([])
   const [running,     setRunning]     = useState(false)
   const abortRef = useRef(false)
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 640)
+  useEffect(() => {
+    const h = () => setIsMobile(window.innerWidth < 640)
+    window.addEventListener('resize', h)
+    return () => window.removeEventListener('resize', h)
+  }, [])
 
   // Load existing bank folders for the folder selector
   useEffect(() => {
@@ -486,8 +493,21 @@ export function MassRemix({ user }: MassRemixProps) {
         // ── 2. AI text detection ─────────────────────────────────────────────
         type Overlay = { text: string; x: string; y: string; fontSize: number; fontColor: string; bold: boolean; shadow: boolean; startTime: number; endTime: number }
         let textOverlays: Overlay[] = []
-
-        if (aiEnabled && anthropicKey.trim()) {
+        if (aiEnabled && manualText.trim()) {
+          const textEndTime = splitTime ?? (detDuration ?? 9999)
+          textOverlays.push({
+            text: manualText.trim(),
+            x: '(w-text_w)/2',
+            y: 'h*0.82-text_h/2',
+            fontSize: 54,
+            fontColor: 'white',
+            bold: false,
+            shadow: true,
+            startTime: 0,
+            endTime: textEndTime,
+          })
+          addLog(job.id, `✏️ Texte manuel: "${manualText.trim().slice(0, 60)}"`)
+        } else if (aiEnabled && !manualText.trim() && anthropicKey.trim()) {
           updateJob(job.id, { status: 'analyzing' })
           addLog(job.id, '✨ Analyse texte IA…')
           const analyzeEnd = splitTime ?? detDuration ?? 30
@@ -562,8 +582,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                   const ef = item.endFrame   ?? frameCount - 1
                   const coversAll = (ef - sf + 1) >= frameCount * 0.8
                   const startTime = coversAll ? 0 : Math.round(sf * interval * 10) / 10
-                  // Always extend endTime well past splitTime so text also shows in Phase 2
-                  const endTime   = 9999
+                  const endTime   = splitTime ?? (detDuration ?? 9999)
                   return { text: item.text, xAlign: item.xAlign ?? 'center', rawY: (item.yPercent ?? 50) / 100, fontSize, fontColor: item.fontColor ?? 'white', bold: item.bold ?? true, startTime, endTime }
                 })
 
@@ -1140,35 +1159,58 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
       <div className="h-full flex flex-col overflow-hidden">
 
         {/* Header */}
-        <div className="flex-shrink-0 px-8 pt-7 pb-4 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
+        <div
+          className="flex-shrink-0 flex items-center justify-between"
+          style={{
+            padding: isMobile ? '14px 16px 12px' : '28px 32px 16px',
+            borderBottom: '1px solid rgba(139,92,246,0.1)',
+          }}
+        >
           <div>
-            <h1 className="text-[20px] font-black text-white leading-none">Mass Remix</h1>
-            <p className="text-[13px] text-text2 mt-1">Génère des remixes vidéo en masse avec FFmpeg + IA</p>
+            <h1 style={{ fontSize: isMobile ? 17 : 20 }} className="font-black text-white leading-none">Mass Remix</h1>
+            {!isMobile && <p className="text-[13px] text-text2 mt-1">Génère des remixes vidéo en masse avec FFmpeg + IA</p>}
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={openPreview} disabled={!canLaunch}
-              className="flex items-center gap-2 px-4 py-3 rounded-xl text-[14px] font-bold transition-all disabled:opacity-40"
-              style={{ background: canLaunch ? 'rgba(139,92,246,0.15)' : 'rgba(255,255,255,0.04)', color: canLaunch ? '#a78bfa' : 'rgba(255,255,255,0.2)', border: '1px solid rgba(139,92,246,0.25)' }}>
-              <span>👁</span>
-              <span>Plan</span>
-            </button>
+            {!isMobile && (
+              <button
+                onClick={openPreview} disabled={!canLaunch}
+                className="flex items-center gap-2 px-4 py-3 rounded-xl text-[14px] font-bold transition-all disabled:opacity-40"
+                style={{ background: canLaunch ? 'rgba(139,92,246,0.15)' : 'rgba(255,255,255,0.04)', color: canLaunch ? '#a78bfa' : 'rgba(255,255,255,0.2)', border: '1px solid rgba(139,92,246,0.25)' }}>
+                <span>👁</span>
+                <span>Plan</span>
+              </button>
+            )}
             <button
               onClick={() => launch()} disabled={!canLaunch}
-              className="flex items-center gap-2.5 px-6 py-3 rounded-xl text-[14px] font-bold transition-all disabled:opacity-40"
-              style={{ background: canLaunch ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.06)', color: '#fff', boxShadow: canLaunch ? '0 4px 20px rgba(124,58,237,0.4)' : 'none' }}>
+              className="flex items-center gap-2.5 rounded-xl font-bold transition-all disabled:opacity-40"
+              style={{
+                padding: isMobile ? '10px 16px' : '12px 24px',
+                fontSize: isMobile ? 13 : 14,
+                background: canLaunch ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.06)',
+                color: '#fff',
+                boxShadow: canLaunch ? '0 4px 20px rgba(124,58,237,0.4)' : 'none',
+              }}>
               <span>⚡</span>
-              <span>Lancer {copies} remix</span>
+              <span>{isMobile ? `Lancer (${copies})` : `Lancer ${copies} remix`}</span>
             </button>
           </div>
         </div>
 
-        {/* Body — 2 columns */}
-        <div className="flex-1 min-h-0 flex gap-6 px-10 py-8">
+        {/* Body — responsive: 2 columns on desktop, stacked on mobile */}
+        <div
+          className="flex-1 min-h-0 overflow-y-auto"
+          style={{
+            display: 'flex',
+            flexDirection: isMobile ? 'column' : 'row',
+            gap: isMobile ? 12 : 24,
+            padding: isMobile ? '14px 12px' : '32px 40px',
+            overflowX: 'hidden',
+          }}
+        >
 
           {/* LEFT — video pickers */}
-          <div className="flex-1 min-w-0 flex flex-col gap-5">
-            <div className="flex-1 min-h-0 rounded-2xl p-6" style={{ background: 'rgba(139,92,246,0.04)', border: '1px solid rgba(139,92,246,0.15)' }}>
+          <div className="flex-1 min-w-0 flex flex-col" style={{ gap: isMobile ? 10 : 20 }}>
+            <div className="rounded-2xl" style={{ padding: isMobile ? '14px' : '24px', background: 'rgba(139,92,246,0.04)', border: '1px solid rgba(139,92,246,0.15)', minHeight: isMobile ? 140 : undefined, flex: isMobile ? 'none' : 1 }}>
               <VideoListPanel
                 label="Vidéos originales"
                 paths={originals}
@@ -1180,7 +1222,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                 onRemove={i => setOriginals(prev => prev.filter((_, j) => j !== i))}
               />
             </div>
-            <div className="flex-1 min-h-0 rounded-2xl p-6" style={{ background: 'rgba(236,72,153,0.04)', border: '1px solid rgba(236,72,153,0.15)' }}>
+            <div className="rounded-2xl" style={{ padding: isMobile ? '14px' : '24px', background: 'rgba(236,72,153,0.04)', border: '1px solid rgba(236,72,153,0.15)', minHeight: isMobile ? 140 : undefined, flex: isMobile ? 'none' : 1 }}>
               <VideoListPanel
                 label="Nouvelles Phase 1"
                 paths={secondaries}
@@ -1195,7 +1237,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
           </div>
 
           {/* RIGHT — settings panel */}
-          <div className="w-72 flex-shrink-0 flex flex-col gap-3">
+          <div className="flex flex-col gap-3" style={{ width: isMobile ? '100%' : 288, flexShrink: 0 }}>
 
             {/* Copies */}
             <div className="rounded-2xl p-4" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
@@ -1223,7 +1265,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
 
             {/* AI Detection — prominent, before format */}
             <button
-              onClick={() => setAiEnabled(v => !v)}
+              onClick={() => setAiEnabled(v => { const next = !v; localStorage.setItem('sf_remix_ai', next ? '1' : '0'); return next })}
               className="rounded-2xl p-4 text-left transition-all w-full"
               style={{
                 background: aiEnabled ? 'rgba(124,58,237,0.12)' : 'rgba(255,255,255,0.03)',
@@ -1247,13 +1289,31 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
               </div>
               {aiEnabled && (
                 <p className="mt-2 text-[11px] leading-relaxed" style={{ color: 'rgba(148,163,184,0.5)' }}>
-                  Analyse et recopie le texte des vidéos automatiquement.
+                  {manualText.trim() ? 'Texte manuel activé (priorité sur la détection IA).' : 'Analyse et recopie le texte des vidéos automatiquement.'}
                 </p>
               )}
-              {aiEnabled && !anthropicKey && (
+              {aiEnabled && !anthropicKey && !manualText.trim() && (
                 <p className="mt-1.5 text-[11px] font-semibold" style={{ color: '#fbbf24' }}>⚠ Clé Anthropic manquante</p>
               )}
             </button>
+            {aiEnabled && (
+              <div className="rounded-2xl p-3 space-y-1.5" style={{ background: 'rgba(124,58,237,0.06)', border: '1px solid rgba(139,92,246,0.2)' }}>
+                <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'rgba(139,92,246,0.7)' }}>✏️ Texte manuel (optionnel)</p>
+                <textarea
+                  value={manualText}
+                  onChange={e => { setManualText(e.target.value); localStorage.setItem('sf_remix_manual_text', e.target.value) }}
+                  placeholder="Laisse vide = détection IA auto"
+                  rows={2}
+                  className="w-full rounded-xl px-3 py-2 text-[12px] resize-none outline-none"
+                  style={{
+                    background: 'rgba(255,255,255,0.05)',
+                    border: '1px solid rgba(139,92,246,0.25)',
+                    color: '#e2e8f0',
+                    lineHeight: 1.5,
+                  }}
+                />
+              </div>
+            )}
 
             {/* Split mode */}
             <div className="rounded-2xl p-4 space-y-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>

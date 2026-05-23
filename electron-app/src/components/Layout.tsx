@@ -201,11 +201,17 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
   const credits = useCredits()
 
   const [activeTask, setActiveTask]     = useState<{ kind: 'single' | 'mass'; progress: number; done: number; total: number } | null>(null)
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 640)
   const [notifOpen, setNotifOpen]       = useState(false)
   const [notifications, setNotifications] = useState<AppNotification[]>([])
   const [unread, setUnread]             = useState(0)
   const notifRef                        = useRef<HTMLDivElement>(null)
   const [breadcrumb, setBreadcrumb]     = useState<string[] | null>(null)
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 640)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
   useEffect(() => {
     const handler = (e: Event) => {
       const val = (e as CustomEvent<string>).detail
@@ -565,12 +571,12 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
   return (
     <div style={{ height: '100vh', overflow: 'hidden', display: 'flex', background: '#08080E' }}>
 
-      {/* ── Sidebar ──────────────────────────────────────────────────────── */}
+      {/* ── Sidebar (desktop only) ───────────────────────────────────────── */}
       <aside
         style={{
           width: collapsed ? 52 : 220,
           flexShrink: 0,
-          display: 'flex',
+          display: isMobile ? 'none' : 'flex',
           flexDirection: 'column',
           background: 'linear-gradient(180deg, #0B0B15 0%, #080810 100%)',
           borderRight: '1px solid rgba(255,255,255,0.065)',
@@ -859,7 +865,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
       </aside>
 
       {/* ── Main area (topbar + content) ──────────────────────────────────── */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative', paddingBottom: isMobile ? 56 : 0 }}>
 
         {/* ── Topbar ──────────────────────────────────────────────────────── */}
         <header style={{
@@ -1280,6 +1286,52 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             </button>
           </div>
         </>
+      )}
+
+      {/* ── Mobile bottom nav ───────────────────────────────────────────── */}
+      {isMobile && (
+        <nav style={{
+          position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 100,
+          height: 56,
+          background: 'rgba(8,8,14,0.97)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          borderTop: '1px solid rgba(255,255,255,0.08)',
+          display: 'flex', alignItems: 'stretch',
+        }}>
+          {([
+            { id: 'remix',    icon: '🔀', label: 'Remix'    },
+            { id: 'bank',     icon: '🗂',  label: 'Bank'     },
+            { id: 'phones',   icon: '📱', label: 'Phones'   },
+            { id: 'scheduler',icon: '📅', label: 'Planif.'  },
+            { id: 'settings', icon: '⚙️',  label: 'Config'   },
+          ] as Array<{ id: Page; icon: string; label: string }>).map(item => {
+            const active = page === item.id
+            return (
+              <button
+                key={item.id}
+                onClick={() => { playNav(); onNavigate(item.id) }}
+                style={{
+                  flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                  gap: 2, border: 'none', background: 'transparent', cursor: 'pointer',
+                  color: active ? '#A78BFA' : 'rgba(148,163,184,0.45)',
+                  position: 'relative',
+                  transition: 'color 0.15s',
+                }}
+              >
+                {active && (
+                  <span style={{
+                    position: 'absolute', top: 0, left: '20%', right: '20%', height: 2,
+                    background: 'linear-gradient(90deg,#7c3aed,#ec4899)',
+                    borderRadius: '0 0 2px 2px',
+                  }} />
+                )}
+                <span style={{ fontSize: 20, lineHeight: 1 }}>{item.icon}</span>
+                <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.03em' }}>{item.label}</span>
+              </button>
+            )
+          })}
+        </nav>
       )}
     </div>
   )
