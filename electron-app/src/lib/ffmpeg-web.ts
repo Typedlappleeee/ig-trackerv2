@@ -255,37 +255,55 @@ export async function detectSceneChangeWeb(opts: {
       }
 
       clearTimeout(globalTimeout)
-      video.src = ''
 
       if (frames.length < 4) {
+        video.src = ''
         resolve({ ok: false, error: 'Pas assez de frames capturées', duration })
         return
       }
 
       // Compute normalised RGB diff between consecutive frames
       const pixelCount = W * H
-      // Require a big background/location change: threshold 0.30 = 30% avg pixel shift.
-      // Minor motion or lighting changes stay < 0.15, real scene cuts are 0.30+.
-      const threshold = opts.threshold ?? 0.30
-      let maxDiff = 0
-      let bestT = frames[1].t
-
-      for (let i = 1; i < frames.length; i++) {
-        const a = frames[i - 1].data, b = frames[i].data
+      const frameDiff = (a: Uint8ClampedArray, b: Uint8ClampedArray) => {
         let diff = 0
         for (let j = 0; j < a.length; j += 4) {
           diff += Math.abs(b[j] - a[j]) + Math.abs(b[j + 1] - a[j + 1]) + Math.abs(b[j + 2] - a[j + 2])
         }
-        diff /= pixelCount * 3 * 255
-        if (diff > maxDiff) { maxDiff = diff; bestT = frames[i].t }
+        return diff / (pixelCount * 3 * 255)
+      }
+      // Require a big background/location change: threshold 0.30 = 30% avg pixel shift.
+      // Minor motion or lighting changes stay < 0.15, real scene cuts are 0.30+.
+      const threshold = opts.threshold ?? 0.30
+
+      // Find the FIRST consecutive-frame transition above threshold (the first
+      // scene change), not the global maximum — the cut must land on the first
+      // moment the original video changes scene.
+      let firstIdx = -1
+      for (let i = 1; i < frames.length; i++) {
+        if (frameDiff(frames[i - 1].data, frames[i].data) > threshold) { firstIdx = i; break }
       }
 
-      if (maxDiff < threshold) {
+      if (firstIdx === -1) {
+        video.src = ''
         resolve({ ok: false, error: 'Aucun changement de scène détecté', duration })
         return
       }
 
-      const splitTime = Math.round(Math.min(bestT, duration - 0.033) * 1000) / 1000
+      // Refine: the change happened somewhere in (frames[firstIdx-1].t, frames[firstIdx].t].
+      // Binary-search for the earliest time whose frame already differs from the
+      // pre-change reference, so the cut is precise (~0.05s) instead of grid-quantised.
+      const ref = frames[firstIdx - 1].data
+      let lo = frames[firstIdx - 1].t   // still old scene
+      let hi = frames[firstIdx].t       // already new scene
+      for (let k = 0; k < 6 && hi - lo > 0.05; k++) {
+        const mid = (lo + hi) / 2
+        const data = await captureFrameAtTime(video, ctx, mid)
+        if (data && frameDiff(ref, data) > threshold) hi = mid
+        else lo = mid
+      }
+
+      const splitTime = Math.round(Math.min(hi, duration - 0.033) * 1000) / 1000
+      video.src = ''
       resolve({ ok: true, splitTime, duration })
     }
 

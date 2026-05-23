@@ -701,11 +701,12 @@ ipcMain.handle('detect-scene-change', async (_event, opts: {
         return resolve({ ok: false, times: [], duration, error: `Pas de changement de décor significatif (Δ=${maxDist.toFixed(1)} < ${SCENE_MIN_DIST})` })
       }
 
-      // Among candidates with dist ≥ 70% of max, pick the LAST (= final scene of original)
-      const cutoff = maxDist * 0.70
-      const picked = sorted.filter(d => d.dist >= cutoff)
-      const times  = picked.map(d => d.time)
-      const best   = Math.max(...times)
+      // Cut on the FIRST real scene change: among frames whose diff clears the
+      // threshold, pick the earliest in time (not the biggest). The cut must land
+      // the moment the original video first changes scene.
+      const candidates = valid.filter(d => d.dist >= SCENE_MIN_DIST)
+      const times = candidates.map(d => d.time).sort((a, b) => a - b)
+      const best  = times[0]
 
       console.log('[scene-detect] best=', best, 'times=', times, 'maxDist=', maxDist.toFixed(1))
       resolve({ ok: true, times, splitTime: best, duration })
