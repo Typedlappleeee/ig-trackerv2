@@ -8,6 +8,18 @@ import { supabase } from '@/lib/supabase'
 import { uploadVideoFromPath, type UploadScope } from '@/lib/storage'
 import { useOrg } from '@/lib/orgContext'
 import { useConnections } from '@/lib/connections'
+import { runFfmpegRemixAIWeb, detectSceneChangeWeb, extractFramesWeb } from '@/lib/ffmpeg-web'
+
+const isWeb = !window.electronAPI
+
+async function anthropicVisionWeb(opts: { apiKey: string; model: string; messages: unknown[]; maxTokens: number }) {
+  const r = await fetch('/api/anthropic', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(opts),
+  })
+  return r.json() as Promise<{ ok: boolean; data?: unknown; error?: string }>
+}
 
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   return Promise.race([
@@ -439,7 +451,9 @@ export function MassRemix({ user }: MassRemixProps) {
         } else {
           addLog(job.id, '🔍 Détection scène…')
           const det = await withTimeout(
-            window.electronAPI!.detectSceneChange!({ filePath: job.originalPath }),
+            isWeb
+              ? detectSceneChangeWeb({ filePath: job.originalPath })
+              : window.electronAPI!.detectSceneChange!({ filePath: job.originalPath }),
             60_000, 'détection scène'
           )
           if (!det.ok) addLog(job.id, `❌ Détection échouée: ${det.error ?? 'inconnu'}`)
@@ -465,13 +479,17 @@ export function MassRemix({ user }: MassRemixProps) {
               const totalDur = det.duration ?? 60
               const phase2Start = Math.min(splitTime + 0.5, totalDur - 0.5)
               addLog(job.id, `🤖 Vérif. décor (cut à ${splitTime}s)…`)
+              const extractFn = (args: { filePath: string; startTime: number; endTime: number }) =>
+                isWeb ? extractFramesWeb(args) : window.electronAPI!.extractFrames!(args)
               const [fr1, fr2] = await Promise.all([
-                withTimeout(window.electronAPI!.extractFrames!({ filePath: job.originalPath, startTime: 0.5, endTime: 1.5 }), 20_000, 'frame debut'),
-                withTimeout(window.electronAPI!.extractFrames!({ filePath: job.originalPath, startTime: phase2Start, endTime: Math.min(phase2Start + 1, totalDur) }), 20_000, 'frame phase2'),
+                withTimeout(extractFn({ filePath: job.originalPath, startTime: 0.5, endTime: 1.5 }), 20_000, 'frame debut'),
+                withTimeout(extractFn({ filePath: job.originalPath, startTime: phase2Start, endTime: Math.min(phase2Start + 1, totalDur) }), 20_000, 'frame phase2'),
               ])
               if (fr1.ok && fr1.frames?.[0] && fr2.ok && fr2.frames?.[0]) {
+                const visionFn = (opts: { apiKey: string; model: string; messages: unknown[]; maxTokens: number }) =>
+                  isWeb ? anthropicVisionWeb(opts) : window.electronAPI!.anthropicVisionRequest!(opts)
                 const res = await withTimeout(
-                  window.electronAPI!.anthropicVisionRequest!({
+                  visionFn({
                     apiKey: anthropicKey.trim(), model: 'claude-haiku-4-5-20251001',
                     messages: [{ role: 'user', content: [
                       { type: 'text', text: 'Frame 1 (before cut):' },
@@ -524,7 +542,9 @@ export function MassRemix({ user }: MassRemixProps) {
           addLog(job.id, '✨ Analyse texte IA…')
           const analyzeEnd = splitTime ?? detDuration ?? 30
           const fr = await withTimeout(
-            window.electronAPI!.extractFrames!({ filePath: job.originalPath, endTime: analyzeEnd }),
+            isWeb
+              ? extractFramesWeb({ filePath: job.originalPath, endTime: analyzeEnd })
+              : window.electronAPI!.extractFrames!({ filePath: job.originalPath, endTime: analyzeEnd }),
             180_000, 'extraction frames'
           )
           if (fr.ok && fr.frames?.length) {
@@ -554,8 +574,10 @@ startFrame/endFrame: first and last frame index where this text is visible.
 
 Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.`
 
+            const visionFn2 = (opts: { apiKey: string; model: string; messages: unknown[]; maxTokens: number }) =>
+              isWeb ? anthropicVisionWeb(opts) : window.electronAPI!.anthropicVisionRequest!(opts)
             const res = await withTimeout(
-              window.electronAPI!.anthropicVisionRequest!({
+              visionFn2({
                 apiKey: anthropicKey.trim(), model: 'claude-haiku-4-5-20251001',
                 messages: [{ role: 'user', content: [...imageBlocks, { type: 'text', text: prompt }] }],
                 maxTokens: 2000,
@@ -695,7 +717,9 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
 
         const outName = `remix_${String(job.id + 1).padStart(3, '0')}.mp4`
         let outputPath: string
-        if (folder) {
+        if (isWeb) {
+          outputPath = outName  // web FFmpeg returns blob URL in gen.outputPath, this is ignored
+        } else if (folder) {
           outputPath = folder.replace(/\\/g, '/') + '/' + outName
         } else {
           const tmp = await window.electronAPI!.writeTempFile!({ name: outName, bytes: new ArrayBuffer(0) })
@@ -713,17 +737,25 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
         const targetDuration = (detDuration != null && detDuration > 1) ? detDuration : undefined
 
         const gen = await withTimeout(
-          window.electronAPI!.runFfmpegRemixAI!({
-            newPhase1Path: job.secondaryPath,
-            originalPath:  job.originalPath,
-            splitTime, outputPath, preset,
-            textOverlays,
-            targetDuration,
-          }),
+          isWeb
+            ? runFfmpegRemixAIWeb({
+                newPhase1Path: job.secondaryPath,
+                originalPath:  job.originalPath,
+                splitTime, outputPath, preset,
+                textOverlays,
+                targetDuration,
+              })
+            : window.electronAPI!.runFfmpegRemixAI!({
+                newPhase1Path: job.secondaryPath,
+                originalPath:  job.originalPath,
+                splitTime, outputPath, preset,
+                textOverlays,
+                targetDuration,
+              }),
           360_000, 'FFmpeg'
         )
 
-        if (gen.command) addLog(job.id, `   cmd: ${gen.command}`)
+        if ((gen as any).command) addLog(job.id, `   cmd: ${(gen as any).command}`)
 
         if (!gen.ok) {
           addLog(job.id, `❌ FFmpeg: ${gen.error ?? 'erreur inconnue'}`)
@@ -732,14 +764,17 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
           return
         }
         addLog(job.id, '✅ FFmpeg OK')
-        updateJob(job.id, { outputPath: gen.outputPath ?? outputPath })
+        const finalPath = gen.outputPath ?? outputPath
+        updateJob(job.id, { outputPath: finalPath })
 
-        // ── 4. Upload to bank if needed ──────────────────────────────────────
-        if (exportMode === 'bank') {
+        // ── 4. Upload to bank ────────────────────────────────────────────────
+        // Always upload on web (blob URL must go to Supabase for mass posting).
+        // On Electron, upload only when exportMode === 'bank'.
+        if (isWeb || exportMode === 'bank') {
           updateJob(job.id, { status: 'uploading' })
           addLog(job.id, '☁️ Upload banque…')
           const up = await withTimeout(
-            uploadVideoFromPath(gen.outputPath ?? outputPath, scope),
+            uploadVideoFromPath(finalPath, scope),
             90_000, 'upload'
           )
           await supabase.from('content_bank').insert({
@@ -749,7 +784,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
             folder: bankFolder.trim() || null,
             tags: [], notes: '',
           })
-          addLog(job.id, '✅ Upload OK')
+          addLog(job.id, '✅ Upload banque OK')
         }
 
         updateJob(job.id, { status: 'done' })
