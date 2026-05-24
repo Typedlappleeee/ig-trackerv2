@@ -1015,3 +1015,110 @@ export async function extractFramesWeb(opts: {
     }
   })
 }
+
+// ── Seeded PRNG (LCG) — deterministic per variant seed ───────────────────────
+function seededRng(seed: number) {
+  let s = (seed * 1664525 + 1013904223) >>> 0
+  return (lo: number, hi: number) => {
+    s = (s * 1664525 + 1013904223) >>> 0
+    return lo + (s / 4294967296) * (hi - lo)
+  }
+}
+
+// ── runFfmpegRepurposeWeb — generate one unique variant ───────────────────────
+// Applies invisible micro-transforms so each export has a different hash/signature
+// while remaining perceptually identical to the source video.
+export async function runFfmpegRepurposeWeb(opts: {
+  inputPath: string
+  seed:      number
+  intensity: 'subtle' | 'medium' | 'aggressive'
+  format:    '9:16' | '1:1' | '16:9' | 'keep'
+  onProgress?: (pct: number) => void
+}): Promise<{ ok: boolean; outputPath?: string; similarityPct?: number; error?: string }> {
+  const FILES = ['rp_in.mp4', 'rp_out.mp4']
+
+  // Intensity-dependent ranges
+  const ranges = {
+    subtle:     { bri: 0.012, con: 0.012, sat: 0.018, gam: 0.012, hue: 1.5, noise: 3, crop: 3, pitch: 0.0008, vol: 0.015, crf: 2 },
+    medium:     { bri: 0.025, con: 0.022, sat: 0.035, gam: 0.022, hue: 3,   noise: 6, crop: 5, pitch: 0.0015, vol: 0.025, crf: 4 },
+    aggressive: { bri: 0.045, con: 0.040, sat: 0.060, gam: 0.040, hue: 6,   noise: 9, crop: 8, pitch: 0.0025, vol: 0.040, crf: 6 },
+  }[opts.intensity]
+
+  const rng  = seededRng(opts.seed)
+  const sign = () => rng(0, 1) > 0.5 ? 1 : -1
+
+  const brightness = sign() * rng(0.002, ranges.bri)
+  const contrast   = 1 + sign() * rng(0.002, ranges.con)
+  const saturation = 1 + sign() * rng(0.002, ranges.sat)
+  const gamma      = 1 + sign() * rng(0.002, ranges.gam)
+  const hue        = sign() * rng(0, ranges.hue)
+  const noise      = rng(1, ranges.noise)
+  const cropX      = Math.floor(rng(0, ranges.crop))
+  const cropY      = Math.floor(rng(0, ranges.crop))
+  const pitchFact  = 1 + sign() * rng(0, ranges.pitch)
+  const volume     = 1 + sign() * rng(0, ranges.vol)
+  const crf        = Math.round(22 + rng(0, ranges.crf))
+
+  // Similarity estimate (higher intensity = lower similarity, but always high)
+  const similarityPct = Math.round(100 - (
+    Math.abs(brightness) * 120 +
+    Math.abs(contrast - 1) * 80 +
+    Math.abs(saturation - 1) * 60 +
+    noise * 1.2 +
+    Math.abs(hue) * 0.8
+  ))
+
+  const ff = await getFFmpeg()
+  for (const f of FILES) await ff.deleteFile(f).catch(() => {})
+  const logs: string[] = []
+  const logH = ({ message }: { message: string }) => logs.push(message)
+  ff.on('log', logH)
+
+  try {
+    opts.onProgress?.(5)
+    await writeInput(ff, 'rp_in.mp4', opts.inputPath)
+    opts.onProgress?.(20)
+
+    // Determine target dimensions
+    let scaleFilter = ''
+    if (opts.format !== 'keep') {
+      const W = opts.format === '16:9' ? 1920 : 1080
+      const H = opts.format === '9:16' ? 1920 : 1080
+      scaleFilter = `scale=${W + cropX * 2}:${H + cropY * 2}:force_original_aspect_ratio=increase,pad=${W + cropX * 2}:${H + cropY * 2}:-1:-1:color=black,`
+    }
+
+    const vf = [
+      scaleFilter,
+      `crop=iw-${cropX * 2}:ih-${cropY * 2}:${cropX}:${cropY}`,
+      `eq=brightness=${brightness.toFixed(4)}:contrast=${contrast.toFixed(4)}:saturation=${saturation.toFixed(4)}:gamma=${gamma.toFixed(4)}`,
+      `hue=h=${hue.toFixed(2)}`,
+      `noise=alls=${noise.toFixed(1)}:allf=t+u`,
+    ].filter(Boolean).join(',')
+
+    const af = `asetrate=44100*${pitchFact.toFixed(5)},aresample=44100,volume=${volume.toFixed(4)}`
+
+    opts.onProgress?.(30)
+    await ff.exec([
+      '-nostdin', '-fflags', '+genpts', '-i', 'rp_in.mp4',
+      '-vf', vf,
+      '-af', af,
+      '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', String(crf),
+      '-pix_fmt', 'yuv420p', '-profile:v', 'main', '-level', '4.0',
+      '-c:a', 'aac', '-b:a', '128k',
+      '-movflags', '+faststart',
+      '-y', 'rp_out.mp4',
+    ])
+    opts.onProgress?.(90)
+
+    const url = await readOutput(ff, 'rp_out.mp4', 'video/mp4')
+    opts.onProgress?.(100)
+    return { ok: true, outputPath: url, similarityPct }
+  } catch (err) {
+    if (isWasmCrash(err)) resetFFmpeg()
+    const relevant = logs.filter(l => /error|invalid|unknown|cannot/i.test(l)).slice(-2)
+    return { ok: false, error: String(err) + (relevant.length ? '\n' + relevant.join('\n') : '') }
+  } finally {
+    ff.off('log', logH)
+    for (const f of FILES) await ff.deleteFile(f).catch(() => {})
+  }
+}

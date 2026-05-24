@@ -53,7 +53,7 @@ function SFLogo({ size = 28 }: { size?: number }) {
 export type Page =
   | 'dashboard' | 'phones' | 'monitor'
   | 'stats' | 'posting' | 'massposting' | 'scheduler' | 'bank' | 'aitools' | 'warmup'
-  | 'montage' | 'remix' | 'textcopy'
+  | 'montage' | 'remix' | 'textcopy' | 'repurpose'
   | 'community' | 'support'
   | 'settings' | 'licences'
 
@@ -95,9 +95,10 @@ const NAV_SECTIONS: NavSection[] = [
     title: 'Montage',
     defaultOpen: true,
     items: [
-      { id: 'montage',  label: 'Montage vidéo',  icon: '✂' },
-      { id: 'remix',    label: 'Remix vidéo',    icon: '🔀' },
-      { id: 'textcopy', label: 'Texte IA',        icon: '✍', beta: true },
+      { id: 'montage',   label: 'Montage vidéo',  icon: '✂' },
+      { id: 'remix',     label: 'Remix vidéo',    icon: '🔀' },
+      { id: 'repurpose', label: 'Repurpose',       icon: '⚡', isNew: true },
+      { id: 'textcopy',  label: 'Texte IA',        icon: '✍', beta: true },
     ],
   },
 ]
@@ -147,6 +148,7 @@ const PAGE_ICON: Record<string, IconKey> = {
   aitools:     'sparkles',
   montage:     'scissors',
   remix:       'refresh',
+  repurpose:   'zap',
   textcopy:    'edit',
 }
 
