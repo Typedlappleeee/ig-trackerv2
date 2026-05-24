@@ -21,7 +21,8 @@ function extOf(filePath: string): string {
 function mimeFor(ext: string): string {
   switch (ext.toLowerCase()) {
     case 'mp4':  return 'video/mp4'
-    case 'mov':  return 'video/quicktime'
+    case 'mov':
+    case 'qt':   return 'video/quicktime'
     case 'webm': return 'video/webm'
     case 'mkv':  return 'video/x-matroska'
     case 'avi':  return 'video/x-msvideo'
@@ -179,7 +180,8 @@ export async function uploadVideoFromPath(
     const resp = await fetch(filePath)
     if (!resp.ok) throw new Error('Lecture blob échouée')
     const blob = await resp.blob()
-    return uploadVideoFromBlob(blob, filePath, scope, onProgress)
+    const ext = blob.type === 'video/quicktime' ? 'mov' : 'mp4'
+    return uploadVideoFromBlob(blob, `remix.${ext}`, scope, onProgress)
   }
 
   if (!window.electronAPI?.readFileBytes) throw new Error('IPC indisponible')

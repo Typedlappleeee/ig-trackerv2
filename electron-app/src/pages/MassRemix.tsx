@@ -693,7 +693,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
         updateJob(job.id, { status: 'generating' })
         addLog(job.id, `⚙️ FFmpeg — splitTime=${splitTime != null ? splitTime + 's' : 'null'}, preset=${preset}, overlays=${textOverlays.length}`)
 
-        const outName = `remix_${String(job.id + 1).padStart(3, '0')}.mp4`
+        const outName = `remix_${String(job.id + 1).padStart(3, '0')}.mov`
         let outputPath: string
         if (folder) {
           outputPath = folder.replace(/\\/g, '/') + '/' + outName
@@ -1236,11 +1236,11 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                       </div>
                       {job.status === 'done' && job.outputPath?.startsWith('blob:') && (
                         <a href={job.outputPath}
-                          download={`remix_${String(job.id + 1).padStart(3, '0')}.mp4`}
+                          download={`remix_${String(job.id + 1).padStart(3, '0')}.mov`}
                           onClick={e => e.stopPropagation()}
                           className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all"
                           style={{ background: 'rgba(52,211,153,0.15)', color: '#34d399', border: '1px solid rgba(52,211,153,0.25)', textDecoration: 'none' }}>
-                          ⬇ MP4
+                          ⬇ MOV
                         </a>
                       )}
                       {job.logs.length > 0 && (
