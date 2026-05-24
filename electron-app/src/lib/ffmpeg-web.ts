@@ -1038,11 +1038,11 @@ export function runFfmpegRepurposeWeb(opts: {
   return withFfmpegLock(async () => {
   const FILES = ['rp_in.mp4', 'rp_out.mp4']
 
-  // Intensity-dependent ranges
+  // Intensity ranges — only safe, universally supported transforms
   const ranges = {
-    subtle:     { bri: 0.012, con: 0.012, sat: 0.018, gam: 0.012, hue: 1.5, noise: 3, crop: 3, crf: 2 },
-    medium:     { bri: 0.025, con: 0.022, sat: 0.035, gam: 0.022, hue: 3,   noise: 6, crop: 5, crf: 4 },
-    aggressive: { bri: 0.045, con: 0.040, sat: 0.060, gam: 0.040, hue: 6,   noise: 9, crop: 8, crf: 6 },
+    subtle:     { bri: 0.012, con: 0.012, sat: 0.018, crop: 3, crf: 2 },
+    medium:     { bri: 0.025, con: 0.022, sat: 0.035, crop: 5, crf: 4 },
+    aggressive: { bri: 0.045, con: 0.040, sat: 0.060, crop: 8, crf: 6 },
   }[opts.intensity]
 
   const rng  = seededRng(opts.seed)
@@ -1051,41 +1051,24 @@ export function runFfmpegRepurposeWeb(opts: {
   const brightness = sign() * rng(0.002, ranges.bri)
   const contrast   = 1 + sign() * rng(0.002, ranges.con)
   const saturation = 1 + sign() * rng(0.002, ranges.sat)
-  const gamma      = 1 + sign() * rng(0.002, ranges.gam)
-  const hue        = sign() * rng(0, ranges.hue)
-  const noise      = rng(1, ranges.noise)
   const cropX      = Math.floor(rng(0, ranges.crop))
   const cropY      = Math.floor(rng(0, ranges.crop))
   const crf        = Math.round(22 + rng(0, ranges.crf))
 
-  // Color preset chosen automatically from seed (very subtle)
-  const colorPresets = [
-    { gr: 1.00, gg: 1.00, gb: 1.00, satD: 0,     conD: 0,    label: null as string | null },
-    { gr: 1.03, gg: 1.01, gb: 0.97, satD: 0.02,  conD: 0,    label: '🟠 Chaud' },
-    { gr: 0.97, gg: 1.00, gb: 1.04, satD: 0,     conD: 0,    label: '🔵 Froid' },
-    { gr: 1.01, gg: 0.99, gb: 0.97, satD: -0.05, conD: 0.04, label: '🎬 Ciné' },
-    { gr: 1.00, gg: 1.00, gb: 1.00, satD: -0.5,  conD: 0.02, label: '🌫 Doux' },
-  ]
-  const colorAdj = colorPresets[Math.floor(rng(0, colorPresets.length))]
-
   // Similarity estimate
-  const similarityPct = Math.round(100 - (
+  const similarityPct = Math.min(99, Math.max(80, Math.round(100 - (
     Math.abs(brightness) * 120 +
     Math.abs(contrast - 1) * 80 +
-    Math.abs(saturation - 1 + colorAdj.satD) * 60 +
-    noise * 1.2 +
-    Math.abs(hue) * 0.8
-  ))
+    Math.abs(saturation - 1) * 60
+  ))))
 
-  // Human-readable transform summary (French)
+  // Human-readable transform summary
   const transformSummary: string[] = []
-  if (Math.abs(brightness) > 0.001)     transformSummary.push(`Lumière ${brightness > 0 ? '+' : ''}${(brightness * 100).toFixed(1)}%`)
-  if (Math.abs(contrast - 1) > 0.001)  transformSummary.push(`Contraste ${contrast > 1 ? '+' : ''}${((contrast - 1) * 100).toFixed(1)}%`)
-  if (Math.abs(saturation - 1) > 0.001) transformSummary.push(`Saturation ${saturation > 1 ? '+' : ''}${((saturation - 1) * 100).toFixed(1)}%`)
-  if (Math.abs(hue) > 0.1)             transformSummary.push(`Teinte ${hue > 0 ? '+' : ''}${hue.toFixed(1)}°`)
-  if (noise > 1.5)                      transformSummary.push(`Grain ×${noise.toFixed(1)}`)
-  if (cropX > 0 || cropY > 0)          transformSummary.push(`Crop ${Math.max(cropX, cropY)}px`)
-  if (colorAdj.label)                   transformSummary.push(colorAdj.label)
+  if (Math.abs(brightness) > 0.001)      transformSummary.push(`Lumière ${brightness > 0 ? '+' : ''}${(brightness * 100).toFixed(1)}%`)
+  if (Math.abs(contrast - 1) > 0.001)    transformSummary.push(`Contraste ${contrast > 1 ? '+' : ''}${((contrast - 1) * 100).toFixed(1)}%`)
+  if (Math.abs(saturation - 1) > 0.001)  transformSummary.push(`Saturation ${saturation > 1 ? '+' : ''}${((saturation - 1) * 100).toFixed(1)}%`)
+  if (cropX > 0 || cropY > 0)            transformSummary.push(`Crop ${Math.max(cropX, cropY)}px`)
+  transformSummary.push(`CRF ${crf}`)
 
   const ff = await getFFmpeg()
   for (const f of FILES) await ff.deleteFile(f).catch(() => {})
@@ -1098,21 +1081,19 @@ export function runFfmpegRepurposeWeb(opts: {
     await writeInput(ff, 'rp_in.mp4', opts.inputPath)
     opts.onProgress?.(20)
 
-    // Determine target dimensions
-    let scaleFilter = ''
+    // eq with only the 3 universally-supported params (brightness/contrast/saturation)
+    const eqFilter = `eq=brightness=${brightness.toFixed(4)}:contrast=${contrast.toFixed(4)}:saturation=${saturation.toFixed(4)}`
+
+    const vfParts: string[] = []
     if (opts.format !== 'keep') {
       const W = opts.format === '16:9' ? 1920 : 1080
       const H = opts.format === '9:16' ? 1920 : 1080
-      scaleFilter = `scale=${W + cropX * 2}:${H + cropY * 2}:force_original_aspect_ratio=increase,pad=${W + cropX * 2}:${H + cropY * 2}:-1:-1:color=black,`
+      vfParts.push(`scale=${W}:${H}:force_original_aspect_ratio=increase`)
+      vfParts.push(`crop=${W}:${H}`)
     }
-
-    const vf = [
-      scaleFilter,
-      `crop=iw-${cropX * 2}:ih-${cropY * 2}:${cropX}:${cropY}`,
-      `eq=brightness=${brightness.toFixed(4)}:contrast=${(contrast + colorAdj.conD).toFixed(4)}:saturation=${(saturation + colorAdj.satD).toFixed(4)}:gamma=${gamma.toFixed(4)}:gamma_r=${colorAdj.gr.toFixed(4)}:gamma_g=${colorAdj.gg.toFixed(4)}:gamma_b=${colorAdj.gb.toFixed(4)}`,
-      `hue=h=${hue.toFixed(2)}`,
-      `noise=alls=${noise.toFixed(1)}:allf=t+u`,
-    ].filter(Boolean).join(',')
+    if (cropX > 0 || cropY > 0) vfParts.push(`crop=iw-${cropX * 2}:ih-${cropY * 2}:${cropX}:${cropY}`)
+    vfParts.push(eqFilter)
+    const vf = vfParts.join(',')
 
     opts.onProgress?.(30)
     await ff.exec([
