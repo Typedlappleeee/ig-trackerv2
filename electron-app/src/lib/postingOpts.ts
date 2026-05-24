@@ -7,6 +7,7 @@ export interface PostingOpts {
   intervalMode: IntervalMode
   intervalMin:  number   // minutes
   intervalMax:  number   // minutes (random upper bound)
+  reelsTrial:   boolean  // post as Instagram Reels Trial (non-followers only)
 }
 
 const KEY = 'sf_posting_opts'
@@ -15,13 +16,20 @@ const DEFAULTS: PostingOpts = {
   intervalMode: 'none',
   intervalMin:  1,
   intervalMax:  5,
+  reelsTrial:   false,
 }
 
 export function loadPostingOpts(): PostingOpts {
   // intervalMode always starts as 'none' (off) — only numeric values are restored
   try {
     const saved = JSON.parse(localStorage.getItem(KEY) ?? '{}')
-    return { ...DEFAULTS, intervalMin: saved.intervalMin ?? DEFAULTS.intervalMin, intervalMax: saved.intervalMax ?? DEFAULTS.intervalMax, intervalMode: 'none' }
+    return {
+      ...DEFAULTS,
+      intervalMin:  saved.intervalMin  ?? DEFAULTS.intervalMin,
+      intervalMax:  saved.intervalMax  ?? DEFAULTS.intervalMax,
+      reelsTrial:   saved.reelsTrial   ?? DEFAULTS.reelsTrial,
+      intervalMode: 'none',
+    }
   } catch { return { ...DEFAULTS } }
 }
 

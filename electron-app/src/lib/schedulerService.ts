@@ -31,6 +31,7 @@ export interface ScheduledPost {
   delay_minutes:   number
   mode:            'seq' | 'random'
   bearer_token:    string
+  reels_trial:     boolean
   result:          { logs: string[] } | null
   error_msg:       string | null
   created_at:      string
@@ -49,6 +50,7 @@ export interface CreateScheduledPostInput {
   delayMinutes:    number
   mode:            'seq' | 'random'
   bearerToken:     string
+  reelsTrial:      boolean
 }
 
 // ── DB operations ──────────────────────────────────────────────────────────────
@@ -67,6 +69,7 @@ export async function createScheduledPost(input: CreateScheduledPostInput): Prom
     delay_minutes:    input.delayMinutes,
     mode:             input.mode,
     bearer_token:     input.bearerToken,
+    reels_trial:      input.reelsTrial,
   }).select().single()
   if (error) throw new Error(error.message)
   return data as ScheduledPost
@@ -125,7 +128,7 @@ export async function executeScheduledPost(
   post: ScheduledPost,
   onLog: (msg: string) => void,
 ): Promise<boolean> {
-  const { bearer_token: bearer, caption, delay_minutes, mode } = post
+  const { bearer_token: bearer, caption, delay_minutes, mode, reels_trial } = post
 
   // Supabase Realtime can deliver jsonb columns as strings — parse defensively
   const phones = (typeof post.phones === 'string'
@@ -165,6 +168,7 @@ export async function executeScheduledPost(
         scheduleAt:  Math.floor(Date.now() / 1000),
         description: caption,
         video:       [videos[videoIdx].token],
+        ...(reels_trial ? { shareType: 2 } : {}),
       }) as any
       if (res.code === 0 && res.data?.id) {
         taskIds.push(res.data.id)

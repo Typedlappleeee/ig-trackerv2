@@ -9,7 +9,7 @@ export function PostingOptions({ opts, onChange }: Props) {
   function set(patch: Partial<PostingOpts>) {
     const next = { ...opts, ...patch }
     onChange(next)
-    // Only persist the numeric values, not the toggle state (always starts OFF)
+    // Only persist the numeric values + trial toggle, not intervalMode (always starts OFF)
     savePostingOpts({ ...next, intervalMode: 'none' })
   }
 
@@ -34,7 +34,23 @@ export function PostingOptions({ opts, onChange }: Props) {
         </button>
       </div>
 
-      {/* Expanded controls */}
+      {/* Reels Trial toggle */}
+      <div className="flex items-center gap-3" style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '12px' }}>
+        <span className="text-[13px]" style={{ color: 'rgba(148,163,184,0.4)' }}>🧪</span>
+        <div className="flex-1 min-w-0">
+          <span className="text-[13px] font-medium" style={{ color: 'rgba(226,232,240,0.7)' }}>Reels Trial</span>
+          <p className="text-[11px] mt-0.5" style={{ color: 'rgba(148,163,184,0.4)' }}>Montré uniquement aux non-abonnés</p>
+        </div>
+        <button
+          onClick={() => set({ reelsTrial: !opts.reelsTrial })}
+          className="relative w-9 h-5 rounded-full transition-colors flex-shrink-0"
+          style={{ background: opts.reelsTrial ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.08)' }}
+        >
+          <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${opts.reelsTrial ? 'translate-x-4' : 'translate-x-0.5'}`} />
+        </button>
+      </div>
+
+      {/* Expanded interval controls */}
       {on && (
         <div className="flex items-center gap-2 pt-1" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
           {/* Mode pill */}

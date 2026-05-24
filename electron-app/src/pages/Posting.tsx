@@ -178,7 +178,7 @@ export function Posting({ user }: PostingProps) {
         type: 'posting', scheduledAt,
         phones: phoneList.map(p => ({ id: p.id, geelark_id: p.geelark_id, phone_name: p.phone_name, ig_username: p.ig_username })),
         videos: [{ token: up.token, title: filePath.split(/[\\/]/).pop() ?? 'video' }],
-        caption, delayMinutes: postingOpts.intervalMode !== 'none' ? postingOpts.intervalMin : 0, mode: 'seq', bearerToken: bearer,
+        caption, delayMinutes: postingOpts.intervalMode !== 'none' ? postingOpts.intervalMin : 0, mode: 'seq', bearerToken: bearer, reelsTrial: postingOpts.reelsTrial,
       })
       log(`📅 Programmé pour ${fmtScheduledTime(scheduledAt.toISOString())} — ${phoneList.length} téléphone(s)`, 'ok')
     } catch (err: any) {
@@ -252,6 +252,7 @@ export function Posting({ user }: PostingProps) {
           scheduleAt:  scheduleTimes[pi],
           description: caption,
           video:       [videoToken],
+          ...(postingOpts.reelsTrial ? { shareType: 2 } : {}),
         })
         if (taskRes['code'] === 0) {
           const tid = (taskRes['data'] as Record<string, unknown>)?.['id'] as string

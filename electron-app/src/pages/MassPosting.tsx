@@ -346,7 +346,7 @@ export function MassPosting({ user }: MassPostingProps) {
         type: 'mass_posting', scheduledAt,
         phones: phoneList.map(p => ({ id: p.id, geelark_id: p.geelark_id, phone_name: p.phone_name, ig_username: p.ig_username })),
         videos: selectedVideos.map((v, i) => ({ token: tokenMap.get(i)!, title: v.item.title })),
-        caption, delayMinutes: 0, mode, bearerToken: bearer,
+        caption, delayMinutes: 0, mode, bearerToken: bearer, reelsTrial: postingOpts.reelsTrial,
       })
       log(`📅 Programmé pour ${fmtScheduledTime(scheduledAt.toISOString())} — ${phoneList.length} téléphone(s)`, 'ok')
     } catch (err: any) {
@@ -450,6 +450,7 @@ export function MassPosting({ user }: MassPostingProps) {
           scheduleAt:  scheduleTimes[ai],
           description: caption,
           video:       [token],
+          ...(postingOpts.reelsTrial ? { shareType: 2 } : {}),
         })
         if (taskRes['code'] === 0) {
           const tid = (taskRes['data'] as Record<string, unknown>)?.['id'] as string
