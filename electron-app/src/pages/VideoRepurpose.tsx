@@ -1,0 +1,534 @@
+import { useState, useRef, useCallback, useEffect } from 'react'
+import type { User } from '@supabase/supabase-js'
+import { runFfmpegRepurposeWeb } from '@/lib/ffmpeg-web'
+import { uploadVideoFromPath, type UploadScope } from '@/lib/storage'
+import { supabase } from '@/lib/supabase'
+import { useOrg } from '@/lib/orgContext'
+
+interface VideoRepurposeProps { user: User }
+
+type Intensity = 'subtle' | 'medium' | 'aggressive'
+type Format    = '9:16' | '1:1' | '16:9' | 'keep'
+type JobStatus = 'queued' | 'processing' | 'done' | 'error'
+
+interface VariantJob {
+  id:            number
+  seed:          number
+  status:        JobStatus
+  progress:      number
+  outputPath?:   string
+  similarityPct?: number
+  error?:        string
+  thumb?:        string
+}
+
+function extractThumb(blobUrl: string): Promise<string | null> {
+  return new Promise(resolve => {
+    const v = document.createElement('video')
+    v.muted = true
+    v.src = blobUrl
+    v.onloadeddata = () => {
+      v.currentTime = 0.5
+      v.onseeked = () => {
+        const c = document.createElement('canvas')
+        c.width = 120; c.height = 214
+        c.getContext('2d')?.drawImage(v, 0, 0, 120, 214)
+        resolve(c.toDataURL('image/jpeg', 0.7))
+        v.src = ''
+      }
+    }
+    v.onerror = () => { v.src = ''; resolve(null) }
+    setTimeout(() => { v.src = ''; resolve(null) }, 8000)
+  })
+}
+
+function SimilarityBadge({ pct }: { pct: number }) {
+  const color = pct >= 90 ? '#22d3ee' : pct >= 80 ? '#a78bfa' : '#f59e0b'
+  const label = pct >= 90 ? 'SAFE' : pct >= 80 ? 'OK' : 'RISKY'
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+      <div style={{
+        fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4,
+        background: `${color}18`, color, border: `1px solid ${color}35`,
+        letterSpacing: '0.06em',
+      }}>{label}</div>
+      <span style={{ fontSize: 11, color, fontWeight: 600 }}>{pct}%</span>
+    </div>
+  )
+}
+
+function VariantCard({ job, index }: { job: VariantJob; index: number }) {
+  const isDone = job.status === 'done'
+  const isErr  = job.status === 'error'
+  const isProc = job.status === 'processing'
+  const isQ    = job.status === 'queued'
+
+  return (
+    <div style={{
+      borderRadius: 14, overflow: 'hidden', position: 'relative',
+      background: 'rgba(255,255,255,0.025)',
+      border: `1px solid ${isDone ? 'rgba(34,211,238,0.2)' : isErr ? 'rgba(239,68,68,0.2)' : 'rgba(255,255,255,0.06)'}`,
+      transition: 'border-color 0.3s, box-shadow 0.3s',
+      boxShadow: isDone ? '0 0 20px rgba(34,211,238,0.06)' : 'none',
+    }}>
+      {/* Thumbnail area */}
+      <div style={{ width: '100%', aspectRatio: '9/16', background: '#0a0a14', position: 'relative', overflow: 'hidden', maxHeight: 160 }}>
+        {job.thumb ? (
+          <img src={job.thumb} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
+        ) : (
+          <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {isProc && (
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ width: 32, height: 32, border: '2px solid rgba(34,211,238,0.3)', borderTopColor: '#22d3ee', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 8px' }} />
+                <div style={{ fontSize: 10, color: 'rgba(34,211,238,0.6)', fontWeight: 600 }}>{job.progress}%</div>
+              </div>
+            )}
+            {isQ && <div style={{ fontSize: 20, opacity: 0.2 }}>⏳</div>}
+            {isErr && <div style={{ fontSize: 20, opacity: 0.5 }}>✕</div>}
+          </div>
+        )}
+        {/* Processing progress overlay */}
+        {isProc && (
+          <div style={{
+            position: 'absolute', bottom: 0, left: 0, right: 0, height: 2,
+            background: 'rgba(255,255,255,0.08)',
+          }}>
+            <div style={{
+              height: '100%', background: 'linear-gradient(90deg, #22d3ee, #818cf8)',
+              width: `${job.progress}%`, transition: 'width 0.4s ease',
+              boxShadow: '0 0 6px rgba(34,211,238,0.6)',
+            }} />
+          </div>
+        )}
+        {/* Variant number badge */}
+        <div style={{
+          position: 'absolute', top: 6, left: 6,
+          background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
+          borderRadius: 5, padding: '2px 6px', fontSize: 10, fontWeight: 700,
+          color: 'rgba(255,255,255,0.7)',
+        }}>#{index + 1}</div>
+      </div>
+
+      {/* Info row */}
+      <div style={{ padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {isDone && job.similarityPct != null && (
+          <SimilarityBadge pct={job.similarityPct} />
+        )}
+        {isErr && (
+          <div style={{ fontSize: 10, color: '#f87171', fontWeight: 500 }}>
+            {job.error?.slice(0, 60)}…
+          </div>
+        )}
+        {isQ && <div style={{ fontSize: 10, color: 'rgba(148,163,184,0.4)' }}>En attente…</div>}
+        {isProc && <div style={{ fontSize: 10, color: '#22d3ee' }}>Traitement…</div>}
+
+        {isDone && job.outputPath && (
+          <a
+            href={job.outputPath}
+            download={`variant_${String(index + 1).padStart(3, '0')}.mp4`}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+              padding: '5px 0', borderRadius: 7, fontSize: 11, fontWeight: 600,
+              background: 'rgba(34,211,238,0.1)', color: '#22d3ee',
+              border: '1px solid rgba(34,211,238,0.2)', textDecoration: 'none',
+              transition: 'background 0.15s',
+            }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(34,211,238,0.2)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'rgba(34,211,238,0.1)')}
+          >
+            ⬇ MP4
+          </a>
+        )}
+      </div>
+    </div>
+  )
+}
+
+export function VideoRepurpose({ user }: VideoRepurposeProps) {
+  const { currentOrg } = useOrg()
+  const scope: UploadScope = currentOrg
+    ? { mode: 'org', id: currentOrg.id }
+    : { mode: 'user', id: user.id }
+
+  const [sourceUrl, setSourceUrl]     = useState<string | null>(null)
+  const [sourceName, setSourceName]   = useState('')
+  const [dragging, setDragging]       = useState(false)
+  const [count, setCount]             = useState(10)
+  const [intensity, setIntensity]     = useState<Intensity>('subtle')
+  const [format, setFormat]           = useState<Format>('9:16')
+  const [saveToBank, setSaveToBank]   = useState(false)
+  const [bankFolder, setBankFolder]   = useState('')
+  const [jobs, setJobs]               = useState<VariantJob[]>([])
+  const [running, setRunning]         = useState(false)
+  const [totalDone, setTotalDone]     = useState(0)
+  const [startedAt, setStartedAt]     = useState<number | null>(null)
+  const [elapsed, setElapsed]         = useState(0)
+  const abortRef = useRef(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Elapsed timer
+  useEffect(() => {
+    if (!running || !startedAt) return
+    const id = setInterval(() => setElapsed(Math.floor((Date.now() - startedAt) / 1000)), 1000)
+    return () => clearInterval(id)
+  }, [running, startedAt])
+
+  function updateJob(id: number, patch: Partial<VariantJob>) {
+    setJobs(prev => prev.map(j => j.id === id ? { ...j, ...patch } : j))
+  }
+
+  function handleFile(file: File) {
+    if (!file.type.startsWith('video/')) return
+    const url = URL.createObjectURL(file)
+    setSourceUrl(url)
+    setSourceName(file.name)
+    setJobs([])
+    setTotalDone(0)
+  }
+
+  const onDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    setDragging(false)
+    const f = e.dataTransfer.files[0]
+    if (f) handleFile(f)
+  }, [])
+
+  async function startGeneration() {
+    if (!sourceUrl || running) return
+    abortRef.current = false
+    setRunning(true)
+    setStartedAt(Date.now())
+    setElapsed(0)
+    setTotalDone(0)
+
+    const newJobs: VariantJob[] = Array.from({ length: count }, (_, i) => ({
+      id: i, seed: Date.now() + i * 7919, status: 'queued', progress: 0,
+    }))
+    setJobs(newJobs)
+
+    let done = 0
+    for (let i = 0; i < count; i++) {
+      if (abortRef.current) break
+      const job = newJobs[i]
+      updateJob(job.id, { status: 'processing', progress: 5 })
+
+      const result = await runFfmpegRepurposeWeb({
+        inputPath: sourceUrl,
+        seed: job.seed,
+        intensity,
+        format,
+        onProgress: pct => updateJob(job.id, { progress: pct }),
+      })
+
+      if (result.ok && result.outputPath) {
+        const thumb = await extractThumb(result.outputPath)
+        updateJob(job.id, {
+          status: 'done', progress: 100,
+          outputPath: result.outputPath,
+          similarityPct: result.similarityPct,
+          thumb: thumb ?? undefined,
+        })
+
+        if (saveToBank) {
+          try {
+            const up = await uploadVideoFromPath(result.outputPath, scope)
+            await supabase.from('content_bank').insert({
+              user_id: user.id, org_id: currentOrg?.id ?? null,
+              title: `Repurpose #${String(i + 1).padStart(3, '0')} — ${sourceName}`,
+              file_url: null, storage_path: up.storagePath, thumbnail_path: up.thumbnailPath,
+              folder: bankFolder.trim() || null,
+              tags: [], notes: '',
+            })
+          } catch (e) {
+            console.warn('[repurpose] bank upload failed:', e)
+          }
+        }
+      } else {
+        updateJob(job.id, { status: 'error', error: result.error ?? 'Erreur inconnue' })
+      }
+
+      done++
+      setTotalDone(done)
+    }
+
+    setRunning(false)
+  }
+
+  function stop() {
+    abortRef.current = true
+    setRunning(false)
+  }
+
+  const donePct   = jobs.length > 0 ? Math.round((totalDone / jobs.length) * 100) : 0
+  const avgSim    = jobs.filter(j => j.similarityPct != null).map(j => j.similarityPct!)
+  const avgSimVal = avgSim.length > 0 ? Math.round(avgSim.reduce((a, b) => a + b, 0) / avgSim.length) : null
+  const elapsedStr = elapsed > 60 ? `${Math.floor(elapsed / 60)}m${elapsed % 60}s` : `${elapsed}s`
+
+  return (
+    <div className="anim-page" style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+
+      {/* ── Header ── */}
+      <div style={{ padding: '20px 24px 0', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16 }}>
+          <div>
+            <h1 style={{ fontSize: 20, fontWeight: 700, color: '#F1F0F7', letterSpacing: '-0.02em', marginBottom: 3 }}>
+              Video Repurpose
+            </h1>
+            <p style={{ fontSize: 13, color: 'rgba(148,163,184,0.55)' }}>
+              1 vidéo → N variantes uniques · transformations invisibles à l'œil
+            </p>
+          </div>
+          {/* Stats row */}
+          {jobs.length > 0 && (
+            <div style={{ display: 'flex', gap: 12 }}>
+              {[
+                { label: 'Générées', value: `${totalDone}/${jobs.length}` },
+                { label: 'Similarité', value: avgSimVal != null ? `${avgSimVal}%` : '—' },
+                { label: 'Temps', value: running ? elapsedStr : elapsedStr },
+              ].map(s => (
+                <div key={s.label} style={{
+                  padding: '8px 14px', borderRadius: 10, textAlign: 'center',
+                  background: 'rgba(255,255,255,0.03)',
+                  border: '1px solid rgba(255,255,255,0.07)',
+                }}>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: '#22d3ee', lineHeight: 1 }}>{s.value}</div>
+                  <div style={{ fontSize: 10, color: 'rgba(148,163,184,0.45)', marginTop: 3, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{s.label}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        {/* Global progress bar */}
+        {running && (
+          <div style={{ height: 2, borderRadius: 2, background: 'rgba(255,255,255,0.06)', marginBottom: 16, overflow: 'hidden' }}>
+            <div style={{
+              height: '100%', background: 'linear-gradient(90deg, #22d3ee, #818cf8)',
+              width: `${donePct}%`, transition: 'width 0.5s ease',
+              boxShadow: '0 0 8px rgba(34,211,238,0.5)',
+            }} />
+          </div>
+        )}
+      </div>
+
+      {/* ── Body ── */}
+      <div style={{ flex: 1, overflow: 'hidden', display: 'flex', gap: 0 }}>
+
+        {/* ── LEFT: settings panel ── */}
+        <div style={{
+          width: 280, flexShrink: 0, borderRight: '1px solid rgba(255,255,255,0.06)',
+          overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 14,
+        }}>
+
+          {/* Upload zone */}
+          <div
+            onDrop={onDrop}
+            onDragOver={e => { e.preventDefault(); setDragging(true) }}
+            onDragLeave={() => setDragging(false)}
+            onClick={() => fileInputRef.current?.click()}
+            style={{
+              borderRadius: 14, border: `2px dashed ${dragging ? '#22d3ee' : sourceUrl ? 'rgba(34,211,238,0.3)' : 'rgba(255,255,255,0.1)'}`,
+              background: dragging ? 'rgba(34,211,238,0.05)' : 'rgba(255,255,255,0.02)',
+              padding: 20, cursor: 'pointer', textAlign: 'center', transition: 'all 0.2s',
+              boxShadow: dragging ? '0 0 24px rgba(34,211,238,0.12)' : 'none',
+            }}
+          >
+            <input ref={fileInputRef} type="file" accept="video/*" style={{ display: 'none' }}
+              onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f) }} />
+            {sourceUrl ? (
+              <>
+                <div style={{ fontSize: 24, marginBottom: 6 }}>🎬</div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: '#22d3ee', marginBottom: 2 }}>Vidéo chargée</div>
+                <div style={{ fontSize: 11, color: 'rgba(148,163,184,0.5)', wordBreak: 'break-all' }}>{sourceName.slice(0, 30)}</div>
+                <div style={{ fontSize: 10, color: 'rgba(148,163,184,0.35)', marginTop: 6 }}>Cliquer pour changer</div>
+              </>
+            ) : (
+              <>
+                <div style={{ fontSize: 28, marginBottom: 8, opacity: 0.5 }}>📁</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'rgba(226,232,240,0.7)', marginBottom: 4 }}>
+                  Drop ta vidéo ici
+                </div>
+                <div style={{ fontSize: 11, color: 'rgba(148,163,184,0.4)' }}>MP4, MOV, WebM</div>
+              </>
+            )}
+          </div>
+
+          {/* Count */}
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(148,163,184,0.5)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>
+              Nombre de variantes
+            </div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {[5, 10, 25, 50].map(n => (
+                <button key={n} onClick={() => setCount(n)} disabled={running}
+                  style={{
+                    flex: 1, padding: '7px 0', borderRadius: 8, fontSize: 13, fontWeight: 600,
+                    cursor: 'pointer', border: 'none', transition: 'all 0.15s',
+                    background: count === n ? 'linear-gradient(135deg, rgba(34,211,238,0.2), rgba(129,140,248,0.2))' : 'rgba(255,255,255,0.04)',
+                    color: count === n ? '#22d3ee' : 'rgba(148,163,184,0.6)',
+                    boxShadow: count === n ? '0 0 12px rgba(34,211,238,0.12)' : 'none',
+                    outline: count === n ? '1px solid rgba(34,211,238,0.25)' : '1px solid transparent',
+                  }}
+                >{n}</button>
+              ))}
+            </div>
+            <input type="range" min={1} max={100} value={count} disabled={running}
+              onChange={e => setCount(Number(e.target.value))}
+              style={{ width: '100%', marginTop: 10, accentColor: '#22d3ee' }}
+            />
+            <div style={{ textAlign: 'center', fontSize: 12, color: 'rgba(148,163,184,0.4)', marginTop: 2 }}>{count} variantes</div>
+          </div>
+
+          {/* Intensity */}
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(148,163,184,0.5)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>
+              Intensité des transformations
+            </div>
+            {(['subtle', 'medium', 'aggressive'] as Intensity[]).map(lv => {
+              const meta = {
+                subtle:     { label: 'Subtile', desc: '~97-99% similarité', emoji: '🔵' },
+                medium:     { label: 'Moyenne', desc: '~92-96% similarité', emoji: '🟡' },
+                aggressive: { label: 'Aggressive', desc: '~85-92% similarité', emoji: '🔴' },
+              }[lv]
+              return (
+                <button key={lv} onClick={() => setIntensity(lv)} disabled={running}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    width: '100%', padding: '8px 12px', borderRadius: 9, marginBottom: 5,
+                    cursor: 'pointer', border: 'none', textAlign: 'left', transition: 'all 0.15s',
+                    background: intensity === lv ? 'rgba(34,211,238,0.08)' : 'rgba(255,255,255,0.03)',
+                    outline: intensity === lv ? '1px solid rgba(34,211,238,0.25)' : '1px solid rgba(255,255,255,0.06)',
+                  }}
+                >
+                  <span style={{ fontSize: 14 }}>{meta.emoji}</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: intensity === lv ? '#22d3ee' : 'rgba(226,232,240,0.7)' }}>{meta.label}</div>
+                    <div style={{ fontSize: 10, color: 'rgba(148,163,184,0.4)', marginTop: 1 }}>{meta.desc}</div>
+                  </div>
+                  {intensity === lv && <span style={{ color: '#22d3ee', fontSize: 12 }}>✓</span>}
+                </button>
+              )
+            })}
+          </div>
+
+          {/* Format */}
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(148,163,184,0.5)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>
+              Format de sortie
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 5 }}>
+              {([['9:16', 'TikTok/Reels'], ['1:1', 'Carré'], ['16:9', 'YouTube'], ['keep', 'Original']] as [Format, string][]).map(([f, lbl]) => (
+                <button key={f} onClick={() => setFormat(f)} disabled={running}
+                  style={{
+                    padding: '7px 4px', borderRadius: 8, fontSize: 11, fontWeight: 600,
+                    cursor: 'pointer', border: 'none', transition: 'all 0.15s',
+                    background: format === f ? 'rgba(34,211,238,0.1)' : 'rgba(255,255,255,0.03)',
+                    color: format === f ? '#22d3ee' : 'rgba(148,163,184,0.55)',
+                    outline: format === f ? '1px solid rgba(34,211,238,0.2)' : '1px solid rgba(255,255,255,0.06)',
+                  }}
+                >{lbl}</button>
+              ))}
+            </div>
+          </div>
+
+          {/* Save to Bank */}
+          <div style={{ borderRadius: 10, padding: '10px 12px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: saveToBank ? 10 : 0 }}>
+              <span style={{ fontSize: 12, flex: 1, color: 'rgba(226,232,240,0.7)', fontWeight: 500 }}>☁ Sauvegarder en banque</span>
+              <button onClick={() => setSaveToBank(v => !v)} disabled={running}
+                className="relative w-9 h-5 rounded-full transition-colors flex-shrink-0"
+                style={{ background: saveToBank ? 'linear-gradient(130deg,#22d3ee,#818cf8)' : 'rgba(255,255,255,0.08)', border: 'none', cursor: 'pointer' }}
+              >
+                <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${saveToBank ? 'translate-x-4' : 'translate-x-0.5'}`} />
+              </button>
+            </div>
+            {saveToBank && (
+              <input
+                placeholder="Dossier banque (optionnel)"
+                value={bankFolder} onChange={e => setBankFolder(e.target.value)}
+                style={{
+                  width: '100%', padding: '6px 10px', borderRadius: 7, fontSize: 12,
+                  background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
+                  color: '#e2d9f3', outline: 'none',
+                }}
+              />
+            )}
+          </div>
+
+          {/* Generate button */}
+          <button
+            onClick={running ? stop : startGeneration}
+            disabled={!sourceUrl}
+            style={{
+              width: '100%', padding: '11px 0', borderRadius: 10, fontSize: 13, fontWeight: 700,
+              cursor: sourceUrl ? 'pointer' : 'not-allowed', border: 'none', transition: 'all 0.2s',
+              background: !sourceUrl
+                ? 'rgba(255,255,255,0.05)'
+                : running
+                  ? 'rgba(239,68,68,0.15)'
+                  : 'linear-gradient(135deg, rgba(34,211,238,0.25), rgba(129,140,248,0.25))',
+              color: !sourceUrl ? 'rgba(148,163,184,0.3)' : running ? '#f87171' : '#22d3ee',
+              boxShadow: sourceUrl && !running ? '0 0 20px rgba(34,211,238,0.15)' : 'none',
+              outline: sourceUrl ? `1px solid ${running ? 'rgba(239,68,68,0.25)' : 'rgba(34,211,238,0.3)'}` : 'none',
+            }}
+          >
+            {running ? `⏹ Arrêter (${totalDone}/${jobs.length})` : `⚡ Générer ${count} variante${count > 1 ? 's' : ''}`}
+          </button>
+
+        </div>
+
+        {/* ── RIGHT: variants grid ── */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px' }}>
+          {jobs.length === 0 ? (
+            <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', gap: 12 }}>
+              {/* Hero empty state */}
+              <div style={{ position: 'relative', width: 80, height: 80, margin: '0 auto 8px' }}>
+                {/* Orbit decoration */}
+                <div style={{
+                  position: 'absolute', inset: -12, borderRadius: '50%',
+                  border: '1px dashed rgba(34,211,238,0.2)',
+                  animation: 'orbit-spin 12s linear infinite',
+                }} />
+                <div style={{
+                  width: '100%', height: '100%', borderRadius: '50%',
+                  background: 'radial-gradient(circle at 40% 35%, rgba(34,211,238,0.12), rgba(129,140,248,0.08))',
+                  border: '1px solid rgba(34,211,238,0.15)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 32,
+                }}>⚡</div>
+              </div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: 'rgba(226,232,240,0.6)' }}>
+                Upload une vidéo & génère tes variantes
+              </div>
+              <div style={{ fontSize: 13, color: 'rgba(148,163,184,0.4)', maxWidth: 360, lineHeight: 1.6 }}>
+                Chaque variante reçoit des micro-transformations invisibles à l'œil :
+                couleur, audio, bruit, crop, encodage — hash unique garanti.
+              </div>
+              <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
+                {['🎨 Couleur', '🔊 Audio', '🌀 Bruit', '✂️ Crop', '📦 Encodage', '🔐 Hash unique'].map(t => (
+                  <span key={t} style={{
+                    padding: '4px 10px', borderRadius: 20, fontSize: 11, fontWeight: 500,
+                    background: 'rgba(34,211,238,0.06)', color: 'rgba(34,211,238,0.7)',
+                    border: '1px solid rgba(34,211,238,0.12)',
+                  }}>{t}</span>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+              gap: 10,
+            }}>
+              {jobs.map((job, i) => (
+                <VariantCard key={job.id} job={job} index={i} />
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── CSS for spinner ── */}
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </div>
+  )
+}

@@ -53,7 +53,7 @@ function SFLogo({ size = 28 }: { size?: number }) {
 export type Page =
   | 'dashboard' | 'phones' | 'monitor'
   | 'stats' | 'posting' | 'massposting' | 'scheduler' | 'bank' | 'aitools' | 'warmup'
-  | 'montage' | 'remix' | 'textcopy'
+  | 'montage' | 'remix' | 'textcopy' | 'repurpose'
   | 'community' | 'support'
   | 'settings' | 'licences'
 
@@ -95,9 +95,10 @@ const NAV_SECTIONS: NavSection[] = [
     title: 'Montage',
     defaultOpen: true,
     items: [
-      { id: 'montage',  label: 'Montage vidéo',  icon: '✂' },
-      { id: 'remix',    label: 'Remix vidéo',    icon: '🔀' },
-      { id: 'textcopy', label: 'Texte IA',        icon: '✍', beta: true },
+      { id: 'montage',   label: 'Montage vidéo',  icon: '✂' },
+      { id: 'remix',     label: 'Remix vidéo',    icon: '🔀' },
+      { id: 'repurpose', label: 'Repurpose',       icon: '⚡', isNew: true },
+      { id: 'textcopy',  label: 'Texte IA',        icon: '✍', beta: true },
     ],
   },
 ]
@@ -147,6 +148,7 @@ const PAGE_ICON: Record<string, IconKey> = {
   aitools:     'sparkles',
   montage:     'scissors',
   remix:       'refresh',
+  repurpose:   'zap',
   textcopy:    'edit',
 }
 
@@ -590,12 +592,20 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
         {/* Nebula blobs inside sidebar */}
         <div className="space-nebula" style={{ width: 120, height: 120, top: -30, left: -30, background: 'rgba(99,57,196,0.18)', '--dur': '7s' } as React.CSSProperties} />
         <div className="space-nebula" style={{ width: 80, height: 80, bottom: 80, right: -20, background: 'rgba(14,116,144,0.12)', '--dur': '9s' } as React.CSSProperties} />
-        {/* Twinkling stars */}
-        <div className="space-star" style={{ width: 2, height: 2, top: '18%', right: 12, '--dur': '2.8s', '--delay': '0s', '--drift': '5s' } as React.CSSProperties} />
-        <div className="space-star" style={{ width: 1.5, height: 1.5, top: '42%', right: 8, '--dur': '3.5s', '--delay': '1.1s', '--drift': '7s' } as React.CSSProperties} />
-        <div className="space-star" style={{ width: 2, height: 2, top: '67%', right: 16, '--dur': '4s', '--delay': '0.6s', '--drift': '6s' } as React.CSSProperties} />
-        <div className="space-star" style={{ width: 1, height: 1, top: '30%', left: 14, '--dur': '3s', '--delay': '1.8s', '--drift': '8s' } as React.CSSProperties} />
-        <div className="space-star" style={{ width: 1.5, height: 1.5, top: '78%', left: 10, '--dur': '2.2s', '--delay': '0.4s', '--drift': '4s' } as React.CSSProperties} />
+        <div className="space-nebula" style={{ width: 60, height: 60, top: '50%', left: '30%', background: 'rgba(139,92,246,0.08)', '--dur': '11s' } as React.CSSProperties} />
+        {/* Twinkling stars — scattered across full sidebar height */}
+        <div className="space-star" style={{ width: 2,   height: 2,   top:  '8%', right: 18, '--dur': '2.8s', '--delay': '0s',   '--drift': '5s'  } as React.CSSProperties} />
+        <div className="space-star" style={{ width: 1.5, height: 1.5, top: '15%', left: 22, '--dur': '3.9s', '--delay': '0.7s', '--drift': '7s'  } as React.CSSProperties} />
+        <div className="space-star" style={{ width: 1,   height: 1,   top: '22%', right: 30, '--dur': '5.1s', '--delay': '1.4s', '--drift': '9s'  } as React.CSSProperties} />
+        <div className="space-star" style={{ width: 2.5, height: 2.5, top: '30%', left: 14, '--dur': '3s',   '--delay': '0.2s', '--drift': '6s'  } as React.CSSProperties} />
+        <div className="space-star" style={{ width: 1.5, height: 1.5, top: '38%', right: 8,  '--dur': '3.5s', '--delay': '1.1s', '--drift': '7s'  } as React.CSSProperties} />
+        <div className="space-star" style={{ width: 1,   height: 1,   top: '47%', left: 35, '--dur': '4.3s', '--delay': '2.3s', '--drift': '8s'  } as React.CSSProperties} />
+        <div className="space-star" style={{ width: 2,   height: 2,   top: '55%', right: 22, '--dur': '2.6s', '--delay': '0.9s', '--drift': '5s'  } as React.CSSProperties} />
+        <div className="space-star" style={{ width: 1,   height: 1,   top: '63%', left: 18, '--dur': '6s',   '--delay': '1.7s', '--drift': '10s' } as React.CSSProperties} />
+        <div className="space-star" style={{ width: 2,   height: 2,   top: '70%', right: 16, '--dur': '4s',   '--delay': '0.6s', '--drift': '6s'  } as React.CSSProperties} />
+        <div className="space-star" style={{ width: 1.5, height: 1.5, top: '78%', left: 10, '--dur': '2.2s', '--delay': '0.4s', '--drift': '4s'  } as React.CSSProperties} />
+        <div className="space-star" style={{ width: 1,   height: 1,   top: '85%', right: 28, '--dur': '4.7s', '--delay': '3.1s', '--drift': '8s'  } as React.CSSProperties} />
+        <div className="space-star" style={{ width: 2,   height: 2,   top: '92%', left: 26, '--dur': '3.3s', '--delay': '1.5s', '--drift': '5s'  } as React.CSSProperties} />
         {/* ── Logo area ─────────────────────────────────────────────────── */}
         <div style={{ height: 56, display: 'flex', alignItems: 'center', gap: 10, padding: '0 10px', flexShrink: 0 }}>
           {/* Logo box with orbit ring */}
