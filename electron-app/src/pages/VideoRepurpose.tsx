@@ -17,7 +17,7 @@ type JobStatus  = 'queued' | 'processing' | 'done' | 'error'
 interface VariantJob {
   id: number; seed: number; status: JobStatus; progress: number
   outputPath?: string; similarityPct?: number; transforms?: string[]
-  error?: string; thumb?: string
+  error?: string; thumb?: string; uploading?: boolean; uploadError?: string
 }
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -118,8 +118,10 @@ function VariantCard({ job, index }: { job: VariantJob; index: number }) {
       <div style={{ padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 5 }}>
         {isDone && job.similarityPct != null && <SimilarityBadge pct={job.similarityPct} />}
         {isErr && <div style={{ fontSize: 10, color: '#f87171', fontWeight: 500 }}>{job.error?.slice(0, 60)}</div>}
-        {isQ   && <div style={{ fontSize: 10, color: 'rgba(148,163,184,0.35)' }}>En attente…</div>}
+        {isQ    && <div style={{ fontSize: 10, color: 'rgba(148,163,184,0.35)' }}>En attente…</div>}
         {isProc && <div style={{ fontSize: 10, color: '#22d3ee' }}>Traitement…</div>}
+        {isDone && job.uploading && <div style={{ fontSize: 9, color: 'rgba(34,211,238,0.6)' }}>☁ Upload…</div>}
+        {isDone && job.uploadError && <div style={{ fontSize: 9, color: '#f87171' }}>⚠ {job.uploadError.slice(0, 40)}</div>}
 
         {/* Transform pills */}
         {isDone && job.transforms && job.transforms.length > 0 && (
@@ -250,15 +252,21 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
         })
 
         if (isWeb || saveToBank) {
+          updateJob(job.id, { uploading: true })
           try {
             const up = await uploadVideoFromPath(result.outputPath, scope)
-            await supabase.from('content_bank').insert({
+            const { error: dbErr } = await supabase.from('content_bank').insert({
               user_id: user.id, org_id: currentOrg?.id ?? null,
               title: `CloneVid #${String(i + 1).padStart(3, '0')} — ${sourceName}`,
               file_url: null, storage_path: up.storagePath, thumbnail_path: up.thumbnailPath,
               folder: bankFolder.trim() || null, tags: [], notes: '',
             })
-          } catch (e) { console.warn('[clonevid] bank upload failed:', e) }
+            if (dbErr) throw new Error(dbErr.message)
+            updateJob(job.id, { uploading: false })
+          } catch (e) {
+            console.error('[clonevid] bank upload failed:', e)
+            updateJob(job.id, { uploading: false, uploadError: String(e instanceof Error ? e.message : e) })
+          }
         }
       } else {
         updateJob(job.id, { status: 'error', error: result.error ?? 'Erreur inconnue' })
