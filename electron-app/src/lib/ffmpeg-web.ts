@@ -1029,12 +1029,11 @@ function seededRng(seed: number) {
 // Applies invisible micro-transforms so each export has a different hash/signature
 // while remaining perceptually identical to the source video.
 export async function runFfmpegRepurposeWeb(opts: {
-  inputPath:    string
-  seed:         number
-  intensity:    'subtle' | 'medium' | 'aggressive'
-  format:       '9:16' | '1:1' | '16:9' | 'keep'
-  colorPreset?: 'off' | 'warm' | 'cool' | 'cinema' | 'bw'
-  onProgress?:  (pct: number) => void
+  inputPath:   string
+  seed:        number
+  intensity:   'subtle' | 'medium' | 'aggressive'
+  format:      '9:16' | '1:1' | '16:9' | 'keep'
+  onProgress?: (pct: number) => void
 }): Promise<{ ok: boolean; outputPath?: string; similarityPct?: number; transformSummary?: string[]; error?: string }> {
   const FILES = ['rp_in.mp4', 'rp_out.mp4']
 
@@ -1060,15 +1059,15 @@ export async function runFfmpegRepurposeWeb(opts: {
   const volume     = 1 + sign() * rng(0, ranges.vol)
   const crf        = Math.round(22 + rng(0, ranges.crf))
 
-  // Color preset — subtle overlay on top of random transforms
-  const cp = opts.colorPreset ?? 'off'
-  const colorAdj = {
-    off:    { gr: 1.00, gg: 1.00, gb: 1.00, satD: 0,     conD: 0,    label: null as string | null },
-    warm:   { gr: 1.04, gg: 1.01, gb: 0.96, satD: 0.025, conD: 0,    label: '🟠 Chaud' },
-    cool:   { gr: 0.96, gg: 1.00, gb: 1.05, satD: 0,     conD: 0,    label: '🔵 Froid' },
-    cinema: { gr: 1.01, gg: 0.99, gb: 0.96, satD: -0.07, conD: 0.05, label: '🎬 Ciné' },
-    bw:     { gr: 1.00, gg: 1.00, gb: 1.00, satD: -0.65, conD: 0.03, label: '🌫 Doux' },
-  }[cp]
+  // Color preset chosen automatically from seed (very subtle)
+  const colorPresets = [
+    { gr: 1.00, gg: 1.00, gb: 1.00, satD: 0,     conD: 0,    label: null as string | null },
+    { gr: 1.03, gg: 1.01, gb: 0.97, satD: 0.02,  conD: 0,    label: '🟠 Chaud' },
+    { gr: 0.97, gg: 1.00, gb: 1.04, satD: 0,     conD: 0,    label: '🔵 Froid' },
+    { gr: 1.01, gg: 0.99, gb: 0.97, satD: -0.05, conD: 0.04, label: '🎬 Ciné' },
+    { gr: 1.00, gg: 1.00, gb: 1.00, satD: -0.5,  conD: 0.02, label: '🌫 Doux' },
+  ]
+  const colorAdj = colorPresets[Math.floor(rng(0, colorPresets.length))]
 
   // Similarity estimate
   const similarityPct = Math.round(100 - (
