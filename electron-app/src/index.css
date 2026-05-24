@@ -11,6 +11,11 @@ html, body, #root {
   color: #FFFFFF;
   font-family: 'Inter', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
+  /* Very subtle nebula blobs fixed in viewport */
+  background-image:
+    radial-gradient(ellipse 600px 400px at 15% 20%,  rgba(99,57,196,0.07)  0%, transparent 70%),
+    radial-gradient(ellipse 500px 350px at 85% 75%,  rgba(14,116,144,0.06) 0%, transparent 70%),
+    radial-gradient(ellipse 400px 300px at 55% 50%,  rgba(76,29,149,0.05)  0%, transparent 70%);
 }
 
 /* ── Scrollbar ──────────────────────────────────────────────────────────────── */
@@ -1610,3 +1615,101 @@ html[data-theme="light"] canvas { filter: invert(1) hue-rotate(180deg); }
 @media (max-width: 1100px) { .sf-grid-4 { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width:  800px) { .sf-grid-3, .sf-grid-4 { grid-template-columns: 1fr 1fr; } }
 @media (max-width:  560px) { .sf-grid-2, .sf-grid-3, .sf-grid-4 { grid-template-columns: 1fr; } }
+
+/* ── Space theme ─────────────────────────────────────────────────────────────── */
+
+/* Star twinkle */
+@keyframes star-twinkle {
+  0%,100% { opacity: 0.15; transform: scale(1); }
+  50%      { opacity: 0.85; transform: scale(1.4); }
+}
+@keyframes star-drift {
+  0%   { transform: translateY(0)   translateX(0); }
+  50%  { transform: translateY(-3px) translateX(1px); }
+  100% { transform: translateY(0)   translateX(0); }
+}
+@keyframes orbit-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+@keyframes nebula-pulse {
+  0%,100% { opacity: 0.5; }
+  50%      { opacity: 0.85; }
+}
+@keyframes comet-trail {
+  0%   { width: 2px; opacity: 0; }
+  40%  { width: 18px; opacity: 0.7; }
+  100% { width: 2px; opacity: 0; }
+}
+
+/* Sidebar stars — three twinkling dots scattered in sidebar */
+.space-star {
+  position: absolute;
+  border-radius: 50%;
+  background: #fff;
+  pointer-events: none;
+  animation: star-twinkle var(--dur, 3s) ease-in-out var(--delay, 0s) infinite,
+             star-drift    var(--drift, 6s) ease-in-out var(--delay, 0s) infinite;
+}
+
+/* Orbit ring around logo */
+.space-orbit {
+  position: absolute;
+  border-radius: 50%;
+  border: 1px solid rgba(139,92,246,0.25);
+  animation: orbit-spin var(--speed, 8s) linear infinite;
+  pointer-events: none;
+}
+.space-orbit::before {
+  content: '';
+  position: absolute;
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #22d3ee, #818cf8);
+  box-shadow: 0 0 6px 2px rgba(34,211,238,0.5);
+  top: -2.5px; left: 50%; transform: translateX(-50%);
+}
+
+/* Comet active indicator — appended to active sidebar item */
+.space-comet {
+  position: absolute;
+  left: 0; top: 50%; transform: translateY(-50%);
+  height: 2px; border-radius: 2px;
+  background: linear-gradient(90deg, transparent, #22d3ee, #a78bfa);
+  animation: comet-trail 2.4s ease-in-out infinite;
+}
+
+/* Nebula glow blob behind sidebar */
+.space-nebula {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  filter: blur(40px);
+  animation: nebula-pulse var(--dur, 5s) ease-in-out infinite;
+}
+
+/* Section label with ✦ */
+.space-section-label::before {
+  content: '✦';
+  margin-right: 5px;
+  font-size: 8px;
+  opacity: 0.45;
+  color: #818cf8;
+  vertical-align: middle;
+}
+
+/* Cyan accent for active nav */
+.space-nav-active-glow {
+  box-shadow: 0 0 12px rgba(139,92,246,0.6), 0 0 24px rgba(34,211,238,0.15);
+}
+
+/* Subtle grid/constellation lines on header */
+.space-header-line {
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(99,57,196,0.35) 20%,
+    rgba(34,211,238,0.25) 50%,
+    rgba(99,57,196,0.35) 80%,
+    transparent 100%
+  );
+}

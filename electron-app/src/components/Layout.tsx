@@ -24,21 +24,21 @@ function SFLogo({ size = 28 }: { size?: number }) {
     <svg width={size} height={size} viewBox="0 0 100 100" fill="none" overflow="visible">
       <defs>
         <linearGradient id="sfl-g" x1="50" y1="5" x2="50" y2="95" gradientUnits="userSpaceOnUse">
-          <stop offset="0%"   stopColor="#60a5fa"/>
+          <stop offset="0%"   stopColor="#22d3ee"/>
           <stop offset="45%"  stopColor="#818cf8"/>
           <stop offset="100%" stopColor="#a855f7"/>
         </linearGradient>
         <filter id="sfl-glow" x="-60%" y="-60%" width="220%" height="220%" colorInterpolationFilters="sRGB">
           <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur"/>
           <feColorMatrix in="blur" type="matrix"
-            values="0 0 0 0 0.38  0 0 0 0 0.25  0 0 0 0 1   0 0 0 1 0" result="colored"/>
+            values="0 0 0 0 0.13  0 0 0 0 0.83  0 0 0 0 0.93   0 0 0 1 0" result="colored"/>
           <feMerge><feMergeNode in="colored"/><feMergeNode in="SourceGraphic"/></feMerge>
         </filter>
       </defs>
       {/* Glow halo */}
       <path
         d="M 66 22 C 76 8 60 3 42 3 C 20 3 12 18 12 32 C 12 46 26 52 46 55 C 66 58 82 65 82 79 C 82 93 68 97 50 97 C 32 97 18 89 16 76"
-        stroke="#7c3aed" strokeWidth="22" strokeLinecap="round" fill="none" opacity="0.35"
+        stroke="#0e7490" strokeWidth="22" strokeLinecap="round" fill="none" opacity="0.3"
       />
       {/* Main S */}
       <path
@@ -153,22 +153,24 @@ const PAGE_ICON: Record<string, IconKey> = {
 // Section label component
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{
+    <div className="space-section-label" style={{
       padding: '10px 12px 4px',
-      fontSize: 11,
-      fontWeight: 600,
+      fontSize: 10,
+      fontWeight: 700,
       textTransform: 'uppercase',
-      letterSpacing: '0.08em',
-      color: 'rgba(148,163,184,0.4)',
+      letterSpacing: '0.1em',
+      color: 'rgba(129,140,248,0.45)',
     }}>
       {children}
     </div>
   )
 }
 
-// Sidebar divider
+// Sidebar divider — subtle cosmic gradient
 function SidebarDivider() {
-  return <div style={{ height: 1, background: 'rgba(255,255,255,0.07)', margin: '4px 0' }} />
+  return (
+    <div style={{ height: 1, margin: '4px 6px', background: 'linear-gradient(90deg, transparent, rgba(99,57,196,0.25), rgba(14,116,144,0.15), transparent)' }} />
+  )
 }
 
 
@@ -460,7 +462,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             cursor: 'pointer',
             border: 'none',
             background: active
-              ? 'rgba(139,92,246,0.1)'
+              ? 'linear-gradient(90deg, rgba(34,211,238,0.06), rgba(139,92,246,0.1))'
               : hovered ? 'rgba(255,255,255,0.045)' : 'transparent',
             color: active ? '#F1F0F7' : hovered ? 'rgba(241,240,247,0.88)' : 'rgba(148,163,184,0.65)',
             transition: 'background 140ms ease, color 140ms ease',
@@ -471,22 +473,22 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             outline: 'none',
           }}
         >
-          {/* Active animated indicator bar */}
+          {/* Active animated indicator — comet-style */}
           {active && (
             <span style={{
               position: 'absolute',
               left: 0, top: 7, bottom: 7,
               width: 2,
               borderRadius: '0 2px 2px 0',
-              background: 'linear-gradient(180deg, #A78BFA, #7C3AED)',
-              boxShadow: '0 0 10px rgba(139,92,246,0.8)',
+              background: 'linear-gradient(180deg, #22d3ee, #818cf8, #7C3AED)',
+              boxShadow: '0 0 8px rgba(34,211,238,0.7), 0 0 16px rgba(139,92,246,0.4)',
               animation: 'sf-nav-active 0.22s cubic-bezier(0.22,1,0.36,1) both',
             }} />
           )}
           <span style={{
             flexShrink: 0,
             display: 'flex',
-            color: active ? '#8B5CF6' : hovered ? 'rgba(196,181,253,0.65)' : 'rgba(148,163,184,0.45)',
+            color: active ? '#22d3ee' : hovered ? 'rgba(196,181,253,0.65)' : 'rgba(148,163,184,0.45)',
             transition: 'color 140ms ease',
           }}>
             <NavIcon d={ICONS[iconKey]} size={16} />
@@ -578,30 +580,47 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
           flexShrink: 0,
           display: isMobile ? 'none' : 'flex',
           flexDirection: 'column',
-          background: 'linear-gradient(180deg, #0B0B15 0%, #080810 100%)',
-          borderRight: '1px solid rgba(255,255,255,0.065)',
+          background: 'linear-gradient(180deg, #090912 0%, #07070F 60%, #060610 100%)',
+          borderRight: '1px solid rgba(99,57,196,0.18)',
           transition: 'width 0.28s cubic-bezier(0.4,0,0.2,1)',
           overflow: 'hidden',
           position: 'relative',
         }}
       >
+        {/* Nebula blobs inside sidebar */}
+        <div className="space-nebula" style={{ width: 120, height: 120, top: -30, left: -30, background: 'rgba(99,57,196,0.18)', '--dur': '7s' } as React.CSSProperties} />
+        <div className="space-nebula" style={{ width: 80, height: 80, bottom: 80, right: -20, background: 'rgba(14,116,144,0.12)', '--dur': '9s' } as React.CSSProperties} />
+        {/* Twinkling stars */}
+        <div className="space-star" style={{ width: 2, height: 2, top: '18%', right: 12, '--dur': '2.8s', '--delay': '0s', '--drift': '5s' } as React.CSSProperties} />
+        <div className="space-star" style={{ width: 1.5, height: 1.5, top: '42%', right: 8, '--dur': '3.5s', '--delay': '1.1s', '--drift': '7s' } as React.CSSProperties} />
+        <div className="space-star" style={{ width: 2, height: 2, top: '67%', right: 16, '--dur': '4s', '--delay': '0.6s', '--drift': '6s' } as React.CSSProperties} />
+        <div className="space-star" style={{ width: 1, height: 1, top: '30%', left: 14, '--dur': '3s', '--delay': '1.8s', '--drift': '8s' } as React.CSSProperties} />
+        <div className="space-star" style={{ width: 1.5, height: 1.5, top: '78%', left: 10, '--dur': '2.2s', '--delay': '0.4s', '--drift': '4s' } as React.CSSProperties} />
         {/* ── Logo area ─────────────────────────────────────────────────── */}
         <div style={{ height: 56, display: 'flex', alignItems: 'center', gap: 10, padding: '0 10px', flexShrink: 0 }}>
-          {/* Logo box */}
-          <div style={{
-            width: 28, height: 28, borderRadius: 8, flexShrink: 0,
-            background: 'rgba(139,92,246,0.12)',
-            border: '1px solid rgba(139,92,246,0.25)',
-            boxShadow: '0 0 12px rgba(139,92,246,0.2)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <SFLogo size={18} />
+          {/* Logo box with orbit ring */}
+          <div style={{ position: 'relative', width: 28, height: 28, flexShrink: 0 }}>
+            {/* Orbit ring */}
+            <div className="space-orbit" style={{
+              width: 40, height: 40,
+              top: -6, left: -6,
+              '--speed': '9s',
+            } as React.CSSProperties} />
+            <div style={{
+              width: 28, height: 28, borderRadius: 8, position: 'relative', zIndex: 1,
+              background: 'rgba(34,211,238,0.08)',
+              border: '1px solid rgba(34,211,238,0.2)',
+              boxShadow: '0 0 14px rgba(34,211,238,0.15), 0 0 28px rgba(99,57,196,0.1)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <SFLogo size={18} />
+            </div>
           </div>
 
           {!collapsed && (
             <span style={{ flex: 1, fontSize: 14, fontWeight: 700, letterSpacing: '-0.02em', whiteSpace: 'nowrap', overflow: 'hidden' }}>
-              <span style={{ color: '#F1F0F7' }}>Scale</span>
-              <span style={{ background: 'linear-gradient(90deg, #8B5CF6, #A78BFA)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Flow</span>
+              <span style={{ background: 'linear-gradient(90deg, #e2e8f0, #cbd5e1)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Scale</span>
+              <span style={{ background: 'linear-gradient(90deg, #22d3ee, #818cf8, #a78bfa)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Flow</span>
             </span>
           )}
 
@@ -848,7 +867,8 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             {/* Avatar pill */}
             <div style={{
               width: 28, height: 28, borderRadius: '50%',
-              background: 'linear-gradient(135deg, #7C3AED, #EC4899)',
+              background: 'linear-gradient(135deg, #0e7490, #7C3AED)',
+              boxShadow: '0 0 8px rgba(34,211,238,0.2)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontSize: 11, fontWeight: 700, color: '#fff', flexShrink: 0,
             }}>
@@ -870,12 +890,13 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
         {/* ── Topbar ──────────────────────────────────────────────────────── */}
         <header style={{
           height: 48, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 12, padding: '0 20px',
-          background: 'rgba(7,7,12,0.92)',
+          background: 'rgba(6,6,14,0.94)',
           backdropFilter: 'blur(20px) saturate(1.3)',
           WebkitBackdropFilter: 'blur(20px) saturate(1.3)',
-          borderBottom: '1px solid rgba(255,255,255,0.07)',
+          borderBottom: '1px solid transparent',
+          borderImage: 'linear-gradient(90deg, rgba(99,57,196,0.2), rgba(34,211,238,0.15), rgba(99,57,196,0.2)) 1',
           position: 'relative', zIndex: 10,
-          boxShadow: '0 1px 0 rgba(139,92,246,0.04)',
+          boxShadow: '0 1px 24px rgba(34,211,238,0.03)',
         }}>
 
           {/* Left: page title + breadcrumb */}
