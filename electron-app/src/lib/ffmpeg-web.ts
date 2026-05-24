@@ -402,7 +402,7 @@ export async function runFfmpegRemixWeb(opts: {
   blendMode:     'screen' | 'multiply'
   preset:        '9:16' | '1:1' | '16:9'
 }): Promise<{ ok: boolean; outputPath?: string; command?: string; error?: string }> {
-  const FILES = ['orig.mp4', 'new1.mp4', 'remix_out.mov']
+  const FILES = ['orig.mp4', 'new1.mp4', 'remix_out.mp4']
   const ff = await getFFmpeg()
   for (const f of FILES) await ff.deleteFile(f).catch(() => {})
   try {
@@ -441,10 +441,11 @@ export async function runFfmpegRemixWeb(opts: {
       '-filter_complex', filterComplex,
       '-map', '[vout]', '-map', '[aout]',
       '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23',
+      '-pix_fmt', 'yuv420p', '-profile:v', 'main', '-level', '4.0',
       '-c:a', 'aac', '-b:a', '128k',
-      '-movflags', '+faststart', '-y', 'remix_out.mov',
+      '-movflags', '+faststart', '-y', 'remix_out.mp4',
     ])
-    const url = await readOutput(ff, 'remix_out.mov', 'video/quicktime')
+    const url = await readOutput(ff, 'remix_out.mp4', 'video/mp4')
     return { ok: true, outputPath: url }
   } catch (err) {
     if (isWasmCrash(err)) resetFFmpeg()
@@ -723,7 +724,7 @@ async function runFfmpegRemixAIWasm(opts: {
 }): Promise<{ ok: boolean; outputPath?: string; error?: string }> {
   const hasPhase2  = opts.splitTime != null && opts.splitTime > 0
   const overlayFiles = opts.textOverlays.map((_, i) => `ai_ov${i}.png`)
-  const FILES = ['ai_orig.mp4', 'ai_new1.mp4', 'ai_out.mov', ...overlayFiles]
+  const FILES = ['ai_orig.mp4', 'ai_new1.mp4', 'ai_out.mp4', ...overlayFiles]
   const ff = await getFFmpeg()
   for (const f of FILES) await ff.deleteFile(f).catch(() => {})
   const ffLogs: string[] = []
@@ -778,10 +779,11 @@ async function runFfmpegRemixAIWasm(opts: {
       '-filter_complex', chains.join(';'),
       '-map', '[vout]', '-map', '[aout]',
       '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23',
+      '-pix_fmt', 'yuv420p', '-profile:v', 'main', '-level', '4.0',
       '-c:a', 'aac', '-b:a', '128k',
-      '-movflags', '+faststart', '-y', 'ai_out.mov',
+      '-movflags', '+faststart', '-y', 'ai_out.mp4',
     ])
-    const url = await readOutput(ff, 'ai_out.mov', 'video/quicktime')
+    const url = await readOutput(ff, 'ai_out.mp4', 'video/mp4')
     return { ok: true, outputPath: url }
   } catch (err) {
     if (isWasmCrash(err)) resetFFmpeg()
@@ -817,45 +819,33 @@ export async function runFfmpegRemixAIWeb(opts: {
     try {
       const { blob, mimeType } = await remixViaMediaRecorder({ ...opts, splitTime })
 
-      // If browser gave us native MP4, return directly
-      if (mimeType.startsWith('video/mp4')) {
-        return { ok: true, outputPath: URL.createObjectURL(blob) }
-      }
-
-      // WebM with H.264 → fast remux to MP4 via WASM (-c copy, no re-encode)
-      if (mimeType.includes('h264')) {
-        try {
-          return await withFfmpegLock(async () => {
-            const ff = await getFFmpeg()
-            await ff.deleteFile('mr_in.webm').catch(() => {})
-            await ff.deleteFile('mr_out.mov').catch(() => {})
-            await ff.writeFile('mr_in.webm', new Uint8Array(await blob.arrayBuffer()))
-            await ff.exec(['-nostdin', '-i', 'mr_in.webm', '-c', 'copy', '-movflags', '+faststart', '-y', 'mr_out.mov'])
-            const url = await readOutput(ff, 'mr_out.mov', 'video/quicktime')
-            await ff.deleteFile('mr_in.webm').catch(() => {})
-            await ff.deleteFile('mr_out.mov').catch(() => {})
-            return { ok: true, outputPath: url }
-          })
-        } catch {
-          // Remux failed → return WebM blob as-is (GéeLark may accept it)
-          return { ok: true, outputPath: URL.createObjectURL(blob) }
-        }
-      }
-
-      // VP9/VP8 WebM → must transcode to H.264 MP4 for Instagram compatibility
+      // All MediaRecorder output goes through FFmpeg to fix timestamps, pixel format,
+      // and container for maximum Instagram/Android compatibility.
       try {
         return await withFfmpegLock(async () => {
           const ff = await getFFmpeg()
-          await ff.deleteFile('mr_in.webm').catch(() => {})
-          await ff.deleteFile('mr_out.mov').catch(() => {})
-          await ff.writeFile('mr_in.webm', new Uint8Array(await blob.arrayBuffer()))
-          await ff.exec(['-nostdin', '-i', 'mr_in.webm',
-            '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23',
-            '-c:a', 'aac', '-b:a', '128k',
-            '-movflags', '+faststart', '-y', 'mr_out.mov'])
-          const url = await readOutput(ff, 'mr_out.mov', 'video/quicktime')
-          await ff.deleteFile('mr_in.webm').catch(() => {})
-          await ff.deleteFile('mr_out.mov').catch(() => {})
+          const inName  = mimeType.startsWith('video/mp4') ? 'mr_in.mp4' : 'mr_in.webm'
+          await ff.deleteFile(inName).catch(() => {})
+          await ff.deleteFile('mr_out.mp4').catch(() => {})
+          await ff.writeFile(inName, new Uint8Array(await blob.arrayBuffer()))
+
+          if (mimeType.includes('h264') && !mimeType.startsWith('video/mp4')) {
+            // H.264 WebM → fast remux to MP4 (no re-encode, but fix timestamps)
+            await ff.exec(['-nostdin', '-fflags', '+genpts', '-i', inName,
+              '-c', 'copy', '-pix_fmt', 'yuv420p',
+              '-movflags', '+faststart', '-y', 'mr_out.mp4'])
+          } else {
+            // VP9/VP8 WebM or native MP4 → full transcode to H.264 MP4
+            await ff.exec(['-nostdin', '-fflags', '+genpts', '-i', inName,
+              '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23',
+              '-pix_fmt', 'yuv420p', '-profile:v', 'main', '-level', '4.0',
+              '-c:a', 'aac', '-b:a', '128k',
+              '-movflags', '+faststart', '-y', 'mr_out.mp4'])
+          }
+
+          const url = await readOutput(ff, 'mr_out.mp4', 'video/mp4')
+          await ff.deleteFile(inName).catch(() => {})
+          await ff.deleteFile('mr_out.mp4').catch(() => {})
           return { ok: true, outputPath: url }
         })
       } catch {
