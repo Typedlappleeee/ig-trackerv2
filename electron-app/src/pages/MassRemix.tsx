@@ -125,86 +125,65 @@ function wrapText(text: string, fontSize: number, frameW = 1080): string[] {
   return lines.length ? lines : [text]
 }
 
-function VideoListPanel({
-  label, paths, accent, loading, onAddBank, onAddPC, onAddFolder, onRemove,
+function VideoSourcePanel({
+  title, phase, accent, paths, loading,
+  onAddBank, onAddPC, onAddFolder, onRemove,
 }: {
-  label: string; paths: string[]; accent: string; loading?: boolean
+  title: string; phase: string; accent: string; paths: string[]; loading?: boolean
   onAddBank: () => void; onAddPC: () => void; onAddFolder: () => void; onRemove: (i: number) => void
 }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-          <div style={{ width: 3, height: 18, borderRadius: 99, background: accent, flexShrink: 0 }} />
-          <p style={{ fontSize: 13, fontWeight: 700, color: '#F1F0F7' }}>{label}</p>
-        </div>
-        <span style={{
-          fontSize: 11, fontWeight: 800, padding: '2px 9px', borderRadius: 99,
-          background: paths.length > 0 ? `${accent}1a` : 'rgba(255,255,255,0.05)',
-          color: paths.length > 0 ? accent : 'rgba(148,163,184,0.35)',
-          border: `1px solid ${paths.length > 0 ? `${accent}28` : 'rgba(255,255,255,0.06)'}`,
-        }}>
-          {paths.length} vidéo{paths.length !== 1 ? 's' : ''}
-        </span>
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', borderRadius: 14, border: `1px solid ${accent}28`, background: `${accent}06`, overflow: 'hidden', minHeight: 0, minWidth: 0 }}>
+      {/* Panel header */}
+      <div style={{ padding: '10px 13px', borderBottom: `1px solid ${accent}16`, display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+        <div style={{ width: 3, height: 13, borderRadius: 99, background: accent, flexShrink: 0 }} />
+        <p style={{ fontSize: 12, fontWeight: 700, color: '#F1F0F7', flex: 1 }}>{title}</p>
+        <span style={{ fontSize: 8, fontWeight: 800, letterSpacing: '0.1em', padding: '2px 6px', borderRadius: 4, background: `${accent}16`, color: accent, border: `1px solid ${accent}28` }}>{phase}</span>
+        {paths.length > 0 && <span style={{ fontSize: 11, fontWeight: 800, color: accent, marginLeft: 2 }}>{paths.length}</span>}
       </div>
 
       {loading && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 10, marginBottom: 8, background: 'rgba(167,139,250,0.07)', border: '1px solid rgba(167,139,250,0.18)', flexShrink: 0 }}>
-          <svg style={{ width: 13, height: 13, color: '#a78bfa', animation: 'spin 0.9s linear infinite', flexShrink: 0 }} viewBox="0 0 24 24" fill="none">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 13px', background: 'rgba(167,139,250,0.06)', flexShrink: 0 }}>
+          <svg style={{ width: 11, height: 11, color: '#a78bfa', animation: 'spin 0.9s linear infinite', flexShrink: 0 }} viewBox="0 0 24 24" fill="none">
             <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="31.4" strokeDashoffset="10" />
           </svg>
-          <span style={{ fontSize: 11, fontWeight: 600, color: '#a78bfa' }}>Chargement…</span>
+          <span style={{ fontSize: 10, color: '#a78bfa', fontWeight: 600 }}>Chargement…</span>
         </div>
       )}
 
       {/* File list */}
-      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', marginBottom: 10 }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '7px 9px', display: 'flex', flexDirection: 'column', gap: 2, minHeight: 0 }}>
         {paths.length === 0 ? (
-          <div style={{
-            height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-            borderRadius: 12, border: `1.5px dashed ${accent}16`, minHeight: 72, gap: 6,
-          }}>
-            <span style={{ fontSize: 20, opacity: 0.14 }}>🎬</span>
-            <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.25)' }}>Aucune vidéo</p>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 5, minHeight: 80 }}>
+            <span style={{ fontSize: 22, opacity: 0.09 }}>🎬</span>
+            <p style={{ fontSize: 10, color: 'rgba(148,163,184,0.22)' }}>Aucune vidéo</p>
           </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-            {paths.map((p, i) => (
-              <div key={i} className="group" style={{
-                display: 'flex', alignItems: 'center', gap: 8, borderRadius: 9, padding: '5px 10px',
-                background: `${accent}07`, border: `1px solid ${accent}10`,
-              }}>
-                <div style={{ width: 2, height: 14, borderRadius: 99, background: accent, opacity: 0.35, flexShrink: 0 }} />
-                <span style={{ fontSize: 11, fontFamily: 'monospace', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'rgba(226,217,243,0.52)' }}>
-                  {fileName(p)}
-                </span>
-                <button onClick={() => onRemove(i)} className="opacity-0 group-hover:opacity-100"
-                  style={{ fontSize: 10, color: '#f87171', background: 'none', border: 'none', cursor: 'pointer', transition: 'opacity 0.15s', flexShrink: 0, lineHeight: 1 }}>
-                  ✕
-                </button>
-              </div>
-            ))}
+        ) : paths.map((p, i) => (
+          <div key={i} className="group" style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 7px', borderRadius: 6, background: `${accent}08` }}>
+            <span style={{ fontSize: 8, fontWeight: 900, color: accent, opacity: 0.4, width: 11, textAlign: 'right', flexShrink: 0 }}>{i + 1}</span>
+            <span style={{ fontSize: 10, fontFamily: 'monospace', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'rgba(226,217,243,0.48)' }}>{fileName(p)}</span>
+            <button onClick={() => onRemove(i)} className="opacity-0 group-hover:opacity-100"
+              style={{ fontSize: 9, color: '#f87171', background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0, transition: 'opacity 0.15s', lineHeight: 1, padding: 0 }}>✕</button>
           </div>
-        )}
+        ))}
       </div>
 
       {/* Add buttons */}
-      <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+      <div style={{ padding: '8px 9px', borderTop: `1px solid ${accent}14`, display: 'flex', gap: 4, flexShrink: 0 }}>
         <button onClick={onAddBank}
-          style={{ flex: 1, borderRadius: 10, padding: '7px 0', fontSize: 11, fontWeight: 600, cursor: 'pointer', background: `${accent}11`, color: accent, border: `1px solid ${accent}22`, transition: 'background 0.15s' }}
-          onMouseEnter={e => (e.currentTarget.style.background = `${accent}1e`)}
-          onMouseLeave={e => (e.currentTarget.style.background = `${accent}11`)}>
+          style={{ flex: 1, padding: '6px 0', borderRadius: 7, fontSize: 10, fontWeight: 600, cursor: 'pointer', background: `${accent}13`, color: accent, border: `1px solid ${accent}24`, transition: 'background 0.15s' }}
+          onMouseEnter={e => (e.currentTarget.style.background = `${accent}20`)}
+          onMouseLeave={e => (e.currentTarget.style.background = `${accent}13`)}>
           🗂 Banque
         </button>
         <button onClick={onAddFolder}
-          style={{ flex: 1, borderRadius: 10, padding: '7px 0', fontSize: 11, fontWeight: 600, cursor: 'pointer', background: 'rgba(167,139,250,0.07)', color: '#a78bfa', border: '1px solid rgba(167,139,250,0.18)', transition: 'background 0.15s' }}
-          onMouseEnter={e => (e.currentTarget.style.background = 'rgba(167,139,250,0.14)')}
-          onMouseLeave={e => (e.currentTarget.style.background = 'rgba(167,139,250,0.07)')}>
+          style={{ flex: 1, padding: '6px 0', borderRadius: 7, fontSize: 10, fontWeight: 600, cursor: 'pointer', background: 'rgba(167,139,250,0.06)', color: '#a78bfa', border: '1px solid rgba(167,139,250,0.14)', transition: 'background 0.15s' }}
+          onMouseEnter={e => (e.currentTarget.style.background = 'rgba(167,139,250,0.12)')}
+          onMouseLeave={e => (e.currentTarget.style.background = 'rgba(167,139,250,0.06)')}>
           📁 Dossier
         </button>
         <button onClick={onAddPC}
-          style={{ flex: 1, borderRadius: 10, padding: '7px 0', fontSize: 11, fontWeight: 600, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.45)', border: '1px solid rgba(255,255,255,0.07)' }}>
+          style={{ flex: 1, padding: '6px 0', borderRadius: 7, fontSize: 10, fontWeight: 600, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.38)', border: '1px solid rgba(255,255,255,0.06)' }}>
           💾 PC
         </button>
       </div>
@@ -1373,237 +1352,130 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
 
         {/* Header */}
         <div style={{
-          flexShrink: 0,
-          padding: isMobile ? '14px 16px 12px' : '20px 28px 16px',
+          flexShrink: 0, padding: isMobile ? '11px 14px' : '14px 22px',
           borderBottom: '1px solid rgba(139,92,246,0.1)',
-          background: 'linear-gradient(90deg, rgba(124,58,237,0.07) 0%, transparent 55%)',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
+          background: 'linear-gradient(90deg,rgba(124,58,237,0.07) 0%,transparent 60%)',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             {!isMobile && (
-              <div style={{
-                width: 42, height: 42, borderRadius: 13, flexShrink: 0,
-                background: 'linear-gradient(135deg,#7c3aed,#ec4899)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                boxShadow: '0 4px 18px rgba(124,58,237,0.35)',
-              }}>
-                <span style={{ fontSize: 21 }}>⚡</span>
+              <div style={{ width: 36, height: 36, borderRadius: 11, background: 'linear-gradient(135deg,#7c3aed,#ec4899)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 3px 14px rgba(124,58,237,0.35)' }}>
+                <span style={{ fontSize: 18 }}>⚡</span>
               </div>
             )}
             <div>
-              <h1 style={{ fontSize: isMobile ? 17 : 21, fontWeight: 900, color: '#F1F0F7', letterSpacing: '-0.02em', lineHeight: 1.1 }}>Mass Remix</h1>
-              {!isMobile && <p style={{ fontSize: 12, color: 'rgba(148,163,184,0.5)', marginTop: 3 }}>Génère des remixes vidéo en masse · FFmpeg + IA</p>}
+              <h1 style={{ fontSize: isMobile ? 15 : 18, fontWeight: 900, color: '#F1F0F7', letterSpacing: '-0.02em', lineHeight: 1.1 }}>Mass Remix</h1>
+              {!isMobile && <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.45)', marginTop: 2 }}>Génère des remixes en masse · FFmpeg + IA</p>}
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
             {!isMobile && (
               <button onClick={openPreview} disabled={!canLaunch}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 7, padding: '9px 16px', borderRadius: 12,
-                  fontSize: 13, fontWeight: 700, cursor: canLaunch ? 'pointer' : 'not-allowed',
-                  background: canLaunch ? 'rgba(139,92,246,0.1)' : 'rgba(255,255,255,0.03)',
-                  color: canLaunch ? '#a78bfa' : 'rgba(255,255,255,0.18)',
-                  border: `1px solid ${canLaunch ? 'rgba(139,92,246,0.28)' : 'rgba(255,255,255,0.06)'}`,
-                  opacity: canLaunch ? 1 : 0.5, transition: 'all 0.15s',
-                }}>
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 13px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: canLaunch ? 'pointer' : 'not-allowed', background: canLaunch ? 'rgba(139,92,246,0.1)' : 'rgba(255,255,255,0.03)', color: canLaunch ? '#a78bfa' : 'rgba(255,255,255,0.18)', border: `1px solid ${canLaunch ? 'rgba(139,92,246,0.26)' : 'rgba(255,255,255,0.06)'}`, opacity: canLaunch ? 1 : 0.5, transition: 'all 0.15s' }}>
                 👁 Plan
               </button>
             )}
             <button onClick={() => launch()} disabled={!canLaunch}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 8,
-                padding: isMobile ? '10px 18px' : '10px 22px',
-                fontSize: isMobile ? 13 : 14, fontWeight: 800, cursor: canLaunch ? 'pointer' : 'not-allowed',
-                borderRadius: 13, border: 'none', color: '#fff',
-                background: canLaunch ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.06)',
-                boxShadow: canLaunch ? '0 4px 20px rgba(124,58,237,0.4)' : 'none',
-                opacity: canLaunch ? 1 : 0.4, transition: 'all 0.2s',
-              }}>
-              <span>⚡</span>
-              <span>{isMobile ? `Lancer (${copies})` : `Lancer ${copies} remix`}</span>
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: isMobile ? '8px 14px' : '8px 18px', fontSize: isMobile ? 12 : 13, fontWeight: 800, cursor: canLaunch ? 'pointer' : 'not-allowed', borderRadius: 11, border: 'none', color: '#fff', background: canLaunch ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.06)', boxShadow: canLaunch ? '0 3px 16px rgba(124,58,237,0.38)' : 'none', opacity: canLaunch ? 1 : 0.4, transition: 'all 0.2s' }}>
+              <span>⚡</span><span>{isMobile ? `Lancer (${copies})` : `Lancer ${copies} remix`}</span>
             </button>
           </div>
         </div>
 
         {/* Body */}
         <div style={{
-          flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden',
-          display: 'flex', flexDirection: isMobile ? 'column' : 'row',
-          gap: isMobile ? 12 : 20, padding: isMobile ? '14px 12px' : '24px 28px',
+          flex: 1, minHeight: 0, display: 'flex',
+          flexDirection: isMobile ? 'column' : 'row',
+          gap: isMobile ? 10 : 14, padding: isMobile ? '12px' : '16px 22px',
+          overflow: isMobile ? 'auto' : 'hidden',
         }}>
 
-          {/* LEFT — source video panels */}
-          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: isMobile ? 10 : 14 }}>
-
-            {/* Originals — Phase 2 */}
-            <div style={{
-              flex: isMobile ? 'none' : 1, minHeight: isMobile ? 160 : undefined,
-              borderRadius: 16, padding: isMobile ? 14 : 20,
-              background: 'rgba(139,92,246,0.04)', border: '1px solid rgba(139,92,246,0.16)',
-              position: 'relative', overflow: 'hidden',
-            }}>
-              <div style={{
-                position: 'absolute', top: 12, right: 12,
-                fontSize: 9, fontWeight: 800, letterSpacing: '0.1em', padding: '2px 7px', borderRadius: 5,
-                background: 'rgba(139,92,246,0.12)', color: 'rgba(167,139,250,0.65)',
-                border: '1px solid rgba(139,92,246,0.2)',
-              }}>PHASE 2</div>
-              <VideoListPanel
-                label="Vidéos originales"
-                paths={originals}
-                accent="#8b5cf6"
-                loading={addingTarget === 'orig'}
-                onAddBank={() => setShowBankOrig(true)}
-                onAddFolder={() => openFolderPick('orig')}
-                onAddPC={async () => { const p = await pickPC(false); setOriginals(prev => [...prev, ...p]) }}
-                onRemove={i => setOriginals(prev => prev.filter((_, j) => j !== i))}
-              />
-            </div>
-
-            {/* Divider connector */}
-            {!isMobile && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 8px' }}>
-                <div style={{ flex: 1, height: 1, background: 'linear-gradient(90deg,rgba(139,92,246,0.15),rgba(236,72,153,0.15))' }} />
-                <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.12em', color: 'rgba(148,163,184,0.22)' }}>+ REMIX</span>
-                <div style={{ flex: 1, height: 1, background: 'linear-gradient(90deg,rgba(236,72,153,0.15),rgba(139,92,246,0.15))' }} />
-              </div>
-            )}
-
-            {/* Secondaries — Phase 1 */}
-            <div style={{
-              flex: isMobile ? 'none' : 1, minHeight: isMobile ? 160 : undefined,
-              borderRadius: 16, padding: isMobile ? 14 : 20,
-              background: 'rgba(236,72,153,0.04)', border: '1px solid rgba(236,72,153,0.16)',
-              position: 'relative', overflow: 'hidden',
-            }}>
-              <div style={{
-                position: 'absolute', top: 12, right: 12,
-                fontSize: 9, fontWeight: 800, letterSpacing: '0.1em', padding: '2px 7px', borderRadius: 5,
-                background: 'rgba(236,72,153,0.12)', color: 'rgba(236,72,153,0.65)',
-                border: '1px solid rgba(236,72,153,0.2)',
-              }}>PHASE 1</div>
-              <VideoListPanel
-                label="Nouvelles Phase 1"
-                paths={secondaries}
-                accent="#ec4899"
-                loading={addingTarget === 'sec'}
-                onAddBank={() => setShowBankSec(true)}
-                onAddFolder={() => openFolderPick('sec')}
-                onAddPC={async () => { const p = await pickPC(false); setSecondaries(prev => [...prev, ...p]) }}
-                onRemove={i => setSecondaries(prev => prev.filter((_, j) => j !== i))}
-              />
-            </div>
+          {/* LEFT: two source panels SIDE BY SIDE */}
+          <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 10 : 10 }}>
+            <VideoSourcePanel
+              title="Originales" phase="PHASE 2" accent="#8b5cf6"
+              paths={originals} loading={addingTarget === 'orig'}
+              onAddBank={() => setShowBankOrig(true)}
+              onAddFolder={() => openFolderPick('orig')}
+              onAddPC={async () => { const p = await pickPC(false); setOriginals(prev => [...prev, ...p]) }}
+              onRemove={i => setOriginals(prev => prev.filter((_, j) => j !== i))}
+            />
+            <VideoSourcePanel
+              title="Phase 1 · Sources" phase="PHASE 1" accent="#ec4899"
+              paths={secondaries} loading={addingTarget === 'sec'}
+              onAddBank={() => setShowBankSec(true)}
+              onAddFolder={() => openFolderPick('sec')}
+              onAddPC={async () => { const p = await pickPC(false); setSecondaries(prev => [...prev, ...p]) }}
+              onRemove={i => setSecondaries(prev => prev.filter((_, j) => j !== i))}
+            />
           </div>
 
-          {/* RIGHT — config sidebar */}
-          <div style={{ width: isMobile ? '100%' : 268, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {/* RIGHT: config sidebar */}
+          <div style={{ width: isMobile ? '100%' : 248, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 7, overflowY: isMobile ? undefined : 'auto' }}>
 
-            {!isMobile && (
-              <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', color: 'rgba(148,163,184,0.28)', textTransform: 'uppercase', padding: '0 2px', marginBottom: 2 }}>Configuration</p>
-            )}
+            {!isMobile && <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', color: 'rgba(148,163,184,0.22)', textTransform: 'uppercase', padding: '0 2px' }}>Configuration</p>}
 
             {/* Copies */}
-            <div style={{ borderRadius: 14, padding: '14px 16px', background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)' }}>
-              <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.09em', textTransform: 'uppercase', color: 'rgba(148,163,184,0.42)', marginBottom: 10 }}>Copies</p>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-                <button onClick={() => setCopies(c => Math.max(1, c - 1))}
-                  style={{ width: 32, height: 32, borderRadius: 10, fontSize: 18, fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: 'rgba(196,181,253,0.7)', cursor: 'pointer', flexShrink: 0 }}>−</button>
-                <input type="number" min={1} max={200} value={copies}
-                  onChange={e => setCopies(Math.max(1, Math.min(200, Number(e.target.value))))}
-                  style={{ flex: 1, background: 'transparent', border: 'none', textAlign: 'center', fontSize: 30, fontWeight: 900, color: '#F1F0F7', outline: 'none' }} />
-                <button onClick={() => setCopies(c => Math.min(200, c + 1))}
-                  style={{ width: 32, height: 32, borderRadius: 10, fontSize: 18, fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: 'rgba(196,181,253,0.7)', cursor: 'pointer', flexShrink: 0 }}>+</button>
+            <div style={{ borderRadius: 12, padding: '12px 13px', background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(148,163,184,0.35)', marginBottom: 9 }}>Copies</p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 7 }}>
+                <button onClick={() => setCopies(c => Math.max(1, c - 1))} style={{ width: 28, height: 28, borderRadius: 8, fontSize: 15, fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: 'rgba(196,181,253,0.7)', cursor: 'pointer', flexShrink: 0 }}>−</button>
+                <input type="number" min={1} max={200} value={copies} onChange={e => setCopies(Math.max(1, Math.min(200, Number(e.target.value))))} style={{ flex: 1, background: 'transparent', border: 'none', textAlign: 'center', fontSize: 26, fontWeight: 900, color: '#F1F0F7', outline: 'none' }} />
+                <button onClick={() => setCopies(c => Math.min(200, c + 1))} style={{ width: 28, height: 28, borderRadius: 8, fontSize: 15, fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: 'rgba(196,181,253,0.7)', cursor: 'pointer', flexShrink: 0 }}>+</button>
               </div>
               <input type="range" min={1} max={50} value={Math.min(copies, 50)} onChange={e => setCopies(Number(e.target.value))} style={{ width: '100%' }} />
               {originals.length > 0 && secondaries.length > 0 && (
-                <p style={{ fontSize: 11, marginTop: 7, color: 'rgba(148,163,184,0.38)' }}>
-                  🔀 {originals.length} × {secondaries.length} → <span style={{ color: '#a78bfa', fontWeight: 700 }}>{copies} vidéos</span>
-                </p>
+                <p style={{ fontSize: 10, marginTop: 5, color: 'rgba(148,163,184,0.32)' }}>🔀 {originals.length} × {secondaries.length} → <span style={{ color: '#a78bfa', fontWeight: 700 }}>{copies} vidéos</span></p>
               )}
             </div>
 
-            {/* AI Detection toggle */}
-            <button
-              onClick={() => setAiEnabled(v => { const next = !v; localStorage.setItem('sf_remix_ai', next ? '1' : '0'); return next })}
-              style={{
-                borderRadius: 14, padding: '12px 14px', textAlign: 'left', cursor: 'pointer', width: '100%', border: 'none',
-                background: aiEnabled ? 'rgba(124,58,237,0.1)' : 'rgba(255,255,255,0.025)',
-                outline: `1px solid ${aiEnabled ? 'rgba(139,92,246,0.38)' : 'rgba(255,255,255,0.07)'}`,
-                boxShadow: aiEnabled ? '0 0 18px rgba(124,58,237,0.1)' : 'none',
-                transition: 'all 0.2s',
-              }}>
+            {/* AI toggle */}
+            <button onClick={() => setAiEnabled(v => { const next = !v; localStorage.setItem('sf_remix_ai', next ? '1' : '0'); return next })}
+              style={{ borderRadius: 12, padding: '10px 13px', textAlign: 'left', cursor: 'pointer', width: '100%', border: 'none', background: aiEnabled ? 'rgba(124,58,237,0.1)' : 'rgba(255,255,255,0.025)', outline: `1px solid ${aiEnabled ? 'rgba(139,92,246,0.35)' : 'rgba(255,255,255,0.07)'}`, boxShadow: aiEnabled ? '0 0 14px rgba(124,58,237,0.1)' : 'none', transition: 'all 0.2s' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div style={{ width: 32, height: 32, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: aiEnabled ? 'rgba(139,92,246,0.15)' : 'rgba(255,255,255,0.05)' }}>
-                    <span style={{ fontSize: 15 }}>✨</span>
-                  </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                  <div style={{ width: 28, height: 28, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: aiEnabled ? 'rgba(139,92,246,0.15)' : 'rgba(255,255,255,0.05)' }}><span style={{ fontSize: 13 }}>✨</span></div>
                   <div>
-                    <p style={{ fontSize: 12, fontWeight: 700, color: aiEnabled ? '#c4b5fd' : 'rgba(196,181,253,0.5)', lineHeight: 1.2 }}>Détection IA</p>
-                    <p style={{ fontSize: 10, color: 'rgba(148,163,184,0.35)', lineHeight: 1.2 }}>Claude Vision</p>
+                    <p style={{ fontSize: 12, fontWeight: 700, color: aiEnabled ? '#c4b5fd' : 'rgba(196,181,253,0.45)', lineHeight: 1.2 }}>Détection IA</p>
+                    <p style={{ fontSize: 9, color: 'rgba(148,163,184,0.3)', lineHeight: 1.2 }}>Claude Vision</p>
                   </div>
                 </div>
-                <div style={{ width: 36, height: 20, borderRadius: 99, position: 'relative', flexShrink: 0, background: aiEnabled ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.1)', transition: 'background 0.2s' }}>
-                  <span style={{ position: 'absolute', top: 3, width: 14, height: 14, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.3)', transition: 'transform 0.2s', transform: `translateX(${aiEnabled ? 18 : 3}px)`, display: 'block' }} />
+                <div style={{ width: 32, height: 18, borderRadius: 99, position: 'relative', flexShrink: 0, background: aiEnabled ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.1)', transition: 'background 0.2s' }}>
+                  <span style={{ position: 'absolute', top: 2, width: 14, height: 14, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.3)', transition: 'transform 0.2s', transform: `translateX(${aiEnabled ? 16 : 2}px)`, display: 'block' }} />
                 </div>
               </div>
-              {aiEnabled && (
-                <p style={{ marginTop: 8, fontSize: 11, color: 'rgba(148,163,184,0.45)', lineHeight: 1.4 }}>
-                  {manualText.trim() ? 'Texte manuel actif (priorité sur l\'IA).' : 'Analyse et recopie le texte automatiquement.'}
-                </p>
-              )}
-              {aiEnabled && !anthropicKey && !manualText.trim() && (
-                <p style={{ marginTop: 6, fontSize: 11, fontWeight: 600, color: '#fbbf24' }}>⚠ Clé Anthropic manquante</p>
-              )}
+              {aiEnabled && <p style={{ marginTop: 6, fontSize: 10, color: 'rgba(148,163,184,0.38)', lineHeight: 1.4 }}>{manualText.trim() ? 'Texte manuel actif.' : 'Analyse et recopie le texte auto.'}</p>}
+              {aiEnabled && !anthropicKey && !manualText.trim() && <p style={{ marginTop: 4, fontSize: 10, fontWeight: 600, color: '#fbbf24' }}>⚠ Clé Anthropic manquante</p>}
             </button>
 
             {aiEnabled && (
-              <div style={{ borderRadius: 12, padding: '10px 12px', background: 'rgba(124,58,237,0.05)', border: '1px solid rgba(139,92,246,0.18)', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.09em', textTransform: 'uppercase', color: 'rgba(139,92,246,0.62)' }}>✏ Texte manuel</p>
-                <textarea
-                  value={manualText}
-                  onChange={e => { setManualText(e.target.value); localStorage.setItem('sf_remix_manual_text', e.target.value) }}
-                  placeholder="Laisse vide = détection IA auto"
-                  rows={2}
-                  style={{ width: '100%', borderRadius: 10, padding: '8px 10px', fontSize: 12, resize: 'none', outline: 'none', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(139,92,246,0.22)', color: '#e2e8f0', lineHeight: 1.5, fontFamily: 'inherit' }}
-                />
+              <div style={{ borderRadius: 10, padding: '8px 11px', background: 'rgba(124,58,237,0.05)', border: '1px solid rgba(139,92,246,0.18)', display: 'flex', flexDirection: 'column', gap: 5 }}>
+                <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', color: 'rgba(139,92,246,0.55)', textTransform: 'uppercase' }}>✏ Texte manuel</p>
+                <textarea value={manualText} onChange={e => { setManualText(e.target.value); localStorage.setItem('sf_remix_manual_text', e.target.value) }} placeholder="Laisse vide = IA auto" rows={2} style={{ width: '100%', borderRadius: 8, padding: '6px 9px', fontSize: 11, resize: 'none', outline: 'none', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(139,92,246,0.2)', color: '#e2e8f0', lineHeight: 1.4, fontFamily: 'inherit' }} />
               </div>
             )}
 
             {/* Point de coupe */}
-            <div style={{ borderRadius: 14, padding: '14px 16px', background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.09em', textTransform: 'uppercase', color: 'rgba(148,163,184,0.42)' }}>Point de coupe</p>
-              <div style={{ display: 'flex', gap: 6 }}>
+            <div style={{ borderRadius: 12, padding: '12px 13px', background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(148,163,184,0.35)' }}>Point de coupe</p>
+              <div style={{ display: 'flex', gap: 5 }}>
                 {(['auto', 'manual'] as const).map(m => (
                   <button key={m} onClick={() => { setSplitMode(m); if (m === 'manual' && canLaunch) openPreview() }}
-                    style={{
-                      flex: 1, padding: '8px 0', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s', border: 'none',
-                      background: splitMode === m ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.05)',
-                      color: splitMode === m ? '#fff' : 'rgba(196,181,253,0.45)',
-                      boxShadow: splitMode === m ? '0 2px 12px rgba(124,58,237,0.3)' : 'none',
-                      outline: splitMode === m ? 'none' : '1px solid rgba(255,255,255,0.07)',
-                    }}>
+                    style={{ flex: 1, padding: '7px 0', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s', border: 'none', background: splitMode === m ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.05)', color: splitMode === m ? '#fff' : 'rgba(196,181,253,0.38)', boxShadow: splitMode === m ? '0 2px 10px rgba(124,58,237,0.28)' : 'none', outline: splitMode === m ? 'none' : '1px solid rgba(255,255,255,0.07)' }}>
                     {m === 'auto' ? '🤖 Auto' : '✂ Manuel'}
                   </button>
                 ))}
               </div>
-              <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.38)', lineHeight: 1.4 }}>
-                {splitMode === 'auto' ? 'Détection automatique du changement de scène.' : 'Définissez le point par vidéo dans l\'aperçu.'}
-              </p>
+              <p style={{ fontSize: 10, color: 'rgba(148,163,184,0.32)', lineHeight: 1.4 }}>{splitMode === 'auto' ? 'Détection auto du changement de scène.' : 'Réglage par vidéo dans l\'aperçu.'}</p>
             </div>
 
             {/* Format */}
-            <div style={{ borderRadius: 14, padding: '14px 16px', background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)' }}>
-              <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.09em', textTransform: 'uppercase', color: 'rgba(148,163,184,0.42)', marginBottom: 10 }}>Format de sortie</p>
-              <div style={{ display: 'flex', gap: 6 }}>
+            <div style={{ borderRadius: 12, padding: '12px 13px', background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(148,163,184,0.35)', marginBottom: 8 }}>Format</p>
+              <div style={{ display: 'flex', gap: 5 }}>
                 {(['9:16', '1:1', '16:9'] as Preset[]).map(p => (
                   <button key={p} onClick={() => setPreset(p)}
-                    style={{
-                      flex: 1, padding: '8px 0', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s', border: 'none',
-                      background: preset === p ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.05)',
-                      color: preset === p ? '#fff' : 'rgba(196,181,253,0.45)',
-                      boxShadow: preset === p ? '0 2px 12px rgba(124,58,237,0.3)' : 'none',
-                      outline: preset === p ? 'none' : '1px solid rgba(255,255,255,0.07)',
-                    }}>
+                    style={{ flex: 1, padding: '7px 0', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s', border: 'none', background: preset === p ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.05)', color: preset === p ? '#fff' : 'rgba(196,181,253,0.38)', boxShadow: preset === p ? '0 2px 10px rgba(124,58,237,0.28)' : 'none', outline: preset === p ? 'none' : '1px solid rgba(255,255,255,0.07)' }}>
                     {p}
                   </button>
                 ))}
@@ -1611,46 +1483,31 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
             </div>
 
             {/* Destination */}
-            <div style={{ borderRadius: 14, padding: '14px 16px', background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.09em', textTransform: 'uppercase', color: 'rgba(148,163,184,0.42)' }}>Destination</p>
-              <div style={{ display: 'flex', gap: 6 }}>
+            <div style={{ borderRadius: 12, padding: '12px 13px', background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(148,163,184,0.35)' }}>Destination</p>
+              <div style={{ display: 'flex', gap: 5 }}>
                 {(['bank', 'folder'] as ExportMode[]).map(m => (
                   <button key={m} onClick={() => setExportMode(m)}
-                    style={{
-                      flex: 1, padding: '8px 0', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s', border: 'none',
-                      background: exportMode === m ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.05)',
-                      color: exportMode === m ? '#fff' : 'rgba(196,181,253,0.45)',
-                      boxShadow: exportMode === m ? '0 2px 12px rgba(124,58,237,0.3)' : 'none',
-                      outline: exportMode === m ? 'none' : '1px solid rgba(255,255,255,0.07)',
-                    }}>
+                    style={{ flex: 1, padding: '7px 0', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s', border: 'none', background: exportMode === m ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.05)', color: exportMode === m ? '#fff' : 'rgba(196,181,253,0.38)', boxShadow: exportMode === m ? '0 2px 10px rgba(124,58,237,0.28)' : 'none', outline: exportMode === m ? 'none' : '1px solid rgba(255,255,255,0.07)' }}>
                     {m === 'bank' ? '☁ Banque' : '💾 Dossier'}
                   </button>
                 ))}
               </div>
               {exportMode === 'bank' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                   {bankFolders.length > 0 && (
-                    <select
-                      value={bankFolders.includes(bankFolder) ? bankFolder : ''}
-                      onChange={e => setBankFolder(e.target.value)}
-                      style={{ width: '100%', borderRadius: 10, padding: '8px 10px', fontSize: 12, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2d9f3', outline: 'none', cursor: 'pointer' }}>
+                    <select value={bankFolders.includes(bankFolder) ? bankFolder : ''} onChange={e => setBankFolder(e.target.value)} style={{ width: '100%', borderRadius: 8, padding: '6px 9px', fontSize: 11, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2d9f3', outline: 'none', cursor: 'pointer' }}>
                       <option value="" style={{ background: '#0c0919', color: '#e2d9f3' }}>— Racine</option>
                       {bankFolders.map(f => <option key={f} value={f} style={{ background: '#0c0919', color: '#e2d9f3' }}>{f}</option>)}
                     </select>
                   )}
-                  <input type="text"
-                    placeholder={bankFolders.length > 0 ? 'Ou créer un dossier…' : 'Dossier (optionnel)'}
-                    value={bankFolder} onChange={e => setBankFolder(e.target.value)}
-                    style={{ width: '100%', borderRadius: 10, padding: '8px 10px', fontSize: 12, background: 'rgba(255,255,255,0.05)', border: `1px solid ${bankFolder.trim() ? 'rgba(139,92,246,0.5)' : 'rgba(255,255,255,0.09)'}`, color: '#e2d9f3', outline: 'none' }} />
+                  <input type="text" placeholder={bankFolders.length > 0 ? 'Ou créer un dossier…' : 'Dossier (optionnel)'} value={bankFolder} onChange={e => setBankFolder(e.target.value)} style={{ width: '100%', borderRadius: 8, padding: '6px 9px', fontSize: 11, background: 'rgba(255,255,255,0.05)', border: `1px solid ${bankFolder.trim() ? 'rgba(139,92,246,0.5)' : 'rgba(255,255,255,0.09)'}`, color: '#e2d9f3', outline: 'none' }} />
                 </div>
               )}
               {exportMode === 'folder' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <button onClick={async () => { const f = await window.electronAPI?.pickOutputFolder?.(); if (f) setOutputFolder(f) }}
-                    style={{ width: '100%', borderRadius: 10, padding: '8px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer', background: 'rgba(139,92,246,0.1)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.2)' }}>
-                    📁 Choisir un dossier…
-                  </button>
-                  {outputFolder && <p style={{ fontSize: 11, fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'rgba(148,163,184,0.38)' }}>{outputFolder}</p>}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                  <button onClick={async () => { const f = await window.electronAPI?.pickOutputFolder?.(); if (f) setOutputFolder(f) }} style={{ width: '100%', borderRadius: 8, padding: '6px 9px', fontSize: 11, fontWeight: 600, cursor: 'pointer', background: 'rgba(139,92,246,0.1)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.2)' }}>📁 Choisir un dossier…</button>
+                  {outputFolder && <p style={{ fontSize: 10, fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'rgba(148,163,184,0.32)' }}>{outputFolder}</p>}
                 </div>
               )}
             </div>
