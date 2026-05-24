@@ -10,7 +10,7 @@ const isWeb = typeof window !== 'undefined' && !(window as any).electronAPI
 
 interface VideoRepurposeProps { user: User }
 
-type Intensity  = 'subtle' | 'medium' | 'aggressive'
+type Intensity  = 'subtle' | 'medium' | 'aggressive' | 'vener'
 type Format     = '9:16' | '1:1' | '16:9' | 'keep'
 type JobStatus  = 'queued' | 'processing' | 'done' | 'error'
 
@@ -408,11 +408,12 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
           {/* Intensity */}
           <div>
             <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(148,163,184,0.45)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 7 }}>Intensité</div>
-            {(['subtle', 'medium', 'aggressive'] as Intensity[]).map(lv => {
+            {(['subtle', 'medium', 'aggressive', 'vener'] as Intensity[]).map(lv => {
               const meta = {
-                subtle:     { label: 'Subtile',    desc: '~97-99%', emoji: '🔵' },
-                medium:     { label: 'Moyenne',    desc: '~92-96%', emoji: '🟡' },
-                aggressive: { label: 'Aggressive', desc: '~85-92%', emoji: '🔴' },
+                subtle:     { label: 'Subtile',    desc: '~90-99%', emoji: '🔵' },
+                medium:     { label: 'Moyenne',    desc: '~80-90%', emoji: '🟡' },
+                aggressive: { label: 'Aggressive', desc: '~65-80%', emoji: '🔴' },
+                vener:      { label: 'Vener 🔥',   desc: '~42-65%', emoji: '💥' },
               }[lv]
               return (
                 <button key={lv} onClick={() => setIntensity(lv)} disabled={running}
