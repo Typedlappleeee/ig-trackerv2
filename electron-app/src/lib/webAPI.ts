@@ -243,11 +243,30 @@ export function buildWebAPI() {
 
     // ── Upload video to GéeLark ─────────────────────────────────────────────
     async uploadVideoGeelark(opts: { bearer: string; filePath: string }) {
+      // Helper: server-side proxy (handles CORS + large files without timeout on Pro plans)
+      const serverProxy = async (): Promise<{ ok: boolean; token?: string; error?: string }> => {
+        const m1 = opts.filePath.match(/\/object\/sign\/([^/?]+)\/(.+?)(?:\?|$)/)
+        const r = await fetch('/api/geelark-upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            storagePath: m1 ? decodeURIComponent(m1[2]) : opts.filePath,
+            bucket: m1 ? m1[1] : 'content',
+            bearer: opts.bearer,
+          }),
+        })
+        return r.json()
+      }
+
       try {
-        // Always upload directly from browser to avoid Vercel serverless timeout
-        // which truncates videos to ~2 seconds on slow connections.
-        // 1. Fetch video bytes (works for blob:, https:, Supabase signed URLs)
-        const bytes = await fetchFileBytes(opts.filePath)
+        // 1. Try fetching bytes directly in browser (avoids server timeout truncation)
+        let bytes: Uint8Array | null = null
+        try {
+          bytes = await fetchFileBytes(opts.filePath)
+        } catch {
+          // CORS or network error fetching the file → fall back to server proxy
+          return serverProxy()
+        }
 
         // 2. Get GéeLark presigned upload URL
         const urlRes = await fetch('/api/gx', {
@@ -261,42 +280,23 @@ export function buildWebAPI() {
           }),
         })
         const urlData = await urlRes.json() as Record<string, unknown>
-        if (!urlData.ok) return { ok: false, error: 'GéeLark upload URL failed' }
+        if (!urlData.ok) return serverProxy()
         const apiResp = ((urlData.data as Record<string, unknown>)?.['data'] ?? urlData.data) as Record<string, unknown>
-        const uploadUrl  = apiResp?.['uploadUrl']   as string | undefined
+        const uploadUrl   = apiResp?.['uploadUrl']   as string | undefined
         const resourceUrl = apiResp?.['resourceUrl'] as string | undefined
-        const token      = resourceUrl ?? apiResp?.['token'] as string | undefined
-        if (!uploadUrl || !token) return { ok: false, error: 'Missing uploadUrl/token from GéeLark. Keys: ' + Object.keys(apiResp ?? {}).join(',') }
+        const token       = resourceUrl ?? apiResp?.['token'] as string | undefined
+        if (!uploadUrl || !token) return serverProxy()
 
         // 3. PUT bytes directly to S3 (no server hop → no timeout truncation)
         let putRes = await fetch(uploadUrl, { method: 'PUT', body: bytes.buffer as ArrayBuffer })
         if (!putRes.ok) {
-          // Retry with explicit Content-Type (some presigned URLs require it)
           putRes = await fetch(uploadUrl, {
             method: 'PUT',
             headers: { 'Content-Type': 'video/mp4' },
             body: bytes.buffer as ArrayBuffer,
           })
         }
-        if (!putRes.ok) {
-          // CORS fallback: route through server proxy
-          const r = await fetch('/api/geelark-upload', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              storagePath: (() => {
-                const m = opts.filePath.match(/\/object\/sign\/([^/?]+)\/(.+?)(?:\?|$)/)
-                return m ? decodeURIComponent(m[2]) : opts.filePath
-              })(),
-              bucket: (() => {
-                const m = opts.filePath.match(/\/object\/sign\/([^/?]+)\//)
-                return m ? m[1] : 'content'
-              })(),
-              bearer: opts.bearer,
-            }),
-          })
-          return await r.json() as { ok: boolean; token?: string; error?: string }
-        }
+        if (!putRes.ok) return serverProxy()
 
         return { ok: true, token }
       } catch (err) {
