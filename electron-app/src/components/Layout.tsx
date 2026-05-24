@@ -97,7 +97,7 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { id: 'montage',   label: 'Montage vidéo',  icon: '✂' },
       { id: 'remix',     label: 'Remix vidéo',    icon: '🔀' },
-      { id: 'repurpose', label: 'Repurpose',       icon: '⚡', isNew: true },
+      { id: 'repurpose', label: 'CloneVid',         icon: '⚡', isNew: true },
       { id: 'textcopy',  label: 'Texte IA',        icon: '✍', beta: true },
     ],
   },

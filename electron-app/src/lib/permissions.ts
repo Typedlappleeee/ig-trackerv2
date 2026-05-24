@@ -7,19 +7,19 @@ import type { OrgRole, PermOverrides, PageKey } from './supabase'
 const ROLE_TABS: Record<OrgRole, Record<PageKey, boolean>> = {
   owner: {
     phones: true, posting: true, massposting: true, scheduler: true,
-    bank: true, autocomment: true, warmup: true, aitools: true, montage: true, remix: true, settings: true,
+    bank: true, autocomment: true, warmup: true, aitools: true, montage: true, remix: true, repurpose: true, settings: true,
   },
   admin: {
     phones: true, posting: true, massposting: true, scheduler: true,
-    bank: true, autocomment: true, warmup: true, aitools: true, montage: true, remix: true, settings: true,
+    bank: true, autocomment: true, warmup: true, aitools: true, montage: true, remix: true, repurpose: true, settings: true,
   },
   member: {
     phones: true, posting: true, massposting: true, scheduler: true,
-    bank: true, autocomment: true, warmup: true, aitools: true, montage: true, remix: true, settings: false,
+    bank: true, autocomment: true, warmup: true, aitools: true, montage: true, remix: true, repurpose: true, settings: false,
   },
   viewer: {
     phones: true, posting: false, massposting: false, scheduler: false,
-    bank: true, autocomment: false, warmup: false, aitools: false, montage: false, remix: false, settings: false,
+    bank: true, autocomment: false, warmup: false, aitools: false, montage: false, remix: false, repurpose: false, settings: false,
   },
 }
 
