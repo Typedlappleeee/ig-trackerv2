@@ -1029,12 +1029,13 @@ function seededRng(seed: number) {
 // Applies invisible micro-transforms so each export has a different hash/signature
 // while remaining perceptually identical to the source video.
 export async function runFfmpegRepurposeWeb(opts: {
-  inputPath: string
-  seed:      number
-  intensity: 'subtle' | 'medium' | 'aggressive'
-  format:    '9:16' | '1:1' | '16:9' | 'keep'
-  onProgress?: (pct: number) => void
-}): Promise<{ ok: boolean; outputPath?: string; similarityPct?: number; error?: string }> {
+  inputPath:    string
+  seed:         number
+  intensity:    'subtle' | 'medium' | 'aggressive'
+  format:       '9:16' | '1:1' | '16:9' | 'keep'
+  colorPreset?: 'off' | 'warm' | 'cool' | 'cinema' | 'bw'
+  onProgress?:  (pct: number) => void
+}): Promise<{ ok: boolean; outputPath?: string; similarityPct?: number; transformSummary?: string[]; error?: string }> {
   const FILES = ['rp_in.mp4', 'rp_out.mp4']
 
   // Intensity-dependent ranges
@@ -1059,14 +1060,36 @@ export async function runFfmpegRepurposeWeb(opts: {
   const volume     = 1 + sign() * rng(0, ranges.vol)
   const crf        = Math.round(22 + rng(0, ranges.crf))
 
-  // Similarity estimate (higher intensity = lower similarity, but always high)
+  // Color preset — subtle overlay on top of random transforms
+  const cp = opts.colorPreset ?? 'off'
+  const colorAdj = {
+    off:    { gr: 1.00, gg: 1.00, gb: 1.00, satD: 0,     conD: 0,    label: null as string | null },
+    warm:   { gr: 1.04, gg: 1.01, gb: 0.96, satD: 0.025, conD: 0,    label: '🟠 Chaud' },
+    cool:   { gr: 0.96, gg: 1.00, gb: 1.05, satD: 0,     conD: 0,    label: '🔵 Froid' },
+    cinema: { gr: 1.01, gg: 0.99, gb: 0.96, satD: -0.07, conD: 0.05, label: '🎬 Ciné' },
+    bw:     { gr: 1.00, gg: 1.00, gb: 1.00, satD: -0.65, conD: 0.03, label: '🌫 Doux' },
+  }[cp]
+
+  // Similarity estimate
   const similarityPct = Math.round(100 - (
     Math.abs(brightness) * 120 +
     Math.abs(contrast - 1) * 80 +
-    Math.abs(saturation - 1) * 60 +
+    Math.abs(saturation - 1 + colorAdj.satD) * 60 +
     noise * 1.2 +
     Math.abs(hue) * 0.8
   ))
+
+  // Human-readable transform summary (French)
+  const transformSummary: string[] = []
+  if (Math.abs(brightness) > 0.001)      transformSummary.push(`Lumière ${brightness > 0 ? '+' : ''}${(brightness * 100).toFixed(1)}%`)
+  if (Math.abs(contrast - 1) > 0.001)    transformSummary.push(`Contraste ${contrast > 1 ? '+' : ''}${((contrast - 1) * 100).toFixed(1)}%`)
+  if (Math.abs(saturation - 1) > 0.001)  transformSummary.push(`Saturation ${saturation > 1 ? '+' : ''}${((saturation - 1) * 100).toFixed(1)}%`)
+  if (Math.abs(hue) > 0.1)               transformSummary.push(`Teinte ${hue > 0 ? '+' : ''}${hue.toFixed(1)}°`)
+  if (noise > 1.5)                        transformSummary.push(`Grain ×${noise.toFixed(1)}`)
+  if (cropX > 0 || cropY > 0)            transformSummary.push(`Crop ${Math.max(cropX, cropY)}px`)
+  if (Math.abs(pitchFact - 1) > 0.00005) transformSummary.push(`Pitch ${pitchFact > 1 ? '+' : '-'}${(Math.abs(pitchFact - 1) * 100).toFixed(2)}%`)
+  if (Math.abs(volume - 1) > 0.002)      transformSummary.push(`Volume ${volume > 1 ? '+' : ''}${((volume - 1) * 100).toFixed(1)}%`)
+  if (colorAdj.label)                     transformSummary.push(colorAdj.label)
 
   const ff = await getFFmpeg()
   for (const f of FILES) await ff.deleteFile(f).catch(() => {})
@@ -1090,7 +1113,7 @@ export async function runFfmpegRepurposeWeb(opts: {
     const vf = [
       scaleFilter,
       `crop=iw-${cropX * 2}:ih-${cropY * 2}:${cropX}:${cropY}`,
-      `eq=brightness=${brightness.toFixed(4)}:contrast=${contrast.toFixed(4)}:saturation=${saturation.toFixed(4)}:gamma=${gamma.toFixed(4)}`,
+      `eq=brightness=${brightness.toFixed(4)}:contrast=${(contrast + colorAdj.conD).toFixed(4)}:saturation=${(saturation + colorAdj.satD).toFixed(4)}:gamma=${gamma.toFixed(4)}:gamma_r=${colorAdj.gr.toFixed(4)}:gamma_g=${colorAdj.gg.toFixed(4)}:gamma_b=${colorAdj.gb.toFixed(4)}`,
       `hue=h=${hue.toFixed(2)}`,
       `noise=alls=${noise.toFixed(1)}:allf=t+u`,
     ].filter(Boolean).join(',')
@@ -1112,7 +1135,7 @@ export async function runFfmpegRepurposeWeb(opts: {
 
     const url = await readOutput(ff, 'rp_out.mp4', 'video/mp4')
     opts.onProgress?.(100)
-    return { ok: true, outputPath: url, similarityPct }
+    return { ok: true, outputPath: url, similarityPct, transformSummary }
   } catch (err) {
     if (isWasmCrash(err)) resetFFmpeg()
     const relevant = logs.filter(l => /error|invalid|unknown|cannot/i.test(l)).slice(-2)
