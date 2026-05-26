@@ -1,5 +1,96 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { AuthPage } from '@/components/auth/AuthPage'
+
+// ── Countdown ─────────────────────────────────────────────────────────────────
+const LAUNCH_DATE = new Date('2026-06-01T00:00:00')
+
+function useCountdown() {
+  const calc = () => {
+    const diff = LAUNCH_DATE.getTime() - Date.now()
+    if (diff <= 0) return { days: 0, hours: 0, minutes: 0, seconds: 0, launched: true }
+    return {
+      days:    Math.floor(diff / 86400000),
+      hours:   Math.floor((diff % 86400000) / 3600000),
+      minutes: Math.floor((diff % 3600000)  / 60000),
+      seconds: Math.floor((diff % 60000)    / 1000),
+      launched: false,
+    }
+  }
+  const [t, setT] = useState(calc)
+  useEffect(() => {
+    const id = setInterval(() => setT(calc()), 1000)
+    return () => clearInterval(id)
+  }, [])
+  return t
+}
+
+function CountdownBanner() {
+  const { days, hours, minutes, seconds, launched } = useCountdown()
+  const pad = (n: number) => String(n).padStart(2, '0')
+
+  if (launched) return null
+
+  const unit = (value: number, label: string) => (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+      <div style={{
+        minWidth: 72, padding: '14px 8px', borderRadius: 14, textAlign: 'center',
+        background: 'rgba(124,58,237,0.10)', border: '1px solid rgba(139,92,246,0.25)',
+        fontSize: 'clamp(28px, 5vw, 44px)', fontWeight: 900, color: '#F2F0FF',
+        letterSpacing: '-0.04em', fontVariantNumeric: 'tabular-nums', lineHeight: 1,
+      }}>
+        {pad(value)}
+      </div>
+      <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'rgba(148,163,184,0.45)' }}>
+        {label}
+      </span>
+    </div>
+  )
+
+  const sep = <span style={{ fontSize: 32, fontWeight: 900, color: 'rgba(139,92,246,0.4)', alignSelf: 'flex-start', paddingTop: 10, lineHeight: 1 }}>:</span>
+
+  return (
+    <div style={{
+      position: 'relative', zIndex: 1,
+      margin: '0 24px 0', maxWidth: 760, marginLeft: 'auto', marginRight: 'auto',
+    }}>
+      <div style={{
+        borderRadius: 22, overflow: 'hidden',
+        border: '1px solid rgba(139,92,246,0.28)',
+        background: 'linear-gradient(135deg, rgba(124,58,237,0.06), rgba(236,72,153,0.04))',
+        boxShadow: '0 0 60px rgba(124,58,237,0.10)',
+        padding: '36px 32px',
+        textAlign: 'center',
+      }}>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '4px 14px', borderRadius: 99, marginBottom: 18, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.18)' }}>
+          <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#ef4444', flexShrink: 0, animation: 'pulse 1.5s infinite' }} />
+          <span style={{ fontSize: 11, fontWeight: 700, color: '#f87171', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Lancement le 1er Juin</span>
+        </div>
+
+        <p style={{ fontSize: 15, color: 'rgba(148,163,184,0.6)', margin: '0 0 28px' }}>
+          ScaleFlow ouvre ses portes dans…
+        </p>
+
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', gap: 10, flexWrap: 'wrap' }}>
+          {unit(days, 'jours')}
+          {sep}
+          {unit(hours, 'heures')}
+          {sep}
+          {unit(minutes, 'minutes')}
+          {sep}
+          {unit(seconds, 'secondes')}
+        </div>
+
+        <p style={{ fontSize: 12, color: 'rgba(148,163,184,0.35)', marginTop: 24, marginBottom: 0 }}>
+          Rejoins la liste d'attente sur{' '}
+          <a href={TELEGRAM_URL} target="_blank" rel="noreferrer" style={{ color: '#a78bfa', textDecoration: 'none', fontWeight: 600 }}>
+            Telegram
+          </a>
+          {' '}pour être notifié au lancement.
+        </p>
+      </div>
+    </div>
+  )
+}
 
 const TELEGRAM_URL = 'https://t.me/justquentin'
 
@@ -235,6 +326,11 @@ export function Landing() {
           </div>
         </div>
       </section>
+
+      {/* ── Countdown ─────────────────────────────────────────────────────── */}
+      <div style={{ paddingBottom: 72 }}>
+        <CountdownBanner />
+      </div>
 
       {/* ── Screenshot placeholder ─────────────────────────────────────────── */}
       <section id="showcase" style={{ position: 'relative', zIndex: 1, padding: '0 24px 80px' }}>
