@@ -169,10 +169,12 @@ export function AdsPower({ user }: AdsPowerProps) {
   const [showAdd, setShowAdd]       = useState(false)
   const [logs, setLogs]             = useState<LogEntry[]>([])
   const [running, setRunning]       = useState(false)
-  const [delayMin, setDelayMin]     = useState(60)   // seconds between posts
+  const [delayMin, setDelayMin]     = useState(60)
+  const [syncing, setSyncing]       = useState(false)
+  const [syncError, setSyncError]   = useState<string | null>(null)
   const logEndRef = useRef<HTMLDivElement>(null)
 
-  // ── Load profiles from localStorage (no DB needed for alpha) ──────────────
+  // ── Load profiles from localStorage ──────────────────────────────────────
   useEffect(() => {
     try {
       const saved = localStorage.getItem(`adspower-profiles-${user.id}`)
@@ -183,6 +185,51 @@ export function AdsPower({ user }: AdsPowerProps) {
   const saveProfiles = (p: FbProfile[]) => {
     setProfiles(p)
     localStorage.setItem(`adspower-profiles-${user.id}`, JSON.stringify(p))
+  }
+
+  // ── Sync from AdsPower API ────────────────────────────────────────────────
+  const syncFromAds = async () => {
+    setSyncing(true)
+    setSyncError(null)
+    try {
+      // Fetch all profiles — paginate until done
+      let allProfiles: FbProfile[] = []
+      let page = 1
+      while (true) {
+        const res = await adsRequest(`/api/v1/user/list?page=${page}&page_size=100`)
+        if (res.code !== 0) throw new Error(res.msg ?? 'Erreur API AdsPower')
+        const rows: Array<{
+          user_id: string
+          name: string
+          domain_name?: string
+          username?: string
+          remark?: string
+          group_name?: string
+        }> = res.data?.list ?? []
+        if (rows.length === 0) break
+        const mapped: FbProfile[] = rows.map(r => ({
+          id:          r.user_id,
+          name:        r.name || r.user_id,
+          page_name:   r.domain_name || r.username || r.remark || r.name || '',
+          ads_user_id: r.user_id,
+          enabled:     true,
+        }))
+        allProfiles = [...allProfiles, ...mapped]
+        if (rows.length < 100) break
+        page++
+      }
+      // Merge: keep existing page_name overrides, add new ones
+      const existing = new Map(profiles.map(p => [p.ads_user_id, p]))
+      const merged = allProfiles.map(p => existing.has(p.ads_user_id)
+        ? { ...existing.get(p.ads_user_id)!, name: p.name }
+        : p
+      )
+      saveProfiles(merged)
+    } catch (e: unknown) {
+      setSyncError((e as Error).message)
+    } finally {
+      setSyncing(false)
+    }
   }
 
   const addProfile = (data: Omit<FbProfile, 'id' | 'enabled'>) => {
@@ -316,20 +363,40 @@ export function AdsPower({ user }: AdsPowerProps) {
         <div style={{ padding: '16px 16px 12px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
             <div>
-              <p style={{ fontSize: 13, fontWeight: 700, color: '#F2F0FF', margin: 0 }}>Profils Facebook</p>
+              <p style={{ fontSize: 13, fontWeight: 700, color: '#F2F0FF', margin: 0 }}>Profils AdsPower</p>
               <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.4)', margin: '2px 0 0' }}>{profiles.length} profil{profiles.length !== 1 ? 's' : ''} · {selected.size} sélectionné{selected.size !== 1 ? 's' : ''}</p>
             </div>
             <button
               onClick={() => setShowAdd(true)}
-              style={{ padding: '6px 12px', borderRadius: 8, background: 'linear-gradient(130deg,#7c3aed,#ec4899)', border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
-              + Ajouter
+              style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: 'rgba(148,163,184,0.7)', fontSize: 12, cursor: 'pointer' }}>
+              + Manuel
             </button>
           </div>
+
+          {/* Sync button */}
+          <button
+            onClick={syncFromAds}
+            disabled={syncing}
+            style={{
+              width: '100%', padding: '8px', borderRadius: 8, border: 'none', cursor: syncing ? 'not-allowed' : 'pointer',
+              background: syncing ? 'rgba(255,255,255,0.04)' : 'linear-gradient(130deg,#1877f2,#0d6bcc)',
+              color: syncing ? 'rgba(148,163,184,0.4)' : '#fff', fontSize: 12, fontWeight: 700,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              marginBottom: syncError ? 8 : 0,
+            }}>
+            {syncing ? '⏳ Synchronisation…' : '🔄 Sync depuis AdsPower'}
+          </button>
+
+          {syncError && (
+            <div style={{ padding: '7px 10px', borderRadius: 7, background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.2)', fontSize: 11, color: '#f87171', marginBottom: 8 }}>
+              ⚠ {syncError}
+            </div>
+          )}
 
           {profiles.length > 0 && (
             <button
               onClick={toggleAll}
-              style={{ fontSize: 11, color: 'rgba(167,139,250,0.6)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+              style={{ fontSize: 11, color: 'rgba(167,139,250,0.6)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginTop: 8, display: 'block' }}>
               {selected.size === profiles.length ? 'Tout désélectionner' : 'Tout sélectionner'}
             </button>
           )}
@@ -338,9 +405,12 @@ export function AdsPower({ user }: AdsPowerProps) {
         {/* Profile list */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
           {profiles.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px 0', color: 'rgba(148,163,184,0.35)' }}>
+            <div style={{ textAlign: 'center', padding: '40px 16px', color: 'rgba(148,163,184,0.35)' }}>
               <p style={{ fontSize: 28, margin: '0 0 10px' }}>📘</p>
-              <p style={{ fontSize: 12, margin: 0 }}>Aucun profil AdsPower.<br />Ajoute-en un pour commencer.</p>
+              <p style={{ fontSize: 12, margin: '0 0 14px', lineHeight: 1.6 }}>
+                Clique sur <strong style={{ color: 'rgba(148,163,184,0.6)' }}>Sync depuis AdsPower</strong> pour importer automatiquement tous tes profils.
+              </p>
+              <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.25)', margin: 0 }}>AdsPower doit être ouvert sur ce PC.</p>
             </div>
           ) : (
             profiles.map(p => (
