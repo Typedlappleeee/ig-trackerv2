@@ -56,7 +56,7 @@ export type Page =
   | 'stats' | 'posting' | 'massposting' | 'scheduler' | 'bank' | 'aitools' | 'warmup'
   | 'montage' | 'remix' | 'textcopy' | 'repurpose'
   | 'community' | 'support'
-  | 'settings' | 'licences'
+  | 'settings' | 'licences' | 'adspower'
 
 interface LayoutProps {
   user:      User
@@ -812,6 +812,28 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
           </button>
 
           {/* Admin (super admin only) */}
+          {license.isSuperAdmin && (
+              <button
+                onClick={() => { playNav(); onNavigate('adspower') }}
+                style={{
+                  width: '100%', padding: '8px 12px',
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  border: 'none', background: page === 'adspower' ? 'rgba(24,119,242,0.12)' : 'transparent',
+                  cursor: 'pointer', borderRadius: 8,
+                  fontSize: 13, fontWeight: page === 'adspower' ? 500 : 400, textAlign: 'left',
+                  borderLeft: page === 'adspower' ? '2px solid #1877f2' : '2px solid transparent',
+                  color: page === 'adspower' ? '#F1F0F7' : 'rgba(148,163,184,0.65)',
+                  transition: 'all 0.15s',
+                }}
+                onMouseEnter={e => { if (page !== 'adspower') (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.04)' }}
+                onMouseLeave={e => { if (page !== 'adspower') (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}
+              >
+                <span style={{ flexShrink: 0, color: page === 'adspower' ? '#1877f2' : 'rgba(148,163,184,0.5)', display: 'flex', fontSize: 14 }}>📘</span>
+                <span>AdsPower</span>
+                <span style={{ marginLeft: 'auto', fontSize: 9, fontWeight: 800, letterSpacing: '0.06em', padding: '2px 6px', borderRadius: 4, background: 'rgba(24,119,242,0.15)', color: '#60a5fa' }}>ADMIN</span>
+              </button>
+            )}
+
           {license.isSuperAdmin && (
             <button
               onClick={() => { playNav(); onNavigate('licences') }}
