@@ -983,7 +983,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
                   <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
                 </svg>
                 <span style={{ fontSize: 12, fontWeight: 700, color: credits.balance < 10 ? '#F87171' : '#A78BFA', fontVariantNumeric: 'tabular-nums' }}>
-                  {credits.balance.toLocaleString('fr-FR')}
+                  💎 {credits.balance.toLocaleString('fr-FR')}
                 </span>
               </button>
             )}
