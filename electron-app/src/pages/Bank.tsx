@@ -260,7 +260,14 @@ export function Bank({ user }: BankProps) {
     if (!confirm(`Supprimer ${selectedIds.size} vidéo(s) ? Cette action est irréversible.`)) return
     const ids = [...selectedIds]
     const toDelete = items.filter(i => ids.includes(i.id))
-    await supabase.from('content_bank').delete().in('id', ids)
+    let q = supabase.from('content_bank').delete().in('id', ids)
+    if (currentOrg) q = q.eq('org_id', currentOrg.id)
+    else q = q.eq('user_id', user.id)
+    const { error: err } = await q
+    if (err) {
+      setError('Suppression échouée : ' + err.message)
+      return
+    }
     deleteStorageObjects(toDelete.flatMap(i => [i.storage_path, i.thumbnail_path]))
     setItems(prev => prev.filter(i => !ids.includes(i.id)))
     exitSelection()
@@ -453,8 +460,13 @@ export function Bank({ user }: BankProps) {
 
   async function deleteItem(id: string) {
     const item = items.find(i => i.id === id)
-    const { error: err } = await supabase.from('content_bank').delete().eq('id', id)
-    if (!err) {
+    let q = supabase.from('content_bank').delete().eq('id', id)
+    if (currentOrg) q = q.eq('org_id', currentOrg.id)
+    else q = q.eq('user_id', user.id)
+    const { error: err } = await q
+    if (err) {
+      setError('Suppression échouée : ' + err.message)
+    } else {
       setItems(prev => prev.filter(i => i.id !== id))
       if (item) {
         deleteStorageObjects([item.storage_path, item.thumbnail_path])
@@ -507,7 +519,11 @@ export function Bank({ user }: BankProps) {
     if (withVideos) {
       const toDelete = items.filter(i => (i as unknown as {folder?: string}).folder === name)
       if (toDelete.length > 0) {
-        await supabase.from('content_bank').delete().in('id', toDelete.map(i => i.id))
+        let dq = supabase.from('content_bank').delete().in('id', toDelete.map(i => i.id))
+        if (currentOrg) dq = dq.eq('org_id', currentOrg.id)
+        else dq = dq.eq('user_id', user.id)
+        const { error: dErr } = await dq
+        if (dErr) { setError('Suppression échouée : ' + dErr.message); return }
         deleteStorageObjects(toDelete.flatMap(i => [i.storage_path, i.thumbnail_path]))
         setItems(prev => prev.filter(i => (i as unknown as {folder?: string}).folder !== name))
       }
