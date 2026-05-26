@@ -787,10 +787,10 @@ ipcMain.handle('run-ffmpeg-remix', async (_event, opts: {
     filterComplex = [
       `[1:v]split=2[ov_a][ov_b]`,
       `[1:a]asplit=2[ao1][ao2]`,
-      `[0:v]trim=duration=${opts.splitTime},setpts=PTS-STARTPTS,${scl}[v_new]`,
-      `[ov_a]trim=end=${opts.splitTime},setpts=PTS-STARTPTS,${scl},lumakey=threshold=0:tolerance=${lkTol}:softness=0.05[text_key]`,
+      `[0:v]fps=30,trim=duration=${opts.splitTime},setpts=PTS-STARTPTS,${scl}[v_new]`,
+      `[ov_a]fps=30,trim=end=${opts.splitTime},setpts=PTS-STARTPTS,${scl},lumakey=threshold=0:tolerance=${lkTol}:softness=0.05[text_key]`,
       `[v_new][text_key]overlay=format=auto[v_blended]`,
-      `[ov_b]trim=start=${opts.splitTime},setpts=PTS-STARTPTS,${scl}[v_p2]`,
+      `[ov_b]fps=30,trim=start=${opts.splitTime},setpts=PTS-STARTPTS,${scl}[v_p2]`,
       `[ao1]atrim=end=${opts.splitTime},asetpts=PTS-STARTPTS,${afmt}[a_p1]`,
       `[ao2]atrim=start=${opts.splitTime},asetpts=PTS-STARTPTS,${afmt}[a_p2]`,
       `[v_blended][a_p1][v_p2][a_p2]concat=n=2:v=1:a=1[vout][aout]`,
@@ -798,8 +798,8 @@ ipcMain.handle('run-ffmpeg-remix', async (_event, opts: {
   } else {
     // No blend — new video visuals for phase 1, original audio throughout
     filterComplex = [
-      `[0:v]trim=duration=${opts.splitTime},setpts=PTS-STARTPTS,${scl}[v_p1]`,
-      `[1:v]trim=start=${opts.splitTime},setpts=PTS-STARTPTS,${scl}[v_p2]`,
+      `[0:v]fps=30,trim=duration=${opts.splitTime},setpts=PTS-STARTPTS,${scl}[v_p1]`,
+      `[1:v]fps=30,trim=start=${opts.splitTime},setpts=PTS-STARTPTS,${scl}[v_p2]`,
       `[1:a]asplit=2[ao1][ao2]`,
       `[ao1]atrim=end=${opts.splitTime},asetpts=PTS-STARTPTS,${afmt}[a_p1]`,
       `[ao2]atrim=start=${opts.splitTime},asetpts=PTS-STARTPTS,${afmt}[a_p2]`,
@@ -814,8 +814,13 @@ ipcMain.handle('run-ffmpeg-remix', async (_event, opts: {
     '-filter_complex', filterComplex,
     '-map', '[vout]', '-map', '[aout]',
     '-c:v', 'libx264', '-preset', 'fast', '-crf', '23',
+    '-r', '30', '-fps_mode', 'cfr',
+    '-g', '30', '-keyint_min', '15',
+    '-pix_fmt', 'yuv420p',
+    '-profile:v', 'main', '-level', '4.0',
     '-c:a', 'aac', '-b:a', '128k',
     '-movflags', '+faststart',
+    '-avoid_negative_ts', 'make_zero',
     '-y', opts.outputPath,
   ]
   const command = `ffmpeg ${args.map(a => a.includes(' ') ? `"${a}"` : a).join(' ')}`
@@ -997,7 +1002,10 @@ ipcMain.handle('run-ffmpeg-remix-ai', async (_event, opts: {
     return `drawtext=${parts.join(':')}`
   }).join(',')
 
-  const vfPhase1 = opts.textOverlays.length > 0 ? `${scl},${drawtextChain}` : scl
+  // fps=30 BEFORE scale normalises VFR input (GeeLark recordings are often VFR).
+  // Without this, timestamp gaps in VFR clips cause frozen frames at concat boundaries.
+  const vfPhase1 = opts.textOverlays.length > 0 ? `fps=30,${scl},${drawtextChain}` : `fps=30,${scl}`
+  const vfPhase2 = `fps=30,${scl}`
 
   // Validate splitTime — undefined/NaN/0 means we can't concat, so just re-encode phase1 alone
   const splitTime = (opts.splitTime != null && !isNaN(opts.splitTime) && opts.splitTime > 0)
@@ -1007,8 +1015,11 @@ ipcMain.handle('run-ffmpeg-remix-ai', async (_event, opts: {
   // Common output flags (WITHOUT the output path — must be last)
   const commonOutputFlags = [
     '-c:v', 'libx264', '-preset', 'fast', '-crf', '20',
-    '-r', '30', '-fps_mode', 'cfr',   // force constant 30 fps output
+    '-r', '30', '-fps_mode', 'cfr',        // force constant 30 fps output
+    '-g', '30', '-keyint_min', '15',        // keyframe every 1s — required by Instagram
     '-pix_fmt', 'yuv420p',
+    '-profile:v', 'main', '-level', '4.0', // Instagram-safe H.264 profile
+    '-bf', '2',                             // max 2 B-frames — keeps file small, stays compatible
     '-movflags', '+faststart',
     '-avoid_negative_ts', 'make_zero',
     '-max_muxing_queue_size', '9999',
@@ -1059,7 +1070,7 @@ ipcMain.handle('run-ffmpeg-remix-ai', async (_event, opts: {
     if (origHasAudio) {
       filterComplex = [
         `[0:v]setpts=PTS-STARTPTS,${vfPhase1}[v_p1]`,
-        `[2:v]setpts=PTS-STARTPTS,${scl}[v_p2]`,
+        `[2:v]setpts=PTS-STARTPTS,${vfPhase2}[v_p2]`,
         `[1:a]asplit=2[ao1][ao2]`,
         `[ao1]atrim=end=${splitTime},asetpts=PTS-STARTPTS,${afmt}[a_p1]`,
         `[ao2]atrim=start=${splitTime},asetpts=PTS-STARTPTS,${afmt}[a_p2]`,
@@ -1070,7 +1081,7 @@ ipcMain.handle('run-ffmpeg-remix-ai', async (_event, opts: {
     } else {
       filterComplex = [
         `[0:v]setpts=PTS-STARTPTS,${vfPhase1}[v_p1]`,
-        `[2:v]setpts=PTS-STARTPTS,${scl}[v_p2]`,
+        `[2:v]setpts=PTS-STARTPTS,${vfPhase2}[v_p2]`,
         `[v_p1][v_p2]concat=n=2:v=1:a=0[vout]`,
       ].join(';')
       mapArgs      = ['-map', '[vout]']
