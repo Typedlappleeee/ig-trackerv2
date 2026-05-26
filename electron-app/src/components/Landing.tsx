@@ -270,8 +270,84 @@ function CountdownBlock() {
   )
 }
 
+// ── Mockup fallback (SVG UI) shown when mockup.png not yet uploaded ───────────
+function MockupFallback() {
+  return (
+    <div style={{ position: 'relative', borderRadius: 20, overflow: 'hidden', border: '1px solid rgba(139,92,246,0.22)', boxShadow: '0 40px 100px rgba(0,0,0,0.75)', background: '#08080f' }}>
+      {/* Chrome bar */}
+      <div style={{ padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.045)', display: 'flex', alignItems: 'center', gap: 8, background: '#0b0b16' }}>
+        {['#ef4444','#f59e0b','#22c55e'].map(c => <div key={c} style={{ width: 10, height: 10, borderRadius: '50%', background: c, opacity: 0.5 }} />)}
+        <div style={{ flex: 1, margin: '0 10px', height: 20, borderRadius: 5, background: 'rgba(255,255,255,0.035)', display: 'flex', alignItems: 'center', paddingLeft: 10 }}>
+          <span style={{ fontSize: 10, color: 'rgba(148,163,184,0.22)' }}>scaleflow-fvtu.vercel.app</span>
+        </div>
+      </div>
+      <div style={{ display: 'flex', height: 480 }}>
+        {/* Sidebar */}
+        <div style={{ width: 200, background: '#07070c', borderRight: '1px solid rgba(255,255,255,0.04)', display: 'flex', flexDirection: 'column', padding: '16px 10px', gap: 2, flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', marginBottom: 12 }}>
+            <SFMark size={22} />
+            <span style={{ fontSize: 13, fontWeight: 800, color: '#F2F0FF' }}>ScaleFlow</span>
+          </div>
+          {[{ icon: '📊', label: 'Dashboard', active: false }, { icon: '📱', label: 'Téléphones', active: false }, { icon: '⚡', label: 'Mass Posting', active: true }, { icon: '📅', label: 'Programmation', active: false }, { icon: '🗂', label: 'Banque vidéos', active: false }, { icon: '🔀', label: 'Remix vidéo', active: false }, { icon: '🤖', label: 'Outils IA', active: false }].map(item => (
+            <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 8, fontSize: 12, background: item.active ? 'rgba(124,58,237,0.15)' : 'transparent', color: item.active ? '#a78bfa' : 'rgba(148,163,184,0.45)', borderLeft: item.active ? '2px solid #7c3aed' : '2px solid transparent' }}>
+              <span style={{ fontSize: 13 }}>{item.icon}</span>
+              <span style={{ fontWeight: item.active ? 600 : 400 }}>{item.label}</span>
+            </div>
+          ))}
+        </div>
+        {/* Main */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#07070c', minWidth: 0 }}>
+          <div style={{ padding: '14px 22px', borderBottom: '1px solid rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div>
+              <p style={{ fontSize: 14, fontWeight: 700, color: '#F2F0FF', margin: 0 }}>Mass Posting</p>
+              <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.4)', margin: '2px 0 0' }}>Poster sur plusieurs comptes en parallèle</p>
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <div style={{ padding: '6px 14px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', fontSize: 11, color: 'rgba(148,163,184,0.5)' }}>Paramètres</div>
+              <div style={{ padding: '6px 14px', borderRadius: 8, background: 'linear-gradient(130deg,#7c3aed,#ec4899)', fontSize: 11, color: '#fff', fontWeight: 700 }}>▶ Lancer</div>
+            </div>
+          </div>
+          <div style={{ flex: 1, display: 'flex', padding: 20, gap: 14, overflow: 'hidden' }}>
+            <div style={{ width: 200, display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0 }}>
+              <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(148,163,184,0.3)', margin: '0 0 6px' }}>12 Téléphones</p>
+              {[{ n:'Phone_001',g:'Groupe A',o:true,s:true},{n:'Phone_002',g:'Groupe A',o:true,s:true},{n:'Phone_003',g:'Groupe B',o:false,s:false},{n:'Phone_004',g:'Groupe B',o:true,s:true},{n:'Phone_005',g:'Groupe A',o:true,s:true},{n:'Phone_006',g:'Groupe C',o:false,s:false}].map(p => (
+                <div key={p.n} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '6px 8px', borderRadius: 7, background: p.s ? 'rgba(124,58,237,0.10)' : 'transparent', border: p.s ? '1px solid rgba(124,58,237,0.18)' : '1px solid transparent' }}>
+                  <div style={{ width: 6, height: 6, borderRadius: '50%', background: p.o ? '#22c55e' : 'rgba(148,163,184,0.2)', flexShrink: 0 }} />
+                  <div style={{ minWidth: 0 }}>
+                    <p style={{ fontSize: 11, fontWeight: 600, color: p.s ? '#c4b5fd' : 'rgba(148,163,184,0.45)', margin: 0 }}>{p.n}</p>
+                    <p style={{ fontSize: 9, color: 'rgba(148,163,184,0.28)', margin: 0 }}>{p.g}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
+              <div>
+                <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(148,163,184,0.3)', margin: '0 0 8px' }}>Vidéos — 3</p>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {['#7c3aed','#ec4899','#3b82f6'].map((c,i) => <div key={i} style={{ width: 52, height: 52, borderRadius: 8, background: `${c}18`, border: `1px solid ${c}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>🎬</div>)}
+                </div>
+              </div>
+              <div style={{ flex: 1, fontFamily: 'monospace', display: 'flex', flexDirection: 'column', gap: 3 }}>
+                <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(148,163,184,0.3)', margin: '0 0 6px' }}>Live log</p>
+                {[{t:'14:22:01',m:'✅ Phone_001 — Publication réussie',c:'#22c55e'},{t:'14:22:03',m:'✅ Phone_002 — Publication réussie',c:'#22c55e'},{t:'14:22:05',m:'⏳ Phone_004 — Upload en cours…',c:'#a78bfa'},{t:'14:22:07',m:'✅ Phone_005 — Publication réussie',c:'#22c55e'}].map((l,i) => (
+                  <div key={i} style={{ display: 'flex', gap: 8, fontSize: 10 }}>
+                    <span style={{ color: 'rgba(148,163,184,0.25)', flexShrink: 0 }}>{l.t}</span>
+                    <span style={{ color: l.c }}>{l.m}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── App mockup (screenshot) ───────────────────────────────────────────────────
 function AppMockup() {
+  const [imgFailed, setImgFailed] = useState(false)
+
   return (
     <div style={{ maxWidth: 1020, margin: '0 auto', position: 'relative' }}>
       {/* outer nebula glow */}
@@ -279,11 +355,16 @@ function AppMockup() {
 
       {/* floating wrapper */}
       <div style={{ position: 'relative', animation: 'sf-float 7s ease-in-out infinite', transformOrigin: 'center bottom' }}>
-        <img
-          src="/mockup.png"
-          alt="ScaleFlow — Mass Posting UI"
-          style={{ width: '100%', height: 'auto', borderRadius: 18, border: '1px solid rgba(139,92,246,0.28)', boxShadow: '0 40px 100px rgba(0,0,0,0.75), 0 0 0 1px rgba(255,255,255,0.04), 0 0 80px rgba(124,58,237,0.15)', display: 'block' }}
-        />
+        {!imgFailed ? (
+          <img
+            src="/mockup.png"
+            alt="ScaleFlow — Mass Posting UI"
+            onError={() => setImgFailed(true)}
+            style={{ width: '100%', height: 'auto', borderRadius: 18, border: '1px solid rgba(139,92,246,0.28)', boxShadow: '0 40px 100px rgba(0,0,0,0.75), 0 0 0 1px rgba(255,255,255,0.04), 0 0 80px rgba(124,58,237,0.15)', display: 'block' }}
+          />
+        ) : (
+          <MockupFallback />
+        )}
         {/* inner top shine */}
         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 120, borderRadius: '18px 18px 0 0', background: 'linear-gradient(180deg, rgba(255,255,255,0.025) 0%, transparent 100%)', pointerEvents: 'none' }} />
       </div>
