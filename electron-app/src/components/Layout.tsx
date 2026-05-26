@@ -15,6 +15,7 @@ import {
 } from '@/lib/notificationStore'
 import { useLicense } from '@/lib/license'
 import { useCredits } from '@/lib/credits'
+import { AuthPage }   from '@/components/auth/AuthPage'
 
 const CREDIT_AUTO_RECHARGE = 10_000
 const CREDIT_MAX_DISPLAY   = 150_000
@@ -199,6 +200,15 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
   const [userMenuPos, setUserMenuPos]   = useState<{ left: number; bottom: number; width: number } | null>(null)
   const [recentAccounts, setRecentAccounts] = useState<RecentAccount[]>([])
   const [switchErr, setSwitchErr]           = useState<string | null>(null)
+  const [showAddAccount, setShowAddAccount] = useState(false)
+
+  useEffect(() => {
+    if (!showAddAccount) return
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(event => {
+      if (event === 'SIGNED_IN') setShowAddAccount(false)
+    })
+    return () => subscription.unsubscribe()
+  }, [showAddAccount])
   const { myOrgs, currentOrg, role, perms, switchOrg, loading: orgLoading } = useOrg()
   const license = useLicense()
   const credits = useCredits()
@@ -369,9 +379,9 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
     setRecentAccounts(getRecentAccounts().filter(x => x.user_id !== user.id))
   }
 
-  async function handleAddAccount() {
+  function handleAddAccount() {
     setUserMenuOpen(false)
-    await supabase.auth.signOut()
+    setShowAddAccount(true)
   }
 
   const isVisibleTab = (id: Page): boolean => {
@@ -1362,6 +1372,22 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             )
           })}
         </nav>
+      )}
+
+      {/* ── Add account modal ───────────────────────────────────────────── */}
+      {showAddAccount && (
+        <div
+          style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(14px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+          onClick={e => { if (e.target === e.currentTarget) setShowAddAccount(false) }}
+        >
+          <div style={{ position: 'relative', width: '100%', maxWidth: 420 }}>
+            <button
+              onClick={() => setShowAddAccount(false)}
+              style={{ position: 'absolute', top: -14, right: -14, zIndex: 10, width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#12121c', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(148,163,184,0.7)', cursor: 'pointer', fontSize: 14 }}
+            >✕</button>
+            <AuthPage />
+          </div>
+        </div>
       )}
     </div>
   )
