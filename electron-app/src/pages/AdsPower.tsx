@@ -41,9 +41,11 @@ const STATUS_ICON: Record<LogStatus, string> = {
 // ── Helpers ────────────────────────────────────────────────────────────────────
 function now() { return new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) }
 
-async function adsRequest(path: string, body?: unknown) {
+async function adsRequest(path: string, apiKey?: string, body?: unknown) {
   const base = 'http://local.adspower.net:50325'
-  const url = `${base}${path}`
+  // Append api_key if provided
+  const sep = path.includes('?') ? '&' : '?'
+  const url = `${base}${path}${apiKey ? `${sep}serial_number=${encodeURIComponent(apiKey)}` : ''}`
   const res = await fetch(url, {
     method: body ? 'POST' : 'GET',
     headers: body ? { 'Content-Type': 'application/json' } : undefined,
@@ -172,15 +174,24 @@ export function AdsPower({ user }: AdsPowerProps) {
   const [delayMin, setDelayMin]     = useState(60)
   const [syncing, setSyncing]       = useState(false)
   const [syncError, setSyncError]   = useState<string | null>(null)
+  const [apiKey, setApiKey]         = useState('')
+  const [showKey, setShowKey]       = useState(false)
   const logEndRef = useRef<HTMLDivElement>(null)
 
-  // ── Load profiles from localStorage ──────────────────────────────────────
+  // ── Load profiles + API key from localStorage ─────────────────────────────
   useEffect(() => {
     try {
       const saved = localStorage.getItem(`adspower-profiles-${user.id}`)
       if (saved) setProfiles(JSON.parse(saved))
+      const key = localStorage.getItem(`adspower-apikey-${user.id}`)
+      if (key) setApiKey(key)
     } catch {}
   }, [user.id])
+
+  const saveApiKey = (k: string) => {
+    setApiKey(k)
+    localStorage.setItem(`adspower-apikey-${user.id}`, k)
+  }
 
   const saveProfiles = (p: FbProfile[]) => {
     setProfiles(p)
@@ -196,7 +207,7 @@ export function AdsPower({ user }: AdsPowerProps) {
       let allProfiles: FbProfile[] = []
       let page = 1
       while (true) {
-        const res = await adsRequest(`/api/v1/user/list?page=${page}&page_size=100`)
+        const res = await adsRequest(`/api/v1/user/list?page=${page}&page_size=100`, apiKey || undefined)
         if (res.code !== 0) throw new Error(res.msg ?? 'Erreur API AdsPower')
         const rows: Array<{
           user_id: string
@@ -277,7 +288,7 @@ export function AdsPower({ user }: AdsPowerProps) {
   const postToProfile = async (profile: FbProfile, videoUrl: string) => {
     // 1. Start browser
     addLog(profile.id, profile.name, 'running', 'Ouverture du navigateur AdsPower…')
-    const startRes = await adsRequest(`/api/v1/browser/start?user_id=${profile.ads_user_id}`)
+    const startRes = await adsRequest(`/api/v1/browser/start?user_id=${profile.ads_user_id}`, apiKey || undefined)
     if (startRes.code !== 0) throw new Error(`Démarrage échoué : ${startRes.msg}`)
 
     const wsUrl = startRes.data?.ws?.puppeteer
@@ -301,7 +312,7 @@ export function AdsPower({ user }: AdsPowerProps) {
     }
 
     // 3. Close browser
-    await adsRequest(`/api/v1/browser/stop?user_id=${profile.ads_user_id}`)
+    await adsRequest(`/api/v1/browser/stop?user_id=${profile.ads_user_id}`, apiKey || undefined)
   }
 
   // ── Launch ─────────────────────────────────────────────────────────────────
@@ -336,7 +347,7 @@ export function AdsPower({ user }: AdsPowerProps) {
       } catch (e: unknown) {
         updateLog(p.id, 'error', `❌ ${(e as Error).message}`)
         // Close browser on error silently
-        try { await adsRequest(`/api/v1/browser/stop?user_id=${p.ads_user_id}`) } catch {}
+        try { await adsRequest(`/api/v1/browser/stop?user_id=${p.ads_user_id}`, apiKey || undefined) } catch {}
       }
 
       // Delay between posts
@@ -371,6 +382,30 @@ export function AdsPower({ user }: AdsPowerProps) {
               style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: 'rgba(148,163,184,0.7)', fontSize: 12, cursor: 'pointer' }}>
               + Manuel
             </button>
+          </div>
+
+          {/* API Key */}
+          <div style={{ marginBottom: 10 }}>
+            <label style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(148,163,184,0.4)', display: 'block', marginBottom: 5 }}>
+              Clé API AdsPower
+            </label>
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+              <input
+                type={showKey ? 'text' : 'password'}
+                value={apiKey}
+                onChange={e => saveApiKey(e.target.value)}
+                placeholder="Colle ta clé ici…"
+                style={{ width: '100%', boxSizing: 'border-box', padding: '8px 36px 8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)', color: '#F2F0FF', fontSize: 12, outline: 'none', fontFamily: 'monospace' }}
+              />
+              <button
+                onClick={() => setShowKey(v => !v)}
+                style={{ position: 'absolute', right: 8, background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(148,163,184,0.4)', fontSize: 13, padding: 0 }}>
+                {showKey ? '🙈' : '👁'}
+              </button>
+            </div>
+            <p style={{ fontSize: 10, color: 'rgba(148,163,184,0.25)', margin: '4px 0 0' }}>
+              AdsPower → Paramètres → Clé API. Optionnel si accès local.
+            </p>
           </div>
 
           {/* Sync button */}
