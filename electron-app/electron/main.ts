@@ -1062,15 +1062,18 @@ ipcMain.handle('run-ffmpeg-remix-ai', async (_event, opts: {
     let audioEncArgs: string[]
 
     // Input layout:
-    //  [0] secondary  — read up to splitTime via -t (avoids last-frame freeze)
-    //  [1] original   — full file, used for audio atrim
-    //  [2] original   — fast-seeked to splitTime via -ss (clean timestamps, no trim filter needed)
-    // Using -ss before input (fast seek) instead of trim= filter eliminates timestamp
-    // discontinuities that caused frozen frames in the concat output.
+    //  [0] secondary  — read up to splitTime via -t
+    //  [1] original   — full file; trim filter used for both video phase 2 AND audio
+    //
+    // We use the trim filter (not fast-seek -ss) for phase 2 video because fast-seek
+    // jumps to the nearest keyframe BEFORE splitTime, producing incorrect PTS on the
+    // first decoded frames → visible freeze at the cut point.
+    // trim= is frame-accurate: it decodes from the start but discards frames before
+    // splitTime, so the concat boundary is clean.
     if (origHasAudio) {
       filterComplex = [
         `[0:v]setpts=PTS-STARTPTS,${vfPhase1}[v_p1]`,
-        `[2:v]setpts=PTS-STARTPTS,${vfPhase2}[v_p2]`,
+        `[1:v]fps=30,trim=start=${splitTime},setpts=PTS-STARTPTS,${scl}[v_p2]`,
         `[1:a]asplit=2[ao1][ao2]`,
         `[ao1]atrim=end=${splitTime},asetpts=PTS-STARTPTS,${afmt}[a_p1]`,
         `[ao2]atrim=start=${splitTime},asetpts=PTS-STARTPTS,${afmt}[a_p2]`,
@@ -1081,7 +1084,7 @@ ipcMain.handle('run-ffmpeg-remix-ai', async (_event, opts: {
     } else {
       filterComplex = [
         `[0:v]setpts=PTS-STARTPTS,${vfPhase1}[v_p1]`,
-        `[2:v]setpts=PTS-STARTPTS,${vfPhase2}[v_p2]`,
+        `[1:v]fps=30,trim=start=${splitTime},setpts=PTS-STARTPTS,${scl}[v_p2]`,
         `[v_p1][v_p2]concat=n=2:v=1:a=0[vout]`,
       ].join(';')
       mapArgs      = ['-map', '[vout]']
@@ -1091,8 +1094,7 @@ ipcMain.handle('run-ffmpeg-remix-ai', async (_event, opts: {
     args = [
       '-nostdin',
       '-t', String(splitTime), '-i', opts.newPhase1Path,  // [0] secondary up to splitTime
-      '-i', opts.originalPath,                              // [1] full original (audio)
-      '-ss', String(splitTime), '-i', opts.originalPath,   // [2] original fast-seeked (video phase 2)
+      '-i', opts.originalPath,                              // [1] full original (video + audio)
       '-filter_complex', filterComplex,
       ...mapArgs,
       ...commonOutputFlags,
