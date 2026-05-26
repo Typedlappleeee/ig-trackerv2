@@ -45,20 +45,38 @@ function now() { return new Date().toLocaleTimeString('fr-FR', { hour: '2-digit'
 async function adsRequest(urlPath: string, apiKey?: string, body?: unknown): Promise<any> {
   const sep = urlPath.includes('?') ? '&' : '?'
   const fullPath = `${urlPath}${apiKey ? `${sep}serial_number=${encodeURIComponent(apiKey)}` : ''}`
+  const fetchOpts: RequestInit = {
+    method: body ? 'POST' : 'GET',
+    headers: body ? { 'Content-Type': 'application/json' } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+  }
 
+  // Electron: use Node http IPC bridge (no restrictions)
   const api = (window as unknown as {
     electronAPI?: {
       adspowerRequest?: (opts: { method: 'GET' | 'POST'; path: string; body?: unknown }) => Promise<{ ok: boolean; data?: unknown; error?: string }>
     }
   }).electronAPI
-
-  if (!api?.adspowerRequest) {
-    throw new Error("AdsPower n'est disponible que dans l'application desktop (Electron), pas dans le navigateur.")
+  if (api?.adspowerRequest) {
+    const result = await api.adspowerRequest({ method: body ? 'POST' : 'GET', path: fullPath, body })
+    if (!result.ok) throw new Error(result.error ?? 'AdsPower IPC error')
+    return result.data
   }
 
-  const result = await api.adspowerRequest({ method: body ? 'POST' : 'GET', path: fullPath, body })
-  if (!result.ok) throw new Error(result.error ?? 'AdsPower IPC error')
-  return result.data
+  // Browser: Chrome allows HTTP requests to localhost from HTTPS pages (secure context exception).
+  // Try localhost then 127.0.0.1 — both resolve to AdsPower's local server.
+  const hosts = ['localhost', '127.0.0.1']
+  let lastErr = ''
+  for (const host of hosts) {
+    try {
+      const res = await fetch(`http://${host}:50325${fullPath}`, fetchOpts)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      return await res.json()
+    } catch (e) {
+      lastErr = (e as Error).message
+    }
+  }
+  throw new Error(`AdsPower inaccessible (${lastErr}). Vérifiez qu'AdsPower est ouvert sur ce PC.`)
 }
 
 // ── Profile row ────────────────────────────────────────────────────────────────
