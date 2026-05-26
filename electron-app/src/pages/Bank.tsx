@@ -1407,10 +1407,11 @@ export function VideoThumbnail({ filePath, thumbnailPath, storagePath }: {
   storagePath?:   string | null
 }) {
   const videoRef = useRef<HTMLVideoElement>(null)
-  const [failed,   setFailed]   = useState(false)
-  const [loading,  setLoading]  = useState(true)
-  const [thumbUrl, setThumbUrl] = useState<string | null>(null)
-  const [videoSrc, setVideoSrc] = useState<string | null>(null)
+  const [failed,    setFailed]    = useState(false)
+  const [loading,   setLoading]   = useState(true)
+  const [thumbUrl,  setThumbUrl]  = useState<string | null>(null)
+  const [videoSrc,  setVideoSrc]  = useState<string | null>(null)
+  const [retryKey,  setRetryKey]  = useState(0)
 
   useEffect(() => {
     let cancelled = false
@@ -1433,7 +1434,13 @@ export function VideoThumbnail({ filePath, thumbnailPath, storagePath }: {
       setLoading(false)
     }
     return () => { cancelled = true }
-  }, [thumbnailPath, storagePath])
+  }, [thumbnailPath, storagePath, retryKey])
+
+  // Retry once on load error (URL may have expired mid-session)
+  const handleError = () => {
+    if (retryKey === 0) setRetryKey(1)
+    else setFailed(true)
+  }
 
   if (failed) return (
     <div className="w-full h-full flex flex-col items-center justify-center bg-surface2 gap-1">
@@ -1448,7 +1455,7 @@ export function VideoThumbnail({ filePath, thumbnailPath, storagePath }: {
     return (
       <img src={thumbUrl} alt=""
         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-        onError={() => setFailed(true)} />
+        onError={handleError} />
     )
   }
 
@@ -1459,7 +1466,7 @@ export function VideoThumbnail({ filePath, thumbnailPath, storagePath }: {
       return (
         <img src={videoSrc} alt=""
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-          onError={() => setFailed(true)} />
+          onError={handleError} />
       )
     }
     return (
@@ -1469,7 +1476,7 @@ export function VideoThumbnail({ filePath, thumbnailPath, storagePath }: {
         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
         muted playsInline preload="metadata"
         onLoadedMetadata={() => { if (videoRef.current) videoRef.current.currentTime = 0.5 }}
-        onError={() => setFailed(true)}
+        onError={handleError}
       />
     )
   }
@@ -1505,6 +1512,7 @@ function VideoPlayerModal({ item, onClose }: { item: ContentItem; onClose: () =>
   const videoRef = useRef<HTMLVideoElement>(null)
   const [cloudUrl, setCloudUrl] = useState<string | null>(null)
   const [urlError, setUrlError] = useState(false)
+  const [retryKey, setRetryKey] = useState(0)
 
   useEffect(() => {
     let cancelled = false
@@ -1516,7 +1524,12 @@ function VideoPlayerModal({ item, onClose }: { item: ContentItem; onClose: () =>
       })
     }
     return () => { cancelled = true }
-  }, [item.storage_path])
+  }, [item.storage_path, retryKey])
+
+  const handleVideoError = () => {
+    if (retryKey === 0) { setCloudUrl(null); setRetryKey(1) }
+    else setUrlError(true)
+  }
 
   const localUrl = item.storage_path
     ? cloudUrl ?? ''
@@ -1587,7 +1600,7 @@ function VideoPlayerModal({ item, onClose }: { item: ContentItem; onClose: () =>
             controls
             autoPlay
             style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
-            onError={() => setUrlError(true)}
+            onError={handleVideoError}
           />
         )}
       </div>
