@@ -556,6 +556,51 @@ ipcMain.handle('adspower-request', (_event, opts: {
   return tryHost(0)
 })
 
+// ── CORS proxy for AdsPower (allows web app to reach local.adspower.net) ────
+// The browser blocks HTTPS→HTTP requests (Private Network Access / CORS).
+// This proxy runs on localhost:50327, forwards to AdsPower on :50325, and
+// adds the required CORS headers so the web app can call it directly.
+const ADS_PROXY_PORT = 50327
+const adsProxy = http.createServer((req, proxyRes) => {
+  const cors = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Private-Network': 'true',
+  }
+  if (req.method === 'OPTIONS') {
+    proxyRes.writeHead(204, cors)
+    proxyRes.end()
+    return
+  }
+  let body = ''
+  req.on('data', c => { body += c })
+  req.on('end', () => {
+    const fwd = http.request({
+      hostname: '127.0.0.1', port: 50325,
+      path: req.url, method: req.method,
+      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
+    }, (upstream) => {
+      let raw = ''
+      upstream.on('data', c => { raw += c })
+      upstream.on('end', () => {
+        proxyRes.writeHead(upstream.statusCode ?? 200, { ...cors, 'Content-Type': 'application/json' })
+        proxyRes.end(raw)
+      })
+    })
+    fwd.on('error', () => {
+      proxyRes.writeHead(502, cors)
+      proxyRes.end(JSON.stringify({ code: -1, msg: 'AdsPower unreachable' }))
+    })
+    if (body) fwd.write(body)
+    fwd.end()
+  })
+})
+adsProxy.listen(ADS_PROXY_PORT, '127.0.0.1', () => {
+  console.log(`[adspower-proxy] listening on http://127.0.0.1:${ADS_PROXY_PORT}`)
+})
+adsProxy.on('error', (e) => console.warn('[adspower-proxy] start error:', e.message))
+
 // ── IPC: open native file picker ────────────────────────────────────────────
 ipcMain.handle('pick-video-file', async () => {
   if (!win) return null

@@ -63,20 +63,26 @@ async function adsRequest(urlPath: string, apiKey?: string, body?: unknown): Pro
     return result.data
   }
 
-  // Browser: Chrome allows HTTP requests to localhost from HTTPS pages (secure context exception).
-  // Try localhost then 127.0.0.1 — both resolve to AdsPower's local server.
-  const hosts = ['localhost', '127.0.0.1']
+  // Browser path: try ports in order.
+  // Port 50327 = Electron's CORS proxy (launched by the desktop app, adds required headers).
+  // Port 50325 = AdsPower direct (works if browser allows HTTP→localhost, fallback).
+  const endpoints = [
+    `http://127.0.0.1:50327${fullPath}`,  // Electron CORS proxy
+    `http://localhost:50327${fullPath}`,   // same, alt hostname
+    `http://localhost:50325${fullPath}`,   // AdsPower direct
+    `http://127.0.0.1:50325${fullPath}`,  // AdsPower direct, alt
+  ]
   let lastErr = ''
-  for (const host of hosts) {
+  for (const url of endpoints) {
     try {
-      const res = await fetch(`http://${host}:50325${fullPath}`, fetchOpts)
+      const res = await fetch(url, fetchOpts)
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       return await res.json()
     } catch (e) {
       lastErr = (e as Error).message
     }
   }
-  throw new Error(`AdsPower inaccessible (${lastErr}). Vérifiez qu'AdsPower est ouvert sur ce PC.`)
+  throw new Error(`AdsPower inaccessible (${lastErr}). Ouvrez l'app desktop ScaleFlow sur ce PC, puis réessayez.`)
 }
 
 // ── Profile row ────────────────────────────────────────────────────────────────
