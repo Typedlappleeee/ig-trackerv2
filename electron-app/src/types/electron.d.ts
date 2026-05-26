@@ -93,6 +93,10 @@ interface ElectronAPI {
     Promise<{ ok: boolean; metadata?: Record<string, string>; duration?: number; error?: string }>
   runFfmpegMetadata: (opts: { inputPath: string; outputPath: string; metadata: Record<string, string> }) =>
     Promise<{ ok: boolean; outputPath?: string; command?: string; error?: string }>
+  runTesseractOcr: (opts: { imageBase64: string; lang?: string }) =>
+    Promise<{ ok: boolean; text?: string; error?: string }>
+  adspowerRequest: (opts: { method: 'GET' | 'POST'; path: string; body?: unknown }) =>
+    Promise<{ ok: boolean; data?: unknown; error?: string }>
 }
 
 declare global {
