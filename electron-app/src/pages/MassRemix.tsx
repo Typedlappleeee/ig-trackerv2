@@ -125,68 +125,67 @@ function wrapText(text: string, fontSize: number, frameW = 1080): string[] {
   return lines.length ? lines : [text]
 }
 
-function VideoListPanel({
-  label, paths, accent, loading, onAddBank, onAddPC, onAddFolder, onRemove,
+function VideoSourcePanel({
+  title, phase, accent, paths, loading,
+  onAddBank, onAddPC, onAddFolder, onRemove,
 }: {
-  label: string; paths: string[]; accent: string; loading?: boolean
+  title: string; phase: string; accent: string; paths: string[]; loading?: boolean
   onAddBank: () => void; onAddPC: () => void; onAddFolder: () => void; onRemove: (i: number) => void
 }) {
   return (
-    <div className="flex flex-col h-full min-h-0">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2.5">
-          <div className="w-1.5 h-5 rounded-full flex-shrink-0" style={{ background: accent }} />
-          <p className="text-[14px] font-bold text-white">{label}</p>
-        </div>
-        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full"
-          style={{ background: `${accent}20`, color: accent }}>
-          {paths.length} vidéo{paths.length !== 1 ? 's' : ''}
-        </span>
-      </div>
-
-      <div className="flex gap-2 mb-3 flex-shrink-0">
-        <button onClick={onAddBank}
-          className="flex-1 rounded-xl py-2 text-[12px] font-semibold transition-all hover:brightness-110"
-          style={{ background: `${accent}15`, color: accent, border: `1px solid ${accent}28` }}>
-          🗂 Banque
-        </button>
-        <button onClick={onAddFolder}
-          className="flex-1 rounded-xl py-2 text-[12px] font-semibold transition-all hover:brightness-110"
-          style={{ background: 'rgba(139,92,246,0.08)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.2)' }}>
-          📁 Dossier
-        </button>
-        <button onClick={onAddPC}
-          className="flex-1 rounded-xl py-2 text-[12px] font-semibold transition-all"
-          style={{ background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.7)', border: '1px solid rgba(255,255,255,0.07)' }}>
-          💾 PC
-        </button>
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', borderRadius: 14, border: `1px solid ${accent}28`, background: `${accent}06`, overflow: 'hidden', minHeight: 0, minWidth: 0 }}>
+      {/* Panel header */}
+      <div style={{ padding: '10px 13px', borderBottom: `1px solid ${accent}16`, display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+        <div style={{ width: 3, height: 13, borderRadius: 99, background: accent, flexShrink: 0 }} />
+        <p style={{ fontSize: 12, fontWeight: 700, color: '#F1F0F7', flex: 1 }}>{title}</p>
+        <span style={{ fontSize: 8, fontWeight: 800, letterSpacing: '0.1em', padding: '2px 6px', borderRadius: 4, background: `${accent}16`, color: accent, border: `1px solid ${accent}28` }}>{phase}</span>
+        {paths.length > 0 && <span style={{ fontSize: 11, fontWeight: 800, color: accent, marginLeft: 2 }}>{paths.length}</span>}
       </div>
 
       {loading && (
-        <div className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 mb-2 flex-shrink-0"
-          style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)' }}>
-          <svg className="animate-spin w-4 h-4 flex-shrink-0" style={{ color: '#a78bfa' }} viewBox="0 0 24 24" fill="none">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 13px', background: 'rgba(167,139,250,0.06)', flexShrink: 0 }}>
+          <svg style={{ width: 11, height: 11, color: '#a78bfa', animation: 'spin 0.9s linear infinite', flexShrink: 0 }} viewBox="0 0 24 24" fill="none">
             <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="31.4" strokeDashoffset="10" />
           </svg>
-          <p className="text-[12px] font-semibold" style={{ color: '#a78bfa' }}>Ajout du dossier en cours…</p>
+          <span style={{ fontSize: 10, color: '#a78bfa', fontWeight: 600 }}>Chargement…</span>
         </div>
       )}
-      <div className="flex-1 min-h-0 overflow-y-auto space-y-1.5">
+
+      {/* File list */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '7px 9px', display: 'flex', flexDirection: 'column', gap: 2, minHeight: 0 }}>
         {paths.length === 0 ? (
-          <div className="h-full flex items-center justify-center rounded-xl text-[12px]"
-            style={{ border: `1px dashed ${accent}20`, color: 'rgba(196,181,253,0.3)', minHeight: 72 }}>
-            Aucune vidéo ajoutée
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 5, minHeight: 80 }}>
+            <span style={{ fontSize: 22, opacity: 0.09 }}>🎬</span>
+            <p style={{ fontSize: 10, color: 'rgba(148,163,184,0.22)' }}>Aucune vidéo</p>
           </div>
         ) : paths.map((p, i) => (
-          <div key={i} className="group flex items-center gap-2.5 rounded-xl px-3 py-2"
-            style={{ background: `${accent}07`, border: `1px solid ${accent}15` }}>
-            <span className="text-[11px] font-black w-4 text-center flex-shrink-0 opacity-50"
-              style={{ color: accent }}>{i + 1}</span>
-            <span className="text-[12px] font-mono truncate flex-1" style={{ color: 'rgba(226,217,243,0.6)' }}>{fileName(p)}</span>
-            <button onClick={() => onRemove(i)}
-              className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-[11px] text-danger/60 hover:text-danger">✕</button>
+          <div key={i} className="group" style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 7px', borderRadius: 6, background: `${accent}08` }}>
+            <span style={{ fontSize: 8, fontWeight: 900, color: accent, opacity: 0.4, width: 11, textAlign: 'right', flexShrink: 0 }}>{i + 1}</span>
+            <span style={{ fontSize: 10, fontFamily: 'monospace', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'rgba(226,217,243,0.48)' }}>{fileName(p)}</span>
+            <button onClick={() => onRemove(i)} className="opacity-0 group-hover:opacity-100"
+              style={{ fontSize: 9, color: '#f87171', background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0, transition: 'opacity 0.15s', lineHeight: 1, padding: 0 }}>✕</button>
           </div>
         ))}
+      </div>
+
+      {/* Add buttons */}
+      <div style={{ padding: '8px 9px', borderTop: `1px solid ${accent}14`, display: 'flex', gap: 4, flexShrink: 0 }}>
+        <button onClick={onAddBank}
+          style={{ flex: 1, padding: '6px 0', borderRadius: 7, fontSize: 10, fontWeight: 600, cursor: 'pointer', background: `${accent}13`, color: accent, border: `1px solid ${accent}24`, transition: 'background 0.15s' }}
+          onMouseEnter={e => (e.currentTarget.style.background = `${accent}20`)}
+          onMouseLeave={e => (e.currentTarget.style.background = `${accent}13`)}>
+          🗂 Banque
+        </button>
+        <button onClick={onAddFolder}
+          style={{ flex: 1, padding: '6px 0', borderRadius: 7, fontSize: 10, fontWeight: 600, cursor: 'pointer', background: 'rgba(167,139,250,0.06)', color: '#a78bfa', border: '1px solid rgba(167,139,250,0.14)', transition: 'background 0.15s' }}
+          onMouseEnter={e => (e.currentTarget.style.background = 'rgba(167,139,250,0.12)')}
+          onMouseLeave={e => (e.currentTarget.style.background = 'rgba(167,139,250,0.06)')}>
+          📁 Dossier
+        </button>
+        <button onClick={onAddPC}
+          style={{ flex: 1, padding: '6px 0', borderRadius: 7, fontSize: 10, fontWeight: 600, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.38)', border: '1px solid rgba(255,255,255,0.06)' }}>
+          💾 PC
+        </button>
       </div>
     </div>
   )
@@ -1348,250 +1347,167 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
         </div>
       )}
 
-      <div className="h-full flex flex-col overflow-hidden">
+      {/* ── MAIN PAGE ── */}
+      <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
         {/* Header */}
-        <div
-          className="flex-shrink-0 flex items-center justify-between"
-          style={{
-            padding: isMobile ? '14px 16px 12px' : '28px 32px 16px',
-            borderBottom: '1px solid rgba(139,92,246,0.1)',
-          }}
-        >
-          <div>
-            <h1 style={{ fontSize: isMobile ? 17 : 20 }} className="font-black text-white leading-none">Mass Remix</h1>
-            {!isMobile && <p className="text-[13px] text-text2 mt-1">Génère des remixes vidéo en masse avec FFmpeg + IA</p>}
-          </div>
-          <div className="flex items-center gap-2">
+        <div style={{
+          flexShrink: 0, padding: isMobile ? '11px 14px' : '14px 22px',
+          borderBottom: '1px solid rgba(139,92,246,0.1)',
+          background: 'linear-gradient(90deg,rgba(124,58,237,0.07) 0%,transparent 60%)',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             {!isMobile && (
-              <button
-                onClick={openPreview} disabled={!canLaunch}
-                className="flex items-center gap-2 px-4 py-3 rounded-xl text-[14px] font-bold transition-all disabled:opacity-40"
-                style={{ background: canLaunch ? 'rgba(139,92,246,0.15)' : 'rgba(255,255,255,0.04)', color: canLaunch ? '#a78bfa' : 'rgba(255,255,255,0.2)', border: '1px solid rgba(139,92,246,0.25)' }}>
-                <span>👁</span>
-                <span>Plan</span>
+              <div style={{ width: 36, height: 36, borderRadius: 11, background: 'linear-gradient(135deg,#7c3aed,#ec4899)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 3px 14px rgba(124,58,237,0.35)' }}>
+                <span style={{ fontSize: 18 }}>⚡</span>
+              </div>
+            )}
+            <div>
+              <h1 style={{ fontSize: isMobile ? 15 : 18, fontWeight: 900, color: '#F1F0F7', letterSpacing: '-0.02em', lineHeight: 1.1 }}>Mass Remix</h1>
+              {!isMobile && <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.45)', marginTop: 2 }}>Génère des remixes en masse · FFmpeg + IA</p>}
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+            {!isMobile && (
+              <button onClick={openPreview} disabled={!canLaunch}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 13px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: canLaunch ? 'pointer' : 'not-allowed', background: canLaunch ? 'rgba(139,92,246,0.1)' : 'rgba(255,255,255,0.03)', color: canLaunch ? '#a78bfa' : 'rgba(255,255,255,0.18)', border: `1px solid ${canLaunch ? 'rgba(139,92,246,0.26)' : 'rgba(255,255,255,0.06)'}`, opacity: canLaunch ? 1 : 0.5, transition: 'all 0.15s' }}>
+                👁 Plan
               </button>
             )}
-            <button
-              onClick={() => launch()} disabled={!canLaunch}
-              className="flex items-center gap-2.5 rounded-xl font-bold transition-all disabled:opacity-40"
-              style={{
-                padding: isMobile ? '10px 16px' : '12px 24px',
-                fontSize: isMobile ? 13 : 14,
-                background: canLaunch ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.06)',
-                color: '#fff',
-                boxShadow: canLaunch ? '0 4px 20px rgba(124,58,237,0.4)' : 'none',
-              }}>
-              <span>⚡</span>
-              <span>{isMobile ? `Lancer (${copies})` : `Lancer ${copies} remix`}</span>
+            <button onClick={() => launch()} disabled={!canLaunch}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: isMobile ? '8px 14px' : '8px 18px', fontSize: isMobile ? 12 : 13, fontWeight: 800, cursor: canLaunch ? 'pointer' : 'not-allowed', borderRadius: 11, border: 'none', color: '#fff', background: canLaunch ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.06)', boxShadow: canLaunch ? '0 3px 16px rgba(124,58,237,0.38)' : 'none', opacity: canLaunch ? 1 : 0.4, transition: 'all 0.2s' }}>
+              <span>⚡</span><span>{isMobile ? `Lancer (${copies})` : `Lancer ${copies} remix`}</span>
             </button>
           </div>
         </div>
 
-        {/* Body — responsive: 2 columns on desktop, stacked on mobile */}
-        <div
-          className="flex-1 min-h-0 overflow-y-auto"
-          style={{
-            display: 'flex',
-            flexDirection: isMobile ? 'column' : 'row',
-            gap: isMobile ? 12 : 24,
-            padding: isMobile ? '14px 12px' : '32px 40px',
-            overflowX: 'hidden',
-          }}
-        >
+        {/* Body */}
+        <div style={{
+          flex: 1, minHeight: 0, display: 'flex',
+          flexDirection: isMobile ? 'column' : 'row',
+          gap: isMobile ? 10 : 14, padding: isMobile ? '12px' : '16px 22px',
+          overflow: isMobile ? 'auto' : 'hidden',
+        }}>
 
-          {/* LEFT — video pickers */}
-          <div className="flex-1 min-w-0 flex flex-col" style={{ gap: isMobile ? 10 : 20 }}>
-            <div className="rounded-2xl" style={{ padding: isMobile ? '14px' : '24px', background: 'rgba(139,92,246,0.04)', border: '1px solid rgba(139,92,246,0.15)', minHeight: isMobile ? 140 : undefined, flex: isMobile ? 'none' : 1 }}>
-              <VideoListPanel
-                label="Vidéos originales"
-                paths={originals}
-                accent="#8b5cf6"
-                loading={addingTarget === 'orig'}
-                onAddBank={() => setShowBankOrig(true)}
-                onAddFolder={() => openFolderPick('orig')}
-                onAddPC={async () => { const p = await pickPC(false); setOriginals(prev => [...prev, ...p]) }}
-                onRemove={i => setOriginals(prev => prev.filter((_, j) => j !== i))}
-              />
-            </div>
-            <div className="rounded-2xl" style={{ padding: isMobile ? '14px' : '24px', background: 'rgba(236,72,153,0.04)', border: '1px solid rgba(236,72,153,0.15)', minHeight: isMobile ? 140 : undefined, flex: isMobile ? 'none' : 1 }}>
-              <VideoListPanel
-                label="Nouvelles Phase 1"
-                paths={secondaries}
-                accent="#ec4899"
-                loading={addingTarget === 'sec'}
-                onAddBank={() => setShowBankSec(true)}
-                onAddFolder={() => openFolderPick('sec')}
-                onAddPC={async () => { const p = await pickPC(false); setSecondaries(prev => [...prev, ...p]) }}
-                onRemove={i => setSecondaries(prev => prev.filter((_, j) => j !== i))}
-              />
-            </div>
+          {/* LEFT: two source panels SIDE BY SIDE */}
+          <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 10 : 10 }}>
+            <VideoSourcePanel
+              title="Originales" phase="PHASE 2" accent="#8b5cf6"
+              paths={originals} loading={addingTarget === 'orig'}
+              onAddBank={() => setShowBankOrig(true)}
+              onAddFolder={() => openFolderPick('orig')}
+              onAddPC={async () => { const p = await pickPC(false); setOriginals(prev => [...prev, ...p]) }}
+              onRemove={i => setOriginals(prev => prev.filter((_, j) => j !== i))}
+            />
+            <VideoSourcePanel
+              title="Phase 1 · Sources" phase="PHASE 1" accent="#ec4899"
+              paths={secondaries} loading={addingTarget === 'sec'}
+              onAddBank={() => setShowBankSec(true)}
+              onAddFolder={() => openFolderPick('sec')}
+              onAddPC={async () => { const p = await pickPC(false); setSecondaries(prev => [...prev, ...p]) }}
+              onRemove={i => setSecondaries(prev => prev.filter((_, j) => j !== i))}
+            />
           </div>
 
-          {/* RIGHT — settings panel */}
-          <div className="flex flex-col gap-3" style={{ width: isMobile ? '100%' : 288, flexShrink: 0 }}>
+          {/* RIGHT: config sidebar */}
+          <div style={{ width: isMobile ? '100%' : 248, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 7, overflowY: isMobile ? undefined : 'auto' }}>
+
+            {!isMobile && <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', color: 'rgba(148,163,184,0.22)', textTransform: 'uppercase', padding: '0 2px' }}>Configuration</p>}
 
             {/* Copies */}
-            <div className="rounded-2xl p-4" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-              <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: 'rgba(148,163,184,0.5)' }}>Nombre de copies</p>
-              <div className="flex items-center gap-3 mb-2">
-                <button onClick={() => setCopies(c => Math.max(1, c - 1))}
-                  className="w-8 h-8 rounded-xl text-[16px] font-black flex items-center justify-center transition-all hover:bg-white/[0.07]"
-                  style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(196,181,253,0.7)' }}>−</button>
-                <input type="number" min={1} max={200} value={copies}
-                  onChange={e => setCopies(Math.max(1, Math.min(200, Number(e.target.value))))}
-                  className="flex-1 py-1 text-[26px] font-black text-white text-center focus:outline-none"
-                  style={{ background: 'transparent', border: 'none' }} />
-                <button onClick={() => setCopies(c => Math.min(200, c + 1))}
-                  className="w-8 h-8 rounded-xl text-[16px] font-black flex items-center justify-center transition-all hover:bg-white/[0.07]"
-                  style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(196,181,253,0.7)' }}>+</button>
+            <div style={{ borderRadius: 12, padding: '12px 13px', background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(148,163,184,0.35)', marginBottom: 9 }}>Copies</p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 7 }}>
+                <button onClick={() => setCopies(c => Math.max(1, c - 1))} style={{ width: 28, height: 28, borderRadius: 8, fontSize: 15, fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: 'rgba(196,181,253,0.7)', cursor: 'pointer', flexShrink: 0 }}>−</button>
+                <input type="number" min={1} max={200} value={copies} onChange={e => setCopies(Math.max(1, Math.min(200, Number(e.target.value))))} style={{ flex: 1, background: 'transparent', border: 'none', textAlign: 'center', fontSize: 26, fontWeight: 900, color: '#F1F0F7', outline: 'none' }} />
+                <button onClick={() => setCopies(c => Math.min(200, c + 1))} style={{ width: 28, height: 28, borderRadius: 8, fontSize: 15, fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: 'rgba(196,181,253,0.7)', cursor: 'pointer', flexShrink: 0 }}>+</button>
               </div>
-              <input type="range" min={1} max={50} value={Math.min(copies, 50)}
-                onChange={e => setCopies(Number(e.target.value))} className="w-full" />
+              <input type="range" min={1} max={50} value={Math.min(copies, 50)} onChange={e => setCopies(Number(e.target.value))} style={{ width: '100%' }} />
               {originals.length > 0 && secondaries.length > 0 && (
-                <p className="text-[11px] mt-1.5" style={{ color: 'rgba(148,163,184,0.45)' }}>
-                  🔀 {originals.length} orig × {secondaries.length} sec → <span style={{ color: '#a78bfa' }}>{copies} vidéos</span>
-                </p>
+                <p style={{ fontSize: 10, marginTop: 5, color: 'rgba(148,163,184,0.32)' }}>🔀 {originals.length} × {secondaries.length} → <span style={{ color: '#a78bfa', fontWeight: 700 }}>{copies} vidéos</span></p>
               )}
             </div>
 
-            {/* AI Detection — prominent, before format */}
-            <button
-              onClick={() => setAiEnabled(v => { const next = !v; localStorage.setItem('sf_remix_ai', next ? '1' : '0'); return next })}
-              className="rounded-2xl p-4 text-left transition-all w-full"
-              style={{
-                background: aiEnabled ? 'rgba(124,58,237,0.12)' : 'rgba(255,255,255,0.03)',
-                border: `1px solid ${aiEnabled ? 'rgba(139,92,246,0.45)' : 'rgba(255,255,255,0.07)'}`,
-                boxShadow: aiEnabled ? '0 0 20px rgba(124,58,237,0.12)' : 'none',
-              }}>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="text-[16px]">✨</span>
+            {/* AI toggle */}
+            <button onClick={() => setAiEnabled(v => { const next = !v; localStorage.setItem('sf_remix_ai', next ? '1' : '0'); return next })}
+              style={{ borderRadius: 12, padding: '10px 13px', textAlign: 'left', cursor: 'pointer', width: '100%', border: 'none', background: aiEnabled ? 'rgba(124,58,237,0.1)' : 'rgba(255,255,255,0.025)', outline: `1px solid ${aiEnabled ? 'rgba(139,92,246,0.35)' : 'rgba(255,255,255,0.07)'}`, boxShadow: aiEnabled ? '0 0 14px rgba(124,58,237,0.1)' : 'none', transition: 'all 0.2s' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                  <div style={{ width: 28, height: 28, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: aiEnabled ? 'rgba(139,92,246,0.15)' : 'rgba(255,255,255,0.05)' }}><span style={{ fontSize: 13 }}>✨</span></div>
                   <div>
-                    <p className="text-[13px] font-bold leading-tight" style={{ color: aiEnabled ? '#c4b5fd' : 'rgba(196,181,253,0.6)' }}>
-                      Détection texte IA
-                    </p>
-                    <p className="text-[11px] leading-tight" style={{ color: 'rgba(148,163,184,0.45)' }}>Claude Vision</p>
+                    <p style={{ fontSize: 12, fontWeight: 700, color: aiEnabled ? '#c4b5fd' : 'rgba(196,181,253,0.45)', lineHeight: 1.2 }}>Détection IA</p>
+                    <p style={{ fontSize: 9, color: 'rgba(148,163,184,0.3)', lineHeight: 1.2 }}>Claude Vision</p>
                   </div>
                 </div>
-                <div className="w-10 h-[22px] rounded-full relative flex-shrink-0 transition-all"
-                  style={{ background: aiEnabled ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.1)' }}>
-                  <span className={`absolute top-[3px] w-4 h-4 rounded-full bg-white shadow transition-transform ${aiEnabled ? 'translate-x-5' : 'translate-x-[3px]'}`} />
+                <div style={{ width: 32, height: 18, borderRadius: 99, position: 'relative', flexShrink: 0, background: aiEnabled ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.1)', transition: 'background 0.2s' }}>
+                  <span style={{ position: 'absolute', top: 2, width: 14, height: 14, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.3)', transition: 'transform 0.2s', transform: `translateX(${aiEnabled ? 16 : 2}px)`, display: 'block' }} />
                 </div>
               </div>
-              {aiEnabled && (
-                <p className="mt-2 text-[11px] leading-relaxed" style={{ color: 'rgba(148,163,184,0.5)' }}>
-                  {manualText.trim() ? 'Texte manuel activé (priorité sur la détection IA).' : 'Analyse et recopie le texte des vidéos automatiquement.'}
-                </p>
-              )}
-              {aiEnabled && !anthropicKey && !manualText.trim() && (
-                <p className="mt-1.5 text-[11px] font-semibold" style={{ color: '#fbbf24' }}>⚠ Clé Anthropic manquante</p>
-              )}
+              {aiEnabled && <p style={{ marginTop: 6, fontSize: 10, color: 'rgba(148,163,184,0.38)', lineHeight: 1.4 }}>{manualText.trim() ? 'Texte manuel actif.' : 'Analyse et recopie le texte auto.'}</p>}
+              {aiEnabled && !anthropicKey && !manualText.trim() && <p style={{ marginTop: 4, fontSize: 10, fontWeight: 600, color: '#fbbf24' }}>⚠ Clé Anthropic manquante</p>}
             </button>
+
             {aiEnabled && (
-              <div className="rounded-2xl p-3 space-y-1.5" style={{ background: 'rgba(124,58,237,0.06)', border: '1px solid rgba(139,92,246,0.2)' }}>
-                <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'rgba(139,92,246,0.7)' }}>✏️ Texte manuel (optionnel)</p>
-                <textarea
-                  value={manualText}
-                  onChange={e => { setManualText(e.target.value); localStorage.setItem('sf_remix_manual_text', e.target.value) }}
-                  placeholder="Laisse vide = détection IA auto"
-                  rows={2}
-                  className="w-full rounded-xl px-3 py-2 text-[12px] resize-none outline-none"
-                  style={{
-                    background: 'rgba(255,255,255,0.05)',
-                    border: '1px solid rgba(139,92,246,0.25)',
-                    color: '#e2e8f0',
-                    lineHeight: 1.5,
-                  }}
-                />
+              <div style={{ borderRadius: 10, padding: '8px 11px', background: 'rgba(124,58,237,0.05)', border: '1px solid rgba(139,92,246,0.18)', display: 'flex', flexDirection: 'column', gap: 5 }}>
+                <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', color: 'rgba(139,92,246,0.55)', textTransform: 'uppercase' }}>✏ Texte manuel</p>
+                <textarea value={manualText} onChange={e => { setManualText(e.target.value); localStorage.setItem('sf_remix_manual_text', e.target.value) }} placeholder="Laisse vide = IA auto" rows={2} style={{ width: '100%', borderRadius: 8, padding: '6px 9px', fontSize: 11, resize: 'none', outline: 'none', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(139,92,246,0.2)', color: '#e2e8f0', lineHeight: 1.4, fontFamily: 'inherit' }} />
               </div>
             )}
 
-            {/* Split mode */}
-            <div className="rounded-2xl p-4 space-y-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-              <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'rgba(148,163,184,0.5)' }}>Point de coupe Phase 2</p>
-              <div className="flex gap-2">
-                <button onClick={() => setSplitMode('auto')}
-                  className="flex-1 py-2 rounded-xl text-[13px] font-bold transition-all"
-                  style={splitMode === 'auto'
-                    ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff', boxShadow: '0 2px 10px rgba(124,58,237,0.3)' }
-                    : { background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.5)', border: '1px solid rgba(255,255,255,0.07)' }
-                  }>🤖 Auto</button>
-                <button
-                  onClick={() => { setSplitMode('manual'); if (canLaunch) openPreview() }}
-                  className="flex-1 py-2 rounded-xl text-[13px] font-bold transition-all"
-                  style={splitMode === 'manual'
-                    ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff', boxShadow: '0 2px 10px rgba(124,58,237,0.3)' }
-                    : { background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.5)', border: '1px solid rgba(255,255,255,0.07)' }
-                  }>✂️ Manuel</button>
+            {/* Point de coupe */}
+            <div style={{ borderRadius: 12, padding: '12px 13px', background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(148,163,184,0.35)' }}>Point de coupe</p>
+              <div style={{ display: 'flex', gap: 5 }}>
+                {(['auto', 'manual'] as const).map(m => (
+                  <button key={m} onClick={() => { setSplitMode(m); if (m === 'manual' && canLaunch) openPreview() }}
+                    style={{ flex: 1, padding: '7px 0', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s', border: 'none', background: splitMode === m ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.05)', color: splitMode === m ? '#fff' : 'rgba(196,181,253,0.38)', boxShadow: splitMode === m ? '0 2px 10px rgba(124,58,237,0.28)' : 'none', outline: splitMode === m ? 'none' : '1px solid rgba(255,255,255,0.07)' }}>
+                    {m === 'auto' ? '🤖 Auto' : '✂ Manuel'}
+                  </button>
+                ))}
               </div>
-              {splitMode === 'manual'
-                ? <p className="text-[11px] leading-relaxed" style={{ color: 'rgba(148,163,184,0.45)' }}>
-                    Définissez le point de coupe par vidéo dans l'aperçu.
-                  </p>
-                : <p className="text-[11px] leading-relaxed" style={{ color: 'rgba(148,163,184,0.45)' }}>
-                    Détecte automatiquement la scène de changement.
-                  </p>
-              }
+              <p style={{ fontSize: 10, color: 'rgba(148,163,184,0.32)', lineHeight: 1.4 }}>{splitMode === 'auto' ? 'Détection auto du changement de scène.' : 'Réglage par vidéo dans l\'aperçu.'}</p>
             </div>
 
             {/* Format */}
-            <div className="rounded-2xl p-4" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-              <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: 'rgba(148,163,184,0.5)' }}>Format de sortie</p>
-              <div className="flex gap-2">
+            <div style={{ borderRadius: 12, padding: '12px 13px', background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(148,163,184,0.35)', marginBottom: 8 }}>Format</p>
+              <div style={{ display: 'flex', gap: 5 }}>
                 {(['9:16', '1:1', '16:9'] as Preset[]).map(p => (
                   <button key={p} onClick={() => setPreset(p)}
-                    className="flex-1 py-2 rounded-xl text-[13px] font-bold transition-all"
-                    style={preset === p
-                      ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff', boxShadow: '0 2px 10px rgba(124,58,237,0.3)' }
-                      : { background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.5)', border: '1px solid rgba(255,255,255,0.07)' }
-                    }>{p}</button>
+                    style={{ flex: 1, padding: '7px 0', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s', border: 'none', background: preset === p ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.05)', color: preset === p ? '#fff' : 'rgba(196,181,253,0.38)', boxShadow: preset === p ? '0 2px 10px rgba(124,58,237,0.28)' : 'none', outline: preset === p ? 'none' : '1px solid rgba(255,255,255,0.07)' }}>
+                    {p}
+                  </button>
                 ))}
               </div>
             </div>
 
-            {/* Export */}
-            <div className="rounded-2xl p-4 space-y-2.5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-              <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'rgba(148,163,184,0.5)' }}>Destination</p>
-              <div className="flex gap-2">
+            {/* Destination */}
+            <div style={{ borderRadius: 12, padding: '12px 13px', background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(148,163,184,0.35)' }}>Destination</p>
+              <div style={{ display: 'flex', gap: 5 }}>
                 {(['bank', 'folder'] as ExportMode[]).map(m => (
                   <button key={m} onClick={() => setExportMode(m)}
-                    className="flex-1 py-2 rounded-xl text-[12px] font-bold transition-all"
-                    style={exportMode === m
-                      ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff' }
-                      : { background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.5)', border: '1px solid rgba(255,255,255,0.07)' }
-                    }>
+                    style={{ flex: 1, padding: '7px 0', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s', border: 'none', background: exportMode === m ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.05)', color: exportMode === m ? '#fff' : 'rgba(196,181,253,0.38)', boxShadow: exportMode === m ? '0 2px 10px rgba(124,58,237,0.28)' : 'none', outline: exportMode === m ? 'none' : '1px solid rgba(255,255,255,0.07)' }}>
                     {m === 'bank' ? '☁ Banque' : '💾 Dossier'}
                   </button>
                 ))}
               </div>
               {exportMode === 'bank' && (
-                <div className="space-y-2">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                   {bankFolders.length > 0 && (
-                    <select
-                      value={bankFolders.includes(bankFolder) ? bankFolder : ''}
-                      onChange={e => setBankFolder(e.target.value)}
-                      className="w-full rounded-xl px-3 py-2 text-[12px] focus:outline-none"
-                      style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2d9f3' }}>
-                      <option value="" style={{ background: '#0c0919', color: '#e2d9f3' }}>— Racine (sans dossier)</option>
+                    <select value={bankFolders.includes(bankFolder) ? bankFolder : ''} onChange={e => setBankFolder(e.target.value)} style={{ width: '100%', borderRadius: 8, padding: '6px 9px', fontSize: 11, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2d9f3', outline: 'none', cursor: 'pointer' }}>
+                      <option value="" style={{ background: '#0c0919', color: '#e2d9f3' }}>— Racine</option>
                       {bankFolders.map(f => <option key={f} value={f} style={{ background: '#0c0919', color: '#e2d9f3' }}>{f}</option>)}
                     </select>
                   )}
-                  <input type="text"
-                    placeholder={bankFolders.length > 0 ? 'Ou nouveau dossier…' : 'Dossier (optionnel)'}
-                    value={bankFolder} onChange={e => setBankFolder(e.target.value)}
-                    className="w-full rounded-xl px-3 py-2 text-[12px] focus:outline-none placeholder:opacity-30"
-                    style={{ background: 'rgba(255,255,255,0.05)', border: `1px solid ${bankFolder.trim() ? 'rgba(139,92,246,0.5)' : 'rgba(255,255,255,0.09)'}`, color: '#e2d9f3' }} />
+                  <input type="text" placeholder={bankFolders.length > 0 ? 'Ou créer un dossier…' : 'Dossier (optionnel)'} value={bankFolder} onChange={e => setBankFolder(e.target.value)} style={{ width: '100%', borderRadius: 8, padding: '6px 9px', fontSize: 11, background: 'rgba(255,255,255,0.05)', border: `1px solid ${bankFolder.trim() ? 'rgba(139,92,246,0.5)' : 'rgba(255,255,255,0.09)'}`, color: '#e2d9f3', outline: 'none' }} />
                 </div>
               )}
               {exportMode === 'folder' && (
-                <div className="space-y-2">
-                  <button onClick={async () => { const f = await window.electronAPI?.pickOutputFolder?.(); if (f) setOutputFolder(f) }}
-                    className="w-full rounded-xl px-3 py-2 text-[12px] font-semibold"
-                    style={{ background: 'rgba(139,92,246,0.1)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.2)' }}>
-                    📁 Choisir un dossier…
-                  </button>
-                  {outputFolder && <p className="text-[11px] font-mono truncate" style={{ color: 'rgba(148,163,184,0.45)' }}>{outputFolder}</p>}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                  <button onClick={async () => { const f = await window.electronAPI?.pickOutputFolder?.(); if (f) setOutputFolder(f) }} style={{ width: '100%', borderRadius: 8, padding: '6px 9px', fontSize: 11, fontWeight: 600, cursor: 'pointer', background: 'rgba(139,92,246,0.1)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.2)' }}>📁 Choisir un dossier…</button>
+                  {outputFolder && <p style={{ fontSize: 10, fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'rgba(148,163,184,0.32)' }}>{outputFolder}</p>}
                 </div>
               )}
             </div>

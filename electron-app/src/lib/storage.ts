@@ -1,7 +1,7 @@
 import { supabase, type ContentItem } from './supabase'
 
 const BUCKET = 'content'
-const SIGNED_URL_TTL = 3600  // 1h
+const SIGNED_URL_TTL = 15552000  // 6 mois
 
 export interface UploadScope {
   mode: 'user' | 'org'

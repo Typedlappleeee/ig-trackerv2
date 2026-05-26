@@ -1028,68 +1028,55 @@ function seededRng(seed: number) {
 // ── runFfmpegRepurposeWeb — generate one unique variant ───────────────────────
 // Applies invisible micro-transforms so each export has a different hash/signature
 // while remaining perceptually identical to the source video.
-export async function runFfmpegRepurposeWeb(opts: {
-  inputPath:    string
-  seed:         number
-  intensity:    'subtle' | 'medium' | 'aggressive'
-  format:       '9:16' | '1:1' | '16:9' | 'keep'
-  colorPreset?: 'off' | 'warm' | 'cool' | 'cinema' | 'bw'
-  onProgress?:  (pct: number) => void
+export function runFfmpegRepurposeWeb(opts: {
+  inputPath:   string
+  seed:        number
+  intensity:   'subtle' | 'medium' | 'aggressive' | 'vener'
+  format:      '9:16' | '1:1' | '16:9' | 'keep'
+  onProgress?: (pct: number) => void
 }): Promise<{ ok: boolean; outputPath?: string; similarityPct?: number; transformSummary?: string[]; error?: string }> {
+  return withFfmpegLock(async () => {
   const FILES = ['rp_in.mp4', 'rp_out.mp4']
 
-  // Intensity-dependent ranges
+  // Intensity ranges — only safe, universally supported transforms
   const ranges = {
-    subtle:     { bri: 0.012, con: 0.012, sat: 0.018, gam: 0.012, hue: 1.5, noise: 3, crop: 3, pitch: 0.0008, vol: 0.015, crf: 2 },
-    medium:     { bri: 0.025, con: 0.022, sat: 0.035, gam: 0.022, hue: 3,   noise: 6, crop: 5, pitch: 0.0015, vol: 0.025, crf: 4 },
-    aggressive: { bri: 0.045, con: 0.040, sat: 0.060, gam: 0.040, hue: 6,   noise: 9, crop: 8, pitch: 0.0025, vol: 0.040, crf: 6 },
+    subtle:     { bri: 0.030, con: 0.025, sat: 0.045, zoomMin: 0.00, zoomMax: 0.04, crop: 3,  crf: 2 },
+    medium:     { bri: 0.070, con: 0.060, sat: 0.100, zoomMin: 0.02, zoomMax: 0.08, crop: 6,  crf: 4 },
+    aggressive: { bri: 0.120, con: 0.090, sat: 0.150, zoomMin: 0.05, zoomMax: 0.13, crop: 10, crf: 7 },
+    vener:      { bri: 0.200, con: 0.150, sat: 0.250, zoomMin: 0.10, zoomMax: 0.22, crop: 16, crf: 11 },
   }[opts.intensity]
 
   const rng  = seededRng(opts.seed)
   const sign = () => rng(0, 1) > 0.5 ? 1 : -1
 
-  const brightness = sign() * rng(0.002, ranges.bri)
-  const contrast   = 1 + sign() * rng(0.002, ranges.con)
-  const saturation = 1 + sign() * rng(0.002, ranges.sat)
-  const gamma      = 1 + sign() * rng(0.002, ranges.gam)
-  const hue        = sign() * rng(0, ranges.hue)
-  const noise      = rng(1, ranges.noise)
+  const brightness = sign() * rng(0.005, ranges.bri)
+  const contrast   = 1 + sign() * rng(0.005, ranges.con)
+  const saturation = 1 + sign() * rng(0.005, ranges.sat)
+  const zoomPct    = rng(ranges.zoomMin, ranges.zoomMax)  // e.g. 0.08 = 8% zoom-in
+  const panX       = rng(0, 1)                             // 0=left, 0.5=center, 1=right
+  const panY       = rng(0, 1)                             // 0=top,  0.5=center, 1=bottom
   const cropX      = Math.floor(rng(0, ranges.crop))
   const cropY      = Math.floor(rng(0, ranges.crop))
-  const pitchFact  = 1 + sign() * rng(0, ranges.pitch)
-  const volume     = 1 + sign() * rng(0, ranges.vol)
   const crf        = Math.round(22 + rng(0, ranges.crf))
 
-  // Color preset — subtle overlay on top of random transforms
-  const cp = opts.colorPreset ?? 'off'
-  const colorAdj = {
-    off:    { gr: 1.00, gg: 1.00, gb: 1.00, satD: 0,     conD: 0,    label: null as string | null },
-    warm:   { gr: 1.04, gg: 1.01, gb: 0.96, satD: 0.025, conD: 0,    label: '🟠 Chaud' },
-    cool:   { gr: 0.96, gg: 1.00, gb: 1.05, satD: 0,     conD: 0,    label: '🔵 Froid' },
-    cinema: { gr: 1.01, gg: 0.99, gb: 0.96, satD: -0.07, conD: 0.05, label: '🎬 Ciné' },
-    bw:     { gr: 1.00, gg: 1.00, gb: 1.00, satD: -0.65, conD: 0.03, label: '🌫 Doux' },
-  }[cp]
+  // Similarity estimate — anchored per intensity
+  const floor = { subtle: 90, medium: 80, aggressive: 65, vener: 42 }[opts.intensity]
+  const rawSim = 100 - (
+    Math.abs(brightness) * 60 +
+    Math.abs(contrast - 1) * 40 +
+    Math.abs(saturation - 1) * 30 +
+    zoomPct * 80
+  )
+  const similarityPct = Math.min(99, Math.max(floor, Math.round(rawSim)))
 
-  // Similarity estimate
-  const similarityPct = Math.round(100 - (
-    Math.abs(brightness) * 120 +
-    Math.abs(contrast - 1) * 80 +
-    Math.abs(saturation - 1 + colorAdj.satD) * 60 +
-    noise * 1.2 +
-    Math.abs(hue) * 0.8
-  ))
-
-  // Human-readable transform summary (French)
+  // Human-readable transform summary
   const transformSummary: string[] = []
+  if (zoomPct > 0.005)                   transformSummary.push(`Zoom +${(zoomPct * 100).toFixed(0)}%`)
   if (Math.abs(brightness) > 0.001)      transformSummary.push(`Lumière ${brightness > 0 ? '+' : ''}${(brightness * 100).toFixed(1)}%`)
   if (Math.abs(contrast - 1) > 0.001)    transformSummary.push(`Contraste ${contrast > 1 ? '+' : ''}${((contrast - 1) * 100).toFixed(1)}%`)
   if (Math.abs(saturation - 1) > 0.001)  transformSummary.push(`Saturation ${saturation > 1 ? '+' : ''}${((saturation - 1) * 100).toFixed(1)}%`)
-  if (Math.abs(hue) > 0.1)               transformSummary.push(`Teinte ${hue > 0 ? '+' : ''}${hue.toFixed(1)}°`)
-  if (noise > 1.5)                        transformSummary.push(`Grain ×${noise.toFixed(1)}`)
   if (cropX > 0 || cropY > 0)            transformSummary.push(`Crop ${Math.max(cropX, cropY)}px`)
-  if (Math.abs(pitchFact - 1) > 0.00005) transformSummary.push(`Pitch ${pitchFact > 1 ? '+' : '-'}${(Math.abs(pitchFact - 1) * 100).toFixed(2)}%`)
-  if (Math.abs(volume - 1) > 0.002)      transformSummary.push(`Volume ${volume > 1 ? '+' : ''}${((volume - 1) * 100).toFixed(1)}%`)
-  if (colorAdj.label)                     transformSummary.push(colorAdj.label)
+  transformSummary.push(`CRF ${crf}`)
 
   const ff = await getFFmpeg()
   for (const f of FILES) await ff.deleteFile(f).catch(() => {})
@@ -1102,29 +1089,39 @@ export async function runFfmpegRepurposeWeb(opts: {
     await writeInput(ff, 'rp_in.mp4', opts.inputPath)
     opts.onProgress?.(20)
 
-    // Determine target dimensions
-    let scaleFilter = ''
+    // eq with only the 3 universally-supported params (brightness/contrast/saturation)
+    const eqFilter = `eq=brightness=${brightness.toFixed(4)}:contrast=${contrast.toFixed(4)}:saturation=${saturation.toFixed(4)}`
+
+    const vfParts: string[] = []
     if (opts.format !== 'keep') {
       const W = opts.format === '16:9' ? 1920 : 1080
       const H = opts.format === '9:16' ? 1920 : 1080
-      scaleFilter = `scale=${W + cropX * 2}:${H + cropY * 2}:force_original_aspect_ratio=increase,pad=${W + cropX * 2}:${H + cropY * 2}:-1:-1:color=black,`
+      vfParts.push(`scale=${W}:${H}:force_original_aspect_ratio=increase`)
+      vfParts.push(`crop=${W}:${H}`)
+    }
+    if (cropX > 0 || cropY > 0) vfParts.push(`crop=iw-${cropX * 2}:ih-${cropY * 2}:${cropX}:${cropY}`)
+
+    // Zoom-in by scaling up then cropping back — pan position shifts which part is kept
+    if (zoomPct > 0.005) {
+      const zf    = (1 + zoomPct).toFixed(4)       // e.g. "1.0800"
+      const invZf = (1 / (1 + zoomPct)).toFixed(4) // e.g. "0.9259"
+      const ox    = ((1 - 1 / (1 + zoomPct)) * panX).toFixed(4)
+      const oy    = ((1 - 1 / (1 + zoomPct)) * panY).toFixed(4)
+      // scale up, then crop back to original size at the pan position
+      vfParts.push(`scale=iw*${zf}:ih*${zf}`)
+      vfParts.push(`crop=iw*${invZf}:ih*${invZf}:iw*${ox}:ih*${oy}`)
     }
 
-    const vf = [
-      scaleFilter,
-      `crop=iw-${cropX * 2}:ih-${cropY * 2}:${cropX}:${cropY}`,
-      `eq=brightness=${brightness.toFixed(4)}:contrast=${(contrast + colorAdj.conD).toFixed(4)}:saturation=${(saturation + colorAdj.satD).toFixed(4)}:gamma=${gamma.toFixed(4)}:gamma_r=${colorAdj.gr.toFixed(4)}:gamma_g=${colorAdj.gg.toFixed(4)}:gamma_b=${colorAdj.gb.toFixed(4)}`,
-      `hue=h=${hue.toFixed(2)}`,
-      `noise=alls=${noise.toFixed(1)}:allf=t+u`,
-    ].filter(Boolean).join(',')
-
-    const af = `asetrate=44100*${pitchFact.toFixed(5)},aresample=44100,volume=${volume.toFixed(4)}`
+    vfParts.push(eqFilter)
+    const vf = vfParts.join(',')
+    console.log('[CloneVid] vf=', vf, 'crf=', crf)
 
     opts.onProgress?.(30)
     await ff.exec([
       '-nostdin', '-fflags', '+genpts', '-i', 'rp_in.mp4',
+      '-map', '0:v:0',
+      '-map', '0:a?',        // include audio only if the input has one
       '-vf', vf,
-      '-af', af,
       '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', String(crf),
       '-pix_fmt', 'yuv420p', '-profile:v', 'main', '-level', '4.0',
       '-c:a', 'aac', '-b:a', '128k',
@@ -1144,4 +1141,5 @@ export async function runFfmpegRepurposeWeb(opts: {
     ff.off('log', logH)
     for (const f of FILES) await ff.deleteFile(f).catch(() => {})
   }
+  }) // end withFfmpegLock
 }

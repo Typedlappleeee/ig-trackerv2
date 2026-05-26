@@ -422,6 +422,7 @@ import { Support }           from '@/pages/Support'
 import { Community }         from '@/pages/Community'
 import Monitor                from '@/pages/Monitor'
 import { FullPageLoader }    from '@/components/ui/Spinner'
+import { Landing }           from '@/components/Landing'
 
 const BETA_KEY = 'scaleflow-v1-seen'
 
@@ -573,7 +574,7 @@ function AppContent({ user }: { user: User }) {
       case 'stats':        return <Stats       user={user} />
       case 'posting':      return <Posting     user={user} />
       case 'massposting':  return <MassPosting user={user} />
-      case 'scheduler':    return <Scheduler   user={user} />
+      case 'scheduler':    return <Scheduler   user={user} onNavigate={p => handleNavigate(p as Page)} />
       case 'bank':         return <Bank        user={user} />
       case 'warmup':       return <Warmup      user={user} />
       case 'montage':      return <Montage     user={user} />
@@ -607,9 +608,15 @@ function AppContent({ user }: { user: User }) {
   )
 }
 
+// Detect Electron vs web browser
+const isElectron = typeof window !== 'undefined' && !!window.electronAPI
+
 export default function App() {
   const { user, loading } = useAuth()
   const [splashDone, setSplashDone] = useState(false)
+
+  // Web: show landing when not logged in (Electron keeps the auth page directly)
+  if (!isElectron && !loading && !user) return <Landing />
 
   return (
     <>

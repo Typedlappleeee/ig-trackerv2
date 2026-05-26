@@ -827,8 +827,6 @@ export function Phones({ user }: PhonesProps) {
 
   const onlineCount  = phones.filter(p => p.status === 'online').length
   const offlineCount = phones.filter(p => p.status === 'offline').length
-  const groupCount   = new Set(phones.map(p => p.group_name).filter(Boolean)).size
-  const igCount      = phones.filter(p => p.ig_username).length
   const groups       = Array.from(new Set(phones.map(p => p.group_name).filter(Boolean))) as string[]
 
   function relativeTime(iso: string): string {
@@ -847,7 +845,7 @@ export function Phones({ user }: PhonesProps) {
     return palette[Math.abs(h) % palette.length]
   }
 
-  const COLS = '40px 1fr 130px 170px 130px 110px 120px'
+  const COLS = '40px 1fr 160px 130px 120px'
 
   // ── small icon action button ──────────────────────────────────────────────
   const ActionBtn = ({
@@ -915,8 +913,9 @@ export function Phones({ user }: PhonesProps) {
             {/* Auto-refresh control */}
             <div style={{
               display: 'flex', alignItems: 'center', gap: 8,
-              padding: '8px 12px', borderRadius: 8,
+              padding: '6px 10px', borderRadius: 8,
               background: '#0C0C15', border: '1px solid rgba(139,92,246,0.22)',
+              flexShrink: 0,
             }}>
               <button
                 onClick={() => { const next = !autoRefresh; poller.setEnabled(next); setAutoRefresh(next) }}
@@ -933,17 +932,17 @@ export function Phones({ user }: PhonesProps) {
                   transition: 'left 0.2s', left: autoRefresh ? 15 : 2.5,
                 }} />
               </button>
-              <span style={{ fontSize: 11, fontWeight: 500, color: 'rgba(148,163,184,0.52)' }}>Auto</span>
+              <span style={{ fontSize: 11, fontWeight: 500, color: 'rgba(148,163,184,0.52)', whiteSpace: 'nowrap' }}>Auto</span>
               {autoRefresh && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 2, background: 'rgba(0,0,0,0.2)', borderRadius: 14, padding: '2px 3px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 2, background: 'rgba(0,0,0,0.2)', borderRadius: 14, padding: '2px 3px', flexShrink: 0 }}>
                   {INTERVALS.map(({ label, value }) => (
                     <button key={value} onClick={() => changeInterval(value)}
                       style={{
-                        padding: '3px 9px', borderRadius: 12, fontSize: 10, border: 'none', cursor: 'pointer',
+                        padding: '3px 7px', borderRadius: 12, fontSize: 10, border: 'none', cursor: 'pointer',
                         background: intervalSec === value ? '#7C3AED' : 'transparent',
                         color: intervalSec === value ? '#fff' : 'rgba(148,163,184,0.52)',
                         fontWeight: intervalSec === value ? 700 : 400,
-                        transition: 'all 0.15s',
+                        transition: 'all 0.15s', whiteSpace: 'nowrap',
                       }}>{label}</button>
                   ))}
                 </div>
@@ -976,7 +975,6 @@ export function Phones({ user }: PhonesProps) {
         {/* ── Summary cards ─────────────────────────────────────────────────── */}
         {(() => {
           const onlinePct = phones.length ? Math.round((onlineCount / phones.length) * 100) : 0
-          const igActivePct = phones.length ? Math.round((igCount / phones.length) * 100) : 0
 
           const summaryCards = [
             {
@@ -1009,24 +1007,13 @@ export function Phones({ user }: PhonesProps) {
                 </svg>
               ),
             },
-            {
-              label: 'Comptes IG', value: igCount, sub: `${igActivePct}% configurés`,
-              color: '#E1306C', f: null,
-              icon: (
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                  <rect x="3" y="3" width="14" height="14" rx="4" stroke="currentColor" strokeWidth="1.5"/>
-                  <circle cx="10" cy="10" r="3" stroke="currentColor" strokeWidth="1.5"/>
-                  <circle cx="14" cy="6" r="1" fill="currentColor"/>
-                </svg>
-              ),
-            },
           ]
 
-          const staggerClasses = ['sf-d50', 'sf-d100', 'sf-d150', 'sf-d200']
+          const staggerClasses = ['sf-d50', 'sf-d100', 'sf-d150']
           return (
             <div style={{
               padding: '16px 32px 12px',
-              display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10,
+              display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10,
             }}>
               {summaryCards.map((card, ci) => (
                 <button
@@ -1267,9 +1254,7 @@ export function Phones({ user }: PhonesProps) {
                   <span>#</span>
                   <span>Téléphone</span>
                   <span>Groupe</span>
-                  <span>Compte Instagram</span>
                   <span>Géelark</span>
-                  <span>IG Status</span>
                   <span>Actions</span>
                 </div>
 
@@ -1625,37 +1610,8 @@ function PhoneRow({
         )}
       </div>
 
-      {/* Compte Instagram */}
-      <div style={{ ...cellStyle, minWidth: 0, paddingRight: 8 }}>
-        {phone.ig_username ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{
-              width: 24, height: 24, borderRadius: '50%', flexShrink: 0,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: 'white', fontSize: 9, fontWeight: 700,
-              background: 'linear-gradient(135deg, #833ab4, #fd1d1d, #fcb045)',
-            }}>
-              {phone.ig_username.charAt(0).toUpperCase()}
-            </div>
-            <div style={{ minWidth: 0 }}>
-              <p style={{ fontSize: 12, color: '#8B5CF6', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>@{phone.ig_username}</p>
-              {phone.followers ? (
-                <p style={{ fontSize: 10, color: 'rgba(148,163,184,0.4)', margin: 0 }}>
-                  {phone.followers >= 1000 ? `${(phone.followers / 1000).toFixed(1)}K` : phone.followers} abonnés
-                </p>
-              ) : null}
-            </div>
-          </div>
-        ) : (
-          <span style={{ fontSize: 12, color: 'rgba(148,163,184,0.25)' }}>—</span>
-        )}
-      </div>
-
       {/* GéeLark status */}
       <div style={cellStyle}><StatusDot status={phone.status ?? 'offline'} /></div>
-
-      {/* IG Status */}
-      <div style={cellStyle}><IgStatusBadge phone={phone} /></div>
 
       {/* Actions */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 4 }} onClick={e => e.stopPropagation()}>

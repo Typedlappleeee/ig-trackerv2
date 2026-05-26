@@ -1,29 +1,23 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { runFfmpegRepurposeWeb } from '@/lib/ffmpeg-web'
-import { uploadVideoFromPath, resolveContentToLocalPath, type UploadScope } from '@/lib/storage'
+import { uploadVideoFromPath, type UploadScope } from '@/lib/storage'
 import { supabase } from '@/lib/supabase'
 import { useOrg } from '@/lib/orgContext'
+import { BankPicker } from '@/pages/Bank'
 
 const isWeb = typeof window !== 'undefined' && !(window as any).electronAPI
 
 interface VideoRepurposeProps { user: User }
 
-type Intensity   = 'subtle' | 'medium' | 'aggressive'
-type Format      = '9:16' | '1:1' | '16:9' | 'keep'
-type ColorPreset = 'off' | 'warm' | 'cool' | 'cinema' | 'bw'
-type JobStatus   = 'queued' | 'processing' | 'done' | 'error'
-
-interface BankItem {
-  id: string; title: string
-  storage_path: string | null; file_url: string | null
-  thumbnail_path: string | null; folder: string | null; created_at: string
-}
+type Intensity  = 'subtle' | 'medium' | 'aggressive' | 'vener'
+type Format     = '9:16' | '1:1' | '16:9' | 'keep'
+type JobStatus  = 'queued' | 'processing' | 'done' | 'error'
 
 interface VariantJob {
   id: number; seed: number; status: JobStatus; progress: number
   outputPath?: string; similarityPct?: number; transforms?: string[]
-  error?: string; thumb?: string
+  error?: string; thumb?: string; uploading?: boolean; uploadError?: string
 }
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -124,8 +118,10 @@ function VariantCard({ job, index }: { job: VariantJob; index: number }) {
       <div style={{ padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 5 }}>
         {isDone && job.similarityPct != null && <SimilarityBadge pct={job.similarityPct} />}
         {isErr && <div style={{ fontSize: 10, color: '#f87171', fontWeight: 500 }}>{job.error?.slice(0, 60)}</div>}
-        {isQ   && <div style={{ fontSize: 10, color: 'rgba(148,163,184,0.35)' }}>En attente…</div>}
+        {isQ    && <div style={{ fontSize: 10, color: 'rgba(148,163,184,0.35)' }}>En attente…</div>}
         {isProc && <div style={{ fontSize: 10, color: '#22d3ee' }}>Traitement…</div>}
+        {isDone && job.uploading && <div style={{ fontSize: 9, color: 'rgba(34,211,238,0.6)' }}>☁ Upload…</div>}
+        {isDone && job.uploadError && <div style={{ fontSize: 9, color: '#f87171' }}>⚠ {job.uploadError.slice(0, 40)}</div>}
 
         {/* Transform pills */}
         {isDone && job.transforms && job.transforms.length > 0 && (
@@ -161,129 +157,6 @@ function VariantCard({ job, index }: { job: VariantJob; index: number }) {
   )
 }
 
-// ── Bank picker modal ─────────────────────────────────────────────────────────
-
-function BankModal({
-  user, currentOrg, onSelect, onClose,
-}: { user: User; currentOrg: any; onSelect: (url: string, name: string) => void; onClose: () => void }) {
-  const [items, setItems]     = useState<BankItem[]>([])
-  const [loading, setLoading] = useState(true)
-  const [search, setSearch]   = useState('')
-  const [folder, setFolder]   = useState<string | null>(null)
-  const [folders, setFolders] = useState<string[]>([])
-  const [resolving, setResolving] = useState<string | null>(null)
-
-  useEffect(() => {
-    async function load() {
-      setLoading(true)
-      let q = supabase.from('content_bank').select('*').order('created_at', { ascending: false }) as any
-      q = currentOrg
-        ? q.eq('org_id', currentOrg.id)
-        : q.eq('user_id', user.id).is('org_id', null)
-      const { data } = await q
-      const all = (data ?? []) as BankItem[]
-      setItems(all)
-      const flist = [...new Set(all.map((i: BankItem) => i.folder).filter(Boolean))] as string[]
-      setFolders(flist)
-      setLoading(false)
-    }
-    load()
-  }, [user.id, currentOrg])
-
-  const filtered = items.filter(it => {
-    if (folder && it.folder !== folder) return false
-    if (search && !it.title.toLowerCase().includes(search.toLowerCase())) return false
-    return true
-  })
-
-  async function pick(item: BankItem) {
-    setResolving(item.id)
-    try {
-      const url = await resolveContentToLocalPath(item)
-      onSelect(url, item.title || 'vidéo banque')
-    } catch (e) {
-      console.error('[bank modal] resolve failed', e)
-    } finally {
-      setResolving(null)
-    }
-  }
-
-  return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-      onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div style={{
-        width: 520, maxHeight: '80vh', display: 'flex', flexDirection: 'column',
-        background: '#0d0b1a', borderRadius: 18, border: '1px solid rgba(129,140,248,0.2)',
-        boxShadow: '0 24px 80px rgba(0,0,0,0.7)',
-      }}>
-        {/* Header */}
-        <div style={{ padding: '18px 20px 0', flexShrink: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-            <div style={{ fontSize: 15, fontWeight: 700, color: '#F1F0F7' }}>📂 Banque vidéos</div>
-            <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'rgba(148,163,184,0.5)', fontSize: 18, cursor: 'pointer', lineHeight: 1 }}>✕</button>
-          </div>
-          <input
-            autoFocus
-            placeholder="Rechercher…"
-            value={search} onChange={e => setSearch(e.target.value)}
-            style={{ width: '100%', padding: '8px 12px', borderRadius: 9, fontSize: 13, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: '#e2d9f3', outline: 'none', marginBottom: 10 }}
-          />
-          {folders.length > 0 && (
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
-              <button onClick={() => setFolder(null)}
-                style={{ padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600, cursor: 'pointer', border: 'none', background: folder === null ? 'rgba(34,211,238,0.15)' : 'rgba(255,255,255,0.05)', color: folder === null ? '#22d3ee' : 'rgba(148,163,184,0.5)' }}>
-                Tous
-              </button>
-              {folders.map(f => (
-                <button key={f} onClick={() => setFolder(folder === f ? null : f)}
-                  style={{ padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600, cursor: 'pointer', border: 'none', background: folder === f ? 'rgba(34,211,238,0.15)' : 'rgba(255,255,255,0.05)', color: folder === f ? '#22d3ee' : 'rgba(148,163,184,0.5)' }}>
-                  {f}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* List */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '0 10px 12px' }}>
-          {loading ? (
-            <div style={{ textAlign: 'center', padding: 30, color: 'rgba(148,163,184,0.4)', fontSize: 13 }}>Chargement…</div>
-          ) : filtered.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: 30, color: 'rgba(148,163,184,0.35)', fontSize: 13 }}>Aucune vidéo trouvée</div>
-          ) : (
-            filtered.map(item => (
-              <button key={item.id} onClick={() => pick(item)} disabled={resolving === item.id}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: '9px 10px',
-                  borderRadius: 10, marginBottom: 4, cursor: 'pointer', border: 'none', textAlign: 'left',
-                  background: resolving === item.id ? 'rgba(34,211,238,0.1)' : 'rgba(255,255,255,0.03)',
-                  transition: 'background 0.15s',
-                }}
-                onMouseEnter={e => { if (resolving !== item.id) e.currentTarget.style.background = 'rgba(255,255,255,0.06)' }}
-                onMouseLeave={e => { if (resolving !== item.id) e.currentTarget.style.background = 'rgba(255,255,255,0.03)' }}
-              >
-                {/* Thumb */}
-                <div style={{ width: 36, height: 64, borderRadius: 6, overflow: 'hidden', flexShrink: 0, background: '#080810' }}>
-                  {item.thumbnail_path ? (
-                    <img src={item.thumbnail_path} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
-                  ) : (
-                    <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, opacity: 0.3 }}>🎬</div>
-                  )}
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: 'rgba(226,232,240,0.85)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title || '(sans titre)'}</div>
-                  {item.folder && <div style={{ fontSize: 10, color: 'rgba(148,163,184,0.4)', marginTop: 2 }}>📁 {item.folder}</div>}
-                </div>
-                {resolving === item.id && <div style={{ width: 16, height: 16, border: '2px solid rgba(34,211,238,0.3)', borderTopColor: '#22d3ee', borderRadius: '50%', animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />}
-              </button>
-            ))
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
-
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export function VideoRepurpose({ user }: VideoRepurposeProps) {
@@ -299,7 +172,6 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
   const [count, setCount]               = useState(10)
   const [intensity, setIntensity]       = useState<Intensity>('subtle')
   const [format, setFormat]             = useState<Format>('9:16')
-  const [colorPreset, setColorPreset]   = useState<ColorPreset>('off')
   const [saveToBank, setSaveToBank]     = useState(isWeb)
   const [bankFolder, setBankFolder]     = useState('')
   const [bankFolders, setBankFolders]   = useState<string[]>([])
@@ -365,7 +237,7 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
       updateJob(job.id, { status: 'processing', progress: 5 })
 
       const result = await runFfmpegRepurposeWeb({
-        inputPath: sourceUrl, seed: job.seed, intensity, format, colorPreset,
+        inputPath: sourceUrl, seed: job.seed, intensity, format,
         onProgress: pct => updateJob(job.id, { progress: pct }),
       })
 
@@ -380,15 +252,21 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
         })
 
         if (isWeb || saveToBank) {
+          updateJob(job.id, { uploading: true })
           try {
             const up = await uploadVideoFromPath(result.outputPath, scope)
-            await supabase.from('content_bank').insert({
+            const { error: dbErr } = await supabase.from('content_bank').insert({
               user_id: user.id, org_id: currentOrg?.id ?? null,
               title: `CloneVid #${String(i + 1).padStart(3, '0')} — ${sourceName}`,
               file_url: null, storage_path: up.storagePath, thumbnail_path: up.thumbnailPath,
               folder: bankFolder.trim() || null, tags: [], notes: '',
             })
-          } catch (e) { console.warn('[clonevid] bank upload failed:', e) }
+            if (dbErr) throw new Error(dbErr.message)
+            updateJob(job.id, { uploading: false })
+          } catch (e) {
+            console.error('[clonevid] bank upload failed:', e)
+            updateJob(job.id, { uploading: false, uploadError: String(e instanceof Error ? e.message : e) })
+          }
         }
       } else {
         updateJob(job.id, { status: 'error', error: result.error ?? 'Erreur inconnue' })
@@ -406,19 +284,21 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
   const avgSimVal  = avgSim.length > 0 ? Math.round(avgSim.reduce((a, b) => a + b, 0) / avgSim.length) : null
   const elapsedStr = elapsed > 60 ? `${Math.floor(elapsed / 60)}m${elapsed % 60}s` : `${elapsed}s`
 
-  const COLOR_PRESETS: { id: ColorPreset; label: string; swatch: string }[] = [
-    { id: 'off',    label: 'Neutre',  swatch: 'linear-gradient(135deg,#888,#555)' },
-    { id: 'warm',   label: 'Chaud',   swatch: 'linear-gradient(135deg,#f97316,#eab308)' },
-    { id: 'cool',   label: 'Froid',   swatch: 'linear-gradient(135deg,#38bdf8,#6366f1)' },
-    { id: 'cinema', label: 'Ciné',    swatch: 'linear-gradient(135deg,#78716c,#292524)' },
-    { id: 'bw',     label: 'Doux',    swatch: 'linear-gradient(135deg,#94a3b8,#cbd5e1)' },
-  ]
-
   return (
     <div className="anim-page" style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       {showBank && (
-        <BankModal user={user} currentOrg={currentOrg}
-          onSelect={(url, name) => { setSourceUrl(url); setSourceName(name); setJobs([]); setTotalDone(0); setShowBank(false) }}
+        <BankPicker
+          user={user}
+          mode="single"
+          resolveMode="full"
+          onSelect={(paths, titles) => {
+            if (paths[0]) {
+              setSourceUrl(paths[0])
+              setSourceName(titles?.[0] ?? 'vidéo banque')
+              setJobs([]); setTotalDone(0)
+            }
+            setShowBank(false)
+          }}
           onClose={() => setShowBank(false)}
         />
       )}
@@ -528,11 +408,12 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
           {/* Intensity */}
           <div>
             <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(148,163,184,0.45)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 7 }}>Intensité</div>
-            {(['subtle', 'medium', 'aggressive'] as Intensity[]).map(lv => {
+            {(['subtle', 'medium', 'aggressive', 'vener'] as Intensity[]).map(lv => {
               const meta = {
-                subtle:     { label: 'Subtile',    desc: '~97-99%', emoji: '🔵' },
-                medium:     { label: 'Moyenne',    desc: '~92-96%', emoji: '🟡' },
-                aggressive: { label: 'Aggressive', desc: '~85-92%', emoji: '🔴' },
+                subtle:     { label: 'Subtile',    desc: '~90-99%', emoji: '🔵' },
+                medium:     { label: 'Moyenne',    desc: '~80-90%', emoji: '🟡' },
+                aggressive: { label: 'Aggressive', desc: '~65-80%', emoji: '🔴' },
+                vener:      { label: 'Vener 🔥',   desc: '~42-65%', emoji: '💥' },
               }[lv]
               return (
                 <button key={lv} onClick={() => setIntensity(lv)} disabled={running}
@@ -547,27 +428,6 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
                 </button>
               )
             })}
-          </div>
-
-          {/* Color preset */}
-          <div>
-            <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(148,163,184,0.45)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 7 }}>Colorimétrie</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 5 }}>
-              {COLOR_PRESETS.map(cp => (
-                <button key={cp.id} onClick={() => setColorPreset(cp.id)} disabled={running}
-                  title={cp.label}
-                  style={{
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
-                    padding: '6px 2px', borderRadius: 9, cursor: 'pointer', border: 'none', transition: 'all 0.15s',
-                    background: colorPreset === cp.id ? 'rgba(34,211,238,0.08)' : 'rgba(255,255,255,0.025)',
-                    outline: colorPreset === cp.id ? '1px solid rgba(34,211,238,0.25)' : '1px solid rgba(255,255,255,0.05)',
-                  }}
-                >
-                  <div style={{ width: 22, height: 22, borderRadius: '50%', background: cp.swatch, border: colorPreset === cp.id ? '2px solid #22d3ee' : '2px solid transparent', transition: 'border-color 0.15s' }} />
-                  <div style={{ fontSize: 8, fontWeight: 600, color: colorPreset === cp.id ? '#22d3ee' : 'rgba(148,163,184,0.45)', letterSpacing: '0.03em' }}>{cp.label}</div>
-                </button>
-              ))}
-            </div>
           </div>
 
           {/* Format de sortie */}
