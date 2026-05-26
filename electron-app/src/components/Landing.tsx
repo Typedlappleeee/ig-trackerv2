@@ -357,7 +357,7 @@ function AppMockup() {
       <div style={{ position: 'relative', animation: 'sf-float 7s ease-in-out infinite', transformOrigin: 'center bottom' }}>
         {!imgFailed ? (
           <img
-            src="/mockup.png"
+            src="/mockup.webp"
             alt="ScaleFlow — Mass Posting UI"
             onError={() => setImgFailed(true)}
             style={{ width: '100%', height: 'auto', borderRadius: 18, border: '1px solid rgba(139,92,246,0.28)', boxShadow: '0 40px 100px rgba(0,0,0,0.75), 0 0 0 1px rgba(255,255,255,0.04), 0 0 80px rgba(124,58,237,0.15)', display: 'block' }}
