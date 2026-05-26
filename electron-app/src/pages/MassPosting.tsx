@@ -8,6 +8,7 @@ import { logActivity } from '@/lib/activityLog'
 import { Button }  from '@/components/ui/Button'
 import { VideoThumbnail } from '@/pages/Bank'
 import { BankPicker } from './Bank'
+import { takeScreenshot } from '@/lib/geelark'
 import {
   getMassPostingState, setMassPostingState, subscribeMassPosting,
   type TaskLog, type TaskStatus, type SelectedVideo,
@@ -103,6 +104,10 @@ export function MassPosting({ user }: MassPostingProps) {
   const activePhonesRef                   = useRef<string[]>([])
   const activeTasksRef                    = useRef<string[]>([])
   const logEndRef                         = useRef<HTMLDivElement>(null)
+  // Track when each phone entered 'posting' state (geelark_id → timestamp ms)
+  const postingStartRef                   = useRef<Map<string, number>>(new Map())
+  // Which phones already triggered a screenshot notification this session
+  const notifiedRef                       = useRef<Set<string>>(new Set())
 
   // Persist-aware setters
   function setSelPhones(v: Set<string> | ((p: Set<string>) => Set<string>)) {
@@ -328,6 +333,12 @@ export function MassPosting({ user }: MassPostingProps) {
     if (selectedVideos.length === 0){ log('Sélectionne au moins une vidéo', 'warn'); return }
     setShowScheduleModal(false)
     setPosting(true); setLogs([])
+    postingStartRef.current.clear()
+    notifiedRef.current.clear()
+    // Request desktop notification permission upfront (user gesture context)
+    if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+      Notification.requestPermission().catch(() => {})
+    }
     try {
       log(`📤 Upload de ${selectedVideos.length} vidéo(s) vers GéeLark…`)
       const tokenMap = new Map<number, string>()
@@ -445,6 +456,7 @@ export function MassPosting({ user }: MassPostingProps) {
           continue
         }
         setPhoneStatus(asgn.phone.id, { status: 'posting' })
+        postingStartRef.current.set(asgn.phone.geelark_id, Date.now())
         const taskRes = await geelark(bearer, '/rpa/task/instagramPubReels', {
           id:          asgn.phone.geelark_id,
           scheduleAt:  scheduleTimes[ai],
@@ -481,6 +493,47 @@ export function MassPosting({ user }: MassPostingProps) {
         const deadline = Date.now() + 6 * 60 * 1000
         const STATUS: Record<number, string> = { 1: '⏳ En attente', 2: '🔄 En cours', 3: '✅ Terminé', 4: '❌ Échoué', 7: '🚫 Annulé' }
 
+        // Keywords that indicate a login / verification popup on the phone screen
+        const ALERT_KEYWORDS = [
+          'log in', 'login', 'sign in', 'password', 'mot de passe', 'connexion',
+          'verify', 'verification', 'vérification', 'suspicious', 'unusual',
+          'confirm', 'phone number', 'email address', 'enter code', 'code envoyé',
+          'we detected', 'challenge', '2-step', 'deux étapes',
+        ]
+        function containsAlertKeyword(text: string): string | null {
+          const lower = text.toLowerCase()
+          return ALERT_KEYWORDS.find(k => lower.includes(k)) ?? null
+        }
+        async function checkPhoneScreen(geelarkId: string, phoneName: string) {
+          if (notifiedRef.current.has(geelarkId)) return
+          try {
+            const dataUrl = await takeScreenshot(bearer, geelarkId)
+            if (!dataUrl) return
+            // OCR if available (Electron), otherwise just notify based on timeout
+            let keyword: string | null = null
+            if (window.electronAPI?.runTesseractOcr) {
+              const base64 = dataUrl.split(',')[1]
+              const ocr = await window.electronAPI.runTesseractOcr({ imageBase64: base64, lang: 'eng+fra' })
+              if (ocr.ok) keyword = containsAlertKeyword(ocr.text ?? '')
+            }
+            const needsAttention = keyword != null
+            const msg = needsAttention
+              ? `🔐 ${phoneName} : fenêtre "${keyword}" détectée — intervention requise`
+              : `📸 ${phoneName} : posting long — vérifiez l'écran`
+            log(msg + ` [screenshot]::${dataUrl}`, needsAttention ? 'warn' : 'warn')
+            notifiedRef.current.add(geelarkId)
+            // Desktop notification (works in Electron + browser with permission)
+            if (Notification.permission === 'granted') {
+              new Notification('ScaleFlow — Intervention requise', {
+                body: needsAttention
+                  ? `${phoneName} : fenêtre de connexion/vérification détectée`
+                  : `${phoneName} prend du temps — ouvrez ScaleFlow pour vérifier`,
+                icon: '/sf-logo.svg',
+              })
+            }
+          } catch { /* ignore screenshot errors */ }
+        }
+
         let pollCount = 0
         while (pending.size > 0 && Date.now() < deadline) {
           if (stopRef.current) { log('⏹ Polling interrompu (stop)', 'warn'); break }
@@ -507,6 +560,7 @@ export function MassPosting({ user }: MassPostingProps) {
             const name   = phone?.phone_name ?? tid
             if ([3, 4, 7].includes(status)) {
               pending.delete(tid)
+              postingStartRef.current.delete(phone?.geelark_id ?? '')
               const level = status === 3 ? 'ok' : 'error'
               const fail  = item['failDesc'] ? ` — ${item['failDesc']}` : ''
               log(`${STATUS[status] ?? status} ${name}${fail}`, level)
@@ -521,6 +575,16 @@ export function MassPosting({ user }: MassPostingProps) {
                   .catch(e => log(`  ⚠️ extinction ${phone.phone_name}: ${e instanceof Error ? e.message : String(e)}`, 'warn'))
                 activePhonesRef.current = activePhonesRef.current.filter(id => id !== phone.geelark_id)
                 activeTasksRef.current  = activeTasksRef.current.filter(id => id !== tid)
+              }
+            }
+          }
+
+          // Every 12 polls (~2 min): screenshot phones still running to detect login/verification popups
+          if (pollCount % 12 === 0) {
+            for (const [geelarkId, startedAt] of postingStartRef.current) {
+              if (Date.now() - startedAt > 90_000) {  // only after 1.5 min
+                const ph = phoneList.find(p => p.geelark_id === geelarkId)
+                if (ph) checkPhoneScreen(geelarkId, ph.phone_name).catch(() => {})
               }
             }
           }
@@ -1203,12 +1267,23 @@ export function MassPosting({ user }: MassPostingProps) {
                 </div>
                 <div className="p-4 max-h-52 overflow-auto" style={{ background: 'rgba(0,0,0,0.4)', scrollbarWidth: 'none' }}>
                   <div className="font-mono text-[11px] space-y-1">
-                    {logs.map((l, i) => (
-                      <div key={i} className="flex gap-3 leading-relaxed">
-                        <span className="flex-shrink-0 tabular-nums" style={{ color: 'rgba(71,85,105,0.8)' }}>{l.time}</span>
-                        <span className={l.level === 'ok' ? 'text-ok' : l.level === 'error' ? 'text-danger' : l.level === 'warn' ? 'text-warn' : 'text-text2'}>{l.message}</span>
-                      </div>
-                    ))}
+                    {logs.map((l, i) => {
+                      // Messages with an embedded screenshot: "text [screenshot]::data:image/..."
+                      const scMatch = l.message.match(/^(.*)\[screenshot\]::(data:image\/[^,]+,[^\s]+)(.*)$/)
+                      const msgText = scMatch ? scMatch[1].trim() : l.message
+                      const scUrl   = scMatch ? scMatch[2] : null
+                      return (
+                        <div key={i} className="flex flex-col gap-1 leading-relaxed">
+                          <div className="flex gap-3">
+                            <span className="flex-shrink-0 tabular-nums" style={{ color: 'rgba(71,85,105,0.8)' }}>{l.time}</span>
+                            <span className={l.level === 'ok' ? 'text-ok' : l.level === 'error' ? 'text-danger' : l.level === 'warn' ? 'text-warn' : 'text-text2'}>{msgText}</span>
+                          </div>
+                          {scUrl && (
+                            <img src={scUrl} alt="screenshot" style={{ maxHeight: 180, borderRadius: 6, border: '1px solid rgba(251,191,36,0.3)', marginLeft: 40, objectFit: 'contain' }} />
+                          )}
+                        </div>
+                      )
+                    })}
                     <div ref={logEndRef} />
                   </div>
                 </div>
