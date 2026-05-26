@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { AuthPage } from '@/components/auth/AuthPage'
 
-const TELEGRAM_URL = 'https://t.me/+drqJbwraMag5M2I0'
+const TELEGRAM_URL = 'https://t.me/justquentin'
 const LAUNCH_DATE  = new Date('2026-06-01T00:00:00')
 
 // ── CSS Keyframes (injected once) ─────────────────────────────────────────────
