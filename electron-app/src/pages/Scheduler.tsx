@@ -42,7 +42,7 @@ import {
 } from '@/lib/schedulerService'
 import { Spinner } from '@/components/ui/Spinner'
 
-interface Props { user: User }
+interface Props { user: User; onNavigate?: (page: string, tab?: string) => void }
 
 type TabFilter = 'pending' | 'history'
 
@@ -350,7 +350,7 @@ function TerminalLogs({ logs, onClose }: { logs: string[]; onClose: () => void }
   )
 }
 
-export function Scheduler({ user }: Props) {
+export function Scheduler({ user, onNavigate }: Props) {
   const { role }                  = useOrg()
   const [posts, setPosts]         = useState<ScheduledPost[]>([])
   const [loading, setLoading]     = useState(true)
@@ -606,6 +606,7 @@ export function Scheduler({ user }: Props) {
               <button
                 className="sf-btn sf-btn-primary sf-btn-sm"
                 style={{ marginTop: 20 }}
+                onClick={() => onNavigate?.('massposting')}
               >
                 Planifier un post
               </button>

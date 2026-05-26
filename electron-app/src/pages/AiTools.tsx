@@ -793,25 +793,6 @@ export function AiTools({ user }: AiToolsProps) {
             </div>
           </div>
 
-          {/* ── Groq IA section ── */}
-          <div>
-            <SectionHeader label="Groq IA — Texte & Stratégie" badge="Llama 3.1" />
-            <div className="grid grid-cols-3 gap-4 anim-stagger">
-              {GROQ_TOOLS.map(t => (
-                <ToolCard key={t.id} {...t} onClick={() => setActive(t.id)} />
-              ))}
-            </div>
-          </div>
-
-          {/* ── Vision IA section ── */}
-          <div>
-            <SectionHeader label="Claude Vision — Analyse Vidéo & Image" badge="Claude" />
-            <div className="grid grid-cols-3 gap-4 anim-stagger">
-              {VISION_TOOLS_META.map(t => (
-                <ToolCard key={t.id} {...t} locked={!conns.anthropic} onClick={() => setActive(t.id)} />
-              ))}
-            </div>
-          </div>
 
         </div>
       </div>
