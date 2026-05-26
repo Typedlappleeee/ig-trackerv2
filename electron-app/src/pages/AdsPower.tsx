@@ -41,30 +41,24 @@ const STATUS_ICON: Record<LogStatus, string> = {
 // ── Helpers ────────────────────────────────────────────────────────────────────
 function now() { return new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) }
 
-async function adsRequest(urlPath: string, apiKey?: string, body?: unknown) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function adsRequest(urlPath: string, apiKey?: string, body?: unknown): Promise<any> {
   const sep = urlPath.includes('?') ? '&' : '?'
   const fullPath = `${urlPath}${apiKey ? `${sep}serial_number=${encodeURIComponent(apiKey)}` : ''}`
 
-  // Prefer the dedicated Node-http IPC bridge (Electron); avoids net.fetch HTTP restriction
   const api = (window as unknown as {
     electronAPI?: {
       adspowerRequest?: (opts: { method: 'GET' | 'POST'; path: string; body?: unknown }) => Promise<{ ok: boolean; data?: unknown; error?: string }>
     }
   }).electronAPI
-  if (api?.adspowerRequest) {
-    const result = await api.adspowerRequest({ method: body ? 'POST' : 'GET', path: fullPath, body })
-    if (!result.ok) throw new Error(result.error ?? 'AdsPower IPC error')
-    return result.data
+
+  if (!api?.adspowerRequest) {
+    throw new Error("AdsPower n'est disponible que dans l'application desktop (Electron), pas dans le navigateur.")
   }
 
-  // Browser fallback (will hit CORS outside Electron)
-  const res = await fetch(`http://local.adspower.net:50325${fullPath}`, {
-    method: body ? 'POST' : 'GET',
-    headers: body ? { 'Content-Type': 'application/json' } : undefined,
-    body: body ? JSON.stringify(body) : undefined,
-  })
-  if (!res.ok) throw new Error(`AdsPower HTTP ${res.status}`)
-  return res.json()
+  const result = await api.adspowerRequest({ method: body ? 'POST' : 'GET', path: fullPath, body })
+  if (!result.ok) throw new Error(result.error ?? 'AdsPower IPC error')
+  return result.data
 }
 
 // ── Profile row ────────────────────────────────────────────────────────────────
