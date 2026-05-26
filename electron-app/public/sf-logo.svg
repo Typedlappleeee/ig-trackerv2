@@ -1,0 +1,31 @@
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="sg" x1="0.3" y1="0" x2="0.7" y2="1">
+      <stop offset="0%"   stop-color="#60aaff"/>
+      <stop offset="50%"  stop-color="#8866ff"/>
+      <stop offset="100%" stop-color="#aa44ff"/>
+    </linearGradient>
+    <filter id="glow-outer" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="10" result="blur1"/>
+      <feColorMatrix in="blur1" type="matrix" values="1 0 0 0 0.35   0 0 0 0 0.2   0 0 0 0 1   0 0 0 1 0" result="colored"/>
+      <feMerge>
+        <feMergeNode in="colored"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="glow-soft" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="18" result="blur2"/>
+      <feColorMatrix in="blur2" type="matrix" values="1 0 0 0 0.3   0 0 0 0 0.15   0 0 0 0 1   0 0 0 0.55 0"/>
+    </filter>
+  </defs>
+  <!-- soft outer bloom -->
+  <text x="100" y="148" text-anchor="middle"
+    font-family="'Arial Rounded MT Bold','Arial Black','Helvetica Neue',Arial,sans-serif"
+    font-weight="900" font-size="148" fill="url(#sg)"
+    filter="url(#glow-soft)">S</text>
+  <!-- main S with inner glow -->
+  <text x="100" y="148" text-anchor="middle"
+    font-family="'Arial Rounded MT Bold','Arial Black','Helvetica Neue',Arial,sans-serif"
+    font-weight="900" font-size="148" fill="url(#sg)"
+    filter="url(#glow-outer)">S</text>
+</svg>

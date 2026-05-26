@@ -82,34 +82,37 @@ function FadeIn({ children, delay = 0, style = {} }: { children: React.ReactNode
   )
 }
 
-// ── Logo SVG ──────────────────────────────────────────────────────────────────
+// ── Logo SVG — glowing S ──────────────────────────────────────────────────────
 function SFMark({ size = 32 }: { size?: number }) {
+  const id = `sfm-${size}`
   return (
-    <svg width={size} height={size} viewBox="0 0 100 100" fill="none">
+    <svg width={size} height={size} viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <linearGradient id="sf-main" x1="10" y1="98" x2="82" y2="2" gradientUnits="userSpaceOnUse">
-          <stop offset="0%"  stopColor="#1d4ed8"/>
-          <stop offset="28%" stopColor="#3b5af0"/>
-          <stop offset="58%" stopColor="#7c3aed"/>
-          <stop offset="100%" stopColor="#a855f7"/>
+        <linearGradient id={`${id}-g`} x1="0.3" y1="0" x2="0.7" y2="1">
+          <stop offset="0%"   stopColor="#60aaff"/>
+          <stop offset="50%"  stopColor="#8866ff"/>
+          <stop offset="100%" stopColor="#aa44ff"/>
         </linearGradient>
-        <linearGradient id="sf-dep" x1="10" y1="98" x2="82" y2="2" gradientUnits="userSpaceOnUse">
-          <stop offset="0%"  stopColor="#0c1f6e" stopOpacity="0.6"/>
-          <stop offset="55%" stopColor="#2e1065" stopOpacity="0.6"/>
-          <stop offset="100%" stopColor="#3b0764" stopOpacity="0.6"/>
-        </linearGradient>
-        <linearGradient id="sf-arr" x1="66" y1="24" x2="90" y2="1" gradientUnits="userSpaceOnUse">
-          <stop offset="0%"  stopColor="#db2777"/>
-          <stop offset="100%" stopColor="#f472b6"/>
-        </linearGradient>
+        <filter id={`${id}-glow`} x="-40%" y="-40%" width="180%" height="180%">
+          <feGaussianBlur stdDeviation="7" result="b"/>
+          <feColorMatrix in="b" type="matrix" values="1 0 0 0 0.35  0 0 0 0 0.2  0 0 0 0 1  0 0 0 1 0" result="c"/>
+          <feMerge><feMergeNode in="c"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+        <filter id={`${id}-bloom`} x="-60%" y="-60%" width="220%" height="220%">
+          <feGaussianBlur stdDeviation="16" result="b2"/>
+          <feColorMatrix in="b2" type="matrix" values="1 0 0 0 0.3  0 0 0 0 0.15  0 0 0 0 1  0 0 0 0.5 0"/>
+        </filter>
       </defs>
-      <path d="M 66 22 C 76 8 60 3 42 3 C 20 3 12 18 12 32 C 12 46 26 52 46 55 C 66 58 82 65 82 79 C 82 93 68 97 50 97 C 32 97 18 89 16 76"
-        stroke="url(#sf-dep)" strokeWidth="18" strokeLinecap="round" fill="none" transform="translate(2.5,4.5)"/>
-      <path d="M 66 22 C 76 8 60 3 42 3 C 20 3 12 18 12 32 C 12 46 26 52 46 55 C 66 58 82 65 82 79 C 82 93 68 97 50 97 C 32 97 18 89 16 76"
-        stroke="url(#sf-main)" strokeWidth="16" strokeLinecap="round" fill="none"/>
-      <line x1="66" y1="22" x2="88" y2="2"  stroke="url(#sf-arr)" strokeWidth="11" strokeLinecap="round"/>
-      <line x1="77" y1="1"  x2="90" y2="1"  stroke="#f472b6" strokeWidth="9" strokeLinecap="round"/>
-      <line x1="90" y1="1"  x2="90" y2="15" stroke="#f472b6" strokeWidth="9" strokeLinecap="round"/>
+      {/* bloom layer */}
+      <text x="100" y="148" textAnchor="middle"
+        fontFamily="'Arial Rounded MT Bold','Arial Black','Helvetica Neue',Arial,sans-serif"
+        fontWeight="900" fontSize="148" fill={`url(#${id}-g)`}
+        filter={`url(#${id}-bloom)`}>S</text>
+      {/* main S */}
+      <text x="100" y="148" textAnchor="middle"
+        fontFamily="'Arial Rounded MT Bold','Arial Black','Helvetica Neue',Arial,sans-serif"
+        fontWeight="900" fontSize="148" fill={`url(#${id}-g)`}
+        filter={`url(#${id}-glow)`}>S</text>
     </svg>
   )
 }
