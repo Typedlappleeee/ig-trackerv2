@@ -510,6 +510,42 @@ ipcMain.handle('geelark-request', async (_event, opts: {
   }
 })
 
+// ── IPC: AdsPower local API (http://local.adspower.net:50325) ────────────────
+// net.fetch blocks plain-HTTP to non-standard hosts; use Node http module instead.
+import http from 'node:http'
+ipcMain.handle('adspower-request', (_event, opts: {
+  method: 'GET' | 'POST'
+  path: string   // e.g. '/api/v1/user/list?page=1&page_size=100'
+  body?: unknown
+}) => {
+  return new Promise<{ ok: boolean; data?: unknown; error?: string }>((resolve) => {
+    const bodyStr = opts.body ? JSON.stringify(opts.body) : undefined
+    const reqOpts: http.RequestOptions = {
+      hostname: 'local.adspower.net',
+      port: 50325,
+      path: opts.path,
+      method: opts.method ?? 'GET',
+      headers: {
+        'Accept': 'application/json',
+        ...(bodyStr ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(bodyStr) } : {}),
+      },
+    }
+    const req = http.request(reqOpts, (res) => {
+      let raw = ''
+      res.setEncoding('utf8')
+      res.on('data', (chunk) => { raw += chunk })
+      res.on('end', () => {
+        try { resolve({ ok: true, data: JSON.parse(raw) }) }
+        catch { resolve({ ok: true, data: raw }) }
+      })
+    })
+    req.on('error', (e) => resolve({ ok: false, error: e.message }))
+    req.setTimeout(10000, () => { req.destroy(); resolve({ ok: false, error: 'Timeout' }) })
+    if (bodyStr) req.write(bodyStr)
+    req.end()
+  })
+})
+
 // ── IPC: open native file picker ────────────────────────────────────────────
 ipcMain.handle('pick-video-file', async () => {
   if (!win) return null

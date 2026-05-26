@@ -41,20 +41,24 @@ const STATUS_ICON: Record<LogStatus, string> = {
 // ── Helpers ────────────────────────────────────────────────────────────────────
 function now() { return new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) }
 
-async function adsRequest(path: string, apiKey?: string, body?: unknown) {
-  const base = 'http://local.adspower.net:50325'
-  const sep = path.includes('?') ? '&' : '?'
-  const url = `${base}${path}${apiKey ? `${sep}serial_number=${encodeURIComponent(apiKey)}` : ''}`
+async function adsRequest(urlPath: string, apiKey?: string, body?: unknown) {
+  const sep = urlPath.includes('?') ? '&' : '?'
+  const fullPath = `${urlPath}${apiKey ? `${sep}serial_number=${encodeURIComponent(apiKey)}` : ''}`
 
-  // Use Electron IPC (bypasses CORS); fall back to direct fetch in browser
-  const api = (window as unknown as { electronAPI?: { geelarkRequest?: (opts: { method: string; url: string; body?: unknown }) => Promise<{ ok: boolean; data?: unknown; error?: string }> } }).electronAPI
-  if (api?.geelarkRequest) {
-    const result = await api.geelarkRequest({ method: body ? 'POST' : 'GET', url, body })
+  // Prefer the dedicated Node-http IPC bridge (Electron); avoids net.fetch HTTP restriction
+  const api = (window as unknown as {
+    electronAPI?: {
+      adspowerRequest?: (opts: { method: 'GET' | 'POST'; path: string; body?: unknown }) => Promise<{ ok: boolean; data?: unknown; error?: string }>
+    }
+  }).electronAPI
+  if (api?.adspowerRequest) {
+    const result = await api.adspowerRequest({ method: body ? 'POST' : 'GET', path: fullPath, body })
     if (!result.ok) throw new Error(result.error ?? 'AdsPower IPC error')
     return result.data
   }
 
-  const res = await fetch(url, {
+  // Browser fallback (will hit CORS outside Electron)
+  const res = await fetch(`http://local.adspower.net:50325${fullPath}`, {
     method: body ? 'POST' : 'GET',
     headers: body ? { 'Content-Type': 'application/json' } : undefined,
     body: body ? JSON.stringify(body) : undefined,

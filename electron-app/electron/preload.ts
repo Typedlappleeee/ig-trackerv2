@@ -137,4 +137,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Rewrite video metadata (strip all, optionally set new values)
   runFfmpegMetadata: (opts: { inputPath: string; outputPath: string; metadata: Record<string, string> }) =>
     ipcRenderer.invoke('run-ffmpeg-metadata', opts),
+
+  // AdsPower local API — uses Node http (bypasses Electron's net.fetch HTTP restrictions)
+  adspowerRequest: (opts: { method: 'GET' | 'POST'; path: string; body?: unknown }) =>
+    ipcRenderer.invoke('adspower-request', opts),
 })
