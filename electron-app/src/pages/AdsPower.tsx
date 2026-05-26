@@ -43,9 +43,17 @@ function now() { return new Date().toLocaleTimeString('fr-FR', { hour: '2-digit'
 
 async function adsRequest(path: string, apiKey?: string, body?: unknown) {
   const base = 'http://local.adspower.net:50325'
-  // Append api_key if provided
   const sep = path.includes('?') ? '&' : '?'
   const url = `${base}${path}${apiKey ? `${sep}serial_number=${encodeURIComponent(apiKey)}` : ''}`
+
+  // Use Electron IPC (bypasses CORS); fall back to direct fetch in browser
+  const api = (window as unknown as { electronAPI?: { geelarkRequest?: (opts: { method: string; url: string; body?: unknown }) => Promise<{ ok: boolean; data?: unknown; error?: string }> } }).electronAPI
+  if (api?.geelarkRequest) {
+    const result = await api.geelarkRequest({ method: body ? 'POST' : 'GET', url, body })
+    if (!result.ok) throw new Error(result.error ?? 'AdsPower IPC error')
+    return result.data
+  }
+
   const res = await fetch(url, {
     method: body ? 'POST' : 'GET',
     headers: body ? { 'Content-Type': 'application/json' } : undefined,
