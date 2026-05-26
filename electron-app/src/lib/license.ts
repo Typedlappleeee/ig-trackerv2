@@ -17,19 +17,25 @@ export interface LicenseStatus {
 
 const FAIL_OPEN: LicenseStatus = { valid: true, expiresAt: null, daysLeft: null, source: 'own', isSuperAdmin: false, plan: null, orgOwnerPlan: null }
 
+const HARDCODED_SUPER_ADMINS = ['tintin.aunea@gmail.com']
+
 export async function checkLicense(userId: string, orgId?: string | null): Promise<LicenseStatus> {
   try {
     // Super admin always valid
     const { data: profile, error: profileErr } = await supabase
       .from('profiles')
-      .select('is_super_admin')
+      .select('is_super_admin, email')
       .eq('id', userId)
       .maybeSingle()
 
     // Any Supabase error (500, network, stale schema cache) → fail open
     if (profileErr) return FAIL_OPEN
 
-    if (profile?.is_super_admin) {
+    const isSuperAdmin = profile?.is_super_admin ||
+      HARDCODED_SUPER_ADMINS.includes(profile?.email ?? '') ||
+      HARDCODED_SUPER_ADMINS.includes((await supabase.auth.getUser()).data.user?.email ?? '')
+
+    if (isSuperAdmin) {
       return { valid: true, expiresAt: null, daysLeft: null, source: 'own', isSuperAdmin: true, plan: 'organisation', orgOwnerPlan: null }
     }
 
