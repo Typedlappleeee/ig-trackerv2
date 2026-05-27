@@ -2,7 +2,9 @@
 // Mirrors the Electron IPC handlers for FFmpeg operations.
 // Uses @ffmpeg/ffmpeg v0.12 which runs entirely in the browser via WebAssembly.
 
+// @ts-ignore – @ffmpeg/ffmpeg uses a 'node' export condition that hides types on Windows/Electron builds
 import { FFmpeg } from '@ffmpeg/ffmpeg'
+// @ts-ignore
 import { fetchFile, toBlobURL } from '@ffmpeg/util'
 
 let _ffmpeg: FFmpeg | null = null
