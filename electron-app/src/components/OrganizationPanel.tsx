@@ -48,8 +48,9 @@ export function OrganizationPanel({ user }: Props) {
   const [renameValue, setRenameValue]     = useState('')
 
   // Invite form
-  const [invLabel, setInvLabel] = useState('')
-  const [invRole,  setInvRole]  = useState<Exclude<OrgRole, 'owner'>>('member')
+  const [invLabel,        setInvLabel]        = useState('')
+  const [invRole,         setInvRole]         = useState<Exclude<OrgRole, 'owner'>>('member')
+  const [invTemplateId,   setInvTemplateId]   = useState<string | null>(null)
   const [invitePermModal, setInvitePermModal] = useState<OrgInvite | null>(null)
 
   const [orgTab, setOrgTab] = useState<'orgas' | 'membres' | 'roles' | 'logs'>('orgas')
@@ -157,8 +158,7 @@ export function OrganizationPanel({ user }: Props) {
   }
 
   async function applyTemplateToMember(member: MemberRow, template: OrgRoleTemplate) {
-    await savePerms(member, template.perm_overrides)
-    flash(`Rôle "${template.name}" appliqué à ${member.display_name ?? member.email ?? 'ce membre'} ✓`)
+    await assignCustomRole(member, template)
   }
 
   useEffect(() => {
@@ -244,13 +244,16 @@ export function OrganizationPanel({ user }: Props) {
     setBusy(true)
     const token = genToken()
     const label = invLabel.trim() || `Invitation ${new Date().toLocaleDateString('fr-FR')}`
+    const template = invTemplateId ? roleTemplates.find(t => t.id === invTemplateId) : null
     const { data, error } = await supabase.from('organization_invites').insert({
       org_id: currentOrg.id, email: label,
       token, role: invRole, invited_by: user.id,
+      custom_role_id: template?.id ?? null,
+      perm_overrides: template?.perm_overrides ?? {},
     }).select().single()
     setBusy(false)
     if (error) { flash(error.message, true); return }
-    setInvLabel('')
+    setInvLabel(''); setInvTemplateId(null)
     if (data) {
       navigator.clipboard.writeText(data.token).catch(() => {})
       setInvitePermModal(data as OrgInvite)
@@ -304,14 +307,14 @@ export function OrganizationPanel({ user }: Props) {
     // Apply pre-configured permissions from the invite token if any
     if (orgId) {
       const { data: inv } = await supabase
-        .from('organization_invites').select('perm_overrides').eq('token', token).maybeSingle()
-      if (inv?.perm_overrides && Object.keys(inv.perm_overrides).length > 0) {
+        .from('organization_invites').select('perm_overrides, custom_role_id').eq('token', token).maybeSingle()
+      if (inv && (Object.keys(inv.perm_overrides ?? {}).length > 0 || inv.custom_role_id)) {
         const { data: mem } = await supabase
           .from('organization_members').select('id')
           .eq('org_id', orgId).eq('user_id', user.id).maybeSingle()
         if (mem) {
           await supabase.from('organization_members')
-            .update({ perm_overrides: inv.perm_overrides }).eq('id', mem.id)
+            .update({ perm_overrides: inv.perm_overrides ?? {}, custom_role_id: inv.custom_role_id ?? null }).eq('id', mem.id)
         }
       }
     }
@@ -324,16 +327,28 @@ export function OrganizationPanel({ user }: Props) {
   async function changeRole(member: MemberRow, newRole: OrgRole) {
     if (member.role === 'owner') { flash('Le propriétaire ne peut pas changer de rôle', true); return }
     setBusy(true)
-    const { error } = await supabase.from('organization_members').update({ role: newRole }).eq('id', member.id)
+    // Switching back to a system role clears the custom_role_id
+    const { error } = await supabase.from('organization_members')
+      .update({ role: newRole, custom_role_id: null }).eq('id', member.id)
     setBusy(false)
     if (error) { flash(error.message, true); return }
+    if (currentOrg) await loadOrgDetail(currentOrg.id)
+  }
+
+  async function assignCustomRole(member: MemberRow, template: OrgRoleTemplate) {
+    setBusy(true)
+    const { error } = await supabase.from('organization_members')
+      .update({ role: 'member', perm_overrides: template.perm_overrides, custom_role_id: template.id }).eq('id', member.id)
+    setBusy(false)
+    if (error) { flash(error.message, true); return }
+    flash(`Rôle "${template.name}" assigné ✓`)
     if (currentOrg) await loadOrgDetail(currentOrg.id)
   }
 
   async function savePerms(member: MemberRow, perms: PermOverrides) {
     setBusy(true)
     const { error } = await supabase.from('organization_members')
-      .update({ perm_overrides: perms }).eq('id', member.id)
+      .update({ perm_overrides: perms, custom_role_id: null }).eq('id', member.id)
     setBusy(false)
     if (error) { flash(error.message, true); return }
     flash('Permissions mises à jour ✓')
@@ -536,18 +551,19 @@ export function OrganizationPanel({ user }: Props) {
                           {m.email ?? m.user_id} · Rejoint {new Date(m.joined_at).toLocaleDateString('fr-FR')}
                         </p>
                       </div>
-                      <select
-                        name="member-role"
-                        value={m.role}
-                        disabled={m.role === 'owner' || isMe}
-                        onChange={e => changeRole(m, e.target.value as OrgRole)}
-                        className="bg-bg border border-border rounded px-2 py-1 text-xs text-text disabled:opacity-50"
-                      >
-                        <option value="owner" disabled>Propriétaire</option>
-                        <option value="admin">Admin</option>
-                        <option value="member">Membre</option>
-                        <option value="viewer">Lecteur</option>
-                      </select>
+                      {m.role === 'owner' || isMe ? (
+                        <span className="text-xs text-text2 px-2">
+                          {m.role === 'owner' ? 'Propriétaire' : (m.custom_role_id ? (roleTemplates.find(t => t.id === m.custom_role_id)?.name ?? 'Membre') : ROLE_LABELS[m.role])}
+                        </span>
+                      ) : (
+                        <RoleDropdown
+                          value={m.custom_role_id ?? m.role}
+                          systemRole={m.role}
+                          templates={roleTemplates}
+                          onSystemRole={r => changeRole(m, r)}
+                          onTemplate={t => assignCustomRole(m, t)}
+                        />
+                      )}
                       {m.role !== 'owner' && (
                         <>
                           <button onClick={() => setEditing(editing === m.id ? null : m.id)} className="text-xs text-accent hover:text-accent2 px-2">
@@ -595,18 +611,15 @@ export function OrganizationPanel({ user }: Props) {
             <div className="border-t border-border pt-4 space-y-3">
               <h3 className="text-xs font-bold text-text uppercase tracking-wider">Générer un code d'invitation</h3>
               <p className="text-text2 text-xs">Chaque code est <strong className="text-text">à usage unique</strong> : une fois utilisé, il devient invalide.</p>
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 <Input value={invLabel} onChange={e => setInvLabel(e.target.value)} placeholder="Note (ex: Pour Pierre) — optionnel" />
-                <select
-                  name="invite-role"
-                  value={invRole}
-                  onChange={e => setInvRole(e.target.value as Exclude<OrgRole, 'owner'>)}
-                  className="bg-bg border border-border rounded px-2 py-1 text-sm text-text"
-                >
-                  <option value="admin">Admin</option>
-                  <option value="member">Membre</option>
-                  <option value="viewer">Lecteur</option>
-                </select>
+                <RoleDropdown
+                  value={invTemplateId ?? invRole}
+                  systemRole={invRole}
+                  templates={roleTemplates}
+                  onSystemRole={r => { setInvRole(r); setInvTemplateId(null) }}
+                  onTemplate={t => { setInvTemplateId(t.id); setInvRole('member') }}
+                />
                 <Button onClick={createInvite} loading={busy}>🎟 Générer un code</Button>
               </div>
 
@@ -616,7 +629,10 @@ export function OrganizationPanel({ user }: Props) {
                 {invites.map(inv => (
                   <li key={inv.id} className="flex items-center gap-2 bg-surface px-3 py-2 rounded-lg text-xs">
                     <span className="flex-1 truncate text-text">{inv.email}</span>
-                    <span className="text-text2">{ROLE_LABELS[inv.role as OrgRole]}</span>
+                    {inv.custom_role_id ? (() => {
+                      const t = roleTemplates.find(r => r.id === inv.custom_role_id)
+                      return t ? <span className="font-semibold px-1.5 py-0.5 rounded-full text-[10px]" style={{ background: t.color + '22', color: t.color }}>{t.name}</span> : null
+                    })() : <span className="text-text2">{ROLE_LABELS[inv.role as OrgRole]}</span>}
                     <code
                       onClick={() => { navigator.clipboard.writeText(inv.token); flash('Code copié ✓') }}
                       className="bg-bg px-2 py-1 rounded font-mono text-[10px] cursor-pointer hover:text-accent"
@@ -1370,5 +1386,46 @@ function RoleTemplateEditor({
         </Button>
       </div>
     </div>
+  )
+}
+
+// ── Unified role dropdown (system roles + custom templates) ──────────────────
+function RoleDropdown({
+  value, systemRole, templates, onSystemRole, onTemplate,
+}: {
+  value: string
+  systemRole: OrgRole
+  templates: OrgRoleTemplate[]
+  onSystemRole: (r: Exclude<OrgRole, 'owner'>) => void
+  onTemplate: (t: OrgRoleTemplate) => void
+}) {
+  const activeTemplate = templates.find(t => t.id === value)
+
+  function handleChange(v: string) {
+    const tpl = templates.find(t => t.id === v)
+    if (tpl) { onTemplate(tpl); return }
+    onSystemRole(v as Exclude<OrgRole, 'owner'>)
+  }
+
+  return (
+    <select
+      value={value}
+      onChange={e => handleChange(e.target.value)}
+      className="bg-bg border border-border rounded px-2 py-1 text-xs text-text"
+      style={activeTemplate ? { color: activeTemplate.color, borderColor: activeTemplate.color + '66' } : {}}
+    >
+      <optgroup label="Rôles système">
+        <option value="admin">Admin</option>
+        <option value="member">Membre</option>
+        <option value="viewer">Lecteur</option>
+      </optgroup>
+      {templates.length > 0 && (
+        <optgroup label="Rôles personnalisés">
+          {templates.map(t => (
+            <option key={t.id} value={t.id}>{t.name}</option>
+          ))}
+        </optgroup>
+      )}
+    </select>
   )
 }
