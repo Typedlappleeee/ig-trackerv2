@@ -162,11 +162,15 @@ export function Warmup({ user }: WarmupProps) {
     })
     initJobs(targets)
 
+    // editPicFile is a local path — the phone uses curl to download the URL so a
+    // local file path won't work. Only URL-based profile pictures are supported.
+    const resolvedPicUrl = editPicUrl.trim() || undefined
+
     const config = {
-      profileName:   editName.trim()     || undefined,
+      profileName:   editName.trim()    || undefined,
       username:      editUsername.trim() || undefined,
-      bio:           editBio.trim()      || undefined,
-      profilePicUrl: editPicUrl.trim()   || undefined,
+      bio:           editBio.trim()     || undefined,
+      profilePicUrl: resolvedPicUrl,
     }
 
     await Promise.all(targets.map(async phone => {
@@ -669,17 +673,6 @@ export function Warmup({ user }: WarmupProps) {
             {/* ── MASS EDIT tab ── */}
             {activeTab === 'massEdit' && (
               <div className="space-y-4 anim-slide-up">
-                <div style={{
-                  display: 'flex', alignItems: 'center', gap: 12, padding: '14px 18px',
-                  borderRadius: 12, background: 'rgba(239,68,68,0.07)',
-                  border: '1px solid rgba(239,68,68,0.22)',
-                }}>
-                  <span style={{ fontSize: 20, flexShrink: 0 }}>🚧</span>
-                  <div>
-                    <p style={{ fontSize: 13, fontWeight: 700, color: '#EF4444', margin: 0 }}>Bug rencontré — fonctionnalité indisponible</p>
-                    <p style={{ fontSize: 12, color: 'rgba(239,68,68,0.65)', margin: '3px 0 0' }}>Mass Edit est temporairement désactivé en raison d'un bug. Un correctif est en cours.</p>
-                  </div>
-                </div>
                 <div className="sf-card rounded-2xl overflow-hidden">
                   <div className="px-5 py-4 flex items-center gap-3" style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
                     <div className="w-7 h-7 rounded-lg flex items-center justify-center text-sm"
