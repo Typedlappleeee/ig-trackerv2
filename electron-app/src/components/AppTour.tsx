@@ -89,11 +89,12 @@ export function AppTour({ onClose, onNavigate }: AppTourProps) {
   return (
     <div style={{
       position: 'fixed', inset: 0, zIndex: 9999,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: 'rgba(0,0,0,0.18)', backdropFilter: 'blur(1px)',
+      display: 'flex', alignItems: 'flex-end', justifyContent: 'flex-end',
+      padding: '0 32px 32px 0',
+      background: 'transparent', pointerEvents: 'none',
     }}>
       <div style={{
-        width: 420, borderRadius: 20,
+        width: 380, borderRadius: 20, pointerEvents: 'auto',
         background: 'linear-gradient(145deg, #16112a 0%, #1a1035 100%)',
         border: '1px solid rgba(124,58,237,0.25)',
         boxShadow: '0 32px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(124,58,237,0.1)',
