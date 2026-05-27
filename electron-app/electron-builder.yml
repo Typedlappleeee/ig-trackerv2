@@ -1,6 +1,6 @@
-appId: com.igtracker.app
-productName: IG Tracker
-copyright: Copyright © 2025
+appId: com.scaleflow.app
+productName: ScaleFlow
+copyright: Copyright © 2025 ScaleFlow
 
 directories:
   output: release
@@ -20,24 +20,28 @@ extraResources:
 asarUnpack:
   - "node_modules/ffmpeg-static/**"
 
-# Windows — portable .exe (1 seul fichier, pas d'installation)
+# Windows — installeur NSIS (setup wizard classique)
 win:
   target:
-    - target: portable
+    - target: nsis
       arch: x64
   signAndEditExecutable: false
 
 nsis:
   oneClick: false
-  allowToChangeInstallationDirectory: false
+  allowToChangeInstallationDirectory: true
+  artifactName: ScaleFlow-Setup-${version}.exe
+  shortcutName: ScaleFlow
+  uninstallDisplayName: ScaleFlow
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
 
-portable:
-  artifactName: IGTracker-portable.exe
-
-# macOS (optionnel)
+# macOS
 mac:
   target: dmg
+  artifactName: ScaleFlow-${version}.dmg
 
-# Linux (optionnel)
+# Linux
 linux:
   target: AppImage
+  artifactName: ScaleFlow-${version}.AppImage
