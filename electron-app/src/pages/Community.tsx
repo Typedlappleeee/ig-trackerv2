@@ -1591,16 +1591,6 @@ export function Community({ user, onNavigate }: CommunityProps) {
                   </div>
                   <span className="text-[10px] flex-shrink-0" style={{ color: 'rgba(196,181,253,0.3)' }}>→</span>
                 </button>
-                <button onClick={() => setTab('support')}
-                  className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left transition-all hover:bg-purple-500/10"
-                  style={{ background: 'rgba(139,92,246,0.05)', border: '1px solid rgba(139,92,246,0.12)' }}>
-                  <span className="text-base flex-shrink-0">❓</span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[12px] font-semibold text-white leading-tight">Voir la FAQ</p>
-                    <p className="text-[9.5px] mt-0.5" style={{ color: 'rgba(196,181,253,0.4)' }}>Questions fréquentes</p>
-                  </div>
-                  <span className="text-[10px] flex-shrink-0" style={{ color: 'rgba(196,181,253,0.3)' }}>→</span>
-                </button>
               </div>
             </div>
           </div>
