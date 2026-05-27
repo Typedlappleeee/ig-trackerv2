@@ -8,27 +8,22 @@ export default defineConfig({
     react(),
     electron({
       main: {
-        // Point d'entrée du processus principal Electron
         entry: 'electron/main.ts',
       },
       preload: {
-        // Script de sécurité entre Electron et React
         input: path.join(__dirname, 'electron/preload.ts'),
       },
-      // Permet d'utiliser les modules Node.js dans le renderer si besoin
       renderer: {},
     }),
   ],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
-    },
-  },
-  build: {
-    rollupOptions: {
-      // @ffmpeg packages use a 'node' export condition that maps to empty.mjs
-      // in Electron context — tell Rollup not to try to bundle them
-      external: ['@ffmpeg/ffmpeg', '@ffmpeg/util', '@ffmpeg/core'],
+      // @ffmpeg/ffmpeg and @ffmpeg/util use wasm which only runs in a real browser.
+      // In the Electron renderer build, swap them for lightweight stubs so the
+      // bundle doesn't break — the real FFmpeg work goes through IPC anyway.
+      '@ffmpeg/ffmpeg': path.resolve(__dirname, './src/lib/stubs/ffmpeg-stub.ts'),
+      '@ffmpeg/util':   path.resolve(__dirname, './src/lib/stubs/ffmpeg-util-stub.ts'),
     },
   },
 })
