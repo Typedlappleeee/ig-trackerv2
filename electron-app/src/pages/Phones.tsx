@@ -1444,13 +1444,13 @@ export function Phones({ user }: PhonesProps) {
                           fontSize: 11, fontWeight: 600,
                           color: p.ig_status === 'active' ? '#22C55E' : (p.ig_status === 'expired' || p.ig_status === 'error') ? '#EF4444' : 'rgba(148,163,184,0.52)',
                         }}>
-                          {p.ig_status === 'active' ? 'Actif' : p.ig_status === 'expired' ? 'Expiré' : p.ig_status === 'error' ? 'Erreur' : 'Non configuré'}
+                          {p.ig_status === 'active' ? 'Active' : p.ig_status === 'expired' ? 'Expired' : p.ig_status === 'error' ? 'Error' : 'Not configured'}
                         </span>
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <span style={{ fontSize: 11, color: 'rgba(148,163,184,0.45)' }}>Session</span>
                         <span style={{ fontSize: 11, fontWeight: 600, color: p.ig_sessionid ? '#22C55E' : 'rgba(148,163,184,0.52)' }}>
-                          {p.ig_sessionid ? 'Configurée' : 'Non configurée'}
+                          {p.ig_sessionid ? 'Configured' : 'Not configured'}
                         </span>
                       </div>
                     </div>
