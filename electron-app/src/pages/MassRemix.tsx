@@ -538,7 +538,7 @@ export function MassRemix({ user }: MassRemixProps) {
             text: manualText.trim(),
             x: '(w-text_w)/2',
             y: 'h*0.82-text_h/2',
-            fontSize: 54,
+            fontSize: 54 - Math.floor(Math.random() * 3),
             fontColor: 'white',
             bold: false,
             shadow: true,
@@ -620,7 +620,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                 // ── Step 1: resolve timing + font for each item ────────────────
                 type TItem = { text: string; xAlign: string; rawY: number; fontSize: number; fontColor: string; bold: boolean; startTime: number; endTime: number }
                 const items: TItem[] = parsed.map(item => {
-                  const fontSize = Math.round(Math.max(44, Math.min(160, (item.fontSizePx ?? 64) * 1.15)))
+                  const fontSize = Math.round(Math.max(44, Math.min(160, (item.fontSizePx ?? 64) * 1.15))) - Math.floor(Math.random() * 3)
                   const sf = item.startFrame ?? 0
                   const ef = item.endFrame   ?? frameCount - 1
                   const coversAll = (ef - sf + 1) >= frameCount * 0.8
