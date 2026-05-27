@@ -941,7 +941,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
   }, [])
 
   useEffect(() => {
-    if (tab !== 'chat' && tab !== 'support') return
+    if (tab !== 'news' && tab !== 'support') return
     const el = listRef.current
     if (!el) return
     if (el.scrollHeight - el.scrollTop - el.clientHeight < 220)
@@ -949,7 +949,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
   }, [messages, tab, selectedThread])
 
   useEffect(() => {
-    if (!loading && (tab === 'chat' || tab === 'support'))
+    if (!loading && (tab === 'news' || tab === 'support'))
       setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'instant' as any }), 50)
   }, [loading, tab, selectedThread])
 
