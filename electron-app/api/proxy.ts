@@ -17,8 +17,9 @@ function isAllowed(url: string): boolean {
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).end()
 
-  const { url, method = 'GET', headers, body, isText } = req.body as {
-    url: string
+  try {
+  const { url, method = 'GET', headers, body, isText } = (req.body ?? {}) as {
+    url?: string
     method?: string
     headers?: Record<string, string>
     body?: unknown
@@ -28,8 +29,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!url || !isAllowed(url)) {
     return res.status(403).json({ ok: false, error: 'Forbidden URL' })
   }
-
-  try {
     const response = await fetch(url, {
       method,
       headers: {
