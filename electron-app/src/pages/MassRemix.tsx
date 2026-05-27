@@ -1248,7 +1248,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
               <button onClick={() => { abortRef.current = true; setRunning(false) }}
                 className="w-full py-2.5 rounded-xl text-[13px] font-semibold"
                 style={{ background: 'rgba(239,68,68,0.08)', color: '#f87171', border: '1px solid rgba(239,68,68,0.2)' }}>
-                ✕ Annuler la génération
+                ✕ Cancel generation
               </button>
             </div>
           </div>
@@ -1336,7 +1336,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
             {folderLoading ? (
               <div className="py-10 text-center text-text2 text-[13px]">Chargement…</div>
             ) : folderList.length === 0 ? (
-              <div className="py-10 text-center text-text2 text-[13px]">Aucun dossier dans la banque</div>
+              <div className="py-10 text-center text-text2 text-[13px]">No folders in the bank</div>
             ) : (
               <div className="max-h-80 overflow-y-auto py-2">
                 {folderList.map(f => (

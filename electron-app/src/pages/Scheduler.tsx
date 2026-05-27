@@ -312,7 +312,7 @@ function TerminalLogs({ logs, onClose }: { logs: string[]; onClose: () => void }
             display: 'inline-block',
             animation: 'pulse 1.4s ease-in-out infinite',
           }} />
-          Logs en direct
+          Live logs
         </span>
         <button
           onClick={onClose}
@@ -487,10 +487,10 @@ export function Scheduler({ user, onNavigate }: Props) {
               fontSize: 22, fontWeight: 700, color: '#F2F0FF',
               margin: 0, lineHeight: 1, letterSpacing: '-0.04em',
             }}>
-              Programmation
+              Scheduler
             </h1>
             <p style={{ fontSize: 12.5, color: 'rgba(148,163,184,0.52)', marginTop: 6, marginBottom: 0 }}>
-              {posts.length} tâche{posts.length !== 1 ? 's' : ''}
+              {posts.length} task{posts.length !== 1 ? 's' : ''}
             </p>
           </div>
 
@@ -498,7 +498,7 @@ export function Scheduler({ user, onNavigate }: Props) {
             {pending.length > 0 && (
               <span className="sf-badge sf-badge-ok" style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
                 <IconClock size={11} color="#22C55E" />
-                {pending.length} en attente
+                {pending.length} pending
               </span>
             )}
             <button
@@ -518,8 +518,8 @@ export function Scheduler({ user, onNavigate }: Props) {
           marginBottom: 0,
         }}>
           {([
-            { id: 'pending' as TabFilter, label: 'En attente', count: pending.length },
-            { id: 'history' as TabFilter, label: 'Historique',  count: history.length },
+            { id: 'pending' as TabFilter, label: 'Pending', count: pending.length },
+            { id: 'history' as TabFilter, label: 'History',  count: history.length },
           ]).map(t => (
             <button
               key={t.id}
