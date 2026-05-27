@@ -424,6 +424,7 @@ import { Community }         from '@/pages/Community'
 import Monitor                from '@/pages/Monitor'
 import { FullPageLoader }    from '@/components/ui/Spinner'
 import { Landing }           from '@/components/Landing'
+import { AppTour }           from '@/components/AppTour'
 
 const BETA_KEY = 'scaleflow-v1-seen'
 
@@ -433,6 +434,7 @@ function AppContent({ user }: { user: User }) {
   const [page, setPage]                     = useState<Page>('community')
   const [settingsPanel, setSettingsPanel]   = useState<string | undefined>(undefined)
   const [onboarding, setOnboarding]         = useState<boolean | null>(null)
+  const [showTour, setShowTour]             = useState(false)
   const [showBeta, setShowBeta]             = useState(false)
   const [phoneCount, setPhoneCount]         = useState(0)
   const [lastRefresh, setLastRefresh]       = useState<Date | null>(null)
@@ -538,7 +540,7 @@ function AppContent({ user }: { user: User }) {
   }
 
   if (onboarding === null) return <FullPageLoader />
-  if (onboarding) return <Onboarding user={user} onComplete={() => setOnboarding(false)} />
+  if (onboarding) return <Onboarding user={user} onComplete={() => { setOnboarding(false); setShowTour(true) }} />
 
   // Wait for orgs to load first — org members without their own key need currentOrg
   // to be set before checkLicense can return valid:true via the org owner's key.
@@ -595,6 +597,7 @@ function AppContent({ user }: { user: User }) {
     <LicenseContext.Provider value={license}>
     <CreditContext.Provider value={{ balance: creditBalance, loading: creditLoading, refresh: refreshCredits, ownerId: creditOwnerId }}>
       {showBeta && <BetaPopup onClose={dismissBeta} />}
+      {showTour && <AppTour onClose={() => setShowTour(false)} onNavigate={p => { setPage(p as Page); }} />}
       <Layout
         user={user}
         page={page}
