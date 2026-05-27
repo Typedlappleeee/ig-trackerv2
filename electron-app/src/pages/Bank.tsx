@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase, type ContentItem } from '@/lib/supabase'
+import { useT, useLang } from '@/lib/i18n'
 import { useOrg } from '@/lib/orgContext'
 import { canAccessBankFolder } from '@/lib/permissions'
 import { uploadVideoFromPath, uploadVideoFromBlob, deleteStorageObjects, type UploadScope } from '@/lib/storage'

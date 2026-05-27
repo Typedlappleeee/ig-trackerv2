@@ -3,6 +3,7 @@ import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/Button'
 import { Input }  from '@/components/ui/Input'
+import { useT, useLang } from '@/lib/i18n'
 
 interface LicenseKey {
   id: string
@@ -31,12 +32,12 @@ function generateKey(): string {
   return `${seg()}-${seg()}-${seg()}-${seg()}`
 }
 
-function daysLeft(expiresAt: string | null): string {
-  if (!expiresAt) return '∞ vie'
+function daysLeft(expiresAt: string | null, lang: string = 'fr'): string {
+  if (!expiresAt) return lang === 'en' ? '∞ lifetime' : '∞ vie'
   const diff = Math.ceil((new Date(expiresAt).getTime() - Date.now()) / 86_400_000)
-  if (diff < 0)  return 'Expiré'
-  if (diff === 0) return 'Expire aujourd\'hui'
-  return `${diff}j restants`
+  if (diff < 0)  return lang === 'en' ? 'Expired' : 'Expiré'
+  if (diff === 0) return lang === 'en' ? 'Expires today' : "Expire aujourd'hui"
+  return lang === 'en' ? `${diff}d left` : `${diff}j restants`
 }
 
 function daysLeftColor(expiresAt: string | null): string {
@@ -67,6 +68,8 @@ function generateCreditCode(): string {
 interface Props { user: User }
 
 export function Licences({ user: _user }: Props) {
+  const t = useT()
+  const { lang } = useLang()
   const [keys, setKeys]       = useState<LicenseKey[]>([])
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
@@ -207,8 +210,8 @@ export function Licences({ user: _user }: Props) {
       {/* Page header */}
       <div className="flex-shrink-0 px-8 pt-7 pb-5 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
         <div>
-          <h1 className="text-[20px] font-black text-white leading-none">🛡 Admin — Licences</h1>
-          <p className="text-[13px] text-text2 mt-0.5">Gère les clés d'accès à ScaleFlow</p>
+          <h1 className="text-[20px] font-black text-white leading-none">🛡 Admin — {t('licencesTitle')}</h1>
+          <p className="text-[13px] text-text2 mt-0.5">{t('licencesSub')}</p>
         </div>
       </div>
 
@@ -218,10 +221,10 @@ export function Licences({ user: _user }: Props) {
         {/* Stats */}
         <div className="grid grid-cols-4 gap-6 mt-8">
           {[
-            { label: 'Total',     value: stats.total,   color: 'text-text' },
-            { label: 'Dispo',     value: stats.active,  color: 'text-green-400' },
-            { label: 'Utilisées', value: stats.used,    color: 'text-blue-400' },
-            { label: 'Expirées',  value: stats.expired, color: 'text-red-400' },
+            { label: t('totalKeys'),    value: stats.total,   color: 'text-text' },
+            { label: t('availableKeys'), value: stats.active,  color: 'text-green-400' },
+            { label: lang === 'en' ? 'Used' : 'Utilisées', value: stats.used, color: 'text-blue-400' },
+            { label: t('expiredKeys'),  value: stats.expired, color: 'text-red-400' },
           ].map(s => (
             <div key={s.label} className="rounded-2xl p-6 text-center" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(139,92,246,0.12)' }}>
               <p className={`text-3xl font-black ${s.color}`}>{s.value}</p>
@@ -232,10 +235,10 @@ export function Licences({ user: _user }: Props) {
 
         {/* Create key */}
         <div className="rounded-2xl p-6 space-y-5 mt-8" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(139,92,246,0.15)' }}>
-          <p className="text-[15px] font-bold text-white mb-4">Créer une clé</p>
+          <p className="text-[15px] font-bold text-white mb-4">{t('createKey')}</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div className="space-y-2">
-              <label className="text-[12px] text-text2 uppercase tracking-wide">Clé générée</label>
+              <label className="text-[12px] text-text2 uppercase tracking-wide">{lang === 'en' ? 'Generated key' : 'Clé générée'}</label>
               <div className="flex gap-2">
                 <input
                   value={genKey}
@@ -249,7 +252,7 @@ export function Licences({ user: _user }: Props) {
               </div>
             </div>
             <div className="space-y-2">
-              <label className="text-[12px] text-text2 uppercase tracking-wide">Durée</label>
+              <label className="text-[12px] text-text2 uppercase tracking-wide">{t('keyDuration')}</label>
               <div className="flex gap-2 flex-wrap">
                 {DURATIONS.map(d => (
                   <button
@@ -264,7 +267,7 @@ export function Licences({ user: _user }: Props) {
               </div>
             </div>
             <div className="space-y-2">
-              <label className="text-[12px] text-text2 uppercase tracking-wide">Plan</label>
+              <label className="text-[12px] text-text2 uppercase tracking-wide">{t('keyPlan')}</label>
               <div className="flex gap-2">
                 {['standard', 'pro', 'organisation'].map(p => (
                   <button
@@ -279,12 +282,12 @@ export function Licences({ user: _user }: Props) {
               </div>
             </div>
             <div className="space-y-2">
-              <label className="text-[12px] text-text2 uppercase tracking-wide">Notes (optionnel)</label>
+              <label className="text-[12px] text-text2 uppercase tracking-wide">{t('keyNotes')}</label>
               <Input value={notes} onChange={e => setNotes(e.target.value)} placeholder="ex: Discord @pseudo" />
             </div>
           </div>
           <Button onClick={createKey} disabled={creating} className="w-full">
-            {creating ? 'Création…' : '+ Créer la clé'}
+            {creating ? t('loading') : t('createKeyBtn')}
           </Button>
         </div>
 
@@ -294,7 +297,7 @@ export function Licences({ user: _user }: Props) {
             <Input
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Rechercher une clé ou email…"
+              placeholder={t('searchKeyOrEmail')}
               className="flex-1 min-w-[200px]"
             />
             {(['all', 'active', 'used', 'expired'] as const).map(f => (
@@ -304,19 +307,19 @@ export function Licences({ user: _user }: Props) {
                 className={`px-4 py-2.5 rounded-xl text-[13px] font-medium capitalize transition-all ${filter === f ? 'text-white' : 'text-text2 hover:text-text'}`}
                 style={filter === f ? { background: 'rgba(139,92,246,0.3)', border: '1px solid rgba(139,92,246,0.4)' } : { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}
               >
-                {f === 'all' ? 'Toutes' : f === 'active' ? 'Disponibles' : f === 'used' ? 'Utilisées' : 'Expirées'}
+                {f === 'all' ? (lang === 'en' ? 'All' : 'Toutes') : f === 'active' ? t('keyAvailable') : f === 'used' ? t('keyActivated') : t('keyExpired')}
               </button>
             ))}
           </div>
 
           {loading ? (
             <div className="rounded-2xl p-10 text-center" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-              <p className="text-[13px] text-text2">Chargement…</p>
+              <p className="text-[13px] text-text2">{t('loading')}</p>
             </div>
           ) : filtered.length === 0 ? (
             <div className="rounded-2xl p-10 text-center" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
               <p className="text-base font-bold text-white mb-2">🔑</p>
-              <p className="text-[13px] text-text2">Aucune clé trouvée</p>
+              <p className="text-[13px] text-text2">{t('noKeys')}</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -340,16 +343,16 @@ export function Licences({ user: _user }: Props) {
 
                   {/* Status */}
                   {!k.is_active ? (
-                    <span className="text-[12px] px-2 py-0.5 rounded-full bg-red-500/10 text-red-400 font-medium">Révoquée</span>
+                    <span className="text-[12px] px-2 py-0.5 rounded-full bg-red-500/10 text-red-400 font-medium">{t('keyRevoked')}</span>
                   ) : k.user_id ? (
-                    <span className="text-[12px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 font-medium">Activée</span>
+                    <span className="text-[12px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 font-medium">{t('keyActivated')}</span>
                   ) : (
-                    <span className="text-[12px] px-2 py-0.5 rounded-full bg-green-500/10 text-green-400 font-medium">Disponible</span>
+                    <span className="text-[12px] px-2 py-0.5 rounded-full bg-green-500/10 text-green-400 font-medium">{t('keyAvailable')}</span>
                   )}
 
                   {/* Expiry */}
                   <span className={`text-[13px] font-medium ml-auto ${daysLeftColor(k.expires_at)}`}>
-                    {daysLeft(k.expires_at)}
+                    {daysLeft(k.expires_at, lang)}
                   </span>
 
                   {/* User email */}
@@ -367,14 +370,14 @@ export function Licences({ user: _user }: Props) {
                         onClick={() => revokeKey(k.id)}
                         className="text-[12px] px-3 py-1.5 rounded-lg text-orange-400 hover:bg-orange-400/10 transition-colors"
                       >
-                        Révoquer
+                        {t('revoke')}
                       </button>
                     )}
                     <button
                       onClick={() => deleteKey(k.id)}
                       className="text-[12px] px-3 py-1.5 rounded-lg text-red-400 hover:bg-red-400/10 transition-colors"
                     >
-                      Supprimer
+                      {t('delete')}
                     </button>
                   </div>
                 </div>
@@ -386,48 +389,48 @@ export function Licences({ user: _user }: Props) {
         {/* ── Credit Codes ──────────────────────────────────────────────────── */}
         <div className="mt-10 space-y-6">
           <div>
-            <h2 className="text-[22px] font-black text-white leading-none">💎 Codes crédit</h2>
-            <p className="text-[13px] text-text2 mt-0.5">Génère des codes que les utilisateurs peuvent échanger contre des crédits</p>
+            <h2 className="text-[22px] font-black text-white leading-none">💎 {lang === 'en' ? 'Credit codes' : 'Codes crédit'}</h2>
+            <p className="text-[13px] text-text2 mt-0.5">{lang === 'en' ? 'Generate codes that users can redeem for credits' : 'Génère des codes que les utilisateurs peuvent échanger contre des crédits'}</p>
           </div>
 
           {/* Create form */}
           <div className="rounded-2xl p-6 space-y-5" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(139,92,246,0.18)' }}>
-            <p className="text-[15px] font-bold text-white mb-4">Nouveau code</p>
+            <p className="text-[15px] font-bold text-white mb-4">{lang === 'en' ? 'New code' : 'Nouveau code'}</p>
             <div className="grid grid-cols-3 gap-5">
               <div className="space-y-2">
-                <p className="text-[12px] text-text2 uppercase tracking-wider">Code</p>
+                <p className="text-[12px] text-text2 uppercase tracking-wider">{lang === 'en' ? 'Code' : 'Code'}</p>
                 <Input value={ccGenCode} onChange={e => setCcGenCode(e.target.value.toUpperCase())}
                   className="font-mono text-[13px]" />
                 <button onClick={() => setCcGenCode(generateCreditCode())}
-                  className="text-[12px] text-accent hover:underline">↺ Régénérer</button>
+                  className="text-[12px] text-accent hover:underline">↺ {lang === 'en' ? 'Regenerate' : 'Régénérer'}</button>
               </div>
               <div className="space-y-2">
-                <p className="text-[12px] text-text2 uppercase tracking-wider">Montant (crédits)</p>
+                <p className="text-[12px] text-text2 uppercase tracking-wider">{lang === 'en' ? 'Amount (credits)' : 'Montant (crédits)'}</p>
                 <Input type="number" value={ccAmount} onChange={e => setCcAmount(Number(e.target.value))}
                   min={1} className="text-[13px]" />
               </div>
               <div className="space-y-2">
-                <p className="text-[12px] text-text2 uppercase tracking-wider">Notes</p>
+                <p className="text-[12px] text-text2 uppercase tracking-wider">{lang === 'en' ? 'Notes' : 'Notes'}</p>
                 <Input value={ccNotes} onChange={e => setCcNotes(e.target.value)}
-                  placeholder="Optionnel…" className="text-[13px]" />
+                  placeholder={lang === 'en' ? 'Optional…' : 'Optionnel…'} className="text-[13px]" />
               </div>
             </div>
             <Button onClick={createCreditCode} disabled={ccCreating || !ccGenCode.trim() || ccAmount < 1}>
-              {ccCreating ? 'Création…' : '+ Créer le code'}
+              {ccCreating ? t('loading') : `+ ${lang === 'en' ? 'Create code' : 'Créer le code'}`}
             </Button>
             {ccCreateErr && (
-              <p className="text-[13px] text-red-400 mt-2">Erreur : {ccCreateErr}</p>
+              <p className="text-[13px] text-red-400 mt-2">{t('error')} : {ccCreateErr}</p>
             )}
           </div>
 
           {/* Code list */}
           <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)' }}>
             {ccLoading ? (
-              <div className="p-10 text-center text-[13px] text-text2">Chargement…</div>
+              <div className="p-10 text-center text-[13px] text-text2">{t('loading')}</div>
             ) : creditCodes.length === 0 ? (
               <div className="p-10 text-center">
                 <p className="text-2xl mb-3">💎</p>
-                <p className="text-[13px] text-text2">Aucun code créé.</p>
+                <p className="text-[13px] text-text2">{lang === 'en' ? 'No codes created.' : 'Aucun code créé.'}</p>
               </div>
             ) : (
               <div className="divide-y" style={{ borderColor: 'rgba(255,255,255,0.05)' }}>
@@ -436,11 +439,11 @@ export function Licences({ user: _user }: Props) {
                     <code className="flex-1 font-mono text-[13px] text-text">{c.code}</code>
                     <span className="text-[13px] font-bold" style={{ color: '#a78bfa' }}>+{c.amount} crédits</span>
                     {c.used_by ? (
-                      <span className="text-[12px] text-text2">Utilisé</span>
+                      <span className="text-[12px] text-text2">{lang === 'en' ? 'Used' : 'Utilisé'}</span>
                     ) : c.is_active ? (
-                      <span className="text-[12px] text-green-400">Disponible</span>
+                      <span className="text-[12px] text-green-400">{t('keyAvailable')}</span>
                     ) : (
-                      <span className="text-[12px] text-red-400">Révoqué</span>
+                      <span className="text-[12px] text-red-400">{lang === 'en' ? 'Revoked' : 'Révoqué'}</span>
                     )}
                     {c.notes && <span className="text-[12px] text-text2 italic">{c.notes}</span>}
                     <button
@@ -448,14 +451,14 @@ export function Licences({ user: _user }: Props) {
                       className="text-[12px] px-3 py-1.5 rounded-lg transition-colors"
                       style={{ color: copied === c.code ? '#34d399' : '#a78bfa', background: 'rgba(139,92,246,0.1)' }}
                     >
-                      {copied === c.code ? '✓' : 'Copier'}
+                      {copied === c.code ? '✓' : t('copy')}
                     </button>
                     {c.is_active && !c.used_by && (
                       <button
                         onClick={() => revokeCreditCode(c.id)}
                         className="text-[12px] px-3 py-1.5 rounded-lg text-orange-400 hover:bg-orange-400/10 transition-colors"
                       >
-                        Révoquer
+                        {t('revoke')}
                       </button>
                     )}
                   </div>

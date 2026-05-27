@@ -3,6 +3,7 @@ import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { useLicense } from '@/lib/license'
 import { useOrg } from '@/lib/orgContext'
+import { useT, useLang } from '@/lib/i18n'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 type TicketStatus   = 'open' | 'in_progress' | 'resolved' | 'closed'
@@ -387,6 +388,8 @@ function ThreadView({
 
 // ── User View ──────────────────────────────────────────────────────────────────
 function UserSupport({ user }: { user: User }) {
+  const t = useT()
+  const { lang } = useLang()
   const { currentOrg }            = useOrg()
   const [tickets, setTickets]     = useState<Ticket[]>([])
   const [loading, setLoading]     = useState(true)
@@ -455,15 +458,15 @@ function UserSupport({ user }: { user: User }) {
       {/* Page header */}
       <div className="flex-shrink-0 px-8 pt-7 pb-5 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
         <div>
-          <h1 className="text-[20px] font-black text-white leading-none">Support</h1>
-          <p className="text-[13px] text-text2 mt-0.5">Besoin d'aide ? Créez un ticket et notre équipe vous répondra.</p>
+          <h1 className="text-[20px] font-black text-white leading-none">{t('supportTitle')}</h1>
+          <p className="text-[13px] text-text2 mt-0.5">{lang === 'en' ? "Need help? Create a ticket and our team will respond." : "Besoin d'aide ? Créez un ticket et notre équipe vous répondra."}</p>
         </div>
         <button
           onClick={() => setView('create')}
           className="rounded-xl px-5 py-2.5 text-[13px] font-semibold text-white"
           style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)' }}
         >
-          + Nouveau ticket
+          + {lang === 'en' ? 'New ticket' : 'Nouveau ticket'}
         </button>
       </div>
 
@@ -473,19 +476,19 @@ function UserSupport({ user }: { user: User }) {
           {/* Tickets list */}
           {loading ? (
             <div className="rounded-2xl p-10 text-center" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-              <p className="text-[13px] text-text2">Chargement…</p>
+              <p className="text-[13px] text-text2">{t('loading')}</p>
             </div>
           ) : tickets.length === 0 ? (
             <div className="rounded-2xl p-10 text-center space-y-4" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
               <div className="text-4xl">🎫</div>
-              <p className="text-base font-bold text-white">Aucun ticket pour l'instant</p>
-              <p className="text-[13px] text-text2">Créez un ticket si vous avez besoin d'aide.</p>
+              <p className="text-base font-bold text-white">{lang === 'en' ? 'No tickets yet' : "Aucun ticket pour l'instant"}</p>
+              <p className="text-[13px] text-text2">{lang === 'en' ? 'Create a ticket if you need help.' : "Créez un ticket si vous avez besoin d'aide."}</p>
               <button
                 onClick={() => setView('create')}
                 className="mt-2 inline-flex items-center gap-1.5 rounded-xl px-5 py-2.5 text-[13px] font-semibold text-white"
                 style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)' }}
               >
-                Créer un ticket
+                {lang === 'en' ? 'Create a ticket' : 'Créer un ticket'}
               </button>
             </div>
           ) : (

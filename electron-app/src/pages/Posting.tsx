@@ -14,6 +14,7 @@ import { getPostingState, setPostingState, subscribePosting, type TaskLog } from
 import { loadPostingOpts, savePostingOpts, buildScheduleTimes, type PostingOpts } from '@/lib/postingOpts'
 import { PostingOptions } from '@/components/PostingOptions'
 import { playSuccess } from '@/lib/sounds'
+import { useT, useLang } from '@/lib/i18n'
 import { checkAndDeductCredits, CREDIT_COSTS, useCredits } from '@/lib/credits'
 
 interface PostingProps { user: User }
@@ -39,6 +40,8 @@ function avatarGradient(name: string) {
 }
 
 export function Posting({ user }: PostingProps) {
+  const t = useT()
+  const { lang } = useLang()
   const { currentOrg, role, perms }    = useOrg()
   const credits = useCredits()
   const [phones, setPhones]            = useState<Phone[]>([])
@@ -350,7 +353,7 @@ export function Posting({ user }: PostingProps) {
                   <rect x="8" y="8" width="5" height="5" rx="1.5" fill="#A78BFA" opacity=".3"/>
                 </svg>
               </div>
-              <span className="text-[13px] font-black text-white tracking-tight">Comptes</span>
+              <span className="text-[13px] font-black text-white tracking-tight">{lang === 'en' ? 'Accounts' : 'Comptes'}</span>
             </div>
             {selectedPhones.size > 0 && (
               <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full text-white"
@@ -380,7 +383,7 @@ export function Posting({ user }: PostingProps) {
               <circle cx="5" cy="5" r="3.5" stroke="rgba(139,92,246,0.5)" strokeWidth="1.3"/>
               <path d="M7.5 7.5L10 10" stroke="rgba(139,92,246,0.5)" strokeWidth="1.3" strokeLinecap="round"/>
             </svg>
-            <input type="text" placeholder="Rechercher…" value={phoneSearch}
+            <input type="text" placeholder={t('search') + '…'} value={phoneSearch}
               onChange={e => setPhoneSearch(e.target.value)}
               className="w-full pl-8 pr-3 py-2 rounded-xl text-[12px] placeholder:text-text3 focus:outline-none transition-all"
               style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(139,92,246,0.12)', color: '#E2E8F0' }}
@@ -393,12 +396,12 @@ export function Posting({ user }: PostingProps) {
           style={{ border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)' }}>
           <button onClick={() => setSelPhones(new Set(visiblePhones.map(p => p.id)))}
             className="flex-1 py-1.5 text-[11px] font-bold text-accent hover:bg-accent/10 transition-colors">
-            Tout
+            {lang === 'en' ? 'All' : 'Tout'}
           </button>
           <div style={{ width: 1, background: 'rgba(255,255,255,0.06)', height: 20 }} />
           <button onClick={() => setSelPhones(new Set())}
             className="flex-1 py-1.5 text-[11px] text-text2 hover:text-white hover:bg-white/[0.04] transition-colors">
-            Aucun
+            {lang === 'en' ? 'None' : 'Aucun'}
           </button>
           <div style={{ width: 1, background: 'rgba(255,255,255,0.06)', height: 20 }} />
           <span className="px-3 text-[11px] font-medium" style={{ color: 'rgba(148,163,184,0.4)' }}>
@@ -414,7 +417,7 @@ export function Posting({ user }: PostingProps) {
                 <rect x="7" y="2" width="14" height="24" rx="3" stroke="rgba(139,92,246,0.3)" strokeWidth="1.5"/>
                 <circle cx="14" cy="22" r="1.5" fill="rgba(139,92,246,0.3)"/>
               </svg>
-              <p className="text-[11px]" style={{ color: 'rgba(148,163,184,0.3)' }}>Aucun téléphone</p>
+              <p className="text-[11px]" style={{ color: 'rgba(148,163,184,0.3)' }}>{t('noPhones')}</p>
             </div>
           ) : visiblePhones.map(phone => {
             const checked = selectedPhones.has(phone.id)
@@ -475,7 +478,11 @@ export function Posting({ user }: PostingProps) {
             style={{ background: selectedPhones.size > 0 ? 'rgba(139,92,246,0.08)' : 'rgba(255,255,255,0.02)', border: `1px solid ${selectedPhones.size > 0 ? 'rgba(139,92,246,0.2)' : 'rgba(255,255,255,0.05)'}` }}>
             <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: selectedPhones.size > 0 ? '#22C55E' : 'rgba(148,163,184,0.2)' }} />
             <p className="text-[12px] font-semibold" style={{ color: selectedPhones.size > 0 ? '#E2E8F0' : 'rgba(148,163,184,0.4)' }}>
-              {selectedPhones.size > 0 ? `${selectedPhones.size} compte${selectedPhones.size > 1 ? 's' : ''} sélectionné${selectedPhones.size > 1 ? 's' : ''}` : 'Aucun sélectionné'}
+              {selectedPhones.size > 0
+                ? lang === 'en'
+                  ? `${selectedPhones.size} account${selectedPhones.size > 1 ? 's' : ''} selected`
+                  : `${selectedPhones.size} compte${selectedPhones.size > 1 ? 's' : ''} sélectionné${selectedPhones.size > 1 ? 's' : ''}`
+                : lang === 'en' ? 'None selected' : 'Aucun sélectionné'}
             </p>
           </div>
         </div>
@@ -491,7 +498,7 @@ export function Posting({ user }: PostingProps) {
             <h1 className="text-[22px] font-black tracking-tight leading-none" style={{
               background: 'linear-gradient(135deg, #FFFFFF 0%, rgba(196,181,253,0.85) 100%)',
               WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-            }}>Nouveau post</h1>
+            }}>{t('newPost')}</h1>
             <p className="text-[12px] mt-1" style={{ color: 'rgba(148,163,184,0.5)' }}>
               Reel Instagram · GéeLark Cloud
             </p>
@@ -503,7 +510,7 @@ export function Posting({ user }: PostingProps) {
               <path d="M9.5 2A5 5 0 1 0 10 5.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
               <path d="M9.5 0V2.5H7" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
-            Réinitialiser
+            {t('reset')}
           </button>
         </div>
 
@@ -517,7 +524,7 @@ export function Posting({ user }: PostingProps) {
                 <div className="w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(245,158,11,0.15)' }}>
                   <span style={{ fontSize: 12 }}>⚠</span>
                 </div>
-                <p style={{ color: '#FCD34D' }}>Bearer Token GéeLark manquant — configure-le dans <strong>Paramètres</strong></p>
+                <p style={{ color: '#FCD34D' }}>{t('bearerMissingWarning')} <strong>{t('navSettings')}</strong></p>
               </div>
             )}
 
@@ -535,7 +542,7 @@ export function Posting({ user }: PostingProps) {
                     <path d="M4.5 4.5v3l3-1.5-3-1.5z" fill="#A78BFA"/>
                   </svg>
                 </div>
-                <span className="text-[12px] font-bold text-white">Vidéo</span>
+                <span className="text-[12px] font-bold text-white">{lang === 'en' ? 'Video' : 'Vidéo'}</span>
               </div>
 
               <div className="flex gap-5 p-5">
@@ -572,12 +579,12 @@ export function Posting({ user }: PostingProps) {
                 {/* File info + pickers */}
                 <div className="flex-1 min-w-0 flex flex-col justify-center gap-4">
                   <div>
-                    <p className="text-[11px] uppercase tracking-widest font-bold mb-1.5" style={{ color: 'rgba(139,92,246,0.6)' }}>Fichier</p>
+                    <p className="text-[11px] uppercase tracking-widest font-bold mb-1.5" style={{ color: 'rgba(139,92,246,0.6)' }}>{t('fileLabel')}</p>
                     <p className="text-[13px] font-semibold leading-snug" style={{ color: fileName ? '#E2E8F0' : 'rgba(148,163,184,0.3)' }}>
-                      {fileName ?? 'Aucune vidéo sélectionnée'}
+                      {fileName ?? t('noVideoSelected')}
                     </p>
                     {filePath && (
-                      <p className="text-[10px] mt-0.5" style={{ color: 'rgba(34,197,94,0.7)' }}>● Prêt pour le post</p>
+                      <p className="text-[10px] mt-0.5" style={{ color: 'rgba(34,197,94,0.7)' }}>{t('readyToPost')}</p>
                     )}
                   </div>
 
@@ -591,7 +598,7 @@ export function Posting({ user }: PostingProps) {
                         <rect x="1" y="7" width="4" height="4" rx="1" fill="white" opacity=".6"/>
                         <rect x="7" y="7" width="4" height="4" rx="1" fill="white" opacity=".4"/>
                       </svg>
-                      Depuis la banque
+                      {t('postFromBank')}
                     </button>
                     <div className="flex gap-2">
                       <button onClick={pickLocalFile}
@@ -601,7 +608,7 @@ export function Posting({ user }: PostingProps) {
                           <path d="M5.5 7V1M3 3.5L5.5 1L8 3.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
                           <path d="M1 8v1.5C1 10.3 1.7 11 2.5 11h6c.8 0 1.5-.7 1.5-1.5V8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
                         </svg>
-                        PC local
+                        {t('localFile')}
                       </button>
                       {filePath && (
                         <button onClick={() => setFilePath(null)}
@@ -641,7 +648,7 @@ export function Posting({ user }: PostingProps) {
 
               <div className="p-5 space-y-3">
                 <textarea value={caption} onChange={e => setCaption(e.target.value)} rows={5}
-                  placeholder="Écris ta description Instagram…"
+                  placeholder={lang === 'en' ? 'Write your Instagram caption…' : 'Écris ta description Instagram…'}
                   className="w-full rounded-xl px-4 py-3 text-[13px] placeholder:text-text3 resize-none focus:outline-none transition-all leading-relaxed"
                   style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(139,92,246,0.1)', color: '#E2E8F0',
                     fontFamily: 'inherit' }}
@@ -664,8 +671,8 @@ export function Posting({ user }: PostingProps) {
                           <path d="M5.5 1L6.8 4.2H10.2L7.5 6.1L8.5 9.5L5.5 7.5L2.5 9.5L3.5 6.1L0.8 4.2H4.2L5.5 1Z" fill="#A78BFA"/>
                         </svg>
                       </div>
-                      <span className="text-[12px] font-bold" style={{ color: '#C4B5FD' }}>Générer avec l'IA</span>
-                      {!groqKey && <span className="text-[10px] px-1.5 py-0.5 rounded-md" style={{ background: 'rgba(245,158,11,0.1)', color: '#FCD34D', border: '1px solid rgba(245,158,11,0.2)' }}>Clé Groq requise</span>}
+                      <span className="text-[12px] font-bold" style={{ color: '#C4B5FD' }}>{t('generateWithAI')}</span>
+                      {!groqKey && <span className="text-[10px] px-1.5 py-0.5 rounded-md" style={{ background: 'rgba(245,158,11,0.1)', color: '#FCD34D', border: '1px solid rgba(245,158,11,0.2)' }}>{lang === 'en' ? 'Groq key required' : 'Clé Groq requise'}</span>}
                     </div>
                     <svg width="12" height="12" viewBox="0 0 12 12" fill="none"
                       style={{ transform: aiExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', color: 'rgba(139,92,246,0.5)' }}>
@@ -678,7 +685,7 @@ export function Posting({ user }: PostingProps) {
                     <div className="px-4 pb-4 space-y-2.5" style={{ borderTop: '1px solid rgba(139,92,246,0.1)' }}>
                       <div className="pt-3 flex gap-2">
                         <input type="text" value={topic} onChange={e => setTopic(e.target.value)}
-                          placeholder="Sujet / niche (ex: lifestyle Paris…)"
+                          placeholder={t('topicPlaceholder')}
                           className="flex-1 px-3 py-2 rounded-xl text-[12px] placeholder:text-text3 focus:outline-none transition-all"
                           style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(139,92,246,0.15)', color: '#E2E8F0' }}
                         />
@@ -686,14 +693,14 @@ export function Posting({ user }: PostingProps) {
                           className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-[12px] font-bold transition-all disabled:opacity-40 hover:opacity-90 active:scale-95"
                           style={{ background: 'linear-gradient(130deg,#7C3AED,#A855F7)', color: '#fff', boxShadow: '0 2px 12px -3px rgba(124,58,237,0.5)', minWidth: 90 }}>
                           {generating ? (
-                            <><span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin inline-block" /> Génère…</>
+                            <><span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin inline-block" /> {t('generatingEllipsis')}</>
                           ) : (
-                            <><span style={{ fontSize: 11 }}>✨</span> Générer</>
+                            <><span style={{ fontSize: 11 }}>✨</span> {t('generateBtn2')}</>
                           )}
                         </button>
                       </div>
                       <input type="text" value={customPrompt} onChange={e => setCustomPrompt(e.target.value)}
-                        placeholder="Instructions supplémentaires (optionnel)…"
+                        placeholder={t('additionalInstructions')}
                         className="w-full px-3 py-2 rounded-xl text-[12px] placeholder:text-text3 focus:outline-none transition-all"
                         style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(139,92,246,0.12)', color: '#E2E8F0' }}
                       />
@@ -728,8 +735,8 @@ export function Posting({ user }: PostingProps) {
                     <span style={{ fontSize: 11 }}>#</span>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-[13px] text-white font-medium">Inclure des hashtags</p>
-                    <p className="text-[11px]" style={{ color: 'rgba(148,163,184,0.4)' }}>Ajoute 10–15 hashtags pertinents</p>
+                    <p className="text-[13px] text-white font-medium">{t('withHashtags')}</p>
+                    <p className="text-[11px]" style={{ color: 'rgba(148,163,184,0.4)' }}>{t('withHashtagsDesc')}</p>
                   </div>
                   <button onClick={() => setWithHashtags(v => !v)}
                     className="relative w-11 h-6 rounded-full transition-all flex-shrink-0"
@@ -751,7 +758,7 @@ export function Posting({ user }: PostingProps) {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       {posting && <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />}
-                      <span className="text-[13px] font-bold text-white">{posting ? 'Publication en cours…' : 'Terminé'}</span>
+                      <span className="text-[13px] font-bold text-white">{posting ? t('publishingProgress') : t('publishingDone')}</span>
                     </div>
                     <span className="text-[14px] font-black font-mono tabular-nums" style={{ color: progress >= 100 ? '#22C55E' : '#A78BFA' }}>
                       {progress}%
@@ -772,7 +779,7 @@ export function Posting({ user }: PostingProps) {
                       style={{ transform: showLogs ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }}>
                       <path d="M3 2l4 3-4 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
                     </svg>
-                    Logs ({logs.length})
+                    {t('logs')} ({logs.length})
                   </button>
 
                   {showLogs && logs.length > 0 && (
@@ -814,14 +821,14 @@ export function Posting({ user }: PostingProps) {
                 {posting ? (
                   <span className="flex items-center justify-center gap-2.5">
                     <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin inline-block" />
-                    Publication en cours…
+                    {t('publishingProgress')}
                   </span>
                 ) : (
                   <span className="flex items-center justify-center gap-2">
                     <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
                       <path d="M7.5 1L9.5 6H14.5L10.5 9L12 14L7.5 11L3 14L4.5 9L0.5 6H5.5L7.5 1Z" fill="white"/>
                     </svg>
-                    Lancer — {selectedPhones.size} compte{selectedPhones.size !== 1 ? 's' : ''}
+                    {t('launchPost')} {selectedPhones.size} {lang === 'en' ? `account${selectedPhones.size !== 1 ? 's' : ''}` : `compte${selectedPhones.size !== 1 ? 's' : ''}`}
                   </span>
                 )}
               </button>
@@ -834,7 +841,7 @@ export function Posting({ user }: PostingProps) {
                   <path d="M4 1v2M9 1v2M1 5h11" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
                   <path d="M4 8h1M6.5 8h1M4 10h1" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
                 </svg>
-                Programmer
+                {t('scheduleBtn')}
               </button>
             </div>
 

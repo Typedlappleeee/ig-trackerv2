@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { useConnections } from '@/lib/connections'
 import { fetchAllPhones, stopPhone, takeScreenshot, GeelarkPhone } from '@/lib/geelark'
+import { useT, useLang } from '@/lib/i18n'
 
 const POLL_MS = 2000  // refresh every 2s per phone
 
@@ -14,6 +15,7 @@ function PhoneCard({
   bearer: string
   onStopped: (id: string) => void
 }) {
+  const t = useT()
   const [imgSrc, setImgSrc]     = useState<string | null>(null)
   const [loading, setLoading]   = useState(true)
   const [stopping, setStopping] = useState(false)
@@ -63,13 +65,13 @@ function PhoneCard({
             <div className="flex flex-col items-center gap-2 text-center px-4">
               <span style={{ fontSize: 28 }}>⚠️</span>
               <p className="text-xs" style={{ color: 'rgba(148,163,184,0.6)' }}>
-                Screenshot indisponible
+                {t('takingScreenshot')}
               </p>
             </div>
           ) : (
             <div className="flex flex-col items-center gap-2">
               <div className="w-5 h-5 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: 'rgba(139,92,246,0.6)', borderTopColor: 'transparent' }} />
-              <p className="text-xs" style={{ color: 'rgba(148,163,184,0.4)' }}>Chargement…</p>
+              <p className="text-xs" style={{ color: 'rgba(148,163,184,0.4)' }}>{t('loading')}</p>
             </div>
           )}
 
@@ -110,7 +112,7 @@ function PhoneCard({
               <rect x="1" y="1" width="8" height="8" rx="1" />
             </svg>
           )}
-          {stopping ? 'Arrêt…' : 'Éteindre'}
+          {stopping ? `${t('stop')}…` : t('stop')}
         </button>
       </div>
     </div>
@@ -118,6 +120,8 @@ function PhoneCard({
 }
 
 export default function Monitor({ user }: { user: User }) {
+  const t = useT()
+  const { lang } = useLang()
   const conns  = useConnections(user)
   const bearer = conns.bearer ?? ''
 
@@ -154,7 +158,7 @@ export default function Monitor({ user }: { user: User }) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-3" style={{ color: 'rgba(148,163,184,0.5)' }}>
         <span style={{ fontSize: 40 }}>🔑</span>
-        <p className="text-sm">Configure ton token GéeLark dans les paramètres</p>
+        <p className="text-sm">{t('noBearerWarning')}</p>
       </div>
     )
   }
@@ -172,7 +176,7 @@ export default function Monitor({ user }: { user: User }) {
           {!fetching && (
             <span className="text-[11px] px-2.5 py-0.5 rounded-full font-bold"
               style={{ background: 'rgba(34,197,94,0.1)', color: '#22C55E', border: '1px solid rgba(34,197,94,0.2)' }}>
-              {phones.length} allumé{phones.length > 1 ? 's' : ''}
+              {phones.length} {lang === 'en' ? (phones.length > 1 ? 'on' : 'on') : (phones.length > 1 ? 'allumés' : 'allumé')}
             </span>
           )}
         </div>
@@ -185,7 +189,7 @@ export default function Monitor({ user }: { user: User }) {
             <path d="M10 6a4 4 0 11-1.17-2.83"/>
             <path d="M10 2v2.5H7.5" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
-          Actualiser
+          {t('refresh')}
         </button>
       </div>
 
@@ -194,7 +198,7 @@ export default function Monitor({ user }: { user: User }) {
         {fetching ? (
           <div className="flex items-center justify-center h-40 gap-3" style={{ color: 'rgba(148,163,184,0.4)' }}>
             <div className="w-5 h-5 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: 'rgba(139,92,246,0.5)', borderTopColor: 'transparent' }} />
-            <span className="text-sm">Chargement des téléphones…</span>
+            <span className="text-sm">{t('loading')}</span>
           </div>
         ) : error ? (
           <div className="flex flex-col items-center justify-center h-40 gap-2">
@@ -204,10 +208,10 @@ export default function Monitor({ user }: { user: User }) {
         ) : phones.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-60 gap-3" style={{ color: 'rgba(148,163,184,0.4)' }}>
             <span style={{ fontSize: 48 }}>📱</span>
-            <p className="text-base font-medium" style={{ color: 'rgba(148,163,184,0.6)' }}>Aucun téléphone allumé</p>
-            <p className="text-sm text-center max-w-xs">Démarre un ou plusieurs téléphones depuis la page Téléphones pour les voir ici.</p>
+            <p className="text-base font-medium" style={{ color: 'rgba(148,163,184,0.6)' }}>{t('noPhonesToMonitor')}</p>
+            <p className="text-sm text-center max-w-xs">{lang === 'en' ? 'Start one or more phones from the Phones page to see them here.' : 'Démarre un ou plusieurs téléphones depuis la page Téléphones pour les voir ici.'}</p>
             <button onClick={loadPhones} className="mt-2 text-xs px-3 py-1.5 rounded-lg" style={{ background: 'rgba(139,92,246,0.15)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.3)' }}>
-              Réessayer
+              {t('refresh')}
             </button>
           </div>
         ) : (

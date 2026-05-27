@@ -9,6 +9,7 @@ import {
 } from '@/lib/geelark'
 import { canAccessPhoneGroup } from '@/lib/permissions'
 import { logActivity } from '@/lib/activityLog'
+import { useT, useLang } from '@/lib/i18n'
 
 interface WarmupProps { user: User }
 
@@ -26,6 +27,8 @@ interface LoginCred { email: string; password: string; totpSecret: string }
 function fileName(p: string) { return p.split(/[\\/]/).pop() ?? p }
 
 export function Warmup({ user }: WarmupProps) {
+  const t = useT()
+  const { lang } = useLang()
   const conns  = useConnections(user)
   const bearer = conns.bearer
   const { currentOrg, role, perms } = useOrg()
@@ -233,7 +236,7 @@ export function Warmup({ user }: WarmupProps) {
             <div className="w-12 h-12 rounded-2xl sf-card flex items-center justify-center">
               <div className="animate-spin w-5 h-5 rounded-full border-2 border-accent border-t-transparent" />
             </div>
-            <span className="text-[13px] text-text2 font-medium">Initialisation du système…</span>
+            <span className="text-[13px] text-text2 font-medium">{t('loading')}</span>
           </div>
         </div>
       </div>
@@ -253,8 +256,8 @@ export function Warmup({ user }: WarmupProps) {
               ⚡
             </div>
             <div>
-              <h1 className="text-[22px] font-black text-text leading-none">Automatisation Instagram</h1>
-              <p className="text-[12px] text-text2 mt-0.5 font-mono">CYBER MONITORING DASHBOARD</p>
+              <h1 className="text-[22px] font-black text-text leading-none">{t('warmupPageTitle')}</h1>
+              <p className="text-[12px] text-text2 mt-0.5 font-mono">{t('warmupPageSub')}</p>
             </div>
           </div>
         </div>
@@ -263,9 +266,9 @@ export function Warmup({ user }: WarmupProps) {
             <div className="flex items-center gap-3 mb-3">
               <div className="w-8 h-8 rounded-lg flex items-center justify-center text-sm"
                 style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)' }}>⚠</div>
-              <p className="text-[14px] font-bold text-warn">Token GéeLark manquant</p>
+              <p className="text-[14px] font-bold text-warn">{t('warmupMissingToken')}</p>
             </div>
-            <p className="text-[13px] text-text2">Configure ton token dans <strong className="text-text">Paramètres → Connexions</strong>.</p>
+            <p className="text-[13px] text-text2">{t('warmupMissingTokenDesc')}</p>
           </div>
         </div>
       </div>
@@ -293,8 +296,8 @@ export function Warmup({ user }: WarmupProps) {
               {running && <div className="absolute inset-0 animate-ping rounded-xl opacity-20" style={{ background: 'linear-gradient(135deg, #7c3aed, #ec4899)' }} />}
             </div>
             <div>
-              <h1 className="text-[22px] font-black text-text leading-none">Automatisation Instagram</h1>
-              <p className="text-[12px] text-text3 mt-0.5 font-mono tracking-widest uppercase">Cyber Monitoring Dashboard</p>
+              <h1 className="text-[22px] font-black text-text leading-none">{t('warmupPageTitle')}</h1>
+              <p className="text-[12px] text-text3 mt-0.5 font-mono tracking-widest uppercase">{t('warmupPageSub')}</p>
             </div>
           </div>
 
@@ -304,20 +307,20 @@ export function Warmup({ user }: WarmupProps) {
               <div className={`w-2 h-2 rounded-full ${onlineCount > 0 ? 'sf-live-dot' : ''}`}
                 style={{ background: onlineCount > 0 ? '#22C55E' : '#52525B' }} />
               <span className="text-[12px] font-mono text-text2">
-                <span className={onlineCount > 0 ? 'text-ok' : 'text-text3'}>{onlineCount}</span>/{phones.length} en ligne
+                <span className={onlineCount > 0 ? 'text-ok' : 'text-text3'}>{onlineCount}</span>/{phones.length} {t('warmupOnline')}
               </span>
             </div>
             {selected.size > 0 && (
               <div className="rounded-xl px-4 py-2.5 flex items-center gap-2" style={{ background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.25)' }}>
                 <div className="w-1.5 h-1.5 rounded-full bg-accent" />
-                <span className="text-[12px] font-bold text-accent">{selected.size} sélectionné{selected.size !== 1 ? 's' : ''}</span>
+                <span className="text-[12px] font-bold text-accent">{selected.size} {t('warmupSelected')}{lang === 'fr' && selected.size !== 1 ? 's' : ''}</span>
               </div>
             )}
             {running && (
               <div className="rounded-xl px-4 py-2.5 flex items-center gap-2.5" style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)' }}>
                 <div className="animate-spin w-3 h-3 rounded-full border-2 border-accent border-t-transparent" />
                 <span className="text-[12px] font-mono text-accent">
-                  {activeTab === 'login' ? 'CONNEXION' : activeTab === 'massEdit' ? 'MASS EDIT' : 'WARMUP'} EN COURS
+                  {activeTab === 'login' ? t('warmupLoginRunning') : activeTab === 'massEdit' ? t('warmupMassEditRunning') : t('warmupWarmupRunning')}
                 </span>
               </div>
             )}
@@ -336,7 +339,7 @@ export function Warmup({ user }: WarmupProps) {
               <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
                 <div className="flex items-center gap-2.5">
                   <span className="text-sm">📱</span>
-                  <p className="text-[14px] font-bold text-text">Téléphones GéeLark</p>
+                  <p className="text-[14px] font-bold text-text">{t('warmupPhoneList')}</p>
                   {phones.length > 0 && (
                     <span className="sf-badge-violet">{phones.length}</span>
                   )}
@@ -345,7 +348,7 @@ export function Warmup({ user }: WarmupProps) {
                   <button onClick={selectAll}
                     className="rounded-lg px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider transition-all"
                     style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.18)', color: '#a78bfa' }}>
-                    Tout sélectionner
+                    {t('warmupSelectAll')}
                   </button>
                   <button onClick={loadPhones}
                     className="rounded-lg px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider transition-all hover:border-accent/40"
@@ -360,7 +363,7 @@ export function Warmup({ user }: WarmupProps) {
                 <div className="px-4 py-3 flex gap-2.5" style={{ borderBottom: '1px solid rgba(139,92,246,0.08)' }}>
                   <input
                     type="text"
-                    placeholder="Rechercher un téléphone…"
+                    placeholder={t('warmupSearchPhone')}
                     value={phoneSearch}
                     onChange={e => setPhoneSearch(e.target.value)}
                     className="sf-search flex-1 min-w-0 rounded-lg px-3.5 py-2 text-[12px] font-mono placeholder:text-text3"
@@ -388,15 +391,15 @@ export function Warmup({ user }: WarmupProps) {
               {phones.length === 0 && !loadingPhones && !phonesError && (
                 <div className="py-12 flex flex-col items-center gap-3">
                   <div className="w-12 h-12 rounded-xl flex items-center justify-center text-xl" style={{ background: 'rgba(139,92,246,0.07)', border: '1px solid rgba(139,92,246,0.12)' }}>📱</div>
-                  <p className="text-[13px] text-text3 font-mono">AUCUN TÉLÉPHONE DÉTECTÉ</p>
-                  <p className="text-[11px] text-text3 text-center max-w-xs">Vérifie ton token GéeLark dans les paramètres de connexion.</p>
+                  <p className="text-[13px] text-text3 font-mono">{t('warmupNoPhone')}</p>
+                  <p className="text-[11px] text-text3 text-center max-w-xs">{t('warmupNoPhoneDesc')}</p>
                 </div>
               )}
 
               {loadingPhones && (
                 <div className="px-5 py-4 flex items-center gap-3">
                   <div className="animate-spin w-4 h-4 rounded-full border-2 border-accent border-t-transparent" />
-                  <span className="text-[12px] font-mono text-text3">SCAN EN COURS…</span>
+                  <span className="text-[12px] font-mono text-text3">{t('warmupScanning')}</span>
                 </div>
               )}
 
@@ -480,8 +483,8 @@ export function Warmup({ user }: WarmupProps) {
                     <div>
                       <p className="text-[13px] font-bold text-text font-mono">
                         {running
-                          ? (activeTab === 'login' ? '[ CONNEXION EN COURS ]' : activeTab === 'massEdit' ? '[ MASS EDIT EN COURS ]' : '[ WARMUP EN COURS ]')
-                          : errorCount === 0 ? `[ ${doneCount} TERMINÉS — SUCCÈS ]` : `[ ${doneCount}/${jobs.length} OK · ${errorCount} ERREURS ]`}
+                          ? (activeTab === 'login' ? `[ ${t('warmupLoginRunning')} ]` : activeTab === 'massEdit' ? `[ ${t('warmupMassEditRunning')} ]` : `[ ${t('warmupWarmupRunning')} ]`)
+                          : errorCount === 0 ? `[ ${doneCount} ${t('warmupSuccessAll')} ]` : `[ ${doneCount}/${jobs.length} ${t('warmupSuccessPartial')} · ${errorCount} ${t('warmupErrors')} ]`}
                       </p>
                       {running && (
                         <p className="text-[11px] text-text3 font-mono mt-0.5">
@@ -494,7 +497,7 @@ export function Warmup({ user }: WarmupProps) {
                     <button onClick={() => setJobs([])}
                       className="rounded-lg px-3 py-1.5 text-[11px] font-bold font-mono uppercase tracking-wider transition-all"
                       style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(139,92,246,0.15)', color: '#71717a' }}>
-                      Fermer
+                      {t('warmupClose')}
                     </button>
                   )}
                 </div>
@@ -503,7 +506,7 @@ export function Warmup({ user }: WarmupProps) {
                 {running && (
                   <div className="px-5 pt-3.5 pb-1">
                     <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-[10px] font-mono text-text3 uppercase tracking-widest">Progression</span>
+                      <span className="text-[10px] font-mono text-text3 uppercase tracking-widest">{t('warmupProgression')}</span>
                       <span className="text-[11px] font-mono font-bold text-accent">{progress}%</span>
                     </div>
                     <div className="h-1 rounded-full overflow-hidden" style={{ background: 'rgba(139,92,246,0.1)' }}>
@@ -564,7 +567,7 @@ export function Warmup({ user }: WarmupProps) {
                     <button onClick={() => { abortRef.current.abort = true }}
                       className="w-full py-2.5 rounded-xl text-[12px] font-bold font-mono uppercase tracking-wider transition-all"
                       style={{ background: 'rgba(239,68,68,0.06)', color: '#f87171', border: '1px solid rgba(239,68,68,0.18)' }}>
-                      ✕ ANNULER L'OPÉRATION
+                      ✕ {t('warmupCancelOp')}
                     </button>
                   </div>
                 )}
@@ -592,15 +595,15 @@ export function Warmup({ user }: WarmupProps) {
                     <div className="w-7 h-7 rounded-lg flex items-center justify-center text-sm"
                       style={{ background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.2)' }}>🔑</div>
                     <div>
-                      <p className="text-[13px] font-bold text-text">Identifiants Instagram</p>
-                      <p className="text-[11px] text-text3 font-mono">Email + mot de passe par téléphone</p>
+                      <p className="text-[13px] font-bold text-text">{t('warmupLoginCredentials')}</p>
+                      <p className="text-[11px] text-text3 font-mono">{t('warmupLoginCredsSub')}</p>
                     </div>
                   </div>
 
                   {selectedPhones.length === 0 ? (
                     <div className="py-10 flex flex-col items-center gap-3">
                       <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg" style={{ background: 'rgba(139,92,246,0.07)', border: '1px solid rgba(139,92,246,0.12)' }}>←</div>
-                      <p className="text-[12px] text-text3 font-mono">SÉLECTIONNE DES TÉLÉPHONES</p>
+                      <p className="text-[12px] text-text3 font-mono">{t('warmupSelectPhones')}</p>
                     </div>
                   ) : (
                     <div className="divide-y max-h-[360px] overflow-auto" style={{ borderColor: 'rgba(139,92,246,0.06)' }}>
@@ -611,14 +614,14 @@ export function Warmup({ user }: WarmupProps) {
                             <p className="text-[12px] font-bold text-accent font-mono uppercase tracking-wider">{phoneName(phone)}</p>
                             <input
                               type="email"
-                              placeholder="Email Instagram"
+                              placeholder={t('warmupEmailPlaceholder')}
                               value={cred.email}
                               onChange={e => setLoginCred(phone.id, 'email', e.target.value)}
                               className="sf-search w-full rounded-lg px-3.5 py-2.5 text-[12px] font-mono"
                             />
                             <input
                               type="password"
-                              placeholder="Mot de passe"
+                              placeholder={t('warmupPasswordPlaceholder')}
                               value={cred.password}
                               onChange={e => setLoginCred(phone.id, 'password', e.target.value)}
                               className="sf-search w-full rounded-lg px-3.5 py-2.5 text-[12px] font-mono"
@@ -638,7 +641,7 @@ export function Warmup({ user }: WarmupProps) {
                               />
                               {cred.totpSecret && (
                                 <p className="text-[10px] font-mono px-1" style={{ color: 'rgba(139,92,246,0.7)' }}>
-                                  ✨ CODE 2FA AUTO-GÉNÉRÉ SI DEMANDÉ
+                                  ✨ {t('warmupTotp2fa')}
                                 </p>
                               )}
                             </div>
@@ -654,7 +657,7 @@ export function Warmup({ user }: WarmupProps) {
                   style={{ background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.15)' }}>
                   <span className="text-warn text-sm flex-shrink-0 mt-0.5">⚠</span>
                   <p className="text-[11px] font-mono leading-relaxed" style={{ color: 'rgba(245,158,11,0.8)' }}>
-                    Le téléphone démarre et saisit les identifiants automatiquement. Si 2FA activé, renseigne le secret TOTP.
+                    {t('warmupLoginWarning')}
                   </p>
                 </div>
 
@@ -665,7 +668,7 @@ export function Warmup({ user }: WarmupProps) {
                   loading={running}
                   onClick={launchLogin}
                 >
-                  🔑 LANCER LA CONNEXION ({selectedPhones.length})
+                  🔑 {t('warmupLaunchLogin')} ({selectedPhones.length})
                 </Button>
               </div>
             )}
@@ -678,20 +681,20 @@ export function Warmup({ user }: WarmupProps) {
                     <div className="w-7 h-7 rounded-lg flex items-center justify-center text-sm"
                       style={{ background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.2)' }}>✏️</div>
                     <div>
-                      <p className="text-[13px] font-bold text-text">Modifications de profil</p>
-                      <p className="text-[11px] text-text3 font-mono">Appliquées à tous les téléphones sélectionnés</p>
+                      <p className="text-[13px] font-bold text-text">{t('warmupProfileEdits')}</p>
+                      <p className="text-[11px] text-text3 font-mono">{t('warmupProfileEditsSub')}</p>
                     </div>
                   </div>
                   <div className="p-5 space-y-4">
                     <div>
-                      <label className="text-[10px] uppercase tracking-widest font-bold block mb-2 text-text3 font-mono">Nom de profil</label>
+                      <label className="text-[10px] uppercase tracking-widest font-bold block mb-2 text-text3 font-mono">{t('warmupProfileName')}</label>
                       <input type="text" placeholder="Ex: Marie Fitness | Coach Minceur"
                         value={editName} onChange={e => setEditName(e.target.value)}
                         className="sf-search w-full rounded-lg px-3.5 py-2.5 text-[12px] font-mono"
                       />
                     </div>
                     <div>
-                      <label className="text-[10px] uppercase tracking-widest font-bold block mb-2 text-text3 font-mono">Nom d'utilisateur</label>
+                      <label className="text-[10px] uppercase tracking-widest font-bold block mb-2 text-text3 font-mono">{t('warmupUsername')}</label>
                       <div className="relative">
                         <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[12px] font-mono text-accent/60">@</span>
                         <input type="text" placeholder="marie.fitness"
@@ -700,10 +703,10 @@ export function Warmup({ user }: WarmupProps) {
                           className="sf-search w-full rounded-lg pl-8 pr-3.5 py-2.5 text-[12px] font-mono"
                         />
                       </div>
-                      <p className="text-[10px] mt-1.5 text-text3 font-mono">Instagram peut refuser si le pseudo est déjà pris</p>
+                      <p className="text-[10px] mt-1.5 text-text3 font-mono">{t('warmupUsernameTaken')}</p>
                     </div>
                     <div>
-                      <label className="text-[10px] uppercase tracking-widest font-bold block mb-2 text-text3 font-mono">Bio</label>
+                      <label className="text-[10px] uppercase tracking-widest font-bold block mb-2 text-text3 font-mono">{t('warmupBio')}</label>
                       <textarea rows={3} placeholder="Ex: 🏋️ Coach fitness certifiée | -10kg en 90 jours ↓"
                         value={editBio} onChange={e => setEditBio(e.target.value)}
                         className="sf-search w-full rounded-lg px-3.5 py-2.5 text-[12px] font-mono resize-none"
@@ -714,7 +717,7 @@ export function Warmup({ user }: WarmupProps) {
                       </p>
                     </div>
                     <div>
-                      <label className="text-[10px] uppercase tracking-widest font-bold block mb-2 text-text3 font-mono">Photo de profil — URL</label>
+                      <label className="text-[10px] uppercase tracking-widest font-bold block mb-2 text-text3 font-mono">{t('warmupProfilePic')}</label>
                       <div className="flex gap-2">
                         <input type="text" placeholder="https://… ou laisser vide"
                           value={editPicUrl} onChange={e => { setEditPicUrl(e.target.value); setEditPicFile(null) }}
@@ -734,7 +737,7 @@ export function Warmup({ user }: WarmupProps) {
                       {editPicFile && (
                         <p className="text-[10px] mt-1.5 font-mono" style={{ color: 'rgba(139,92,246,0.7)' }}>📎 {fileName(editPicFile)}</p>
                       )}
-                      <p className="text-[10px] mt-1.5 text-text3 font-mono">Lien direct — le téléphone télécharge via curl</p>
+                      <p className="text-[10px] mt-1.5 text-text3 font-mono">{t('warmupDirectLink')}</p>
                     </div>
                   </div>
                 </div>
@@ -746,7 +749,7 @@ export function Warmup({ user }: WarmupProps) {
                   loading={running}
                   onClick={launchMassEdit}
                 >
-                  ✏️ APPLIQUER LES MODIFICATIONS ({selectedPhones.length})
+                  ✏️ {t('warmupApplyEdits')} ({selectedPhones.length})
                 </Button>
               </div>
             )}
@@ -761,8 +764,8 @@ export function Warmup({ user }: WarmupProps) {
                 }}>
                   <span style={{ fontSize: 20, flexShrink: 0 }}>🚧</span>
                   <div>
-                    <p style={{ fontSize: 13, fontWeight: 700, color: '#EF4444', margin: 0 }}>Bug rencontré — fonctionnalité indisponible</p>
-                    <p style={{ fontSize: 12, color: 'rgba(239,68,68,0.65)', margin: '3px 0 0' }}>Warmup est temporairement désactivé en raison d'un bug. Un correctif est en cours.</p>
+                    <p style={{ fontSize: 13, fontWeight: 700, color: '#EF4444', margin: 0 }}>{t('warmupBugTitle')}</p>
+                    <p style={{ fontSize: 12, color: 'rgba(239,68,68,0.65)', margin: '3px 0 0' }}>{t('warmupBugDesc')}</p>
                   </div>
                 </div>
                 <div className="sf-card rounded-2xl overflow-hidden">
@@ -770,15 +773,15 @@ export function Warmup({ user }: WarmupProps) {
                     <div className="w-7 h-7 rounded-lg flex items-center justify-center text-sm"
                       style={{ background: 'rgba(236,72,153,0.12)', border: '1px solid rgba(236,72,153,0.2)' }}>🔥</div>
                     <div>
-                      <p className="text-[13px] font-bold text-text">Configuration Warmup</p>
-                      <p className="text-[11px] text-text3 font-mono">Actions automatisées sur chaque compte</p>
+                      <p className="text-[13px] font-bold text-text">{t('warmupConfig')}</p>
+                      <p className="text-[11px] text-text3 font-mono">{t('warmupConfigSub')}</p>
                     </div>
                   </div>
                   <div className="p-5 space-y-5">
 
                     {/* Duration picker */}
                     <div>
-                      <p className="text-[10px] uppercase tracking-widest font-bold mb-3 text-text3 font-mono">Durée de navigation</p>
+                      <p className="text-[10px] uppercase tracking-widest font-bold mb-3 text-text3 font-mono">{t('warmupNavDuration')}</p>
                       <div className="grid grid-cols-3 gap-2">
                         {[0, 5, 10, 15, 20, 30].map(m => (
                           <button key={m} onClick={() => setBrowseMinutes(m)}
@@ -794,20 +797,20 @@ export function Warmup({ user }: WarmupProps) {
 
                     {/* Toggles */}
                     <div>
-                      <p className="text-[10px] uppercase tracking-widest font-bold mb-3 text-text3 font-mono">Actions activées</p>
+                      <p className="text-[10px] uppercase tracking-widest font-bold mb-3 text-text3 font-mono">{t('warmupEnabledActions')}</p>
                       <div className="space-y-2.5">
                         {([
-                          { key: 'like',   label: 'Liker des posts',            value: likePosts,       set: setLikePosts,       icon: '❤️' },
-                          { key: 'reels',  label: 'Regarder des Reels',         value: watchReels,      set: setWatchReels,      icon: '🎬' },
-                          { key: 'follow', label: 'Follow des comptes suggérés', value: followSuggested, set: setFollowSuggested, icon: '➕' },
-                        ] as const).map(({ key, label, value, set, icon }) => {
+                          { key: 'like',   labelKey: 'warmupLikeLabel',   value: likePosts,       set: setLikePosts,       icon: '❤️' },
+                          { key: 'reels',  labelKey: 'warmupReelsLabel',  value: watchReels,      set: setWatchReels,      icon: '🎬' },
+                          { key: 'follow', labelKey: 'warmupFollowLabel', value: followSuggested, set: setFollowSuggested, icon: '➕' },
+                        ] as const).map(({ key, labelKey, value, set, icon }) => {
                           const disabled = browseMinutes === 0
                           return (
                             <div key={key}
                               className={`flex items-center gap-3 p-3 rounded-xl transition-all ${disabled ? 'opacity-35' : ''}`}
                               style={{ background: value && !disabled ? 'rgba(139,92,246,0.06)' : 'rgba(255,255,255,0.02)', border: `1px solid ${value && !disabled ? 'rgba(139,92,246,0.18)' : 'rgba(139,92,246,0.06)'}` }}>
                               <span className="text-base flex-shrink-0">{icon}</span>
-                              <span className="text-[12px] font-mono text-text2 flex-1">{label}</span>
+                              <span className="text-[12px] font-mono text-text2 flex-1">{t(labelKey)}</span>
                               <div onClick={() => !disabled && set(!value)}
                                 className="relative flex-shrink-0 w-8 h-4 rounded-full cursor-pointer transition-all"
                                 style={{ background: value && !disabled ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.08)' }}>
@@ -823,7 +826,7 @@ export function Warmup({ user }: WarmupProps) {
                       <div className="rounded-lg px-3.5 py-2.5 flex items-center gap-2"
                         style={{ background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.15)' }}>
                         <span className="text-warn text-sm">⚠</span>
-                        <p className="text-[11px] font-mono" style={{ color: 'rgba(245,158,11,0.75)' }}>DURÉE = 0 — AUCUNE NAVIGATION</p>
+                        <p className="text-[11px] font-mono" style={{ color: 'rgba(245,158,11,0.75)' }}>{t('warmupDurationZero')}</p>
                       </div>
                     )}
                   </div>
@@ -831,13 +834,13 @@ export function Warmup({ user }: WarmupProps) {
 
                 {/* Summary card */}
                 <div className="sf-card rounded-2xl p-4">
-                  <p className="text-[10px] uppercase tracking-widest font-bold text-text3 font-mono mb-3">Résumé d'opération</p>
+                  <p className="text-[10px] uppercase tracking-widest font-bold text-text3 font-mono mb-3">{t('warmupSummary')}</p>
                   <div className="grid grid-cols-2 gap-2">
                     {[
-                      { label: 'Téléphones', value: String(selectedPhones.length), color: selectedPhones.length > 0 ? '#8B5CF6' : '#52525B' },
-                      { label: 'Navigation', value: browseMinutes === 0 ? '—' : `${browseMinutes} min`, color: browseMinutes > 0 ? '#22C55E' : '#52525B' },
-                      { label: 'Actions', value: browseMinutes > 0 ? [likePosts && 'Likes', watchReels && 'Reels', followSuggested && 'Follows'].filter(Boolean).join('+') || '—' : '—', color: '#A1A1AA' },
-                      { label: 'Durée totale ~', value: `${selectedPhones.length * (browseMinutes + 2)} min`, color: '#F59E0B' },
+                      { label: t('warmupPhones'), value: String(selectedPhones.length), color: selectedPhones.length > 0 ? '#8B5CF6' : '#52525B' },
+                      { label: t('warmupNavigation'), value: browseMinutes === 0 ? '—' : `${browseMinutes} min`, color: browseMinutes > 0 ? '#22C55E' : '#52525B' },
+                      { label: t('warmupActionsLabel'), value: browseMinutes > 0 ? [likePosts && 'Likes', watchReels && 'Reels', followSuggested && 'Follows'].filter(Boolean).join('+') || '—' : '—', color: '#A1A1AA' },
+                      { label: t('warmupTotalDuration'), value: `${selectedPhones.length * (browseMinutes + 2)} min`, color: '#F59E0B' },
                     ].map(({ label, value, color }) => (
                       <div key={label} className="rounded-lg p-3" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(139,92,246,0.07)' }}>
                         <p className="text-[9px] font-mono text-text3 uppercase tracking-widest mb-1">{label}</p>
@@ -853,7 +856,7 @@ export function Warmup({ user }: WarmupProps) {
                   loading={running}
                   onClick={launchWarmup}
                 >
-                  🔥 LANCER LE WARMUP ({selectedPhones.length})
+                  🔥 {t('warmupLaunchBtn')} ({selectedPhones.length})
                 </Button>
               </div>
             )}

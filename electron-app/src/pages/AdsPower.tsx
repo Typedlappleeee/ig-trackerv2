@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { BankPicker } from '@/pages/Bank'
+import { useT, useLang } from '@/lib/i18n'
 
 interface AdsPowerProps { user: User }
 
@@ -141,6 +142,7 @@ function ProfileRow({
 
 // ── Add profile modal ──────────────────────────────────────────────────────────
 function AddProfileModal({ onClose, onAdd }: { onClose: () => void; onAdd: (p: Omit<FbProfile, 'id' | 'enabled'>) => void }) {
+  const t = useT()
   const [name, setName]       = useState('')
   const [page, setPage]       = useState('')
   const [adsId, setAdsId]     = useState('')
@@ -155,12 +157,12 @@ function AddProfileModal({ onClose, onAdd }: { onClose: () => void; onAdd: (p: O
     <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
       onClick={e => { if (e.target === e.currentTarget) onClose() }}>
       <div style={{ width: '100%', maxWidth: 420, background: '#0e0e1a', border: '1px solid rgba(139,92,246,0.25)', borderRadius: 16, padding: 24 }}>
-        <h3 style={{ fontSize: 15, fontWeight: 700, color: '#F2F0FF', margin: '0 0 20px' }}>Ajouter un profil AdsPower</h3>
+        <h3 style={{ fontSize: 15, fontWeight: 700, color: '#F2F0FF', margin: '0 0 20px' }}>{t('adspowerAddProfile')}</h3>
 
         {[
-          { label: 'Nom affiché', value: name, set: setName, placeholder: 'Ex: Page Cuisine FR' },
-          { label: 'Nom de la page Facebook', value: page, set: setPage, placeholder: 'Ex: maboutique.fr ou @maboutique' },
-          { label: 'AdsPower User ID', value: adsId, set: setAdsId, placeholder: 'Ex: j5abc123' },
+          { label: t('adspowerDisplayName'), value: name, set: setName, placeholder: 'Ex: Page Cuisine FR' },
+          { label: t('adspowerFbPageName'), value: page, set: setPage, placeholder: 'Ex: maboutique.fr ou @maboutique' },
+          { label: t('adspowerUserId'), value: adsId, set: setAdsId, placeholder: 'Ex: j5abc123' },
         ].map(f => (
           <div key={f.label} style={{ marginBottom: 14 }}>
             <label style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(148,163,184,0.5)', display: 'block', marginBottom: 6 }}>{f.label}</label>
@@ -175,15 +177,15 @@ function AddProfileModal({ onClose, onAdd }: { onClose: () => void; onAdd: (p: O
         ))}
 
         <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.35)', margin: '0 0 18px', lineHeight: 1.6 }}>
-          L'User ID se trouve dans AdsPower → liste des profils → colonne ID.
+          {t('adspowerUserIdHint')}
         </p>
 
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
           <button onClick={onClose} style={{ padding: '8px 16px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(148,163,184,0.7)', fontSize: 13, cursor: 'pointer' }}>
-            Annuler
+            {t('cancel')}
           </button>
           <button onClick={submit} disabled={!name || !adsId} style={{ padding: '8px 16px', borderRadius: 8, background: 'linear-gradient(130deg,#7c3aed,#ec4899)', border: 'none', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', opacity: (!name || !adsId) ? 0.5 : 1 }}>
-            Ajouter
+            {t('adspowerAdd')}
           </button>
         </div>
       </div>
@@ -193,6 +195,8 @@ function AddProfileModal({ onClose, onAdd }: { onClose: () => void; onAdd: (p: O
 
 // ── Main page ──────────────────────────────────────────────────────────────────
 export function AdsPower({ user }: AdsPowerProps) {
+  const t = useT()
+  const { lang } = useLang()
   const [profiles, setProfiles]     = useState<FbProfile[]>([])
   const [selected, setSelected]     = useState<Set<string>>(new Set())
   const [video, setVideo]           = useState<SelectedVideo | null>(null)
@@ -404,27 +408,27 @@ export function AdsPower({ user }: AdsPowerProps) {
         <div style={{ padding: '16px 16px 12px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
             <div>
-              <p style={{ fontSize: 13, fontWeight: 700, color: '#F2F0FF', margin: 0 }}>Profils AdsPower</p>
-              <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.4)', margin: '2px 0 0' }}>{profiles.length} profil{profiles.length !== 1 ? 's' : ''} · {selected.size} sélectionné{selected.size !== 1 ? 's' : ''}</p>
+              <p style={{ fontSize: 13, fontWeight: 700, color: '#F2F0FF', margin: 0 }}>{t('adspowerProfiles')}</p>
+              <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.4)', margin: '2px 0 0' }}>{profiles.length} profil{profiles.length !== 1 ? 's' : ''} · {selected.size} {t('selectedCount')}</p>
             </div>
             <button
               onClick={() => setShowAdd(true)}
               style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: 'rgba(148,163,184,0.7)', fontSize: 12, cursor: 'pointer' }}>
-              + Manuel
+              {t('adspowerManual')}
             </button>
           </div>
 
           {/* API Key */}
           <div style={{ marginBottom: 10 }}>
             <label style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(148,163,184,0.4)', display: 'block', marginBottom: 5 }}>
-              Clé API AdsPower
+              {t('adspowerApiKey')}
             </label>
             <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
               <input
                 type={showKey ? 'text' : 'password'}
                 value={apiKey}
                 onChange={e => saveApiKey(e.target.value)}
-                placeholder="Colle ta clé ici…"
+                placeholder={t('adspowerApiKeyPlaceholder')}
                 style={{ width: '100%', boxSizing: 'border-box', padding: '8px 36px 8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)', color: '#F2F0FF', fontSize: 12, outline: 'none', fontFamily: 'monospace' }}
               />
               <button
@@ -434,7 +438,7 @@ export function AdsPower({ user }: AdsPowerProps) {
               </button>
             </div>
             <p style={{ fontSize: 10, color: 'rgba(148,163,184,0.25)', margin: '4px 0 0' }}>
-              AdsPower → Paramètres → Clé API. Optionnel si accès local.
+              {t('adspowerApiKeyHint')}
             </p>
           </div>
 
@@ -449,7 +453,7 @@ export function AdsPower({ user }: AdsPowerProps) {
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
               marginBottom: syncError ? 8 : 0,
             }}>
-            {syncing ? '⏳ Synchronisation…' : '🔄 Sync depuis AdsPower'}
+            {syncing ? t('adspowerSyncing') : t('adspowerSyncBtn')}
           </button>
 
           {syncError && (
@@ -462,7 +466,7 @@ export function AdsPower({ user }: AdsPowerProps) {
             <button
               onClick={toggleAll}
               style={{ fontSize: 11, color: 'rgba(167,139,250,0.6)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginTop: 8, display: 'block' }}>
-              {selected.size === profiles.length ? 'Tout désélectionner' : 'Tout sélectionner'}
+              {selected.size === profiles.length ? t('adspowerDeselectAll') : t('adspowerSelectAll')}
             </button>
           )}
         </div>
@@ -473,9 +477,9 @@ export function AdsPower({ user }: AdsPowerProps) {
             <div style={{ textAlign: 'center', padding: '40px 16px', color: 'rgba(148,163,184,0.35)' }}>
               <p style={{ fontSize: 28, margin: '0 0 10px' }}>📘</p>
               <p style={{ fontSize: 12, margin: '0 0 14px', lineHeight: 1.6 }}>
-                Clique sur <strong style={{ color: 'rgba(148,163,184,0.6)' }}>Sync depuis AdsPower</strong> pour importer automatiquement tous tes profils.
+                {t('adspowerNoProfiles')}
               </p>
-              <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.25)', margin: 0 }}>AdsPower doit être ouvert sur ce PC.</p>
+              <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.25)', margin: 0 }}>{t('adspowerMustBeOpen')}</p>
             </div>
           ) : (
             profiles.map(p => (
@@ -499,8 +503,8 @@ export function AdsPower({ user }: AdsPowerProps) {
           <div>
             <p style={{ fontSize: 14, fontWeight: 700, color: '#F2F0FF', margin: 0 }}>AdsPower — Facebook Mass Post</p>
             <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.4)', margin: '2px 0 0' }}>
-              {selectedProfiles.length} compte{selectedProfiles.length !== 1 ? 's' : ''} sélectionné{selectedProfiles.length !== 1 ? 's' : ''}
-              {video ? ` · ${video.title}` : ' · aucune vidéo'}
+              {selectedProfiles.length} {t('selectedCount')}
+              {video ? ` · ${video.title}` : ` ${t('adspowerNoVideo')}`}
             </p>
           </div>
           <button
@@ -513,7 +517,7 @@ export function AdsPower({ user }: AdsPowerProps) {
               boxShadow: canLaunch ? '0 4px 20px rgba(124,58,237,0.35)' : 'none',
               transition: 'all 0.15s',
             }}>
-            {running ? '⏳ En cours…' : '▶ Lancer'}
+            {running ? t('adspowerRunning') : t('adspowerLaunch')}
           </button>
         </div>
 
@@ -524,31 +528,31 @@ export function AdsPower({ user }: AdsPowerProps) {
 
             {/* Video picker */}
             <div style={{ padding: '16px 18px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-              <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(148,163,184,0.4)', margin: '0 0 10px' }}>Vidéo</p>
+              <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(148,163,184,0.4)', margin: '0 0 10px' }}>{t('adspowerVideo')}</p>
               {video ? (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <div style={{ width: 48, height: 48, borderRadius: 8, background: 'rgba(124,58,237,0.15)', border: '1px solid rgba(124,58,237,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>🎬</div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <p style={{ fontSize: 12, fontWeight: 600, color: '#F2F0FF', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{video.title}</p>
-                    <button onClick={() => setVideo(null)} style={{ fontSize: 11, color: 'rgba(248,113,113,0.6)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginTop: 4 }}>Retirer</button>
+                    <button onClick={() => setVideo(null)} style={{ fontSize: 11, color: 'rgba(248,113,113,0.6)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginTop: 4 }}>{t('adspowerRemoveVideo')}</button>
                   </div>
                 </div>
               ) : (
                 <button
                   onClick={() => setShowBank(true)}
                   style={{ width: '100%', padding: '14px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1.5px dashed rgba(139,92,246,0.25)', color: 'rgba(167,139,250,0.6)', fontSize: 13, cursor: 'pointer', fontWeight: 600 }}>
-                  🎬 Choisir depuis la banque
+                  {t('adspowerSelectFromBank')}
                 </button>
               )}
             </div>
 
             {/* Caption */}
             <div style={{ padding: '16px 18px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-              <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(148,163,184,0.4)', margin: '0 0 10px' }}>Description / Caption</p>
+              <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(148,163,184,0.4)', margin: '0 0 10px' }}>{t('adspowerCaption')}</p>
               <textarea
                 value={caption}
                 onChange={e => setCaption(e.target.value)}
-                placeholder="Écris ta description ici…&#10;&#10;#hashtag #facebook"
+                placeholder={t('adspowerCaptionPlaceholder')}
                 rows={6}
                 style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', color: '#F2F0FF', fontSize: 13, resize: 'vertical', outline: 'none', fontFamily: 'inherit', lineHeight: 1.6 }}
               />
@@ -557,11 +561,11 @@ export function AdsPower({ user }: AdsPowerProps) {
 
             {/* Options */}
             <div style={{ padding: '16px 18px' }}>
-              <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(148,163,184,0.4)', margin: '0 0 12px' }}>Options</p>
+              <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(148,163,184,0.4)', margin: '0 0 12px' }}>{t('adspowerOptions')}</p>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div>
-                  <p style={{ fontSize: 12, fontWeight: 600, color: '#F2F0FF', margin: 0 }}>Délai entre les posts</p>
-                  <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.4)', margin: '2px 0 0' }}>Pour éviter les détections</p>
+                  <p style={{ fontSize: 12, fontWeight: 600, color: '#F2F0FF', margin: 0 }}>{t('adspowerDelay')}</p>
+                  <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.4)', margin: '2px 0 0' }}>{t('adspowerDelayHint')}</p>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <input
@@ -572,7 +576,7 @@ export function AdsPower({ user }: AdsPowerProps) {
                     onChange={e => setDelayMin(Number(e.target.value))}
                     style={{ width: 60, padding: '6px 8px', borderRadius: 7, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#F2F0FF', fontSize: 13, textAlign: 'center', outline: 'none' }}
                   />
-                  <span style={{ fontSize: 11, color: 'rgba(148,163,184,0.4)' }}>sec</span>
+                  <span style={{ fontSize: 11, color: 'rgba(148,163,184,0.4)' }}>{t('adspowerSec')}</span>
                 </div>
               </div>
             </div>
@@ -581,9 +585,9 @@ export function AdsPower({ user }: AdsPowerProps) {
           {/* Log col */}
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
             <div style={{ padding: '12px 18px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(148,163,184,0.4)', margin: 0 }}>Journal en temps réel</p>
+              <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(148,163,184,0.4)', margin: 0 }}>{t('adspowerLogs')}</p>
               {logs.length > 0 && (
-                <button onClick={() => setLogs([])} style={{ fontSize: 10, color: 'rgba(148,163,184,0.3)', background: 'none', border: 'none', cursor: 'pointer' }}>Effacer</button>
+                <button onClick={() => setLogs([])} style={{ fontSize: 10, color: 'rgba(148,163,184,0.3)', background: 'none', border: 'none', cursor: 'pointer' }}>{t('adspowerClearLogs')}</button>
               )}
             </div>
 
@@ -591,7 +595,7 @@ export function AdsPower({ user }: AdsPowerProps) {
               {logs.length === 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'rgba(148,163,184,0.25)' }}>
                   <p style={{ fontSize: 24, margin: '0 0 8px' }}>📋</p>
-                  <p style={{ fontSize: 12, margin: 0 }}>Le journal apparaîtra ici au lancement</p>
+                  <p style={{ fontSize: 12, margin: 0 }}>{t('adspowerLogsEmpty')}</p>
                 </div>
               ) : (
                 logs.map((l, i) => (
@@ -610,8 +614,8 @@ export function AdsPower({ user }: AdsPowerProps) {
             {logs.length > 0 && !running && (
               <div style={{ padding: '10px 18px', borderTop: '1px solid rgba(255,255,255,0.05)', display: 'flex', gap: 16 }}>
                 {[
-                  { label: 'Réussi', count: logs.filter(l => l.status === 'done').length, color: '#22c55e' },
-                  { label: 'Erreur', count: logs.filter(l => l.status === 'error').length, color: '#f87171' },
+                  { label: t('adspowerSuccess'), count: logs.filter(l => l.status === 'done').length, color: '#22c55e' },
+                  { label: t('adspowerError'), count: logs.filter(l => l.status === 'error').length, color: '#f87171' },
                 ].map(s => (
                   <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <div style={{ width: 7, height: 7, borderRadius: '50%', background: s.color }} />

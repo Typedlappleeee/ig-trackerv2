@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { useOrg }    from '@/lib/orgContext'
+import { useT } from '@/lib/i18n'
 import { canSeeTab } from '@/lib/permissions'
 import { useToast }  from '@/components/Toast'
 import { playNav }   from '@/lib/sounds'
@@ -76,29 +77,29 @@ const NAV_SECTIONS: NavSection[] = [
     title: 'Principal',
     defaultOpen: true,
     items: [
-      { id: 'phones',      label: 'Téléphones',   icon: '📱' },
-      { id: 'monitor',     label: 'Monitor Live',  icon: '🖥' },
+      { id: 'phones',      label: 'navPhones',   icon: '📱' },
+      { id: 'monitor',     label: 'navMonitor',  icon: '🖥' },
     ],
   },
   {
     title: 'Instagram',
     defaultOpen: true,
     items: [
-      { id: 'posting',     label: 'Posting',       icon: '🚀' },
-      { id: 'massposting', label: 'Mass Posting',  icon: '⚡' },
-      { id: 'scheduler',   label: 'Programmation', icon: '📅', isNew: true },
-      { id: 'bank',        label: 'Banque vidéos', icon: '🗂' },
-      { id: 'warmup',      label: 'Warmup Compte', icon: '🔥', beta: true },
-      { id: 'aitools',     label: 'Outils IA',     icon: '🔧' },
+      { id: 'posting',     label: 'navPosting',      icon: '🚀' },
+      { id: 'massposting', label: 'navMassPosting',  icon: '⚡' },
+      { id: 'scheduler',   label: 'navScheduler',    icon: '📅', isNew: true },
+      { id: 'bank',        label: 'navBank',         icon: '🗂' },
+      { id: 'warmup',      label: 'navWarmup',       icon: '🔥', beta: true },
+      { id: 'aitools',     label: 'navAiTools',      icon: '🔧' },
     ],
   },
   {
     title: 'Montage',
     defaultOpen: true,
     items: [
-      { id: 'remix',     label: 'Remix vidéo',    icon: '🔀' },
-      { id: 'repurpose', label: 'CloneVid',         icon: '⚡', isNew: true },
-      { id: 'textcopy',  label: 'Texte IA',        icon: '✍', beta: true },
+      { id: 'remix',     label: 'navRemix',     icon: '🔀' },
+      { id: 'repurpose', label: 'navRepurpose', icon: '⚡', isNew: true },
+      { id: 'textcopy',  label: 'navTextCopy',  icon: '✍', beta: true },
     ],
   },
 ]
@@ -177,6 +178,7 @@ function SidebarDivider() {
 
 
 export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefresh, children }: LayoutProps) {
+  const t = useT()
   const toast = useToast()
   const [collapsed, setCollapsed]         = useState(() => {
     const v = localStorage.getItem('sf-sidebar')
@@ -338,7 +340,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
     setOrgMenuOpen(false)
     onNavigate('dashboard')
     toast.show({
-      title: orgId ? `Passé à "${orgName}"` : 'Repassé en mode solo',
+      title: orgId ? `→ "${orgName}"` : t('soloMode'),
       kind:  'info',
       duration: 3500,
     })
@@ -555,23 +557,23 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
   }
 
   const pageLabels: Record<string, string> = {
-    dashboard:   'Dashboard',
-    phones:      'Téléphones',
-    monitor:     'Monitor Live',
-    stats:       'Statistiques',
-    posting:     'Posting',
-    massposting: 'Mass Posting',
-    scheduler:   'Programmation',
-    bank:        'Banque Vidéos',
-    aitools:     'Outils IA',
-    warmup:      'Warmup',
-    montage:     'Montage',
-    remix:       'Remix Vidéo',
-    textcopy:    'Texte IA',
-    community:   'Communauté',
-    support:     'Support',
-    settings:    'Paramètres',
-    licences:    'Licences',
+    dashboard:   t('pageDashboard'),
+    phones:      t('pagePhones'),
+    monitor:     t('pageMonitor'),
+    stats:       t('pageStats'),
+    posting:     t('pagePosting'),
+    massposting: t('pageMassPosting'),
+    scheduler:   t('pageScheduler'),
+    bank:        t('pageBank'),
+    aitools:     t('pageAiTools'),
+    warmup:      t('pageWarmup'),
+    montage:     t('pageMontage'),
+    remix:       t('pageRemix'),
+    textcopy:    t('pageTextcopy'),
+    community:   t('pageCommunity'),
+    support:     t('pageSupport'),
+    settings:    t('pageSettings'),
+    licences:    t('pageLicences'),
   }
 
   // Suppress unused variable warnings for variables kept for logic parity
@@ -656,7 +658,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
               cursor: 'pointer', flexShrink: 0,
               marginLeft: collapsed ? 'auto' : 0,
             }}
-            title={collapsed ? 'Déplier' : 'Réduire'}
+            title={collapsed ? t('expandSidebar') : t('collapseSidebar')}
           >
             <NavIcon d={collapsed ? ICONS.chevronRight : ICONS.chevronDown} size={11} />
           </button>
@@ -669,7 +671,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
           {isVisibleTab('community') && (
             <button
               onClick={() => { playNav(); onNavigate('community') }}
-              title={collapsed ? 'Communauté' : undefined}
+              title={collapsed ? t('navCommunity') : undefined}
               style={{
                 display: 'flex', alignItems: 'center', gap: collapsed ? 0 : 8,
                 width: '100%', height: 34, padding: '0 8px', borderRadius: 8,
@@ -694,7 +696,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
               </span>
               {!collapsed && (
                 <>
-                  <span style={{ flex: 1 }}>Communauté</span>
+                  <span style={{ flex: 1 }}>{t('navCommunity')}</span>
                   {page !== 'community' && (
                     <span style={{
                       fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em',
@@ -718,12 +720,12 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             if (items.length === 0) return null
             return (
               <>
-                {!collapsed && <SectionLabel>Principal</SectionLabel>}
+                {!collapsed && <SectionLabel>{t('sectionPrincipal')}</SectionLabel>}
                 {items.map(item => (
                   <SidebarNavItem
                     key={item.id}
                     id={item.id}
-                    label={item.label}
+                    label={t(item.label as any)}
                     iconKey={PAGE_ICON[item.id] ?? 'phone'}
                     beta={item.beta}
                     isNew={item.isNew}
@@ -741,12 +743,12 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             if (items.length === 0) return null
             return (
               <>
-                {!collapsed && <SectionLabel>Instagram</SectionLabel>}
+                {!collapsed && <SectionLabel>{t('sectionInstagram')}</SectionLabel>}
                 {items.map(item => (
                   <SidebarNavItem
                     key={item.id}
                     id={item.id}
-                    label={item.label}
+                    label={t(item.label as any)}
                     iconKey={PAGE_ICON[item.id] ?? 'send'}
                     beta={item.beta}
                     isNew={item.isNew}
@@ -764,12 +766,12 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             if (items.length === 0) return null
             return (
               <>
-                {!collapsed && <SectionLabel>Création</SectionLabel>}
+                {!collapsed && <SectionLabel>{t('sectionCreation')}</SectionLabel>}
                 {items.map(item => (
                   <SidebarNavItem
                     key={item.id}
                     id={item.id}
-                    label={item.label}
+                    label={t(item.label as any)}
                     iconKey={PAGE_ICON[item.id] ?? 'edit'}
                     beta={item.beta}
                     isNew={item.isNew}
@@ -787,7 +789,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
           {/* Settings */}
           <button
             onClick={() => { playNav(); onNavigate('settings') }}
-            title={collapsed ? 'Paramètres' : undefined}
+            title={collapsed ? t('navSettings') : undefined}
             style={{
               display: 'flex', alignItems: 'center', gap: collapsed ? 0 : 8,
               width: '100%', height: 34, padding: '0 8px', borderRadius: 8,
@@ -809,7 +811,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             <span style={{ flexShrink: 0, color: page === 'settings' ? '#8B5CF6' : 'rgba(148,163,184,0.5)', display: 'flex' }}>
               <NavIcon d={ICONS.settings} size={16} />
             </span>
-            {!collapsed && <span style={{ flex: 1 }}>Paramètres</span>}
+            {!collapsed && <span style={{ flex: 1 }}>{t('navSettings')}</span>}
           </button>
 
           {/* Admin (super admin only) */}
@@ -838,7 +840,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
           {license.isSuperAdmin && (
             <button
               onClick={() => { playNav(); onNavigate('licences') }}
-              title={collapsed ? 'Admin' : undefined}
+              title={collapsed ? t('navAdmin') : undefined}
               style={{
                 display: 'flex', alignItems: 'center', gap: collapsed ? 0 : 8,
                 width: '100%', height: 34, padding: '0 8px', borderRadius: 8,
@@ -860,7 +862,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
               <span style={{ flexShrink: 0, color: page === 'licences' ? '#8B5CF6' : 'rgba(148,163,184,0.5)', display: 'flex' }}>
                 <NavIcon d={ICONS.shield} size={16} />
               </span>
-              {!collapsed && <span style={{ flex: 1 }}>Admin</span>}
+              {!collapsed && <span style={{ flex: 1 }}>{t('navAdmin')}</span>}
             </button>
           )}
 
@@ -985,7 +987,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
                 padding: '3px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700,
                 background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.35)', color: '#F87171',
               }}>
-                <span>{license.daysLeft === 0 ? 'Abonnement expiré' : '< 24h restantes'}</span>
+                <span>{license.daysLeft === 0 ? t('subscriptionExpired') : t('lessThan24h')}</span>
               </div>
             )}
 
@@ -1051,7 +1053,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
                       <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="#A78BFA" strokeWidth={2}>
                         <path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
                       </svg>
-                      <span className="text-[13px] font-bold text-white">Notifications</span>
+                      <span className="text-[13px] font-bold text-white">{t('notifications')}</span>
                       {notifications.length > 0 && (
                         <span className="text-[10px] px-1.5 py-0.5 rounded-full font-bold" style={{ background: 'rgba(139,92,246,0.15)', color: '#a78bfa' }}>
                           {notifications.length}
@@ -1063,7 +1065,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
                         className="text-[11px] transition-colors hover:text-white flex items-center gap-1"
                         style={{ color: 'rgba(148,163,184,0.4)' }}>
                         <svg width="9" height="9" viewBox="0 0 9 9" fill="none"><path d="M1 2h7M3.5 2V1.5h2V2M2.5 2l.5 6h3l.5-6" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                        Effacer
+                        {t('clearNotifications')}
                       </button>
                     )}
                   </div>
@@ -1078,9 +1080,9 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
                             <path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
                           </svg>
                         </div>
-                        <p className="text-[12px] font-semibold" style={{ color: 'rgba(148,163,184,0.3)' }}>Aucune notification</p>
+                        <p className="text-[12px] font-semibold" style={{ color: 'rgba(148,163,184,0.3)' }}>{t('noNotifications')}</p>
                         <p className="text-[11px] text-center max-w-[180px]" style={{ color: 'rgba(82,82,91,0.6)' }}>
-                          Les résultats de tes posts apparaîtront ici
+                          {t('notificationsDesc')}
                         </p>
                       </div>
                     ) : notifications.map(n => {
@@ -1146,7 +1148,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
                     <path className="opacity-80" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
                   </svg>
                 </div>
-                <p className="text-xs text-text2 font-medium tracking-wide">Chargement du contexte…</p>
+                <p className="text-xs text-text2 font-medium tracking-wide">{t('loadingContext')}</p>
               </div>
             </div>
           )}
@@ -1163,18 +1165,18 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
                 <div className="absolute -inset-3 rounded-[32px] bg-danger/5 -z-10" />
               </div>
               <div className="space-y-2.5 max-w-sm">
-                <h2 className="text-2xl font-bold text-text">Accès refusé</h2>
+                <h2 className="text-2xl font-bold text-text">{t('accessDenied')}</h2>
                 <p className="text-text2 text-sm leading-relaxed">
-                  Vous n'avez pas la permission d'accéder à cet onglet dans l'organisation{' '}
+                  {t('accessDeniedDesc')}{' '}
                   <strong className="text-text font-semibold">"{currentOrg?.name}"</strong>.
                 </p>
-                <p className="text-text2/50 text-xs">Contactez un administrateur pour modifier vos droits d'accès.</p>
+                <p className="text-text2/50 text-xs">{t('accessDeniedContact')}</p>
               </div>
               <button
                 onClick={() => onNavigate('dashboard')}
                 className="px-6 py-2.5 active:scale-95 text-white text-sm font-semibold rounded-xl transition-all btn-sf-primary"
               >
-                Retour au Dashboard
+                {t('backToDashboard')}
               </button>
             </div>
           ) : (
@@ -1219,7 +1221,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
               style={{ borderColor: 'rgba(139,92,246,0.12)' }}
             >
               <NavIcon d={ICONS.settings} size={11} color="currentColor" />
-              Gérer les organisations
+              {t('manageOrganizations')}
             </button>
           </div>
         </>
@@ -1246,12 +1248,12 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-[12px] font-semibold text-white leading-tight">
-                {activeTask.kind === 'mass' ? 'Mass Posting' : 'Posting'} en cours
+                {activeTask.kind === 'mass' ? 'Mass Posting' : 'Posting'} {t('taskInProgress')}
               </p>
               <p className="text-[10px] leading-tight" style={{ color: 'rgba(196,181,253,0.45)' }}>
                 {activeTask.kind === 'mass' && activeTask.total > 0
-                  ? `${activeTask.done} / ${activeTask.total} téléphones`
-                  : 'Tâche active…'}
+                  ? `${activeTask.done} / ${activeTask.total} ${t('phones')}`
+                  : `${t('taskPending')}…`}
               </p>
             </div>
             <span className="relative w-2 h-2 flex-shrink-0">
@@ -1261,7 +1263,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
           </div>
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
-              <span className="text-[10px]" style={{ color: 'rgba(196,181,253,0.4)' }}>Progression</span>
+              <span className="text-[10px]" style={{ color: 'rgba(196,181,253,0.4)' }}>{t('progress')}</span>
               <span className="text-[10px] font-mono" style={{ color: 'rgba(196,181,253,0.6)' }}>{activeTask.progress}%</span>
             </div>
             <div className="w-full h-[3px] rounded-full overflow-hidden" style={{ background: 'rgba(139,92,246,0.12)' }}>
@@ -1276,7 +1278,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             className="mt-3 w-full text-[11px] font-semibold py-1.5 rounded-lg transition-all hover:opacity-90"
             style={{ background: 'rgba(139,92,246,0.14)', color: '#c4b5fd', border: '1px solid rgba(139,92,246,0.2)' }}
           >
-            Voir les détails &rarr;
+            {t('viewDetails')}
           </button>
         </div>
       )}
@@ -1295,14 +1297,14 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
                 {userInitial}
               </div>
               <div>
-                <p className="text-[10px] uppercase tracking-wider" style={{ color: 'rgba(167,139,250,0.5)' }}>Compte actif</p>
+                <p className="text-[10px] uppercase tracking-wider" style={{ color: 'rgba(167,139,250,0.5)' }}>{t('activeAccount')}</p>
                 <p className="text-[12px] font-semibold text-white truncate max-w-[160px]">{user.email}</p>
               </div>
             </div>
 
             {recentAccounts.length > 0 && (
               <>
-                <p className="px-3 pt-2 pb-1 text-[10px] uppercase tracking-wider text-text2">Récents</p>
+                <p className="px-3 pt-2 pb-1 text-[10px] uppercase tracking-wider text-text2">{t('recentAccounts')}</p>
                 {recentAccounts.map(a => (
                   <button
                     key={a.user_id}
@@ -1316,7 +1318,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
                     <span
                       onClick={e => handleForget(a, e)}
                       className="text-text2 hover:text-danger text-[10px] opacity-0 group-hover:opacity-100 transition-opacity"
-                      title="Oublier ce compte"
+                      title={t('forgetAccount')}
                     >
                       ✕
                     </span>
@@ -1335,7 +1337,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
               style={{ borderColor: 'rgba(139,92,246,0.12)' }}
             >
               <span className="w-4 h-4 rounded-full border border-current flex items-center justify-center text-[10px] opacity-60">+</span>
-              <span>Ajouter un compte</span>
+              <span>{t('addAccount')}</span>
             </button>
             <button
               onClick={() => { setUserMenuOpen(false); supabase.auth.signOut() }}
@@ -1345,7 +1347,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3h4a3 3 0 0 1 3 3v1"/>
               </svg>
-              <span>Se déconnecter</span>
+              <span>{t('signOut')}</span>
             </button>
           </div>
         </>
