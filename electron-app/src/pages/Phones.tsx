@@ -37,7 +37,7 @@ function StatusDot({ status }: { status: string }) {
         ? <span className="sf-ping-dot" style={{ background: '#22C55E' }} />
         : <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'rgba(148,163,184,0.25)', display: 'inline-block' }} />
       }
-      {online ? 'En ligne' : 'Hors ligne'}
+      {online ? 'Online' : 'Offline'}
     </span>
   )
 }
@@ -51,7 +51,7 @@ function IgStatusBadge({ phone }: { phone: Phone }) {
   if (phone.ig_status === 'expired')
     return <span className="sf-badge sf-badge-danger">Expired</span>
   if (phone.ig_status === 'error')
-    return <span className="sf-badge sf-badge-danger">Erreur</span>
+    return <span className="sf-badge sf-badge-danger">Error</span>
   if (phone.ig_status === 'rate_limited')
     return <span className="sf-badge sf-badge-warn">Limited</span>
   if (phone.ig_sessionid)
@@ -234,17 +234,17 @@ function SessionDialog({
             }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div>
-                  <p style={{ fontSize: 12, fontWeight: 600, color: '#F2F0FF', margin: 0 }}>Extraction automatique</p>
+                  <p style={{ fontSize: 12, fontWeight: 600, color: '#F2F0FF', margin: 0 }}>Automatic extraction</p>
                   <p style={{ fontSize: 10, color: 'rgba(148,163,184,0.52)', margin: '2px 0 0' }}>Retrieves the sessionid directly from the GéeLark phone (max 3 min)</p>
                 </div>
                 <div style={{ display: 'flex', gap: 6 }}>
                   {extracting && (
                     <button className="sf-btn sf-btn-secondary sf-btn-sm" onClick={cancelExtract}>
-                      Annuler
+                      Cancel
                     </button>
                   )}
                   <Button size="sm" onClick={extractFromPhone} loading={extracting} disabled={extracting}>
-                    {extracting ? 'Extraction…' : 'Extraire'}
+                    {extracting ? 'Extracting…' : 'Extract'}
                   </Button>
                 </div>
               </div>
@@ -271,12 +271,12 @@ function SessionDialog({
             background: '#111120', border: '1px solid rgba(255,255,255,0.09)',
             borderRadius: 11, padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 3,
           }}>
-            <p style={{ fontSize: 11, fontWeight: 600, color: '#F2F0FF', margin: 0 }}>Ou manuellement :</p>
+            <p style={{ fontSize: 11, fontWeight: 600, color: '#F2F0FF', margin: 0 }}>Or manually:</p>
             {[
-              <>1. Ouvre <span style={{ color: '#8B5CF6' }}>instagram.com</span> dans Chrome</>,
-              <>2. Appuie sur <span style={{ color: '#8B5CF6' }}>F12</span> (DevTools)</>,
-              <>3. Va dans <span style={{ color: '#8B5CF6' }}>Application → Cookies → instagram.com</span></>,
-              <>4. Trouve le cookie <span style={{ color: '#8B5CF6', fontFamily: 'monospace' }}>sessionid</span> et copie sa valeur</>,
+              <>1. Open <span style={{ color: '#8B5CF6' }}>instagram.com</span> in Chrome</>,
+              <>2. Press <span style={{ color: '#8B5CF6' }}>F12</span> (DevTools)</>,
+              <>3. Go to <span style={{ color: '#8B5CF6' }}>Application → Cookies → instagram.com</span></>,
+              <>4. Find the <span style={{ color: '#8B5CF6', fontFamily: 'monospace' }}>sessionid</span> cookie and copy its value</>,
             ].map((t, i) => (
               <p key={i} style={{ fontSize: 11, color: 'rgba(148,163,184,0.52)', margin: 0 }}>{t}</p>
             ))}
@@ -291,7 +291,7 @@ function SessionDialog({
                 type="password"
                 value={value}
                 onChange={e => handleChange(e.target.value)}
-                placeholder="Colle ton sessionid ici…"
+                placeholder="Paste your sessionid here…"
                 className="sf-input"
                 style={{
                   width: '100%', boxSizing: 'border-box',
@@ -321,7 +321,7 @@ function SessionDialog({
             </div>
             {testResult === 'ok' && detectedUser && (
               <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.52)', margin: 0 }}>
-                Compte : <span style={{ color: '#8B5CF6', fontWeight: 600 }}>@{detectedUser}</span>
+                Account: <span style={{ color: '#8B5CF6', fontWeight: 600 }}>@{detectedUser}</span>
                 {phone.ig_username && phone.ig_username !== detectedUser && (
                   <span style={{ color: '#F59E0B', marginLeft: 4 }}>· different from @{phone.ig_username} — will be updated</span>
                 )}
@@ -329,7 +329,7 @@ function SessionDialog({
             )}
             {testResult === 'fail' && <p style={{ fontSize: 11, color: '#EF4444', margin: 0 }}>Invalid or expired session — make sure you copied the correct value.</p>}
             {testResult === 'idle' && value.trim().length > 10 && !testing && (
-              <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.52)', margin: 0 }}>Test automatique en cours…</p>
+              <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.52)', margin: 0 }}>Automatic test in progress…</p>
             )}
           </div>
         </div>
@@ -415,7 +415,7 @@ function ContextMenu({
           <div style={{ borderTop: '1px solid rgba(255,255,255,0.055)', margin: '4px 0' }} />
           {item(
             <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 3.5h9M5 3.5V2h3v1.5M4.5 3.5l.5 7h3l.5-7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>,
-            'Supprimer', onDelete, true
+            'Delete', onDelete, true
           )}
         </>
       )}
@@ -613,7 +613,7 @@ export function Phones({ user }: PhonesProps) {
     let q = supabase.from('phones').select('*').order('phone_name')
     q = currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
     const { data, error: err } = await q
-    if (err) setError('Erreur lors du chargement.')
+    if (err) setError('Error loading phones.')
     else {
       setPhones(data ?? [])
     }
@@ -739,7 +739,7 @@ export function Phones({ user }: PhonesProps) {
       await loadPhones()
       setLastUpdated(new Date())
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Erreur de synchronisation.')
+      setError(e instanceof Error ? e.message : 'Sync error.')
     }
     setSyncing(false)
   }, [bearer, user.id, currentOrg?.id])
@@ -832,10 +832,10 @@ export function Phones({ user }: PhonesProps) {
 
   function relativeTime(iso: string): string {
     const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000)
-    if (diff < 60)        return 'il y a < 1 min'
-    if (diff < 3600)      return `il y a ${Math.floor(diff / 60)} min`
-    if (diff < 86400)     return `il y a ${Math.floor(diff / 3600)}h`
-    if (diff < 86400 * 7) return `il y a ${Math.floor(diff / 86400)}j`
+    if (diff < 60)        return '< 1 min ago'
+    if (diff < 3600)      return `${Math.floor(diff / 60)} min ago`
+    if (diff < 86400)     return `${Math.floor(diff / 3600)}h ago`
+    if (diff < 86400 * 7) return `${Math.floor(diff / 86400)}d ago`
     return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
   }
 
@@ -989,7 +989,7 @@ export function Phones({ user }: PhonesProps) {
               ),
             },
             {
-              label: 'En ligne', value: onlineCount, sub: `${onlinePct}% actifs`,
+              label: 'Online', value: onlineCount, sub: `${onlinePct}% active`,
               color: '#22C55E', f: 'online' as const,
               icon: (
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
@@ -999,7 +999,7 @@ export function Phones({ user }: PhonesProps) {
               ),
             },
             {
-              label: 'Hors ligne', value: offlineCount, sub: `${100 - onlinePct}% inactifs`,
+              label: 'Offline', value: offlineCount, sub: `${100 - onlinePct}% inactive`,
               color: 'rgba(148,163,184,0.52)', f: 'offline' as const,
               icon: (
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
@@ -1125,7 +1125,7 @@ export function Phones({ user }: PhonesProps) {
                     fontSize: 12, fontWeight: 500, cursor: 'pointer',
                   }}
                 >
-                  <option value="all">Tous les groupes</option>
+                  <option value="all">All groups</option>
                   {groups.map(g => <option key={g} value={g}>{g}</option>)}
                 </select>
                 <span style={{ position: 'absolute', right: 9, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: 'rgba(148,163,184,0.4)', fontSize: 9 }}>▼</span>
@@ -1148,7 +1148,7 @@ export function Phones({ user }: PhonesProps) {
                       color: filter === v ? '#fff' : 'rgba(148,163,184,0.52)',
                     }}
                   >
-                    {v === 'all' ? 'Tous' : v === 'online' ? 'En ligne' : 'Hors ligne'}
+                    {v === 'all' ? 'All' : v === 'online' ? 'Online' : 'Offline'}
                   </button>
                 ))}
               </div>
@@ -1255,7 +1255,7 @@ export function Phones({ user }: PhonesProps) {
                   <span>#</span>
                   <span>Phone</span>
                   <span>Groupe</span>
-                  <span>Géelark</span>
+                  <span>GéeLark</span>
                   <span>Actions</span>
                 </div>
 
@@ -1396,14 +1396,14 @@ export function Phones({ user }: PhonesProps) {
 
                 {/* Info rows */}
                 <div style={{ padding: '14px 18px', borderBottom: '1px solid rgba(255,255,255,0.055)' }}>
-                  <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'rgba(148,163,184,0.35)', margin: '0 0 10px' }}>Informations</p>
+                  <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'rgba(148,163,184,0.35)', margin: '0 0 10px' }}>Information</p>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     {[
                       { label: 'Model',        value: p.phone_name },
                       { label: 'Serial',       value: p.serial_no ?? '—' },
                       { label: 'GéeLark ID',   value: p.geelark_id ?? '—' },
                       { label: 'Groupe',       value: p.group_name ?? '—' },
-                      { label: 'Dernier sync', value: p.synced_at ? relativeTime(p.synced_at) : '—' },
+                      { label: 'Last sync',    value: p.synced_at ? relativeTime(p.synced_at) : '—' },
                     ].map(row => (
                       <div key={row.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                         <span style={{ fontSize: 11, color: 'rgba(148,163,184,0.45)', flexShrink: 0 }}>{row.label}</span>
@@ -1416,7 +1416,7 @@ export function Phones({ user }: PhonesProps) {
                 {/* Instagram section */}
                 {p.ig_username && (
                   <div style={{ padding: '14px 18px', borderBottom: '1px solid rgba(255,255,255,0.055)' }}>
-                    <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'rgba(148,163,184,0.35)', margin: '0 0 10px' }}>Compte Instagram</p>
+                    <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'rgba(148,163,184,0.35)', margin: '0 0 10px' }}>Instagram account</p>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
                       <div style={{
                         width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
@@ -1432,14 +1432,14 @@ export function Phones({ user }: PhonesProps) {
                           <p style={{ fontSize: 10, color: 'rgba(148,163,184,0.45)', margin: '2px 0 0' }}>
                             {p.followers ? `${p.followers >= 1000 ? `${(p.followers / 1000).toFixed(1)}K` : p.followers} followers` : ''}
                             {p.followers && p.following ? ' · ' : ''}
-                            {p.following ? `${p.following} suivi(s)` : ''}
+                            {p.following ? `${p.following} following` : ''}
                           </p>
                         ) : null}
                       </div>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: 11, color: 'rgba(148,163,184,0.45)' }}>Statut</span>
+                        <span style={{ fontSize: 11, color: 'rgba(148,163,184,0.45)' }}>Status</span>
                         <span style={{
                           fontSize: 11, fontWeight: 600,
                           color: p.ig_status === 'active' ? '#22C55E' : (p.ig_status === 'expired' || p.ig_status === 'error') ? '#EF4444' : 'rgba(148,163,184,0.52)',
@@ -1459,7 +1459,7 @@ export function Phones({ user }: PhonesProps) {
 
                 {/* Actions rapides */}
                 <div style={{ padding: '14px 18px' }}>
-                  <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'rgba(148,163,184,0.35)', margin: '0 0 8px' }}>Actions rapides</p>
+                  <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'rgba(148,163,184,0.35)', margin: '0 0 8px' }}>Quick actions</p>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                     <button onClick={() => setSessionDialog({ phone: p })} style={{
                       width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px',
@@ -1498,7 +1498,7 @@ export function Phones({ user }: PhonesProps) {
                         onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'none' }}
                       >
                         <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 3.5h9M5 3.5V2h3v1.5M4.5 3.5l.5 7h3l.5-7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                        Supprimer
+                        Delete
                       </button>
                     )}
                   </div>
@@ -1603,7 +1603,7 @@ function PhoneRow({
           <>
             <p style={{ fontSize: 12, fontWeight: 500, color: 'rgba(196,181,253,0.72)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phone.group_name}</p>
             <p style={{ fontSize: 10, color: 'rgba(148,163,184,0.35)', margin: 0 }}>
-              {phones.filter(p2 => p2.group_name === phone.group_name).length} tél.
+              {phones.filter(p2 => p2.group_name === phone.group_name).length} ph.
             </p>
           </>
         ) : (
