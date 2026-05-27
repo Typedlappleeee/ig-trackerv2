@@ -38,18 +38,18 @@ function note(
 }
 
 /** Soft click when switching tabs */
-export function playNav() {
+export async function playNav() {
   try {
-    const ac = ctx()
+    const ac = await resume()
     const t  = ac.currentTime
     note(ac, 1046, t, 0.07, 0.04, 'sine')  // C6 — crisp tap
   } catch { /* audio not available */ }
 }
 
 /** Notification chime, flavored by toast kind */
-export function playToast(kind: 'ok' | 'error' | 'warn' | 'info') {
+export async function playToast(kind: 'ok' | 'error' | 'warn' | 'info') {
   try {
-    const ac = ctx()
+    const ac = await resume()
     const t  = ac.currentTime
     if (kind === 'ok') {
       // C5 → E5 — pleasant ascending double chime
@@ -95,18 +95,18 @@ export async function playSplash() {
 }
 
 /** Short tick for button toggle / selection */
-export function playTick() {
+export async function playTick() {
   try {
-    const ac = ctx()
+    const ac = await resume()
     const t  = ac.currentTime
     note(ac, 880, t, 0.055, 0.03, 'sine')
   } catch { /* */ }
 }
 
 /** Success chime — task launched / action confirmed */
-export function playSuccess() {
+export async function playSuccess() {
   try {
-    const ac = ctx()
+    const ac = await resume()
     const t  = ac.currentTime
     note(ac, 523.25, t,        0.15, 0.07, 'sine')
     note(ac, 783.99, t + 0.10, 0.22, 0.08, 'sine')
@@ -115,9 +115,9 @@ export function playSuccess() {
 }
 
 /** Subtle whoosh when opening a panel / modal */
-export function playWhoosh() {
+export async function playWhoosh() {
   try {
-    const ac = ctx()
+    const ac = await resume()
     const t  = ac.currentTime
     const osc = ac.createOscillator()
     const env = ac.createGain()
@@ -133,9 +133,9 @@ export function playWhoosh() {
 }
 
 /** Soft error buzz */
-export function playError() {
+export async function playError() {
   try {
-    const ac = ctx()
+    const ac = await resume()
     const t  = ac.currentTime
     note(ac, 220, t,        0.12, 0.07, 'sawtooth')
     note(ac, 180, t + 0.08, 0.16, 0.06, 'sawtooth')

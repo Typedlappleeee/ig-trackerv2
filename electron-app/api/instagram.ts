@@ -4,10 +4,10 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).end()
 
-  const { sessionid, username } = req.body as { sessionid: string; username?: string }
-  if (!sessionid) return res.status(400).json({ ok: false })
-
   try {
+    const { sessionid, username } = (req.body ?? {}) as { sessionid?: string; username?: string }
+    if (!sessionid) return res.status(400).json({ ok: false })
+
     const response = await fetch('https://i.instagram.com/api/v1/accounts/current_user/?edit=true', {
       headers: {
         'Cookie':       `sessionid=${sessionid}`,

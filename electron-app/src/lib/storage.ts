@@ -194,15 +194,39 @@ export async function uploadVideoFromPath(
   return uploadVideoFromBlob(blob, filePath, scope, onProgress)
 }
 
+// In-memory cache for signed URLs — avoids hammering Supabase connections when
+// many thumbnails render at once. TTL matches SIGNED_URL_TTL so entries stay valid.
+const signedUrlCache = new Map<string, { url: string; expiresAt: number }>()
+
+// Dedupe in-flight requests for the same path to prevent N concurrent connections.
+const signedUrlInFlight = new Map<string, Promise<string | null>>()
+
 // Generate a short-lived signed URL for a Storage path. Returns null on failure.
 export async function getSignedUrl(path: string | null | undefined): Promise<string | null> {
   if (!path) return null
-  const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, SIGNED_URL_TTL)
-  if (error || !data) {
-    console.warn('[storage] getSignedUrl failed for', path, error?.message)
-    return null
-  }
-  return data.signedUrl
+
+  const cached = signedUrlCache.get(path)
+  if (cached && cached.expiresAt > Date.now()) return cached.url
+
+  const inflight = signedUrlInFlight.get(path)
+  if (inflight) return inflight
+
+  const promise = (async () => {
+    try {
+      const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, SIGNED_URL_TTL)
+      if (error || !data) {
+        console.warn('[storage] getSignedUrl failed for', path, error?.message)
+        return null
+      }
+      signedUrlCache.set(path, { url: data.signedUrl, expiresAt: Date.now() + (SIGNED_URL_TTL - 60) * 1000 })
+      return data.signedUrl
+    } finally {
+      signedUrlInFlight.delete(path)
+    }
+  })()
+
+  signedUrlInFlight.set(path, promise)
+  return promise
 }
 
 // Cache to avoid re-downloading the same cloud video twice within a session
