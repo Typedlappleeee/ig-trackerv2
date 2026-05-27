@@ -90,7 +90,7 @@ export function AppTour({ onClose, onNavigate }: AppTourProps) {
     <div style={{
       position: 'fixed', inset: 0, zIndex: 9999,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
+      background: 'rgba(0,0,0,0.18)', backdropFilter: 'blur(1px)',
     }}>
       <div style={{
         width: 420, borderRadius: 20,
