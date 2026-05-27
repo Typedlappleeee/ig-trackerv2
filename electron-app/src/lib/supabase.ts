@@ -39,13 +39,38 @@ export type PageKey =
   | 'phones' | 'posting' | 'massposting' | 'scheduler'
   | 'bank' | 'autocomment' | 'warmup' | 'aitools' | 'montage' | 'remix' | 'repurpose' | 'settings'
 
+// Granular action permissions (on top of tab visibility).
+export type ActionKey =
+  | 'bank_upload'        // can upload files to the bank
+  | 'bank_delete'        // can delete files/folders from the bank
+  | 'bank_move'          // can move/rename files & folders
+  | 'bank_folder_create' // can create new bank folders
+  | 'phone_add'          // can add new phones
+  | 'phone_delete'       // can delete phones
+  | 'phone_edit'         // can edit phone info (name, group, session…)
+  | 'posting_launch'     // can launch posting / mass-posting jobs
+  | 'scheduler_write'    // can create / edit / delete scheduler jobs
+
 // Per-member overrides on top of role defaults.
 // tabs: explicit per-tab allow (true) / deny (false). Missing = use role default.
 // bank_folders.mode='all' grants every folder; 'allow' restricts to list; 'deny' blocks list.
+// actions: explicit action allow (true) / deny (false). Missing = follow role default.
 export interface PermOverrides {
   tabs?:         Partial<Record<PageKey, boolean>>
   bank_folders?: { mode: 'all' } | { mode: 'allow'; list: string[] } | { mode: 'deny'; list: string[] }
   phone_groups?: { mode: 'all' } | { mode: 'allow'; list: string[] }
+  actions?:      Partial<Record<ActionKey, boolean>>
+}
+
+// Reusable permission template created by org admins/owners
+export interface OrgRoleTemplate {
+  id:             string
+  org_id:         string
+  name:           string
+  color:          string
+  perm_overrides: PermOverrides
+  created_by:     string | null
+  created_at:     string
 }
 
 export interface Organization {
