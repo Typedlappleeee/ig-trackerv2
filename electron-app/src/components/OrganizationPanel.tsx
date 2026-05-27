@@ -264,8 +264,10 @@ export function OrganizationPanel({ user }: Props) {
       }
     }
     flash('Bienvenue dans l\'organisation ✓')
-    await refresh()
-    if (orgId) switchOrg(orgId)
+    // Persist the target org so it's selected after the reload
+    if (orgId) localStorage.setItem('ig-tracker-current-org', orgId)
+    // Full reload is the most reliable way to flush all stale auth/org state
+    setTimeout(() => window.location.reload(), 800)
   }
 
   async function changeRole(member: MemberRow, newRole: OrgRole) {
