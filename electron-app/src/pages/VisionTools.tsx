@@ -37,7 +37,7 @@ function ToolShell({ title, icon, children, onBack }: { title: string; icon: str
         <button onClick={onBack}
           className="rounded-xl px-4 py-2.5 text-[13px] font-semibold flex-shrink-0"
           style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}>
-          ← Retour
+          ← Back
         </button>
         <span className="text-2xl">{icon}</span>
         <h1 className="text-[22px] font-black text-white leading-none">{title}</h1>
@@ -64,11 +64,11 @@ function ViralScore({ anthropicKey, onBack }: { anthropicKey: string; onBack: ()
   }>(null)
 
   const SCORE_LABELS: Record<string, string> = {
-    hook: '🎣 Hook visuel (0–3s)',
-    retention: '📈 Rétention estimée',
-    text: '✍️ Lisibilité du texte',
-    thumbnail: '🖼 Qualité thumbnail',
-    dynamism: '⚡ Dynamisme visuel',
+    hook: '🎣 Visual hook (0–3s)',
+    retention: '📈 Estimated retention',
+    text: '✍️ Text readability',
+    thumbnail: '🖼 Thumbnail quality',
+    dynamism: '⚡ Visual dynamism',
   }
 
   async function analyze() {
@@ -76,7 +76,7 @@ function ViralScore({ anthropicKey, onBack }: { anthropicKey: string; onBack: ()
     setLoading(true); setError(null); setResult(null)
     try {
       const fr = await window.electronAPI!.extractFrames!({ filePath, endTime: 999, fps: 0.5 })
-      if (!fr.ok || !fr.frames?.length) throw new Error('Impossible d\'extraire les frames')
+      if (!fr.ok || !fr.frames?.length) throw new Error('Unable to extract frames')
       const imageBlocks = fr.frames.map(f => ({
         type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: f.data },
       }))
@@ -100,10 +100,10 @@ Return ONLY valid JSON, no explanation outside the JSON:
         messages: [{ role: 'user', content: [...imageBlocks, { type: 'text', text: prompt }] }],
         maxTokens: 1000,
       })
-      if (!res.ok) throw new Error(res.error ?? 'Erreur Anthropic')
+      if (!res.ok) throw new Error(res.error ?? 'Anthropic error')
       const txt = (res.data as { content: Array<{ type: string; text: string }> })?.content?.[0]?.text ?? ''
       const m = txt.match(/\{[\s\S]*\}/)
-      if (!m) throw new Error('Réponse invalide de Claude')
+      if (!m) throw new Error('Invalid response from Claude')
       setResult(JSON.parse(m[0]))
     } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
     setLoading(false)
@@ -112,22 +112,22 @@ Return ONLY valid JSON, no explanation outside the JSON:
   const overallColor = result ? (result.overall >= 7 ? '#34d399' : result.overall >= 5 ? '#fbbf24' : '#f87171') : '#a78bfa'
 
   return (
-    <ToolShell title="Score Viral" icon="🔥" onBack={onBack}>
+    <ToolShell title="Viral Score" icon="🔥" onBack={onBack}>
       <div className="space-y-5">
         <p className="text-[13px] text-text2">
-          Upload une vidéo, Claude analyse les frames et note son potentiel viral sur 5 critères.
+          Upload a video, Claude analyzes the frames and scores its viral potential on 5 criteria.
         </p>
 
         <div className="rounded-2xl p-5 space-y-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
           {filePath
             ? <p className="text-[13px] font-mono text-white/70 truncate">📹 {fileName(filePath)}</p>
-            : <p className="text-[13px] text-text2">Aucune vidéo sélectionnée</p>
+            : <p className="text-[13px] text-text2">No video selected</p>
           }
           <Button variant="secondary" onClick={async () => {
             const p = await window.electronAPI!.pickVideoFile()
             if (p) { setFilePath(p); setResult(null); setError(null) }
           }}>
-            📂 Choisir une vidéo
+            📂 Choose a video
           </Button>
         </div>
 
@@ -138,12 +138,12 @@ Return ONLY valid JSON, no explanation outside the JSON:
         )}
 
         <Button className="w-full" disabled={!filePath || !anthropicKey} loading={loading} onClick={analyze}>
-          🔥 Analyser le potentiel viral
+          🔥 Analyze viral potential
         </Button>
 
         {!anthropicKey && (
           <div className="rounded-xl px-4 py-3" style={{ background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.2)', color: '#fbbf24' }}>
-            <p className="text-[13px]">⚠ Clé Anthropic manquante — configure-la dans Paramètres → Connexions</p>
+            <p className="text-[13px]">⚠ Missing Anthropic key — configure it in Settings → Connections</p>
           </div>
         )}
 
@@ -151,7 +151,7 @@ Return ONLY valid JSON, no explanation outside the JSON:
           <div className="space-y-4">
             {/* Overall score */}
             <div className="rounded-2xl p-6 text-center space-y-1" style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${overallColor}40` }}>
-              <p className="text-[12px] uppercase tracking-widest font-bold text-text2">Score Global</p>
+              <p className="text-[12px] uppercase tracking-widest font-bold text-text2">Overall Score</p>
               <p className="text-[52px] font-black leading-none" style={{ color: overallColor }}>{result.overall.toFixed(1)}</p>
               <p className="text-[12px] text-text2">/ 10</p>
               <p className="text-[13px] text-white/70 mt-2">{result.verdict}</p>
@@ -159,7 +159,7 @@ Return ONLY valid JSON, no explanation outside the JSON:
 
             {/* Category scores */}
             <div className="rounded-2xl p-5 space-y-5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-              <p className="text-[15px] font-bold text-white mb-4">Critères détaillés</p>
+              <p className="text-[15px] font-bold text-white mb-4">Detailed criteria</p>
               {Object.entries(result.scores).map(([key, val]) => (
                 <ScoreBar key={key} score={val.score} label={SCORE_LABELS[key] ?? key} comment={val.comment} />
               ))}
@@ -167,7 +167,7 @@ Return ONLY valid JSON, no explanation outside the JSON:
 
             {/* Top recommendation */}
             <div className="rounded-xl px-5 py-4 space-y-1.5" style={{ background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.2)' }}>
-              <p className="text-[12px] uppercase tracking-wider font-bold" style={{ color: '#fbbf24' }}>💡 Top recommandation</p>
+              <p className="text-[12px] uppercase tracking-wider font-bold" style={{ color: '#fbbf24' }}>💡 Top recommendation</p>
               <p className="text-[13px] text-white/80">{result.topRecommendation}</p>
             </div>
           </div>
@@ -194,8 +194,8 @@ function ViralStructure({ anthropicKey, onBack }: { anthropicKey: string; onBack
     proof: '#fbbf24', cta: '#f87171', transition: '#06b6d4',
   }
   const TYPE_LABEL: Record<string, string> = {
-    hook: 'Hook', context: 'Contexte', value: 'Valeur',
-    proof: 'Preuve', cta: 'CTA', transition: 'Transition',
+    hook: 'Hook', context: 'Context', value: 'Value',
+    proof: 'Proof', cta: 'CTA', transition: 'Transition',
   }
 
   async function analyze() {
@@ -203,7 +203,7 @@ function ViralStructure({ anthropicKey, onBack }: { anthropicKey: string; onBack
     setLoading(true); setError(null); setResult(null)
     try {
       const fr = await window.electronAPI!.extractFrames!({ filePath, endTime: 999, fps: 0.5 })
-      if (!fr.ok || !fr.frames?.length) throw new Error('Impossible d\'extraire les frames')
+      if (!fr.ok || !fr.frames?.length) throw new Error('Unable to extract frames')
       const imageBlocks = fr.frames.map(f => ({
         type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: f.data },
       }))
@@ -223,32 +223,32 @@ Return ONLY valid JSON:
         messages: [{ role: 'user', content: [...imageBlocks, { type: 'text', text: prompt }] }],
         maxTokens: 1500,
       })
-      if (!res.ok) throw new Error(res.error ?? 'Erreur Anthropic')
+      if (!res.ok) throw new Error(res.error ?? 'Anthropic error')
       const txt = (res.data as { content: Array<{ type: string; text: string }> })?.content?.[0]?.text ?? ''
       const m = txt.match(/\{[\s\S]*\}/)
-      if (!m) throw new Error('Réponse invalide de Claude')
+      if (!m) throw new Error('Invalid response from Claude')
       setResult(JSON.parse(m[0]))
     } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
     setLoading(false)
   }
 
   return (
-    <ToolShell title="Structure Virale" icon="🧬" onBack={onBack}>
+    <ToolShell title="Viral Structure" icon="🧬" onBack={onBack}>
       <div className="space-y-5">
         <p className="text-[13px] text-text2">
-          Décompose la structure narrative d'une vidéo — hook, valeur, CTA — pour comprendre pourquoi ça marche.
+          Breaks down a video's narrative structure — hook, value, CTA — to understand why it works.
         </p>
 
         <div className="rounded-2xl p-5 space-y-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
           {filePath
             ? <p className="text-[13px] font-mono text-white/70 truncate">📹 {fileName(filePath)}</p>
-            : <p className="text-[13px] text-text2">Aucune vidéo sélectionnée</p>
+            : <p className="text-[13px] text-text2">No video selected</p>
           }
           <Button variant="secondary" onClick={async () => {
             const p = await window.electronAPI!.pickVideoFile()
             if (p) { setFilePath(p); setResult(null); setError(null) }
           }}>
-            📂 Choisir une vidéo
+            📂 Choose a video
           </Button>
         </div>
 
@@ -259,12 +259,12 @@ Return ONLY valid JSON:
         )}
 
         <Button className="w-full" disabled={!filePath || !anthropicKey} loading={loading} onClick={analyze}>
-          🧬 Analyser la structure
+          🧬 Analyze structure
         </Button>
 
         {!anthropicKey && (
           <div className="rounded-xl px-4 py-3" style={{ background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.2)', color: '#fbbf24' }}>
-            <p className="text-[13px]">⚠ Clé Anthropic manquante — configure-la dans Paramètres → Connexions</p>
+            <p className="text-[13px]">⚠ Missing Anthropic key — configure it in Settings → Connections</p>
           </div>
         )}
 
@@ -306,11 +306,11 @@ Return ONLY valid JSON:
             {/* Strengths + improvements */}
             <div className="grid grid-cols-2 gap-4">
               <div className="rounded-xl p-4 space-y-2.5" style={{ background: 'rgba(52,211,153,0.06)', border: '1px solid rgba(52,211,153,0.2)' }}>
-                <p className="text-[12px] font-black uppercase tracking-wider" style={{ color: '#34d399' }}>✅ Points forts</p>
+                <p className="text-[12px] font-black uppercase tracking-wider" style={{ color: '#34d399' }}>✅ Strengths</p>
                 {result.strengths.map((s, i) => <p key={i} className="text-[13px] text-white/60">• {s}</p>)}
               </div>
               <div className="rounded-xl p-4 space-y-2.5" style={{ background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.2)' }}>
-                <p className="text-[12px] font-black uppercase tracking-wider" style={{ color: '#fbbf24' }}>💡 Améliorations</p>
+                <p className="text-[12px] font-black uppercase tracking-wider" style={{ color: '#fbbf24' }}>💡 Improvements</p>
                 {result.improvements.map((s, i) => <p key={i} className="text-[13px] text-white/60">• {s}</p>)}
               </div>
             </div>
@@ -335,10 +335,10 @@ function ThumbnailAudit({ anthropicKey, onBack }: { anthropicKey: string; onBack
   }>(null)
 
   const SCORE_LABELS: Record<string, string> = {
-    contrast: '🎨 Contraste & visibilité',
-    textReadability: '✍️ Lisibilité du texte',
-    emotion: '😮 Émotion / Expression',
-    colors: '🌈 Couleurs accrocheuses',
+    contrast: '🎨 Contrast & visibility',
+    textReadability: '✍️ Text readability',
+    emotion: '😮 Emotion / Expression',
+    colors: '🌈 Eye-catching colors',
     composition: '📐 Composition',
   }
 
@@ -351,13 +351,13 @@ function ThumbnailAudit({ anthropicKey, onBack }: { anthropicKey: string; onBack
 
       if (isVideo) {
         const fr = await window.electronAPI!.extractFrames!({ filePath, endTime: 0.5, fps: 2 })
-        if (!fr.ok || !fr.frames?.length) throw new Error('Impossible d\'extraire le thumbnail')
+        if (!fr.ok || !fr.frames?.length) throw new Error('Unable to extract thumbnail')
         imageData = fr.frames[0].data
       } else {
         const ext = filePath.split('.').pop()?.toLowerCase() ?? ''
         mediaType = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg'
         const bytes = await window.electronAPI!.readFileBytes(filePath)
-        if (!bytes.ok || !bytes.bytes) throw new Error('Impossible de lire l\'image')
+        if (!bytes.ok || !bytes.bytes) throw new Error('Unable to read image')
         const arr = new Uint8Array(bytes.bytes)
         let b64 = ''
         for (let i = 0; i < arr.length; i += 8192) {
@@ -391,10 +391,10 @@ Rate each category 1-10. Return ONLY valid JSON:
         }],
         maxTokens: 800,
       })
-      if (!res.ok) throw new Error(res.error ?? 'Erreur Anthropic')
+      if (!res.ok) throw new Error(res.error ?? 'Anthropic error')
       const txt = (res.data as { content: Array<{ type: string; text: string }> })?.content?.[0]?.text ?? ''
       const m = txt.match(/\{[\s\S]*\}/)
-      if (!m) throw new Error('Réponse invalide de Claude')
+      if (!m) throw new Error('Invalid response from Claude')
       setResult(JSON.parse(m[0]))
     } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
     setLoading(false)
@@ -403,14 +403,14 @@ Rate each category 1-10. Return ONLY valid JSON:
   const overallColor = result ? (result.overall >= 7 ? '#34d399' : result.overall >= 5 ? '#fbbf24' : '#f87171') : '#a78bfa'
 
   return (
-    <ToolShell title="Audit Thumbnail" icon="🖼" onBack={onBack}>
+    <ToolShell title="Thumbnail Audit" icon="🖼" onBack={onBack}>
       <div className="space-y-5">
         <p className="text-[13px] text-text2">
-          Analyse ta miniature sur 5 critères de performance. Accepte une image ou une vidéo (prend le premier frame).
+          Analyzes your thumbnail on 5 performance criteria. Accepts an image or video (takes the first frame).
         </p>
 
         <div className="flex gap-2">
-          {[{ label: '🖼 Image', v: false }, { label: '🎬 Vidéo', v: true }].map(({ label, v }) => (
+          {[{ label: '🖼 Image', v: false }, { label: '🎬 Video', v: true }].map(({ label, v }) => (
             <button key={String(v)} onClick={() => { setIsVideo(v); setFilePath(null); setResult(null) }}
               className="flex-1 py-2.5 rounded-xl text-[13px] font-bold"
               style={isVideo === v

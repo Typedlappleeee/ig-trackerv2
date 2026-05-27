@@ -707,7 +707,7 @@ export function Warmup({ user }: WarmupProps) {
                     </div>
                     <div>
                       <label className="text-[10px] uppercase tracking-widest font-bold block mb-2 text-text3 font-mono">{t('warmupBio')}</label>
-                      <textarea rows={3} placeholder="Ex: 🏋️ Coach fitness certifiée | -10kg en 90 jours ↓"
+                      <textarea rows={3} placeholder="Ex: 🏋️ Certified fitness coach | -10kg in 90 days ↓"
                         value={editBio} onChange={e => setEditBio(e.target.value)}
                         className="sf-search w-full rounded-lg px-3.5 py-2.5 text-[12px] font-mono resize-none"
                       />

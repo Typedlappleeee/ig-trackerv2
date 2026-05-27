@@ -172,15 +172,15 @@ function gradientForId(id: string): [string, string] {
 
 function timeAgo(iso: string): string {
   const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000)
-  if (diff < 60)        return 'à l\'instant'
+  if (diff < 60)        return 'just now'
   if (diff < 3600)      return `${Math.floor(diff / 60)}min`
   if (diff < 86400)     return `${Math.floor(diff / 3600)}h`
-  if (diff < 86400 * 7) return `${Math.floor(diff / 86400)}j`
-  return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
+  if (diff < 86400 * 7) return `${Math.floor(diff / 86400)}d`
+  return new Date(iso).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })
 }
 
 function fullDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('fr-FR', {
+  return new Date(iso).toLocaleDateString('en-US', {
     weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
     hour: '2-digit', minute: '2-digit',
   })
@@ -229,7 +229,7 @@ function ChatRow({ msg, isOwn, compact, isAdmin, likeCount, liked, onLike, onDel
         {!compact && (
           <div className="flex items-center gap-2 mb-[3px] flex-wrap">
             <span className="text-[13px] font-bold leading-none" style={{ color: isOwn ? '#c4b5fd' : '#e8e0ff' }}>
-              {msg.display_name || 'Anonyme'}
+              {msg.display_name || 'Anonymous'}
             </span>
             {msg.is_admin && (
               <span className="text-[8px] font-black uppercase px-1.5 py-[2px] rounded-full tracking-wide"
@@ -239,7 +239,7 @@ function ChatRow({ msg, isOwn, compact, isAdmin, likeCount, liked, onLike, onDel
             )}
             {isOwn && !msg.is_admin && (
               <span className="text-[8px] font-black uppercase px-1.5 py-[2px] rounded-full tracking-wide"
-                style={{ background: 'rgba(139,92,246,0.2)', color: '#a78bfa' }}>Moi</span>
+                style={{ background: 'rgba(139,92,246,0.2)', color: '#a78bfa' }}>Me</span>
             )}
             {msg.org_name && !msg.is_admin && (
               <span className="text-[10px] font-semibold px-2 py-[2px] rounded-full"
@@ -272,12 +272,12 @@ function ChatRow({ msg, isOwn, compact, isAdmin, likeCount, liked, onLike, onDel
             {isAdmin && !isOwn && onMute && (
               <button onClick={() => onMute(msg.user_id, msg.display_name)}
                 className="w-5 h-5 flex items-center justify-center rounded text-[11px]"
-                style={{ color: 'rgba(251,191,36,0.6)' }} title="Muter">🔇</button>
+                style={{ color: 'rgba(251,191,36,0.6)' }} title="Mute">🔇</button>
             )}
             {isAdmin && (
               <button onClick={() => onDelete(msg.id)}
                 className="w-5 h-5 flex items-center justify-center rounded text-[11px]"
-                style={{ color: 'rgba(239,68,68,0.6)' }} title="Supprimer">🗑</button>
+                style={{ color: 'rgba(239,68,68,0.6)' }} title="Delete">🗑</button>
             )}
           </div>
         </div>
@@ -301,7 +301,7 @@ function SupportMsgRow({ msg, isAdmin, compact, onDelete }: {
         {!compact && (
           <div className={`flex items-center gap-2 mb-[3px] flex-wrap ${isAdminMsg ? 'justify-end' : ''}`}>
             <span className="text-[13px] font-bold" style={{ color: isAdminMsg ? '#93c5fd' : '#e8e0ff' }}>
-              {msg.display_name || 'Anonyme'}
+              {msg.display_name || 'Anonymous'}
             </span>
             {isAdminMsg && (
               <span className="text-[8px] font-black uppercase px-1.5 py-[2px] rounded-full"
@@ -341,10 +341,10 @@ function MuteModal({ targetName, onMute, onClose }: {
   const [custom, setCustom] = useState('')
   const DURATIONS = [
     { label: '30 minutes', minutes: 30 },
-    { label: '2 heures',   minutes: 120 },
-    { label: '24 heures',  minutes: 1440 },
-    { label: '7 jours',    minutes: 10080 },
-    { label: '30 jours',   minutes: 43200 },
+    { label: '2 hours',    minutes: 120 },
+    { label: '24 hours',   minutes: 1440 },
+    { label: '7 days',     minutes: 10080 },
+    { label: '30 days',    minutes: 43200 },
   ]
   return (
     <div className="fixed inset-0 z-[9980] flex items-center justify-center"
@@ -355,8 +355,8 @@ function MuteModal({ targetName, onMute, onClose }: {
         <div className="flex items-center justify-between px-5 py-4"
           style={{ borderBottom: '1px solid rgba(251,191,36,0.1)', background: 'rgba(251,191,36,0.04)' }}>
           <div>
-            <p className="font-black text-white text-[14px]">🔇 Muter {targetName}</p>
-            <p className="text-[10px] mt-0.5" style={{ color: 'rgba(251,191,36,0.5)' }}>Durée du mute</p>
+            <p className="font-black text-white text-[14px]">🔇 Mute {targetName}</p>
+            <p className="text-[10px] mt-0.5" style={{ color: 'rgba(251,191,36,0.5)' }}>Mute duration</p>
           </div>
           <button onClick={onClose} className="w-7 h-7 rounded-lg flex items-center justify-center text-sm hover:bg-white/[0.06]"
             style={{ color: 'rgba(196,181,253,0.5)' }}>✕</button>
@@ -371,7 +371,7 @@ function MuteModal({ targetName, onMute, onClose }: {
           ))}
           <div className="flex gap-2 pt-1">
             <input type="number" value={custom} onChange={e => setCustom(e.target.value)}
-              placeholder="Durée custom (min)…" min={1}
+              placeholder="Custom duration (min)…" min={1}
               className="flex-1 rounded-xl px-3 py-2.5 text-sm text-white outline-none sf-input" />
             <button onClick={() => { const m = parseInt(custom); if (m > 0) onMute(m) }}
               disabled={!custom || parseInt(custom) <= 0}
@@ -407,7 +407,7 @@ function ProfileModal({ profile, userId, isAdmin, onClose, onSaved }: {
       const ext  = file.name.split('.').pop() ?? 'jpg'
       const path = `${userId}/avatar.${ext}`
       const { error } = await supabase.storage.from('avatars').upload(path, file, { upsert: true })
-      if (error) { setUploadErr('Bucket "avatars" introuvable — crée-le en Public dans Supabase → Storage'); return }
+      if (error) { setUploadErr('Bucket "avatars" not found — create it as Public in Supabase → Storage'); return }
       const { data } = supabase.storage.from('avatars').getPublicUrl(path)
       setAUrl(data.publicUrl + `?t=${Date.now()}`)
     } finally { setUpload(false) }
@@ -443,8 +443,8 @@ function ProfileModal({ profile, userId, isAdmin, onClose, onSaved }: {
         <div className="flex items-center justify-between px-5 py-4"
           style={{ borderBottom: '1px solid rgba(139,92,246,0.12)', background: 'linear-gradient(135deg,rgba(139,92,246,0.09),rgba(236,72,153,0.04))' }}>
           <div>
-            <p className="font-black text-white text-[15px]">Mon profil</p>
-            <p className="text-[10px] mt-0.5" style={{ color: 'rgba(196,181,253,0.45)' }}>Visible par toute la communauté</p>
+            <p className="font-black text-white text-[15px]">My profile</p>
+            <p className="text-[10px] mt-0.5" style={{ color: 'rgba(196,181,253,0.45)' }}>Visible to the whole community</p>
           </div>
           <button onClick={onClose} className="w-7 h-7 rounded-lg flex items-center justify-center text-sm hover:bg-white/[0.06]"
             style={{ color: 'rgba(196,181,253,0.5)' }}>✕</button>
@@ -456,28 +456,28 @@ function ProfileModal({ profile, userId, isAdmin, onClose, onSaved }: {
               <div onClick={() => fileRef.current?.click()}
                 className="absolute inset-0 flex flex-col items-center justify-center gap-1 cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
                 style={{ background: 'rgba(0,0,0,0.6)', borderRadius: Math.round(80 * 0.3) }}>
-                {uploading ? <Spinner size="sm" /> : <><span className="text-lg">📷</span><span className="text-[9px] text-white font-bold">Modifier</span></>}
+                {uploading ? <Spinner size="sm" /> : <><span className="text-lg">📷</span><span className="text-[9px] text-white font-bold">Edit</span></>}
               </div>
             </div>
             {uploadErr
               ? <p className="text-[10px] text-center max-w-[220px]" style={{ color: '#f87171' }}>{uploadErr}</p>
-              : <p className="text-[10px]" style={{ color: 'rgba(196,181,253,0.35)' }}>Clique pour changer ta photo</p>
+              : <p className="text-[10px]" style={{ color: 'rgba(196,181,253,0.35)' }}>Click to change your photo</p>
             }
           </div>
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="text-[10px] uppercase tracking-[0.15em] font-black" style={{ color: 'rgba(139,92,246,0.6)' }}>
-                Pseudo
+                Username
               </label>
               {!canChangeName && !isAdmin && (
                 <span className="text-[9px] font-semibold px-2 py-0.5 rounded-lg"
                   style={{ background: 'rgba(239,68,68,0.1)', color: 'rgba(252,165,165,0.7)', border: '1px solid rgba(239,68,68,0.15)' }}>
-                  🔒 Dans {daysLeft} jour{daysLeft > 1 ? 's' : ''}
+                  🔒 In {daysLeft} day{daysLeft !== 1 ? 's' : ''}
                 </span>
               )}
             </div>
             <input type="text" value={displayedName} onChange={e => canChangeName && setName(e.target.value)}
-              disabled={!canChangeName} placeholder="Ton pseudo…" maxLength={32}
+              disabled={!canChangeName} placeholder="Your username…" maxLength={32}
               className="w-full rounded-xl px-3.5 py-2.5 text-sm text-white outline-none sf-input disabled:opacity-50 disabled:cursor-not-allowed" />
             {canChangeName && (
               <div className="flex justify-end mt-1">
@@ -489,19 +489,19 @@ function ProfileModal({ profile, userId, isAdmin, onClose, onSaved }: {
             style={{ background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.12)' }}>
             <Avatar url={avatarUrl} name={displayedName || '?'} userId={userId} size={36} />
             <div>
-              <p className="text-[12px] font-bold text-white">{displayedName || 'Ton pseudo'}</p>
-              <p className="text-[10px]" style={{ color: 'rgba(196,181,253,0.4)' }}>Aperçu</p>
+              <p className="text-[12px] font-bold text-white">{displayedName || 'Your username'}</p>
+              <p className="text-[10px]" style={{ color: 'rgba(196,181,253,0.4)' }}>Preview</p>
             </div>
           </div>
         </div>
         <div className="px-5 pb-5 flex gap-2.5">
           <button onClick={onClose} className="flex-1 py-2.5 rounded-xl text-[12px] font-semibold transition-all"
             style={{ background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.6)', border: '1px solid rgba(255,255,255,0.07)' }}>
-            Annuler
+            Cancel
           </button>
           <button onClick={save} disabled={saving || uploading}
             className="flex-1 py-2.5 rounded-xl text-[12px] font-semibold transition-all btn-sf-primary disabled:opacity-50">
-            {saving ? 'Sauvegarde…' : 'Sauvegarder'}
+            {saving ? 'Saving…' : 'Save'}
           </button>
         </div>
       </div>
@@ -540,8 +540,8 @@ function CreateTopicModal({ onClose, onCreate }: {
         <div className="flex items-center justify-between px-5 py-4"
           style={{ borderBottom: '1px solid rgba(139,92,246,0.12)', background: 'linear-gradient(135deg,rgba(139,92,246,0.09),rgba(236,72,153,0.04))' }}>
           <div>
-            <p className="font-black text-white text-[15px]">Créer une communauté</p>
-            <p className="text-[10px] mt-0.5" style={{ color: 'rgba(196,181,253,0.45)' }}>Visible par tous les membres</p>
+            <p className="font-black text-white text-[15px]">Create a community</p>
+            <p className="text-[10px] mt-0.5" style={{ color: 'rgba(196,181,253,0.45)' }}>Visible to all members</p>
           </div>
           <button onClick={onClose} className="w-7 h-7 rounded-lg flex items-center justify-center text-sm hover:bg-white/[0.06]"
             style={{ color: 'rgba(196,181,253,0.5)' }}>✕</button>
@@ -549,7 +549,7 @@ function CreateTopicModal({ onClose, onCreate }: {
         <div className="p-5 space-y-4">
           {/* Emoji picker */}
           <div>
-            <label className="text-[10px] uppercase tracking-[0.15em] font-black block mb-2" style={{ color: 'rgba(139,92,246,0.6)' }}>Icône</label>
+            <label className="text-[10px] uppercase tracking-[0.15em] font-black block mb-2" style={{ color: 'rgba(139,92,246,0.6)' }}>Icon</label>
             <div className="flex flex-wrap gap-1.5">
               {TOPIC_EMOJIS.map(e => (
                 <button key={e} onClick={() => setEmoji(e)}
@@ -564,9 +564,9 @@ function CreateTopicModal({ onClose, onCreate }: {
           </div>
           {/* Name */}
           <div>
-            <label className="text-[10px] uppercase tracking-[0.15em] font-black block mb-1.5" style={{ color: 'rgba(139,92,246,0.6)' }}>Nom *</label>
+            <label className="text-[10px] uppercase tracking-[0.15em] font-black block mb-1.5" style={{ color: 'rgba(139,92,246,0.6)' }}>Name *</label>
             <input type="text" value={name} onChange={e => setName(e.target.value)}
-              placeholder="Ex: Growth Hacks, Créas IG…" maxLength={40}
+              placeholder="Ex: Growth Hacks, IG Creatives…" maxLength={40}
               className="w-full rounded-xl px-3.5 py-2.5 text-sm text-white outline-none sf-input" />
             <div className="flex justify-end mt-1">
               <span className="text-[9px]" style={{ color: 'rgba(196,181,253,0.25)' }}>{name.length}/40</span>
@@ -576,7 +576,7 @@ function CreateTopicModal({ onClose, onCreate }: {
           <div>
             <label className="text-[10px] uppercase tracking-[0.15em] font-black block mb-1.5" style={{ color: 'rgba(139,92,246,0.6)' }}>Description</label>
             <textarea value={desc} onChange={e => setDesc(e.target.value)}
-              placeholder="De quoi parle cette communauté ?" maxLength={140} rows={2}
+              placeholder="What is this community about?" maxLength={140} rows={2}
               className="w-full rounded-xl px-3.5 py-2.5 text-sm text-white outline-none resize-none sf-input" />
             <div className="flex justify-end mt-1">
               <span className="text-[9px]" style={{ color: 'rgba(196,181,253,0.25)' }}>{desc.length}/140</span>
@@ -588,7 +588,7 @@ function CreateTopicModal({ onClose, onCreate }: {
             <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
               style={{ background: 'rgba(139,92,246,0.15)' }}>{emoji}</div>
             <div className="min-w-0">
-              <p className="text-[13px] font-black text-white truncate">{name || 'Nom de la communauté'}</p>
+              <p className="text-[13px] font-black text-white truncate">{name || 'Community name'}</p>
               <p className="text-[10px] truncate" style={{ color: 'rgba(196,181,253,0.4)' }}>{desc || 'Description…'}</p>
             </div>
           </div>
@@ -596,11 +596,11 @@ function CreateTopicModal({ onClose, onCreate }: {
         <div className="px-5 pb-5 flex gap-2.5">
           <button onClick={onClose} className="flex-1 py-2.5 rounded-xl text-[12px] font-semibold transition-all"
             style={{ background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.6)', border: '1px solid rgba(255,255,255,0.07)' }}>
-            Annuler
+            Cancel
           </button>
           <button onClick={submit} disabled={!name.trim() || saving}
             className="flex-1 py-2.5 rounded-xl text-[12px] font-semibold transition-all btn-sf-primary disabled:opacity-40">
-            {saving ? 'Création…' : '✨ Créer'}
+            {saving ? 'Creating…' : '✨ Create'}
           </button>
         </div>
       </div>
@@ -750,9 +750,9 @@ function SetupScreen({ onRetry }: { onRetry: () => void }) {
       <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl"
         style={{ background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.2)' }}>💬</div>
       <div className="text-center space-y-2">
-        <p className="text-lg font-black text-white">Configuration requise</p>
+        <p className="text-lg font-black text-white">Setup required</p>
         <p className="text-sm max-w-sm" style={{ color: 'rgba(196,181,253,0.5)' }}>
-          Lance ce SQL dans <strong className="text-accent">Supabase → SQL Editor</strong> pour activer la communauté.
+          Run this SQL in <strong className="text-accent">Supabase → SQL Editor</strong> to enable the community.
         </p>
       </div>
       <div className="w-full max-w-2xl rounded-xl overflow-hidden"
@@ -762,7 +762,7 @@ function SetupScreen({ onRetry }: { onRetry: () => void }) {
           <span className="text-[10px] uppercase tracking-widest font-bold" style={{ color: '#a78bfa' }}>SQL</span>
           <button onClick={copy} className="text-[10px] font-semibold px-2.5 py-1 rounded-lg transition-all"
             style={{ background: copied ? 'rgba(52,211,153,0.15)' : 'rgba(139,92,246,0.15)', color: copied ? '#34d399' : '#a78bfa' }}>
-            {copied ? '✓ Copié' : '📋 Copier'}
+            {copied ? '✓ Copied' : '📋 Copy'}
           </button>
         </div>
         <pre className="p-4 text-[11px] leading-relaxed overflow-auto max-h-56"
@@ -771,7 +771,7 @@ function SetupScreen({ onRetry }: { onRetry: () => void }) {
         </pre>
       </div>
       <button onClick={onRetry} className="px-5 py-2.5 rounded-xl text-sm font-semibold btn-sf-primary">
-        ↺ Réessayer
+        ↺ Retry
       </button>
     </div>
   )
@@ -1249,7 +1249,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
           <span className="text-sm">🔇</span>
           <p className="text-[11px]" style={{ color: 'rgba(251,191,36,0.8)' }}>
             Tu es muté jusqu'au <strong>
-              {new Date(mutedUntil!).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}
+              {new Date(mutedUntil!).toLocaleDateString('en-US', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}
             </strong>
           </p>
         </div>
@@ -1556,7 +1556,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                       </span>
                       <Avatar url={m.avatar_url} name={m.display_name} userId={m.user_id} size={24} />
                       <span className="flex-1 text-[11px] font-semibold text-white truncate">
-                        {m.display_name || 'Anonyme'}
+                        {m.display_name || 'Anonymous'}
                       </span>
                       <span className="text-[10px] tabular-nums flex-shrink-0"
                         style={{ color: 'rgba(196,181,253,0.3)' }}>
@@ -1669,7 +1669,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                           {canDelete && (
                             <button onClick={e => { e.stopPropagation(); deleteTopic(t.id) }}
                               className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-lg text-[12px]"
-                              style={{ color: 'rgba(239,68,68,0.6)' }} title="Supprimer">🗑</button>
+                              style={{ color: 'rgba(239,68,68,0.6)' }} title="Delete">🗑</button>
                           )}
                         </div>
                         <div className="flex items-center justify-between">
@@ -1793,7 +1793,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                             {!compact && (
                               <div className="flex items-center gap-2 mb-[3px] flex-wrap">
                                 <span className="text-[13px] font-bold" style={{ color: msg.user_id === user.id ? '#c4b5fd' : '#e8e0ff' }}>
-                                  {msg.display_name || 'Anonyme'}
+                                  {msg.display_name || 'Anonymous'}
                                 </span>
                                 {msg.is_admin && (
                                   <span className="text-[8px] font-black uppercase px-1.5 py-[2px] rounded-full"
@@ -1803,7 +1803,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                                 )}
                                 {msg.user_id === user.id && !msg.is_admin && (
                                   <span className="text-[8px] font-black uppercase px-1.5 py-[2px] rounded-full"
-                                    style={{ background: 'rgba(139,92,246,0.2)', color: '#a78bfa' }}>Moi</span>
+                                    style={{ background: 'rgba(139,92,246,0.2)', color: '#a78bfa' }}>Me</span>
                                 )}
                                 <span className="ml-auto text-[10px] opacity-0 group-hover:opacity-60 transition-opacity tabular-nums"
                                   style={{ color: 'rgba(196,181,253,0.5)' }}>{timeAgo(msg.created_at)}</span>
@@ -1922,7 +1922,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className={`text-[11px] truncate ${hasUnread ? 'font-black text-white' : 'font-bold text-white'}`}>
-                            {t.display_name || 'Anonyme'}
+                            {t.display_name || 'Anonymous'}
                           </p>
                           <p className="text-[9px] truncate" style={{ color: hasUnread ? 'rgba(236,72,153,0.7)' : 'rgba(196,181,253,0.4)' }}>
                             {hasUnread && '● '}{t.lastMsg.content.slice(0, 24)}{t.lastMsg.content.length > 24 ? '…' : ''}
@@ -1959,7 +1959,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                         <>
                           <Avatar url={t.avatar_url} name={t.display_name} userId={t.user_id} size={26} />
                           <div>
-                            <p className="text-[12px] font-black text-white">{t.display_name || 'Anonyme'}</p>
+                            <p className="text-[12px] font-black text-white">{t.display_name || 'Anonymous'}</p>
                             <p className="text-[9px]" style={{ color: 'rgba(196,181,253,0.35)' }}>
                               {threadMessages.length} message{threadMessages.length > 1 ? 's' : ''}
                             </p>

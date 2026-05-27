@@ -68,11 +68,11 @@ interface MassJob extends PlannedPair {
 
 const STATUS_LABEL: Record<MassJob['status'], string> = {
   pending:    '⏳ En attente',
-  detecting:  '🔍 Détection…',
+  detecting:  '🔍 Detecting…',
   analyzing:  '✨ IA texte…',
   generating: '⚙ FFmpeg…',
   uploading:  '☁ Upload…',
-  done:       '✅ Terminé',
+  done:       '✅ Done',
   error:      '❌ Erreur',
 }
 
@@ -158,7 +158,7 @@ function VideoSourcePanel({
         {paths.length === 0 ? (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 5, minHeight: 80 }}>
             <span style={{ fontSize: 22, opacity: 0.09 }}>🎬</span>
-            <p style={{ fontSize: 10, color: 'rgba(148,163,184,0.22)' }}>Aucune vidéo</p>
+            <p style={{ fontSize: 10, color: 'rgba(148,163,184,0.22)' }}>No video</p>
           </div>
         ) : paths.map((p, i) => (
           <div key={i} className="group" style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 7px', borderRadius: 6, background: `${accent}08` }}>
@@ -827,7 +827,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
             style={{ borderBottom: '1px solid rgba(139,92,246,0.2)', background: 'rgba(12,8,28,0.9)' }}>
             <div>
               <p className="text-[18px] font-black text-white">Plan des remixes</p>
-              <p className="text-[12px]" style={{ color: 'rgba(148,163,184,0.6)' }}>{plannedPairs.length} paires · Cliquez pour prévisualiser et régler le point de coupe</p>
+              <p className="text-[12px]" style={{ color: 'rgba(148,163,184,0.6)' }}>{plannedPairs.length} pairs · Click to preview and adjust the cut point</p>
             </div>
             <div className="flex items-center gap-3">
               <button onClick={() => setPreviewOpen(false)}
@@ -989,7 +989,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                               : <div className="w-full h-full flex items-center justify-center" style={{ color: 'rgba(148,163,184,0.3)', fontSize: 11 }}>chargement…</div>}
                             <div className="absolute top-0 left-0 right-0 px-2 py-1" style={{ background: 'linear-gradient(180deg,rgba(0,0,0,0.8),transparent)' }}>
                               <p style={{ fontSize: 8, fontWeight: 800, color: '#ec4899', letterSpacing: '0.08em' }}>PHASE 1 — SECONDAIRE</p>
-                              <p style={{ fontSize: 7, color: 'rgba(236,72,153,0.7)', fontFamily: 'monospace' }}>jusqu'à {selectedPair.cutSec.toFixed(3)}s</p>
+                              <p style={{ fontSize: 7, color: 'rgba(236,72,153,0.7)', fontFamily: 'monospace' }}>up to {selectedPair.cutSec.toFixed(3)}s</p>
                             </div>
                           </div>
 
@@ -1009,7 +1009,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                               : <div className="w-full h-full flex items-center justify-center" style={{ color: 'rgba(148,163,184,0.3)', fontSize: 11 }}>chargement…</div>}
                             <div className="absolute top-0 left-0 right-0 px-2 py-1" style={{ background: 'linear-gradient(180deg,rgba(0,0,0,0.8),transparent)' }}>
                               <p style={{ fontSize: 8, fontWeight: 800, color: '#a78bfa', letterSpacing: '0.08em' }}>PHASE 2 — ORIGINALE</p>
-                              <p style={{ fontSize: 7, color: 'rgba(167,139,250,0.7)', fontFamily: 'monospace' }}>reprend à {selectedPair.cutSec.toFixed(3)}s</p>
+                              <p style={{ fontSize: 7, color: 'rgba(167,139,250,0.7)', fontFamily: 'monospace' }}>resumes at {selectedPair.cutSec.toFixed(3)}s</p>
                             </div>
                           </div>
                         </div>
@@ -1191,7 +1191,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
               ) : (
                 <div className="text-center space-y-3 opacity-40">
                   <div className="text-6xl">🎬</div>
-                  <p className="text-[14px]" style={{ color: 'rgba(196,181,253,0.6)' }}>Sélectionnez un remix pour le prévisualiser</p>
+                  <p className="text-[14px]" style={{ color: 'rgba(196,181,253,0.6)' }}>Select a remix to preview it</p>
                 </div>
               )}
             </div>
@@ -1212,7 +1212,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                   </div>
                 </div>
                 <div>
-                  <p className="text-[15px] font-black text-white">Génération en parallèle…</p>
+                  <p className="text-[15px] font-black text-white">Generating in parallel…</p>
                   <p className="text-[13px] text-text2">
                     {runningCount} en cours · {doneCount} terminée(s) · {errorCount} erreur(s)
                   </p>
@@ -1263,7 +1263,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
               <div className="text-center space-y-2">
                 <div className="text-5xl">{errorCount === 0 ? '✅' : '⚠️'}</div>
                 <p className="text-[20px] font-black text-white">
-                  {errorCount === 0 ? 'Tous les remixes générés !' : `${doneCount} / ${jobs.length} terminés`}
+                  {errorCount === 0 ? 'All remixes generated!' : `${doneCount} / ${jobs.length} done`}
                 </p>
                 {errorCount > 0 && <p className="text-[13px]" style={{ color: '#fbbf24' }}>{errorCount} erreur(s)</p>}
               </div>
@@ -1375,7 +1375,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
             )}
             <div>
               <h1 style={{ fontSize: isMobile ? 15 : 18, fontWeight: 900, color: '#F1F0F7', letterSpacing: '-0.02em', lineHeight: 1.1 }}>Mass Remix</h1>
-              {!isMobile && <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.45)', marginTop: 2 }}>Génère des remixes en masse · FFmpeg + IA</p>}
+              {!isMobile && <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.45)', marginTop: 2 }}>Generate remixes in bulk · FFmpeg + AI</p>}
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
