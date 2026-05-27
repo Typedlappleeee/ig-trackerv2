@@ -24,4 +24,11 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  build: {
+    rollupOptions: {
+      // @ffmpeg packages use a 'node' export condition that maps to empty.mjs
+      // in Electron context — tell Rollup not to try to bundle them
+      external: ['@ffmpeg/ffmpeg', '@ffmpeg/util', '@ffmpeg/core'],
+    },
+  },
 })
