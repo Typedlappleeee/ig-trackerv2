@@ -132,7 +132,7 @@ function SubTabBtn({ active, icon, label, onClick, S }: {
 
 type GeneralTab = 'apparence' | 'sons' | 'notifications' | 'langue' | 'securite' | 'avance'
 type Panel = 'general' | 'profile' | 'connexions' | 'organization' | 'admin' | 'abonnement'
-interface SettingsProps { user: User; initialPanel?: Panel; initialTab?: GeneralTab }
+interface SettingsProps { user: User; initialPanel?: Panel; initialTab?: GeneralTab; onNavigate?: (page: string) => void }
 
 const GEN_SIDEBAR: { id: GeneralTab; label: string; icon: string }[] = [
   { id: 'apparence',     label: 'Apparence',       icon: '🎨' },
@@ -214,7 +214,7 @@ const GEN_ICONS: Record<GeneralTab, JSX.Element> = {
   ),
 }
 
-export function Settings({ user, initialPanel, initialTab }: SettingsProps) {
+export function Settings({ user, initialPanel, initialTab, onNavigate }: SettingsProps) {
   const { role, perms, currentOrg } = useOrg()
   const license = useLicense()
   const canSeeConnexions     = role ? canSeeTab(role, perms, 'settings') : true
@@ -264,6 +264,11 @@ export function Settings({ user, initialPanel, initialTab }: SettingsProps) {
   // ── Sécurité ──────────────────────────────────────────────────────────────
   const [twoFA, setTwoFA]           = useState(false)
   const [sessionTimeout, setSessionTimeout] = useState('jamais')
+  const [pwChangeOpen, setPwChangeOpen] = useState(false)
+  const [newPw, setNewPw]               = useState('')
+  const [confirmPw, setConfirmPw]       = useState('')
+  const [pwError, setPwError]           = useState<string | null>(null)
+  const [pwOk, setPwOk]                 = useState(false)
 
   // ── Avancé ────────────────────────────────────────────────────────────────
   const [devMode, setDevMode]       = useState(false)
@@ -601,22 +606,14 @@ export function Settings({ user, initialPanel, initialTab }: SettingsProps) {
           {/* Help section */}
           <div style={{ marginTop: 'auto', paddingTop: 20, borderTop: `1px solid ${S.border}` }}>
             <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: S.text3, padding: '0 8px', marginBottom: 8 }}>Support</p>
-            <a href="https://t.me/justquentin" target="_blank" rel="noreferrer" style={{
+            <button onClick={() => onNavigate?.('support')} style={{
               display: 'flex', alignItems: 'center', gap: 7,
               padding: '7px 10px', borderRadius: 8, fontSize: 12,
-              color: S.accent3, textDecoration: 'none', fontWeight: 500,
-            }}>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-              Voir le guide
-            </a>
-            <a href="https://t.me/justquentin" target="_blank" rel="noreferrer" style={{
-              display: 'flex', alignItems: 'center', gap: 7,
-              padding: '7px 10px', borderRadius: 8, fontSize: 12,
-              color: S.accent3, textDecoration: 'none', fontWeight: 500,
+              color: S.accent3, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 500, width: '100%', textAlign: 'left',
             }}>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
               Contacter le support
-            </a>
+            </button>
           </div>
         </div>
 
@@ -828,29 +825,11 @@ export function Settings({ user, initialPanel, initialTab }: SettingsProps) {
                       <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0 }}>Langue & région</h2>
                       <p style={{ fontSize: 13, color: S.text3, margin: '4px 0 0' }}>Personnalise la langue et les paramètres régionaux.</p>
                     </div>
-                    <div style={cardSt}>
-                      <SelectRow first label="Langue de l'interface" sub="La langue utilisée dans toute l'application."
-                        value={lang} onChange={v => setLang(v)}
-                        options={[{ value: 'fr', label: 'Français' }, { value: 'en', label: 'English' }]} />
-                      <SelectRow label="Format de date" sub="Comment les dates sont affichées dans l'interface."
-                        value={dateFormat} onChange={v => setDateFormat(v)}
-                        options={[{ value: 'dd/mm/yyyy', label: 'JJ/MM/AAAA' }, { value: 'mm/dd/yyyy', label: 'MM/JJ/AAAA' }, { value: 'yyyy-mm-dd', label: 'AAAA-MM-JJ' }]} />
-                      <SelectRow label="Fuseau horaire" sub="Utilisé pour afficher les dates et heures locales."
-                        value={timezone} onChange={v => setTimezone(v)}
-                        options={[
-                          { value: 'Europe/Paris',    label: 'Paris (UTC+1/+2)' },
-                          { value: 'Europe/London',   label: 'Londres (UTC+0/+1)' },
-                          { value: 'America/New_York',label: 'New York (UTC-5/-4)' },
-                          { value: 'America/Los_Angeles', label: 'Los Angeles (UTC-8/-7)' },
-                          { value: 'Asia/Dubai',      label: 'Dubaï (UTC+4)' },
-                          { value: 'UTC',             label: 'UTC' },
-                        ]} />
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '12px 16px', borderRadius: 11, background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.2)' }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '14px 16px', borderRadius: 11, background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.2)' }}>
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginTop: 1, flexShrink: 0 }}>
                         <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
                       </svg>
-                      <p style={{ fontSize: 12, color: S.text2, margin: 0 }}>Certains paramètres régionaux nécessitent un rechargement de l'application pour prendre effet.</p>
+                      <p style={{ fontSize: 13, color: S.text2, margin: 0 }}>Le changement de langue sera disponible prochainement. L'application est actuellement en français.</p>
                     </div>
                   </div>
                 )}
@@ -914,6 +893,35 @@ export function Settings({ user, initialPanel, initialTab }: SettingsProps) {
                           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
                           Envoyer un email de réinitialisation de mot de passe
                         </button>
+                        {/* Change password inline */}
+                        {!pwChangeOpen ? (
+                          <button
+                            onClick={() => setPwChangeOpen(true)}
+                            className="sf-btn sf-btn-secondary sf-btn-sm"
+                            style={{ display: 'flex', alignItems: 'center', gap: 9, textAlign: 'left', width: '100%' }}>
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                            Changer le mot de passe
+                          </button>
+                        ) : (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '12px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                            <input type="password" className="sf-input" placeholder="Nouveau mot de passe" value={newPw} onChange={e => setNewPw(e.target.value)} style={{ width: '100%' }} />
+                            <input type="password" className="sf-input" placeholder="Confirmer le mot de passe" value={confirmPw} onChange={e => setConfirmPw(e.target.value)} style={{ width: '100%' }} />
+                            {pwError && <p style={{ fontSize: 12, color: '#F87171', margin: 0 }}>{pwError}</p>}
+                            {pwOk && <p style={{ fontSize: 12, color: '#22c55e', margin: 0 }}>Mot de passe changé ✓</p>}
+                            <div style={{ display: 'flex', gap: 8 }}>
+                              <button onClick={() => { setPwChangeOpen(false); setNewPw(''); setConfirmPw(''); setPwError(null); setPwOk(false) }} className="sf-btn sf-btn-secondary sf-btn-sm" style={{ flex: 1 }}>Annuler</button>
+                              <button onClick={async () => {
+                                if (newPw.length < 6) { setPwError('Minimum 6 caractères'); return }
+                                if (newPw !== confirmPw) { setPwError('Les mots de passe ne correspondent pas'); return }
+                                setPwError(null)
+                                const { error } = await supabase.auth.updateUser({ password: newPw })
+                                if (error) { setPwError(error.message); return }
+                                setPwOk(true); setNewPw(''); setConfirmPw('')
+                                setTimeout(() => { setPwChangeOpen(false); setPwOk(false) }, 2000)
+                              }} className="sf-btn sf-btn-primary sf-btn-sm" style={{ flex: 1 }}>Confirmer</button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>

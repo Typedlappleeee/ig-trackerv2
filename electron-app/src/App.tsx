@@ -583,7 +583,7 @@ function AppContent({ user }: { user: User }) {
       case 'textcopy':     return <TextCopy    user={user} />
       case 'repurpose':    return <VideoRepurpose user={user} />
       case 'aitools':      return <AiTools     user={user} />
-      case 'settings':     return <Settings    user={user} initialPanel={settingsPanel as any} />
+      case 'settings':     return <Settings    user={user} initialPanel={settingsPanel as any} onNavigate={(p) => setPage(p as any)} />
       case 'community':    return <Community    user={user} onNavigate={handleNavigate} />
       case 'support':      return <Support      user={user} />
       case 'licences':     return <Licences    user={user} />
