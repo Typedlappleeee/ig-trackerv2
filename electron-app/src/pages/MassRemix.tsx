@@ -9,6 +9,7 @@ import { uploadVideoFromPath, type UploadScope } from '@/lib/storage'
 import { useOrg } from '@/lib/orgContext'
 import { useConnections } from '@/lib/connections'
 import { runFfmpegRemixAIWeb, detectSceneChangeWeb, extractFramesWeb } from '@/lib/ffmpeg-web'
+import { checkAndDeductCredits, CREDIT_COSTS, useCredits } from '@/lib/credits'
 
 const isWeb = !window.electronAPI
 
@@ -194,6 +195,7 @@ function VideoSourcePanel({
 export function MassRemix({ user }: MassRemixProps) {
   const { currentOrg } = useOrg()
   const conns = useConnections(user)
+  const credits = useCredits()
 
   const [originals,    setOriginals]    = useState<string[]>([])
   const [secondaries,  setSecondaries]  = useState<string[]>([])
@@ -407,8 +409,15 @@ export function MassRemix({ user }: MassRemixProps) {
       setOutputFolder(f)
     }
 
-    const folder = exportMode === 'folder' ? outputFolder : null
     const n = Math.max(1, copies)
+    const creditCost = n * CREDIT_COSTS.remix
+    const creditRes = await checkAndDeductCredits(credits.ownerId, creditCost)
+    if (!creditRes.ok) {
+      alert(`Crédits insuffisants — il faut ${creditCost} crédit(s) pour ${n} remix. Solde : ${creditRes.balance ?? 0}`)
+      return
+    }
+
+    const folder = exportMode === 'folder' ? outputFolder : null
     const basePairs = prePlanned ?? Array.from({ length: n }, (_, i) => ({
       id: i,
       originalPath:  originals[Math.floor(Math.random() * originals.length)],

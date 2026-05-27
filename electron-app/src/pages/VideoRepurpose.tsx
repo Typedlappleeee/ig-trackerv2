@@ -5,6 +5,7 @@ import { uploadVideoFromPath, type UploadScope } from '@/lib/storage'
 import { supabase } from '@/lib/supabase'
 import { useOrg } from '@/lib/orgContext'
 import { BankPicker } from '@/pages/Bank'
+import { checkAndDeductCredits, CREDIT_COSTS, useCredits } from '@/lib/credits'
 
 const isWeb = typeof window !== 'undefined' && !(window as any).electronAPI
 
@@ -161,6 +162,7 @@ function VariantCard({ job, index }: { job: VariantJob; index: number }) {
 
 export function VideoRepurpose({ user }: VideoRepurposeProps) {
   const { currentOrg } = useOrg()
+  const credits = useCredits()
   const scope: UploadScope = currentOrg
     ? { mode: 'org', id: currentOrg.id }
     : { mode: 'user', id: user.id }
@@ -222,6 +224,12 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
 
   async function startGeneration() {
     if (!sourceUrl || running) return
+    const creditCost = count * CREDIT_COSTS.clone_vid
+    const creditRes = await checkAndDeductCredits(credits.ownerId, creditCost)
+    if (!creditRes.ok) {
+      alert(`Crédits insuffisants — il faut ${creditCost} crédit(s) pour ${count} vidéo(s). Solde : ${creditRes.balance ?? 0}`)
+      return
+    }
     abortRef.current = false
     setRunning(true); setStartedAt(Date.now()); setElapsed(0); setTotalDone(0)
 

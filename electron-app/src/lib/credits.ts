@@ -22,10 +22,10 @@ export const PLAN_MAX_MASS_POSTING: Record<string, number> = {
 }
 
 export const CREDIT_COSTS = {
-  montage:      1,
-  remix:        2,
-  posting:      1,  // per phone
-  mass_posting: 2,  // per phone
+  remix:        0.5,  // per remix (MassRemix)
+  clone_vid:    0.5,  // per video (CloneVid / VideoRepurpose)
+  posting:      1,    // per phone (Posting)
+  mass_posting: 2,    // per phone (MassPosting)
 } as const
 
 // Credit packs — intentionally more expensive per credit than subscriptions

@@ -530,12 +530,7 @@ export function Montage({ user }: MontageProps) {
     if (!clips.length) return
     setExporting(true); setExpResult(null)
 
-    const creditRes = await checkAndDeductCredits(credits.ownerId, CREDIT_COSTS.montage)
-    if (!creditRes.ok) {
-      setExporting(false)
-      setExpResult({ ok: false, msg: `Crédits insuffisants (solde : ${creditRes.balance ?? 0})` })
-      return
-    }
+    // Montage is free — no credit deduction
 
     const out = await window.electronAPI?.pickOutputFile?.({ defaultName: `${projectName.replace(/\s+/g, '_')}.mp4` })
     if (!out) { setExporting(false); return }
