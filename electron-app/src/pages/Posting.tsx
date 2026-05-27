@@ -532,17 +532,6 @@ export function Posting({ user }: PostingProps) {
               border: '1px solid rgba(139,92,246,0.12)',
               boxShadow: '0 4px 32px -4px rgba(0,0,0,0.5)',
             }}>
-              {/* Section label */}
-              <div className="flex items-center gap-2.5 px-5 pt-4 pb-3" style={{ borderBottom: '1px solid rgba(139,92,246,0.08)' }}>
-                <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: 'rgba(139,92,246,0.15)' }}>
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                    <path d="M1 3.5C1 2.67 1.67 2 2.5 2H8L11 5v4.5c0 .83-.67 1.5-1.5 1.5h-7C1.67 11 1 10.33 1 9.5v-6z" stroke="#A78BFA" strokeWidth="1.2" fill="rgba(139,92,246,0.2)"/>
-                    <path d="M4.5 4.5v3l3-1.5-3-1.5z" fill="#A78BFA"/>
-                  </svg>
-                </div>
-                <span className="text-[12px] font-bold text-white">{lang === 'en' ? 'Video' : 'Vidéo'}</span>
-              </div>
-
               <div className="flex gap-5 p-5">
                 {/* Phone frame preview */}
                 <div className="flex-shrink-0 relative" style={{ width: 90 }}>
