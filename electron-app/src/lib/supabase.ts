@@ -87,6 +87,7 @@ export interface OrgMember {
   user_id:        string
   role:           OrgRole
   perm_overrides: PermOverrides
+  custom_role_id: string | null
   invited_by:     string | null
   joined_at:      string
 }
@@ -98,6 +99,7 @@ export interface OrgInvite {
   token:          string
   role:           Exclude<OrgRole, 'owner'>
   perm_overrides: PermOverrides
+  custom_role_id: string | null
   invited_by:     string | null
   expires_at:     string
   accepted_at:    string | null
