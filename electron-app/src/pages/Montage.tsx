@@ -48,8 +48,8 @@ type Filter        = 'none' | 'vivid' | 'warm' | 'cold' | 'bw' | 'cinema' | 'vin
 type AutoCaptionPos = 'top' | 'center' | 'bottom'
 
 const FILTER_LABELS: Record<Filter, string> = {
-  none: 'Original', vivid: 'Vif', warm: 'Chaud', cold: 'Froid',
-  bw: 'Noir & Blanc', cinema: 'Cinéma', vintage: 'Vintage', fade: 'Doux',
+  none: 'Original', vivid: 'Vivid', warm: 'Warm', cold: 'Cold',
+  bw: 'Black & White', cinema: 'Cinema', vintage: 'Vintage', fade: 'Soft',
 }
 const FILTER_CSS: Record<Filter, string> = {
   none:    '',
@@ -64,10 +64,10 @@ const FILTER_CSS: Record<Filter, string> = {
 
 const COLORS = ['#4f9eff','#a56ef5','#00ccaa','#ffaa2a','#ff6ec7','#2dde78','#ff5c6e','#00e5d4']
 const TRANSITIONS: { type: Transition['type']; label: string; icon: string }[] = [
-  { type: 'cut',     label: 'Coupe',    icon: '✂' },
-  { type: 'fade',    label: 'Fondu',    icon: '◑' },
-  { type: 'dissolve',label: 'Dissolution', icon: '◌' },
-  { type: 'wipe',    label: 'Balayage', icon: '→' },
+  { type: 'cut',     label: 'Cut',      icon: '✂' },
+  { type: 'fade',    label: 'Fade',     icon: '◑' },
+  { type: 'dissolve',label: 'Dissolve', icon: '◌' },
+  { type: 'wipe',    label: 'Wipe',     icon: '→' },
 ]
 
 let _ci = 0
@@ -215,7 +215,7 @@ function PropertiesPanel({
     <div className="flex items-center justify-center h-full text-xs text-text2 p-4 text-center">
       <div className="space-y-2">
         <p className="text-2xl">🎬</p>
-        <p>Sélectionne un clip pour éditer ses propriétés</p>
+        <p>Select a clip to edit its properties</p>
       </div>
     </div>
   )
@@ -232,27 +232,27 @@ function PropertiesPanel({
 
       {/* Trim */}
       <div className="space-y-2">
-        <p className="text-[10px] font-semibold text-text2 uppercase tracking-wider">Découpe</p>
+        <p className="text-[10px] font-semibold text-text2 uppercase tracking-wider">Trim</p>
         <div className="grid grid-cols-2 gap-2">
           <div>
-            <label className="text-text2 block mb-1">Début: <span className="text-accent">{fmtTime(clip.trimStart)}</span></label>
+            <label className="text-text2 block mb-1">Start: <span className="text-accent">{fmtTime(clip.trimStart)}</span></label>
             <input type="range" min={0} max={end - 0.5} step={0.5} value={clip.trimStart}
               onChange={e => onUpdate(clip.uid, { trimStart: parseFloat(e.target.value) })}
               className="w-full accent-accent h-1.5" />
           </div>
           <div>
-            <label className="text-text2 block mb-1">Fin: <span className="text-accent">{fmtTime(end)}</span></label>
+            <label className="text-text2 block mb-1">End: <span className="text-accent">{fmtTime(end)}</span></label>
             <input type="range" min={clip.trimStart + 0.5} max={raw} step={0.5} value={end}
               onChange={e => onUpdate(clip.uid, { trimEnd: parseFloat(e.target.value) })}
               className="w-full accent-accent h-1.5" />
           </div>
         </div>
-        <p className="text-text2">Durée: <span className="text-accent font-medium">{fmtTime(effectiveDur(clip))}</span></p>
+        <p className="text-text2">Duration: <span className="text-accent font-medium">{fmtTime(effectiveDur(clip))}</span></p>
       </div>
 
       {/* Speed */}
       <div className="space-y-1.5">
-        <p className="text-[10px] font-semibold text-text2 uppercase tracking-wider">Vitesse: <span className="text-accent">{clip.speed}×</span></p>
+        <p className="text-[10px] font-semibold text-text2 uppercase tracking-wider">Speed: <span className="text-accent">{clip.speed}×</span></p>
         <input type="range" min={0.25} max={4} step={0.25} value={clip.speed}
           onChange={e => onUpdate(clip.uid, { speed: parseFloat(e.target.value) })}
           className="w-full accent-accent h-1.5" />
@@ -263,7 +263,7 @@ function PropertiesPanel({
 
       {/* Fade */}
       <div className="flex items-center justify-between">
-        <p className="text-[10px] font-semibold text-text2 uppercase tracking-wider">Fondu entrée</p>
+        <p className="text-[10px] font-semibold text-text2 uppercase tracking-wider">Fade in</p>
         <button
           onClick={() => onUpdate(clip.uid, { fade: !clip.fade })}
           className={`w-8 h-4 rounded-full transition-colors ${clip.fade ? 'bg-accent' : 'bg-surface2'}`}
@@ -283,7 +283,7 @@ function PropertiesPanel({
 
       {/* Color */}
       <div className="space-y-1.5">
-        <p className="text-[10px] font-semibold text-text2 uppercase tracking-wider">Couleur</p>
+        <p className="text-[10px] font-semibold text-text2 uppercase tracking-wider">Color</p>
         <div className="flex gap-1.5 flex-wrap">
           {COLORS.map(c => (
             <button key={c} onClick={() => onUpdate(clip.uid, { color: c })}
@@ -556,13 +556,13 @@ export function Montage({ user }: MontageProps) {
 
   // ── AI Caption generation ────────────────────────────────────────────────────────────────
   async function generateAiCaption(clip: TimelineClip) {
-    if (!conns.anthropic) { setAiCapError('Clé API Anthropic manquante (Settings → Connexions)'); return }
+    if (!conns.anthropic) { setAiCapError('Missing Anthropic API key (Settings → Connections)'); return }
     setAiCapLoading(true); setAiCapError(null)
     try {
       const { resolveContentToLocalPath } = await import('@/lib/storage')
       const filePath = await resolveContentToLocalPath(clip.item)
       const fr = await window.electronAPI!.extractFrames!({ filePath, endTime: 5, fps: 0.5 })
-      if (!fr.ok || !fr.frames?.length) throw new Error('Impossible d\'extraire une frame de la vidéo')
+      if (!fr.ok || !fr.frames?.length) throw new Error('Unable to extract a frame from the video')
 
       const images = fr.frames.slice(0, 4).map(f => ({
         type: 'image' as const,
@@ -598,7 +598,7 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
       if (!res.ok) throw new Error(res.error ?? 'Erreur Anthropic')
       const raw = res.data as { content?: Array<{ type: string; text?: string }> }
       const text = raw?.content?.find(b => b.type === 'text')?.text?.trim() ?? ''
-      if (!text) throw new Error('Réponse vide')
+      if (!text) throw new Error('Empty response')
 
       // Apply to auto-caption mode
       setAutoCaptionEnabled(true)
@@ -666,7 +666,7 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
   const PRESET_DIMS: Record<Preset, string> = { '9:16': '1080×1920', '1:1': '1080×1080', '16:9': '1920×1080' }
 
   const TABS: { id: Tab; label: string; icon: string }[] = [
-    { id: 'medias',      label: 'Médias',      icon: '🎬' },
+    { id: 'medias',      label: 'Media',       icon: '🎬' },
     { id: 'texte',       label: 'Texte',        icon: '𝐓' },
     { id: 'transitions', label: 'Transitions',  icon: '◑' },
     { id: 'filtres',     label: 'Filtres',      icon: '🎨' },
@@ -682,7 +682,7 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
         <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
           <div className="border-2 border-dashed border-accent rounded-2xl px-20 py-12 bg-bg/90 backdrop-blur text-center space-y-3">
             <p className="text-5xl">🎬</p>
-            <p className="text-xl font-semibold text-accent">Dépose la vidéo ici</p>
+            <p className="text-xl font-semibold text-accent">Drop video here</p>
           </div>
         </div>
       )}
@@ -774,7 +774,7 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
               : filteredBank.length === 0 ? (
                 <div className="px-3 py-6 text-center text-[11px] text-text2 space-y-2">
                   <p className="text-2xl">🎬</p>
-                  <p>{bankItems.length === 0 ? 'Banque vide.\nGlisse des vidéos ici.' : 'Aucun résultat.'}</p>
+                  <p>{bankItems.length === 0 ? 'Bank empty.\nDrag videos here.' : 'No results.'}</p>
                 </div>
               ) : filteredBank.map(item => (
                 <button key={item.id} onClick={() => addClip(item)}
@@ -805,7 +805,7 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
                     <span className="text-base">⚡</span>
                     <div className="text-left">
                       <p className="text-xs font-semibold text-text">Mode Auto</p>
-                      <p className="text-[9px] text-text2">Caption directement sur la vidéo</p>
+                      <p className="text-[9px] text-text2">Caption directly on the video</p>
                     </div>
                   </div>
                   <div className={`w-9 h-5 rounded-full transition-colors flex-shrink-0 ${autoCaptionEnabled ? 'bg-accent' : 'bg-surface'}`}>
@@ -821,13 +821,13 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
                       disabled={!selectedClip || aiCapLoading || !conns.anthropic}
                       className="mt-2.5 w-full flex items-center justify-center gap-1.5 py-2 rounded-lg text-[11px] font-semibold transition-all bg-gradient-to-r from-violet-600 to-accent text-white hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
                     >
-                      {aiCapLoading ? <><Spinner size="sm" /><span>Analyse…</span></> : <><span>✨</span><span>Générer avec l'IA</span></>}
+                      {aiCapLoading ? <><Spinner size="sm" /><span>Analyzing…</span></> : <><span>✨</span><span>Generate with AI</span></>}
                     </button>
                     {!conns.anthropic && !conns.loading && (
-                      <p className="text-[9px] text-amber-400/80">Clé Anthropic requise (Settings → Connexions)</p>
+                      <p className="text-[9px] text-amber-400/80">Anthropic key required (Settings → Connections)</p>
                     )}
                     {!selectedClip && conns.anthropic && (
-                      <p className="text-[9px] text-text2/60">Sélectionne un clip dans la timeline d'abord.</p>
+                      <p className="text-[9px] text-text2/60">Select a clip in the timeline first.</p>
                     )}
                     {aiCapError && <p className="text-[9px] text-danger">{aiCapError}</p>}
 
@@ -847,7 +847,7 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
                         {(['top','center','bottom'] as AutoCaptionPos[]).map(p => (
                           <button key={p} onClick={() => setAutoCaptionPos(p)}
                             className={`py-1.5 rounded text-[10px] font-medium transition-all ${autoCaptionPos === p ? 'bg-accent text-white' : 'bg-surface text-text2 hover:text-text'}`}>
-                            {p === 'top' ? 'Haut' : p === 'center' ? 'Centre' : 'Bas'}
+                            {p === 'top' ? 'Top' : p === 'center' ? 'Center' : 'Bottom'}
                           </button>
                         ))}
                       </div>
@@ -855,7 +855,7 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
 
                     {/* Font size */}
                     <div>
-                      <p className="text-[9px] text-text2 uppercase tracking-wider mb-1">Taille: <span className="text-accent">{autoCaptionSize}px</span></p>
+                      <p className="text-[9px] text-text2 uppercase tracking-wider mb-1">Size: <span className="text-accent">{autoCaptionSize}px</span></p>
                       <input type="range" min={16} max={80} step={2} value={autoCaptionSize}
                         onChange={e => setAutoCaptionSize(+e.target.value)}
                         className="w-full accent-accent h-1.5" />
@@ -863,7 +863,7 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
 
                     {/* Color */}
                     <div>
-                      <p className="text-[9px] text-text2 uppercase tracking-wider mb-1.5">Couleur</p>
+                      <p className="text-[9px] text-text2 uppercase tracking-wider mb-1.5">Color</p>
                       <div className="flex gap-1.5 flex-wrap items-center">
                         {['#ffffff','#000000','#ffff00','#ff5c6e','#4f9eff','#2dde78','#ff6ec7','#ffaa2a'].map(c => (
                           <button key={c} onClick={() => setAutoCaptionColor(c)}
@@ -871,29 +871,29 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
                             style={{ backgroundColor: c, border: c === '#ffffff' ? '1px solid rgba(255,255,255,0.3)' : undefined }} />
                         ))}
                         <input type="color" value={autoCaptionColor} onChange={e => setAutoCaptionColor(e.target.value)}
-                          className="w-5 h-5 rounded cursor-pointer bg-transparent border-0 p-0" title="Couleur personnalisée" />
+                          className="w-5 h-5 rounded cursor-pointer bg-transparent border-0 p-0" title="Custom color" />
                       </div>
                     </div>
 
                     {!autoCaptionText.trim() && (
-                      <p className="text-[9px] text-text2/60 italic">Entre du texte pour voir l'aperçu sur la vidéo.</p>
+                      <p className="text-[9px] text-text2/60 italic">Enter text to see the preview on the video.</p>
                     )}
                     {autoCaptionText.trim() && (
-                      <p className="text-[9px] text-ok/80">✓ Texte affiché sur toute la durée de la vidéo</p>
+                      <p className="text-[9px] text-ok/80">✓ Text shown for the full video duration</p>
                     )}
                   </div>
                 )}
               </div>
 
               {/* ── Manuel ────────────────────────────────────────────────────────────────────── */}
-              <p className="text-[10px] text-text2 uppercase tracking-wider font-semibold pt-1">Manuel</p>
+              <p className="text-[10px] text-text2 uppercase tracking-wider font-semibold pt-1">Manual</p>
               {([
-                { pos: 'top',    label: 'Haut',   x: 50, y: 10 },
-                { pos: 'center', label: 'Centre', x: 50, y: 50 },
-                { pos: 'bottom', label: 'Bas',    x: 50, y: 85 },
+                { pos: 'top',    label: 'Top',    x: 50, y: 10 },
+                { pos: 'center', label: 'Center', x: 50, y: 50 },
+                { pos: 'bottom', label: 'Bottom', x: 50, y: 85 },
               ] as { pos: TextOverlay['position']; label: string; x: number; y: number }[]).map(({ pos, label, x, y }) => (
                 <button key={pos} onClick={() => setTexts(prev => [...prev, {
-                  uid: `text-${Date.now()}`, text: 'Texte ici…',
+                  uid: `text-${Date.now()}`, text: 'Text here…',
                   startTime: playhead, endTime: Math.min(playhead + 3, total),
                   position: pos, x, y, fontSize: 32, color: '#ffffff',
                 }])}
@@ -932,9 +932,9 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
                     <div>
                       <p className="text-xs font-medium text-text">{tr.label}</p>
                       <p className="text-[9px] text-text2">
-                        {tr.type === 'cut' ? 'Coupe directe' :
-                         tr.type === 'fade' ? 'Fondu au noir' :
-                         tr.type === 'dissolve' ? 'Fondu enchâîné' : 'Balayage horizontal'}
+                        {tr.type === 'cut' ? 'Direct cut' :
+                         tr.type === 'fade' ? 'Fade to black' :
+                         tr.type === 'dissolve' ? 'Cross-fade' : 'Horizontal sweep'}
                       </p>
                     </div>
                   </div>

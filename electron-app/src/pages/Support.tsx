@@ -38,10 +38,10 @@ interface TicketMessage {
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 const STATUS_LABELS: Record<TicketStatus, string> = {
-  open:        '🟡 Ouvert',
-  in_progress: '🔵 En cours',
-  resolved:    '🟢 Résolu',
-  closed:      '⚫ Fermé',
+  open:        '🟡 Open',
+  in_progress: '🔵 In progress',
+  resolved:    '🟢 Resolved',
+  closed:      '⚫ Closed',
 }
 
 const STATUS_COLORS: Record<TicketStatus, string> = {
@@ -52,9 +52,9 @@ const STATUS_COLORS: Record<TicketStatus, string> = {
 }
 
 const PRIORITY_LABELS: Record<TicketPriority, string> = {
-  low:    '▽ Faible',
+  low:    '▽ Low',
   normal: '◇ Normal',
-  high:   '▲ Élevé',
+  high:   '▲ High',
   urgent: '🔴 Urgent',
 }
 
@@ -66,15 +66,15 @@ const PRIORITY_COLORS: Record<TicketPriority, string> = {
 }
 
 const CATEGORY_LABELS: Record<TicketCategory, string> = {
-  general:   '💬 Général',
-  billing:   '💳 Facturation',
-  technical: '⚙️ Technique',
-  other:     '📎 Autre',
+  general:   '💬 General',
+  billing:   '💳 Billing',
+  technical: '⚙️ Technical',
+  other:     '📎 Other',
 }
 
 function fmtDate(iso: string) {
   const d = new Date(iso)
-  return d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+  return d.toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
 // ── Badge ─────────────────────────────────────────────────────────────────────
@@ -106,7 +106,7 @@ function CreateTicketForm({
 
   async function submit() {
     if (!subject.trim() || !description.trim()) {
-      setError('Merci de remplir tous les champs.')
+      setError('Please fill in all fields.')
       return
     }
     setSaving(true)
@@ -132,20 +132,20 @@ function CreateTicketForm({
           onClick={onCancel}
           className="text-[13px] text-text2 hover:text-text transition-colors"
         >
-          ← Retour
+          ← Back
         </button>
-        <h2 className="text-[22px] font-black text-white">Nouveau ticket</h2>
+        <h2 className="text-[22px] font-black text-white">New ticket</h2>
       </div>
 
       <div className="rounded-2xl p-6 space-y-5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
         <div className="grid grid-cols-2 gap-5">
           <div className="col-span-2 space-y-2">
-            <label className="text-[12px] font-medium text-text2 uppercase tracking-wide">Sujet</label>
+            <label className="text-[12px] font-medium text-text2 uppercase tracking-wide">Subject</label>
             <input
               name="subject"
               value={subject}
               onChange={e => setSubject(e.target.value)}
-              placeholder="Résumé de votre problème"
+              placeholder="Summary of your issue"
               className="w-full rounded-xl px-4 py-2.5 text-[13px] focus:outline-none"
               style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
             />
@@ -188,7 +188,7 @@ function CreateTicketForm({
             className="rounded-xl px-5 py-2.5 text-[13px] font-semibold"
             style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
           >
-            Annuler
+            Cancel
           </button>
           <button
             onClick={submit}
@@ -196,7 +196,7 @@ function CreateTicketForm({
             className="rounded-xl px-5 py-2.5 text-[13px] font-semibold text-white disabled:opacity-50"
             style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)' }}
           >
-            {saving ? 'Envoi…' : 'Envoyer le ticket'}
+            {saving ? 'Sending…' : 'Send ticket'}
           </button>
         </div>
       </div>
@@ -297,10 +297,10 @@ function ThreadView({
             className="shrink-0 rounded-xl px-3 py-2 text-[13px] focus:outline-none"
             style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
           >
-            <option value="open" style={{ background: '#0d1120', color: '#e2d9f3' }}>Ouvert</option>
-            <option value="in_progress" style={{ background: '#0d1120', color: '#e2d9f3' }}>En cours</option>
-            <option value="resolved" style={{ background: '#0d1120', color: '#e2d9f3' }}>Résolu</option>
-            <option value="closed" style={{ background: '#0d1120', color: '#e2d9f3' }}>Fermé</option>
+            <option value="open" style={{ background: '#0d1120', color: '#e2d9f3' }}>Open</option>
+            <option value="in_progress" style={{ background: '#0d1120', color: '#e2d9f3' }}>In progress</option>
+            <option value="resolved" style={{ background: '#0d1120', color: '#e2d9f3' }}>Resolved</option>
+            <option value="closed" style={{ background: '#0d1120', color: '#e2d9f3' }}>Closed</option>
           </select>
         )}
       </div>

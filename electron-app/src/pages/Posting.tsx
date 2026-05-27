@@ -132,11 +132,11 @@ export function Posting({ user }: PostingProps) {
   }
 
   async function generateCaption() {
-    if (!groqKey) { log('❌ Clé Groq manquante — Paramètres', 'error'); return }
+    if (!groqKey) { log('❌ Missing Groq key — Settings', 'error'); return }
     if (!window.electronAPI?.groqRequest) return
     setGenerating(true)
     try {
-      const subject = topic.trim() || 'créateur de contenu Instagram lifestyle'
+      const subject = topic.trim() || 'lifestyle Instagram content creator'
       const systemContent = withHashtags
         ? 'Tu génères des descriptions Instagram virales en français. Hook fort + body engageant + CTA + 10-15 hashtags pertinents. Max 2200 caractères.'
         : 'Tu génères des descriptions Instagram virales en français. Hook fort + body engageant + CTA. Sans hashtags. Max 2200 caractères.'
@@ -202,7 +202,7 @@ export function Posting({ user }: PostingProps) {
     const creditCost = total * CREDIT_COSTS.posting
     const creditRes = await checkAndDeductCredits(credits.ownerId, creditCost)
     if (!creditRes.ok) {
-      log(`❌ ${creditRes.error ?? 'Crédits insuffisants'} (besoin: ${creditCost} crédits pour ${total} phone${total > 1 ? 's' : ''})`, 'error')
+      log(`❌ ${creditRes.error ?? 'Insufficient credits'} (besoin: ${creditCost} crédits pour ${total} phone${total > 1 ? 's' : ''})`, 'error')
       return
     }
     credits.refresh()
@@ -273,7 +273,7 @@ export function Posting({ user }: PostingProps) {
         log(`⏳ Suivi de ${Object.keys(taskIds).length} tâche(s)…`)
         const pending  = new Set(Object.values(taskIds))
         const deadline = Date.now() + 8 * 60 * 1000
-        const STATUS: Record<number, string> = { 1: '⏳ En attente', 2: '🔄 En cours', 3: '✅ Terminé', 4: '❌ Échoué', 7: '🚫 Annulé' }
+        const STATUS: Record<number, string> = { 1: '⏳ Pending', 2: '🔄 In progress', 3: '✅ Done', 4: '❌ Failed', 7: '🚫 Cancelled' }
 
         let pollCount = 0
         while (pending.size > 0 && Date.now() < deadline) {
@@ -479,10 +479,8 @@ export function Posting({ user }: PostingProps) {
             <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: selectedPhones.size > 0 ? '#22C55E' : 'rgba(148,163,184,0.2)' }} />
             <p className="text-[12px] font-semibold" style={{ color: selectedPhones.size > 0 ? '#E2E8F0' : 'rgba(148,163,184,0.4)' }}>
               {selectedPhones.size > 0
-                ? lang === 'en'
-                  ? `${selectedPhones.size} account${selectedPhones.size > 1 ? 's' : ''} selected`
-                  : `${selectedPhones.size} compte${selectedPhones.size > 1 ? 's' : ''} sélectionné${selectedPhones.size > 1 ? 's' : ''}`
-                : lang === 'en' ? 'None selected' : 'Aucun sélectionné'}
+                ? `${selectedPhones.size} account${selectedPhones.size !== 1 ? 's' : ''} selected`
+                : 'None selected'}
             </p>
           </div>
         </div>

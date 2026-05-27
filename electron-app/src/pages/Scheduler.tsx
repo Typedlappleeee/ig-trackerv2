@@ -48,11 +48,11 @@ interface Props { user: User; onNavigate?: (page: string, tab?: string) => void 
 type TabFilter = 'pending' | 'history'
 
 const STATUS_LABEL: Record<ScheduleStatus, string> = {
-  pending:   'En attente',
-  running:   'En cours',
-  done:      'Terminé',
-  failed:    'Échoué',
-  cancelled: 'Annulé',
+  pending:   'Pending',
+  running:   'In progress',
+  done:      'Done',
+  failed:    'Failed',
+  cancelled: 'Cancelled',
 }
 
 const TYPE_LABEL: Record<string, string> = {
@@ -596,12 +596,12 @@ export function Scheduler({ user, onNavigate }: Props) {
               <IconCalendar size={32} color="rgba(139,92,246,0.45)" />
             </div>
             <p style={{ fontSize: 15, fontWeight: 700, color: '#F2F0FF', margin: 0 }}>
-              {tab === 'pending' ? 'Aucune tâche programmée' : 'Aucun historique'}
+              {tab === 'pending' ? 'No scheduled tasks' : 'No history'}
             </p>
             <p style={{ fontSize: 13, color: 'rgba(148,163,184,0.52)', marginTop: 8, marginBottom: 0 }}>
               {tab === 'pending'
                 ? 'Programme un post depuis Posting ou Mass Posting.'
-                : 'Les posts exécutés apparaîtront ici.'}
+                : 'Executed posts will appear here.'}
             </p>
             {tab === 'pending' && (
               <button
@@ -787,7 +787,7 @@ function PostCard({ post, index, isOwn, canCancel, isRunning, runLogs, cancellin
             icon={post.mode === 'random'
               ? <IconShuffle size={11} color="rgba(196,181,253,0.72)" />
               : <IconArrowRight size={11} color="rgba(196,181,253,0.72)" />}
-            label={post.mode === 'random' ? 'Aléatoire' : 'Séquentiel'}
+            label={post.mode === 'random' ? 'Random' : 'Sequential'}
           />
         )}
       </div>

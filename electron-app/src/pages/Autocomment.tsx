@@ -240,15 +240,15 @@ export function Autocomment({ user }: AutocommentProps) {
       {/* Header */}
       <div className="flex-shrink-0 px-8 pt-7 pb-5 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
         <div>
-          <h1 className="text-[20px] font-black text-white leading-none">Auto-Commentaires</h1>
-          <p className="text-[13px] text-text2 mt-0.5">Réponse IA ou manuelle aux commentaires Instagram</p>
+          <h1 className="text-[20px] font-black text-white leading-none">Auto-Comments</h1>
+          <p className="text-[13px] text-text2 mt-0.5">AI or manual replies to Instagram comments</p>
         </div>
       </div>
 
       {/* Account chips bar */}
       <div className="flex-shrink-0 px-6 py-3 flex items-center gap-2 overflow-x-auto" style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
         {phones.length === 0 ? (
-          <p className="text-[13px] text-text2">Aucun compte Instagram lié — va dans Téléphones d'abord.</p>
+          <p className="text-[13px] text-text2">No Instagram account linked — go to Phones first.</p>
         ) : phones.map((p, i) => {
           const palette = ['#4f8ef7','#22c55e','#f59e0b','#e0245e','#8b5cf6','#06b6d4','#f97316','#ec4899']
           const color = palette[i % palette.length]
@@ -283,7 +283,7 @@ export function Autocomment({ user }: AutocommentProps) {
         <aside className="w-[300px] flex-shrink-0 flex flex-col overflow-hidden" style={{ borderRight: '1px solid rgba(255,255,255,0.06)' }}>
           <div className="px-5 py-3.5 flex items-center gap-2" style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
             <p className="text-[13px] font-bold text-white flex-1">
-              {selectedPhone ? `@${selectedPhone.ig_username}` : 'Sélectionne un compte'}
+              {selectedPhone ? `@${selectedPhone.ig_username}` : 'Select an account'}
             </p>
             {selectedPhone && (
               <button
@@ -298,7 +298,7 @@ export function Autocomment({ user }: AutocommentProps) {
           <div className="px-4 py-2.5 flex gap-1.5" style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
             {([
               { k: 'all',     l: 'Tous'        },
-              { k: 'replied', l: '✓ Commentés' },
+              { k: 'replied', l: '✓ Commented' },
               { k: 'new',     l: 'Nouveau'     },
             ] as const).map(f => (
               <button
@@ -323,7 +323,7 @@ export function Autocomment({ user }: AutocommentProps) {
               <div className="px-5 py-10 text-center">
                 <p className="text-3xl mb-3">🎬</p>
                 <p className="text-[13px] text-text2">
-                  {selectedPhone ? 'Aucune vidéo' : 'Choisis un compte au-dessus'}
+                  {selectedPhone ? 'No video' : 'Choose an account above'}
                 </p>
               </div>
             ) : visiblePosts.map(p => (
@@ -354,14 +354,14 @@ export function Autocomment({ user }: AutocommentProps) {
             <div className="flex-1 flex items-center justify-center">
               <div className="rounded-2xl p-10 text-center" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
                 <div className="text-5xl mb-4">✈️</div>
-                <p className="text-base font-bold text-white">Sélectionne une vidéo</p>
-                <p className="text-[13px] text-text2 mt-1">Choisis une vidéo dans la liste pour commencer</p>
+                <p className="text-base font-bold text-white">Select a video</p>
+                <p className="text-[13px] text-text2 mt-1">Choose a video from the list to start</p>
               </div>
             </div>
           ) : (
             <>
               <div className="flex-shrink-0 px-6 py-3.5 flex items-center gap-3" style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
-                <h2 className="text-[15px] font-bold text-white">💬 Commentaires</h2>
+                <h2 className="text-[15px] font-bold text-white">💬 Comments</h2>
                 <span className="text-[13px] text-text2">{comments.length}</span>
                 <button onClick={() => loadComments(selectedPost)} className="ml-auto text-text2 hover:text-white text-[15px] transition-colors">⟳</button>
               </div>
@@ -371,13 +371,13 @@ export function Autocomment({ user }: AutocommentProps) {
                 ) : comments.length === 0 ? (
                   <div className="rounded-2xl p-10 text-center" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
                     <p className="text-3xl mb-3">💬</p>
-                    <p className="text-[13px] text-text2">Aucun commentaire chargé.</p>
+                    <p className="text-[13px] text-text2">No comments loaded.</p>
                   </div>
                 ) : comments.map(c => (
                   <div key={c.pk} className="rounded-2xl p-4 space-y-2" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
                     <div className="flex items-center gap-2">
                       <p className="text-[13px] font-bold text-accent">@{c.username}</p>
-                      {c.replied && <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ background: 'rgba(52,211,153,0.12)', color: '#34d399', border: '1px solid rgba(52,211,153,0.2)' }}>✓ Répondu</span>}
+                      {c.replied && <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ background: 'rgba(52,211,153,0.12)', color: '#34d399', border: '1px solid rgba(52,211,153,0.2)' }}>✓ Replied</span>}
                     </div>
                     <p className="text-[13px] text-white">{c.text}</p>
                     {c.replied && (
@@ -393,7 +393,7 @@ export function Autocomment({ user }: AutocommentProps) {
                           value={manualReplies[c.pk] ?? ''}
                           onChange={e => setManualReplies(prev => ({ ...prev, [c.pk]: e.target.value }))}
                           onKeyDown={e => { if (e.key === 'Enter') sendManualReply(c) }}
-                          placeholder="Écrire une réponse…"
+                          placeholder="Write a reply…"
                           className="flex-1 rounded-xl px-4 py-2.5 text-[13px] placeholder:text-text2 focus:outline-none"
                           style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
                         />
@@ -403,7 +403,7 @@ export function Autocomment({ user }: AutocommentProps) {
                           className="rounded-xl px-4 py-2.5 text-[13px] font-semibold disabled:opacity-40 transition-colors"
                           style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff' }}
                         >
-                          {sendingReply === c.pk ? '…' : '↑ Envoyer'}
+                          {sendingReply === c.pk ? '…' : '↑ Send'}
                         </button>
                       </div>
                     )}
@@ -417,7 +417,7 @@ export function Autocomment({ user }: AutocommentProps) {
           <div className="flex-shrink-0 px-6 py-5 space-y-4" style={{ borderTop: '1px solid rgba(255,255,255,0.06)', background: 'rgba(0,0,0,0.2)' }}>
             {/* Mode toggle */}
             <div className="flex items-center gap-3">
-              <span className="text-[12px] uppercase tracking-wider text-text2 font-semibold">Mode réponse</span>
+              <span className="text-[12px] uppercase tracking-wider text-text2 font-semibold">Reply mode</span>
               <div className="flex rounded-xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.09)' }}>
                 <button
                   onClick={() => setReplyMode('ai')}
@@ -440,7 +440,7 @@ export function Autocomment({ user }: AutocommentProps) {
               <>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-[12px] uppercase tracking-wider text-text2 font-semibold block mb-2">Clé Groq API</label>
+                    <label className="text-[12px] uppercase tracking-wider text-text2 font-semibold block mb-2">Groq API Key</label>
                     <input
                       type="password"
                       name="groq-key"
@@ -478,9 +478,9 @@ export function Autocomment({ user }: AutocommentProps) {
                 </div>
                 <div className="flex gap-2">
                   {!running ? (
-                    <Button size="sm" onClick={start} className="flex-1 !bg-ok hover:!bg-ok/80 !text-bg">▶ Démarrer</Button>
+                    <Button size="sm" onClick={start} className="flex-1 !bg-ok hover:!bg-ok/80 !text-bg">▶ Start</Button>
                   ) : (
-                    <Button size="sm" onClick={stop} variant="danger" className="flex-1">■ Arrêter</Button>
+                    <Button size="sm" onClick={stop} variant="danger" className="flex-1">■ Stop</Button>
                   )}
                   <Button size="sm" variant="secondary" onClick={() => setLogs([])}>🗑 Logs</Button>
                 </div>
@@ -489,7 +489,7 @@ export function Autocomment({ user }: AutocommentProps) {
 
             {replyMode === 'manual' && (
               <div className="space-y-3">
-                <p className="text-[13px] text-text2">✍️ Mode manuel — écris ta réponse sous chaque commentaire puis clique sur Envoyer.</p>
+                <p className="text-[13px] text-text2">✍️ Manual mode — write your reply under each comment then click Send.</p>
                 <div className="flex items-center gap-3 rounded-xl px-4 py-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
                   <label className="flex items-center gap-2.5 text-[13px] text-white cursor-pointer">
                     <input
@@ -497,16 +497,16 @@ export function Autocomment({ user }: AutocommentProps) {
                       checked={useGeelark}
                       onChange={e => { setUseGeelark(e.target.checked); localStorage.setItem('autocomment-use-geelark', String(e.target.checked)) }}
                     />
-                    📱 Envoyer via téléphone GéeLark <span className="text-text2">(indétectable, ~15s)</span>
+                    📱 Send via GéeLark phone <span className="text-text2">(indétectable, ~15s)</span>
                   </label>
                 </div>
-                <Button size="sm" variant="secondary" onClick={() => setLogs([])}>🗑 Effacer logs</Button>
+                <Button size="sm" variant="secondary" onClick={() => setLogs([])}>🗑 Clear logs</Button>
               </div>
             )}
 
             {/* Log */}
             <div className="rounded-xl p-3 max-h-20 overflow-y-auto font-mono text-[11px] text-text2 space-y-0.5" style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.06)' }}>
-              {logs.length === 0 ? <p className="opacity-40">Aucun log</p> : logs.map((l, i) => <p key={i}>{l}</p>)}
+              {logs.length === 0 ? <p className="opacity-40">No logs</p> : logs.map((l, i) => <p key={i}>{l}</p>)}
             </div>
           </div>
         </div>

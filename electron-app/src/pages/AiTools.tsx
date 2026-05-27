@@ -164,9 +164,9 @@ function StratConcurrente({ groqKey, onBack }: { groqKey: string; onBack: () => 
   }
 
   return (
-    <ToolShell title="Stratégie Niche" icon="🔍" onBack={onBack} error={error}>
+    <ToolShell title="Niche Strategy" icon="🔍" onBack={onBack} error={error}>
       <FormSection label="Niche ou compte concurrent">
-        <p className="text-[12px] text-text2 font-mono">Entre un pseudo concurrent ou une niche pour une stratégie complète.</p>
+        <p className="text-[12px] text-text2 font-mono">Enter a competitor handle or niche for a complete strategy.</p>
         <FieldInput placeholder="@concurrent ou niche (ex: fitness, crypto)" value={handle} onChange={setHandle} />
         <div className="flex gap-2.5">
           <Button onClick={run} loading={loading} disabled={!handle.trim()}>🔍 Analyser la niche</Button>
@@ -179,9 +179,9 @@ function StratConcurrente({ groqKey, onBack }: { groqKey: string; onBack: () => 
 }
 
 function CaptionsVirales({ groqKey, onBack }: { groqKey: string; onBack: () => void }) {
-  const TONES = ['Engageant', 'Humoristique', 'Informatif', 'Mystérieux', 'Inspirant', 'Provocateur']
+  const TONES = ['Engaging', 'Humorous', 'Informative', 'Mysterious', 'Inspiring', 'Provocative']
   const [subject, setSubject] = useState('')
-  const [tone, setTone] = useState('Engageant')
+  const [tone, setTone] = useState('Engaging')
   const [result, setResult] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -200,7 +200,7 @@ function CaptionsVirales({ groqKey, onBack }: { groqKey: string; onBack: () => v
   return (
     <ToolShell title="Captions Virales" icon="💬" onBack={onBack} error={error}>
       <FormSection label="Configuration de la caption">
-        <p className="text-[12px] text-text2 font-mono">Hook + corps + CTA + 15 hashtags générés automatiquement.</p>
+        <p className="text-[12px] text-text2 font-mono">Hook + body + CTA + 15 hashtags generated automatically.</p>
         <div className="grid grid-cols-2 gap-3">
           <FieldInput placeholder="Sujet du post" value={subject} onChange={setSubject} />
           <SelectInput value={tone} onChange={setTone} options={TONES} />
@@ -239,8 +239,8 @@ function Planificateur({ groqKey, onBack, userId }: { groqKey: string; onBack: (
 
   return (
     <ToolShell title="Planificateur 7 Jours" icon="📅" onBack={onBack} error={error}>
-      <FormSection label="Niche éditoriale">
-        <p className="text-[12px] text-text2 font-mono">Calendrier éditorial complet — 7 jours avec heures, types et idées.</p>
+      <FormSection label="Editorial Niche">
+        <p className="text-[12px] text-text2 font-mono">Full editorial calendar — 7 days with times, types and ideas.</p>
         <FieldInput placeholder="Niche (fitness, crypto, lifestyle…)" value={niche} onChange={setNiche} />
         <div className="flex gap-2.5">
           <Button onClick={run} loading={loading} disabled={!niche.trim()}>📅 Générer le planning</Button>
@@ -255,8 +255,8 @@ function Planificateur({ groqKey, onBack, userId }: { groqKey: string; onBack: (
 function ScriptReel({ groqKey, onBack }: { groqKey: string; onBack: () => void }) {
   const [subject, setSubject] = useState('')
   const [duration, setDuration] = useState('30s')
-  const [tone, setTone] = useState('Engageant')
-  const TONES = ['Engageant', 'Humoristique', 'Informatif', 'Inspirant', 'Provocateur', 'Éducatif']
+  const [tone, setTone] = useState('Engaging')
+  const TONES = ['Engaging', 'Humorous', 'Informative', 'Inspiring', 'Provocative', 'Éducatif']
   const [result, setResult] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -284,12 +284,12 @@ Format le script comme si c'était prêt à lire face caméra. Inclus les indica
 
   return (
     <ToolShell title="Script Reel Complet" icon="🎬" onBack={onBack} error={error}>
-      <FormSection label="Paramètres du Reel">
-        <p className="text-[12px] text-text2 font-mono">Script prêt à lire face caméra — hook, corps, CTA avec timings précis.</p>
-        <FieldInput placeholder="Sujet de ta vidéo" value={subject} onChange={setSubject} />
+      <FormSection label="Reel Settings">
+        <p className="text-[12px] text-text2 font-mono">Camera-ready script — hook, body, CTA with precise timings.</p>
+        <FieldInput placeholder="Video topic" value={subject} onChange={setSubject} />
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <p className="text-[10px] uppercase tracking-widest font-bold mb-2.5 text-text3 font-mono">Durée cible</p>
+            <p className="text-[10px] uppercase tracking-widest font-bold mb-2.5 text-text3 font-mono">Target Duration</p>
             <div className="flex gap-2">
               {['15s', '30s', '60s'].map(d => (
                 <button key={d} onClick={() => setDuration(d)}
@@ -352,7 +352,7 @@ Chaque hook doit faire maximum 2 lignes. Format :
 
   return (
     <ToolShell title="3 Hooks A/B/C" icon="🪝" onBack={onBack} error={error}>
-      <FormSection label="Sujet de ta vidéo">
+      <FormSection label="Video Topic">
         <p className="text-[12px] text-text2 font-mono">3 styles radicalement différents — trouve celui qui performe le mieux.</p>
         <FieldInput placeholder="Sujet de ta vidéo" value={subject} onChange={setSubject} />
         <div className="flex gap-2.5">
@@ -399,11 +399,11 @@ Réponds avec :
   return (
     <ToolShell title="Bio Optimizer" icon="👤" onBack={onBack} error={error}>
       <FormSection label="Bio et objectif">
-        <p className="text-[12px] text-text2 font-mono">Réécrit ta bio pour maximiser les conversions selon ton objectif.</p>
+        <p className="text-[12px] text-text2 font-mono">Rewrites your bio to maximize conversions based on your goal.</p>
         <FieldInput placeholder="Ta bio actuelle (colle-la ici)" value={bio} onChange={setBio} textarea rows={3} />
         <div className="grid grid-cols-2 gap-3">
           <FieldInput placeholder="Niche / domaine" value={niche} onChange={setNiche} />
-          <SelectInput value={goal} onChange={setGoal} options={['Followers', 'Ventes', 'Trafic lien bio', 'DMs', 'Notoriété']} />
+          <SelectInput value={goal} onChange={setGoal} options={['Followers', 'Sales', 'Bio link traffic', 'DMs', 'Brand awareness']} />
         </div>
         <div className="flex gap-2.5">
           <Button onClick={run} loading={loading} disabled={!bio.trim()}>👤 Optimiser la bio</Button>
@@ -417,7 +417,7 @@ Réponds avec :
 
 function CommentReplies({ groqKey, onBack }: { groqKey: string; onBack: () => void }) {
   const [comments, setComments] = useState('')
-  const [tone, setTone] = useState('Sympathique')
+  const [tone, setTone] = useState('Friendly')
   const [result, setResult] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -442,11 +442,11 @@ Commentaire 2 → [réponse]
   }
 
   return (
-    <ToolShell title="Réponses Commentaires" icon="💬" onBack={onBack} error={error}>
-      <FormSection label="Commentaires à traiter">
-        <p className="text-[12px] text-text2 font-mono">Jusqu'à 20 commentaires (un par ligne) — réponse personnalisée pour chacun.</p>
+    <ToolShell title="Comment Replies" icon="💬" onBack={onBack} error={error}>
+      <FormSection label="Comments to process">
+        <p className="text-[12px] text-text2 font-mono">Up to 20 comments (one per line) — personalized reply for each.</p>
         <FieldInput placeholder={"Commentaire 1\nCommentaire 2\nCommentaire 3…"} value={comments} onChange={setComments} textarea rows={5} />
-        <SelectInput value={tone} onChange={setTone} options={['Sympathique', 'Professionnel', 'Humoristique', 'Motivant', 'Mystérieux']} />
+        <SelectInput value={tone} onChange={setTone} options={['Friendly', 'Professional', 'Humorous', 'Motivating', 'Mysterious']} />
         <div className="flex gap-2.5">
           <Button onClick={run} loading={loading} disabled={!comments.trim()}>💬 Générer les réponses</Button>
           {result && <CopyButton text={result} />}
@@ -493,10 +493,10 @@ Pour chaque langue, format :
   }
 
   return (
-    <ToolShell title="Traducteur Multi-Marché" icon="🌍" onBack={onBack} error={error}>
-      <FormSection label="Caption et marchés cibles">
+    <ToolShell title="Multi-Market Translator" icon="🌍" onBack={onBack} error={error}>
+      <FormSection label="Caption and target markets">
         <p className="text-[12px] text-text2 font-mono">Adaptation culturelle + hashtags locaux — pas juste une traduction.</p>
-        <FieldInput placeholder="Colle ta caption française ici…" value={caption} onChange={setCaption} textarea rows={4} />
+        <FieldInput placeholder="Paste your caption here…" value={caption} onChange={setCaption} textarea rows={4} />
         <div>
           <p className="text-[10px] uppercase tracking-widest font-bold mb-2.5 text-text3 font-mono">Langues cibles</p>
           <div className="flex flex-wrap gap-2">
@@ -560,8 +560,8 @@ Produis une analyse complète :
 
   return (
     <ToolShell title="Analyse Concurrent" icon="🕵️" onBack={onBack} error={error}>
-      <FormSection label="Compte à analyser">
-        <p className="text-[12px] text-text2 font-mono">Gaps, formules de hooks, plan d'action — pour dépasser un concurrent.</p>
+      <FormSection label="Account to analyze">
+        <p className="text-[12px] text-text2 font-mono">Gaps, hook formulas, action plan — to outperform a competitor.</p>
         <div className="grid grid-cols-2 gap-3">
           <FieldInput placeholder="@concurrent ou compte" value={handle} onChange={setHandle} />
           <FieldInput placeholder="Niche (optionnel)" value={niche} onChange={setNiche} />
