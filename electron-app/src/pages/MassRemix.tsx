@@ -67,13 +67,13 @@ interface MassJob extends PlannedPair {
 }
 
 const STATUS_LABEL: Record<MassJob['status'], string> = {
-  pending:    '⏳ En attente',
+  pending:    '⏳ Pending',
   detecting:  '🔍 Detecting…',
-  analyzing:  '✨ IA texte…',
+  analyzing:  '✨ AI text…',
   generating: '⚙ FFmpeg…',
   uploading:  '☁ Upload…',
   done:       '✅ Done',
-  error:      '❌ Erreur',
+  error:      '❌ Error',
 }
 
 function fileName(p: string) { return p.replace(/\\/g, '/').split('/').pop() ?? p }
@@ -149,7 +149,7 @@ function VideoSourcePanel({
           <svg style={{ width: 11, height: 11, color: '#a78bfa', animation: 'spin 0.9s linear infinite', flexShrink: 0 }} viewBox="0 0 24 24" fill="none">
             <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="31.4" strokeDashoffset="10" />
           </svg>
-          <span style={{ fontSize: 10, color: '#a78bfa', fontWeight: 600 }}>Chargement…</span>
+          <span style={{ fontSize: 10, color: '#a78bfa', fontWeight: 600 }}>Loading…</span>
         </div>
       )}
 
@@ -1329,7 +1329,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
             style={{ background: '#0d0a1e', border: '1px solid rgba(139,92,246,0.25)' }}>
             <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(139,92,246,0.12)' }}>
               <p className="text-[14px] font-bold text-white">
-                📁 {folderTarget === 'orig' ? 'Dossier — Originales' : 'Dossier — Phase 1'}
+                📁 {folderTarget === 'orig' ? 'Folder — Originals' : 'Folder — Phase 1'}
               </p>
               <button onClick={() => setFolderTarget(null)} className="text-text2 hover:text-white text-lg leading-none">✕</button>
             </div>
