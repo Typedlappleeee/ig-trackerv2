@@ -154,7 +154,7 @@ export function Posting({ user }: PostingProps) {
         const choice = (r.data as { choices?: Array<{ message?: { content?: string } }> }).choices?.[0]?.message?.content
         if (choice) setCaption(choice.trim())
       } else {
-        log(`❌ Génération échouée: ${r.error}`, 'error')
+        log(`❌ Generation failed: ${r.error}`, 'error')
       }
     } catch (e) {
       log(`❌ ${e instanceof Error ? e.message : String(e)}`, 'error')
@@ -163,18 +163,18 @@ export function Posting({ user }: PostingProps) {
   }
 
   async function schedulePost(scheduledAt: Date) {
-    if (!bearer)                  { log('Token GéeLark manquant — Paramètres', 'error'); return }
-    if (selectedPhones.size === 0){ log('Sélectionne au moins un téléphone', 'warn'); return }
-    if (!filePath)                { log('Sélectionne une vidéo', 'warn'); return }
+    if (!bearer)                  { log('Missing GéeLark token — Settings', 'error'); return }
+    if (selectedPhones.size === 0){ log('Select at least one phone', 'warn'); return }
+    if (!filePath)                { log('Select a video', 'warn'); return }
     setShowScheduleModal(false)
 
     const phoneList = phones.filter(p => selectedPhones.has(p.id))
     setPosting(true); setLogs([]); setProgress(5)
     try {
-      log('📤 Upload de la vidéo vers GéeLark…')
+      log('📤 Uploading video to GéeLark…')
       const up = await window.electronAPI!.uploadVideoGeelark({ bearer, filePath })
-      if (!up.ok || !up.token) { log(`❌ Upload échoué: ${up.error}`, 'error'); return }
-      log(`✅ Vidéo prête (token: ${up.token.slice(0, 12)}…)`, 'ok')
+      if (!up.ok || !up.token) { log(`❌ Upload failed: ${up.error}`, 'error'); return }
+      log(`✅ Video ready (token: ${up.token.slice(0, 12)}…)`, 'ok')
       await createScheduledPost({
         userId: user.id, orgId: currentOrg?.id ?? null,
         createdByName: user.email?.split('@')[0] ?? 'Moi',
@@ -183,7 +183,7 @@ export function Posting({ user }: PostingProps) {
         videos: [{ token: up.token, title: filePath.split(/[\\/]/).pop() ?? 'video' }],
         caption, delayMinutes: postingOpts.intervalMode !== 'none' ? postingOpts.intervalMin : 0, mode: 'seq', bearerToken: bearer, reelsTrial: postingOpts.reelsTrial,
       })
-      log(`📅 Programmé pour ${fmtScheduledTime(scheduledAt.toISOString())} — ${phoneList.length} téléphone(s)`, 'ok')
+      log(`📅 Scheduled for ${fmtScheduledTime(scheduledAt.toISOString())} — ${phoneList.length} phone(s)`, 'ok')
     } catch (err: any) {
       log(`❌ Erreur: ${err.message}`, 'error')
     } finally {
@@ -192,9 +192,9 @@ export function Posting({ user }: PostingProps) {
   }
 
   async function post() {
-    if (!bearer)               { log('Token GéeLark manquant — Paramètres', 'error'); return }
-    if (selectedPhones.size === 0) { log('Sélectionne au moins un téléphone', 'warn'); return }
-    if (!filePath)             { log('Sélectionne une vidéo', 'warn'); return }
+    if (!bearer)               { log('Missing GéeLark token — Settings', 'error'); return }
+    if (selectedPhones.size === 0) { log('Select at least one phone', 'warn'); return }
+    if (!filePath)             { log('Select a video', 'warn'); return }
 
     const phoneList = phones.filter(p => selectedPhones.has(p.id))
     const total     = phoneList.length
@@ -202,11 +202,11 @@ export function Posting({ user }: PostingProps) {
     const creditCost = total * CREDIT_COSTS.posting
     const creditRes = await checkAndDeductCredits(credits.ownerId, creditCost)
     if (!creditRes.ok) {
-      log(`❌ ${creditRes.error ?? 'Insufficient credits'} (besoin: ${creditCost} crédits pour ${total} phone${total > 1 ? 's' : ''})`, 'error')
+      log(`❌ ${creditRes.error ?? 'Insufficient credits'} (need: ${creditCost} credits for ${total} phone${total > 1 ? 's' : ''})`, 'error')
       return
     }
     credits.refresh()
-    log(`💳 ${creditCost} crédits débités (${CREDIT_COSTS.posting}/phone × ${total}) — solde: ${creditRes.balance ?? '?'}`)
+    log(`💳 ${creditCost} credits deducted (${CREDIT_COSTS.posting}/phone × ${total}) — balance: ${creditRes.balance ?? '?'}`)
 
     playSuccess()
     setPosting(true); setLogs([]); setProgress(0)
@@ -218,19 +218,19 @@ export function Posting({ user }: PostingProps) {
     })
 
     try {
-      log('📤 Upload de la vidéo vers GéeLark…')
+      log('📤 Uploading video to GéeLark…')
       setProgress(5)
       const up = await window.electronAPI!.uploadVideoGeelark({ bearer, filePath })
-      if (!up.ok || !up.token) { log(`❌ Upload échoué: ${up.error}`, 'error'); setPosting(false); return }
+      if (!up.ok || !up.token) { log(`❌ Upload failed: ${up.error}`, 'error'); setPosting(false); return }
       const videoToken = up.token
-      log(`✅ Vidéo uploadée (token: ${videoToken.slice(0, 12)}…)`, 'ok')
+      log(`✅ Video uploaded (token: ${videoToken.slice(0, 12)}…)`, 'ok')
       setProgress(20)
 
       const geelarkIds = phoneList.map(p => p.geelark_id)
-      log(`📱 Démarrage de ${total} téléphone${total > 1 ? 's' : ''}…`)
+      log(`📱 Starting ${total} phone${total > 1 ? 's' : ''}…`)
       const startRes = await geelark(bearer, '/phone/start', { ids: geelarkIds })
       const started  = (startRes['data'] as Record<string, number>)?.['successAmount'] ?? 0
-      log(`  ${started} démarré(s)`, started > 0 ? 'ok' : 'warn')
+      log(`  ${started} started`, started > 0 ? 'ok' : 'warn')
       setProgress(35)
 
       log('⏳ Attente 30s (boot)…')
@@ -245,7 +245,7 @@ export function Posting({ user }: PostingProps) {
       const scheduleTimes = buildScheduleTimes(phoneList.length, postingOpts)
       if (postingOpts.intervalMode !== 'none' && phoneList.length > 1) {
         const lastMin = Math.round((scheduleTimes[scheduleTimes.length - 1] - scheduleTimes[0]) / 60)
-        log(`⏱ Intervalle activé — dernier post dans ~${lastMin} min`, 'info')
+        log(`⏱ Interval enabled — last post in ~${lastMin} min`, 'info')
       }
 
       for (let pi = 0; pi < phoneList.length; pi++) {
@@ -260,7 +260,7 @@ export function Posting({ user }: PostingProps) {
         if (taskRes['code'] === 0) {
           const tid = (taskRes['data'] as Record<string, unknown>)?.['id'] as string
           taskIds[phone.geelark_id] = tid
-          log(`  ✅ Tâche créée pour ${phone.phone_name}`, 'ok')
+          log(`  ✅ Task created for ${phone.phone_name}`, 'ok')
         } else {
           log(`  ❌ ${phone.phone_name}: ${taskRes['msg'] ?? taskRes['code']}`, 'error')
         }
@@ -268,9 +268,9 @@ export function Posting({ user }: PostingProps) {
       setProgress(70)
 
       if (Object.keys(taskIds).length === 0) {
-        log('❌ Aucune tâche créée.', 'error')
+        log('❌ No tasks created.', 'error')
       } else {
-        log(`⏳ Suivi de ${Object.keys(taskIds).length} tâche(s)…`)
+        log(`⏳ Tracking ${Object.keys(taskIds).length} task(s)…`)
         const pending  = new Set(Object.values(taskIds))
         const deadline = Date.now() + 8 * 60 * 1000
         const STATUS: Record<number, string> = { 1: '⏳ Pending', 2: '🔄 In progress', 3: '✅ Done', 4: '❌ Failed', 7: '🚫 Cancelled' }
@@ -287,7 +287,7 @@ export function Posting({ user }: PostingProps) {
 
           if (pollCount === 1 && items.length === 0) {
             console.log('[posting] /task/query raw response:', JSON.stringify(qRes).slice(0, 800))
-            log(`ℹ️ Réponse /task/query (debug): clés=${Object.keys(d).join(',') || '(vide)'}`, 'warn')
+            log(`ℹ️ /task/query response (debug): keys=${Object.keys(d).join(',') || '(empty)'}`, 'warn')
           }
 
           for (const item of items) {
@@ -305,13 +305,13 @@ export function Posting({ user }: PostingProps) {
           const done = Object.keys(taskIds).length - pending.size
           setProgress(70 + Math.round((done / Object.keys(taskIds).length) * 25))
         }
-        if (pending.size > 0) log(`⏳ ${pending.size} tâche(s) sans réponse — on continue (posts probablement faits)`, 'warn')
+        if (pending.size > 0) log(`⏳ ${pending.size} task(s) with no response — continuing (posts likely done)`, 'warn')
       }
 
-      log('🛑 Arrêt des téléphones…')
+      log('🛑 Stopping phones…')
       await geelark(bearer, '/phone/stop', { ids: geelarkIds })
       setProgress(100)
-      log('🎉 Terminé !', 'ok')
+      log('🎉 Done!', 'ok')
 
     } catch (e: unknown) {
       log(`❌ Erreur: ${e instanceof Error ? e.message : String(e)}`, 'error')

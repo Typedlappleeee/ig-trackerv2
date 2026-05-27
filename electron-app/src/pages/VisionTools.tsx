@@ -423,7 +423,7 @@ Rate each category 1-10. Return ONLY valid JSON:
         <div className="rounded-2xl p-5 space-y-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
           {filePath
             ? <p className="text-[13px] font-mono text-white/70 truncate">{isVideo ? '📹' : '🖼'} {fileName(filePath)}</p>
-            : <p className="text-[13px] text-text2">Aucun fichier sélectionné</p>
+            : <p className="text-[13px] text-text2">No file selected</p>
           }
           <Button variant="secondary" onClick={async () => {
             const p = isVideo
@@ -431,7 +431,7 @@ Rate each category 1-10. Return ONLY valid JSON:
               : await window.electronAPI!.pickAnyFile!({ filters: [{ name: 'Images', extensions: ['jpg','jpeg','png','webp'] }] })
             if (p) { setFilePath(p); setResult(null); setError(null) }
           }}>
-            📂 {isVideo ? 'Choisir une vidéo' : 'Choisir une image'}
+            📂 {isVideo ? 'Choose a video' : 'Choose an image'}
           </Button>
         </div>
 
@@ -442,33 +442,33 @@ Rate each category 1-10. Return ONLY valid JSON:
         )}
 
         <Button className="w-full" disabled={!filePath || !anthropicKey} loading={loading} onClick={analyze}>
-          🖼 Auditer le thumbnail
+          🖼 Audit thumbnail
         </Button>
 
         {!anthropicKey && (
           <div className="rounded-xl px-4 py-3" style={{ background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.2)', color: '#fbbf24' }}>
-            <p className="text-[13px]">⚠ Clé Anthropic manquante — configure-la dans Paramètres → Connexions</p>
+            <p className="text-[13px]">⚠ Missing Anthropic key — configure it in Settings → Connections</p>
           </div>
         )}
 
         {result && (
           <div className="space-y-4">
             <div className="rounded-2xl p-6 text-center space-y-1" style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${overallColor}40` }}>
-              <p className="text-[12px] uppercase tracking-widest font-bold text-text2">Score Global</p>
+              <p className="text-[12px] uppercase tracking-widest font-bold text-text2">Overall Score</p>
               <p className="text-[52px] font-black leading-none" style={{ color: overallColor }}>{result.overall.toFixed(1)}</p>
               <p className="text-[12px] text-text2">/ 10</p>
               <p className="text-[13px] text-white/70 mt-2">{result.verdict}</p>
             </div>
 
             <div className="rounded-2xl p-5 space-y-5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-              <p className="text-[15px] font-bold text-white">Critères détaillés</p>
+              <p className="text-[15px] font-bold text-white">Detailed criteria</p>
               {Object.entries(result.scores).map(([key, val]) => (
                 <ScoreBar key={key} score={val.score} label={SCORE_LABELS[key] ?? key} comment={val.comment} />
               ))}
             </div>
 
             <div className="rounded-xl px-5 py-4 space-y-2.5" style={{ background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.2)' }}>
-              <p className="text-[12px] font-black uppercase tracking-wider" style={{ color: '#fbbf24' }}>🔧 Corrections prioritaires</p>
+              <p className="text-[12px] font-black uppercase tracking-wider" style={{ color: '#fbbf24' }}>🔧 Priority fixes</p>
               {result.topFixes.map((f, i) => <p key={i} className="text-[13px] text-white/70">• {f}</p>)}
             </div>
           </div>

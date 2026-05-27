@@ -1355,7 +1355,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                             {isAdmin && (
                               <button onClick={e => { e.stopPropagation(); deleteMessage(featuredMsg.id) }}
                                 className="text-[14px] transition-opacity hover:opacity-80"
-                                style={{ color: 'rgba(239,68,68,0.5)' }} title="Supprimer">🗑</button>
+                                style={{ color: 'rgba(239,68,68,0.5)' }} title="Delete">🗑</button>
                             )}
                           </div>
                         </div>
@@ -1419,7 +1419,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                             <button onClick={() => { setShowNewsForm(false); setNewsVideo(null) }}
                               className="px-4 py-2 rounded-xl text-[12px] font-semibold"
                               style={{ background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.6)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                              Annuler
+                              Cancel
                             </button>
                             <button onClick={sendNews} disabled={(!newsContent.trim() && !newsVideo) || newsSending}
                               className="px-4 py-2 rounded-xl text-[12px] font-semibold btn-sf-primary disabled:opacity-40">

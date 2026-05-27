@@ -37,11 +37,11 @@ const STATUS_COLOR: Record<TaskStatus['status'], string> = {
 }
 const STATUS_LABEL_FR: Record<TaskStatus['status'], string> = {
   idle:      '—',
-  pending:   'En attente',
-  uploading: 'Upload…',
-  posting:   'En cours',
-  done:      'Terminé',
-  error:     'Erreur',
+  pending:   'Pending',
+  uploading: 'Uploading…',
+  posting:   'In progress',
+  done:      'Done',
+  error:     'Error',
 }
 const STATUS_LABEL_EN: Record<TaskStatus['status'], string> = {
   idle:      '—',
@@ -283,7 +283,7 @@ export function MassPosting({ user }: MassPostingProps) {
 
   async function stop() {
     stopRef.current = true
-    log('🛑 Arrêt demandé — annulation des tâches et extinction des téléphones…', 'warn')
+    log('🛑 Stop requested — cancelling tasks and shutting down phones…', 'warn')
     const tasks = activeTasksRef.current
     const phones = activePhonesRef.current
     try {
@@ -307,7 +307,7 @@ export function MassPosting({ user }: MassPostingProps) {
   }
 
   async function generateCaption() {
-    if (!groqKey) { log('❌ Clé Groq manquante — Paramètres', 'error'); return }
+    if (!groqKey) { log('❌ Missing Groq key — Settings', 'error'); return }
     if (!window.electronAPI?.groqRequest) return
     setGenerating(true)
     try {
@@ -339,9 +339,9 @@ export function MassPosting({ user }: MassPostingProps) {
   }
 
   async function scheduleMassPost(scheduledAt: Date) {
-    if (!bearer)                    { log('Token GéeLark manquant — Paramètres', 'error'); return }
-    if (phoneList.length === 0)     { log('Sélectionne au moins un téléphone', 'warn'); return }
-    if (selectedVideos.length === 0){ log('Sélectionne au moins une vidéo', 'warn'); return }
+    if (!bearer)                    { log('Missing GéeLark token — Settings', 'error'); return }
+    if (phoneList.length === 0)     { log('Select at least one phone', 'warn'); return }
+    if (selectedVideos.length === 0){ log('Select at least one video', 'warn'); return }
     setShowScheduleModal(false)
     setPosting(true); setLogs([])
     postingStartRef.current.clear()
@@ -379,14 +379,14 @@ export function MassPosting({ user }: MassPostingProps) {
   }
 
   async function post() {
-    if (!bearer)                  { log('Token GéeLark manquant — Paramètres', 'error'); return }
-    if (phoneList.length === 0)   { log('Sélectionne au moins un téléphone', 'warn'); return }
-    if (selectedVideos.length === 0) { log('Sélectionne au moins une vidéo', 'warn'); return }
+    if (!bearer)                  { log('Missing GéeLark token — Settings', 'error'); return }
+    if (phoneList.length === 0)   { log('Select at least one phone', 'warn'); return }
+    if (selectedVideos.length === 0) { log('Select at least one video', 'warn'); return }
 
     const creditCost = phoneList.length * CREDIT_COSTS.mass_posting
     const creditRes = await checkAndDeductCredits(credits.ownerId, creditCost)
     if (!creditRes.ok) {
-      log(`❌ ${creditRes.error ?? 'Crédits insuffisants'} (besoin: ${creditCost} crédits pour ${phoneList.length} phone${phoneList.length > 1 ? 's' : ''})`, 'error')
+      log(`❌ ${creditRes.error ?? 'Insufficient credits'} (need: ${creditCost} credits for ${phoneList.length} phone${phoneList.length > 1 ? 's' : ''})`, 'error')
       return
     }
     credits.refresh()
@@ -450,7 +450,7 @@ export function MassPosting({ user }: MassPostingProps) {
       await new Promise(r => setTimeout(r, 30000))
 
       // ── Step 3: create RPA tasks ──────────────────────────────────────────
-      log('🎬 Création des tâches de post…')
+      log('🎬 Creating post tasks…')
       const taskIds: Record<string, string> = {}
       const scheduleTimes = buildScheduleTimes(assignments.length, postingOpts)
       if (postingOpts.intervalMode !== 'none' && assignments.length > 1) {
@@ -502,7 +502,7 @@ export function MassPosting({ user }: MassPostingProps) {
         log(`⏳ Suivi de ${Object.keys(taskIds).length} tâche(s)…`)
         const pending = new Set(Object.values(taskIds))
         const deadline = Date.now() + 6 * 60 * 1000
-        const STATUS: Record<number, string> = { 1: '⏳ En attente', 2: '🔄 En cours', 3: '✅ Terminé', 4: '❌ Échoué', 7: '🚫 Annulé' }
+        const STATUS: Record<number, string> = { 1: '⏳ Pending', 2: '🔄 In progress', 3: '✅ Done', 4: '❌ Failed', 7: '🚫 Cancelled' }
 
         // Keywords that indicate a login / verification popup on the phone screen
         const ALERT_KEYWORDS = [
@@ -620,7 +620,7 @@ export function MassPosting({ user }: MassPostingProps) {
       // Mark every phone as done
       for (const p of phoneList) setPhoneStatus(p.id, { status: 'done' })
 
-      log('🎉 Terminé ! Réinitialisation dans 5s…', 'ok')
+      log('🎉 Done! Resetting in 5s…', 'ok')
       await new Promise(r => setTimeout(r, 5000))
       resetMassPosting()
       setSelPhones(new Set())
@@ -756,7 +756,7 @@ export function MassPosting({ user }: MassPostingProps) {
           <div className="w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(245,158,11,0.15)' }}>
             <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M5.5 1L10 9.5H1L5.5 1Z" stroke="#FCD34D" strokeWidth="1.2" strokeLinejoin="round"/><path d="M5.5 4.5v2.5" stroke="#FCD34D" strokeWidth="1.2" strokeLinecap="round"/></svg>
           </div>
-          <p style={{ color: '#FCD34D' }}>Token GéeLark manquant — configure-le dans <strong>Paramètres</strong></p>
+          <p style={{ color: '#FCD34D' }}>Missing GéeLark token — configure it in <strong>Settings</strong></p>
         </div>
       )}
 

@@ -238,7 +238,7 @@ function Planificateur({ groqKey, onBack, userId }: { groqKey: string; onBack: (
   }
 
   return (
-    <ToolShell title="Planificateur 7 Jours" icon="📅" onBack={onBack} error={error}>
+    <ToolShell title="7-Day Planner" icon="📅" onBack={onBack} error={error}>
       <FormSection label="Editorial Niche">
         <p className="text-[12px] text-text2 font-mono">Full editorial calendar — 7 days with times, types and ideas.</p>
         <FieldInput placeholder="Niche (fitness, crypto, lifestyle…)" value={niche} onChange={setNiche} />
@@ -353,8 +353,8 @@ Chaque hook doit faire maximum 2 lignes. Format :
   return (
     <ToolShell title="3 Hooks A/B/C" icon="🪝" onBack={onBack} error={error}>
       <FormSection label="Video Topic">
-        <p className="text-[12px] text-text2 font-mono">3 styles radicalement différents — trouve celui qui performe le mieux.</p>
-        <FieldInput placeholder="Sujet de ta vidéo" value={subject} onChange={setSubject} />
+        <p className="text-[12px] text-text2 font-mono">3 radically different hooks to test the best one.</p>
+        <FieldInput placeholder="Video topic" value={subject} onChange={setSubject} />
         <div className="flex gap-2.5">
           <Button onClick={run} loading={loading} disabled={!subject.trim()}>🪝 Générer les hooks</Button>
           {result && <CopyButton text={result} />}
@@ -559,7 +559,7 @@ Produis une analyse complète :
   }
 
   return (
-    <ToolShell title="Analyse Concurrent" icon="🕵️" onBack={onBack} error={error}>
+    <ToolShell title="Competitor Analysis" icon="🕵️" onBack={onBack} error={error}>
       <FormSection label="Account to analyze">
         <p className="text-[12px] text-text2 font-mono">Gaps, hook formulas, action plan — to outperform a competitor.</p>
         <div className="grid grid-cols-2 gap-3">
@@ -578,21 +578,21 @@ Produis une analyse complète :
 
 // ── Hub tool metadata ─────────────────────────────────────────────────────────
 const GROQ_TOOLS: { id: GroqToolId; icon: string; title: string; desc: string; tags: string[] }[] = [
-  { id: 'script',     icon: '🎬', title: 'Script Reel',           desc: 'Script complet prêt à lire — hook, corps, CTA avec timings.',       tags: ['Script', 'Hook', 'CTA'] },
-  { id: 'hooks',      icon: '🪝', title: '3 Hooks A/B/C',         desc: '3 hooks radicalement différents pour tester le meilleur.',          tags: ['A/B Test', 'Hook', 'Copywriting'] },
-  { id: 'caption',    icon: '💬', title: 'Captions Virales',       desc: 'Caption complète : hook, corps, CTA et 15 hashtags.',               tags: ['Caption', 'Hashtags'] },
-  { id: 'bio',        icon: '👤', title: 'Bio Optimizer',          desc: 'Réécrit ta bio pour maximiser follows, ventes ou trafic.',          tags: ['Bio', 'Profil', 'SEO'] },
-  { id: 'replies',    icon: '💬', title: 'Réponses Commentaires',  desc: 'Réponses personnalisées pour 20 commentaires en un clic.',          tags: ['Engagement', 'Commentaires'] },
-  { id: 'translate',  icon: '🌍', title: 'Traducteur Multi-Marché',desc: 'Adapte ta caption pour EN/ES/PT/DE/IT avec hashtags locaux.',       tags: ['International', 'Traduction'] },
-  { id: 'competitor', icon: '🕵️', title: 'Analyse Concurrent',    desc: 'Gaps, formules de hooks, plan d\'action pour dépasser un compte.',  tags: ['Concurrent', 'Stratégie'] },
-  { id: 'strat',      icon: '🔍', title: 'Stratégie Niche',        desc: 'Fréquence, heures, hashtags et idées Reels pour une niche.',        tags: ['Niche', 'Planning'] },
-  { id: 'plan',       icon: '📅', title: 'Planificateur 7 Jours',  desc: 'Calendrier éditorial complet sur 7 jours avec heures et idées.',    tags: ['Calendrier', 'Contenu'] },
+  { id: 'script',     icon: '🎬', title: 'Script Reel',            desc: 'Full camera-ready script — hook, body, CTA with timings.',              tags: ['Script', 'Hook', 'CTA'] },
+  { id: 'hooks',      icon: '🪝', title: '3 Hooks A/B/C',          desc: '3 radically different hooks to test the best one.',                     tags: ['A/B Test', 'Hook', 'Copywriting'] },
+  { id: 'caption',    icon: '💬', title: 'Captions Virales',        desc: 'Full caption: hook, body, CTA and 15 hashtags.',                        tags: ['Caption', 'Hashtags'] },
+  { id: 'bio',        icon: '👤', title: 'Bio Optimizer',           desc: 'Rewrites your bio to maximize follows, sales or traffic.',              tags: ['Bio', 'Profil', 'SEO'] },
+  { id: 'replies',    icon: '💬', title: 'Comment Replies',         desc: 'Personalized replies for 20 comments in one click.',                   tags: ['Engagement', 'Commentaires'] },
+  { id: 'translate',  icon: '🌍', title: 'Multi-Market Translator', desc: 'Adapts your caption for EN/ES/PT/DE/IT with local hashtags.',          tags: ['International', 'Traduction'] },
+  { id: 'competitor', icon: '🕵️', title: 'Competitor Analysis',    desc: 'Gaps, hook formulas, action plan to outperform an account.',           tags: ['Concurrent', 'Stratégie'] },
+  { id: 'strat',      icon: '🔍', title: 'Niche Strategy',          desc: 'Frequency, times, hashtags and Reels ideas for a niche.',              tags: ['Niche', 'Planning'] },
+  { id: 'plan',       icon: '📅', title: '7-Day Planner',           desc: 'Full 7-day editorial calendar with times and ideas.',                  tags: ['Calendrier', 'Contenu'] },
 ]
 
 const VISION_TOOLS_META: { id: VisionToolId; icon: string; title: string; desc: string; tags: string[]; needsAnthopic: boolean }[] = [
-  { id: 'vision-score',     icon: '🔥', title: 'Score Viral',     desc: 'Note 1-10 sur 5 critères : hook, rétention, texte, thumbnail, dynamisme.', tags: ['Vidéo', 'Score', 'Claude'], needsAnthopic: true },
-  { id: 'vision-structure', icon: '🧬', title: 'Structure Virale', desc: 'Décompose la timeline d\'une vidéo : hook, valeur, CTA, transitions.',      tags: ['Vidéo', 'Timeline', 'Claude'], needsAnthopic: true },
-  { id: 'vision-thumb',     icon: '🖼', title: 'Audit Thumbnail',  desc: 'Score contraste, lisibilité, émotion, couleurs + corrections prioritaires.',  tags: ['Image', 'CTR', 'Claude'], needsAnthopic: true },
+  { id: 'vision-score',     icon: '🔥', title: 'Viral Score',      desc: 'Score 1-10 on 5 criteria: hook, retention, text, thumbnail, dynamism.', tags: ['Vidéo', 'Score', 'Claude'], needsAnthopic: true },
+  { id: 'vision-structure', icon: '🧬', title: 'Viral Structure',  desc: 'Breaks down a video\'s timeline: hook, value, CTA, transitions.',        tags: ['Vidéo', 'Timeline', 'Claude'], needsAnthopic: true },
+  { id: 'vision-thumb',     icon: '🖼', title: 'Audit Thumbnail',   desc: 'Score contrast, readability, emotion, colors + priority fixes.',         tags: ['Image', 'CTR', 'Claude'], needsAnthopic: true },
 ]
 
 // ── Premium tool card ─────────────────────────────────────────────────────────
@@ -611,7 +611,7 @@ function ToolCard({ icon, title, desc, tags, locked, onClick }: {
         {locked && (
           <span className="text-[9px] px-2 py-1 rounded-lg font-bold font-mono uppercase tracking-wider flex-shrink-0"
             style={{ background: 'rgba(245,158,11,0.08)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.18)' }}>
-            Clé Anthropic
+            Anthropic Key
           </span>
         )}
       </div>
@@ -666,7 +666,7 @@ export function AiTools({ user }: AiToolsProps) {
             </div>
             <div className="text-center">
               <p className="text-[13px] font-bold text-text2">{t('loading')}</p>
-              <p className="text-[11px] text-text3 font-mono mt-1">{lang === 'en' ? 'Connecting to studio' : 'Connexion au studio'}</p>
+              <p className="text-[11px] text-text3 font-mono mt-1">Connecting to studio</p>
             </div>
           </div>
         </div>
@@ -697,7 +697,7 @@ export function AiTools({ user }: AiToolsProps) {
               <p className="text-[14px] font-bold text-warn">{t('noGroqKey')}</p>
             </div>
             <p className="text-[13px] text-text2 mb-2">{t('configureGroq')}</p>
-            <p className="text-[11px] font-mono" style={{ color: 'rgba(139,92,246,0.6)' }}>{lang === 'en' ? 'Free on groq.com → API Keys → Create' : 'Gratuit sur groq.com → API Keys → Create'}</p>
+            <p className="text-[11px] font-mono" style={{ color: 'rgba(139,92,246,0.6)' }}>Free on groq.com → API Keys → Create</p>
           </div>
         </div>
       </div>
@@ -746,7 +746,7 @@ export function AiTools({ user }: AiToolsProps) {
           {!conns.anthropic && (
             <div className="ml-4 rounded-xl px-3 py-1.5 flex items-center gap-2" style={{ background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.15)' }}>
               <span className="text-warn text-xs">⚠</span>
-              <p className="text-[11px] font-mono" style={{ color: 'rgba(245,158,11,0.75)' }}>{lang === 'en' ? 'Anthropic key missing' : 'Clé Anthropic manquante'}</p>
+              <p className="text-[11px] font-mono" style={{ color: 'rgba(245,158,11,0.75)' }}>Missing Anthropic key</p>
             </div>
           )}
         </div>
@@ -757,19 +757,19 @@ export function AiTools({ user }: AiToolsProps) {
 
           {/* ── Vidéo section ── */}
           <div>
-            <SectionHeader label="Traitement Vidéo" badge="FFmpeg" />
+            <SectionHeader label="Video Processing" badge="FFmpeg" />
             <div className="grid grid-cols-3 gap-4 anim-stagger">
               <ToolCard
                 icon="🏷"
-                title="Changeur de Métadonnées"
-                desc="Supprime toutes les métadonnées et injecte un timestamp aléatoire."
+                title="Metadata Changer"
+                desc="Removes all metadata and injects a random timestamp."
                 tags={['FFmpeg', 'Stream copy', 'Instant']}
                 onClick={() => setActive('metadata')}
               />
               <ToolCard
                 icon="✍"
                 title="Texte IA — Dupliquer"
-                desc="Ajoute un texte sur tes vidéos avec plusieurs positions pour créer des copies uniques."
+                desc="Adds text to your videos at multiple positions to create unique copies."
                 tags={['FFmpeg', 'Canvas', 'Mass']}
                 onClick={() => setActive('textcopy')}
               />
