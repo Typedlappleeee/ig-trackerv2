@@ -7,7 +7,7 @@ import { Onboarding }        from '@/components/Onboarding'
 import { Layout, type Page } from '@/components/Layout'
 import { OrgProvider, useOrg } from '@/lib/orgContext'
 import { useConnections }    from '@/lib/connections'
-import { playSplash }        from '@/lib/sounds'
+import { playSplash, unlockAudio } from '@/lib/sounds'
 import { startMusic, stopMusic, isMusicEnabled, subscribeMusicState } from '@/lib/music'
 import { checkLicense, LicenseContext, type LicenseStatus } from '@/lib/license'
 import { LicenseGate } from '@/components/LicenseGate'
@@ -223,7 +223,11 @@ function SplashScreen({ onDone }: { onDone: () => void }) {
   const [fading, setFading] = useState(false)
   const doneRef             = useRef(false)
 
-  useEffect(() => { playSplash() }, [])
+  useEffect(() => {
+    const handler = () => { unlockAudio(); playSplash(); window.removeEventListener('pointerdown', handler) }
+    window.addEventListener('pointerdown', handler)
+    return () => window.removeEventListener('pointerdown', handler)
+  }, [])
 
   useEffect(() => {
     const t1 = setTimeout(() => setFading(true), SPLASH_DURATION)

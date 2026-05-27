@@ -1,17 +1,30 @@
 // Web Audio API sound synthesizer — no external files, zero dependencies.
 // All sounds are generated procedurally via oscillators + gain envelopes.
+//
+// AudioContext is created lazily on first user gesture to comply with browser
+// autoplay policy. Sounds requested before any gesture are silently dropped.
 
 let _ctx: AudioContext | null = null
+let _unlocked = false
 
-function ctx(): AudioContext {
+// Call once from any user gesture (click, keydown) to unlock audio.
+export function unlockAudio() {
+  if (_unlocked) return
+  _unlocked = true
   if (!_ctx) _ctx = new AudioContext()
-  return _ctx
+  if (_ctx.state === 'suspended') _ctx.resume().catch(() => {})
 }
 
-async function resume(): Promise<AudioContext> {
-  const ac = ctx()
-  if (ac.state === 'suspended') await ac.resume()
-  return ac
+// Returns the AudioContext only if audio has been unlocked by a user gesture.
+function ctx(): AudioContext | null {
+  return _unlocked ? _ctx : null
+}
+
+async function resume(): Promise<AudioContext | null> {
+  if (!_unlocked) return null
+  if (!_ctx) _ctx = new AudioContext()
+  if (_ctx.state === 'suspended') await _ctx.resume()
+  return _ctx
 }
 
 function note(
@@ -40,54 +53,44 @@ function note(
 /** Soft click when switching tabs */
 export async function playNav() {
   try {
-    const ac = await resume()
+    const ac = await resume(); if (!ac) return
     const t  = ac.currentTime
-    note(ac, 1046, t, 0.07, 0.04, 'sine')  // C6 — crisp tap
+    note(ac, 1046, t, 0.07, 0.04, 'sine')
   } catch { /* audio not available */ }
 }
 
 /** Notification chime, flavored by toast kind */
 export async function playToast(kind: 'ok' | 'error' | 'warn' | 'info') {
   try {
-    const ac = await resume()
+    const ac = await resume(); if (!ac) return
     const t  = ac.currentTime
     if (kind === 'ok') {
-      // C5 → E5 — pleasant ascending double chime
       note(ac, 523.25, t,        0.22, 0.09, 'sine')
       note(ac, 659.25, t + 0.11, 0.28, 0.10, 'sine')
     } else if (kind === 'error') {
-      // Buzzy two-tone descending
       note(ac, 380, t,        0.18, 0.10, 'sawtooth')
       note(ac, 280, t + 0.12, 0.22, 0.09, 'sawtooth')
     } else if (kind === 'warn') {
-      // A4 minor wobble
       note(ac, 440, t,        0.16, 0.09, 'triangle')
       note(ac, 415, t + 0.09, 0.20, 0.07, 'triangle')
     } else {
-      // Single airy high chime
       note(ac, 784, t, 0.25, 0.06, 'sine')
       note(ac, 784, t, 0.25, 0.02, 'triangle', 3)
     }
   } catch { /* audio not available */ }
 }
 
-/** 4-note C major arpeggio jingle played at app startup */
+/** 4-note C major arpeggio — only plays if audio already unlocked by a gesture */
 export async function playSplash() {
   try {
-    // Must await resume() — AudioContext starts suspended on web (autoplay policy).
-    // Scheduling notes against a suspended context makes them play late once resumed.
-    const ac = await resume()
-    const t0 = ac.currentTime + 0.05  // tiny scheduling headroom only
-
-    // Melody: C4 → E4 → G4 → C5
+    const ac = await resume(); if (!ac) return
+    const t0 = ac.currentTime + 0.05
     const melody = [261.63, 329.63, 392.00, 523.25]
     melody.forEach((freq, i) => {
       const start = t0 + i * 0.19
       note(ac, freq,     start, 0.5, 0.09, 'sine')
-      note(ac, freq * 2, start, 0.3, 0.03, 'triangle', 4)  // octave shimmer
+      note(ac, freq * 2, start, 0.3, 0.03, 'triangle', 4)
     })
-
-    // Final resolved chord (C5 + G5) with slow decay
     note(ac, 523.25, t0 + 0.82, 1.1, 0.07, 'sine')
     note(ac, 783.99, t0 + 0.82, 1.0, 0.04, 'sine')
     note(ac, 523.25, t0 + 0.82, 1.3, 0.02, 'triangle', 2)
@@ -97,7 +100,7 @@ export async function playSplash() {
 /** Short tick for button toggle / selection */
 export async function playTick() {
   try {
-    const ac = await resume()
+    const ac = await resume(); if (!ac) return
     const t  = ac.currentTime
     note(ac, 880, t, 0.055, 0.03, 'sine')
   } catch { /* */ }
@@ -106,7 +109,7 @@ export async function playTick() {
 /** Success chime — task launched / action confirmed */
 export async function playSuccess() {
   try {
-    const ac = await resume()
+    const ac = await resume(); if (!ac) return
     const t  = ac.currentTime
     note(ac, 523.25, t,        0.15, 0.07, 'sine')
     note(ac, 783.99, t + 0.10, 0.22, 0.08, 'sine')
@@ -117,7 +120,7 @@ export async function playSuccess() {
 /** Subtle whoosh when opening a panel / modal */
 export async function playWhoosh() {
   try {
-    const ac = await resume()
+    const ac = await resume(); if (!ac) return
     const t  = ac.currentTime
     const osc = ac.createOscillator()
     const env = ac.createGain()
@@ -135,7 +138,7 @@ export async function playWhoosh() {
 /** Soft error buzz */
 export async function playError() {
   try {
-    const ac = await resume()
+    const ac = await resume(); if (!ac) return
     const t  = ac.currentTime
     note(ac, 220, t,        0.12, 0.07, 'sawtooth')
     note(ac, 180, t + 0.08, 0.16, 0.06, 'sawtooth')
