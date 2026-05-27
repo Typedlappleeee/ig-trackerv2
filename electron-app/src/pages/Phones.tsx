@@ -623,12 +623,15 @@ export function Phones({ user }: PhonesProps) {
   }
 
   // ── Periodic IG stats refresh (every 5 min, only when Phones is mounted) ───
+  const igFailCountRef = useRef(0)
+  const igBackoffUntilRef = useRef(0)
   useEffect(() => {
     const interval = setInterval(async () => {
+      if (!window.electronAPI?.fetchInstagramBySession) return
+      if (Date.now() < igBackoffUntilRef.current) return
       const sinceIg = lastIgSyncRef.current
         ? (Date.now() - lastIgSyncRef.current.getTime()) / 1000 : Infinity
       if (sinceIg < 290) return
-      if (!window.electronAPI?.fetchInstagramBySession) return
       lastIgSyncRef.current = new Date()
       const withSession = phonesRef.current.filter(p => p.ig_username && p.ig_sessionid)
       for (const phone of withSession) {
@@ -637,6 +640,7 @@ export function Phones({ user }: PhonesProps) {
             username: phone.ig_username!, sessionid: phone.ig_sessionid!,
           })
           if (r.ok) {
+            igFailCountRef.current = 0
             await supabase.from('phones').update({
               followers: r.followers ?? 0, following: r.following ?? 0,
               total_views: r.total_views ?? 0, posts: r.posts ?? 0,
@@ -649,6 +653,13 @@ export function Phones({ user }: PhonesProps) {
                 bio: r.bio ?? null, ig_status: 'active' } : p
             ))
           } else {
+            igFailCountRef.current++
+            if (igFailCountRef.current >= 3) {
+              // Back off 30 min after 3 consecutive failures to avoid hammering the API
+              igBackoffUntilRef.current = Date.now() + 30 * 60 * 1000
+              igFailCountRef.current = 0
+              break
+            }
             await supabase.from('phones').update({ ig_status: 'error' }).eq('id', phone.id)
             setPhones(prev => prev.map(p =>
               p.id === phone.id ? { ...p, ig_status: 'error' } : p
