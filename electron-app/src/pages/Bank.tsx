@@ -45,7 +45,7 @@ function RenameModal({ item, onSave, onClose }: {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
       <div className="bg-surface border border-border rounded-xl p-5 w-80 space-y-4" onClick={e => e.stopPropagation()}>
-        <h3 className="text-sm font-semibold text-text">Renommer la vidéo</h3>
+        <h3 className="text-sm font-semibold text-text">Rename video</h3>
         <input
           autoFocus
           className="w-full bg-bg border border-border rounded-lg px-3 py-2 text-sm text-text focus:border-accent focus:outline-none"
@@ -72,7 +72,7 @@ function MoveModal({ item, folders, onSave, onClose }: {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
       <div className="bg-surface border border-border rounded-xl p-5 w-72 space-y-3" onClick={e => e.stopPropagation()}>
-        <h3 className="text-sm font-semibold text-text">Déplacer vers</h3>
+        <h3 className="text-sm font-semibold text-text">Move to</h3>
         <button
           onClick={() => { onSave(item.id, null); onClose() }}
           className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${!item.folder ? 'bg-accent/10 text-accent' : 'hover:bg-surface2 text-text'}`}
@@ -113,7 +113,7 @@ function TagsModal({ item, onSave, onClose }: {
           onChange={e => setVal(e.target.value)}
           onKeyDown={e => { if (e.key === 'Escape') onClose() }}
         />
-        <p className="text-[11px] text-text2">Sépare les tags par des virgules.</p>
+        <p className="text-[11px] text-text2">Separate tags with commas.</p>
         <div className="flex gap-2 justify-end">
           <Button variant="secondary" size="sm" onClick={onClose}>Annuler</Button>
           <Button size="sm" onClick={() => {
@@ -160,7 +160,7 @@ function AddMediaModal({ onFiles, onElectronPick, onClose }: {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={onClose}>
       <div className="bg-surface border border-border rounded-2xl p-6 w-96 space-y-4 shadow-2xl" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-bold text-text">➕ Ajouter un média</h3>
+          <h3 className="text-sm font-bold text-text">➕ Add media</h3>
           <button onClick={onClose} className="text-text2 hover:text-text transition-colors text-lg leading-none">✕</button>
         </div>
 
@@ -176,8 +176,8 @@ function AddMediaModal({ onFiles, onElectronPick, onClose }: {
         >
           <span className="text-4xl">{dragOver ? '📂' : '🎬'}</span>
           <div className="text-center">
-            <p className="text-sm font-semibold text-text">Glisse tes fichiers ici</p>
-            <p className="text-xs text-text2 mt-0.5">Vidéos, photos, GIFs, audio</p>
+            <p className="text-sm font-semibold text-text">Drag your files here</p>
+            <p className="text-xs text-text2 mt-0.5">Videos, photos, GIFs, audio</p>
           </div>
         </div>
 
@@ -266,7 +266,7 @@ export function Bank({ user }: BankProps) {
     else q = q.eq('user_id', user.id)
     const { error: err } = await q
     if (err) {
-      setError('Suppression échouée : ' + err.message)
+      setError('Deletion failed: ' + err.message)
       return
     }
     deleteStorageObjects(toDelete.flatMap(i => [i.storage_path, i.thumbnail_path]))
@@ -363,7 +363,7 @@ export function Bank({ user }: BankProps) {
     const labels: Record<string, string> = {
       'reading':          '📂 Lecture du fichier…',
       'uploading-video':  '☁ Upload vers Supabase…',
-      'thumbnail':        '🖼 Génération de la miniature…',
+      'thumbnail':        '🖼 Generating thumbnail…',
       'uploading-thumb':  '☁ Upload de la miniature…',
     }
     return labels[phase] ?? ''
@@ -421,7 +421,7 @@ export function Bank({ user }: BankProps) {
         storage_path: storagePath, thumbnail_path: thumbnailPath, file_url: null,
       }).eq('id', item.id)
       if (err) {
-        setError('Migration échouée : ' + err.message)
+        setError('Migration failed: ' + err.message)
         await deleteStorageObjects([storagePath, thumbnailPath])
       } else {
         setItems(prev => prev.map(i => i.id === item.id ? { ...i, storage_path: storagePath, thumbnail_path: thumbnailPath, file_url: null } : i))
@@ -477,7 +477,7 @@ export function Bank({ user }: BankProps) {
     else q = q.eq('user_id', user.id)
     const { error: err } = await q
     if (err) {
-      setError('Suppression échouée : ' + err.message)
+      setError('Deletion failed: ' + err.message)
     } else {
       setItems(prev => prev.filter(i => i.id !== id))
       if (item) {
@@ -535,7 +535,7 @@ export function Bank({ user }: BankProps) {
         if (currentOrg) dq = dq.eq('org_id', currentOrg.id)
         else dq = dq.eq('user_id', user.id)
         const { error: dErr } = await dq
-        if (dErr) { setError('Suppression échouée : ' + dErr.message); return }
+        if (dErr) { setError('Deletion failed: ' + dErr.message); return }
         deleteStorageObjects(toDelete.flatMap(i => [i.storage_path, i.thumbnail_path]))
         setItems(prev => prev.filter(i => (i as unknown as {folder?: string}).folder !== name))
       }
@@ -618,8 +618,8 @@ export function Bank({ user }: BankProps) {
             <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#8B5CF6" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
             </svg>
-            <p className="text-[15px] font-bold text-white">Dépose tes fichiers ici</p>
-            <p className="text-[12px]" style={{ color: '#A1A1AA' }}>Vidéos, photos, GIFs, audio</p>
+            <p className="text-[15px] font-bold text-white">Drop your files here</p>
+            <p className="text-[12px]" style={{ color: '#A1A1AA' }}>Videos, photos, GIFs, audio</p>
           </div>
         </div>
       )}
@@ -632,7 +632,7 @@ export function Bank({ user }: BankProps) {
         {/* Title + badge */}
         <div className="flex items-center gap-3">
           <div>
-            <h1 className="text-[22px] font-black text-white leading-none tracking-tight">Banque Vidéos</h1>
+            <h1 className="text-[22px] font-black text-white leading-none tracking-tight">Video Bank</h1>
             <p className="text-[12px] mt-0.5" style={{ color: '#52525B' }}>
               Bibliothèque de médias · glisse-dépose ou importe
             </p>
@@ -722,7 +722,7 @@ export function Bank({ user }: BankProps) {
           onClick={() => setSelectedIds(prev => prev.size === visible.length ? new Set() : new Set(visible.map(i => i.id)))}
           className="flex items-center gap-1.5 text-[12px] font-medium transition-colors px-2 py-1 rounded"
           style={{ color: selectedIds.size === visible.length && visible.length > 0 ? '#A78BFA' : '#52525B' }}
-          title="Tout sélectionner / désélectionner"
+          title="Select all / deselect all"
         >
           <div
             className="w-4 h-4 rounded flex items-center justify-center flex-shrink-0 transition-all"
@@ -741,7 +741,7 @@ export function Bank({ user }: BankProps) {
         <div className="flex gap-1">
           {([
             { k: 'all',   l: 'Tous'  },
-            { k: 'video', l: 'Vidéo' },
+            { k: 'video', l: 'Video' },
             { k: 'photo', l: 'Photo' },
             { k: 'gif',   l: 'GIF'   },
             { k: 'audio', l: 'Audio' },
@@ -879,7 +879,7 @@ export function Bank({ user }: BankProps) {
                 className="text-[12px] px-2.5 py-1 rounded-md font-medium transition-colors"
                 style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: '#A1A1AA' }}
               >
-                {selectedIds.size === visible.length ? 'Désélectionner tout' : 'Tout sélectionner'}
+                {selectedIds.size === visible.length ? 'Deselect all' : 'Select all'}
               </button>
               <button
                 onClick={() => setShowBulkMove(true)}
@@ -932,7 +932,7 @@ export function Bank({ user }: BankProps) {
                 className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold flex-shrink-0 transition-colors"
                 style={{ background: 'rgba(251,191,36,0.12)', color: '#FBBF24', border: '1px solid rgba(251,191,36,0.28)' }}
               >
-                {sqlCopied ? '✓ Copié' : 'Copier'}
+                {sqlCopied ? '✓ Copied' : 'Copy'}
               </button>
             </div>
           )}
@@ -991,8 +991,8 @@ export function Bank({ user }: BankProps) {
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#52525B" strokeWidth="1.5" strokeLinecap="round" className="mb-3">
                   <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
                 </svg>
-                <p className="text-[14px] font-medium text-white">Aucun résultat</p>
-                <p className="text-[12px] mt-1" style={{ color: '#52525B' }}>Essaie d'autres mots-clés ou filtres</p>
+                <p className="text-[14px] font-medium text-white">No results</p>
+                <p className="text-[12px] mt-1" style={{ color: '#52525B' }}>Try other keywords or filters</p>
               </div>
 
             ) : viewMode === 'grid' ? (
@@ -1108,7 +1108,7 @@ export function Bank({ user }: BankProps) {
             },
             {
               icon: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>,
-              label: 'Déplacer vers…',
+              label: 'Move to…',
               action: () => { setMoveItem(ctxMenu.item); setCtxMenu(null) }
             },
             {
@@ -1389,7 +1389,7 @@ function FolderRow({ name, count, active, onClick, onRename, onDelete, onMerge, 
             style={{ color: '#52525B' }}
             onMouseEnter={e => (e.currentTarget.style.color = '#A78BFA')}
             onMouseLeave={e => (e.currentTarget.style.color = '#52525B')}
-            title="Déplacer vers…"
+            title="Move to…"
           >
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
           </button>

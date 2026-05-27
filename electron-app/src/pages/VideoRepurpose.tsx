@@ -62,7 +62,7 @@ async function downloadBlob(url: string, filename: string) {
 
 function SimilarityBadge({ pct }: { pct: number }) {
   const color = pct >= 90 ? '#22d3ee' : pct >= 80 ? '#a78bfa' : '#f59e0b'
-  const label = pct >= 90 ? 'SAFE' : pct >= 80 ? 'OK' : 'RISQUÉ'
+  const label = pct >= 90 ? 'SAFE' : pct >= 80 ? 'OK' : 'RISKY'
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
       <div style={{
@@ -120,8 +120,8 @@ function VariantCard({ job, index }: { job: VariantJob; index: number }) {
       <div style={{ padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 5 }}>
         {isDone && job.similarityPct != null && <SimilarityBadge pct={job.similarityPct} />}
         {isErr && <div style={{ fontSize: 10, color: '#f87171', fontWeight: 500 }}>{job.error?.slice(0, 60)}</div>}
-        {isQ    && <div style={{ fontSize: 10, color: 'rgba(148,163,184,0.35)' }}>En attente…</div>}
-        {isProc && <div style={{ fontSize: 10, color: '#22d3ee' }}>Traitement…</div>}
+        {isQ    && <div style={{ fontSize: 10, color: 'rgba(148,163,184,0.35)' }}>Pending…</div>}
+        {isProc && <div style={{ fontSize: 10, color: '#22d3ee' }}>Processing…</div>}
         {isDone && job.uploading && <div style={{ fontSize: 9, color: 'rgba(34,211,238,0.6)' }}>☁ Upload…</div>}
         {isDone && job.uploadError && <div style={{ fontSize: 9, color: '#f87171' }}>⚠ {job.uploadError.slice(0, 40)}</div>}
 
@@ -228,7 +228,7 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
     const creditCost = count * CREDIT_COSTS.clone_vid
     const creditRes = await checkAndDeductCredits(credits.ownerId, creditCost)
     if (!creditRes.ok) {
-      alert(`Crédits insuffisants — il faut ${creditCost} crédit(s) pour ${count} vidéo(s). Solde : ${creditRes.balance ?? 0}`)
+      alert(`Insufficient credits — need ${creditCost} credit(s) for ${count} video(s). Balance: ${creditRes.balance ?? 0}`)
       return
     }
     abortRef.current = false
@@ -278,7 +278,7 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
           }
         }
       } else {
-        updateJob(job.id, { status: 'error', error: result.error ?? 'Erreur inconnue' })
+        updateJob(job.id, { status: 'error', error: result.error ?? 'Unknown error' })
       }
 
       done++; setTotalDone(done)
@@ -328,7 +328,7 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
               {[
                 { label: 'Generated', value: `${totalDone}/${jobs.length}` },
                 { label: 'Similarity', value: avgSimVal != null ? `${avgSimVal}%` : '—' },
-                { label: 'Temps', value: elapsedStr },
+                { label: 'Time', value: elapsedStr },
               ].map(s => (
                 <div key={s.label} style={{ padding: '8px 14px', borderRadius: 10, textAlign: 'center', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
                   <div style={{ fontSize: 16, fontWeight: 700, color: '#22d3ee', lineHeight: 1 }}>{s.value}</div>
@@ -372,7 +372,7 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
                   <div style={{ fontSize: 22, marginBottom: 4 }}>🎬</div>
                   <div style={{ fontSize: 11, fontWeight: 600, color: '#22d3ee', marginBottom: 2 }}>Video loaded</div>
                   <div style={{ fontSize: 10, color: 'rgba(148,163,184,0.45)', wordBreak: 'break-all' }}>{sourceName.slice(0, 28)}{sourceName.length > 28 ? '…' : ''}</div>
-                  <div style={{ fontSize: 9, color: 'rgba(148,163,184,0.3)', marginTop: 4 }}>Cliquer pour changer</div>
+                  <div style={{ fontSize: 9, color: 'rgba(148,163,184,0.3)', marginTop: 4 }}>Click to change</div>
                 </>
               ) : (
                 <>
@@ -382,7 +382,7 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
                 </>
               )}
             </div>
-            {/* Depuis la banque */}
+            {/* From bank */}
             <button
               onClick={() => setShowBank(true)} disabled={running}
               style={{
@@ -393,13 +393,13 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
               onMouseEnter={e => { e.currentTarget.style.background = 'rgba(129,140,248,0.12)'; e.currentTarget.style.color = '#a78bfa' }}
               onMouseLeave={e => { e.currentTarget.style.background = 'rgba(129,140,248,0.06)'; e.currentTarget.style.color = 'rgba(167,139,250,0.7)' }}
             >
-              🗂 Depuis la banque
+              🗂 From bank
             </button>
           </div>
 
           {/* Count */}
           <div>
-            <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(148,163,184,0.45)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 7 }}>Variantes</div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(148,163,184,0.45)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 7 }}>Variants</div>
             <div style={{ display: 'flex', gap: 5 }}>
               {[5, 10, 25, 50].map(n => (
                 <button key={n} onClick={() => setCount(n)} disabled={running}
@@ -411,7 +411,7 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
               onChange={e => setCount(Number(e.target.value))}
               style={{ width: '100%', marginTop: 8, accentColor: '#22d3ee' }}
             />
-            <div style={{ textAlign: 'center', fontSize: 11, color: 'rgba(148,163,184,0.35)', marginTop: 1 }}>{count} variante{count > 1 ? 's' : ''}</div>
+            <div style={{ textAlign: 'center', fontSize: 11, color: 'rgba(148,163,184,0.35)', marginTop: 1 }}>{count} variant{count > 1 ? 's' : ''}</div>
           </div>
 
           {/* Intensity */}
@@ -419,8 +419,8 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
             <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(148,163,184,0.45)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 7 }}>Intensity</div>
             {(['subtle', 'medium', 'aggressive', 'vener'] as Intensity[]).map(lv => {
               const meta = {
-                subtle:     { label: 'Subtile',    desc: '~90-99%', emoji: '🔵' },
-                medium:     { label: 'Moyenne',    desc: '~80-90%', emoji: '🟡' },
+                subtle:     { label: 'Subtle',     desc: '~90-99%', emoji: '🔵' },
+                medium:     { label: 'Medium',     desc: '~80-90%', emoji: '🟡' },
                 aggressive: { label: 'Aggressive', desc: '~65-80%', emoji: '🔴' },
                 vener:      { label: 'Vener 🔥',   desc: '~42-65%', emoji: '💥' },
               }[lv]
@@ -439,9 +439,9 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
             })}
           </div>
 
-          {/* Format de sortie */}
+          {/* Output format */}
           <div>
-            <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(148,163,184,0.45)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 7 }}>Format de sortie</div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(148,163,184,0.45)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 7 }}>Output format</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 5 }}>
               {([['9:16', 'TikTok/Reels'], ['1:1', 'Square'], ['16:9', 'YouTube'], ['keep', 'Original']] as [Format, string][]).map(([f, lbl]) => (
                 <button key={f} onClick={() => setFormat(f)} disabled={running}
@@ -454,7 +454,7 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
           {/* Export banque */}
           <div style={{ borderRadius: 9, padding: '9px 11px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: (isWeb || saveToBank) ? 9 : 0 }}>
-              <span style={{ fontSize: 11, flex: 1, color: 'rgba(226,232,240,0.65)', fontWeight: 500 }}>☁ {isWeb ? 'Export automatique banque' : 'Sauvegarder en banque'}</span>
+              <span style={{ fontSize: 11, flex: 1, color: 'rgba(226,232,240,0.65)', fontWeight: 500 }}>☁ {isWeb ? 'Auto export to bank' : 'Save to bank'}</span>
               {!isWeb && (
                 <button onClick={() => setSaveToBank(v => !v)} disabled={running}
                   className="relative w-9 h-5 rounded-full transition-colors flex-shrink-0"
@@ -471,11 +471,11 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
                   <select value={bankFolders.includes(bankFolder) ? bankFolder : ''}
                     onChange={e => setBankFolder(e.target.value)}
                     style={{ width: '100%', padding: '5px 8px', borderRadius: 7, fontSize: 11, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: '#e2d9f3', marginBottom: 5, cursor: 'pointer' }}>
-                    <option value="" style={{ background: '#0c0919' }}>Choisir un dossier…</option>
+                    <option value="" style={{ background: '#0c0919' }}>Choose a folder…</option>
                     {bankFolders.map(f => <option key={f} value={f} style={{ background: '#0c0919' }}>{f}</option>)}
                   </select>
                 )}
-                <input placeholder={bankFolders.length > 0 ? 'Ou nouveau dossier…' : 'Dossier (optionnel)'}
+                <input placeholder={bankFolders.length > 0 ? 'Or new folder…' : 'Folder (optional)'}
                   value={bankFolder} onChange={e => setBankFolder(e.target.value)}
                   style={{ width: '100%', padding: '5px 8px', borderRadius: 7, fontSize: 11, background: 'rgba(255,255,255,0.04)', border: `1px solid ${bankFolder.trim() ? 'rgba(139,92,246,0.4)' : 'rgba(255,255,255,0.07)'}`, color: '#e2d9f3', outline: 'none' }}
                 />
@@ -496,7 +496,7 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
               outline: sourceUrl ? `1px solid ${running ? 'rgba(239,68,68,0.22)' : 'rgba(34,211,238,0.28)'}` : 'none',
             }}
           >
-            {running ? `⏹ Arrêter (${totalDone}/${jobs.length})` : `⚡ Générer ${count} variante${count > 1 ? 's' : ''}`}
+            {running ? `⏹ Stop (${totalDone}/${jobs.length})` : `⚡ Generate ${count} variant${count > 1 ? 's' : ''}`}
           </button>
         </div>
 
@@ -510,7 +510,7 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
               </div>
               <div style={{ fontSize: 15, fontWeight: 700, color: 'rgba(226,232,240,0.55)' }}>Upload a video & generate your variants</div>
               <div style={{ fontSize: 12, color: 'rgba(148,163,184,0.35)', maxWidth: 340, lineHeight: 1.7 }}>
-                Chaque variante reçoit des micro-transformations invisibles :<br />couleur, audio, grain, crop, encodage — hash unique garanti.
+                Each variant receives invisible micro-transformations:<br />color, audio, grain, crop, encoding — unique hash guaranteed.
               </div>
               <div style={{ display: 'flex', gap: 7, marginTop: 6, flexWrap: 'wrap', justifyContent: 'center' }}>
                 {['🎨 Color grading', '🔊 Audio', '🌀 Grain', '✂️ Crop', '📦 Encoding', '🔐 Unique hash'].map(t => (

@@ -277,7 +277,7 @@ function PropertiesPanel({
         <p className="text-[10px] font-semibold text-text2 uppercase tracking-wider">Caption</p>
         <textarea value={clip.caption} rows={3}
           onChange={e => onUpdate(clip.uid, { caption: e.target.value })}
-          placeholder="Caption pour ce clip…"
+          placeholder="Caption for this clip…"
           className="w-full bg-surface border border-border rounded px-2 py-1.5 text-[11px] text-text focus:outline-none focus:border-accent resize-none" />
       </div>
 
@@ -384,7 +384,7 @@ export function Montage({ user }: MontageProps) {
   const [selectedUid, setSelUid]    = useState<string | null>(null)
   const [draggingUid, setDragUid]   = useState<string | null>(null)
   const [globalCaption, setGCap]    = useState('')
-  const [projectName, setProjName]  = useState('Mon montage')
+  const [projectName, setProjName]  = useState('My edit')
   const [activeFilter, setFilter]   = useState<Filter>('none')
   const [preset, setPreset]         = useState<Preset>('9:16')
   const [scale, setScale]           = useState(50)
@@ -546,8 +546,8 @@ export function Montage({ user }: MontageProps) {
         clips: ffmpegClips, outputPath: out, preset, transition: 'cut',
       })
       setExporting(false)
-      if (res?.ok) setExpResult({ ok: true, msg: `✓ Exporté : ${out}` })
-      else setExpResult({ ok: false, msg: res?.error ?? 'Erreur FFmpeg', command: res?.command })
+      if (res?.ok) setExpResult({ ok: true, msg: `✓ Exported: ${out}` })
+      else setExpResult({ ok: false, msg: res?.error ?? 'FFmpeg error', command: res?.command })
     } catch (e) {
       setExporting(false)
       setExpResult({ ok: false, msg: e instanceof Error ? e.message : String(e) })
@@ -695,7 +695,7 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
           <div className="w-56 flex-shrink-0 px-4 py-3" style={{ borderRight: '1px solid rgba(255,255,255,0.06)' }}>
             <input value={projectName} onChange={e => setProjName(e.target.value)}
               className="text-[13px] font-semibold text-white bg-transparent focus:outline-none w-full truncate"
-              placeholder="Nom du montage…" />
+              placeholder="Project name…" />
           </div>
 
           {/* Tab bar */}
@@ -764,7 +764,7 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
                   + Importer
                 </button>
               </div>
-              <input type="text" placeholder="🔍 Rechercher…" value={bankSearch}
+              <input type="text" placeholder="🔍 Search…" value={bankSearch}
                 onChange={e => setBSearch(e.target.value)}
                 className="w-full bg-surface2 border border-border rounded px-2 py-1.5 text-[11px] text-text placeholder:text-text2 focus:border-accent focus:outline-none transition-colors"
               />
@@ -836,7 +836,7 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
                       value={autoCaptionText}
                       onChange={e => setAutoCaptionText(e.target.value)}
                       rows={3}
-                      placeholder="ou tape ta caption ici…"
+                      placeholder="or type your caption here…"
                       className="w-full bg-surface border border-border rounded-lg px-2.5 py-2 text-[11px] text-text focus:outline-none focus:border-accent resize-none placeholder:text-text2/60"
                     />
 
@@ -906,7 +906,7 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
               {textOverlays.filter(t => t.uid !== '__auto_caption__').length > 0 && (
                 <div className="space-y-2 pt-2 border-t border-border">
                   <p className="text-[10px] text-text2 uppercase tracking-wider font-semibold">
-                    Textes manuels ({textOverlays.filter(t => t.uid !== '__auto_caption__').length})
+                    Manual text ({textOverlays.filter(t => t.uid !== '__auto_caption__').length})
                   </p>
                   {textOverlays.filter(t => t.uid !== '__auto_caption__').map(ov => (
                     <div key={ov.uid} className="flex items-center gap-2 bg-surface2 rounded-lg px-2 py-1.5">
@@ -923,8 +923,8 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
           {/* Transitions */}
           {activeTab === 'transitions' && (
             <div className="p-3 space-y-3 flex-1 overflow-auto">
-              <p className="text-[10px] text-text2 uppercase tracking-wider font-semibold">Types de transition</p>
-              <p className="text-[10px] text-text2">Clique sur le badge ◑ entre deux clips pour changer la transition.</p>
+              <p className="text-[10px] text-text2 uppercase tracking-wider font-semibold">Transition types</p>
+              <p className="text-[10px] text-text2">Click the ◑ badge between two clips to change the transition.</p>
               <div className="space-y-2 pt-1">
                 {TRANSITIONS.map(tr => (
                   <div key={tr.type} className="flex items-center gap-3 px-3 py-2 bg-surface2 rounded-lg">
@@ -946,7 +946,7 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
           {/* Filtres */}
           {activeTab === 'filtres' && (
             <div className="p-3 space-y-3 flex-1 overflow-auto">
-              <p className="text-[10px] text-text2 uppercase tracking-wider font-semibold">Filtre couleur</p>
+              <p className="text-[10px] text-text2 uppercase tracking-wider font-semibold">Color filter</p>
               <div className="grid grid-cols-2 gap-2">
                 {(Object.keys(FILTER_LABELS) as Filter[]).map(f => (
                   <button key={f} onClick={() => setFilter(f)}
@@ -955,28 +955,28 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
                   </button>
                 ))}
               </div>
-              <p className="text-[9px] text-text2">Filtre appliqué dans l'export FFmpeg.</p>
+              <p className="text-[9px] text-text2">Filter applied in the FFmpeg export.</p>
             </div>
           )}
 
           {/* Ajustement */}
           {activeTab === 'ajustement' && (
             <div className="p-3 space-y-4 flex-1 overflow-auto">
-              <p className="text-[10px] text-text2 uppercase tracking-wider font-semibold">Paramètres globaux</p>
+              <p className="text-[10px] text-text2 uppercase tracking-wider font-semibold">Global settings</p>
               <div className="space-y-3">
                 <div>
-                  <p className="text-[10px] text-text2 mb-1">Caption globale</p>
+                  <p className="text-[10px] text-text2 mb-1">Global caption</p>
                   <textarea value={globalCaption} rows={4}
                     onChange={e => setGCap(e.target.value)}
-                    placeholder="Caption commune à toutes les publications…"
+                    placeholder="Caption shared across all posts…"
                     className="w-full bg-surface border border-border rounded px-2 py-1.5 text-[11px] text-text focus:outline-none focus:border-accent resize-none" />
                 </div>
                 <div className="space-y-1">
-                  <p className="text-[10px] text-text2">Total : <span className="text-accent font-medium">{fmtTime(total)}</span></p>
+                  <p className="text-[10px] text-text2">Total: <span className="text-accent font-medium">{fmtTime(total)}</span></p>
                   <div className="h-1.5 bg-surface2 rounded-full overflow-hidden">
                     <div className="h-full bg-accent rounded-full transition-all" style={{ width: `${Math.min(100, (total / 90) * 100)}%` }} />
                   </div>
-                  <p className="text-[9px] text-text2">{total > 90 ? '⚠ > 90s (limite Reels)' : `${Math.round((total / 90) * 100)}% de 90s`}</p>
+                  <p className="text-[9px] text-text2">{total > 90 ? '⚠ > 90s (Reels limit)' : `${Math.round((total / 90) * 100)}% of 90s`}</p>
                 </div>
               </div>
             </div>
@@ -993,7 +993,7 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
                   onClick={playAll}
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-accent rounded-lg text-white text-xs font-semibold hover:bg-accent/80 transition-colors"
                 >
-                  ▶ Lire tout ({clips.length} clips)
+                  ▶ Play all ({clips.length} clips)
                 </button>
               ) : (
                 <div className="flex items-center gap-2">
@@ -1023,8 +1023,8 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
           ) : (
             <div className="text-center text-text2 space-y-3">
               <p className="text-5xl">▶</p>
-              <p className="text-sm">Sélectionne un clip pour prévisualiser</p>
-              <p className="text-xs text-text2/60">ou glisse une vidéo dans l'application</p>
+              <p className="text-sm">Select a clip to preview</p>
+              <p className="text-xs text-text2/60">or drag a video into the app</p>
             </div>
           )}
 
@@ -1041,7 +1041,7 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
         {/* RIGHT: properties */}
         <aside className="w-52 flex-shrink-0 border-l border-border bg-surface">
           <div className="px-3 py-2 border-b border-border">
-            <p className="text-[10px] font-semibold text-text2 uppercase tracking-wider">Propriétés</p>
+            <p className="text-[10px] font-semibold text-text2 uppercase tracking-wider">Properties</p>
           </div>
           <div className="h-[calc(100%-33px)] overflow-auto">
             <PropertiesPanel clip={selectedClip} onUpdate={updateClip} />
@@ -1054,17 +1054,17 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
         {/* Timeline toolbar */}
         <div className="flex items-center gap-2 px-3 py-1.5 border-b border-border bg-surface2">
           {/* Edit tools */}
-          <button onClick={cutAtPlayhead} disabled={!selectedUid} title="Couper le clip à la tête de lecture"
+          <button onClick={cutAtPlayhead} disabled={!selectedUid} title="Cut clip at playhead"
             className="flex items-center gap-1 px-2 py-1 rounded text-xs text-text2 hover:text-text hover:bg-surface disabled:opacity-40 transition-all">
-            ✂ Couper
+            ✂ Cut
           </button>
           <button onClick={() => selectedUid && deleteClip(selectedUid)} disabled={!selectedUid}
             className="flex items-center gap-1 px-2 py-1 rounded text-xs text-text2 hover:text-danger disabled:opacity-40 transition-all">
-            🗑 Suppr.
+            🗑 Delete
           </button>
           <button onClick={() => setClips([])} disabled={!clips.length}
             className="flex items-center gap-1 px-2 py-1 rounded text-xs text-text2 hover:text-danger disabled:opacity-40 transition-all">
-            🗑 Tout vider
+            🗑 Clear all
           </button>
           <div className="w-px h-5 bg-border mx-1" />
 
@@ -1103,10 +1103,10 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
 
             {/* Video track */}
             <div className="px-2 py-1">
-              <div className="text-[9px] text-text2 mb-1 uppercase tracking-wider">Vidéo</div>
+              <div className="text-[9px] text-text2 mb-1 uppercase tracking-wider">Video</div>
               {clips.length === 0 ? (
                 <div className="flex items-center text-[11px] text-text2/50 h-12 px-4">
-                  ← Clique sur un clip dans Médias pour l'ajouter
+                  ← Click a clip in Media to add it
                 </div>
               ) : (
                 <div className="flex items-center gap-0.5">
@@ -1130,7 +1130,7 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
             <div className="px-2 py-0.5 border-t border-border/40">
               <div className="text-[9px] text-text2/50 mb-1 uppercase tracking-wider">Audio</div>
               <div className="h-7 rounded bg-surface2/40 border border-dashed border-border/40 flex items-center justify-center text-[10px] text-text2/40" style={{ width: Math.max(timelineW - 20, 200) }}>
-                Glisse un fichier audio ici (à venir)
+                Drag an audio file here (coming soon)
               </div>
             </div>
 
@@ -1162,7 +1162,7 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
             {expResult.command && (
               <code className="block mt-1 text-[10px] bg-surface px-2 py-1 rounded text-text2 truncate cursor-pointer hover:whitespace-normal"
                 onClick={() => navigator.clipboard.writeText(expResult.command!)}
-                title="Cliquer pour copier la commande">
+                title="Click to copy the command">
                 {expResult.command}
               </code>
             )}

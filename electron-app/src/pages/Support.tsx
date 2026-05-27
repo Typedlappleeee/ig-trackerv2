@@ -466,7 +466,7 @@ function UserSupport({ user }: { user: User }) {
           className="rounded-xl px-5 py-2.5 text-[13px] font-semibold text-white"
           style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)' }}
         >
-          + {lang === 'en' ? 'New ticket' : 'Nouveau ticket'}
+          + New ticket
         </button>
       </div>
 
@@ -642,7 +642,7 @@ function AdminSupport({ user }: { user: User }) {
               <table className="w-full">
                 <thead>
                   <tr style={{ borderBottom: '1px solid rgba(139,92,246,0.1)', background: 'rgba(255,255,255,0.02)' }}>
-                    <th className="text-left px-5 py-3.5 text-[12px] font-semibold text-text2 uppercase tracking-wide">Sujet</th>
+                    <th className="text-left px-5 py-3.5 text-[12px] font-semibold text-text2 uppercase tracking-wide">Subject</th>
                     <th className="text-left px-5 py-3.5 text-[12px] font-semibold text-text2 uppercase tracking-wide">Email</th>
                     <th className="text-left px-5 py-3.5 text-[12px] font-semibold text-text2 uppercase tracking-wide">Orga</th>
                     <th className="text-left px-5 py-3.5 text-[12px] font-semibold text-text2 uppercase tracking-wide">Cat.</th>

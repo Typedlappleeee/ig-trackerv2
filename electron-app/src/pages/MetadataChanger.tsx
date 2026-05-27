@@ -46,7 +46,7 @@ function MetaRow({ field, before, after }: { field: string; before?: string; aft
       <span className="truncate font-mono flex items-center gap-1.5"
         style={{ color: after ? (changed ? '#34d399' : 'rgba(255,255,255,0.3)') : 'rgba(52,211,153,0.4)' }}>
         {changed && before && <span style={{ color: '#34d399' }}>✓</span>}
-        {after || <span style={{ color: 'rgba(52,211,153,0.5)' }}>supprimé</span>}
+        {after || <span style={{ color: 'rgba(52,211,153,0.5)' }}>removed</span>}
       </span>
     </div>
   )
@@ -85,7 +85,7 @@ export function MetadataChanger({ user, onBack }: MetadataChangerProps) {
   async function readMeta(path: string) {
     setPhase('reading'); setError(null); setBeforeMeta({}); setAfterMeta({})
     const r = await window.electronAPI!.readVideoMetadata!({ filePath: path })
-    if (!r.ok) { setPhase('error'); setError(r.error ?? 'Lecture impossible'); playError(); return }
+    if (!r.ok) { setPhase('error'); setError(r.error ?? 'Unable to read'); playError(); return }
     setBeforeMeta(r.metadata ?? {})
     setDuration(r.duration)
     setPhase('ready')
@@ -118,7 +118,7 @@ export function MetadataChanger({ user, onBack }: MetadataChangerProps) {
     })
 
     if (!r.ok) {
-      setPhase('error'); setError(r.error ?? 'Erreur FFmpeg'); setCommand(r.command ?? null)
+      setPhase('error'); setError(r.error ?? 'FFmpeg error'); setCommand(r.command ?? null)
       playError(); return
     }
 
@@ -146,7 +146,7 @@ export function MetadataChanger({ user, onBack }: MetadataChangerProps) {
     })
 
     if (!r.ok) {
-      setPhase('error'); setError(r.error ?? 'Erreur FFmpeg'); setCommand(r.command ?? null)
+      setPhase('error'); setError(r.error ?? 'FFmpeg error'); setCommand(r.command ?? null)
       playError(); return
     }
 
