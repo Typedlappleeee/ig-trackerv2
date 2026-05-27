@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, type CSSProperties } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
+import { useT, useLang } from '@/lib/i18n'
 import { Button } from '@/components/ui/Button'
 import { Input }  from '@/components/ui/Input'
 import { OrganizationPanel } from '@/components/OrganizationPanel'
@@ -134,14 +135,16 @@ type GeneralTab = 'apparence' | 'sons' | 'notifications' | 'langue' | 'securite'
 type Panel = 'general' | 'profile' | 'connexions' | 'organization' | 'admin' | 'abonnement' | 'desktop'
 interface SettingsProps { user: User; initialPanel?: Panel; initialTab?: GeneralTab; onNavigate?: (page: string) => void }
 
-const GEN_SIDEBAR: { id: GeneralTab; label: string; icon: string }[] = [
-  { id: 'apparence',     label: 'Apparence',       icon: '🎨' },
-  { id: 'sons',          label: 'Sons',            icon: '🔊' },
-  { id: 'notifications', label: 'Notifications',   icon: '🔔' },
-  { id: 'langue',        label: 'Langue & région', icon: '🌐' },
-  { id: 'securite',      label: 'Sécurité',        icon: '🔒' },
-  { id: 'avance',        label: 'Avancé',          icon: '⚙️' },
+const GEN_SIDEBAR_IDS: { id: GeneralTab; labelKey: 'tabAppearance' | 'tabSounds' | 'tabNotifications' | 'tabLanguage' | 'tabSecurity' | 'tabAdvanced'; icon: string }[] = [
+  { id: 'apparence',     labelKey: 'tabAppearance',    icon: '🎨' },
+  { id: 'sons',          labelKey: 'tabSounds',        icon: '🔊' },
+  { id: 'notifications', labelKey: 'tabNotifications', icon: '🔔' },
+  { id: 'langue',        labelKey: 'tabLanguage',      icon: '🌐' },
+  { id: 'securite',      labelKey: 'tabSecurity',      icon: '🔒' },
+  { id: 'avance',        labelKey: 'tabAdvanced',      icon: '⚙️' },
 ]
+// Keep backward compat alias
+const GEN_SIDEBAR = GEN_SIDEBAR_IDS
 
 // SVG icons for main nav panels
 const NAV_ICONS: Record<string, JSX.Element> = {
@@ -215,6 +218,8 @@ const GEN_ICONS: Record<GeneralTab, JSX.Element> = {
 }
 
 export function Settings({ user, initialPanel, initialTab, onNavigate }: SettingsProps) {
+  const t = useT()
+  const { lang, setLang: setAppLang } = useLang()
   const { role, perms, currentOrg } = useOrg()
   const license = useLicense()
   const canSeeConnexions     = role ? canSeeTab(role, perms, 'settings') : true
@@ -257,7 +262,6 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
   const [notifyErrors, setNotifyErrors] = useState(true)
 
   // ── Langue ───────────────────────────────────────────────────────────────
-  const [lang, setLang]             = useState('fr')
   const [dateFormat, setDateFormat] = useState('dd/mm/yyyy')
   const [timezone, setTimezone]     = useState('Europe/Paris')
 
@@ -338,7 +342,6 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
     setNotifySound(lb('notify-sound', true))
     setNotifyUpdates(lb('sf-notify-updates', true))
     setNotifyErrors(lb('sf-notify-errors',  true))
-    setLang(ls('sf-lang', 'fr'))
     setDateFormat(ls('sf-date-format', 'dd/mm/yyyy'))
     setTimezone(ls('sf-timezone', 'Europe/Paris'))
     setDevMode(lb('sf-dev-mode', false))
@@ -404,7 +407,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
       setb('sf-dark', darkMode);         setb('sf-animations', animationsOn)
       setb('sf-glass', glassOn);         setb('notify-popup', notifyPopup)
       setb('notify-sound', notifySound); setb('sf-notify-updates', notifyUpdates)
-      setb('sf-notify-errors', notifyErrors); set('sf-lang', lang)
+      setb('sf-notify-errors', notifyErrors); set('sf-lang', lang as string)
       set('sf-date-format', dateFormat); set('sf-timezone', timezone)
       setb('sf-dev-mode', devMode)
       applyAppearanceCSS({})
@@ -413,13 +416,13 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
       }, { onConflict: 'user_id' })
       if (e) throw e
       setSaved(true); setTimeout(() => setSaved(false), 2500)
-    } catch (e: any) { setError(e.message ?? 'Erreur inconnue') } finally { setSaving(false) }
+    } catch (e: any) { setError(e.message ?? t('unknownError')) } finally { setSaving(false) }
   }
 
   async function saveConnexions() {
     setSaving(true); setError(null)
     try {
-      if (!canEditOrgConnexions) throw new Error('Seuls les admins peuvent modifier les connexions.')
+      if (!canEditOrgConnexions) throw new Error(t('adminOnlyError'))
       if (currentOrg) {
         const { error: e } = await supabase.from('org_config').upsert({
           org_id: currentOrg.id, bearer_token: bearer, groq_api_key: groqKey,
@@ -436,7 +439,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
         if (e) throw e
       }
       notifyConnectionsChanged(); setSaved(true); setTimeout(() => setSaved(false), 2500)
-    } catch (e: any) { setError(e.message ?? 'Erreur inconnue') } finally { setSaving(false) }
+    } catch (e: any) { setError(e.message ?? t('unknownError')) } finally { setSaving(false) }
   }
 
   async function saveProfile() {
@@ -448,7 +451,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
       }, { onConflict: 'id' })
       if (e) throw e
       setSaved(true); setTimeout(() => setSaved(false), 2500)
-    } catch (e: any) { setError(e.message ?? 'Erreur inconnue') } finally { setSaving(false) }
+    } catch (e: any) { setError(e.message ?? t('unknownError')) } finally { setSaving(false) }
   }
 
   // ── Shared helpers ─────────────────────────────────────────────────────────
@@ -531,22 +534,22 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
   }
 
   const mainNavItems = [
-    { k: 'general' as Panel,      l: 'Général' },
-    { k: 'profile' as Panel,      l: 'Profil' },
-    ...(canSeeConnexions ? [{ k: 'connexions' as Panel, l: 'Connexions' }] : []),
-    { k: 'organization' as Panel, l: 'Équipe' },
-    ...(license.isSuperAdmin ? [{ k: 'admin' as Panel, l: 'Admin' }] : []),
-    { k: 'abonnement' as Panel,   l: 'Plan' },
-    { k: 'desktop' as Panel,      l: '💻 App Desktop' },
+    { k: 'general' as Panel,      l: t('panelGeneral') },
+    { k: 'profile' as Panel,      l: t('panelProfile') },
+    ...(canSeeConnexions ? [{ k: 'connexions' as Panel, l: t('panelConnexions') }] : []),
+    { k: 'organization' as Panel, l: t('panelOrganization') },
+    ...(license.isSuperAdmin ? [{ k: 'admin' as Panel, l: t('panelAdmin') }] : []),
+    { k: 'abonnement' as Panel,   l: t('panelPlan') },
+    { k: 'desktop' as Panel,      l: t('panelDesktop') },
   ]
 
   if (loading) return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: S.base }}>
       <div style={{ padding: '32px 40px 28px', borderBottom: `1px solid ${S.border}` }}>
-        <h1 style={{ fontSize: 26, fontWeight: 900, color: S.text, margin: 0, lineHeight: 1 }}>Paramètres</h1>
+        <h1 style={{ fontSize: 26, fontWeight: 900, color: S.text, margin: 0, lineHeight: 1 }}>{t('settingsTitle')}</h1>
       </div>
       <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <p style={{ fontSize: 13, color: S.text3 }}>Chargement…</p>
+        <p style={{ fontSize: 13, color: S.text3 }}>{t('settingsLoading')}</p>
       </div>
     </div>
   )
@@ -562,14 +565,14 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       }}>
         <div>
-          <h1 style={{ fontSize: 24, fontWeight: 800, color: S.text, margin: 0, lineHeight: 1.1, letterSpacing: '-0.3px' }}>Paramètres</h1>
-          <p style={{ fontSize: 13, color: S.text3, margin: '4px 0 0' }}>Personnalise ton expérience ScaleFlow</p>
+          <h1 style={{ fontSize: 24, fontWeight: 800, color: S.text, margin: 0, lineHeight: 1.1, letterSpacing: '-0.3px' }}>{t('settingsTitle')}</h1>
+          <p style={{ fontSize: 13, color: S.text3, margin: '4px 0 0' }}>{t('settingsSub')}</p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           {saved && (
             <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#22C55E', fontWeight: 500 }}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-              Sauvegardé
+              {t('settingsSaved')}
             </span>
           )}
           <button
@@ -580,7 +583,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
             </svg>
-            {saving ? 'Sauvegarde…' : 'Sauvegarder'}
+            {saving ? t('saving') : t('save')}
           </button>
         </div>
       </div>
@@ -596,7 +599,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
           padding: '16px 10px',
           display: 'flex', flexDirection: 'column', gap: 2,
         }}>
-          <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: S.text3, padding: '0 8px', marginBottom: 8 }}>Navigation</p>
+          <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: S.text3, padding: '0 8px', marginBottom: 8 }}>{t('navLabel')}</p>
           {mainNavItems.map(item => {
             const active = panel === item.k
             return (
@@ -606,14 +609,14 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
 
           {/* Help section */}
           <div style={{ marginTop: 'auto', paddingTop: 20, borderTop: `1px solid ${S.border}` }}>
-            <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: S.text3, padding: '0 8px', marginBottom: 8 }}>Support</p>
+            <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: S.text3, padding: '0 8px', marginBottom: 8 }}>{t('supportLabel')}</p>
             <button onClick={() => onNavigate?.('support')} style={{
               display: 'flex', alignItems: 'center', gap: 7,
               padding: '7px 10px', borderRadius: 8, fontSize: 12,
               color: S.accent3, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 500, width: '100%', textAlign: 'left',
             }}>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-              Contacter le support
+              {t('contactSupport')}
             </button>
           </div>
         </div>
@@ -633,7 +636,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                 {GEN_SIDEBAR.map(item => {
                   const active = genTab === item.id
                   return (
-                    <SubTabBtn key={item.id} active={active} icon={GEN_ICONS[item.id]} label={item.label} onClick={() => setGenTab(item.id)} S={S} />
+                    <SubTabBtn key={item.id} active={active} icon={GEN_ICONS[item.id]} label={t(item.labelKey)} onClick={() => setGenTab(item.id)} S={S} />
                   )
                 })}
               </div>
@@ -645,15 +648,15 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                 {genTab === 'apparence' && (
                   <div className="sf-anim-slide-up" style={{ maxWidth: 640, display: 'flex', flexDirection: 'column', gap: 20 }}>
                     <div>
-                      <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0 }}>Apparence</h2>
-                      <p style={{ fontSize: 13, color: S.text3, margin: '4px 0 0' }}>Personnalise l'apparence de ton interface.</p>
+                      <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0 }}>{t('appearanceTitle')}</h2>
+                      <p style={{ fontSize: 13, color: S.text3, margin: '4px 0 0' }}>{t('appearanceSub')}</p>
                     </div>
 
-                    {/* Thème de couleur */}
+                    {/* Color theme */}
                     <div style={cardSt}>
                       <div style={{ marginBottom: 14 }}>
-                        <h3 style={cardTitleSt}>Thème de couleur</h3>
-                        <p style={cardSubSt}>Cette couleur sera utilisée pour les accents et éléments interactifs.</p>
+                        <h3 style={cardTitleSt}>{t('colorTheme')}</h3>
+                        <p style={cardSubSt}>{t('colorThemeSub')}</p>
                       </div>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
                         {THEMES.map(t => (
@@ -679,41 +682,41 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                       </div>
                       {pixelUnlocked && (
                         <div style={{ padding: '8px 12px', borderRadius: 8, fontSize: 12, color: S.text3, background: 'rgba(255,255,255,0.04)', border: `1px solid ${S.border}`, marginTop: 10 }}>
-                          Mode Pixel débloqué — clique encore 7 fois sur un thème pour activer
+                          {t('pixelUnlocked')}
                         </div>
                       )}
                     </div>
 
                     {/* Toggles + dropdowns */}
                     <div style={cardSt}>
-                      <SettingToggle first label="Mode sombre" sub="Active ou désactive le thème sombre."
+                      <SettingToggle first label={t('darkMode')} sub={t('darkModeSub')}
                         checked={darkMode} onChange={v => { setDarkMode(v); localStorage.setItem('sf-dark', v ? '1' : '0'); applyAppearanceCSS({ dark: v }) }} />
-                      <SettingToggle label="Animations UI" sub="Active ou désactive les animations et transitions."
+                      <SettingToggle label={t('uiAnimations')} sub={t('uiAnimationsSub')}
                         checked={animationsOn} onChange={v => { setAnimationsOn(v); localStorage.setItem('sf-animations', v ? '1' : '0'); applyAppearanceCSS({ anim: v }) }} />
-                      <SettingToggle label="Effets de flou (Glassmorphism)" sub="Active ou désactive les effets de flou."
+                      <SettingToggle label={t('glassEffects')} sub={t('glassEffectsSub')}
                         checked={glassOn} onChange={v => { setGlassOn(v); localStorage.setItem('sf-glass', v ? '1' : '0'); applyAppearanceCSS({ glass: v }) }} />
-                      <SelectRow label="Coins arrondis" sub="Ajuste l'arrondi des éléments de l'interface."
+                      <SelectRow label={t('roundedCorners')} sub={t('roundedCornersSub')}
                         value={roundedCorners} onChange={v => { setRoundedCorners(v); applyAppearanceCSS({ rounded: v }) }}
-                        options={[{ value: 'aucun', label: 'Aucun' }, { value: 'petit', label: 'Petit' }, { value: 'moyen', label: 'Moyen' }, { value: 'grand', label: 'Grand' }]} />
-                      <SelectRow label="Police d'interface" sub="Choisis la police utilisée dans l'interface."
+                        options={[{ value: 'aucun', label: t('roundNone') }, { value: 'petit', label: t('roundSmall') }, { value: 'moyen', label: t('roundMedium') }, { value: 'grand', label: t('roundLarge') }]} />
+                      <SelectRow label={t('fontFamily')} sub={t('fontFamilySub')}
                         value={fontFamily} onChange={v => { setFontFamily(v); applyAppearanceCSS({ fontFam: v }) }}
                         options={[{ value: 'inter', label: 'Inter' }, { value: 'system', label: 'System UI' }, { value: 'mono', label: 'Monospace' }]} />
-                      <SelectRow label="Taille de la police" sub="Ajuste la taille du texte global."
+                      <SelectRow label={t('fontSize')} sub={t('fontSizeSub')}
                         value={fontSize} onChange={v => { setFontSize(v); applyAppearanceCSS({ fs: v }) }}
-                        options={[{ value: 'petite', label: 'Petite' }, { value: 'moyenne', label: 'Moyenne' }, { value: 'grande', label: 'Grande' }]} />
-                      <SelectRow label="Densité d'affichage" sub="Choisis la densité des éléments à l'écran."
+                        options={[{ value: 'petite', label: t('fontSizeSmall') }, { value: 'moyenne', label: t('fontSizeMedium') }, { value: 'grande', label: t('fontSizeLarge') }]} />
+                      <SelectRow label={t('displayDensity')} sub={t('displayDensitySub')}
                         value={density} onChange={v => { setDensity(v); applyAppearanceCSS({ density: v }) }}
-                        options={[{ value: 'compact', label: 'Compact' }, { value: 'confortable', label: 'Confortable' }, { value: 'spacieux', label: 'Spacieux' }]} />
-                      <SelectRow label="Barre latérale" sub="Affiche ou masque la barre latérale."
+                        options={[{ value: 'compact', label: t('densityCompact') }, { value: 'confortable', label: t('densityComfortable') }, { value: 'spacieux', label: t('densitySpacious') }]} />
+                      <SelectRow label={t('sidebar')} sub={t('sidebarSub')}
                         value={sidebarMode} onChange={v => { setSidebarMode(v); localStorage.setItem('sf-sidebar', v); applyAppearanceCSS({ sidebar: v }) }}
-                        options={[{ value: 'etendue', label: 'Étendue' }, { value: 'reduite', label: 'Réduite' }, { value: 'masquee', label: 'Masquée' }]} />
+                        options={[{ value: 'etendue', label: t('sidebarExpanded') }, { value: 'reduite', label: t('sidebarReduced') }, { value: 'masquee', label: t('sidebarHidden') }]} />
                     </div>
 
-                    {/* Aperçu */}
+                    {/* Preview */}
                     <div style={cardSt}>
                       <div style={{ marginBottom: 12 }}>
-                        <h3 style={cardTitleSt}>Aperçu</h3>
-                        <p style={cardSubSt}>Voici un aperçu de ton interface avec ces paramètres.</p>
+                        <h3 style={cardTitleSt}>{t('preview')}</h3>
+                        <p style={cardSubSt}>{t('previewSub')}</p>
                       </div>
                       <div style={{ borderRadius: 11, overflow: 'hidden', background: 'rgba(0,0,0,0.3)', border: `1px solid ${S.border}`, height: 100 }}>
                         <div style={{ display: 'flex', height: '100%' }}>
@@ -736,18 +739,18 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                 {genTab === 'sons' && (
                   <div className="sf-anim-slide-up" style={{ maxWidth: 640, display: 'flex', flexDirection: 'column', gap: 20 }}>
                     <div>
-                      <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0 }}>Sons</h2>
-                      <p style={{ fontSize: 13, color: S.text3, margin: '4px 0 0' }}>Gère les sons et la musique d'ambiance de l'application.</p>
+                      <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0 }}>{t('soundsTitle')}</h2>
+                      <p style={{ fontSize: 13, color: S.text3, margin: '4px 0 0' }}>{t('soundsSub')}</p>
                     </div>
                     <div style={cardSt}>
-                      <SettingToggle first label="Sons de navigation" sub="Joue un son lors des changements de page."
+                      <SettingToggle first label={t('navSounds')} sub={t('navSoundsSub')}
                         checked={notifySound} onChange={v => setNotifySound(v)} />
-                      <SettingToggle label="Musique d'ambiance" sub="Joue une musique en fond lors de l'utilisation de l'app."
+                      <SettingToggle label={t('ambientMusic')} sub={t('ambientMusicSub')}
                         checked={musicOn} onChange={v => { setMusicOn(v); setMusicEnabled(v) }} />
                     </div>
                     {musicOn && (
                       <div style={cardSt}>
-                        <h3 style={cardTitleSt}>Piste musicale</h3>
+                        <h3 style={cardTitleSt}>{t('musicTrack')}</h3>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
                           {TRACKS.map((tr, i) => (
                             <button key={i} onClick={() => { setMusicTrackS(i); setTrack(i) }} style={{
@@ -766,7 +769,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                         </div>
                         <div>
                           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                            <p style={{ fontSize: 13, fontWeight: 500, color: S.text, margin: 0 }}>Volume</p>
+                            <p style={{ fontSize: 13, fontWeight: 500, color: S.text, margin: 0 }}>{t('volume')}</p>
                             <p style={{ fontSize: 13, fontWeight: 700, color: S.accent3, margin: 0 }}>{Math.round(musicVol * 100)}%</p>
                           </div>
                           <input type="range" min={0} max={1} step={0.05} value={musicVol}
@@ -782,23 +785,23 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                 {genTab === 'notifications' && (
                   <div className="sf-anim-slide-up" style={{ maxWidth: 640, display: 'flex', flexDirection: 'column', gap: 20 }}>
                     <div>
-                      <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0 }}>Notifications</h2>
-                      <p style={{ fontSize: 13, color: S.text3, margin: '4px 0 0' }}>Choisis comment et quand tu souhaites être notifié.</p>
+                      <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0 }}>{t('notificationsTitle')}</h2>
+                      <p style={{ fontSize: 13, color: S.text3, margin: '4px 0 0' }}>{t('notificationsSub')}</p>
                     </div>
                     <div style={cardSt}>
-                      <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: S.text3, margin: '0 0 14px' }}>In-app</h3>
-                      <SettingToggle first label="Notifications popup" sub="Affiche une notification en haut à droite lors d'actions importantes."
+                      <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: S.text3, margin: '0 0 14px' }}>{t('inApp')}</h3>
+                      <SettingToggle first label={t('popupNotifs')} sub={t('popupNotifsSub')}
                         checked={notifyPopup} onChange={v => setNotifyPopup(v)} />
-                      <SettingToggle label="Alertes d'erreurs" sub="Affiche les erreurs critiques de manière visible."
+                      <SettingToggle label={t('errorAlerts')} sub={t('errorAlertsSub')}
                         checked={notifyErrors} onChange={v => setNotifyErrors(v)} />
-                      <SettingToggle label="Mises à jour & nouveautés" sub="Informe lors des nouvelles versions ou fonctionnalités."
+                      <SettingToggle label={t('updatesNotifs')} sub={t('updatesNotifsSub')}
                         checked={notifyUpdates} onChange={v => setNotifyUpdates(v)} />
                     </div>
                     <div style={cardSt}>
-                      <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: S.text3, margin: '0 0 14px' }}>Système</h3>
+                      <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: S.text3, margin: '0 0 14px' }}>{t('systemNotifs')}</h3>
                       <SettingToggle first
-                        label="Notifications bureau"
-                        sub="Envoie des notifications natives du système d'exploitation."
+                        label={t('desktopNotifs')}
+                        sub={t('desktopNotifsSub')}
                         checked={notifyDesktop}
                         onChange={async v => {
                           if (v && 'Notification' in window) {
@@ -810,9 +813,9 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                         }}
                       />
                       {notifyDesktop && (
-                        <button onClick={() => new Notification('ScaleFlow', { body: 'Les notifications bureau sont actives', icon: '/icon.png' })}
+                        <button onClick={() => new Notification('ScaleFlow', { body: lang === 'en' ? 'Desktop notifications are active' : 'Les notifications bureau sont actives', icon: '/icon.png' })}
                           style={{ marginTop: 10, fontSize: 12, color: S.accent3, background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>
-                          Tester une notification
+                          {t('testNotif')}
                         </button>
                       )}
                     </div>
@@ -823,14 +826,40 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                 {genTab === 'langue' && (
                   <div className="sf-anim-slide-up" style={{ maxWidth: 640, display: 'flex', flexDirection: 'column', gap: 20 }}>
                     <div>
-                      <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0 }}>Langue & région</h2>
-                      <p style={{ fontSize: 13, color: S.text3, margin: '4px 0 0' }}>Personnalise la langue et les paramètres régionaux.</p>
+                      <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0 }}>{t('languageTitle')}</h2>
+                      <p style={{ fontSize: 13, color: S.text3, margin: '4px 0 0' }}>{t('languageSub')}</p>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '14px 16px', borderRadius: 11, background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.2)' }}>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginTop: 1, flexShrink: 0 }}>
-                        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-                      </svg>
-                      <p style={{ fontSize: 13, color: S.text2, margin: 0 }}>Le changement de langue sera disponible prochainement. L'application est actuellement en français.</p>
+
+                    {/* Language toggle */}
+                    <div style={cardSt}>
+                      <div style={{ marginBottom: 16 }}>
+                        <h3 style={cardTitleSt}>{t('languageLabel')}</h3>
+                        <p style={cardSubSt}>{t('languageLabelSub')}</p>
+                      </div>
+                      <div style={{ display: 'flex', gap: 10 }}>
+                        {(['fr', 'en'] as const).map(l => (
+                          <button
+                            key={l}
+                            onClick={() => setAppLang(l)}
+                            style={{
+                              display: 'flex', alignItems: 'center', gap: 10,
+                              padding: '12px 20px', borderRadius: 11, cursor: 'pointer',
+                              fontSize: 14, fontWeight: 600, transition: 'all 0.15s',
+                              background: lang === l ? `rgba(139,92,246,0.15)` : 'rgba(255,255,255,0.03)',
+                              border: lang === l ? `1px solid rgba(139,92,246,0.45)` : `1px solid ${S.border}`,
+                              color: lang === l ? S.accent3 : S.text3,
+                            }}
+                          >
+                            <span style={{ fontSize: 20 }}>{l === 'fr' ? '🇫🇷' : '🇬🇧'}</span>
+                            <span>{l === 'fr' ? t('langFr') : t('langEn')}</span>
+                            {lang === l && (
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: 4 }}>
+                                <polyline points="20 6 9 17 4 12"/>
+                              </svg>
+                            )}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 )}
@@ -839,17 +868,17 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                 {genTab === 'securite' && (
                   <div className="sf-anim-slide-up" style={{ maxWidth: 640, display: 'flex', flexDirection: 'column', gap: 20 }}>
                     <div>
-                      <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0 }}>Sécurité</h2>
-                      <p style={{ fontSize: 13, color: S.text3, margin: '4px 0 0' }}>Gère la sécurité et l'accès à ton compte.</p>
+                      <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0 }}>{t('securityTitle')}</h2>
+                      <p style={{ fontSize: 13, color: S.text3, margin: '4px 0 0' }}>{t('securitySub')}</p>
                     </div>
 
                     {/* Session info */}
                     <div style={cardSt}>
-                      <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: S.text3, margin: '0 0 14px' }}>Session active</h3>
+                      <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: S.text3, margin: '0 0 14px' }}>{t('activeSession')}</h3>
                       {[
-                        { label: 'Compte',       value: user.email ?? '—' },
-                        { label: 'Connecté le',  value: user.created_at ? new Date(user.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : '—' },
-                        { label: 'ID session',   value: user.id.slice(0, 8) + '…' },
+                        { label: t('account'),     value: user.email ?? '—' },
+                        { label: t('connectedOn'), value: user.created_at ? new Date(user.created_at).toLocaleDateString(lang === 'en' ? 'en-US' : 'fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : '—' },
+                        { label: t('sessionId'),   value: user.id.slice(0, 8) + '…' },
                       ].map(row => (
                         <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 0', borderBottom: `1px solid ${S.border}` }}>
                           <span style={{ fontSize: 12, color: S.text3 }}>{row.label}</span>
@@ -860,29 +889,29 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
 
                     {/* Options */}
                     <div style={cardSt}>
-                      <SettingToggle first label="Authentification à deux facteurs (2FA)"
-                        sub="Ajoute une couche de sécurité supplémentaire à ton compte."
+                      <SettingToggle first label={t('twoFA')}
+                        sub={t('twoFASub')}
                         checked={twoFA} onChange={v => setTwoFA(v)} />
-                      <SelectRow label="Déconnexion automatique" sub="Se déconnecte automatiquement après une période d'inactivité."
+                      <SelectRow label={t('autoLogout')} sub={t('autoLogoutSub')}
                         value={sessionTimeout} onChange={v => setSessionTimeout(v)}
                         options={[
-                          { value: 'jamais',  label: 'Jamais' },
-                          { value: '1h',      label: 'Après 1 heure' },
-                          { value: '8h',      label: 'Après 8 heures' },
-                          { value: '24h',     label: 'Après 24 heures' },
+                          { value: 'jamais',  label: t('never') },
+                          { value: '1h',      label: t('after1h') },
+                          { value: '8h',      label: t('after8h') },
+                          { value: '24h',     label: t('after24h') },
                         ]} />
                     </div>
 
                     {/* Actions */}
                     <div style={cardSt}>
-                      <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: S.text3, margin: '0 0 14px' }}>Actions de compte</h3>
+                      <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: S.text3, margin: '0 0 14px' }}>{t('accountActions')}</h3>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                         <button
                           onClick={async () => { await supabase.auth.signOut() }}
                           className="sf-btn sf-btn-danger sf-btn-sm"
                           style={{ display: 'flex', alignItems: 'center', gap: 9, textAlign: 'left', width: '100%' }}>
                           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-                          Déconnexion
+                          {t('signOutBtn')}
                         </button>
                         <button
                           onClick={async () => {
@@ -892,7 +921,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                           className="sf-btn sf-btn-ghost sf-btn-sm"
                           style={{ display: 'flex', alignItems: 'center', gap: 9, textAlign: 'left', width: '100%' }}>
                           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                          Envoyer un email de réinitialisation de mot de passe
+                          {t('sendResetEmail')}
                         </button>
                         {/* Change password inline */}
                         {!pwChangeOpen ? (
@@ -901,25 +930,25 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                             className="sf-btn sf-btn-secondary sf-btn-sm"
                             style={{ display: 'flex', alignItems: 'center', gap: 9, textAlign: 'left', width: '100%' }}>
                             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                            Changer le mot de passe
+                            {t('changePassword')}
                           </button>
                         ) : (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '12px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                            <input type="password" className="sf-input" placeholder="Nouveau mot de passe" value={newPw} onChange={e => setNewPw(e.target.value)} style={{ width: '100%' }} />
-                            <input type="password" className="sf-input" placeholder="Confirmer le mot de passe" value={confirmPw} onChange={e => setConfirmPw(e.target.value)} style={{ width: '100%' }} />
+                            <input type="password" className="sf-input" placeholder={t('newPassword')} value={newPw} onChange={e => setNewPw(e.target.value)} style={{ width: '100%' }} />
+                            <input type="password" className="sf-input" placeholder={t('confirmPassword')} value={confirmPw} onChange={e => setConfirmPw(e.target.value)} style={{ width: '100%' }} />
                             {pwError && <p style={{ fontSize: 12, color: '#F87171', margin: 0 }}>{pwError}</p>}
-                            {pwOk && <p style={{ fontSize: 12, color: '#22c55e', margin: 0 }}>Mot de passe changé ✓</p>}
+                            {pwOk && <p style={{ fontSize: 12, color: '#22c55e', margin: 0 }}>{t('passwordChanged')}</p>}
                             <div style={{ display: 'flex', gap: 8 }}>
-                              <button onClick={() => { setPwChangeOpen(false); setNewPw(''); setConfirmPw(''); setPwError(null); setPwOk(false) }} className="sf-btn sf-btn-secondary sf-btn-sm" style={{ flex: 1 }}>Annuler</button>
+                              <button onClick={() => { setPwChangeOpen(false); setNewPw(''); setConfirmPw(''); setPwError(null); setPwOk(false) }} className="sf-btn sf-btn-secondary sf-btn-sm" style={{ flex: 1 }}>{t('cancel')}</button>
                               <button onClick={async () => {
-                                if (newPw.length < 6) { setPwError('Minimum 6 caractères'); return }
-                                if (newPw !== confirmPw) { setPwError('Les mots de passe ne correspondent pas'); return }
+                                if (newPw.length < 6) { setPwError(t('minSixChars')); return }
+                                if (newPw !== confirmPw) { setPwError(t('passwordsNoMatch')); return }
                                 setPwError(null)
                                 const { error } = await supabase.auth.updateUser({ password: newPw })
                                 if (error) { setPwError(error.message); return }
                                 setPwOk(true); setNewPw(''); setConfirmPw('')
                                 setTimeout(() => { setPwChangeOpen(false); setPwOk(false) }, 2000)
-                              }} className="sf-btn sf-btn-primary sf-btn-sm" style={{ flex: 1 }}>Confirmer</button>
+                              }} className="sf-btn sf-btn-primary sf-btn-sm" style={{ flex: 1 }}>{t('confirm')}</button>
                             </div>
                           </div>
                         )}
@@ -932,12 +961,12 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                 {genTab === 'avance' && (
                   <div className="sf-anim-slide-up" style={{ maxWidth: 640, display: 'flex', flexDirection: 'column', gap: 20 }}>
                     <div>
-                      <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0 }}>Avancé</h2>
-                      <p style={{ fontSize: 13, color: S.text3, margin: '4px 0 0' }}>Options avancées pour les utilisateurs expérimentés.</p>
+                      <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0 }}>{t('advancedTitle')}</h2>
+                      <p style={{ fontSize: 13, color: S.text3, margin: '4px 0 0' }}>{t('advancedSub')}</p>
                     </div>
 
                     <div style={cardSt}>
-                      <SettingToggle first label="Mode développeur" sub="Affiche des informations de débogage supplémentaires dans l'interface."
+                      <SettingToggle first label={t('developerMode')} sub={t('developerModeSub')}
                         checked={devMode} onChange={v => setDevMode(v)} />
                     </div>
 
@@ -953,7 +982,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                     )}
 
                     <div style={cardSt}>
-                      <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: S.text3, margin: '0 0 14px' }}>Données & cache</h3>
+                      <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: S.text3, margin: '0 0 14px' }}>{t('dataCache')}</h3>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                         <button
                           onClick={() => {
@@ -964,7 +993,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                           className="sf-btn sf-btn-ghost sf-btn-sm"
                           style={{ display: 'flex', alignItems: 'center', gap: 9, textAlign: 'left', width: '100%' }}>
                           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
-                          Vider le cache local
+                          {t('clearCache')}
                         </button>
                         <button
                           onClick={() => {
@@ -984,25 +1013,25 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                           className="sf-btn sf-btn-ghost sf-btn-sm"
                           style={{ display: 'flex', alignItems: 'center', gap: 9, textAlign: 'left', width: '100%' }}>
                           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                          Exporter mes paramètres (JSON)
+                          {t('exportSettings')}
                         </button>
                         {!resetConfirm ? (
                           <button onClick={() => setResetConfirm(true)}
                             className="sf-btn sf-btn-danger sf-btn-sm"
                             style={{ display: 'flex', alignItems: 'center', gap: 9, textAlign: 'left', width: '100%' }}>
                             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-                            Réinitialiser tous les paramètres
+                            {t('resetAllSettings')}
                           </button>
                         ) : (
                           <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
                             <button onClick={() => { localStorage.clear(); window.location.reload() }}
                               className="sf-btn sf-btn-danger"
                               style={{ flex: 1 }}>
-                              Confirmer la réinitialisation
+                              {t('confirmReset')}
                             </button>
                             <button onClick={() => setResetConfirm(false)}
                               className="sf-btn sf-btn-secondary sf-btn-sm">
-                              Annuler
+                              {t('cancel')}
                             </button>
                           </div>
                         )}
@@ -1010,7 +1039,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                     </div>
 
                     <div style={{ textAlign: 'center', paddingTop: 8 }}>
-                      <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.3)', margin: 0 }}>ScaleFlow v2.0.0 · Electron · React · Supabase</p>
+                      <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.3)', margin: 0 }}>{t('version')}</p>
                     </div>
                   </div>
                 )}
@@ -1026,8 +1055,8 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
               {panel === 'profile' && (
                 <div className="sf-anim-slide-up" style={{ maxWidth: 560, display: 'flex', flexDirection: 'column', gap: 20 }}>
                   <div>
-                    <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0 }}>Profil</h2>
-                    <p style={{ fontSize: 13, color: S.text3, margin: '4px 0 0' }}>Informations de ton compte ScaleFlow.</p>
+                    <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0 }}>{t('profileTitle')}</h2>
+                    <p style={{ fontSize: 13, color: S.text3, margin: '4px 0 0' }}>{t('profileSub')}</p>
                   </div>
 
                   {/* Avatar card */}
@@ -1042,41 +1071,41 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                       {(displayName || profileName || user.email || '?').charAt(0).toUpperCase()}
                     </div>
                     <div style={{ flex: 1 }}>
-                      <p style={{ fontSize: 15, fontWeight: 700, color: S.text, margin: 0 }}>{displayName || profileName || 'Utilisateur'}</p>
+                      <p style={{ fontSize: 15, fontWeight: 700, color: S.text, margin: 0 }}>{displayName || profileName || t('user')}</p>
                       <p style={{ fontSize: 12, color: S.text3, margin: '3px 0 6px' }}>{user.email}</p>
                       <span className={`sf-badge ${role === 'owner' ? 'sf-badge-accent' : role === 'admin' ? 'sf-badge-accent' : 'sf-badge-muted'}`}>
-                        {role === 'owner' ? 'Propriétaire' : role === 'admin' ? 'Admin' : role === 'member' ? 'Membre' : 'Solo'}
+                        {role === 'owner' ? t('owner') : role === 'admin' ? t('admin') : role === 'member' ? t('member') : t('solo')}
                       </span>
                     </div>
                   </div>
 
                   {/* Form */}
                   <div style={{ ...cardSt, display: 'flex', flexDirection: 'column', gap: 16 }}>
-                    <h3 style={cardTitleSt}>Informations personnelles</h3>
+                    <h3 style={cardTitleSt}>{t('personalInfo')}</h3>
                     <div>
                       <label style={{ fontSize: 12, fontWeight: 600, color: 'rgba(148,163,184,0.65)', marginBottom: 6, display: 'block', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Email</label>
                       <input type="email" className="sf-input" value={profileEmail} onChange={e => setProfileEmail(e.target.value)} style={{ width: '100%' }} />
                     </div>
                     <div>
-                      <label style={{ fontSize: 12, fontWeight: 600, color: 'rgba(148,163,184,0.65)', marginBottom: 6, display: 'block', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Nom complet</label>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: 'rgba(148,163,184,0.65)', marginBottom: 6, display: 'block', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('fullName')}</label>
                       <input className="sf-input" placeholder="Jean Dupont" value={profileName} onChange={e => setProfileName(e.target.value)} style={{ width: '100%' }} />
                     </div>
                     <div>
-                      <label style={{ fontSize: 12, fontWeight: 600, color: 'rgba(148,163,184,0.65)', marginBottom: 6, display: 'block', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Pseudo</label>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: 'rgba(148,163,184,0.65)', marginBottom: 6, display: 'block', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('username')}</label>
                       <input className="sf-input" placeholder="@jean" value={displayName} onChange={e => setDisplayName(e.target.value)} style={{ width: '100%' }} />
                     </div>
                   </div>
 
                   {/* Danger zone */}
                   <div style={{ ...cardSt, background: 'rgba(239,68,68,0.03)', border: '1px solid rgba(239,68,68,0.15)' }}>
-                    <h3 style={{ ...cardTitleSt, color: '#EF4444', marginBottom: 12 }}>Zone dangereuse</h3>
-                    <p style={{ fontSize: 12, color: 'rgba(148,163,184,0.5)', marginBottom: 14, marginTop: 0 }}>Ces actions sont irréversibles. Procède avec prudence.</p>
+                    <h3 style={{ ...cardTitleSt, color: '#EF4444', marginBottom: 12 }}>{t('dangerZone')}</h3>
+                    <p style={{ fontSize: 12, color: 'rgba(148,163,184,0.5)', marginBottom: 14, marginTop: 0 }}>{t('dangerZoneSub')}</p>
                     <button
                       onClick={async () => { await supabase.auth.signOut() }}
                       className="sf-btn sf-btn-danger sf-btn-sm"
                       style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
                       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-                      Se déconnecter
+                      {t('signOutBtn')}
                     </button>
                   </div>
 
@@ -1088,8 +1117,8 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
               {panel === 'connexions' && canSeeConnexions && (
                 <div className="sf-anim-slide-up" style={{ maxWidth: 560, display: 'flex', flexDirection: 'column', gap: 20 }}>
                   <div>
-                    <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0 }}>Connexions</h2>
-                    <p style={{ fontSize: 13, color: S.text3, margin: '4px 0 0' }}>Clés API et tokens de connexion aux services externes.</p>
+                    <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0 }}>{t('connexionsTitle')}</h2>
+                    <p style={{ fontSize: 13, color: S.text3, margin: '4px 0 0' }}>{t('connexionsSub')}</p>
                   </div>
 
                   {/* Org/solo notice */}
@@ -1100,28 +1129,28 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                       : { background: 'rgba(255,255,255,0.04)', border: `1px solid ${S.border}`, color: S.text3 }),
                   }}>
                     {currentOrg
-                      ? <><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg><span>Organisation — <strong>{currentOrg.name}</strong>{!canEditOrgConnexions && <span style={{ color: '#F59E0B' }}> · Lecture seule</span>}</span></>
-                      : <><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg><span>Mode solo — ces clés sont privées à ton compte</span></>}
+                      ? <><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg><span>{t('orgMode')} — <strong>{currentOrg.name}</strong>{!canEditOrgConnexions && <span style={{ color: '#F59E0B' }}> · {t('readOnly')}</span>}</span></>
+                      : <><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg><span>{t('soloMode')}</span></>}
                   </div>
 
                   <div style={{ ...cardSt, display: 'flex', flexDirection: 'column', gap: 16 }}>
                     <h3 style={cardTitleSt}>GéeLark</h3>
                     <div>
-                      <label style={{ fontSize: 12, fontWeight: 600, color: 'rgba(148,163,184,0.65)', marginBottom: 6, display: 'block', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Bearer Token</label>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: 'rgba(148,163,184,0.65)', marginBottom: 6, display: 'block', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('bearerToken')}</label>
                       <input type="password" className="sf-input" placeholder="Bearer …" value={bearer} onChange={e => setBearer(e.target.value)} disabled={!!currentOrg && !canEditOrgConnexions} style={{ width: '100%' }} />
                     </div>
                     <div>
-                      <label style={{ fontSize: 12, fontWeight: 600, color: 'rgba(148,163,184,0.65)', marginBottom: 6, display: 'block', textTransform: 'uppercase', letterSpacing: '0.06em' }}>URL Proxy (optionnel)</label>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: 'rgba(148,163,184,0.65)', marginBottom: 6, display: 'block', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('proxyUrl')}</label>
                       <input className="sf-input" placeholder="http://proxy:8080" value={proxyUrl} onChange={e => setProxyUrl(e.target.value)} disabled={!!currentOrg && !canEditOrgConnexions} style={{ width: '100%' }} />
                     </div>
                     <div>
-                      <label style={{ fontSize: 12, fontWeight: 600, color: 'rgba(148,163,184,0.65)', marginBottom: 6, display: 'block', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Session ID Instagram</label>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: 'rgba(148,163,184,0.65)', marginBottom: 6, display: 'block', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('igSessionId')}</label>
                       <input type="password" className="sf-input" placeholder="sessionid=…" value={igSession} onChange={e => setIgSession(e.target.value)} disabled={!!currentOrg && !canEditOrgConnexions} style={{ width: '100%' }} />
                     </div>
                   </div>
 
                   <div style={{ ...cardSt, display: 'flex', flexDirection: 'column', gap: 16 }}>
-                    <h3 style={cardTitleSt}>Clés API IA</h3>
+                    <h3 style={cardTitleSt}>{t('aiApiKeys')}</h3>
                     <div>
                       <label style={{ fontSize: 12, fontWeight: 600, color: 'rgba(148,163,184,0.65)', marginBottom: 6, display: 'block', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Groq API Key</label>
                       <input type="password" className="sf-input" placeholder="gsk_…" value={groqKey} onChange={e => setGroqKey(e.target.value)} disabled={!!currentOrg && !canEditOrgConnexions} style={{ width: '100%' }} />
@@ -1165,23 +1194,24 @@ const DL_MAC = `${SUPABASE_STORAGE}/ScaleFlow-latest.dmg`
 
 type StyleObj = { text: string; text2: string; text3: string; border: string; base: string; accent3: string }
 function DesktopDownloadPanel({ S }: { S: StyleObj }) {
+  const t = useT()
   const isElectron = !!(window as any).electronAPI
   return (
     <div className="sf-anim-slide-up" style={{ maxWidth: 540, display: 'flex', flexDirection: 'column', gap: 20, padding: '28px 28px 0' }}>
       <div>
-        <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0 }}>Application Desktop</h2>
+        <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0 }}>{t('desktopTitle')}</h2>
         <p style={{ fontSize: 13, color: S.text3, margin: '4px 0 0' }}>
-          {isElectron ? '✅ Tu utilises déjà l\'application desktop.' : 'Installe ScaleFlow sur ton PC pour accéder aux fonctionnalités avancées (AdsPower, FFmpeg local, notifications).'}
+          {isElectron ? t('desktopAlready') : t('desktopSub')}
         </p>
       </div>
 
       {/* Feature list */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {[
-          { icon: '🔔', label: 'Notifications sonores en temps réel' },
-          { icon: '⚡', label: 'Fonctionne même fenêtre minimisée' },
-          { icon: '🎬', label: 'FFmpeg local — remix & cloneVid ultra rapide' },
-          { icon: '🤝', label: 'Intégration AdsPower native' },
+          { icon: '🔔', label: t('desktopFeature1') },
+          { icon: '⚡', label: t('desktopFeature2') },
+          { icon: '🎬', label: t('desktopFeature3') },
+          { icon: '🤝', label: t('desktopFeature4') },
         ].map(f => (
           <div key={f.label} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
             <span style={{ fontSize: 16 }}>{f.icon}</span>
@@ -1201,7 +1231,7 @@ function DesktopDownloadPanel({ S }: { S: StyleObj }) {
             boxShadow: '0 4px 16px rgba(124,58,237,0.35)',
           }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            Télécharger pour Windows (.exe)
+            {t('downloadWindows')}
           </button>
         </a>
         <a href={DL_MAC} download="ScaleFlow-latest.dmg" style={{ textDecoration: 'none' }}>
@@ -1212,15 +1242,15 @@ function DesktopDownloadPanel({ S }: { S: StyleObj }) {
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9,
           }}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-            Mac (.dmg)
+            {t('downloadMac')}
           </button>
         </a>
       </div>
 
       {/* Install instructions */}
       <div style={{ padding: '12px 14px', borderRadius: 10, background: 'rgba(124,58,237,0.06)', border: '1px solid rgba(124,58,237,0.15)' }}>
-        <p style={{ fontSize: 12, fontWeight: 700, color: S.text3, margin: '0 0 8px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Installation Windows</p>
-        {['1. Télécharge le fichier ScaleFlow-Setup.exe', '2. Double-clique pour installer', '3. Connecte-toi avec tes identifiants habituels'].map((s, i) => (
+        <p style={{ fontSize: 12, fontWeight: 700, color: S.text3, margin: '0 0 8px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('installInstructions')}</p>
+        {[t('installStep1'), t('installStep2'), t('installStep3')].map((s, i) => (
           <p key={i} style={{ fontSize: 12, color: S.text3, margin: '3px 0 0' }}>{s}</p>
         ))}
       </div>
@@ -1252,7 +1282,7 @@ function genKey() {
 function daysLeft(exp: string | null) {
   if (!exp) return '∞ vie'
   const d = Math.ceil((new Date(exp).getTime() - Date.now()) / 86_400_000)
-  return d < 0 ? 'Expiré' : d === 0 ? "Expire auj." : `${d}j`
+  return d < 0 ? 'Expiré' : d === 0 ? 'Expire auj.' : `${d}j`
 }
 
 function daysColor(exp: string | null) {
@@ -1262,6 +1292,7 @@ function daysColor(exp: string | null) {
 }
 
 function AdminPanel({ user: _user }: { user: User }) {
+  const t = useT()
   const [keys, setKeys]       = useState<LicenseKey[]>([])
   const [loading, setLoading] = useState(true)
   const [newKey, setNewKey]   = useState(genKey)
@@ -1328,10 +1359,10 @@ function AdminPanel({ user: _user }: { user: User }) {
       {/* Stats */}
       <div className="grid grid-cols-4 gap-6">
         {[
-          ['Total', stats.total, 'text-text'],
-          ['Dispo', stats.dispo, 'text-green-400'],
-          ['Actives', stats.actives, 'text-blue-400'],
-          ['Expirées', stats.expirées, 'text-red-400'],
+          [t('totalKeys'),   stats.total,    'text-text'],
+          [t('availableKeys'), stats.dispo,  'text-green-400'],
+          [t('activeKeys'),  stats.actives,  'text-blue-400'],
+          [t('expiredKeys'), stats.expirées, 'text-red-400'],
         ].map(([l, v, c]) => (
           <div key={l as string} className="rounded-2xl p-6 text-center" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(139,92,246,0.12)' }}>
             <p className={`text-2xl font-black ${c}`}>{v}</p>
@@ -1340,9 +1371,9 @@ function AdminPanel({ user: _user }: { user: User }) {
         ))}
       </div>
 
-      {/* Créer */}
+      {/* Create key */}
       <div className="rounded-2xl p-6 space-y-4" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(139,92,246,0.15)' }}>
-        <p className="text-[15px] font-bold text-white mb-4">Créer une clé</p>
+        <p className="text-[15px] font-bold text-white mb-4">{t('createKey')}</p>
         <div className="flex gap-2">
           <input
             value={newKey}
@@ -1370,16 +1401,16 @@ function AdminPanel({ user: _user }: { user: User }) {
             </button>
           ))}
         </div>
-        <Input value={notes} onChange={e => setNotes(e.target.value)} placeholder="Notes (ex: Discord @pseudo)" />
+        <Input value={notes} onChange={e => setNotes(e.target.value)} placeholder={t('keyNotes')} />
         {createErr && <p className="text-[13px] text-red-400 text-center">{createErr}</p>}
-        <Button onClick={create} loading={creating} className="w-full">+ Créer la clé</Button>
+        <Button onClick={create} loading={creating} className="w-full">{t('createKeyBtn')}</Button>
       </div>
 
-      {/* Liste */}
+      {/* Key list */}
       <div className="space-y-3">
-        <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher clé ou email…" />
-        {loading ? <p className="text-[13px] text-text2 text-center py-8">Chargement…</p> : filtered.length === 0 ? (
-          <p className="text-[13px] text-text2 text-center py-8">Aucune clé</p>
+        <Input value={search} onChange={e => setSearch(e.target.value)} placeholder={t('searchKeyOrEmail')} />
+        {loading ? <p className="text-[13px] text-text2 text-center py-8">{t('loading')}</p> : filtered.length === 0 ? (
+          <p className="text-[13px] text-text2 text-center py-8">{t('noKeys')}</p>
         ) : filtered.map(k => (
           <div key={k.id} className={`rounded-xl px-5 py-4 flex flex-wrap items-center gap-2 ${!k.is_active ? 'opacity-50' : ''}`}
             style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(139,92,246,0.1)' }}>
@@ -1388,17 +1419,17 @@ function AdminPanel({ user: _user }: { user: User }) {
             </button>
             <span className="text-[12px] px-2 py-0.5 rounded-full capitalize" style={{ background: 'rgba(139,92,246,0.15)', color: '#a78bfa' }}>{k.plan}</span>
             {!k.is_active
-              ? <span className="text-[12px] px-2 py-0.5 rounded-full bg-red-500/10 text-red-400">Révoquée</span>
+              ? <span className="text-[12px] px-2 py-0.5 rounded-full bg-red-500/10 text-red-400">{t('keyRevoked')}</span>
               : k.user_id
-                ? <span className="text-[12px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400">Activée</span>
-                : <span className="text-[12px] px-2 py-0.5 rounded-full bg-green-500/10 text-green-400">Dispo</span>
+                ? <span className="text-[12px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400">{t('keyActivated')}</span>
+                : <span className="text-[12px] px-2 py-0.5 rounded-full bg-green-500/10 text-green-400">{t('keyAvailable')}</span>
             }
             <span className={`text-[13px] font-semibold ml-auto ${daysColor(k.expires_at)}`}>{daysLeft(k.expires_at)}</span>
             {k.user_email && <span className="text-[12px] text-text2 truncate max-w-[140px]">{k.user_email}</span>}
             {k.notes && <span className="text-[12px] text-text2 italic truncate max-w-[100px]">{k.notes}</span>}
             <div className="flex gap-1">
-              {k.is_active && <button onClick={() => revoke(k.id)} className="text-[12px] px-2 py-1 rounded text-orange-400 hover:bg-orange-400/10">Révoquer</button>}
-              <button onClick={() => del(k.id)} className="text-[12px] px-2 py-1 rounded text-red-400 hover:bg-red-400/10">Suppr.</button>
+              {k.is_active && <button onClick={() => revoke(k.id)} className="text-[12px] px-2 py-1 rounded text-orange-400 hover:bg-orange-400/10">{t('revoke')}</button>}
+              <button onClick={() => del(k.id)} className="text-[12px] px-2 py-1 rounded text-red-400 hover:bg-red-400/10">{t('delete')}</button>
             </div>
           </div>
         ))}
@@ -1409,6 +1440,8 @@ function AdminPanel({ user: _user }: { user: User }) {
 
 // ── Subscription panel ───────────────────────────────────────────────────────
 function SubscriptionPanel() {
+  const t = useT()
+  const { lang } = useLang()
   const license = useLicense()
   const { balance: creditBalance, refresh: refreshCredits } = useCredits()
   const [licenseKey, setLicenseKey] = useState<string | null>(null)
@@ -1425,15 +1458,15 @@ function SubscriptionPanel() {
     setKeyLoading(true); setKeyResult(null)
     const { activateKey } = await import('@/lib/license')
     const userId = (await supabase.auth.getUser()).data.user?.id
-    if (!userId) { setKeyLoading(false); setKeyResult({ ok: false, text: 'Non connecté' }); return }
+    if (!userId) { setKeyLoading(false); setKeyResult({ ok: false, text: t('notConnected') }); return }
     const res = await activateKey(newKey.trim(), userId)
     setKeyLoading(false)
     if (res.success) {
-      setKeyResult({ ok: true, text: '✓ Clé activée avec succès !' })
+      setKeyResult({ ok: true, text: `✓ ${t('licenseSuccess')}` })
       setNewKey('')
       setLicenseKey(newKey.trim().toUpperCase())
     } else {
-      setKeyResult({ ok: false, text: res.error ?? 'Clé invalide' })
+      setKeyResult({ ok: false, text: res.error ?? t('licenseError') })
     }
   }
 
@@ -1463,15 +1496,15 @@ function SubscriptionPanel() {
     setCodeLoading(true); setCodeResult(null)
     const { redeemCreditCode } = await import('@/lib/credits')
     const userId = (await supabase.auth.getUser()).data.user?.id
-    if (!userId) { setCodeLoading(false); setCodeResult({ ok: false, text: 'Non connecté' }); return }
+    if (!userId) { setCodeLoading(false); setCodeResult({ ok: false, text: t('notConnected') }); return }
     const res = await redeemCreditCode(creditCode.trim(), userId)
     setCodeLoading(false)
     if (res.ok) {
-      setCodeResult({ ok: true, text: `✓ +${res.amount} crédits ajoutés ! Nouveau solde : ${res.balance}` })
+      setCodeResult({ ok: true, text: `✓ +${res.amount} ${t('creditsCosts')} ! ${lang === 'en' ? 'New balance' : 'Nouveau solde'} : ${res.balance}` })
       setCreditCode('')
       refreshCredits()
     } else {
-      setCodeResult({ ok: false, text: res.error ?? 'Code invalide' })
+      setCodeResult({ ok: false, text: res.error ?? t('licenseError') })
     }
   }
 
@@ -1480,46 +1513,48 @@ function SubscriptionPanel() {
     : license.daysLeft <= 7  ? '#F59E0B'
     : '#22C55E'
 
-  const statusLabel = !license.valid ? 'Inactif'
-    : license.source === 'org_owner' ? 'Via organisation'
-    : license.daysLeft === null ? 'Actif — à vie'
-    : license.daysLeft <= 0 ? 'Expiré'
-    : `Actif — ${license.daysLeft}j restants`
+  const statusLabel = !license.valid ? t('statusInactive')
+    : license.source === 'org_owner' ? t('statusViaOrg')
+    : license.daysLeft === null ? t('statusLifetime')
+    : license.daysLeft <= 0 ? t('statusExpired')
+    : `${t('statusDaysLeft')} ${license.daysLeft} ${t('daysLeft')}`
 
   const planLabel   = license.plan === 'organisation' ? 'Organisation' : license.plan === 'pro' ? 'Pro' : license.plan === 'standard' ? 'Standard' : '—'
   const planCredits = license.plan === 'organisation' ? 11000 : license.plan === 'pro' ? 5500 : license.plan === 'standard' ? 2500 : 0
   const maxPhones   = license.plan === 'organisation' ? '∞' : license.plan === 'pro' ? '200' : license.plan === 'standard' ? '50' : '—'
 
+  const locale = lang === 'en' ? 'en-US' : 'fr-FR'
+
   return (
     <div className="space-y-6 max-w-2xl">
       {/* Current status */}
       <div className="rounded-2xl p-6 space-y-4" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(139,92,246,0.18)' }}>
-        <p className="text-[15px] font-bold text-white mb-4">Mon abonnement actuel</p>
+        <p className="text-[15px] font-bold text-white mb-4">{t('mySubscription')}</p>
 
         <div className="flex items-center justify-between">
-          <span className="text-[13px] text-text2">Statut</span>
+          <span className="text-[13px] text-text2">{t('status')}</span>
           <span className="text-[13px] font-bold" style={{ color: statusColor }}>{statusLabel}</span>
         </div>
 
         {license.plan && (
           <div className="flex items-center justify-between">
-            <span className="text-[13px] text-text2">Plan</span>
+            <span className="text-[13px] text-text2">{t('plan')}</span>
             <span className="text-[13px] font-bold" style={{ color: '#a78bfa' }}>{planLabel}</span>
           </div>
         )}
 
         {license.expiresAt && (
           <div className="flex items-center justify-between">
-            <span className="text-[13px] text-text2">Expiration</span>
+            <span className="text-[13px] text-text2">{t('expiration')}</span>
             <span className="text-[13px] font-semibold text-text">
-              {license.expiresAt.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
+              {license.expiresAt.toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' })}
             </span>
           </div>
         )}
 
         {licenseKey && (
           <div className="space-y-2">
-            <p className="text-[12px] text-text2">Clé de licence</p>
+            <p className="text-[12px] text-text2">{t('licenseKey')}</p>
             <div className="flex items-center gap-2">
               <code className="flex-1 rounded-xl px-4 py-2.5 text-[13px] font-mono tracking-widest text-text2 truncate" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
                 {licenseKey}
@@ -1529,7 +1564,7 @@ function SubscriptionPanel() {
                 className="px-4 py-2.5 rounded-xl text-[13px] font-semibold transition-all flex-shrink-0"
                 style={{ background: copied ? 'rgba(34,197,94,0.12)' : 'rgba(139,92,246,0.1)', color: copied ? '#22C55E' : '#a78bfa', border: `1px solid ${copied ? 'rgba(34,197,94,0.25)' : 'rgba(139,92,246,0.2)'}` }}
               >
-                {copied ? 'Copié' : 'Copier'}
+                {copied ? t('copied') : t('copy')}
               </button>
             </div>
           </div>
@@ -1538,7 +1573,7 @@ function SubscriptionPanel() {
 
       {/* Activate a license key */}
       <div className="rounded-2xl p-6 space-y-4" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(139,92,246,0.18)' }}>
-        <p className="text-[15px] font-bold text-white mb-4">Activer une clé</p>
+        <p className="text-[15px] font-bold text-white mb-4">{t('activateLicense')}</p>
         <form onSubmit={handleActivateKey} className="flex gap-2">
           <input
             value={newKey}
@@ -1554,7 +1589,7 @@ function SubscriptionPanel() {
             disabled={keyLoading || !newKey.trim()}
             className="rounded-xl px-5 py-2.5 text-[13px] font-semibold text-white disabled:opacity-40 transition-all"
             style={{ background: 'linear-gradient(135deg,#7C3AED,#6D28D9)' }}
-          >{keyLoading ? '…' : 'Activer'}</button>
+          >{keyLoading ? '…' : t('activate')}</button>
         </form>
         {keyResult && (
           <p className={`text-[13px] ${keyResult.ok ? 'text-ok' : 'text-danger'}`}>{keyResult.text}</p>
@@ -1563,29 +1598,29 @@ function SubscriptionPanel() {
 
       {/* Credits */}
       <div className="rounded-2xl p-6 space-y-5" style={{ background: 'rgba(139,92,246,0.04)', border: '1px solid rgba(139,92,246,0.2)' }}>
-        <p className="text-[15px] font-bold text-white mb-4">Crédits</p>
+        <p className="text-[15px] font-bold text-white mb-4">{t('credits')}</p>
 
         <div className="flex items-center justify-between">
-          <span className="text-[13px] text-text2">Solde actuel</span>
+          <span className="text-[13px] text-text2">{t('currentBalance')}</span>
           <span className="text-3xl font-black" style={{ color: creditBalance < 10 ? '#EF4444' : '#a78bfa' }}>
-            {creditBalance.toLocaleString('fr-FR')}
+            {creditBalance.toLocaleString(locale)}
           </span>
         </div>
 
         {planCredits > 0 && (
           <div className="flex items-center justify-between">
-            <span className="text-[13px] text-text2">Crédits mensuels inclus (plan {planLabel})</span>
-            <span className="text-[13px] font-semibold text-text">{planCredits.toLocaleString('fr-FR')} / mois</span>
+            <span className="text-[13px] text-text2">{t('monthlyCreditsIncluded')} {planLabel})</span>
+            <span className="text-[13px] font-semibold text-text">{planCredits.toLocaleString(locale)} {t('perMonth')}</span>
           </div>
         )}
 
         <div className="rounded-xl p-4 space-y-2" style={{ background: 'rgba(0,0,0,0.2)' }}>
-          <p className="text-[12px] font-bold uppercase tracking-wider text-text2 mb-3">Coût des opérations</p>
+          <p className="text-[12px] font-bold uppercase tracking-wider text-text2 mb-3">{t('operationCosts')}</p>
           {[
-            ['Posting', '1 crédit / tél.'],
-            ['Mass Posting', '2 crédits / tél.'],
-            ['Montage vidéo', '1 crédit'],
-            ['Remix vidéo', '2 crédits'],
+            ['Posting', `1 ${t('creditsCost')} ${t('perPhone')}`],
+            ['Mass Posting', `2 ${t('creditsCosts')} ${t('perPhone')}`],
+            [lang === 'en' ? 'Video Montage' : 'Montage vidéo', `1 ${t('creditsCost')}`],
+            [lang === 'en' ? 'Video Remix' : 'Remix vidéo', `2 ${t('creditsCosts')}`],
           ].map(([op, cost]) => (
             <div key={op} className="flex justify-between">
               <span className="text-[13px] text-text2">{op}</span>
@@ -1595,16 +1630,16 @@ function SubscriptionPanel() {
         </div>
 
         <div className="rounded-xl p-4" style={{ background: 'rgba(0,0,0,0.2)' }}>
-          <p className="text-[12px] font-bold uppercase tracking-wider text-text2 mb-3">Téléphones GéeLark</p>
+          <p className="text-[12px] font-bold uppercase tracking-wider text-text2 mb-3">{t('geelarkPhones')}</p>
           <div className="flex justify-between">
-            <span className="text-[13px] text-text2">Maximum autorisé</span>
+            <span className="text-[13px] text-text2">{t('maxAllowed')}</span>
             <span className="text-[13px] font-semibold" style={{ color: maxPhones === '∞' ? '#22C55E' : '#a78bfa' }}>{maxPhones}</span>
           </div>
         </div>
 
         {/* Redeem code */}
         <div className="space-y-3 pt-2" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-          <p className="text-[13px] font-semibold text-text2">Activer un code crédit</p>
+          <p className="text-[13px] font-semibold text-text2">{t('redeemCreditCode')}</p>
           <form onSubmit={handleRedeemCode} className="flex gap-2">
             <input
               value={creditCode}
@@ -1620,7 +1655,7 @@ function SubscriptionPanel() {
               className="px-5 py-2.5 rounded-xl text-[13px] font-bold text-white transition-all disabled:opacity-40"
               style={{ background: 'linear-gradient(135deg,#7C3AED,#6D28D9)' }}
             >
-              {codeLoading ? '…' : 'Activer'}
+              {codeLoading ? '…' : t('activate')}
             </button>
           </form>
           {codeResult && (
@@ -1631,7 +1666,7 @@ function SubscriptionPanel() {
 
       {/* Plan pricing */}
       <div>
-        <p className="text-[15px] font-bold text-white mb-6">Abonnements</p>
+        <p className="text-[15px] font-bold text-white mb-6">{t('subscriptions')}</p>
         <div className="grid grid-cols-3 gap-4">
 
           {/* Standard */}
@@ -1640,11 +1675,17 @@ function SubscriptionPanel() {
               <p className="text-[12px] font-black uppercase tracking-wider" style={{ color: '#60a5fa' }}>Standard</p>
               <div className="flex items-baseline gap-1 mt-1.5">
                 <span className="text-2xl font-black text-white">49,99$</span>
-                <span className="text-[12px] text-text2">/ mois</span>
+                <span className="text-[12px] text-text2">{t('perMonth')}</span>
               </div>
             </div>
             <ul className="space-y-1.5 flex-1">
-              {['2 500 crédits / mois', '50 téléphones max', 'Toutes les fonctionnalités', 'Mass Posting — 10 comptes', 'Support 24/7'].map(f => (
+              {[
+                `2 500 ${t('creditsCosts')} ${t('perMonth')}`,
+                `50 ${t('perPhones')} max`,
+                lang === 'en' ? 'All features' : 'Toutes les fonctionnalités',
+                `Mass Posting — 10 ${lang === 'en' ? 'accounts' : 'comptes'}`,
+                'Support 24/7',
+              ].map(f => (
                 <li key={f} className="flex items-start gap-2 text-[12px] text-text2">
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginTop: 2, flexShrink: 0 }}><polyline points="20 6 9 17 4 12"/></svg>{f}
                 </li>
@@ -1653,24 +1694,30 @@ function SubscriptionPanel() {
             <a href="https://t.me/justquentin" target="_blank" rel="noreferrer"
               className="block w-full py-2.5 rounded-xl text-[12px] font-bold text-center text-white transition-all hover:brightness-110"
               style={{ background: 'rgba(96,165,250,0.2)', border: '1px solid rgba(96,165,250,0.35)' }}>
-              Obtenir →
+              {t('getBtn')}
             </a>
           </div>
 
           {/* Pro */}
           <div className="rounded-2xl p-5 space-y-4 flex flex-col relative overflow-hidden" style={{ background: 'linear-gradient(145deg,rgba(236,72,153,0.08),rgba(124,58,237,0.08))', border: '1px solid rgba(236,72,153,0.4)' }}>
             <div className="absolute top-2.5 right-2.5 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider" style={{ background: 'linear-gradient(135deg,#7c3aed,#ec4899)', color: '#fff' }}>
-              Populaire
+              {t('popular')}
             </div>
             <div>
               <p className="text-[12px] font-black uppercase tracking-wider" style={{ color: '#f472b6' }}>Pro</p>
               <div className="flex items-baseline gap-1 mt-1.5">
                 <span className="text-2xl font-black text-white">99,99$</span>
-                <span className="text-[12px] text-text2">/ mois</span>
+                <span className="text-[12px] text-text2">{t('perMonth')}</span>
               </div>
             </div>
             <ul className="space-y-1.5 flex-1">
-              {['5 500 crédits / mois', '200 téléphones max', 'Toutes les fonctionnalités', 'Mass Posting illimité', 'Support 24/7'].map(f => (
+              {[
+                `5 500 ${t('creditsCosts')} ${t('perMonth')}`,
+                `200 ${t('perPhones')} max`,
+                lang === 'en' ? 'All features' : 'Toutes les fonctionnalités',
+                `Mass Posting ${lang === 'en' ? 'unlimited' : 'illimité'}`,
+                'Support 24/7',
+              ].map(f => (
                 <li key={f} className="flex items-start gap-2 text-[12px] text-text2">
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#f472b6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginTop: 2, flexShrink: 0 }}><polyline points="20 6 9 17 4 12"/></svg>{f}
                 </li>
@@ -1679,7 +1726,7 @@ function SubscriptionPanel() {
             <a href="https://t.me/justquentin" target="_blank" rel="noreferrer"
               className="block w-full py-2.5 rounded-xl text-[12px] font-bold text-center text-white transition-all"
               style={{ background: 'linear-gradient(135deg,#7c3aed,#ec4899)', boxShadow: '0 2px 16px -4px rgba(236,72,153,0.4)' }}>
-              Obtenir →
+              {t('getBtn')}
             </a>
           </div>
 
@@ -1689,11 +1736,18 @@ function SubscriptionPanel() {
               <p className="text-[12px] font-black uppercase tracking-wider" style={{ color: '#22C55E' }}>Organisation</p>
               <div className="flex items-baseline gap-1 mt-1.5">
                 <span className="text-2xl font-black text-white">149,99$</span>
-                <span className="text-[12px] text-text2">/ mois</span>
+                <span className="text-[12px] text-text2">{t('perMonth')}</span>
               </div>
             </div>
             <ul className="space-y-1.5 flex-1">
-              {['11 000 crédits / mois', 'Téléphones illimités', 'Toutes les fonctionnalités', 'Mass Posting illimité', 'Support 24/7 prioritaire', 'Proposition d\'ajouts'].map(f => (
+              {[
+                `11 000 ${t('creditsCosts')} ${t('perMonth')}`,
+                lang === 'en' ? 'Unlimited phones' : 'Téléphones illimités',
+                lang === 'en' ? 'All features' : 'Toutes les fonctionnalités',
+                `Mass Posting ${lang === 'en' ? 'unlimited' : 'illimité'}`,
+                `Support 24/7 ${lang === 'en' ? 'priority' : 'prioritaire'}`,
+                lang === 'en' ? 'Feature suggestions' : "Proposition d'ajouts",
+              ].map(f => (
                 <li key={f} className="flex items-start gap-2 text-[12px] text-text2">
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#22C55E" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginTop: 2, flexShrink: 0 }}><polyline points="20 6 9 17 4 12"/></svg>{f}
                 </li>
@@ -1702,14 +1756,14 @@ function SubscriptionPanel() {
             <a href="https://t.me/justquentin" target="_blank" rel="noreferrer"
               className="block w-full py-2.5 rounded-xl text-[12px] font-bold text-center text-white transition-all hover:brightness-110"
               style={{ background: 'rgba(34,197,94,0.2)', border: '1px solid rgba(34,197,94,0.35)' }}>
-              Obtenir →
+              {t('getBtn')}
             </a>
           </div>
         </div>
 
         {/* Credit packs */}
         <div className="mt-6">
-          <p className="text-[13px] font-bold text-white mb-3">Packs de crédits</p>
+          <p className="text-[13px] font-bold text-white mb-3">{t('creditPacks')}</p>
           <div className="grid grid-cols-5 gap-3">
             {[
               { cr: '500',    price: '19,99$' },
@@ -1722,7 +1776,7 @@ function SubscriptionPanel() {
                 className="rounded-xl p-3.5 text-center transition-all hover:brightness-110 no-underline"
                 style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(139,92,246,0.15)', textDecoration: 'none' }}>
                 <div className="text-[15px] font-black text-white">{pk.cr}</div>
-                <div className="text-[10px] text-text2 mb-1.5">crédits</div>
+                <div className="text-[10px] text-text2 mb-1.5">{t('creditsCosts')}</div>
                 <div className="text-[12px] font-bold" style={{ color: '#a78bfa' }}>{pk.price}</div>
               </a>
             ))}
@@ -1740,8 +1794,8 @@ function SubscriptionPanel() {
             <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.833.941z"/>
           </svg>
           <div>
-            <p className="text-[13px] font-bold text-text">Commander via Telegram</p>
-            <p className="text-[12px] text-text2">Crypto / virement — clé envoyée immédiatement · @justquentin</p>
+            <p className="text-[13px] font-bold text-text">{t('orderViaTelegram')}</p>
+            <p className="text-[12px] text-text2">{t('telegramSub')}</p>
           </div>
           <div className="ml-auto text-[#29b6f6] text-lg">→</div>
         </a>

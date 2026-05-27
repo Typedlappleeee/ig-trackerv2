@@ -400,6 +400,7 @@ function BetaPopup({ onClose }: { onClose: () => void }) {
     </div>
   )
 }
+import { LangProvider } from '@/lib/i18n'
 import { initPoller, stopPoller } from '@/lib/phonePoller'
 import { initIgStatsPoller } from '@/lib/igStatsPoller'
 import { Dashboard }         from '@/pages/Dashboard'
@@ -630,7 +631,7 @@ export default function App() {
       {splashDone && (
         loading        ? <FullPageLoader /> :
         !user          ? <AuthPage />       :
-        <OrgProvider user={user}><AppContent user={user} /></OrgProvider>
+        <LangProvider><OrgProvider user={user}><AppContent user={user} /></OrgProvider></LangProvider>
       )}
       <FlameOverlay />
     </>

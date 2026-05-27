@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button'
 import { MetadataChanger } from './MetadataChanger'
 import { VisionTools, type VisionToolId } from './VisionTools'
 import { TextCopy } from './TextCopy'
+import { useT, useLang } from '@/lib/i18n'
 
 interface AiToolsProps { user: User }
 
@@ -30,6 +31,7 @@ async function groqCall(apiKey: string, prompt: string, maxTokens = 600): Promis
 }
 
 function CopyButton({ text }: { text: string }) {
+  const t = useT()
   const [copied, setCopied] = useState(false)
   return (
     <button
@@ -41,7 +43,7 @@ function CopyButton({ text }: { text: string }) {
         border: `1px solid ${copied ? 'rgba(34,197,94,0.25)' : 'rgba(139,92,246,0.2)'}`,
       }}>
       <span>{copied ? '✓' : '⎘'}</span>
-      <span>{copied ? 'COPIÉ' : 'COPIER'}</span>
+      <span>{copied ? t('copied').toUpperCase() : t('copy').toUpperCase()}</span>
     </button>
   )
 }
@@ -94,6 +96,7 @@ function SelectInput({ value, onChange, options }: { value: string; onChange: (v
 function ToolShell({ title, icon, children, onBack, error }: {
   title: string; icon: string; children: React.ReactNode; onBack: () => void; error?: string | null
 }) {
+  const t = useT()
   return (
     <div className="h-full flex flex-col overflow-hidden bg-bg anim-page">
       {/* Header */}
@@ -102,7 +105,7 @@ function ToolShell({ title, icon, children, onBack, error }: {
           <button onClick={onBack}
             className="rounded-xl px-4 py-2.5 text-[12px] font-bold font-mono uppercase tracking-wider flex-shrink-0 transition-all"
             style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)', color: '#a78bfa' }}>
-            ← Retour
+            ← {t('back')}
           </button>
           <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
             style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.2), rgba(236,72,153,0.1))', border: '1px solid rgba(139,92,246,0.3)' }}>
@@ -110,7 +113,7 @@ function ToolShell({ title, icon, children, onBack, error }: {
           </div>
           <div>
             <h1 className="text-[20px] font-black text-text leading-none">{title}</h1>
-            <p className="text-[11px] text-text3 font-mono mt-0.5 uppercase tracking-widest">Outils IA — Studio</p>
+            <p className="text-[11px] text-text3 font-mono mt-0.5 uppercase tracking-widest">{t('aiToolsTitle')} — Studio</p>
           </div>
         </div>
       </div>
@@ -646,6 +649,8 @@ function SectionHeader({ label, badge }: { label: string; badge?: string }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 export function AiTools({ user }: AiToolsProps) {
+  const t = useT()
+  const { lang } = useLang()
   const [active, setActive] = useState<ActiveTool>('hub')
   const conns = useConnections(user)
 
@@ -660,8 +665,8 @@ export function AiTools({ user }: AiToolsProps) {
               <div className="absolute inset-0 animate-pulse rounded-2xl" style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.1), rgba(236,72,153,0.06))' }} />
             </div>
             <div className="text-center">
-              <p className="text-[13px] font-bold text-text2">Chargement des outils IA…</p>
-              <p className="text-[11px] text-text3 font-mono mt-1">Connexion au studio</p>
+              <p className="text-[13px] font-bold text-text2">{t('loading')}</p>
+              <p className="text-[11px] text-text3 font-mono mt-1">{lang === 'en' ? 'Connecting to studio' : 'Connexion au studio'}</p>
             </div>
           </div>
         </div>
@@ -679,7 +684,7 @@ export function AiTools({ user }: AiToolsProps) {
               ✨
             </div>
             <div>
-              <h1 className="text-[22px] font-black text-text leading-none">Outils IA</h1>
+              <h1 className="text-[22px] font-black text-text leading-none">{t('aiToolsTitle')}</h1>
               <p className="text-[12px] text-text3 font-mono mt-0.5 tracking-widest uppercase">AI Creative Studio</p>
             </div>
           </div>
@@ -689,10 +694,10 @@ export function AiTools({ user }: AiToolsProps) {
             <div className="flex items-center gap-3 mb-3">
               <div className="w-9 h-9 rounded-xl flex items-center justify-center text-base"
                 style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)' }}>⚠</div>
-              <p className="text-[14px] font-bold text-warn">Clé Groq API manquante</p>
+              <p className="text-[14px] font-bold text-warn">{t('noGroqKey')}</p>
             </div>
-            <p className="text-[13px] text-text2 mb-2">Va dans <strong className="text-text">Paramètres → Connexions → Clés API</strong> et colle ta clé Groq.</p>
-            <p className="text-[11px] font-mono" style={{ color: 'rgba(139,92,246,0.6)' }}>Gratuit sur groq.com → API Keys → Create</p>
+            <p className="text-[13px] text-text2 mb-2">{t('configureGroq')}</p>
+            <p className="text-[11px] font-mono" style={{ color: 'rgba(139,92,246,0.6)' }}>{lang === 'en' ? 'Free on groq.com → API Keys → Create' : 'Gratuit sur groq.com → API Keys → Create'}</p>
           </div>
         </div>
       </div>
@@ -735,13 +740,13 @@ export function AiTools({ user }: AiToolsProps) {
             <div className="absolute inset-0 anim-glow rounded-2xl" />
           </div>
           <div>
-            <h1 className="text-[26px] font-black leading-none sf-text-gradient">Outils IA</h1>
+            <h1 className="text-[26px] font-black leading-none sf-text-gradient">{t('aiToolsTitle')}</h1>
             <p className="text-[12px] text-text3 font-mono mt-1 tracking-widest uppercase">AI Creative Studio</p>
           </div>
           {!conns.anthropic && (
             <div className="ml-4 rounded-xl px-3 py-1.5 flex items-center gap-2" style={{ background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.15)' }}>
               <span className="text-warn text-xs">⚠</span>
-              <p className="text-[11px] font-mono" style={{ color: 'rgba(245,158,11,0.75)' }}>Clé Anthropic manquante</p>
+              <p className="text-[11px] font-mono" style={{ color: 'rgba(245,158,11,0.75)' }}>{lang === 'en' ? 'Anthropic key missing' : 'Clé Anthropic manquante'}</p>
             </div>
           )}
         </div>

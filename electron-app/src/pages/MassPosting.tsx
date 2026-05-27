@@ -15,6 +15,7 @@ import {
   resetMassPosting,
 } from '@/lib/massPostingStore'
 import { playSuccess } from '@/lib/sounds'
+import { useT, useLang } from '@/lib/i18n'
 import { checkAndDeductCredits, CREDIT_COSTS, useCredits } from '@/lib/credits'
 import { createScheduledPost, fmtScheduledTime } from '@/lib/schedulerService'
 import { ScheduleModal } from '@/components/ScheduleModal'
@@ -34,13 +35,21 @@ const STATUS_COLOR: Record<TaskStatus['status'], string> = {
   done:      'text-ok',
   error:     'text-danger',
 }
-const STATUS_LABEL: Record<TaskStatus['status'], string> = {
+const STATUS_LABEL_FR: Record<TaskStatus['status'], string> = {
   idle:      '—',
   pending:   'En attente',
   uploading: 'Upload…',
   posting:   'En cours',
   done:      'Terminé',
   error:     'Erreur',
+}
+const STATUS_LABEL_EN: Record<TaskStatus['status'], string> = {
+  idle:      '—',
+  pending:   'Pending',
+  uploading: 'Uploading…',
+  posting:   'In progress',
+  done:      'Done',
+  error:     'Error',
 }
 
 const AVATAR_COLORS = [
@@ -72,6 +81,8 @@ async function geelark(bearer: string, path: string, body: unknown) {
 }
 
 export function MassPosting({ user }: MassPostingProps) {
+  const t = useT()
+  const { lang } = useLang()
   const { currentOrg, role, perms } = useOrg()
   const credits = useCredits()
   const [phones, setPhones]               = useState<Phone[]>([])
@@ -668,21 +679,21 @@ export function MassPosting({ user }: MassPostingProps) {
               {posting ? (
                 <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider"
                   style={{ background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.3)', color: '#a78bfa' }}>
-                  <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />En cours
+                  <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />{t('running')}
                 </span>
               ) : (
                 <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider"
                   style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', color: '#52525b' }}>
-                  <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'rgba(82,82,91,0.6)' }} />Idle
+                  <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'rgba(82,82,91,0.6)' }} />{t('idle')}
                 </span>
               )}
             </div>
             <p className="text-[11px] mt-0.5 flex items-center gap-2" style={{ color: 'rgba(148,163,184,0.45)' }}>
-              <span>{phoneList.length} cible{phoneList.length !== 1 ? 's' : ''}</span>
+              <span>{phoneList.length} {lang === 'en' ? `target${phoneList.length !== 1 ? 's' : ''}` : `cible${phoneList.length !== 1 ? 's' : ''}`}</span>
               <span>·</span>
-              <span>{selectedVideos.length} vidéo{selectedVideos.length !== 1 ? 's' : ''}</span>
+              <span>{selectedVideos.length} {lang === 'en' ? `video${selectedVideos.length !== 1 ? 's' : ''}` : `vidéo${selectedVideos.length !== 1 ? 's' : ''}`}</span>
               {posting && totalTasks > 0 && (
-                <><span>·</span><span style={{ color: '#a78bfa' }}>{doneTasks}/{totalTasks} terminé{doneTasks !== 1 ? 's' : ''}</span></>
+                <><span>·</span><span style={{ color: '#a78bfa' }}>{doneTasks}/{totalTasks} {lang === 'en' ? `done` : `terminé${doneTasks !== 1 ? 's' : ''}`}</span></>
               )}
             </p>
           </div>
@@ -693,13 +704,13 @@ export function MassPosting({ user }: MassPostingProps) {
           {/* Assignment mode pill */}
           <div className="flex rounded-xl p-1 gap-0.5"
             style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
-            {([{ k: 'seq', l: 'Séquentiel' }, { k: 'random', l: 'Aléatoire' }] as const).map(m => (
+            {([{ k: 'seq', lFr: 'Séquentiel', lEn: 'Sequential' }, { k: 'random', lFr: 'Aléatoire', lEn: 'Random' }] as const).map(m => (
               <button key={m.k} onClick={() => setMode(m.k)}
                 className="px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-all"
                 style={mode === m.k
                   ? { background: 'rgba(139,92,246,0.2)', color: '#c4b5fd', border: '1px solid rgba(139,92,246,0.28)' }
                   : { color: 'rgba(82,82,91,0.9)' }}>
-                {m.l}
+                {lang === 'en' ? m.lEn : m.lFr}
               </button>
             ))}
           </div>
@@ -709,7 +720,7 @@ export function MassPosting({ user }: MassPostingProps) {
             className="flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-[12px] font-semibold transition-all disabled:opacity-25 disabled:cursor-not-allowed"
             style={{ background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.2)', color: '#f87171' }}>
             <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><rect x="1" y="1" width="8" height="8" rx="1.5"/></svg>
-            Stopper
+            {t('stop')}
           </button>
 
           {/* Schedule */}
@@ -718,7 +729,7 @@ export function MassPosting({ user }: MassPostingProps) {
             className="flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-[12px] font-semibold transition-all disabled:opacity-30 disabled:cursor-not-allowed"
             style={{ background: 'rgba(59,130,246,0.07)', border: '1px solid rgba(59,130,246,0.2)', color: '#93c5fd' }}>
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="1" y="2" width="10" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.2"/><path d="M4 1v2M8 1v2M1 5h10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
-            Programmer
+            {t('schedule')}
           </button>
 
           {/* Launch */}
@@ -730,9 +741,9 @@ export function MassPosting({ user }: MassPostingProps) {
             } : { background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}>
             {canLaunch && <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(105deg,transparent 40%,rgba(255,255,255,0.08) 50%,transparent 60%)', backgroundSize: '200% 100%', animation: 'progressShimmer 3s linear infinite' }} />}
             {posting ? (
-              <><svg className="animate-spin w-3.5 h-3.5" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="31.4" strokeDashoffset="10"/></svg>En cours…</>
+              <><svg className="animate-spin w-3.5 h-3.5" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="31.4" strokeDashoffset="10"/></svg>{t('running')}…</>
             ) : (
-              <><svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polygon points="3 1.5 11.5 6.5 3 11.5"/></svg>Lancer</>
+              <><svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polygon points="3 1.5 11.5 6.5 3 11.5"/></svg>{t('launch')}</>
             )}
           </button>
         </div>
@@ -987,7 +998,7 @@ export function MassPosting({ user }: MassPostingProps) {
                     {ts && ts.status !== 'idle' && ts.status !== 'pending' && (
                       <p className="text-[10px] font-semibold flex items-center gap-1" style={{ color: statusDot[ts.status] ?? '#71717a' }}>
                         <span className="w-1 h-1 rounded-full inline-block" style={{ background: statusDot[ts.status] ?? '#71717a' }} />
-                        {STATUS_LABEL[ts.status]}
+                        {( lang === 'en' ? STATUS_LABEL_EN : STATUS_LABEL_FR)[ts.status]}
                       </p>
                     )}
                   </div>
@@ -1197,7 +1208,7 @@ export function MassPosting({ user }: MassPostingProps) {
                               <div className="inline-flex flex-col items-end gap-1">
                                 <span className="px-2 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap"
                                   style={{ background: cfg.bg, color: cfg.fg }}>
-                                  {STATUS_LABEL[status]}
+                                  {( lang === 'en' ? STATUS_LABEL_EN : STATUS_LABEL_FR)[status]}
                                 </span>
                                 {ts?.detail && <span className="text-[10px] text-text3 max-w-[110px] truncate">{ts.detail}</span>}
                                 {(status === 'uploading' || status === 'posting') && (

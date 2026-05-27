@@ -8,6 +8,7 @@ import { fetchIgStats, invalidateIgCache, type IgStats } from '@/lib/instagram'
 import { Spinner } from '@/components/ui/Spinner'
 import { Button }  from '@/components/ui/Button'
 import { playNav } from '@/lib/sounds'
+import { useT, useLang } from '@/lib/i18n'
 
 interface StatsProps { user: User }
 
@@ -153,6 +154,9 @@ function AnimatedNumber({ value, color }: { value: number; color: string }) {
 }
 
 export function Stats({ user }: StatsProps) {
+  const t                       = useT()
+  const { lang }                = useLang()
+  const locale                  = lang === 'en' ? 'en-US' : 'fr-FR'
   const { currentOrg }          = useOrg()
   const conns                   = useConnections(user)
   const [phones, setPhones]     = useState<Phone[]>([])
@@ -283,9 +287,9 @@ export function Stats({ user }: StatsProps) {
       if (v.length === 0) v = await fetchIgVideos(phone.ig_username)
       setVideos(v); setLL(false)
       if (!s && v.length === 0)
-        setLoadErr('Instagram indisponible ou compte privé. Réessaie dans quelques secondes.')
+        setLoadErr(t('igUnavailableOrPrivate'))
     } catch {
-      setLoadErr('Erreur lors du chargement. Clique sur Réessayer.')
+      setLoadErr(t('igLoadError'))
       setLS(false); setLL(false)
     }
     setRetrying(false)
@@ -307,20 +311,20 @@ export function Stats({ user }: StatsProps) {
         style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}
       >
         <div>
-          <h1 className="text-[20px] font-black text-white leading-none">Statistiques Instagram</h1>
+          <h1 className="text-[20px] font-black text-white leading-none">{t('igStatsTitle')}</h1>
           <p className="text-[13px] text-text2 mt-0.5">
-            {phones.length} compte{phones.length !== 1 ? 's' : ''} liés · Vues, followers, vidéos
+            {phones.length} {phones.length !== 1 ? t('igStatsAccounts') : t('igStatsAccount')}
           </p>
         </div>
         {selected && (
           <div className="flex gap-2">
             {loadError && (
               <Button variant="secondary" size="sm" onClick={() => selectPhone(selected, true)} loading={retrying}>
-                ↺ Réessayer
+                ↺ {t('igRetry')}
               </Button>
             )}
             <Button variant="secondary" size="sm" onClick={() => selectPhone(selected)} loading={loadingStats && !retrying}>
-              ↺ Rafraîchir
+              ↺ {t('refresh')}
             </Button>
           </div>
         )}
@@ -338,12 +342,12 @@ export function Stats({ user }: StatsProps) {
             className="px-4 py-3 space-y-3"
             style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}
           >
-            <p className="text-[13px] font-bold text-white">Comptes Instagram</p>
+            <p className="text-[13px] font-bold text-white">{t('igAccounts2')}</p>
             <form onSubmit={e => { e.preventDefault(); searchByUsername(searchInput) }}>
               <div className="relative">
                 <input
                   type="text"
-                  placeholder="@username ou lien…"
+                  placeholder={t('igSearchPlaceholder')}
                   value={searchInput}
                   onChange={e => setSearchInput(e.target.value)}
                   className="w-full rounded-xl px-3 py-2 text-[12px] pr-8 placeholder:text-text2 focus:outline-none"
@@ -363,7 +367,7 @@ export function Stats({ user }: StatsProps) {
               <div className="px-5 py-8 text-center space-y-2">
                 <p className="text-3xl">📱</p>
                 <p className="text-[13px] text-text2">
-                  Aucun compte lié.<br />Va dans Téléphones → colonne Instagram.
+                  {t('igNoAccount')}<br />{t('igNoAccountHint')}
                 </p>
               </div>
             ) : phones.map(phone => {
@@ -432,9 +436,9 @@ export function Stats({ user }: StatsProps) {
                     <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
                   </svg>
                 </div>
-                <p className="text-[15px] font-bold text-white">Recherche un compte</p>
+                <p className="text-[15px] font-bold text-white">{t('igSelectAccount')}</p>
                 <p className="text-[13px] text-text2 mt-1.5 max-w-[220px] mx-auto leading-relaxed">
-                  Sélectionne un compte dans la liste ou colle un @username dans la barre de recherche.
+                  {t('igSelectAccountHint')}
                 </p>
               </div>
             </div>
@@ -480,7 +484,7 @@ export function Stats({ user }: StatsProps) {
                           className="text-[11px] font-semibold px-2.5 py-1 rounded-full"
                           style={{ background: 'rgba(52,211,153,0.12)', color: '#34d399', border: '1px solid rgba(52,211,153,0.2)' }}
                         >
-                          En ligne
+                          {t('igOnline')}
                         </span>
                       )}
                     </div>
@@ -515,8 +519,8 @@ export function Stats({ user }: StatsProps) {
                   ) : stats ? (
                     <div className="flex items-center gap-6 mt-4">
                       {([
-                        { label: 'followers',    value: stats.followers },
-                        { label: 'abonnements',  value: stats.following },
+                        { label: t('followers'),    value: stats.followers },
+                        { label: lang === 'en' ? 'following' : 'abonnements',  value: stats.following },
                         { label: 'posts',        value: stats.posts     },
                       ] as const).map(({ label, value }, i) => (
                         <div key={label} className="flex items-baseline gap-1.5">
@@ -561,7 +565,7 @@ export function Stats({ user }: StatsProps) {
                     style={{ background: 'linear-gradient(90deg,#78350f,#f59e0b)' }}
                   />
                   <p className="text-[11px] font-bold uppercase tracking-widest text-text2 mb-1 mt-0.5">
-                    Vues des 12 derniers posts
+                    {t('igViewsLast12')}
                   </p>
                   <p className="text-[32px] font-black leading-none">
                     <AnimatedNumber value={stats.total_views} color="#f59e0b" />
@@ -572,7 +576,7 @@ export function Stats({ user }: StatsProps) {
                   className="rounded-2xl p-8 text-center"
                   style={{ background: '#0E0E16', border: '1px solid rgba(255,255,255,0.07)' }}
                 >
-                  <p className="text-[13px] text-text2">Impossible de charger les stats — compte privé ou Instagram indisponible.</p>
+                  <p className="text-[13px] text-text2">{t('igNoStats')}</p>
                 </div>
               ) : null}
 
@@ -581,7 +585,7 @@ export function Stats({ user }: StatsProps) {
                 {/* Section header */}
                 <div className="flex items-center justify-between mb-5">
                   <div className="flex items-center gap-2">
-                    <h3 className="text-[15px] font-bold text-white">Vidéos</h3>
+                    <h3 className="text-[15px] font-bold text-white">{t('igVideos')}</h3>
                     {videos.length > 0 && (
                       <span
                         className="text-[12px] font-bold px-2.5 py-0.5 rounded-full"
@@ -598,9 +602,9 @@ export function Stats({ user }: StatsProps) {
                     style={{ background: '#0E0E16', border: '1px solid rgba(255,255,255,0.07)' }}
                   >
                     {([
-                      { key: 'recent', label: 'Récent'    },
-                      { key: 'views',  label: '+ de vues' },
-                      { key: 'likes',  label: '+ likes'   },
+                      { key: 'recent', label: t('igSortRecent') },
+                      { key: 'views',  label: t('igSortViews')  },
+                      { key: 'likes',  label: t('igSortLikes')  },
                     ] as const).map(({ key, label }) => (
                       <button
                         key={key}
@@ -635,9 +639,9 @@ export function Stats({ user }: StatsProps) {
                     style={{ background: '#0E0E16', border: '1px solid rgba(255,255,255,0.07)' }}
                   >
                     <div className="text-5xl mb-4">🎥</div>
-                    <p className="text-base font-bold text-white">Aucune vidéo</p>
+                    <p className="text-base font-bold text-white">{t('igNoVideos')}</p>
                     <p className="text-[13px] text-text2 mt-1">
-                      {loadError ? 'Chargement échoué.' : 'Aucune vidéo trouvée.'}
+                      {loadError ? t('igLoadFailed') : t('igNoVideosMsg')}
                     </p>
                   </div>
                 ) : (
@@ -706,7 +710,7 @@ export function Stats({ user }: StatsProps) {
                               <div className="absolute bottom-0 left-0 right-0 p-3 space-y-1.5">
                                 <div className="flex items-baseline gap-1.5">
                                   <span className="text-[22px] font-black text-white leading-none">{fmt(video.views)}</span>
-                                  <span className="text-[10px] text-white/50">vues</span>
+                                  <span className="text-[10px] text-white/50">{t('igViewsUnit')}</span>
                                 </div>
                                 <div className="h-[2px] rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.12)' }}>
                                   <div
@@ -719,7 +723,7 @@ export function Stats({ user }: StatsProps) {
                                   {video.comments > 0 && <span>✎ {fmt(video.comments)}</span>}
                                   {video.timestamp && (
                                     <span className="ml-auto">
-                                      {new Date(video.timestamp).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}
+                                      {new Date(video.timestamp).toLocaleDateString(locale, { day: '2-digit', month: 'short' })}
                                     </span>
                                   )}
                                 </div>
@@ -747,6 +751,9 @@ export function Stats({ user }: StatsProps) {
 
 // ── IG video player modal ────────────────────────────────────────────────────
 function IgVideoPlayerModal({ video, onClose }: { video: IgVideo; onClose: () => void }) {
+  const t = useT()
+  const { lang } = useLang()
+  const locale = lang === 'en' ? 'en-US' : 'fr-FR'
   const [localPath, setLocalPath] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -754,13 +761,13 @@ function IgVideoPlayerModal({ video, onClose }: { video: IgVideo; onClose: () =>
   useEffect(() => {
     let cancelled = false
     setLoading(true); setErr(null)
-    if (!video.video_url) { setErr('Aucune URL vidéo disponible.'); setLoading(false); return }
-    if (!window.electronAPI?.fetchIgVideo) { setErr('IPC indisponible.'); setLoading(false); return }
+    if (!video.video_url) { setErr(t('igNoVideoUrl')); setLoading(false); return }
+    if (!window.electronAPI?.fetchIgVideo) { setErr(t('igIpcUnavailable')); setLoading(false); return }
     window.electronAPI.fetchIgVideo({ url: video.video_url }).then(r => {
       if (cancelled) return
       setLoading(false)
       if (r.ok && r.path) setLocalPath(r.path)
-      else setErr(r.error ?? 'Téléchargement échoué')
+      else setErr(r.error ?? t('igDownloadFailed'))
     })
     return () => { cancelled = true }
   }, [video.video_url])
@@ -798,10 +805,10 @@ function IgVideoPlayerModal({ video, onClose }: { video: IgVideo; onClose: () =>
         {/* Meta row */}
         <div className="flex items-center gap-3 text-xs mb-2 px-1">
           <span className="font-semibold" style={{ color: '#c4b5fd' }}>
-            {video.views.toLocaleString('fr-FR')} vues
+            {video.views.toLocaleString(locale)} {t('igViewsUnit')}
           </span>
-          {video.likes    > 0 && <span style={{ color: '#f9a8d4' }}>♥ {video.likes.toLocaleString('fr-FR')}</span>}
-          {video.comments > 0 && <span style={{ color: 'rgba(196,181,253,0.6)' }}>✎ {video.comments.toLocaleString('fr-FR')}</span>}
+          {video.likes    > 0 && <span style={{ color: '#f9a8d4' }}>♥ {video.likes.toLocaleString(locale)}</span>}
+          {video.comments > 0 && <span style={{ color: 'rgba(196,181,253,0.6)' }}>✎ {video.comments.toLocaleString(locale)}</span>}
           <a
             href={video.url}
             target="_blank"
@@ -809,7 +816,7 @@ function IgVideoPlayerModal({ video, onClose }: { video: IgVideo; onClose: () =>
             className="ml-auto text-[11px] font-semibold transition-colors"
             style={{ color: '#a78bfa' }}
           >
-            ↗ Voir sur Instagram
+            {t('igViewOnInstagram')}
           </a>
         </div>
 
@@ -836,7 +843,7 @@ function IgVideoPlayerModal({ video, onClose }: { video: IgVideo; onClose: () =>
           ) : loading ? (
             <div className="flex flex-col items-center gap-3 p-14">
               <Spinner size="lg" />
-              <p className="text-[13px] text-text2">Chargement…</p>
+              <p className="text-[13px] text-text2">{t('igVideoLoading')}</p>
             </div>
           ) : (
             <video

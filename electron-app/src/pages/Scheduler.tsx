@@ -34,6 +34,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
+import { useT, useLang } from '@/lib/i18n'
 import { useOrg } from '@/lib/orgContext'
 import {
   loadScheduledPosts, cancelScheduledPost, claimScheduledPost,

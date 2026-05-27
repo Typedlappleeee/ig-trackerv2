@@ -9,6 +9,7 @@ import { useOrg } from '@/lib/orgContext'
 import { uploadVideoFromPath, getSignedUrl, type UploadScope } from '@/lib/storage'
 import { logActivity } from '@/lib/activityLog'
 import { useConnections } from '@/lib/connections'
+import { useT, useLang } from '@/lib/i18n'
 
 interface MontageProps { user: User }
 
