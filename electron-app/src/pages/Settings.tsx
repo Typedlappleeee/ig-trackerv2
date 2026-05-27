@@ -131,7 +131,7 @@ function SubTabBtn({ active, icon, label, onClick, S }: {
 }
 
 type GeneralTab = 'apparence' | 'sons' | 'notifications' | 'langue' | 'securite' | 'avance'
-type Panel = 'general' | 'profile' | 'connexions' | 'organization' | 'admin' | 'abonnement'
+type Panel = 'general' | 'profile' | 'connexions' | 'organization' | 'admin' | 'abonnement' | 'desktop'
 interface SettingsProps { user: User; initialPanel?: Panel; initialTab?: GeneralTab; onNavigate?: (page: string) => void }
 
 const GEN_SIDEBAR: { id: GeneralTab; label: string; icon: string }[] = [
@@ -537,6 +537,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
     { k: 'organization' as Panel, l: 'Équipe' },
     ...(license.isSuperAdmin ? [{ k: 'admin' as Panel, l: 'Admin' }] : []),
     { k: 'abonnement' as Panel,   l: 'Plan' },
+    { k: 'desktop' as Panel,      l: '💻 App Desktop' },
   ]
 
   if (loading) return (
@@ -1143,12 +1144,84 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
               {/* Abonnement */}
               {panel === 'abonnement' && <SubscriptionPanel />}
 
+              {/* App Desktop */}
+              {panel === 'desktop' && <DesktopDownloadPanel S={S} />}
+
               {error && panel !== 'profile' && panel !== 'connexions' && (
                 <div style={{ marginTop: 16, padding: '10px 14px', borderRadius: 11, fontSize: 12, color: '#EF4444', maxWidth: 560, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>{error}</div>
               )}
             </div>
           )}
         </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Desktop download panel ───────────────────────────────────────────────────
+const DL_WIN = 'https://github.com/typedlappleeee/ig-trackerv2/releases/latest/download/ScaleFlow-Setup-latest.exe'
+const DL_MAC = 'https://github.com/typedlappleeee/ig-trackerv2/releases/latest/download/ScaleFlow-latest.dmg'
+
+type StyleObj = { text: string; text2: string; text3: string; border: string; base: string; accent3: string }
+function DesktopDownloadPanel({ S }: { S: StyleObj }) {
+  const isElectron = !!(window as any).electronAPI
+  return (
+    <div className="sf-anim-slide-up" style={{ maxWidth: 540, display: 'flex', flexDirection: 'column', gap: 20, padding: '28px 28px 0' }}>
+      <div>
+        <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0 }}>Application Desktop</h2>
+        <p style={{ fontSize: 13, color: S.text3, margin: '4px 0 0' }}>
+          {isElectron ? '✅ Tu utilises déjà l\'application desktop.' : 'Installe ScaleFlow sur ton PC pour accéder aux fonctionnalités avancées (AdsPower, FFmpeg local, notifications).'}
+        </p>
+      </div>
+
+      {/* Feature list */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {[
+          { icon: '🔔', label: 'Notifications sonores en temps réel' },
+          { icon: '⚡', label: 'Fonctionne même fenêtre minimisée' },
+          { icon: '🎬', label: 'FFmpeg local — remix & cloneVid ultra rapide' },
+          { icon: '🤝', label: 'Intégration AdsPower native' },
+        ].map(f => (
+          <div key={f.label} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <span style={{ fontSize: 16 }}>{f.icon}</span>
+            <span style={{ fontSize: 13, color: S.text2 }}>{f.label}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Download buttons */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <a href={DL_WIN} target="_blank" rel="noreferrer" style={{ textDecoration: 'none' }}>
+          <button style={{
+            width: '100%', height: 44, borderRadius: 11, border: 'none', cursor: 'pointer',
+            background: 'linear-gradient(135deg, #7C3AED, #a855f7)',
+            color: '#fff', fontSize: 14, fontWeight: 700,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9,
+            boxShadow: '0 4px 16px rgba(124,58,237,0.35)',
+          }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Télécharger pour Windows (.exe)
+          </button>
+        </a>
+        <a href={DL_MAC} target="_blank" rel="noreferrer" style={{ textDecoration: 'none' }}>
+          <button style={{
+            width: '100%', height: 44, borderRadius: 11, cursor: 'pointer',
+            background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
+            color: S.text2, fontSize: 13, fontWeight: 600,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9,
+          }}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+            Mac (.dmg)
+          </button>
+        </a>
+      </div>
+
+      {/* Install instructions */}
+      <div style={{ padding: '12px 14px', borderRadius: 10, background: 'rgba(124,58,237,0.06)', border: '1px solid rgba(124,58,237,0.15)' }}>
+        <p style={{ fontSize: 12, fontWeight: 700, color: S.text3, margin: '0 0 8px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Installation Windows</p>
+        {['1. Télécharge le fichier ScaleFlow-Setup.exe', '2. Double-clique pour installer', '3. Connecte-toi avec tes identifiants habituels'].map((s, i) => (
+          <p key={i} style={{ fontSize: 12, color: S.text3, margin: '3px 0 0' }}>{s}</p>
+        ))}
       </div>
     </div>
   )
