@@ -1,7 +1,7 @@
 {
-  "name": "ig-tracker",
+  "name": "scaleflow",
   "version": "1.0.0",
-  "description": "IG Tracker — Desktop App",
+  "description": "ScaleFlow — Desktop App",
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vite",
