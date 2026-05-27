@@ -50,6 +50,7 @@ export function OrganizationPanel({ user }: Props) {
   // Invite form
   const [invLabel, setInvLabel] = useState('')
   const [invRole,  setInvRole]  = useState<Exclude<OrgRole, 'owner'>>('member')
+  const [invitePermModal, setInvitePermModal] = useState<OrgInvite | null>(null)
 
   const [orgTab, setOrgTab] = useState<'orgas' | 'membres' | 'logs'>('orgas')
 
@@ -222,9 +223,15 @@ export function OrganizationPanel({ user }: Props) {
     setInvLabel('')
     if (data) {
       navigator.clipboard.writeText(data.token).catch(() => {})
-      flash('Code généré et copié ✓ — partage-le, il ne marche qu\'une fois')
+      setInvitePermModal(data as OrgInvite)
     }
     await loadOrgDetail(currentOrg.id)
+  }
+
+  async function saveInvitePerms(inv: OrgInvite, perms: PermOverrides) {
+    await supabase.from('organization_invites').update({ perm_overrides: perms }).eq('id', inv.id)
+    setInvitePermModal(null)
+    flash('Code généré ✓ — permissions configurées et code copié')
   }
 
   async function revokeInvite(inv: OrgInvite) {
@@ -264,6 +271,20 @@ export function OrganizationPanel({ user }: Props) {
       }
     }
     flash('Bienvenue dans l\'organisation ✓')
+    // Apply pre-configured permissions from the invite token if any
+    if (orgId) {
+      const { data: inv } = await supabase
+        .from('organization_invites').select('perm_overrides').eq('token', token).maybeSingle()
+      if (inv?.perm_overrides && Object.keys(inv.perm_overrides).length > 0) {
+        const { data: mem } = await supabase
+          .from('organization_members').select('id')
+          .eq('org_id', orgId).eq('user_id', user.id).maybeSingle()
+        if (mem) {
+          await supabase.from('organization_members')
+            .update({ perm_overrides: inv.perm_overrides }).eq('id', mem.id)
+        }
+      }
+    }
     // Persist the target org so it's selected after the reload
     if (orgId) localStorage.setItem('ig-tracker-current-org', orgId)
     // Full reload is the most reliable way to flush all stale auth/org state
@@ -618,6 +639,17 @@ export function OrganizationPanel({ user }: Props) {
           )}
         </section>
       )}
+
+      {/* ── Invite permission modal ──────────────────────────────────────── */}
+      {invitePermModal && (
+        <InvitePermModal
+          invite={invitePermModal}
+          availableFolders={folders}
+          availableGroups={groups}
+          onSave={perms => saveInvitePerms(invitePermModal, perms)}
+          onSkip={() => { setInvitePermModal(null); flash('Code généré et copié ✓ — partage-le, il ne marche qu\'une fois') }}
+        />
+      )}
     </div>
   )
 }
@@ -811,6 +843,162 @@ function PermEditor({
       <div className="flex gap-2 justify-end">
         <Button size="sm" variant="secondary" onClick={onCancel}>Annuler</Button>
         <Button size="sm" onClick={save}>Enregistrer</Button>
+      </div>
+    </div>
+  )
+}
+
+// ── Invite permission modal ──────────────────────────────────────────────────
+function InvitePermModal({
+  invite, availableFolders, availableGroups, onSave, onSkip,
+}: {
+  invite: OrgInvite
+  availableFolders: string[]
+  availableGroups: string[]
+  onSave: (p: PermOverrides) => void
+  onSkip: () => void
+}) {
+  const init = invite.perm_overrides ?? {}
+  const [tabs, setTabs]         = useState<Partial<Record<PageKey, boolean>>>(init.tabs ?? {})
+  const [bankMode, setBankMode] = useState<'all' | 'allow' | 'deny'>(init.bank_folders?.mode ?? 'all')
+  const [bankList, setBankList] = useState<string[]>(
+    init.bank_folders && init.bank_folders.mode !== 'all' ? init.bank_folders.list : []
+  )
+  const [groupMode, setGroupMode] = useState<'all' | 'allow'>(init.phone_groups?.mode ?? 'all')
+  const [groupList, setGroupList] = useState<string[]>(
+    init.phone_groups && init.phone_groups.mode === 'allow' ? init.phone_groups.list : []
+  )
+  const [copied, setCopied] = useState(false)
+
+  function toggleTab(tab: PageKey, v: boolean | undefined) {
+    setTabs(prev => {
+      const next = { ...prev }
+      if (v === undefined) delete next[tab]; else next[tab] = v
+      return next
+    })
+  }
+
+  function save() {
+    const out: PermOverrides = {}
+    if (Object.keys(tabs).length > 0) out.tabs = tabs
+    if (bankMode === 'all') out.bank_folders = { mode: 'all' }
+    else                    out.bank_folders = { mode: bankMode, list: bankList }
+    if (groupMode === 'all') out.phone_groups = { mode: 'all' }
+    else                     out.phone_groups = { mode: 'allow', list: groupList }
+    onSave(out)
+  }
+
+  function copyToken() {
+    navigator.clipboard.writeText(invite.token).catch(() => {})
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)' }}
+    >
+      <div className="bg-card border border-border rounded-2xl w-full max-w-lg max-h-[88vh] flex flex-col shadow-2xl">
+        {/* Header */}
+        <div className="px-6 py-5 border-b border-border flex-shrink-0">
+          <div className="flex items-center gap-3 mb-1">
+            <span className="text-2xl">🎟</span>
+            <div>
+              <h2 className="text-sm font-bold text-text">Code généré — Configure les permissions</h2>
+              <p className="text-xs text-text2 mt-0.5">
+                {invite.email || 'Nouveau membre'} · <span className="text-accent font-medium">{ROLE_LABELS[invite.role as OrgRole]}</span>
+              </p>
+            </div>
+          </div>
+          {/* Token display */}
+          <div className="mt-3 flex items-center gap-2 bg-bg border border-border rounded-xl px-4 py-3">
+            <code className="flex-1 font-mono text-xs text-accent tracking-wider break-all">{invite.token}</code>
+            <button
+              onClick={copyToken}
+              className="flex-shrink-0 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
+              style={{ background: copied ? 'rgba(34,197,94,0.15)' : 'rgba(139,92,246,0.15)', color: copied ? '#4ade80' : '#a78bfa' }}
+            >
+              {copied ? '✓ Copié' : 'Copier'}
+            </button>
+          </div>
+          <p className="text-[10px] text-text2 mt-2">
+            Ce code est à <strong className="text-text">usage unique</strong>. Configure ci-dessous ce que ce membre pourra faire avant de le partager.
+          </p>
+        </div>
+
+        {/* Scrollable permissions body */}
+        <div className="overflow-y-auto flex-1 px-6 py-4 space-y-5">
+          {/* Tabs */}
+          <div>
+            <p className="text-xs font-bold text-text mb-2">Onglets accessibles</p>
+            <div className="grid grid-cols-2 gap-1.5">
+              {ALL_TABS.map(t => {
+                const v = tabs[t.key]
+                return (
+                  <div key={t.key} className="flex items-center gap-2 bg-surface rounded px-2 py-1.5">
+                    <span className="text-base">{t.icon}</span>
+                    <span className="flex-1 text-xs text-text truncate" title={t.label}>{t.label}</span>
+                    <select
+                      value={v === undefined ? 'default' : v ? 'allow' : 'deny'}
+                      onChange={e => {
+                        const val = e.target.value
+                        toggleTab(t.key, val === 'default' ? undefined : val === 'allow')
+                      }}
+                      className="bg-bg border border-border rounded text-[10px] px-1 py-0.5 text-text"
+                    >
+                      <option value="default">Par défaut</option>
+                      <option value="allow">Autorisé</option>
+                      <option value="deny">Bloqué</option>
+                    </select>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Bank folders */}
+          <div>
+            <p className="text-xs font-bold text-text mb-2">Dossiers de la banque</p>
+            <div className="flex flex-col gap-2">
+              <select value={bankMode} onChange={e => setBankMode(e.target.value as 'all' | 'allow' | 'deny')}
+                className="bg-bg border border-border rounded px-2 py-1 text-xs text-text">
+                <option value="all">Tous les dossiers</option>
+                <option value="allow">Uniquement ces dossiers…</option>
+                <option value="deny">Tous sauf ces dossiers…</option>
+              </select>
+              {bankMode !== 'all' && (
+                <MultiSelect options={availableFolders} selected={bankList} onChange={setBankList} placeholder="Sélectionne les dossiers…" />
+              )}
+            </div>
+          </div>
+
+          {/* Phone groups */}
+          <div>
+            <p className="text-xs font-bold text-text mb-2">Groupes de téléphones</p>
+            <div className="flex flex-col gap-2">
+              <select value={groupMode} onChange={e => setGroupMode(e.target.value as 'all' | 'allow')}
+                className="bg-bg border border-border rounded px-2 py-1 text-xs text-text">
+                <option value="all">Tous les groupes</option>
+                <option value="allow">Uniquement ces groupes…</option>
+              </select>
+              {groupMode === 'allow' && (
+                <MultiSelect options={availableGroups} selected={groupList} onChange={setGroupList} placeholder="Sélectionne les groupes GéeLark…" />
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-4 border-t border-border flex-shrink-0 flex items-center justify-between gap-3">
+          <button
+            onClick={onSkip}
+            className="text-xs text-text2 hover:text-text transition-colors underline underline-offset-2"
+          >
+            Passer (sans configurer)
+          </button>
+          <Button onClick={save}>Enregistrer les permissions</Button>
+        </div>
       </div>
     </div>
   )
