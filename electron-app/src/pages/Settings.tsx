@@ -1159,8 +1159,9 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
 }
 
 // ── Desktop download panel ───────────────────────────────────────────────────
-const DL_WIN = 'https://github.com/typedlappleeee/ig-trackerv2/releases/latest/download/ScaleFlow-Setup-latest.exe'
-const DL_MAC = 'https://github.com/typedlappleeee/ig-trackerv2/releases/latest/download/ScaleFlow-latest.dmg'
+const SUPABASE_STORAGE = 'https://fvmkmkspfksscgqyvysl.supabase.co/storage/v1/object/public/downloads'
+const DL_WIN = `${SUPABASE_STORAGE}/ScaleFlow-Setup-latest.exe`
+const DL_MAC = `${SUPABASE_STORAGE}/ScaleFlow-latest.dmg`
 
 type StyleObj = { text: string; text2: string; text3: string; border: string; base: string; accent3: string }
 function DesktopDownloadPanel({ S }: { S: StyleObj }) {
@@ -1191,7 +1192,7 @@ function DesktopDownloadPanel({ S }: { S: StyleObj }) {
 
       {/* Download buttons */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <a href={DL_WIN} target="_blank" rel="noreferrer" style={{ textDecoration: 'none' }}>
+        <a href={DL_WIN} download="ScaleFlow-Setup-latest.exe" style={{ textDecoration: 'none' }}>
           <button style={{
             width: '100%', height: 44, borderRadius: 11, border: 'none', cursor: 'pointer',
             background: 'linear-gradient(135deg, #7C3AED, #a855f7)',
@@ -1203,7 +1204,7 @@ function DesktopDownloadPanel({ S }: { S: StyleObj }) {
             Télécharger pour Windows (.exe)
           </button>
         </a>
-        <a href={DL_MAC} target="_blank" rel="noreferrer" style={{ textDecoration: 'none' }}>
+        <a href={DL_MAC} download="ScaleFlow-latest.dmg" style={{ textDecoration: 'none' }}>
           <button style={{
             width: '100%', height: 44, borderRadius: 11, cursor: 'pointer',
             background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
