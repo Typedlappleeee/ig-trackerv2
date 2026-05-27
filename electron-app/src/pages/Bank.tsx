@@ -54,8 +54,8 @@ function RenameModal({ item, onSave, onClose }: {
           onKeyDown={e => { if (e.key === 'Enter') { onSave(item.id, val.trim()); onClose() } if (e.key === 'Escape') onClose() }}
         />
         <div className="flex gap-2 justify-end">
-          <Button variant="secondary" size="sm" onClick={onClose}>Annuler</Button>
-          <Button size="sm" onClick={() => { onSave(item.id, val.trim()); onClose() }} disabled={!val.trim()}>Enregistrer</Button>
+          <Button variant="secondary" size="sm" onClick={onClose}>Cancel</Button>
+          <Button size="sm" onClick={() => { onSave(item.id, val.trim()); onClose() }} disabled={!val.trim()}>Save</Button>
         </div>
       </div>
     </div>
@@ -77,7 +77,7 @@ function MoveModal({ item, folders, onSave, onClose }: {
           onClick={() => { onSave(item.id, null); onClose() }}
           className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${!item.folder ? 'bg-accent/10 text-accent' : 'hover:bg-surface2 text-text'}`}
         >
-          📁 Toute la banque (sans dossier)
+          📁 All (no folder)
         </button>
         {folders.map(f => (
           <button
@@ -88,7 +88,7 @@ function MoveModal({ item, folders, onSave, onClose }: {
             📂 {f}
           </button>
         ))}
-        <Button variant="secondary" size="sm" className="w-full" onClick={onClose}>Annuler</Button>
+        <Button variant="secondary" size="sm" className="w-full" onClick={onClose}>Cancel</Button>
       </div>
     </div>
   )
@@ -115,11 +115,11 @@ function TagsModal({ item, onSave, onClose }: {
         />
         <p className="text-[11px] text-text2">Separate tags with commas.</p>
         <div className="flex gap-2 justify-end">
-          <Button variant="secondary" size="sm" onClick={onClose}>Annuler</Button>
+          <Button variant="secondary" size="sm" onClick={onClose}>Cancel</Button>
           <Button size="sm" onClick={() => {
             const tags = val.split(',').map(t => t.trim()).filter(Boolean)
             onSave(item.id, tags); onClose()
-          }}>Enregistrer</Button>
+          }}>Save</Button>
         </div>
       </div>
     </div>
@@ -204,7 +204,7 @@ function AddMediaModal({ onFiles, onElectronPick, onClose }: {
           onClick={handlePickClick}
           className="w-full bg-accent hover:bg-accent2 text-white font-semibold py-2.5 rounded-xl text-sm transition-colors"
         >
-          📁 Choisir depuis ton PC
+          📁 Choose from your PC
         </button>
       </div>
     </div>
@@ -258,7 +258,7 @@ export function Bank({ user }: BankProps) {
 
   async function deleteSelected() {
     if (!selectedIds.size) return
-    if (!confirm(`Supprimer ${selectedIds.size} vidéo(s) ? Cette action est irréversible.`)) return
+    if (!confirm(`Delete ${selectedIds.size} video(s)? This action is irreversible.`)) return
     const ids = [...selectedIds]
     const toDelete = items.filter(i => ids.includes(i.id))
     let q = supabase.from('content_bank').delete().in('id', ids)
@@ -634,7 +634,7 @@ export function Bank({ user }: BankProps) {
           <div>
             <h1 className="text-[22px] font-black text-white leading-none tracking-tight">Video Bank</h1>
             <p className="text-[12px] mt-0.5" style={{ color: '#52525B' }}>
-              Bibliothèque de médias · glisse-dépose ou importe
+              Media library · drag-drop or import
             </p>
           </div>
           <span
@@ -695,7 +695,7 @@ export function Bank({ user }: BankProps) {
             onClick={loadItems}
             className="px-3 py-2 rounded-lg text-[12px] font-medium transition-colors"
             style={{ background: '#0E0E16', border: '1px solid rgba(139,92,246,0.18)', color: '#A1A1AA' }}
-            title="Rafraîchir"
+            title="Refresh"
           >
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
@@ -707,7 +707,7 @@ export function Bank({ user }: BankProps) {
             className="btn-sf-primary px-4 py-2 rounded-lg text-[13px] font-semibold flex items-center gap-1.5"
           >
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            Ajouter
+            Add
           </button>
         </div>
       </header>
@@ -760,7 +760,7 @@ export function Bank({ user }: BankProps) {
         <div className="flex-1" />
 
         <span className="text-[12px]" style={{ color: '#52525B' }}>
-          {visible.length} élément{visible.length !== 1 ? 's' : ''}
+          {visible.length} item{visible.length !== 1 ? 's' : ''}
         </span>
         {adding && (
           <span className="flex items-center gap-1.5 text-[12px]" style={{ color: '#A78BFA' }}>
@@ -782,12 +782,12 @@ export function Bank({ user }: BankProps) {
             className="px-4 py-3 flex items-center justify-between flex-shrink-0"
             style={{ borderBottom: '1px solid rgba(139,92,246,0.08)' }}
           >
-            <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#52525B' }}>Dossiers</span>
+            <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#52525B' }}>Folders</span>
             <button
               onClick={() => setShowNewFolder(v => !v)}
               className="w-5 h-5 rounded flex items-center justify-center transition-colors"
               style={{ color: '#52525B' }}
-              title="Nouveau dossier"
+              title="New folder"
               onMouseEnter={e => (e.currentTarget.style.color = '#A78BFA')}
               onMouseLeave={e => (e.currentTarget.style.color = '#52525B')}
             >
@@ -803,7 +803,7 @@ export function Bank({ user }: BankProps) {
             >
               <input
                 autoFocus
-                placeholder="Nom du dossier…"
+                placeholder="Folder name…"
                 className="sf-search flex-1 px-2.5 py-1.5 text-[12px]"
                 value={newFolderName}
                 onChange={e => setNewFolderName(e.target.value)}
@@ -834,7 +834,7 @@ export function Bank({ user }: BankProps) {
                 <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
               </svg>
               <span className="text-[13px] font-medium flex-1" style={{ color: selectedFolder === null ? '#FFFFFF' : '#A1A1AA' }}>
-                Toute la banque
+                All
               </span>
               <span
                 className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0"
@@ -872,7 +872,7 @@ export function Bank({ user }: BankProps) {
                 style={{ background: '#8B5CF6', boxShadow: '0 0 8px rgba(139,92,246,0.8)' }}
               />
               <span className="text-[13px] font-bold" style={{ color: '#A78BFA' }}>
-                {selectedIds.size} sélectionné{selectedIds.size > 1 ? 's' : ''}
+                {selectedIds.size} selected
               </span>
               <button
                 onClick={() => setSelectedIds(prev => prev.size === visible.length ? new Set() : new Set(visible.map(i => i.id)))}
@@ -889,7 +889,7 @@ export function Bank({ user }: BankProps) {
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
                 </svg>
-                Déplacer ({selectedIds.size})
+                Move ({selectedIds.size})
               </button>
               <button
                 onClick={deleteSelected}
@@ -899,7 +899,7 @@ export function Bank({ user }: BankProps) {
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/>
                 </svg>
-                Supprimer ({selectedIds.size})
+                Delete ({selectedIds.size})
               </button>
               <div className="flex-1" />
               <button
@@ -908,7 +908,7 @@ export function Bank({ user }: BankProps) {
                 style={{ color: '#52525B' }}
                 onMouseEnter={e => (e.currentTarget.style.color = '#A1A1AA')}
                 onMouseLeave={e => (e.currentTarget.style.color = '#52525B')}
-              >✕ Annuler</button>
+              >✕ Cancel</button>
             </div>
           )}
 
@@ -974,15 +974,15 @@ export function Bank({ user }: BankProps) {
                     <polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
                   </svg>
                 </div>
-                <h2 className="text-[16px] font-bold text-white mb-2">Banque vide</h2>
+                <h2 className="text-[16px] font-bold text-white mb-2">Empty bank</h2>
                 <p className="text-[13px] max-w-xs" style={{ color: '#A1A1AA' }}>
-                  Glisse-dépose tes vidéos ici ou clique sur
+                  Drag and drop your videos here or click
                 </p>
                 <button
                   onClick={() => setShowAddModal(true)}
                   className="btn-sf-primary mt-5 px-5 py-2.5 rounded-xl text-[13px] font-semibold"
                 >
-                  + Ajouter un média
+                  + Add media
                 </button>
               </div>
 
@@ -1021,7 +1021,7 @@ export function Bank({ user }: BankProps) {
                 >
                   <span />
                   <span>Nom</span>
-                  <span>Durée</span>
+                  <span>Duration</span>
                   <span>Tags</span>
                   <span />
                 </div>
@@ -1103,7 +1103,7 @@ export function Bank({ user }: BankProps) {
           {[
             {
               icon: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>,
-              label: 'Renommer',
+              label: 'Rename',
               action: () => { setRenameItem(ctxMenu.item); setCtxMenu(null) }
             },
             {
@@ -1113,7 +1113,7 @@ export function Bank({ user }: BankProps) {
             },
             {
               icon: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>,
-              label: 'Modifier les tags',
+              label: 'Edit tags',
               action: () => { setTagsItem(ctxMenu.item); setCtxMenu(null) }
             },
             ...(ctxMenu.item.file_url && !ctxMenu.item.storage_path ? [{
@@ -1145,7 +1145,7 @@ export function Bank({ user }: BankProps) {
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/>
             </svg>
-            Supprimer
+            Delete
           </button>
         </div>
       )}
@@ -1166,10 +1166,10 @@ export function Bank({ user }: BankProps) {
             {folderModal.mode === 'delete' ? (<>
               <div>
                 <p className="font-semibold text-white text-[14px]">
-                  Supprimer le dossier <span style={{ color: '#A78BFA' }}>"{folderModal.name}"</span>
+                  Delete folder <span style={{ color: '#A78BFA' }}>"{folderModal.name}"</span>
                 </p>
                 <p className="text-[12px] mt-1" style={{ color: '#A1A1AA' }}>
-                  {items.filter(i => (i as unknown as {folder?:string}).folder === folderModal.name).length} vidéo(s) dans ce dossier.
+                  {items.filter(i => (i as unknown as {folder?:string}).folder === folderModal.name).length} video(s) in this folder.
                 </p>
               </div>
               <div className="flex flex-col gap-2">
@@ -1180,7 +1180,7 @@ export function Bank({ user }: BankProps) {
                   onMouseEnter={e => (e.currentTarget.style.background = 'rgba(139,92,246,0.25)')}
                   onMouseLeave={e => (e.currentTarget.style.background = 'rgba(139,92,246,0.15)')}
                 >
-                  Supprimer le dossier, garder les vidéos
+                  Delete folder, keep videos
                 </button>
                 <button
                   onClick={() => deleteFolder(folderModal.name, true)}
@@ -1189,17 +1189,17 @@ export function Bank({ user }: BankProps) {
                   onMouseEnter={e => (e.currentTarget.style.background = 'rgba(239,68,68,0.18)')}
                   onMouseLeave={e => (e.currentTarget.style.background = 'rgba(239,68,68,0.1)')}
                 >
-                  Supprimer le dossier ET ses vidéos
+                  Delete folder AND its videos
                 </button>
                 <button
                   onClick={() => setFolderModal(null)}
                   className="w-full py-2.5 rounded-xl text-[13px] font-medium transition-colors"
                   style={{ background: 'rgba(255,255,255,0.04)', color: '#A1A1AA', border: '1px solid rgba(255,255,255,0.07)' }}
-                >Annuler</button>
+                >Cancel</button>
               </div>
             </>) : (<>
               <p className="font-semibold text-white text-[14px]">
-                Déplacer les vidéos de <span style={{ color: '#A78BFA' }}>"{folderModal.name}"</span> vers…
+                Move videos from <span style={{ color: '#A78BFA' }}>"{folderModal.name}"</span> to…
               </p>
               <div className="flex flex-col gap-1 max-h-56 overflow-auto">
                 <button
@@ -1209,7 +1209,7 @@ export function Bank({ user }: BankProps) {
                   onMouseEnter={e => { e.currentTarget.style.background = 'rgba(139,92,246,0.08)'; e.currentTarget.style.color = '#fff' }}
                   onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#A1A1AA' }}
                 >
-                  Racine (sans dossier)
+                  Root (no folder)
                 </button>
                 {folders.filter(f => f !== folderModal.name).map(f => (
                   <button
@@ -1228,7 +1228,7 @@ export function Bank({ user }: BankProps) {
                 onClick={() => setFolderModal(null)}
                 className="w-full py-2.5 rounded-xl text-[13px] font-medium transition-colors"
                 style={{ background: 'rgba(255,255,255,0.04)', color: '#A1A1AA', border: '1px solid rgba(255,255,255,0.07)' }}
-              >Annuler</button>
+              >Cancel</button>
             </>)}
           </div>
         </div>
@@ -1243,7 +1243,7 @@ export function Bank({ user }: BankProps) {
             onClick={e => e.stopPropagation()}
           >
             <p className="font-semibold text-white text-[14px]">
-              Déplacer {selectedIds.size} vidéo{selectedIds.size > 1 ? 's' : ''} vers…
+              Move {selectedIds.size} video{selectedIds.size > 1 ? 's' : ''} to…
             </p>
             <div className="flex flex-col gap-1 max-h-64 overflow-auto">
               <button
@@ -1253,7 +1253,7 @@ export function Bank({ user }: BankProps) {
                 onMouseEnter={e => { e.currentTarget.style.background = 'rgba(139,92,246,0.08)'; e.currentTarget.style.color = '#fff' }}
                 onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#A1A1AA' }}
               >
-                Racine (sans dossier)
+                Root (no folder)
               </button>
               {folders.map(f => (
                 <button
@@ -1272,7 +1272,7 @@ export function Bank({ user }: BankProps) {
               onClick={() => setShowBulkMove(false)}
               className="w-full py-2.5 rounded-xl text-[13px] font-medium"
               style={{ background: 'rgba(255,255,255,0.04)', color: '#A1A1AA', border: '1px solid rgba(255,255,255,0.07)' }}
-            >Annuler</button>
+            >Cancel</button>
           </div>
         </div>
       )}
@@ -1399,7 +1399,7 @@ function FolderRow({ name, count, active, onClick, onRename, onDelete, onMerge, 
             style={{ color: '#52525B' }}
             onMouseEnter={e => (e.currentTarget.style.color = '#F87171')}
             onMouseLeave={e => (e.currentTarget.style.color = '#52525B')}
-            title="Supprimer"
+            title="Delete"
           >
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg>
           </button>
@@ -1615,7 +1615,7 @@ function VideoPlayerModal({ item, onClose }: { item: ContentItem; onClose: () =>
         {urlError && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-white/60">
             <span className="text-3xl">⚠️</span>
-            <span className="text-sm">Impossible de charger la vidéo</span>
+            <span className="text-sm">Unable to load the video</span>
           </div>
         )}
 
@@ -1684,7 +1684,7 @@ function VideoCard({ item, onContextMenu, onPlay, selectionMode, isSelected, onT
             : { background: 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.3)', opacity: 0 }
           }
           onClick={e => { e.stopPropagation(); onToggleSelect?.() }}
-          title={isSelected ? 'Désélectionner' : 'Sélectionner'}
+          title={isSelected ? 'Deselect' : 'Select'}
         >
           {isSelected && (
             <svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round">
@@ -1877,15 +1877,15 @@ export function BankPicker({ user, mode, onSelect, onClose, resolveMode = 'full'
         <div className="px-5 py-4 border-b border-border flex items-center gap-4 flex-shrink-0">
           <div className="flex items-center gap-2.5">
             <span className="text-xl">🗂</span>
-            <h2 className="text-sm font-semibold text-text">Banque de vidéos</h2>
+            <h2 className="text-sm font-semibold text-text">Video Bank</h2>
             <span className="text-xs text-text2">
-              {mode === 'multi' ? 'Sélection multiple' : 'Sélection unique'}
+              {mode === 'multi' ? 'Multiple selection' : 'Single selection'}
             </span>
           </div>
           <div className="flex-1" />
           <input
             type="text"
-            placeholder="🔍 Rechercher…"
+            placeholder="🔍 Search…"
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="w-44 bg-bg border border-border rounded-lg px-3 py-1.5 text-xs text-text placeholder:text-text2 focus:border-accent focus:outline-none"
@@ -1903,21 +1903,21 @@ export function BankPicker({ user, mode, onSelect, onClose, resolveMode = 'full'
               }}
               className="px-2.5 py-1.5 rounded-lg text-[11px] font-medium text-text2 hover:text-text transition-colors"
               style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}
-              title={selectedFolder ? `Sélectionner tout le dossier "${selectedFolder}"` : 'Sélectionner tout'}
+              title={selectedFolder ? `Select all in folder "${selectedFolder}"` : 'Select all'}
             >
-              {visible.every(v => selected.has(v.id)) ? '☐ Désélectionner' : '☑ Tout sélectionner'}
+              {visible.every(v => selected.has(v.id)) ? '☐ Deselect' : '☑ Select all'}
             </button>
           )}
           {mode === 'multi' && selected.size > 0 && (
             <Button size="sm" onClick={confirm} disabled={!!resolving}>
-              {resolving ? 'Téléchargement…' : `Confirmer (${selected.size})`}
+              {resolving ? 'Downloading…' : `Confirm (${selected.size})`}
             </Button>
           )}
           <button onClick={onClose} className="text-text2 hover:text-text transition-colors text-xl leading-none">✕</button>
         </div>
         {resolving && (
           <div className="px-5 py-2 bg-accent/10 border-b border-accent/30 text-accent text-xs flex items-center gap-2">
-            <span className="animate-spin">↻</span><span>📥 Téléchargement depuis le cloud : {resolving}</span>
+            <span className="animate-spin">↻</span><span>📥 Downloading from cloud: {resolving}</span>
           </div>
         )}
 
@@ -1931,7 +1931,7 @@ export function BankPicker({ user, mode, onSelect, onClose, resolveMode = 'full'
               }`}
             >
               <span className="text-sm">🎬</span>
-              <span className="text-xs text-text flex-1">Toute la banque</span>
+              <span className="text-xs text-text flex-1">All</span>
               <span className="text-[10px] text-text2">{items.length}</span>
             </button>
             {folders.map(f => (
@@ -1958,7 +1958,7 @@ export function BankPicker({ user, mode, onSelect, onClose, resolveMode = 'full'
             ) : visible.length === 0 ? (
               <div className="text-center py-16 text-text2 space-y-2">
                 <p className="text-3xl">🎬</p>
-                <p className="text-sm">Aucune vidéo</p>
+                <p className="text-sm">No video</p>
               </div>
             ) : (
               <div className="grid grid-cols-3 xl:grid-cols-4 gap-3">
