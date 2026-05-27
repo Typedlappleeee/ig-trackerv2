@@ -302,17 +302,28 @@ export function Bank({ user }: BankProps) {
 
   async function loadItems() {
     setLoading(true)
-    let q = supabase.from('content_bank').select('*').order('created_at', { ascending: false })
-    q = currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
-    const { data, error: err } = await q
-    if (err) {
-      setError('Erreur lors du chargement.')
-    } else {
-      let rows = (data ?? []) as ContentItem[]
+    // Fetch all pages — Supabase default page size is 1000, so paginate to get every row.
+    const PAGE = 1000
+    let allRows: ContentItem[] = []
+    let from = 0
+    let hasMigrationIssue = false
+    while (true) {
+      let q = supabase.from('content_bank').select('*').order('created_at', { ascending: false }).range(from, from + PAGE - 1)
+      q = currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
+      const { data, error: err } = await q
+      if (err) { setError('Erreur lors du chargement.'); setLoading(false); return }
+      const rows = (data ?? []) as ContentItem[]
+      if (rows.length > 0 && !hasMigrationIssue && !('folder' in rows[0])) hasMigrationIssue = true
+      allRows = allRows.concat(rows)
+      if (rows.length < PAGE) break   // last page
+      from += PAGE
+    }
+    {
+      let rows = allRows
       // In org mode, filter out folders the member is not allowed to see
       if (role) rows = rows.filter(i => canAccessBankFolder(role, perms, i.folder ?? null))
       setItems(rows)
-      if (data && data.length > 0 && !('folder' in data[0])) setNeedsMigration(true)
+      if (hasMigrationIssue) setNeedsMigration(true)
     }
     setLoading(false)
   }
