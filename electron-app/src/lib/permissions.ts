@@ -1,4 +1,4 @@
-import type { OrgRole, PermOverrides, PageKey } from './supabase'
+import type { OrgRole, PermOverrides, PageKey, ActionKey } from './supabase'
 
 // Default tab access per role.
 // Note: `settings` here means "can access the Connexions sub-panel of Settings"
@@ -70,6 +70,20 @@ export const ROLE_LABELS: Record<OrgRole, string> = {
   viewer: 'Lecteur',
 }
 
+// Default action permissions per role (true = allowed, false = blocked)
+const ROLE_ACTIONS: Record<OrgRole, Record<ActionKey, boolean>> = {
+  owner:  { bank_upload: true,  bank_delete: true,  bank_move: true,  bank_folder_create: true,  phone_add: true,  phone_delete: true,  phone_edit: true,  posting_launch: true,  scheduler_write: true  },
+  admin:  { bank_upload: true,  bank_delete: true,  bank_move: true,  bank_folder_create: true,  phone_add: true,  phone_delete: true,  phone_edit: true,  posting_launch: true,  scheduler_write: true  },
+  member: { bank_upload: true,  bank_delete: false, bank_move: false, bank_folder_create: false, phone_add: false, phone_delete: false, phone_edit: true,  posting_launch: true,  scheduler_write: true  },
+  viewer: { bank_upload: false, bank_delete: false, bank_move: false, bank_folder_create: false, phone_add: false, phone_delete: false, phone_edit: false, posting_launch: false, scheduler_write: false },
+}
+
+export function canDoAction(role: OrgRole, overrides: PermOverrides | undefined, action: ActionKey): boolean {
+  const o = overrides?.actions?.[action]
+  if (typeof o === 'boolean') return o
+  return ROLE_ACTIONS[role][action]
+}
+
 // Tabs shown in the per-member permission editor.
 // `settings` represents the *Connexions sub-panel* (API keys), not the whole page.
 export const ALL_TABS: { key: PageKey; label: string; icon: string }[] = [
@@ -81,4 +95,16 @@ export const ALL_TABS: { key: PageKey; label: string; icon: string }[] = [
   { key: 'aitools',     label: 'Outils IA',                            icon: '🔧' },
   { key: 'montage',     label: 'Montage',                              icon: '✂' },
   { key: 'settings',    label: 'Paramètres → Connexions (clés API)',  icon: '🔑' },
+]
+
+export const ALL_ACTIONS: { key: ActionKey; label: string; icon: string; group: string }[] = [
+  { key: 'bank_upload',        label: 'Upload dans la banque',    icon: '⬆️', group: 'Banque' },
+  { key: 'bank_delete',        label: 'Supprimer de la banque',   icon: '🗑', group: 'Banque' },
+  { key: 'bank_move',          label: 'Déplacer / renommer',      icon: '✂️', group: 'Banque' },
+  { key: 'bank_folder_create', label: 'Créer des dossiers',       icon: '📁', group: 'Banque' },
+  { key: 'phone_add',          label: 'Ajouter des téléphones',   icon: '➕', group: 'Téléphones' },
+  { key: 'phone_delete',       label: 'Supprimer des téléphones', icon: '🗑', group: 'Téléphones' },
+  { key: 'phone_edit',         label: 'Modifier les téléphones',  icon: '✏️', group: 'Téléphones' },
+  { key: 'posting_launch',     label: 'Lancer le posting',        icon: '🚀', group: 'Actions' },
+  { key: 'scheduler_write',    label: 'Éditer le scheduler',      icon: '📅', group: 'Actions' },
 ]

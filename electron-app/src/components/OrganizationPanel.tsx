@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
-import { supabase, type Organization, type OrgMember, type OrgInvite, type OrgRole, type PermOverrides, type PageKey } from '@/lib/supabase'
+import { supabase, type Organization, type OrgMember, type OrgInvite, type OrgRole, type OrgRoleTemplate, type PermOverrides, type PageKey, type ActionKey } from '@/lib/supabase'
 import { useOrg } from '@/lib/orgContext'
-import { ROLE_LABELS, ALL_TABS, canManageOrg } from '@/lib/permissions'
+import { ROLE_LABELS, ALL_TABS, ALL_ACTIONS, canManageOrg } from '@/lib/permissions'
 import { Button } from '@/components/ui/Button'
 import { Input }  from '@/components/ui/Input'
 import { Onboarding } from '@/components/Onboarding'
@@ -52,7 +52,12 @@ export function OrganizationPanel({ user }: Props) {
   const [invRole,  setInvRole]  = useState<Exclude<OrgRole, 'owner'>>('member')
   const [invitePermModal, setInvitePermModal] = useState<OrgInvite | null>(null)
 
-  const [orgTab, setOrgTab] = useState<'orgas' | 'membres' | 'logs'>('orgas')
+  const [orgTab, setOrgTab] = useState<'orgas' | 'membres' | 'roles' | 'logs'>('orgas')
+
+  // Custom role templates
+  const [roleTemplates, setRoleTemplates]       = useState<OrgRoleTemplate[]>([])
+  const [editingTemplate, setEditingTemplate]   = useState<OrgRoleTemplate | null>(null)
+  const [creatingTemplate, setCreatingTemplate] = useState(false)
 
   // Activity logs (admin/owner only)
   interface ActivityLog { id: string; user_email: string | null; action: string; details: Record<string, unknown>; created_at: string }
@@ -89,12 +94,12 @@ export function OrganizationPanel({ user }: Props) {
   }, [user.id])
 
   async function loadOrgDetail(orgId: string) {
-    const [m, i, b, p] = await Promise.all([
+    const [m, i, b, p, rt] = await Promise.all([
       supabase.from('organization_members').select('*').eq('org_id', orgId),
       supabase.from('organization_invites').select('*').eq('org_id', orgId).is('accepted_at', null).order('created_at', { ascending: false }),
-      // Distinct folders / groups for this org → used by the dropdowns in PermEditor
       supabase.from('content_bank').select('folder').eq('org_id', orgId),
       supabase.from('phones').select('group_name').eq('org_id', orgId),
+      supabase.from('org_role_templates').select('*').eq('org_id', orgId).order('created_at'),
     ])
     const memberRows = (m.data ?? []) as OrgMember[]
 
@@ -129,6 +134,31 @@ export function OrganizationPanel({ user }: Props) {
       groupSet.add(row.group_name ?? '(sans groupe)')
     }
     setGroups([...groupSet].sort())
+    setRoleTemplates((rt.data ?? []) as OrgRoleTemplate[])
+  }
+
+  async function saveTemplate(name: string, color: string, perms: PermOverrides, id?: string) {
+    if (!currentOrg) return
+    if (id) {
+      await supabase.from('org_role_templates').update({ name, color, perm_overrides: perms }).eq('id', id)
+    } else {
+      await supabase.from('org_role_templates').insert({ org_id: currentOrg.id, name, color, perm_overrides: perms, created_by: user.id })
+    }
+    setEditingTemplate(null); setCreatingTemplate(false)
+    await loadOrgDetail(currentOrg.id)
+    flash(id ? 'Rôle mis à jour ✓' : 'Rôle créé ✓')
+  }
+
+  async function deleteTemplate(t: OrgRoleTemplate) {
+    if (!confirm(`Supprimer le rôle "${t.name}" ?`)) return
+    await supabase.from('org_role_templates').delete().eq('id', t.id)
+    if (currentOrg) await loadOrgDetail(currentOrg.id)
+    flash('Rôle supprimé')
+  }
+
+  async function applyTemplateToMember(member: MemberRow, template: OrgRoleTemplate) {
+    await savePerms(member, template.perm_overrides)
+    flash(`Rôle "${template.name}" appliqué à ${member.display_name ?? member.email ?? 'ce membre'} ✓`)
   }
 
   useEffect(() => {
@@ -349,7 +379,8 @@ export function OrganizationPanel({ user }: Props) {
         {([
           { k: 'orgas',   l: '🏢 Organisations' },
           { k: 'membres', l: '👥 Membres'        },
-          ...(canManage ? [{ k: 'logs', l: '📋 Logs activité' }] : []),
+          ...(canManage ? [{ k: 'roles', l: '🎭 Rôles' }] : []),
+          ...(canManage ? [{ k: 'logs',  l: '📋 Logs' }] : []),
         ] as const).map(t => (
           <button
             key={t.k}
@@ -527,13 +558,33 @@ export function OrganizationPanel({ user }: Props) {
                       )}
                     </div>
                     {editing === m.id && (
-                      <PermEditor
-                        member={m}
-                        availableFolders={folders}
-                        availableGroups={groups}
-                        onSave={perms => savePerms(m, perms)}
-                        onCancel={() => setEditing(null)}
-                      />
+                      <>
+                        {roleTemplates.length > 0 && (
+                          <div className="px-3 pt-2 pb-1 bg-bg/40 border-t border-border flex items-center gap-2">
+                            <span className="text-[10px] text-text2 font-medium">Appliquer un rôle :</span>
+                            <div className="flex gap-1 flex-wrap">
+                              {roleTemplates.map(t => (
+                                <button
+                                  key={t.id}
+                                  onClick={() => applyTemplateToMember(m, t)}
+                                  title={permSummary(t.perm_overrides)}
+                                  className="text-[10px] font-semibold px-2 py-0.5 rounded-full border transition-colors hover:opacity-80"
+                                  style={{ background: t.color + '22', color: t.color, borderColor: t.color + '55' }}
+                                >
+                                  {t.name}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        <PermEditor
+                          member={m}
+                          availableFolders={folders}
+                          availableGroups={groups}
+                          onSave={perms => savePerms(m, perms)}
+                          onCancel={() => setEditing(null)}
+                        />
+                      </>
                     )}
                   </li>
                 )
@@ -580,6 +631,73 @@ export function OrganizationPanel({ user }: Props) {
         </section>
         )
       )}
+      {/* ── Roles tab ─────────────────────────────────────────────────────── */}
+      {orgTab === 'roles' && canManage && (
+        <section className="bg-card border border-border rounded-xl overflow-hidden">
+          <div className="px-5 py-3 border-b border-border flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-bold text-text">🎭 Rôles personnalisés</h2>
+              <p className="text-xs text-text2 mt-0.5">Crée des templates de permissions réutilisables pour ton agence</p>
+            </div>
+            <Button size="sm" onClick={() => setCreatingTemplate(true)}>+ Nouveau rôle</Button>
+          </div>
+          <div className="divide-y divide-border">
+            {roleTemplates.length === 0 && !creatingTemplate && (
+              <div className="px-5 py-8 text-center">
+                <p className="text-3xl mb-2">🎭</p>
+                <p className="text-sm font-medium text-text mb-1">Aucun rôle personnalisé</p>
+                <p className="text-xs text-text2 mb-4">Crée des templates comme "Content Manager", "Analyst"… pour assigner des permissions en un clic.</p>
+                <Button size="sm" onClick={() => setCreatingTemplate(true)}>Créer mon premier rôle</Button>
+              </div>
+            )}
+            {roleTemplates.map(t => (
+              <div key={t.id}>
+                {editingTemplate?.id === t.id ? (
+                  <div className="p-4">
+                    <RoleTemplateEditor
+                      initial={t}
+                      availableFolders={folders}
+                      availableGroups={groups}
+                      onSave={(name, color, perms) => saveTemplate(name, color, perms, t.id)}
+                      onCancel={() => setEditingTemplate(null)}
+                    />
+                  </div>
+                ) : (
+                  <div className="px-5 py-3 flex items-center gap-3 hover:bg-surface/50 transition-colors">
+                    <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: t.color }} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-text">{t.name}</p>
+                      <p className="text-[10px] text-text2 truncate">{permSummary(t.perm_overrides)}</p>
+                    </div>
+                    <div className="flex gap-1">
+                      <button onClick={() => setEditingTemplate(t)} className="text-xs text-accent hover:opacity-70 px-2 py-1 rounded hover:bg-accent/10 transition-colors">✎ Éditer</button>
+                      <button onClick={() => deleteTemplate(t)} className="text-xs text-danger hover:opacity-70 px-2 py-1 rounded hover:bg-danger/10 transition-colors">✕</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+            {creatingTemplate && (
+              <div className="p-4">
+                <RoleTemplateEditor
+                  availableFolders={folders}
+                  availableGroups={groups}
+                  onSave={(name, color, perms) => saveTemplate(name, color, perms)}
+                  onCancel={() => setCreatingTemplate(false)}
+                />
+              </div>
+            )}
+          </div>
+          {roleTemplates.length > 0 && (
+            <div className="px-5 py-3 border-t border-border bg-surface/30">
+              <p className="text-[10px] text-text2">
+                Pour appliquer un rôle à un membre, va dans l'onglet <strong className="text-text">Membres</strong> et clique sur son nom.
+              </p>
+            </div>
+          )}
+        </section>
+      )}
+
       {/* ── Logs tab ──────────────────────────────────────────────────────── */}
       {orgTab === 'logs' && canManage && (
         <section className="bg-card border border-border rounded-xl overflow-hidden">
@@ -646,6 +764,7 @@ export function OrganizationPanel({ user }: Props) {
           invite={invitePermModal}
           availableFolders={folders}
           availableGroups={groups}
+          roleTemplates={roleTemplates}
           onSave={perms => saveInvitePerms(invitePermModal, perms)}
           onSkip={() => { setInvitePermModal(null); flash('Code généré et copié ✓ — partage-le, il ne marche qu\'une fois') }}
         />
@@ -848,18 +967,36 @@ function PermEditor({
   )
 }
 
+// ── Helper: short readable summary of PermOverrides ─────────────────────────
+function permSummary(p: PermOverrides): string {
+  const parts: string[] = []
+  const deniedTabs = Object.entries(p.tabs ?? {}).filter(([, v]) => v === false).length
+  const allowedTabs = Object.entries(p.tabs ?? {}).filter(([, v]) => v === true).length
+  if (deniedTabs > 0) parts.push(`${deniedTabs} onglet(s) bloqué(s)`)
+  if (allowedTabs > 0) parts.push(`${allowedTabs} onglet(s) forcé(s)`)
+  if (p.bank_folders?.mode === 'allow') parts.push(`banque: ${(p.bank_folders as { list: string[] }).list.length} dossier(s)`)
+  if (p.bank_folders?.mode === 'deny')  parts.push(`banque: sauf ${(p.bank_folders as { list: string[] }).list.length} dossier(s)`)
+  const deniedActions = Object.entries(p.actions ?? {}).filter(([, v]) => v === false).length
+  const allowedActions = Object.entries(p.actions ?? {}).filter(([, v]) => v === true).length
+  if (deniedActions > 0) parts.push(`${deniedActions} action(s) bloquée(s)`)
+  if (allowedActions > 0) parts.push(`${allowedActions} action(s) activée(s)`)
+  return parts.length > 0 ? parts.join(' · ') : 'Permissions par défaut'
+}
+
 // ── Invite permission modal ──────────────────────────────────────────────────
 function InvitePermModal({
-  invite, availableFolders, availableGroups, onSave, onSkip,
+  invite, availableFolders, availableGroups, roleTemplates, onSave, onSkip,
 }: {
   invite: OrgInvite
   availableFolders: string[]
   availableGroups: string[]
+  roleTemplates: OrgRoleTemplate[]
   onSave: (p: PermOverrides) => void
   onSkip: () => void
 }) {
   const init = invite.perm_overrides ?? {}
   const [tabs, setTabs]         = useState<Partial<Record<PageKey, boolean>>>(init.tabs ?? {})
+  const [actions, setActions]   = useState<Partial<Record<ActionKey, boolean>>>(init.actions ?? {})
   const [bankMode, setBankMode] = useState<'all' | 'allow' | 'deny'>(init.bank_folders?.mode ?? 'all')
   const [bankList, setBankList] = useState<string[]>(
     init.bank_folders && init.bank_folders.mode !== 'all' ? init.bank_folders.list : []
@@ -869,6 +1006,16 @@ function InvitePermModal({
     init.phone_groups && init.phone_groups.mode === 'allow' ? init.phone_groups.list : []
   )
   const [copied, setCopied] = useState(false)
+
+  function applyTemplate(t: OrgRoleTemplate) {
+    const p = t.perm_overrides
+    setTabs(p.tabs ?? {})
+    setActions(p.actions ?? {})
+    setBankMode(p.bank_folders?.mode ?? 'all')
+    setBankList(p.bank_folders && p.bank_folders.mode !== 'all' ? p.bank_folders.list : [])
+    setGroupMode(p.phone_groups?.mode ?? 'all')
+    setGroupList(p.phone_groups && p.phone_groups.mode === 'allow' ? p.phone_groups.list : [])
+  }
 
   function toggleTab(tab: PageKey, v: boolean | undefined) {
     setTabs(prev => {
@@ -881,6 +1028,7 @@ function InvitePermModal({
   function save() {
     const out: PermOverrides = {}
     if (Object.keys(tabs).length > 0) out.tabs = tabs
+    if (Object.keys(actions).length > 0) out.actions = actions
     if (bankMode === 'all') out.bank_folders = { mode: 'all' }
     else                    out.bank_folders = { mode: bankMode, list: bankList }
     if (groupMode === 'all') out.phone_groups = { mode: 'all' }
@@ -929,6 +1077,27 @@ function InvitePermModal({
 
         {/* Scrollable permissions body */}
         <div className="overflow-y-auto flex-1 px-6 py-4 space-y-5">
+          {/* Role templates quick-apply */}
+          {roleTemplates.length > 0 && (
+            <div>
+              <p className="text-xs font-bold text-text mb-2">Appliquer un rôle existant</p>
+              <div className="flex gap-1.5 flex-wrap">
+                {roleTemplates.map(t => (
+                  <button
+                    key={t.id}
+                    onClick={() => applyTemplate(t)}
+                    title={permSummary(t.perm_overrides)}
+                    className="text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors hover:opacity-80"
+                    style={{ background: t.color + '22', color: t.color, borderColor: t.color + '55' }}
+                  >
+                    {t.name}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[10px] text-text2 mt-1.5">Clique pour pré-remplir les permissions. Tu peux ensuite affiner manuellement.</p>
+              <div className="border-t border-border mt-3" />
+            </div>
+          )}
           {/* Tabs */}
           <div>
             <p className="text-xs font-bold text-text mb-2">Onglets accessibles</p>
@@ -987,6 +1156,44 @@ function InvitePermModal({
               )}
             </div>
           </div>
+
+          {/* Actions */}
+          <div>
+            <p className="text-xs font-bold text-text mb-2">Actions autorisées</p>
+            <p className="text-[10px] text-text2 mb-2">Contrôle ce que ce membre peut faire dans chaque section.</p>
+            {['Banque', 'Téléphones', 'Actions'].map(group => (
+              <div key={group} className="mb-3">
+                <p className="text-[10px] font-bold text-text2 uppercase tracking-wider mb-1.5">{group}</p>
+                <div className="grid grid-cols-2 gap-1">
+                  {ALL_ACTIONS.filter(a => a.group === group).map(a => {
+                    const v = actions[a.key]
+                    return (
+                      <div key={a.key} className="flex items-center gap-1.5 bg-surface rounded px-2 py-1.5">
+                        <span className="text-sm">{a.icon}</span>
+                        <span className="flex-1 text-[10px] text-text truncate">{a.label}</span>
+                        <select
+                          value={v === undefined ? 'default' : v ? 'allow' : 'deny'}
+                          onChange={e => {
+                            const val = e.target.value
+                            setActions(prev => {
+                              const next = { ...prev }
+                              if (val === 'default') delete next[a.key]; else next[a.key] = val === 'allow'
+                              return next
+                            })
+                          }}
+                          className="bg-bg border border-border rounded text-[10px] px-1 py-0.5 text-text"
+                        >
+                          <option value="default">Par défaut</option>
+                          <option value="allow">Autorisé</option>
+                          <option value="deny">Bloqué</option>
+                        </select>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* Footer */}
@@ -999,6 +1206,168 @@ function InvitePermModal({
           </button>
           <Button onClick={save}>Enregistrer les permissions</Button>
         </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Role template creator / editor ──────────────────────────────────────────
+const TEMPLATE_COLORS = [
+  '#7c3aed','#2563eb','#059669','#d97706','#dc2626','#db2777','#0891b2','#65a30d',
+]
+function RoleTemplateEditor({
+  initial, availableFolders, availableGroups, onSave, onCancel,
+}: {
+  initial?: OrgRoleTemplate
+  availableFolders: string[]
+  availableGroups: string[]
+  onSave: (name: string, color: string, perms: PermOverrides) => void
+  onCancel: () => void
+}) {
+  const init = initial?.perm_overrides ?? {}
+  const [name,      setName]      = useState(initial?.name ?? '')
+  const [color,     setColor]     = useState(initial?.color ?? TEMPLATE_COLORS[0])
+  const [tabs,      setTabs]      = useState<Partial<Record<PageKey, boolean>>>(init.tabs ?? {})
+  const [actions,   setActions]   = useState<Partial<Record<ActionKey, boolean>>>(init.actions ?? {})
+  const [bankMode,  setBankMode]  = useState<'all' | 'allow' | 'deny'>(init.bank_folders?.mode ?? 'all')
+  const [bankList,  setBankList]  = useState<string[]>(init.bank_folders && init.bank_folders.mode !== 'all' ? init.bank_folders.list : [])
+  const [groupMode, setGroupMode] = useState<'all' | 'allow'>(init.phone_groups?.mode ?? 'all')
+  const [groupList, setGroupList] = useState<string[]>(init.phone_groups?.mode === 'allow' ? (init.phone_groups as { list: string[] }).list : [])
+
+  function save() {
+    if (!name.trim()) return
+    const out: PermOverrides = {}
+    if (Object.keys(tabs).length > 0) out.tabs = tabs
+    if (Object.keys(actions).length > 0) out.actions = actions
+    if (bankMode !== 'all') out.bank_folders = { mode: bankMode, list: bankList }
+    if (groupMode === 'allow') out.phone_groups = { mode: 'allow', list: groupList }
+    onSave(name.trim(), color, out)
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Name + color */}
+      <div className="flex gap-2 items-center">
+        <div className="flex gap-1 flex-shrink-0">
+          {TEMPLATE_COLORS.map(c => (
+            <button
+              key={c}
+              onClick={() => setColor(c)}
+              className="w-5 h-5 rounded-full transition-transform hover:scale-110 ring-offset-1"
+              style={{ background: c, outline: color === c ? `2px solid ${c}` : 'none', outlineOffset: 2 }}
+            />
+          ))}
+        </div>
+        <Input
+          value={name}
+          onChange={e => setName(e.target.value)}
+          placeholder="Nom du rôle (ex: Content Manager)"
+          onKeyDown={e => { if (e.key === 'Enter') save() }}
+        />
+      </div>
+
+      {/* Tabs */}
+      <div>
+        <p className="text-xs font-bold text-text mb-1.5">Onglets</p>
+        <div className="grid grid-cols-2 gap-1">
+          {ALL_TABS.map(t => {
+            const v = tabs[t.key]
+            return (
+              <div key={t.key} className="flex items-center gap-1.5 bg-surface rounded px-2 py-1">
+                <span className="text-sm">{t.icon}</span>
+                <span className="flex-1 text-[10px] text-text truncate">{t.label}</span>
+                <select
+                  value={v === undefined ? 'default' : v ? 'allow' : 'deny'}
+                  onChange={e => {
+                    const val = e.target.value
+                    setTabs(prev => {
+                      const next = { ...prev }
+                      if (val === 'default') delete next[t.key]; else next[t.key] = val === 'allow'
+                      return next
+                    })
+                  }}
+                  className="bg-bg border border-border rounded text-[10px] px-1 py-0.5 text-text"
+                >
+                  <option value="default">Défaut</option>
+                  <option value="allow">Autorisé</option>
+                  <option value="deny">Bloqué</option>
+                </select>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div>
+        <p className="text-xs font-bold text-text mb-1.5">Actions</p>
+        {['Banque', 'Téléphones', 'Actions'].map(group => (
+          <div key={group} className="mb-2">
+            <p className="text-[10px] font-bold text-text2 uppercase tracking-wider mb-1">{group}</p>
+            <div className="grid grid-cols-2 gap-1">
+              {ALL_ACTIONS.filter(a => a.group === group).map(a => {
+                const v = actions[a.key]
+                return (
+                  <div key={a.key} className="flex items-center gap-1.5 bg-surface rounded px-2 py-1">
+                    <span className="text-sm">{a.icon}</span>
+                    <span className="flex-1 text-[10px] text-text truncate">{a.label}</span>
+                    <select
+                      value={v === undefined ? 'default' : v ? 'allow' : 'deny'}
+                      onChange={e => {
+                        const val = e.target.value
+                        setActions(prev => {
+                          const next = { ...prev }
+                          if (val === 'default') delete next[a.key]; else next[a.key] = val === 'allow'
+                          return next
+                        })
+                      }}
+                      className="bg-bg border border-border rounded text-[10px] px-1 py-0.5 text-text"
+                    >
+                      <option value="default">Défaut</option>
+                      <option value="allow">Autorisé</option>
+                      <option value="deny">Bloqué</option>
+                    </select>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Bank folders & phone groups */}
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <p className="text-[10px] font-bold text-text2 uppercase tracking-wider mb-1">Dossiers banque</p>
+          <select value={bankMode} onChange={e => setBankMode(e.target.value as 'all' | 'allow' | 'deny')}
+            className="w-full bg-bg border border-border rounded px-2 py-1 text-xs text-text mb-1">
+            <option value="all">Tous</option>
+            <option value="allow">Seulement…</option>
+            <option value="deny">Sauf…</option>
+          </select>
+          {bankMode !== 'all' && <MultiSelect options={availableFolders} selected={bankList} onChange={setBankList} placeholder="Dossiers…" />}
+        </div>
+        <div>
+          <p className="text-[10px] font-bold text-text2 uppercase tracking-wider mb-1">Groupes téléphones</p>
+          <select value={groupMode} onChange={e => setGroupMode(e.target.value as 'all' | 'allow')}
+            className="w-full bg-bg border border-border rounded px-2 py-1 text-xs text-text mb-1">
+            <option value="all">Tous</option>
+            <option value="allow">Seulement…</option>
+          </select>
+          {groupMode === 'allow' && <MultiSelect options={availableGroups} selected={groupList} onChange={setGroupList} placeholder="Groupes…" />}
+        </div>
+      </div>
+
+      <div className="flex gap-2 justify-end pt-1">
+        <Button size="sm" variant="secondary" onClick={onCancel}>Annuler</Button>
+        <Button
+          size="sm"
+          onClick={save}
+          style={name.trim() ? { background: color + '33', color, borderColor: color + '66' } : {}}
+          disabled={!name.trim()}
+        >
+          {initial ? 'Mettre à jour' : 'Créer le rôle'}
+        </Button>
       </div>
     </div>
   )
