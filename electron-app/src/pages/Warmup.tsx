@@ -136,7 +136,7 @@ export function Warmup({ user }: WarmupProps) {
     await Promise.all(targets.map(async phone => {
       const cred = loginCreds[phone.id]
       if (!cred?.email || !cred?.password) {
-        updateJob(phone.id, { status: 'error', error: 'Identifiants manquants' })
+        updateJob(phone.id, { status: 'error', error: 'Missing credentials' })
         return
       }
       updateJob(phone.id, { status: 'running' })

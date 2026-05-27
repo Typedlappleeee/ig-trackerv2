@@ -600,7 +600,7 @@ export function Scheduler({ user, onNavigate }: Props) {
             </p>
             <p style={{ fontSize: 13, color: 'rgba(148,163,184,0.52)', marginTop: 8, marginBottom: 0 }}>
               {tab === 'pending'
-                ? 'Programme un post depuis Posting ou Mass Posting.'
+                ? 'Schedule a post from Posting or Mass Posting.'
                 : 'Executed posts will appear here.'}
             </p>
             {tab === 'pending' && (
@@ -609,7 +609,7 @@ export function Scheduler({ user, onNavigate }: Props) {
                 style={{ marginTop: 20 }}
                 onClick={() => onNavigate?.('massposting')}
               >
-                Planifier un post
+                Schedule a post
               </button>
             )}
           </div>
@@ -647,11 +647,11 @@ export function Scheduler({ user, onNavigate }: Props) {
             <IconInfo size={14} color="rgba(139,92,246,0.7)" />
           </span>
           <p style={{ fontSize: 12, lineHeight: 1.6, color: 'rgba(196,181,253,0.72)', margin: 0 }}>
-            Les posts sont exécutés{' '}
-            <strong style={{ color: 'rgba(242,240,255,0.7)' }}>automatiquement</strong>{' '}
-            à l'heure choisie. Si l'app est ouverte, elle s'en charge. Sinon, la{' '}
+            Posts are executed{' '}
+            <strong style={{ color: 'rgba(242,240,255,0.7)' }}>automatically</strong>{' '}
+            at the scheduled time. If the app is open, it handles it. Otherwise, the{' '}
             <strong style={{ color: 'rgba(242,240,255,0.7)' }}>Supabase Edge Function</strong>{' '}
-            prend le relais. La vidéo est uploadée au moment de la programmation.
+            takes over. The video is uploaded at scheduling time.
           </p>
         </div>
       </div>
@@ -716,7 +716,7 @@ function PostCard({ post, index, isOwn, canCancel, isRunning, runLogs, cancellin
               borderRadius: 6, padding: '3px 8px', fontSize: 11, fontWeight: 500,
             }}>
               <IconUser size={11} color={isOwn ? '#A78BFA' : 'rgba(196,181,253,0.5)'} />
-              {isOwn ? 'Moi' : post.created_by_name}
+              {isOwn ? 'Me' : post.created_by_name}
             </span>
           )}
 
@@ -741,7 +741,7 @@ function PostCard({ post, index, isOwn, canCancel, isRunning, runLogs, cancellin
             }}
           >
             <IconX size={11} color="#EF4444" />
-            {cancelling ? 'Annulation…' : 'Annuler'}
+            {cancelling ? 'Cancelling…' : 'Cancel'}
           </button>
         )}
       </div>
@@ -770,16 +770,16 @@ function PostCard({ post, index, isOwn, canCancel, isRunning, runLogs, cancellin
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
         <StatChip
           icon={<IconPhone size={11} color="rgba(196,181,253,0.72)" />}
-          label={`${post.phones.length} téléphone${post.phones.length !== 1 ? 's' : ''}`}
+          label={`${post.phones.length} phone${post.phones.length !== 1 ? 's' : ''}`}
         />
         <StatChip
           icon={<IconVideo size={11} color="rgba(196,181,253,0.72)" />}
-          label={`${post.videos.length} vidéo${post.videos.length !== 1 ? 's' : ''}`}
+          label={`${post.videos.length} video${post.videos.length !== 1 ? 's' : ''}`}
         />
         {post.delay_minutes > 0 && (
           <StatChip
             icon={<IconTime size={11} color="rgba(196,181,253,0.72)" />}
-            label={`${post.delay_minutes} min entre comptes`}
+            label={`${post.delay_minutes} min between accounts`}
           />
         )}
         {post.type === 'mass_posting' && (
@@ -825,7 +825,7 @@ function PostCard({ post, index, isOwn, canCancel, isRunning, runLogs, cancellin
               background: 'rgba(124,58,237,0.1)', color: '#A78BFA',
               borderRadius: 5, padding: '2px 8px', fontSize: 11,
             }}>
-              +{post.phones.length - 6} autres
+              +{post.phones.length - 6} more
             </span>
           )}
         </div>
@@ -845,7 +845,7 @@ function PostCard({ post, index, isOwn, canCancel, isRunning, runLogs, cancellin
               }}
             >
               <IconChevron size={11} color="rgba(139,92,246,0.8)" rotated={false} />
-              Afficher les logs ({allLogs.length})
+              Show logs ({allLogs.length})
             </button>
           ) : (
             <TerminalLogs logs={allLogs} onClose={() => setShowLogs(false)} />

@@ -49,11 +49,11 @@ function IgStatusBadge({ phone }: { phone: Phone }) {
   if (phone.ig_status === 'active')
     return <span className="sf-badge sf-badge-ok">IG OK</span>
   if (phone.ig_status === 'expired')
-    return <span className="sf-badge sf-badge-danger">Expiré</span>
+    return <span className="sf-badge sf-badge-danger">Expired</span>
   if (phone.ig_status === 'error')
     return <span className="sf-badge sf-badge-danger">Erreur</span>
   if (phone.ig_status === 'rate_limited')
-    return <span className="sf-badge sf-badge-warn">Limité</span>
+    return <span className="sf-badge sf-badge-warn">Limited</span>
   if (phone.ig_sessionid)
     return <span className="sf-badge sf-badge-accent">Session</span>
   return <span className="sf-badge sf-badge-muted">Public</span>
@@ -131,7 +131,7 @@ function SessionDialog({
 
   async function extractFromPhone() {
     if (!bearer || !phone.geelark_id) {
-      setExtractError('Téléphone non lié à GéeLark ou token manquant')
+      setExtractError('Phone not linked to GéeLark or missing token')
       return
     }
     const ctrl = new AbortController()
@@ -156,11 +156,11 @@ function SessionDialog({
         handleChange(sessionid)
         setExtractError(null)
       } else if (!ctrl.signal.aborted) {
-        setExtractError('sessionid non trouvé — voir les logs ci-dessus')
+        setExtractError('sessionid not found — see logs above')
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
-      if (msg !== 'Annulé') setExtractError(msg)
+      if (msg !== 'Cancelled') setExtractError(msg)
     }
     abortCtrlRef.current = null
     setExtracting(false)
@@ -235,7 +235,7 @@ function SessionDialog({
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div>
                   <p style={{ fontSize: 12, fontWeight: 600, color: '#F2F0FF', margin: 0 }}>Extraction automatique</p>
-                  <p style={{ fontSize: 10, color: 'rgba(148,163,184,0.52)', margin: '2px 0 0' }}>Récupère le sessionid directement depuis le téléphone GéeLark (max 3 min)</p>
+                  <p style={{ fontSize: 10, color: 'rgba(148,163,184,0.52)', margin: '2px 0 0' }}>Retrieves the sessionid directly from the GéeLark phone (max 3 min)</p>
                 </div>
                 <div style={{ display: 'flex', gap: 6 }}>
                   {extracting && (
@@ -323,11 +323,11 @@ function SessionDialog({
               <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.52)', margin: 0 }}>
                 Compte : <span style={{ color: '#8B5CF6', fontWeight: 600 }}>@{detectedUser}</span>
                 {phone.ig_username && phone.ig_username !== detectedUser && (
-                  <span style={{ color: '#F59E0B', marginLeft: 4 }}>· différent de @{phone.ig_username} — sera mis à jour</span>
+                  <span style={{ color: '#F59E0B', marginLeft: 4 }}>· different from @{phone.ig_username} — will be updated</span>
                 )}
               </p>
             )}
-            {testResult === 'fail' && <p style={{ fontSize: 11, color: '#EF4444', margin: 0 }}>Session invalide ou expirée — vérifie que tu as copié la bonne valeur.</p>}
+            {testResult === 'fail' && <p style={{ fontSize: 11, color: '#EF4444', margin: 0 }}>Invalid or expired session — make sure you copied the correct value.</p>}
             {testResult === 'idle' && value.trim().length > 10 && !testing && (
               <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.52)', margin: 0 }}>Test automatique en cours…</p>
             )}
@@ -337,10 +337,10 @@ function SessionDialog({
         {/* Footer */}
         <div className="sf-modal-footer">
           <button onClick={onClose} disabled={busy} className="sf-btn sf-btn-ghost">
-            Annuler
+            Cancel
           </button>
           <Button size="sm" onClick={save} loading={busy} disabled={!value.trim()}>
-            {testing ? 'Vérification…' : saving ? 'Sauvegarde…' : testResult === 'ok' ? 'Sauvegarder' : 'Tester & Sauvegarder'}
+            {testing ? 'Verifying…' : saving ? 'Saving…' : testResult === 'ok' ? 'Save' : 'Test & Save'}
           </Button>
         </div>
       </div>
@@ -408,7 +408,7 @@ function ContextMenu({
       )}
       {phone.ig_username && item(
         <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 6.5C2 4 4 2 6.5 2s4.5 2 4.5 4.5S9 11 6.5 11" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/><path d="M2 11l4-4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>,
-        'Délier Instagram', onUnlink
+        'Unlink Instagram', onUnlink
       )}
       {canDelete && (
         <>
@@ -460,7 +460,7 @@ function IgCell({ phone, onSave }: { phone: Phone; onSave: (id: string, u: strin
     <button
       onClick={() => setEditing(true)}
       style={{ fontSize: 13, textAlign: 'left', display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', minWidth: 0, padding: 0 }}
-      title="Cliquer pour éditer"
+      title="Click to edit"
     >
       {phone.ig_username ? (
         <span style={{ color: '#8B5CF6', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>@{phone.ig_username}</span>
@@ -509,7 +509,7 @@ function NoteCell({ phone, onSave }: { phone: Phone; onSave: (id: string, v: str
     <button
       onClick={() => setEditing(true)}
       style={{ fontSize: 13, textAlign: 'left', display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', minWidth: 0, width: '100%', padding: 0 }}
-      title="Cliquer pour éditer"
+      title="Click to edit"
     >
       {phone.remark ? (
         <span style={{ color: 'rgba(196,181,253,0.72)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phone.remark}</span>
@@ -669,13 +669,13 @@ export function Phones({ user }: PhonesProps) {
 
   // ── Full sync from GéeLark ─────────────────────────────────────────────
   const syncFromGeelark = useCallback(async () => {
-    if (!bearer) { setError('Token GéeLark manquant — configure-le dans Paramètres.'); return }
+    if (!bearer) { setError('Missing GéeLark token — configure it in Settings.'); return }
     setSyncing(true); setError(null)
     try {
       const items = await fetchAllPhones(bearer)
-      if (items.length === 0) { setError('Aucun téléphone trouvé.'); setSyncing(false); return }
+      if (items.length === 0) { setError('No phones found.'); setSyncing(false); return }
       if (items.length > phoneLimit) {
-        setError(`Limite du plan atteinte : ${phoneLimit} téléphones max (${effectivePlan(license) ?? 'standard'}). Passez au plan supérieur pour en ajouter plus.`)
+        setError(`Plan limit reached: ${phoneLimit} phones max (${effectivePlan(license) ?? 'standard'}). Upgrade your plan to add more.`)
         setSyncing(false)
         return
       }
@@ -771,7 +771,7 @@ export function Phones({ user }: PhonesProps) {
 
   async function deletePhone(id: string) {
     if (!canDelete) return
-    if (!confirm('Supprimer ce téléphone ?')) return
+    if (!confirm('Delete this phone?')) return
     const { error: err } = await supabase.from('phones').delete().eq('id', id)
     if (!err) setPhones(prev => prev.filter(p => p.id !== id))
   }
@@ -908,7 +908,7 @@ export function Phones({ user }: PhonesProps) {
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
           <div>
-            <h1 style={{ fontSize: 16, fontWeight: 700, color: '#F2F0FF', margin: 0, letterSpacing: '-0.3px' }}>Téléphones</h1>
+            <h1 style={{ fontSize: 16, fontWeight: 700, color: '#F2F0FF', margin: 0, letterSpacing: '-0.3px' }}>Phones</h1>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {/* Auto-refresh control */}
@@ -979,7 +979,7 @@ export function Phones({ user }: PhonesProps) {
 
           const summaryCards = [
             {
-              label: 'Total', value: phones.length, sub: 'téléphones',
+              label: 'Total', value: phones.length, sub: 'phones',
               color: '#8B5CF6', f: 'all' as const,
               icon: (
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
@@ -1066,7 +1066,7 @@ export function Phones({ user }: PhonesProps) {
                   <path d="M7.5 6v3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
                   <circle cx="7.5" cy="11" r="0.7" fill="currentColor"/>
                 </svg>
-                Token GéeLark manquant — configure-le dans Paramètres.
+                Missing GéeLark token — configure it in Settings.
               </div>
             )}
             {error && (
@@ -1106,7 +1106,7 @@ export function Phones({ user }: PhonesProps) {
                 </span>
                 <input
                   type="text"
-                  placeholder="Rechercher téléphone, compte, groupe…"
+                  placeholder="Search phone, account, group…"
                   value={search}
                   onChange={e => setSearch(e.target.value)}
                   className="sf-input"
@@ -1216,9 +1216,9 @@ export function Phones({ user }: PhonesProps) {
                     <path d="M10 5h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
                   </svg>
                 </div>
-                <p style={{ fontSize: 16, fontWeight: 700, color: '#F2F0FF', margin: '0 0 8px' }}>Aucun téléphone configuré</p>
+                <p style={{ fontSize: 16, fontWeight: 700, color: '#F2F0FF', margin: '0 0 8px' }}>No phones configured</p>
                 <p style={{ fontSize: 13, color: 'rgba(148,163,184,0.52)', margin: '0 0 24px', maxWidth: 320 }}>
-                  Synchronisez depuis GéeLark pour importer vos téléphones et commencer le suivi.
+                  Sync from GéeLark to import your phones and start tracking.
                 </p>
                 <button
                   onClick={syncFromGeelark}
@@ -1253,7 +1253,7 @@ export function Phones({ user }: PhonesProps) {
                   userSelect: 'none',
                 }}>
                   <span>#</span>
-                  <span>Téléphone</span>
+                  <span>Phone</span>
                   <span>Groupe</span>
                   <span>Géelark</span>
                   <span>Actions</span>
@@ -1261,7 +1261,7 @@ export function Phones({ user }: PhonesProps) {
 
                 {visible.length === 0 ? (
                   <p style={{ padding: '40px 20px', textAlign: 'center', fontSize: 13, color: 'rgba(148,163,184,0.52)', margin: 0 }}>
-                    Aucun résultat pour cette recherche.
+                    No results for this search.
                   </p>
                 ) : (
                   visible.map((phone, i) => {
@@ -1296,9 +1296,9 @@ export function Phones({ user }: PhonesProps) {
 
             {!loading && visible.length > 0 && (
               <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.3)', marginTop: 10 }}>
-                {visible.length} sur {phones.length} téléphone{phones.length > 1 ? 's' : ''}
+                {visible.length} of {phones.length} phone{phones.length > 1 ? 's' : ''}
                 {lastUpdated && (
-                  <span> · mis à jour {lastUpdated.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
+                  <span> · updated at {lastUpdated.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
                 )}
               </p>
             )}
@@ -1399,7 +1399,7 @@ export function Phones({ user }: PhonesProps) {
                   <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'rgba(148,163,184,0.35)', margin: '0 0 10px' }}>Informations</p>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     {[
-                      { label: 'Modèle',       value: p.phone_name },
+                      { label: 'Model',        value: p.phone_name },
                       { label: 'Serial',       value: p.serial_no ?? '—' },
                       { label: 'GéeLark ID',   value: p.geelark_id ?? '—' },
                       { label: 'Groupe',       value: p.group_name ?? '—' },
@@ -1430,7 +1430,7 @@ export function Phones({ user }: PhonesProps) {
                         <p style={{ fontSize: 13, fontWeight: 600, color: '#8B5CF6', margin: 0 }}>@{p.ig_username}</p>
                         {(p.followers || p.following) ? (
                           <p style={{ fontSize: 10, color: 'rgba(148,163,184,0.45)', margin: '2px 0 0' }}>
-                            {p.followers ? `${p.followers >= 1000 ? `${(p.followers / 1000).toFixed(1)}K` : p.followers} abonnés` : ''}
+                            {p.followers ? `${p.followers >= 1000 ? `${(p.followers / 1000).toFixed(1)}K` : p.followers} followers` : ''}
                             {p.followers && p.following ? ' · ' : ''}
                             {p.following ? `${p.following} suivi(s)` : ''}
                           </p>
@@ -1484,7 +1484,7 @@ export function Phones({ user }: PhonesProps) {
                         onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'none' }}
                       >
                         <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 6.5C2 4 4 2 6.5 2s4.5 2 4.5 4.5S9 11 6.5 11" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/><path d="M2 11l4-4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
-                        Délier Instagram
+                        Unlink Instagram
                       </button>
                     )}
                     {canDelete && (
@@ -1622,7 +1622,7 @@ function PhoneRow({
             <path d="M8 1.5l1.5 1.5L8 4.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         </button>
-        <button className="sf-btn sf-btn-ghost sf-btn-sm sf-btn-icon" onClick={() => setSelectedPhone(isSelected ? null : phone)} title="Voir les détails" style={{ width: 28, height: 28 }}>
+        <button className="sf-btn sf-btn-ghost sf-btn-sm sf-btn-icon" onClick={() => setSelectedPhone(isSelected ? null : phone)} title="View details" style={{ width: 28, height: 28 }}>
           <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
             <ellipse cx="6.5" cy="6.5" rx="5" ry="3" stroke="currentColor" strokeWidth="1.4"/>
             <circle cx="6.5" cy="6.5" r="1.5" fill="currentColor"/>

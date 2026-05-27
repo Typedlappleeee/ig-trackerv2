@@ -734,7 +734,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
           const tmp = await window.electronAPI!.writeTempFile!({ name: outName, bytes: new ArrayBuffer(0) })
           if (!tmp.ok || !tmp.path) {
             addLog(job.id, '❌ Impossible de créer le fichier temporaire')
-            updateJob(job.id, { status: 'error', error: 'Impossible de créer le fichier temp' })
+            updateJob(job.id, { status: 'error', error: 'Unable to create temp file' })
             return
           }
           outputPath = tmp.path
@@ -1214,7 +1214,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                 <div>
                   <p className="text-[15px] font-black text-white">Generating in parallel…</p>
                   <p className="text-[13px] text-text2">
-                    {runningCount} en cours · {doneCount} terminée(s) · {errorCount} erreur(s)
+                    {runningCount} running · {doneCount} done · {errorCount} error(s)
                   </p>
                 </div>
               </div>
@@ -1224,7 +1224,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
               <div className="flex items-center justify-between text-[13px] mb-1">
                 <span className="text-text2">{doneCount + errorCount} / {jobs.length}</span>
                 <span className="font-bold" style={{ color: '#a78bfa' }}>{progress}%</span>
-                <span className="text-text2">{runningCount} actives</span>
+                <span className="text-text2">{runningCount} active</span>
               </div>
               <div className="h-2.5 rounded-full overflow-hidden" style={{ background: 'rgba(139,92,246,0.12)' }}>
                 <div className="h-full rounded-full transition-all duration-500"
@@ -1265,7 +1265,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                 <p className="text-[20px] font-black text-white">
                   {errorCount === 0 ? 'All remixes generated!' : `${doneCount} / ${jobs.length} done`}
                 </p>
-                {errorCount > 0 && <p className="text-[13px]" style={{ color: '#fbbf24' }}>{errorCount} erreur(s)</p>}
+                {errorCount > 0 && <p className="text-[13px]" style={{ color: '#fbbf24' }}>{errorCount} error(s)</p>}
               </div>
               <div className="space-y-2 max-h-72 overflow-auto">
                 {jobs.map(job => (

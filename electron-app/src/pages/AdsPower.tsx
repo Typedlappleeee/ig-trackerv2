@@ -83,7 +83,7 @@ async function adsRequest(urlPath: string, apiKey?: string, body?: unknown): Pro
       lastErr = (e as Error).message
     }
   }
-  throw new Error(`AdsPower inaccessible (${lastErr}). Ouvrez l'app desktop ScaleFlow sur ce PC, puis réessayez.`)
+  throw new Error(`AdsPower inaccessible (${lastErr}). Open the ScaleFlow desktop app on this PC, then try again.`)
 }
 
 // ── Profile row ────────────────────────────────────────────────────────────────
@@ -242,7 +242,7 @@ export function AdsPower({ user }: AdsPowerProps) {
       let page = 1
       while (true) {
         const res = await adsRequest(`/api/v1/user/list?page=${page}&page_size=100`, apiKey || undefined)
-        if (res.code !== 0) throw new Error(res.msg ?? 'Erreur API AdsPower')
+        if (res.code !== 0) throw new Error(res.msg ?? 'AdsPower API error')
         const rows: Array<{
           user_id: string
           name: string
@@ -314,21 +314,21 @@ export function AdsPower({ user }: AdsPowerProps) {
 
   // ── Get video URL (already resolved by BankPicker resolveMode=signed-url) ──
   const getVideoUrl = async (): Promise<string> => {
-    if (!video?.path) throw new Error('Aucune vidéo sélectionnée')
+    if (!video?.path) throw new Error('No video selected')
     return video.path
   }
 
   // ── Post to one profile via AdsPower API ───────────────────────────────────
   const postToProfile = async (profile: FbProfile, videoUrl: string) => {
     // 1. Start browser
-    addLog(profile.id, profile.name, 'running', 'Ouverture du navigateur AdsPower…')
+    addLog(profile.id, profile.name, 'running', 'Opening AdsPower browser…')
     const startRes = await adsRequest(`/api/v1/browser/start?user_id=${profile.ads_user_id}`, apiKey || undefined)
-    if (startRes.code !== 0) throw new Error(`Démarrage échoué : ${startRes.msg}`)
+    if (startRes.code !== 0) throw new Error(`Start failed: ${startRes.msg}`)
 
     const wsUrl = startRes.data?.ws?.puppeteer
-    if (!wsUrl) throw new Error('WebSocket Puppeteer non trouvé')
+    if (!wsUrl) throw new Error('Puppeteer WebSocket not found')
 
-    updateLog(profile.id, 'running', 'Navigateur ouvert — connexion Playwright…')
+    updateLog(profile.id, 'running', 'Browser open — connecting Playwright…')
 
     // 2. Use Electron's playwright bridge if available, otherwise fetch proxy
     if (false) {
@@ -342,7 +342,7 @@ export function AdsPower({ user }: AdsPowerProps) {
       })
       if (!res.ok) throw new Error(`Proxy HTTP ${res.status}`)
       const r = await res.json()
-      if (!r.success) throw new Error(r.error ?? 'Erreur inconnue')
+      if (!r.success) throw new Error(r.error ?? 'Unknown error')
     }
 
     // 3. Close browser
@@ -362,22 +362,22 @@ export function AdsPower({ user }: AdsPowerProps) {
     try {
       videoUrl = await getVideoUrl()
     } catch (e: unknown) {
-      addLog('_', 'Système', 'error', (e as Error).message)
+      addLog('_', 'System', 'error', (e as Error).message)
       setRunning(false)
       return
     }
 
     for (let i = 0; i < targets.length; i++) {
       const p = targets[i]
-      addLog(p.id, p.name, 'pending', 'En attente…')
+      addLog(p.id, p.name, 'pending', 'Pending…')
     }
 
     for (let i = 0; i < targets.length; i++) {
       const p = targets[i]
       try {
-        updateLog(p.id, 'running', 'Démarrage…')
+        updateLog(p.id, 'running', 'Starting…')
         await postToProfile(p, videoUrl)
-        updateLog(p.id, 'done', '✅ Publication réussie !')
+        updateLog(p.id, 'done', '✅ Published successfully!')
       } catch (e: unknown) {
         updateLog(p.id, 'error', `❌ ${(e as Error).message}`)
         // Close browser on error silently
@@ -386,7 +386,7 @@ export function AdsPower({ user }: AdsPowerProps) {
 
       // Delay between posts
       if (i < targets.length - 1 && delayMin > 0) {
-        addLog('_delay', `Pause`, 'running', `Pause ${delayMin}s avant le prochain compte…`)
+        addLog('_delay', `Pause`, 'running', `Pause ${delayMin}s before next account…`)
         await new Promise(r => setTimeout(r, delayMin * 1000))
         setLogs(prev => prev.filter(l => l.profile_id !== '_delay'))
       }
@@ -556,7 +556,7 @@ export function AdsPower({ user }: AdsPowerProps) {
                 rows={6}
                 style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', color: '#F2F0FF', fontSize: 13, resize: 'vertical', outline: 'none', fontFamily: 'inherit', lineHeight: 1.6 }}
               />
-              <p style={{ fontSize: 10, color: 'rgba(148,163,184,0.3)', margin: '6px 0 0', textAlign: 'right' }}>{caption.length} caractères</p>
+              <p style={{ fontSize: 10, color: 'rgba(148,163,184,0.3)', margin: '6px 0 0', textAlign: 'right' }}>{caption.length} characters</p>
             </div>
 
             {/* Options */}
@@ -635,7 +635,7 @@ export function AdsPower({ user }: AdsPowerProps) {
           user={user}
           mode="single"
           onSelect={(paths, titles) => {
-            if (paths[0]) setVideo({ path: paths[0], title: titles?.[0] ?? paths[0].split('/').pop() ?? 'Vidéo' })
+            if (paths[0]) setVideo({ path: paths[0], title: titles?.[0] ?? paths[0].split('/').pop() ?? 'Video' })
             setShowBank(false)
           }}
           onClose={() => setShowBank(false)}

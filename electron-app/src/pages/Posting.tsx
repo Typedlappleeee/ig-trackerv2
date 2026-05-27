@@ -240,7 +240,7 @@ export function Posting({ user }: PostingProps) {
       }
 
       setProgress(60)
-      log('🎬 Création des tâches de post…')
+      log('🎬 Creating post tasks…')
       const taskIds: Record<string, string> = {}
       const scheduleTimes = buildScheduleTimes(phoneList.length, postingOpts)
       if (postingOpts.intervalMode !== 'none' && phoneList.length > 1) {
