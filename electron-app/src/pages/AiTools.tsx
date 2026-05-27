@@ -723,49 +723,27 @@ export function AiTools({ user }: AiToolsProps) {
   if (active === 'competitor') return <CompetitorAnalysis groqKey={conns.groq} onBack={back} />
 
   // ── Hub ───────────────────────────────────────────────────────────────────
-  const totalTools = GROQ_TOOLS.length + VISION_TOOLS_META.length + 2
   return (
     <div className="h-full flex flex-col overflow-hidden bg-bg anim-page">
 
       {/* Header */}
       <div className="flex-shrink-0 px-8 pt-8 pb-6 sf-topbar">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            {/* Glowing icon */}
-            <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl relative overflow-hidden"
-              style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.22), rgba(236,72,153,0.12))', border: '1px solid rgba(139,92,246,0.3)' }}>
-              <span className="relative z-10">✨</span>
-              <div className="absolute inset-0 anim-glow rounded-2xl" />
-            </div>
-            <div>
-              <h1 className="text-[26px] font-black leading-none sf-text-gradient">Outils IA</h1>
-              <p className="text-[12px] text-text3 font-mono mt-1 tracking-widest uppercase">AI Creative Studio</p>
-            </div>
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl relative overflow-hidden"
+            style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.22), rgba(236,72,153,0.12))', border: '1px solid rgba(139,92,246,0.3)' }}>
+            <span className="relative z-10">✨</span>
+            <div className="absolute inset-0 anim-glow rounded-2xl" />
           </div>
-
-          {/* Stats */}
-          <div className="flex items-center gap-3">
-            <div className="sf-card rounded-xl px-4 py-2.5 flex items-center gap-2.5">
-              <span className="text-base">⚡</span>
-              <div>
-                <p className="text-[11px] font-mono text-text3 uppercase tracking-wider">Outils actifs</p>
-                <p className="text-[15px] font-black text-accent leading-none">{totalTools}</p>
-              </div>
-            </div>
-            <div className="sf-card rounded-xl px-4 py-2.5 flex items-center gap-2.5">
-              <span className="text-base">🤖</span>
-              <div>
-                <p className="text-[11px] font-mono text-text3 uppercase tracking-wider">Moteur</p>
-                <p className="text-[13px] font-bold text-text leading-none">Groq + Claude</p>
-              </div>
-            </div>
-            {!conns.anthropic && (
-              <div className="rounded-xl px-4 py-2.5 flex items-center gap-2" style={{ background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.15)' }}>
-                <span className="text-warn text-sm">⚠</span>
-                <p className="text-[11px] font-mono" style={{ color: 'rgba(245,158,11,0.75)' }}>Clé Anthropic manquante</p>
-              </div>
-            )}
+          <div>
+            <h1 className="text-[26px] font-black leading-none sf-text-gradient">Outils IA</h1>
+            <p className="text-[12px] text-text3 font-mono mt-1 tracking-widest uppercase">AI Creative Studio</p>
           </div>
+          {!conns.anthropic && (
+            <div className="ml-4 rounded-xl px-3 py-1.5 flex items-center gap-2" style={{ background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.15)' }}>
+              <span className="text-warn text-xs">⚠</span>
+              <p className="text-[11px] font-mono" style={{ color: 'rgba(245,158,11,0.75)' }}>Clé Anthropic manquante</p>
+            </div>
+          )}
         </div>
       </div>
 
