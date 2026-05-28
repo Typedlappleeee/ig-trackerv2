@@ -454,18 +454,33 @@ function AppContent({ user }: { user: User }) {
   // app_config.onboarded_at and fall back to bearer presence for legacy users
   // who finished onboarding before this column existed.
   useEffect(() => {
-    supabase.from('app_config').select('bearer_token, onboarded_at').eq('user_id', user.id).maybeSingle()
-      .then(({ data, error }) => {
+    let cancelled = false
+    // 6s timeout — if Supabase hangs (paused project, network issue) don't block forever
+    const fallback = setTimeout(() => { if (!cancelled) setOnboarding(true) }, 6000)
+    Promise.resolve(
+      supabase.from('app_config').select('bearer_token, onboarded_at').eq('user_id', user.id).maybeSingle()
+    ).then(({ data, error }) => {
+        clearTimeout(fallback)
+        if (cancelled) return
         if (error) console.error('[app_config] read error:', error)
         const finished = !!(data && (data.onboarded_at || data.bearer_token))
         setOnboarding(!finished)
         if (finished && !localStorage.getItem(BETA_KEY)) setShowBeta(true)
       })
+      .catch(() => { clearTimeout(fallback); if (!cancelled) setOnboarding(true) })
+    return () => { cancelled = true; clearTimeout(fallback) }
   }, [user.id])
 
   // License check — re-run whenever the org changes
   useEffect(() => {
-    checkLicense(user.id, currentOrg?.id ?? null).then(async l => {
+    let cancelled = false
+    // 8s timeout — if checkLicense hangs, fail open so the user isn't locked out
+    const fallback = setTimeout(() => {
+      if (!cancelled) { setLicense({ valid: true, expiresAt: null, daysLeft: null, source: 'own', isSuperAdmin: false, plan: null, orgOwnerPlan: null }); setCreditLoading(false) }
+    }, 8000)
+    Promise.resolve(checkLicense(user.id, currentOrg?.id ?? null)).then(async l => {
+      clearTimeout(fallback)
+      if (cancelled) return
       setLicense(l)
       // Grant monthly credits for own account (if applicable)
       if (l.valid && l.plan && l.source === 'own') {
@@ -478,9 +493,12 @@ function AppContent({ user }: { user: User }) {
       const bal = isOrgMember
         ? await fetchOrgBalance(currentOrg!.id, currentOrg!.owner_id)
         : await fetchBalance(creditOwnerId)
-      setCreditBalance(bal)
-      setCreditLoading(false)
+      if (!cancelled) { setCreditBalance(bal); setCreditLoading(false) }
+    }).catch(() => {
+      clearTimeout(fallback)
+      if (!cancelled) { setLicense({ valid: true, expiresAt: null, daysLeft: null, source: 'own', isSuperAdmin: false, plan: null, orgOwnerPlan: null }); setCreditLoading(false) }
     })
+    return () => { cancelled = true; clearTimeout(fallback) }
   }, [user.id, currentOrg?.id, currentOrg?.owner_id])
 
   // Poll the license every 3s while it's invalid, so an incoming Stripe webhook

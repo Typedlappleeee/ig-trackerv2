@@ -27,10 +27,14 @@ export function OrgProvider({ user, children }: { user: User; children: ReactNod
 
   const load = useCallback(async () => {
     setLoading(true)
-    const { data: members, error } = await supabase
-      .from('organization_members')
-      .select('*, organizations(*)')
-      .eq('user_id', user.id)
+    // 7s timeout — if Supabase hangs, unblock the app rather than spinning forever
+    const timeout = new Promise<{ data: null; error: Error }>(res =>
+      setTimeout(() => res({ data: null, error: new Error('org load timeout') }), 7000)
+    )
+    const { data: members, error } = await Promise.race([
+      Promise.resolve(supabase.from('organization_members').select('*, organizations(*)').eq('user_id', user.id)),
+      timeout,
+    ])
 
     if (error) {
       console.error('[orgContext] load error:', error)
@@ -49,7 +53,7 @@ export function OrgProvider({ user, children }: { user: User; children: ReactNod
     setMyOrgs(list)
     // Validate persisted choice; if stale, clear it
     let effective = localStorage.getItem(LS_KEY)
-    if (effective && !list.some(x => x.org.id === effective)) {
+    if (effective && !list.some((x: { org: Organization }) => x.org.id === effective)) {
       localStorage.removeItem(LS_KEY)
       effective = null
     }
@@ -58,7 +62,7 @@ export function OrgProvider({ user, children }: { user: User; children: ReactNod
       effective = list[0].org.id
       localStorage.setItem(LS_KEY, effective)
     }
-    setCurrentId(effective)
+    setCurrentId(effective ?? null)
     setLoading(false)
   }, [user.id])
 

@@ -419,8 +419,9 @@ export function Montage({ user }: MontageProps) {
     let q = supabase.from('content_bank').select('*').order('created_at', { ascending: false })
     if (currentOrg) q = q.eq('org_id', currentOrg.id)
     else q = q.eq('user_id', user.id)
-    q.then(({ data }) => { setBankItems(data ?? []); setLL(false) })
-      .catch(err => { console.error('[Montage] bank load failed:', err); setLL(false) })
+    Promise.resolve(q)
+      .then(({ data }) => { setBankItems(data ?? []); setLL(false) })
+      .catch((err: unknown) => { console.error('[Montage] bank load failed:', err); setLL(false) })
   }, [currentOrg?.id])
 
   // Sync auto-caption overlay → textOverlays
