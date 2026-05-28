@@ -844,8 +844,11 @@ export async function runFfmpegRemixAIWeb(opts: {
     startTime: number; endTime: number; bold?: boolean; shadow?: boolean
   }>
 }): Promise<{ ok: boolean; outputPath?: string; error?: string }> {
+  // Add 0.5s to the detected cut point so the secondary clip plays a bit longer
+  // before the original video appears. This hides the first frame of the original
+  // which often looks jarring right at the scene-change boundary.
   const splitTime = (opts.splitTime != null && !isNaN(opts.splitTime) && opts.splitTime > 0)
-    ? opts.splitTime : 0
+    ? opts.splitTime + 0.5 : 0
 
   // ── Fast path: hardware encoding via MediaRecorder ────────────────────────
   if (typeof MediaRecorder !== 'undefined') {
