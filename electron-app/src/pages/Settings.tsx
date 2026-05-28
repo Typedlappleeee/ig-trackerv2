@@ -1444,6 +1444,7 @@ function SubscriptionPanel() {
   const { lang } = useLang()
   const license = useLicense()
   const { balance: creditBalance, refresh: refreshCredits } = useCredits()
+  const { myOrgs } = useOrg()
   const [licenseKey, setLicenseKey] = useState<string | null>(null)
   const [copied, setCopied]         = useState(false)
 
