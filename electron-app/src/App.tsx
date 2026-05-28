@@ -471,10 +471,13 @@ function AppContent({ user }: { user: User }) {
       if (l.valid && l.plan && l.source === 'own') {
         await maybeGrantMonthlyCredits(user.id, l.plan).catch(() => {})
       }
-      // Show org owner's credit pool when in org mode, own balance otherwise
-      const bal = currentOrg?.owner_id
-        ? await fetchOrgBalance(currentOrg.id)
-        : await fetchBalance(user.id)
+      // Show org owner's credit pool when in org mode, own balance otherwise.
+      // If the current user IS the owner, read directly (avoids org RPC which
+      // may fail if the owner has no row in organization_members).
+      const isOrgMember = currentOrg?.owner_id && currentOrg.owner_id !== user.id
+      const bal = isOrgMember
+        ? await fetchOrgBalance(currentOrg!.id, currentOrg!.owner_id)
+        : await fetchBalance(creditOwnerId)
       setCreditBalance(bal)
       setCreditLoading(false)
     })
@@ -493,9 +496,10 @@ function AppContent({ user }: { user: User }) {
   }, [license?.valid, user.id, currentOrg?.id])
 
   function refreshCredits() {
-    const p = currentOrg?.owner_id
-      ? fetchOrgBalance(currentOrg.id)
-      : fetchBalance(user.id)
+    const isOrgMember = currentOrg?.owner_id && currentOrg.owner_id !== user.id
+    const p = isOrgMember
+      ? fetchOrgBalance(currentOrg!.id, currentOrg!.owner_id)
+      : fetchBalance(creditOwnerId)
     p.then(b => setCreditBalance(b))
   }
 
