@@ -886,7 +886,7 @@ export async function runFfmpegRemixAIWeb(opts: {
   // before the original appears — hides the jarring first frame at the cut boundary.
   // Manual cuts (user-specified time) are used as-is.
   const splitTime = (opts.splitTime != null && !isNaN(opts.splitTime) && opts.splitTime > 0)
-    ? (opts.manualCut ? opts.splitTime : opts.splitTime + 0.5) : 0
+    ? (opts.manualCut ? opts.splitTime : opts.splitTime + 0.2) : 0
 
   // ── Fast path: hardware encoding via MediaRecorder ────────────────────────
   if (typeof MediaRecorder !== 'undefined') {
