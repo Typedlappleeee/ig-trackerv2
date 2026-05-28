@@ -70,13 +70,14 @@ export async function fetchBalance(userId: string): Promise<number> {
 }
 
 // Fetch org owner's balance via SECURITY DEFINER RPC (bypasses RLS for members).
-// Falls back to own balance if the function doesn't exist yet.
-export async function fetchOrgBalance(orgId: string): Promise<number> {
+// Falls back to direct user_credits lookup when the RPC doesn't exist yet.
+export async function fetchOrgBalance(orgId: string, ownerUserId?: string): Promise<number> {
   try {
     const { data, error } = await supabase.rpc('get_org_credit_balance', { p_org_id: orgId })
     if (error) throw error
     return typeof data === 'number' ? data : 0
   } catch {
+    if (ownerUserId) return fetchBalance(ownerUserId)
     return 0
   }
 }
@@ -91,7 +92,7 @@ export async function checkAndDeductCredits(
       p_amount:  amount,
     })
     if (error) return { ok: false, error: error.message }
-    if (!data?.ok) return { ok: false, error: data?.error ?? 'Crédits insuffisants' }
+    if (!data?.ok) return { ok: false, error: data?.error ?? 'Crédits insuffisants', balance: data?.balance }
     return { ok: true, balance: data.balance }
   } catch {
     // Table doesn't exist yet — fail open so features still work

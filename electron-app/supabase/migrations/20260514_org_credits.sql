@@ -10,10 +10,13 @@ DECLARE
   v_balance   integer;
   v_is_member boolean;
 BEGIN
-  -- Caller must be a member of the org
+  -- Caller must be a member OR the owner of the org
   SELECT EXISTS(
     SELECT 1 FROM public.organization_members
     WHERE org_id = p_org_id AND user_id = auth.uid()
+    UNION ALL
+    SELECT 1 FROM public.organizations
+    WHERE id = p_org_id AND owner_id = auth.uid()
   ) INTO v_is_member;
 
   IF NOT v_is_member THEN
