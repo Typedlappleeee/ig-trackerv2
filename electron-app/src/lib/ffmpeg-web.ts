@@ -691,6 +691,8 @@ async function remixViaMediaRecorder(opts: {
     recorder.stop()
   }
 
+  let firstFrameDrawn = false
+
   const drawFrame = () => {
     const t = origVid.currentTime
 
@@ -700,9 +702,14 @@ async function remixViaMediaRecorder(opts: {
       try { recorder.requestData() } catch { /* flush buffer at cut point */ }
     }
 
-    const source = switched ? origVid : secVid
-    // Only draw if the video has at least one decoded frame ready
-    if (source.readyState >= 2) {
+    // Draw whichever source has a decoded frame ready.
+    // If origVid isn't ready yet but secVid is, use secVid as fallback so we
+    // never record black frames while waiting for the primary video to decode.
+    const preferred = switched ? origVid : secVid
+    const source    = preferred.readyState >= 2 ? preferred
+                    : (origVid.readyState >= 2   ? origVid : null)
+    if (source) {
+      firstFrameDrawn = true
       const vw = source.videoWidth  || W
       const vh = source.videoHeight || H
       const scale = Math.min(W / vw, H / vh)
@@ -731,6 +738,13 @@ async function remixViaMediaRecorder(opts: {
     drawTimerId = setInterval(drawFrame, 1000 / 30) as unknown as number
   }
 
+  // Abort if video never starts — avoids a silent recording of all-black frames
+  const firstFrameTimeout = setTimeout(() => {
+    if (!firstFrameDrawn && !recordingStopped) {
+      stopRecording()
+    }
+  }, 8000)
+
   const safetyTimeout = setTimeout(() => stopRecording(), (totalDuration + 10) * 1000)
 
   // When secVid stalls (buffering), pause origVid so audio stays in sync.
@@ -754,6 +768,7 @@ async function remixViaMediaRecorder(opts: {
 
   await new Promise<void>(res => { recorder.onstop = () => res() })
   clearTimeout(safetyTimeout)
+  clearTimeout(firstFrameTimeout)
   clearInterval(drawTimerId)
   await audioCtx.close()
 

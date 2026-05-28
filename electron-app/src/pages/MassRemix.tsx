@@ -566,21 +566,19 @@ export function MassRemix({ user }: MassRemixProps) {
               { type: 'text', text: `[Frame ${fi} — t=${f.timestamp}s]` },
             ])
             const prompt = `These are ${fr.frames.length} frames from a ${analyzeEnd.toFixed(1)}s vertical video (1080×1920).
-Your job: identify EVERY burned-in text overlay visible anywhere in the frames (titles, captions, subtitles, watermarks, stickers, any readable text). Do NOT skip any text, even partial.
+Your job: identify burned-in text overlays. Group lines that belong to the SAME paragraph or caption into ONE entry — only create separate entries for text that is visually distinct (different position group, different style, or a separate sticker/watermark).
 
-For EACH text overlay return a JSON object:
-{"text":"exact string","xAlign":"left"|"center"|"right","yPercent":0-100,"fontSizePx":number,"fontColor":"white"|"black"|"#rrggbb","bold":true|false,"startFrame":0,"endFrame":${fr.frames.length - 1}}
+For EACH text group return a JSON object:
+{"text":"full paragraph text with \\n between lines if multi-line","xAlign":"left"|"center"|"right","yPercent":0-100,"fontSizePx":number,"fontColor":"white"|"black"|"#rrggbb","bold":true|false,"startFrame":0,"endFrame":${fr.frames.length - 1}}
 
-Position (yPercent): 0=top edge, 100=bottom edge. Be precise — match where text actually appears.
-- Text clearly in top area → 5-25
-- Text clearly in bottom area → 70-92
-- Text in middle → 40-60 (only if it truly is centered)
+Position (yPercent): vertical center of the text group. 0=top edge, 100=bottom edge.
+- Text in top area → 5-25
+- Text in bottom area → 70-92
+- Text in middle → 40-60
+
+IMPORTANT: if two lines are part of the same sentence or caption, combine them into one entry with \\n between them. Only split into separate entries when the text blocks are clearly independent (e.g. a title at the top AND a separate sticker at the bottom).
 
 Font size (fontSizePx): size of the text AS IT APPEARS in a 1080px wide frame.
-- Very large heading → 80-150px
-- Normal caption → 50-80px
-- Small subtitle → 36-55px
-
 startFrame/endFrame: first and last frame index where this text is visible.
 
 Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.`
@@ -634,68 +632,32 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                   return { text: item.text, xAlign: item.xAlign ?? 'center', rawY: (item.yPercent ?? 50) / 100, fontSize, fontColor: item.fontColor ?? 'white', bold: item.bold ?? true, startTime, endTime }
                 })
 
-                // ── Step 2: assign zones (top / bottom) ───────────────────────
-                type Zone = 'top' | 'bottom'
-                // Build zones iteratively — cannot use .map() here because the
-                // callback references `zones[j]` from earlier indices, which is a
-                // TDZ (Temporal Dead Zone) violation when `const zones` is still
-                // being initialised. A plain for-loop avoids this entirely.
-                const zones: Zone[] = []
-                for (let i = 0; i < items.length; i++) {
-                  const item = items[i]
-                  const defaultZone: Zone = item.rawY < 0.5 ? 'top' : 'bottom'
-                  const hasConflict = items.slice(0, i).some((prev, j) => {
-                    const overlap = prev.endTime > item.startTime && prev.startTime < item.endTime
-                    return overlap && zones[j] === defaultZone
-                  })
-                  zones.push(hasConflict ? (defaultZone === 'top' ? 'bottom' : 'top') : defaultZone)
-                }
+                // ── Step 2+3: place overlays at their source rawY, adjust for overlaps ──
+                // Trust the AI's yPercent — it reflects where text actually appears in
+                // the source video. Only nudge items that are time-concurrent AND would
+                // visually overlap each other. No arbitrary top/bottom zone remapping.
+                type Placed = { centerY: number; halfH: number }
+                const placed: Placed[] = []
 
-                // ── Step 3: generate per-item overlays ──────────────────────────────
-                // ONE overlay entry per item — drawOverlayText/renderTextPNG handle
-                // multi-line wrapping internally using real Canvas measurements.
-                // Per-line splitting caused overlap when Canvas wrapped differently
-                // from the character-count estimate used for layout.
-                const baseYMap = new Map<number, number>()
                 items.forEach((item, idx) => {
-                  const zone   = zones[idx]
                   const lines  = wrapText(item.text, item.fontSize, outW)
                   const stepFr = (item.fontSize * 1.3) / outH
+                  const halfH  = (lines.length * stepFr) / 2
 
-                  let baseY: number
-                  if (zone === 'top') {
-                    const concurrentEnd = items
-                      .slice(0, idx)
-                      .filter((_, j) => zones[j] === 'top' && items[j].endTime > item.startTime && items[j].startTime < item.endTime)
-                      .reduce((max, it) => {
-                        const j = items.indexOf(it)
-                        const b = baseYMap.get(j) ?? 0.10
-                        const n = wrapText(it.text, it.fontSize, outW).length
-                        const s = (it.fontSize * 1.3) / outH
-                        return Math.max(max, b + (n + 1) * s)
-                      }, 0.10)
-                    baseY = Math.min(concurrentEnd, 0.28)
-                  } else {
-                    const concurrentEnd = items
-                      .slice(0, idx)
-                      .filter((_, j) => zones[j] === 'bottom' && items[j].endTime > item.startTime && items[j].startTime < item.endTime)
-                      .reduce((max, it) => {
-                        const j = items.indexOf(it)
-                        const b = baseYMap.get(j) ?? 0.65
-                        const n = wrapText(it.text, it.fontSize, outW).length
-                        const s = (it.fontSize * 1.3) / outH
-                        return Math.max(max, b + (n + 1) * s)
-                      }, 0.65)
-                    baseY = Math.min(concurrentEnd, 0.82)
+                  // Start from the AI-reported position, clamped to screen edges
+                  let centerY = Math.max(halfH + 0.02, Math.min(0.97 - halfH, item.rawY))
+
+                  // Push down only if this item would overlap a concurrent earlier item
+                  for (let j = 0; j < idx; j++) {
+                    const concurrent = items[j].endTime > item.startTime && items[j].startTime < item.endTime
+                    if (!concurrent) continue
+                    const p = placed[j]
+                    const minClear = p.centerY + p.halfH + 0.025 + halfH
+                    if (centerY < minClear) centerY = minClear
                   }
-                  baseYMap.set(idx, baseY)
 
-                  // Center Y for the whole block: drawOverlayText centres multi-line
-                  // text around cy, so shift down by half the block height.
-                  const blockHFrac = (lines.length - 1) * stepFr
-                  const centerY = zone === 'top'
-                    ? Math.min(0.33, baseY + blockHFrac / 2)
-                    : Math.min(0.87, baseY + blockHFrac / 2)
+                  centerY = Math.min(0.97 - halfH, centerY)
+                  placed.push({ centerY, halfH })
 
                   textOverlays.push({
                     text:      item.text,
