@@ -637,9 +637,6 @@ async function remixViaMediaRecorder(opts: {
   canvas.width = W; canvas.height = H
   const ctx = canvas.getContext('2d', { alpha: false })!
   // captureStream(30) = auto-sample at up to 30fps.
-  // The Web Worker drives draw calls at 30fps; captureStream picks up each
-  // drawn frame automatically. Do NOT use captureStream(0) + requestFrame():
-  // if requestFrame() is missing/fails silently the output is entirely black.
   const canvasStream: MediaStream = (canvas as any).captureStream(30)
 
   // ── audio routing ─────────────────────────────────────────────────────────────
@@ -647,8 +644,11 @@ async function remixViaMediaRecorder(opts: {
   const audioCtx = new AudioContext()
   const audioDest = audioCtx.createMediaStreamDestination()
   const audioSrc  = audioCtx.createMediaElementSource(origVid)
-  audioSrc.connect(audioDest)   // → recorder only, not speakers
-  origVid.muted = false          // needed so AudioContext captures it
+  audioSrc.connect(audioDest)
+  // Keep origVid muted=false so AudioContext can capture its audio stream.
+  // Note: createMediaElementSource reroutes audio away from speakers, so
+  // setting muted=false here does NOT play audio through the speakers.
+  origVid.muted = false
 
   const stream = new MediaStream([
     canvasStream.getVideoTracks()[0],
@@ -679,17 +679,15 @@ async function remixViaMediaRecorder(opts: {
   recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data) }
   recorder.start(100)
 
-  // ── draw loop — Web Worker timer (never throttled by browser tab visibility) ──
-  // Both setInterval and requestAnimationFrame are throttled to ~1fps in hidden
-  // tabs. A Web Worker's setInterval is exempt from this throttling policy, so
-  // we always get exactly 30 ticks/sec regardless of whether the user switches tabs.
+  // ── draw loop ────────────────────────────────────────────────────────────────
   let switched = false
+  let drawTimerId = 0
   let recordingStopped = false
 
   const stopRecording = () => {
     if (recordingStopped) return
     recordingStopped = true
-    worker.postMessage('stop')
+    clearInterval(drawTimerId)
     recorder.stop()
   }
 
@@ -699,41 +697,43 @@ async function remixViaMediaRecorder(opts: {
     if (!switched && hasSplit && t >= opts.splitTime) {
       switched = true
       secVid.pause()
-      try { recorder.requestData() } catch { /* flush buffer at exact cut point */ }
+      try { recorder.requestData() } catch { /* flush buffer at cut point */ }
     }
 
     const source = switched ? origVid : secVid
-    const vw = source.videoWidth  || W
-    const vh = source.videoHeight || H
-    const scale = Math.min(W / vw, H / vh)
-    const dw = vw * scale, dh = vh * scale
-
-    ctx.fillStyle = '#000'
-    ctx.fillRect(0, 0, W, H)
-    ctx.drawImage(source, (W - dw) / 2, (H - dh) / 2, dw, dh)
-
-    for (const { canvas: oc, ov } of overlayImages) {
-      if (t >= ov.startTime && t <= ov.endTime) ctx.drawImage(oc, 0, 0)
+    // Only draw if the video has at least one decoded frame ready
+    if (source.readyState >= 2) {
+      const vw = source.videoWidth  || W
+      const vh = source.videoHeight || H
+      const scale = Math.min(W / vw, H / vh)
+      const dw = vw * scale, dh = vh * scale
+      ctx.fillStyle = '#000'
+      ctx.fillRect(0, 0, W, H)
+      ctx.drawImage(source, (W - dw) / 2, (H - dh) / 2, dw, dh)
+      for (const { canvas: oc, ov } of overlayImages) {
+        if (t >= ov.startTime && t <= ov.endTime) ctx.drawImage(oc, 0, 0)
+      }
     }
-
   }
 
-  // Inline Web Worker — fires a 'tick' message every 33ms on a non-throttled thread
-  const workerBlob = new Blob([`
-    let t;
-    self.onmessage = e => {
-      if (e.data === 'start') t = setInterval(() => self.postMessage('tick'), ${Math.round(1000 / 30)});
-      else { clearInterval(t); self.close(); }
-    };
-  `], { type: 'application/javascript' })
-  const workerUrl = URL.createObjectURL(workerBlob)
-  const worker = new Worker(workerUrl)
-  worker.onmessage = () => { if (!recordingStopped) drawFrame() }
+  // ── timing — requestVideoFrameCallback if available, else setInterval ────────
+  // rVFC fires in sync with each decoded video frame even in background tabs.
+  // setInterval is the fallback for Firefox (which doesn't support rVFC).
+  if (typeof (origVid as any).requestVideoFrameCallback === 'function') {
+    const scheduleRVFC = () => {
+      if (recordingStopped) return
+      ;(origVid as any).requestVideoFrameCallback(() => { drawFrame(); scheduleRVFC() })
+    }
+    origVid.onended = () => stopRecording()
+    scheduleRVFC()
+  } else {
+    origVid.onended = () => stopRecording()
+    drawTimerId = setInterval(drawFrame, 1000 / 30) as unknown as number
+  }
 
-  origVid.onended = () => stopRecording()
   const safetyTimeout = setTimeout(() => stopRecording(), (totalDuration + 10) * 1000)
 
-  // When secVid stalls (buffering), pause origVid to keep audio/video in sync.
+  // When secVid stalls (buffering), pause origVid so audio stays in sync.
   secVid.onwaiting = () => { if (!switched) origVid.pause() }
   secVid.onplaying = () => { if (!switched && origVid.paused) origVid.play().catch(() => {}) }
 
@@ -747,14 +747,14 @@ async function remixViaMediaRecorder(opts: {
   await seekTo(origVid, 0)
   await seekTo(secVid, 0)
 
-  origVid.play()
-  secVid.play()
-  worker.postMessage('start')
+  // Catch autoplay rejections — if the browser blocks unmuted autoplay,
+  // fall back to muted so playback still starts and the Worker can start recording.
+  await origVid.play().catch(() => { origVid.muted = true; return origVid.play().catch(() => {}) })
+  await secVid.play().catch(() => {})
 
   await new Promise<void>(res => { recorder.onstop = () => res() })
   clearTimeout(safetyTimeout)
-  worker.postMessage('stop')
-  URL.revokeObjectURL(workerUrl)
+  clearInterval(drawTimerId)
   await audioCtx.close()
 
   return { blob: new Blob(chunks, { type: recorder.mimeType || mimeType }), mimeType }
