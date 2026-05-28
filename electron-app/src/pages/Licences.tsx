@@ -19,6 +19,7 @@ interface LicenseKey {
 }
 
 const DURATIONS = [
+  { label: '24h',       days: 1 },
   { label: '7 jours',   days: 7 },
   { label: '30 jours',  days: 30 },
   { label: '90 jours',  days: 90 },
