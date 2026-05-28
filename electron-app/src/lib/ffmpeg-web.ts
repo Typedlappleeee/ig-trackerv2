@@ -636,7 +636,9 @@ async function remixViaMediaRecorder(opts: {
   const canvas = document.createElement('canvas')
   canvas.width = W; canvas.height = H
   const ctx = canvas.getContext('2d', { alpha: false })!
-  const canvasStream: MediaStream = (canvas as any).captureStream(30)
+  // captureStream(0) = manual frame push via requestFrame().
+  // Gives us full control over when frames enter the encoder regardless of tab state.
+  const canvasStream: MediaStream = (canvas as any).captureStream(0)
 
   // ── audio routing ─────────────────────────────────────────────────────────────
   // Use AudioContext to route origVid's audio to the recorder without playing through speakers.
@@ -675,19 +677,18 @@ async function remixViaMediaRecorder(opts: {
   recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data) }
   recorder.start(100)
 
-  // ── draw loop ─────────────────────────────────────────────────────────────────
-  // Use setInterval at exactly 30fps instead of requestAnimationFrame.
-  // rAF is throttled by the browser when the tab is not the active foreground
-  // window, which causes the output video to record at ~1-5fps. setInterval
-  // is more reliable for background recording tasks.
+  // ── draw loop — Web Worker timer (never throttled by browser tab visibility) ──
+  // Both setInterval and requestAnimationFrame are throttled to ~1fps in hidden
+  // tabs. A Web Worker's setInterval is exempt from this throttling policy, so
+  // we always get exactly 30 ticks/sec regardless of whether the user switches tabs.
   let switched = false
-  let drawTimer = 0
   let recordingStopped = false
+  const videoTrack = canvasStream.getVideoTracks()[0] as any
 
   const stopRecording = () => {
     if (recordingStopped) return
     recordingStopped = true
-    clearInterval(drawTimer)
+    worker.postMessage('stop')
     recorder.stop()
   }
 
@@ -697,9 +698,7 @@ async function remixViaMediaRecorder(opts: {
     if (!switched && hasSplit && t >= opts.splitTime) {
       switched = true
       secVid.pause()
-      // Flush the recorder buffer at the exact cut point so no secVid frames
-      // bleed past splitTime in the encoded output.
-      try { recorder.requestData() } catch { /* not all browsers support mid-stream flush */ }
+      try { recorder.requestData() } catch { /* flush buffer at exact cut point */ }
     }
 
     const source = switched ? origVid : secVid
@@ -712,17 +711,30 @@ async function remixViaMediaRecorder(opts: {
     ctx.fillRect(0, 0, W, H)
     ctx.drawImage(source, (W - dw) / 2, (H - dh) / 2, dw, dh)
 
-    // Composite pre-rendered overlay canvases — single drawImage call per overlay
     for (const { canvas: oc, ov } of overlayImages) {
       if (t >= ov.startTime && t <= ov.endTime) ctx.drawImage(oc, 0, 0)
     }
+
+    // Push this frame explicitly into the capture stream
+    videoTrack.requestFrame?.()
   }
+
+  // Inline Web Worker — fires a 'tick' message every 33ms on a non-throttled thread
+  const workerBlob = new Blob([`
+    let t;
+    self.onmessage = e => {
+      if (e.data === 'start') t = setInterval(() => self.postMessage('tick'), ${Math.round(1000 / 30)});
+      else { clearInterval(t); self.close(); }
+    };
+  `], { type: 'application/javascript' })
+  const workerUrl = URL.createObjectURL(workerBlob)
+  const worker = new Worker(workerUrl)
+  worker.onmessage = () => { if (!recordingStopped) drawFrame() }
 
   origVid.onended = () => stopRecording()
   const safetyTimeout = setTimeout(() => stopRecording(), (totalDuration + 10) * 1000)
 
   // When secVid stalls (buffering), pause origVid to keep audio/video in sync.
-  // Without this, origVid audio keeps playing while the canvas shows a frozen secVid frame.
   secVid.onwaiting = () => { if (!switched) origVid.pause() }
   secVid.onplaying = () => { if (!switched && origVid.paused) origVid.play().catch(() => {}) }
 
@@ -738,11 +750,12 @@ async function remixViaMediaRecorder(opts: {
 
   origVid.play()
   secVid.play()
-  drawTimer = setInterval(drawFrame, 1000 / 30) as unknown as number
+  worker.postMessage('start')
 
   await new Promise<void>(res => { recorder.onstop = () => res() })
   clearTimeout(safetyTimeout)
-  clearInterval(drawTimer)
+  worker.postMessage('stop')
+  URL.revokeObjectURL(workerUrl)
   await audioCtx.close()
 
   return { blob: new Blob(chunks, { type: recorder.mimeType || mimeType }), mimeType }
