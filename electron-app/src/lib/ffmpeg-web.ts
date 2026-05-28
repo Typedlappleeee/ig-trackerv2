@@ -632,11 +632,19 @@ async function remixViaMediaRecorder(opts: {
   ])
   const totalDuration = (opts.targetDuration && opts.targetDuration > 1) ? opts.targetDuration : origVid.duration
 
+  // Chrome suspends video decoding for elements that are not in the DOM, even when
+  // play() is called. ctx.drawImage() on a suspended video returns black frames.
+  // Fix: attach both videos to the document body (invisible) to force active decoding.
+  const vidStyle = 'position:fixed;top:-9999px;width:1px;height:1px;opacity:0.001;pointer-events:none;z-index:-9999'
+  origVid.style.cssText = vidStyle
+  secVid.style.cssText  = vidStyle
+  document.body.appendChild(origVid)
+  document.body.appendChild(secVid)
+
   // ── canvas + capture stream ───────────────────────────────────────────────────
   const canvas = document.createElement('canvas')
   canvas.width = W; canvas.height = H
   const ctx = canvas.getContext('2d', { alpha: false })!
-  // captureStream(30) = auto-sample at up to 30fps.
   const canvasStream: MediaStream = (canvas as any).captureStream(30)
 
   // ── audio routing ─────────────────────────────────────────────────────────────
@@ -771,6 +779,8 @@ async function remixViaMediaRecorder(opts: {
   clearTimeout(firstFrameTimeout)
   clearInterval(drawTimerId)
   await audioCtx.close()
+  origVid.remove()
+  secVid.remove()
 
   return { blob: new Blob(chunks, { type: recorder.mimeType || mimeType }), mimeType }
 }
