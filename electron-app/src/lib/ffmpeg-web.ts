@@ -614,9 +614,16 @@ async function remixViaMediaRecorder(opts: {
   const loadVid = (src: string): Promise<HTMLVideoElement> => new Promise((res, rej) => {
     const v = document.createElement('video')
     v.muted = true; v.playsInline = true; v.preload = 'auto'; v.src = src
-    v.onloadeddata = () => res(v)
-    v.onerror      = () => rej(new Error('Impossible de charger la vidéo'))
-    setTimeout(() => rej(new Error('Timeout chargement vidéo')), 30_000)
+    // Wait for canplaythrough so the browser has buffered enough to play without stalling.
+    // Falls back to loadeddata if canplaythrough never fires (e.g. very large remote files).
+    const tid = setTimeout(() => res(v), 30_000)
+    const done = (vid: HTMLVideoElement) => { clearTimeout(tid); res(vid) }
+    v.oncanplaythrough = () => done(v)
+    v.onloadeddata     = () => {
+      // Give canplaythrough up to 3s more before falling back
+      setTimeout(() => done(v), 3_000)
+    }
+    v.onerror = () => { clearTimeout(tid); rej(new Error('Impossible de charger la vidéo')) }
   })
   // Always load secondary — it's the main visual source regardless of split
   const [secVid, origVid] = await Promise.all([
@@ -664,6 +671,14 @@ async function remixViaMediaRecorder(opts: {
   // When no split: secondary plays for full duration
   let switched = false
   let animId = 0
+  let recordingStopped = false
+
+  const stopRecording = () => {
+    if (recordingStopped) return
+    recordingStopped = true
+    cancelAnimationFrame(animId)
+    recorder.stop()
+  }
 
   const drawFrame = () => {
     const t = origVid.currentTime
@@ -689,12 +704,12 @@ async function remixViaMediaRecorder(opts: {
       if (t >= ov.startTime && t <= ov.endTime) drawOverlayText(ctx, ov, W, H)
     }
 
-    if (!origVid.ended && origVid.currentTime < totalDuration) {
-      animId = requestAnimationFrame(drawFrame)
-    } else {
-      recorder.stop()
-    }
+    if (!recordingStopped) animId = requestAnimationFrame(drawFrame)
   }
+
+  // Stop recording when origVid finishes naturally, or after a safety timeout
+  origVid.onended = () => stopRecording()
+  const safetyTimeout = setTimeout(() => stopRecording(), (totalDuration + 10) * 1000)
 
   // ── seek & play ───────────────────────────────────────────────────────────────
   const seekTo = (v: HTMLVideoElement, t: number) => new Promise<void>(r => {
@@ -711,6 +726,7 @@ async function remixViaMediaRecorder(opts: {
   animId = requestAnimationFrame(drawFrame)
 
   await new Promise<void>(res => { recorder.onstop = () => res() })
+  clearTimeout(safetyTimeout)
   cancelAnimationFrame(animId)
   await audioCtx.close()
 

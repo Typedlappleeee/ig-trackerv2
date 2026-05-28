@@ -792,7 +792,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
         updateJob(job.id, { status: 'error', error: msg })
         playError()
       }
-    }), 2)
+    }), 1)
 
     setRunning(false)
   }
