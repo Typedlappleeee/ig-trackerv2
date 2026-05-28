@@ -640,9 +640,11 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                   i === 0 && item.rawY < 0.5 ? 'top' : 'bottom'
                 )
 
-                // ── Step 3: generate per-line overlays inside their zone ──────────
-                // Randomise position within safe bands: top [0.10–0.30], bottom [0.60–0.82]
-                // Track baseY per item so concurrent stacking works correctly
+                // ── Step 3: generate per-item overlays ──────────────────────────────
+                // ONE overlay entry per item — drawOverlayText/renderTextPNG handle
+                // multi-line wrapping internally using real Canvas measurements.
+                // Per-line splitting caused overlap when Canvas wrapped differently
+                // from the character-count estimate used for layout.
                 const baseYMap = new Map<number, number>()
                 items.forEach((item, idx) => {
                   const zone   = zones[idx]
@@ -651,51 +653,49 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
 
                   let baseY: number
                   if (zone === 'top') {
-                    // Random position in top safe zone [0.10, 0.28]
-                    const preferred = 0.10 + Math.random() * 0.18
                     const concurrentEnd = items
                       .slice(0, idx)
                       .filter((_, j) => zones[j] === 'top' && items[j].endTime > item.startTime && items[j].startTime < item.endTime)
                       .reduce((max, it) => {
                         const j = items.indexOf(it)
-                        const b = baseYMap.get(j) ?? preferred
+                        const b = baseYMap.get(j) ?? 0.10
                         const n = wrapText(it.text, it.fontSize, outW).length
                         const s = (it.fontSize * 1.3) / outH
-                        return Math.max(max, b + n * s)
-                      }, preferred)
-                    baseY = concurrentEnd
+                        return Math.max(max, b + (n + 1) * s)
+                      }, 0.10)
+                    baseY = Math.min(concurrentEnd, 0.28)
                   } else {
-                    // Random position in bottom safe zone [0.62, 0.80]
-                    const preferred = 0.72 + Math.random() * 0.10
                     const concurrentEnd = items
                       .slice(0, idx)
                       .filter((_, j) => zones[j] === 'bottom' && items[j].endTime > item.startTime && items[j].startTime < item.endTime)
                       .reduce((max, it) => {
                         const j = items.indexOf(it)
-                        const b = baseYMap.get(j) ?? preferred
+                        const b = baseYMap.get(j) ?? 0.65
                         const n = wrapText(it.text, it.fontSize, outW).length
                         const s = (it.fontSize * 1.3) / outH
-                        return Math.max(max, b + n * s)
-                      }, preferred)
-                    baseY = concurrentEnd
+                        return Math.max(max, b + (n + 1) * s)
+                      }, 0.65)
+                    baseY = Math.min(concurrentEnd, 0.82)
                   }
                   baseYMap.set(idx, baseY)
 
-                  lines.forEach((line, li) => {
-                    const lineYFrac = zone === 'top'
-                      ? Math.min(0.35, baseY + li * stepFr)
-                      : Math.min(0.87, baseY + li * stepFr)
-                    textOverlays.push({
-                      text: line,
-                      x: '(w-text_w)/2',
-                      y: `h*${lineYFrac.toFixed(4)}-${Math.round(item.fontSize / 2)}`,
-                      fontSize: item.fontSize,
-                      fontColor: item.fontColor,
-                      bold: item.bold,
-                      shadow: true,
-                      startTime: item.startTime,
-                      endTime:   item.endTime,
-                    })
+                  // Center Y for the whole block: drawOverlayText centres multi-line
+                  // text around cy, so shift down by half the block height.
+                  const blockHFrac = (lines.length - 1) * stepFr
+                  const centerY = zone === 'top'
+                    ? Math.min(0.33, baseY + blockHFrac / 2)
+                    : Math.min(0.87, baseY + blockHFrac / 2)
+
+                  textOverlays.push({
+                    text:      item.text,
+                    x:         '(w-text_w)/2',
+                    y:         `h*${centerY.toFixed(4)}`,
+                    fontSize:  item.fontSize,
+                    fontColor: item.fontColor,
+                    bold:      item.bold,
+                    shadow:    true,
+                    startTime: item.startTime,
+                    endTime:   item.endTime,
                   })
                 })
                 addLog(job.id, `   ${parsed.length} texte(s) → ${textOverlays.length} overlay(s): ${textOverlays.map(o => `"${o.text}"@${o.fontSize}px`).join(', ')}`)

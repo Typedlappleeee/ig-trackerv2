@@ -694,7 +694,7 @@ async function remixViaMediaRecorder(opts: {
   const drawFrame = () => {
     const t = origVid.currentTime
 
-    if (!switched && hasSplit && t >= opts.splitTime + 0.2) {
+    if (!switched && hasSplit && t >= opts.splitTime) {
       switched = true
       secVid.pause()
     }
