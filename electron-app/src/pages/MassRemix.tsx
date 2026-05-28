@@ -633,26 +633,12 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
 
                 // ── Step 2: assign zones (top / bottom) to avoid face + overlaps ─
                 type Zone = 'top' | 'bottom'
-                const zones: Zone[] = items.map(_ => 'bottom' as Zone)
-                // Conflict resolution: two concurrent items in the same zone.
-                // Assign based on rawY so vertical order is preserved:
-                // the item with the smaller rawY (higher on screen) → top zone,
-                // the item with the larger rawY (lower on screen)   → bottom zone.
-                // This guarantees paragraph 1 (higher) stays above paragraph 2 (lower).
-                for (let i = 1; i < items.length; i++) {
-                  for (let j = 0; j < i; j++) {
-                    const overlap = items[j].endTime > items[i].startTime && items[j].startTime < items[i].endTime
-                    if (overlap && zones[j] === zones[i]) {
-                      if (items[j].rawY <= items[i].rawY) {
-                        zones[j] = 'top'
-                        zones[i] = 'bottom'
-                      } else {
-                        zones[j] = 'bottom'
-                        zones[i] = 'top'
-                      }
-                    }
-                  }
-                }
+                // First text block (the primary line) → top when it originates in the upper half.
+                // All subsequent blocks are continuations and always stack in the bottom zone.
+                // This preserves dialogue order: "Lui:" at top, "elle:" + rest at bottom.
+                const zones: Zone[] = items.map((item, i) =>
+                  i === 0 && item.rawY < 0.5 ? 'top' : 'bottom'
+                )
 
                 // ── Step 3: generate per-line overlays inside their zone ──────────
                 // Randomise position within safe bands: top [0.10–0.30], bottom [0.60–0.82]

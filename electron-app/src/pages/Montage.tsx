@@ -678,7 +678,9 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
     if (playingIndex !== null && !playAdvancedRef.current) {
       const clip = clips[playingIndex]
       const end  = clip?.trimEnd > 0 ? clip.trimEnd : Infinity
-      if (v.currentTime >= end) { v.pause(); onVideoEnded() }
+      // Detect 0.25s early to compensate for timeupdate's ~250ms firing interval.
+      // This ensures we never overshoot the cut point and show unwanted content.
+      if (v.currentTime >= end - 0.25) { v.pause(); onVideoEnded() }
     }
   }
   const filteredBank  = bankItems.filter(i => !bankSearch || i.title.toLowerCase().includes(bankSearch.toLowerCase()) || i.tags.some(t => t.toLowerCase().includes(bankSearch.toLowerCase())))
