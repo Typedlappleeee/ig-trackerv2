@@ -353,7 +353,7 @@ export function Posting({ user }: PostingProps) {
                   <rect x="8" y="8" width="5" height="5" rx="1.5" fill="#A78BFA" opacity=".3"/>
                 </svg>
               </div>
-              <span className="text-[13px] font-black text-white tracking-tight">{lang === 'en' ? 'Accounts' : 'Comptes'}</span>
+              <span className="text-[13px] font-black text-white tracking-tight">{t('postingAccountsLabel')}</span>
             </div>
             {selectedPhones.size > 0 && (
               <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full text-white"
@@ -396,12 +396,12 @@ export function Posting({ user }: PostingProps) {
           style={{ border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)' }}>
           <button onClick={() => setSelPhones(new Set(visiblePhones.map(p => p.id)))}
             className="flex-1 py-1.5 text-[11px] font-bold text-accent hover:bg-accent/10 transition-colors">
-            {lang === 'en' ? 'All' : 'Tout'}
+            {t('selectAll')}
           </button>
           <div style={{ width: 1, background: 'rgba(255,255,255,0.06)', height: 20 }} />
           <button onClick={() => setSelPhones(new Set())}
             className="flex-1 py-1.5 text-[11px] text-text2 hover:text-white hover:bg-white/[0.04] transition-colors">
-            {lang === 'en' ? 'None' : 'Aucun'}
+            {t('deselect')}
           </button>
           <div style={{ width: 1, background: 'rgba(255,255,255,0.06)', height: 20 }} />
           <span className="px-3 text-[11px] font-medium" style={{ color: 'rgba(148,163,184,0.4)' }}>
@@ -479,8 +479,8 @@ export function Posting({ user }: PostingProps) {
             <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: selectedPhones.size > 0 ? '#22C55E' : 'rgba(148,163,184,0.2)' }} />
             <p className="text-[12px] font-semibold" style={{ color: selectedPhones.size > 0 ? '#E2E8F0' : 'rgba(148,163,184,0.4)' }}>
               {selectedPhones.size > 0
-                ? `${selectedPhones.size} account${selectedPhones.size !== 1 ? 's' : ''} selected`
-                : 'None selected'}
+                ? `${selectedPhones.size} ${selectedPhones.size !== 1 ? t('postingAccountsSelected') : t('postingAccountSelected')}`
+                : t('postingNoneSelected')}
             </p>
           </div>
         </div>
@@ -625,7 +625,7 @@ export function Posting({ user }: PostingProps) {
                       <path d="M1 2h10M1 5h7M1 8h8M1 11h5" stroke="#A78BFA" strokeWidth="1.2" strokeLinecap="round"/>
                     </svg>
                   </div>
-                  <span className="text-[12px] font-bold text-white">Description</span>
+                  <span className="text-[12px] font-bold text-white">{t('postingDescriptionLabel')}</span>
                 </div>
                 <span className={`text-[11px] font-mono tabular-nums px-2 py-0.5 rounded-lg ${caption.length > 2200 ? 'text-danger' : 'text-text3'}`}
                   style={{ background: caption.length > 2200 ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.04)' }}>
@@ -635,7 +635,7 @@ export function Posting({ user }: PostingProps) {
 
               <div className="p-5 space-y-3">
                 <textarea value={caption} onChange={e => setCaption(e.target.value)} rows={5}
-                  placeholder={lang === 'en' ? 'Write your Instagram caption…' : 'Écris ta description Instagram…'}
+                  placeholder={t('postingCaptionPlaceholder')}
                   className="w-full rounded-xl px-4 py-3 text-[13px] placeholder:text-text3 resize-none focus:outline-none transition-all leading-relaxed"
                   style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(139,92,246,0.1)', color: '#E2E8F0',
                     fontFamily: 'inherit' }}
@@ -659,7 +659,7 @@ export function Posting({ user }: PostingProps) {
                         </svg>
                       </div>
                       <span className="text-[12px] font-bold" style={{ color: '#C4B5FD' }}>{t('generateWithAI')}</span>
-                      {!groqKey && <span className="text-[10px] px-1.5 py-0.5 rounded-md" style={{ background: 'rgba(245,158,11,0.1)', color: '#FCD34D', border: '1px solid rgba(245,158,11,0.2)' }}>{lang === 'en' ? 'Groq key required' : 'Clé Groq requise'}</span>}
+                      {!groqKey && <span className="text-[10px] px-1.5 py-0.5 rounded-md" style={{ background: 'rgba(245,158,11,0.1)', color: '#FCD34D', border: '1px solid rgba(245,158,11,0.2)' }}>{t('postingGroqRequired')}</span>}
                     </div>
                     <svg width="12" height="12" viewBox="0 0 12 12" fill="none"
                       style={{ transform: aiExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', color: 'rgba(139,92,246,0.5)' }}>
@@ -710,7 +710,7 @@ export function Posting({ user }: PostingProps) {
                     <path d="M6 1v1.5M6 9.5V11M1 6h1.5M9.5 6H11M2.5 2.5l1 1M8.5 8.5l1 1M2.5 9.5l1-1M8.5 3.5l1-1" stroke="#A78BFA" strokeWidth="1.2" strokeLinecap="round"/>
                   </svg>
                 </div>
-                <span className="text-[12px] font-bold text-white">Options</span>
+                <span className="text-[12px] font-bold text-white">{t('postingOptionsLabel')}</span>
               </div>
 
               <div className="px-5 py-4 space-y-0 divide-y" style={{ '--tw-divide-opacity': '0.03' } as any}>
@@ -815,7 +815,7 @@ export function Posting({ user }: PostingProps) {
                     <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
                       <path d="M7.5 1L9.5 6H14.5L10.5 9L12 14L7.5 11L3 14L4.5 9L0.5 6H5.5L7.5 1Z" fill="white"/>
                     </svg>
-                    {t('launchPost')} {selectedPhones.size} {lang === 'en' ? `account${selectedPhones.size !== 1 ? 's' : ''}` : `compte${selectedPhones.size !== 1 ? 's' : ''}`}
+                    {t('launchPost')} {selectedPhones.size} {selectedPhones.size !== 1 ? t('postingAccountsSelected') : t('postingAccountSelected')}
                   </span>
                 )}
               </button>

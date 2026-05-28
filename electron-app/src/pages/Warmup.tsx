@@ -444,7 +444,7 @@ export function Warmup({ user }: WarmupProps) {
                             color: job.status === 'done' ? '#22C55E' : job.status === 'error' ? '#EF4444' : '#8B5CF6',
                             border: `1px solid ${job.status === 'done' ? 'rgba(34,197,94,0.2)' : job.status === 'error' ? 'rgba(239,68,68,0.2)' : 'rgba(139,92,246,0.2)'}`,
                           }}>
-                          {job.status === 'done' ? 'DONE' : job.status === 'error' ? 'ERR' : 'RUN'}
+                          {job.status === 'done' ? t('warmupDoneLabel') : job.status === 'error' ? t('warmupErrLabel') : t('warmupRunLabel')}
                         </div>
                       )}
 
@@ -453,7 +453,7 @@ export function Warmup({ user }: WarmupProps) {
                         <div className={`w-1.5 h-1.5 rounded-full ${online ? 'sf-live-dot' : ''}`}
                           style={{ background: online ? '#22C55E' : '#3f3f46', position: online ? 'relative' : 'static' }} />
                         <span className="text-[11px] font-mono" style={{ color: online ? '#22C55E' : '#52525B' }}>
-                          {online ? 'ONLINE' : 'OFFLINE'}
+                          {online ? t('warmupOnlineLabel') : t('warmupOfflineLabel')}
                         </span>
                       </div>
                     </button>
@@ -488,7 +488,7 @@ export function Warmup({ user }: WarmupProps) {
                       </p>
                       {running && (
                         <p className="text-[11px] text-text3 font-mono mt-0.5">
-                          {doneCount} done · {runningCount} active · {idleCount} waiting
+                          {doneCount} {t('warmupDoneLabel').toLowerCase()} · {runningCount} {lang === 'en' ? 'active' : 'actif'} · {idleCount} {lang === 'en' ? 'waiting' : 'en attente'}
                         </p>
                       )}
                     </div>

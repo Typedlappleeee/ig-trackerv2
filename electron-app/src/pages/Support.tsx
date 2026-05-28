@@ -98,6 +98,7 @@ function CreateTicketForm({
   onCreated: () => void
   onCancel: () => void
 }) {
+  const t = useT()
   const [subject,     setSubject]     = useState('')
   const [description, setDescription] = useState('')
   const [category,    setCategory]    = useState<TicketCategory>('general')
@@ -106,7 +107,7 @@ function CreateTicketForm({
 
   async function submit() {
     if (!subject.trim() || !description.trim()) {
-      setError('Please fill in all fields.')
+      setError(t('supportFillAllFields'))
       return
     }
     setSaving(true)
@@ -132,27 +133,27 @@ function CreateTicketForm({
           onClick={onCancel}
           className="text-[13px] text-text2 hover:text-text transition-colors"
         >
-          ← Back
+          {t('supportBackBtn')}
         </button>
-        <h2 className="text-[22px] font-black text-white">New ticket</h2>
+        <h2 className="text-[22px] font-black text-white">{t('supportNewTicket')}</h2>
       </div>
 
       <div className="rounded-2xl p-6 space-y-5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
         <div className="grid grid-cols-2 gap-5">
           <div className="col-span-2 space-y-2">
-            <label className="text-[12px] font-medium text-text2 uppercase tracking-wide">Subject</label>
+            <label className="text-[12px] font-medium text-text2 uppercase tracking-wide">{t('supportSubjectLabel')}</label>
             <input
               name="subject"
               value={subject}
               onChange={e => setSubject(e.target.value)}
-              placeholder="Summary of your issue"
+              placeholder={t('supportSubjectPlaceholder')}
               className="w-full rounded-xl px-4 py-2.5 text-[13px] focus:outline-none"
               style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
             />
           </div>
 
           <div className="space-y-2">
-            <label className="text-[12px] font-medium text-text2 uppercase tracking-wide">Catégorie</label>
+            <label className="text-[12px] font-medium text-text2 uppercase tracking-wide">{t('supportCategoryLabel')}</label>
             <select
               name="category"
               value={category}
@@ -167,12 +168,12 @@ function CreateTicketForm({
           </div>
 
           <div className="col-span-2 space-y-2">
-            <label className="text-[12px] font-medium text-text2 uppercase tracking-wide">Description</label>
+            <label className="text-[12px] font-medium text-text2 uppercase tracking-wide">{t('supportDescriptionLabel')}</label>
             <textarea
               name="description"
               value={description}
               onChange={e => setDescription(e.target.value)}
-              placeholder="Décrivez votre problème en détail…"
+              placeholder={t('supportDescPlaceholder')}
               rows={5}
               className="w-full rounded-xl px-4 py-2.5 text-[13px] focus:outline-none resize-none"
               style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
@@ -188,7 +189,7 @@ function CreateTicketForm({
             className="rounded-xl px-5 py-2.5 text-[13px] font-semibold"
             style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
           >
-            Cancel
+            {t('cancel')}
           </button>
           <button
             onClick={submit}
@@ -196,7 +197,7 @@ function CreateTicketForm({
             className="rounded-xl px-5 py-2.5 text-[13px] font-semibold text-white disabled:opacity-50"
             style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)' }}
           >
-            {saving ? 'Sending…' : 'Send ticket'}
+            {saving ? t('supportSendingBtn') : t('supportSendBtn')}
           </button>
         </div>
       </div>
@@ -215,6 +216,7 @@ function ThreadView({
   onBack:         () => void
   onStatusChange: (id: string, status: TicketStatus) => void
 }) {
+  const t = useT()
   const [messages, setMessages]   = useState<TicketMessage[]>([])
   const [reply,    setReply]      = useState('')
   const [sending,  setSending]    = useState(false)
@@ -297,17 +299,17 @@ function ThreadView({
             className="shrink-0 rounded-xl px-3 py-2 text-[13px] focus:outline-none"
             style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
           >
-            <option value="open" style={{ background: '#0d1120', color: '#e2d9f3' }}>Open</option>
-            <option value="in_progress" style={{ background: '#0d1120', color: '#e2d9f3' }}>In progress</option>
-            <option value="resolved" style={{ background: '#0d1120', color: '#e2d9f3' }}>Resolved</option>
-            <option value="closed" style={{ background: '#0d1120', color: '#e2d9f3' }}>Closed</option>
+            <option value="open" style={{ background: '#0d1120', color: '#e2d9f3' }}>{t('supportStatusOpen')}</option>
+            <option value="in_progress" style={{ background: '#0d1120', color: '#e2d9f3' }}>{t('supportStatusInProgress')}</option>
+            <option value="resolved" style={{ background: '#0d1120', color: '#e2d9f3' }}>{t('supportStatusResolved')}</option>
+            <option value="closed" style={{ background: '#0d1120', color: '#e2d9f3' }}>{t('supportStatusClosed')}</option>
           </select>
         )}
       </div>
 
       {/* Description card */}
       <div className="rounded-2xl p-6" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-        <p className="text-[12px] font-medium text-text2 uppercase tracking-wide mb-3">Description initiale</p>
+        <p className="text-[12px] font-medium text-text2 uppercase tracking-wide mb-3">{t('supportInitialDesc')}</p>
         <p className="text-[13px] text-text whitespace-pre-wrap">{ticket.description}</p>
       </div>
 
@@ -315,9 +317,9 @@ function ThreadView({
       <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
         <div className="max-h-80 overflow-y-auto p-5 space-y-4">
           {loading ? (
-            <p className="text-[13px] text-text2 text-center py-4">Chargement…</p>
+            <p className="text-[13px] text-text2 text-center py-4">{t('supportLoading')}</p>
           ) : messages.length === 0 ? (
-            <p className="text-[13px] text-text2 text-center py-4">Aucun message pour l'instant.</p>
+            <p className="text-[13px] text-text2 text-center py-4">{t('supportNoMessages')}</p>
           ) : (
             messages.map(m => (
               <div
@@ -334,7 +336,7 @@ function ThreadView({
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-[13px] font-medium text-text">
-                      {m.is_admin ? 'Support' : m.sender_email}
+                      {m.is_admin ? t('supportAdminLabel') : m.sender_email}
                     </span>
                     {m.is_admin && (
                       <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-violet-500/20 text-violet-300 border border-violet-500/30">

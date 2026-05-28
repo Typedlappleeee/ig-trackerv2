@@ -47,18 +47,7 @@ interface Props { user: User; onNavigate?: (page: string, tab?: string) => void 
 
 type TabFilter = 'pending' | 'history'
 
-const STATUS_LABEL: Record<ScheduleStatus, string> = {
-  pending:   'Pending',
-  running:   'In progress',
-  done:      'Done',
-  failed:    'Failed',
-  cancelled: 'Cancelled',
-}
-
-const TYPE_LABEL: Record<string, string> = {
-  posting:      'Posting',
-  mass_posting: 'Mass Posting',
-}
+// STATUS_LABEL and TYPE_LABEL are now built dynamically inside components using t()
 
 // ── SVG icon components ────────────────────────────────────────────────────────
 
@@ -214,6 +203,14 @@ function IconClose({ size = 12, color = 'currentColor' }: { size?: number; color
 // ── Status pill ────────────────────────────────────────────────────────────────
 
 function StatusPill({ status }: { status: ScheduleStatus }) {
+  const t = useT()
+  const STATUS_LABELS: Record<ScheduleStatus, string> = {
+    pending:   t('schedulerStatusPending'),
+    running:   t('schedulerStatusInProgress'),
+    done:      t('schedulerStatusDone'),
+    failed:    t('schedulerStatusFailed'),
+    cancelled: t('schedulerStatusCancelled'),
+  }
   const cfg: Record<ScheduleStatus, { cls: string; icon: JSX.Element }> = {
     pending:   { cls: 'sf-badge sf-badge-warn',   icon: <IconClock   size={11} color="#F59E0B" /> },
     running:   { cls: 'sf-badge sf-badge-accent',  icon: <IconSpinner size={11} color="#8B5CF6" /> },
@@ -225,7 +222,7 @@ function StatusPill({ status }: { status: ScheduleStatus }) {
   return (
     <span className={cls} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
       {icon}
-      {STATUS_LABEL[status]}
+      {STATUS_LABELS[status]}
     </span>
   )
 }
@@ -233,6 +230,11 @@ function StatusPill({ status }: { status: ScheduleStatus }) {
 // ── Type badge ─────────────────────────────────────────────────────────────────
 
 function TypeBadge({ type }: { type: string }) {
+  const t = useT()
+  const TYPE_LABELS: Record<string, string> = {
+    posting:      t('schedulerTypePosting'),
+    mass_posting: t('schedulerTypeMassPosting'),
+  }
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center',
@@ -240,7 +242,7 @@ function TypeBadge({ type }: { type: string }) {
       border: '1px solid rgba(139,92,246,0.22)', borderRadius: 6,
       padding: '3px 9px', fontSize: 11, fontWeight: 600,
     }}>
-      {TYPE_LABEL[type] ?? type}
+      {TYPE_LABELS[type] ?? type}
     </span>
   )
 }
@@ -264,6 +266,7 @@ function StatChip({ icon, label }: { icon: JSX.Element; label: string }) {
 // ── Terminal log panel ─────────────────────────────────────────────────────────
 
 function TerminalLogs({ logs, onClose }: { logs: string[]; onClose: () => void }) {
+  const t = useT()
   const scrollRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -312,7 +315,7 @@ function TerminalLogs({ logs, onClose }: { logs: string[]; onClose: () => void }
             display: 'inline-block',
             animation: 'pulse 1.4s ease-in-out infinite',
           }} />
-          Live logs
+          {t('schedulerLiveLogs')}
         </span>
         <button
           onClick={onClose}
@@ -352,6 +355,7 @@ function TerminalLogs({ logs, onClose }: { logs: string[]; onClose: () => void }
 }
 
 export function Scheduler({ user, onNavigate }: Props) {
+  const t                         = useT()
   const { role }                  = useOrg()
   const [posts, setPosts]         = useState<ScheduledPost[]>([])
   const [loading, setLoading]     = useState(true)
@@ -487,10 +491,10 @@ export function Scheduler({ user, onNavigate }: Props) {
               fontSize: 22, fontWeight: 700, color: '#F2F0FF',
               margin: 0, lineHeight: 1, letterSpacing: '-0.04em',
             }}>
-              Scheduler
+              {t('schedulerTitle')}
             </h1>
             <p style={{ fontSize: 12.5, color: 'rgba(148,163,184,0.52)', marginTop: 6, marginBottom: 0 }}>
-              {posts.length} task{posts.length !== 1 ? 's' : ''}
+              {posts.length} {posts.length !== 1 ? t('schedulerTaskCountPlural') : t('schedulerTaskCount')}
             </p>
           </div>
 
@@ -498,7 +502,7 @@ export function Scheduler({ user, onNavigate }: Props) {
             {pending.length > 0 && (
               <span className="sf-badge sf-badge-ok" style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
                 <IconClock size={11} color="#22C55E" />
-                {pending.length} pending
+                {pending.length} {t('schedulerPendingCount')}
               </span>
             )}
             <button
@@ -518,8 +522,8 @@ export function Scheduler({ user, onNavigate }: Props) {
           marginBottom: 0,
         }}>
           {([
-            { id: 'pending' as TabFilter, label: 'Pending', count: pending.length },
-            { id: 'history' as TabFilter, label: 'History',  count: history.length },
+            { id: 'pending' as TabFilter, label: t('schedulerTabPending'), count: pending.length },
+            { id: 'history' as TabFilter, label: t('schedulerTabHistory'),  count: history.length },
           ]).map(t => (
             <button
               key={t.id}
@@ -596,12 +600,10 @@ export function Scheduler({ user, onNavigate }: Props) {
               <IconCalendar size={32} color="rgba(139,92,246,0.45)" />
             </div>
             <p style={{ fontSize: 15, fontWeight: 700, color: '#F2F0FF', margin: 0 }}>
-              {tab === 'pending' ? 'No scheduled tasks' : 'No history'}
+              {tab === 'pending' ? t('schedulerEmptyPending') : t('schedulerEmptyHistory')}
             </p>
             <p style={{ fontSize: 13, color: 'rgba(148,163,184,0.52)', marginTop: 8, marginBottom: 0 }}>
-              {tab === 'pending'
-                ? 'Schedule a post from Posting or Mass Posting.'
-                : 'Executed posts will appear here.'}
+              {tab === 'pending' ? t('schedulerEmptyPendingHint') : t('schedulerEmptyHistoryHint')}
             </p>
             {tab === 'pending' && (
               <button
@@ -609,7 +611,7 @@ export function Scheduler({ user, onNavigate }: Props) {
                 style={{ marginTop: 20 }}
                 onClick={() => onNavigate?.('massposting')}
               >
-                Schedule a post
+                {t('schedulerSchedulePost')}
               </button>
             )}
           </div>
@@ -647,11 +649,7 @@ export function Scheduler({ user, onNavigate }: Props) {
             <IconInfo size={14} color="rgba(139,92,246,0.7)" />
           </span>
           <p style={{ fontSize: 12, lineHeight: 1.6, color: 'rgba(196,181,253,0.72)', margin: 0 }}>
-            Posts are executed{' '}
-            <strong style={{ color: 'rgba(242,240,255,0.7)' }}>automatically</strong>{' '}
-            at the scheduled time. If the app is open, it handles it. Otherwise, the{' '}
-            <strong style={{ color: 'rgba(242,240,255,0.7)' }}>Supabase Edge Function</strong>{' '}
-            takes over. The video is uploaded at scheduling time.
+            {t('schedulerAutoBanner')}
           </p>
         </div>
       </div>
@@ -671,6 +669,7 @@ function PostCard({ post, index, isOwn, canCancel, isRunning, runLogs, cancellin
   cancelling: boolean
   onCancel: () => void
 }) {
+  const t = useT()
   const [showLogs, setShowLogs] = useState(false)
   const [hovered, setHovered]   = useState(false)
   const isPending   = post.status === 'pending'
@@ -716,7 +715,7 @@ function PostCard({ post, index, isOwn, canCancel, isRunning, runLogs, cancellin
               borderRadius: 6, padding: '3px 8px', fontSize: 11, fontWeight: 500,
             }}>
               <IconUser size={11} color={isOwn ? '#A78BFA' : 'rgba(196,181,253,0.5)'} />
-              {isOwn ? 'Me' : post.created_by_name}
+              {isOwn ? t('schedulerMe') : post.created_by_name}
             </span>
           )}
 
@@ -741,7 +740,7 @@ function PostCard({ post, index, isOwn, canCancel, isRunning, runLogs, cancellin
             }}
           >
             <IconX size={11} color="#EF4444" />
-            {cancelling ? 'Cancelling…' : 'Cancel'}
+            {cancelling ? t('schedulerCancelling') : t('cancel')}
           </button>
         )}
       </div>
@@ -770,16 +769,16 @@ function PostCard({ post, index, isOwn, canCancel, isRunning, runLogs, cancellin
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
         <StatChip
           icon={<IconPhone size={11} color="rgba(196,181,253,0.72)" />}
-          label={`${post.phones.length} phone${post.phones.length !== 1 ? 's' : ''}`}
+          label={`${post.phones.length} ${post.phones.length !== 1 ? t('schedulerPhonePlural') : t('schedulerPhone')}`}
         />
         <StatChip
           icon={<IconVideo size={11} color="rgba(196,181,253,0.72)" />}
-          label={`${post.videos.length} video${post.videos.length !== 1 ? 's' : ''}`}
+          label={`${post.videos.length} ${post.videos.length !== 1 ? t('schedulerVideoPlural') : t('schedulerVideo')}`}
         />
         {post.delay_minutes > 0 && (
           <StatChip
             icon={<IconTime size={11} color="rgba(196,181,253,0.72)" />}
-            label={`${post.delay_minutes} min between accounts`}
+            label={`${post.delay_minutes} ${t('schedulerMinBetween')}`}
           />
         )}
         {post.type === 'mass_posting' && (
@@ -787,7 +786,7 @@ function PostCard({ post, index, isOwn, canCancel, isRunning, runLogs, cancellin
             icon={post.mode === 'random'
               ? <IconShuffle size={11} color="rgba(196,181,253,0.72)" />
               : <IconArrowRight size={11} color="rgba(196,181,253,0.72)" />}
-            label={post.mode === 'random' ? 'Random' : 'Sequential'}
+            label={post.mode === 'random' ? t('schedulerRandom') : t('schedulerSequential')}
           />
         )}
       </div>
@@ -825,7 +824,7 @@ function PostCard({ post, index, isOwn, canCancel, isRunning, runLogs, cancellin
               background: 'rgba(124,58,237,0.1)', color: '#A78BFA',
               borderRadius: 5, padding: '2px 8px', fontSize: 11,
             }}>
-              +{post.phones.length - 6} more
+              +{post.phones.length - 6} {t('schedulerMoreItems')}
             </span>
           )}
         </div>
@@ -845,7 +844,7 @@ function PostCard({ post, index, isOwn, canCancel, isRunning, runLogs, cancellin
               }}
             >
               <IconChevron size={11} color="rgba(139,92,246,0.8)" rotated={false} />
-              Show logs ({allLogs.length})
+              {t('schedulerShowLogs')} ({allLogs.length})
             </button>
           ) : (
             <TerminalLogs logs={allLogs} onClose={() => setShowLogs(false)} />

@@ -35,22 +35,7 @@ const STATUS_COLOR: Record<TaskStatus['status'], string> = {
   done:      'text-ok',
   error:     'text-danger',
 }
-const STATUS_LABEL_FR: Record<TaskStatus['status'], string> = {
-  idle:      '—',
-  pending:   'Pending',
-  uploading: 'Uploading…',
-  posting:   'In progress',
-  done:      'Done',
-  error:     'Error',
-}
-const STATUS_LABEL_EN: Record<TaskStatus['status'], string> = {
-  idle:      '—',
-  pending:   'Pending',
-  uploading: 'Uploading…',
-  posting:   'In progress',
-  done:      'Done',
-  error:     'Error',
-}
+// STATUS labels are now built inside the component using t()
 
 const AVATAR_COLORS = [
   ['#7C3AED','#A855F7'], ['#2563EB','#60A5FA'], ['#059669','#34D399'],
@@ -83,6 +68,14 @@ async function geelark(bearer: string, path: string, body: unknown) {
 export function MassPosting({ user }: MassPostingProps) {
   const t = useT()
   const { lang } = useLang()
+  const STATUS_LABEL: Record<string, string> = {
+    idle:      '—',
+    pending:   t('schedulerStatusPending'),
+    uploading: t('uploading') + '…',
+    posting:   t('schedulerStatusInProgress'),
+    done:      t('schedulerStatusDone'),
+    error:     t('schedulerStatusFailed'),
+  }
   const { currentOrg, role, perms } = useOrg()
   const credits = useCredits()
   const [phones, setPhones]               = useState<Phone[]>([])
@@ -704,13 +697,13 @@ export function MassPosting({ user }: MassPostingProps) {
           {/* Assignment mode pill */}
           <div className="flex rounded-xl p-1 gap-0.5"
             style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
-            {([{ k: 'seq', lFr: 'Séquentiel', lEn: 'Sequential' }, { k: 'random', lFr: 'Aléatoire', lEn: 'Random' }] as const).map(m => (
+            {([{ k: 'seq', label: t('schedulerSequential') }, { k: 'random', label: t('schedulerRandom') }] as const).map(m => (
               <button key={m.k} onClick={() => setMode(m.k)}
                 className="px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-all"
                 style={mode === m.k
                   ? { background: 'rgba(139,92,246,0.2)', color: '#c4b5fd', border: '1px solid rgba(139,92,246,0.28)' }
                   : { color: 'rgba(82,82,91,0.9)' }}>
-                {lang === 'en' ? m.lEn : m.lFr}
+                {m.label}
               </button>
             ))}
           </div>
@@ -756,7 +749,7 @@ export function MassPosting({ user }: MassPostingProps) {
           <div className="w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(245,158,11,0.15)' }}>
             <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M5.5 1L10 9.5H1L5.5 1Z" stroke="#FCD34D" strokeWidth="1.2" strokeLinejoin="round"/><path d="M5.5 4.5v2.5" stroke="#FCD34D" strokeWidth="1.2" strokeLinecap="round"/></svg>
           </div>
-          <p style={{ color: '#FCD34D' }}>Missing GéeLark token — configure it in <strong>Settings</strong></p>
+          <p style={{ color: '#FCD34D' }}>{t('massPostingMissingToken')}</p>
         </div>
       )}
 
@@ -767,11 +760,11 @@ export function MassPosting({ user }: MassPostingProps) {
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-3">
               <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />
-              <span className="text-[13px] font-bold text-white">{doneTasks + errorTasks} / {totalTasks} tâches</span>
+              <span className="text-[13px] font-bold text-white">{doneTasks + errorTasks} / {totalTasks} {t('massPostingTasksProgress')}</span>
               <div className="flex items-center gap-1.5">
                 {activeTasks > 0 && (
                   <span className="px-2 py-0.5 rounded-full text-[10px] font-bold" style={{ background: 'rgba(245,158,11,0.12)', color: '#f59e0b' }}>
-                    {activeTasks} actif{activeTasks !== 1 ? 's' : ''}
+                    {activeTasks} {t('massPostingActiveCount')}{lang === 'fr' && activeTasks !== 1 ? 's' : ''}
                   </span>
                 )}
                 {doneTasks > 0 && (
@@ -807,7 +800,7 @@ export function MassPosting({ user }: MassPostingProps) {
                 <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.2)' }}>
                   <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x="1" y="2" width="9" height="7" rx="1.5" stroke="#A78BFA" strokeWidth="1.2"/><path d="M10 5.5L12 4v5L10 7.5V5.5Z" stroke="#A78BFA" strokeWidth="1.2" strokeLinejoin="round"/></svg>
                 </div>
-                <p className="text-[13px] font-black text-white">Contenu</p>
+                <p className="text-[13px] font-black text-white">{t('massPostingContent')}</p>
               </div>
               {selectedVideos.length > 0 && (
                 <span className="text-[11px] font-bold px-2 py-0.5 rounded-full text-white"
@@ -823,20 +816,20 @@ export function MassPosting({ user }: MassPostingProps) {
                 className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-[12px] font-bold transition-all hover:opacity-90 active:scale-[0.98]"
                 style={{ background: 'linear-gradient(130deg,#7C3AED,#A855F7)', color: '#fff', boxShadow: '0 3px 14px -4px rgba(124,58,237,0.5)' }}>
                 <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><rect x="0.5" y="0.5" width="4" height="4" rx="1" fill="white" opacity=".8"/><rect x="6.5" y="0.5" width="4" height="4" rx="1" fill="white" opacity=".6"/><rect x="0.5" y="6.5" width="4" height="4" rx="1" fill="white" opacity=".6"/><rect x="6.5" y="6.5" width="4" height="4" rx="1" fill="white" opacity=".4"/></svg>
-                Banque
+                {t('massPostingFromBank')}
               </button>
               <div className="flex gap-1.5">
                 <button onClick={() => pickLocalFile(-1)}
                   className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-[12px] font-semibold transition-all hover:bg-white/[0.05]"
                   style={{ border: '1px solid rgba(255,255,255,0.09)', color: 'rgba(148,163,184,0.7)' }}>
                   <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M5.5 7V1M3 3.5L5.5 1L8 3.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/><path d="M1 8v1.5C1 10.3 1.7 11 2.5 11h6c.8 0 1.5-.7 1.5-1.5V8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
-                  PC local
+                  {t('massPostingFromPC')}
                 </button>
                 <button onClick={openFolderPick}
                   className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-[12px] font-semibold transition-all hover:bg-accent/10"
                   style={{ border: '1px solid rgba(139,92,246,0.2)', color: '#a78bfa' }}>
                   <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M1 8.5V4A1 1 0 0 1 2 3h2.5L5.5 4.5H9A1 1 0 0 1 10 5.5V8.5A1 1 0 0 1 9 9.5H2A1 1 0 0 1 1 8.5Z" stroke="currentColor" strokeWidth="1.1" strokeLinejoin="round"/></svg>
-                  Dossier
+                  {t('massPostingFromFolder')}
                 </button>
               </div>
             </div>
@@ -846,7 +839,7 @@ export function MassPosting({ user }: MassPostingProps) {
             <div className="flex-shrink-0 flex items-center gap-2 px-4 py-2"
               style={{ background: 'rgba(139,92,246,0.06)', borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
               <svg className="animate-spin w-3 h-3 flex-shrink-0" style={{ color: '#a78bfa' }} viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="31.4" strokeDashoffset="10"/></svg>
-              <p className="text-[11px] font-semibold truncate" style={{ color: '#a78bfa' }}>Ajout «{addingFolder}»…</p>
+              <p className="text-[11px] font-semibold truncate" style={{ color: '#a78bfa' }}>{t('massPostingAddingFolder')} «{addingFolder}»…</p>
             </div>
           )}
 
@@ -857,9 +850,9 @@ export function MassPosting({ user }: MassPostingProps) {
                   style={{ background: 'rgba(139,92,246,0.06)', border: '1px dashed rgba(139,92,246,0.2)' }}>
                   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(82,82,91,0.7)" strokeWidth="1.3"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
                 </div>
-                <p className="text-[13px] font-bold text-white mb-1">Aucun contenu</p>
-                <p className="text-[11px] leading-relaxed max-w-[160px]" style={{ color: 'rgba(148,163,184,0.4)' }}>Ajoute des vidéos depuis la banque ou ton PC.</p>
-                <p className="text-[10px] mt-3" style={{ color: 'rgba(82,82,91,0.6)' }}>Formats supportés<br/>MP4, MOV, AVI · Max 2GB</p>
+                <p className="text-[13px] font-bold text-white mb-1">{t('massPostingNoContent')}</p>
+                <p className="text-[11px] leading-relaxed max-w-[160px]" style={{ color: 'rgba(148,163,184,0.4)' }}>{t('massPostingNoContentHint')}</p>
+                <p className="text-[10px] mt-3" style={{ color: 'rgba(82,82,91,0.6)' }}>{t('massPostingFormats').split('\n').map((line, i) => <span key={i}>{line}{i === 0 ? <br/> : ''}</span>)}</p>
               </div>
             ) : (
               <div className="py-2">
@@ -900,7 +893,7 @@ export function MassPosting({ user }: MassPostingProps) {
                 <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.2)' }}>
                   <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="2" y="1" width="8" height="10" rx="1.5" stroke="#A78BFA" strokeWidth="1.2"/><circle cx="6" cy="9" r="0.8" fill="#A78BFA"/></svg>
                 </div>
-                <p className="text-[13px] font-black text-white">Cibles</p>
+                <p className="text-[13px] font-black text-white">{t('massPostingTargets')}</p>
               </div>
               {selectedPhones.size > 0 && (
                 <span className="text-[11px] font-bold px-2 py-0.5 rounded-full text-white"
@@ -913,7 +906,7 @@ export function MassPosting({ user }: MassPostingProps) {
             {/* Phones / Groups toggle */}
             <div className="flex rounded-xl p-1 gap-0.5 mb-3"
               style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-              {([{ k: 'phones', l: 'Téléphones' }, { k: 'groups', l: 'Groupes' }] as const).map(m => (
+              {([{ k: 'phones', l: t('massPostingPhones') }, { k: 'groups', l: t('massPostingGroups') }] as const).map(m => (
                 <button key={m.k} onClick={() => setPhonePickMode(m.k)}
                   className="flex-1 py-1.5 rounded-lg text-[11px] font-semibold transition-all"
                   style={phonePickMode === m.k
@@ -938,7 +931,7 @@ export function MassPosting({ user }: MassPostingProps) {
                 )}
                 <div className="relative">
                   <svg className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" width="11" height="11" viewBox="0 0 11 11" fill="none"><circle cx="5" cy="5" r="3.5" stroke="rgba(139,92,246,0.5)" strokeWidth="1.2"/><path d="M7.5 7.5L10 10" stroke="rgba(139,92,246,0.5)" strokeWidth="1.2" strokeLinecap="round"/></svg>
-                  <input type="text" placeholder="Rechercher…" value={phoneSearch}
+                  <input type="text" placeholder={t('massPostingSearchPhone')} value={phoneSearch}
                     onChange={e => setPhoneSearch(e.target.value)}
                     className="w-full pl-8 pr-3 py-2 rounded-xl text-[12px] placeholder:text-text3 focus:outline-none"
                     style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(139,92,246,0.12)', color: '#E2E8F0' }}
@@ -955,9 +948,9 @@ export function MassPosting({ user }: MassPostingProps) {
                     if (role && !canAccessPhoneGroup(role, perms, p.group_name)) return false
                     return Boolean(p.group_name)
                   }).map(p => p.id)))
-                }} className="text-[12px] font-bold text-accent hover:text-white transition-colors">Tout</button>
+                }} className="text-[12px] font-bold text-accent hover:text-white transition-colors">{t('massPostingAllGroup')}</button>
                 <button onClick={() => { setSelectedGroups(new Set()); setSelPhones(new Set()) }}
-                  className="text-[12px] text-text3 hover:text-white transition-colors">Aucun</button>
+                  className="text-[12px] text-text3 hover:text-white transition-colors">{t('massPostingNoneGroup')}</button>
               </div>
             )}
           </div>
@@ -966,10 +959,10 @@ export function MassPosting({ user }: MassPostingProps) {
             <div className="flex-shrink-0 flex items-center gap-0 mx-4 mb-2 mt-2 rounded-xl overflow-hidden"
               style={{ border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)' }}>
               <button onClick={() => setSelPhones(new Set(visiblePhones.map(p => p.id)))}
-                className="flex-1 py-1.5 text-[11px] font-bold text-accent hover:bg-accent/10 transition-colors">Tout</button>
+                className="flex-1 py-1.5 text-[11px] font-bold text-accent hover:bg-accent/10 transition-colors">{t('massPostingAllGroup')}</button>
               <div style={{ width: 1, background: 'rgba(255,255,255,0.06)', height: 20 }} />
               <button onClick={() => setSelPhones(new Set())}
-                className="flex-1 py-1.5 text-[11px] text-text2 hover:text-white hover:bg-white/[0.04] transition-colors">Aucun</button>
+                className="flex-1 py-1.5 text-[11px] text-text2 hover:text-white hover:bg-white/[0.04] transition-colors">{t('massPostingNoneGroup')}</button>
               <div style={{ width: 1, background: 'rgba(255,255,255,0.06)', height: 20 }} />
               <span className="px-3 text-[11px] font-medium" style={{ color: 'rgba(148,163,184,0.4)' }}>{visiblePhones.length}</span>
             </div>
@@ -998,7 +991,7 @@ export function MassPosting({ user }: MassPostingProps) {
                     {ts && ts.status !== 'idle' && ts.status !== 'pending' && (
                       <p className="text-[10px] font-semibold flex items-center gap-1" style={{ color: statusDot[ts.status] ?? '#71717a' }}>
                         <span className="w-1 h-1 rounded-full inline-block" style={{ background: statusDot[ts.status] ?? '#71717a' }} />
-                        {( lang === 'en' ? STATUS_LABEL_EN : STATUS_LABEL_FR)[ts.status]}
+                        {STATUS_LABEL[ts.status]}
                       </p>
                     )}
                   </div>
@@ -1023,8 +1016,8 @@ export function MassPosting({ user }: MassPostingProps) {
                   <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-3" style={{ background: 'rgba(139,92,246,0.06)', border: '1px dashed rgba(139,92,246,0.2)' }}>
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(82,82,91,0.7)" strokeWidth="1.3"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                   </div>
-                  <p className="text-[12px] font-bold text-white mb-1">Aucun groupe</p>
-                  <p className="text-[11px] text-text3">Assigne des groupes à tes téléphones</p>
+                  <p className="text-[12px] font-bold text-white mb-1">{t('massPostingNoGroup')}</p>
+                  <p className="text-[11px] text-text3">{t('massPostingNoGroupHint')}</p>
                 </div>
               )
               return (
@@ -1048,7 +1041,7 @@ export function MassPosting({ user }: MassPostingProps) {
                         <div className="min-w-0 flex-1">
                           <p className={`text-[13px] font-bold truncate ${checked ? 'text-white' : 'text-text2'}`}>{g}</p>
                           <p className="text-[11px]" style={{ color: checked ? '#a78bfa' : 'rgba(82,82,91,0.7)' }}>
-                            {checked ? `${selCount}/${inGroup.length} sél.` : `${inGroup.length} tél.`}
+                            {checked ? `${selCount}/${inGroup.length} ${t('massPostingSelCount')}` : `${inGroup.length} ${t('massPostingPhoneCount')}`}
                           </p>
                         </div>
                         <div className="w-4 h-4 rounded-md flex items-center justify-center flex-shrink-0"
@@ -1074,7 +1067,7 @@ export function MassPosting({ user }: MassPostingProps) {
                 <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: 'rgba(139,92,246,0.15)' }}>
                   <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="2" stroke="#A78BFA" strokeWidth="1.2"/><path d="M6 1v1.5M6 9.5V11M1 6h1.5M9.5 6H11" stroke="#A78BFA" strokeWidth="1.2" strokeLinecap="round"/></svg>
                 </div>
-                <span className="text-[12px] font-bold text-white">Options de publication</span>
+                <span className="text-[12px] font-bold text-white">{t('massPostingPublishOptions')}</span>
               </div>
               <div className="px-5 py-4">
                 <PostingOptions opts={postingOpts} onChange={o => { setPostingOpts(o); savePostingOpts(o) }} />
@@ -1088,7 +1081,7 @@ export function MassPosting({ user }: MassPostingProps) {
                   <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: 'rgba(139,92,246,0.15)' }}>
                     <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 2h10M1 5h7M1 8h8M1 11h5" stroke="#A78BFA" strokeWidth="1.2" strokeLinecap="round"/></svg>
                   </div>
-                  <span className="text-[12px] font-bold text-white">Description</span>
+                  <span className="text-[12px] font-bold text-white">{t('massPostingDescription')}</span>
                 </div>
                 <span className={`text-[11px] font-mono tabular-nums px-2 py-0.5 rounded-lg ${caption.length > 2200 ? 'text-danger' : 'text-text3'}`}
                   style={{ background: caption.length > 2200 ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.04)' }}>
@@ -1097,7 +1090,7 @@ export function MassPosting({ user }: MassPostingProps) {
               </div>
               <div className="p-5 space-y-3">
                 <textarea value={caption} onChange={e => setCaption(e.target.value)} rows={4}
-                  placeholder="Description partagée par tous les téléphones (optionnel)…"
+                  placeholder={t('massPostingCaptionPlaceholder')}
                   className="w-full rounded-xl px-4 py-3 text-[13px] placeholder:text-text3 resize-none focus:outline-none transition-all leading-relaxed"
                   style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(139,92,246,0.1)', color: '#E2E8F0', fontFamily: 'inherit' }}
                   onFocus={e => { e.target.style.borderColor = 'rgba(139,92,246,0.35)'; e.target.style.background = 'rgba(139,92,246,0.04)' }}
@@ -1108,10 +1101,10 @@ export function MassPosting({ user }: MassPostingProps) {
                     className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-[12px] font-bold transition-all disabled:opacity-40 hover:opacity-90"
                     style={{ background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.25)', color: '#A78BFA' }}>
                     {generating ? <span className="w-3 h-3 border-2 border-accent/50 border-t-accent rounded-full animate-spin inline-block" /> : <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M5.5 1L6.8 4.2H10.2L7.5 6.1L8.5 9.5L5.5 7.5L2.5 9.5L3.5 6.1L0.8 4.2H4.2L5.5 1Z" fill="#A78BFA"/></svg>}
-                    {generating ? 'Génère…' : 'Générer IA'}
+                    {generating ? t('massPostingGeneratingAI') : t('massPostingGenerateAI')}
                   </button>
                   <input type="text" value={customPrompt} onChange={e => setCustomPrompt(e.target.value)}
-                    placeholder="Prompt personnalisé…"
+                    placeholder={t('massPostingCustomPrompt')}
                     className="flex-1 px-3 py-2 rounded-xl text-[12px] placeholder:text-text3 focus:outline-none"
                     style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(139,92,246,0.12)', color: '#E2E8F0' }}
                   />
@@ -1133,11 +1126,11 @@ export function MassPosting({ user }: MassPostingProps) {
                   <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: 'rgba(139,92,246,0.15)' }}>
                     <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 3h10M1 6h10M1 9h10" stroke="#A78BFA" strokeWidth="1.2" strokeLinecap="round"/></svg>
                   </div>
-                  <span className="text-[12px] font-bold text-white">Assignations</span>
+                  <span className="text-[12px] font-bold text-white">{t('massPostingAssignments')}</span>
                 </div>
                 {assignments.length > 0 && (
                   <span className="text-[11px] px-2 py-0.5 rounded-full font-bold" style={{ background: 'rgba(139,92,246,0.1)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.2)' }}>
-                    {assignments.length} tâche{assignments.length !== 1 ? 's' : ''}
+                    {assignments.length} {assignments.length !== 1 ? t('massPostingAssignmentCountPlural') : t('massPostingAssignmentCount')}
                   </span>
                 )}
               </div>
@@ -1147,9 +1140,9 @@ export function MassPosting({ user }: MassPostingProps) {
                   <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4" style={{ background: 'rgba(139,92,246,0.06)', border: '1px dashed rgba(139,92,246,0.2)' }}>
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(82,82,91,0.7)" strokeWidth="1.3"><path d="M9 17H5a2 2 0 0 0-2 2"/><path d="M11 17h8a2 2 0 0 1 2 2"/><rect x="1" y="3" width="22" height="12" rx="2"/></svg>
                   </div>
-                  <p className="text-[13px] font-bold text-white mb-1">Aucune assignation</p>
+                  <p className="text-[13px] font-bold text-white mb-1">{t('massPostingAssignments')}</p>
                   <p className="text-[12px] max-w-[280px] leading-relaxed" style={{ color: 'rgba(148,163,184,0.4)' }}>
-                    Sélectionne des téléphones et des vidéos pour voir les assignations.<br/>Chaque téléphone est automatiquement assigné à une vidéo (rotation)
+                    {t('massPostingNoAssignment')}
                   </p>
                 </div>
               ) : (
@@ -1208,7 +1201,7 @@ export function MassPosting({ user }: MassPostingProps) {
                               <div className="inline-flex flex-col items-end gap-1">
                                 <span className="px-2 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap"
                                   style={{ background: cfg.bg, color: cfg.fg }}>
-                                  {( lang === 'en' ? STATUS_LABEL_EN : STATUS_LABEL_FR)[status]}
+                                  {STATUS_LABEL[status]}
                                 </span>
                                 {ts?.detail && <span className="text-[10px] text-text3 max-w-[110px] truncate">{ts.detail}</span>}
                                 {(status === 'uploading' || status === 'posting') && (
