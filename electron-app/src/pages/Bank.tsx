@@ -41,11 +41,12 @@ function RenameModal({ item, onSave, onClose }: {
   onSave: (id: string, title: string) => void
   onClose: () => void
 }) {
+  const t = useT()
   const [val, setVal] = useState(item.title)
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
       <div className="bg-surface border border-border rounded-xl p-5 w-80 space-y-4" onClick={e => e.stopPropagation()}>
-        <h3 className="text-sm font-semibold text-text">Rename video</h3>
+        <h3 className="text-sm font-semibold text-text">{t('bankRenameVideo')}</h3>
         <input
           autoFocus
           className="w-full bg-bg border border-border rounded-lg px-3 py-2 text-sm text-text focus:border-accent focus:outline-none"
@@ -54,8 +55,8 @@ function RenameModal({ item, onSave, onClose }: {
           onKeyDown={e => { if (e.key === 'Enter') { onSave(item.id, val.trim()); onClose() } if (e.key === 'Escape') onClose() }}
         />
         <div className="flex gap-2 justify-end">
-          <Button variant="secondary" size="sm" onClick={onClose}>Cancel</Button>
-          <Button size="sm" onClick={() => { onSave(item.id, val.trim()); onClose() }} disabled={!val.trim()}>Save</Button>
+          <Button variant="secondary" size="sm" onClick={onClose}>{t('cancel')}</Button>
+          <Button size="sm" onClick={() => { onSave(item.id, val.trim()); onClose() }} disabled={!val.trim()}>{t('save')}</Button>
         </div>
       </div>
     </div>
@@ -69,15 +70,16 @@ function MoveModal({ item, folders, onSave, onClose }: {
   onSave: (id: string, folder: string | null) => void
   onClose: () => void
 }) {
+  const t = useT()
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
       <div className="bg-surface border border-border rounded-xl p-5 w-72 space-y-3" onClick={e => e.stopPropagation()}>
-        <h3 className="text-sm font-semibold text-text">Move to</h3>
+        <h3 className="text-sm font-semibold text-text">{t('bankMoveTo')}</h3>
         <button
           onClick={() => { onSave(item.id, null); onClose() }}
           className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${!item.folder ? 'bg-accent/10 text-accent' : 'hover:bg-surface2 text-text'}`}
         >
-          📁 All (no folder)
+          {t('bankAllNoFolder')}
         </button>
         {folders.map(f => (
           <button
@@ -88,7 +90,7 @@ function MoveModal({ item, folders, onSave, onClose }: {
             📂 {f}
           </button>
         ))}
-        <Button variant="secondary" size="sm" className="w-full" onClick={onClose}>Cancel</Button>
+        <Button variant="secondary" size="sm" className="w-full" onClick={onClose}>{t('cancel')}</Button>
       </div>
     </div>
   )
@@ -100,26 +102,27 @@ function TagsModal({ item, onSave, onClose }: {
   onSave: (id: string, tags: string[]) => void
   onClose: () => void
 }) {
+  const t = useT()
   const [val, setVal] = useState(item.tags.join(', '))
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
       <div className="bg-surface border border-border rounded-xl p-5 w-80 space-y-4" onClick={e => e.stopPropagation()}>
-        <h3 className="text-sm font-semibold text-text">Tags</h3>
+        <h3 className="text-sm font-semibold text-text">{t('bankTagsTitle')}</h3>
         <input
           autoFocus
-          placeholder="viral, trending, fitness…"
+          placeholder={t('bankTagsPlaceholder')}
           className="w-full bg-bg border border-border rounded-lg px-3 py-2 text-sm text-text focus:border-accent focus:outline-none"
           value={val}
           onChange={e => setVal(e.target.value)}
           onKeyDown={e => { if (e.key === 'Escape') onClose() }}
         />
-        <p className="text-[11px] text-text2">Separate tags with commas.</p>
+        <p className="text-[11px] text-text2">{t('bankTagsSeparate')}</p>
         <div className="flex gap-2 justify-end">
-          <Button variant="secondary" size="sm" onClick={onClose}>Cancel</Button>
+          <Button variant="secondary" size="sm" onClick={onClose}>{t('cancel')}</Button>
           <Button size="sm" onClick={() => {
-            const tags = val.split(',').map(t => t.trim()).filter(Boolean)
+            const tags = val.split(',').map(tag => tag.trim()).filter(Boolean)
             onSave(item.id, tags); onClose()
-          }}>Save</Button>
+          }}>{t('save')}</Button>
         </div>
       </div>
     </div>
@@ -135,6 +138,7 @@ function AddMediaModal({ onFiles, onElectronPick, onClose }: {
   onElectronPick?: () => void
   onClose: () => void
 }) {
+  const t = useT()
   const [dragOver, setDragOver] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
