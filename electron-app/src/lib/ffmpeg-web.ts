@@ -636,9 +636,11 @@ async function remixViaMediaRecorder(opts: {
   const canvas = document.createElement('canvas')
   canvas.width = W; canvas.height = H
   const ctx = canvas.getContext('2d', { alpha: false })!
-  // captureStream(0) = manual frame push via requestFrame().
-  // Gives us full control over when frames enter the encoder regardless of tab state.
-  const canvasStream: MediaStream = (canvas as any).captureStream(0)
+  // captureStream(30) = auto-sample at up to 30fps.
+  // The Web Worker drives draw calls at 30fps; captureStream picks up each
+  // drawn frame automatically. Do NOT use captureStream(0) + requestFrame():
+  // if requestFrame() is missing/fails silently the output is entirely black.
+  const canvasStream: MediaStream = (canvas as any).captureStream(30)
 
   // ── audio routing ─────────────────────────────────────────────────────────────
   // Use AudioContext to route origVid's audio to the recorder without playing through speakers.
@@ -683,7 +685,6 @@ async function remixViaMediaRecorder(opts: {
   // we always get exactly 30 ticks/sec regardless of whether the user switches tabs.
   let switched = false
   let recordingStopped = false
-  const videoTrack = canvasStream.getVideoTracks()[0] as any
 
   const stopRecording = () => {
     if (recordingStopped) return
@@ -715,8 +716,6 @@ async function remixViaMediaRecorder(opts: {
       if (t >= ov.startTime && t <= ov.endTime) ctx.drawImage(oc, 0, 0)
     }
 
-    // Push this frame explicitly into the capture stream
-    videoTrack.requestFrame?.()
   }
 
   // Inline Web Worker — fires a 'tick' message every 33ms on a non-throttled thread

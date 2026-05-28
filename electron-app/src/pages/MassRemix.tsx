@@ -636,16 +636,20 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
 
                 // ── Step 2: assign zones (top / bottom) ───────────────────────
                 type Zone = 'top' | 'bottom'
-                // Default zone from rawY (where text physically appears in the source).
-                // For time-concurrent items that collide in the same zone, flip the later one.
-                const zones: Zone[] = items.map((item, i) => {
+                // Build zones iteratively — cannot use .map() here because the
+                // callback references `zones[j]` from earlier indices, which is a
+                // TDZ (Temporal Dead Zone) violation when `const zones` is still
+                // being initialised. A plain for-loop avoids this entirely.
+                const zones: Zone[] = []
+                for (let i = 0; i < items.length; i++) {
+                  const item = items[i]
                   const defaultZone: Zone = item.rawY < 0.5 ? 'top' : 'bottom'
                   const hasConflict = items.slice(0, i).some((prev, j) => {
                     const overlap = prev.endTime > item.startTime && prev.startTime < item.endTime
                     return overlap && zones[j] === defaultZone
                   })
-                  return hasConflict ? (defaultZone === 'top' ? 'bottom' : 'top') : defaultZone
-                })
+                  zones.push(hasConflict ? (defaultZone === 'top' ? 'bottom' : 'top') : defaultZone)
+                }
 
                 // ── Step 3: generate per-item overlays ──────────────────────────────
                 // ONE overlay entry per item — drawOverlayText/renderTextPNG handle
