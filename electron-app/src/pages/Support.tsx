@@ -369,7 +369,7 @@ function ThreadView({
               value={reply}
               onChange={e => setReply(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendReply() } }}
-              placeholder="Répondre…"
+              placeholder={t('supportReplyPlaceholder')}
               className="flex-1 rounded-xl px-4 py-2.5 text-[13px] focus:outline-none"
               style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
             />
@@ -379,7 +379,7 @@ function ThreadView({
               className="rounded-xl px-5 py-2.5 text-[13px] font-semibold text-white disabled:opacity-50"
               style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)' }}
             >
-              {sending ? '…' : 'Envoyer'}
+              {sending ? '…' : t('supportReplyBtn')}
             </button>
           </div>
         )}
@@ -461,14 +461,14 @@ function UserSupport({ user }: { user: User }) {
       <div className="flex-shrink-0 px-8 pt-7 pb-5 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
         <div>
           <h1 className="text-[20px] font-black text-white leading-none">{t('supportTitle')}</h1>
-          <p className="text-[13px] text-text2 mt-0.5">{lang === 'en' ? "Need help? Create a ticket and our team will respond." : "Besoin d'aide ? Créez un ticket et notre équipe vous répondra."}</p>
+          <p className="text-[13px] text-text2 mt-0.5">{t('supportHelp')}</p>
         </div>
         <button
           onClick={() => setView('create')}
           className="rounded-xl px-5 py-2.5 text-[13px] font-semibold text-white"
           style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)' }}
         >
-          + New ticket
+          {t('supportNewTicketBtn')}
         </button>
       </div>
 
