@@ -1706,7 +1706,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                         <div>
                           <p className="text-[9px] uppercase tracking-widest font-black mb-3 px-0.5" style={{ color: 'rgba(139,92,246,0.5)' }}>{t('communityTopicsMyCommunities')}</p>
                           <div className="space-y-2">
-                            {joined.map(t => <TopicCard key={t.id} t={t} />)}
+                            {joined.map(topic => <TopicCard key={topic.id} t={topic} />)}
                           </div>
                         </div>
                       )}
@@ -1716,7 +1716,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                             {joined.length > 0 ? t('communityTopicsDiscover') : t('communityTopicsAll')}
                           </p>
                           <div className="space-y-2">
-                            {others.map(t => <TopicCard key={t.id} t={t} />)}
+                            {others.map(topic => <TopicCard key={topic.id} t={topic} />)}
                           </div>
                         </div>
                       )}

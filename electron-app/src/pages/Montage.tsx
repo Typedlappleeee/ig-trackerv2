@@ -396,6 +396,7 @@ export function Montage({ user }: MontageProps) {
 
   // Sequential playback
   const [playingIndex, setPlayingIndex] = useState<number | null>(null)
+  const playAdvancedRef = useRef(false)  // guard against double-advance (onTimeUpdate + onEnded)
 
   // Auto-caption mode
   const [autoCaptionEnabled, setAutoCaptionEnabled] = useState(false)
@@ -419,6 +420,7 @@ export function Montage({ user }: MontageProps) {
     if (currentOrg) q = q.eq('org_id', currentOrg.id)
     else q = q.eq('user_id', user.id)
     q.then(({ data }) => { setBankItems(data ?? []); setLL(false) })
+      .catch(err => { console.error('[Montage] bank load failed:', err); setLL(false) })
   }, [currentOrg?.id])
 
   // Sync auto-caption overlay → textOverlays
@@ -631,14 +633,17 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
     if (!item) { setPreviewSrc(null); return }
     if (item.file_url) { setPreviewSrc(localSrc(item.file_url)); return }
     if (item.storage_path) {
-      // Clear first so we don't briefly play the wrong clip if item changes
+      // Clear first so we don't briefly play the wrong clip when clip changes
       setPreviewSrc(null)
-      getSignedUrl(item.storage_path).then(url => { if (!cancelled) setPreviewSrc(url) })
+      getSignedUrl(item.storage_path)
+        .then(url => { if (!cancelled) setPreviewSrc(url) })
+        .catch(err => { console.error('[Montage] signed URL failed:', err) })
     } else {
       setPreviewSrc(null)
     }
     return () => { cancelled = true }
-  }, [previewClip?.item.id])
+  // Use uid (timeline-unique) so effect reruns even when the same ContentItem is used twice
+  }, [previewClip?.uid])
 
   function playAll() {
     if (clips.length === 0) return
@@ -650,14 +655,17 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
   }
   function onVideoLoaded() {
     if (playingIndex === null || !videoRef.current) return
+    playAdvancedRef.current = false  // reset guard for this clip
     const clip = clips[playingIndex]
     if (clip?.trimStart > 0) videoRef.current.currentTime = clip.trimStart
-    else videoRef.current.play()
+    else videoRef.current.play().catch(() => {})
   }
   function onVideoSeekedForPlay() {
-    if (playingIndex !== null) videoRef.current?.play()
+    if (playingIndex !== null) videoRef.current?.play().catch(() => {})
   }
   function onVideoEnded() {
+    if (playAdvancedRef.current) return  // already advanced from onTimeUpdate
+    playAdvancedRef.current = true
     if (playingIndex === null) return
     const next = playingIndex + 1
     if (next < clips.length) setPlayingIndex(next)
@@ -666,7 +674,7 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
   function onTimeUpdate(e: React.SyntheticEvent<HTMLVideoElement>) {
     const v = e.target as HTMLVideoElement
     setPlayhead(v.currentTime)
-    if (playingIndex !== null) {
+    if (playingIndex !== null && !playAdvancedRef.current) {
       const clip = clips[playingIndex]
       const end  = clip?.trimEnd > 0 ? clip.trimEnd : Infinity
       if (v.currentTime >= end) { v.pause(); onVideoEnded() }

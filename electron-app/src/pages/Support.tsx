@@ -551,7 +551,7 @@ function AdminSupport({ user }: { user: User }) {
 
   async function handleStatusChange(id: string, status: TicketStatus) {
     await supabase.rpc('admin_update_ticket', { p_ticket_id: id, p_status: status })
-    setTickets(prev => prev.map(t => t.id === id ? { ...t, status } : t))
+    setTickets(prev => prev.map(tk => tk.id === id ? { ...tk, status } : tk))
     if (active?.id === id) setActive(prev => prev ? { ...prev, status } : prev)
   }
 

@@ -227,6 +227,7 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
 
   async function startGeneration() {
     if (!sourceUrl || running) return
+    try {
     const creditCost = count * CREDIT_COSTS.clone_vid
     const creditRes = await checkAndDeductCredits(credits.ownerId, creditCost)
     if (!creditRes.ok) {
@@ -285,7 +286,11 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
 
       done++; setTotalDone(done)
     }
-    setRunning(false)
+    } catch (e) {
+      console.error('[CloneVid] startGeneration error:', e)
+    } finally {
+      setRunning(false)
+    }
   }
 
   function stop() { abortRef.current = true; setRunning(false) }
@@ -456,7 +461,7 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
           {/* Export banque */}
           <div style={{ borderRadius: 9, padding: '9px 11px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: (isWeb || saveToBank) ? 9 : 0 }}>
-              <span style={{ fontSize: 11, flex: 1, color: 'rgba(226,232,240,0.65)', fontWeight: 500 }}>☁ {isWeb ? `Auto export to bank` : t('repurposeSaveToBank')}</span>
+              <span style={{ fontSize: 11, flex: 1, color: 'rgba(226,232,240,0.65)', fontWeight: 500 }}>☁ {isWeb ? t('repurposeAutoExport') : t('repurposeSaveToBank')}</span>
               {!isWeb && (
                 <button onClick={() => setSaveToBank(v => !v)} disabled={running}
                   className="relative w-9 h-5 rounded-full transition-colors flex-shrink-0"
@@ -473,11 +478,11 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
                   <select value={bankFolders.includes(bankFolder) ? bankFolder : ''}
                     onChange={e => setBankFolder(e.target.value)}
                     style={{ width: '100%', padding: '5px 8px', borderRadius: 7, fontSize: 11, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: '#e2d9f3', marginBottom: 5, cursor: 'pointer' }}>
-                    <option value="" style={{ background: '#0c0919' }}>Choose a folder…</option>
+                    <option value="" style={{ background: '#0c0919' }}>{t('repurposeChooseFolder')}</option>
                     {bankFolders.map(f => <option key={f} value={f} style={{ background: '#0c0919' }}>{f}</option>)}
                   </select>
                 )}
-                <input placeholder={bankFolders.length > 0 ? 'Or new folder…' : 'Folder (optional)'}
+                <input placeholder={bankFolders.length > 0 ? t('repurposeNewFolder') : t('repurposeFolderOptional')}
                   value={bankFolder} onChange={e => setBankFolder(e.target.value)}
                   style={{ width: '100%', padding: '5px 8px', borderRadius: 7, fontSize: 11, background: 'rgba(255,255,255,0.04)', border: `1px solid ${bankFolder.trim() ? 'rgba(139,92,246,0.4)' : 'rgba(255,255,255,0.07)'}`, color: '#e2d9f3', outline: 'none' }}
                 />
@@ -498,7 +503,7 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
               outline: sourceUrl ? `1px solid ${running ? 'rgba(239,68,68,0.22)' : 'rgba(34,211,238,0.28)'}` : 'none',
             }}
           >
-            {running ? `⏹ Stop (${totalDone}/${jobs.length})` : `${t('repurposeGenerateBtn')} ${count} ${count > 1 ? t('repurposeVariantPlural') : t('repurposeVariant')}`}
+            {running ? `${t('repurposeStopBtn')} (${totalDone}/${jobs.length})` : `${t('repurposeGenerateBtn')} ${count} ${count > 1 ? t('repurposeVariantPlural') : t('repurposeVariant')}`}
           </button>
         </div>
 
@@ -512,11 +517,11 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
               </div>
               <div style={{ fontSize: 15, fontWeight: 700, color: 'rgba(226,232,240,0.55)' }}>{t('repurposeEmptyState')}</div>
               <div style={{ fontSize: 12, color: 'rgba(148,163,184,0.35)', maxWidth: 340, lineHeight: 1.7 }}>
-                Each variant receives invisible micro-transformations:<br />color, audio, grain, crop, encoding — unique hash guaranteed.
+                {t('repurposeEmptyDesc').split('\n').map((line, i) => <span key={i}>{line}{i === 0 && <br />}</span>)}
               </div>
               <div style={{ display: 'flex', gap: 7, marginTop: 6, flexWrap: 'wrap', justifyContent: 'center' }}>
-                {['🎨 Color grading', '🔊 Audio', '🌀 Grain', '✂️ Crop', '📦 Encoding', '🔐 Unique hash'].map(t => (
-                  <span key={t} style={{ padding: '3px 9px', borderRadius: 20, fontSize: 10, fontWeight: 500, background: 'rgba(34,211,238,0.05)', color: 'rgba(34,211,238,0.6)', border: '1px solid rgba(34,211,238,0.1)' }}>{t}</span>
+                {['🎨 Color grading', '🔊 Audio', '🌀 Grain', '✂️ Crop', '📦 Encoding', '🔐 Unique hash'].map(pill => (
+                  <span key={pill} style={{ padding: '3px 9px', borderRadius: 20, fontSize: 10, fontWeight: 500, background: 'rgba(34,211,238,0.05)', color: 'rgba(34,211,238,0.6)', border: '1px solid rgba(34,211,238,0.1)' }}>{pill}</span>
                 ))}
               </div>
             </div>

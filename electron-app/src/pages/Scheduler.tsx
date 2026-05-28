@@ -524,39 +524,39 @@ export function Scheduler({ user, onNavigate }: Props) {
           {([
             { id: 'pending' as TabFilter, label: t('schedulerTabPending'), count: pending.length },
             { id: 'history' as TabFilter, label: t('schedulerTabHistory'),  count: history.length },
-          ]).map(t => (
+          ]).map(tabItem => (
             <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
+              key={tabItem.id}
+              onClick={() => setTab(tabItem.id)}
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 8,
                 padding: '10px 18px',
                 background: 'transparent',
                 border: 'none',
-                borderBottom: tab === t.id ? '2px solid #7C3AED' : '2px solid transparent',
+                borderBottom: tab === tabItem.id ? '2px solid #7C3AED' : '2px solid transparent',
                 cursor: 'pointer',
-                color: tab === t.id ? '#F2F0FF' : 'rgba(148,163,184,0.45)',
-                fontSize: 13, fontWeight: tab === t.id ? 600 : 500,
+                color: tab === tabItem.id ? '#F2F0FF' : 'rgba(148,163,184,0.45)',
+                fontSize: 13, fontWeight: tab === tabItem.id ? 600 : 500,
                 transition: 'color 0.15s, border-color 0.15s',
                 marginBottom: -1,
                 outline: 'none',
               }}
               onMouseEnter={e => {
-                if (tab !== t.id) (e.currentTarget as HTMLButtonElement).style.color = 'rgba(196,181,253,0.7)'
+                if (tab !== tabItem.id) (e.currentTarget as HTMLButtonElement).style.color = 'rgba(196,181,253,0.7)'
               }}
               onMouseLeave={e => {
-                if (tab !== t.id) (e.currentTarget as HTMLButtonElement).style.color = 'rgba(148,163,184,0.45)'
+                if (tab !== tabItem.id) (e.currentTarget as HTMLButtonElement).style.color = 'rgba(148,163,184,0.45)'
               }}
             >
-              {t.label}
-              {t.count > 0 && (
+              {tabItem.label}
+              {tabItem.count > 0 && (
                 <span style={{
-                  background: tab === t.id ? 'rgba(139,92,246,0.22)' : 'rgba(255,255,255,0.05)',
-                  color: tab === t.id ? '#A78BFA' : 'rgba(148,163,184,0.4)',
+                  background: tab === tabItem.id ? 'rgba(139,92,246,0.22)' : 'rgba(255,255,255,0.05)',
+                  color: tab === tabItem.id ? '#A78BFA' : 'rgba(148,163,184,0.4)',
                   borderRadius: 20, padding: '1px 7px', fontSize: 11, fontWeight: 700,
                   transition: 'background 0.15s, color 0.15s',
                 }}>
-                  {t.count}
+                  {tabItem.count}
                 </span>
               )}
             </button>

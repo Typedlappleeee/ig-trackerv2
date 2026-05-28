@@ -190,8 +190,8 @@ export function MassRemix({ user }: MassRemixProps) {
   const STATUS_LABEL: Record<MassJob['status'], string> = {
     pending:    t('massRemixStatusPending'),
     detecting:  t('massRemixStatusDetecting'),
-    analyzing:  '✨ AI text…',
-    generating: '⚙ FFmpeg…',
+    analyzing:  t('massRemixStatusAnalyzing'),
+    generating: t('massRemixStatusGenerating'),
     uploading:  `☁ ${t('uploading')}…`,
     done:       t('massRemixStatusDone'),
     error:      t('massRemixStatusError'),
