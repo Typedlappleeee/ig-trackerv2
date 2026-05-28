@@ -164,7 +164,7 @@ function AddMediaModal({ onFiles, onElectronPick, onClose }: {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={onClose}>
       <div className="bg-surface border border-border rounded-2xl p-6 w-96 space-y-4 shadow-2xl" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-bold text-text">➕ Add media</h3>
+          <h3 className="text-sm font-bold text-text">{t('bankAddMedia')}</h3>
           <button onClick={onClose} className="text-text2 hover:text-text transition-colors text-lg leading-none">✕</button>
         </div>
 
@@ -180,14 +180,14 @@ function AddMediaModal({ onFiles, onElectronPick, onClose }: {
         >
           <span className="text-4xl">{dragOver ? '📂' : '🎬'}</span>
           <div className="text-center">
-            <p className="text-sm font-semibold text-text">Drag your files here</p>
-            <p className="text-xs text-text2 mt-0.5">Videos, photos, GIFs, audio</p>
+            <p className="text-sm font-semibold text-text">{t('bankDragFiles')}</p>
+            <p className="text-xs text-text2 mt-0.5">{t('bankMediaTypes')}</p>
           </div>
         </div>
 
         <div className="flex items-center gap-3">
           <div className="flex-1 h-px bg-border" />
-          <span className="text-xs text-text2">ou</span>
+          <span className="text-xs text-text2">{t('bankOr')}</span>
           <div className="flex-1 h-px bg-border" />
         </div>
 
@@ -208,7 +208,7 @@ function AddMediaModal({ onFiles, onElectronPick, onClose }: {
           onClick={handlePickClick}
           className="w-full bg-accent hover:bg-accent2 text-white font-semibold py-2.5 rounded-xl text-sm transition-colors"
         >
-          📁 Choose from your PC
+          {t('bankChoosePC')}
         </button>
       </div>
     </div>
@@ -216,6 +216,7 @@ function AddMediaModal({ onFiles, onElectronPick, onClose }: {
 }
 
 export function Bank({ user }: BankProps) {
+  const t = useT()
   const { currentOrg, role, perms } = useOrg()
   const [items, setItems]         = useState<ContentItem[]>([])
   const [loading, setLoading]     = useState(true)
@@ -262,7 +263,7 @@ export function Bank({ user }: BankProps) {
 
   async function deleteSelected() {
     if (!selectedIds.size) return
-    if (!confirm(`Delete ${selectedIds.size} video(s)? This action is irreversible.`)) return
+    if (!confirm(`${t('bankDeleteSelected')} ${selectedIds.size} video(s)? ${t('phoneDeleteMsg')}`)) return
     const ids = [...selectedIds]
     const toDelete = items.filter(i => ids.includes(i.id))
     let q = supabase.from('content_bank').delete().in('id', ids)
@@ -622,8 +623,8 @@ export function Bank({ user }: BankProps) {
             <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#8B5CF6" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
             </svg>
-            <p className="text-[15px] font-bold text-white">Drop your files here</p>
-            <p className="text-[12px]" style={{ color: '#A1A1AA' }}>Videos, photos, GIFs, audio</p>
+            <p className="text-[15px] font-bold text-white">{t('bankDropFiles')}</p>
+            <p className="text-[12px]" style={{ color: '#A1A1AA' }}>{t('bankMediaTypes')}</p>
           </div>
         </div>
       )}
@@ -636,9 +637,9 @@ export function Bank({ user }: BankProps) {
         {/* Title + badge */}
         <div className="flex items-center gap-3">
           <div>
-            <h1 className="text-[22px] font-black text-white leading-none tracking-tight">Video Bank</h1>
+            <h1 className="text-[22px] font-black text-white leading-none tracking-tight">{t('bankTitle')}</h1>
             <p className="text-[12px] mt-0.5" style={{ color: '#52525B' }}>
-              Media library · drag-drop or import
+              {t('bankSubtitle')}
             </p>
           </div>
           <span
@@ -657,7 +658,7 @@ export function Bank({ user }: BankProps) {
             </svg>
             <input
               type="text"
-              placeholder="Rechercher…"
+              placeholder={t('bankSearchPlaceholder')}
               value={search}
               onChange={e => setSearch(e.target.value)}
               className="sf-search w-full pl-9 pr-4 py-2 text-[13px]"
@@ -676,7 +677,7 @@ export function Bank({ user }: BankProps) {
               onClick={() => setViewMode('grid')}
               className="px-2.5 py-1.5 transition-colors"
               style={viewMode === 'grid' ? { background: 'rgba(139,92,246,0.25)', color: '#A78BFA' } : { color: '#52525B' }}
-              title="Grille"
+              title={t('bankGridView')}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
                 <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
@@ -686,7 +687,7 @@ export function Bank({ user }: BankProps) {
               onClick={() => setViewMode('list')}
               className="px-2.5 py-1.5 transition-colors"
               style={viewMode === 'list' ? { background: 'rgba(139,92,246,0.25)', color: '#A78BFA' } : { color: '#52525B' }}
-              title="Liste"
+              title={t('bankListView')}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                 <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/>
@@ -699,7 +700,7 @@ export function Bank({ user }: BankProps) {
             onClick={loadItems}
             className="px-3 py-2 rounded-lg text-[12px] font-medium transition-colors"
             style={{ background: '#0E0E16', border: '1px solid rgba(139,92,246,0.18)', color: '#A1A1AA' }}
-            title="Refresh"
+            title={t('refresh')}
           >
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
@@ -711,7 +712,7 @@ export function Bank({ user }: BankProps) {
             className="btn-sf-primary px-4 py-2 rounded-lg text-[13px] font-semibold flex items-center gap-1.5"
           >
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            Add
+            {t('add')}
           </button>
         </div>
       </header>
@@ -726,7 +727,7 @@ export function Bank({ user }: BankProps) {
           onClick={() => setSelectedIds(prev => prev.size === visible.length ? new Set() : new Set(visible.map(i => i.id)))}
           className="flex items-center gap-1.5 text-[12px] font-medium transition-colors px-2 py-1 rounded"
           style={{ color: selectedIds.size === visible.length && visible.length > 0 ? '#A78BFA' : '#52525B' }}
-          title="Select all / deselect all"
+          title={t('bankSelectAll')}
         >
           <div
             className="w-4 h-4 rounded flex items-center justify-center flex-shrink-0 transition-all"
@@ -736,7 +737,7 @@ export function Bank({ user }: BankProps) {
           >
             {selectedIds.size > 0 && <svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"><polyline points="2,6 5,9 10,3"/></svg>}
           </div>
-          <span className="hidden sm:inline">Tout</span>
+          <span className="hidden sm:inline">{t('bankSelectAllLabel')}</span>
         </button>
 
         <div style={{ width: '1px', height: '16px', background: 'rgba(139,92,246,0.15)' }} />
@@ -744,20 +745,20 @@ export function Bank({ user }: BankProps) {
         {/* Type pills */}
         <div className="flex gap-1">
           {([
-            { k: 'all',   l: 'Tous'  },
-            { k: 'video', l: 'Video' },
-            { k: 'photo', l: 'Photo' },
-            { k: 'gif',   l: 'GIF'   },
-            { k: 'audio', l: 'Audio' },
-          ] as const).map(t => (
+            { k: 'all',   l: t('bankTypeAll')   },
+            { k: 'video', l: t('bankTypeVideo')  },
+            { k: 'photo', l: t('bankTypePhoto')  },
+            { k: 'gif',   l: t('bankTypeGif')    },
+            { k: 'audio', l: t('bankTypeAudio')  },
+          ] as const).map(tf => (
             <button
-              key={t.k}
-              onClick={() => setTypeFilter(t.k)}
+              key={tf.k}
+              onClick={() => setTypeFilter(tf.k)}
               className="px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all"
-              style={typeFilter === t.k
+              style={typeFilter === tf.k
                 ? { background: 'rgba(139,92,246,0.2)', color: '#A78BFA', border: '1px solid rgba(139,92,246,0.4)' }
                 : { background: 'transparent', color: '#52525B', border: '1px solid transparent' }}
-            >{t.l}</button>
+            >{tf.l}</button>
           ))}
         </div>
 
@@ -768,7 +769,7 @@ export function Bank({ user }: BankProps) {
         </span>
         {adding && (
           <span className="flex items-center gap-1.5 text-[12px]" style={{ color: '#A78BFA' }}>
-            <span className="animate-spin inline-block">↻</span> Upload…
+            <span className="animate-spin inline-block">↻</span> {t('bankUploading')}
           </span>
         )}
       </div>
@@ -786,12 +787,12 @@ export function Bank({ user }: BankProps) {
             className="px-4 py-3 flex items-center justify-between flex-shrink-0"
             style={{ borderBottom: '1px solid rgba(139,92,246,0.08)' }}
           >
-            <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#52525B' }}>Folders</span>
+            <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#52525B' }}>{t('bankFolders')}</span>
             <button
               onClick={() => setShowNewFolder(v => !v)}
               className="w-5 h-5 rounded flex items-center justify-center transition-colors"
               style={{ color: '#52525B' }}
-              title="New folder"
+              title={t('bankNewFolderTitle')}
               onMouseEnter={e => (e.currentTarget.style.color = '#A78BFA')}
               onMouseLeave={e => (e.currentTarget.style.color = '#52525B')}
             >
@@ -807,7 +808,7 @@ export function Bank({ user }: BankProps) {
             >
               <input
                 autoFocus
-                placeholder="Folder name…"
+                placeholder={t('bankFolderNamePlaceholder')}
                 className="sf-search flex-1 px-2.5 py-1.5 text-[12px]"
                 value={newFolderName}
                 onChange={e => setNewFolderName(e.target.value)}
@@ -838,7 +839,7 @@ export function Bank({ user }: BankProps) {
                 <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
               </svg>
               <span className="text-[13px] font-medium flex-1" style={{ color: selectedFolder === null ? '#FFFFFF' : '#A1A1AA' }}>
-                All
+                {t('bankAllItems')}
               </span>
               <span
                 className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0"
@@ -876,14 +877,14 @@ export function Bank({ user }: BankProps) {
                 style={{ background: '#8B5CF6', boxShadow: '0 0 8px rgba(139,92,246,0.8)' }}
               />
               <span className="text-[13px] font-bold" style={{ color: '#A78BFA' }}>
-                {selectedIds.size} selected
+                {selectedIds.size} {t('bankSelected')}
               </span>
               <button
                 onClick={() => setSelectedIds(prev => prev.size === visible.length ? new Set() : new Set(visible.map(i => i.id)))}
                 className="text-[12px] px-2.5 py-1 rounded-md font-medium transition-colors"
                 style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: '#A1A1AA' }}
               >
-                {selectedIds.size === visible.length ? 'Deselect all' : 'Select all'}
+                {selectedIds.size === visible.length ? t('bankDeselectAll') : t('selectAll')}
               </button>
               <button
                 onClick={() => setShowBulkMove(true)}
@@ -893,7 +894,7 @@ export function Bank({ user }: BankProps) {
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
                 </svg>
-                Move ({selectedIds.size})
+                {t('bankMoveSelected')} ({selectedIds.size})
               </button>
               <button
                 onClick={deleteSelected}
@@ -903,7 +904,7 @@ export function Bank({ user }: BankProps) {
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/>
                 </svg>
-                Delete ({selectedIds.size})
+                {t('bankDeleteSelected')} ({selectedIds.size})
               </button>
               <div className="flex-1" />
               <button
@@ -912,7 +913,7 @@ export function Bank({ user }: BankProps) {
                 style={{ color: '#52525B' }}
                 onMouseEnter={e => (e.currentTarget.style.color = '#A1A1AA')}
                 onMouseLeave={e => (e.currentTarget.style.color = '#52525B')}
-              >✕ Cancel</button>
+              >✕ {t('bankCancelSelection')}</button>
             </div>
           )}
 
@@ -936,7 +937,7 @@ export function Bank({ user }: BankProps) {
                 className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold flex-shrink-0 transition-colors"
                 style={{ background: 'rgba(251,191,36,0.12)', color: '#FBBF24', border: '1px solid rgba(251,191,36,0.28)' }}
               >
-                {sqlCopied ? '✓ Copied' : 'Copy'}
+                {sqlCopied ? t('bankSqlCopied') : t('copy')}
               </button>
             </div>
           )}
@@ -978,15 +979,15 @@ export function Bank({ user }: BankProps) {
                     <polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
                   </svg>
                 </div>
-                <h2 className="text-[16px] font-bold text-white mb-2">Empty bank</h2>
+                <h2 className="text-[16px] font-bold text-white mb-2">{t('bankEmptyTitle')}</h2>
                 <p className="text-[13px] max-w-xs" style={{ color: '#A1A1AA' }}>
-                  Drag and drop your videos here or click
+                  {t('bankEmptyDesc')}
                 </p>
                 <button
                   onClick={() => setShowAddModal(true)}
                   className="btn-sf-primary mt-5 px-5 py-2.5 rounded-xl text-[13px] font-semibold"
                 >
-                  + Add media
+                  {t('bankAddMediaBtn')}
                 </button>
               </div>
 
@@ -995,8 +996,8 @@ export function Bank({ user }: BankProps) {
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#52525B" strokeWidth="1.5" strokeLinecap="round" className="mb-3">
                   <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
                 </svg>
-                <p className="text-[14px] font-medium text-white">No results</p>
-                <p className="text-[12px] mt-1" style={{ color: '#52525B' }}>Try other keywords or filters</p>
+                <p className="text-[14px] font-medium text-white">{t('bankNoResults')}</p>
+                <p className="text-[12px] mt-1" style={{ color: '#52525B' }}>{t('bankNoResultsHint')}</p>
               </div>
 
             ) : viewMode === 'grid' ? (
@@ -1024,9 +1025,9 @@ export function Bank({ user }: BankProps) {
                   style={{ gridTemplateColumns: '40px 1fr 80px 100px 32px', color: '#52525B', borderBottom: '1px solid rgba(139,92,246,0.1)' }}
                 >
                   <span />
-                  <span>Nom</span>
-                  <span>Duration</span>
-                  <span>Tags</span>
+                  <span>{t('bankColName')}</span>
+                  <span>{t('bankColDuration')}</span>
+                  <span>{t('bankColTags')}</span>
                   <span />
                 </div>
                 {visible.map((item, idx) => (
@@ -1107,22 +1108,22 @@ export function Bank({ user }: BankProps) {
           {[
             {
               icon: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>,
-              label: 'Rename',
+              label: t('bankCtxRename'),
               action: () => { setRenameItem(ctxMenu.item); setCtxMenu(null) }
             },
             {
               icon: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>,
-              label: 'Move to…',
+              label: t('bankCtxMoveTo'),
               action: () => { setMoveItem(ctxMenu.item); setCtxMenu(null) }
             },
             {
               icon: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>,
-              label: 'Edit tags',
+              label: t('bankCtxEditTags'),
               action: () => { setTagsItem(ctxMenu.item); setCtxMenu(null) }
             },
             ...(ctxMenu.item.file_url && !ctxMenu.item.storage_path ? [{
               icon: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>,
-              label: 'Uploader vers le cloud',
+              label: t('bankCtxUpload'),
               action: () => { reuploadItem(ctxMenu.item); setCtxMenu(null) }
             }] : []),
           ].map(({ icon, label, action }) => (
@@ -1149,7 +1150,7 @@ export function Bank({ user }: BankProps) {
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/>
             </svg>
-            Delete
+            {t('bankCtxDelete')}
           </button>
         </div>
       )}
@@ -1170,10 +1171,10 @@ export function Bank({ user }: BankProps) {
             {folderModal.mode === 'delete' ? (<>
               <div>
                 <p className="font-semibold text-white text-[14px]">
-                  Delete folder <span style={{ color: '#A78BFA' }}>"{folderModal.name}"</span>
+                  {t('bankDeleteFolderTitle')} <span style={{ color: '#A78BFA' }}>"{folderModal.name}"</span>
                 </p>
                 <p className="text-[12px] mt-1" style={{ color: '#A1A1AA' }}>
-                  {items.filter(i => (i as unknown as {folder?:string}).folder === folderModal.name).length} video(s) in this folder.
+                  {items.filter(i => (i as unknown as {folder?:string}).folder === folderModal.name).length} {t('bankVideosInFolder')}
                 </p>
               </div>
               <div className="flex flex-col gap-2">
@@ -1184,7 +1185,7 @@ export function Bank({ user }: BankProps) {
                   onMouseEnter={e => (e.currentTarget.style.background = 'rgba(139,92,246,0.25)')}
                   onMouseLeave={e => (e.currentTarget.style.background = 'rgba(139,92,246,0.15)')}
                 >
-                  Delete folder, keep videos
+                  {t('bankDeleteFolderKeep')}
                 </button>
                 <button
                   onClick={() => deleteFolder(folderModal.name, true)}
@@ -1193,17 +1194,17 @@ export function Bank({ user }: BankProps) {
                   onMouseEnter={e => (e.currentTarget.style.background = 'rgba(239,68,68,0.18)')}
                   onMouseLeave={e => (e.currentTarget.style.background = 'rgba(239,68,68,0.1)')}
                 >
-                  Delete folder AND its videos
+                  {t('bankDeleteFolderAll')}
                 </button>
                 <button
                   onClick={() => setFolderModal(null)}
                   className="w-full py-2.5 rounded-xl text-[13px] font-medium transition-colors"
                   style={{ background: 'rgba(255,255,255,0.04)', color: '#A1A1AA', border: '1px solid rgba(255,255,255,0.07)' }}
-                >Cancel</button>
+                >{t('cancel')}</button>
               </div>
             </>) : (<>
               <p className="font-semibold text-white text-[14px]">
-                Move videos from <span style={{ color: '#A78BFA' }}>"{folderModal.name}"</span> to…
+                {t('bankMoveVideosFrom')} <span style={{ color: '#A78BFA' }}>"{folderModal.name}"</span> {t('bankMoveVideosTo')}
               </p>
               <div className="flex flex-col gap-1 max-h-56 overflow-auto">
                 <button
@@ -1213,7 +1214,7 @@ export function Bank({ user }: BankProps) {
                   onMouseEnter={e => { e.currentTarget.style.background = 'rgba(139,92,246,0.08)'; e.currentTarget.style.color = '#fff' }}
                   onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#A1A1AA' }}
                 >
-                  Root (no folder)
+                  {t('bankRootNoFolder')}
                 </button>
                 {folders.filter(f => f !== folderModal.name).map(f => (
                   <button
@@ -1232,7 +1233,7 @@ export function Bank({ user }: BankProps) {
                 onClick={() => setFolderModal(null)}
                 className="w-full py-2.5 rounded-xl text-[13px] font-medium transition-colors"
                 style={{ background: 'rgba(255,255,255,0.04)', color: '#A1A1AA', border: '1px solid rgba(255,255,255,0.07)' }}
-              >Cancel</button>
+              >{t('cancel')}</button>
             </>)}
           </div>
         </div>
@@ -1247,7 +1248,7 @@ export function Bank({ user }: BankProps) {
             onClick={e => e.stopPropagation()}
           >
             <p className="font-semibold text-white text-[14px]">
-              Move {selectedIds.size} video{selectedIds.size > 1 ? 's' : ''} to…
+              {t('bankMoveSelected')} {selectedIds.size} video{selectedIds.size > 1 ? 's' : ''} {t('bankVideosBulkTo')}
             </p>
             <div className="flex flex-col gap-1 max-h-64 overflow-auto">
               <button
@@ -1257,7 +1258,7 @@ export function Bank({ user }: BankProps) {
                 onMouseEnter={e => { e.currentTarget.style.background = 'rgba(139,92,246,0.08)'; e.currentTarget.style.color = '#fff' }}
                 onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#A1A1AA' }}
               >
-                Root (no folder)
+                {t('bankRootNoFolder')}
               </button>
               {folders.map(f => (
                 <button
@@ -1276,7 +1277,7 @@ export function Bank({ user }: BankProps) {
               onClick={() => setShowBulkMove(false)}
               className="w-full py-2.5 rounded-xl text-[13px] font-medium"
               style={{ background: 'rgba(255,255,255,0.04)', color: '#A1A1AA', border: '1px solid rgba(255,255,255,0.07)' }}
-            >Cancel</button>
+            >{t('cancel')}</button>
           </div>
         </div>
       )}
@@ -1315,6 +1316,7 @@ function FolderRow({ name, count, active, onClick, onRename, onDelete, onMerge, 
   onMerge: () => void
   onDropItem: (itemId: string) => void
 }) {
+  const t = useT()
   const [editing, setEditing] = useState(false)
   const [val, setVal]         = useState(name)
   const [showActions, setShowActions] = useState(false)
@@ -1383,7 +1385,7 @@ function FolderRow({ name, count, active, onClick, onRename, onDelete, onMerge, 
             style={{ color: '#52525B' }}
             onMouseEnter={e => (e.currentTarget.style.color = '#A78BFA')}
             onMouseLeave={e => (e.currentTarget.style.color = '#52525B')}
-            title="Renommer"
+            title={t('bankFolderRename')}
           >
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
           </button>
@@ -1393,7 +1395,7 @@ function FolderRow({ name, count, active, onClick, onRename, onDelete, onMerge, 
             style={{ color: '#52525B' }}
             onMouseEnter={e => (e.currentTarget.style.color = '#A78BFA')}
             onMouseLeave={e => (e.currentTarget.style.color = '#52525B')}
-            title="Move to…"
+            title={t('bankFolderMergeTo')}
           >
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
           </button>
@@ -1403,7 +1405,7 @@ function FolderRow({ name, count, active, onClick, onRename, onDelete, onMerge, 
             style={{ color: '#52525B' }}
             onMouseEnter={e => (e.currentTarget.style.color = '#F87171')}
             onMouseLeave={e => (e.currentTarget.style.color = '#52525B')}
-            title="Delete"
+            title={t('bankFolderDelete')}
           >
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg>
           </button>
@@ -1438,6 +1440,7 @@ export function VideoThumbnail({ filePath, thumbnailPath, storagePath }: {
   thumbnailPath?: string | null
   storagePath?:   string | null
 }) {
+  const t = useT()
   const videoRef = useRef<HTMLVideoElement>(null)
   const [failed,    setFailed]    = useState(false)
   const [loading,   setLoading]   = useState(true)
@@ -1477,7 +1480,7 @@ export function VideoThumbnail({ filePath, thumbnailPath, storagePath }: {
   if (failed) return (
     <div className="w-full h-full flex flex-col items-center justify-center bg-surface2 gap-1">
       <span className="text-2xl">⚠️</span>
-      <span className="text-[10px] text-text2/50">Indisponible</span>
+      <span className="text-[10px] text-text2/50">{t('bankVideoUnableLoad')}</span>
     </div>
   )
 
@@ -1541,6 +1544,7 @@ export function VideoThumbnail({ filePath, thumbnailPath, storagePath }: {
 
 // ── Video player modal ────────────────────────────────────────────────────────
 function VideoPlayerModal({ item, onClose }: { item: ContentItem; onClose: () => void }) {
+  const t = useT()
   const videoRef = useRef<HTMLVideoElement>(null)
   const [cloudUrl, setCloudUrl] = useState<string | null>(null)
   const [urlError, setUrlError] = useState(false)
@@ -1619,7 +1623,7 @@ function VideoPlayerModal({ item, onClose }: { item: ContentItem; onClose: () =>
         {urlError && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-white/60">
             <span className="text-3xl">⚠️</span>
-            <span className="text-sm">Unable to load the video</span>
+            <span className="text-sm">{t('bankVideoUnableLoad')}</span>
           </div>
         )}
 
@@ -1649,6 +1653,7 @@ function VideoCard({ item, onContextMenu, onPlay, selectionMode, isSelected, onT
   isSelected?: boolean
   onToggleSelect?: () => void
 }) {
+  const t = useT()
   return (
     <div
       draggable={!selectionMode}
@@ -1688,7 +1693,7 @@ function VideoCard({ item, onContextMenu, onPlay, selectionMode, isSelected, onT
             : { background: 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.3)', opacity: 0 }
           }
           onClick={e => { e.stopPropagation(); onToggleSelect?.() }}
-          title={isSelected ? 'Deselect' : 'Select'}
+          title={isSelected ? t('bankCardDeselect') : t('bankCardSelect')}
         >
           {isSelected && (
             <svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round">
@@ -1736,7 +1741,7 @@ function VideoCard({ item, onContextMenu, onPlay, selectionMode, isSelected, onT
             className="absolute top-2 right-2 w-6 h-6 rounded-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10"
             style={{ background: 'rgba(0,0,0,0.65)', color: '#fff', backdropFilter: 'blur(4px)' }}
             onClick={e => { e.stopPropagation(); onContextMenu(e, item) }}
-            title="Options"
+            title={t('bankCardOptions')}
             onMouseEnter={e => (e.currentTarget.style.background = 'rgba(139,92,246,0.6)')}
             onMouseLeave={e => (e.currentTarget.style.background = 'rgba(0,0,0,0.65)')}
           >
@@ -1793,6 +1798,7 @@ export interface BankPickerProps {
 }
 
 export function BankPicker({ user, mode, onSelect, onClose, resolveMode = 'full' }: BankPickerProps) {
+  const t = useT()
   const { currentOrg, role, perms } = useOrg()
   const [items, setItems]           = useState<ContentItem[]>([])
   const [loading, setLoading]       = useState(true)
@@ -1881,15 +1887,15 @@ export function BankPicker({ user, mode, onSelect, onClose, resolveMode = 'full'
         <div className="px-5 py-4 border-b border-border flex items-center gap-4 flex-shrink-0">
           <div className="flex items-center gap-2.5">
             <span className="text-xl">🗂</span>
-            <h2 className="text-sm font-semibold text-text">Video Bank</h2>
+            <h2 className="text-sm font-semibold text-text">{t('bankTitle')}</h2>
             <span className="text-xs text-text2">
-              {mode === 'multi' ? 'Multiple selection' : 'Single selection'}
+              {mode === 'multi' ? t('bankPickerMultiple') : t('bankPickerSingle')}
             </span>
           </div>
           <div className="flex-1" />
           <input
             type="text"
-            placeholder="🔍 Search…"
+            placeholder={t('bankPickerSearch')}
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="w-44 bg-bg border border-border rounded-lg px-3 py-1.5 text-xs text-text placeholder:text-text2 focus:border-accent focus:outline-none"
@@ -1907,21 +1913,21 @@ export function BankPicker({ user, mode, onSelect, onClose, resolveMode = 'full'
               }}
               className="px-2.5 py-1.5 rounded-lg text-[11px] font-medium text-text2 hover:text-text transition-colors"
               style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}
-              title={selectedFolder ? `Select all in folder "${selectedFolder}"` : 'Select all'}
+              title={selectedFolder ? `${t('selectAll')} "${selectedFolder}"` : t('selectAll')}
             >
-              {visible.every(v => selected.has(v.id)) ? '☐ Deselect' : '☑ Select all'}
+              {visible.every(v => selected.has(v.id)) ? t('bankPickerDeselect') : t('bankPickerSelectAll')}
             </button>
           )}
           {mode === 'multi' && selected.size > 0 && (
             <Button size="sm" onClick={confirm} disabled={!!resolving}>
-              {resolving ? 'Downloading…' : `Confirm (${selected.size})`}
+              {resolving ? t('bankPickerDownloading') : `${t('confirm')} (${selected.size})`}
             </Button>
           )}
           <button onClick={onClose} className="text-text2 hover:text-text transition-colors text-xl leading-none">✕</button>
         </div>
         {resolving && (
           <div className="px-5 py-2 bg-accent/10 border-b border-accent/30 text-accent text-xs flex items-center gap-2">
-            <span className="animate-spin">↻</span><span>📥 Downloading from cloud: {resolving}</span>
+            <span className="animate-spin">↻</span><span>📥 {t('bankPickerDownloadingCloud')}: {resolving}</span>
           </div>
         )}
 
@@ -1935,7 +1941,7 @@ export function BankPicker({ user, mode, onSelect, onClose, resolveMode = 'full'
               }`}
             >
               <span className="text-sm">🎬</span>
-              <span className="text-xs text-text flex-1">All</span>
+              <span className="text-xs text-text flex-1">{t('bankAllItems')}</span>
               <span className="text-[10px] text-text2">{items.length}</span>
             </button>
             {folders.map(f => (
@@ -1962,7 +1968,7 @@ export function BankPicker({ user, mode, onSelect, onClose, resolveMode = 'full'
             ) : visible.length === 0 ? (
               <div className="text-center py-16 text-text2 space-y-2">
                 <p className="text-3xl">🎬</p>
-                <p className="text-sm">No video</p>
+                <p className="text-sm">{t('bankPickerNoVideo')}</p>
               </div>
             ) : (
               <div className="grid grid-cols-3 xl:grid-cols-4 gap-3">

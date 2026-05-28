@@ -23,6 +23,7 @@ const INTERVALS = [
 
 // ── GéeLark status dot ──────────────────────────────────────────────────────
 function StatusDot({ status }: { status: string }) {
+  const t = useT()
   const online = status === 'online'
   return (
     <span style={{
@@ -37,26 +38,27 @@ function StatusDot({ status }: { status: string }) {
         ? <span className="sf-ping-dot" style={{ background: '#22C55E' }} />
         : <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'rgba(148,163,184,0.25)', display: 'inline-block' }} />
       }
-      {online ? 'Online' : 'Offline'}
+      {online ? t('online') : t('offline')}
     </span>
   )
 }
 
 // ── IG Status badge ─────────────────────────────────────────────────────────
 function IgStatusBadge({ phone }: { phone: Phone }) {
+  const t = useT()
   if (!phone.ig_username) return <span style={{ fontSize: 13, color: 'rgba(148,163,184,0.35)' }}>—</span>
 
   if (phone.ig_status === 'active')
-    return <span className="sf-badge sf-badge-ok">IG OK</span>
+    return <span className="sf-badge sf-badge-ok">{t('phoneOk')}</span>
   if (phone.ig_status === 'expired')
-    return <span className="sf-badge sf-badge-danger">Expired</span>
+    return <span className="sf-badge sf-badge-danger">{t('phoneExpired')}</span>
   if (phone.ig_status === 'error')
-    return <span className="sf-badge sf-badge-danger">Error</span>
+    return <span className="sf-badge sf-badge-danger">{t('phoneError')}</span>
   if (phone.ig_status === 'rate_limited')
-    return <span className="sf-badge sf-badge-warn">Limited</span>
+    return <span className="sf-badge sf-badge-warn">{t('phoneRateLimited')}</span>
   if (phone.ig_sessionid)
-    return <span className="sf-badge sf-badge-accent">Session</span>
-  return <span className="sf-badge sf-badge-muted">Public</span>
+    return <span className="sf-badge sf-badge-accent">{t('phoneSession')}</span>
+  return <span className="sf-badge sf-badge-muted">{t('phonePublic')}</span>
 }
 
 // ── Countdown display ────────────────────────────────────────────────────────
@@ -86,6 +88,7 @@ function SessionDialog({
   onClose: () => void
   onSaved: (id: string, sessionid: string, detectedUsername?: string) => void
 }) {
+  const t = useT()
   const [value, setValue]               = useState(phone.ig_sessionid ?? '')
   const [testing, setTesting]           = useState(false)
   const [testResult, setTestResult]     = useState<'idle' | 'ok' | 'fail'>('idle')
@@ -213,7 +216,7 @@ function SessionDialog({
         {/* Header */}
         <div className="sf-modal-header">
           <div>
-            <h2 className="sf-modal-title">Session ID Instagram</h2>
+            <h2 className="sf-modal-title">{t('phoneSessionTitle')}</h2>
             {phone.ig_username && (
               <p style={{ fontSize: 12, color: '#8B5CF6', margin: '4px 0 0' }}>@{phone.ig_username}</p>
             )}
@@ -234,17 +237,17 @@ function SessionDialog({
             }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div>
-                  <p style={{ fontSize: 12, fontWeight: 600, color: '#F2F0FF', margin: 0 }}>Automatic extraction</p>
-                  <p style={{ fontSize: 10, color: 'rgba(148,163,184,0.52)', margin: '2px 0 0' }}>Retrieves the sessionid directly from the GéeLark phone (max 3 min)</p>
+                  <p style={{ fontSize: 12, fontWeight: 600, color: '#F2F0FF', margin: 0 }}>{t('phoneAutoExtract')}</p>
+                  <p style={{ fontSize: 10, color: 'rgba(148,163,184,0.52)', margin: '2px 0 0' }}>{t('phoneAutoExtractDesc')}</p>
                 </div>
                 <div style={{ display: 'flex', gap: 6 }}>
                   {extracting && (
                     <button className="sf-btn sf-btn-secondary sf-btn-sm" onClick={cancelExtract}>
-                      Cancel
+                      {t('phoneCancelExtract')}
                     </button>
                   )}
                   <Button size="sm" onClick={extractFromPhone} loading={extracting} disabled={extracting}>
-                    {extracting ? 'Extracting…' : 'Extract'}
+                    {extracting ? t('phoneExtractingBtn') : t('phoneExtractBtn')}
                   </Button>
                 </div>
               </div>
@@ -271,27 +274,27 @@ function SessionDialog({
             background: '#111120', border: '1px solid rgba(255,255,255,0.09)',
             borderRadius: 11, padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 3,
           }}>
-            <p style={{ fontSize: 11, fontWeight: 600, color: '#F2F0FF', margin: 0 }}>Or manually:</p>
+            <p style={{ fontSize: 11, fontWeight: 600, color: '#F2F0FF', margin: 0 }}>{t('phoneManualInstructions')}</p>
             {[
-              <>1. Open <span style={{ color: '#8B5CF6' }}>instagram.com</span> in Chrome</>,
-              <>2. Press <span style={{ color: '#8B5CF6' }}>F12</span> (DevTools)</>,
-              <>3. Go to <span style={{ color: '#8B5CF6' }}>Application → Cookies → instagram.com</span></>,
-              <>4. Find the <span style={{ color: '#8B5CF6', fontFamily: 'monospace' }}>sessionid</span> cookie and copy its value</>,
-            ].map((t, i) => (
-              <p key={i} style={{ fontSize: 11, color: 'rgba(148,163,184,0.52)', margin: 0 }}>{t}</p>
+              <>1. Open <span style={{ color: '#8B5CF6' }}>{t('phoneManualStep1Chrome')}</span> in Chrome</>,
+              <>2. Press <span style={{ color: '#8B5CF6' }}>{t('phoneManualStep2DevTools')}</span> (DevTools)</>,
+              <>3. Go to <span style={{ color: '#8B5CF6' }}>{t('phoneManualStep3Cookies')}</span></>,
+              <>4. Find the <span style={{ color: '#8B5CF6', fontFamily: 'monospace' }}>{t('phoneManualStep4Cookie')}</span> cookie and copy its value</>,
+            ].map((step, i) => (
+              <p key={i} style={{ fontSize: 11, color: 'rgba(148,163,184,0.52)', margin: 0 }}>{step}</p>
             ))}
           </div>
 
           {/* Session input */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <label style={{ fontSize: 11, fontWeight: 500, color: 'rgba(196,181,253,0.72)' }}>Session ID</label>
+            <label style={{ fontSize: 11, fontWeight: 500, color: 'rgba(196,181,253,0.72)' }}>{t('phoneSessionLabel')}</label>
             <div style={{ position: 'relative' }}>
               <input
                 ref={inputRef}
                 type="password"
                 value={value}
                 onChange={e => handleChange(e.target.value)}
-                placeholder="Paste your sessionid here…"
+                placeholder={t('phoneSessionPlaceholder')}
                 className="sf-input"
                 style={{
                   width: '100%', boxSizing: 'border-box',
@@ -321,15 +324,15 @@ function SessionDialog({
             </div>
             {testResult === 'ok' && detectedUser && (
               <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.52)', margin: 0 }}>
-                Account: <span style={{ color: '#8B5CF6', fontWeight: 600 }}>@{detectedUser}</span>
+                {t('phoneSessionTestOkUser')} <span style={{ color: '#8B5CF6', fontWeight: 600 }}>@{detectedUser}</span>
                 {phone.ig_username && phone.ig_username !== detectedUser && (
-                  <span style={{ color: '#F59E0B', marginLeft: 4 }}>· different from @{phone.ig_username} — will be updated</span>
+                  <span style={{ color: '#F59E0B', marginLeft: 4 }}>{t('phoneSessionDifferentUser')} @{phone.ig_username} {t('phoneSessionWillUpdate')}</span>
                 )}
               </p>
             )}
-            {testResult === 'fail' && <p style={{ fontSize: 11, color: '#EF4444', margin: 0 }}>Invalid or expired session — make sure you copied the correct value.</p>}
+            {testResult === 'fail' && <p style={{ fontSize: 11, color: '#EF4444', margin: 0 }}>{t('phoneSessionInvalid')}</p>}
             {testResult === 'idle' && value.trim().length > 10 && !testing && (
-              <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.52)', margin: 0 }}>Automatic test in progress…</p>
+              <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.52)', margin: 0 }}>{t('phoneSessionAutoTest')}</p>
             )}
           </div>
         </div>
@@ -337,10 +340,10 @@ function SessionDialog({
         {/* Footer */}
         <div className="sf-modal-footer">
           <button onClick={onClose} disabled={busy} className="sf-btn sf-btn-ghost">
-            Cancel
+            {t('cancel')}
           </button>
           <Button size="sm" onClick={save} loading={busy} disabled={!value.trim()}>
-            {testing ? 'Verifying…' : saving ? 'Saving…' : testResult === 'ok' ? 'Save' : 'Test & Save'}
+            {testing ? t('phoneSessionVerifying') : saving ? t('phoneSessionSaving') : testResult === 'ok' ? t('phoneSessionSave') : t('phoneSessionTestAndSave')}
           </Button>
         </div>
       </div>
@@ -355,6 +358,7 @@ function ContextMenu({
   phone: Phone; x: number; y: number; onClose: () => void
   onSession: () => void; onUnlink: () => void; onDelete: () => void; canDelete: boolean
 }) {
+  const t = useT()
   const menuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -404,18 +408,18 @@ function ContextMenu({
       </div>
       {item(
         <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x="1.5" y="5.5" width="10" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.4"/><path d="M4.5 5.5V4a2 2 0 0 1 4 0v1.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>,
-        'Session ID', onSession
+        t('phoneCtxSessionId'), onSession
       )}
       {phone.ig_username && item(
         <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 6.5C2 4 4 2 6.5 2s4.5 2 4.5 4.5S9 11 6.5 11" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/><path d="M2 11l4-4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>,
-        'Unlink Instagram', onUnlink
+        t('phoneCtxUnlink'), onUnlink
       )}
       {canDelete && (
         <>
           <div style={{ borderTop: '1px solid rgba(255,255,255,0.055)', margin: '4px 0' }} />
           {item(
             <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 3.5h9M5 3.5V2h3v1.5M4.5 3.5l.5 7h3l.5-7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>,
-            'Delete', onDelete, true
+            t('phoneCtxDelete'), onDelete, true
           )}
         </>
       )}
@@ -425,6 +429,7 @@ function ContextMenu({
 
 // ── Inline Instagram username edit ─────────────────────────────────────────────
 function IgCell({ phone, onSave }: { phone: Phone; onSave: (id: string, u: string) => Promise<void> }) {
+  const t = useT()
   const [editing, setEditing] = useState(false)
   const [value, setValue]     = useState(phone.ig_username ?? '')
   const [saving, setSaving]   = useState(false)
@@ -460,12 +465,12 @@ function IgCell({ phone, onSave }: { phone: Phone; onSave: (id: string, u: strin
     <button
       onClick={() => setEditing(true)}
       style={{ fontSize: 13, textAlign: 'left', display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', minWidth: 0, padding: 0 }}
-      title="Click to edit"
+      title={t('phoneClickToEdit')}
     >
       {phone.ig_username ? (
         <span style={{ color: '#8B5CF6', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>@{phone.ig_username}</span>
       ) : (
-        <span style={{ color: 'rgba(148,163,184,0.35)', fontStyle: 'italic' }}>+ ajouter</span>
+        <span style={{ color: 'rgba(148,163,184,0.35)', fontStyle: 'italic' }}>{t('phoneIgCellAdd')}</span>
       )}
       <svg width="11" height="11" viewBox="0 0 11 11" fill="none" style={{ opacity: 0, flexShrink: 0, transition: 'opacity 0.15s' }} className="edit-pencil">
         <path d="M7.5 1.5l2 2-6 6H1.5v-2l6-6z" stroke="rgba(148,163,184,0.52)" strokeWidth="1.2" strokeLinejoin="round"/>
@@ -476,6 +481,7 @@ function IgCell({ phone, onSave }: { phone: Phone; onSave: (id: string, u: strin
 
 // ── Inline note (remark) edit ─────────────────────────────────────────────────
 function NoteCell({ phone, onSave }: { phone: Phone; onSave: (id: string, v: string) => Promise<void> }) {
+  const t = useT()
   const [editing, setEditing] = useState(false)
   const [value, setValue]     = useState(phone.remark ?? '')
   const [saving, setSaving]   = useState(false)
@@ -501,7 +507,7 @@ function NoteCell({ phone, onSave }: { phone: Phone; onSave: (id: string, v: str
       onKeyDown={onKey} onBlur={save} disabled={saving}
       className="sf-input"
       style={{ width: '100%', padding: '2px 6px', fontSize: 13, borderColor: '#8B5CF6' }}
-      placeholder="Note…"
+      placeholder={t('phoneNoteCellPlaceholder')}
     />
   )
 
@@ -509,12 +515,12 @@ function NoteCell({ phone, onSave }: { phone: Phone; onSave: (id: string, v: str
     <button
       onClick={() => setEditing(true)}
       style={{ fontSize: 13, textAlign: 'left', display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', minWidth: 0, width: '100%', padding: 0 }}
-      title="Click to edit"
+      title={t('phoneClickToEdit')}
     >
       {phone.remark ? (
         <span style={{ color: 'rgba(196,181,253,0.72)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phone.remark}</span>
       ) : (
-        <span style={{ color: 'rgba(148,163,184,0.25)', fontStyle: 'italic' }}>+ note</span>
+        <span style={{ color: 'rgba(148,163,184,0.25)', fontStyle: 'italic' }}>{t('phoneNoteCellAdd')}</span>
       )}
     </button>
   )
@@ -523,6 +529,7 @@ function NoteCell({ phone, onSave }: { phone: Phone; onSave: (id: string, v: str
 // ────────────────────────────────────────────────────────────────────────────
 
 export function Phones({ user }: PhonesProps) {
+  const t = useT()
   const { currentOrg, role, perms } = useOrg()
   const conns = useConnections(user)
   const license = useLicense()
@@ -680,11 +687,11 @@ export function Phones({ user }: PhonesProps) {
 
   // ── Full sync from GéeLark ─────────────────────────────────────────────
   const syncFromGeelark = useCallback(async () => {
-    if (!bearer) { setError('Missing GéeLark token — configure it in Settings.'); return }
+    if (!bearer) { setError(t('phoneMissingToken')); return }
     setSyncing(true); setError(null)
     try {
       const items = await fetchAllPhones(bearer)
-      if (items.length === 0) { setError('No phones found.'); setSyncing(false); return }
+      if (items.length === 0) { setError(t('noPhones')); setSyncing(false); return }
       if (items.length > phoneLimit) {
         setError(`Plan limit reached: ${phoneLimit} phones max (${effectivePlan(license) ?? 'standard'}). Upgrade your plan to add more.`)
         setSyncing(false)
@@ -782,7 +789,7 @@ export function Phones({ user }: PhonesProps) {
 
   async function deletePhone(id: string) {
     if (!canDelete) return
-    if (!confirm('Delete this phone?')) return
+    if (!confirm(t('phoneDeleteConfirm'))) return
     const { error: err } = await supabase.from('phones').delete().eq('id', id)
     if (!err) setPhones(prev => prev.filter(p => p.id !== id))
   }
@@ -919,7 +926,7 @@ export function Phones({ user }: PhonesProps) {
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
           <div>
-            <h1 style={{ fontSize: 16, fontWeight: 700, color: '#F2F0FF', margin: 0, letterSpacing: '-0.3px' }}>Phones</h1>
+            <h1 style={{ fontSize: 16, fontWeight: 700, color: '#F2F0FF', margin: 0, letterSpacing: '-0.3px' }}>{t('phonesHeading')}</h1>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {/* Auto-refresh control */}
@@ -944,7 +951,7 @@ export function Phones({ user }: PhonesProps) {
                   transition: 'left 0.2s', left: autoRefresh ? 15 : 2.5,
                 }} />
               </button>
-              <span style={{ fontSize: 11, fontWeight: 500, color: 'rgba(148,163,184,0.52)', whiteSpace: 'nowrap' }}>Auto</span>
+              <span style={{ fontSize: 11, fontWeight: 500, color: 'rgba(148,163,184,0.52)', whiteSpace: 'nowrap' }}>{t('phonesAutoLabel')}</span>
               {autoRefresh && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 2, background: 'rgba(0,0,0,0.2)', borderRadius: 14, padding: '2px 3px', flexShrink: 0 }}>
                   {INTERVALS.map(({ label, value }) => (
@@ -976,7 +983,7 @@ export function Phones({ user }: PhonesProps) {
                 <path d="M12 7A5 5 0 1 1 9.5 2.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
                 <path d="M9 1l1.5 1.5L9 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
-              Sync GéeLark
+              {t('phonesSyncGeelark')}
             </button>
           </div>
         </div>
@@ -990,7 +997,7 @@ export function Phones({ user }: PhonesProps) {
 
           const summaryCards = [
             {
-              label: 'Total', value: phones.length, sub: 'phones',
+              label: t('phoneSummaryTotal'), value: phones.length, sub: t('phoneSummaryPhonesSub'),
               color: '#8B5CF6', f: 'all' as const,
               icon: (
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
@@ -1000,7 +1007,7 @@ export function Phones({ user }: PhonesProps) {
               ),
             },
             {
-              label: 'Online', value: onlineCount, sub: `${onlinePct}% active`,
+              label: t('phoneSummaryOnline'), value: onlineCount, sub: `${onlinePct}% ${t('phoneSummaryActivePct')}`,
               color: '#22C55E', f: 'online' as const,
               icon: (
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
@@ -1010,7 +1017,7 @@ export function Phones({ user }: PhonesProps) {
               ),
             },
             {
-              label: 'Offline', value: offlineCount, sub: `${100 - onlinePct}% inactive`,
+              label: t('phoneSummaryOffline'), value: offlineCount, sub: `${100 - onlinePct}% ${t('phoneSummaryInactivePct')}`,
               color: 'rgba(148,163,184,0.52)', f: 'offline' as const,
               icon: (
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
@@ -1077,7 +1084,7 @@ export function Phones({ user }: PhonesProps) {
                   <path d="M7.5 6v3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
                   <circle cx="7.5" cy="11" r="0.7" fill="currentColor"/>
                 </svg>
-                Missing GéeLark token — configure it in Settings.
+                {t('phoneMissingToken')}
               </div>
             )}
             {error && (
@@ -1117,7 +1124,7 @@ export function Phones({ user }: PhonesProps) {
                 </span>
                 <input
                   type="text"
-                  placeholder="Search phone, account, group…"
+                  placeholder={t('phonesSearchPlaceholder')}
                   value={search}
                   onChange={e => setSearch(e.target.value)}
                   className="sf-input"
@@ -1136,7 +1143,7 @@ export function Phones({ user }: PhonesProps) {
                     fontSize: 12, fontWeight: 500, cursor: 'pointer',
                   }}
                 >
-                  <option value="all">All groups</option>
+                  <option value="all">{t('phonesAllGroups')}</option>
                   {groups.map(g => <option key={g} value={g}>{g}</option>)}
                 </select>
                 <span style={{ position: 'absolute', right: 9, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: 'rgba(148,163,184,0.4)', fontSize: 9 }}>▼</span>
@@ -1159,7 +1166,7 @@ export function Phones({ user }: PhonesProps) {
                       color: filter === v ? '#fff' : 'rgba(148,163,184,0.52)',
                     }}
                   >
-                    {v === 'all' ? 'All' : v === 'online' ? 'Online' : 'Offline'}
+                    {v === 'all' ? t('phonesFilterAll') : v === 'online' ? t('phonesFilterOnline') : t('phonesFilterOffline')}
                   </button>
                 ))}
               </div>
@@ -1180,7 +1187,7 @@ export function Phones({ user }: PhonesProps) {
                   <path d="M11 6.5A4.5 4.5 0 1 1 8.5 2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
                   <path d="M8 1.5l1.5 1.5L8 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
-                {syncing ? 'Sync…' : 'Sync'}
+                {syncing ? t('phonesSyncing') : t('phonesSync')}
               </button>
             </div>
 
@@ -1227,9 +1234,9 @@ export function Phones({ user }: PhonesProps) {
                     <path d="M10 5h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
                   </svg>
                 </div>
-                <p style={{ fontSize: 16, fontWeight: 700, color: '#F2F0FF', margin: '0 0 8px' }}>No phones configured</p>
+                <p style={{ fontSize: 16, fontWeight: 700, color: '#F2F0FF', margin: '0 0 8px' }}>{t('phonesNoConfigured')}</p>
                 <p style={{ fontSize: 13, color: 'rgba(148,163,184,0.52)', margin: '0 0 24px', maxWidth: 320 }}>
-                  Sync from GéeLark to import your phones and start tracking.
+                  {t('phonesNoConfiguredDesc')}
                 </p>
                 <button
                   onClick={syncFromGeelark}
@@ -1245,7 +1252,7 @@ export function Phones({ user }: PhonesProps) {
                     <path d="M12 7A5 5 0 1 1 9.5 2.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
                     <path d="M9 1l1.5 1.5L9 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
-                  Sync GéeLark
+                  {t('phonesSyncGeelark')}
                 </button>
               </div>
             ) : (
@@ -1263,16 +1270,16 @@ export function Phones({ user }: PhonesProps) {
                   letterSpacing: '0.07em', color: 'rgba(148,163,184,0.45)',
                   userSelect: 'none',
                 }}>
-                  <span>#</span>
-                  <span>Phone</span>
-                  <span>Groupe</span>
-                  <span>GéeLark</span>
-                  <span>Actions</span>
+                  <span>{t('phonesTableNum')}</span>
+                  <span>{t('phonesTablePhone')}</span>
+                  <span>{t('phonesTableGroup')}</span>
+                  <span>{t('phonesTableGeelark')}</span>
+                  <span>{t('phonesTableActions')}</span>
                 </div>
 
                 {visible.length === 0 ? (
                   <p style={{ padding: '40px 20px', textAlign: 'center', fontSize: 13, color: 'rgba(148,163,184,0.52)', margin: 0 }}>
-                    No results for this search.
+                    {t('phonesNoSearchResults')}
                   </p>
                 ) : (
                   visible.map((phone, i) => {
@@ -1307,9 +1314,9 @@ export function Phones({ user }: PhonesProps) {
 
             {!loading && visible.length > 0 && (
               <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.3)', marginTop: 10 }}>
-                {visible.length} of {phones.length} phone{phones.length > 1 ? 's' : ''}
+                {visible.length} {t('phonesCountOf')} {phones.length} {phones.length > 1 ? t('phonesPhonesPlural') : t('phonesPhonesSuffix')}
                 {lastUpdated && (
-                  <span> · updated at {lastUpdated.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
+                  <span> · {t('phonesUpdatedAt')} {lastUpdated.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
                 )}
               </p>
             )}
@@ -1373,8 +1380,8 @@ export function Phones({ user }: PhonesProps) {
                   {/* Quick actions */}
                   <div style={{ display: 'flex', gap: 6 }}>
                     {[
-                      { label: 'Session', icon: <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="1.5" y="5" width="9" height="6.5" rx="1.2" stroke="currentColor" strokeWidth="1.3"/><path d="M4 5V3.5a2 2 0 0 1 4 0V5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>, action: () => setSessionDialog({ phone: p }) },
-                      { label: 'Sync', icon: <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M10.5 6A4.5 4.5 0 1 1 8 2.2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/><path d="M7.5 1l1.5 1.5L7.5 4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>, action: () => poller.pollNow() },
+                      { label: t('phoneSession'), icon: <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="1.5" y="5" width="9" height="6.5" rx="1.2" stroke="currentColor" strokeWidth="1.3"/><path d="M4 5V3.5a2 2 0 0 1 4 0V5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>, action: () => setSessionDialog({ phone: p }) },
+                      { label: t('phonesSync'), icon: <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M10.5 6A4.5 4.5 0 1 1 8 2.2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/><path d="M7.5 1l1.5 1.5L7.5 4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>, action: () => poller.pollNow() },
                     ].map(a => (
                       <button key={a.label} onClick={a.action}
                         style={{
@@ -1407,14 +1414,14 @@ export function Phones({ user }: PhonesProps) {
 
                 {/* Info rows */}
                 <div style={{ padding: '14px 18px', borderBottom: '1px solid rgba(255,255,255,0.055)' }}>
-                  <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'rgba(148,163,184,0.35)', margin: '0 0 10px' }}>Information</p>
+                  <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'rgba(148,163,184,0.35)', margin: '0 0 10px' }}>{t('phonesInfoSection')}</p>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     {[
-                      { label: 'Model',        value: p.phone_name },
-                      { label: 'Serial',       value: p.serial_no ?? '—' },
-                      { label: 'GéeLark ID',   value: p.geelark_id ?? '—' },
-                      { label: 'Groupe',       value: p.group_name ?? '—' },
-                      { label: 'Last sync',    value: p.synced_at ? relativeTime(p.synced_at) : '—' },
+                      { label: t('phonesDetailModel'),    value: p.phone_name },
+                      { label: t('phonesDetailSerial'),   value: p.serial_no ?? '—' },
+                      { label: t('phonesDetailGeelarkId'), value: p.geelark_id ?? '—' },
+                      { label: t('phonesDetailGroup'),    value: p.group_name ?? '—' },
+                      { label: t('phonesDetailLastSync'), value: p.synced_at ? relativeTime(p.synced_at) : '—' },
                     ].map(row => (
                       <div key={row.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                         <span style={{ fontSize: 11, color: 'rgba(148,163,184,0.45)', flexShrink: 0 }}>{row.label}</span>
@@ -1427,7 +1434,7 @@ export function Phones({ user }: PhonesProps) {
                 {/* Instagram section */}
                 {p.ig_username && (
                   <div style={{ padding: '14px 18px', borderBottom: '1px solid rgba(255,255,255,0.055)' }}>
-                    <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'rgba(148,163,184,0.35)', margin: '0 0 10px' }}>Instagram account</p>
+                    <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'rgba(148,163,184,0.35)', margin: '0 0 10px' }}>{t('phonesIgSection')}</p>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
                       <div style={{
                         width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
@@ -1441,27 +1448,27 @@ export function Phones({ user }: PhonesProps) {
                         <p style={{ fontSize: 13, fontWeight: 600, color: '#8B5CF6', margin: 0 }}>@{p.ig_username}</p>
                         {(p.followers || p.following) ? (
                           <p style={{ fontSize: 10, color: 'rgba(148,163,184,0.45)', margin: '2px 0 0' }}>
-                            {p.followers ? `${p.followers >= 1000 ? `${(p.followers / 1000).toFixed(1)}K` : p.followers} followers` : ''}
+                            {p.followers ? `${p.followers >= 1000 ? `${(p.followers / 1000).toFixed(1)}K` : p.followers} ${t('phonesIgFollowers')}` : ''}
                             {p.followers && p.following ? ' · ' : ''}
-                            {p.following ? `${p.following} following` : ''}
+                            {p.following ? `${p.following} ${t('phonesIgFollowing')}` : ''}
                           </p>
                         ) : null}
                       </div>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: 11, color: 'rgba(148,163,184,0.45)' }}>Status</span>
+                        <span style={{ fontSize: 11, color: 'rgba(148,163,184,0.45)' }}>{t('phonesIgStatus')}</span>
                         <span style={{
                           fontSize: 11, fontWeight: 600,
                           color: p.ig_status === 'active' ? '#22C55E' : (p.ig_status === 'expired' || p.ig_status === 'error') ? '#EF4444' : 'rgba(148,163,184,0.52)',
                         }}>
-                          {p.ig_status === 'active' ? 'Active' : p.ig_status === 'expired' ? 'Expired' : p.ig_status === 'error' ? 'Error' : 'Not configured'}
+                          {p.ig_status === 'active' ? t('phonesIgStatusActive') : p.ig_status === 'expired' ? t('phonesIgStatusExpired') : p.ig_status === 'error' ? t('phonesIgStatusError') : t('phonesIgNotConfigured')}
                         </span>
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: 11, color: 'rgba(148,163,184,0.45)' }}>Session</span>
+                        <span style={{ fontSize: 11, color: 'rgba(148,163,184,0.45)' }}>{t('phonesIgSession')}</span>
                         <span style={{ fontSize: 11, fontWeight: 600, color: p.ig_sessionid ? '#22C55E' : 'rgba(148,163,184,0.52)' }}>
-                          {p.ig_sessionid ? 'Configured' : 'Not configured'}
+                          {p.ig_sessionid ? t('phonesIgSessionConfigured') : t('phonesIgNotConfigured')}
                         </span>
                       </div>
                     </div>
@@ -1470,7 +1477,7 @@ export function Phones({ user }: PhonesProps) {
 
                 {/* Actions rapides */}
                 <div style={{ padding: '14px 18px' }}>
-                  <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'rgba(148,163,184,0.35)', margin: '0 0 8px' }}>Quick actions</p>
+                  <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'rgba(148,163,184,0.35)', margin: '0 0 8px' }}>{t('phonesQuickActions')}</p>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                     <button onClick={() => setSessionDialog({ phone: p })} style={{
                       width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px',
@@ -1482,7 +1489,7 @@ export function Phones({ user }: PhonesProps) {
                       onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'none' }}
                     >
                       <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x="1.5" y="5.5" width="10" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.4"/><path d="M4.5 5.5V4a2 2 0 0 1 4 0v1.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
-                      Session ID Instagram
+                      {t('phonesSessionIdAction')}
                     </button>
                     {p.ig_username && (
                       <button onClick={() => { unlinkIg(p.id); setSelectedPhone(null) }} style={{
@@ -1495,7 +1502,7 @@ export function Phones({ user }: PhonesProps) {
                         onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'none' }}
                       >
                         <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 6.5C2 4 4 2 6.5 2s4.5 2 4.5 4.5S9 11 6.5 11" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/><path d="M2 11l4-4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
-                        Unlink Instagram
+                        {t('phonesUnlinkIgAction')}
                       </button>
                     )}
                     {canDelete && (
@@ -1509,7 +1516,7 @@ export function Phones({ user }: PhonesProps) {
                         onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'none' }}
                       >
                         <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 3.5h9M5 3.5V2h3v1.5M4.5 3.5l.5 7h3l.5-7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                        Delete
+                        {t('phonesDeleteAction')}
                       </button>
                     )}
                   </div>
@@ -1543,6 +1550,7 @@ function PhoneRow({
   canDelete: boolean
   ActionBtn: React.ComponentType<{ onClick: () => void; title: string; children: React.ReactNode; danger?: boolean }>
 }) {
+  const t = useT()
   const [hovered, setHovered] = useState(false)
 
   const rowBg = isSelected
@@ -1627,26 +1635,26 @@ function PhoneRow({
 
       {/* Actions */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 4 }} onClick={e => e.stopPropagation()}>
-        <button className="sf-btn sf-btn-ghost sf-btn-sm sf-btn-icon" onClick={() => poller.pollNow()} title="Actualiser" style={{ width: 28, height: 28 }}>
+        <button className="sf-btn sf-btn-ghost sf-btn-sm sf-btn-icon" onClick={() => poller.pollNow()} title={t('phonesRowRefresh')} style={{ width: 28, height: 28 }}>
           <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
             <path d="M11 6.5A4.5 4.5 0 1 1 8.5 2.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
             <path d="M8 1.5l1.5 1.5L8 4.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         </button>
-        <button className="sf-btn sf-btn-ghost sf-btn-sm sf-btn-icon" onClick={() => setSelectedPhone(isSelected ? null : phone)} title="View details" style={{ width: 28, height: 28 }}>
+        <button className="sf-btn sf-btn-ghost sf-btn-sm sf-btn-icon" onClick={() => setSelectedPhone(isSelected ? null : phone)} title={t('phonesRowViewDetails')} style={{ width: 28, height: 28 }}>
           <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
             <ellipse cx="6.5" cy="6.5" rx="5" ry="3" stroke="currentColor" strokeWidth="1.4"/>
             <circle cx="6.5" cy="6.5" r="1.5" fill="currentColor"/>
           </svg>
         </button>
-        <button className="sf-btn sf-btn-ghost sf-btn-sm sf-btn-icon" onClick={() => setSessionDialog({ phone })} title="Session ID" style={{ width: 28, height: 28 }}>
+        <button className="sf-btn sf-btn-ghost sf-btn-sm sf-btn-icon" onClick={() => setSessionDialog({ phone })} title={t('phonesRowSessionId')} style={{ width: 28, height: 28 }}>
           <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
             <rect x="1.5" y="5.5" width="10" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.4"/>
             <path d="M4.5 5.5V4a2 2 0 0 1 4 0v1.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
           </svg>
         </button>
         {canDelete && (
-          <button className="sf-btn sf-btn-ghost sf-btn-sm sf-btn-icon" onClick={() => deletePhone(phone.id)} title="Supprimer" style={{ width: 28, height: 28, color: '#EF4444' }}>
+          <button className="sf-btn sf-btn-ghost sf-btn-sm sf-btn-icon" onClick={() => deletePhone(phone.id)} title={t('phonesRowDelete')} style={{ width: 28, height: 28, color: '#EF4444' }}>
             <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
               <path d="M2 3.5h9M5 3.5V2h3v1.5M4.5 3.5l.5 7h3l.5-7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
