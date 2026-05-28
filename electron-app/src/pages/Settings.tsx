@@ -220,7 +220,7 @@ const GEN_ICONS: Record<GeneralTab, JSX.Element> = {
 export function Settings({ user, initialPanel, initialTab, onNavigate }: SettingsProps) {
   const t = useT()
   const { lang, setLang: setAppLang } = useLang()
-  const { role, perms, currentOrg } = useOrg()
+  const { role, perms, currentOrg, myOrgs } = useOrg()
   const license = useLicense()
   const canSeeConnexions     = role ? canSeeTab(role, perms, 'settings') : true
   const canEditOrgConnexions = role === 'owner' || role === 'admin'
@@ -1474,6 +1474,8 @@ function SubscriptionPanel() {
   const [creditCode, setCreditCode]       = useState('')
   const [codeLoading, setCodeLoading]     = useState(false)
   const [codeResult, setCodeResult]       = useState<{ ok: boolean; text: string } | null>(null)
+  // 'personal' = own account, otherwise an org id
+  const [codeTarget, setCodeTarget]       = useState<string>('personal')
 
   useEffect(() => {
     supabase.from('license_keys')
@@ -1494,13 +1496,18 @@ function SubscriptionPanel() {
     e.preventDefault()
     if (!creditCode.trim()) return
     setCodeLoading(true); setCodeResult(null)
-    const { redeemCreditCode } = await import('@/lib/credits')
+    const { redeemCreditCode, redeemCreditCodeForOrg } = await import('@/lib/credits')
     const userId = (await supabase.auth.getUser()).data.user?.id
     if (!userId) { setCodeLoading(false); setCodeResult({ ok: false, text: t('notConnected') }); return }
-    const res = await redeemCreditCode(creditCode.trim(), userId)
+    const res = codeTarget !== 'personal'
+      ? await redeemCreditCodeForOrg(creditCode.trim(), codeTarget)
+      : await redeemCreditCode(creditCode.trim(), userId)
     setCodeLoading(false)
     if (res.ok) {
-      setCodeResult({ ok: true, text: `✓ +${res.amount} ${t('creditsCosts')} ! ${lang === 'en' ? 'New balance' : 'Nouveau solde'} : ${res.balance}` })
+      const targetName = codeTarget !== 'personal'
+        ? (myOrgs.find(o => o.org.id === codeTarget)?.org.name ?? codeTarget)
+        : (lang === 'en' ? 'your account' : 'ton compte')
+      setCodeResult({ ok: true, text: `✓ +${res.amount} ${t('creditsCosts')} → ${targetName} ! ${lang === 'en' ? 'Balance' : 'Solde'} : ${res.balance}` })
       setCreditCode('')
       refreshCredits()
     } else {
@@ -1640,6 +1647,22 @@ function SubscriptionPanel() {
         {/* Redeem code */}
         <div className="space-y-3 pt-2" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
           <p className="text-[13px] font-semibold text-text2">{t('redeemCreditCode')}</p>
+          {myOrgs.length > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="text-[12px] text-text2 shrink-0">{lang === 'en' ? 'Credit to:' : 'Créditer :'}</span>
+              <select
+                value={codeTarget}
+                onChange={e => setCodeTarget(e.target.value)}
+                className="flex-1 rounded-lg px-3 py-1.5 text-[12px] focus:outline-none"
+                style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
+              >
+                <option value="personal">{lang === 'en' ? '👤 My account' : '👤 Mon compte'}</option>
+                {myOrgs.map(({ org }) => (
+                  <option key={org.id} value={org.id}>🏢 {org.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
           <form onSubmit={handleRedeemCode} className="flex gap-2">
             <input
               value={creditCode}

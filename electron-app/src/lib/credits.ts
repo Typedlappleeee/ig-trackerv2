@@ -106,6 +106,22 @@ export async function redeemCreditCode(
   }
 }
 
+export async function redeemCreditCodeForOrg(
+  code: string,
+  orgId: string,
+): Promise<{ ok: boolean; amount?: number; balance?: number; error?: string }> {
+  try {
+    const { data, error } = await supabase.rpc('redeem_credit_code_for_org', {
+      p_code:   code.toUpperCase().replace(/\s/g, ''),
+      p_org_id: orgId,
+    })
+    if (error) return { ok: false, error: error.message }
+    return data ?? { ok: false, error: 'Erreur inconnue' }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
 export async function maybeGrantMonthlyCredits(userId: string, plan: string): Promise<void> {
   const amount = PLAN_MONTHLY_CREDITS[plan] ?? 0
   if (!amount) return
