@@ -697,6 +697,9 @@ async function remixViaMediaRecorder(opts: {
     if (!switched && hasSplit && t >= opts.splitTime) {
       switched = true
       secVid.pause()
+      // Flush the recorder buffer at the exact cut point so no secVid frames
+      // bleed past splitTime in the encoded output.
+      try { recorder.requestData() } catch { /* not all browsers support mid-stream flush */ }
     }
 
     const source = switched ? origVid : secVid
@@ -717,6 +720,11 @@ async function remixViaMediaRecorder(opts: {
 
   origVid.onended = () => stopRecording()
   const safetyTimeout = setTimeout(() => stopRecording(), (totalDuration + 10) * 1000)
+
+  // When secVid stalls (buffering), pause origVid to keep audio/video in sync.
+  // Without this, origVid audio keeps playing while the canvas shows a frozen secVid frame.
+  secVid.onwaiting = () => { if (!switched) origVid.pause() }
+  secVid.onplaying = () => { if (!switched && origVid.paused) origVid.play().catch(() => {}) }
 
   // ── seek & play ───────────────────────────────────────────────────────────────
   const seekTo = (v: HTMLVideoElement, t: number) => new Promise<void>(r => {

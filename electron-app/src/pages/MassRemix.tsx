@@ -626,19 +626,26 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                   const sf = item.startFrame ?? 0
                   const ef = item.endFrame   ?? frameCount - 1
                   const coversAll = (ef - sf + 1) >= frameCount * 0.8
+                  const maxEnd    = splitTime ?? detDuration ?? 9999
                   const startTime = coversAll ? 0 : Math.round(sf * interval * 10) / 10
-                  const endTime   = splitTime ?? (detDuration ?? 9999)
+                  // Use endFrame to compute real endTime per paragraph — don't force all items
+                  // to show until the video end (that's what caused simultaneous overlay overlap).
+                  const endTime   = coversAll ? maxEnd : Math.min(Math.round((ef + 1) * interval * 10) / 10, maxEnd)
                   return { text: item.text, xAlign: item.xAlign ?? 'center', rawY: (item.yPercent ?? 50) / 100, fontSize, fontColor: item.fontColor ?? 'white', bold: item.bold ?? true, startTime, endTime }
                 })
 
-                // ── Step 2: assign zones (top / bottom) to avoid face + overlaps ─
+                // ── Step 2: assign zones (top / bottom) ───────────────────────
                 type Zone = 'top' | 'bottom'
-                // First text block (the primary line) → top when it originates in the upper half.
-                // All subsequent blocks are continuations and always stack in the bottom zone.
-                // This preserves dialogue order: "Lui:" at top, "elle:" + rest at bottom.
-                const zones: Zone[] = items.map((item, i) =>
-                  i === 0 && item.rawY < 0.5 ? 'top' : 'bottom'
-                )
+                // Default zone from rawY (where text physically appears in the source).
+                // For time-concurrent items that collide in the same zone, flip the later one.
+                const zones: Zone[] = items.map((item, i) => {
+                  const defaultZone: Zone = item.rawY < 0.5 ? 'top' : 'bottom'
+                  const hasConflict = items.slice(0, i).some((prev, j) => {
+                    const overlap = prev.endTime > item.startTime && prev.startTime < item.endTime
+                    return overlap && zones[j] === defaultZone
+                  })
+                  return hasConflict ? (defaultZone === 'top' ? 'bottom' : 'top') : defaultZone
+                })
 
                 // ── Step 3: generate per-item overlays ──────────────────────────────
                 // ONE overlay entry per item — drawOverlayText/renderTextPNG handle
