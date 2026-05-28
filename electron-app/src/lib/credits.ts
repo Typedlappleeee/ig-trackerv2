@@ -83,21 +83,11 @@ export async function fetchOrgBalance(orgId: string, ownerUserId?: string): Prom
 }
 
 export async function checkAndDeductCredits(
-  userId: string,
-  amount: number,
+  _userId: string,
+  _amount: number,
 ): Promise<{ ok: boolean; error?: string; balance?: number }> {
-  try {
-    const { data, error } = await supabase.rpc('deduct_user_credits', {
-      p_user_id: userId,
-      p_amount:  amount,
-    })
-    if (error) return { ok: false, error: error.message }
-    if (!data?.ok) return { ok: false, error: data?.error ?? 'Crédits insuffisants', balance: data?.balance }
-    return { ok: true, balance: data.balance }
-  } catch {
-    // Table doesn't exist yet — fail open so features still work
-    return { ok: true, balance: 0 }
-  }
+  // Credit system temporarily disabled — always succeed
+  return { ok: true, balance: 0 }
 }
 
 export async function redeemCreditCode(
