@@ -660,36 +660,45 @@ async function remixViaMediaRecorder(opts: {
     'video/webm',
   ].find(m => MediaRecorder.isTypeSupported(m)) ?? 'video/webm'
 
+  // Pre-render each text overlay onto its own full-size canvas once.
+  // Compositing a pre-drawn canvas with drawImage() is GPU-accelerated and
+  // ~10x faster than re-running stroke/fill/shadow text every frame.
+  const overlayImages = opts.textOverlays.map(ov => {
+    const oc = document.createElement('canvas')
+    oc.width = W; oc.height = H
+    drawOverlayText(oc.getContext('2d')!, ov, W, H)
+    return { canvas: oc, ov }
+  })
+
   const chunks: Blob[] = []
-  const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 5_000_000, audioBitsPerSecond: 128_000 })
+  const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 8_000_000, audioBitsPerSecond: 128_000 })
   recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data) }
-  recorder.start(250)
+  recorder.start(100)
 
   // ── draw loop ─────────────────────────────────────────────────────────────────
-  // Phase 1 (0 → splitTime): draw secondary video
-  // Phase 2 (splitTime → end): draw original video
-  // When no split: secondary plays for full duration
+  // Use setInterval at exactly 30fps instead of requestAnimationFrame.
+  // rAF is throttled by the browser when the tab is not the active foreground
+  // window, which causes the output video to record at ~1-5fps. setInterval
+  // is more reliable for background recording tasks.
   let switched = false
-  let animId = 0
+  let drawTimer = 0
   let recordingStopped = false
 
   const stopRecording = () => {
     if (recordingStopped) return
     recordingStopped = true
-    cancelAnimationFrame(animId)
+    clearInterval(drawTimer)
     recorder.stop()
   }
 
   const drawFrame = () => {
     const t = origVid.currentTime
 
-    // Switch from secondary to original at splitTime (with 0.2s grace)
     if (!switched && hasSplit && t >= opts.splitTime + 0.2) {
       switched = true
       secVid.pause()
     }
 
-    // Draw secondary during phase 1, original during phase 2
     const source = switched ? origVid : secVid
     const vw = source.videoWidth  || W
     const vh = source.videoHeight || H
@@ -700,14 +709,12 @@ async function remixViaMediaRecorder(opts: {
     ctx.fillRect(0, 0, W, H)
     ctx.drawImage(source, (W - dw) / 2, (H - dh) / 2, dw, dh)
 
-    for (const ov of opts.textOverlays) {
-      if (t >= ov.startTime && t <= ov.endTime) drawOverlayText(ctx, ov, W, H)
+    // Composite pre-rendered overlay canvases — single drawImage call per overlay
+    for (const { canvas: oc, ov } of overlayImages) {
+      if (t >= ov.startTime && t <= ov.endTime) ctx.drawImage(oc, 0, 0)
     }
-
-    if (!recordingStopped) animId = requestAnimationFrame(drawFrame)
   }
 
-  // Stop recording when origVid finishes naturally, or after a safety timeout
   origVid.onended = () => stopRecording()
   const safetyTimeout = setTimeout(() => stopRecording(), (totalDuration + 10) * 1000)
 
@@ -723,11 +730,11 @@ async function remixViaMediaRecorder(opts: {
 
   origVid.play()
   secVid.play()
-  animId = requestAnimationFrame(drawFrame)
+  drawTimer = setInterval(drawFrame, 1000 / 30) as unknown as number
 
   await new Promise<void>(res => { recorder.onstop = () => res() })
   clearTimeout(safetyTimeout)
-  cancelAnimationFrame(animId)
+  clearInterval(drawTimer)
   await audioCtx.close()
 
   return { blob: new Blob(chunks, { type: recorder.mimeType || mimeType }), mimeType }
