@@ -11,7 +11,7 @@ interface OnboardingProps {
   orgId?:     string | null
 }
 
-type Step = 1 | 2 | 3 | 4
+type Step = 1 | 2
 type TestState = 'idle' | 'testing' | 'ok' | 'fail'
 
 function openExternal(url: string) {
@@ -55,16 +55,12 @@ function SFLogoMark() {
 }
 
 export function Onboarding({ user, onComplete, orgId }: OnboardingProps) {
-  const [step, setStep]              = useState<Step>(1)
-  const [bearer, setBearer]          = useState('')
-  const [groqKey, setGroqKey]        = useState('')
-  const [anthropicKey, setAnthropicKey] = useState('')
-  const [bearerState, setBState]     = useState<TestState>('idle')
-  const [bearerMsg, setBMsg]         = useState('')
-  const [groqState, setGState]       = useState<TestState>('idle')
-  const [groqMsg, setGMsg]           = useState('')
-  const [saving, setSaving]          = useState(false)
-  const [saveErr, setSaveErr]        = useState<string | null>(null)
+  const [step, setStep]          = useState<Step>(1)
+  const [bearer, setBearer]      = useState('')
+  const [bearerState, setBState] = useState<TestState>('idle')
+  const [bearerMsg, setBMsg]     = useState('')
+  const [saving, setSaving]      = useState(false)
+  const [saveErr, setSaveErr]    = useState<string | null>(null)
 
   async function testBearer() {
     if (!bearer.trim()) return
@@ -91,31 +87,6 @@ export function Onboarding({ user, onComplete, orgId }: OnboardingProps) {
     }
   }
 
-  async function testGroq() {
-    if (!groqKey.trim()) return
-    setGState('testing'); setGMsg('')
-    try {
-      const r = await window.electronAPI!.groqRequest({
-        apiKey:    groqKey.trim(),
-        messages:  [{ role: 'user', content: 'Reply with just: OK' }],
-        maxTokens: 5,
-      })
-      const d = r.data as Record<string, unknown>
-      const choice = ((d?.['choices'] as unknown[])?.[0] as Record<string, unknown>)
-      const reply  = (choice?.['message'] as Record<string, unknown>)?.['content'] as string
-      if (r.ok && reply) {
-        setGState('ok')
-        setGMsg(`✓ Clé valide — modèle Llama opérationnel (réponse : "${reply.trim()}").`)
-      } else {
-        setGState('fail')
-        setGMsg(`✗ Clé invalide ou compte Groq sans accès. Erreur : ${(d?.['error'] as Record<string, unknown>)?.['message'] ?? 'inconnue'}.`)
-      }
-    } catch (e) {
-      setGState('fail')
-      setGMsg(`✗ Erreur : ${e instanceof Error ? e.message : String(e)}`)
-    }
-  }
-
   async function finish() {
     if (!bearer.trim()) return
     setSaving(true); setSaveErr(null)
@@ -123,48 +94,23 @@ export function Onboarding({ user, onComplete, orgId }: OnboardingProps) {
     let error: { message: string } | null = null
     if (orgId) {
       const r = await supabase.from('org_config').upsert({
-        org_id:            orgId,
-        bearer_token:      bearer.trim(),
-        groq_api_key:      groqKey.trim(),
-        anthropic_api_key: anthropicKey.trim(),
-        updated_at:        now,
+        org_id:       orgId,
+        bearer_token: bearer.trim(),
+        updated_at:   now,
       }, { onConflict: 'org_id' })
       error = r.error
-      if (error && /anthropic|column|schema cache/i.test(error.message)) {
-        const r2 = await supabase.from('org_config').upsert({
-          org_id:       orgId,
-          bearer_token: bearer.trim(),
-          groq_api_key: groqKey.trim(),
-          updated_at:   now,
-        }, { onConflict: 'org_id' })
-        error = r2.error
-      }
-      // Mark user-level onboarding done too, so we don't re-prompt globally.
       await supabase.from('app_config').upsert({
         user_id: user.id, onboarded_at: now, theme: 'Bleu', updated_at: now,
       }, { onConflict: 'user_id' })
     } else {
       const r = await supabase.from('app_config').upsert({
-        user_id:           user.id,
-        bearer_token:      bearer.trim(),
-        groq_api_key:      groqKey.trim(),
-        anthropic_api_key: anthropicKey.trim(),
-        theme:             'Bleu',
-        onboarded_at:      now,
-        updated_at:        now,
+        user_id:      user.id,
+        bearer_token: bearer.trim(),
+        theme:        'Bleu',
+        onboarded_at: now,
+        updated_at:   now,
       }, { onConflict: 'user_id' })
       error = r.error
-      if (error && /anthropic|column|schema cache/i.test(error.message)) {
-        const r2 = await supabase.from('app_config').upsert({
-          user_id:      user.id,
-          bearer_token: bearer.trim(),
-          groq_api_key: groqKey.trim(),
-          theme:        'Bleu',
-          onboarded_at: now,
-          updated_at:   now,
-        }, { onConflict: 'user_id' })
-        error = r2.error
-      }
     }
     setSaving(false)
     if (error) {
@@ -203,9 +149,7 @@ export function Onboarding({ user, onComplete, orgId }: OnboardingProps) {
     return null
   }
 
-  const stepLabels = ['GéeLark', 'Groq IA', 'Anthropic', 'Terminé']
-
-  const sfAccent = { color: '#a78bfa' }
+  const sfAccent    = { color: '#a78bfa' }
   const sfUnderline = { color: '#c4b5fd', textDecoration: 'underline', textUnderlineOffset: '2px' }
 
   return (
@@ -213,23 +157,16 @@ export function Onboarding({ user, onComplete, orgId }: OnboardingProps) {
       className="min-h-screen flex items-center justify-center p-6 relative overflow-hidden"
       style={{ background: '#05030f' }}
     >
-      {/* Aurora */}
       <div className="sf-aurora absolute" style={{ width: 600, height: 600, top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }} />
-      {/* Grid */}
       <div className="absolute inset-0 pointer-events-none opacity-[0.025]"
         style={{ backgroundImage: 'linear-gradient(rgba(139,92,246,1) 1px, transparent 1px), linear-gradient(90deg, rgba(139,92,246,1) 1px, transparent 1px)', backgroundSize: '48px 48px' }}
       />
 
-      {/* Skip */}
       <button
         onClick={skip}
         disabled={saving}
         className="absolute top-5 right-6 px-4 py-2 rounded-lg text-sm font-medium text-white transition-all hover:scale-105 disabled:opacity-40"
-        style={{
-          background: 'rgba(139,92,246,0.15)',
-          border: '1px solid rgba(139,92,246,0.4)',
-          boxShadow: '0 0 16px rgba(139,92,246,0.15)',
-        }}
+        style={{ background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.4)' }}
       >
         Ignorer pour l'instant →
       </button>
@@ -238,65 +175,45 @@ export function Onboarding({ user, onComplete, orgId }: OnboardingProps) {
 
         {/* Logo + title */}
         <div className="text-center space-y-3">
-          <div
-            className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto"
-            style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)', boxShadow: '0 0 32px rgba(139,92,246,0.12)' }}
-          >
+          <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto"
+            style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)', boxShadow: '0 0 32px rgba(139,92,246,0.12)' }}>
             <SFLogoMark />
           </div>
           <div>
             <h1 className="text-2xl font-bold">
-              <span className="text-white">Configuration de </span>
+              <span className="text-white">Bienvenue sur </span>
               <span className="sf-text-gradient">ScaleFlow</span>
             </h1>
-            <p className="text-sm mt-1" style={{ color: 'rgba(196,181,253,0.5)' }}>Connecte tes services pour démarrer. Prend ~2 minutes.</p>
+            <p className="text-sm mt-1" style={{ color: 'rgba(196,181,253,0.5)' }}>Une seule chose pour commencer.</p>
           </div>
         </div>
 
-        {/* Step indicator */}
-        <div className="flex items-center gap-2 justify-center">
-          {stepLabels.map((label, i) => {
-            const n = (i + 1) as Step
-            const done   = step > n
-            const active = step === n
-            return (
-              <div key={label} className="flex items-center gap-2">
-                <div
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold transition-all"
-                  style={
-                    active ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff' } :
-                    done   ? { background: 'rgba(52,211,153,0.15)', color: '#34d399' } :
-                             { background: 'rgba(139,92,246,0.08)', color: 'rgba(196,181,253,0.45)' }
-                  }
-                >
-                  <span className="w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold border-2 border-current">
-                    {done ? '✓' : n}
-                  </span>
-                  {label}
-                </div>
-                {i < 2 && <span className="text-[10px]" style={{ color: 'rgba(139,92,246,0.3)' }}>──</span>}
-              </div>
-            )
-          })}
+        {/* Step dots */}
+        <div className="flex items-center justify-center gap-2">
+          {[1, 2].map(n => (
+            <div key={n} className="w-2 h-2 rounded-full transition-all"
+              style={{ background: step >= n ? '#7c3aed' : 'rgba(139,92,246,0.2)', transform: step === n ? 'scale(1.4)' : 'scale(1)' }}
+            />
+          ))}
         </div>
 
-        {/* ── STEP 1: GéeLark ─────────────────────────────────────────────── */}
+        {/* ── STEP 1: GéeLark token ─────────────────────────────────────── */}
         {step === 1 && (
           <div className="glass-card rounded-2xl p-6 space-y-5">
             <div>
               <h2 className="text-lg font-bold text-text flex items-center gap-2">
                 <span className="text-2xl">📱</span> Token GéeLark
               </h2>
-              <p className="text-sm text-text2 mt-1">Requis pour piloter tes cloud phones (démarrer, arrêter, poster).</p>
+              <p className="text-sm text-text2 mt-1">Requis pour piloter tes cloud phones. Tu pourras configurer les clés IA plus tard dans Paramètres.</p>
             </div>
 
-            <div className="rounded-xl p-4 space-y-2 text-sm" style={{ background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.1)' }}>
+            <div className="rounded-xl p-4 space-y-2" style={{ background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.1)' }}>
               <p className="font-semibold text-xs uppercase tracking-wider" style={{ color: 'rgba(196,181,253,0.5)' }}>Comment obtenir ton token :</p>
               <div className="space-y-1.5 text-xs" style={{ color: 'rgba(196,181,253,0.6)' }}>
                 <div className="flex gap-2"><span style={sfAccent} className="font-bold">1.</span><span>Connecte-toi sur <button onClick={() => openExternal('https://app.geelark.com')} style={sfUnderline}>app.geelark.com</button></span></div>
                 <div className="flex gap-2"><span style={sfAccent} className="font-bold">2.</span><span>En haut à droite → <strong className="text-text">ton avatar</strong> → <strong className="text-text">API</strong></span></div>
-                <div className="flex gap-2"><span style={sfAccent} className="font-bold">3.</span><span>Section <strong className="text-text">API Key</strong> (⚠ pas l'App ID — c'est différent)</span></div>
-                <div className="flex gap-2"><span style={sfAccent} className="font-bold">4.</span><span>Clique <strong className="text-text">Créer un token</strong> ou copie la clé existante</span></div>
+                <div className="flex gap-2"><span style={sfAccent} className="font-bold">3.</span><span>Section <strong className="text-text">API Key</strong> <span style={{ color: '#f59e0b' }}>(⚠ pas l'App ID)</span></span></div>
+                <div className="flex gap-2"><span style={sfAccent} className="font-bold">4.</span><span>Copie ou crée un token</span></div>
               </div>
             </div>
 
@@ -309,12 +226,10 @@ export function Onboarding({ user, onComplete, orgId }: OnboardingProps) {
                 onChange={e => { setBearer(e.target.value); setBState('idle') }}
                 hint={bearer ? `${bearer.length} caractères` : undefined}
               />
-              <div className="flex items-center gap-3">
-                <Button onClick={testBearer} loading={bearerState === 'testing'} disabled={!bearer.trim()} variant="secondary">
-                  <StateIcon s={bearerState} />
-                  {bearerState === 'testing' ? 'Test…' : '🔍 Tester la connexion'}
-                </Button>
-              </div>
+              <Button onClick={testBearer} loading={bearerState === 'testing'} disabled={!bearer.trim()} variant="secondary">
+                <StateIcon s={bearerState} />
+                {bearerState === 'testing' ? 'Test…' : '🔍 Tester la connexion'}
+              </Button>
               {bearerMsg && (
                 <p className={`text-xs px-3 py-2 rounded-lg ${bearerState === 'ok' ? 'bg-ok/10 text-ok' : 'bg-danger/10 text-danger'}`}>
                   {bearerMsg}
@@ -328,129 +243,21 @@ export function Onboarding({ user, onComplete, orgId }: OnboardingProps) {
           </div>
         )}
 
-        {/* ── STEP 2: Groq ────────────────────────────────────────────────── */}
+        {/* ── STEP 2: Done ─────────────────────────────────────────────── */}
         {step === 2 && (
-          <div className="glass-card rounded-2xl p-6 space-y-5">
-            <div>
-              <h2 className="text-lg font-bold text-text flex items-center gap-2">
-                <span className="text-2xl">✨</span> Clé API Groq <span className="text-xs text-text2 font-normal ml-1">(optionnel)</span>
-              </h2>
-              <p className="text-sm text-text2 mt-1">
-                Pour générer des captions, hashtags et hooks IA automatiquement.
-                <br />Gratuit : 14 400 requêtes/jour avec Llama 3.3.
-              </p>
-            </div>
-
-            <div className="rounded-xl p-4 space-y-2 text-sm" style={{ background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.1)' }}>
-              <p className="font-semibold text-xs uppercase tracking-wider" style={{ color: 'rgba(196,181,253,0.5)' }}>Comment obtenir ta clé :</p>
-              <div className="space-y-1.5 text-xs" style={{ color: 'rgba(196,181,253,0.6)' }}>
-                <div className="flex gap-2"><span style={sfAccent} className="font-bold">1.</span><span>Créé un compte sur <button onClick={() => openExternal('https://console.groq.com')} style={sfUnderline}>console.groq.com</button></span></div>
-                <div className="flex gap-2"><span style={sfAccent} className="font-bold">2.</span><span>Menu gauche → <strong className="text-text">API Keys</strong> → <strong className="text-text">Create API Key</strong></span></div>
-                <div className="flex gap-2"><span style={sfAccent} className="font-bold">3.</span><span>Copie la clé qui commence par <code className="bg-surface px-1 rounded">gsk_</code></span></div>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <Input
-                label="Groq API Key"
-                type="password"
-                placeholder="gsk_…"
-                value={groqKey}
-                onChange={e => { setGroqKey(e.target.value); setGState('idle') }}
-              />
-              <div className="flex items-center gap-3">
-                <Button onClick={testGroq} loading={groqState === 'testing'} disabled={!groqKey.trim()} variant="secondary">
-                  <StateIcon s={groqState} />
-                  {groqState === 'testing' ? 'Test…' : '🔍 Tester la clé'}
-                </Button>
-              </div>
-              {groqMsg && (
-                <p className={`text-xs px-3 py-2 rounded-lg ${groqState === 'ok' ? 'bg-ok/10 text-ok' : 'bg-danger/10 text-danger'}`}>
-                  {groqMsg}
-                </p>
-              )}
-            </div>
-
-            <div className="flex gap-3">
-              <Button variant="secondary" onClick={() => setStep(1)}>← Retour</Button>
-              <Button className="flex-1" onClick={() => setStep(3)}>
-                {groqKey.trim() ? 'Suivant →' : 'Passer cette étape →'}
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* ── STEP 3: Anthropic ───────────────────────────────────────────── */}
-        {step === 3 && (
-          <div className="glass-card rounded-2xl p-6 space-y-5">
-            <div>
-              <h2 className="text-lg font-bold text-text flex items-center gap-2">
-                <span className="text-2xl">🔀</span> Clé API Anthropic <span className="text-xs text-text2 font-normal ml-1">(optionnel)</span>
-              </h2>
-              <p className="text-sm text-text2 mt-1">
-                Pour le <strong className="text-text">Remix Vidéo</strong> — Claude Vision détecte les textes de ta vidéo originale et les recopie sur la nouvelle vidéo.
-              </p>
-            </div>
-
-            <div className="rounded-xl p-4 space-y-2 text-sm" style={{ background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.1)' }}>
-              <p className="font-semibold text-xs uppercase tracking-wider" style={{ color: 'rgba(196,181,253,0.5)' }}>Comment obtenir ta clé :</p>
-              <div className="space-y-1.5 text-xs" style={{ color: 'rgba(196,181,253,0.6)' }}>
-                <div className="flex gap-2"><span style={sfAccent} className="font-bold">1.</span><span>Créé un compte sur <button onClick={() => openExternal('https://console.anthropic.com')} style={sfUnderline}>console.anthropic.com</button></span></div>
-                <div className="flex gap-2"><span style={sfAccent} className="font-bold">2.</span><span>Menu gauche → <strong className="text-text">API Keys</strong> → <strong className="text-text">Create Key</strong></span></div>
-                <div className="flex gap-2"><span style={sfAccent} className="font-bold">3.</span><span>Copie la clé qui commence par <code className="bg-surface px-1 rounded">sk-ant-</code></span></div>
-              </div>
-            </div>
-
-            <Input
-              label="Anthropic API Key"
-              type="password"
-              placeholder="sk-ant-…"
-              value={anthropicKey}
-              onChange={e => setAnthropicKey(e.target.value)}
-            />
-
-            <div className="flex gap-3">
-              <Button variant="secondary" onClick={() => setStep(2)}>← Retour</Button>
-              <Button className="flex-1" onClick={() => setStep(4)}>
-                {anthropicKey.trim() ? 'Suivant →' : 'Passer cette étape →'}
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* ── STEP 4: Done ────────────────────────────────────────────────── */}
-        {step === 4 && (
           <div className="glass-card rounded-2xl p-6 space-y-5 text-center">
             <div className="space-y-2">
-              <div className="text-5xl">🎉</div>
-              <h2 className="text-xl font-bold text-text">Tout est prêt !</h2>
-              <p className="text-sm text-text2">Voici ce que tu peux faire maintenant :</p>
+              <div className="text-5xl">🚀</div>
+              <h2 className="text-xl font-bold text-text">Prêt à démarrer !</h2>
+              <p className="text-sm text-text2">Ton token GéeLark est configuré. Tu peux maintenant accéder à ScaleFlow.</p>
             </div>
 
-            <div className="text-left space-y-2">
-              {[
-                { icon: '📱', title: 'Téléphones', desc: 'Synchronise tes cloud phones GéeLark et vois leur statut en temps réel' },
-                { icon: '📈', title: 'Stats IG',   desc: 'Consulte les stats Instagram de chaque compte (followers, vues, vidéos)' },
-                { icon: '🚀', title: 'Posting',    desc: 'Poste des Reels automatiquement sur tes phones via GéeLark' },
-                { icon: '✨', title: 'Outils IA',  desc: 'Génère captions, hashtags, hooks et bios avec Groq Llama 3.3' },
-                { icon: '🎞', title: 'Montage',    desc: "Assemble et découpe tes vidéos avec l'éditeur de montage" },
-              ].map(({ icon, title, desc }) => (
-                <div key={title}
-                  className="flex items-start gap-3 px-4 py-3 rounded-xl transition-colors"
-                  style={{ background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.1)' }}
-                >
-                  <span className="text-xl flex-shrink-0">{icon}</span>
-                  <div>
-                    <p className="text-sm font-semibold text-text">{title}</p>
-                    <p className="text-xs text-text2">{desc}</p>
-                  </div>
-                </div>
-              ))}
+            <div className="text-left rounded-xl p-4 space-y-1 text-xs" style={{ background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.1)', color: 'rgba(196,181,253,0.6)' }}>
+              <p className="font-semibold text-xs uppercase tracking-wider mb-2" style={{ color: 'rgba(196,181,253,0.5)' }}>Configurer plus tard dans Paramètres :</p>
+              <div className="flex gap-2"><span style={sfAccent}>✦</span><span><strong className="text-text">Groq API Key</strong> — génération de captions & hashtags IA</span></div>
+              <div className="flex gap-2"><span style={sfAccent}>✦</span><span><strong className="text-text">Anthropic API Key</strong> — remix vidéo avec Claude Vision</span></div>
+              <div className="flex gap-2"><span style={sfAccent}>✦</span><span><strong className="text-text">Session ID Instagram</strong> — stats & monitoring des comptes</span></div>
             </div>
-
-            <p className="text-xs text-text2">
-              Tu peux modifier ces clés à tout moment dans <strong className="text-text">Paramètres → Connexions</strong>.
-            </p>
 
             {saveErr && (
               <p className="text-xs text-danger bg-danger/10 border border-danger/30 rounded-lg px-3 py-2 text-left">
@@ -458,13 +265,14 @@ export function Onboarding({ user, onComplete, orgId }: OnboardingProps) {
               </p>
             )}
             <div className="flex gap-3">
-              <Button variant="secondary" onClick={() => setStep(3)}>← Retour</Button>
+              <Button variant="secondary" onClick={() => setStep(1)}>← Retour</Button>
               <Button className="flex-1" onClick={finish} loading={saving}>
                 Entrer dans ScaleFlow →
               </Button>
             </div>
           </div>
         )}
+
       </div>
     </div>
   )
