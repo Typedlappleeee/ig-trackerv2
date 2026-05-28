@@ -220,6 +220,7 @@ function ChatRow({ msg, isOwn, compact, isAdmin, likeCount, liked, onLike, onDel
   likeCount: number; liked: boolean; onLike: (id: string) => void
   onDelete: (id: string) => void; onMute?: (uid: string, name: string) => void
 }) {
+  const t = useT()
   return (
     <div className={`flex gap-3 group ${compact ? 'mt-[2px]' : 'mt-4'}`}>
       <div style={{ width: 34, flexShrink: 0 }}>
@@ -229,17 +230,17 @@ function ChatRow({ msg, isOwn, compact, isAdmin, likeCount, liked, onLike, onDel
         {!compact && (
           <div className="flex items-center gap-2 mb-[3px] flex-wrap">
             <span className="text-[13px] font-bold leading-none" style={{ color: isOwn ? '#c4b5fd' : '#e8e0ff' }}>
-              {msg.display_name || 'Anonymous'}
+              {msg.display_name || t('communityAnonymous')}
             </span>
             {msg.is_admin && (
               <span className="text-[8px] font-black uppercase px-1.5 py-[2px] rounded-full tracking-wide"
                 style={{ background: 'linear-gradient(130deg,rgba(124,58,237,0.35),rgba(236,72,153,0.25))', color: '#f0a8ff', border: '1px solid rgba(236,72,153,0.25)' }}>
-                ⭐ ScaleFlow Admin
+                {t('communityAdminLabel')}
               </span>
             )}
             {isOwn && !msg.is_admin && (
               <span className="text-[8px] font-black uppercase px-1.5 py-[2px] rounded-full tracking-wide"
-                style={{ background: 'rgba(139,92,246,0.2)', color: '#a78bfa' }}>Me</span>
+                style={{ background: 'rgba(139,92,246,0.2)', color: '#a78bfa' }}>{t('communityMeLabel')}</span>
             )}
             {msg.org_name && !msg.is_admin && (
               <span className="text-[10px] font-semibold px-2 py-[2px] rounded-full"
@@ -291,6 +292,7 @@ function ChatRow({ msg, isOwn, compact, isAdmin, likeCount, liked, onLike, onDel
 function SupportMsgRow({ msg, isAdmin, compact, onDelete }: {
   msg: Message; isAdmin: boolean; compact: boolean; onDelete: (id: string) => void
 }) {
+  const t = useT()
   const isAdminMsg = msg.is_admin
   return (
     <div className={`flex gap-3 group ${compact ? 'mt-[2px]' : 'mt-4'} ${isAdminMsg ? 'flex-row-reverse' : ''}`}>
@@ -301,12 +303,12 @@ function SupportMsgRow({ msg, isAdmin, compact, onDelete }: {
         {!compact && (
           <div className={`flex items-center gap-2 mb-[3px] flex-wrap ${isAdminMsg ? 'justify-end' : ''}`}>
             <span className="text-[13px] font-bold" style={{ color: isAdminMsg ? '#93c5fd' : '#e8e0ff' }}>
-              {msg.display_name || 'Anonymous'}
+              {msg.display_name || t('communityAnonymous')}
             </span>
             {isAdminMsg && (
               <span className="text-[8px] font-black uppercase px-1.5 py-[2px] rounded-full"
                 style={{ background: 'linear-gradient(130deg,rgba(124,58,237,0.35),rgba(236,72,153,0.25))', color: '#f0a8ff', border: '1px solid rgba(236,72,153,0.25)' }}>
-                ⭐ ScaleFlow Admin
+                {t('communityAdminLabel')}
               </span>
             )}
             <span className="text-[10px] opacity-0 group-hover:opacity-60 transition-opacity ml-auto tabular-nums"
@@ -338,13 +340,14 @@ function SupportMsgRow({ msg, isAdmin, compact, onDelete }: {
 function MuteModal({ targetName, onMute, onClose }: {
   targetName: string; onMute: (minutes: number) => void; onClose: () => void
 }) {
+  const t = useT()
   const [custom, setCustom] = useState('')
   const DURATIONS = [
-    { label: '30 minutes', minutes: 30 },
-    { label: '2 hours',    minutes: 120 },
-    { label: '24 hours',   minutes: 1440 },
-    { label: '7 days',     minutes: 10080 },
-    { label: '30 days',    minutes: 43200 },
+    { label: t('communityMute30min'), minutes: 30 },
+    { label: t('communityMute2h'),    minutes: 120 },
+    { label: t('communityMute24h'),   minutes: 1440 },
+    { label: t('communityMute7d'),    minutes: 10080 },
+    { label: t('communityMute30d'),   minutes: 43200 },
   ]
   return (
     <div className="fixed inset-0 z-[9980] flex items-center justify-center"
@@ -355,8 +358,8 @@ function MuteModal({ targetName, onMute, onClose }: {
         <div className="flex items-center justify-between px-5 py-4"
           style={{ borderBottom: '1px solid rgba(251,191,36,0.1)', background: 'rgba(251,191,36,0.04)' }}>
           <div>
-            <p className="font-black text-white text-[14px]">🔇 Mute {targetName}</p>
-            <p className="text-[10px] mt-0.5" style={{ color: 'rgba(251,191,36,0.5)' }}>Mute duration</p>
+            <p className="font-black text-white text-[14px]">{t('communityMuteTitle')} {targetName}</p>
+            <p className="text-[10px] mt-0.5" style={{ color: 'rgba(251,191,36,0.5)' }}>{t('communityMuteDuration')}</p>
           </div>
           <button onClick={onClose} className="w-7 h-7 rounded-lg flex items-center justify-center text-sm hover:bg-white/[0.06]"
             style={{ color: 'rgba(196,181,253,0.5)' }}>✕</button>
@@ -371,7 +374,7 @@ function MuteModal({ targetName, onMute, onClose }: {
           ))}
           <div className="flex gap-2 pt-1">
             <input type="number" value={custom} onChange={e => setCustom(e.target.value)}
-              placeholder="Custom duration (min)…" min={1}
+              placeholder={t('communityMuteCustom')} min={1}
               className="flex-1 rounded-xl px-3 py-2.5 text-sm text-white outline-none sf-input" />
             <button onClick={() => { const m = parseInt(custom); if (m > 0) onMute(m) }}
               disabled={!custom || parseInt(custom) <= 0}
@@ -388,6 +391,7 @@ function MuteModal({ targetName, onMute, onClose }: {
 function ProfileModal({ profile, userId, isAdmin, onClose, onSaved }: {
   profile: Profile; userId: string; isAdmin: boolean; onClose: () => void; onSaved: (p: Profile) => void
 }) {
+  const t = useT()
   const [name, setName]        = useState(profile.display_name)
   const [avatarUrl, setAUrl]   = useState(profile.avatar_url)
   const [uploading, setUpload]   = useState(false)
@@ -443,8 +447,8 @@ function ProfileModal({ profile, userId, isAdmin, onClose, onSaved }: {
         <div className="flex items-center justify-between px-5 py-4"
           style={{ borderBottom: '1px solid rgba(139,92,246,0.12)', background: 'linear-gradient(135deg,rgba(139,92,246,0.09),rgba(236,72,153,0.04))' }}>
           <div>
-            <p className="font-black text-white text-[15px]">My profile</p>
-            <p className="text-[10px] mt-0.5" style={{ color: 'rgba(196,181,253,0.45)' }}>Visible to the whole community</p>
+            <p className="font-black text-white text-[15px]">{t('communityProfileTitle')}</p>
+            <p className="text-[10px] mt-0.5" style={{ color: 'rgba(196,181,253,0.45)' }}>{t('communityProfileVisible')}</p>
           </div>
           <button onClick={onClose} className="w-7 h-7 rounded-lg flex items-center justify-center text-sm hover:bg-white/[0.06]"
             style={{ color: 'rgba(196,181,253,0.5)' }}>✕</button>
@@ -456,28 +460,28 @@ function ProfileModal({ profile, userId, isAdmin, onClose, onSaved }: {
               <div onClick={() => fileRef.current?.click()}
                 className="absolute inset-0 flex flex-col items-center justify-center gap-1 cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
                 style={{ background: 'rgba(0,0,0,0.6)', borderRadius: Math.round(80 * 0.3) }}>
-                {uploading ? <Spinner size="sm" /> : <><span className="text-lg">📷</span><span className="text-[9px] text-white font-bold">Edit</span></>}
+                {uploading ? <Spinner size="sm" /> : <><span className="text-lg">📷</span><span className="text-[9px] text-white font-bold">{t('communityProfileEdit')}</span></>}
               </div>
             </div>
             {uploadErr
               ? <p className="text-[10px] text-center max-w-[220px]" style={{ color: '#f87171' }}>{uploadErr}</p>
-              : <p className="text-[10px]" style={{ color: 'rgba(196,181,253,0.35)' }}>Click to change your photo</p>
+              : <p className="text-[10px]" style={{ color: 'rgba(196,181,253,0.35)' }}>{t('communityProfileClickToChange')}</p>
             }
           </div>
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="text-[10px] uppercase tracking-[0.15em] font-black" style={{ color: 'rgba(139,92,246,0.6)' }}>
-                Username
+                {t('communityProfileUsername')}
               </label>
               {!canChangeName && !isAdmin && (
                 <span className="text-[9px] font-semibold px-2 py-0.5 rounded-lg"
                   style={{ background: 'rgba(239,68,68,0.1)', color: 'rgba(252,165,165,0.7)', border: '1px solid rgba(239,68,68,0.15)' }}>
-                  🔒 In {daysLeft} day{daysLeft !== 1 ? 's' : ''}
+                  🔒 {t('communityProfileInDays').replace('{n}', String(daysLeft)).replace('{s}', daysLeft !== 1 ? 's' : '')}
                 </span>
               )}
             </div>
             <input type="text" value={displayedName} onChange={e => canChangeName && setName(e.target.value)}
-              disabled={!canChangeName} placeholder="Your username…" maxLength={32}
+              disabled={!canChangeName} placeholder={t('communityProfileUsernamePlaceholder')} maxLength={32}
               className="w-full rounded-xl px-3.5 py-2.5 text-sm text-white outline-none sf-input disabled:opacity-50 disabled:cursor-not-allowed" />
             {canChangeName && (
               <div className="flex justify-end mt-1">
@@ -489,19 +493,19 @@ function ProfileModal({ profile, userId, isAdmin, onClose, onSaved }: {
             style={{ background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.12)' }}>
             <Avatar url={avatarUrl} name={displayedName || '?'} userId={userId} size={36} />
             <div>
-              <p className="text-[12px] font-bold text-white">{displayedName || 'Your username'}</p>
-              <p className="text-[10px]" style={{ color: 'rgba(196,181,253,0.4)' }}>Preview</p>
+              <p className="text-[12px] font-bold text-white">{displayedName || t('communityCreateNameLabel')}</p>
+              <p className="text-[10px]" style={{ color: 'rgba(196,181,253,0.4)' }}>{t('communityProfilePreview')}</p>
             </div>
           </div>
         </div>
         <div className="px-5 pb-5 flex gap-2.5">
           <button onClick={onClose} className="flex-1 py-2.5 rounded-xl text-[12px] font-semibold transition-all"
             style={{ background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.6)', border: '1px solid rgba(255,255,255,0.07)' }}>
-            Cancel
+            {t('cancel')}
           </button>
           <button onClick={save} disabled={saving || uploading}
             className="flex-1 py-2.5 rounded-xl text-[12px] font-semibold transition-all btn-sf-primary disabled:opacity-50">
-            {saving ? 'Saving…' : 'Save'}
+            {saving ? t('communityProfileSaving') : t('communityProfileSave')}
           </button>
         </div>
       </div>
@@ -519,6 +523,7 @@ function CreateTopicModal({ onClose, onCreate }: {
   onClose: () => void
   onCreate: (topic: { name: string; description: string; emoji: string }) => Promise<void>
 }) {
+  const t = useT()
   const [name, setName]     = useState('')
   const [desc, setDesc]     = useState('')
   const [emoji, setEmoji]   = useState('💬')
@@ -540,8 +545,8 @@ function CreateTopicModal({ onClose, onCreate }: {
         <div className="flex items-center justify-between px-5 py-4"
           style={{ borderBottom: '1px solid rgba(139,92,246,0.12)', background: 'linear-gradient(135deg,rgba(139,92,246,0.09),rgba(236,72,153,0.04))' }}>
           <div>
-            <p className="font-black text-white text-[15px]">Create a community</p>
-            <p className="text-[10px] mt-0.5" style={{ color: 'rgba(196,181,253,0.45)' }}>Visible to all members</p>
+            <p className="font-black text-white text-[15px]">{t('communityCreateTitle')}</p>
+            <p className="text-[10px] mt-0.5" style={{ color: 'rgba(196,181,253,0.45)' }}>{t('communityCreateVisible')}</p>
           </div>
           <button onClick={onClose} className="w-7 h-7 rounded-lg flex items-center justify-center text-sm hover:bg-white/[0.06]"
             style={{ color: 'rgba(196,181,253,0.5)' }}>✕</button>
@@ -549,7 +554,7 @@ function CreateTopicModal({ onClose, onCreate }: {
         <div className="p-5 space-y-4">
           {/* Emoji picker */}
           <div>
-            <label className="text-[10px] uppercase tracking-[0.15em] font-black block mb-2" style={{ color: 'rgba(139,92,246,0.6)' }}>Icon</label>
+            <label className="text-[10px] uppercase tracking-[0.15em] font-black block mb-2" style={{ color: 'rgba(139,92,246,0.6)' }}>{t('communityCreateIcon')}</label>
             <div className="flex flex-wrap gap-1.5">
               {TOPIC_EMOJIS.map(e => (
                 <button key={e} onClick={() => setEmoji(e)}
@@ -564,9 +569,9 @@ function CreateTopicModal({ onClose, onCreate }: {
           </div>
           {/* Name */}
           <div>
-            <label className="text-[10px] uppercase tracking-[0.15em] font-black block mb-1.5" style={{ color: 'rgba(139,92,246,0.6)' }}>Name *</label>
+            <label className="text-[10px] uppercase tracking-[0.15em] font-black block mb-1.5" style={{ color: 'rgba(139,92,246,0.6)' }}>{t('communityCreateName')}</label>
             <input type="text" value={name} onChange={e => setName(e.target.value)}
-              placeholder="Ex: Growth Hacks, IG Creatives…" maxLength={40}
+              placeholder={t('communityCreateNamePlaceholder')} maxLength={40}
               className="w-full rounded-xl px-3.5 py-2.5 text-sm text-white outline-none sf-input" />
             <div className="flex justify-end mt-1">
               <span className="text-[9px]" style={{ color: 'rgba(196,181,253,0.25)' }}>{name.length}/40</span>
@@ -574,9 +579,9 @@ function CreateTopicModal({ onClose, onCreate }: {
           </div>
           {/* Description */}
           <div>
-            <label className="text-[10px] uppercase tracking-[0.15em] font-black block mb-1.5" style={{ color: 'rgba(139,92,246,0.6)' }}>Description</label>
+            <label className="text-[10px] uppercase tracking-[0.15em] font-black block mb-1.5" style={{ color: 'rgba(139,92,246,0.6)' }}>{t('communityCreateDescription')}</label>
             <textarea value={desc} onChange={e => setDesc(e.target.value)}
-              placeholder="What is this community about?" maxLength={140} rows={2}
+              placeholder={t('communityCreateDescPlaceholder')} maxLength={140} rows={2}
               className="w-full rounded-xl px-3.5 py-2.5 text-sm text-white outline-none resize-none sf-input" />
             <div className="flex justify-end mt-1">
               <span className="text-[9px]" style={{ color: 'rgba(196,181,253,0.25)' }}>{desc.length}/140</span>
@@ -588,19 +593,19 @@ function CreateTopicModal({ onClose, onCreate }: {
             <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
               style={{ background: 'rgba(139,92,246,0.15)' }}>{emoji}</div>
             <div className="min-w-0">
-              <p className="text-[13px] font-black text-white truncate">{name || 'Community name'}</p>
-              <p className="text-[10px] truncate" style={{ color: 'rgba(196,181,253,0.4)' }}>{desc || 'Description…'}</p>
+              <p className="text-[13px] font-black text-white truncate">{name || t('communityCreateNameLabel')}</p>
+              <p className="text-[10px] truncate" style={{ color: 'rgba(196,181,253,0.4)' }}>{desc || t('communityCreateDescLabel')}</p>
             </div>
           </div>
         </div>
         <div className="px-5 pb-5 flex gap-2.5">
           <button onClick={onClose} className="flex-1 py-2.5 rounded-xl text-[12px] font-semibold transition-all"
             style={{ background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.6)', border: '1px solid rgba(255,255,255,0.07)' }}>
-            Cancel
+            {t('cancel')}
           </button>
           <button onClick={submit} disabled={!name.trim() || saving}
             className="flex-1 py-2.5 rounded-xl text-[12px] font-semibold transition-all btn-sf-primary disabled:opacity-40">
-            {saving ? 'Creating…' : '✨ Create'}
+            {saving ? t('communityCreating') : t('communityCreate')}
           </button>
         </div>
       </div>
@@ -740,6 +745,7 @@ CREATE POLICY "topic_messages_insert" ON topic_messages FOR INSERT WITH CHECK (a
 CREATE POLICY "topic_messages_delete" ON topic_messages FOR DELETE USING (auth.uid() = user_id OR EXISTS (SELECT 1 FROM platform_admins WHERE user_id = auth.uid()));`
 
 function SetupScreen({ onRetry }: { onRetry: () => void }) {
+  const t = useT()
   const [copied, setCopied] = useState(false)
   function copy() {
     navigator.clipboard.writeText(SETUP_SQL)
@@ -750,9 +756,9 @@ function SetupScreen({ onRetry }: { onRetry: () => void }) {
       <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl"
         style={{ background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.2)' }}>💬</div>
       <div className="text-center space-y-2">
-        <p className="text-lg font-black text-white">Setup required</p>
+        <p className="text-lg font-black text-white">{t('communitySetupTitle')}</p>
         <p className="text-sm max-w-sm" style={{ color: 'rgba(196,181,253,0.5)' }}>
-          Run this SQL in <strong className="text-accent">Supabase → SQL Editor</strong> to enable the community.
+          {t('communitySetupDesc')} <strong className="text-accent">Supabase → SQL Editor</strong> to enable the community.
         </p>
       </div>
       <div className="w-full max-w-2xl rounded-xl overflow-hidden"
@@ -762,7 +768,7 @@ function SetupScreen({ onRetry }: { onRetry: () => void }) {
           <span className="text-[10px] uppercase tracking-widest font-bold" style={{ color: '#a78bfa' }}>SQL</span>
           <button onClick={copy} className="text-[10px] font-semibold px-2.5 py-1 rounded-lg transition-all"
             style={{ background: copied ? 'rgba(52,211,153,0.15)' : 'rgba(139,92,246,0.15)', color: copied ? '#34d399' : '#a78bfa' }}>
-            {copied ? '✓ Copied' : '📋 Copy'}
+            {copied ? t('communitySetupCopied') : t('communitySetupCopy')}
           </button>
         </div>
         <pre className="p-4 text-[11px] leading-relaxed overflow-auto max-h-56"
@@ -771,7 +777,7 @@ function SetupScreen({ onRetry }: { onRetry: () => void }) {
         </pre>
       </div>
       <button onClick={onRetry} className="px-5 py-2.5 rounded-xl text-sm font-semibold btn-sf-primary">
-        ↺ Retry
+        {t('communitySetupRetry')}
       </button>
     </div>
   )
@@ -780,6 +786,7 @@ function SetupScreen({ onRetry }: { onRetry: () => void }) {
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export function Community({ user, onNavigate }: CommunityProps) {
+  const t = useT()
   const { currentOrg } = useOrg()
   useLicense()
 
@@ -928,9 +935,9 @@ export function Community({ user, onNavigate }: CommunityProps) {
         if (msg.user_id !== user.id && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
           const body = msg.content.slice(0, 80) + (msg.content.length > 80 ? '…' : '')
           if (msg.channel === 'support' && !msg.is_admin && isAdminRef.current) {
-            new Notification(`🎫 Nouveau ticket — ${msg.display_name}`, { body, silent: false })
+            new Notification(t('communityNotifNewTicket').replace('{name}', msg.display_name), { body, silent: false })
           } else if (msg.channel === 'support' && msg.is_admin && msg.thread_user_id === user.id) {
-            new Notification('💬 Réponse à ton ticket', { body: `ScaleFlow Admin : ${body}`, silent: false })
+            new Notification(t('communityNotifReply'), { body: `${t('communityNotifAdminPrefix')}${body}`, silent: false })
           }
         }
       })
@@ -1222,9 +1229,9 @@ export function Community({ user, onNavigate }: CommunityProps) {
       <div className="flex-shrink-0 flex items-center justify-between px-6 py-4"
         style={{ borderBottom: '1px solid rgba(139,92,246,0.12)', background: 'rgba(8,5,20,0.95)', backdropFilter: 'blur(12px)' }}>
         <div>
-          <h1 className="text-[18px] font-black text-white leading-tight">Communauté</h1>
+          <h1 className="text-[18px] font-black text-white leading-tight">{t('communityTitle')}</h1>
           <p className="text-[11px] mt-0.5" style={{ color: 'rgba(196,181,253,0.4)' }}>
-            Rejoignez la communauté ScaleFlow
+            {t('communitySub')}
           </p>
         </div>
         <button onClick={() => setShowProfile(true)}
@@ -1234,7 +1241,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
           <div className="text-left">
             <p className="text-[11.5px] font-semibold leading-tight"
               style={{ color: profile.display_name ? 'white' : 'rgba(196,181,253,0.4)' }}>
-              {profile.display_name || 'Définir pseudo'}
+              {profile.display_name || t('communitySetPseudo')}
             </p>
             {currentOrg && <p className="text-[9.5px] leading-tight" style={{ color: 'rgba(139,92,246,0.7)' }}>{currentOrg.name}</p>}
           </div>
@@ -1248,7 +1255,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
           style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)' }}>
           <span className="text-sm">🔇</span>
           <p className="text-[11px]" style={{ color: 'rgba(251,191,36,0.8)' }}>
-            Tu es muté jusqu'au <strong>
+            {t('communityMutedBanner')} <strong>
               {new Date(mutedUntil!).toLocaleDateString('en-US', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}
             </strong>
           </p>
@@ -1259,21 +1266,21 @@ export function Community({ user, onNavigate }: CommunityProps) {
       <div className="flex-shrink-0 flex px-5 gap-1"
         style={{ borderBottom: '1px solid rgba(139,92,246,0.1)', background: 'rgba(8,5,20,0.7)' }}>
         {([
-          { id: 'news'    as Tab, label: 'Actualités', icon: '📢' },
-          { id: 'topics'  as Tab, label: 'Communautés', icon: '🌐' },
-          { id: 'support' as Tab, label: 'Support',     icon: '🎫' },
-        ]).map(t => (
-          <button key={t.id} onClick={() => {
-              setTab(t.id)
-              if (t.id === 'support') setLastSeenSupportAt(new Date().toISOString())
+          { id: 'news'    as Tab, label: t('communityTabNews'),    icon: '📢' },
+          { id: 'topics'  as Tab, label: t('communityTabTopics'),  icon: '🌐' },
+          { id: 'support' as Tab, label: t('communityTabSupport'), icon: '🎫' },
+        ]).map(tab_ => (
+          <button key={tab_.id} onClick={() => {
+              setTab(tab_.id)
+              if (tab_.id === 'support') setLastSeenSupportAt(new Date().toISOString())
             }}
             className="flex items-center gap-1.5 px-4 py-2.5 text-[12.5px] font-bold transition-all relative"
-            style={tab === t.id
+            style={tab === tab_.id
               ? { color: '#c4b5fd', borderBottom: '2px solid #8b5cf6', marginBottom: -1 }
               : { color: 'rgba(196,181,253,0.35)', borderBottom: '2px solid transparent', marginBottom: -1 }}>
-            <span className="text-[14px]">{t.icon}</span>
-            <span>{t.label}</span>
-            {t.id === 'support' && !isAdmin && tab !== 'support' &&
+            <span className="text-[14px]">{tab_.icon}</span>
+            <span>{tab_.label}</span>
+            {tab_.id === 'support' && !isAdmin && tab !== 'support' &&
               myThreadMessages.some(m => m.is_admin && new Date(m.created_at) > new Date(lastSeenSupportAt)) && (
               <span className="w-2 h-2 rounded-full flex-shrink-0"
                 style={{ background: '#ec4899', boxShadow: '0 0 6px #ec4899' }} />
@@ -1305,11 +1312,11 @@ export function Community({ user, onNavigate }: CommunityProps) {
                         <div className="flex items-center gap-2 mb-4">
                           <span className="text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full"
                             style={{ background: 'linear-gradient(130deg,rgba(124,58,237,0.45),rgba(236,72,153,0.3))', color: '#f0a8ff', border: '1px solid rgba(236,72,153,0.3)' }}>
-                            📌 Épinglé
+                            {t('communityNewsPinned')}
                           </span>
                           <span className="text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full"
                             style={{ background: 'rgba(139,92,246,0.15)', color: '#c4b5fd', border: '1px solid rgba(139,92,246,0.25)' }}>
-                            Actualités ScaleFlow
+                            {t('communityNewsScaleFlow')}
                           </span>
                         </div>
                         {featuredMsg.title && (
@@ -1371,7 +1378,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                       <div className="w-7 h-7 rounded-lg flex items-center justify-center text-sm flex-shrink-0"
                         style={{ background: 'rgba(139,92,246,0.15)' }}>📢</div>
                       <span className="text-[12.5px] font-semibold" style={{ color: 'rgba(196,181,253,0.55)' }}>
-                        + Nouvelle publication
+                        {t('communityNewsNewPost')}
                       </span>
                       <span className="ml-auto text-[9px] font-black px-2 py-0.5 rounded-lg"
                         style={{ background: 'rgba(124,58,237,0.25)', color: '#f0a8ff' }}>ADMIN</span>
@@ -1385,16 +1392,16 @@ export function Community({ user, onNavigate }: CommunityProps) {
                         style={{ borderBottom: '1px solid rgba(139,92,246,0.12)', background: 'linear-gradient(135deg,rgba(139,92,246,0.1),rgba(236,72,153,0.05))' }}>
                         <div className="flex items-center gap-2">
                           <span>📢</span>
-                          <p className="text-[12px] font-black text-white">Nouvelle publication</p>
+                          <p className="text-[12px] font-black text-white">{t('communityNewsNewPost').replace('+ ', '')}</p>
                         </div>
                         <button onClick={() => setShowNewsForm(false)} style={{ color: 'rgba(196,181,253,0.4)' }}>✕</button>
                       </div>
                       <div className="p-4 space-y-3">
                         <input type="text" value={newsTitle} onChange={e => setNewsTitle(e.target.value)}
-                          placeholder="Titre (optionnel)…"
+                          placeholder={t('communityNewsTitlePlaceholder')}
                           className="w-full rounded-xl px-3.5 py-2.5 text-sm font-bold text-white outline-none sf-input" />
                         <textarea value={newsContent} onChange={e => setNewsContent(e.target.value)}
-                          placeholder="Contenu…" rows={4} maxLength={2000}
+                          placeholder={t('communityNewsContentPlaceholder')} rows={4} maxLength={2000}
                           className="w-full rounded-xl px-3.5 py-2.5 text-sm text-white outline-none resize-none sf-input" />
                         {newsVideo ? (
                           <div className="flex items-center gap-2 px-3 py-2 rounded-lg"
@@ -1408,7 +1415,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                             className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left transition-all"
                             style={{ background: 'rgba(139,92,246,0.04)', border: '1px dashed rgba(139,92,246,0.2)', color: 'rgba(196,181,253,0.5)' }}>
                             <span className="text-sm">📎</span>
-                            <span className="text-[11px]">Joindre une image / vidéo (optionnel)</span>
+                            <span className="text-[11px]">{t('communityNewsAttach')}</span>
                           </button>
                         )}
                         <input ref={newsVideoRef} type="file" accept="image/*,video/*" className="hidden"
@@ -1419,11 +1426,11 @@ export function Community({ user, onNavigate }: CommunityProps) {
                             <button onClick={() => { setShowNewsForm(false); setNewsVideo(null) }}
                               className="px-4 py-2 rounded-xl text-[12px] font-semibold"
                               style={{ background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.6)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                              Cancel
+                              {t('cancel')}
                             </button>
                             <button onClick={sendNews} disabled={(!newsContent.trim() && !newsVideo) || newsSending}
                               className="px-4 py-2 rounded-xl text-[12px] font-semibold btn-sf-primary disabled:opacity-40">
-                              {newsSending ? 'Publication…' : '📢 Publier'}
+                              {newsSending ? t('communityNewsPublishing') : t('communityNewsPublish')}
                             </button>
                           </div>
                         </div>
@@ -1435,7 +1442,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                   {newsMessages.length > 1 && (
                     <div>
                       <div className="flex items-center justify-between mb-3">
-                        <h2 className="text-[13px] font-black text-white">Dernières publications</h2>
+                        <h2 className="text-[13px] font-black text-white">{t('communityNewsLatest')}</h2>
                       </div>
                       <div className="space-y-2">
                         {newsMessages.slice(1).map(msg => (
@@ -1449,7 +1456,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                               <div className="flex items-center gap-2 mb-1 flex-wrap">
                                 <span className="text-[9px] font-black uppercase tracking-wide px-1.5 py-[2px] rounded-full flex-shrink-0"
                                   style={{ background: 'linear-gradient(130deg,rgba(124,58,237,0.3),rgba(236,72,153,0.2))', color: '#f0a8ff', border: '1px solid rgba(236,72,153,0.2)' }}>
-                                  Actualités
+                                  {t('communityNewsFeaturedBadge')}
                                 </span>
                                 {msg.title && (
                                   <p className="text-[13px] font-bold text-white truncate">{msg.title}</p>
@@ -1487,9 +1494,9 @@ export function Community({ user, onNavigate }: CommunityProps) {
                       <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl"
                         style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.12)' }}>📢</div>
                       <div className="space-y-1">
-                        <p className="font-bold text-white">Aucune actualité</p>
+                        <p className="font-bold text-white">{t('communityNewsEmpty')}</p>
                         <p className="text-sm" style={{ color: 'rgba(196,181,253,0.4)' }}>
-                          Les admins publieront bientôt des actualités.
+                          {t('communityNewsEmptyHint')}
                         </p>
                       </div>
                     </div>
@@ -1509,18 +1516,18 @@ export function Community({ user, onNavigate }: CommunityProps) {
               <div className="px-4 py-3"
                 style={{ borderBottom: '1px solid rgba(139,92,246,0.1)', background: 'rgba(139,92,246,0.07)' }}>
                 <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: '#a78bfa' }}>
-                  À propos
+                  {t('communityAbout')}
                 </p>
               </div>
               <div className="p-4 space-y-3">
                 <p className="text-[11.5px] leading-relaxed" style={{ color: 'rgba(196,181,253,0.5)' }}>
-                  La communauté officielle ScaleFlow — échangez, partagez et évoluez ensemble.
+                  {t('communityAboutDesc')}
                 </p>
                 <div className="grid grid-cols-3 gap-2">
                   {[
-                    { label: 'Membres', value: uniqueUserCount > 0 ? uniqueUserCount : '—' },
-                    { label: 'En ligne', value: '🟢' },
-                    { label: 'Posts', value: newsMessages.length },
+                    { label: t('communityAboutMembers'), value: uniqueUserCount > 0 ? uniqueUserCount : '—' },
+                    { label: t('communityAboutOnline'), value: '🟢' },
+                    { label: t('communityAboutPosts'), value: newsMessages.length },
                   ].map(s => (
                     <div key={s.label} className="rounded-lg p-2 text-center"
                       style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.1)' }}>
@@ -1532,7 +1539,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                 <a href="https://t.me/+drqJbwraMag5M2I0" target="_blank" rel="noreferrer"
                   className="w-full py-2 rounded-xl text-[12px] font-semibold transition-all flex items-center justify-center gap-1.5 hover:brightness-110"
                   style={{ background: 'rgba(34,150,243,0.12)', color: '#60b8f5', border: '1px solid rgba(34,150,243,0.2)' }}>
-                  ✈️ Rejoindre Telegram
+                  {t('communityTelegram')}
                 </a>
               </div>
             </div>
@@ -1544,7 +1551,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                 <div className="px-4 py-3"
                   style={{ borderBottom: '1px solid rgba(139,92,246,0.1)', background: 'rgba(139,92,246,0.07)' }}>
                   <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: '#a78bfa' }}>
-                    Membres les plus actifs
+                    {t('communityTopMembers')}
                   </p>
                 </div>
                 <div className="p-3 space-y-2">
@@ -1556,7 +1563,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                       </span>
                       <Avatar url={m.avatar_url} name={m.display_name} userId={m.user_id} size={24} />
                       <span className="flex-1 text-[11px] font-semibold text-white truncate">
-                        {m.display_name || 'Anonymous'}
+                        {m.display_name || t('communityAnonymous')}
                       </span>
                       <span className="text-[10px] tabular-nums flex-shrink-0"
                         style={{ color: 'rgba(196,181,253,0.3)' }}>
@@ -1566,7 +1573,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                   ))}
                   <button className="w-full mt-1 py-1.5 rounded-lg text-[11px] font-semibold transition-all"
                     style={{ background: 'transparent', color: 'rgba(196,181,253,0.35)', border: '1px solid rgba(139,92,246,0.1)' }}>
-                    Voir le classement →
+                    {t('communityViewLeaderboard')}
                   </button>
                 </div>
               </div>
@@ -1578,7 +1585,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
               <div className="px-4 py-3"
                 style={{ borderBottom: '1px solid rgba(139,92,246,0.1)', background: 'rgba(139,92,246,0.07)' }}>
                 <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: '#a78bfa' }}>
-                  Besoin d'aide ?
+                  {t('communityHelpTitle')}
                 </p>
               </div>
               <div className="p-3 space-y-2">
@@ -1587,8 +1594,8 @@ export function Community({ user, onNavigate }: CommunityProps) {
                   style={{ background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(139,92,246,0.18)' }}>
                   <span className="text-base flex-shrink-0">🎫</span>
                   <div className="flex-1 min-w-0">
-                    <p className="text-[12px] font-semibold text-white leading-tight">Ouvrir un ticket</p>
-                    <p className="text-[9.5px] mt-0.5" style={{ color: 'rgba(196,181,253,0.4)' }}>Support ScaleFlow</p>
+                    <p className="text-[12px] font-semibold text-white leading-tight">{t('communityOpenTicket')}</p>
+                    <p className="text-[9.5px] mt-0.5" style={{ color: 'rgba(196,181,253,0.4)' }}>{t('communityOpenTicketSub')}</p>
                   </div>
                   <span className="text-[10px] flex-shrink-0" style={{ color: 'rgba(196,181,253,0.3)' }}>→</span>
                 </button>
@@ -1607,12 +1614,12 @@ export function Community({ user, onNavigate }: CommunityProps) {
                 {/* Header row */}
                 <div className="flex items-center justify-between mb-4">
                   <div>
-                    <h2 className="text-[16px] font-black text-white">Communautés</h2>
-                    <p className="text-[10px] mt-0.5" style={{ color: 'rgba(196,181,253,0.4)' }}>{topics.length} communauté{topics.length !== 1 ? 's' : ''}</p>
+                    <h2 className="text-[16px] font-black text-white">{t('communityTopicsHeader')}</h2>
+                    <p className="text-[10px] mt-0.5" style={{ color: 'rgba(196,181,253,0.4)' }}>{topics.length} {t('communityTabTopics').toLowerCase()}</p>
                   </div>
                   <button onClick={() => { if (!requirePseudo()) return; setShowCreateTopic(true) }}
                     className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-[12px] font-semibold transition-all btn-sf-primary">
-                    <span>+</span> Créer
+                    {t('communityTopicsCreate')}
                   </button>
                 </div>
 
@@ -1620,7 +1627,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                 <div className="relative mb-5">
                   <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[13px]" style={{ color: 'rgba(196,181,253,0.3)' }}>🔍</span>
                   <input type="text" value={topicSearch} onChange={e => setTopicSearch(e.target.value)}
-                    placeholder="Rechercher une communauté…"
+                    placeholder={t('communityTopicsSearch')}
                     className="w-full rounded-xl pl-9 pr-4 py-2.5 text-sm text-white outline-none sf-input" />
                 </div>
 
@@ -1629,12 +1636,12 @@ export function Community({ user, onNavigate }: CommunityProps) {
                     <div className="w-20 h-20 rounded-3xl flex items-center justify-center text-4xl"
                       style={{ background: 'linear-gradient(135deg,rgba(139,92,246,0.12),rgba(236,72,153,0.06))', border: '1px solid rgba(139,92,246,0.15)' }}>🌐</div>
                     <div className="space-y-1.5">
-                      <p className="text-base font-black text-white">Aucune communauté</p>
-                      <p className="text-sm" style={{ color: 'rgba(196,181,253,0.4)' }}>Sois le premier à créer une communauté !</p>
+                      <p className="text-base font-black text-white">{t('communityTopicsEmpty')}</p>
+                      <p className="text-sm" style={{ color: 'rgba(196,181,253,0.4)' }}>{t('communityTopicsEmptyHint')}</p>
                     </div>
                     <button onClick={() => { if (!requirePseudo()) return; setShowCreateTopic(true) }}
                       className="px-5 py-2.5 rounded-xl text-sm font-semibold btn-sf-primary">
-                      ✨ Créer la première communauté
+                      {t('communityTopicsEmptyCreate')}
                     </button>
                   </div>
                 ) : (() => {
@@ -1644,49 +1651,49 @@ export function Community({ user, onNavigate }: CommunityProps) {
                   const joined  = filtered.filter(t => joinedTopicIds.has(t.id))
                   const others  = filtered.filter(t => !joinedTopicIds.has(t.id))
 
-                  function TopicCard({ t }: { t: Topic }) {
-                    const members = memberCounts.get(t.id) ?? 0
-                    const last    = topicLastMsg.get(t.id)
-                    const isJoined = joinedTopicIds.has(t.id)
-                    const canDelete = isAdmin || t.created_by === user.id
+                  function TopicCard({ t: topic }: { t: Topic }) {
+                    const members = memberCounts.get(topic.id) ?? 0
+                    const last    = topicLastMsg.get(topic.id)
+                    const isJoined = joinedTopicIds.has(topic.id)
+                    const canDelete = isAdmin || topic.created_by === user.id
                     return (
                       <div className="relative group flex flex-col gap-3 p-4 rounded-2xl cursor-pointer transition-all hover:border-purple-500/40"
                         style={{ background: isJoined ? 'rgba(139,92,246,0.08)' : 'rgba(8,5,20,0.8)', border: `1px solid ${isJoined ? 'rgba(139,92,246,0.25)' : 'rgba(139,92,246,0.1)'}` }}
-                        onClick={() => { setSelectedTopic(t); setTopicsView('chat') }}>
+                        onClick={() => { setSelectedTopic(topic); setTopicsView('chat') }}>
                         <div className="flex items-start gap-3">
                           <div className="w-11 h-11 rounded-xl flex items-center justify-center text-2xl flex-shrink-0"
-                            style={{ background: isJoined ? 'rgba(139,92,246,0.2)' : 'rgba(139,92,246,0.08)' }}>{t.emoji}</div>
+                            style={{ background: isJoined ? 'rgba(139,92,246,0.2)' : 'rgba(139,92,246,0.08)' }}>{topic.emoji}</div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-0.5">
-                              <p className="text-[13.5px] font-black text-white truncate">{t.name}</p>
+                              <p className="text-[13.5px] font-black text-white truncate">{topic.name}</p>
                               {isJoined && <span className="text-[8px] font-black px-1.5 py-[2px] rounded-full flex-shrink-0"
-                                style={{ background: 'rgba(139,92,246,0.2)', color: '#c4b5fd' }}>REJOINT</span>}
+                                style={{ background: 'rgba(139,92,246,0.2)', color: '#c4b5fd' }}>{t('communityTopicsJoinedBadge')}</span>}
                             </div>
-                            {t.description && (
-                              <p className="text-[11.5px] leading-relaxed line-clamp-2" style={{ color: 'rgba(196,181,253,0.5)' }}>{t.description}</p>
+                            {topic.description && (
+                              <p className="text-[11.5px] leading-relaxed line-clamp-2" style={{ color: 'rgba(196,181,253,0.5)' }}>{topic.description}</p>
                             )}
                           </div>
                           {canDelete && (
-                            <button onClick={e => { e.stopPropagation(); deleteTopic(t.id) }}
+                            <button onClick={e => { e.stopPropagation(); deleteTopic(topic.id) }}
                               className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-lg text-[12px]"
                               style={{ color: 'rgba(239,68,68,0.6)' }} title="Delete">🗑</button>
                           )}
                         </div>
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3 text-[10px]" style={{ color: 'rgba(196,181,253,0.35)' }}>
-                            <span>👥 {members} membre{members !== 1 ? 's' : ''}</span>
+                            <span>👥 {members} {members !== 1 ? t('communityMemberPlural') : t('communityMemberSingular')}</span>
                             {last && <><span>·</span><span className="truncate max-w-[140px]">{last.content.slice(0, 35)}{last.content.length > 35 ? '…' : ''}</span><span>·</span><span>{timeAgo(last.at)}</span></>}
                           </div>
                           <button onClick={e => {
                               e.stopPropagation()
-                              if (isJoined) leaveTopic(t.id)
-                              else joinTopic(t.id)
+                              if (isJoined) leaveTopic(topic.id)
+                              else joinTopic(topic.id)
                             }}
                             className="flex-shrink-0 px-3 py-1 rounded-lg text-[11px] font-bold transition-all"
                             style={isJoined
                               ? { background: 'rgba(239,68,68,0.1)', color: 'rgba(252,165,165,0.7)', border: '1px solid rgba(239,68,68,0.15)' }
                               : { background: 'rgba(139,92,246,0.15)', color: '#c4b5fd', border: '1px solid rgba(139,92,246,0.25)' }}>
-                            {isJoined ? 'Quitter' : '+ Rejoindre'}
+                            {isJoined ? t('communityTopicsLeave') : t('communityTopicsJoin')}
                           </button>
                         </div>
                       </div>
@@ -1697,7 +1704,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                     <div className="space-y-5">
                       {joined.length > 0 && (
                         <div>
-                          <p className="text-[9px] uppercase tracking-widest font-black mb-3 px-0.5" style={{ color: 'rgba(139,92,246,0.5)' }}>Mes communautés</p>
+                          <p className="text-[9px] uppercase tracking-widest font-black mb-3 px-0.5" style={{ color: 'rgba(139,92,246,0.5)' }}>{t('communityTopicsMyCommunities')}</p>
                           <div className="space-y-2">
                             {joined.map(t => <TopicCard key={t.id} t={t} />)}
                           </div>
@@ -1706,7 +1713,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                       {others.length > 0 && (
                         <div>
                           <p className="text-[9px] uppercase tracking-widest font-black mb-3 px-0.5" style={{ color: 'rgba(139,92,246,0.5)' }}>
-                            {joined.length > 0 ? 'Découvrir' : 'Toutes les communautés'}
+                            {joined.length > 0 ? t('communityTopicsDiscover') : t('communityTopicsAll')}
                           </p>
                           <div className="space-y-2">
                             {others.map(t => <TopicCard key={t.id} t={t} />)}
@@ -1715,10 +1722,10 @@ export function Community({ user, onNavigate }: CommunityProps) {
                       )}
                       {filtered.length === 0 && topicSearch && (
                         <div className="flex flex-col items-center py-12 gap-2 text-center">
-                          <p className="text-[13px] font-bold text-white">Aucun résultat pour « {topicSearch} »</p>
+                          <p className="text-[13px] font-bold text-white">{t('communityTopicsNoResult')} « {topicSearch} »</p>
                           <button onClick={() => { setTopicSearch(''); setShowCreateTopic(true) }}
                             className="text-[11px] mt-1" style={{ color: '#a78bfa' }}>
-                            Créer cette communauté →
+                            {t('communityTopicsCreateThis')}
                           </button>
                         </div>
                       )}
@@ -1741,7 +1748,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                 <div className="flex-1 min-w-0">
                   <p className="text-[13px] font-black text-white leading-tight">{selectedTopic?.name}</p>
                   <p className="text-[9px]" style={{ color: 'rgba(196,181,253,0.4)' }}>
-                    {memberCounts.get(selectedTopic?.id ?? '') ?? 0} membre{(memberCounts.get(selectedTopic?.id ?? '') ?? 0) !== 1 ? 's' : ''}
+                    {(() => { const cnt = memberCounts.get(selectedTopic?.id ?? '') ?? 0; return `${cnt} ${cnt !== 1 ? t('communityMemberPlural') : t('communityMemberSingular')}` })()}
                   </p>
                 </div>
                 {selectedTopic && (
@@ -1749,12 +1756,12 @@ export function Community({ user, onNavigate }: CommunityProps) {
                     <button onClick={() => leaveTopic(selectedTopic.id)}
                       className="px-3 py-1.5 rounded-xl text-[11px] font-semibold transition-all"
                       style={{ background: 'rgba(239,68,68,0.08)', color: 'rgba(252,165,165,0.7)', border: '1px solid rgba(239,68,68,0.15)' }}>
-                      Quitter
+                      {t('communityTopicsLeave')}
                     </button>
                   ) : (
                     <button onClick={() => joinTopic(selectedTopic.id)}
                       className="px-3 py-1.5 rounded-xl text-[11px] font-semibold transition-all btn-sf-primary">
-                      + Rejoindre
+                      {t('communityTopicsJoin')}
                     </button>
                   )
                 )}
@@ -1769,15 +1776,15 @@ export function Community({ user, onNavigate }: CommunityProps) {
                       {selectedTopic?.emoji}
                     </div>
                     <div className="text-center space-y-1">
-                      <p className="font-bold text-white">Début de {selectedTopic?.name}</p>
-                      <p className="text-sm" style={{ color: 'rgba(196,181,253,0.4)' }}>Sois le premier à écrire ici !</p>
+                      <p className="font-bold text-white">{selectedTopic?.name}</p>
+                      <p className="text-sm" style={{ color: 'rgba(196,181,253,0.4)' }}>{t('communityTopicsFirstWrite')}</p>
                     </div>
                   </div>
                 ) : (
                   <>
                     <div className="flex items-center gap-3 mb-4">
                       <div className="flex-1 h-px" style={{ background: 'rgba(139,92,246,0.1)' }} />
-                      <span className="text-[10px] font-semibold px-2" style={{ color: 'rgba(196,181,253,0.3)' }}>Début de la discussion</span>
+                      <span className="text-[10px] font-semibold px-2" style={{ color: 'rgba(196,181,253,0.3)' }}>{t('communityTopicsStart')}</span>
                       <div className="flex-1 h-px" style={{ background: 'rgba(139,92,246,0.1)' }} />
                     </div>
                     {topicMessages.map((msg, i) => {
@@ -1793,17 +1800,17 @@ export function Community({ user, onNavigate }: CommunityProps) {
                             {!compact && (
                               <div className="flex items-center gap-2 mb-[3px] flex-wrap">
                                 <span className="text-[13px] font-bold" style={{ color: msg.user_id === user.id ? '#c4b5fd' : '#e8e0ff' }}>
-                                  {msg.display_name || 'Anonymous'}
+                                  {msg.display_name || t('communityAnonymous')}
                                 </span>
                                 {msg.is_admin && (
                                   <span className="text-[8px] font-black uppercase px-1.5 py-[2px] rounded-full"
                                     style={{ background: 'linear-gradient(130deg,rgba(124,58,237,0.35),rgba(236,72,153,0.25))', color: '#f0a8ff', border: '1px solid rgba(236,72,153,0.25)' }}>
-                                    ⭐ Admin
+                                    {t('communityAdminLabel')}
                                   </span>
                                 )}
                                 {msg.user_id === user.id && !msg.is_admin && (
                                   <span className="text-[8px] font-black uppercase px-1.5 py-[2px] rounded-full"
-                                    style={{ background: 'rgba(139,92,246,0.2)', color: '#a78bfa' }}>Me</span>
+                                    style={{ background: 'rgba(139,92,246,0.2)', color: '#a78bfa' }}>{t('communityMeLabel')}</span>
                                 )}
                                 <span className="ml-auto text-[10px] opacity-0 group-hover:opacity-60 transition-opacity tabular-nums"
                                   style={{ color: 'rgba(196,181,253,0.5)' }}>{timeAgo(msg.created_at)}</span>
@@ -1839,7 +1846,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                   <div className="flex items-center gap-2 px-4 py-3 rounded-xl"
                     style={{ background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.15)' }}>
                     <span>🔇</span>
-                    <p className="text-[12px]" style={{ color: 'rgba(251,191,36,0.7)' }}>Tu es muté.</p>
+                    <p className="text-[12px]" style={{ color: 'rgba(251,191,36,0.7)' }}>{t('communityTopicsMuted')}</p>
                   </div>
                 ) : (
                   <>
@@ -1858,11 +1865,11 @@ export function Community({ user, onNavigate }: CommunityProps) {
                         <textarea ref={topicRef} value={topicDraft} onChange={e => setTopicDraft(e.target.value)}
                           onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendTopicMessage() } }}
                           onInput={e => { const el = e.currentTarget; el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 120) + 'px' }}
-                          placeholder={profile.display_name ? `Écrire dans ${selectedTopic?.name}… (⏎)` : 'Définis ton pseudo d\'abord…'}
+                          placeholder={profile.display_name ? `${selectedTopic?.name}… (⏎)` : t('communityTopicsSetPseudoFirst')}
                           rows={1} maxLength={1000}
                           className="flex-1 bg-transparent text-[13px] text-white resize-none outline-none leading-relaxed"
                           style={{ minHeight: 22, maxHeight: 120 }} />
-                        <button onClick={() => topicVideoRef.current?.click()}
+                        <button onClick={() => topicVideoRef.current?.click()} title={t('communityAttachVideo')}
                           className="flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-all"
                           style={{ color: topicVideo ? '#a78bfa' : 'rgba(196,181,253,0.35)', background: topicVideo ? 'rgba(139,92,246,0.15)' : 'transparent' }}>
                           <span className="text-[15px]">📎</span>
@@ -1895,26 +1902,26 @@ export function Community({ user, onNavigate }: CommunityProps) {
                 <div className="px-3 pt-3 pb-2">
                   <p className="text-[9px] uppercase tracking-widest font-black mb-3 px-1"
                     style={{ color: 'rgba(139,92,246,0.5)' }}>
-                    🎫 Tickets ({threadList.length})
+                    {t('communityAdminTickets')} ({threadList.length})
                   </p>
                   {loading ? <div className="flex justify-center py-8"><Spinner size="sm" /></div>
                   : threadList.length === 0 ? (
                     <div className="flex flex-col items-center py-8 gap-2 text-center">
                       <span className="text-3xl">🎫</span>
-                      <p className="text-[11px]" style={{ color: 'rgba(196,181,253,0.3)' }}>Aucun ticket</p>
+                      <p className="text-[11px]" style={{ color: 'rgba(196,181,253,0.3)' }}>{t('communityAdminNoTickets')}</p>
                     </div>
-                  ) : threadList.map(t => {
-                    const hasUnread = !t.lastMsg.is_admin && selectedThread !== t.user_id
+                  ) : threadList.map(th => {
+                    const hasUnread = !th.lastMsg.is_admin && selectedThread !== th.user_id
                     return (
-                      <button key={t.user_id} onClick={() => setSelectedThread(t.user_id)}
+                      <button key={th.user_id} onClick={() => setSelectedThread(th.user_id)}
                         className="w-full flex items-center gap-2.5 px-2.5 py-2.5 rounded-xl mb-1 text-left transition-all"
-                        style={selectedThread === t.user_id
+                        style={selectedThread === th.user_id
                           ? { background: 'rgba(139,92,246,0.18)', border: '1px solid rgba(139,92,246,0.3)' }
                           : hasUnread
                           ? { background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.22)' }
                           : { background: 'transparent', border: '1px solid transparent' }}>
                         <div className="relative flex-shrink-0">
-                          <Avatar url={t.avatar_url} name={t.display_name} userId={t.user_id} size={28} />
+                          <Avatar url={th.avatar_url} name={th.display_name} userId={th.user_id} size={28} />
                           {hasUnread && (
                             <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2"
                               style={{ background: '#ec4899', borderColor: '#080614' }} />
@@ -1922,15 +1929,15 @@ export function Community({ user, onNavigate }: CommunityProps) {
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className={`text-[11px] truncate ${hasUnread ? 'font-black text-white' : 'font-bold text-white'}`}>
-                            {t.display_name || 'Anonymous'}
+                            {th.display_name || t('communityAnonymous')}
                           </p>
                           <p className="text-[9px] truncate" style={{ color: hasUnread ? 'rgba(236,72,153,0.7)' : 'rgba(196,181,253,0.4)' }}>
-                            {hasUnread && '● '}{t.lastMsg.content.slice(0, 24)}{t.lastMsg.content.length > 24 ? '…' : ''}
+                            {hasUnread && '● '}{th.lastMsg.content.slice(0, 24)}{th.lastMsg.content.length > 24 ? '…' : ''}
                           </p>
                         </div>
                         <div className="flex flex-col items-end gap-1 flex-shrink-0">
                           <span className="text-[8px] tabular-nums" style={{ color: hasUnread ? 'rgba(236,72,153,0.6)' : 'rgba(196,181,253,0.3)' }}>
-                            {timeAgo(t.lastMsg.created_at)}
+                            {timeAgo(th.lastMsg.created_at)}
                           </span>
                           {hasUnread && (
                             <span className="text-[7px] font-black px-1 py-0.5 rounded"
@@ -1948,18 +1955,18 @@ export function Community({ user, onNavigate }: CommunityProps) {
                 {!selectedThread ? (
                   <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center p-6">
                     <span className="text-5xl opacity-20">💬</span>
-                    <p className="font-bold text-white">Sélectionne un ticket</p>
-                    <p className="text-sm" style={{ color: 'rgba(196,181,253,0.4)' }}>Clique sur un utilisateur à gauche</p>
+                    <p className="font-bold text-white">{t('communityAdminSelectTicket')}</p>
+                    <p className="text-sm" style={{ color: 'rgba(196,181,253,0.4)' }}>{t('communityAdminSelectTicketHint')}</p>
                   </div>
                 ) : (
                   <>
                     <div className="flex-shrink-0 px-4 py-2.5 flex items-center gap-2.5"
                       style={{ borderBottom: '1px solid rgba(139,92,246,0.1)', background: 'rgba(8,5,20,0.6)' }}>
-                      {(() => { const t = threadList.find(t => t.user_id === selectedThread); return t ? (
+                      {(() => { const th2 = threadList.find(th2 => th2.user_id === selectedThread); return th2 ? (
                         <>
-                          <Avatar url={t.avatar_url} name={t.display_name} userId={t.user_id} size={26} />
+                          <Avatar url={th2.avatar_url} name={th2.display_name} userId={th2.user_id} size={26} />
                           <div>
-                            <p className="text-[12px] font-black text-white">{t.display_name || 'Anonymous'}</p>
+                            <p className="text-[12px] font-black text-white">{th2.display_name || t('communityAnonymous')}</p>
                             <p className="text-[9px]" style={{ color: 'rgba(196,181,253,0.35)' }}>
                               {threadMessages.length} message{threadMessages.length > 1 ? 's' : ''}
                             </p>
@@ -1993,11 +2000,11 @@ export function Community({ user, onNavigate }: CommunityProps) {
                           <textarea value={chatDraft} onChange={e => setChatDraft(e.target.value)}
                             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendSupport() } }}
                             onInput={e => { const el = e.currentTarget; el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 120) + 'px' }}
-                            placeholder="Répondre en tant qu'admin…"
+                            placeholder={t('communityAdminReplyPlaceholder')}
                             rows={1} maxLength={1000}
                             className="flex-1 bg-transparent text-[13px] text-white resize-none outline-none leading-relaxed"
                             style={{ minHeight: 22, maxHeight: 120 }} />
-                          <button onClick={() => chatVideoRef.current?.click()} title="Joindre une vidéo"
+                          <button onClick={() => chatVideoRef.current?.click()} title={t('communityAttachVideo')}
                             className="flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-all"
                             style={{ color: chatVideo ? '#a78bfa' : 'rgba(196,181,253,0.35)', background: chatVideo ? 'rgba(139,92,246,0.15)' : 'transparent' }}>
                             <span className="text-[15px]">📎</span>
@@ -2024,9 +2031,9 @@ export function Community({ user, onNavigate }: CommunityProps) {
                     <div className="w-20 h-20 rounded-3xl flex items-center justify-center text-4xl"
                       style={{ background: 'linear-gradient(135deg,rgba(96,165,250,0.12),rgba(139,92,246,0.06))', border: '1px solid rgba(96,165,250,0.15)' }}>🎫</div>
                     <div className="text-center space-y-1.5">
-                      <p className="text-base font-black text-white">Ouvre un ticket de support</p>
+                      <p className="text-base font-black text-white">{t('communitySupportEmpty')}</p>
                       <p className="text-sm" style={{ color: 'rgba(196,181,253,0.4)' }}>
-                        Pose ta question — l'équipe ScaleFlow te répondra ici.
+                        {t('communitySupportEmptyHint')}
                       </p>
                     </div>
                   </div>
@@ -2034,7 +2041,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                   <>
                     <div className="flex items-center gap-3 mb-4">
                       <div className="flex-1 h-px" style={{ background: 'rgba(96,165,250,0.1)' }} />
-                      <span className="text-[10px] font-semibold px-2" style={{ color: 'rgba(147,197,253,0.35)' }}>Ton ticket de support</span>
+                      <span className="text-[10px] font-semibold px-2" style={{ color: 'rgba(147,197,253,0.35)' }}>{t('communitySupportMyTicket')}</span>
                       <div className="flex-1 h-px" style={{ background: 'rgba(96,165,250,0.1)' }} />
                     </div>
                     {myThreadMessages.map((msg, i) => {
@@ -2053,14 +2060,14 @@ export function Community({ user, onNavigate }: CommunityProps) {
                   <div className="flex items-center gap-2 px-4 py-3 rounded-xl"
                     style={{ background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.15)' }}>
                     <span>🔇</span>
-                    <p className="text-[12px]" style={{ color: 'rgba(251,191,36,0.7)' }}>Tu es muté — impossible d'envoyer des messages.</p>
+                    <p className="text-[12px]" style={{ color: 'rgba(251,191,36,0.7)' }}>{t('communityMutedCantSend')}</p>
                   </div>
                 ) : (
                   <>
                     <div className="flex items-center gap-2 mb-2 px-1">
                       <div className="w-1.5 h-1.5 rounded-full flex-shrink-0 bg-blue-400/60" />
                       <span className="text-[10px]" style={{ color: 'rgba(196,181,253,0.35)' }}>
-                        Pose ta question à l'équipe <strong style={{ color: 'rgba(147,197,253,0.6)' }}>ScaleFlow</strong>
+                        {t('communitySupportAskTeam')} <strong style={{ color: 'rgba(147,197,253,0.6)' }}>ScaleFlow</strong>
                       </span>
                     </div>
                     {chatVideo && (
@@ -2078,11 +2085,11 @@ export function Community({ user, onNavigate }: CommunityProps) {
                         <textarea value={chatDraft} onChange={e => setChatDraft(e.target.value)}
                           onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendSupport() } }}
                           onInput={e => { const el = e.currentTarget; el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 120) + 'px' }}
-                          placeholder={profile.display_name ? 'Pose ta question… (⏎ pour envoyer)' : 'Définis ton pseudo d\'abord…'}
+                          placeholder={profile.display_name ? t('communitySupportAskPlaceholder') : t('communityTopicsSetPseudoFirst')}
                           rows={1} maxLength={1000}
                           className="flex-1 bg-transparent text-[13px] text-white resize-none outline-none leading-relaxed"
                           style={{ minHeight: 22, maxHeight: 120 }} />
-                        <button onClick={() => chatVideoRef.current?.click()} title="Joindre une vidéo"
+                        <button onClick={() => chatVideoRef.current?.click()} title={t('communityAttachVideo')}
                           className="flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-all"
                           style={{ color: chatVideo ? '#93c5fd' : 'rgba(147,197,253,0.35)', background: chatVideo ? 'rgba(96,165,250,0.15)' : 'transparent' }}>
                           <span className="text-[15px]">📎</span>
@@ -2154,11 +2161,11 @@ export function Community({ user, onNavigate }: CommunityProps) {
                 style={myLikes.has(selectedPost.id)
                   ? { background: 'rgba(236,72,153,0.15)', color: '#f472b6', border: '1px solid rgba(236,72,153,0.25)' }
                   : { background: 'rgba(255,255,255,0.05)', color: 'rgba(196,181,253,0.5)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                ❤️ {reactions.get(selectedPost.id) ?? 0} {myLikes.has(selectedPost.id) ? 'Aimé' : "J'aime"}
+                ❤️ {reactions.get(selectedPost.id) ?? 0} {myLikes.has(selectedPost.id) ? t('communityPostLiked') : t('communityPostLike')}
               </button>
               <div className="flex items-center gap-1 text-[11px]" style={{ color: 'rgba(196,181,253,0.3)' }}>
                 <span>👁</span>
-                <span className="tabular-nums">{selectedPost.view_count} vues</span>
+                <span className="tabular-nums">{selectedPost.view_count} {t('communityPostViews')}</span>
               </div>
             </div>
           </div>

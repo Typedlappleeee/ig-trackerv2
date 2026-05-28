@@ -66,15 +66,6 @@ interface MassJob extends PlannedPair {
   logs:       string[]
 }
 
-const STATUS_LABEL: Record<MassJob['status'], string> = {
-  pending:    '⏳ Pending',
-  detecting:  '🔍 Detecting…',
-  analyzing:  '✨ AI text…',
-  generating: '⚙ FFmpeg…',
-  uploading:  '☁ Upload…',
-  done:       '✅ Done',
-  error:      '❌ Error',
-}
 
 function fileName(p: string) { return p.replace(/\\/g, '/').split('/').pop() ?? p }
 // localvideo:// custom protocol registered in Electron main (supports byte-range / seeking).
@@ -134,6 +125,7 @@ function VideoSourcePanel({
   title: string; phase: string; accent: string; paths: string[]; loading?: boolean
   onAddBank: () => void; onAddPC: () => void; onAddFolder: () => void; onRemove: (i: number) => void
 }) {
+  const t = useT()
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', borderRadius: 14, border: `1px solid ${accent}28`, background: `${accent}06`, overflow: 'hidden', minHeight: 0, minWidth: 0 }}>
       {/* Panel header */}
@@ -149,7 +141,7 @@ function VideoSourcePanel({
           <svg style={{ width: 11, height: 11, color: '#a78bfa', animation: 'spin 0.9s linear infinite', flexShrink: 0 }} viewBox="0 0 24 24" fill="none">
             <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="31.4" strokeDashoffset="10" />
           </svg>
-          <span style={{ fontSize: 10, color: '#a78bfa', fontWeight: 600 }}>Loading…</span>
+          <span style={{ fontSize: 10, color: '#a78bfa', fontWeight: 600 }}>{t('massRemixLoadingSource')}</span>
         </div>
       )}
 
@@ -158,7 +150,7 @@ function VideoSourcePanel({
         {paths.length === 0 ? (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 5, minHeight: 80 }}>
             <span style={{ fontSize: 22, opacity: 0.09 }}>🎬</span>
-            <p style={{ fontSize: 10, color: 'rgba(148,163,184,0.22)' }}>No video</p>
+            <p style={{ fontSize: 10, color: 'rgba(148,163,184,0.22)' }}>{t('massRemixNoVideo')}</p>
           </div>
         ) : paths.map((p, i) => (
           <div key={i} className="group" style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 7px', borderRadius: 6, background: `${accent}08` }}>
@@ -176,17 +168,17 @@ function VideoSourcePanel({
           style={{ flex: 1, padding: '6px 0', borderRadius: 7, fontSize: 10, fontWeight: 600, cursor: 'pointer', background: `${accent}13`, color: accent, border: `1px solid ${accent}24`, transition: 'background 0.15s' }}
           onMouseEnter={e => (e.currentTarget.style.background = `${accent}20`)}
           onMouseLeave={e => (e.currentTarget.style.background = `${accent}13`)}>
-          🗂 Banque
+          🗂 {t('massRemixBankSource')}
         </button>
         <button onClick={onAddFolder}
           style={{ flex: 1, padding: '6px 0', borderRadius: 7, fontSize: 10, fontWeight: 600, cursor: 'pointer', background: 'rgba(167,139,250,0.06)', color: '#a78bfa', border: '1px solid rgba(167,139,250,0.14)', transition: 'background 0.15s' }}
           onMouseEnter={e => (e.currentTarget.style.background = 'rgba(167,139,250,0.12)')}
           onMouseLeave={e => (e.currentTarget.style.background = 'rgba(167,139,250,0.06)')}>
-          📁 Dossier
+          📁 {t('massRemixFolderSource')}
         </button>
         <button onClick={onAddPC}
           style={{ flex: 1, padding: '6px 0', borderRadius: 7, fontSize: 10, fontWeight: 600, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.38)', border: '1px solid rgba(255,255,255,0.06)' }}>
-          💾 PC
+          💾 {t('massRemixPCSource')}
         </button>
       </div>
     </div>
@@ -194,6 +186,16 @@ function VideoSourcePanel({
 }
 
 export function MassRemix({ user }: MassRemixProps) {
+  const t = useT()
+  const STATUS_LABEL: Record<MassJob['status'], string> = {
+    pending:    t('massRemixStatusPending'),
+    detecting:  t('massRemixStatusDetecting'),
+    analyzing:  '✨ AI text…',
+    generating: '⚙ FFmpeg…',
+    uploading:  `☁ ${t('uploading')}…`,
+    done:       t('massRemixStatusDone'),
+    error:      t('massRemixStatusError'),
+  }
   const { currentOrg } = useOrg()
   const conns = useConnections(user)
   const credits = useCredits()
@@ -414,7 +416,7 @@ export function MassRemix({ user }: MassRemixProps) {
     const creditCost = n * CREDIT_COSTS.remix
     const creditRes = await checkAndDeductCredits(credits.ownerId, creditCost)
     if (!creditRes.ok) {
-      alert(`Crédits insuffisants — il faut ${creditCost} crédit(s) pour ${n} remix. Solde : ${creditRes.balance ?? 0}`)
+      alert(`${t('massRemixInsufficientCredits')} — ${creditCost} credit(s) needed for ${n} remix. Balance: ${creditRes.balance ?? 0}`)
       return
     }
 
@@ -826,20 +828,20 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
           <div className="flex-shrink-0 flex items-center justify-between px-8 py-4"
             style={{ borderBottom: '1px solid rgba(139,92,246,0.2)', background: 'rgba(12,8,28,0.9)' }}>
             <div>
-              <p className="text-[18px] font-black text-white">Plan des remixes</p>
-              <p className="text-[12px]" style={{ color: 'rgba(148,163,184,0.6)' }}>{plannedPairs.length} pairs · Click to preview and adjust the cut point</p>
+              <p className="text-[18px] font-black text-white">{t('massRemixPreviewTitle')}</p>
+              <p className="text-[12px]" style={{ color: 'rgba(148,163,184,0.6)' }}>{plannedPairs.length} {t('massRemixPairsHint')}</p>
             </div>
             <div className="flex items-center gap-3">
               <button onClick={() => setPreviewOpen(false)}
                 className="px-4 py-2 rounded-xl text-[13px] font-semibold transition-all"
                 style={{ background: 'rgba(255,255,255,0.05)', color: 'rgba(196,181,253,0.7)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                ✕ Fermer
+                {t('massRemixPreviewClose')}
               </button>
               <button
                 onClick={() => { setPreviewOpen(false); launch(plannedPairs) }}
                 className="px-6 py-2.5 rounded-xl text-[14px] font-bold transition-all"
                 style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff', boxShadow: '0 4px 20px rgba(124,58,237,0.4)' }}>
-                ⚡ Lancer {plannedPairs.length} remix
+                {t('massRemixLaunchBtn')} {plannedPairs.length} remix
               </button>
             </div>
           </div>
@@ -915,7 +917,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                     {/* ── Row 1: play controls ── */}
                     <div className="flex items-center gap-1.5 flex-wrap">
                       {/* Frame back */}
-                      <button title="Reculer 1 image (←)" onClick={() => {
+                      <button title={t('massRemixFrameBack')} onClick={() => {
                         const v = vidRef.current; if (!v) return; v.pause()
                         const t = Math.max(0, v.currentTime - 1/30); v.currentTime = t; setVidCurrentTime(t)
                         if (selectedPair.cutSec != null) captureBeforeAfter(selectedPair.cutSec)
@@ -928,7 +930,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                         {isPlaying ? '⏸' : '▶'}
                       </button>
                       {/* Frame forward */}
-                      <button title="Avancer 1 image (→)" onClick={() => {
+                      <button title={t('massRemixFrameForward')} onClick={() => {
                         const v = vidRef.current; if (!v) return; v.pause()
                         const t = Math.min(vidDuration, v.currentTime + 1/30); v.currentTime = t; setVidCurrentTime(t)
                         if (selectedPair.cutSec != null) captureBeforeAfter(selectedPair.cutSec)
@@ -962,7 +964,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                             }}
                             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-bold transition-all hover:brightness-110"
                             style={{ background: 'linear-gradient(130deg,rgba(234,179,8,0.25),rgba(234,179,8,0.12))', border: '1px solid rgba(234,179,8,0.5)', color: '#eab308', boxShadow: '0 0 12px rgba(234,179,8,0.15)' }}>
-                            ✂ Couper ici
+                            {t('massRemixCutHere')}
                           </button>
                         )}
                         {selectedPair.cutSec != null && (
@@ -979,14 +981,14 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                     {selectedPair.cutSec != null && (beforeFrameUrl || afterFrameUrl) && (
                       <div>
                         <p className="text-[9px] font-bold uppercase tracking-widest mb-1.5 text-center" style={{ color: 'rgba(148,163,184,0.4)' }}>
-                          Aperçu de la coupe à <span style={{ color: '#eab308' }}>{selectedPair.cutSec.toFixed(3)}s</span>
+                          {t('massRemixCutPreviewLabel')} <span style={{ color: '#eab308' }}>{selectedPair.cutSec.toFixed(3)}s</span>
                         </p>
                         <div className="flex gap-2 items-stretch">
                           {/* Phase 1 — secondary */}
                           <div className="flex-1 rounded-xl overflow-hidden relative" style={{ background: '#000', border: '2px solid rgba(236,72,153,0.45)', aspectRatio: preset === '9:16' ? '9/16' : preset === '1:1' ? '1/1' : '16/9', maxHeight: 180 }}>
                             {beforeFrameUrl
                               ? <img src={beforeFrameUrl} alt="phase1" className="w-full h-full object-contain" />
-                              : <div className="w-full h-full flex items-center justify-center" style={{ color: 'rgba(148,163,184,0.3)', fontSize: 11 }}>chargement…</div>}
+                              : <div className="w-full h-full flex items-center justify-center" style={{ color: 'rgba(148,163,184,0.3)', fontSize: 11 }}>{t('massRemixLoadingFrame')}</div>}
                             <div className="absolute top-0 left-0 right-0 px-2 py-1" style={{ background: 'linear-gradient(180deg,rgba(0,0,0,0.8),transparent)' }}>
                               <p style={{ fontSize: 8, fontWeight: 800, color: '#ec4899', letterSpacing: '0.08em' }}>PHASE 1 — SECONDAIRE</p>
                               <p style={{ fontSize: 7, color: 'rgba(236,72,153,0.7)', fontFamily: 'monospace' }}>up to {selectedPair.cutSec.toFixed(3)}s</p>
@@ -1006,7 +1008,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                           <div className="flex-1 rounded-xl overflow-hidden relative" style={{ background: '#000', border: '2px solid rgba(139,92,246,0.45)', aspectRatio: preset === '9:16' ? '9/16' : preset === '1:1' ? '1/1' : '16/9', maxHeight: 180 }}>
                             {afterFrameUrl
                               ? <img src={afterFrameUrl} alt="phase2" className="w-full h-full object-contain" />
-                              : <div className="w-full h-full flex items-center justify-center" style={{ color: 'rgba(148,163,184,0.3)', fontSize: 11 }}>chargement…</div>}
+                              : <div className="w-full h-full flex items-center justify-center" style={{ color: 'rgba(148,163,184,0.3)', fontSize: 11 }}>{t('massRemixLoadingFrame')}</div>}
                             <div className="absolute top-0 left-0 right-0 px-2 py-1" style={{ background: 'linear-gradient(180deg,rgba(0,0,0,0.8),transparent)' }}>
                               <p style={{ fontSize: 8, fontWeight: 800, color: '#a78bfa', letterSpacing: '0.08em' }}>PHASE 2 — ORIGINALE</p>
                               <p style={{ fontSize: 7, color: 'rgba(167,139,250,0.7)', fontFamily: 'monospace' }}>resumes at {selectedPair.cutSec.toFixed(3)}s</p>
@@ -1105,7 +1107,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                       return (
                         <div>
                           <p className="text-[9px] font-bold uppercase tracking-widest mb-1" style={{ color: 'rgba(234,179,8,0.5)' }}>
-                            Zoom ×{(vidDuration / win).toFixed(0)} — ±1.5s autour du cut · glisser pour ajuster
+                            Zoom ×{(vidDuration / win).toFixed(0)} — {t('massRemixZoomHint')}
                           </p>
                           <div
                             className="relative select-none"
@@ -1184,14 +1186,14 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                     })()}
 
                     <p className="text-[9px]" style={{ color: 'rgba(148,163,184,0.25)' }}>
-                      ← → image/image · Shift ±0.1s · Ctrl ±1s · Espace play/pause · glisser la timeline zoomée pour précision maximale
+                      {t('massRemixKeyHint')}
                     </p>
                   </div>
                 </>
               ) : (
                 <div className="text-center space-y-3 opacity-40">
                   <div className="text-6xl">🎬</div>
-                  <p className="text-[14px]" style={{ color: 'rgba(196,181,253,0.6)' }}>Select a remix to preview it</p>
+                  <p className="text-[14px]" style={{ color: 'rgba(196,181,253,0.6)' }}>{t('massRemixSelectPreview')}</p>
                 </div>
               )}
             </div>
@@ -1212,7 +1214,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                   </div>
                 </div>
                 <div>
-                  <p className="text-[15px] font-black text-white">Generating in parallel…</p>
+                  <p className="text-[15px] font-black text-white">{t('massRemixGenerating')}</p>
                   <p className="text-[13px] text-text2">
                     {runningCount} running · {doneCount} done · {errorCount} error(s)
                   </p>
@@ -1224,7 +1226,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
               <div className="flex items-center justify-between text-[13px] mb-1">
                 <span className="text-text2">{doneCount + errorCount} / {jobs.length}</span>
                 <span className="font-bold" style={{ color: '#a78bfa' }}>{progress}%</span>
-                <span className="text-text2">{runningCount} active</span>
+                <span className="text-text2">{runningCount} {t('massRemixActive')}</span>
               </div>
               <div className="h-2.5 rounded-full overflow-hidden" style={{ background: 'rgba(139,92,246,0.12)' }}>
                 <div className="h-full rounded-full transition-all duration-500"
@@ -1248,7 +1250,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
               <button onClick={() => { abortRef.current = true; setRunning(false) }}
                 className="w-full py-2.5 rounded-xl text-[13px] font-semibold"
                 style={{ background: 'rgba(239,68,68,0.08)', color: '#f87171', border: '1px solid rgba(239,68,68,0.2)' }}>
-                ✕ Cancel generation
+                {t('massRemixCancelBtn')}
               </button>
             </div>
           </div>
@@ -1263,7 +1265,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
               <div className="text-center space-y-2">
                 <div className="text-5xl">{errorCount === 0 ? '✅' : '⚠️'}</div>
                 <p className="text-[20px] font-black text-white">
-                  {errorCount === 0 ? 'All remixes generated!' : `${doneCount} / ${jobs.length} done`}
+                  {errorCount === 0 ? t('massRemixDoneTitle') : `${doneCount} / ${jobs.length} done`}
                 </p>
                 {errorCount > 0 && <p className="text-[13px]" style={{ color: '#fbbf24' }}>{errorCount} error(s)</p>}
               </div>
@@ -1304,7 +1306,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                   </details>
                 ))}
               </div>
-              <Button onClick={() => { setJobs([]); setRunning(false) }} className="w-full">Fermer</Button>
+              <Button onClick={() => { setJobs([]); setRunning(false) }} className="w-full">{t('massRemixCloseBtn')}</Button>
             </div>
           </div>
         </div>
@@ -1329,14 +1331,14 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
             style={{ background: '#0d0a1e', border: '1px solid rgba(139,92,246,0.25)' }}>
             <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(139,92,246,0.12)' }}>
               <p className="text-[14px] font-bold text-white">
-                📁 {folderTarget === 'orig' ? 'Folder — Originals' : 'Folder — Phase 1'}
+                📁 {folderTarget === 'orig' ? t('massRemixFolderOriginals') : t('massRemixFolderPhase1')}
               </p>
               <button onClick={() => setFolderTarget(null)} className="text-text2 hover:text-white text-lg leading-none">✕</button>
             </div>
             {folderLoading ? (
-              <div className="py-10 text-center text-text2 text-[13px]">Chargement…</div>
+              <div className="py-10 text-center text-text2 text-[13px]">{t('massRemixLoadingSource')}</div>
             ) : folderList.length === 0 ? (
-              <div className="py-10 text-center text-text2 text-[13px]">No folders in the bank</div>
+              <div className="py-10 text-center text-text2 text-[13px]">{t('massRemixNoFolders')}</div>
             ) : (
               <div className="max-h-80 overflow-y-auto py-2">
                 {folderList.map(f => (
@@ -1374,20 +1376,20 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
               </div>
             )}
             <div>
-              <h1 style={{ fontSize: isMobile ? 15 : 18, fontWeight: 900, color: '#F1F0F7', letterSpacing: '-0.02em', lineHeight: 1.1 }}>Mass Remix</h1>
-              {!isMobile && <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.45)', marginTop: 2 }}>Generate remixes in bulk · FFmpeg + AI</p>}
+              <h1 style={{ fontSize: isMobile ? 15 : 18, fontWeight: 900, color: '#F1F0F7', letterSpacing: '-0.02em', lineHeight: 1.1 }}>{t('massRemixTitle')}</h1>
+              {!isMobile && <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.45)', marginTop: 2 }}>{t('massRemixSub')}</p>}
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
             {!isMobile && (
               <button onClick={openPreview} disabled={!canLaunch}
                 style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 13px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: canLaunch ? 'pointer' : 'not-allowed', background: canLaunch ? 'rgba(139,92,246,0.1)' : 'rgba(255,255,255,0.03)', color: canLaunch ? '#a78bfa' : 'rgba(255,255,255,0.18)', border: `1px solid ${canLaunch ? 'rgba(139,92,246,0.26)' : 'rgba(255,255,255,0.06)'}`, opacity: canLaunch ? 1 : 0.5, transition: 'all 0.15s' }}>
-                👁 Plan
+                {t('massRemixPlanBtn')}
               </button>
             )}
             <button onClick={() => launch()} disabled={!canLaunch}
               style={{ display: 'flex', alignItems: 'center', gap: 6, padding: isMobile ? '8px 14px' : '8px 18px', fontSize: isMobile ? 12 : 13, fontWeight: 800, cursor: canLaunch ? 'pointer' : 'not-allowed', borderRadius: 11, border: 'none', color: '#fff', background: canLaunch ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.06)', boxShadow: canLaunch ? '0 3px 16px rgba(124,58,237,0.38)' : 'none', opacity: canLaunch ? 1 : 0.4, transition: 'all 0.2s' }}>
-              <span>⚡</span><span>{isMobile ? `Lancer (${copies})` : `Lancer ${copies} remix`}</span>
+              <span>⚡</span><span>{isMobile ? `${t('massRemixLaunchMobile')} (${copies})` : `${t('massRemixLaunchBtn')} ${copies} remix`}</span>
             </button>
           </div>
         </div>
@@ -1403,7 +1405,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
           {/* LEFT: two source panels SIDE BY SIDE */}
           <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 10 : 10 }}>
             <VideoSourcePanel
-              title="Originales" phase="PHASE 2" accent="#8b5cf6"
+              title={t('massRemixPanelOriginals')} phase="PHASE 2" accent="#8b5cf6"
               paths={originals} loading={addingTarget === 'orig'}
               onAddBank={() => setShowBankOrig(true)}
               onAddFolder={() => openFolderPick('orig')}
@@ -1411,7 +1413,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
               onRemove={i => setOriginals(prev => prev.filter((_, j) => j !== i))}
             />
             <VideoSourcePanel
-              title="Phase 1 · Sources" phase="PHASE 1" accent="#ec4899"
+              title={t('massRemixPanelPhase1')} phase="PHASE 1" accent="#ec4899"
               paths={secondaries} loading={addingTarget === 'sec'}
               onAddBank={() => setShowBankSec(true)}
               onAddFolder={() => openFolderPick('sec')}
@@ -1423,11 +1425,11 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
           {/* RIGHT: config sidebar */}
           <div style={{ width: isMobile ? '100%' : 248, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 7, overflowY: isMobile ? undefined : 'auto' }}>
 
-            {!isMobile && <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', color: 'rgba(148,163,184,0.22)', textTransform: 'uppercase', padding: '0 2px' }}>Configuration</p>}
+            {!isMobile && <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', color: 'rgba(148,163,184,0.22)', textTransform: 'uppercase', padding: '0 2px' }}>{t('massRemixConfiguration')}</p>}
 
             {/* Copies */}
             <div style={{ borderRadius: 12, padding: '12px 13px', background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)' }}>
-              <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(148,163,184,0.35)', marginBottom: 9 }}>Copies</p>
+              <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(148,163,184,0.35)', marginBottom: 9 }}>{t('massRemixCopies')}</p>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 7 }}>
                 <button onClick={() => setCopies(c => Math.max(1, c - 1))} style={{ width: 28, height: 28, borderRadius: 8, fontSize: 15, fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: 'rgba(196,181,253,0.7)', cursor: 'pointer', flexShrink: 0 }}>−</button>
                 <input type="number" min={1} max={200} value={copies} onChange={e => setCopies(Math.max(1, Math.min(200, Number(e.target.value))))} style={{ flex: 1, background: 'transparent', border: 'none', textAlign: 'center', fontSize: 26, fontWeight: 900, color: '#F1F0F7', outline: 'none' }} />
@@ -1435,7 +1437,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
               </div>
               <input type="range" min={1} max={50} value={Math.min(copies, 50)} onChange={e => setCopies(Number(e.target.value))} style={{ width: '100%' }} />
               {originals.length > 0 && secondaries.length > 0 && (
-                <p style={{ fontSize: 10, marginTop: 5, color: 'rgba(148,163,184,0.32)' }}>🔀 {originals.length} × {secondaries.length} → <span style={{ color: '#a78bfa', fontWeight: 700 }}>{copies} vidéos</span></p>
+                <p style={{ fontSize: 10, marginTop: 5, color: 'rgba(148,163,184,0.32)' }}>🔀 {originals.length} × {secondaries.length} → <span style={{ color: '#a78bfa', fontWeight: 700 }}>{copies} {t('massRemixVideoCount')}</span></p>
               )}
             </div>
 
@@ -1446,42 +1448,42 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                 <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
                   <div style={{ width: 28, height: 28, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: aiEnabled ? 'rgba(139,92,246,0.15)' : 'rgba(255,255,255,0.05)' }}><span style={{ fontSize: 13 }}>✨</span></div>
                   <div>
-                    <p style={{ fontSize: 12, fontWeight: 700, color: aiEnabled ? '#c4b5fd' : 'rgba(196,181,253,0.45)', lineHeight: 1.2 }}>Détection IA</p>
-                    <p style={{ fontSize: 9, color: 'rgba(148,163,184,0.3)', lineHeight: 1.2 }}>Claude Vision</p>
+                    <p style={{ fontSize: 12, fontWeight: 700, color: aiEnabled ? '#c4b5fd' : 'rgba(196,181,253,0.45)', lineHeight: 1.2 }}>{t('massRemixAiLabel')}</p>
+                    <p style={{ fontSize: 9, color: 'rgba(148,163,184,0.3)', lineHeight: 1.2 }}>{t('massRemixAiSub')}</p>
                   </div>
                 </div>
                 <div style={{ width: 32, height: 18, borderRadius: 99, position: 'relative', flexShrink: 0, background: aiEnabled ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.1)', transition: 'background 0.2s' }}>
                   <span style={{ position: 'absolute', top: 2, width: 14, height: 14, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.3)', transition: 'transform 0.2s', transform: `translateX(${aiEnabled ? 16 : 2}px)`, display: 'block' }} />
                 </div>
               </div>
-              {aiEnabled && <p style={{ marginTop: 6, fontSize: 10, color: 'rgba(148,163,184,0.38)', lineHeight: 1.4 }}>{manualText.trim() ? 'Texte manuel actif.' : 'Analyse et recopie le texte auto.'}</p>}
-              {aiEnabled && !anthropicKey && !manualText.trim() && <p style={{ marginTop: 4, fontSize: 10, fontWeight: 600, color: '#fbbf24' }}>⚠ Clé Anthropic manquante</p>}
+              {aiEnabled && <p style={{ marginTop: 6, fontSize: 10, color: 'rgba(148,163,184,0.38)', lineHeight: 1.4 }}>{manualText.trim() ? t('massRemixManualActive') : t('massRemixAutoAnalyze')}</p>}
+              {aiEnabled && !anthropicKey && !manualText.trim() && <p style={{ marginTop: 4, fontSize: 10, fontWeight: 600, color: '#fbbf24' }}>{t('massRemixNoAnthropicKey')}</p>}
             </button>
 
             {aiEnabled && (
               <div style={{ borderRadius: 10, padding: '8px 11px', background: 'rgba(124,58,237,0.05)', border: '1px solid rgba(139,92,246,0.18)', display: 'flex', flexDirection: 'column', gap: 5 }}>
-                <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', color: 'rgba(139,92,246,0.55)', textTransform: 'uppercase' }}>✏ Texte manuel</p>
-                <textarea value={manualText} onChange={e => { setManualText(e.target.value); localStorage.setItem('sf_remix_manual_text', e.target.value) }} placeholder="Laisse vide = IA auto" rows={2} style={{ width: '100%', borderRadius: 8, padding: '6px 9px', fontSize: 11, resize: 'none', outline: 'none', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(139,92,246,0.2)', color: '#e2e8f0', lineHeight: 1.4, fontFamily: 'inherit' }} />
+                <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', color: 'rgba(139,92,246,0.55)', textTransform: 'uppercase' }}>{t('massRemixManualTextLabel')}</p>
+                <textarea value={manualText} onChange={e => { setManualText(e.target.value); localStorage.setItem('sf_remix_manual_text', e.target.value) }} placeholder={t('massRemixManualPlaceholder')} rows={2} style={{ width: '100%', borderRadius: 8, padding: '6px 9px', fontSize: 11, resize: 'none', outline: 'none', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(139,92,246,0.2)', color: '#e2e8f0', lineHeight: 1.4, fontFamily: 'inherit' }} />
               </div>
             )}
 
             {/* Point de coupe */}
             <div style={{ borderRadius: 12, padding: '12px 13px', background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(148,163,184,0.35)' }}>Point de coupe</p>
+              <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(148,163,184,0.35)' }}>{t('massRemixCutPoint')}</p>
               <div style={{ display: 'flex', gap: 5 }}>
                 {(['auto', 'manual'] as const).map(m => (
                   <button key={m} onClick={() => { setSplitMode(m); if (m === 'manual' && canLaunch) openPreview() }}
                     style={{ flex: 1, padding: '7px 0', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s', border: 'none', background: splitMode === m ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.05)', color: splitMode === m ? '#fff' : 'rgba(196,181,253,0.38)', boxShadow: splitMode === m ? '0 2px 10px rgba(124,58,237,0.28)' : 'none', outline: splitMode === m ? 'none' : '1px solid rgba(255,255,255,0.07)' }}>
-                    {m === 'auto' ? '🤖 Auto' : '✂ Manuel'}
+                    {m === 'auto' ? t('massRemixAutoMode') : t('massRemixManualMode')}
                   </button>
                 ))}
               </div>
-              <p style={{ fontSize: 10, color: 'rgba(148,163,184,0.32)', lineHeight: 1.4 }}>{splitMode === 'auto' ? 'Détection auto du changement de scène.' : 'Réglage par vidéo dans l\'aperçu.'}</p>
+              <p style={{ fontSize: 10, color: 'rgba(148,163,184,0.32)', lineHeight: 1.4 }}>{splitMode === 'auto' ? t('massRemixAutoDesc') : t('massRemixManualDesc')}</p>
             </div>
 
             {/* Format */}
             <div style={{ borderRadius: 12, padding: '12px 13px', background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)' }}>
-              <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(148,163,184,0.35)', marginBottom: 8 }}>Format</p>
+              <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(148,163,184,0.35)', marginBottom: 8 }}>{t('massRemixFormat')}</p>
               <div style={{ display: 'flex', gap: 5 }}>
                 {(['9:16', '1:1', '16:9'] as Preset[]).map(p => (
                   <button key={p} onClick={() => setPreset(p)}
@@ -1494,12 +1496,12 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
 
             {/* Destination */}
             <div style={{ borderRadius: 12, padding: '12px 13px', background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(148,163,184,0.35)' }}>Destination</p>
+              <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(148,163,184,0.35)' }}>{t('massRemixDestination')}</p>
               <div style={{ display: 'flex', gap: 5 }}>
                 {(['bank', 'folder'] as ExportMode[]).map(m => (
                   <button key={m} onClick={() => setExportMode(m)}
                     style={{ flex: 1, padding: '7px 0', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s', border: 'none', background: exportMode === m ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.05)', color: exportMode === m ? '#fff' : 'rgba(196,181,253,0.38)', boxShadow: exportMode === m ? '0 2px 10px rgba(124,58,237,0.28)' : 'none', outline: exportMode === m ? 'none' : '1px solid rgba(255,255,255,0.07)' }}>
-                    {m === 'bank' ? '☁ Banque' : '💾 Dossier'}
+                    {m === 'bank' ? t('massRemixBankDest') : t('massRemixFolderDest')}
                   </button>
                 ))}
               </div>
@@ -1507,16 +1509,16 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                   {bankFolders.length > 0 && (
                     <select value={bankFolders.includes(bankFolder) ? bankFolder : ''} onChange={e => setBankFolder(e.target.value)} style={{ width: '100%', borderRadius: 8, padding: '6px 9px', fontSize: 11, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2d9f3', outline: 'none', cursor: 'pointer' }}>
-                      <option value="" style={{ background: '#0c0919', color: '#e2d9f3' }}>— Racine</option>
+                      <option value="" style={{ background: '#0c0919', color: '#e2d9f3' }}>{t('massRemixRootFolder')}</option>
                       {bankFolders.map(f => <option key={f} value={f} style={{ background: '#0c0919', color: '#e2d9f3' }}>{f}</option>)}
                     </select>
                   )}
-                  <input type="text" placeholder={bankFolders.length > 0 ? 'Ou créer un dossier…' : 'Dossier (optionnel)'} value={bankFolder} onChange={e => setBankFolder(e.target.value)} style={{ width: '100%', borderRadius: 8, padding: '6px 9px', fontSize: 11, background: 'rgba(255,255,255,0.05)', border: `1px solid ${bankFolder.trim() ? 'rgba(139,92,246,0.5)' : 'rgba(255,255,255,0.09)'}`, color: '#e2d9f3', outline: 'none' }} />
+                  <input type="text" placeholder={bankFolders.length > 0 ? t('massRemixNewFolderPlaceholder') : t('massRemixFolderOptional')} value={bankFolder} onChange={e => setBankFolder(e.target.value)} style={{ width: '100%', borderRadius: 8, padding: '6px 9px', fontSize: 11, background: 'rgba(255,255,255,0.05)', border: `1px solid ${bankFolder.trim() ? 'rgba(139,92,246,0.5)' : 'rgba(255,255,255,0.09)'}`, color: '#e2d9f3', outline: 'none' }} />
                 </div>
               )}
               {exportMode === 'folder' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                  <button onClick={async () => { const f = await window.electronAPI?.pickOutputFolder?.(); if (f) setOutputFolder(f) }} style={{ width: '100%', borderRadius: 8, padding: '6px 9px', fontSize: 11, fontWeight: 600, cursor: 'pointer', background: 'rgba(139,92,246,0.1)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.2)' }}>📁 Choisir un dossier…</button>
+                  <button onClick={async () => { const f = await window.electronAPI?.pickOutputFolder?.(); if (f) setOutputFolder(f) }} style={{ width: '100%', borderRadius: 8, padding: '6px 9px', fontSize: 11, fontWeight: 600, cursor: 'pointer', background: 'rgba(139,92,246,0.1)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.2)' }}>{t('massRemixChooseFolder')}</button>
                   {outputFolder && <p style={{ fontSize: 10, fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'rgba(148,163,184,0.32)' }}>{outputFolder}</p>}
                 </div>
               )}

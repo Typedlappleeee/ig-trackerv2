@@ -211,11 +211,12 @@ function PropertiesPanel({
   clip:     TimelineClip | null
   onUpdate: (uid: string, p: Partial<TimelineClip>) => void
 }) {
+  const t = useT()
   if (!clip) return (
     <div className="flex items-center justify-center h-full text-xs text-text2 p-4 text-center">
       <div className="space-y-2">
         <p className="text-2xl">🎬</p>
-        <p>Select a clip to edit its properties</p>
+        <p>{t('montageSelectClipProps')}</p>
       </div>
     </div>
   )
@@ -225,34 +226,34 @@ function PropertiesPanel({
   return (
     <div className="p-3 space-y-4 overflow-auto h-full text-xs">
       <div>
-        <p className="text-[10px] font-semibold text-text2 uppercase tracking-wider mb-1">Clip</p>
+        <p className="text-[10px] font-semibold text-text2 uppercase tracking-wider mb-1">{t('montageClipLabel')}</p>
         <p className="font-medium text-text text-sm truncate">{clip.item.title}</p>
         {clip.item.file_url && <p className="text-[9px] text-text2 font-mono truncate mt-0.5">{basename(clip.item.file_url)}</p>}
       </div>
 
       {/* Trim */}
       <div className="space-y-2">
-        <p className="text-[10px] font-semibold text-text2 uppercase tracking-wider">Trim</p>
+        <p className="text-[10px] font-semibold text-text2 uppercase tracking-wider">{t('montageTrimLabel')}</p>
         <div className="grid grid-cols-2 gap-2">
           <div>
-            <label className="text-text2 block mb-1">Start: <span className="text-accent">{fmtTime(clip.trimStart)}</span></label>
+            <label className="text-text2 block mb-1">{t('montageStartLabel')} <span className="text-accent">{fmtTime(clip.trimStart)}</span></label>
             <input type="range" min={0} max={end - 0.5} step={0.5} value={clip.trimStart}
               onChange={e => onUpdate(clip.uid, { trimStart: parseFloat(e.target.value) })}
               className="w-full accent-accent h-1.5" />
           </div>
           <div>
-            <label className="text-text2 block mb-1">End: <span className="text-accent">{fmtTime(end)}</span></label>
+            <label className="text-text2 block mb-1">{t('montageEndLabel')} <span className="text-accent">{fmtTime(end)}</span></label>
             <input type="range" min={clip.trimStart + 0.5} max={raw} step={0.5} value={end}
               onChange={e => onUpdate(clip.uid, { trimEnd: parseFloat(e.target.value) })}
               className="w-full accent-accent h-1.5" />
           </div>
         </div>
-        <p className="text-text2">Duration: <span className="text-accent font-medium">{fmtTime(effectiveDur(clip))}</span></p>
+        <p className="text-text2">{t('montageDurationLabel')} <span className="text-accent font-medium">{fmtTime(effectiveDur(clip))}</span></p>
       </div>
 
       {/* Speed */}
       <div className="space-y-1.5">
-        <p className="text-[10px] font-semibold text-text2 uppercase tracking-wider">Speed: <span className="text-accent">{clip.speed}×</span></p>
+        <p className="text-[10px] font-semibold text-text2 uppercase tracking-wider">{t('montageSpeedLabel')} <span className="text-accent">{clip.speed}×</span></p>
         <input type="range" min={0.25} max={4} step={0.25} value={clip.speed}
           onChange={e => onUpdate(clip.uid, { speed: parseFloat(e.target.value) })}
           className="w-full accent-accent h-1.5" />
@@ -263,7 +264,7 @@ function PropertiesPanel({
 
       {/* Fade */}
       <div className="flex items-center justify-between">
-        <p className="text-[10px] font-semibold text-text2 uppercase tracking-wider">Fade in</p>
+        <p className="text-[10px] font-semibold text-text2 uppercase tracking-wider">{t('montageFadeInLabel')}</p>
         <button
           onClick={() => onUpdate(clip.uid, { fade: !clip.fade })}
           className={`w-8 h-4 rounded-full transition-colors ${clip.fade ? 'bg-accent' : 'bg-surface2'}`}
@@ -274,16 +275,16 @@ function PropertiesPanel({
 
       {/* Caption */}
       <div className="space-y-1.5">
-        <p className="text-[10px] font-semibold text-text2 uppercase tracking-wider">Caption</p>
+        <p className="text-[10px] font-semibold text-text2 uppercase tracking-wider">{t('montageCaptionLabel')}</p>
         <textarea value={clip.caption} rows={3}
           onChange={e => onUpdate(clip.uid, { caption: e.target.value })}
-          placeholder="Caption for this clip…"
+          placeholder={t('montageCaptionPlaceholder')}
           className="w-full bg-surface border border-border rounded px-2 py-1.5 text-[11px] text-text focus:outline-none focus:border-accent resize-none" />
       </div>
 
       {/* Color */}
       <div className="space-y-1.5">
-        <p className="text-[10px] font-semibold text-text2 uppercase tracking-wider">Color</p>
+        <p className="text-[10px] font-semibold text-text2 uppercase tracking-wider">{t('montageColorLabel')}</p>
         <div className="flex gap-1.5 flex-wrap">
           {COLORS.map(c => (
             <button key={c} onClick={() => onUpdate(clip.uid, { color: c })}
@@ -364,6 +365,7 @@ function DraggableText({ overlay, onMove }: {
 
 // ── Main component ────────────────────────────────────────────────────────────────────────────
 export function Montage({ user }: MontageProps) {
+  const t = useT()
   const { currentOrg } = useOrg()
   const credits = useCredits()
   const conns = useConnections(user)
@@ -666,12 +668,16 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
   const PRESET_DIMS: Record<Preset, string> = { '9:16': '1080×1920', '1:1': '1080×1080', '16:9': '1920×1080' }
 
   const TABS: { id: Tab; label: string; icon: string }[] = [
-    { id: 'medias',      label: 'Media',       icon: '🎬' },
-    { id: 'texte',       label: 'Texte',        icon: '𝐓' },
-    { id: 'transitions', label: 'Transitions',  icon: '◑' },
-    { id: 'filtres',     label: 'Filtres',      icon: '🎨' },
-    { id: 'ajustement',  label: 'Ajustement',   icon: '⚙' },
+    { id: 'medias',      label: t('montageMediaTab'),       icon: '🎬' },
+    { id: 'texte',       label: t('montageTextTab'),        icon: '𝐓' },
+    { id: 'transitions', label: t('montageTransitionsTab'), icon: '◑' },
+    { id: 'filtres',     label: t('montageFiltersTab'),     icon: '🎨' },
+    { id: 'ajustement',  label: t('montageAdjustTab'),      icon: '⚙' },
   ]
+  const FILTER_LABELS_DYN: Record<Filter, string> = {
+    none: t('montageFilterOriginal'), vivid: t('montageFilterVivid'), warm: t('montageFilterWarm'), cold: t('montageFilterCold'),
+    bw: t('montageFilterBW'), cinema: t('montageFilterCinema'), vintage: t('montageFilterVintage'), fade: t('montageFilterFade'),
+  }
 
   return (
     <div ref={dropRef} className="flex flex-col h-full min-h-0 bg-bg"
@@ -682,7 +688,7 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
         <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
           <div className="border-2 border-dashed border-accent rounded-2xl px-20 py-12 bg-bg/90 backdrop-blur text-center space-y-3">
             <p className="text-5xl">🎬</p>
-            <p className="text-xl font-semibold text-accent">Drop video here</p>
+            <p className="text-xl font-semibold text-accent">{t('montageDropVideoHere')}</p>
           </div>
         </div>
       )}
@@ -695,7 +701,7 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
           <div className="w-56 flex-shrink-0 px-4 py-3" style={{ borderRight: '1px solid rgba(255,255,255,0.06)' }}>
             <input value={projectName} onChange={e => setProjName(e.target.value)}
               className="text-[13px] font-semibold text-white bg-transparent focus:outline-none w-full truncate"
-              placeholder="Project name…" />
+              placeholder={t('montageProjectName')} />
           </div>
 
           {/* Tab bar */}
@@ -714,7 +720,7 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
 
           {/* Right controls */}
           <div className="flex items-center gap-2 px-4 flex-shrink-0" style={{ borderLeft: '1px solid rgba(255,255,255,0.06)' }}>
-            <span className="text-[11px] text-text2">Format:</span>
+            <span className="text-[11px] text-text2">{t('montageFormat')}</span>
             {(['9:16','1:1','16:9'] as Preset[]).map(p => (
               <button key={p} onClick={() => setPreset(p)}
                 className={`px-2.5 py-1.5 rounded-lg text-[11px] font-mono transition-all ${preset === p ? 'text-white' : 'text-text2 hover:text-text'}`}
@@ -725,7 +731,7 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
             <span className="text-[10px] text-text2 ml-1">{PRESET_DIMS[preset]}</span>
             <div className="w-px h-5 mx-1" style={{ background: 'rgba(255,255,255,0.08)' }} />
             <Button size="sm" onClick={handleExport} loading={exporting} disabled={!clips.length}>
-              Exporter
+              {t('montageExport')}
             </Button>
           </div>
         </div>
@@ -761,10 +767,10 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
                     console.error('[Montage] upload failed', err)
                   }
                 }} className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-accent/10 hover:bg-accent/20 text-accent text-xs font-semibold rounded-lg transition-colors">
-                  + Importer
+                  {t('montageImport')}
                 </button>
               </div>
-              <input type="text" placeholder="🔍 Search…" value={bankSearch}
+              <input type="text" placeholder={t('montageSearchBank')} value={bankSearch}
                 onChange={e => setBSearch(e.target.value)}
                 className="w-full bg-surface2 border border-border rounded px-2 py-1.5 text-[11px] text-text placeholder:text-text2 focus:border-accent focus:outline-none transition-colors"
               />
@@ -774,7 +780,7 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
               : filteredBank.length === 0 ? (
                 <div className="px-3 py-6 text-center text-[11px] text-text2 space-y-2">
                   <p className="text-2xl">🎬</p>
-                  <p>{bankItems.length === 0 ? 'Bank empty.\nDrag videos here.' : 'No results.'}</p>
+                  <p>{bankItems.length === 0 ? t('montageBankEmpty') : t('montageBankNoResults')}</p>
                 </div>
               ) : filteredBank.map(item => (
                 <button key={item.id} onClick={() => addClip(item)}
@@ -804,8 +810,8 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
                   <div className="flex items-center gap-2">
                     <span className="text-base">⚡</span>
                     <div className="text-left">
-                      <p className="text-xs font-semibold text-text">Mode Auto</p>
-                      <p className="text-[9px] text-text2">Caption directly on the video</p>
+                      <p className="text-xs font-semibold text-text">{t('montageAutoCaption')}</p>
+                      <p className="text-[9px] text-text2">{t('montageAutoCaptionDesc')}</p>
                     </div>
                   </div>
                   <div className={`w-9 h-5 rounded-full transition-colors flex-shrink-0 ${autoCaptionEnabled ? 'bg-accent' : 'bg-surface'}`}>
@@ -821,13 +827,13 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
                       disabled={!selectedClip || aiCapLoading || !conns.anthropic}
                       className="mt-2.5 w-full flex items-center justify-center gap-1.5 py-2 rounded-lg text-[11px] font-semibold transition-all bg-gradient-to-r from-violet-600 to-accent text-white hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
                     >
-                      {aiCapLoading ? <><Spinner size="sm" /><span>Analyzing…</span></> : <><span>✨</span><span>Generate with AI</span></>}
+                      {aiCapLoading ? <><Spinner size="sm" /><span>{t('montageAnalyzing')}</span></> : <><span>✨</span><span>{t('montageGenerateAI')}</span></>}
                     </button>
                     {!conns.anthropic && !conns.loading && (
-                      <p className="text-[9px] text-amber-400/80">Anthropic key required (Settings → Connections)</p>
+                      <p className="text-[9px] text-amber-400/80">{t('montageAIKeyRequired')}</p>
                     )}
                     {!selectedClip && conns.anthropic && (
-                      <p className="text-[9px] text-text2/60">Select a clip in the timeline first.</p>
+                      <p className="text-[9px] text-text2/60">{t('montageSelectClipFirst')}</p>
                     )}
                     {aiCapError && <p className="text-[9px] text-danger">{aiCapError}</p>}
 
@@ -836,7 +842,7 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
                       value={autoCaptionText}
                       onChange={e => setAutoCaptionText(e.target.value)}
                       rows={3}
-                      placeholder="or type your caption here…"
+                      placeholder={t('montageTypeCaption')}
                       className="w-full bg-surface border border-border rounded-lg px-2.5 py-2 text-[11px] text-text focus:outline-none focus:border-accent resize-none placeholder:text-text2/60"
                     />
 
@@ -847,7 +853,7 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
                         {(['top','center','bottom'] as AutoCaptionPos[]).map(p => (
                           <button key={p} onClick={() => setAutoCaptionPos(p)}
                             className={`py-1.5 rounded text-[10px] font-medium transition-all ${autoCaptionPos === p ? 'bg-accent text-white' : 'bg-surface text-text2 hover:text-text'}`}>
-                            {p === 'top' ? 'Top' : p === 'center' ? 'Center' : 'Bottom'}
+                            {p === 'top' ? t('montagePositionTop') : p === 'center' ? t('montagePositionCenter') : t('montagePositionBottom')}
                           </button>
                         ))}
                       </div>
@@ -886,14 +892,14 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
               </div>
 
               {/* ── Manuel ────────────────────────────────────────────────────────────────────── */}
-              <p className="text-[10px] text-text2 uppercase tracking-wider font-semibold pt-1">Manual</p>
+              <p className="text-[10px] text-text2 uppercase tracking-wider font-semibold pt-1">{t('montageManual')}</p>
               {([
-                { pos: 'top',    label: 'Top',    x: 50, y: 10 },
-                { pos: 'center', label: 'Center', x: 50, y: 50 },
-                { pos: 'bottom', label: 'Bottom', x: 50, y: 85 },
+                { pos: 'top',    label: t('montagePositionTop'),    x: 50, y: 10 },
+                { pos: 'center', label: t('montagePositionCenter'), x: 50, y: 50 },
+                { pos: 'bottom', label: t('montagePositionBottom'), x: 50, y: 85 },
               ] as { pos: TextOverlay['position']; label: string; x: number; y: number }[]).map(({ pos, label, x, y }) => (
                 <button key={pos} onClick={() => setTexts(prev => [...prev, {
-                  uid: `text-${Date.now()}`, text: 'Text here…',
+                  uid: `text-${Date.now()}`, text: t('montageTypeCaption'),
                   startTime: playhead, endTime: Math.min(playhead + 3, total),
                   position: pos, x, y, fontSize: 32, color: '#ffffff',
                 }])}
@@ -923,7 +929,7 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
           {/* Transitions */}
           {activeTab === 'transitions' && (
             <div className="p-3 space-y-3 flex-1 overflow-auto">
-              <p className="text-[10px] text-text2 uppercase tracking-wider font-semibold">Transition types</p>
+              <p className="text-[10px] text-text2 uppercase tracking-wider font-semibold">{t('montageTransitionsTab')}</p>
               <p className="text-[10px] text-text2">Click the ◑ badge between two clips to change the transition.</p>
               <div className="space-y-2 pt-1">
                 {TRANSITIONS.map(tr => (
@@ -932,9 +938,9 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
                     <div>
                       <p className="text-xs font-medium text-text">{tr.label}</p>
                       <p className="text-[9px] text-text2">
-                        {tr.type === 'cut' ? 'Direct cut' :
-                         tr.type === 'fade' ? 'Fade to black' :
-                         tr.type === 'dissolve' ? 'Cross-fade' : 'Horizontal sweep'}
+                        {tr.type === 'cut' ? t('montageTransitionCut') :
+                         tr.type === 'fade' ? t('montageFadeBlack') :
+                         tr.type === 'dissolve' ? t('montageCrossFade') : t('montageHorizSweep')}
                       </p>
                     </div>
                   </div>
@@ -946,29 +952,29 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
           {/* Filtres */}
           {activeTab === 'filtres' && (
             <div className="p-3 space-y-3 flex-1 overflow-auto">
-              <p className="text-[10px] text-text2 uppercase tracking-wider font-semibold">Color filter</p>
+              <p className="text-[10px] text-text2 uppercase tracking-wider font-semibold">{t('montageColorFilter')}</p>
               <div className="grid grid-cols-2 gap-2">
                 {(Object.keys(FILTER_LABELS) as Filter[]).map(f => (
                   <button key={f} onClick={() => setFilter(f)}
                     className={`py-2 px-3 rounded-lg text-xs text-center transition-all ${activeFilter === f ? 'bg-accent text-white font-semibold' : 'bg-surface2 text-text2 hover:text-text'}`}>
-                    {FILTER_LABELS[f]}
+                    {FILTER_LABELS_DYN[f]}
                   </button>
                 ))}
               </div>
-              <p className="text-[9px] text-text2">Filter applied in the FFmpeg export.</p>
+              <p className="text-[9px] text-text2">{t('montageFilterNote')}</p>
             </div>
           )}
 
           {/* Ajustement */}
           {activeTab === 'ajustement' && (
             <div className="p-3 space-y-4 flex-1 overflow-auto">
-              <p className="text-[10px] text-text2 uppercase tracking-wider font-semibold">Global settings</p>
+              <p className="text-[10px] text-text2 uppercase tracking-wider font-semibold">{t('montageGlobalSettings')}</p>
               <div className="space-y-3">
                 <div>
-                  <p className="text-[10px] text-text2 mb-1">Global caption</p>
+                  <p className="text-[10px] text-text2 mb-1">{t('montageGlobalCaption')}</p>
                   <textarea value={globalCaption} rows={4}
                     onChange={e => setGCap(e.target.value)}
-                    placeholder="Caption shared across all posts…"
+                    placeholder={t('montageGlobalCaptionDesc')}
                     className="w-full bg-surface border border-border rounded px-2 py-1.5 text-[11px] text-text focus:outline-none focus:border-accent resize-none" />
                 </div>
                 <div className="space-y-1">
@@ -976,7 +982,7 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
                   <div className="h-1.5 bg-surface2 rounded-full overflow-hidden">
                     <div className="h-full bg-accent rounded-full transition-all" style={{ width: `${Math.min(100, (total / 90) * 100)}%` }} />
                   </div>
-                  <p className="text-[9px] text-text2">{total > 90 ? '⚠ > 90s (Reels limit)' : `${Math.round((total / 90) * 100)}% of 90s`}</p>
+                  <p className="text-[9px] text-text2">{total > 90 ? `⚠ ${t('montageReelsLimit')}` : `${Math.round((total / 90) * 100)}% of 90s`}</p>
                 </div>
               </div>
             </div>
@@ -1023,8 +1029,8 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
           ) : (
             <div className="text-center text-text2 space-y-3">
               <p className="text-5xl">▶</p>
-              <p className="text-sm">Select a clip to preview</p>
-              <p className="text-xs text-text2/60">or drag a video into the app</p>
+              <p className="text-sm">{t('montageSelectClipPreview')}</p>
+              <p className="text-xs text-text2/60">{t('montageOrDragVideo')}</p>
             </div>
           )}
 
@@ -1041,7 +1047,7 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
         {/* RIGHT: properties */}
         <aside className="w-52 flex-shrink-0 border-l border-border bg-surface">
           <div className="px-3 py-2 border-b border-border">
-            <p className="text-[10px] font-semibold text-text2 uppercase tracking-wider">Properties</p>
+            <p className="text-[10px] font-semibold text-text2 uppercase tracking-wider">{t('montageProperties')}</p>
           </div>
           <div className="h-[calc(100%-33px)] overflow-auto">
             <PropertiesPanel clip={selectedClip} onUpdate={updateClip} />
@@ -1056,15 +1062,15 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
           {/* Edit tools */}
           <button onClick={cutAtPlayhead} disabled={!selectedUid} title="Cut clip at playhead"
             className="flex items-center gap-1 px-2 py-1 rounded text-xs text-text2 hover:text-text hover:bg-surface disabled:opacity-40 transition-all">
-            ✂ Cut
+            {t('montageCut')}
           </button>
           <button onClick={() => selectedUid && deleteClip(selectedUid)} disabled={!selectedUid}
             className="flex items-center gap-1 px-2 py-1 rounded text-xs text-text2 hover:text-danger disabled:opacity-40 transition-all">
-            🗑 Delete
+            {t('montageDelete')}
           </button>
           <button onClick={() => setClips([])} disabled={!clips.length}
             className="flex items-center gap-1 px-2 py-1 rounded text-xs text-text2 hover:text-danger disabled:opacity-40 transition-all">
-            🗑 Clear all
+            {t('montageClearAll')}
           </button>
           <div className="w-px h-5 bg-border mx-1" />
 
@@ -1103,7 +1109,7 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
 
             {/* Video track */}
             <div className="px-2 py-1">
-              <div className="text-[9px] text-text2 mb-1 uppercase tracking-wider">Video</div>
+              <div className="text-[9px] text-text2 mb-1 uppercase tracking-wider">{t('montageVideoTrack')}</div>
               {clips.length === 0 ? (
                 <div className="flex items-center text-[11px] text-text2/50 h-12 px-4">
                   ← Click a clip in Media to add it
@@ -1128,9 +1134,9 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
 
             {/* Audio track (placeholder) */}
             <div className="px-2 py-0.5 border-t border-border/40">
-              <div className="text-[9px] text-text2/50 mb-1 uppercase tracking-wider">Audio</div>
+              <div className="text-[9px] text-text2/50 mb-1 uppercase tracking-wider">{t('montageAudioTrack')}</div>
               <div className="h-7 rounded bg-surface2/40 border border-dashed border-border/40 flex items-center justify-center text-[10px] text-text2/40" style={{ width: Math.max(timelineW - 20, 200) }}>
-                Drag an audio file here (coming soon)
+                {t('montageAudioDragHint')}
               </div>
             </div>
 

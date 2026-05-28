@@ -79,9 +79,16 @@ function fmtDate(iso: string) {
 
 // ── Badge ─────────────────────────────────────────────────────────────────────
 function StatusBadge({ status }: { status: TicketStatus }) {
+  const t = useT()
+  const DYNAMIC_STATUS_LABELS: Record<TicketStatus, string> = {
+    open:        `🟡 ${t('supportStatusOpen')}`,
+    in_progress: `🔵 ${t('supportStatusInProgress')}`,
+    resolved:    `🟢 ${t('supportStatusResolved')}`,
+    closed:      `⚫ ${t('supportStatusClosed')}`,
+  }
   return (
     <span className={`text-[12px] px-2 py-0.5 rounded-full border font-medium ${STATUS_COLORS[status]}`}>
-      {STATUS_LABELS[status]}
+      {DYNAMIC_STATUS_LABELS[status]}
     </span>
   )
 }
@@ -161,7 +168,7 @@ function CreateTicketForm({
               className="w-full rounded-xl px-4 py-2.5 text-[13px] focus:outline-none"
               style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
             >
-              {(Object.entries(CATEGORY_LABELS) as [TicketCategory, string][]).map(([k, v]) => (
+              {([['general', t('supportCategoryGeneral')], ['billing', t('supportCategoryBilling')], ['technical', t('supportCategoryTechnical')], ['other', t('supportCategoryOther')]] as [TicketCategory, string][]).map(([k, v]) => (
                 <option key={k} value={k} style={{ background: '#0d1120', color: '#e2d9f3' }}>{v}</option>
               ))}
             </select>
@@ -280,14 +287,14 @@ function ThreadView({
             <StatusBadge status={ticket.status} />
             {isAdmin && (
               <span className={`text-[13px] font-medium ${PRIORITY_COLORS[ticket.priority]}`}>
-                {PRIORITY_LABELS[ticket.priority]}
+                {({ low: t('supportPriorityLow'), normal: t('supportPriorityNormal'), high: t('supportPriorityHigh'), urgent: t('supportPriorityUrgent') } as Record<string,string>)[ticket.priority]}
               </span>
             )}
           </div>
           <p className="text-[12px] text-text2 mt-1">
             {ticket.user_email}
             {ticket.org_name && <> · <span className="text-violet-400">{ticket.org_name}</span></>}
-            {' · '}{CATEGORY_LABELS[ticket.category]}
+            {' · '}{({ general: t('supportCategoryGeneral'), billing: t('supportCategoryBilling'), technical: t('supportCategoryTechnical'), other: t('supportCategoryOther') } as Record<string,string>)[ticket.category]}
             {' · '}{fmtDate(ticket.created_at)}
           </p>
         </div>
@@ -483,33 +490,33 @@ function UserSupport({ user }: { user: User }) {
           ) : tickets.length === 0 ? (
             <div className="rounded-2xl p-10 text-center space-y-4" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
               <div className="text-4xl">🎫</div>
-              <p className="text-base font-bold text-white">{lang === 'en' ? 'No tickets yet' : "Aucun ticket pour l'instant"}</p>
-              <p className="text-[13px] text-text2">{lang === 'en' ? 'Create a ticket if you need help.' : "Créez un ticket si vous avez besoin d'aide."}</p>
+              <p className="text-base font-bold text-white">{t('supportNoTicketsYet')}</p>
+              <p className="text-[13px] text-text2">{t('supportNoTicketsHint')}</p>
               <button
                 onClick={() => setView('create')}
                 className="mt-2 inline-flex items-center gap-1.5 rounded-xl px-5 py-2.5 text-[13px] font-semibold text-white"
                 style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)' }}
               >
-                {lang === 'en' ? 'Create a ticket' : 'Créer un ticket'}
+                {t('supportCreateTicket')}
               </button>
             </div>
           ) : (
             <div className="space-y-3">
-              {tickets.map(t => (
+              {tickets.map(tk => (
                 <button
-                  key={t.id}
-                  onClick={() => openTicket(t)}
+                  key={tk.id}
+                  onClick={() => openTicket(tk)}
                   className="w-full text-left rounded-2xl px-5 py-4 transition-all hover:bg-white/[0.03]"
                   style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-[13px] font-medium text-text truncate">{t.subject}</span>
-                        <StatusBadge status={t.status} />
+                        <span className="text-[13px] font-medium text-text truncate">{tk.subject}</span>
+                        <StatusBadge status={tk.status} />
                       </div>
                       <p className="text-[12px] text-text2 mt-1">
-                        {CATEGORY_LABELS[t.category]} · {fmtDate(t.created_at)}
+                        {({ general: t('supportCategoryGeneral'), billing: t('supportCategoryBilling'), technical: t('supportCategoryTechnical'), other: t('supportCategoryOther') } as Record<string,string>)[tk.category]} · {fmtDate(tk.created_at)}
                       </p>
                     </div>
                     <span className="text-[13px] text-text2 shrink-0">→</span>
@@ -526,6 +533,7 @@ function UserSupport({ user }: { user: User }) {
 
 // ── Admin View ─────────────────────────────────────────────────────────────────
 function AdminSupport({ user }: { user: User }) {
+  const t = useT()
   const [tickets,  setTickets]  = useState<Ticket[]>([])
   const [loading,  setLoading]  = useState(true)
   const [active,   setActive]   = useState<Ticket | null>(null)
@@ -567,7 +575,7 @@ function AdminSupport({ user }: { user: User }) {
     return (
       <div className="h-full flex flex-col overflow-hidden">
         <div className="flex-shrink-0 px-8 pt-7 pb-5" style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
-          <h1 className="text-[20px] font-black text-white leading-none">Support Admin</h1>
+          <h1 className="text-[20px] font-black text-white leading-none">{t('supportAdminPanel')}</h1>
         </div>
         <div className="flex-1 overflow-y-auto px-10 pb-10 mt-8">
           <ThreadView
@@ -587,15 +595,15 @@ function AdminSupport({ user }: { user: User }) {
       {/* Page header */}
       <div className="flex-shrink-0 px-8 pt-7 pb-5 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
         <div>
-          <h1 className="text-[20px] font-black text-white leading-none">Tickets support</h1>
-          <p className="text-[13px] text-text2 mt-0.5">{tickets.length} ticket(s) au total</p>
+          <h1 className="text-[20px] font-black text-white leading-none">{t('supportAdminTickets')}</h1>
+          <p className="text-[13px] text-text2 mt-0.5">{tickets.length} {t('supportAdminTotal')}</p>
         </div>
         <button
           onClick={load}
           className="rounded-xl px-5 py-2.5 text-[13px] font-semibold"
           style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
         >
-          ↺ Actualiser
+          {t('supportAdminRefresh')}
         </button>
       </div>
 
@@ -609,7 +617,7 @@ function AdminSupport({ user }: { user: User }) {
               name="search"
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Rechercher (email, sujet, orga)…"
+              placeholder={t('supportAdminSearchPlaceholder')}
               className="flex-1 min-w-48 rounded-xl px-4 py-2.5 text-[13px] focus:outline-none"
               style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
             />
@@ -624,7 +632,7 @@ function AdminSupport({ user }: { user: User }) {
                 }`}
                 style={filter !== s ? { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' } : {}}
               >
-                {s === 'all' ? 'Tous' : STATUS_LABELS[s as TicketStatus]}
+                {s === 'all' ? t('supportAdminAll') : t(`supportStatus${s === 'in_progress' ? 'InProgress' : s.charAt(0).toUpperCase() + s.slice(1)}` as Parameters<typeof t>[0])}
                 <span className="ml-1 text-[11px] opacity-70">({counts[s] ?? 0})</span>
               </button>
             ))}
@@ -633,45 +641,45 @@ function AdminSupport({ user }: { user: User }) {
           {/* Table */}
           {loading ? (
             <div className="rounded-2xl p-10 text-center" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-              <p className="text-[13px] text-text2">Chargement…</p>
+              <p className="text-[13px] text-text2">{t('supportAdminLoading')}</p>
             </div>
           ) : shown.length === 0 ? (
             <div className="rounded-2xl p-10 text-center" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-              <p className="text-[13px] text-text2">Aucun ticket trouvé.</p>
+              <p className="text-[13px] text-text2">{t('supportAdminNoTickets')}</p>
             </div>
           ) : (
             <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
               <table className="w-full">
                 <thead>
                   <tr style={{ borderBottom: '1px solid rgba(139,92,246,0.1)', background: 'rgba(255,255,255,0.02)' }}>
-                    <th className="text-left px-5 py-3.5 text-[12px] font-semibold text-text2 uppercase tracking-wide">Subject</th>
-                    <th className="text-left px-5 py-3.5 text-[12px] font-semibold text-text2 uppercase tracking-wide">Email</th>
-                    <th className="text-left px-5 py-3.5 text-[12px] font-semibold text-text2 uppercase tracking-wide">Orga</th>
-                    <th className="text-left px-5 py-3.5 text-[12px] font-semibold text-text2 uppercase tracking-wide">Cat.</th>
-                    <th className="text-left px-5 py-3.5 text-[12px] font-semibold text-text2 uppercase tracking-wide">Statut</th>
-                    <th className="text-left px-5 py-3.5 text-[12px] font-semibold text-text2 uppercase tracking-wide">Priorité</th>
-                    <th className="text-left px-5 py-3.5 text-[12px] font-semibold text-text2 uppercase tracking-wide">Msgs</th>
-                    <th className="text-left px-5 py-3.5 text-[12px] font-semibold text-text2 uppercase tracking-wide">Màj</th>
+                    <th className="text-left px-5 py-3.5 text-[12px] font-semibold text-text2 uppercase tracking-wide">{t('supportAdminColSubject')}</th>
+                    <th className="text-left px-5 py-3.5 text-[12px] font-semibold text-text2 uppercase tracking-wide">{t('supportAdminColEmail')}</th>
+                    <th className="text-left px-5 py-3.5 text-[12px] font-semibold text-text2 uppercase tracking-wide">{t('supportAdminColOrg')}</th>
+                    <th className="text-left px-5 py-3.5 text-[12px] font-semibold text-text2 uppercase tracking-wide">{t('supportAdminColCat')}</th>
+                    <th className="text-left px-5 py-3.5 text-[12px] font-semibold text-text2 uppercase tracking-wide">{t('supportAdminColStatus')}</th>
+                    <th className="text-left px-5 py-3.5 text-[12px] font-semibold text-text2 uppercase tracking-wide">{t('supportAdminColPriority')}</th>
+                    <th className="text-left px-5 py-3.5 text-[12px] font-semibold text-text2 uppercase tracking-wide">{t('supportAdminColMsgs')}</th>
+                    <th className="text-left px-5 py-3.5 text-[12px] font-semibold text-text2 uppercase tracking-wide">{t('supportAdminColUpdated')}</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {shown.map(t => (
+                  {shown.map(tk => (
                     <tr
-                      key={t.id}
-                      onClick={() => setActive(t)}
+                      key={tk.id}
+                      onClick={() => setActive(tk)}
                       className="cursor-pointer transition-colors hover:bg-white/[0.02]"
                       style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}
                     >
-                      <td className="px-5 py-4 text-[13px] font-medium text-text max-w-40 truncate">{t.subject}</td>
-                      <td className="px-5 py-4 text-[13px] text-text2">{t.user_email}</td>
-                      <td className="px-5 py-4 text-[13px] text-violet-400">{t.org_name ?? '—'}</td>
-                      <td className="px-5 py-4 text-[13px] text-text2">{CATEGORY_LABELS[t.category as TicketCategory]}</td>
-                      <td className="px-5 py-4"><StatusBadge status={t.status} /></td>
-                      <td className={`px-5 py-4 text-[13px] font-medium ${PRIORITY_COLORS[t.priority]}`}>
-                        {PRIORITY_LABELS[t.priority]}
+                      <td className="px-5 py-4 text-[13px] font-medium text-text max-w-40 truncate">{tk.subject}</td>
+                      <td className="px-5 py-4 text-[13px] text-text2">{tk.user_email}</td>
+                      <td className="px-5 py-4 text-[13px] text-violet-400">{tk.org_name ?? '—'}</td>
+                      <td className="px-5 py-4 text-[13px] text-text2">{({ general: t('supportCategoryGeneral'), billing: t('supportCategoryBilling'), technical: t('supportCategoryTechnical'), other: t('supportCategoryOther') } as Record<string,string>)[tk.category]}</td>
+                      <td className="px-5 py-4"><StatusBadge status={tk.status} /></td>
+                      <td className={`px-5 py-4 text-[13px] font-medium ${PRIORITY_COLORS[tk.priority]}`}>
+                        {({ low: t('supportPriorityLow'), normal: t('supportPriorityNormal'), high: t('supportPriorityHigh'), urgent: t('supportPriorityUrgent') } as Record<string,string>)[tk.priority]}
                       </td>
-                      <td className="px-5 py-4 text-[13px] text-text2 text-center">{t.message_count ?? 0}</td>
-                      <td className="px-5 py-4 text-[13px] text-text2 whitespace-nowrap">{fmtDate(t.updated_at)}</td>
+                      <td className="px-5 py-4 text-[13px] text-text2 text-center">{tk.message_count ?? 0}</td>
+                      <td className="px-5 py-4 text-[13px] text-text2 whitespace-nowrap">{fmtDate(tk.updated_at)}</td>
                     </tr>
                   ))}
                 </tbody>
