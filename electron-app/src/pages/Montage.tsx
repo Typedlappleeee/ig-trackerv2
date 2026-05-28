@@ -88,6 +88,7 @@ function basename(p: string) { return p.replace(/\\/g, '/').split('/').pop() ?? 
 function localSrc(p: string | null | undefined): string | null {
   if (!p) return null
   if (p.startsWith('http') || p.startsWith('blob:') || p.startsWith('data:')) return p
+  if (!window.electronAPI) return null  // web mode: can't serve local file paths
   const n = p.replace(/\\/g, '/')
   const withSlash = n.startsWith('/') ? n : `/${n}`
   return `localvideo://${encodeURI(withSlash)}`
@@ -414,9 +415,11 @@ export function Montage({ user }: MontageProps) {
   const [osDragging, setOsDrag] = useState(false)
 
   useEffect(() => {
-    supabase.from('content_bank').select('*').eq('user_id', user.id).order('created_at', { ascending: false })
-      .then(({ data }) => { setBankItems(data ?? []); setLL(false) })
-  }, [])
+    let q = supabase.from('content_bank').select('*').order('created_at', { ascending: false })
+    if (currentOrg) q = q.eq('org_id', currentOrg.id)
+    else q = q.eq('user_id', user.id)
+    q.then(({ data }) => { setBankItems(data ?? []); setLL(false) })
+  }, [currentOrg?.id])
 
   // Sync auto-caption overlay → textOverlays
   useEffect(() => {
@@ -475,7 +478,8 @@ export function Montage({ user }: MontageProps) {
     const clipEnd  = clip.trimEnd > 0 ? clip.trimEnd : raw
     if (cutPoint <= clip.trimStart + 0.5 || cutPoint >= clipEnd - 0.5) return
     const a: TimelineClip = { ...clip, uid: `${clip.uid}-a`, trimEnd: cutPoint }
-    const b: TimelineClip = { ...clip, uid: `${clip.uid}-b`, trimStart: cutPoint, trimEnd: clip.trimEnd }
+    // Start the second half 0.3s after the cut to avoid showing the uncut frame on transition
+    const b: TimelineClip = { ...clip, uid: `${clip.uid}-b`, trimStart: Math.min(cutPoint + 0.3, clipEnd - 0.1), trimEnd: clip.trimEnd }
     setClips(prev => { const next = [...prev]; const i = next.findIndex(c => c.uid === selectedUid); next.splice(i, 1, a, b); return next })
     setSelUid(a.uid)
   }, [clips, selectedUid, playhead])
@@ -622,15 +626,19 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
   const previewClip = playingIndex !== null ? (clips[playingIndex] ?? null) : selectedClip
   const [previewSrc, setPreviewSrc] = useState<string | null>(null)
   useEffect(() => {
+    let cancelled = false
     const item = previewClip?.item
     if (!item) { setPreviewSrc(null); return }
     if (item.file_url) { setPreviewSrc(localSrc(item.file_url)); return }
     if (item.storage_path) {
-      getSignedUrl(item.storage_path).then(url => setPreviewSrc(url))
+      // Clear first so we don't briefly play the wrong clip if item changes
+      setPreviewSrc(null)
+      getSignedUrl(item.storage_path).then(url => { if (!cancelled) setPreviewSrc(url) })
     } else {
       setPreviewSrc(null)
     }
-  }, [previewClip?.item.file_url, previewClip?.item.storage_path])
+    return () => { cancelled = true }
+  }, [previewClip?.item.id])
 
   function playAll() {
     if (clips.length === 0) return
@@ -1016,6 +1024,7 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
 
           {previewSrc ? (
             <video
+              key={playingIndex !== null ? `play-${playingIndex}` : 'preview'}
               ref={videoRef}
               src={previewSrc}
               className="max-h-full max-w-full rounded object-contain"
