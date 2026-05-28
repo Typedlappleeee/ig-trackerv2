@@ -714,6 +714,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                 splitTime, outputPath, preset,
                 textOverlays,
                 targetDuration,
+                manualCut: job.cutSec != null || splitMode === 'manual',
               })
             : window.electronAPI!.runFfmpegRemixAI!({
                 newPhase1Path: job.secondaryPath,

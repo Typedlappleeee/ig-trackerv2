@@ -876,16 +876,17 @@ export async function runFfmpegRemixAIWeb(opts: {
   outputPath:    string
   preset:        '9:16' | '1:1' | '16:9'
   copyTextFromOriginal?: boolean
+  manualCut?:    boolean
   textOverlays:  Array<{
     text: string; x: string; y: string; fontSize: number; fontColor: string
     startTime: number; endTime: number; bold?: boolean; shadow?: boolean
   }>
 }): Promise<{ ok: boolean; outputPath?: string; error?: string }> {
-  // Add 0.5s to the detected cut point so the secondary clip plays a bit longer
-  // before the original video appears. This hides the first frame of the original
-  // which often looks jarring right at the scene-change boundary.
+  // For auto-detected cuts, add 0.5s so the secondary clip plays a bit longer
+  // before the original appears — hides the jarring first frame at the cut boundary.
+  // Manual cuts (user-specified time) are used as-is.
   const splitTime = (opts.splitTime != null && !isNaN(opts.splitTime) && opts.splitTime > 0)
-    ? opts.splitTime + 0.5 : 0
+    ? (opts.manualCut ? opts.splitTime : opts.splitTime + 0.5) : 0
 
   // ── Fast path: hardware encoding via MediaRecorder ────────────────────────
   if (typeof MediaRecorder !== 'undefined') {
