@@ -1,36 +1,56 @@
 // Video download proxy — multi-fallback strategy for Instagram and TikTok.
-// 1. cobalt.tools (handles both platforms, actively maintained)
-// 2. Instagram: mobile user-agent scraping + multiple JSON patterns
-// 3. TikTok: douyin.wtf public API
+// cobalt.tools was removed (now requires JWT auth as of 2026).
+// TikTok: tikmate.app (reliable) → page scraping fallback
+// Instagram: mobile UA scraping (best-effort; Instagram blocks most server IPs)
 const TIMEOUT = 14000
 
 function cleanUrl(raw) {
   try {
     const u = new URL(raw.trim())
-    // Strip tracking params but keep the path clean
     return (u.origin + u.pathname).replace(/\/$/, '')
   } catch { return raw.trim() }
 }
 
-// ── cobalt.tools ─────────────────────────────────────────────────────────────
-async function tryCobalt(url) {
-  const r = await fetch('https://api.cobalt.tools/', {
+// ── TikTok — tikmate.app ──────────────────────────────────────────────────────
+// Returns a direct download URL via tikmate's token-based system
+async function tryTikmate(url) {
+  const r = await fetch('https://api.tikmate.app/api/lookup', {
     method:  'POST',
-    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-    body:    JSON.stringify({ url, downloadMode: 'auto', videoQuality: 'max' }),
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': 'Mozilla/5.0' },
+    body:    new URLSearchParams({ url }).toString(),
     signal:  AbortSignal.timeout(TIMEOUT),
   })
   if (!r.ok) return null
   const d = await r.json()
-  if (d.status === 'error' || (!d.url && !d.picker)) return null
-  return d
+  if (!d.success || !d.token || !d.id) return null
+  return `https://tikmate.app/download/${d.token}/${d.id}.mp4`
+}
+
+// ── TikTok — page scraping ────────────────────────────────────────────────────
+// TikTok embeds playAddr in the page HTML (server-rendered JSON)
+async function tryTikTokScrape(url) {
+  const r = await fetch(url, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Accept': 'text/html',
+    },
+    signal: AbortSignal.timeout(TIMEOUT),
+  })
+  if (!r.ok) return null
+  const html = await r.text()
+  const m = html.match(/"playAddr":"([^"]+)"/) || html.match(/"downloadAddr":"([^"]+)"/)
+  if (!m) return null
+  return m[1]
+    .replace(/\\u002F/g, '/')
+    .replace(/\\\//g,    '/')
+    .replace(/\\u0026/g, '&')
+    .replace(/\\/g,      '')
 }
 
 // ── Instagram scraping ───────────────────────────────────────────────────────
-// Fetch with a mobile Instagram user-agent — this sometimes includes JSON data
-// with video URLs directly in the page source.
+// Instagram renders video URLs client-side, so server-side scraping often fails
+// for standard datacenter IPs. This tries anyway with multiple patterns.
 async function tryInstagramScrape(url) {
-  // Try both the clean URL and the /embed/ version
   const urls = [url + '/', url + '/embed/']
 
   for (const target of urls) {
@@ -70,30 +90,6 @@ async function tryInstagramScrape(url) {
   return null
 }
 
-// ── TikTok — douyin.wtf ───────────────────────────────────────────────────────
-async function tryDouyinWtf(url) {
-  const r = await fetch(`https://api.douyin.wtf/api?url=${encodeURIComponent(url)}&minimal=true`, {
-    headers: { 'User-Agent': 'Mozilla/5.0' },
-    signal: AbortSignal.timeout(TIMEOUT),
-  })
-  if (!r.ok) return null
-  const d = await r.json()
-  return d?.video_url_noWaterMark || d?.video_url || null
-}
-
-// ── TikTok — tikwm ────────────────────────────────────────────────────────────
-async function tryTikwm(url) {
-  const r = await fetch('https://api.tikwm.com/', {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': 'Mozilla/5.0' },
-    body:    new URLSearchParams({ url, hd: '1' }).toString(),
-    signal:  AbortSignal.timeout(TIMEOUT),
-  })
-  if (!r.ok) return null
-  const d = await r.json()
-  return d?.data?.play || d?.data?.wmplay || null
-}
-
 // ── main handler ─────────────────────────────────────────────────────────────
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
@@ -111,22 +107,21 @@ export default async function handler(req, res) {
     return res.json({ status: 'error', error: { code: 'unsupported_platform' } })
   }
 
-  // 1. cobalt.tools — primary (handles both IG + TT)
-  const cobalt = await tryCobalt(clean).catch(() => null)
-  if (cobalt) return res.json(cobalt)
+  if (isTT) {
+    // 1. tikmate.app (most reliable for TikTok)
+    const tikmate = await tryTikmate(url).catch(() => null)
+    if (tikmate) return res.json({ status: 'tunnel', url: tikmate })
 
-  // 2. Platform-specific fallbacks
+    // 2. Page scraping fallback
+    const scraped = await tryTikTokScrape(url).catch(() => null)
+    if (scraped) return res.json({ status: 'tunnel', url: scraped })
+
+    return res.json({ status: 'error', error: { code: 'tiktok_video_not_found' } })
+  }
+
   if (isIG) {
     const videoUrl = await tryInstagramScrape(clean).catch(() => null)
     if (videoUrl) return res.json({ status: 'tunnel', url: videoUrl })
-    return res.json({ status: 'error', error: { code: 'instagram_video_not_found' } })
-  }
-
-  if (isTT) {
-    const videoUrl =
-      await tryDouyinWtf(url).catch(() => null) ||
-      await tryTikwm(url).catch(() => null)
-    if (videoUrl) return res.json({ status: 'tunnel', url: videoUrl })
-    return res.json({ status: 'error', error: { code: 'tiktok_video_not_found' } })
+    return res.json({ status: 'error', error: { code: 'instagram_not_supported' } })
   }
 }

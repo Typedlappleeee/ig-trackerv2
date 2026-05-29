@@ -58,7 +58,9 @@ export function VideoImport({ user }: { user: User }) {
       if (!cobaltRes.ok || cobalt?.status === 'error') {
         const code = cobalt?.error?.code ?? cobalt?.error ?? `HTTP ${cobaltRes.status}`
         const msg =
-          code === 'instagram_video_not_found' ? 'Vidéo Instagram introuvable — le compte est peut-être privé'
+          code === 'instagram_not_supported'   ? 'Instagram bloque les téléchargements depuis nos serveurs — essaie avec un lien TikTok, ou télécharge la vidéo manuellement puis importe-la'
+          : code === 'instagram_video_not_found' ? 'Vidéo Instagram introuvable — le compte est peut-être privé'
+          : code === 'tiktok_video_not_found'  ? 'Vidéo TikTok introuvable — vérifie que le lien est correct et que le compte est public'
           : code === 'unsupported_platform'    ? 'Plateforme non supportée (Instagram et TikTok uniquement)'
           : `Impossible de télécharger : ${code}`
         throw new Error(msg)
