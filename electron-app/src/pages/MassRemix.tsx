@@ -417,7 +417,9 @@ export function MassRemix({ user }: MassRemixProps) {
 
     const n = prePlanned ? prePlanned.length : Math.max(1, copies)
     const creditCost = n * CREDIT_COSTS.remix
+    console.log('[credits] ownerId:', credits.ownerId, 'cost:', creditCost)
     const creditRes = await checkAndDeductCredits(credits.ownerId, creditCost)
+    console.log('[credits] result:', creditRes)
     if (!creditRes.ok) {
       alert(`${t('massRemixInsufficientCredits')} — ${creditCost} credit(s) needed for ${n} remix. Balance: ${creditRes.balance ?? 0}`)
       return
