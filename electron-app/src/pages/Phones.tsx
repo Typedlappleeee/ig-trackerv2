@@ -714,10 +714,13 @@ export function Phones({ user }: PhonesProps) {
       const currentGeelarkIds = new Set(rows.map(r => r.geelark_id))
 
       if (currentOrg) {
-        // Fetch ALL phones for this user (any org_id) that match the current GéeLark set
+        // In org mode, check existing phones by org_id + geelark_id (not user_id)
+        // because another org member may have already synced the same phone with
+        // their own user_id — using user_id here would miss it and cause a duplicate
+        // key violation on the phones_org_geelark_uniq index.
         const { data: existingAll } = await supabase
           .from('phones').select('id,geelark_id')
-          .eq('user_id', user.id)
+          .eq('org_id', currentOrg.id)
           .in('geelark_id', [...currentGeelarkIds])
         const existingMap = new Map((existingAll ?? []).map((p: { id: string; geelark_id: string }) => [p.geelark_id, p.id]))
 
@@ -733,7 +736,10 @@ export function Phones({ user }: PhonesProps) {
         const toUpdate = rows.filter(r =>  existingMap.has(r.geelark_id))
 
         if (toInsert.length > 0) {
-          const { error } = await supabase.from('phones').insert(toInsert)
+          // Use upsert (not insert) so a race condition between two members syncing
+          // simultaneously doesn't produce a second duplicate key error.
+          const { error } = await supabase.from('phones')
+            .upsert(toInsert, { onConflict: 'org_id,geelark_id', ignoreDuplicates: false })
           if (error) throw new Error(error.message)
         }
         for (const row of toUpdate) {
