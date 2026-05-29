@@ -245,8 +245,8 @@ export async function detectSceneChangeWeb(opts: {
       canvas.width = W; canvas.height = H
       const ctx = canvas.getContext('2d', { willReadFrequently: true })!
 
-      // Sample up to 30 timestamps spread across the video
-      const maxSamples = 30
+      // Sample up to 10 timestamps spread across the video
+      const maxSamples = 10
       const step = duration / maxSamples
       const times = Array.from({ length: maxSamples }, (_, i) => (i + 0.5) * step)
 
@@ -275,7 +275,7 @@ export async function detectSceneChangeWeb(opts: {
       }
       // Require a big background/location change: threshold 0.30 = 30% avg pixel shift.
       // Minor motion or lighting changes stay < 0.15, real scene cuts are 0.30+.
-      const threshold = opts.threshold ?? 0.25
+      const threshold = opts.threshold ?? 0.30
 
       // Find the FIRST consecutive-frame transition above threshold (the first
       // scene change), not the global maximum — the cut must land on the first
@@ -613,16 +613,17 @@ async function remixViaMediaRecorder(opts: {
   // ── load videos ──────────────────────────────────────────────────────────────
   const loadVid = (src: string): Promise<HTMLVideoElement> => new Promise((res, rej) => {
     const v = document.createElement('video')
-    v.muted = true; v.playsInline = true; v.preload = 'auto'; v.src = src
-    // Wait for canplaythrough so the browser has buffered enough to play without stalling.
-    // Falls back to loadeddata if canplaythrough never fires (e.g. very large remote files).
-    const tid = setTimeout(() => res(v), 30_000)
+    v.muted = true; v.playsInline = true; v.preload = 'auto'
+    v.crossOrigin = 'anonymous'
+    v.src = src
+    // Resolve on canplaythrough (readyState=4) — guarantees frames are available.
+    // Falls back after 8s if canplaythrough never fires (large / slow files).
+    const tid = setTimeout(() => {
+      if (v.readyState >= 2) res(v)
+      else rej(new Error('Vidéo non chargée après 8s'))
+    }, 8_000)
     const done = (vid: HTMLVideoElement) => { clearTimeout(tid); res(vid) }
     v.oncanplaythrough = () => done(v)
-    v.onloadeddata     = () => {
-      // Give canplaythrough up to 3s more before falling back
-      setTimeout(() => done(v), 3_000)
-    }
     v.onerror = () => { clearTimeout(tid); rej(new Error('Impossible de charger la vidéo')) }
   })
   // Always load secondary — it's the main visual source regardless of split
@@ -738,19 +739,20 @@ async function remixViaMediaRecorder(opts: {
   let switched = false
   let drawTimerId = 0
   let recordingStopped = false
+  let recorder: MediaRecorder  // declared here, started after first frame
 
   const stopRecording = () => {
     if (recordingStopped) return
     recordingStopped = true
     clearInterval(drawTimerId)
-    recorder.stop()
+    if (recorder?.state !== 'inactive') recorder?.stop()
   }
 
   const drawFrame = () => {
     if (!switched && hasSplit && origVid.currentTime >= opts.splitTime) {
       switched = true
       secVid.pause()
-      try { recorder.requestData() } catch { /* flush buffer at cut point */ }
+      try { recorder?.requestData() } catch { /* flush buffer at cut point */ }
     }
     drawOneFrame(switched)
   }

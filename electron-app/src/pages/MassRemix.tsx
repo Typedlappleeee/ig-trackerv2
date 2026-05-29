@@ -188,6 +188,7 @@ function VideoSourcePanel({
 
 export function MassRemix({ user }: MassRemixProps) {
   const t = useT()
+  const { lang } = useLang()
   const STATUS_LABEL: Record<MassJob['status'], string> = {
     pending:    t('massRemixStatusPending'),
     detecting:  t('massRemixStatusDetecting'),
@@ -406,6 +407,7 @@ export function MassRemix({ user }: MassRemixProps) {
   }
 
   async function launch(prePlanned?: PlannedPair[]) {
+    if (running) return
     if (!originals.length || !secondaries.length) return
     if (exportMode === 'folder' && !outputFolder) {
       const f = await window.electronAPI?.pickOutputFolder?.()
@@ -413,9 +415,11 @@ export function MassRemix({ user }: MassRemixProps) {
       setOutputFolder(f)
     }
 
-    const n = Math.max(1, copies)
+    const n = prePlanned ? prePlanned.length : Math.max(1, copies)
     const creditCost = n * CREDIT_COSTS.remix
+    console.log('[credits] ownerId:', credits.ownerId, 'cost:', creditCost)
     const creditRes = await checkAndDeductCredits(credits.ownerId, creditCost)
+    console.log('[credits] result:', creditRes)
     if (!creditRes.ok) {
       alert(`${t('massRemixInsufficientCredits')} — ${creditCost} crédit(s) requis pour ${n} remix. Solde: ${creditRes.balance ?? 0}`)
       return
@@ -787,7 +791,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
         updateJob(job.id, { status: 'error', error: msg })
         playError()
       }
-    }), 1)
+    }), 3)
 
     setRunning(false)
   }
@@ -953,16 +957,30 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
 
                       <div className="ml-auto flex items-center gap-2">
                         {vidDuration > 0 && (
-                          <button
-                            onClick={() => {
-                              const sec = Math.round(vidCurrentTime * 1000) / 1000
-                              setCutForPair(selectedPair.id, sec)
-                              vidRef.current?.pause()
-                            }}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-bold transition-all hover:brightness-110"
-                            style={{ background: 'linear-gradient(130deg,rgba(234,179,8,0.25),rgba(234,179,8,0.12))', border: '1px solid rgba(234,179,8,0.5)', color: '#eab308', boxShadow: '0 0 12px rgba(234,179,8,0.15)' }}>
-                            {t('massRemixCutHere')}
-                          </button>
+                          <>
+                            <button
+                              onClick={() => {
+                                const sec = Math.round(vidCurrentTime * 1000) / 1000
+                                setCutForPair(selectedPair.id, sec)
+                                vidRef.current?.pause()
+                              }}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-bold transition-all hover:brightness-110"
+                              style={{ background: 'linear-gradient(130deg,rgba(234,179,8,0.25),rgba(234,179,8,0.12))', border: '1px solid rgba(234,179,8,0.5)', color: '#eab308', boxShadow: '0 0 12px rgba(234,179,8,0.15)' }}>
+                              {t('massRemixCutHere')}
+                            </button>
+                            {plannedPairs.length > 1 && (
+                              <button
+                                onClick={() => {
+                                  const sec = Math.round(vidCurrentTime * 1000) / 1000
+                                  setPlannedPairs(prev => prev.map(p => ({ ...p, cutSec: sec })))
+                                  vidRef.current?.pause()
+                                }}
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-bold transition-all hover:brightness-110"
+                                style={{ background: 'linear-gradient(130deg,rgba(124,58,237,0.25),rgba(124,58,237,0.12))', border: '1px solid rgba(124,58,237,0.5)', color: '#a78bfa' }}>
+                                {lang === 'en' ? 'Apply to all' : 'Appliquer à tout'}
+                              </button>
+                            )}
+                          </>
                         )}
                         {selectedPair.cutSec != null && (
                           <button onClick={() => setCutForPair(selectedPair.id, undefined)}
