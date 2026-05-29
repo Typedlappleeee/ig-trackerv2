@@ -69,9 +69,25 @@
  * CREATE POLICY "reactions_delete" ON community_reactions FOR DELETE USING (auth.uid() = user_id);
  *
  * CREATE OR REPLACE FUNCTION increment_view(msg_id uuid) RETURNS void
- * LANGUAGE sql SECURITY DEFINER AS $$
- *   UPDATE community_messages SET view_count = view_count + 1 WHERE id = msg_id;
+ * LANGUAGE plpgsql SECURITY DEFINER AS $$
+ * BEGIN
+ *   INSERT INTO community_views (user_id, message_id) VALUES (auth.uid(), msg_id)
+ *   ON CONFLICT (user_id, message_id) DO NOTHING;
+ *   IF FOUND THEN
+ *     UPDATE community_messages SET view_count = view_count + 1 WHERE id = msg_id;
+ *   END IF;
+ * END;
  * $$;
+ *
+ * CREATE TABLE IF NOT EXISTS community_views (
+ *   user_id    uuid REFERENCES auth.users NOT NULL,
+ *   message_id uuid REFERENCES community_messages NOT NULL,
+ *   created_at timestamptz DEFAULT now(),
+ *   PRIMARY KEY (user_id, message_id)
+ * );
+ * ALTER TABLE community_views ENABLE ROW LEVEL SECURITY;
+ * CREATE POLICY "views_insert" ON community_views FOR INSERT WITH CHECK (auth.uid() = user_id);
+ * CREATE POLICY "views_select" ON community_views FOR SELECT USING (auth.uid() = user_id);
  *
  * -- Bucket "avatars" public → Supabase dashboard → Storage
  *
@@ -862,6 +878,11 @@ export function Community({ user, onNavigate }: CommunityProps) {
     setLoading(false)
   }, [])
 
+  const loadViews = useCallback(async () => {
+    const { data } = await supabase.from('community_views').select('message_id').eq('user_id', user.id)
+    if (data) data.forEach(r => viewedRef.current.add(r.message_id))
+  }, [user.id])
+
   const loadReactions = useCallback(async () => {
     const { data } = await supabase.from('community_reactions').select('user_id, message_id')
     if (!data) return
@@ -890,8 +911,14 @@ export function Community({ user, onNavigate }: CommunityProps) {
   async function trackView(messageId: string) {
     if (viewedRef.current.has(messageId)) return
     viewedRef.current.add(messageId)
+    // Optimistic update — DB RPC will silently no-op if user already viewed (ON CONFLICT DO NOTHING)
     setMessages(prev => prev.map(m => m.id === messageId ? { ...m, view_count: m.view_count + 1 } : m))
-    await supabase.rpc('increment_view', { msg_id: messageId })
+    const { error } = await supabase.rpc('increment_view', { msg_id: messageId })
+    // If RPC fails, revert optimistic update and remove from viewedRef so it can be retried
+    if (error) {
+      viewedRef.current.delete(messageId)
+      setMessages(prev => prev.map(m => m.id === messageId ? { ...m, view_count: Math.max(0, m.view_count - 1) } : m))
+    }
   }
 
   async function uploadVideo(file: File): Promise<string | null> {
@@ -926,6 +953,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
   useEffect(() => { loadProfile() }, [loadProfile])
   useEffect(() => { loadMessages() }, [loadMessages])
   useEffect(() => { loadReactions() }, [loadReactions])
+  useEffect(() => { loadViews() }, [loadViews])
 
   useEffect(() => {
     const ch = supabase.channel('community-v3')
