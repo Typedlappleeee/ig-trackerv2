@@ -714,22 +714,9 @@ export function Phones({ user }: PhonesProps) {
       const currentGeelarkIds = new Set(rows.map(r => r.geelark_id))
 
       if (currentOrg) {
-        // Search by BOTH org_id and user_id to catch every existing row:
-        // - org phones synced by another member  → found via org_id
-        // - solo phones this user had previously → found via user_id (org_id IS NULL)
-        // Missing either one causes a unique-constraint violation on insert.
-        const [{ data: byOrg }, { data: byUser }] = await Promise.all([
-          supabase.from('phones').select('id,geelark_id')
-            .eq('org_id', currentOrg.id)
-            .in('geelark_id', [...currentGeelarkIds]),
-          supabase.from('phones').select('id,geelark_id')
-            .eq('user_id', user.id)
-            .in('geelark_id', [...currentGeelarkIds]),
-        ])
-        const existingMap = new Map(
-          [...(byOrg ?? []), ...(byUser ?? [])]
-            .map((p: { id: string; geelark_id: string }) => [p.geelark_id, p.id])
-        )
+        // Org mode: unique key is (org_id, geelark_id) — not (user_id, geelark_id).
+        // Two members of the same org, or two orgs sharing the same GéeLark API,
+        // can all have rows with the same geelark_id under different org_ids.
 
         // Delete phones removed from GéeLark (only those already in this org)
         const { data: orgPhones } = await supabase
@@ -739,21 +726,11 @@ export function Phones({ user }: PhonesProps) {
           await supabase.from('phones').delete().in('id', toDelete.map((p: { id: string }) => p.id))
         }
 
-        const toInsert = rows.filter(r => !existingMap.has(r.geelark_id))
-        const toUpdate = rows.filter(r =>  existingMap.has(r.geelark_id))
-
-        if (toInsert.length > 0) {
-          // Upsert on the table-level constraint so a solo row (org_id NULL) that
-          // already exists for this user gets updated in-place instead of re-inserted.
-          const { error } = await supabase.from('phones')
-            .upsert(toInsert, { onConflict: 'user_id,geelark_id', ignoreDuplicates: false })
-          if (error) throw new Error(error.message)
-        }
-        for (const row of toUpdate) {
-          const id = existingMap.get(row.geelark_id)!
-          const { error } = await supabase.from('phones').update(row).eq('id', id)
-          if (error) throw new Error(error.message)
-        }
+        // Upsert on (org_id, geelark_id): handles race conditions between members
+        // syncing simultaneously and re-syncs after the phone was deleted.
+        const { error } = await supabase.from('phones')
+          .upsert(rows, { onConflict: 'org_id,geelark_id', ignoreDuplicates: false })
+        if (error) throw new Error(error.message)
       } else {
         // Solo mode — delete phones no longer in GéeLark then upsert the rest
         await supabase.from('phones')
