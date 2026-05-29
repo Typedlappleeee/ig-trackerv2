@@ -1195,6 +1195,7 @@ const DL_MAC = `${SUPABASE_STORAGE}/ScaleFlow-latest.dmg`
 type StyleObj = { text: string; text2: string; text3: string; border: string; base: string; accent3: string }
 function DesktopDownloadPanel({ S }: { S: StyleObj }) {
   const t = useT()
+  const { lang } = useLang()
   const isElectron = !!(window as any).electronAPI
   return (
     <div className="sf-anim-slide-up" style={{ maxWidth: 540, display: 'flex', flexDirection: 'column', gap: 20, padding: '28px 28px 0' }}>
@@ -1220,40 +1221,25 @@ function DesktopDownloadPanel({ S }: { S: StyleObj }) {
         ))}
       </div>
 
-      {/* Download buttons */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <a href={DL_WIN} download="ScaleFlow-Setup-latest.exe" style={{ textDecoration: 'none' }}>
-          <button style={{
-            width: '100%', height: 44, borderRadius: 11, border: 'none', cursor: 'pointer',
-            background: 'linear-gradient(135deg, #7C3AED, #a855f7)',
-            color: '#fff', fontSize: 14, fontWeight: 700,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9,
-            boxShadow: '0 4px 16px rgba(124,58,237,0.35)',
-          }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            {t('downloadWindows')}
-          </button>
-        </a>
-        <a href={DL_MAC} download="ScaleFlow-latest.dmg" style={{ textDecoration: 'none' }}>
-          <button style={{
-            width: '100%', height: 44, borderRadius: 11, cursor: 'pointer',
-            background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
-            color: S.text2, fontSize: 13, fontWeight: 600,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9,
-          }}>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-            {t('downloadMac')}
-          </button>
-        </a>
+      {/* Coming soon banner */}
+      <div style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
+        padding: '24px 20px', borderRadius: 14,
+        background: 'linear-gradient(135deg, rgba(124,58,237,0.12), rgba(168,85,247,0.08))',
+        border: '1px solid rgba(124,58,237,0.25)',
+        textAlign: 'center',
+      }}>
+        <span style={{ fontSize: 32 }}>🖥️</span>
+        <p style={{ fontSize: 16, fontWeight: 700, color: S.text, margin: 0 }}>
+          {lang === 'en' ? 'Coming soon' : 'Prochainement'}
+        </p>
+        <p style={{ fontSize: 13, color: S.text3, margin: 0 }}>
+          {lang === 'en'
+            ? 'The desktop app is under development. Stay tuned!'
+            : "L'application desktop est en cours de développement. Restez connecté !"}
+        </p>
       </div>
 
-      {/* Install instructions */}
-      <div style={{ padding: '12px 14px', borderRadius: 10, background: 'rgba(124,58,237,0.06)', border: '1px solid rgba(124,58,237,0.15)' }}>
-        <p style={{ fontSize: 12, fontWeight: 700, color: S.text3, margin: '0 0 8px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('installInstructions')}</p>
-        {[t('installStep1'), t('installStep2'), t('installStep3')].map((s, i) => (
-          <p key={i} style={{ fontSize: 12, color: S.text3, margin: '3px 0 0' }}>{s}</p>
-        ))}
-      </div>
     </div>
   )
 }
@@ -1444,7 +1430,7 @@ function SubscriptionPanel() {
   const { lang } = useLang()
   const license = useLicense()
   const { balance: creditBalance, refresh: refreshCredits } = useCredits()
-  const { myOrgs } = useOrg()
+  const { myOrgs, currentOrg } = useOrg()
   const [licenseKey, setLicenseKey] = useState<string | null>(null)
   const [copied, setCopied]         = useState(false)
 
@@ -1476,7 +1462,7 @@ function SubscriptionPanel() {
   const [codeLoading, setCodeLoading]     = useState(false)
   const [codeResult, setCodeResult]       = useState<{ ok: boolean; text: string } | null>(null)
   // 'personal' = own account, otherwise an org id
-  const [codeTarget, setCodeTarget]       = useState<string>('personal')
+  const [codeTarget, setCodeTarget]       = useState<string>(() => currentOrg?.id ?? 'personal')
 
   useEffect(() => {
     supabase.from('license_keys')
@@ -1627,8 +1613,8 @@ function SubscriptionPanel() {
           {[
             ['Posting', `1 ${t('creditsCost')} ${t('perPhone')}`],
             ['Mass Posting', `2 ${t('creditsCosts')} ${t('perPhone')}`],
-            [lang === 'en' ? 'Video Montage' : 'Montage vidéo', `1 ${t('creditsCost')}`],
-            [lang === 'en' ? 'Video Remix' : 'Remix vidéo', `2 ${t('creditsCosts')}`],
+            [lang === 'en' ? 'CloneVid' : 'CloneVid', `0.5 ${t('creditsCost')}`],
+            [lang === 'en' ? 'Video Remix' : 'Remix vidéo', `0.5 ${t('creditsCost')}`],
           ].map(([op, cost]) => (
             <div key={op} className="flex justify-between">
               <span className="text-[13px] text-text2">{op}</span>
@@ -1657,10 +1643,10 @@ function SubscriptionPanel() {
                 className="flex-1 rounded-lg px-3 py-1.5 text-[12px] focus:outline-none"
                 style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
               >
-                <option value="personal">{lang === 'en' ? '👤 My account' : '👤 Mon compte'}</option>
                 {myOrgs.map(({ org }) => (
                   <option key={org.id} value={org.id}>🏢 {org.name}</option>
                 ))}
+                <option value="personal">{lang === 'en' ? '👤 My account' : '👤 Mon compte'}</option>
               </select>
             </div>
           )}
