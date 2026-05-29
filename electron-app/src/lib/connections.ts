@@ -3,6 +3,10 @@ import type { User } from '@supabase/supabase-js'
 import { supabase } from './supabase'
 import { useOrg } from './orgContext'
 
+// Default Groq key for agencies that haven't configured their own.
+// Set VITE_DEFAULT_GROQ_KEY in Vercel / .env.local to activate.
+const DEFAULT_GROQ_KEY = import.meta.env.VITE_DEFAULT_GROQ_KEY ?? ''
+
 // Connection-level config that switches between solo (app_config) and org (org_config).
 // Connection-only fields: bearer/groq/proxy/ig_sessionid. Other settings (theme,
 // language, notifications, profile name…) stay user-level in app_config.
@@ -61,7 +65,7 @@ export function useConnections(user: User): ActiveConnections {
       if (cancelled) return
       setConns({
         bearer:       (data as Record<string,string> | null)?.bearer_token ?? '',
-        groq:         (data as Record<string,string> | null)?.groq_api_key ?? '',
+        groq:         (data as Record<string,string> | null)?.groq_api_key || DEFAULT_GROQ_KEY,
         anthropic:    (data as Record<string,string> | null)?.anthropic_api_key ?? '',
         proxy:        (data as Record<string,string> | null)?.proxy ?? '',
         ig_sessionid: (data as Record<string,string> | null)?.ig_sessionid ?? '',
@@ -85,7 +89,7 @@ export function useConnections(user: User): ActiveConnections {
       if (cancelled) return
       setConns({
         bearer:       (data as Record<string,string> | null)?.bearer_token ?? '',
-        groq:         (data as Record<string,string> | null)?.groq_api_key ?? '',
+        groq:         (data as Record<string,string> | null)?.groq_api_key || DEFAULT_GROQ_KEY,
         anthropic:    (data as Record<string,string> | null)?.anthropic_api_key ?? '',
         proxy:        (data as Record<string,string> | null)?.proxy ?? '',
         ig_sessionid: (data as Record<string,string> | null)?.ig_sessionid ?? '',

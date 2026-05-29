@@ -423,7 +423,7 @@ import { Warmup }            from '@/pages/Warmup'
 import { TextCopy }          from '@/pages/TextCopy'
 import { VideoRepurpose }    from '@/pages/VideoRepurpose'
 import { Licences }          from '@/pages/Licences'
-import { AdsPower }          from '@/pages/AdsPower'
+
 import { Support }           from '@/pages/Support'
 import { Community }         from '@/pages/Community'
 import { VideoImport }       from '@/pages/VideoImport'
@@ -619,7 +619,7 @@ function AppContent({ user }: { user: User }) {
       case 'community':    return <Community    user={user} onNavigate={handleNavigate} />
       case 'support':      return <Support      user={user} />
       case 'licences':     return <Licences    user={user} />
-      case 'adspower':     return <AdsPower    user={user} />
+
     }
   })()
 
