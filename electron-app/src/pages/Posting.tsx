@@ -35,7 +35,7 @@ const AVATAR_COLORS = [
   ['#D97706','#FBBF24'], ['#DC2626','#F87171'], ['#7C3AED','#EC4899'],
 ]
 function avatarGradient(name: string) {
-  const i = (name?.charCodeAt(0) ?? 0) % AVATAR_COLORS.length
+  const i = (name?.charCodeAt(0) || 0) % AVATAR_COLORS.length
   return `linear-gradient(135deg,${AVATAR_COLORS[i][0]},${AVATAR_COLORS[i][1]})`
 }
 
