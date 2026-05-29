@@ -1,5 +1,100 @@
-// Video download proxy — routes Instagram and TikTok through server-side extraction
-// to avoid CORS and Instagram/TikTok anti-bot measures in the browser.
+// Video download proxy — multi-fallback strategy for Instagram and TikTok.
+// 1. cobalt.tools (handles both platforms, actively maintained)
+// 2. Instagram: mobile user-agent scraping + multiple JSON patterns
+// 3. TikTok: douyin.wtf public API
+const TIMEOUT = 14000
+
+function cleanUrl(raw) {
+  try {
+    const u = new URL(raw.trim())
+    // Strip tracking params but keep the path clean
+    return (u.origin + u.pathname).replace(/\/$/, '')
+  } catch { return raw.trim() }
+}
+
+// ── cobalt.tools ─────────────────────────────────────────────────────────────
+async function tryCobalt(url) {
+  const r = await fetch('https://api.cobalt.tools/', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+    body:    JSON.stringify({ url, downloadMode: 'auto', videoQuality: 'max' }),
+    signal:  AbortSignal.timeout(TIMEOUT),
+  })
+  if (!r.ok) return null
+  const d = await r.json()
+  if (d.status === 'error' || (!d.url && !d.picker)) return null
+  return d
+}
+
+// ── Instagram scraping ───────────────────────────────────────────────────────
+// Fetch with a mobile Instagram user-agent — this sometimes includes JSON data
+// with video URLs directly in the page source.
+async function tryInstagramScrape(url) {
+  // Try both the clean URL and the /embed/ version
+  const urls = [url + '/', url + '/embed/']
+
+  for (const target of urls) {
+    try {
+      const r = await fetch(target, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1',
+          'Accept': 'text/html,application/xhtml+xml',
+          'Accept-Language': 'en-US,en;q=0.9',
+          'Referer': 'https://www.instagram.com/',
+        },
+        signal: AbortSignal.timeout(TIMEOUT),
+      })
+      if (!r.ok) continue
+
+      const html = await r.text()
+
+      const patterns = [
+        /"video_url":"(https:[^"]+)"/,
+        /"playback_url":"(https:[^"]+)"/,
+        /"video_versions":\[{"type":\d+,"width":\d+,"height":\d+,"url":"(https:[^"]+)"/,
+        /property="og:video:secure_url"\s+content="([^"]+)"/,
+        /content="([^"]+)"\s+property="og:video:secure_url"/,
+        /property="og:video"\s+content="([^"]+)"/,
+        /content="([^"]+)"\s+property="og:video"/,
+        /<video[^>]+src="(https:[^"]+)"/,
+      ]
+
+      for (const p of patterns) {
+        const m = html.match(p)
+        if (m?.[1]) {
+          return m[1].replace(/\\u0026/g, '&').replace(/\\\/\\\//g, '//').replace(/\\/g, '')
+        }
+      }
+    } catch { /* try next */ }
+  }
+  return null
+}
+
+// ── TikTok — douyin.wtf ───────────────────────────────────────────────────────
+async function tryDouyinWtf(url) {
+  const r = await fetch(`https://api.douyin.wtf/api?url=${encodeURIComponent(url)}&minimal=true`, {
+    headers: { 'User-Agent': 'Mozilla/5.0' },
+    signal: AbortSignal.timeout(TIMEOUT),
+  })
+  if (!r.ok) return null
+  const d = await r.json()
+  return d?.video_url_noWaterMark || d?.video_url || null
+}
+
+// ── TikTok — tikwm ────────────────────────────────────────────────────────────
+async function tryTikwm(url) {
+  const r = await fetch('https://api.tikwm.com/', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': 'Mozilla/5.0' },
+    body:    new URLSearchParams({ url, hd: '1' }).toString(),
+    signal:  AbortSignal.timeout(TIMEOUT),
+  })
+  if (!r.ok) return null
+  const d = await r.json()
+  return d?.data?.play || d?.data?.wmplay || null
+}
+
+// ── main handler ─────────────────────────────────────────────────────────────
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
 
@@ -8,79 +103,30 @@ export default async function handler(req, res) {
     return res.status(400).json({ status: 'error', error: { code: 'missing_url' } })
   }
 
-  try {
-    if (url.includes('instagram.com')) {
-      return await handleInstagram(url, res)
-    }
-    if (url.includes('tiktok.com')) {
-      return await handleTikTok(url, res)
-    }
+  const clean = cleanUrl(url)
+  const isIG  = url.includes('instagram.com')
+  const isTT  = url.includes('tiktok.com')
+
+  if (!isIG && !isTT) {
     return res.json({ status: 'error', error: { code: 'unsupported_platform' } })
-  } catch (err) {
-    return res.json({ status: 'error', error: { code: err instanceof Error ? err.message : String(err) } })
-  }
-}
-
-// ── Instagram ────────────────────────────────────────────────────────────────
-// Fetches the public page and extracts the og:video meta tag URL.
-async function handleInstagram(url, res) {
-  // Normalise URL — remove query params and trailing slash
-  const clean = url.split('?')[0].replace(/\/$/, '')
-
-  const page = await fetch(clean + '/', {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-      'Accept-Language': 'en-US,en;q=0.5',
-    },
-  })
-
-  if (!page.ok) {
-    return res.json({ status: 'error', error: { code: `instagram_page_${page.status}` } })
   }
 
-  const html = await page.text()
+  // 1. cobalt.tools — primary (handles both IG + TT)
+  const cobalt = await tryCobalt(clean).catch(() => null)
+  if (cobalt) return res.json(cobalt)
 
-  // Look for og:video or og:video:secure_url
-  const videoMatch =
-    html.match(/<meta[^>]+property="og:video:secure_url"[^>]+content="([^"]+)"/) ||
-    html.match(/<meta[^>]+content="([^"]+)"[^>]+property="og:video:secure_url"/) ||
-    html.match(/<meta[^>]+property="og:video"[^>]+content="([^"]+)"/) ||
-    html.match(/<meta[^>]+content="([^"]+)"[^>]+property="og:video"/)
-
-  if (videoMatch?.[1]) {
-    const videoUrl = videoMatch[1].replace(/&amp;/g, '&')
-    return res.json({ status: 'tunnel', url: videoUrl })
+  // 2. Platform-specific fallbacks
+  if (isIG) {
+    const videoUrl = await tryInstagramScrape(clean).catch(() => null)
+    if (videoUrl) return res.json({ status: 'tunnel', url: videoUrl })
+    return res.json({ status: 'error', error: { code: 'instagram_video_not_found' } })
   }
 
-  // Fallback: try JSON-LD or window.__additionalDataLoaded
-  const jsonMatch = html.match(/"video_url":"([^"]+)"/) || html.match(/"playback_url":"([^"]+)"/)
-  if (jsonMatch?.[1]) {
-    return res.json({ status: 'tunnel', url: jsonMatch[1].replace(/\\u0026/g, '&').replace(/\\/g, '') })
+  if (isTT) {
+    const videoUrl =
+      await tryDouyinWtf(url).catch(() => null) ||
+      await tryTikwm(url).catch(() => null)
+    if (videoUrl) return res.json({ status: 'tunnel', url: videoUrl })
+    return res.json({ status: 'error', error: { code: 'tiktok_video_not_found' } })
   }
-
-  return res.json({ status: 'error', error: { code: 'instagram_video_not_found' } })
-}
-
-// ── TikTok ───────────────────────────────────────────────────────────────────
-// Uses tikwm.com public API — returns a watermark-free MP4 URL.
-async function handleTikTok(url, res) {
-  const r = await fetch('https://api.tikwm.com/', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body:   new URLSearchParams({ url, hd: '1' }).toString(),
-  })
-
-  if (!r.ok) {
-    return res.json({ status: 'error', error: { code: `tikwm_${r.status}` } })
-  }
-
-  const data = await r.json()
-  // data.data.play = no-watermark HD URL; data.data.wmplay = with watermark
-  const videoUrl = data?.data?.play || data?.data?.wmplay
-  if (!videoUrl) {
-    return res.json({ status: 'error', error: { code: data?.msg ?? 'tiktok_no_url' } })
-  }
-
-  return res.json({ status: 'tunnel', url: videoUrl })
 }

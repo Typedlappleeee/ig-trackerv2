@@ -12,12 +12,15 @@ const isWeb = typeof window !== 'undefined' && !(window as any).electronAPI
 
 interface VideoRepurposeProps { user: User }
 
-type Intensity  = 'subtle' | 'medium' | 'aggressive' | 'vener'
+type Intensity  = 'subtle' | 'medium' | 'aggressive'
 type Format     = '9:16' | '1:1' | '16:9' | 'keep'
 type JobStatus  = 'queued' | 'processing' | 'done' | 'error'
 
+interface SourceVideo { url: string; name: string }
+
 interface VariantJob {
   id: number; seed: number; status: JobStatus; progress: number
+  sourceIndex: number; sourceName: string
   outputPath?: string; similarityPct?: number; transforms?: string[]
   error?: string; thumb?: string; uploading?: boolean; uploadError?: string
 }
@@ -48,13 +51,11 @@ async function downloadBlob(url: string, filename: string) {
     const blob = await res.blob()
     const a    = document.createElement('a')
     a.href     = URL.createObjectURL(new Blob([await blob.arrayBuffer()], { type: 'video/mp4' }))
-    a.download = filename
-    a.click()
+    a.download = filename; a.click()
     setTimeout(() => URL.revokeObjectURL(a.href), 10000)
   } catch {
-    // fallback — direct link
-    const a    = document.createElement('a')
-    a.href     = url; a.download = filename; a.click()
+    const a = document.createElement('a')
+    a.href = url; a.download = filename; a.click()
   }
 }
 
@@ -65,10 +66,7 @@ function SimilarityBadge({ pct }: { pct: number }) {
   const label = pct >= 90 ? 'SAFE' : pct >= 80 ? 'OK' : 'RISKY'
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-      <div style={{
-        fontSize: 9, fontWeight: 700, padding: '2px 5px', borderRadius: 4,
-        background: `${color}18`, color, border: `1px solid ${color}35`, letterSpacing: '0.06em',
-      }}>{label}</div>
+      <div style={{ fontSize: 9, fontWeight: 700, padding: '2px 5px', borderRadius: 4, background: `${color}18`, color, border: `1px solid ${color}35`, letterSpacing: '0.06em' }}>{label}</div>
       <span style={{ fontSize: 11, color, fontWeight: 600 }}>{pct}%</span>
     </div>
   )
@@ -99,62 +97,40 @@ function VariantCard({ job, index }: { job: VariantJob; index: number }) {
           <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             {isProc && (
               <div style={{ textAlign: 'center' }}>
-                <div style={{ width: 28, height: 28, border: '2px solid rgba(34,211,238,0.3)', borderTopColor: '#22d3ee', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 6px' }} />
-                <div style={{ fontSize: 10, color: 'rgba(34,211,238,0.6)', fontWeight: 600 }}>{job.progress}%</div>
+                <div style={{ width: 28, height: 28, borderRadius: '50%', border: '2px solid rgba(34,211,238,0.2)', borderTopColor: '#22d3ee', animation: 'spin 0.9s linear infinite', margin: '0 auto 6px' }} />
+                <div style={{ fontSize: 10, color: 'rgba(34,211,238,0.6)' }}>{job.progress}%</div>
               </div>
             )}
-            {isQ   && <div style={{ fontSize: 18, opacity: 0.2 }}>⏳</div>}
-            {isErr && <div style={{ fontSize: 18, opacity: 0.5 }}>✕</div>}
+            {isQ    && <span style={{ fontSize: 18, opacity: 0.2 }}>⏳</span>}
+            {isErr  && <span style={{ fontSize: 18 }}>❌</span>}
           </div>
         )}
         {isProc && (
-          <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 2, background: 'rgba(255,255,255,0.06)' }}>
-            <div style={{ height: '100%', background: 'linear-gradient(90deg,#22d3ee,#818cf8)', width: `${job.progress}%`, transition: 'width 0.4s ease', boxShadow: '0 0 6px rgba(34,211,238,0.6)' }} />
+          <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 2, background: 'rgba(0,0,0,0.4)' }}>
+            <div style={{ height: '100%', background: 'linear-gradient(90deg,#22d3ee,#818cf8)', width: `${job.progress}%`, transition: 'width 0.4s ease' }} />
           </div>
         )}
-        <div style={{ position: 'absolute', top: 6, left: 6, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', borderRadius: 5, padding: '2px 6px', fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.7)' }}>
-          #{index + 1}
-        </div>
       </div>
 
       {/* Info */}
-      <div style={{ padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 5 }}>
-        {isDone && job.similarityPct != null && <SimilarityBadge pct={job.similarityPct} />}
-        {isErr && <div style={{ fontSize: 10, color: '#f87171', fontWeight: 500 }}>{job.error?.slice(0, 60)}</div>}
-        {isQ    && <div style={{ fontSize: 10, color: 'rgba(148,163,184,0.35)' }}>{t('repurposePendingVariant')}</div>}
-        {isProc && <div style={{ fontSize: 10, color: '#22d3ee' }}>{t('repurposeProcessingVariant')}</div>}
-        {isDone && job.uploading && <div style={{ fontSize: 9, color: 'rgba(34,211,238,0.6)' }}>☁ Upload…</div>}
-        {isDone && job.uploadError && <div style={{ fontSize: 9, color: '#f87171' }}>⚠ {job.uploadError.slice(0, 40)}</div>}
+      <div style={{ padding: '7px 9px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 3 }}>
+          <span style={{ fontSize: 10, fontWeight: 700, color: isDone ? '#22d3ee' : isErr ? '#f87171' : 'rgba(148,163,184,0.4)' }}>
+            #{String(index + 1).padStart(2, '0')}
+          </span>
+          {isDone && job.similarityPct != null && <SimilarityBadge pct={job.similarityPct} />}
+        </div>
 
-        {/* Transform pills */}
-        {isDone && job.transforms && job.transforms.length > 0 && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginTop: 2 }}>
-            {job.transforms.map((t, i) => (
-              <span key={i} style={{
-                fontSize: 9, padding: '1px 5px', borderRadius: 4, fontWeight: 500,
-                background: 'rgba(129,140,248,0.08)', color: 'rgba(167,139,250,0.7)',
-                border: '1px solid rgba(129,140,248,0.12)',
-              }}>{t}</span>
-            ))}
+        {isDone && (
+          <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
+            <button onClick={() => job.outputPath && downloadBlob(job.outputPath, `variant_${index + 1}.mp4`)}
+              style={{ flex: 1, padding: '4px 0', borderRadius: 6, fontSize: 9, fontWeight: 700, cursor: 'pointer', border: 'none', background: 'rgba(34,211,238,0.1)', color: '#22d3ee', transition: 'background 0.15s' }}
+            >⬇ DL</button>
+            {job.uploading && <span style={{ fontSize: 9, color: 'rgba(148,163,184,0.4)', display: 'flex', alignItems: 'center' }}>☁…</span>}
+            {job.uploadError && <span title={job.uploadError} style={{ fontSize: 9, color: '#f87171', cursor: 'help' }}>⚠</span>}
           </div>
         )}
-
-        {/* Download button */}
-        {isDone && job.outputPath && (
-          <button
-            onClick={() => downloadBlob(job.outputPath!, `clonevid_${String(index + 1).padStart(3, '0')}.mp4`)}
-            style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
-              padding: '5px 0', borderRadius: 7, fontSize: 11, fontWeight: 600,
-              background: 'rgba(34,211,238,0.1)', color: '#22d3ee',
-              border: '1px solid rgba(34,211,238,0.2)', cursor: 'pointer', transition: 'background 0.15s', marginTop: 2,
-            }}
-            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(34,211,238,0.2)')}
-            onMouseLeave={e => (e.currentTarget.style.background = 'rgba(34,211,238,0.1)')}
-          >
-            ⬇ MP4
-          </button>
-        )}
+        {isErr && <div style={{ fontSize: 9, color: '#f87171', marginTop: 3 }}>{job.error?.slice(0, 40)}</div>}
       </div>
     </div>
   )
@@ -170,11 +146,10 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
     ? { mode: 'org', id: currentOrg.id }
     : { mode: 'user', id: user.id }
 
-  const [sourceUrl, setSourceUrl]       = useState<string | null>(null)
-  const [sourceName, setSourceName]     = useState('')
+  const [sources, setSources]           = useState<SourceVideo[]>([])
   const [dragging, setDragging]         = useState(false)
   const [showBank, setShowBank]         = useState(false)
-  const [count, setCount]               = useState(10)
+  const [count, setCount]               = useState(5)
   const [intensity, setIntensity]       = useState<Intensity>('subtle')
   const [format, setFormat]             = useState<Format>('9:16')
   const [saveToBank, setSaveToBank]     = useState(isWeb)
@@ -194,7 +169,6 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
     return () => clearInterval(id)
   }, [running, startedAt])
 
-  // Load existing bank folders
   useEffect(() => {
     async function loadFolders() {
       let q = supabase.from('content_bank').select('folder') as any
@@ -212,82 +186,93 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
     setJobs(prev => prev.map(j => j.id === id ? { ...j, ...patch } : j))
   }
 
-  function handleFile(file: File) {
-    if (!file.type.startsWith('video/')) return
-    setSourceUrl(URL.createObjectURL(file))
-    setSourceName(file.name)
+  function addFiles(files: FileList | File[]) {
+    const vids = Array.from(files).filter(f => f.type.startsWith('video/'))
+    if (!vids.length) return
+    setSources(prev => [
+      ...prev,
+      ...vids.map(f => ({ url: URL.createObjectURL(f), name: f.name })),
+    ])
     setJobs([]); setTotalDone(0)
   }
 
   const onDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault(); setDragging(false)
-    const f = e.dataTransfer.files[0]
-    if (f) handleFile(f)
+    addFiles(e.dataTransfer.files)
   }, [])
 
+  const totalJobs = sources.length * count
+
   async function startGeneration() {
-    if (!sourceUrl || running) return
-    try {
-    const creditCost = count * CREDIT_COSTS.clone_vid
+    if (!sources.length || running) return
+    const creditCost = totalJobs * CREDIT_COSTS.clone_vid
     const creditRes = await checkAndDeductCredits(credits.ownerId, creditCost)
     if (!creditRes.ok) {
-      alert(`Insufficient credits — need ${creditCost} credit(s) for ${count} video(s). Balance: ${creditRes.balance ?? 0}`)
+      alert(`Crédits insuffisants — ${creditCost} crédits requis pour ${totalJobs} vidéos. Solde: ${creditRes.balance ?? 0}`)
       return
     }
     abortRef.current = false
     setRunning(true); setStartedAt(Date.now()); setElapsed(0); setTotalDone(0)
 
-    const newJobs: VariantJob[] = Array.from({ length: count }, (_, i) => ({
-      id: i, seed: Date.now() + i * 7919, status: 'queued', progress: 0,
-    }))
-    setJobs(newJobs)
+    // Build all jobs upfront: for each source × count variants
+    let jobId = 0
+    const allJobs: VariantJob[] = []
+    for (let si = 0; si < sources.length; si++) {
+      for (let vi = 0; vi < count; vi++) {
+        allJobs.push({
+          id: jobId++, seed: Date.now() + jobId * 7919,
+          status: 'queued', progress: 0,
+          sourceIndex: si, sourceName: sources[si].name,
+        })
+      }
+    }
+    setJobs(allJobs)
 
-    let done = 0
-    for (let i = 0; i < count; i++) {
-      if (abortRef.current) break
-      const job = newJobs[i]
-      updateJob(job.id, { status: 'processing', progress: 5 })
+    try {
+      let done = 0
+      for (const job of allJobs) {
+        if (abortRef.current) break
+        const src = sources[job.sourceIndex]
+        updateJob(job.id, { status: 'processing', progress: 5 })
 
-      const result = await runFfmpegRepurposeWeb({
-        inputPath: sourceUrl, seed: job.seed, intensity, format,
-        onProgress: pct => updateJob(job.id, { progress: pct }),
-      })
-
-      if (result.ok && result.outputPath) {
-        const thumb = await extractThumb(result.outputPath)
-        updateJob(job.id, {
-          status: 'done', progress: 100,
-          outputPath: result.outputPath,
-          similarityPct: result.similarityPct,
-          transforms: result.transformSummary,
-          thumb: thumb ?? undefined,
+        const result = await runFfmpegRepurposeWeb({
+          inputPath: src.url, seed: job.seed, intensity, format,
+          onProgress: pct => updateJob(job.id, { progress: pct }),
         })
 
-        if (isWeb || saveToBank) {
-          updateJob(job.id, { uploading: true })
-          try {
-            const up = await uploadVideoFromPath(result.outputPath, scope)
-            const { error: dbErr } = await supabase.from('content_bank').insert({
-              user_id: user.id, org_id: currentOrg?.id ?? null,
-              title: `CloneVid #${String(i + 1).padStart(3, '0')} — ${sourceName}`,
-              file_url: null, storage_path: up.storagePath, thumbnail_path: up.thumbnailPath,
-              folder: bankFolder.trim() || null, tags: [], notes: '',
-            })
-            if (dbErr) throw new Error(dbErr.message)
-            updateJob(job.id, { uploading: false })
-          } catch (e) {
-            console.error('[clonevid] bank upload failed:', e)
-            updateJob(job.id, { uploading: false, uploadError: String(e instanceof Error ? e.message : e) })
-          }
-        }
-      } else {
-        updateJob(job.id, { status: 'error', error: result.error ?? 'Unknown error' })
-      }
+        if (result.ok && result.outputPath) {
+          const thumb = await extractThumb(result.outputPath)
+          updateJob(job.id, {
+            status: 'done', progress: 100,
+            outputPath: result.outputPath,
+            similarityPct: result.similarityPct,
+            transforms: result.transformSummary,
+            thumb: thumb ?? undefined,
+          })
 
-      done++; setTotalDone(done)
-    }
-    } catch (e) {
-      console.error('[CloneVid] startGeneration error:', e)
+          if (isWeb || saveToBank) {
+            updateJob(job.id, { uploading: true })
+            try {
+              const variantNum = (job.id % count) + 1
+              const up = await uploadVideoFromPath(result.outputPath, scope)
+              const { error: dbErr } = await supabase.from('content_bank').insert({
+                user_id: user.id, org_id: currentOrg?.id ?? null,
+                title: `CloneVid #${String(variantNum).padStart(3, '0')} — ${src.name}`,
+                file_url: null, storage_path: up.storagePath, thumbnail_path: up.thumbnailPath,
+                folder: bankFolder.trim() || null, tags: [], notes: '',
+              })
+              if (dbErr) throw new Error(dbErr.message)
+              updateJob(job.id, { uploading: false })
+            } catch (e) {
+              updateJob(job.id, { uploading: false, uploadError: String(e instanceof Error ? e.message : e) })
+            }
+          }
+        } else {
+          updateJob(job.id, { status: 'error', error: result.error ?? 'Unknown error' })
+        }
+
+        done++; setTotalDone(done)
+      }
     } finally {
       setRunning(false)
     }
@@ -295,24 +280,33 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
 
   function stop() { abortRef.current = true; setRunning(false) }
 
+  function removeSource(i: number) {
+    setSources(prev => prev.filter((_, idx) => idx !== i))
+    setJobs([]); setTotalDone(0)
+  }
+
   const donePct    = jobs.length > 0 ? Math.round((totalDone / jobs.length) * 100) : 0
   const avgSim     = jobs.filter(j => j.similarityPct != null).map(j => j.similarityPct!)
   const avgSimVal  = avgSim.length > 0 ? Math.round(avgSim.reduce((a, b) => a + b, 0) / avgSim.length) : null
   const elapsedStr = elapsed > 60 ? `${Math.floor(elapsed / 60)}m${elapsed % 60}s` : `${elapsed}s`
+
+  // Group jobs by source for display
+  const jobsBySource = sources.map((src, si) => ({
+    src,
+    jobs: jobs.filter(j => j.sourceIndex === si),
+  }))
 
   return (
     <div className="anim-page" style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       {showBank && (
         <BankPicker
           user={user}
-          mode="single"
+          mode="multi"
           resolveMode="full"
           onSelect={(paths, titles) => {
-            if (paths[0]) {
-              setSourceUrl(paths[0])
-              setSourceName(titles?.[0] ?? 'bank video')
-              setJobs([]); setTotalDone(0)
-            }
+            const newSrcs = paths.map((url, i) => ({ url, name: titles?.[i] ?? 'bank video' }))
+            setSources(prev => [...prev, ...newSrcs])
+            setJobs([]); setTotalDone(0)
             setShowBank(false)
           }}
           onClose={() => setShowBank(false)}
@@ -323,11 +317,11 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
       <div style={{ padding: '20px 24px 0', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16 }}>
           <div>
-            <h1 style={{ fontSize: 20, fontWeight: 700, color: '#F1F0F7', letterSpacing: '-0.02em', marginBottom: 3 }}>
-              CloneVid
-            </h1>
+            <h1 style={{ fontSize: 20, fontWeight: 700, color: '#F1F0F7', letterSpacing: '-0.02em', marginBottom: 3 }}>CloneVid</h1>
             <p style={{ fontSize: 13, color: 'rgba(148,163,184,0.55)' }}>
-              1 video → N unique variants · invisible transformations
+              {sources.length > 1
+                ? `${sources.length} vidéos × ${count} variantes = ${totalJobs} au total`
+                : `1 video → N unique variants · invisible transformations`}
             </p>
           </div>
           {jobs.length > 0 && (
@@ -356,7 +350,7 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
       <div style={{ flex: 1, overflow: 'hidden', display: 'flex' }}>
 
         {/* Left panel */}
-        <div style={{ width: 270, flexShrink: 0, borderRight: '1px solid rgba(255,255,255,0.06)', overflowY: 'auto', padding: '16px 16px', display: 'flex', flexDirection: 'column', gap: 13 }}>
+        <div style={{ width: 270, flexShrink: 0, borderRight: '1px solid rgba(255,255,255,0.06)', overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: 13 }}>
 
           {/* Upload zone */}
           <div>
@@ -366,29 +360,40 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
               onDragLeave={() => setDragging(false)}
               onClick={() => fileInputRef.current?.click()}
               style={{
-                borderRadius: 12, border: `2px dashed ${dragging ? '#22d3ee' : sourceUrl ? 'rgba(34,211,238,0.3)' : 'rgba(255,255,255,0.1)'}`,
+                borderRadius: 12, border: `2px dashed ${dragging ? '#22d3ee' : sources.length ? 'rgba(34,211,238,0.3)' : 'rgba(255,255,255,0.1)'}`,
                 background: dragging ? 'rgba(34,211,238,0.05)' : 'rgba(255,255,255,0.02)',
-                padding: '16px 12px', cursor: 'pointer', textAlign: 'center', transition: 'all 0.2s',
-                boxShadow: dragging ? '0 0 24px rgba(34,211,238,0.12)' : 'none',
+                padding: '14px 12px', cursor: 'pointer', textAlign: 'center', transition: 'all 0.2s',
               }}
             >
-              <input ref={fileInputRef} type="file" accept="video/*" style={{ display: 'none' }}
-                onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f) }} />
-              {sourceUrl ? (
-                <>
-                  <div style={{ fontSize: 22, marginBottom: 4 }}>🎬</div>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: '#22d3ee', marginBottom: 2 }}>{t('repurposeVideoLoaded')}</div>
-                  <div style={{ fontSize: 10, color: 'rgba(148,163,184,0.45)', wordBreak: 'break-all' }}>{sourceName.slice(0, 28)}{sourceName.length > 28 ? '…' : ''}</div>
-                  <div style={{ fontSize: 9, color: 'rgba(148,163,184,0.3)', marginTop: 4 }}>{t('repurposeClickToChange')}</div>
-                </>
-              ) : (
-                <>
-                  <div style={{ fontSize: 24, marginBottom: 6, opacity: 0.4 }}>📁</div>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: 'rgba(226,232,240,0.6)', marginBottom: 3 }}>{t('repurposeDropVideo')}</div>
-                  <div style={{ fontSize: 10, color: 'rgba(148,163,184,0.35)' }}>MP4, MOV, WebM</div>
-                </>
-              )}
+              <input ref={fileInputRef} type="file" accept="video/*" multiple style={{ display: 'none' }}
+                onChange={e => { if (e.target.files) addFiles(e.target.files); e.target.value = '' }} />
+              <div style={{ fontSize: 20, marginBottom: 4, opacity: sources.length ? 1 : 0.4 }}>📁</div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: sources.length ? '#22d3ee' : 'rgba(226,232,240,0.6)', marginBottom: 2 }}>
+                {sources.length ? `${sources.length} vidéo${sources.length > 1 ? 's' : ''} sélectionnée${sources.length > 1 ? 's' : ''}` : t('repurposeDropVideo')}
+              </div>
+              <div style={{ fontSize: 10, color: 'rgba(148,163,184,0.35)' }}>
+                {sources.length ? 'Cliquer pour en ajouter d\'autres' : 'MP4, MOV, WebM — plusieurs fichiers OK'}
+              </div>
             </div>
+
+            {/* Selected videos list */}
+            {sources.length > 0 && (
+              <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 3 }}>
+                {sources.map((src, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 8px', borderRadius: 7, background: 'rgba(34,211,238,0.04)', border: '1px solid rgba(34,211,238,0.1)' }}>
+                    <span style={{ fontSize: 10 }}>🎬</span>
+                    <span style={{ flex: 1, fontSize: 10, color: 'rgba(226,232,240,0.65)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {src.name.slice(0, 22)}{src.name.length > 22 ? '…' : ''}
+                    </span>
+                    {!running && (
+                      <button onClick={e => { e.stopPropagation(); removeSource(i) }}
+                        style={{ fontSize: 10, color: 'rgba(148,163,184,0.4)', background: 'none', border: 'none', cursor: 'pointer', padding: '0 2px', lineHeight: 1 }}>✕</button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
             {/* From bank */}
             <button
               onClick={() => setShowBank(true)} disabled={running}
@@ -404,32 +409,38 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
             </button>
           </div>
 
-          {/* Count */}
+          {/* Count — per video */}
           <div>
-            <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(148,163,184,0.45)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 7 }}>{t('repurposeVariantsSection')}</div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(148,163,184,0.45)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 7 }}>
+              {t('repurposeVariantsSection')}
+              {sources.length > 1 && <span style={{ marginLeft: 4, color: 'rgba(34,211,238,0.5)', fontWeight: 600 }}>par vidéo</span>}
+            </div>
             <div style={{ display: 'flex', gap: 5 }}>
-              {[5, 10, 25, 50].map(n => (
+              {[3, 5, 10, 25].map(n => (
                 <button key={n} onClick={() => setCount(n)} disabled={running}
                   style={{ flex: 1, padding: '6px 0', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: 'none', transition: 'all 0.15s', background: count === n ? 'linear-gradient(135deg,rgba(34,211,238,0.2),rgba(129,140,248,0.2))' : 'rgba(255,255,255,0.04)', color: count === n ? '#22d3ee' : 'rgba(148,163,184,0.5)', outline: count === n ? '1px solid rgba(34,211,238,0.25)' : '1px solid transparent' }}
                 >{n}</button>
               ))}
             </div>
-            <input type="range" min={1} max={100} value={count} disabled={running}
+            <input type="range" min={1} max={50} value={count} disabled={running}
               onChange={e => setCount(Number(e.target.value))}
               style={{ width: '100%', marginTop: 8, accentColor: '#22d3ee' }}
             />
-            <div style={{ textAlign: 'center', fontSize: 11, color: 'rgba(148,163,184,0.35)', marginTop: 1 }}>{count} {count > 1 ? t('repurposeVariantPlural') : t('repurposeVariant')}</div>
+            <div style={{ textAlign: 'center', fontSize: 11, color: 'rgba(148,163,184,0.35)', marginTop: 1 }}>
+              {sources.length > 1
+                ? <span><span style={{ color: '#22d3ee', fontWeight: 600 }}>{count}</span> /vidéo · <span style={{ color: '#a78bfa', fontWeight: 600 }}>{totalJobs}</span> total</span>
+                : `${count} ${count > 1 ? t('repurposeVariantPlural') : t('repurposeVariant')}`}
+            </div>
           </div>
 
           {/* Intensity */}
           <div>
             <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(148,163,184,0.45)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 7 }}>{t('repurposeIntensitySection')}</div>
-            {(['subtle', 'medium', 'aggressive', 'vener'] as Intensity[]).map(lv => {
+            {(['subtle', 'medium', 'aggressive'] as Intensity[]).map(lv => {
               const meta = {
                 subtle:     { label: t('repurposeSubtle'),     desc: '~90-99%', emoji: '🔵' },
                 medium:     { label: t('repurposeMedium'),     desc: '~80-90%', emoji: '🟡' },
                 aggressive: { label: t('repurposeAggressive'), desc: '~65-80%', emoji: '🔴' },
-                vener:      { label: t('repurposeVener'),      desc: '~42-65%', emoji: '💥' },
               }[lv]
               return (
                 <button key={lv} onClick={() => setIntensity(lv)} disabled={running}
@@ -493,17 +504,21 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
           {/* Generate button */}
           <button
             onClick={running ? stop : startGeneration}
-            disabled={!sourceUrl}
+            disabled={!sources.length}
             style={{
               width: '100%', padding: '10px 0', borderRadius: 10, fontSize: 13, fontWeight: 700,
-              cursor: sourceUrl ? 'pointer' : 'not-allowed', border: 'none', transition: 'all 0.2s',
-              background: !sourceUrl ? 'rgba(255,255,255,0.04)' : running ? 'rgba(239,68,68,0.12)' : 'linear-gradient(135deg,rgba(34,211,238,0.22),rgba(129,140,248,0.22))',
-              color: !sourceUrl ? 'rgba(148,163,184,0.25)' : running ? '#f87171' : '#22d3ee',
-              boxShadow: sourceUrl && !running ? '0 0 20px rgba(34,211,238,0.12)' : 'none',
-              outline: sourceUrl ? `1px solid ${running ? 'rgba(239,68,68,0.22)' : 'rgba(34,211,238,0.28)'}` : 'none',
+              cursor: sources.length ? 'pointer' : 'not-allowed', border: 'none', transition: 'all 0.2s',
+              background: !sources.length ? 'rgba(255,255,255,0.04)' : running ? 'rgba(239,68,68,0.12)' : 'linear-gradient(135deg,rgba(34,211,238,0.22),rgba(129,140,248,0.22))',
+              color: !sources.length ? 'rgba(148,163,184,0.25)' : running ? '#f87171' : '#22d3ee',
+              boxShadow: sources.length && !running ? '0 0 20px rgba(34,211,238,0.12)' : 'none',
+              outline: sources.length ? `1px solid ${running ? 'rgba(239,68,68,0.22)' : 'rgba(34,211,238,0.28)'}` : 'none',
             }}
           >
-            {running ? `${t('repurposeStopBtn')} (${totalDone}/${jobs.length})` : `${t('repurposeGenerateBtn')} ${count} ${count > 1 ? t('repurposeVariantPlural') : t('repurposeVariant')}`}
+            {running
+              ? `${t('repurposeStopBtn')} (${totalDone}/${jobs.length})`
+              : sources.length > 1
+                ? `Générer ${totalJobs} variantes (${sources.length}×${count})`
+                : `${t('repurposeGenerateBtn')} ${count} ${count > 1 ? t('repurposeVariantPlural') : t('repurposeVariant')}`}
           </button>
         </div>
 
@@ -526,8 +541,25 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
               </div>
             </div>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(140px,1fr))', gap: 10 }}>
-              {jobs.map((job, i) => <VariantCard key={job.id} job={job} index={i} />)}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+              {jobsBySource.map(({ src, jobs: srcJobs }, si) => (
+                srcJobs.length > 0 && (
+                  <div key={si}>
+                    {sources.length > 1 && (
+                      <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(148,163,184,0.5)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontSize: 10 }}>🎬</span>
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{src.name}</span>
+                        <span style={{ fontSize: 10, color: 'rgba(34,211,238,0.4)', flexShrink: 0 }}>
+                          {srcJobs.filter(j => j.status === 'done').length}/{srcJobs.length}
+                        </span>
+                      </div>
+                    )}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(140px,1fr))', gap: 10 }}>
+                      {srcJobs.map((job, i) => <VariantCard key={job.id} job={job} index={i} />)}
+                    </div>
+                  </div>
+                )
+              ))}
             </div>
           )}
         </div>
