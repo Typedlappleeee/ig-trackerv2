@@ -226,10 +226,22 @@ CREATE UNIQUE INDEX IF NOT EXISTS license_keys_stripe_sub_uidx
 -- ── user_credits ───────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.user_credits (
   user_id               uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-  balance               integer NOT NULL DEFAULT 0 CHECK (balance >= 0),
+  balance               numeric(12,2) NOT NULL DEFAULT 0 CHECK (balance >= 0),
   last_monthly_grant_at timestamptz,
   updated_at            timestamptz DEFAULT now()
 );
+-- Migrate existing integer balance to numeric if needed
+DO $func$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema='public' AND table_name='user_credits' AND column_name='balance'
+    AND data_type='integer'
+  ) THEN
+    ALTER TABLE public.user_credits ALTER COLUMN balance TYPE numeric(12,2) USING balance::numeric;
+  END IF;
+END
+$func$;
 
 -- ── credit_codes ───────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.credit_codes (
@@ -880,9 +892,9 @@ $$;
 GRANT EXECUTE ON FUNCTION public.accept_org_invite(text) TO authenticated;
 
 -- ── RPC : déduire des crédits (atomique) ──────────────────────
-CREATE OR REPLACE FUNCTION public.deduct_user_credits(p_user_id uuid, p_amount integer)
+CREATE OR REPLACE FUNCTION public.deduct_user_credits(p_user_id uuid, p_amount numeric)
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$
-DECLARE v_balance integer;
+DECLARE v_balance numeric(12,2);
 BEGIN
   INSERT INTO public.user_credits (user_id, balance) VALUES (p_user_id, 0)
   ON CONFLICT (user_id) DO NOTHING;
@@ -983,10 +995,10 @@ $$;
 
 -- ── RPC : solde crédits de l'orga (visible aux membres) ───────
 CREATE OR REPLACE FUNCTION public.get_org_credit_balance(p_org_id uuid)
-RETURNS integer LANGUAGE plpgsql SECURITY DEFINER AS $$
+RETURNS numeric LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
   v_owner_id  uuid;
-  v_balance   integer;
+  v_balance   numeric(12,2);
   v_is_member boolean;
 BEGIN
   SELECT EXISTS(
