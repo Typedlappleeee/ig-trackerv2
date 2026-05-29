@@ -245,8 +245,8 @@ export async function detectSceneChangeWeb(opts: {
       canvas.width = W; canvas.height = H
       const ctx = canvas.getContext('2d')!
 
-      // Sample up to 15 timestamps spread across the video
-      const maxSamples = 15
+      // Sample up to 10 timestamps spread across the video
+      const maxSamples = 10
       const step = duration / maxSamples
       const times = Array.from({ length: maxSamples }, (_, i) => (i + 0.5) * step)
 
@@ -613,16 +613,17 @@ async function remixViaMediaRecorder(opts: {
   // ── load videos ──────────────────────────────────────────────────────────────
   const loadVid = (src: string): Promise<HTMLVideoElement> => new Promise((res, rej) => {
     const v = document.createElement('video')
-    v.muted = true; v.playsInline = true; v.preload = 'auto'; v.src = src
-    // Wait for canplaythrough so the browser has buffered enough to play without stalling.
-    // Falls back to loadeddata if canplaythrough never fires (e.g. very large remote files).
-    const tid = setTimeout(() => res(v), 30_000)
+    v.muted = true; v.playsInline = true; v.preload = 'auto'
+    v.crossOrigin = 'anonymous'
+    v.src = src
+    // Resolve on canplaythrough (readyState=4) — guarantees frames are available.
+    // Falls back after 8s if canplaythrough never fires (large / slow files).
+    const tid = setTimeout(() => {
+      if (v.readyState >= 2) res(v)
+      else rej(new Error('Vidéo non chargée après 8s'))
+    }, 8_000)
     const done = (vid: HTMLVideoElement) => { clearTimeout(tid); res(vid) }
     v.oncanplaythrough = () => done(v)
-    v.onloadeddata     = () => {
-      // Give canplaythrough up to 3s more before falling back
-      setTimeout(() => done(v), 3_000)
-    }
     v.onerror = () => { clearTimeout(tid); rej(new Error('Impossible de charger la vidéo')) }
   })
   // Always load secondary — it's the main visual source regardless of split
@@ -632,10 +633,10 @@ async function remixViaMediaRecorder(opts: {
   ])
   const totalDuration = (opts.targetDuration && opts.targetDuration > 1) ? opts.targetDuration : origVid.duration
 
-  // Chrome suspends video decoding for elements that are not in the DOM, even when
-  // play() is called. ctx.drawImage() on a suspended video returns black frames.
-  // Fix: attach both videos to the document body (invisible) to force active decoding.
-  const vidStyle = 'position:fixed;top:-9999px;width:1px;height:1px;opacity:0.001;pointer-events:none;z-index:-9999'
+  // Chrome suspends video decoding for elements that are too small (< ~10px) or
+  // fully outside the viewport. Use visibility:hidden at a real size to force
+  // hardware decoding without showing anything to the user.
+  const vidStyle = 'position:fixed;top:0;left:0;width:120px;height:120px;visibility:hidden;pointer-events:none;z-index:-9999;'
   origVid.style.cssText = vidStyle
   secVid.style.cssText  = vidStyle
   document.body.appendChild(origVid)
@@ -682,82 +683,46 @@ async function remixViaMediaRecorder(opts: {
     return { canvas: oc, ov }
   })
 
-  const chunks: Blob[] = []
-  const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 8_000_000, audioBitsPerSecond: 128_000 })
-  recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data) }
-  recorder.start(100)
-
   // ── draw loop ────────────────────────────────────────────────────────────────
   let switched = false
   let drawTimerId = 0
   let recordingStopped = false
+  let recorder: MediaRecorder  // declared here, started after first frame
 
   const stopRecording = () => {
     if (recordingStopped) return
     recordingStopped = true
     clearInterval(drawTimerId)
-    recorder.stop()
+    if (recorder?.state !== 'inactive') recorder?.stop()
   }
 
-  let firstFrameDrawn = false
-
-  const drawFrame = () => {
-    const t = origVid.currentTime
-
-    if (!switched && hasSplit && t >= opts.splitTime) {
-      switched = true
-      secVid.pause()
-      try { recorder.requestData() } catch { /* flush buffer at cut point */ }
-    }
-
-    // Draw whichever source has a decoded frame ready.
-    // If origVid isn't ready yet but secVid is, use secVid as fallback so we
-    // never record black frames while waiting for the primary video to decode.
+  const drawOneFrame = (t: number) => {
     const preferred = switched ? origVid : secVid
     const source    = preferred.readyState >= 2 ? preferred
                     : (origVid.readyState >= 2   ? origVid : null)
-    if (source) {
-      firstFrameDrawn = true
-      const vw = source.videoWidth  || W
-      const vh = source.videoHeight || H
-      const scale = Math.min(W / vw, H / vh)
-      const dw = vw * scale, dh = vh * scale
-      ctx.fillStyle = '#000'
-      ctx.fillRect(0, 0, W, H)
-      ctx.drawImage(source, (W - dw) / 2, (H - dh) / 2, dw, dh)
-      for (const { canvas: oc, ov } of overlayImages) {
-        if (t >= ov.startTime && t <= ov.endTime) ctx.drawImage(oc, 0, 0)
-      }
+    if (!source) return false
+    const vw = source.videoWidth  || W
+    const vh = source.videoHeight || H
+    const scale = Math.min(W / vw, H / vh)
+    const dw = vw * scale, dh = vh * scale
+    ctx.fillStyle = '#000'
+    ctx.fillRect(0, 0, W, H)
+    ctx.drawImage(source, (W - dw) / 2, (H - dh) / 2, dw, dh)
+    for (const { canvas: oc, ov } of overlayImages) {
+      if (t >= ov.startTime && t <= ov.endTime) ctx.drawImage(oc, 0, 0)
     }
+    return true
   }
 
-  // ── timing — requestVideoFrameCallback if available, else setInterval ────────
-  // rVFC fires in sync with each decoded video frame even in background tabs.
-  // setInterval is the fallback for Firefox (which doesn't support rVFC).
-  if (typeof (origVid as any).requestVideoFrameCallback === 'function') {
-    const scheduleRVFC = () => {
-      if (recordingStopped) return
-      ;(origVid as any).requestVideoFrameCallback(() => { drawFrame(); scheduleRVFC() })
+  const drawFrame = () => {
+    const t = origVid.currentTime
+    if (!switched && hasSplit && t >= opts.splitTime) {
+      switched = true
+      secVid.pause()
+      try { recorder?.requestData() } catch { /* flush buffer at cut point */ }
     }
-    origVid.onended = () => stopRecording()
-    scheduleRVFC()
-  } else {
-    origVid.onended = () => stopRecording()
-    drawTimerId = setInterval(drawFrame, 1000 / 30) as unknown as number
+    drawOneFrame(t)
   }
-
-  // Abort if video never starts — avoids a silent recording of all-black frames
-  const firstFrameTimeout = setTimeout(() => {
-    if (!firstFrameDrawn && !recordingStopped) {
-      stopRecording()
-    }
-  }, 8000)
-
-  const safetyTimeout = setTimeout(() => stopRecording(), (totalDuration + 10) * 1000)
-
-  // When secVid stalls (buffering), pause origVid so audio stays in sync.
-  secVid.onwaiting = () => { if (!switched) origVid.pause() }
-  secVid.onplaying = () => { if (!switched && origVid.paused) origVid.play().catch(() => {}) }
 
   // ── seek & play ───────────────────────────────────────────────────────────────
   const seekTo = (v: HTMLVideoElement, t: number) => new Promise<void>(r => {
@@ -774,11 +739,51 @@ async function remixViaMediaRecorder(opts: {
   await origVid.play().catch(() => { origVid.muted = true; return origVid.play().catch(() => {}) })
   await secVid.play().catch(() => {})
 
+  // ── Wait for first valid frame before starting recorder ───────────────────────
+  // This prevents the recorder from capturing black frames while the browser
+  // decodes the first frames of the video (race condition between start() and play()).
+  await new Promise<void>(resolve => {
+    let attempts = 0
+    const waitForFrame = () => {
+      if (drawOneFrame(origVid.currentTime)) { resolve(); return }
+      attempts++
+      if (attempts > 200) { resolve(); return }  // max 2s wait, then start anyway
+      requestAnimationFrame(waitForFrame)
+    }
+    requestAnimationFrame(waitForFrame)
+  })
+
+  // ── Start recorder now that canvas has a real frame ───────────────────────────
+  const chunks: Blob[] = []
+  recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 8_000_000, audioBitsPerSecond: 128_000 })
+  recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data) }
+  recorder.start(100)
+
+  // ── timing — requestVideoFrameCallback if available, else setInterval ────────
+  // rVFC fires in sync with each decoded video frame even in background tabs.
+  // setInterval is the fallback for Firefox (which doesn't support rVFC).
+  if (typeof (origVid as any).requestVideoFrameCallback === 'function') {
+    const scheduleRVFC = () => {
+      if (recordingStopped) return
+      ;(origVid as any).requestVideoFrameCallback(() => { drawFrame(); scheduleRVFC() })
+    }
+    origVid.onended = () => stopRecording()
+    scheduleRVFC()
+  } else {
+    origVid.onended = () => stopRecording()
+    drawTimerId = setInterval(drawFrame, 1000 / 30) as unknown as number
+  }
+
+  const safetyTimeout = setTimeout(() => stopRecording(), (totalDuration + 10) * 1000)
+
+  // When secVid stalls (buffering), pause origVid so audio stays in sync.
+  secVid.onwaiting = () => { if (!switched) origVid.pause() }
+  secVid.onplaying = () => { if (!switched && origVid.paused) origVid.play().catch(() => {}) }
+
   try {
     await new Promise<void>(res => { recorder.onstop = () => res() })
   } finally {
     clearTimeout(safetyTimeout)
-    clearTimeout(firstFrameTimeout)
     clearInterval(drawTimerId)
     await audioCtx.close().catch(() => {})
     origVid.remove()
