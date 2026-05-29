@@ -377,13 +377,12 @@ export function MassPosting({ user }: MassPostingProps) {
     if (selectedVideos.length === 0) { log('Select at least one video', 'warn'); return }
 
     const creditCost = phoneList.length * CREDIT_COSTS.mass_posting
-    const creditRes = await checkAndDeductCredits(credits.ownerId, creditCost)
+    const creditRes  = await checkAndDeductCredits(credits.ownerId, creditCost)
     if (!creditRes.ok) {
-      log(`❌ ${creditRes.error ?? 'Insufficient credits'} (need: ${creditCost} credits for ${phoneList.length} phone${phoneList.length > 1 ? 's' : ''})`, 'error')
+      log(`❌ ${creditRes.error ?? 'Crédits insuffisants'} (requis: ${creditCost} pour ${phoneList.length} téléphone${phoneList.length > 1 ? 's' : ''})`, 'error')
       return
     }
-    credits.refresh()
-    log(`💳 ${creditCost} crédits débités (${CREDIT_COSTS.mass_posting}/phone × ${phoneList.length}) — solde: ${creditRes.balance ?? '?'}`)
+    if (typeof creditRes.balance === 'number') credits.setBalance(creditRes.balance)
 
     playSuccess()
     setPosting(true)

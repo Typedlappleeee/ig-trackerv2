@@ -243,7 +243,7 @@ export async function detectSceneChangeWeb(opts: {
       const W = 64, H = 64
       const canvas = document.createElement('canvas')
       canvas.width = W; canvas.height = H
-      const ctx = canvas.getContext('2d')!
+      const ctx = canvas.getContext('2d', { willReadFrequently: true })!
 
       // Sample up to 10 timestamps spread across the video
       const maxSamples = 10
@@ -520,13 +520,13 @@ async function renderTextPNG(
   const weight = ov.bold ? 'bold' : 'normal'
   ctx.font = `${weight} ${ov.fontSize}px Arial, sans-serif`
   ctx.textBaseline = 'middle'
+  ctx.textAlign    = 'center'
 
-  const { align, x: cx } = getXDrawParams(ov.x, W)
-  const cy       = getYCenter(ov.y, H)
-  ctx.textAlign  = align
+  const cx = W / 2
+  const cy = getYCenter(ov.y, H)
 
-  const maxWidth  = W * 0.88
-  const lineH     = ov.fontSize * 1.25
+  const maxWidth  = W * 0.78
+  const lineH     = ov.fontSize * 1.35
   const borderPx  = Math.max(3, Math.round(ov.fontSize * 0.09))
   const lines     = wrapText(ctx, ov.text, maxWidth)
   const blockH    = lines.length * lineH
@@ -557,7 +557,7 @@ async function renderTextPNG(
 }
 
 // ── drawOverlayText ───────────────────────────────────────────────────────────
-// Same rendering logic as renderTextPNG: word-wrap, multi-line, border + shadow.
+// Always centers text horizontally. y expression is parsed to get vertical pos.
 function drawOverlayText(
   ctx: CanvasRenderingContext2D,
   ov: { text: string; x: string; y: string; fontSize: number; fontColor: string; bold?: boolean; shadow?: boolean },
@@ -566,13 +566,13 @@ function drawOverlayText(
   const weight   = ov.bold ? 'bold' : 'normal'
   ctx.font       = `${weight} ${ov.fontSize}px Arial, sans-serif`
   ctx.textBaseline = 'middle'
+  ctx.textAlign    = 'center'
 
-  const { align, x: cx } = getXDrawParams(ov.x, W)
-  const cy       = getYCenter(ov.y, H)
-  ctx.textAlign  = align
+  const cx = W / 2
+  const cy = getYCenter(ov.y, H)
 
-  const maxWidth = W * 0.88
-  const lineH    = ov.fontSize * 1.25
+  const maxWidth = W * 0.78
+  const lineH    = ov.fontSize * 1.35
   const borderPx = Math.max(3, Math.round(ov.fontSize * 0.09))
   const lines    = wrapText(ctx, ov.text, maxWidth)
   const blockH   = lines.length * lineH
@@ -633,10 +633,11 @@ async function remixViaMediaRecorder(opts: {
   ])
   const totalDuration = (opts.targetDuration && opts.targetDuration > 1) ? opts.targetDuration : origVid.duration
 
-  // Chrome suspends video decoding for elements that are too small (< ~10px) or
-  // fully outside the viewport. Use visibility:hidden at a real size to force
-  // hardware decoding without showing anything to the user.
-  const vidStyle = 'position:fixed;top:0;left:0;width:120px;height:120px;visibility:hidden;pointer-events:none;z-index:-9999;'
+  // Chrome suspends video decoding for elements that are not in the DOM, even when
+  // play() is called. ctx.drawImage() on a suspended video returns black frames.
+  // Fix: attach both videos to the document body with real dimensions (≥ a few px).
+  // Elements at top:-9999px or width:1px are treated as off-screen and not decoded.
+  const vidStyle = 'position:fixed;top:0;left:0;width:120px;height:120px;visibility:hidden;pointer-events:none;z-index:-9999'
   origVid.style.cssText = vidStyle
   secVid.style.cssText  = vidStyle
   document.body.appendChild(origVid)
@@ -683,24 +684,13 @@ async function remixViaMediaRecorder(opts: {
     return { canvas: oc, ov }
   })
 
-  // ── draw loop ────────────────────────────────────────────────────────────────
-  let switched = false
-  let drawTimerId = 0
-  let recordingStopped = false
-  let recorder: MediaRecorder  // declared here, started after first frame
-
-  const stopRecording = () => {
-    if (recordingStopped) return
-    recordingStopped = true
-    clearInterval(drawTimerId)
-    if (recorder?.state !== 'inactive') recorder?.stop()
-  }
-
-  const drawOneFrame = (t: number) => {
-    const preferred = switched ? origVid : secVid
+  // ── draw helper (used before and after recorder starts) ─────────────────────
+  const drawOneFrame = (sw: boolean): boolean => {
+    const preferred = sw ? origVid : secVid
     const source    = preferred.readyState >= 2 ? preferred
                     : (origVid.readyState >= 2   ? origVid : null)
     if (!source) return false
+    const t  = origVid.currentTime
     const vw = source.videoWidth  || W
     const vh = source.videoHeight || H
     const scale = Math.min(W / vw, H / vh)
@@ -714,17 +704,7 @@ async function remixViaMediaRecorder(opts: {
     return true
   }
 
-  const drawFrame = () => {
-    const t = origVid.currentTime
-    if (!switched && hasSplit && t >= opts.splitTime) {
-      switched = true
-      secVid.pause()
-      try { recorder?.requestData() } catch { /* flush buffer at cut point */ }
-    }
-    drawOneFrame(t)
-  }
-
-  // ── seek & play ───────────────────────────────────────────────────────────────
+  // ── seek & play FIRST — before recorder starts ───────────────────────────────
   const seekTo = (v: HTMLVideoElement, t: number) => new Promise<void>(r => {
     if (Math.abs(v.currentTime - t) < 0.05) { r(); return }
     v.onseeked = () => { v.onseeked = null; r() }
@@ -734,34 +714,50 @@ async function remixViaMediaRecorder(opts: {
   await seekTo(origVid, 0)
   await seekTo(secVid, 0)
 
-  // Catch autoplay rejections — if the browser blocks unmuted autoplay,
-  // fall back to muted so playback still starts and the Worker can start recording.
+  // Catch autoplay rejections — fall back to muted if browser blocks unmuted play.
   await origVid.play().catch(() => { origVid.muted = true; return origVid.play().catch(() => {}) })
   await secVid.play().catch(() => {})
 
-  // ── Wait for first valid frame before starting recorder ───────────────────────
-  // This prevents the recorder from capturing black frames while the browser
-  // decodes the first frames of the video (race condition between start() and play()).
+  // Wait for the first real (non-black) frame before starting the recorder so we
+  // never capture the black frames the decoder emits while it warms up.
   await new Promise<void>(resolve => {
     let attempts = 0
-    const waitForFrame = () => {
-      if (drawOneFrame(origVid.currentTime)) { resolve(); return }
-      attempts++
-      if (attempts > 200) { resolve(); return }  // max 2s wait, then start anyway
-      requestAnimationFrame(waitForFrame)
+    const waitFrame = () => {
+      if (drawOneFrame(false) || attempts++ > 200) { resolve(); return }
+      requestAnimationFrame(waitFrame)
     }
-    requestAnimationFrame(waitForFrame)
+    requestAnimationFrame(waitFrame)
   })
 
-  // ── Start recorder now that canvas has a real frame ───────────────────────────
+  // ── now start the recorder ────────────────────────────────────────────────────
   const chunks: Blob[] = []
-  recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 8_000_000, audioBitsPerSecond: 128_000 })
+  const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 8_000_000, audioBitsPerSecond: 128_000 })
   recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data) }
   recorder.start(100)
 
+  // ── draw loop ────────────────────────────────────────────────────────────────
+  let switched = false
+  let drawTimerId = 0
+  let recordingStopped = false
+  let recorder: MediaRecorder  // declared here, started after first frame
+
+  const stopRecording = () => {
+    if (recordingStopped) return
+    recordingStopped = true
+    clearInterval(drawTimerId)
+    if (recorder?.state !== 'inactive') recorder?.stop()
+  }
+
+  const drawFrame = () => {
+    if (!switched && hasSplit && origVid.currentTime >= opts.splitTime) {
+      switched = true
+      secVid.pause()
+      try { recorder?.requestData() } catch { /* flush buffer at cut point */ }
+    }
+    drawOneFrame(switched)
+  }
+
   // ── timing — requestVideoFrameCallback if available, else setInterval ────────
-  // rVFC fires in sync with each decoded video frame even in background tabs.
-  // setInterval is the fallback for Firefox (which doesn't support rVFC).
   if (typeof (origVid as any).requestVideoFrameCallback === 'function') {
     const scheduleRVFC = () => {
       if (recordingStopped) return
@@ -780,12 +776,14 @@ async function remixViaMediaRecorder(opts: {
   secVid.onwaiting = () => { if (!switched) origVid.pause() }
   secVid.onplaying = () => { if (!switched && origVid.paused) origVid.play().catch(() => {}) }
 
+  // try/finally ensures AudioContext always closes even if an error is thrown,
+  // preventing Chrome's ~6 AudioContext limit from being hit on subsequent videos.
   try {
     await new Promise<void>(res => { recorder.onstop = () => res() })
   } finally {
     clearTimeout(safetyTimeout)
     clearInterval(drawTimerId)
-    await audioCtx.close().catch(() => {})
+    await audioCtx.close()
     origVid.remove()
     secVid.remove()
   }

@@ -80,7 +80,7 @@ function _tryCapture(videoBlob: Blob, atSeconds: number): Promise<Blob | null> {
         const ratio = Math.min(1, maxSide / Math.max(w, h))
         c.width  = Math.round(w * ratio)
         c.height = Math.round(h * ratio)
-        const ctx = c.getContext('2d')
+        const ctx = c.getContext('2d', { willReadFrequently: true })
         if (!ctx) return finish(null)
         ctx.drawImage(v, 0, 0, c.width, c.height)
         // Check if frame is actually black — if so, signal failure to try next seek time
@@ -201,7 +201,24 @@ const signedUrlCache = new Map<string, { url: string; expiresAt: number }>()
 // Dedupe in-flight requests for the same path to prevent N concurrent connections.
 const signedUrlInFlight = new Map<string, Promise<string | null>>()
 
-// Generate a short-lived signed URL for a Storage path. Returns null on failure.
+// Concurrency limiter — free-tier Supabase has ~20 DB connections shared across
+// all clients. Capping signed URL fetches at 5 concurrent prevents pool exhaustion
+// when a page renders 100+ thumbnails simultaneously.
+let _activeSlots = 0
+const _MAX_SLOTS  = 5
+const _slotQueue: Array<() => void> = []
+function _acquireSlot(): Promise<void> {
+  return new Promise(resolve => {
+    if (_activeSlots < _MAX_SLOTS) { _activeSlots++; resolve() }
+    else _slotQueue.push(() => { _activeSlots++; resolve() })
+  })
+}
+function _releaseSlot(): void {
+  _activeSlots--
+  _slotQueue.shift()?.()
+}
+
+// Generate a long-lived signed URL for a Storage path. Returns null on failure.
 export async function getSignedUrl(path: string | null | undefined): Promise<string | null> {
   if (!path) return null
 
@@ -212,6 +229,7 @@ export async function getSignedUrl(path: string | null | undefined): Promise<str
   if (inflight) return inflight
 
   const promise = (async () => {
+    await _acquireSlot()
     try {
       const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, SIGNED_URL_TTL)
       if (error || !data) {
@@ -221,6 +239,7 @@ export async function getSignedUrl(path: string | null | undefined): Promise<str
       signedUrlCache.set(path, { url: data.signedUrl, expiresAt: Date.now() + (SIGNED_URL_TTL - 60) * 1000 })
       return data.signedUrl
     } finally {
+      _releaseSlot()
       signedUrlInFlight.delete(path)
     }
   })()

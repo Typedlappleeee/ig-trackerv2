@@ -36,8 +36,10 @@ export interface UserItem {
 export type OrgRole = 'owner' | 'admin' | 'member' | 'viewer'
 
 export type PageKey =
-  | 'phones' | 'posting' | 'massposting' | 'scheduler'
-  | 'bank' | 'autocomment' | 'warmup' | 'aitools' | 'montage' | 'remix' | 'repurpose' | 'settings'
+  | 'phones'
+  | 'posting' | 'massposting' | 'scheduler' | 'bank' | 'warmup' | 'aitools'
+  | 'remix' | 'repurpose' | 'montage'
+  | 'settings'
 
 // Granular action permissions (on top of tab visibility).
 export type ActionKey =

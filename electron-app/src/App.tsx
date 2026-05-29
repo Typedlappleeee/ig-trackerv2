@@ -420,13 +420,11 @@ import { Settings }          from '@/pages/Settings'
 import { MassPosting }       from '@/pages/MassPosting'
 import { Scheduler }         from '@/pages/Scheduler'
 import { Warmup }            from '@/pages/Warmup'
-import { TextCopy }          from '@/pages/TextCopy'
 import { VideoRepurpose }    from '@/pages/VideoRepurpose'
 import { Licences }          from '@/pages/Licences'
 
 import { Support }           from '@/pages/Support'
 import { Community }         from '@/pages/Community'
-import Monitor                from '@/pages/Monitor'
 import { FullPageLoader }    from '@/components/ui/Spinner'
 import { Landing }           from '@/components/Landing'
 import { AppTour }           from '@/components/AppTour'
@@ -601,7 +599,6 @@ function AppContent({ user }: { user: User }) {
     switch (page) {
       case 'dashboard':    return <Dashboard   user={user} onNavigate={p => handleNavigate(p as Page)} />
       case 'phones':       return <Phones      user={user} key={refreshTick} />
-      case 'monitor':      return <Monitor     user={user} />
       case 'stats':        return <Stats       user={user} />
       case 'posting':      return <Posting     user={user} />
       case 'massposting':  return <MassPosting user={user} />
@@ -610,7 +607,6 @@ function AppContent({ user }: { user: User }) {
       case 'warmup':       return <Warmup      user={user} />
       case 'montage':      return <Montage     user={user} />
       case 'remix':        return <Remix       user={user} />
-      case 'textcopy':     return <TextCopy    user={user} />
       case 'repurpose':    return <VideoRepurpose user={user} />
       case 'aitools':      return <AiTools     user={user} />
       case 'settings':     return <Settings    user={user} initialPanel={settingsPanel as any} onNavigate={(p) => setPage(p as any)} />
@@ -623,7 +619,7 @@ function AppContent({ user }: { user: User }) {
 
   return (
     <LicenseContext.Provider value={license}>
-    <CreditContext.Provider value={{ balance: creditBalance, loading: creditLoading, refresh: refreshCredits, ownerId: creditOwnerId }}>
+    <CreditContext.Provider value={{ balance: creditBalance, loading: creditLoading, refresh: refreshCredits, setBalance: setCreditBalance, ownerId: creditOwnerId }}>
       {showBeta && <BetaPopup onClose={dismissBeta} />}
       {showTour && <AppTour onClose={() => { localStorage.removeItem(TOUR_KEY); setShowTour(false) }} onNavigate={p => { setPage(p as Page); }} />}
       <Layout

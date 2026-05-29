@@ -6,20 +6,28 @@ import type { OrgRole, PermOverrides, PageKey, ActionKey } from './supabase'
 // can edit their profile / see organisation info.
 const ROLE_TABS: Record<OrgRole, Record<PageKey, boolean>> = {
   owner: {
-    phones: true, posting: true, massposting: true, scheduler: true,
-    bank: true, autocomment: true, warmup: true, aitools: true, montage: true, remix: true, repurpose: true, settings: true,
+    phones: true,
+    posting: true, massposting: true, scheduler: true, bank: true, warmup: true, aitools: true,
+    remix: true, repurpose: true, montage: true,
+    settings: true,
   },
   admin: {
-    phones: true, posting: true, massposting: true, scheduler: true,
-    bank: true, autocomment: true, warmup: true, aitools: true, montage: true, remix: true, repurpose: true, settings: true,
+    phones: true,
+    posting: true, massposting: true, scheduler: true, bank: true, warmup: true, aitools: true,
+    remix: true, repurpose: true, montage: true,
+    settings: true,
   },
   member: {
-    phones: true, posting: true, massposting: true, scheduler: true,
-    bank: true, autocomment: true, warmup: true, aitools: true, montage: true, remix: true, repurpose: true, settings: false,
+    phones: true,
+    posting: true, massposting: true, scheduler: true, bank: true, warmup: true, aitools: true,
+    remix: true, repurpose: true, montage: true,
+    settings: false,
   },
   viewer: {
-    phones: true, posting: false, massposting: false, scheduler: false,
-    bank: true, autocomment: false, warmup: false, aitools: false, montage: false, remix: false, repurpose: false, settings: false,
+    phones: true,
+    posting: false, massposting: false, scheduler: false, bank: true, warmup: false, aitools: false,
+    remix: false, repurpose: false, montage: false,
+    settings: false,
   },
 }
 
@@ -87,14 +95,16 @@ export function canDoAction(role: OrgRole, overrides: PermOverrides | undefined,
 // Tabs shown in the per-member permission editor.
 // `settings` represents the *Connexions sub-panel* (API keys), not the whole page.
 export const ALL_TABS: { key: PageKey; label: string; icon: string }[] = [
-  { key: 'phones',      label: 'Téléphones',                           icon: '📱' },
-  { key: 'posting',     label: 'Posting',                              icon: '🚀' },
-  { key: 'massposting', label: 'Mass Posting',                         icon: '⚡' },
-  { key: 'bank',        label: 'Banque',                               icon: '🗂' },
-  { key: 'autocomment', label: 'Commentaires',                         icon: '💬' },
-  { key: 'aitools',     label: 'Outils IA',                            icon: '🔧' },
-  { key: 'montage',     label: 'Montage',                              icon: '✂' },
-  { key: 'settings',    label: 'Paramètres → Connexions (clés API)',  icon: '🔑' },
+  { key: 'phones',      label: 'Téléphones',                          icon: '📱' },
+  { key: 'posting',     label: 'Posting',                             icon: '🚀' },
+  { key: 'massposting', label: 'Mass Posting',                        icon: '⚡' },
+  { key: 'scheduler',   label: 'Scheduler',                           icon: '📅' },
+  { key: 'bank',        label: 'Banque',                              icon: '🗂' },
+  { key: 'warmup',      label: 'Warmup',                              icon: '🔥' },
+  { key: 'aitools',     label: 'Outils IA',                           icon: '🔧' },
+  { key: 'remix',       label: 'Remix',                               icon: '🔀' },
+  { key: 'repurpose',   label: 'Repurpose',                           icon: '⚡' },
+  { key: 'settings',    label: 'Paramètres → Connexions (clés API)', icon: '🔑' },
 ]
 
 export const ALL_ACTIONS: { key: ActionKey; label: string; icon: string; group: string }[] = [

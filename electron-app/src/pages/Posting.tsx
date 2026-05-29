@@ -200,13 +200,12 @@ export function Posting({ user }: PostingProps) {
     const total     = phoneList.length
 
     const creditCost = total * CREDIT_COSTS.posting
-    const creditRes = await checkAndDeductCredits(credits.ownerId, creditCost)
+    const creditRes  = await checkAndDeductCredits(credits.ownerId, creditCost)
     if (!creditRes.ok) {
-      log(`❌ ${creditRes.error ?? 'Insufficient credits'} (need: ${creditCost} credits for ${total} phone${total > 1 ? 's' : ''})`, 'error')
+      log(`❌ ${creditRes.error ?? 'Crédits insuffisants'} (requis: ${creditCost} pour ${total} téléphone${total > 1 ? 's' : ''})`, 'error')
       return
     }
-    credits.refresh()
-    log(`💳 ${creditCost} credits deducted (${CREDIT_COSTS.posting}/phone × ${total}) — balance: ${creditRes.balance ?? '?'}`)
+    if (typeof creditRes.balance === 'number') credits.setBalance(creditRes.balance)
 
     playSuccess()
     setPosting(true); setLogs([]); setProgress(0)

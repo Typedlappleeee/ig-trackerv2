@@ -714,12 +714,9 @@ export function Phones({ user }: PhonesProps) {
       const currentGeelarkIds = new Set(rows.map(r => r.geelark_id))
 
       if (currentOrg) {
-        // Fetch ALL phones for this user (any org_id) that match the current GéeLark set
-        const { data: existingAll } = await supabase
-          .from('phones').select('id,geelark_id')
-          .eq('user_id', user.id)
-          .in('geelark_id', [...currentGeelarkIds])
-        const existingMap = new Map((existingAll ?? []).map((p: { id: string; geelark_id: string }) => [p.geelark_id, p.id]))
+        // Org mode: unique key is (org_id, geelark_id) — not (user_id, geelark_id).
+        // Two members of the same org, or two orgs sharing the same GéeLark API,
+        // can all have rows with the same geelark_id under different org_ids.
 
         // Delete phones removed from GéeLark (only those already in this org)
         const { data: orgPhones } = await supabase
@@ -729,18 +726,11 @@ export function Phones({ user }: PhonesProps) {
           await supabase.from('phones').delete().in('id', toDelete.map((p: { id: string }) => p.id))
         }
 
-        const toInsert = rows.filter(r => !existingMap.has(r.geelark_id))
-        const toUpdate = rows.filter(r =>  existingMap.has(r.geelark_id))
-
-        if (toInsert.length > 0) {
-          const { error } = await supabase.from('phones').insert(toInsert)
-          if (error) throw new Error(error.message)
-        }
-        for (const row of toUpdate) {
-          const id = existingMap.get(row.geelark_id)!
-          const { error } = await supabase.from('phones').update(row).eq('id', id)
-          if (error) throw new Error(error.message)
-        }
+        // Upsert on (org_id, geelark_id): handles race conditions between members
+        // syncing simultaneously and re-syncs after the phone was deleted.
+        const { error } = await supabase.from('phones')
+          .upsert(rows, { onConflict: 'org_id,geelark_id', ignoreDuplicates: false })
+        if (error) throw new Error(error.message)
       } else {
         // Solo mode — delete phones no longer in GéeLark then upsert the rest
         await supabase.from('phones')
