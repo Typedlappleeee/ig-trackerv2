@@ -188,6 +188,7 @@ function VideoSourcePanel({
 
 export function MassRemix({ user }: MassRemixProps) {
   const t = useT()
+  const { lang } = useLang()
   const STATUS_LABEL: Record<MassJob['status'], string> = {
     pending:    t('massRemixStatusPending'),
     detecting:  t('massRemixStatusDetecting'),
@@ -933,16 +934,30 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
 
                       <div className="ml-auto flex items-center gap-2">
                         {vidDuration > 0 && (
-                          <button
-                            onClick={() => {
-                              const sec = Math.round(vidCurrentTime * 1000) / 1000
-                              setCutForPair(selectedPair.id, sec)
-                              vidRef.current?.pause()
-                            }}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-bold transition-all hover:brightness-110"
-                            style={{ background: 'linear-gradient(130deg,rgba(234,179,8,0.25),rgba(234,179,8,0.12))', border: '1px solid rgba(234,179,8,0.5)', color: '#eab308', boxShadow: '0 0 12px rgba(234,179,8,0.15)' }}>
-                            {t('massRemixCutHere')}
-                          </button>
+                          <>
+                            <button
+                              onClick={() => {
+                                const sec = Math.round(vidCurrentTime * 1000) / 1000
+                                setCutForPair(selectedPair.id, sec)
+                                vidRef.current?.pause()
+                              }}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-bold transition-all hover:brightness-110"
+                              style={{ background: 'linear-gradient(130deg,rgba(234,179,8,0.25),rgba(234,179,8,0.12))', border: '1px solid rgba(234,179,8,0.5)', color: '#eab308', boxShadow: '0 0 12px rgba(234,179,8,0.15)' }}>
+                              {t('massRemixCutHere')}
+                            </button>
+                            {plannedPairs.length > 1 && (
+                              <button
+                                onClick={() => {
+                                  const sec = Math.round(vidCurrentTime * 1000) / 1000
+                                  setPlannedPairs(prev => prev.map(p => ({ ...p, cutSec: sec })))
+                                  vidRef.current?.pause()
+                                }}
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-bold transition-all hover:brightness-110"
+                                style={{ background: 'linear-gradient(130deg,rgba(124,58,237,0.25),rgba(124,58,237,0.12))', border: '1px solid rgba(124,58,237,0.5)', color: '#a78bfa' }}>
+                                {lang === 'en' ? 'Apply to all' : 'Appliquer à tout'}
+                              </button>
+                            )}
+                          </>
                         )}
                         {selectedPair.cutSec != null && (
                           <button onClick={() => setCutForPair(selectedPair.id, undefined)}

@@ -774,13 +774,16 @@ async function remixViaMediaRecorder(opts: {
   await origVid.play().catch(() => { origVid.muted = true; return origVid.play().catch(() => {}) })
   await secVid.play().catch(() => {})
 
-  await new Promise<void>(res => { recorder.onstop = () => res() })
-  clearTimeout(safetyTimeout)
-  clearTimeout(firstFrameTimeout)
-  clearInterval(drawTimerId)
-  await audioCtx.close()
-  origVid.remove()
-  secVid.remove()
+  try {
+    await new Promise<void>(res => { recorder.onstop = () => res() })
+  } finally {
+    clearTimeout(safetyTimeout)
+    clearTimeout(firstFrameTimeout)
+    clearInterval(drawTimerId)
+    await audioCtx.close().catch(() => {})
+    origVid.remove()
+    secVid.remove()
+  }
 
   return { blob: new Blob(chunks, { type: recorder.mimeType || mimeType }), mimeType }
 }
