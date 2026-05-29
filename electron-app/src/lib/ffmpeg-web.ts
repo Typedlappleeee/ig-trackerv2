@@ -634,8 +634,9 @@ async function remixViaMediaRecorder(opts: {
 
   // Chrome suspends video decoding for elements that are not in the DOM, even when
   // play() is called. ctx.drawImage() on a suspended video returns black frames.
-  // Fix: attach both videos to the document body (invisible) to force active decoding.
-  const vidStyle = 'position:fixed;top:-9999px;width:1px;height:1px;opacity:0.001;pointer-events:none;z-index:-9999'
+  // Fix: attach both videos to the document body with real dimensions (≥ a few px).
+  // Elements at top:-9999px or width:1px are treated as off-screen and not decoded.
+  const vidStyle = 'position:fixed;top:0;left:0;width:120px;height:120px;visibility:hidden;pointer-events:none;z-index:-9999'
   origVid.style.cssText = vidStyle
   secVid.style.cssText  = vidStyle
   document.body.appendChild(origVid)
@@ -682,6 +683,52 @@ async function remixViaMediaRecorder(opts: {
     return { canvas: oc, ov }
   })
 
+  // ── draw helper (used before and after recorder starts) ─────────────────────
+  const drawOneFrame = (sw: boolean): boolean => {
+    const preferred = sw ? origVid : secVid
+    const source    = preferred.readyState >= 2 ? preferred
+                    : (origVid.readyState >= 2   ? origVid : null)
+    if (!source) return false
+    const t  = origVid.currentTime
+    const vw = source.videoWidth  || W
+    const vh = source.videoHeight || H
+    const scale = Math.min(W / vw, H / vh)
+    const dw = vw * scale, dh = vh * scale
+    ctx.fillStyle = '#000'
+    ctx.fillRect(0, 0, W, H)
+    ctx.drawImage(source, (W - dw) / 2, (H - dh) / 2, dw, dh)
+    for (const { canvas: oc, ov } of overlayImages) {
+      if (t >= ov.startTime && t <= ov.endTime) ctx.drawImage(oc, 0, 0)
+    }
+    return true
+  }
+
+  // ── seek & play FIRST — before recorder starts ───────────────────────────────
+  const seekTo = (v: HTMLVideoElement, t: number) => new Promise<void>(r => {
+    if (Math.abs(v.currentTime - t) < 0.05) { r(); return }
+    v.onseeked = () => { v.onseeked = null; r() }
+    v.currentTime = t
+  })
+
+  await seekTo(origVid, 0)
+  await seekTo(secVid, 0)
+
+  // Catch autoplay rejections — fall back to muted if browser blocks unmuted play.
+  await origVid.play().catch(() => { origVid.muted = true; return origVid.play().catch(() => {}) })
+  await secVid.play().catch(() => {})
+
+  // Wait for the first real (non-black) frame before starting the recorder so we
+  // never capture the black frames the decoder emits while it warms up.
+  await new Promise<void>(resolve => {
+    let attempts = 0
+    const waitFrame = () => {
+      if (drawOneFrame(false) || attempts++ > 200) { resolve(); return }
+      requestAnimationFrame(waitFrame)
+    }
+    requestAnimationFrame(waitFrame)
+  })
+
+  // ── now start the recorder ────────────────────────────────────────────────────
   const chunks: Blob[] = []
   const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 8_000_000, audioBitsPerSecond: 128_000 })
   recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data) }
@@ -699,41 +746,16 @@ async function remixViaMediaRecorder(opts: {
     recorder.stop()
   }
 
-  let firstFrameDrawn = false
-
   const drawFrame = () => {
-    const t = origVid.currentTime
-
-    if (!switched && hasSplit && t >= opts.splitTime) {
+    if (!switched && hasSplit && origVid.currentTime >= opts.splitTime) {
       switched = true
       secVid.pause()
       try { recorder.requestData() } catch { /* flush buffer at cut point */ }
     }
-
-    // Draw whichever source has a decoded frame ready.
-    // If origVid isn't ready yet but secVid is, use secVid as fallback so we
-    // never record black frames while waiting for the primary video to decode.
-    const preferred = switched ? origVid : secVid
-    const source    = preferred.readyState >= 2 ? preferred
-                    : (origVid.readyState >= 2   ? origVid : null)
-    if (source) {
-      firstFrameDrawn = true
-      const vw = source.videoWidth  || W
-      const vh = source.videoHeight || H
-      const scale = Math.min(W / vw, H / vh)
-      const dw = vw * scale, dh = vh * scale
-      ctx.fillStyle = '#000'
-      ctx.fillRect(0, 0, W, H)
-      ctx.drawImage(source, (W - dw) / 2, (H - dh) / 2, dw, dh)
-      for (const { canvas: oc, ov } of overlayImages) {
-        if (t >= ov.startTime && t <= ov.endTime) ctx.drawImage(oc, 0, 0)
-      }
-    }
+    drawOneFrame(switched)
   }
 
   // ── timing — requestVideoFrameCallback if available, else setInterval ────────
-  // rVFC fires in sync with each decoded video frame even in background tabs.
-  // setInterval is the fallback for Firefox (which doesn't support rVFC).
   if (typeof (origVid as any).requestVideoFrameCallback === 'function') {
     const scheduleRVFC = () => {
       if (recordingStopped) return
@@ -746,41 +768,23 @@ async function remixViaMediaRecorder(opts: {
     drawTimerId = setInterval(drawFrame, 1000 / 30) as unknown as number
   }
 
-  // Abort if video never starts — avoids a silent recording of all-black frames
-  const firstFrameTimeout = setTimeout(() => {
-    if (!firstFrameDrawn && !recordingStopped) {
-      stopRecording()
-    }
-  }, 8000)
-
   const safetyTimeout = setTimeout(() => stopRecording(), (totalDuration + 10) * 1000)
 
   // When secVid stalls (buffering), pause origVid so audio stays in sync.
   secVid.onwaiting = () => { if (!switched) origVid.pause() }
   secVid.onplaying = () => { if (!switched && origVid.paused) origVid.play().catch(() => {}) }
 
-  // ── seek & play ───────────────────────────────────────────────────────────────
-  const seekTo = (v: HTMLVideoElement, t: number) => new Promise<void>(r => {
-    if (Math.abs(v.currentTime - t) < 0.05) { r(); return }
-    v.onseeked = () => { v.onseeked = null; r() }
-    v.currentTime = t
-  })
-
-  await seekTo(origVid, 0)
-  await seekTo(secVid, 0)
-
-  // Catch autoplay rejections — if the browser blocks unmuted autoplay,
-  // fall back to muted so playback still starts and the Worker can start recording.
-  await origVid.play().catch(() => { origVid.muted = true; return origVid.play().catch(() => {}) })
-  await secVid.play().catch(() => {})
-
-  await new Promise<void>(res => { recorder.onstop = () => res() })
-  clearTimeout(safetyTimeout)
-  clearTimeout(firstFrameTimeout)
-  clearInterval(drawTimerId)
-  await audioCtx.close()
-  origVid.remove()
-  secVid.remove()
+  // try/finally ensures AudioContext always closes even if an error is thrown,
+  // preventing Chrome's ~6 AudioContext limit from being hit on subsequent videos.
+  try {
+    await new Promise<void>(res => { recorder.onstop = () => res() })
+  } finally {
+    clearTimeout(safetyTimeout)
+    clearInterval(drawTimerId)
+    await audioCtx.close()
+    origVid.remove()
+    secVid.remove()
+  }
 
   return { blob: new Blob(chunks, { type: recorder.mimeType || mimeType }), mimeType }
 }
