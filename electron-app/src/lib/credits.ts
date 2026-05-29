@@ -85,11 +85,19 @@ export async function fetchOrgBalance(orgId: string, ownerUserId?: string): Prom
 }
 
 export async function checkAndDeductCredits(
-  _userId: string,
-  _amount: number,
+  userId: string,
+  amount: number,
 ): Promise<{ ok: boolean; error?: string; balance?: number }> {
-  // Credit system temporarily disabled — always succeed
-  return { ok: true, balance: 0 }
+  try {
+    const { data, error } = await supabase.rpc('deduct_user_credits', {
+      p_user_id: userId,
+      p_amount:  amount,
+    })
+    if (error) return { ok: false, error: error.message }
+    return data ?? { ok: false, error: 'Erreur inconnue' }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
 }
 
 export async function redeemCreditCode(

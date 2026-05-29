@@ -199,7 +199,13 @@ export function Posting({ user }: PostingProps) {
     const phoneList = phones.filter(p => selectedPhones.has(p.id))
     const total     = phoneList.length
 
-
+    const creditCost = total * CREDIT_COSTS.posting
+    const creditRes  = await checkAndDeductCredits(credits.ownerId, creditCost)
+    if (!creditRes.ok) {
+      log(`❌ ${creditRes.error ?? 'Crédits insuffisants'} (requis: ${creditCost} pour ${total} téléphone${total > 1 ? 's' : ''})`, 'error')
+      return
+    }
+    if (typeof creditRes.balance === 'number') credits.setBalance(creditRes.balance)
 
     playSuccess()
     setPosting(true); setLogs([]); setProgress(0)

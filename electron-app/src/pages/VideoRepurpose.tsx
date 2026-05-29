@@ -207,6 +207,13 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
 
   async function startGeneration() {
     if (!sources.length || running) return
+    const creditCost = totalJobs * CREDIT_COSTS.clone_vid
+    const creditRes  = await checkAndDeductCredits(credits.ownerId, creditCost)
+    if (!creditRes.ok) {
+      alert(`Crédits insuffisants — ${creditCost} crédits requis pour ${totalJobs} vidéos. Solde: ${creditRes.balance ?? 0}`)
+      return
+    }
+    if (typeof creditRes.balance === 'number') credits.setBalance(creditRes.balance)
     abortRef.current = false
     setRunning(true); setStartedAt(Date.now()); setElapsed(0); setTotalDone(0)
 
