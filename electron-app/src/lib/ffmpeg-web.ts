@@ -243,7 +243,7 @@ export async function detectSceneChangeWeb(opts: {
       const W = 64, H = 64
       const canvas = document.createElement('canvas')
       canvas.width = W; canvas.height = H
-      const ctx = canvas.getContext('2d')!
+      const ctx = canvas.getContext('2d', { willReadFrequently: true })!
 
       // Sample up to 30 timestamps spread across the video
       const maxSamples = 30
