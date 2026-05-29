@@ -89,7 +89,6 @@ const NAV_SECTIONS: NavSection[] = [
       { id: 'massposting', label: 'navMassPosting',  icon: '⚡' },
       { id: 'scheduler',   label: 'navScheduler',    icon: '📅', isNew: true },
       { id: 'bank',        label: 'navBank',         icon: '🗂' },
-      { id: 'videoimport', label: 'navVideoImport',  icon: '⬇️', isNew: true },
       { id: 'warmup',      label: 'navWarmup',       icon: '🔥', beta: true },
       { id: 'aitools',     label: 'navAiTools',      icon: '🔧' },
     ],
@@ -98,9 +97,10 @@ const NAV_SECTIONS: NavSection[] = [
     title: 'Montage',
     defaultOpen: true,
     items: [
-      { id: 'remix',     label: 'navRemix',     icon: '🔀' },
-      { id: 'repurpose', label: 'navRepurpose', icon: '⚡', isNew: true },
-      { id: 'textcopy',  label: 'navTextCopy',  icon: '✍', beta: true },
+      { id: 'remix',       label: 'navRemix',       icon: '🔀' },
+      { id: 'repurpose',   label: 'navRepurpose',   icon: '⚡', isNew: true },
+      { id: 'textcopy',    label: 'navTextCopy',    icon: '✍', beta: true },
+      { id: 'videoimport', label: 'navVideoImport', icon: '⬇️', isNew: true },
     ],
   },
 ]
