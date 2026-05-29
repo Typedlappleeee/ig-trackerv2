@@ -989,24 +989,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
               </div>
             )}
 
-            {/* Credits button */}
-            {!credits.loading && (
-              <button
-                onClick={() => onNavigate('settings', 'abonnement')}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 5,
-                  padding: '4px 10px', borderRadius: 6,
-                  border: '1px solid rgba(139,92,246,0.2)', background: 'transparent',
-                  cursor: 'pointer', transition: 'background 0.15s',
-                }}
-                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.04)' }}
-                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}
-              >
-                <span style={{ fontSize: 12, fontWeight: 700, color: credits.balance < 10 ? '#F87171' : '#A78BFA', fontVariantNumeric: 'tabular-nums' }}>
-                  💎 {credits.balance.toLocaleString('fr-FR')}
-                </span>
-              </button>
-            )}
+            {/* Credits button — temporarily hidden */}
 
             {/* Notification bell */}
             <div style={{ position: 'relative' }} ref={notifRef}>
