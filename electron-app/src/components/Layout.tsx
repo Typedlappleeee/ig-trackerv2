@@ -54,7 +54,7 @@ function SFLogo({ size = 28 }: { size?: number }) {
 
 export type Page =
   | 'dashboard' | 'phones' | 'monitor'
-  | 'stats' | 'posting' | 'massposting' | 'scheduler' | 'bank' | 'videoimport' | 'aitools' | 'warmup'
+  | 'stats' | 'posting' | 'massposting' | 'scheduler' | 'bank' | 'aitools' | 'warmup'
   | 'montage' | 'remix' | 'textcopy' | 'repurpose'
   | 'community' | 'support'
   | 'settings' | 'licences'
@@ -100,7 +100,6 @@ const NAV_SECTIONS: NavSection[] = [
       { id: 'remix',       label: 'navRemix',       icon: '🔀' },
       { id: 'repurpose',   label: 'navRepurpose',   icon: '⚡', isNew: true },
       { id: 'textcopy',    label: 'navTextCopy',    icon: '✍', beta: true },
-      { id: 'videoimport', label: 'navVideoImport', icon: '⬇️', isNew: true },
     ],
   },
 ]
