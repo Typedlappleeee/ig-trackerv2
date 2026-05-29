@@ -359,7 +359,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
     if (orgId === (currentOrg?.id ?? null)) { setOrgMenuOpen(false); return }
     switchOrg(orgId)
     setOrgMenuOpen(false)
-    onNavigate('dashboard')
+    onNavigate('community')
     toast.show({
       title: orgId ? `→ "${orgName}"` : t('soloMode'),
       kind:  'info',
@@ -409,9 +409,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
 
   const isVisibleTab = (id: Page): boolean => {
     if (id === 'licences')  return license.isSuperAdmin
-
-    if (id === 'support')   return true
-    if (id === 'community') return true
+    if (id === 'support' || id === 'community' || id === 'dashboard' || id === 'stats') return true
     return role ? canSeeTab(role, perms, id as import('@/lib/supabase').PageKey) : true
   }
 
@@ -419,6 +417,13 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
     const t = setInterval(() => setNow(Date.now()), 10000)
     return () => clearInterval(t)
   }, [])
+
+  // Auto-redirect to community when the current page isn't accessible in this org
+  useEffect(() => {
+    if (!orgLoading && page !== 'settings' && !isVisibleTab(page)) {
+      onNavigate('community')
+    }
+  }, [page, orgLoading, currentOrg?.id])
 
   function toggleSection(title: string) {
     setOpenSections(prev => {
