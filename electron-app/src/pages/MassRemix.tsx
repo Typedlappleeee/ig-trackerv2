@@ -576,7 +576,7 @@ export function MassRemix({ user }: MassRemixProps) {
 Your job: identify burned-in text overlays. Group lines that belong to the SAME paragraph or caption into ONE entry — only create separate entries for text that is visually distinct (different position group, different style, or a separate sticker/watermark).
 
 For EACH text group return a JSON object:
-{"text":"full paragraph text with \\n between lines if multi-line","xAlign":"left"|"center"|"right","yPercent":0-100,"fontSizePx":number,"fontColor":"white"|"black"|"#rrggbb","bold":true|false,"startFrame":0,"endFrame":${fr.frames.length - 1}}
+{"text":"full paragraph text with \\n between lines if multi-line","yPercent":0-100,"fontSizePx":number,"fontColor":"white"|"black"|"#rrggbb","bold":true|false,"startFrame":0,"endFrame":${fr.frames.length - 1}}
 
 Position (yPercent): vertical center of the text group. 0=top edge, 100=bottom edge.
 - Text in top area → 10-20
@@ -682,7 +682,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
 
                   textOverlays.push({
                     text:      item.text,
-                    x:         xAlignToExpr(item.xAlign),
+                    x:         '(w-text_w)/2',
                     y:         `h*${centerY.toFixed(4)}`,
                     fontSize:  item.fontSize,
                     fontColor: item.fontColor,
