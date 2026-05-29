@@ -534,7 +534,7 @@ export function MassRemix({ user }: MassRemixProps) {
           textOverlays.push({
             text: manualText.trim(),
             x: '(w-text_w)/2',
-            y: 'h*0.82-text_h/2',
+            y: 'h*0.85',
             fontSize: 45 + Math.floor(Math.random() * 10),
             fontColor: 'white',
             bold: false,
@@ -567,11 +567,11 @@ For EACH text group return a JSON object:
 {"text":"full paragraph text with \\n between lines if multi-line","xAlign":"left"|"center"|"right","yPercent":0-100,"fontSizePx":number,"fontColor":"white"|"black"|"#rrggbb","bold":true|false,"startFrame":0,"endFrame":${fr.frames.length - 1}}
 
 Position (yPercent): vertical center of the text group. 0=top edge, 100=bottom edge.
-- Text in top area → 5-25
-- Text in bottom area → 70-92
-- Text in middle → 40-60
+- Text in top area → 10-20
+- Text in bottom area → 78-88
+IMPORTANT: texts are ONLY at the top or bottom of the frame. Never use values between 25 and 70.
 
-IMPORTANT: if two lines are part of the same sentence or caption, combine them into one entry with \\n between them. Only split into separate entries when the text blocks are clearly independent (e.g. a title at the top AND a separate sticker at the bottom).
+IMPORTANT: if two lines are part of the same sentence or caption, combine them into one entry with \\n between them. Only split into separate entries when the text blocks are clearly independent (e.g. a title at the top AND a separate sticker at the bottom). Do NOT return duplicate entries for the same text.
 
 Font size (fontSizePx): size of the text AS IT APPEARS in a 1080px wide frame.
 startFrame/endFrame: first and last frame index where this text is visible.
@@ -597,10 +597,10 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                 const outH = preset === '9:16' ? 1920 : 1080
                 const outW = preset === '16:9' ? 1920 : 1080
 
-                // Deduplicate: merge entries whose text is ≥70% similar by word overlap
-                // (catches emoji/ASCII variants like 🇺🇸 vs "us" for the same caption)
+                // Deduplicate: merge entries whose text is ≥60% similar by word overlap
+                // (catches emoji/ASCII variants, near-identical repeated captions)
                 const parsed = rawParsed.reduce((acc, item) => {
-                  const existing = acc.find(e => textSimilarity(e.text, item.text) >= 0.70)
+                  const existing = acc.find(e => textSimilarity(e.text, item.text) >= 0.60)
                   if (existing) {
                     existing.startFrame = Math.min(existing.startFrame ?? 0, item.startFrame ?? 0)
                     existing.endFrame   = Math.max(existing.endFrame   ?? frameCount - 1, item.endFrame ?? frameCount - 1)
@@ -627,36 +627,47 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                   return { text: item.text, xAlign: item.xAlign ?? 'center', rawY: (item.yPercent ?? 50) / 100, fontSize, fontColor: item.fontColor ?? 'white', bold: item.bold ?? true, startTime, endTime }
                 })
 
-                // ── Step 2+3: place overlays at their source rawY, adjust for overlaps ──
-                // Trust the AI's yPercent — it reflects where text actually appears in
-                // the source video. Only nudge items that are time-concurrent AND would
-                // visually overlap each other. No arbitrary top/bottom zone remapping.
-                type Placed = { centerY: number; halfH: number }
+                // ── Step 2+3: snap to top/bottom zones, adjust for overlaps ─────
+                // Force text to be either top (≤ 0.30 rawY) or bottom (> 0.30 rawY).
+                // This prevents text from landing in the middle of the frame where it
+                // covers the subject's face.
+                type Placed = { centerY: number; halfH: number; zone: 'top' | 'bottom' }
                 const placed: Placed[] = []
 
                 items.forEach((item, idx) => {
                   const lines  = wrapText(item.text, item.fontSize, outW)
-                  const stepFr = (item.fontSize * 1.3) / outH
+                  const stepFr = (item.fontSize * 1.35) / outH
                   const halfH  = (lines.length * stepFr) / 2
 
-                  // Start from the AI-reported position, clamped to screen edges
-                  let centerY = Math.max(halfH + 0.02, Math.min(0.97 - halfH, item.rawY))
+                  // Snap to top or bottom zone based on AI's raw position
+                  const zone: 'top' | 'bottom' = item.rawY <= 0.35 ? 'top' : 'bottom'
 
-                  // Push down only if this item would overlap a concurrent earlier item
+                  // Top zone: center at ~13%, bottom zone: center at ~85%
+                  let centerY = zone === 'top'
+                    ? Math.max(halfH + 0.04, 0.13)
+                    : Math.min(0.96 - halfH, 0.85)
+
+                  // Nudge to avoid overlapping concurrent items in the same zone
                   for (let j = 0; j < idx; j++) {
+                    if (placed[j].zone !== zone) continue
                     const concurrent = items[j].endTime > item.startTime && items[j].startTime < item.endTime
                     if (!concurrent) continue
                     const p = placed[j]
-                    const minClear = p.centerY + p.halfH + 0.025 + halfH
-                    if (centerY < minClear) centerY = minClear
+                    if (zone === 'top') {
+                      const minClear = p.centerY + p.halfH + 0.02 + halfH
+                      if (centerY < minClear) centerY = minClear
+                    } else {
+                      const maxClear = p.centerY - p.halfH - 0.02 - halfH
+                      if (centerY > maxClear) centerY = maxClear
+                    }
                   }
 
-                  centerY = Math.min(0.97 - halfH, centerY)
-                  placed.push({ centerY, halfH })
+                  centerY = Math.max(halfH + 0.03, Math.min(0.97 - halfH, centerY))
+                  placed.push({ centerY, halfH, zone })
 
                   textOverlays.push({
                     text:      item.text,
-                    x:         '(w-text_w)/2',
+                    x:         xAlignToExpr(item.xAlign),
                     y:         `h*${centerY.toFixed(4)}`,
                     fontSize:  item.fontSize,
                     fontColor: item.fontColor,

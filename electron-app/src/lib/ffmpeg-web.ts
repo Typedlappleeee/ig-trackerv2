@@ -525,8 +525,8 @@ async function renderTextPNG(
   const cy       = getYCenter(ov.y, H)
   ctx.textAlign  = align
 
-  const maxWidth  = W * 0.88
-  const lineH     = ov.fontSize * 1.25
+  const maxWidth  = W * 0.78
+  const lineH     = ov.fontSize * 1.35
   const borderPx  = Math.max(3, Math.round(ov.fontSize * 0.09))
   const lines     = wrapText(ctx, ov.text, maxWidth)
   const blockH    = lines.length * lineH
@@ -571,8 +571,8 @@ function drawOverlayText(
   const cy       = getYCenter(ov.y, H)
   ctx.textAlign  = align
 
-  const maxWidth = W * 0.88
-  const lineH    = ov.fontSize * 1.25
+  const maxWidth = W * 0.78
+  const lineH    = ov.fontSize * 1.35
   const borderPx = Math.max(3, Math.round(ov.fontSize * 0.09))
   const lines    = wrapText(ctx, ov.text, maxWidth)
   const blockH   = lines.length * lineH
