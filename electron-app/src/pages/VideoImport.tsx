@@ -46,22 +46,24 @@ export function VideoImport({ user }: { user: User }) {
     setStatus('🔗 Analyse du lien…')
 
     try {
-      // 1. Ask cobalt for a download URL
+      // 1. Get download URL via our server-side proxy
       const cobaltRes = await fetch(COBALT_API, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
         body:    JSON.stringify({ url: trimmed }),
       })
-      if (!cobaltRes.ok) throw new Error(`Service indisponible (HTTP ${cobaltRes.status})`)
 
-      const cobalt = await cobaltRes.json()
-
-      if (cobalt.status === 'error') {
-        const code = cobalt.error?.code ?? cobalt.text ?? 'lien invalide'
-        throw new Error(`Impossible de télécharger : ${code}`)
+      // Always try to parse JSON even on non-200 (proxy puts error details there)
+      const cobalt = await cobaltRes.json().catch(() => null)
+      if (!cobaltRes.ok || cobalt?.status === 'error') {
+        const code = cobalt?.error?.code ?? cobalt?.error ?? `HTTP ${cobaltRes.status}`
+        const msg =
+          code === 'instagram_video_not_found' ? 'Vidéo Instagram introuvable — le compte est peut-être privé'
+          : code === 'unsupported_platform'    ? 'Plateforme non supportée (Instagram et TikTok uniquement)'
+          : `Impossible de télécharger : ${code}`
+        throw new Error(msg)
       }
 
-      // Handles tunnel / redirect / picker responses
       const downloadUrl: string | null =
         cobalt.url ??
         cobalt.picker?.find((p: any) => p.type === 'video')?.url ??
