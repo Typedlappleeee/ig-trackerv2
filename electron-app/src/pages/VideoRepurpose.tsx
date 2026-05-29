@@ -155,6 +155,8 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
   const [saveToBank, setSaveToBank]     = useState(isWeb)
   const [bankFolder, setBankFolder]     = useState('')
   const [bankFolders, setBankFolders]   = useState<string[]>([])
+  const [creatingFolder, setCreatingFolder] = useState(false)
+  const [newFolderName, setNewFolderName]   = useState('')
   const [jobs, setJobs]                 = useState<VariantJob[]>([])
   const [running, setRunning]           = useState(false)
   const [totalDone, setTotalDone]       = useState(0)
@@ -483,21 +485,69 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
               )}
               {isWeb && <span style={{ fontSize: 9, color: '#22d3ee', fontWeight: 600, background: 'rgba(34,211,238,0.1)', padding: '2px 6px', borderRadius: 4 }}>ON</span>}
             </div>
+
             {(isWeb || saveToBank) && (
-              <>
-                {bankFolders.length > 0 && (
-                  <select value={bankFolders.includes(bankFolder) ? bankFolder : ''}
-                    onChange={e => setBankFolder(e.target.value)}
-                    style={{ width: '100%', padding: '5px 8px', borderRadius: 7, fontSize: 11, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: '#e2d9f3', marginBottom: 5, cursor: 'pointer' }}>
-                    <option value="" style={{ background: '#0c0919' }}>{t('repurposeChooseFolder')}</option>
-                    {bankFolders.map(f => <option key={f} value={f} style={{ background: '#0c0919' }}>{f}</option>)}
-                  </select>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {/* Dossier actif */}
+                {bankFolder.trim() && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 8px', borderRadius: 6, background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.25)' }}>
+                    <span style={{ fontSize: 10 }}>📁</span>
+                    <span style={{ flex: 1, fontSize: 10, fontWeight: 600, color: '#c4b5fd' }}>{bankFolder}</span>
+                    <button onClick={() => setBankFolder('')} disabled={running}
+                      style={{ fontSize: 10, color: 'rgba(148,163,184,0.4)', background: 'none', border: 'none', cursor: 'pointer', padding: '0 2px' }}>✕</button>
+                  </div>
                 )}
-                <input placeholder={bankFolders.length > 0 ? t('repurposeNewFolder') : t('repurposeFolderOptional')}
-                  value={bankFolder} onChange={e => setBankFolder(e.target.value)}
-                  style={{ width: '100%', padding: '5px 8px', borderRadius: 7, fontSize: 11, background: 'rgba(255,255,255,0.04)', border: `1px solid ${bankFolder.trim() ? 'rgba(139,92,246,0.4)' : 'rgba(255,255,255,0.07)'}`, color: '#e2d9f3', outline: 'none' }}
-                />
-              </>
+
+                {/* Dossiers existants */}
+                {bankFolders.length > 0 && !bankFolder.trim() && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                    {bankFolders.map(f => (
+                      <button key={f} onClick={() => { setBankFolder(f); setCreatingFolder(false) }} disabled={running}
+                        style={{ padding: '3px 8px', borderRadius: 5, fontSize: 10, fontWeight: 500, cursor: 'pointer', border: 'none', background: 'rgba(255,255,255,0.05)', color: 'rgba(196,181,253,0.7)', transition: 'all 0.1s' }}
+                        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(139,92,246,0.12)'; e.currentTarget.style.color = '#a78bfa' }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; e.currentTarget.style.color = 'rgba(196,181,253,0.7)' }}
+                      >📁 {f}</button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Créer nouveau dossier */}
+                {!creatingFolder && !bankFolder.trim() ? (
+                  <button onClick={() => setCreatingFolder(true)} disabled={running}
+                    style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 8px', borderRadius: 6, fontSize: 10, fontWeight: 600, cursor: 'pointer', border: '1px dashed rgba(139,92,246,0.3)', background: 'transparent', color: 'rgba(139,92,246,0.6)', transition: 'all 0.15s', width: '100%' }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(139,92,246,0.06)'; e.currentTarget.style.color = '#a78bfa' }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'rgba(139,92,246,0.6)' }}
+                  >
+                    <span style={{ fontSize: 12 }}>+</span> Nouveau dossier
+                  </button>
+                ) : creatingFolder && (
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    <input autoFocus placeholder="Nom du dossier…"
+                      value={newFolderName}
+                      onChange={e => setNewFolderName(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' && newFolderName.trim()) {
+                          setBankFolder(newFolderName.trim())
+                          setBankFolders(prev => prev.includes(newFolderName.trim()) ? prev : [...prev, newFolderName.trim()])
+                          setNewFolderName(''); setCreatingFolder(false)
+                        }
+                        if (e.key === 'Escape') { setCreatingFolder(false); setNewFolderName('') }
+                      }}
+                      style={{ flex: 1, padding: '4px 8px', borderRadius: 6, fontSize: 10, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(139,92,246,0.4)', color: '#e2d9f3', outline: 'none' }}
+                    />
+                    <button
+                      onClick={() => {
+                        if (newFolderName.trim()) {
+                          setBankFolder(newFolderName.trim())
+                          setBankFolders(prev => prev.includes(newFolderName.trim()) ? prev : [...prev, newFolderName.trim()])
+                        }
+                        setNewFolderName(''); setCreatingFolder(false)
+                      }}
+                      style={{ padding: '4px 8px', borderRadius: 6, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: 'none', background: 'rgba(139,92,246,0.2)', color: '#a78bfa' }}
+                    >OK</button>
+                  </div>
+                )}
+              </div>
             )}
           </div>
 
