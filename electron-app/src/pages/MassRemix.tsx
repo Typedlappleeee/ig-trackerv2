@@ -407,6 +407,7 @@ export function MassRemix({ user }: MassRemixProps) {
   }
 
   async function launch(prePlanned?: PlannedPair[]) {
+    if (running) return
     if (!originals.length || !secondaries.length) return
     if (exportMode === 'folder' && !outputFolder) {
       const f = await window.electronAPI?.pickOutputFolder?.()
@@ -414,7 +415,7 @@ export function MassRemix({ user }: MassRemixProps) {
       setOutputFolder(f)
     }
 
-    const n = Math.max(1, copies)
+    const n = prePlanned ? prePlanned.length : Math.max(1, copies)
     const creditCost = n * CREDIT_COSTS.remix
     const creditRes = await checkAndDeductCredits(credits.ownerId, creditCost)
     if (!creditRes.ok) {
