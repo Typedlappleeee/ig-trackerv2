@@ -87,7 +87,7 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { id: 'posting',     label: 'navPosting',      icon: '🚀' },
       { id: 'massposting', label: 'navMassPosting',  icon: '⚡' },
-      { id: 'scheduler',   label: 'navScheduler',    icon: '📅', isNew: true },
+      { id: 'scheduler',   label: 'navScheduler',    icon: '📅' },
       { id: 'bank',        label: 'navBank',         icon: '🗂' },
       { id: 'warmup',      label: 'navWarmup',       icon: '🔥', beta: true },
       { id: 'aitools',     label: 'navAiTools',      icon: '🔧' },
