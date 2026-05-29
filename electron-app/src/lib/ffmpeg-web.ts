@@ -245,8 +245,8 @@ export async function detectSceneChangeWeb(opts: {
       canvas.width = W; canvas.height = H
       const ctx = canvas.getContext('2d')!
 
-      // Sample up to 30 timestamps spread across the video
-      const maxSamples = 30
+      // Sample up to 15 timestamps spread across the video
+      const maxSamples = 15
       const step = duration / maxSamples
       const times = Array.from({ length: maxSamples }, (_, i) => (i + 0.5) * step)
 
@@ -275,7 +275,7 @@ export async function detectSceneChangeWeb(opts: {
       }
       // Require a big background/location change: threshold 0.30 = 30% avg pixel shift.
       // Minor motion or lighting changes stay < 0.15, real scene cuts are 0.30+.
-      const threshold = opts.threshold ?? 0.25
+      const threshold = opts.threshold ?? 0.30
 
       // Find the FIRST consecutive-frame transition above threshold (the first
       // scene change), not the global maximum — the cut must land on the first
