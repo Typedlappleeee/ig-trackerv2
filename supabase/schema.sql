@@ -892,6 +892,8 @@ $$;
 GRANT EXECUTE ON FUNCTION public.accept_org_invite(text) TO authenticated;
 
 -- ── RPC : déduire des crédits (atomique) ──────────────────────
+DROP FUNCTION IF EXISTS public.deduct_user_credits(uuid, integer);
+DROP FUNCTION IF EXISTS public.deduct_user_credits(uuid, numeric);
 CREATE OR REPLACE FUNCTION public.deduct_user_credits(p_user_id uuid, p_amount numeric)
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE v_balance numeric(12,2);
@@ -994,6 +996,7 @@ END;
 $$;
 
 -- ── RPC : solde crédits de l'orga (visible aux membres) ───────
+DROP FUNCTION IF EXISTS public.get_org_credit_balance(uuid);
 CREATE OR REPLACE FUNCTION public.get_org_credit_balance(p_org_id uuid)
 RETURNS numeric LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
