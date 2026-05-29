@@ -56,8 +56,6 @@
  *   EXISTS (SELECT 1 FROM platform_admins WHERE user_id = auth.uid())
  * );
  *
- * ALTER TABLE community_messages ADD COLUMN IF NOT EXISTS view_count integer NOT NULL DEFAULT 0;
- *
  * CREATE TABLE IF NOT EXISTS community_reactions (
  *   user_id    uuid REFERENCES auth.users NOT NULL,
  *   message_id uuid REFERENCES community_messages NOT NULL,
@@ -68,26 +66,6 @@
  * CREATE POLICY "reactions_insert" ON community_reactions FOR INSERT WITH CHECK (auth.uid() = user_id);
  * CREATE POLICY "reactions_delete" ON community_reactions FOR DELETE USING (auth.uid() = user_id);
  *
- * CREATE OR REPLACE FUNCTION increment_view(msg_id uuid) RETURNS void
- * LANGUAGE plpgsql SECURITY DEFINER AS $$
- * BEGIN
- *   INSERT INTO community_views (user_id, message_id) VALUES (auth.uid(), msg_id)
- *   ON CONFLICT (user_id, message_id) DO NOTHING;
- *   IF FOUND THEN
- *     UPDATE community_messages SET view_count = view_count + 1 WHERE id = msg_id;
- *   END IF;
- * END;
- * $$;
- *
- * CREATE TABLE IF NOT EXISTS community_views (
- *   user_id    uuid REFERENCES auth.users NOT NULL,
- *   message_id uuid REFERENCES community_messages NOT NULL,
- *   created_at timestamptz DEFAULT now(),
- *   PRIMARY KEY (user_id, message_id)
- * );
- * ALTER TABLE community_views ENABLE ROW LEVEL SECURITY;
- * CREATE POLICY "views_insert" ON community_views FOR INSERT WITH CHECK (auth.uid() = user_id);
- * CREATE POLICY "views_select" ON community_views FOR SELECT USING (auth.uid() = user_id);
  *
  * -- Bucket "avatars" public → Supabase dashboard → Storage
  *
@@ -146,7 +124,6 @@ interface Message {
   is_admin: boolean
   thread_user_id: string | null
   video_url: string | null
-  view_count: number
   created_at: string
 }
 
@@ -700,13 +677,6 @@ CREATE POLICY "reactions_read"   ON community_reactions FOR SELECT USING (auth.r
 CREATE POLICY "reactions_insert" ON community_reactions FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "reactions_delete" ON community_reactions FOR DELETE USING (auth.uid() = user_id);
 
--- Colonne vues + fonction RPC
-ALTER TABLE community_messages ADD COLUMN IF NOT EXISTS view_count integer NOT NULL DEFAULT 0;
-CREATE OR REPLACE FUNCTION increment_view(msg_id uuid) RETURNS void
-LANGUAGE sql SECURITY DEFINER AS $$
-  UPDATE community_messages SET view_count = view_count + 1 WHERE id = msg_id;
-$$;
-
 -- 6. Bucket "avatars" public → Supabase dashboard → Storage
 
 -- 7. Bucket "community" public → Supabase dashboard → Storage → New bucket → "community" → Public
@@ -850,7 +820,6 @@ export function Community({ user, onNavigate }: CommunityProps) {
   const [newsVideo, setNewsVideo]   = useState<File | null>(null)
   const [reactions, setReactions]   = useState<Map<string, number>>(new Map())
   const [myLikes, setMyLikes]       = useState<Set<string>>(new Set())
-  const viewedRef = useRef<Set<string>>(new Set())
 
   const [newsTitle, setNewsTitle]     = useState('')
   const [newsContent, setNewsContent] = useState('')
@@ -869,7 +838,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
     setLoading(true)
     const { data, error } = await supabase
       .from('community_messages')
-      .select('id, user_id, content, display_name, avatar_url, org_name, channel, title, is_admin, thread_user_id, video_url, view_count, created_at')
+      .select('id, user_id, content, display_name, avatar_url, org_name, channel, title, is_admin, thread_user_id, video_url, created_at')
       .order('created_at', { ascending: true })
       .limit(300)
     if (error) { if (error.code === '42P01') setNeedsSetup(true); setLoading(false); return }
@@ -877,11 +846,6 @@ export function Community({ user, onNavigate }: CommunityProps) {
     setMessages(data ?? [])
     setLoading(false)
   }, [])
-
-  const loadViews = useCallback(async () => {
-    const { data } = await supabase.from('community_views').select('message_id').eq('user_id', user.id)
-    if (data) data.forEach(r => viewedRef.current.add(r.message_id))
-  }, [user.id])
 
   const loadReactions = useCallback(async () => {
     const { data } = await supabase.from('community_reactions').select('user_id, message_id')
@@ -908,18 +872,6 @@ export function Community({ user, onNavigate }: CommunityProps) {
     }
   }
 
-  async function trackView(messageId: string) {
-    if (viewedRef.current.has(messageId)) return
-    viewedRef.current.add(messageId)
-    // Optimistic update — DB RPC will silently no-op if user already viewed (ON CONFLICT DO NOTHING)
-    setMessages(prev => prev.map(m => m.id === messageId ? { ...m, view_count: m.view_count + 1 } : m))
-    const { error } = await supabase.rpc('increment_view', { msg_id: messageId })
-    // If RPC fails, revert optimistic update and remove from viewedRef so it can be retried
-    if (error) {
-      viewedRef.current.delete(messageId)
-      setMessages(prev => prev.map(m => m.id === messageId ? { ...m, view_count: Math.max(0, m.view_count - 1) } : m))
-    }
-  }
 
   async function uploadVideo(file: File): Promise<string | null> {
     const ext  = file.name.split('.').pop() ?? 'mp4'
@@ -953,7 +905,6 @@ export function Community({ user, onNavigate }: CommunityProps) {
   useEffect(() => { loadProfile() }, [loadProfile])
   useEffect(() => { loadMessages() }, [loadMessages])
   useEffect(() => { loadReactions() }, [loadReactions])
-  useEffect(() => { loadViews() }, [loadViews])
 
   useEffect(() => {
     const ch = supabase.channel('community-v3')
@@ -1005,7 +956,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
     const videoFile = chatVideo; setChatVideo(null)
     const localVideoUrl = videoFile ? URL.createObjectURL(videoFile) : null
     const optId = crypto.randomUUID()
-    const opt: Message = { id: optId, user_id: user.id, content: content || '', display_name: profile.display_name, avatar_url: profile.avatar_url, org_name: currentOrg?.name ?? null, channel: 'chat', title: null, is_admin: isAdmin, thread_user_id: null, video_url: localVideoUrl, view_count: 0, created_at: new Date().toISOString() }
+    const opt: Message = { id: optId, user_id: user.id, content: content || '', display_name: profile.display_name, avatar_url: profile.avatar_url, org_name: currentOrg?.name ?? null, channel: 'chat', title: null, is_admin: isAdmin, thread_user_id: null, video_url: localVideoUrl, created_at: new Date().toISOString() }
     setMessages(prev => [...prev, opt])
     const video_url = videoFile ? await uploadVideo(videoFile) : null
     const { error, data } = await supabase.from('community_messages').insert({ user_id: user.id, content: content || '', display_name: profile.display_name, avatar_url: profile.avatar_url, org_name: currentOrg?.name ?? null, channel: 'chat', title: null, is_admin: isAdmin, thread_user_id: null, video_url }).select().single()
@@ -1023,7 +974,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
     const videoFile = newsVideo; setNewsVideo(null)
     const localVideoUrl = videoFile ? URL.createObjectURL(videoFile) : null
     const optId = crypto.randomUUID()
-    const opt: Message = { id: optId, user_id: user.id, content: content || '', display_name: profile.display_name, avatar_url: profile.avatar_url, org_name: currentOrg?.name ?? null, channel: 'news', title: newsTitle.trim() || null, is_admin: true, thread_user_id: null, video_url: localVideoUrl, view_count: 0, created_at: new Date().toISOString() }
+    const opt: Message = { id: optId, user_id: user.id, content: content || '', display_name: profile.display_name, avatar_url: profile.avatar_url, org_name: currentOrg?.name ?? null, channel: 'news', title: newsTitle.trim() || null, is_admin: true, thread_user_id: null, video_url: localVideoUrl, created_at: new Date().toISOString() }
     setMessages(prev => [...prev, opt])
     const video_url = videoFile ? await uploadVideo(videoFile) : null
     const { error, data } = await supabase.from('community_messages').insert({ user_id: user.id, content: content || '', display_name: profile.display_name, avatar_url: profile.avatar_url, org_name: currentOrg?.name ?? null, channel: 'news', title: newsTitle.trim() || null, is_admin: true, thread_user_id: null, video_url }).select().single()
@@ -1044,7 +995,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
     const localVideoUrl = videoFile ? URL.createObjectURL(videoFile) : null
     const threadId = isAdmin ? selectedThread! : user.id
     const optId = crypto.randomUUID()
-    const opt: Message = { id: optId, user_id: user.id, content: content || '', display_name: profile.display_name, avatar_url: profile.avatar_url, org_name: currentOrg?.name ?? null, channel: 'support', title: null, is_admin: isAdmin, thread_user_id: threadId, video_url: localVideoUrl, view_count: 0, created_at: new Date().toISOString() }
+    const opt: Message = { id: optId, user_id: user.id, content: content || '', display_name: profile.display_name, avatar_url: profile.avatar_url, org_name: currentOrg?.name ?? null, channel: 'support', title: null, is_admin: isAdmin, thread_user_id: threadId, video_url: localVideoUrl, created_at: new Date().toISOString() }
     setMessages(prev => [...prev, opt])
     const video_url = videoFile ? await uploadVideo(videoFile) : null
     const { error, data } = await supabase.from('community_messages').insert({ user_id: user.id, content: content || '', display_name: profile.display_name, avatar_url: profile.avatar_url, org_name: currentOrg?.name ?? null, channel: 'support', title: null, is_admin: isAdmin, thread_user_id: threadId, video_url }).select().single()
@@ -1383,10 +1334,6 @@ export function Community({ user, onNavigate }: CommunityProps) {
                                 : { background: 'rgba(255,255,255,0.05)', color: 'rgba(196,181,253,0.5)', border: '1px solid rgba(255,255,255,0.07)' }}>
                               ❤️ {reactions.get(featuredMsg.id) ?? 0}
                             </button>
-                            <div className="flex items-center gap-1 text-[11px]" style={{ color: 'rgba(196,181,253,0.3)' }}>
-                              <span>👁</span>
-                              <span className="tabular-nums">{featuredMsg.view_count}</span>
-                            </div>
                             {isAdmin && (
                               <button onClick={e => { e.stopPropagation(); deleteMessage(featuredMsg.id) }}
                                 className="text-[14px] transition-opacity hover:opacity-80"
@@ -1477,7 +1424,6 @@ export function Community({ user, onNavigate }: CommunityProps) {
                           <div key={msg.id}
                             className="flex items-start gap-3 p-4 rounded-xl group transition-all cursor-pointer hover:border-purple-500/30"
                             style={{ background: 'rgba(8,5,20,0.8)', border: '1px solid rgba(139,92,246,0.12)' }}
-                            onMouseEnter={() => trackView(msg.id)}
                             onClick={() => setSelectedPost(msg)}>
                             <Avatar url={msg.avatar_url} name={msg.display_name} userId={msg.user_id} size={38} />
                             <div className="flex-1 min-w-0">
@@ -1503,7 +1449,6 @@ export function Community({ user, onNavigate }: CommunityProps) {
                                   style={{ color: myLikes.has(msg.id) ? '#f472b6' : 'rgba(196,181,253,0.35)' }}>
                                   ❤️ {reactions.get(msg.id) ?? 0}
                                 </button>
-                                <span className="flex items-center gap-1">👁 {msg.view_count}</span>
                               </div>
                             </div>
                             {isAdmin && (
@@ -2191,10 +2136,6 @@ export function Community({ user, onNavigate }: CommunityProps) {
                   : { background: 'rgba(255,255,255,0.05)', color: 'rgba(196,181,253,0.5)', border: '1px solid rgba(255,255,255,0.07)' }}>
                 ❤️ {reactions.get(selectedPost.id) ?? 0} {myLikes.has(selectedPost.id) ? t('communityPostLiked') : t('communityPostLike')}
               </button>
-              <div className="flex items-center gap-1 text-[11px]" style={{ color: 'rgba(196,181,253,0.3)' }}>
-                <span>👁</span>
-                <span className="tabular-nums">{selectedPost.view_count} {t('communityPostViews')}</span>
-              </div>
             </div>
           </div>
         </div>
