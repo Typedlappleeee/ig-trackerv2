@@ -538,10 +538,15 @@ export function MassRemix({ user }: MassRemixProps) {
         let textOverlays: Overlay[] = []
         if (aiEnabled && manualText.trim()) {
           const textEndTime = splitTime ?? (detDuration ?? 9999)
+          // Random position: top zone (8–22%) or bottom zone (74–90%)
+          const useTop     = Math.random() < 0.5
+          const randY      = useTop
+            ? (0.08 + Math.random() * 0.14)
+            : (0.74 + Math.random() * 0.16)
           textOverlays.push({
             text: manualText.trim(),
             x: '(w-text_w)/2',
-            y: 'h*0.85',
+            y: `h*${randY.toFixed(4)}`,
             fontSize: 45 + Math.floor(Math.random() * 10),
             fontColor: 'white',
             bold: false,
@@ -634,25 +639,28 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                   return { text: item.text, xAlign: item.xAlign ?? 'center', rawY: (item.yPercent ?? 50) / 100, fontSize, fontColor: item.fontColor ?? 'white', bold: item.bold ?? true, startTime, endTime }
                 })
 
-                // ── Step 2+3: snap to top/bottom zones, adjust for overlaps ─────
-                // Force text to be either top (≤ 0.30 rawY) or bottom (> 0.30 rawY).
-                // This prevents text from landing in the middle of the frame where it
-                // covers the subject's face.
+                // ── Step 2+3: randomise position within top/bottom zone ──────────
+                // Top zone: 8–22% from top. Bottom zone: 74–90% from top.
+                // Randomised per batch so each video has a slightly different layout
+                // while keeping the original text zone (top → top, bottom → bottom).
                 type Placed = { centerY: number; halfH: number; zone: 'top' | 'bottom' }
                 const placed: Placed[] = []
+
+                // One random offset per zone, shared across all items in that zone
+                // so concurrent items nudge relative to a consistent base position.
+                const topBase    = 0.08 + Math.random() * 0.14   // 8–22%
+                const bottomBase = 0.74 + Math.random() * 0.16   // 74–90%
 
                 items.forEach((item, idx) => {
                   const lines  = wrapText(item.text, item.fontSize, outW)
                   const stepFr = (item.fontSize * 1.35) / outH
                   const halfH  = (lines.length * stepFr) / 2
 
-                  // Snap to top or bottom zone based on AI's raw position
                   const zone: 'top' | 'bottom' = item.rawY <= 0.35 ? 'top' : 'bottom'
 
-                  // Top zone: center at ~13%, bottom zone: center at ~85%
                   let centerY = zone === 'top'
-                    ? Math.max(halfH + 0.04, 0.13)
-                    : Math.min(0.96 - halfH, 0.85)
+                    ? Math.max(halfH + 0.03, topBase)
+                    : Math.min(0.97 - halfH, bottomBase)
 
                   // Nudge to avoid overlapping concurrent items in the same zone
                   for (let j = 0; j < idx; j++) {
