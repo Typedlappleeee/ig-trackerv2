@@ -54,7 +54,7 @@ function SFLogo({ size = 28 }: { size?: number }) {
 
 export type Page =
   | 'dashboard' | 'phones' | 'monitor'
-  | 'stats' | 'posting' | 'massposting' | 'scheduler' | 'bank' | 'aitools' | 'warmup'
+  | 'stats' | 'posting' | 'massposting' | 'scheduler' | 'bank' | 'videoimport' | 'aitools' | 'warmup'
   | 'montage' | 'remix' | 'textcopy' | 'repurpose'
   | 'community' | 'support'
   | 'settings' | 'licences' | 'adspower'
@@ -89,6 +89,7 @@ const NAV_SECTIONS: NavSection[] = [
       { id: 'massposting', label: 'navMassPosting',  icon: '⚡' },
       { id: 'scheduler',   label: 'navScheduler',    icon: '📅', isNew: true },
       { id: 'bank',        label: 'navBank',         icon: '🗂' },
+      { id: 'videoimport', label: 'navVideoImport',  icon: '⬇️', isNew: true },
       { id: 'warmup',      label: 'navWarmup',       icon: '🔥', beta: true },
       { id: 'aitools',     label: 'navAiTools',      icon: '🔧' },
     ],
@@ -321,6 +322,27 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
     syncNotifs()
     const unsub = subscribeNotifications(syncNotifs)
     return unsub
+  }, [])
+
+  // Notify when a new admin news post is published in the community
+  useEffect(() => {
+    const ch = supabase
+      .channel('layout-news-notif')
+      .on('postgres_changes', {
+        event: 'INSERT', schema: 'public', table: 'community_messages',
+        filter: 'channel=eq.news',
+      }, payload => {
+        const msg = payload.new as any
+        if (msg?.is_admin) {
+          pushNotification({
+            title: '📢 Nouvelle actualité',
+            body: msg.title || msg.content?.slice(0, 80) || undefined,
+            level: 'info',
+          })
+        }
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(ch) }
   }, [])
 
   // Close notif panel on outside click
@@ -1004,9 +1026,6 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
                 onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.04)' }}
                 onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}
               >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#A78BFA" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-                </svg>
                 <span style={{ fontSize: 12, fontWeight: 700, color: credits.balance < 10 ? '#F87171' : '#A78BFA', fontVariantNumeric: 'tabular-nums' }}>
                   💎 {credits.balance.toLocaleString('fr-FR')}
                 </span>

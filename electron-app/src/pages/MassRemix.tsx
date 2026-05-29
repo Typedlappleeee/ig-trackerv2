@@ -11,6 +11,7 @@ import { useOrg } from '@/lib/orgContext'
 import { useConnections } from '@/lib/connections'
 import { runFfmpegRemixAIWeb, detectSceneChangeWeb, extractFramesWeb } from '@/lib/ffmpeg-web'
 import { checkAndDeductCredits, CREDIT_COSTS, useCredits } from '@/lib/credits'
+import { pushNotification } from '@/lib/notificationStore'
 
 const isWeb = !window.electronAPI
 
@@ -770,6 +771,22 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
 
     setRunning(false)
   }
+
+  const prevRunningRef = useRef(false)
+  useEffect(() => {
+    if (prevRunningRef.current && !running && jobs.length > 0) {
+      const done   = jobs.filter(j => j.status === 'done').length
+      const errors = jobs.filter(j => j.status === 'error').length
+      if (done > 0 || errors > 0) {
+        pushNotification({
+          title: errors === 0 ? 'Mass Remix terminé ✅' : `Mass Remix: ${errors} erreur${errors > 1 ? 's' : ''}`,
+          body:  `${done} succès · ${errors} erreur${errors > 1 ? 's' : ''} · ${jobs.length} vidéo${jobs.length > 1 ? 's' : ''}`,
+          level: errors === 0 ? 'ok' : 'warn',
+        })
+      }
+    }
+    prevRunningRef.current = running
+  }, [running, jobs])
 
   const doneCount  = jobs.filter(j => j.status === 'done').length
   const errorCount = jobs.filter(j => j.status === 'error').length

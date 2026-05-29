@@ -426,6 +426,7 @@ import { Licences }          from '@/pages/Licences'
 import { AdsPower }          from '@/pages/AdsPower'
 import { Support }           from '@/pages/Support'
 import { Community }         from '@/pages/Community'
+import { VideoImport }       from '@/pages/VideoImport'
 import Monitor                from '@/pages/Monitor'
 import { FullPageLoader }    from '@/components/ui/Spinner'
 import { Landing }           from '@/components/Landing'
@@ -607,6 +608,7 @@ function AppContent({ user }: { user: User }) {
       case 'massposting':  return <MassPosting user={user} />
       case 'scheduler':    return <Scheduler   user={user} onNavigate={p => handleNavigate(p as Page)} />
       case 'bank':         return <Bank        user={user} />
+      case 'videoimport':  return <VideoImport user={user} />
       case 'warmup':       return <Warmup      user={user} />
       case 'montage':      return <Montage     user={user} />
       case 'remix':        return <Remix       user={user} />
