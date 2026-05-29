@@ -739,7 +739,6 @@ async function remixViaMediaRecorder(opts: {
   let switched = false
   let drawTimerId = 0
   let recordingStopped = false
-  let recorder: MediaRecorder  // declared here, started after first frame
 
   const stopRecording = () => {
     if (recordingStopped) return
