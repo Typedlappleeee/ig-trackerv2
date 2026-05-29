@@ -714,15 +714,22 @@ export function Phones({ user }: PhonesProps) {
       const currentGeelarkIds = new Set(rows.map(r => r.geelark_id))
 
       if (currentOrg) {
-        // In org mode, check existing phones by org_id + geelark_id (not user_id)
-        // because another org member may have already synced the same phone with
-        // their own user_id — using user_id here would miss it and cause a duplicate
-        // key violation on the phones_org_geelark_uniq index.
-        const { data: existingAll } = await supabase
-          .from('phones').select('id,geelark_id')
-          .eq('org_id', currentOrg.id)
-          .in('geelark_id', [...currentGeelarkIds])
-        const existingMap = new Map((existingAll ?? []).map((p: { id: string; geelark_id: string }) => [p.geelark_id, p.id]))
+        // Search by BOTH org_id and user_id to catch every existing row:
+        // - org phones synced by another member  → found via org_id
+        // - solo phones this user had previously → found via user_id (org_id IS NULL)
+        // Missing either one causes a unique-constraint violation on insert.
+        const [{ data: byOrg }, { data: byUser }] = await Promise.all([
+          supabase.from('phones').select('id,geelark_id')
+            .eq('org_id', currentOrg.id)
+            .in('geelark_id', [...currentGeelarkIds]),
+          supabase.from('phones').select('id,geelark_id')
+            .eq('user_id', user.id)
+            .in('geelark_id', [...currentGeelarkIds]),
+        ])
+        const existingMap = new Map(
+          [...(byOrg ?? []), ...(byUser ?? [])]
+            .map((p: { id: string; geelark_id: string }) => [p.geelark_id, p.id])
+        )
 
         // Delete phones removed from GéeLark (only those already in this org)
         const { data: orgPhones } = await supabase
@@ -736,10 +743,10 @@ export function Phones({ user }: PhonesProps) {
         const toUpdate = rows.filter(r =>  existingMap.has(r.geelark_id))
 
         if (toInsert.length > 0) {
-          // Use upsert (not insert) so a race condition between two members syncing
-          // simultaneously doesn't produce a second duplicate key error.
+          // Upsert on the table-level constraint so a solo row (org_id NULL) that
+          // already exists for this user gets updated in-place instead of re-inserted.
           const { error } = await supabase.from('phones')
-            .upsert(toInsert, { onConflict: 'org_id,geelark_id', ignoreDuplicates: false })
+            .upsert(toInsert, { onConflict: 'user_id,geelark_id', ignoreDuplicates: false })
           if (error) throw new Error(error.message)
         }
         for (const row of toUpdate) {
