@@ -121,13 +121,24 @@ CREATE TABLE IF NOT EXISTS public.organizations (
 );
 
 -- Ajouter les FK org_id sur phones / content_bank maintenant que organizations existe
-ALTER TABLE public.phones
-  ADD CONSTRAINT IF NOT EXISTS phones_org_id_fkey
-  FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE SET NULL;
-
-ALTER TABLE public.content_bank
-  ADD CONSTRAINT IF NOT EXISTS content_bank_org_id_fkey
-  FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE SET NULL;
+DO $func$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'phones_org_id_fkey'
+  ) THEN
+    ALTER TABLE public.phones
+      ADD CONSTRAINT phones_org_id_fkey
+      FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE SET NULL;
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'content_bank_org_id_fkey'
+  ) THEN
+    ALTER TABLE public.content_bank
+      ADD CONSTRAINT content_bank_org_id_fkey
+      FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE SET NULL;
+  END IF;
+END
+$func$;
 
 -- ── org_role_templates ─────────────────────────────────────────
 -- Créé AVANT organization_members pour que la FK custom_role_id fonctionne
