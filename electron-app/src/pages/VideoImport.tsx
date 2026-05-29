@@ -9,8 +9,8 @@ import { pushNotification } from '@/lib/notificationStore'
 
 interface ImportedVideo { title: string; thumbnailUrl: string | null }
 
-// cobalt.tools — open-source social media downloader with a public API
-const COBALT_API = 'https://api.cobalt.tools/'
+// Routed through /api/cobalt to avoid CORS restrictions in the browser
+const COBALT_API = '/api/cobalt'
 
 function extractTitle(url: string): string {
   try {
