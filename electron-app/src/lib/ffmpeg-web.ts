@@ -520,10 +520,10 @@ async function renderTextPNG(
   const weight = ov.bold ? 'bold' : 'normal'
   ctx.font = `${weight} ${ov.fontSize}px Arial, sans-serif`
   ctx.textBaseline = 'middle'
+  ctx.textAlign    = 'center'
 
-  const { align, x: cx } = getXDrawParams(ov.x, W)
-  const cy       = getYCenter(ov.y, H)
-  ctx.textAlign  = align
+  const cx = W / 2
+  const cy = getYCenter(ov.y, H)
 
   const maxWidth  = W * 0.78
   const lineH     = ov.fontSize * 1.35
@@ -557,7 +557,7 @@ async function renderTextPNG(
 }
 
 // ── drawOverlayText ───────────────────────────────────────────────────────────
-// Same rendering logic as renderTextPNG: word-wrap, multi-line, border + shadow.
+// Always centers text horizontally. y expression is parsed to get vertical pos.
 function drawOverlayText(
   ctx: CanvasRenderingContext2D,
   ov: { text: string; x: string; y: string; fontSize: number; fontColor: string; bold?: boolean; shadow?: boolean },
@@ -566,10 +566,10 @@ function drawOverlayText(
   const weight   = ov.bold ? 'bold' : 'normal'
   ctx.font       = `${weight} ${ov.fontSize}px Arial, sans-serif`
   ctx.textBaseline = 'middle'
+  ctx.textAlign    = 'center'
 
-  const { align, x: cx } = getXDrawParams(ov.x, W)
-  const cy       = getYCenter(ov.y, H)
-  ctx.textAlign  = align
+  const cx = W / 2
+  const cy = getYCenter(ov.y, H)
 
   const maxWidth = W * 0.78
   const lineH    = ov.fontSize * 1.35
