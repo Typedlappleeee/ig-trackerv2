@@ -205,7 +205,7 @@ export function Posting({ user }: PostingProps) {
       log(`❌ ${creditRes.error ?? 'Insufficient credits'} (need: ${creditCost} credits for ${total} phone${total > 1 ? 's' : ''})`, 'error')
       return
     }
-    credits.refresh()
+    if (typeof creditRes.balance === 'number') credits.setBalance(creditRes.balance)
     log(`💳 ${creditCost} credits deducted (${CREDIT_COSTS.posting}/phone × ${total}) — balance: ${creditRes.balance ?? '?'}`)
 
     playSuccess()

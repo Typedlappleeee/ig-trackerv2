@@ -382,7 +382,7 @@ export function MassPosting({ user }: MassPostingProps) {
       log(`❌ ${creditRes.error ?? 'Insufficient credits'} (need: ${creditCost} credits for ${phoneList.length} phone${phoneList.length > 1 ? 's' : ''})`, 'error')
       return
     }
-    credits.refresh()
+    if (typeof creditRes.balance === 'number') credits.setBalance(creditRes.balance)
     log(`💳 ${creditCost} crédits débités (${CREDIT_COSTS.mass_posting}/phone × ${phoneList.length}) — solde: ${creditRes.balance ?? '?'}`)
 
     playSuccess()

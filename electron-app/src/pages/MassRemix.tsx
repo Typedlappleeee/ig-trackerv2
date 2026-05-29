@@ -420,6 +420,7 @@ export function MassRemix({ user }: MassRemixProps) {
       alert(`${t('massRemixInsufficientCredits')} — ${creditCost} credit(s) needed for ${n} remix. Balance: ${creditRes.balance ?? 0}`)
       return
     }
+    if (typeof creditRes.balance === 'number') credits.setBalance(creditRes.balance)
 
     const folder = exportMode === 'folder' ? outputFolder : null
     const basePairs = prePlanned ?? Array.from({ length: n }, (_, i) => ({

@@ -42,6 +42,7 @@ export interface CreditState {
   balance: number
   loading: boolean
   refresh: () => void
+  setBalance: (b: number) => void
   ownerId: string   // user_id whose credits are shown/charged (org owner in org mode, self otherwise)
 }
 
@@ -49,6 +50,7 @@ export const CreditContext = createContext<CreditState>({
   balance: 0,
   loading: true,
   refresh: () => {},
+  setBalance: () => {},
   ownerId: '',
 })
 
