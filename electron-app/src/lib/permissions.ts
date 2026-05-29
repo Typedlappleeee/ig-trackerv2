@@ -6,27 +6,27 @@ import type { OrgRole, PermOverrides, PageKey, ActionKey } from './supabase'
 // can edit their profile / see organisation info.
 const ROLE_TABS: Record<OrgRole, Record<PageKey, boolean>> = {
   owner: {
-    phones: true, monitor: true,
+    phones: true,
     posting: true, massposting: true, scheduler: true, bank: true, warmup: true, aitools: true,
-    remix: true, repurpose: true, textcopy: true, montage: true,
+    remix: true, repurpose: true, montage: true,
     settings: true,
   },
   admin: {
-    phones: true, monitor: true,
+    phones: true,
     posting: true, massposting: true, scheduler: true, bank: true, warmup: true, aitools: true,
-    remix: true, repurpose: true, textcopy: true, montage: true,
+    remix: true, repurpose: true, montage: true,
     settings: true,
   },
   member: {
-    phones: true, monitor: true,
+    phones: true,
     posting: true, massposting: true, scheduler: true, bank: true, warmup: true, aitools: true,
-    remix: true, repurpose: true, textcopy: true, montage: true,
+    remix: true, repurpose: true, montage: true,
     settings: false,
   },
   viewer: {
-    phones: true, monitor: true,
+    phones: true,
     posting: false, massposting: false, scheduler: false, bank: true, warmup: false, aitools: false,
-    remix: false, repurpose: false, textcopy: false, montage: false,
+    remix: false, repurpose: false, montage: false,
     settings: false,
   },
 }
@@ -96,7 +96,6 @@ export function canDoAction(role: OrgRole, overrides: PermOverrides | undefined,
 // `settings` represents the *Connexions sub-panel* (API keys), not the whole page.
 export const ALL_TABS: { key: PageKey; label: string; icon: string }[] = [
   { key: 'phones',      label: 'Téléphones',                          icon: '📱' },
-  { key: 'monitor',     label: 'Monitor',                             icon: '🖥' },
   { key: 'posting',     label: 'Posting',                             icon: '🚀' },
   { key: 'massposting', label: 'Mass Posting',                        icon: '⚡' },
   { key: 'scheduler',   label: 'Scheduler',                           icon: '📅' },
@@ -105,7 +104,6 @@ export const ALL_TABS: { key: PageKey; label: string; icon: string }[] = [
   { key: 'aitools',     label: 'Outils IA',                           icon: '🔧' },
   { key: 'remix',       label: 'Remix',                               icon: '🔀' },
   { key: 'repurpose',   label: 'Repurpose',                           icon: '⚡' },
-  { key: 'textcopy',    label: 'Text Copy',                           icon: '✍' },
   { key: 'settings',    label: 'Paramètres → Connexions (clés API)', icon: '🔑' },
 ]
 
