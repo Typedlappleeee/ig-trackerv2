@@ -144,6 +144,7 @@ export const EN = {
   accessDeniedDesc: "You don't have permission to access this tab in the organization",
   accessDeniedContact: 'Contact an administrator to modify your access rights.',
   backToDashboard: 'Back to Dashboard',
+  backToCommunity: 'Back to Community',
 
   // Org loading
   loadingContext: 'Loading context…',
@@ -1586,6 +1587,7 @@ export const FR: { [K in keyof typeof EN]?: string } = {
   accessDeniedDesc: "Vous n'avez pas la permission d'accéder à cet onglet dans l'organisation",
   accessDeniedContact: "Contactez un administrateur pour modifier vos droits d'accès.",
   backToDashboard: 'Retour au Dashboard',
+  backToCommunity: 'Retour à la Communauté',
 
   loadingContext: 'Chargement du contexte…',
 

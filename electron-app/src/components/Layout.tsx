@@ -53,8 +53,8 @@ function SFLogo({ size = 28 }: { size?: number }) {
 }
 
 export type Page =
-  | 'dashboard' | 'phones'
-  | 'stats' | 'posting' | 'massposting' | 'scheduler' | 'bank' | 'aitools' | 'warmup'
+  | 'phones'
+  | 'posting' | 'massposting' | 'scheduler' | 'bank' | 'aitools' | 'warmup'
   | 'montage' | 'remix' | 'repurpose'
   | 'community' | 'support'
   | 'settings' | 'licences'
@@ -407,7 +407,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
 
   const isVisibleTab = (id: Page): boolean => {
     if (id === 'licences')  return license.isSuperAdmin
-    if (id === 'support' || id === 'community' || id === 'dashboard' || id === 'stats') return true
+    if (id === 'support' || id === 'community') return true
     return role ? canSeeTab(role, perms, id as import('@/lib/supabase').PageKey) : true
   }
 
@@ -581,10 +581,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
   }
 
   const pageLabels: Record<string, string> = {
-    dashboard:   t('pageDashboard'),
     phones:      t('pagePhones'),
-    monitor:     t('pageMonitor'),
-    stats:       t('pageStats'),
     posting:     t('pagePosting'),
     massposting: t('pageMassPosting'),
     scheduler:   t('pageScheduler'),
@@ -1171,10 +1168,10 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
                 <p className="text-text2/50 text-xs">{t('accessDeniedContact')}</p>
               </div>
               <button
-                onClick={() => onNavigate('dashboard')}
+                onClick={() => onNavigate('community')}
                 className="px-6 py-2.5 active:scale-95 text-white text-sm font-semibold rounded-xl transition-all btn-sf-primary"
               >
-                {t('backToDashboard')}
+                {t('backToCommunity')}
               </button>
             </div>
           ) : (
