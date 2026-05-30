@@ -179,6 +179,7 @@ export async function runFfmpegWeb(opts: {
       '-filter_complex', filterParts.join(';'),
       '-map', '[vout]', '-map', '[aout]',
       '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23',
+      '-r', '30',
       '-c:a', 'aac', '-b:a', '128k',
       '-movflags', '+faststart', '-y', 'output.mp4',
     ])
@@ -444,6 +445,7 @@ export async function runFfmpegRemixWeb(opts: {
       '-map', '[vout]', '-map', '[aout]',
       '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23',
       '-pix_fmt', 'yuv420p', '-profile:v', 'main', '-level', '4.0',
+      '-r', '30',
       '-c:a', 'aac', '-b:a', '128k',
       '-movflags', '+faststart', '-y', 'remix_out.mp4',
     ])
@@ -855,6 +857,7 @@ async function runFfmpegRemixAIWasm(opts: {
       '-map', '[vout]', '-map', '[aout]',
       '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23',
       '-pix_fmt', 'yuv420p', '-profile:v', 'main', '-level', '4.0',
+      '-r', '30',
       '-c:a', 'aac', '-b:a', '128k',
       '-movflags', '+faststart', '-y', 'ai_out.mp4',
     ])
@@ -908,19 +911,14 @@ export async function runFfmpegRemixAIWeb(opts: {
           await ff.deleteFile('mr_out.mp4').catch(() => {})
           await ff.writeFile(inName, new Uint8Array(await blob.arrayBuffer()))
 
-          if (mimeType.includes('h264') && !mimeType.startsWith('video/mp4')) {
-            // H.264 WebM → fast remux to MP4 (no re-encode, but fix timestamps)
-            await ff.exec(['-nostdin', '-fflags', '+genpts', '-i', inName,
-              '-c', 'copy', '-pix_fmt', 'yuv420p',
-              '-movflags', '+faststart', '-y', 'mr_out.mp4'])
-          } else {
-            // VP9/VP8 WebM or native MP4 → full transcode to H.264 MP4
-            await ff.exec(['-nostdin', '-fflags', '+genpts', '-i', inName,
-              '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23',
-              '-pix_fmt', 'yuv420p', '-profile:v', 'main', '-level', '4.0',
-              '-c:a', 'aac', '-b:a', '128k',
-              '-movflags', '+faststart', '-y', 'mr_out.mp4'])
-          }
+          // Always transcode to H.264 CFR — Instagram requires constant 30fps.
+          // Fast remux with -c copy cannot enforce -r 30 (needs re-encode).
+          await ff.exec(['-nostdin', '-fflags', '+genpts', '-i', inName,
+            '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23',
+            '-pix_fmt', 'yuv420p', '-profile:v', 'main', '-level', '4.0',
+            '-r', '30',
+            '-c:a', 'aac', '-b:a', '128k',
+            '-movflags', '+faststart', '-y', 'mr_out.mp4'])
 
           const url = await readOutput(ff, 'mr_out.mp4', 'video/mp4')
           await ff.deleteFile(inName).catch(() => {})
@@ -983,6 +981,8 @@ export async function runFfmpegTextOverlayWeb(opts: {
       '-filter_complex', `[0:v]${scl}[base];[base][1:v]overlay=0:0[vout]`,
       '-map', '[vout]', '-map', '0:a',
       '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23',
+      '-pix_fmt', 'yuv420p', '-profile:v', 'main', '-level', '4.0',
+      '-r', '30',
       '-c:a', 'aac', '-b:a', '128k',
       '-movflags', '+faststart', '-y', 'txov_out.mp4',
     ])
