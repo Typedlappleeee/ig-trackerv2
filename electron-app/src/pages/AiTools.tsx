@@ -5,6 +5,7 @@ import { useConnections } from '@/lib/connections'
 import { Button } from '@/components/ui/Button'
 import { MetadataChanger } from './MetadataChanger'
 import { VisionTools, type VisionToolId } from './VisionTools'
+import { TextCopy } from './TextCopy'
 import { useT, useLang } from '@/lib/i18n'
 
 interface AiToolsProps { user: User }
@@ -13,7 +14,7 @@ type GroqToolId =
   | 'strat' | 'caption' | 'plan'
   | 'script' | 'hooks' | 'bio' | 'replies' | 'translate' | 'competitor'
 
-type ActiveTool = 'hub' | 'metadata' | GroqToolId | VisionToolId
+type ActiveTool = 'hub' | 'metadata' | 'textcopy' | GroqToolId | VisionToolId
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 async function groqCall(apiKey: string, prompt: string, maxTokens = 600): Promise<string> {
@@ -707,6 +708,7 @@ export function AiTools({ user }: AiToolsProps) {
   if (active === 'metadata') return <MetadataChanger user={user} onBack={() => setActive('hub')} />
 
   // Route — text copy
+  if (active === 'textcopy') return <TextCopy user={user} onBack={() => setActive('hub')} />
 
   // Route — vision tools
   if (active === 'vision-score' || active === 'vision-structure' || active === 'vision-thumb') {
@@ -763,6 +765,13 @@ export function AiTools({ user }: AiToolsProps) {
                 desc="Removes all metadata and injects a random timestamp."
                 tags={['FFmpeg', 'Stream copy', 'Instant']}
                 onClick={() => setActive('metadata')}
+              />
+              <ToolCard
+                icon="✍️"
+                title="Texte IA"
+                desc="Add text at multiple positions to create unique video copies."
+                tags={['FFmpeg', 'Texte', 'Anti-ban']}
+                onClick={() => setActive('textcopy')}
               />
             </div>
           </div>
