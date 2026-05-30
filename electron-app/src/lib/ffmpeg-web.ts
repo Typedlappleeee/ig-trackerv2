@@ -654,6 +654,8 @@ async function remixViaMediaRecorder(opts: {
   // ── audio routing ─────────────────────────────────────────────────────────────
   // Use AudioContext to route origVid's audio to the recorder without playing through speakers.
   const audioCtx = new AudioContext()
+  // Browser may auto-suspend AudioContext if too much time elapsed since user gesture.
+  if (audioCtx.state === 'suspended') await audioCtx.resume()
   const audioDest = audioCtx.createMediaStreamDestination()
   const audioSrc  = audioCtx.createMediaElementSource(origVid)
   audioSrc.connect(audioDest)
