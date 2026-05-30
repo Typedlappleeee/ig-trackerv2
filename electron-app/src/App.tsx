@@ -419,7 +419,6 @@ import { MassPosting }       from '@/pages/MassPosting'
 import { Scheduler }         from '@/pages/Scheduler'
 import { Warmup }            from '@/pages/Warmup'
 import { VideoRepurpose }    from '@/pages/VideoRepurpose'
-import { TextCopy }          from '@/pages/TextCopy'
 import { Licences }          from '@/pages/Licences'
 
 import { Support }           from '@/pages/Support'
@@ -605,7 +604,6 @@ function AppContent({ user }: { user: User }) {
       case 'montage':      return <Montage     user={user} />
       case 'remix':        return <Remix       user={user} />
       case 'repurpose':    return <VideoRepurpose user={user} />
-      case 'textcopy':     return <TextCopy     user={user} />
       case 'aitools':      return <AiTools     user={user} />
       case 'settings':     return <Settings    user={user} initialPanel={settingsPanel as any} onNavigate={(p) => setPage(p as any)} />
       case 'community':    return <Community    user={user} onNavigate={handleNavigate} />

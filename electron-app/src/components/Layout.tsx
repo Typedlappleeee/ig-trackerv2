@@ -55,7 +55,7 @@ function SFLogo({ size = 28 }: { size?: number }) {
 export type Page =
   | 'phones'
   | 'posting' | 'massposting' | 'scheduler' | 'bank' | 'aitools' | 'warmup'
-  | 'montage' | 'remix' | 'repurpose' | 'textcopy'
+  | 'montage' | 'remix' | 'repurpose'
   | 'community' | 'support'
   | 'settings' | 'licences'
 
@@ -98,7 +98,6 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { id: 'remix',       label: 'navRemix',       icon: '🔀' },
       { id: 'repurpose',   label: 'navRepurpose',   icon: '⚡', isNew: true },
-      { id: 'textcopy',    label: 'navTextCopy',    icon: '✍️' },
     ],
   },
 ]

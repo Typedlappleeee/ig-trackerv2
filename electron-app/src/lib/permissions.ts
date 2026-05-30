@@ -8,25 +8,25 @@ const ROLE_TABS: Record<OrgRole, Record<PageKey, boolean>> = {
   owner: {
     phones: true,
     posting: true, massposting: true, scheduler: true, bank: true, warmup: true, aitools: true,
-    remix: true, repurpose: true, montage: true, textcopy: true,
+    remix: true, repurpose: true, montage: true,
     settings: true,
   },
   admin: {
     phones: true,
     posting: true, massposting: true, scheduler: true, bank: true, warmup: true, aitools: true,
-    remix: true, repurpose: true, montage: true, textcopy: true,
+    remix: true, repurpose: true, montage: true,
     settings: true,
   },
   member: {
     phones: true,
     posting: true, massposting: true, scheduler: true, bank: true, warmup: true, aitools: true,
-    remix: true, repurpose: true, montage: true, textcopy: true,
+    remix: true, repurpose: true, montage: true,
     settings: false,
   },
   viewer: {
     phones: true,
     posting: false, massposting: false, scheduler: false, bank: true, warmup: false, aitools: false,
-    remix: false, repurpose: false, montage: false, textcopy: false,
+    remix: false, repurpose: false, montage: false,
     settings: false,
   },
 }
@@ -104,7 +104,6 @@ export const ALL_TABS: { key: PageKey; label: string; icon: string }[] = [
   { key: 'aitools',     label: 'Outils IA',                           icon: '🔧' },
   { key: 'remix',       label: 'Remix',                               icon: '🔀' },
   { key: 'repurpose',   label: 'CloneVid',                            icon: '⚡' },
-  { key: 'textcopy',    label: 'Texte IA',                            icon: '✍️' },
   { key: 'settings',    label: 'Paramètres → Connexions (clés API)', icon: '🔑' },
 ]
 
