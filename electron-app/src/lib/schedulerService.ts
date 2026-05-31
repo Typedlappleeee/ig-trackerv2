@@ -153,6 +153,7 @@ export async function executeScheduledPost(
     // 3. Create RPA tasks
     onLog('📤 Envoi des tâches de posting…')
     const taskIds: string[] = []
+    let failedCount = 0
 
     for (let i = 0; i < phones.length; i++) {
       const phone = phones[i]
@@ -170,15 +171,20 @@ export async function executeScheduledPost(
         video:       [videos[videoIdx].token],
         ...(reels_trial ? { shareType: 2 } : {}),
       }) as any
-      if (res.code === 0 && res.data?.id) {
-        taskIds.push(res.data.id)
+      onLog(`📦 Réponse GeelarK (${phone.ig_username ?? phone.phone_name}): code=${res.code} msg=${res.msg ?? '?'} data=${JSON.stringify(res.data ?? null)}`)
+      const taskId = res.data?.id ?? res.data?.taskId ?? res.taskId ?? res.id ?? null
+      if (res.code === 0) {
+        if (taskId) taskIds.push(taskId)
         onLog(`✅ Tâche créée : ${phone.ig_username ?? phone.phone_name}`)
       } else {
-        onLog(`⚠ Tâche échouée (${phone.ig_username ?? phone.phone_name}): code=${res.code} msg=${res.msg ?? '?'}`)
+        failedCount++
+        onLog(`❌ Tâche refusée (${phone.ig_username ?? phone.phone_name}): code=${res.code} msg=${res.msg ?? '?'}`)
       }
     }
 
     // 4. Poll until done (max 10 min)
+    let pollSuccessCount = 0
+    let pollFailCount = 0
     if (taskIds.length > 0) {
       onLog('⏳ Attente de complétion…')
       let elapsed = 0
@@ -192,9 +198,9 @@ export async function executeScheduledPost(
         for (const it of items) {
           const tid = it.id ?? it.taskId
           const st  = Number(it.status)
-          if (st === 3) { onLog(`✅ Succès : ${tid}`); pending.delete(tid) }
-          else if (st === 4) { onLog(`❌ Échec : ${it.failDesc ?? tid}`); pending.delete(tid) }
-          else if ([7, 8].includes(st)) { onLog(`🚫 Annulé : ${tid}`); pending.delete(tid) }
+          if (st === 3) { pollSuccessCount++; onLog(`✅ Succès : ${tid}`); pending.delete(tid) }
+          else if (st === 4) { pollFailCount++; onLog(`❌ Échec GeelarK : ${it.failDesc ?? tid}`); pending.delete(tid) }
+          else if ([7, 8].includes(st)) { pollFailCount++; onLog(`🚫 Annulé : ${tid}`); pending.delete(tid) }
         }
       }
       if (pending.size > 0) onLog(`⏳ ${pending.size} tâche(s) toujours en attente après timeout`)
@@ -203,6 +209,16 @@ export async function executeScheduledPost(
     // 5. Stop phones
     onLog('⏹ Arrêt des téléphones…')
     await gPost(bearer, '/phone/stop', { ids: geelarkIds })
+
+    const totalFailed = failedCount + pollFailCount
+    const totalOk = phones.length - failedCount + pollSuccessCount - (taskIds.length - pollSuccessCount - pollFailCount)
+    if (totalFailed > 0 && failedCount >= phones.length) {
+      onLog(`❌ Toutes les tâches ont échoué (${totalFailed}/${phones.length})`)
+      return false
+    } else if (totalFailed > 0) {
+      onLog(`⚠ Partiel : ${totalFailed} tâche(s) échouée(s) sur ${phones.length}`)
+      return true
+    }
     onLog('✅ Post programmé exécuté avec succès !')
     return true
   } catch (err: any) {
