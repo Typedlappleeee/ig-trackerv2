@@ -623,11 +623,11 @@ export function Landing() {
                   <p style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.12em', color: p.accent, margin: '0 0 8px' }}>{p.name}</p>
                   <div style={{ marginBottom: 22 }}>
                     {(p as any).originalPrice && (
-                      <span style={{ fontSize: 14, color: 'rgba(148,163,184,0.35)', textDecoration: 'line-through', display: 'block', marginBottom: 2 }}>{(p as any).originalPrice}/mois</span>
+                      <span style={{ fontSize: 13, color: 'rgba(148,163,184,0.35)', textDecoration: 'line-through' }}>{(p as any).originalPrice}</span>
                     )}
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
-                      <span style={{ fontSize: 38, fontWeight: 900, color: '#F2F0FF', letterSpacing: '-0.04em' }}>{p.price}</span>
-                      <span style={{ fontSize: 13, color: 'rgba(148,163,184,0.38)' }}>{p.period}</span>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, flexWrap: 'nowrap' }}>
+                      <span style={{ fontSize: 38, fontWeight: 900, color: '#F2F0FF', letterSpacing: '-0.04em', whiteSpace: 'nowrap' }}>{p.price}</span>
+                      <span style={{ fontSize: 13, color: 'rgba(148,163,184,0.38)', whiteSpace: 'nowrap' }}>{p.period}</span>
                     </div>
                   </div>
                   <ul style={{ listStyle: 'none', margin: '0 0 24px', padding: 0, display: 'flex', flexDirection: 'column', gap: 9, flex: 1 }}>
