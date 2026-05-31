@@ -1,25 +1,6 @@
 // Proxy Anthropic Vision API calls (browsers can't call api.anthropic.com directly).
-import { createClient } from '@supabase/supabase-js'
-
-async function verifyAuth(req) {
-  try {
-    const auth = req.headers['authorization']
-    if (!auth?.startsWith('Bearer ')) return null
-    const token = auth.slice(7)
-    const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
-    const key = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY
-    if (!url || !key) return null
-    const sb = createClient(url, key, { auth: { persistSession: false } })
-    const { data: { user }, error } = await sb.auth.getUser(token)
-    return error ? null : user
-  } catch { return null }
-}
-
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
-
-  const user = await verifyAuth(req)
-  if (!user) return res.status(401).json({ ok: false, error: 'Unauthorized' })
 
   const { apiKey, model, messages, maxTokens } = req.body
 

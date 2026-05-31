@@ -1,9 +1,8 @@
 /// <reference types="vite/client" />
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl  = import.meta.env.VITE_SUPABASE_URL  as string
-const supabaseKey  = import.meta.env.VITE_SUPABASE_ANON_KEY as string
-if (!supabaseUrl || !supabaseKey) throw new Error('VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY not set')
+const supabaseUrl  = (import.meta.env.VITE_SUPABASE_URL  as string) || 'https://fvmkmkspfksscgqyvysl.supabase.co'
+const supabaseKey  = (import.meta.env.VITE_SUPABASE_ANON_KEY as string) || 'sb_publishable_hip63djbBYnu3EsSx2gA4w_0tgjweEo'
 
 export const supabase = createClient(supabaseUrl, supabaseKey, {
   auth: {
