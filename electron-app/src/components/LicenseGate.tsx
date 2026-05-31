@@ -25,22 +25,24 @@ const PLANS = [
     accent:  '#60a5fa',
   },
   {
-    name:    'Pro',
-    price:   '$99.99',
-    credits: '5 500',
-    phones:  '200 téléphones',
-    posting: 'Mass posting illimité',
-    accent:  '#c084fc',
-    popular: true,
+    name:          'Pro',
+    price:         '$59.99',
+    originalPrice: '$99.99',
+    credits:       '5 500',
+    phones:        '200 téléphones',
+    posting:       'Mass posting illimité',
+    accent:        '#c084fc',
+    popular:       true,
   },
   {
-    name:    'Organisation',
-    price:   '$149.99',
-    credits: '11 000',
-    phones:  'Téléphones illimités',
-    posting: 'Mass posting illimité',
-    accent:  '#34d399',
-    extra:   'Support 24/7 prioritaire · Proposition d\'ajouts',
+    name:          'Organisation',
+    price:         '$89.99',
+    originalPrice: '$149.99',
+    credits:       '11 000',
+    phones:        'Téléphones illimités',
+    posting:       'Mass posting illimité',
+    accent:        '#34d399',
+    extra:         'Support 24/7 prioritaire · Proposition d\'ajouts',
   },
 ]
 
@@ -335,7 +337,10 @@ export function LicenseGate({ userId, email: _email, onActivated, initialStep = 
                 </button>
 
                 {/* Plans */}
-                <p className="text-[10px] text-[#4a3f7a] uppercase tracking-widest text-center">Choisir un plan</p>
+                <div className="flex items-center justify-between">
+                  <p className="text-[10px] text-[#4a3f7a] uppercase tracking-widest">Choisir un plan</p>
+                  <span className="text-[9px] font-black px-2 py-0.5 rounded-full" style={{ background: 'rgba(251,146,60,0.15)', color: '#fb923c', border: '1px solid rgba(251,146,60,0.3)' }}>🔥 -40% jusqu'au 1er juillet</span>
+                </div>
                 <div className="space-y-2">
                   {PLANS.map(p => (
                     <div key={p.name}
@@ -346,7 +351,12 @@ export function LicenseGate({ userId, email: _email, onActivated, initialStep = 
                       )}
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-sm font-black" style={{ color: p.accent }}>{p.name}</span>
-                        <span className="text-white font-black text-sm">{p.price}<span className="text-[10px] text-[#6b5fa0] font-normal">/mois</span></span>
+                        <span className="flex items-baseline gap-1.5">
+                          {(p as any).originalPrice && (
+                            <span className="text-[11px] line-through" style={{ color: '#4a3f7a' }}>{(p as any).originalPrice}</span>
+                          )}
+                          <span className="text-white font-black text-sm">{p.price}<span className="text-[10px] text-[#6b5fa0] font-normal">/mois</span></span>
+                        </span>
                       </div>
                       <div className="flex flex-wrap gap-x-3 gap-y-0.5">
                         {[`${p.credits} crédits/mois`, p.phones, p.posting, 'Support 24/7', ...(p.extra ? [p.extra] : [])].map(f => (

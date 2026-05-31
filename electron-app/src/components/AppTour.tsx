@@ -21,13 +21,6 @@ const STEPS: TourStep[] = [
     color: '#7C3AED',
   },
   {
-    icon: '📊',
-    title: 'Dashboard',
-    desc: 'Ton tableau de bord central. Vois tes statistiques en temps réel, l\'activité récente et l\'état de tes comptes Instagram.',
-    page: 'dashboard',
-    color: '#2563EB',
-  },
-  {
     icon: '📤',
     title: 'Mass Posting',
     desc: 'Poste automatiquement une vidéo sur plusieurs comptes Instagram en même temps. Sélectionne tes téléphones, ta vidéo, et lance.',
@@ -54,13 +47,6 @@ const STEPS: TourStep[] = [
     desc: 'Stocke et organise toutes tes vidéos par dossiers. Retrouve-les facilement pour tes campagnes de posting.',
     page: 'bank',
     color: '#DC2626',
-  },
-  {
-    icon: '📈',
-    title: 'Stats Instagram',
-    desc: 'Analyse les performances de tes comptes : vues, abonnés, engagement. Identifie tes meilleures vidéos.',
-    page: 'stats',
-    color: '#0891B2',
   },
   {
     icon: '🚀',

@@ -400,8 +400,8 @@ const FEATURES = [
 // ── Pricing ───────────────────────────────────────────────────────────────────
 const PLANS = [
   { name: 'Standard', price: '49,99$', period: '/mois', accent: '#60a5fa', features: ['2 500 crédits / mois', '50 téléphones max', 'Toutes les fonctionnalités', 'Mass Posting — 10 comptes max', 'Support 24/7'] },
-  { name: 'Pro', price: '99,99$', period: '/mois', accent: '#c084fc', popular: true, features: ['5 500 crédits / mois', '200 téléphones max', 'Toutes les fonctionnalités', 'Mass Posting illimité', 'Support 24/7'] },
-  { name: 'Organisation', price: '149,99$', period: '/mois', accent: '#34d399', features: ['11 000 crédits / mois', 'Téléphones illimités', 'Toutes les fonctionnalités', 'Mass Posting illimité', 'Support prioritaire', "Suggestions d'ajouts avec les devs"] },
+  { name: 'Pro', price: '59,99$', originalPrice: '99,99$', period: '/mois', accent: '#c084fc', popular: true, features: ['5 500 crédits / mois', '200 téléphones max', 'Toutes les fonctionnalités', 'Mass Posting illimité', 'Support 24/7'] },
+  { name: 'Organisation', price: '89,99$', originalPrice: '149,99$', period: '/mois', accent: '#34d399', features: ['11 000 crédits / mois', 'Téléphones illimités', 'Toutes les fonctionnalités', 'Mass Posting illimité', 'Support prioritaire', "Suggestions d'ajouts avec les devs"] },
 ]
 
 // ── FAQ ───────────────────────────────────────────────────────────────────────
@@ -607,6 +607,10 @@ export function Landing() {
                 <span style={{ background: 'linear-gradient(120deg,#a78bfa,#ec4899)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>plan.</span>
               </h2>
               <p style={{ fontSize: 15, color: 'rgba(148,163,184,0.5)' }}>Tout est inclus dès le Standard. Activation via Telegram.</p>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginTop: 16, padding: '8px 18px', borderRadius: 99, background: 'rgba(251,146,60,0.1)', border: '1px solid rgba(251,146,60,0.3)' }}>
+                <span style={{ fontSize: 16 }}>🔥</span>
+                <span style={{ fontSize: 13, fontWeight: 800, color: '#fb923c' }}>-40% sur Pro &amp; Organisation jusqu'au 1er juillet</span>
+              </div>
             </div>
           </FadeIn>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(265px,1fr))', gap: 14 }}>
@@ -617,9 +621,14 @@ export function Landing() {
                   onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = p.popular ? '0 0 50px rgba(124,58,237,0.1)' : 'none' }}>
                   {p.popular && <div style={{ position: 'absolute', top: -13, left: '50%', transform: 'translateX(-50%)', padding: '3px 14px', borderRadius: 99, fontSize: 10, fontWeight: 900, color: '#fff', letterSpacing: '0.1em', background: 'linear-gradient(130deg,#7c3aed,#ec4899)', whiteSpace: 'nowrap' }}>POPULAIRE</div>}
                   <p style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.12em', color: p.accent, margin: '0 0 8px' }}>{p.name}</p>
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginBottom: 22 }}>
-                    <span style={{ fontSize: 38, fontWeight: 900, color: '#F2F0FF', letterSpacing: '-0.04em' }}>{p.price}</span>
-                    <span style={{ fontSize: 13, color: 'rgba(148,163,184,0.38)' }}>{p.period}</span>
+                  <div style={{ marginBottom: 22 }}>
+                    {(p as any).originalPrice && (
+                      <span style={{ fontSize: 13, color: 'rgba(148,163,184,0.35)', textDecoration: 'line-through' }}>{(p as any).originalPrice}</span>
+                    )}
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, flexWrap: 'nowrap' }}>
+                      <span style={{ fontSize: 38, fontWeight: 900, color: '#F2F0FF', letterSpacing: '-0.04em', whiteSpace: 'nowrap' }}>{p.price}</span>
+                      <span style={{ fontSize: 13, color: 'rgba(148,163,184,0.38)', whiteSpace: 'nowrap' }}>{p.period}</span>
+                    </div>
                   </div>
                   <ul style={{ listStyle: 'none', margin: '0 0 24px', padding: 0, display: 'flex', flexDirection: 'column', gap: 9, flex: 1 }}>
                     {p.features.map(f => (

@@ -98,12 +98,12 @@ export const ALL_TABS: { key: PageKey; label: string; icon: string }[] = [
   { key: 'phones',      label: 'Téléphones',                          icon: '📱' },
   { key: 'posting',     label: 'Posting',                             icon: '🚀' },
   { key: 'massposting', label: 'Mass Posting',                        icon: '⚡' },
-  { key: 'scheduler',   label: 'Scheduler',                           icon: '📅' },
+  { key: 'scheduler',   label: 'Programmation',                       icon: '📅' },
   { key: 'bank',        label: 'Banque',                              icon: '🗂' },
   { key: 'warmup',      label: 'Warmup',                              icon: '🔥' },
   { key: 'aitools',     label: 'Outils IA',                           icon: '🔧' },
   { key: 'remix',       label: 'Remix',                               icon: '🔀' },
-  { key: 'repurpose',   label: 'Repurpose',                           icon: '⚡' },
+  { key: 'repurpose',   label: 'CloneVid',                            icon: '⚡' },
   { key: 'settings',    label: 'Paramètres → Connexions (clés API)', icon: '🔑' },
 ]
 

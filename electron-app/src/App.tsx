@@ -383,7 +383,7 @@ function BetaPopup({ onClose }: { onClose: () => void }) {
             { icon: '⚡', text: 'Interface redessinée, rapide et professionnelle' },
             { icon: '✨', text: 'Captions IA via Groq Llama 3.3 70B' },
             { icon: '🚀', text: 'Posting & Mass Posting automatisés sur GéeLark' },
-            { icon: '📊', text: 'Dashboard, Stats et historique de vues' },
+            { icon: '🎬', text: 'MassRemix & CloneVid pour du contenu unique' },
           ].map(({ icon, text }) => (
             <div key={text} className="flex items-center gap-3 rounded-xl px-4 py-2.5"
               style={{ background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.1)' }}>
@@ -407,9 +407,7 @@ function BetaPopup({ onClose }: { onClose: () => void }) {
 import { LangProvider } from '@/lib/i18n'
 import { initPoller, stopPoller } from '@/lib/phonePoller'
 import { initIgStatsPoller } from '@/lib/igStatsPoller'
-import { Dashboard }         from '@/pages/Dashboard'
 import { Phones }            from '@/pages/Phones'
-import { Stats }             from '@/pages/Stats'
 import { Posting }           from '@/pages/Posting'
 import { Bank }              from '@/pages/Bank'
 import { Montage }           from '@/pages/Montage'
@@ -597,9 +595,7 @@ function AppContent({ user }: { user: User }) {
 
   const content = (() => {
     switch (page) {
-      case 'dashboard':    return <Dashboard   user={user} onNavigate={p => handleNavigate(p as Page)} />
       case 'phones':       return <Phones      user={user} key={refreshTick} />
-      case 'stats':        return <Stats       user={user} />
       case 'posting':      return <Posting     user={user} />
       case 'massposting':  return <MassPosting user={user} />
       case 'scheduler':    return <Scheduler   user={user} onNavigate={p => handleNavigate(p as Page)} />
