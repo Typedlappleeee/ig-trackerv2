@@ -344,23 +344,30 @@ export function MassPosting({ user }: MassPostingProps) {
       Notification.requestPermission().catch(() => {})
     }
     try {
-      log(`📤 Upload de ${selectedVideos.length} vidéo(s) vers GéeLark…`)
+      // In sequential mode, only upload the videos that will actually be assigned:
+      // phone i gets video at i % videos.length, so only the first min(phones, videos) are used.
+      // In random mode, any video could be picked — keep all.
+      const videosToSchedule = mode === 'random'
+        ? selectedVideos
+        : selectedVideos.slice(0, Math.min(phoneList.length, selectedVideos.length))
+
+      log(`📤 Upload de ${videosToSchedule.length} vidéo(s) vers GéeLark…`)
       const tokenMap = new Map<number, string>()
-      for (let i = 0; i < selectedVideos.length; i++) {
-        const sv = selectedVideos[i]
+      for (let i = 0; i < videosToSchedule.length; i++) {
+        const sv = videosToSchedule[i]
         const filePath = sv.localPath ?? sv.item.file_url
         if (!filePath) { log(`❌ Chemin manquant pour ${sv.item.title}`, 'error'); return }
         const up = await window.electronAPI!.uploadVideoGeelark({ bearer, filePath })
         if (!up.ok || !up.token) { log(`❌ Upload échoué pour ${sv.item.title}: ${up.error}`, 'error'); return }
         tokenMap.set(i, up.token)
-        log(`✅ Vidéo ${i + 1}/${selectedVideos.length} prête`, 'ok')
+        log(`✅ Vidéo ${i + 1}/${videosToSchedule.length} prête`, 'ok')
       }
       await createScheduledPost({
         userId: user.id, orgId: currentOrg?.id ?? null,
         createdByName: user.email?.split('@')[0] ?? 'Moi',
         type: 'mass_posting', scheduledAt,
         phones: phoneList.map(p => ({ id: p.id, geelark_id: p.geelark_id, phone_name: p.phone_name, ig_username: p.ig_username })),
-        videos: selectedVideos.map((v, i) => ({ token: tokenMap.get(i)!, title: v.item.title })),
+        videos: videosToSchedule.map((v, i) => ({ token: tokenMap.get(i)!, title: v.item.title })),
         caption, delayMinutes: 0, mode, bearerToken: bearer, reelsTrial: postingOpts.reelsTrial,
       })
       log(`📅 Programmé pour ${fmtScheduledTime(scheduledAt.toISOString())} — ${phoneList.length} téléphone(s)`, 'ok')
