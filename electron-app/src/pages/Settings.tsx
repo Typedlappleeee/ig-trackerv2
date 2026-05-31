@@ -1714,11 +1714,16 @@ function SubscriptionPanel() {
               {t('popular')}
             </div>
             <div>
-              <p className="text-[12px] font-black uppercase tracking-wider" style={{ color: '#f472b6' }}>Pro</p>
+              <div className="flex items-center justify-between">
+                <p className="text-[12px] font-black uppercase tracking-wider" style={{ color: '#f472b6' }}>Pro</p>
+                <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(251,146,60,0.15)', color: '#fb923c', border: '1px solid rgba(251,146,60,0.3)' }}>🔥 -40%</span>
+              </div>
               <div className="flex items-baseline gap-1 mt-1.5">
-                <span className="text-2xl font-black text-white">99,99$</span>
+                <span className="text-[12px] line-through" style={{ color: 'rgba(148,163,184,0.35)' }}>99,99$</span>
+                <span className="text-2xl font-black text-white">59,99$</span>
                 <span className="text-[12px] text-text2">{t('perMonth')}</span>
               </div>
+              <p className="text-[10px] mt-0.5" style={{ color: '#fb923c' }}>jusqu'au 1er juillet</p>
             </div>
             <ul className="space-y-1.5 flex-1">
               {[
@@ -1743,11 +1748,16 @@ function SubscriptionPanel() {
           {/* Organisation */}
           <div className="rounded-2xl p-5 space-y-4 flex flex-col" style={{ background: 'rgba(34,197,94,0.05)', border: '1px solid rgba(34,197,94,0.2)' }}>
             <div>
-              <p className="text-[12px] font-black uppercase tracking-wider" style={{ color: '#22C55E' }}>Organisation</p>
+              <div className="flex items-center justify-between">
+                <p className="text-[12px] font-black uppercase tracking-wider" style={{ color: '#22C55E' }}>Organisation</p>
+                <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(251,146,60,0.15)', color: '#fb923c', border: '1px solid rgba(251,146,60,0.3)' }}>🔥 -40%</span>
+              </div>
               <div className="flex items-baseline gap-1 mt-1.5">
-                <span className="text-2xl font-black text-white">149,99$</span>
+                <span className="text-[12px] line-through" style={{ color: 'rgba(148,163,184,0.35)' }}>149,99$</span>
+                <span className="text-2xl font-black text-white">89,99$</span>
                 <span className="text-[12px] text-text2">{t('perMonth')}</span>
               </div>
+              <p className="text-[10px] mt-0.5" style={{ color: '#fb923c' }}>jusqu'au 1er juillet</p>
             </div>
             <ul className="space-y-1.5 flex-1">
               {[
