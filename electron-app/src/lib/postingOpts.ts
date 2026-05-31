@@ -27,7 +27,6 @@ export function loadPostingOpts(): PostingOpts {
       ...DEFAULTS,
       intervalMin:  saved.intervalMin  ?? DEFAULTS.intervalMin,
       intervalMax:  saved.intervalMax  ?? DEFAULTS.intervalMax,
-      reelsTrial:   saved.reelsTrial   ?? DEFAULTS.reelsTrial,
       intervalMode: 'none',
     }
   } catch { return { ...DEFAULTS } }
