@@ -57,7 +57,6 @@ protocol.registerSchemesAsPrivileged([
     privileges: {
       standard: true,
       secure: true,
-      bypassCSP: true,
       supportFetchAPI: true,
       stream: true,
       corsEnabled: true,
@@ -72,7 +71,7 @@ function getIgBrowser(): BrowserWindow {
   if (!_igBrowser || _igBrowser.isDestroyed()) {
     _igBrowser = new BrowserWindow({
       show: false, width: 1280, height: 900,
-      webPreferences: { nodeIntegration: false, contextIsolation: false, webSecurity: true, sandbox: false },
+      webPreferences: { nodeIntegration: false, contextIsolation: true, webSecurity: true, sandbox: true },
     })
     _igBrowser.webContents.setUserAgent(
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
@@ -470,7 +469,8 @@ ipcMain.handle('geelark-request', async (_event, opts: {
     const reqBody = opts.body ? JSON.stringify(opts.body) : undefined
 
     let response: Response
-    if (opts.url.includes('instagram.com')) {
+    const reqHostname = (() => { try { return new URL(opts.url).hostname } catch { return '' } })()
+    if (reqHostname === 'instagram.com' || reqHostname.endsWith('.instagram.com')) {
       // Keep all headers (including Referer/Origin) for Instagram — they help avoid 403s.
       // Use session.defaultSession.fetch so Instagram cookies are automatically attached.
       const igHeaders: Record<string, string> = { ...opts.headers }
@@ -1036,10 +1036,13 @@ ipcMain.handle('run-ffmpeg-remix-ai', async (_event, opts: {
     // Clamp y so text stays fully on-screen. text_h = rendered height of this line.
     // Add a small bottom margin (text_h * 0.2) so descenders don't clip.
     const ySafe = `'max(4,min(h-text_h-8,${ov.y}))'`
+    const safeX = /^[\d+\-*/().\s]+$/.test(String(ov.x)) ? String(ov.x) : '10'
+    const safeFontSize = Math.max(8, Math.min(300, Math.round(Number(ov.fontSize) || 32)))
+    const safeFontColor = /^[a-zA-Z0-9#@.]+$/.test(String(ov.fontColor)) ? String(ov.fontColor) : 'white'
     parts.push(
-      `x=${ov.x}`, `y=${ySafe}`,
-      `fontsize=${ov.fontSize}`,
-      `fontcolor=${ov.fontColor}`,
+      `x=${safeX}`, `y=${ySafe}`,
+      `fontsize=${safeFontSize}`,
+      `fontcolor=${safeFontColor}`,
       `borderw=${borderPx}`, `bordercolor=black@1.0`,
       `enable='between(t,${ov.startTime},${ov.endTime})'`,
     )
@@ -1226,7 +1229,7 @@ ipcMain.handle('run-ffmpeg-metadata', async (_event, opts: {
   const ffmpegBin = getFfmpegBin()
   const args: string[] = ['-nostdin', '-hide_banner', '-i', opts.inputPath, '-map_metadata', '-1']
   for (const [k, v] of Object.entries(opts.metadata)) {
-    if (v) { args.push('-metadata', `${k}=${v}`) }
+    if (v && /^[a-zA-Z0-9_]+$/.test(k)) { args.push('-metadata', `${k}=${v}`) }
   }
   // Copy all streams without re-encoding
   args.push('-c', 'copy', '-movflags', '+faststart', '-y', opts.outputPath)
@@ -1471,10 +1474,8 @@ function createWindow() {
       })(),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false,
-      // Allow file:// URLs in <video>/<img> regardless of renderer origin (dev = localhost).
-      // Safe for a local desktop app — the renderer never loads untrusted external content.
-      webSecurity: false,
+      sandbox: true,
+      webSecurity: true,
     },
     titleBarStyle: 'default',
     frame: true,
@@ -1489,10 +1490,15 @@ function createWindow() {
 
   if (VITE_DEV_SERVER_URL) {
     win.loadURL(VITE_DEV_SERVER_URL)
-    win.webContents.openDevTools()
+    if (!app.isPackaged) win.webContents.openDevTools()
   } else {
     win.loadFile(path.join(RENDERER_DIST, 'index.html'))
   }
+}
+
+function isAllowedFilePath(filePath: string): boolean {
+  const normalized = path.normalize(filePath)
+  return normalized.startsWith(os.homedir()) || normalized.startsWith(os.tmpdir())
 }
 
 // ── IPC: read a local file and return as a data URL (fallback for previews) ──
@@ -1500,6 +1506,7 @@ function createWindow() {
 // Limited to first 25 MB (enough for the first frames to render a thumbnail).
 ipcMain.handle('read-local-video', async (_event, filePath: string) => {
   try {
+    if (!isAllowedFilePath(filePath)) return { ok: false, error: 'path not allowed' }
     if (!existsSync(filePath)) return { ok: false, error: 'not found' }
     const stat = statSync(filePath)
     const MAX = 25 * 1024 * 1024
@@ -1565,6 +1572,7 @@ ipcMain.handle('fetch-ig-video', async (_event, opts: { url: string }) => {
 // ── IPC: read full file bytes (for cloud upload) ─────────────────────────────
 ipcMain.handle('read-file-bytes', async (_event, filePath: string) => {
   try {
+    if (!isAllowedFilePath(filePath)) return { ok: false, error: 'path not allowed' }
     if (!existsSync(filePath)) return { ok: false, error: 'not found' }
     const buf = readFileSync(filePath)
     // Return a transferable ArrayBuffer (fast — no base64)
@@ -1613,6 +1621,9 @@ app.whenReady().then(() => {
       // On Windows, strip the leading slash so path is C:/...
       if (process.platform === 'win32' && /^\/[A-Za-z]:/.test(filePath)) {
         filePath = filePath.slice(1)
+      }
+      if (!isAllowedFilePath(filePath)) {
+        return new Response('Forbidden', { status: 403 })
       }
       if (!existsSync(filePath)) {
         return new Response('Not found', { status: 404 })

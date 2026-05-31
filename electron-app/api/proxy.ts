@@ -3,13 +3,13 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 const ALLOWED_HOSTS = [
   'instagram.com', 'www.instagram.com', 'i.instagram.com',
   'graph.instagram.com', 'api.instagram.com',
-  'cdninstagram.com', 'scontent', // IG CDN subdomains
+  'cdninstagram.com', 'fbcdn.net',
 ]
 
 function isAllowed(url: string): boolean {
   try {
     const { hostname } = new URL(url)
-    return ALLOWED_HOSTS.some(h => hostname === h || hostname.endsWith('.' + h) || hostname.includes(h))
+    return ALLOWED_HOSTS.some(h => hostname === h || hostname.endsWith('.' + h))
   } catch { return false }
 }
 

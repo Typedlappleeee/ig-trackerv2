@@ -16,9 +16,14 @@ import { pushNotification } from '@/lib/notificationStore'
 const isWeb = !window.electronAPI
 
 async function anthropicVisionWeb(opts: { apiKey: string; model: string; messages: unknown[]; maxTokens: number }) {
+  let authHeader: Record<string, string> = {}
+  try {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session?.access_token) authHeader = { 'Authorization': `Bearer ${session.access_token}` }
+  } catch {}
   const r = await fetch('/api/anthropic', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...authHeader },
     body: JSON.stringify(opts),
   })
   return r.json() as Promise<{ ok: boolean; data?: unknown; error?: string }>

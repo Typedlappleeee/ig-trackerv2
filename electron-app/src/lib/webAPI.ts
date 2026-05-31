@@ -2,6 +2,15 @@
 // Replaces window.electronAPI when the app runs in a browser (Vercel/web).
 // Each method mirrors its Electron IPC counterpart exactly.
 
+import { supabase } from './supabase'
+
+async function getAuthHeader(): Promise<Record<string, string>> {
+  try {
+    const { data: { session } } = await supabase.auth.getSession()
+    return session?.access_token ? { 'Authorization': `Bearer ${session.access_token}` } : {}
+  } catch { return {} }
+}
+
 // In-memory store for File objects picked by the user (keyed by blob URL)
 const fileStore = new Map<string, File>()
 
@@ -153,7 +162,7 @@ export function buildWebAPI() {
     }) {
       const r = await fetch('/api/groq', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...await getAuthHeader() },
         body: JSON.stringify(opts),
       })
       try { return await r.json() } catch { return { ok: false, error: `Erreur serveur (HTTP ${r.status})` } }
@@ -165,7 +174,7 @@ export function buildWebAPI() {
     }) {
       const r = await fetch('/api/anthropic', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...await getAuthHeader() },
         body: JSON.stringify(opts),
       })
       try { return await r.json() } catch { return { ok: false, error: `Erreur serveur (HTTP ${r.status})` } }
@@ -248,7 +257,7 @@ export function buildWebAPI() {
         const m1 = opts.filePath.match(/\/object\/sign\/([^/?]+)\/(.+?)(?:\?|$)/)
         const r = await fetch('/api/geelark-upload', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...await getAuthHeader() },
           body: JSON.stringify({
             storagePath: m1 ? decodeURIComponent(m1[2]) : opts.filePath,
             bucket: m1 ? m1[1] : 'content',
