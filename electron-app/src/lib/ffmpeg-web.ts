@@ -1107,125 +1107,149 @@ function seededRng(seed: number) {
 }
 
 // ── runFfmpegRepurposeWeb — generate one unique variant ───────────────────────
-// Applies invisible micro-transforms so each export has a different hash/signature
-// while remaining perceptually identical to the source video.
+type RepurposeResult = { ok: boolean; outputPath?: string; similarityPct?: number; transformSummary?: string[]; error?: string }
+
+// Build per-variant transforms from a seed + intensity settings
+function buildRepurposeVariant(seed: number, intensity: 'subtle' | 'medium' | 'aggressive' | 'vener', format: '9:16' | '1:1' | '16:9' | 'keep') {
+  const ranges = {
+    subtle:     { bri: 0.030, con: 0.025, sat: 0.045, zoomMin: 0.00, zoomMax: 0.04, crop: 3,  crf: 2 },
+    medium:     { bri: 0.070, con: 0.060, sat: 0.100, zoomMin: 0.02, zoomMax: 0.08, crop: 6,  crf: 4 },
+    aggressive: { bri: 0.120, con: 0.090, sat: 0.150, zoomMin: 0.05, zoomMax: 0.13, crop: 10, crf: 7 },
+    vener:      { bri: 0.200, con: 0.150, sat: 0.250, zoomMin: 0.10, zoomMax: 0.22, crop: 16, crf: 11 },
+  }[intensity]
+
+  const rng  = seededRng(seed)
+  const sign = () => rng(0, 1) > 0.5 ? 1 : -1
+
+  const brightness = sign() * rng(0.005, ranges.bri)
+  const contrast   = 1 + sign() * rng(0.005, ranges.con)
+  const saturation = 1 + sign() * rng(0.005, ranges.sat)
+  const zoomPct    = rng(ranges.zoomMin, ranges.zoomMax)
+  const panX       = rng(0, 1)
+  const panY       = rng(0, 1)
+  const cropX      = Math.floor(rng(0, ranges.crop))
+  const cropY      = Math.floor(rng(0, ranges.crop))
+  const crf        = Math.round(26 + rng(0, ranges.crf))
+
+  const floor = { subtle: 90, medium: 80, aggressive: 65, vener: 42 }[intensity]
+  const rawSim = 100 - (Math.abs(brightness) * 60 + Math.abs(contrast - 1) * 40 + Math.abs(saturation - 1) * 30 + zoomPct * 80)
+  const similarityPct = Math.min(99, Math.max(floor, Math.round(rawSim)))
+
+  const transformSummary: string[] = []
+  if (zoomPct > 0.005)                  transformSummary.push(`Zoom +${(zoomPct * 100).toFixed(0)}%`)
+  if (Math.abs(brightness) > 0.001)     transformSummary.push(`Lumière ${brightness > 0 ? '+' : ''}${(brightness * 100).toFixed(1)}%`)
+  if (Math.abs(contrast - 1) > 0.001)   transformSummary.push(`Contraste ${contrast > 1 ? '+' : ''}${((contrast - 1) * 100).toFixed(1)}%`)
+  if (Math.abs(saturation - 1) > 0.001) transformSummary.push(`Saturation ${saturation > 1 ? '+' : ''}${((saturation - 1) * 100).toFixed(1)}%`)
+  if (cropX > 0 || cropY > 0)           transformSummary.push(`Crop ${Math.max(cropX, cropY)}px`)
+  transformSummary.push(`CRF ${crf}`)
+
+  const eqFilter = `eq=brightness=${brightness.toFixed(4)}:contrast=${contrast.toFixed(4)}:saturation=${saturation.toFixed(4)}`
+
+  const vfParts: string[] = []
+
+  // 720p cap — 2.25× fewer pixels vs 1080p → ~2× faster encode
+  // Portrait: min(720,1280), Landscape: min(1280,720), auto-orient by iw/ih ratio
+  vfParts.push(`scale='if(gt(iw,ih),min(iw,1280),min(iw,720))':'if(gt(iw,ih),min(ih,720),min(ih,1280))'`)
+
+  if (format !== 'keep') {
+    // 720p targets instead of 1080p
+    const W = format === '16:9' ? 1280 : 720
+    const H = format === '9:16' ? 1280 : 720
+    vfParts.push(`scale=${W}:${H}:force_original_aspect_ratio=increase`)
+    vfParts.push(`crop=${W}:${H}`)
+  }
+  if (cropX > 0 || cropY > 0) vfParts.push(`crop=iw-${cropX * 2}:ih-${cropY * 2}:${cropX}:${cropY}`)
+
+  if (zoomPct > 0.005) {
+    const zf    = (1 + zoomPct).toFixed(4)
+    const invZf = (1 / (1 + zoomPct)).toFixed(4)
+    const ox    = ((1 - 1 / (1 + zoomPct)) * panX).toFixed(4)
+    const oy    = ((1 - 1 / (1 + zoomPct)) * panY).toFixed(4)
+    vfParts.push(`scale=iw*${zf}:ih*${zf}`)
+    vfParts.push(`crop=iw*${invZf}:ih*${invZf}:iw*${ox}:ih*${oy}`)
+  }
+
+  vfParts.push(eqFilter)
+
+  return { vf: vfParts.join(','), crf, similarityPct, transformSummary }
+}
+
+// Batch version: writes input ONCE then runs N variants — avoids repeated I/O per variant.
+// For 5 variants of one source, saves ~4× writeInput cost (~3-5s each).
+export function runFfmpegRepurposeBatch(opts: {
+  inputPath:   string
+  seeds:       number[]
+  intensity:   'subtle' | 'medium' | 'aggressive' | 'vener'
+  format:      '9:16' | '1:1' | '16:9' | 'keep'
+  onVariantStart:    (idx: number) => void
+  onVariantProgress: (idx: number, pct: number) => void
+}): Promise<RepurposeResult[]> {
+  return withFfmpegLock(async () => {
+    const ff = await getFFmpeg()
+    await ff.deleteFile('rp_in.mp4').catch(() => {})
+
+    const logs: string[] = []
+    const logH = ({ message }: { message: string }) => logs.push(message)
+    ff.on('log', logH)
+
+    // Write input once for all variants
+    opts.onVariantStart(0)
+    opts.onVariantProgress(0, 5)
+    await writeInput(ff, 'rp_in.mp4', opts.inputPath)
+
+    const results: RepurposeResult[] = []
+
+    for (let i = 0; i < opts.seeds.length; i++) {
+      if (i > 0) opts.onVariantStart(i)
+      opts.onVariantProgress(i, 15)
+
+      const { vf, crf, similarityPct, transformSummary } = buildRepurposeVariant(opts.seeds[i], opts.intensity, opts.format)
+      await ff.deleteFile('rp_out.mp4').catch(() => {})
+
+      try {
+        opts.onVariantProgress(i, 30)
+        await ff.exec([
+          '-nostdin', '-fflags', '+genpts', '-i', 'rp_in.mp4',
+          '-map', '0:v:0', '-map', '0:a?',
+          '-vf', vf,
+          '-c:v', 'libx264', '-preset', 'ultrafast', '-tune', 'fastdecode',
+          '-crf', String(crf),
+          '-pix_fmt', 'yuv420p', '-profile:v', 'main', '-level', '4.0',
+          '-c:a', 'copy',
+          '-movflags', '+faststart',
+          '-y', 'rp_out.mp4',
+        ])
+        opts.onVariantProgress(i, 90)
+        const url = await readOutput(ff, 'rp_out.mp4', 'video/mp4')
+        opts.onVariantProgress(i, 100)
+        results.push({ ok: true, outputPath: url, similarityPct, transformSummary })
+      } catch (err) {
+        if (isWasmCrash(err)) { resetFFmpeg(); results.push({ ok: false, error: String(err) }); break }
+        const relevant = logs.filter(l => /error|invalid|unknown|cannot/i.test(l)).slice(-2)
+        results.push({ ok: false, error: String(err) + (relevant.length ? '\n' + relevant.join('\n') : '') })
+      }
+    }
+
+    ff.off('log', logH)
+    for (const f of ['rp_in.mp4', 'rp_out.mp4']) await ff.deleteFile(f).catch(() => {})
+    return results
+  })
+}
+
+// Single-variant wrapper kept for backwards compat
 export function runFfmpegRepurposeWeb(opts: {
   inputPath:   string
   seed:        number
   intensity:   'subtle' | 'medium' | 'aggressive' | 'vener'
   format:      '9:16' | '1:1' | '16:9' | 'keep'
   onProgress?: (pct: number) => void
-}): Promise<{ ok: boolean; outputPath?: string; similarityPct?: number; transformSummary?: string[]; error?: string }> {
-  return withFfmpegLock(async () => {
-  const FILES = ['rp_in.mp4', 'rp_out.mp4']
-
-  // Intensity ranges — only safe, universally supported transforms
-  const ranges = {
-    subtle:     { bri: 0.030, con: 0.025, sat: 0.045, zoomMin: 0.00, zoomMax: 0.04, crop: 3,  crf: 2 },
-    medium:     { bri: 0.070, con: 0.060, sat: 0.100, zoomMin: 0.02, zoomMax: 0.08, crop: 6,  crf: 4 },
-    aggressive: { bri: 0.120, con: 0.090, sat: 0.150, zoomMin: 0.05, zoomMax: 0.13, crop: 10, crf: 7 },
-    vener:      { bri: 0.200, con: 0.150, sat: 0.250, zoomMin: 0.10, zoomMax: 0.22, crop: 16, crf: 11 },
-  }[opts.intensity]
-
-  const rng  = seededRng(opts.seed)
-  const sign = () => rng(0, 1) > 0.5 ? 1 : -1
-
-  const brightness = sign() * rng(0.005, ranges.bri)
-  const contrast   = 1 + sign() * rng(0.005, ranges.con)
-  const saturation = 1 + sign() * rng(0.005, ranges.sat)
-  const zoomPct    = rng(ranges.zoomMin, ranges.zoomMax)  // e.g. 0.08 = 8% zoom-in
-  const panX       = rng(0, 1)                             // 0=left, 0.5=center, 1=right
-  const panY       = rng(0, 1)                             // 0=top,  0.5=center, 1=bottom
-  const cropX      = Math.floor(rng(0, ranges.crop))
-  const cropY      = Math.floor(rng(0, ranges.crop))
-  const crf        = Math.round(26 + rng(0, ranges.crf))
-
-  // Similarity estimate — anchored per intensity
-  const floor = { subtle: 90, medium: 80, aggressive: 65, vener: 42 }[opts.intensity]
-  const rawSim = 100 - (
-    Math.abs(brightness) * 60 +
-    Math.abs(contrast - 1) * 40 +
-    Math.abs(saturation - 1) * 30 +
-    zoomPct * 80
-  )
-  const similarityPct = Math.min(99, Math.max(floor, Math.round(rawSim)))
-
-  // Human-readable transform summary
-  const transformSummary: string[] = []
-  if (zoomPct > 0.005)                   transformSummary.push(`Zoom +${(zoomPct * 100).toFixed(0)}%`)
-  if (Math.abs(brightness) > 0.001)      transformSummary.push(`Lumière ${brightness > 0 ? '+' : ''}${(brightness * 100).toFixed(1)}%`)
-  if (Math.abs(contrast - 1) > 0.001)    transformSummary.push(`Contraste ${contrast > 1 ? '+' : ''}${((contrast - 1) * 100).toFixed(1)}%`)
-  if (Math.abs(saturation - 1) > 0.001)  transformSummary.push(`Saturation ${saturation > 1 ? '+' : ''}${((saturation - 1) * 100).toFixed(1)}%`)
-  if (cropX > 0 || cropY > 0)            transformSummary.push(`Crop ${Math.max(cropX, cropY)}px`)
-  transformSummary.push(`CRF ${crf}`)
-
-  const ff = await getFFmpeg()
-  for (const f of FILES) await ff.deleteFile(f).catch(() => {})
-  const logs: string[] = []
-  const logH = ({ message }: { message: string }) => logs.push(message)
-  ff.on('log', logH)
-
-  try {
-    opts.onProgress?.(5)
-    await writeInput(ff, 'rp_in.mp4', opts.inputPath)
-    opts.onProgress?.(20)
-
-    // eq with only the 3 universally-supported params (brightness/contrast/saturation)
-    const eqFilter = `eq=brightness=${brightness.toFixed(4)}:contrast=${contrast.toFixed(4)}:saturation=${saturation.toFixed(4)}`
-
-    const vfParts: string[] = []
-
-    // Cap resolution to 1080p max (portrait or landscape) before any transform —
-    // dramatically speeds up encoding for high-res inputs (4K → ~4× faster).
-    vfParts.push(`scale='if(gt(iw,1920),1920,iw)':-2`)
-
-    if (opts.format !== 'keep') {
-      const W = opts.format === '16:9' ? 1920 : 1080
-      const H = opts.format === '9:16' ? 1920 : 1080
-      vfParts.push(`scale=${W}:${H}:force_original_aspect_ratio=increase`)
-      vfParts.push(`crop=${W}:${H}`)
-    }
-    if (cropX > 0 || cropY > 0) vfParts.push(`crop=iw-${cropX * 2}:ih-${cropY * 2}:${cropX}:${cropY}`)
-
-    // Zoom-in by scaling up then cropping back — pan position shifts which part is kept
-    if (zoomPct > 0.005) {
-      const zf    = (1 + zoomPct).toFixed(4)
-      const invZf = (1 / (1 + zoomPct)).toFixed(4)
-      const ox    = ((1 - 1 / (1 + zoomPct)) * panX).toFixed(4)
-      const oy    = ((1 - 1 / (1 + zoomPct)) * panY).toFixed(4)
-      vfParts.push(`scale=iw*${zf}:ih*${zf}`)
-      vfParts.push(`crop=iw*${invZf}:ih*${invZf}:iw*${ox}:ih*${oy}`)
-    }
-
-    vfParts.push(eqFilter)
-    const vf = vfParts.join(',')
-    console.log('[CloneVid] vf=', vf, 'crf=', crf)
-
-    opts.onProgress?.(30)
-    await ff.exec([
-      '-nostdin', '-fflags', '+genpts', '-i', 'rp_in.mp4',
-      '-map', '0:v:0',
-      '-map', '0:a?',
-      '-vf', vf,
-      '-c:v', 'libx264', '-preset', 'ultrafast', '-tune', 'fastdecode',
-      '-crf', String(crf),
-      '-pix_fmt', 'yuv420p', '-profile:v', 'main', '-level', '4.0',
-      '-c:a', 'copy',        // copy audio stream as-is — no re-encode needed
-      '-movflags', '+faststart',
-      '-y', 'rp_out.mp4',
-    ])
-    opts.onProgress?.(90)
-
-    const url = await readOutput(ff, 'rp_out.mp4', 'video/mp4')
-    opts.onProgress?.(100)
-    return { ok: true, outputPath: url, similarityPct, transformSummary }
-  } catch (err) {
-    if (isWasmCrash(err)) resetFFmpeg()
-    const relevant = logs.filter(l => /error|invalid|unknown|cannot/i.test(l)).slice(-2)
-    return { ok: false, error: String(err) + (relevant.length ? '\n' + relevant.join('\n') : '') }
-  } finally {
-    ff.off('log', logH)
-    for (const f of FILES) await ff.deleteFile(f).catch(() => {})
-  }
-  }) // end withFfmpegLock
+}): Promise<RepurposeResult> {
+  return runFfmpegRepurposeBatch({
+    inputPath: opts.inputPath,
+    seeds: [opts.seed],
+    intensity: opts.intensity,
+    format: opts.format,
+    onVariantStart: () => {},
+    onVariantProgress: (_, pct) => opts.onProgress?.(pct),
+  }).then(r => r[0] ?? { ok: false, error: 'No result' })
 }

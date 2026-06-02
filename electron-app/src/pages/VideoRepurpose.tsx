@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import type { User } from '@supabase/supabase-js'
-import { runFfmpegRepurposeWeb } from '@/lib/ffmpeg-web'
+import { runFfmpegRepurposeBatch } from '@/lib/ffmpeg-web'
 import { uploadVideoFromPath, type UploadScope } from '@/lib/storage'
 import { supabase } from '@/lib/supabase'
 import { useT, useLang } from '@/lib/i18n'
@@ -258,48 +258,59 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
 
     try {
       let done = 0
-      for (const job of allJobs) {
+      // Process all variants of each source in one batch — input written once per source
+      for (let si = 0; si < sources.length; si++) {
         if (abortRef.current) break
-        const src = sources[job.sourceIndex]
-        updateJob(job.id, { status: 'processing', progress: 5 })
+        const src = sources[si]
+        const sourceJobs = allJobs.filter(j => j.sourceIndex === si)
 
-        const result = await runFfmpegRepurposeWeb({
-          inputPath: src.url, seed: job.seed, intensity, format,
-          onProgress: pct => updateJob(job.id, { progress: pct }),
+        const results = await runFfmpegRepurposeBatch({
+          inputPath: src.url,
+          seeds: sourceJobs.map(j => j.seed),
+          intensity,
+          format,
+          onVariantStart:    idx => updateJob(sourceJobs[idx].id, { status: 'processing', progress: 5 }),
+          onVariantProgress: (idx, pct) => updateJob(sourceJobs[idx].id, { progress: pct }),
         })
 
-        if (result.ok && result.outputPath) {
-          const thumb = await extractThumb(result.outputPath)
-          updateJob(job.id, {
-            status: 'done', progress: 100,
-            outputPath: result.outputPath,
-            similarityPct: result.similarityPct,
-            transforms: result.transformSummary,
-            thumb: thumb ?? undefined,
-          })
+        for (let vi = 0; vi < results.length; vi++) {
+          if (abortRef.current) break
+          const result = results[vi]
+          const job    = sourceJobs[vi]
 
-          if (isWeb || saveToBank) {
-            updateJob(job.id, { uploading: true })
-            try {
-              const variantNum = (job.id % count) + 1
-              const up = await uploadVideoFromPath(result.outputPath, scope)
-              const { error: dbErr } = await supabase.from('content_bank').insert({
-                user_id: user.id, org_id: currentOrg?.id ?? null,
-                title: `CloneVid #${String(variantNum).padStart(3, '0')} — ${src.name}`,
-                file_url: null, storage_path: up.storagePath, thumbnail_path: up.thumbnailPath,
-                folder: bankFolder.trim() || null, tags: [], notes: '',
-              })
-              if (dbErr) throw new Error(dbErr.message)
-              updateJob(job.id, { uploading: false })
-            } catch (e) {
-              updateJob(job.id, { uploading: false, uploadError: String(e instanceof Error ? e.message : e) })
+          if (result.ok && result.outputPath) {
+            const thumb = await extractThumb(result.outputPath)
+            updateJob(job.id, {
+              status: 'done', progress: 100,
+              outputPath: result.outputPath,
+              similarityPct: result.similarityPct,
+              transforms: result.transformSummary,
+              thumb: thumb ?? undefined,
+            })
+
+            if (isWeb || saveToBank) {
+              updateJob(job.id, { uploading: true })
+              try {
+                const variantNum = vi + 1
+                const up = await uploadVideoFromPath(result.outputPath, scope)
+                const { error: dbErr } = await supabase.from('content_bank').insert({
+                  user_id: user.id, org_id: currentOrg?.id ?? null,
+                  title: `CloneVid #${String(variantNum).padStart(3, '0')} — ${src.name}`,
+                  file_url: null, storage_path: up.storagePath, thumbnail_path: up.thumbnailPath,
+                  folder: bankFolder.trim() || null, tags: [], notes: '',
+                })
+                if (dbErr) throw new Error(dbErr.message)
+                updateJob(job.id, { uploading: false })
+              } catch (e) {
+                updateJob(job.id, { uploading: false, uploadError: String(e instanceof Error ? e.message : e) })
+              }
             }
+          } else {
+            updateJob(job.id, { status: 'error', error: result.error ?? 'Unknown error' })
           }
-        } else {
-          updateJob(job.id, { status: 'error', error: result.error ?? 'Unknown error' })
-        }
 
-        done++; setTotalDone(done)
+          done++; setTotalDone(done)
+        }
       }
     } finally {
       setRunning(false)
