@@ -24,7 +24,7 @@ function getSupabaseAdmin() {
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'Method not allowed' })
 
-  const { storagePath, bucket = 'content', variants } = req.body ?? {}
+  const { storagePath, userId, bucket = 'content', variants } = req.body ?? {}
   if (!storagePath || !Array.isArray(variants) || variants.length === 0)
     return res.status(400).json({ ok: false, error: 'Missing storagePath or variants' })
 
@@ -55,7 +55,10 @@ module.exports = async (req, res) => {
           '-y', outPath,
         ], { maxBuffer: 100 * 1024 * 1024 })
 
-        const resultPath = `repurpose-results/${Date.now()}_${i}_${Math.random().toString(36).slice(2)}.mp4`
+        // Store under videos/users/{userId}/ so the client's storage SELECT policy allows reading it
+        const resultPath = userId
+          ? `videos/users/${userId}/rp-out-${Date.now()}_${i}_${Math.random().toString(36).slice(2)}.mp4`
+          : `repurpose-results/${Date.now()}_${i}_${Math.random().toString(36).slice(2)}.mp4`
         const outBuf = fs.readFileSync(outPath)
         const { error: upErr } = await supabase.storage.from(bucket).upload(resultPath, outBuf, {
           contentType: 'video/mp4',

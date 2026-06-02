@@ -1298,11 +1298,13 @@ export async function runRepurposeViaServer(opts: {
     return { vf, crf, transformSummary }
   })
 
-  // Upload source video to Supabase temp storage
+  // Upload source video using a path that satisfies the storage RLS policy
+  // (policy requires videos/users/{uid}/ or videos/orgs/{orgId}/)
   opts.onUploadProgress?.(0)
   const resp = await fetch(opts.sourceUrl)
   const blob = await resp.blob()
-  const tempPath = `repurpose-temp/${opts.userId}/${Date.now()}.mp4`
+  const ts = Date.now()
+  const tempPath = `videos/users/${opts.userId}/rp-src-${ts}.mp4`
 
   const { error: upErr } = await supabase.storage.from(bucket).upload(tempPath, blob, {
     contentType: 'video/mp4',
@@ -1312,12 +1314,14 @@ export async function runRepurposeViaServer(opts: {
   opts.onUploadProgress?.(100)
 
   // Call the Vercel function — native FFmpeg, all variants in parallel
+  // Pass userId so the server stores results under videos/users/{userId}/ (readable by client)
   opts.onProcessing?.()
   const apiResp = await fetch('/api/repurpose', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       storagePath: tempPath,
+      userId: opts.userId,
       bucket,
       variants: variants.map(v => ({ vf: v.vf, crf: v.crf })),
     }),
