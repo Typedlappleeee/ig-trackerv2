@@ -85,10 +85,10 @@ function VariantCard({ job, index }: { job: VariantJob; index: number }) {
   return (
     <div style={{
       borderRadius: 14, overflow: 'hidden', position: 'relative',
-      background: 'rgba(255,255,255,0.025)',
-      border: `1px solid ${isDone ? 'rgba(34,211,238,0.2)' : isErr ? 'rgba(239,68,68,0.2)' : 'rgba(255,255,255,0.06)'}`,
+      background: isDone ? 'rgba(34,211,238,0.03)' : 'rgba(255,255,255,0.025)',
+      border: `1px solid ${isDone ? 'rgba(34,211,238,0.25)' : isErr ? 'rgba(239,68,68,0.2)' : 'rgba(255,255,255,0.06)'}`,
       transition: 'border-color 0.3s, box-shadow 0.3s',
-      boxShadow: isDone ? '0 0 20px rgba(34,211,238,0.06)' : 'none',
+      boxShadow: isDone ? '0 0 24px rgba(34,211,238,0.08)' : 'none',
     }}>
       {/* Thumbnail */}
       <div style={{ width: '100%', aspectRatio: '9/16', background: '#0a0a14', position: 'relative', overflow: 'hidden', maxHeight: 160 }}>
@@ -111,27 +111,46 @@ function VariantCard({ job, index }: { job: VariantJob; index: number }) {
             <div style={{ height: '100%', background: 'linear-gradient(90deg,#22d3ee,#818cf8)', width: `${job.progress}%`, transition: 'width 0.4s ease' }} />
           </div>
         )}
-      </div>
-
-      {/* Info */}
-      <div style={{ padding: '7px 9px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 3 }}>
-          <span style={{ fontSize: 10, fontWeight: 700, color: isDone ? '#22d3ee' : isErr ? '#f87171' : 'rgba(148,163,184,0.4)' }}>
-            #{String(index + 1).padStart(2, '0')}
-          </span>
-          {isDone && job.similarityPct != null && <SimilarityBadge pct={job.similarityPct} />}
-        </div>
-
+        {/* Status badge top-left */}
         {isDone && (
-          <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
-            <button onClick={() => job.outputPath && downloadBlob(job.outputPath, `variant_${index + 1}.mp4`)}
-              style={{ flex: 1, padding: '4px 0', borderRadius: 6, fontSize: 9, fontWeight: 700, cursor: 'pointer', border: 'none', background: 'rgba(34,211,238,0.1)', color: '#22d3ee', transition: 'background 0.15s' }}
-            >⬇ DL</button>
-            {job.uploading && <span style={{ fontSize: 9, color: 'rgba(148,163,184,0.4)', display: 'flex', alignItems: 'center' }}>☁…</span>}
-            {job.uploadError && <span title={job.uploadError} style={{ fontSize: 9, color: '#f87171', cursor: 'help' }}>⚠</span>}
+          <div style={{ position: 'absolute', top: 6, left: 6, background: 'rgba(10,10,20,0.8)', backdropFilter: 'blur(4px)', borderRadius: 5, padding: '2px 6px', fontSize: 9, fontWeight: 700, color: '#22d3ee', border: '1px solid rgba(34,211,238,0.2)' }}>
+            #{String(index + 1).padStart(2, '0')}
           </div>
         )}
-        {isErr && <div style={{ fontSize: 9, color: '#f87171', marginTop: 3 }}>{job.error?.slice(0, 40)}</div>}
+        {isDone && job.similarityPct != null && (
+          <div style={{ position: 'absolute', top: 6, right: 6 }}>
+            <SimilarityBadge pct={job.similarityPct} />
+          </div>
+        )}
+      </div>
+
+      {/* Transforms tags */}
+      {isDone && job.transforms && job.transforms.length > 0 && (
+        <div style={{ padding: '6px 8px', display: 'flex', flexWrap: 'wrap', gap: 3, borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+          {job.transforms.map((t, i) => (
+            <span key={i} style={{
+              fontSize: 8, fontWeight: 600, padding: '2px 5px', borderRadius: 4,
+              background: 'rgba(129,140,248,0.1)', color: 'rgba(167,139,250,0.8)',
+              border: '1px solid rgba(129,140,248,0.15)',
+            }}>{t}</span>
+          ))}
+        </div>
+      )}
+
+      {/* Actions */}
+      <div style={{ padding: '6px 8px' }}>
+        {isDone && (
+          <div style={{ display: 'flex', gap: 4 }}>
+            <button onClick={() => job.outputPath && downloadBlob(job.outputPath, `variant_${index + 1}.mp4`)}
+              style={{ flex: 1, padding: '5px 0', borderRadius: 6, fontSize: 9, fontWeight: 700, cursor: 'pointer', border: 'none', background: 'rgba(34,211,238,0.12)', color: '#22d3ee', transition: 'background 0.15s' }}
+            >⬇ Télécharger</button>
+            {job.uploading && <span style={{ fontSize: 9, color: 'rgba(148,163,184,0.4)', display: 'flex', alignItems: 'center', paddingRight: 2 }}>☁…</span>}
+            {job.uploadError && <span title={job.uploadError} style={{ fontSize: 9, color: '#f87171', cursor: 'help', display: 'flex', alignItems: 'center' }}>⚠</span>}
+          </div>
+        )}
+        {isErr && <div style={{ fontSize: 9, color: '#f87171' }}>{job.error?.slice(0, 45)}</div>}
+        {isQ   && <div style={{ fontSize: 9, color: 'rgba(148,163,184,0.3)', textAlign: 'center' }}>En attente…</div>}
+        {isProc && <div style={{ fontSize: 9, color: 'rgba(34,211,238,0.5)', textAlign: 'center' }}>Traitement {job.progress}%</div>}
       </div>
     </div>
   )
@@ -447,20 +466,34 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
             <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(148,163,184,0.45)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 7 }}>{t('repurposeIntensitySection')}</div>
             {(['subtle', 'medium', 'aggressive'] as Intensity[]).map(lv => {
               const meta = {
-                subtle:     { label: t('repurposeSubtle'),     desc: '~90-99%', emoji: '🔵' },
-                medium:     { label: t('repurposeMedium'),     desc: '~80-90%', emoji: '🟡' },
-                aggressive: { label: t('repurposeAggressive'), desc: '~65-80%', emoji: '🔴' },
+                subtle:     { label: t('repurposeSubtle'),     desc: '~90-99% similaire', color: '#22d3ee', bars: 1 },
+                medium:     { label: t('repurposeMedium'),     desc: '~80-90% similaire', color: '#fbbf24', bars: 2 },
+                aggressive: { label: t('repurposeAggressive'), desc: '~65-80% similaire', color: '#f87171', bars: 3 },
               }[lv]
+              const active = intensity === lv
               return (
                 <button key={lv} onClick={() => setIntensity(lv)} disabled={running}
-                  style={{ display: 'flex', alignItems: 'center', gap: 9, width: '100%', padding: '7px 10px', borderRadius: 8, marginBottom: 4, cursor: 'pointer', border: 'none', textAlign: 'left', transition: 'all 0.15s', background: intensity === lv ? 'rgba(34,211,238,0.07)' : 'rgba(255,255,255,0.025)', outline: intensity === lv ? '1px solid rgba(34,211,238,0.22)' : '1px solid rgba(255,255,255,0.05)' }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 9, width: '100%', padding: '8px 10px', borderRadius: 8, marginBottom: 4, cursor: 'pointer', border: 'none', textAlign: 'left', transition: 'all 0.15s',
+                    background: active ? `rgba(${lv === 'subtle' ? '34,211,238' : lv === 'medium' ? '251,191,36' : '248,113,113'},0.08)` : 'rgba(255,255,255,0.025)',
+                    outline: active ? `1px solid rgba(${lv === 'subtle' ? '34,211,238' : lv === 'medium' ? '251,191,36' : '248,113,113'},0.3)` : '1px solid rgba(255,255,255,0.05)',
+                  }}
                 >
-                  <span style={{ fontSize: 12 }}>{meta.emoji}</span>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: intensity === lv ? '#22d3ee' : 'rgba(226,232,240,0.65)' }}>{meta.label}</div>
-                    <div style={{ fontSize: 9, color: 'rgba(148,163,184,0.35)', marginTop: 1 }}>{meta.desc} similarity</div>
+                  {/* Level bars */}
+                  <div style={{ display: 'flex', gap: 2, alignItems: 'flex-end', flexShrink: 0 }}>
+                    {[1,2,3].map(b => (
+                      <div key={b} style={{
+                        width: 4, borderRadius: 2,
+                        height: b === 1 ? 8 : b === 2 ? 12 : 16,
+                        background: b <= meta.bars && active ? meta.color : b <= meta.bars ? `${meta.color}44` : 'rgba(255,255,255,0.08)',
+                        transition: 'background 0.2s',
+                      }} />
+                    ))}
                   </div>
-                  {intensity === lv && <span style={{ color: '#22d3ee', fontSize: 11 }}>✓</span>}
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: active ? meta.color : 'rgba(226,232,240,0.65)', transition: 'color 0.15s' }}>{meta.label}</div>
+                    <div style={{ fontSize: 9, color: 'rgba(148,163,184,0.4)', marginTop: 1 }}>{meta.desc}</div>
+                  </div>
+                  {active && <div style={{ width: 6, height: 6, borderRadius: '50%', background: meta.color, flexShrink: 0, boxShadow: `0 0 6px ${meta.color}` }} />}
                 </button>
               )
             })}
