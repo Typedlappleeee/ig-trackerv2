@@ -213,7 +213,9 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
     if (!isSuperAdmin) {
       const creditRes = await checkAndDeductCredits(credits.ownerId, creditCost)
       if (!creditRes.ok) {
-        alert(`Crédits insuffisants — ${creditCost} crédits requis pour ${totalJobs} vidéos. Solde: ${creditRes.balance ?? 0}`)
+        const balanceDisplay = creditRes.balance ?? credits.balance
+        const errDetail = creditRes.error ? ` (${creditRes.error})` : ''
+        alert(`Crédits insuffisants — ${creditCost} crédits requis pour ${totalJobs} vidéos. Solde: ${balanceDisplay}${errDetail}`)
         return
       }
       if (typeof creditRes.balance === 'number') credits.setBalance(creditRes.balance)
