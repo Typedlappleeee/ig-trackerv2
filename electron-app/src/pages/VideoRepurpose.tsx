@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import type { User } from '@supabase/supabase-js'
-import { runFfmpegRepurposeBatch } from '@/lib/ffmpeg-web'
+import { runFfmpegRepurposeBatch, runRepurposeViaServer } from '@/lib/ffmpeg-web'
 import { uploadVideoFromPath, type UploadScope } from '@/lib/storage'
 import { supabase } from '@/lib/supabase'
 import { useT, useLang } from '@/lib/i18n'
@@ -245,14 +245,31 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
         const src = sources[si]
         const sourceJobs = allJobs.filter(j => j.sourceIndex === si)
 
-        const results = await runFfmpegRepurposeBatch({
-          inputPath: src.url,
-          seeds: sourceJobs.map(j => j.seed),
-          intensity,
-          format,
-          onVariantStart:    idx => updateJob(sourceJobs[idx].id, { status: 'processing', progress: 5 }),
-          onVariantProgress: (idx, pct) => updateJob(sourceJobs[idx].id, { progress: pct }),
-        })
+        // Mark all variants as processing while server encodes them in parallel
+        sourceJobs.forEach((j, idx) => updateJob(j.id, { status: 'processing', progress: idx === 0 ? 10 : 5 }))
+
+        let results
+        try {
+          results = await runRepurposeViaServer({
+            sourceUrl: src.url,
+            userId:    user.id,
+            seeds:     sourceJobs.map(j => j.seed),
+            intensity,
+            format,
+            onUploadProgress: pct => sourceJobs.forEach(j => updateJob(j.id, { progress: Math.round(pct * 0.3) })),
+            onProcessing:     ()  => sourceJobs.forEach(j => updateJob(j.id, { progress: 40 })),
+          })
+        } catch {
+          // Server unavailable — fall back to WASM
+          results = await runFfmpegRepurposeBatch({
+            inputPath: src.url,
+            seeds:     sourceJobs.map(j => j.seed),
+            intensity,
+            format,
+            onVariantStart:    idx => updateJob(sourceJobs[idx].id, { status: 'processing', progress: 5 }),
+            onVariantProgress: (idx, pct) => updateJob(sourceJobs[idx].id, { progress: pct }),
+          })
+        }
 
         for (let vi = 0; vi < results.length; vi++) {
           if (abortRef.current) break
@@ -273,11 +290,20 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
               updateJob(job.id, { uploading: true })
               try {
                 const variantNum = vi + 1
-                const up = await uploadVideoFromPath(result.outputPath, scope)
+                let storagePath: string
+                let thumbnailPath: string | null = null
+                if (result.storagePath) {
+                  // Server already uploaded — use path directly, no re-upload needed
+                  storagePath = result.storagePath
+                } else {
+                  const up = await uploadVideoFromPath(result.outputPath!, scope)
+                  storagePath   = up.storagePath
+                  thumbnailPath = up.thumbnailPath
+                }
                 const { error: dbErr } = await supabase.from('content_bank').insert({
                   user_id: user.id, org_id: currentOrg?.id ?? null,
                   title: `CloneVid #${String(variantNum).padStart(3, '0')} — ${src.name}`,
-                  file_url: null, storage_path: up.storagePath, thumbnail_path: up.thumbnailPath,
+                  file_url: null, storage_path: storagePath, thumbnail_path: thumbnailPath,
                   folder: bankFolder.trim() || null, tags: [], notes: '',
                 })
                 if (dbErr) throw new Error(dbErr.message)
