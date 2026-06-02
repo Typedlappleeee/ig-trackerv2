@@ -7,6 +7,7 @@ import { useT, useLang } from '@/lib/i18n'
 import { useOrg } from '@/lib/orgContext'
 import { BankPicker } from '@/pages/Bank'
 import { checkAndDeductCredits, CREDIT_COSTS, useCredits } from '@/lib/credits'
+import { useLicense } from '@/lib/license'
 
 const isWeb = typeof window !== 'undefined' && !(window as any).electronAPI
 
@@ -142,6 +143,7 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
   const t = useT()
   const { currentOrg } = useOrg()
   const credits = useCredits()
+  const { isSuperAdmin } = useLicense()
   const scope: UploadScope = currentOrg
     ? { mode: 'org', id: currentOrg.id }
     : { mode: 'user', id: user.id }
@@ -208,12 +210,14 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
   async function startGeneration() {
     if (!sources.length || running) return
     const creditCost = totalJobs * CREDIT_COSTS.clone_vid
-    const creditRes  = await checkAndDeductCredits(credits.ownerId, creditCost)
-    if (!creditRes.ok) {
-      alert(`Crédits insuffisants — ${creditCost} crédits requis pour ${totalJobs} vidéos. Solde: ${creditRes.balance ?? 0}`)
-      return
+    if (!isSuperAdmin) {
+      const creditRes = await checkAndDeductCredits(credits.ownerId, creditCost)
+      if (!creditRes.ok) {
+        alert(`Crédits insuffisants — ${creditCost} crédits requis pour ${totalJobs} vidéos. Solde: ${creditRes.balance ?? 0}`)
+        return
+      }
+      if (typeof creditRes.balance === 'number') credits.setBalance(creditRes.balance)
     }
-    if (typeof creditRes.balance === 'number') credits.setBalance(creditRes.balance)
     abortRef.current = false
     setRunning(true); setStartedAt(Date.now()); setElapsed(0); setTotalDone(0)
 
