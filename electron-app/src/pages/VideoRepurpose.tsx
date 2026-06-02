@@ -60,19 +60,6 @@ async function downloadBlob(url: string, filename: string) {
   }
 }
 
-// ── SimilarityBadge ──────────────────────────────────────────────────────────
-
-function SimilarityBadge({ pct }: { pct: number }) {
-  const color = pct >= 90 ? '#22d3ee' : pct >= 80 ? '#a78bfa' : '#f59e0b'
-  const label = pct >= 90 ? 'SAFE' : pct >= 80 ? 'OK' : 'RISKY'
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-      <div style={{ fontSize: 9, fontWeight: 700, padding: '2px 5px', borderRadius: 4, background: `${color}18`, color, border: `1px solid ${color}35`, letterSpacing: '0.06em' }}>{label}</div>
-      <span style={{ fontSize: 11, color, fontWeight: 600 }}>{pct}%</span>
-    </div>
-  )
-}
-
 // ── VariantCard ───────────────────────────────────────────────────────────────
 
 function VariantCard({ job, index }: { job: VariantJob; index: number }) {
@@ -111,15 +98,9 @@ function VariantCard({ job, index }: { job: VariantJob; index: number }) {
             <div style={{ height: '100%', background: 'linear-gradient(90deg,#22d3ee,#818cf8)', width: `${job.progress}%`, transition: 'width 0.4s ease' }} />
           </div>
         )}
-        {/* Status badge top-left */}
         {isDone && (
           <div style={{ position: 'absolute', top: 6, left: 6, background: 'rgba(10,10,20,0.8)', backdropFilter: 'blur(4px)', borderRadius: 5, padding: '2px 6px', fontSize: 9, fontWeight: 700, color: '#22d3ee', border: '1px solid rgba(34,211,238,0.2)' }}>
             #{String(index + 1).padStart(2, '0')}
-          </div>
-        )}
-        {isDone && job.similarityPct != null && (
-          <div style={{ position: 'absolute', top: 6, right: 6 }}>
-            <SimilarityBadge pct={job.similarityPct} />
           </div>
         )}
       </div>
@@ -127,12 +108,12 @@ function VariantCard({ job, index }: { job: VariantJob; index: number }) {
       {/* Transforms tags */}
       {isDone && job.transforms && job.transforms.length > 0 && (
         <div style={{ padding: '6px 8px', display: 'flex', flexWrap: 'wrap', gap: 3, borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-          {job.transforms.map((t, i) => (
+          {job.transforms.map((tr, i) => (
             <span key={i} style={{
               fontSize: 8, fontWeight: 600, padding: '2px 5px', borderRadius: 4,
               background: 'rgba(129,140,248,0.1)', color: 'rgba(167,139,250,0.8)',
               border: '1px solid rgba(129,140,248,0.15)',
-            }}>{t}</span>
+            }}>{tr}</span>
           ))}
         </div>
       )}

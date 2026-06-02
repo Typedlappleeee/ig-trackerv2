@@ -1112,59 +1112,52 @@ type RepurposeResult = { ok: boolean; outputPath?: string; similarityPct?: numbe
 // Build per-variant transforms from a seed + intensity settings
 function buildRepurposeVariant(seed: number, intensity: 'subtle' | 'medium' | 'aggressive' | 'vener', format: '9:16' | '1:1' | '16:9' | 'keep') {
   const ranges = {
-    //                  bri    con    sat    zoomMin zoomMax crop  crf  temp   hue
-    subtle:     { bri: 0.08,  con: 0.08,  sat: 0.25, zoomMin: 0.01, zoomMax: 0.06, crop: 5,  crf: 2, temp: 0.09, hue: 10 },
-    medium:     { bri: 0.15,  con: 0.15,  sat: 0.45, zoomMin: 0.03, zoomMax: 0.12, crop: 9,  crf: 4, temp: 0.18, hue: 22 },
-    aggressive: { bri: 0.28,  con: 0.25,  sat: 0.70, zoomMin: 0.07, zoomMax: 0.20, crop: 15, crf: 7, temp: 0.30, hue: 40 },
-    vener:      { bri: 0.40,  con: 0.38,  sat: 1.00, zoomMin: 0.14, zoomMax: 0.30, crop: 22, crf: 11, temp: 0.45, hue: 65 },
+    //              bri    con    sat    zoomMin zoomMax crop  crf  temp   hue
+    subtle:     { bri: 0.12, con: 0.12, sat: 0.40, zoomMin: 0.02, zoomMax: 0.07, crop: 6,  crf: 2, temp: 0.18, hue: 20 },
+    medium:     { bri: 0.22, con: 0.20, sat: 0.70, zoomMin: 0.04, zoomMax: 0.14, crop: 11, crf: 4, temp: 0.32, hue: 45 },
+    aggressive: { bri: 0.38, con: 0.35, sat: 1.10, zoomMin: 0.08, zoomMax: 0.22, crop: 18, crf: 6, temp: 0.50, hue: 75 },
+    vener:      { bri: 0.55, con: 0.50, sat: 1.50, zoomMin: 0.15, zoomMax: 0.32, crop: 25, crf: 9, temp: 0.70, hue: 110 },
   }[intensity]
 
   const rng  = seededRng(seed)
   const sign = () => rng(0, 1) > 0.5 ? 1 : -1
 
-  const brightness = sign() * rng(0.02, ranges.bri)
-  const contrast   = 1 + sign() * rng(0.02, ranges.con)
-  const saturation = 1 + sign() * rng(0.05, ranges.sat)
+  const brightness = sign() * rng(0.03, ranges.bri)
+  const contrast   = 1 + sign() * rng(0.03, ranges.con)
+  const saturation = 1 + sign() * rng(0.08, ranges.sat)
   const zoomPct    = rng(ranges.zoomMin, ranges.zoomMax)
   const panX       = rng(0, 1)
   const panY       = rng(0, 1)
   const cropX      = Math.floor(rng(0, ranges.crop))
   const cropY      = Math.floor(rng(0, ranges.crop))
-  const crf        = Math.round(26 + rng(0, ranges.crf))
+  const crf        = Math.round(28 + rng(0, ranges.crf))
 
-  // Color temperature: warm (boost R, cut B) or cool (boost B, cut R)
-  const tempStrength = rng(0.02, ranges.temp)
+  // Color temperature — warm (orange/amber) or cool (blue/cyan)
+  const tempStrength = rng(0.05, ranges.temp)
   const isWarm       = rng(0, 1) > 0.5
-  const rr = (isWarm ? 1 + tempStrength        : 1 - tempStrength * 0.6).toFixed(4)
-  const gg = (isWarm ? 1 + tempStrength * 0.15 : 1 - tempStrength * 0.05).toFixed(4)
-  const bb = (isWarm ? 1 - tempStrength * 0.75 : 1 + tempStrength       ).toFixed(4)
+  const rr = (isWarm ? 1 + tempStrength        : 1 - tempStrength * 0.7).toFixed(4)
+  const gg = (isWarm ? 1 + tempStrength * 0.2  : 1 - tempStrength * 0.1).toFixed(4)
+  const bb = (isWarm ? 1 - tempStrength * 0.8  : 1 + tempStrength      ).toFixed(4)
 
-  // Hue rotation — shifts all colors around the wheel
-  const hueShift = sign() * rng(2, ranges.hue)
+  // Hue rotation — shifts all colors distinctly per variant
+  const hueShift = sign() * rng(5, ranges.hue)
 
-  const floor = { subtle: 75, medium: 60, aggressive: 42, vener: 25 }[intensity]
-  const rawSim = 100 - (
-    Math.abs(brightness) * 55 +
-    Math.abs(contrast - 1) * 35 +
-    Math.abs(saturation - 1) * 25 +
-    zoomPct * 70 +
-    tempStrength * 50 +
-    Math.abs(hueShift) * 0.4
-  )
-  const similarityPct = Math.min(98, Math.max(floor, Math.round(rawSim)))
+  // Lifted blacks (matte/faded look) — random 0 or applied
+  const liftBlacks = rng(0, 1) > 0.5
+  const liftAmt    = rng(0.04, 0.12)
 
   const transformSummary: string[] = []
-  if (zoomPct > 0.005)                  transformSummary.push(`Zoom +${(zoomPct * 100).toFixed(0)}%`)
-  if (Math.abs(brightness) > 0.01)      transformSummary.push(`Lumière ${brightness > 0 ? '+' : ''}${(brightness * 100).toFixed(0)}%`)
-  if (Math.abs(contrast - 1) > 0.01)    transformSummary.push(`Contraste ${contrast > 1 ? '+' : ''}${((contrast - 1) * 100).toFixed(0)}%`)
-  if (Math.abs(saturation - 1) > 0.02)  transformSummary.push(`Saturation ${saturation > 1 ? '+' : ''}${((saturation - 1) * 100).toFixed(0)}%`)
   transformSummary.push(isWarm ? `🌡 Chaud +${(tempStrength * 100).toFixed(0)}%` : `❄ Froid +${(tempStrength * 100).toFixed(0)}%`)
-  if (Math.abs(hueShift) > 1)           transformSummary.push(`Teinte ${hueShift > 0 ? '+' : ''}${hueShift.toFixed(0)}°`)
-  if (cropX > 0 || cropY > 0)           transformSummary.push(`Crop ${Math.max(cropX, cropY)}px`)
+  transformSummary.push(`Teinte ${hueShift > 0 ? '+' : ''}${hueShift.toFixed(0)}°`)
+  transformSummary.push(`Saturation ${saturation > 1 ? '+' : ''}${((saturation - 1) * 100).toFixed(0)}%`)
+  if (Math.abs(brightness) > 0.02) transformSummary.push(`Lumière ${brightness > 0 ? '+' : ''}${(brightness * 100).toFixed(0)}%`)
+  if (Math.abs(contrast - 1) > 0.02) transformSummary.push(`Contraste ${contrast > 1 ? '+' : ''}${((contrast - 1) * 100).toFixed(0)}%`)
+  if (liftBlacks) transformSummary.push(`Matte +${(liftAmt * 100).toFixed(0)}%`)
+  if (zoomPct > 0.01) transformSummary.push(`Zoom +${(zoomPct * 100).toFixed(0)}%`)
 
   const vfParts: string[] = []
 
-  // 720p cap
+  // 720p cap — good quality for social media
   vfParts.push(`scale='if(gt(iw,ih),min(iw,1280),min(iw,720))':'if(gt(iw,ih),min(ih,720),min(ih,1280))'`)
 
   if (format !== 'keep') {
@@ -1175,7 +1168,7 @@ function buildRepurposeVariant(seed: number, intensity: 'subtle' | 'medium' | 'a
   }
   if (cropX > 0 || cropY > 0) vfParts.push(`crop=iw-${cropX * 2}:ih-${cropY * 2}:${cropX}:${cropY}`)
 
-  if (zoomPct > 0.005) {
+  if (zoomPct > 0.01) {
     const zf    = (1 + zoomPct).toFixed(4)
     const invZf = (1 / (1 + zoomPct)).toFixed(4)
     const ox    = ((1 - 1 / (1 + zoomPct)) * panX).toFixed(4)
@@ -1184,13 +1177,16 @@ function buildRepurposeVariant(seed: number, intensity: 'subtle' | 'medium' | 'a
     vfParts.push(`crop=iw*${invZf}:ih*${invZf}:iw*${ox}:ih*${oy}`)
   }
 
-  // Color temperature via channel mixer
+  // Color temperature
   vfParts.push(`colorchannelmixer=rr=${rr}:gg=${gg}:bb=${bb}`)
-  // Hue rotation + saturation + brightness/contrast
-  vfParts.push(`hue=h=${hueShift.toFixed(2)}:s=${saturation.toFixed(4)}`)
+  // Hue + saturation
+  vfParts.push(`hue=h=${hueShift.toFixed(1)}:s=${saturation.toFixed(4)}`)
+  // Brightness + contrast
   vfParts.push(`eq=brightness=${brightness.toFixed(4)}:contrast=${contrast.toFixed(4)}`)
+  // Lifted blacks (faded/matte look)
+  if (liftBlacks) vfParts.push(`curves=r='0/${liftAmt.toFixed(3)} 1/1':g='0/${liftAmt.toFixed(3)} 1/1':b='0/${liftAmt.toFixed(3)} 1/1'`)
 
-  return { vf: vfParts.join(','), crf, similarityPct, transformSummary }
+  return { vf: vfParts.join(','), crf, transformSummary }
 }
 
 // Batch version: writes input ONCE then runs N variants — avoids repeated I/O per variant.
@@ -1222,7 +1218,7 @@ export function runFfmpegRepurposeBatch(opts: {
       if (i > 0) opts.onVariantStart(i)
       opts.onVariantProgress(i, 15)
 
-      const { vf, crf, similarityPct, transformSummary } = buildRepurposeVariant(opts.seeds[i], opts.intensity, opts.format)
+      const { vf, crf, transformSummary } = buildRepurposeVariant(opts.seeds[i], opts.intensity, opts.format)
       await ff.deleteFile('rp_out.mp4').catch(() => {})
 
       try {
@@ -1231,6 +1227,7 @@ export function runFfmpegRepurposeBatch(opts: {
           '-nostdin', '-fflags', '+genpts', '-i', 'rp_in.mp4',
           '-map', '0:v:0', '-map', '0:a?',
           '-vf', vf,
+          '-r', '30',   // cap at 30fps — if source is 60fps, halves frames to encode
           '-c:v', 'libx264', '-preset', 'ultrafast', '-tune', 'fastdecode',
           '-crf', String(crf),
           '-pix_fmt', 'yuv420p', '-profile:v', 'main', '-level', '4.0',
@@ -1241,7 +1238,7 @@ export function runFfmpegRepurposeBatch(opts: {
         opts.onVariantProgress(i, 90)
         const url = await readOutput(ff, 'rp_out.mp4', 'video/mp4')
         opts.onVariantProgress(i, 100)
-        results.push({ ok: true, outputPath: url, similarityPct, transformSummary })
+        results.push({ ok: true, outputPath: url, transformSummary })
       } catch (err) {
         if (isWasmCrash(err)) { resetFFmpeg(); results.push({ ok: false, error: String(err) }); break }
         const relevant = logs.filter(l => /error|invalid|unknown|cannot/i.test(l)).slice(-2)
