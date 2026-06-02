@@ -1,6 +1,7 @@
 // ── ffmpeg.wasm wrappers ─────────────────────────────────────────────────────
 // Mirrors the Electron IPC handlers for FFmpeg operations.
 // Uses @ffmpeg/ffmpeg v0.12 which runs entirely in the browser via WebAssembly.
+import { supabase } from './supabase'
 
 // @ts-ignore – @ffmpeg/ffmpeg uses a 'node' export condition that hides types on Windows/Electron builds
 import { FFmpeg } from '@ffmpeg/ffmpeg'
@@ -1110,7 +1111,7 @@ function seededRng(seed: number) {
 type RepurposeResult = { ok: boolean; outputPath?: string; similarityPct?: number; transformSummary?: string[]; error?: string }
 
 // Build per-variant transforms from a seed + intensity settings
-function buildRepurposeVariant(seed: number, intensity: 'subtle' | 'medium' | 'aggressive' | 'vener', format: '9:16' | '1:1' | '16:9' | 'keep') {
+export function buildRepurposeVariant(seed: number, intensity: 'subtle' | 'medium' | 'aggressive' | 'vener', format: '9:16' | '1:1' | '16:9' | 'keep') {
   const ranges = {
     //              bri    con    sat    zoomMin zoomMax crop  crf  temp   hue
     subtle:     { bri: 0.12, con: 0.12, sat: 0.40, zoomMin: 0.02, zoomMax: 0.07, crop: 6,  crf: 2, temp: 0.18, hue: 20 },
@@ -1181,10 +1182,9 @@ function buildRepurposeVariant(seed: number, intensity: 'subtle' | 'medium' | 'a
   vfParts.push(`colorchannelmixer=rr=${rr}:gg=${gg}:bb=${bb}`)
   // Hue + saturation
   vfParts.push(`hue=h=${hueShift.toFixed(1)}:s=${saturation.toFixed(4)}`)
-  // Brightness + contrast
-  vfParts.push(`eq=brightness=${brightness.toFixed(4)}:contrast=${contrast.toFixed(4)}`)
-  // Lifted blacks (faded/matte look)
-  if (liftBlacks) vfParts.push(`curves=r='0/${liftAmt.toFixed(3)} 1/1':g='0/${liftAmt.toFixed(3)} 1/1':b='0/${liftAmt.toFixed(3)} 1/1'`)
+  // Brightness + contrast + optional gamma lift (gamma>1 lifts shadows for matte look)
+  const gammaVal = liftBlacks ? (1 + liftAmt * 2).toFixed(3) : '1.000'
+  vfParts.push(`eq=brightness=${brightness.toFixed(4)}:contrast=${contrast.toFixed(4)}:gamma=${gammaVal}`)
 
   return { vf: vfParts.join(','), crf, transformSummary }
 }
@@ -1268,4 +1268,65 @@ export function runFfmpegRepurposeWeb(opts: {
     onVariantStart: () => {},
     onVariantProgress: (_, pct) => opts.onProgress?.(pct),
   }).then(r => r[0] ?? { ok: false, error: 'No result' })
+}
+
+// Server-side repurpose via Vercel function + native FFmpeg.
+// Much faster than WASM: parallel encoding, native speed, no browser limits.
+export async function runRepurposeViaServer(opts: {
+  sourceUrl:   string
+  userId:      string
+  bucket?:     string
+  seeds:       number[]
+  intensity:   'subtle' | 'medium' | 'aggressive' | 'vener'
+  format:      '9:16' | '1:1' | '16:9' | 'keep'
+  onUploadProgress?: (pct: number) => void
+  onProcessing?:     () => void
+}): Promise<RepurposeResult[]> {
+  const bucket = opts.bucket ?? 'content'
+
+  // Build variant params client-side (deterministic from seed)
+  const variants = opts.seeds.map(seed => {
+    const { vf, crf, transformSummary } = buildRepurposeVariant(seed, opts.intensity, opts.format)
+    return { vf, crf, transformSummary }
+  })
+
+  // Upload source video to Supabase temp storage
+  opts.onUploadProgress?.(0)
+  const resp = await fetch(opts.sourceUrl)
+  const blob = await resp.blob()
+  const tempPath = `repurpose-temp/${opts.userId}/${Date.now()}.mp4`
+
+  const { error: upErr } = await supabase.storage.from(bucket).upload(tempPath, blob, {
+    contentType: 'video/mp4',
+    upsert: true,
+  })
+  if (upErr) return [{ ok: false, error: upErr.message }]
+  opts.onUploadProgress?.(100)
+
+  // Call the Vercel function — native FFmpeg, all variants in parallel
+  opts.onProcessing?.()
+  const apiResp = await fetch('/api/repurpose', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      storagePath: tempPath,
+      bucket,
+      variants: variants.map(v => ({ vf: v.vf, crf: v.crf })),
+    }),
+  })
+
+  if (!apiResp.ok) {
+    const txt = await apiResp.text().catch(() => apiResp.statusText)
+    return [{ ok: false, error: `Server error: ${txt}` }]
+  }
+
+  const data = await apiResp.json()
+  if (!data.ok) return [{ ok: false, error: data.error ?? 'Server error' }]
+
+  return (data.results as Array<{ ok: boolean; url?: string; storagePath?: string; error?: string }>).map((r, i) => ({
+    ok:              r.ok,
+    outputPath:      r.url,
+    transformSummary: variants[i]?.transformSummary,
+    error:           r.error,
+  }))
 }
