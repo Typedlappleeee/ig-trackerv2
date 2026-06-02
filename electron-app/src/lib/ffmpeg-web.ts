@@ -1138,7 +1138,7 @@ export function runFfmpegRepurposeWeb(opts: {
   const panY       = rng(0, 1)                             // 0=top,  0.5=center, 1=bottom
   const cropX      = Math.floor(rng(0, ranges.crop))
   const cropY      = Math.floor(rng(0, ranges.crop))
-  const crf        = Math.round(22 + rng(0, ranges.crf))
+  const crf        = Math.round(26 + rng(0, ranges.crf))
 
   // Similarity estimate — anchored per intensity
   const floor = { subtle: 90, medium: 80, aggressive: 65, vener: 42 }[opts.intensity]
@@ -1174,6 +1174,11 @@ export function runFfmpegRepurposeWeb(opts: {
     const eqFilter = `eq=brightness=${brightness.toFixed(4)}:contrast=${contrast.toFixed(4)}:saturation=${saturation.toFixed(4)}`
 
     const vfParts: string[] = []
+
+    // Cap resolution to 1080p max (portrait or landscape) before any transform —
+    // dramatically speeds up encoding for high-res inputs (4K → ~4× faster).
+    vfParts.push(`scale='if(gt(iw,1920),1920,iw)':-2`)
+
     if (opts.format !== 'keep') {
       const W = opts.format === '16:9' ? 1920 : 1080
       const H = opts.format === '9:16' ? 1920 : 1080
@@ -1184,11 +1189,10 @@ export function runFfmpegRepurposeWeb(opts: {
 
     // Zoom-in by scaling up then cropping back — pan position shifts which part is kept
     if (zoomPct > 0.005) {
-      const zf    = (1 + zoomPct).toFixed(4)       // e.g. "1.0800"
-      const invZf = (1 / (1 + zoomPct)).toFixed(4) // e.g. "0.9259"
+      const zf    = (1 + zoomPct).toFixed(4)
+      const invZf = (1 / (1 + zoomPct)).toFixed(4)
       const ox    = ((1 - 1 / (1 + zoomPct)) * panX).toFixed(4)
       const oy    = ((1 - 1 / (1 + zoomPct)) * panY).toFixed(4)
-      // scale up, then crop back to original size at the pan position
       vfParts.push(`scale=iw*${zf}:ih*${zf}`)
       vfParts.push(`crop=iw*${invZf}:ih*${invZf}:iw*${ox}:ih*${oy}`)
     }
@@ -1201,11 +1205,12 @@ export function runFfmpegRepurposeWeb(opts: {
     await ff.exec([
       '-nostdin', '-fflags', '+genpts', '-i', 'rp_in.mp4',
       '-map', '0:v:0',
-      '-map', '0:a?',        // include audio only if the input has one
+      '-map', '0:a?',
       '-vf', vf,
-      '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', String(crf),
+      '-c:v', 'libx264', '-preset', 'ultrafast', '-tune', 'fastdecode',
+      '-crf', String(crf),
       '-pix_fmt', 'yuv420p', '-profile:v', 'main', '-level', '4.0',
-      '-c:a', 'aac', '-b:a', '128k',
+      '-c:a', 'copy',        // copy audio stream as-is — no re-encode needed
       '-movflags', '+faststart',
       '-y', 'rp_out.mp4',
     ])
