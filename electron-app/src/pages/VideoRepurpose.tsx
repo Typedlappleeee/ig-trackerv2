@@ -477,9 +477,9 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
             <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(148,163,184,0.45)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 7 }}>{t('repurposeIntensitySection')}</div>
             {(['subtle', 'medium', 'aggressive'] as Intensity[]).map(lv => {
               const meta = {
-                subtle:     { label: t('repurposeSubtle'),     desc: '~90-99% similaire', color: '#22d3ee', bars: 1 },
-                medium:     { label: t('repurposeMedium'),     desc: '~80-90% similaire', color: '#fbbf24', bars: 2 },
-                aggressive: { label: t('repurposeAggressive'), desc: '~65-80% similaire', color: '#f87171', bars: 3 },
+                subtle:     { label: t('repurposeSubtle'),     desc: '~75-90% · couleur + zoom léger',    color: '#22d3ee', bars: 1 },
+                medium:     { label: t('repurposeMedium'),     desc: '~60-80% · temp. couleur + teinte',  color: '#fbbf24', bars: 2 },
+                aggressive: { label: t('repurposeAggressive'), desc: '~42-65% · fort changement visuel',  color: '#f87171', bars: 3 },
               }[lv]
               const active = intensity === lv
               return (

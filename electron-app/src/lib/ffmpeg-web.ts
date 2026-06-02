@@ -1112,18 +1112,19 @@ type RepurposeResult = { ok: boolean; outputPath?: string; similarityPct?: numbe
 // Build per-variant transforms from a seed + intensity settings
 function buildRepurposeVariant(seed: number, intensity: 'subtle' | 'medium' | 'aggressive' | 'vener', format: '9:16' | '1:1' | '16:9' | 'keep') {
   const ranges = {
-    subtle:     { bri: 0.030, con: 0.025, sat: 0.045, zoomMin: 0.00, zoomMax: 0.04, crop: 3,  crf: 2 },
-    medium:     { bri: 0.070, con: 0.060, sat: 0.100, zoomMin: 0.02, zoomMax: 0.08, crop: 6,  crf: 4 },
-    aggressive: { bri: 0.120, con: 0.090, sat: 0.150, zoomMin: 0.05, zoomMax: 0.13, crop: 10, crf: 7 },
-    vener:      { bri: 0.200, con: 0.150, sat: 0.250, zoomMin: 0.10, zoomMax: 0.22, crop: 16, crf: 11 },
+    //                  bri    con    sat    zoomMin zoomMax crop  crf  temp   hue
+    subtle:     { bri: 0.08,  con: 0.08,  sat: 0.25, zoomMin: 0.01, zoomMax: 0.06, crop: 5,  crf: 2, temp: 0.09, hue: 10 },
+    medium:     { bri: 0.15,  con: 0.15,  sat: 0.45, zoomMin: 0.03, zoomMax: 0.12, crop: 9,  crf: 4, temp: 0.18, hue: 22 },
+    aggressive: { bri: 0.28,  con: 0.25,  sat: 0.70, zoomMin: 0.07, zoomMax: 0.20, crop: 15, crf: 7, temp: 0.30, hue: 40 },
+    vener:      { bri: 0.40,  con: 0.38,  sat: 1.00, zoomMin: 0.14, zoomMax: 0.30, crop: 22, crf: 11, temp: 0.45, hue: 65 },
   }[intensity]
 
   const rng  = seededRng(seed)
   const sign = () => rng(0, 1) > 0.5 ? 1 : -1
 
-  const brightness = sign() * rng(0.005, ranges.bri)
-  const contrast   = 1 + sign() * rng(0.005, ranges.con)
-  const saturation = 1 + sign() * rng(0.005, ranges.sat)
+  const brightness = sign() * rng(0.02, ranges.bri)
+  const contrast   = 1 + sign() * rng(0.02, ranges.con)
+  const saturation = 1 + sign() * rng(0.05, ranges.sat)
   const zoomPct    = rng(ranges.zoomMin, ranges.zoomMax)
   const panX       = rng(0, 1)
   const panY       = rng(0, 1)
@@ -1131,28 +1132,42 @@ function buildRepurposeVariant(seed: number, intensity: 'subtle' | 'medium' | 'a
   const cropY      = Math.floor(rng(0, ranges.crop))
   const crf        = Math.round(26 + rng(0, ranges.crf))
 
-  const floor = { subtle: 90, medium: 80, aggressive: 65, vener: 42 }[intensity]
-  const rawSim = 100 - (Math.abs(brightness) * 60 + Math.abs(contrast - 1) * 40 + Math.abs(saturation - 1) * 30 + zoomPct * 80)
-  const similarityPct = Math.min(99, Math.max(floor, Math.round(rawSim)))
+  // Color temperature: warm (boost R, cut B) or cool (boost B, cut R)
+  const tempStrength = rng(0.02, ranges.temp)
+  const isWarm       = rng(0, 1) > 0.5
+  const rr = (isWarm ? 1 + tempStrength        : 1 - tempStrength * 0.6).toFixed(4)
+  const gg = (isWarm ? 1 + tempStrength * 0.15 : 1 - tempStrength * 0.05).toFixed(4)
+  const bb = (isWarm ? 1 - tempStrength * 0.75 : 1 + tempStrength       ).toFixed(4)
+
+  // Hue rotation — shifts all colors around the wheel
+  const hueShift = sign() * rng(2, ranges.hue)
+
+  const floor = { subtle: 75, medium: 60, aggressive: 42, vener: 25 }[intensity]
+  const rawSim = 100 - (
+    Math.abs(brightness) * 55 +
+    Math.abs(contrast - 1) * 35 +
+    Math.abs(saturation - 1) * 25 +
+    zoomPct * 70 +
+    tempStrength * 50 +
+    Math.abs(hueShift) * 0.4
+  )
+  const similarityPct = Math.min(98, Math.max(floor, Math.round(rawSim)))
 
   const transformSummary: string[] = []
   if (zoomPct > 0.005)                  transformSummary.push(`Zoom +${(zoomPct * 100).toFixed(0)}%`)
-  if (Math.abs(brightness) > 0.001)     transformSummary.push(`Lumière ${brightness > 0 ? '+' : ''}${(brightness * 100).toFixed(1)}%`)
-  if (Math.abs(contrast - 1) > 0.001)   transformSummary.push(`Contraste ${contrast > 1 ? '+' : ''}${((contrast - 1) * 100).toFixed(1)}%`)
-  if (Math.abs(saturation - 1) > 0.001) transformSummary.push(`Saturation ${saturation > 1 ? '+' : ''}${((saturation - 1) * 100).toFixed(1)}%`)
+  if (Math.abs(brightness) > 0.01)      transformSummary.push(`Lumière ${brightness > 0 ? '+' : ''}${(brightness * 100).toFixed(0)}%`)
+  if (Math.abs(contrast - 1) > 0.01)    transformSummary.push(`Contraste ${contrast > 1 ? '+' : ''}${((contrast - 1) * 100).toFixed(0)}%`)
+  if (Math.abs(saturation - 1) > 0.02)  transformSummary.push(`Saturation ${saturation > 1 ? '+' : ''}${((saturation - 1) * 100).toFixed(0)}%`)
+  transformSummary.push(isWarm ? `🌡 Chaud +${(tempStrength * 100).toFixed(0)}%` : `❄ Froid +${(tempStrength * 100).toFixed(0)}%`)
+  if (Math.abs(hueShift) > 1)           transformSummary.push(`Teinte ${hueShift > 0 ? '+' : ''}${hueShift.toFixed(0)}°`)
   if (cropX > 0 || cropY > 0)           transformSummary.push(`Crop ${Math.max(cropX, cropY)}px`)
-  transformSummary.push(`CRF ${crf}`)
-
-  const eqFilter = `eq=brightness=${brightness.toFixed(4)}:contrast=${contrast.toFixed(4)}:saturation=${saturation.toFixed(4)}`
 
   const vfParts: string[] = []
 
-  // 720p cap — 2.25× fewer pixels vs 1080p → ~2× faster encode
-  // Portrait: min(720,1280), Landscape: min(1280,720), auto-orient by iw/ih ratio
+  // 720p cap
   vfParts.push(`scale='if(gt(iw,ih),min(iw,1280),min(iw,720))':'if(gt(iw,ih),min(ih,720),min(ih,1280))'`)
 
   if (format !== 'keep') {
-    // 720p targets instead of 1080p
     const W = format === '16:9' ? 1280 : 720
     const H = format === '9:16' ? 1280 : 720
     vfParts.push(`scale=${W}:${H}:force_original_aspect_ratio=increase`)
@@ -1169,7 +1184,11 @@ function buildRepurposeVariant(seed: number, intensity: 'subtle' | 'medium' | 'a
     vfParts.push(`crop=iw*${invZf}:ih*${invZf}:iw*${ox}:ih*${oy}`)
   }
 
-  vfParts.push(eqFilter)
+  // Color temperature via channel mixer
+  vfParts.push(`colorchannelmixer=rr=${rr}:gg=${gg}:bb=${bb}`)
+  // Hue rotation + saturation + brightness/contrast
+  vfParts.push(`hue=h=${hueShift.toFixed(2)}:s=${saturation.toFixed(4)}`)
+  vfParts.push(`eq=brightness=${brightness.toFixed(4)}:contrast=${contrast.toFixed(4)}`)
 
   return { vf: vfParts.join(','), crf, similarityPct, transformSummary }
 }
