@@ -1158,8 +1158,8 @@ export function buildRepurposeVariant(seed: number, intensity: 'subtle' | 'mediu
 
   const vfParts: string[] = []
 
-  // 720p cap — good quality for social media
-  vfParts.push(`scale='if(gt(iw,ih),min(iw,1280),min(iw,720))':'if(gt(iw,ih),min(ih,720),min(ih,1280))'`)
+  // 720p cap — scale so shortest side ≤ 720, no upscaling (backslash-escapes avoid single-quote issues in WASM)
+  vfParts.push('scale=iw*min(1\\,720/min(iw\\,ih)):ih*min(1\\,720/min(iw\\,ih))')
 
   if (format !== 'keep') {
     const W = format === '16:9' ? 1280 : 720
@@ -1185,6 +1185,8 @@ export function buildRepurposeVariant(seed: number, intensity: 'subtle' | 'mediu
   // Brightness + contrast + optional gamma lift (gamma>1 lifts shadows for matte look)
   const gammaVal = liftBlacks ? (1 + liftAmt * 2).toFixed(3) : '1.000'
   vfParts.push(`eq=brightness=${brightness.toFixed(4)}:contrast=${contrast.toFixed(4)}:gamma=${gammaVal}`)
+  // Guarantee even dimensions (libx264 yuv420p requires width & height to be multiples of 2)
+  vfParts.push('scale=trunc(iw/2)*2:trunc(ih/2)*2')
 
   return { vf: vfParts.join(','), crf, transformSummary }
 }
@@ -1236,7 +1238,13 @@ export function runFfmpegRepurposeBatch(opts: {
           '-y', 'rp_out.mp4',
         ])
         opts.onVariantProgress(i, 90)
-        const url = await readOutput(ff, 'rp_out.mp4', 'video/mp4')
+        // Validate output before creating blob — FFmpeg can exit 0 with an empty file
+        const rawOut = await ff.readFile('rp_out.mp4') as Uint8Array
+        if (rawOut.byteLength < 5000) {
+          const errLine = logs.filter(l => /error|invalid/i.test(l)).slice(-1)[0] ?? ''
+          throw new Error(`Output vide (${rawOut.byteLength}B)${errLine ? ` — ${errLine}` : ''}`)
+        }
+        const url = URL.createObjectURL(new Blob([rawOut.buffer as ArrayBuffer], { type: 'video/mp4' }))
         opts.onVariantProgress(i, 100)
         results.push({ ok: true, outputPath: url, transformSummary })
       } catch (err) {
