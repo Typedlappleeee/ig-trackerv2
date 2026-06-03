@@ -1292,37 +1292,40 @@ export async function runRepurposeViaServer(opts: {
 }): Promise<RepurposeResult[]> {
   const bucket = opts.bucket ?? 'content'
 
-  // Build variant params client-side (deterministic from seed)
   const variants = opts.seeds.map(seed => {
     const { vf, crf, transformSummary } = buildRepurposeVariant(seed, opts.intensity, opts.format)
     return { vf, crf, transformSummary }
   })
 
-  // Upload source video using a path that satisfies the storage RLS policy
-  // (policy requires videos/users/{uid}/ or videos/orgs/{orgId}/)
-  opts.onUploadProgress?.(0)
-  const resp = await fetch(opts.sourceUrl)
-  const blob = await resp.blob()
-  const ts = Date.now()
-  const tempPath = `videos/users/${opts.userId}/rp-src-${ts}.mp4`
+  // If the source is already an HTTP URL (e.g. Supabase signed URL from bank),
+  // pass it directly to the server — no upload needed, saves 10-30s.
+  // Only upload when it's a local blob: URL (file picked from device).
+  let sourcePayload: { sourceUrl: string } | { storagePath: string; bucket: string }
 
-  const { error: upErr } = await supabase.storage.from(bucket).upload(tempPath, blob, {
-    contentType: 'video/mp4',
-    upsert: true,
-  })
-  if (upErr) return [{ ok: false, error: upErr.message }]
-  opts.onUploadProgress?.(100)
+  if (opts.sourceUrl.startsWith('blob:') || opts.sourceUrl.startsWith('data:')) {
+    opts.onUploadProgress?.(0)
+    const resp = await fetch(opts.sourceUrl)
+    const blob = await resp.blob()
+    const tempPath = `videos/users/${opts.userId}/rp-src-${Date.now()}.mp4`
+    const { error: upErr } = await supabase.storage.from(bucket).upload(tempPath, blob, {
+      contentType: 'video/mp4', upsert: true,
+    })
+    if (upErr) throw new Error(upErr.message)
+    opts.onUploadProgress?.(100)
+    sourcePayload = { storagePath: tempPath, bucket }
+  } else {
+    // Already a reachable URL — server fetches it directly, no Supabase roundtrip
+    opts.onUploadProgress?.(100)
+    sourcePayload = { sourceUrl: opts.sourceUrl }
+  }
 
-  // Call the Vercel function — native FFmpeg, all variants in parallel
-  // Pass userId so the server stores results under videos/users/{userId}/ (readable by client)
   opts.onProcessing?.()
   const apiResp = await fetch('/api/repurpose', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      storagePath: tempPath,
+      ...sourcePayload,
       userId: opts.userId,
-      bucket,
       variants: variants.map(v => ({ vf: v.vf, crf: v.crf })),
     }),
   })

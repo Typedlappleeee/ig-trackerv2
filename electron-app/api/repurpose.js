@@ -1,7 +1,5 @@
 // Server-side video repurpose using native FFmpeg.
-// Flow: client uploads source to Supabase temp → calls this → FFmpeg processes
-//       all variants in parallel → uploads results → returns public URLs.
-// Accepts: POST { storagePath, bucket, variants: [{vf, crf}] }
+// Accepts: POST { sourceUrl|storagePath, userId, bucket?, variants: [{vf, crf}] }
 // Returns: { ok, results: [{ok, url, storagePath?}] }
 
 const ffmpegPath = require('ffmpeg-static')
@@ -24,21 +22,29 @@ function getSupabaseAdmin() {
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'Method not allowed' })
 
-  const { storagePath, userId, bucket = 'content', variants } = req.body ?? {}
-  if (!storagePath || !Array.isArray(variants) || variants.length === 0)
-    return res.status(400).json({ ok: false, error: 'Missing storagePath or variants' })
+  const { sourceUrl, storagePath, userId, bucket = 'content', variants } = req.body ?? {}
+  if ((!sourceUrl && !storagePath) || !Array.isArray(variants) || variants.length === 0)
+    return res.status(400).json({ ok: false, error: 'Missing source or variants' })
 
   const supabase = getSupabaseAdmin()
   const tmpDir   = os.tmpdir()
   const inputPath = path.join(tmpDir, `rp_in_${Date.now()}.mp4`)
 
   try {
-    // Download source from Supabase
-    const { data: blob, error: dlErr } = await supabase.storage.from(bucket).download(storagePath)
-    if (dlErr) return res.status(400).json({ ok: false, error: dlErr.message })
-    fs.writeFileSync(inputPath, Buffer.from(await blob.arrayBuffer()))
+    if (sourceUrl) {
+      // Direct HTTP URL (e.g. Supabase signed URL) — fetch without Supabase roundtrip
+      const resp = await fetch(sourceUrl)
+      if (!resp.ok) return res.status(400).json({ ok: false, error: `Failed to fetch source: ${resp.status}` })
+      const buf = Buffer.from(await resp.arrayBuffer())
+      fs.writeFileSync(inputPath, buf)
+    } else {
+      // Blob was uploaded to Supabase by client — download via service role
+      const { data: blob, error: dlErr } = await supabase.storage.from(bucket).download(storagePath)
+      if (dlErr) return res.status(400).json({ ok: false, error: dlErr.message })
+      fs.writeFileSync(inputPath, Buffer.from(await blob.arrayBuffer()))
+    }
 
-    // Process all variants in parallel — native FFmpeg is fast enough to run concurrently
+    // Process all variants in parallel
     const results = await Promise.all(variants.map(async (variant, i) => {
       const outPath = path.join(tmpDir, `rp_out_${Date.now()}_${i}.mp4`)
       try {
@@ -55,14 +61,12 @@ module.exports = async (req, res) => {
           '-y', outPath,
         ], { maxBuffer: 100 * 1024 * 1024 })
 
-        // Store under videos/users/{userId}/ so the client's storage SELECT policy allows reading it
         const resultPath = userId
           ? `videos/users/${userId}/rp-out-${Date.now()}_${i}_${Math.random().toString(36).slice(2)}.mp4`
           : `repurpose-results/${Date.now()}_${i}_${Math.random().toString(36).slice(2)}.mp4`
         const outBuf = fs.readFileSync(outPath)
         const { error: upErr } = await supabase.storage.from(bucket).upload(resultPath, outBuf, {
-          contentType: 'video/mp4',
-          upsert: true,
+          contentType: 'video/mp4', upsert: true,
         })
         if (upErr) throw new Error(upErr.message)
 
@@ -80,8 +84,8 @@ module.exports = async (req, res) => {
     res.status(500).json({ ok: false, error: String(err) })
   } finally {
     fs.rmSync(inputPath, { force: true })
-    // Clean up temp source from Supabase (best-effort)
-    supabase.storage.from(bucket).remove([storagePath]).catch(() => {})
+    // Clean up temp source from Supabase if it was uploaded by client
+    if (storagePath) supabase.storage.from(bucket).remove([storagePath]).catch(() => {})
   }
 }
 
