@@ -1329,11 +1329,11 @@ export async function runRepurposeViaServer(opts: {
 
   if (!apiResp.ok) {
     const txt = await apiResp.text().catch(() => apiResp.statusText)
-    return [{ ok: false, error: `Server error: ${txt}` }]
+    throw new Error(`Server error: ${txt}`)
   }
 
   const data = await apiResp.json()
-  if (!data.ok) return [{ ok: false, error: data.error ?? 'Server error' }]
+  if (!data.ok) throw new Error(data.error ?? 'Server error')
 
   return (data.results as Array<{ ok: boolean; url?: string; storagePath?: string; error?: string }>).map((r, i) => ({
     ok:              r.ok,

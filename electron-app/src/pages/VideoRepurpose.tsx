@@ -271,9 +271,9 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
           })
         }
 
-        for (let vi = 0; vi < results.length; vi++) {
+        for (let vi = 0; vi < sourceJobs.length; vi++) {
           if (abortRef.current) break
-          const result = results[vi]
+          const result = results[vi] ?? { ok: false, error: 'No result' }
           const job    = sourceJobs[vi]
 
           if (result.ok && result.outputPath) {
