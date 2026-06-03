@@ -1279,7 +1279,7 @@ export function runFfmpegRepurposeWeb(opts: {
 }
 
 // Server-side repurpose via Vercel function + native FFmpeg.
-// Much faster than WASM: parallel encoding, native speed, no browser limits.
+// Splits into parallel batches of 3 to stay within Vercel's 60s timeout.
 export async function runRepurposeViaServer(opts: {
   sourceUrl:   string
   userId:      string
@@ -1290,23 +1290,23 @@ export async function runRepurposeViaServer(opts: {
   onUploadProgress?: (pct: number) => void
   onProcessing?:     () => void
 }): Promise<RepurposeResult[]> {
-  const bucket = opts.bucket ?? 'content'
+  const bucket   = opts.bucket ?? 'content'
+  const BATCH    = 3  // max variants per Vercel call to stay under 60s timeout
 
-  const variants = opts.seeds.map(seed => {
+  const allVariants = opts.seeds.map(seed => {
     const { vf, crf, transformSummary } = buildRepurposeVariant(seed, opts.intensity, opts.format)
     return { vf, crf, transformSummary }
   })
 
-  // If the source is already an HTTP URL (e.g. Supabase signed URL from bank),
-  // pass it directly to the server — no upload needed, saves 10-30s.
-  // Only upload when it's a local blob: URL (file picked from device).
-  let sourcePayload: { sourceUrl: string } | { storagePath: string; bucket: string }
+  // For blob: URLs upload once to Supabase; HTTP URLs are fetched directly by server
+  let sourcePayload: Record<string, string>
+  let tempPath: string | null = null
 
   if (opts.sourceUrl.startsWith('blob:') || opts.sourceUrl.startsWith('data:')) {
     opts.onUploadProgress?.(0)
     const resp = await fetch(opts.sourceUrl)
     const blob = await resp.blob()
-    const tempPath = `videos/users/${opts.userId}/rp-src-${Date.now()}.mp4`
+    tempPath = `videos/users/${opts.userId}/rp-src-${Date.now()}.mp4`
     const { error: upErr } = await supabase.storage.from(bucket).upload(tempPath, blob, {
       contentType: 'video/mp4', upsert: true,
     })
@@ -1314,35 +1314,43 @@ export async function runRepurposeViaServer(opts: {
     opts.onUploadProgress?.(100)
     sourcePayload = { storagePath: tempPath, bucket }
   } else {
-    // Already a reachable URL — server fetches it directly, no Supabase roundtrip
     opts.onUploadProgress?.(100)
     sourcePayload = { sourceUrl: opts.sourceUrl }
   }
 
   opts.onProcessing?.()
-  const apiResp = await fetch('/api/repurpose', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      ...sourcePayload,
-      userId: opts.userId,
-      variants: variants.map(v => ({ vf: v.vf, crf: v.crf })),
-    }),
-  })
 
-  if (!apiResp.ok) {
-    const txt = await apiResp.text().catch(() => apiResp.statusText)
-    throw new Error(`Server error: ${txt}`)
-  }
+  // Split into batches and fire all in parallel
+  const batches: Array<typeof allVariants> = []
+  for (let i = 0; i < allVariants.length; i += BATCH) batches.push(allVariants.slice(i, i + BATCH))
 
-  const data = await apiResp.json()
-  if (!data.ok) throw new Error(data.error ?? 'Server error')
-
-  return (data.results as Array<{ ok: boolean; url?: string; storagePath?: string; error?: string }>).map((r, i) => ({
-    ok:              r.ok,
-    outputPath:      r.url,
-    storagePath:     r.storagePath,
-    transformSummary: variants[i]?.transformSummary,
-    error:           r.error,
+  const batchResponses = await Promise.all(batches.map(async batch => {
+    const apiResp = await fetch('/api/repurpose', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...sourcePayload,
+        userId: opts.userId,
+        variants: batch.map(v => ({ vf: v.vf, crf: v.crf })),
+      }),
+    })
+    if (!apiResp.ok) throw new Error(`Server error: ${await apiResp.text().catch(() => apiResp.statusText)}`)
+    const data = await apiResp.json()
+    if (!data.ok) throw new Error(data.error ?? 'Server error')
+    return { data, batch }
   }))
+
+  // Cleanup temp source (best-effort, after all batches done)
+  if (tempPath) supabase.storage.from(bucket).remove([tempPath]).catch(() => {})
+
+  // Flatten results in original seed order
+  return batchResponses.flatMap(({ data, batch }) =>
+    (data.results as Array<{ ok: boolean; url?: string; storagePath?: string; error?: string }>).map((r, i) => ({
+      ok:               r.ok,
+      outputPath:       r.url,
+      storagePath:      r.storagePath,
+      transformSummary: batch[i]?.transformSummary,
+      error:            r.error,
+    }))
+  )
 }
