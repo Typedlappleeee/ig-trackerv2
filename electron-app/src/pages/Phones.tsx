@@ -714,10 +714,6 @@ export function Phones({ user }: PhonesProps) {
       const currentGeelarkIds = new Set(rows.map(r => r.geelark_id))
 
       if (currentOrg) {
-        // Org mode: unique key is (org_id, geelark_id) — not (user_id, geelark_id).
-        // Two members of the same org, or two orgs sharing the same GéeLark API,
-        // can all have rows with the same geelark_id under different org_ids.
-
         // Delete phones removed from GéeLark (only those already in this org)
         const { data: orgPhones } = await supabase
           .from('phones').select('id,geelark_id').eq('org_id', currentOrg.id)
@@ -726,10 +722,10 @@ export function Phones({ user }: PhonesProps) {
           await supabase.from('phones').delete().in('id', toDelete.map((p: { id: string }) => p.id))
         }
 
-        // Upsert on (org_id, geelark_id): handles race conditions between members
-        // syncing simultaneously and re-syncs after the phone was deleted.
-        const { error } = await supabase.from('phones')
-          .upsert(rows, { onConflict: 'org_id,geelark_id', ignoreDuplicates: false })
+        const { error } = await supabase.rpc('sync_geelark_phones', {
+          p_rows:   rows,
+          p_org_id: currentOrg.id,
+        })
         if (error) throw new Error(error.message)
       } else {
         // Solo mode — delete phones no longer in GéeLark then upsert the rest
@@ -739,8 +735,10 @@ export function Phones({ user }: PhonesProps) {
           .is('org_id', null)
           .not('geelark_id', 'in', `(${[...currentGeelarkIds].join(',')})`)
 
-        const { error: upsertErr } = await supabase
-          .from('phones').upsert(rows, { onConflict: 'user_id,geelark_id' })
+        const { error: upsertErr } = await supabase.rpc('sync_geelark_phones', {
+          p_rows:   rows,
+          p_org_id: null,
+        })
         if (upsertErr) throw new Error(upsertErr.message)
       }
       lastDbSyncRef.current = new Date()

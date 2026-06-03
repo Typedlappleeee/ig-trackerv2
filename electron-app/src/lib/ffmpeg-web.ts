@@ -1,6 +1,7 @@
 // ── ffmpeg.wasm wrappers ─────────────────────────────────────────────────────
 // Mirrors the Electron IPC handlers for FFmpeg operations.
 // Uses @ffmpeg/ffmpeg v0.12 which runs entirely in the browser via WebAssembly.
+import { supabase } from './supabase'
 
 // @ts-ignore – @ffmpeg/ffmpeg uses a 'node' export condition that hides types on Windows/Electron builds
 import { FFmpeg } from '@ffmpeg/ffmpeg'
@@ -1107,120 +1108,249 @@ function seededRng(seed: number) {
 }
 
 // ── runFfmpegRepurposeWeb — generate one unique variant ───────────────────────
-// Applies invisible micro-transforms so each export has a different hash/signature
-// while remaining perceptually identical to the source video.
+type RepurposeResult = { ok: boolean; outputPath?: string; storagePath?: string; similarityPct?: number; transformSummary?: string[]; error?: string }
+
+// Build per-variant transforms from a seed + intensity settings
+export function buildRepurposeVariant(seed: number, intensity: 'subtle' | 'medium' | 'aggressive' | 'vener', format: '9:16' | '1:1' | '16:9' | 'keep') {
+  const ranges = {
+    //              bri    con    sat    zoomMin zoomMax crop  crf  temp   hue
+    subtle:     { bri: 0.12, con: 0.12, sat: 0.40, zoomMin: 0.02, zoomMax: 0.07, crop: 6,  crf: 2, temp: 0.18, hue: 20 },
+    medium:     { bri: 0.22, con: 0.20, sat: 0.70, zoomMin: 0.04, zoomMax: 0.14, crop: 11, crf: 4, temp: 0.32, hue: 45 },
+    aggressive: { bri: 0.38, con: 0.35, sat: 1.10, zoomMin: 0.08, zoomMax: 0.22, crop: 18, crf: 6, temp: 0.50, hue: 75 },
+    vener:      { bri: 0.55, con: 0.50, sat: 1.50, zoomMin: 0.15, zoomMax: 0.32, crop: 25, crf: 9, temp: 0.70, hue: 110 },
+  }[intensity]
+
+  const rng  = seededRng(seed)
+  const sign = () => rng(0, 1) > 0.5 ? 1 : -1
+
+  const brightness = sign() * rng(0.03, ranges.bri)
+  const contrast   = 1 + sign() * rng(0.03, ranges.con)
+  const saturation = 1 + sign() * rng(0.08, ranges.sat)
+  const zoomPct    = rng(ranges.zoomMin, ranges.zoomMax)
+  const panX       = rng(0, 1)
+  const panY       = rng(0, 1)
+  const cropX      = Math.floor(rng(0, ranges.crop))
+  const cropY      = Math.floor(rng(0, ranges.crop))
+  const crf        = Math.round(28 + rng(0, ranges.crf))
+
+  // Color temperature — warm (orange/amber) or cool (blue/cyan)
+  const tempStrength = rng(0.05, ranges.temp)
+  const isWarm       = rng(0, 1) > 0.5
+  const rr = (isWarm ? 1 + tempStrength        : 1 - tempStrength * 0.7).toFixed(4)
+  const gg = (isWarm ? 1 + tempStrength * 0.2  : 1 - tempStrength * 0.1).toFixed(4)
+  const bb = (isWarm ? 1 - tempStrength * 0.8  : 1 + tempStrength      ).toFixed(4)
+
+  // Hue rotation — shifts all colors distinctly per variant
+  const hueShift = sign() * rng(5, ranges.hue)
+
+  // Lifted blacks (matte/faded look) — random 0 or applied
+  const liftBlacks = rng(0, 1) > 0.5
+  const liftAmt    = rng(0.04, 0.12)
+
+  const transformSummary: string[] = []
+  transformSummary.push(isWarm ? `🌡 Chaud +${(tempStrength * 100).toFixed(0)}%` : `❄ Froid +${(tempStrength * 100).toFixed(0)}%`)
+  transformSummary.push(`Teinte ${hueShift > 0 ? '+' : ''}${hueShift.toFixed(0)}°`)
+  transformSummary.push(`Saturation ${saturation > 1 ? '+' : ''}${((saturation - 1) * 100).toFixed(0)}%`)
+  if (Math.abs(brightness) > 0.02) transformSummary.push(`Lumière ${brightness > 0 ? '+' : ''}${(brightness * 100).toFixed(0)}%`)
+  if (Math.abs(contrast - 1) > 0.02) transformSummary.push(`Contraste ${contrast > 1 ? '+' : ''}${((contrast - 1) * 100).toFixed(0)}%`)
+  if (liftBlacks) transformSummary.push(`Matte +${(liftAmt * 100).toFixed(0)}%`)
+  if (zoomPct > 0.01) transformSummary.push(`Zoom +${(zoomPct * 100).toFixed(0)}%`)
+
+  const vfParts: string[] = []
+
+  // 720p cap — scale so shortest side ≤ 720, no upscaling (backslash-escapes avoid single-quote issues in WASM)
+  vfParts.push('scale=iw*min(1\\,720/min(iw\\,ih)):ih*min(1\\,720/min(iw\\,ih))')
+
+  if (format !== 'keep') {
+    const W = format === '16:9' ? 1280 : 720
+    const H = format === '9:16' ? 1280 : 720
+    vfParts.push(`scale=${W}:${H}:force_original_aspect_ratio=increase`)
+    vfParts.push(`crop=${W}:${H}`)
+  }
+  if (cropX > 0 || cropY > 0) vfParts.push(`crop=iw-${cropX * 2}:ih-${cropY * 2}:${cropX}:${cropY}`)
+
+  if (zoomPct > 0.01) {
+    const zf    = (1 + zoomPct).toFixed(4)
+    const invZf = (1 / (1 + zoomPct)).toFixed(4)
+    const ox    = ((1 - 1 / (1 + zoomPct)) * panX).toFixed(4)
+    const oy    = ((1 - 1 / (1 + zoomPct)) * panY).toFixed(4)
+    vfParts.push(`scale=iw*${zf}:ih*${zf}`)
+    vfParts.push(`crop=iw*${invZf}:ih*${invZf}:iw*${ox}:ih*${oy}`)
+  }
+
+  // Color temperature
+  vfParts.push(`colorchannelmixer=rr=${rr}:gg=${gg}:bb=${bb}`)
+  // Hue + saturation
+  vfParts.push(`hue=h=${hueShift.toFixed(1)}:s=${saturation.toFixed(4)}`)
+  // Brightness + contrast + optional gamma lift (gamma>1 lifts shadows for matte look)
+  const gammaVal = liftBlacks ? (1 + liftAmt * 2).toFixed(3) : '1.000'
+  vfParts.push(`eq=brightness=${brightness.toFixed(4)}:contrast=${contrast.toFixed(4)}:gamma=${gammaVal}`)
+  // Guarantee even dimensions (libx264 yuv420p requires width & height to be multiples of 2)
+  vfParts.push('scale=trunc(iw/2)*2:trunc(ih/2)*2')
+
+  return { vf: vfParts.join(','), crf, transformSummary }
+}
+
+// Batch version: writes input ONCE then runs N variants — avoids repeated I/O per variant.
+// For 5 variants of one source, saves ~4× writeInput cost (~3-5s each).
+export function runFfmpegRepurposeBatch(opts: {
+  inputPath:   string
+  seeds:       number[]
+  intensity:   'subtle' | 'medium' | 'aggressive' | 'vener'
+  format:      '9:16' | '1:1' | '16:9' | 'keep'
+  onVariantStart:    (idx: number) => void
+  onVariantProgress: (idx: number, pct: number) => void
+}): Promise<RepurposeResult[]> {
+  return withFfmpegLock(async () => {
+    const ff = await getFFmpeg()
+    await ff.deleteFile('rp_in.mp4').catch(() => {})
+
+    const logs: string[] = []
+    const logH = ({ message }: { message: string }) => logs.push(message)
+    ff.on('log', logH)
+
+    // Write input once for all variants
+    opts.onVariantStart(0)
+    opts.onVariantProgress(0, 5)
+    await writeInput(ff, 'rp_in.mp4', opts.inputPath)
+
+    const results: RepurposeResult[] = []
+
+    for (let i = 0; i < opts.seeds.length; i++) {
+      if (i > 0) opts.onVariantStart(i)
+      opts.onVariantProgress(i, 15)
+
+      const { vf, crf, transformSummary } = buildRepurposeVariant(opts.seeds[i], opts.intensity, opts.format)
+      await ff.deleteFile('rp_out.mp4').catch(() => {})
+
+      try {
+        opts.onVariantProgress(i, 30)
+        await ff.exec([
+          '-nostdin', '-fflags', '+genpts', '-i', 'rp_in.mp4',
+          '-map', '0:v:0', '-map', '0:a?',
+          '-vf', vf,
+          '-r', '30',   // cap at 30fps — if source is 60fps, halves frames to encode
+          '-c:v', 'libx264', '-preset', 'ultrafast', '-tune', 'fastdecode',
+          '-crf', String(crf),
+          '-pix_fmt', 'yuv420p', '-profile:v', 'main', '-level', '4.0',
+          '-c:a', 'copy',
+          '-movflags', '+faststart',
+          '-y', 'rp_out.mp4',
+        ])
+        opts.onVariantProgress(i, 90)
+        // Validate output before creating blob — FFmpeg can exit 0 with an empty file
+        const rawOut = await ff.readFile('rp_out.mp4') as Uint8Array
+        if (rawOut.byteLength < 5000) {
+          const errLine = logs.filter(l => /error|invalid/i.test(l)).slice(-1)[0] ?? ''
+          throw new Error(`Output vide (${rawOut.byteLength}B)${errLine ? ` — ${errLine}` : ''}`)
+        }
+        const url = URL.createObjectURL(new Blob([rawOut.buffer as ArrayBuffer], { type: 'video/mp4' }))
+        opts.onVariantProgress(i, 100)
+        results.push({ ok: true, outputPath: url, transformSummary })
+      } catch (err) {
+        if (isWasmCrash(err)) { resetFFmpeg(); results.push({ ok: false, error: String(err) }); break }
+        const relevant = logs.filter(l => /error|invalid|unknown|cannot/i.test(l)).slice(-2)
+        results.push({ ok: false, error: String(err) + (relevant.length ? '\n' + relevant.join('\n') : '') })
+      }
+    }
+
+    ff.off('log', logH)
+    for (const f of ['rp_in.mp4', 'rp_out.mp4']) await ff.deleteFile(f).catch(() => {})
+    return results
+  })
+}
+
+// Single-variant wrapper kept for backwards compat
 export function runFfmpegRepurposeWeb(opts: {
   inputPath:   string
   seed:        number
   intensity:   'subtle' | 'medium' | 'aggressive' | 'vener'
   format:      '9:16' | '1:1' | '16:9' | 'keep'
   onProgress?: (pct: number) => void
-}): Promise<{ ok: boolean; outputPath?: string; similarityPct?: number; transformSummary?: string[]; error?: string }> {
-  return withFfmpegLock(async () => {
-  const FILES = ['rp_in.mp4', 'rp_out.mp4']
+}): Promise<RepurposeResult> {
+  return runFfmpegRepurposeBatch({
+    inputPath: opts.inputPath,
+    seeds: [opts.seed],
+    intensity: opts.intensity,
+    format: opts.format,
+    onVariantStart: () => {},
+    onVariantProgress: (_, pct) => opts.onProgress?.(pct),
+  }).then(r => r[0] ?? { ok: false, error: 'No result' })
+}
 
-  // Intensity ranges — only safe, universally supported transforms
-  const ranges = {
-    subtle:     { bri: 0.030, con: 0.025, sat: 0.045, zoomMin: 0.00, zoomMax: 0.04, crop: 3,  crf: 2 },
-    medium:     { bri: 0.070, con: 0.060, sat: 0.100, zoomMin: 0.02, zoomMax: 0.08, crop: 6,  crf: 4 },
-    aggressive: { bri: 0.120, con: 0.090, sat: 0.150, zoomMin: 0.05, zoomMax: 0.13, crop: 10, crf: 7 },
-    vener:      { bri: 0.200, con: 0.150, sat: 0.250, zoomMin: 0.10, zoomMax: 0.22, crop: 16, crf: 11 },
-  }[opts.intensity]
+// Server-side repurpose via Vercel function + native FFmpeg.
+// Splits into parallel batches of 3 to stay within Vercel's 60s timeout.
+export async function runRepurposeViaServer(opts: {
+  sourceUrl:   string
+  userId:      string
+  bucket?:     string
+  seeds:       number[]
+  intensity:   'subtle' | 'medium' | 'aggressive' | 'vener'
+  format:      '9:16' | '1:1' | '16:9' | 'keep'
+  onUploadProgress?: (pct: number) => void
+  onProcessing?:     () => void
+}): Promise<RepurposeResult[]> {
+  const bucket   = opts.bucket ?? 'content'
+  const BATCH    = 3  // max variants per Vercel call to stay under 60s timeout
 
-  const rng  = seededRng(opts.seed)
-  const sign = () => rng(0, 1) > 0.5 ? 1 : -1
+  const allVariants = opts.seeds.map(seed => {
+    const { vf, crf, transformSummary } = buildRepurposeVariant(seed, opts.intensity, opts.format)
+    return { vf, crf, transformSummary }
+  })
 
-  const brightness = sign() * rng(0.005, ranges.bri)
-  const contrast   = 1 + sign() * rng(0.005, ranges.con)
-  const saturation = 1 + sign() * rng(0.005, ranges.sat)
-  const zoomPct    = rng(ranges.zoomMin, ranges.zoomMax)  // e.g. 0.08 = 8% zoom-in
-  const panX       = rng(0, 1)                             // 0=left, 0.5=center, 1=right
-  const panY       = rng(0, 1)                             // 0=top,  0.5=center, 1=bottom
-  const cropX      = Math.floor(rng(0, ranges.crop))
-  const cropY      = Math.floor(rng(0, ranges.crop))
-  const crf        = Math.round(22 + rng(0, ranges.crf))
+  // For blob: URLs upload once to Supabase; HTTP URLs are fetched directly by server
+  let sourcePayload: Record<string, string>
+  let tempPath: string | null = null
 
-  // Similarity estimate — anchored per intensity
-  const floor = { subtle: 90, medium: 80, aggressive: 65, vener: 42 }[opts.intensity]
-  const rawSim = 100 - (
-    Math.abs(brightness) * 60 +
-    Math.abs(contrast - 1) * 40 +
-    Math.abs(saturation - 1) * 30 +
-    zoomPct * 80
-  )
-  const similarityPct = Math.min(99, Math.max(floor, Math.round(rawSim)))
-
-  // Human-readable transform summary
-  const transformSummary: string[] = []
-  if (zoomPct > 0.005)                   transformSummary.push(`Zoom +${(zoomPct * 100).toFixed(0)}%`)
-  if (Math.abs(brightness) > 0.001)      transformSummary.push(`Lumière ${brightness > 0 ? '+' : ''}${(brightness * 100).toFixed(1)}%`)
-  if (Math.abs(contrast - 1) > 0.001)    transformSummary.push(`Contraste ${contrast > 1 ? '+' : ''}${((contrast - 1) * 100).toFixed(1)}%`)
-  if (Math.abs(saturation - 1) > 0.001)  transformSummary.push(`Saturation ${saturation > 1 ? '+' : ''}${((saturation - 1) * 100).toFixed(1)}%`)
-  if (cropX > 0 || cropY > 0)            transformSummary.push(`Crop ${Math.max(cropX, cropY)}px`)
-  transformSummary.push(`CRF ${crf}`)
-
-  const ff = await getFFmpeg()
-  for (const f of FILES) await ff.deleteFile(f).catch(() => {})
-  const logs: string[] = []
-  const logH = ({ message }: { message: string }) => logs.push(message)
-  ff.on('log', logH)
-
-  try {
-    opts.onProgress?.(5)
-    await writeInput(ff, 'rp_in.mp4', opts.inputPath)
-    opts.onProgress?.(20)
-
-    // eq with only the 3 universally-supported params (brightness/contrast/saturation)
-    const eqFilter = `eq=brightness=${brightness.toFixed(4)}:contrast=${contrast.toFixed(4)}:saturation=${saturation.toFixed(4)}`
-
-    const vfParts: string[] = []
-    if (opts.format !== 'keep') {
-      const W = opts.format === '16:9' ? 1920 : 1080
-      const H = opts.format === '9:16' ? 1920 : 1080
-      vfParts.push(`scale=${W}:${H}:force_original_aspect_ratio=increase`)
-      vfParts.push(`crop=${W}:${H}`)
-    }
-    if (cropX > 0 || cropY > 0) vfParts.push(`crop=iw-${cropX * 2}:ih-${cropY * 2}:${cropX}:${cropY}`)
-
-    // Zoom-in by scaling up then cropping back — pan position shifts which part is kept
-    if (zoomPct > 0.005) {
-      const zf    = (1 + zoomPct).toFixed(4)       // e.g. "1.0800"
-      const invZf = (1 / (1 + zoomPct)).toFixed(4) // e.g. "0.9259"
-      const ox    = ((1 - 1 / (1 + zoomPct)) * panX).toFixed(4)
-      const oy    = ((1 - 1 / (1 + zoomPct)) * panY).toFixed(4)
-      // scale up, then crop back to original size at the pan position
-      vfParts.push(`scale=iw*${zf}:ih*${zf}`)
-      vfParts.push(`crop=iw*${invZf}:ih*${invZf}:iw*${ox}:ih*${oy}`)
-    }
-
-    vfParts.push(eqFilter)
-    const vf = vfParts.join(',')
-    console.log('[CloneVid] vf=', vf, 'crf=', crf)
-
-    opts.onProgress?.(30)
-    await ff.exec([
-      '-nostdin', '-fflags', '+genpts', '-i', 'rp_in.mp4',
-      '-map', '0:v:0',
-      '-map', '0:a?',        // include audio only if the input has one
-      '-vf', vf,
-      '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', String(crf),
-      '-pix_fmt', 'yuv420p', '-profile:v', 'main', '-level', '4.0',
-      '-c:a', 'aac', '-b:a', '128k',
-      '-movflags', '+faststart',
-      '-y', 'rp_out.mp4',
-    ])
-    opts.onProgress?.(90)
-
-    const url = await readOutput(ff, 'rp_out.mp4', 'video/mp4')
-    opts.onProgress?.(100)
-    return { ok: true, outputPath: url, similarityPct, transformSummary }
-  } catch (err) {
-    if (isWasmCrash(err)) resetFFmpeg()
-    const relevant = logs.filter(l => /error|invalid|unknown|cannot/i.test(l)).slice(-2)
-    return { ok: false, error: String(err) + (relevant.length ? '\n' + relevant.join('\n') : '') }
-  } finally {
-    ff.off('log', logH)
-    for (const f of FILES) await ff.deleteFile(f).catch(() => {})
+  if (opts.sourceUrl.startsWith('blob:') || opts.sourceUrl.startsWith('data:')) {
+    opts.onUploadProgress?.(0)
+    const resp = await fetch(opts.sourceUrl)
+    const blob = await resp.blob()
+    tempPath = `videos/users/${opts.userId}/rp-src-${Date.now()}.mp4`
+    const { error: upErr } = await supabase.storage.from(bucket).upload(tempPath, blob, {
+      contentType: 'video/mp4', upsert: true,
+    })
+    if (upErr) throw new Error(upErr.message)
+    opts.onUploadProgress?.(100)
+    sourcePayload = { storagePath: tempPath, bucket }
+  } else {
+    opts.onUploadProgress?.(100)
+    sourcePayload = { sourceUrl: opts.sourceUrl }
   }
-  }) // end withFfmpegLock
+
+  opts.onProcessing?.()
+
+  // Split into batches and fire all in parallel
+  const batches: Array<typeof allVariants> = []
+  for (let i = 0; i < allVariants.length; i += BATCH) batches.push(allVariants.slice(i, i + BATCH))
+
+  const batchResponses = await Promise.all(batches.map(async batch => {
+    const apiResp = await fetch('/api/repurpose', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...sourcePayload,
+        userId: opts.userId,
+        variants: batch.map(v => ({ vf: v.vf, crf: v.crf })),
+      }),
+    })
+    if (!apiResp.ok) throw new Error(`Server error: ${await apiResp.text().catch(() => apiResp.statusText)}`)
+    const data = await apiResp.json()
+    if (!data.ok) throw new Error(data.error ?? 'Server error')
+    return { data, batch }
+  }))
+
+  // Cleanup temp source (best-effort, after all batches done)
+  if (tempPath) supabase.storage.from(bucket).remove([tempPath]).catch(() => {})
+
+  // Flatten results in original seed order
+  return batchResponses.flatMap(({ data, batch }) =>
+    (data.results as Array<{ ok: boolean; url?: string; storagePath?: string; error?: string }>).map((r, i) => ({
+      ok:               r.ok,
+      outputPath:       r.url,
+      storagePath:      r.storagePath,
+      transformSummary: batch[i]?.transformSummary,
+      error:            r.error,
+    }))
+  )
 }

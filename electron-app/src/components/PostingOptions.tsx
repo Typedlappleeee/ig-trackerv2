@@ -27,10 +27,10 @@ export function PostingOptions({ opts, onChange }: Props) {
         </span>
         <button
           onClick={() => onChange({ ...opts, intervalMode: on ? 'none' : 'fixed' })}
-          className="relative w-9 h-5 rounded-full transition-colors flex-shrink-0 overflow-hidden"
+          className="relative w-9 h-5 rounded-full transition-colors flex-shrink-0"
           style={{ background: on ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.08)' }}
         >
-          <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${on ? 'translate-x-4' : 'translate-x-0.5'}`} />
+          <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${on ? 'translate-x-4' : 'translate-x-0'}`} />
         </button>
       </div>
 
@@ -43,10 +43,10 @@ export function PostingOptions({ opts, onChange }: Props) {
         </div>
         <button
           onClick={() => set({ reelsTrial: !opts.reelsTrial })}
-          className="relative w-9 h-5 rounded-full transition-colors flex-shrink-0 overflow-hidden"
+          className="relative w-9 h-5 rounded-full transition-colors flex-shrink-0"
           style={{ background: opts.reelsTrial ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.08)' }}
         >
-          <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${opts.reelsTrial ? 'translate-x-4' : 'translate-x-0.5'}`} />
+          <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${opts.reelsTrial ? 'translate-x-4' : 'translate-x-0'}`} />
         </button>
       </div>
 
