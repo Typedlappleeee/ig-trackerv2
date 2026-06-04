@@ -678,19 +678,15 @@ const TGIcon = ({ size = 14 }: { size?: number }) => (
 )
 
 const TUNNEL_CSS = `
-  @keyframes orbit-spin    { from { transform: rotate(0deg); }    to { transform: rotate(360deg); } }
-  @keyframes orbit-upright { from { transform: rotate(0deg); }    to { transform: rotate(-360deg); } }
-  @keyframes orbit-card-glow {
-    0%,100% { box-shadow: 0 4px 18px rgba(0,0,0,0.55); }
-    50%     { box-shadow: 0 4px 28px rgba(0,0,0,0.75); }
+  @keyframes tunnel-ring-zoom {
+    0%   { transform: scale(0.04); opacity: 0; }
+    8%   { opacity: 1; }
+    78%  { opacity: 0.6; }
+    100% { transform: scale(3); opacity: 0; }
   }
-  @keyframes tunnel-drift {
-    0%   { transform: translateZ(0px) rotateX(0deg); }
-    100% { transform: translateZ(60px) rotateX(0.4deg); }
-  }
-  @keyframes tunnel-card-float {
-    0%,100% { opacity: var(--base-op); }
-    50%      { opacity: calc(var(--base-op) + 0.08); }
+  @keyframes tunnel-glow-pulse {
+    0%,100% { opacity: 0.38; transform: translate(-50%,-50%) scale(1); }
+    50%     { opacity: 0.68; transform: translate(-50%,-50%) scale(1.1); }
   }
   @keyframes enter-btn-pulse {
     0%,100% { box-shadow: 0 0 0 0 rgba(255,255,255,0.12), inset 0 1px 0 rgba(255,255,255,0.15); }
@@ -714,38 +710,10 @@ const TUNNEL_CSS = `
   }
 `
 
-// ── 3D tunnel card positions ───────────────────────────────────────────────────
-// Each card: left%, top%, rotateY, rotateX, translateZ, width, height, image seed, base opacity
-const TUNNEL_CARDS = [
-  // ── Left wall, far ──
-  { x:-42, y:-26, ry: 44, rx:-8,  tz:-280, w:200, h:130, s: 10, op:0.55 },
-  { x:-50, y: -4, ry: 48, rx: 0,  tz:-180, w:240, h:158, s: 20, op:0.70 },
-  { x:-44, y: 18, ry: 42, rx: 8,  tz:-230, w:210, h:140, s: 30, op:0.60 },
-  // ── Left wall, near ──
-  { x:-58, y:-16, ry: 55, rx:-5,  tz: -60, w:280, h:190, s: 40, op:0.85 },
-  { x:-62, y: 26, ry: 52, rx: 7,  tz: -90, w:260, h:172, s: 50, op:0.80 },
-  // ── Left floor-ish ──
-  { x:-36, y: 42, ry: 30, rx: 22, tz:-160, w:230, h:148, s: 60, op:0.65 },
-  { x:-50, y: 52, ry: 38, rx: 30, tz: -80, w:270, h:170, s: 70, op:0.75 },
-  // ── Right wall, far ──
-  { x: 42, y:-26, ry:-44, rx:-8,  tz:-280, w:200, h:130, s: 80, op:0.55 },
-  { x: 50, y: -4, ry:-48, rx: 0,  tz:-180, w:240, h:158, s:100, op:0.70 },
-  { x: 44, y: 18, ry:-42, rx: 8,  tz:-230, w:210, h:140, s:110, op:0.60 },
-  // ── Right wall, near ──
-  { x: 58, y:-16, ry:-55, rx:-5,  tz: -60, w:280, h:190, s:120, op:0.85 },
-  { x: 62, y: 26, ry:-52, rx: 7,  tz: -90, w:260, h:172, s:130, op:0.80 },
-  // ── Right floor-ish ──
-  { x: 36, y: 42, ry:-30, rx: 22, tz:-160, w:230, h:148, s:140, op:0.65 },
-  { x: 50, y: 52, ry:-38, rx: 30, tz: -80, w:270, h:170, s:150, op:0.75 },
-  // ── Top center ──
-  { x: -8, y:-48, ry:  4, rx:-38, tz:-200, w:190, h:120, s:160, op:0.55 },
-  { x:  6, y:-52, ry: -6, rx:-42, tz:-120, w:220, h:140, s:170, op:0.65 },
-  // ── Center far ──
-  { x:-10, y:-10, ry:  8, rx: 4,  tz:-380, w:170, h:110, s:180, op:0.40 },
-  { x:  8, y:  6, ry: -5, rx:-3,  tz:-350, w:150, h: 96, s:190, op:0.35 },
-]
+const TUNNEL_RING_COUNT = 16
+const TUNNEL_RING_DURATION = 3.6
 
-// ── 3D Tunnel hero ─────────────────────────────────────────────────────────────
+// ── Tunnel hero ────────────────────────────────────────────────────────────────
 function TunnelHero({ onEnter }: { onEnter: () => void }) {
   useEffect(() => {
     const id = 'sf-tunnel-css'
@@ -760,62 +728,57 @@ function TunnelHero({ onEnter }: { onEnter: () => void }) {
     <section style={{
       position: 'relative', height: '100vh', overflow: 'hidden',
       cursor: 'none',
-      background: '#000',
-      backgroundImage: [
-        'linear-gradient(rgba(255,255,255,0.028) 1px, transparent 1px)',
-        'linear-gradient(90deg, rgba(255,255,255,0.028) 1px, transparent 1px)',
-      ].join(','),
-      backgroundSize: '52px 52px',
+      background: '#02010a',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
     }}>
-      {/* Subtle radial vignette */}
-      <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse 70% 70% at 50% 50%, transparent 30%, rgba(0,0,0,0.72) 100%)', pointerEvents: 'none', zIndex: 2 }} />
 
-      {/* 3D perspective scene */}
-      <div style={{
-        position: 'absolute', inset: 0,
-        perspective: '900px',
-        perspectiveOrigin: '50% 50%',
-        overflow: 'visible',
-      }}>
-        <div style={{
-          position: 'absolute', inset: 0,
-          transformStyle: 'preserve-3d',
-          animation: 'tunnel-drift 8s ease-in-out infinite alternate',
-        }}>
-          {TUNNEL_CARDS.map((c, i) => (
-            <div
-              key={i}
-              style={{
-                position: 'absolute',
-                left: `calc(50% + ${c.x}vw - ${c.w / 2}px)`,
-                top:  `calc(50% + ${c.y}vh - ${c.h / 2}px)`,
-                width:  c.w,
-                height: c.h,
-                transform: `rotateY(${c.ry}deg) rotateX(${c.rx}deg) translateZ(${c.tz}px)`,
-                borderRadius: 10,
-                overflow: 'hidden',
-                border: '1px solid rgba(255,255,255,0.10)',
-                boxShadow: '0 8px 32px rgba(0,0,0,0.55)',
-                ['--base-op' as any]: c.op,
-                opacity: c.op,
-                animation: `tunnel-card-float ${5 + (i % 4)}s ease-in-out ${(i * 0.4) % 3}s infinite`,
-                willChange: 'transform, opacity',
-              }}
-            >
-              <img
-                src={`https://picsum.photos/seed/${c.s}/${c.w * 2}/${c.h * 2}`}
-                alt=""
-                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', filter: 'brightness(0.75) saturate(0.9)' }}
-                loading="lazy"
-                draggable={false}
-              />
-            </div>
-          ))}
-        </div>
+      {/* Perspective corridor lines — vanishing point at center */}
+      <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 1 }} preserveAspectRatio="none">
+        <line x1="0"    y1="0"    x2="50%" y2="50%" stroke="rgba(139,92,246,0.12)" strokeWidth="1" />
+        <line x1="100%" y1="0"    x2="50%" y2="50%" stroke="rgba(139,92,246,0.12)" strokeWidth="1" />
+        <line x1="0"    y1="100%" x2="50%" y2="50%" stroke="rgba(139,92,246,0.12)" strokeWidth="1" />
+        <line x1="100%" y1="100%" x2="50%" y2="50%" stroke="rgba(139,92,246,0.12)" strokeWidth="1" />
+        <line x1="50%"  y1="0"    x2="50%" y2="50%" stroke="rgba(139,92,246,0.06)" strokeWidth="1" />
+        <line x1="50%"  y1="100%" x2="50%" y2="50%" stroke="rgba(139,92,246,0.06)" strokeWidth="1" />
+        <line x1="0"    y1="50%"  x2="50%" y2="50%" stroke="rgba(139,92,246,0.06)" strokeWidth="1" />
+        <line x1="100%" y1="50%"  x2="50%" y2="50%" stroke="rgba(139,92,246,0.06)" strokeWidth="1" />
+      </svg>
+
+      {/* Zooming rings — create the fly-through tunnel illusion */}
+      <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1 }}>
+        {Array.from({ length: TUNNEL_RING_COUNT }).map((_, i) => {
+          const delay = -(i / TUNNEL_RING_COUNT) * TUNNEL_RING_DURATION
+          const accent = i % 4 === 0
+          return (
+            <div key={i} style={{
+              position: 'absolute',
+              width: '58vw',
+              height: '34vw',
+              border: accent
+                ? '1px solid rgba(167,139,250,0.75)'
+                : '1px solid rgba(109,64,220,0.38)',
+              borderRadius: '22px',
+              boxShadow: accent ? '0 0 20px rgba(139,92,246,0.14)' : 'none',
+              animation: `tunnel-ring-zoom ${TUNNEL_RING_DURATION}s linear ${delay}s infinite`,
+              willChange: 'transform, opacity',
+            }} />
+          )
+        })}
       </div>
 
-      {/* Center content */}
+      {/* Central purple glow */}
+      <div style={{
+        position: 'absolute', top: '50%', left: '50%',
+        width: 520, height: 300,
+        background: 'radial-gradient(ellipse closest-side, rgba(109,40,217,0.30), transparent)',
+        filter: 'blur(55px)', pointerEvents: 'none', zIndex: 1,
+        animation: 'tunnel-glow-pulse 5s ease-in-out infinite',
+      }} />
+
+      {/* Deep vignette — keeps edges dark, text readable */}
+      <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse 58% 58% at 50% 50%, transparent 18%, rgba(2,1,10,0.94) 100%)', pointerEvents: 'none', zIndex: 2 }} />
+
+      {/* Center branding */}
       <div style={{ position: 'relative', zIndex: 10, textAlign: 'center', userSelect: 'none' }}>
         <h1 style={{
           fontSize: 'clamp(64px, 11vw, 130px)',
@@ -845,29 +808,19 @@ function TunnelHero({ onEnter }: { onEnter: () => void }) {
           Instagram Automation
         </p>
 
-        {/* Dot indicator */}
         <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginBottom: 40, animation: 'sf-fade-in 1s ease 1.1s both' }}>
-          {[1, 0, 0].map((active, i) => (
-            <div key={i} style={{ width: active ? 20 : 6, height: 6, borderRadius: 99, background: active ? '#fff' : 'rgba(255,255,255,0.2)', transition: 'width 0.3s' }} />
+          {[1, 0, 0].map((active, j) => (
+            <div key={j} style={{ width: active ? 20 : 6, height: 6, borderRadius: 99, background: active ? '#fff' : 'rgba(255,255,255,0.2)' }} />
           ))}
         </div>
 
-        {/* Enter button */}
         <button
           onClick={onEnter}
           style={{
-            display: 'inline-block',
-            padding: '13px 44px',
-            borderRadius: 99,
-            border: '1.5px solid rgba(255,255,255,0.3)',
-            background: 'rgba(255,255,255,0.06)',
-            backdropFilter: 'blur(12px)',
-            color: '#fff',
-            fontSize: 13,
-            fontWeight: 700,
-            letterSpacing: '0.18em',
-            textTransform: 'uppercase',
-            cursor: 'pointer',
+            display: 'inline-block', padding: '13px 44px', borderRadius: 99,
+            border: '1.5px solid rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.06)',
+            backdropFilter: 'blur(12px)', color: '#fff', fontSize: 13, fontWeight: 700,
+            letterSpacing: '0.18em', textTransform: 'uppercase', cursor: 'pointer',
             animation: 'sf-fade-in 0.8s ease 1.3s both, enter-btn-pulse 3s ease-in-out 2s infinite',
             transition: 'background 0.2s, border-color 0.2s, transform 0.15s',
           }}
