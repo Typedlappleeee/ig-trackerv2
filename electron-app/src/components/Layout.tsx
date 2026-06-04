@@ -54,8 +54,8 @@ function SFLogo({ size = 28 }: { size?: number }) {
 
 export type Page =
   | 'phones'
-  | 'posting' | 'massposting' | 'scheduler' | 'bank' | 'aitools' | 'warmup'
-  | 'montage' | 'remix' | 'repurpose'
+  | 'posting' | 'massposting' | 'scheduler' | 'bank' | 'captionbank' | 'aitools' | 'warmup'
+  | 'montage' | 'remix' | 'repurpose' | 'mixer'
   | 'community' | 'support'
   | 'settings' | 'licences'
 
@@ -88,6 +88,7 @@ const NAV_SECTIONS: NavSection[] = [
       { id: 'massposting', label: 'navMassPosting',  icon: '⚡' },
       { id: 'scheduler',   label: 'navScheduler',    icon: '📅' },
       { id: 'bank',        label: 'navBank',         icon: '🗂' },
+      { id: 'captionbank', label: 'navCaptionBank',  icon: '💬' },
       { id: 'warmup',      label: 'navWarmup',       icon: '🔥', beta: true },
       { id: 'aitools',     label: 'navAiTools',      icon: '🔧' },
     ],
@@ -98,6 +99,7 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { id: 'remix',       label: 'navRemix',       icon: '🔀' },
       { id: 'repurpose',   label: 'navRepurpose',   icon: '⚡', isNew: true },
+      { id: 'mixer',       label: 'navMixer',       icon: '🎞️', isNew: true },
     ],
   },
 ]

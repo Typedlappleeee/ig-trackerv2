@@ -1291,7 +1291,7 @@ export async function runRepurposeViaServer(opts: {
   onProcessing?:     () => void
 }): Promise<RepurposeResult[]> {
   const bucket   = opts.bucket ?? 'content'
-  const BATCH    = 3  // max variants per Vercel call to stay under 60s timeout
+  const BATCH    = 5  // single decode pass per call → 5 variants fit in 60s
 
   const allVariants = opts.seeds.map(seed => {
     const { vf, crf, transformSummary } = buildRepurposeVariant(seed, opts.intensity, opts.format)

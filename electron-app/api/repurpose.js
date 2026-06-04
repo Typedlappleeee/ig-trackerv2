@@ -28,43 +28,55 @@ module.exports = async (req, res) => {
 
   const supabase = getSupabaseAdmin()
   const tmpDir   = os.tmpdir()
-  const inputPath = path.join(tmpDir, `rp_in_${Date.now()}.mp4`)
+  const ts       = Date.now()
+  const inputPath = path.join(tmpDir, `rp_in_${ts}.mp4`)
 
   try {
+    // ── Download source video ──────────────────────────────────────────────
     if (sourceUrl) {
-      // Direct HTTP URL (e.g. Supabase signed URL) — fetch without Supabase roundtrip
       const resp = await fetch(sourceUrl)
       if (!resp.ok) return res.status(400).json({ ok: false, error: `Failed to fetch source: ${resp.status}` })
-      const buf = Buffer.from(await resp.arrayBuffer())
-      fs.writeFileSync(inputPath, buf)
+      fs.writeFileSync(inputPath, Buffer.from(await resp.arrayBuffer()))
     } else {
-      // Blob was uploaded to Supabase by client — download via service role
       const { data: blob, error: dlErr } = await supabase.storage.from(bucket).download(storagePath)
       if (dlErr) return res.status(400).json({ ok: false, error: dlErr.message })
       fs.writeFileSync(inputPath, Buffer.from(await blob.arrayBuffer()))
     }
 
-    // Process all variants in parallel
-    const results = await Promise.all(variants.map(async (variant, i) => {
-      const outPath = path.join(tmpDir, `rp_out_${Date.now()}_${i}.mp4`)
-      try {
-        await execFileAsync(ffmpegPath, [
-          '-nostdin', '-i', inputPath,
-          '-map', '0:v:0', '-map', '0:a?',
-          '-vf', variant.vf,
-          '-r', '30',
-          '-c:v', 'libx264', '-preset', 'fast',
-          '-crf', String(variant.crf ?? 26),
-          '-pix_fmt', 'yuv420p', '-profile:v', 'main', '-level', '4.0',
-          '-c:a', 'copy',
-          '-movflags', '+faststart',
-          '-y', outPath,
-        ], { maxBuffer: 100 * 1024 * 1024 })
+    // ── Build one FFmpeg call for all variants (single decode pass) ────────
+    const outPaths = variants.map((_, i) => path.join(tmpDir, `rp_out_${ts}_${i}.mp4`))
 
+    // filter_complex: each variant gets its own named output [v0], [v1], …
+    const filterComplex = variants.map((v, i) => `[0:v:0]${v.vf}[v${i}]`).join(';')
+
+    const ffArgs = [
+      '-nostdin', '-threads', '0', '-i', inputPath,
+      '-filter_complex', filterComplex,
+    ]
+    variants.forEach((v, i) => {
+      ffArgs.push(
+        '-map', `[v${i}]`, '-map', '0:a?',
+        '-r', '30',
+        '-c:v', 'libx264', '-preset', 'ultrafast', '-tune', 'fastdecode',
+        '-crf', String(v.crf ?? 30),
+        '-pix_fmt', 'yuv420p', '-profile:v', 'main', '-level', '4.0',
+        '-c:a', 'copy',
+        '-movflags', '+faststart',
+        outPaths[i],
+      )
+    })
+    ffArgs.push('-y')
+
+    await execFileAsync(ffmpegPath, ffArgs, { maxBuffer: 100 * 1024 * 1024 })
+
+    // ── Upload all outputs to Supabase in parallel ─────────────────────────
+    const results = await Promise.all(variants.map(async (variant, i) => {
+      try {
         const resultPath = userId
-          ? `videos/users/${userId}/rp-out-${Date.now()}_${i}_${Math.random().toString(36).slice(2)}.mp4`
-          : `repurpose-results/${Date.now()}_${i}_${Math.random().toString(36).slice(2)}.mp4`
-        const outBuf = fs.readFileSync(outPath)
+          ? `videos/users/${userId}/rp-out-${ts}_${i}_${Math.random().toString(36).slice(2)}.mp4`
+          : `repurpose-results/${ts}_${i}_${Math.random().toString(36).slice(2)}.mp4`
+
+        const outBuf = fs.readFileSync(outPaths[i])
         const { error: upErr } = await supabase.storage.from(bucket).upload(resultPath, outBuf, {
           contentType: 'video/mp4', upsert: true,
         })
@@ -75,7 +87,7 @@ module.exports = async (req, res) => {
       } catch (err) {
         return { ok: false, error: String(err).slice(0, 300) }
       } finally {
-        fs.rmSync(outPath, { force: true })
+        fs.rmSync(outPaths[i], { force: true })
       }
     }))
 
@@ -84,7 +96,6 @@ module.exports = async (req, res) => {
     res.status(500).json({ ok: false, error: String(err) })
   } finally {
     fs.rmSync(inputPath, { force: true })
-    // Clean up temp source from Supabase if it was uploaded by client
     if (storagePath) supabase.storage.from(bucket).remove([storagePath]).catch(() => {})
   }
 }
