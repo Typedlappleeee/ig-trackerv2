@@ -1,8 +1,17 @@
 import { useState, useEffect, useRef } from 'react'
 import { AuthPage } from '@/components/auth/AuthPage'
+import { supabase } from '@/lib/supabase'
 
 const TELEGRAM_URL = 'https://t.me/justquentin'
 const LAUNCH_DATE  = new Date('2026-06-01T00:00:00')
+
+const REEL_PHOTOS = [
+  '/reels/reel-1.png',
+  '/reels/reel-2.png',
+  '/reels/reel-3.png',
+  '/reels/reel-4.png',
+  '/reels/reel-5.png',
+]
 
 // ── CSS Keyframes (injected once) ─────────────────────────────────────────────
 const GLOBAL_CSS = `
@@ -270,77 +279,279 @@ function CountdownBlock() {
   )
 }
 
-// ── Mockup fallback (SVG UI) shown when mockup.png not yet uploaded ───────────
+// ── Hero mockup composition ────────────────────────────────────────────────────
 function MockupFallback() {
+  const panel: React.CSSProperties = {
+    background: 'rgba(10,9,20,0.92)',
+    border: '1px solid rgba(255,255,255,0.07)',
+    borderRadius: 14,
+    backdropFilter: 'blur(12px)',
+    boxShadow: '0 20px 60px rgba(0,0,0,0.7)',
+  }
+  const phoneScreen: React.CSSProperties = {
+    width: 130, height: 220, borderRadius: 16,
+    background: '#0a0910', border: '6px solid #1a1828',
+    overflow: 'hidden', boxShadow: '0 24px 60px rgba(0,0,0,0.8)',
+    flexShrink: 0,
+  }
+  const ig = (color: string, label: string) => (
+    <div style={{ width: '100%', height: '100%', background: `linear-gradient(160deg, ${color}22, #0a0910)`, display: 'flex', flexDirection: 'column', padding: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 6 }}>
+        <div style={{ width: 20, height: 20, borderRadius: '50%', background: `linear-gradient(135deg, ${color}, #ec4899)` }} />
+        <span style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.7)' }}>{label}</span>
+      </div>
+      <div style={{ flex: 1, borderRadius: 8, background: `linear-gradient(160deg, ${color}40, ${color}15)`, marginBottom: 6 }} />
+      <div style={{ display: 'flex', gap: 8, justifyContent: 'space-around' }}>
+        {['♥','💬','✈️','🔖'].map(ic => <span key={ic} style={{ fontSize: 11 }}>{ic}</span>)}
+      </div>
+    </div>
+  )
+
   return (
-    <div style={{ position: 'relative', borderRadius: 20, overflow: 'hidden', border: '1px solid rgba(139,92,246,0.22)', boxShadow: '0 40px 100px rgba(0,0,0,0.75)', background: '#08080f' }}>
-      {/* Chrome bar */}
-      <div style={{ padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.045)', display: 'flex', alignItems: 'center', gap: 8, background: '#0b0b16' }}>
-        {['#ef4444','#f59e0b','#22c55e'].map(c => <div key={c} style={{ width: 10, height: 10, borderRadius: '50%', background: c, opacity: 0.5 }} />)}
-        <div style={{ flex: 1, margin: '0 10px', height: 20, borderRadius: 5, background: 'rgba(255,255,255,0.035)', display: 'flex', alignItems: 'center', paddingLeft: 10 }}>
-          <span style={{ fontSize: 10, color: 'rgba(148,163,184,0.22)' }}>scaleflow-fvtu.vercel.app</span>
+    <div style={{ position: 'relative', width: '100%', height: 560, overflow: 'hidden', borderRadius: 20 }}>
+      {/* Background */}
+      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(135deg, #0c0918 0%, #08060f 50%, #100a1e 100%)' }} />
+      <div style={{ position: 'absolute', top: '20%', left: '35%', width: 400, height: 400, borderRadius: '50%', background: 'radial-gradient(closest-side, rgba(124,58,237,0.2), transparent)', filter: 'blur(60px)' }} />
+      <div style={{ position: 'absolute', top: '40%', right: '10%', width: 250, height: 250, borderRadius: '50%', background: 'radial-gradient(closest-side, rgba(236,72,153,0.12), transparent)', filter: 'blur(40px)' }} />
+
+      {/* Phone — left edge */}
+      <div style={{ position: 'absolute', left: -20, top: 60, ...phoneScreen, transform: 'rotate(-6deg)' }}>
+        {ig('#a78bfa', 'lifestyle.ig')}
+      </div>
+
+      {/* Nouveau post panel — left */}
+      <div style={{ position: 'absolute', left: 120, top: 40, width: 230, ...panel, padding: 14, zIndex: 10 }}>
+        <p style={{ fontSize: 11, fontWeight: 700, color: '#F2F0FF', margin: '0 0 10px' }}>Nouveau post</p>
+        <p style={{ fontSize: 9, color: 'rgba(148,163,184,0.45)', margin: '0 0 6px' }}>Publier sur</p>
+        <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
+          {['#7c3aed','#ec4899','#3b82f6','#34d399','#f59e0b'].map((c,i) => (
+            <div key={i} style={{ width: 20, height: 20, borderRadius: '50%', background: `linear-gradient(135deg,${c},${c}88)`, border: '2px solid #0a0910' }} />
+          ))}
+          <div style={{ width: 20, height: 20, borderRadius: '50%', background: 'rgba(255,255,255,0.07)', border: '1px dashed rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>+</div>
+        </div>
+        <p style={{ fontSize: 9, color: 'rgba(148,163,184,0.45)', margin: '0 0 6px' }}>Média</p>
+        <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
+          {['#7c3aed','#ec4899','#3b82f6'].map((c,i) => (
+            <div key={i} style={{ width: 52, height: 52, borderRadius: 8, background: `linear-gradient(135deg,${c}30,${c}10)`, border: `1px solid ${c}25`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>🎬</div>
+          ))}
+        </div>
+        <div style={{ height: 28, borderRadius: 7, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', marginBottom: 10, display: 'flex', alignItems: 'center', paddingLeft: 8 }}>
+          <span style={{ fontSize: 9, color: 'rgba(148,163,184,0.25)' }}>Écrire une légende...</span>
+        </div>
+        <div style={{ padding: '8px 0', borderTop: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{ fontSize: 9, color: 'rgba(148,163,184,0.35)' }}>📅 Programmer</span>
+          <span style={{ fontSize: 9, color: 'rgba(148,163,184,0.35)' }}>28/05/2024 · 18:45</span>
+        </div>
+        <div style={{ marginTop: 8, padding: '9px 0', borderRadius: 9, background: 'linear-gradient(130deg,#7c3aed,#ec4899)', textAlign: 'center', fontSize: 11, fontWeight: 700, color: '#fff' }}>
+          Ajouter à la file
         </div>
       </div>
-      <div style={{ display: 'flex', height: 480 }}>
-        {/* Sidebar */}
-        <div style={{ width: 200, background: '#07070c', borderRight: '1px solid rgba(255,255,255,0.04)', display: 'flex', flexDirection: 'column', padding: '16px 10px', gap: 2, flexShrink: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', marginBottom: 12 }}>
-            <SFMark size={22} />
-            <span style={{ fontSize: 13, fontWeight: 800, color: '#F2F0FF' }}>ScaleFlow</span>
-          </div>
-          {[{ icon: '📊', label: 'Dashboard', active: false }, { icon: '📱', label: 'Téléphones', active: false }, { icon: '⚡', label: 'Mass Posting', active: true }, { icon: '📅', label: 'Programmation', active: false }, { icon: '🗂', label: 'Banque vidéos', active: false }, { icon: '🔀', label: 'Remix vidéo', active: false }, { icon: '🤖', label: 'Outils IA', active: false }].map(item => (
-            <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 8, fontSize: 12, background: item.active ? 'rgba(124,58,237,0.15)' : 'transparent', color: item.active ? '#a78bfa' : 'rgba(148,163,184,0.45)', borderLeft: item.active ? '2px solid #7c3aed' : '2px solid transparent' }}>
-              <span style={{ fontSize: 13 }}>{item.icon}</span>
-              <span style={{ fontWeight: item.active ? 600 : 400 }}>{item.label}</span>
+
+      {/* Central — brand + feature grid */}
+      <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', textAlign: 'center', zIndex: 5, pointerEvents: 'none' }}>
+        <div style={{ fontSize: 'clamp(28px,4vw,52px)', fontWeight: 900, letterSpacing: '-0.04em', color: '#F2F0FF', marginBottom: 4 }}>ScaleFlow</div>
+        <p style={{ fontSize: 10, letterSpacing: '0.22em', textTransform: 'uppercase', color: 'rgba(148,163,184,0.4)', margin: '0 0 28px' }}>Instagram Automation</p>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, maxWidth: 260, margin: '0 auto' }}>
+          {[
+            { icon: '⚡', label: 'MASS POSTING', c: '#a78bfa' },
+            { icon: '👥', label: 'MULTI-COMPTES', c: '#60a5fa' },
+            { icon: '🤖', label: 'AUTOMATION', c: '#34d399' },
+            { icon: '🎬', label: 'REELS & STORIES', c: '#f472b6' },
+          ].map(f => (
+            <div key={f.label} style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${f.c}20`, borderRadius: 10, padding: '10px 8px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
+              <span style={{ fontSize: 16 }}>{f.icon}</span>
+              <span style={{ fontSize: 7, fontWeight: 800, letterSpacing: '0.08em', color: f.c }}>{f.label}</span>
             </div>
           ))}
         </div>
-        {/* Main */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#07070c', minWidth: 0 }}>
-          <div style={{ padding: '14px 22px', borderBottom: '1px solid rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div>
-              <p style={{ fontSize: 14, fontWeight: 700, color: '#F2F0FF', margin: 0 }}>Mass Posting</p>
-              <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.4)', margin: '2px 0 0' }}>Poster sur plusieurs comptes en parallèle</p>
+        <div style={{ display: 'flex', gap: 8, marginTop: 8, justifyContent: 'center' }}>
+          {[
+            { icon: '📊', label: 'ANALYTIQUES', c: '#fbbf24' },
+            { icon: '⏱', label: 'GAIN DE TEMPS', c: '#4ade80' },
+            { icon: '📅', label: 'SCHEDULER', c: '#e879f9' },
+          ].map(f => (
+            <div key={f.label} style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${f.c}20`, borderRadius: 10, padding: '8px 10px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+              <span style={{ fontSize: 14 }}>{f.icon}</span>
+              <span style={{ fontSize: 7, fontWeight: 800, letterSpacing: '0.08em', color: f.c }}>{f.label}</span>
             </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <div style={{ padding: '6px 14px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', fontSize: 11, color: 'rgba(148,163,184,0.5)' }}>Paramètres</div>
-              <div style={{ padding: '6px 14px', borderRadius: 8, background: 'linear-gradient(130deg,#7c3aed,#ec4899)', fontSize: 11, color: '#fff', fontWeight: 700 }}>▶ Lancer</div>
-            </div>
-          </div>
-          <div style={{ flex: 1, display: 'flex', padding: 20, gap: 14, overflow: 'hidden' }}>
-            <div style={{ width: 200, display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0 }}>
-              <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(148,163,184,0.3)', margin: '0 0 6px' }}>12 Téléphones</p>
-              {[{ n:'Phone_001',g:'Groupe A',o:true,s:true},{n:'Phone_002',g:'Groupe A',o:true,s:true},{n:'Phone_003',g:'Groupe B',o:false,s:false},{n:'Phone_004',g:'Groupe B',o:true,s:true},{n:'Phone_005',g:'Groupe A',o:true,s:true},{n:'Phone_006',g:'Groupe C',o:false,s:false}].map(p => (
-                <div key={p.n} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '6px 8px', borderRadius: 7, background: p.s ? 'rgba(124,58,237,0.10)' : 'transparent', border: p.s ? '1px solid rgba(124,58,237,0.18)' : '1px solid transparent' }}>
-                  <div style={{ width: 6, height: 6, borderRadius: '50%', background: p.o ? '#22c55e' : 'rgba(148,163,184,0.2)', flexShrink: 0 }} />
-                  <div style={{ minWidth: 0 }}>
-                    <p style={{ fontSize: 11, fontWeight: 600, color: p.s ? '#c4b5fd' : 'rgba(148,163,184,0.45)', margin: 0 }}>{p.n}</p>
-                    <p style={{ fontSize: 9, color: 'rgba(148,163,184,0.28)', margin: 0 }}>{p.g}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
-              <div>
-                <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(148,163,184,0.3)', margin: '0 0 8px' }}>Vidéos — 3</p>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  {['#7c3aed','#ec4899','#3b82f6'].map((c,i) => <div key={i} style={{ width: 52, height: 52, borderRadius: 8, background: `${c}18`, border: `1px solid ${c}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>🎬</div>)}
-                </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Stats panel — right */}
+      <div style={{ position: 'absolute', right: 120, top: 50, width: 200, ...panel, padding: 14, zIndex: 10 }}>
+        <p style={{ fontSize: 11, fontWeight: 700, color: '#F2F0FF', margin: '0 0 14px' }}>Statistiques</p>
+        <div style={{ marginBottom: 12 }}>
+          <p style={{ fontSize: 9, color: 'rgba(148,163,184,0.4)', margin: '0 0 3px' }}>Vue d'ensemble</p>
+          <p style={{ fontSize: 28, fontWeight: 900, color: '#F2F0FF', margin: 0, letterSpacing: '-0.04em' }}>128,4K</p>
+          <p style={{ fontSize: 9, color: '#34d399', margin: '2px 0 0' }}>+72% ↑</p>
+        </div>
+        {/* Sparkline */}
+        <svg width="100%" height="44" viewBox="0 0 176 44" fill="none">
+          <defs>
+            <linearGradient id="sparkGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#7c3aed" stopOpacity="0.3"/>
+              <stop offset="100%" stopColor="#7c3aed" stopOpacity="0"/>
+            </linearGradient>
+          </defs>
+          <path d="M0,38 L22,30 L44,34 L66,20 L88,22 L110,10 L132,14 L154,6 L176,2" stroke="#a78bfa" strokeWidth="2" strokeLinecap="round" fill="none"/>
+          <path d="M0,38 L22,30 L44,34 L66,20 L88,22 L110,10 L132,14 L154,6 L176,2 L176,44 L0,44Z" fill="url(#sparkGrad)"/>
+        </svg>
+        <div style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between' }}>
+          {['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'].map(d => (
+            <span key={d} style={{ fontSize: 7, color: 'rgba(148,163,184,0.3)' }}>{d}</span>
+          ))}
+        </div>
+        <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+          <p style={{ fontSize: 9, fontWeight: 700, color: '#F2F0FF', margin: '0 0 8px' }}>Audience</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <svg width="40" height="40" viewBox="0 0 40 40">
+              <circle cx="20" cy="20" r="16" fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="6"/>
+              <circle cx="20" cy="20" r="16" fill="none" stroke="#7c3aed" strokeWidth="6" strokeDasharray="78 22" strokeDashoffset="25" strokeLinecap="round"/>
+              <circle cx="20" cy="20" r="16" fill="none" stroke="#ec4899" strokeWidth="6" strokeDasharray="22 78" strokeDashoffset="-53" strokeLinecap="round"/>
+            </svg>
+            <div style={{ fontSize: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'rgba(196,181,253,0.7)', marginBottom: 3 }}>
+                <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#7c3aed' }} /> Non-abonnés 78%
               </div>
-              <div style={{ flex: 1, fontFamily: 'monospace', display: 'flex', flexDirection: 'column', gap: 3 }}>
-                <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(148,163,184,0.3)', margin: '0 0 6px' }}>Live log</p>
-                {[{t:'14:22:01',m:'✅ Phone_001 — Publication réussie',c:'#22c55e'},{t:'14:22:03',m:'✅ Phone_002 — Publication réussie',c:'#22c55e'},{t:'14:22:05',m:'⏳ Phone_004 — Upload en cours…',c:'#a78bfa'},{t:'14:22:07',m:'✅ Phone_005 — Publication réussie',c:'#22c55e'}].map((l,i) => (
-                  <div key={i} style={{ display: 'flex', gap: 8, fontSize: 10 }}>
-                    <span style={{ color: 'rgba(148,163,184,0.25)', flexShrink: 0 }}>{l.t}</span>
-                    <span style={{ color: l.c }}>{l.m}</span>
-                  </div>
-                ))}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'rgba(244,114,182,0.7)' }}>
+                <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#ec4899' }} /> Abonnés 22%
               </div>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Queue panel — bottom center */}
+      <div style={{ position: 'absolute', bottom: 24, left: '50%', transform: 'translateX(-50%)', width: 280, ...panel, padding: 12, zIndex: 10 }}>
+        <p style={{ fontSize: 10, fontWeight: 700, color: '#F2F0FF', margin: '0 0 8px' }}>File de publications</p>
+        {[
+          { label: 'Reel — Outfit of the day', time: '28 Mai 2024 à 18:45', c: '#a78bfa' },
+          { label: 'Story — New collection', time: '29 Mai 2024 à 20:30', c: '#60a5fa' },
+          { label: 'Reel — Lifestyle', time: '30 Mai 2024 à 12:00', c: '#34d399' },
+        ].map(item => (
+          <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+            <div style={{ width: 28, height: 28, borderRadius: 6, background: `${item.c}18`, border: `1px solid ${item.c}25`, flexShrink: 0 }} />
+            <div>
+              <p style={{ fontSize: 9, fontWeight: 600, color: 'rgba(241,240,247,0.8)', margin: 0 }}>{item.label}</p>
+              <p style={{ fontSize: 8, color: 'rgba(148,163,184,0.35)', margin: 0 }}>{item.time}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Phone — right edge */}
+      <div style={{ position: 'absolute', right: -20, top: 80, ...phoneScreen, transform: 'rotate(5deg)' }}>
+        {ig('#60a5fa', 'fashion.daily')}
+      </div>
+      {/* Phone — right bottom */}
+      <div style={{ position: 'absolute', right: 60, bottom: 20, width: 100, height: 170, borderRadius: 12, background: '#0a0910', border: '5px solid #1a1828', overflow: 'hidden', boxShadow: '0 20px 50px rgba(0,0,0,0.7)', transform: 'rotate(-3deg)' }}>
+        {ig('#34d399', 'beauty.tips')}
+      </div>
     </div>
+  )
+}
+
+// ── Site hero (discover page full-screen marketing hero) ──────────────────────
+function SiteHero({ onStudio }: { onStudio: () => void }) {
+  const CARDS = [
+    { x: -32, y: -22, rot: -8,  views: '870K', g1: '#c084fc', g2: '#7c3aed', seed: 0 },
+    { x:  -8, y: -28, rot: -2,  views: '680K', g1: '#f472b6', g2: '#db2777', seed: 1 },
+    { x:  24, y: -20, rot:  6,  views: '1.1M', g1: '#60a5fa', g2: '#2563eb', seed: 2 },
+    { x: -26, y:  20, rot: -5,  views: '920K', g1: '#4ade80', g2: '#16a34a', seed: 3 },
+    { x:  30, y:  16, rot:  7,  views: '990K', g1: '#fb923c', g2: '#ea580c', seed: 4 },
+  ]
+  const cW = 130, cH = 185
+
+  return (
+    <section style={{ position: 'relative', height: 'calc(100vh - 60px)', overflow: 'hidden', background: '#06050f' }}>
+      {/* Purple glow */}
+      <div style={{ position: 'absolute', top: '42%', left: '50%', transform: 'translate(-50%,-50%)', width: 800, height: 800, borderRadius: '50%', background: 'radial-gradient(closest-side, rgba(109,40,217,0.16), transparent)', filter: 'blur(80px)', pointerEvents: 'none' }} />
+
+      {/* Floating phone cards */}
+      {CARDS.map((c, i) => (
+        <div key={i} style={{
+          position: 'absolute',
+          left: `calc(50% + ${c.x}% - ${cW / 2}px)`,
+          top: `calc(50% + ${c.y}% - ${cH / 2}px)`,
+          width: cW, height: cH,
+          transform: `rotate(${c.rot}deg)`,
+          borderRadius: 18, overflow: 'hidden',
+          border: '1px solid rgba(255,255,255,0.12)',
+          boxShadow: '0 24px 60px rgba(0,0,0,0.8)',
+          animation: `sf-float ${4.5 + i * 0.6}s ease-in-out ${i * 0.9}s infinite`,
+          zIndex: 2,
+        }}>
+          <img src={REEL_PHOTOS[i]} alt="" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '78%', objectFit: 'cover', display: 'block' }} loading="lazy" />
+          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '78%', background: 'linear-gradient(to bottom, rgba(0,0,0,0.08) 0%, transparent 40%, rgba(0,0,0,0.18) 100%)', pointerEvents: 'none' }} />
+          <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '8px 10px', background: 'rgba(0,0,0,0.62)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', gap: 5 }}>
+            <svg width="9" height="9" viewBox="0 0 24 24" fill="rgba(255,255,255,0.8)"><path d="M8 5v14l11-7z"/></svg>
+            <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.9)' }}>{c.views}</span>
+          </div>
+          <div style={{ position: 'absolute', top: 6, right: 6, width: 18, height: 18, borderRadius: '50%', background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, color: 'rgba(255,255,255,0.55)' }}>✕</div>
+        </div>
+      ))}
+
+      {/* Instagram icon — top left */}
+      <div style={{ position: 'absolute', top: '12%', left: '8%', width: 64, height: 64, borderRadius: 18, background: 'linear-gradient(135deg,#833ab4 0%,#fd1d1d 50%,#fcb045 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 14px 40px rgba(253,29,29,0.35),0 4px 12px rgba(0,0,0,0.5)', animation: 'sf-float-slow 5s ease-in-out infinite', zIndex: 3 }}>
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="white"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
+      </div>
+
+      {/* Telegram — bottom left */}
+      <div style={{ position: 'absolute', bottom: '16%', left: '6%', width: 60, height: 60, borderRadius: 16, background: 'linear-gradient(135deg,#229ED9,#1a7ab5)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 14px 40px rgba(34,158,217,0.3),0 4px 12px rgba(0,0,0,0.5)', animation: 'sf-float-slow 6s ease-in-out 1.2s infinite', zIndex: 3 }}>
+        <svg viewBox="0 0 24 24" width="30" height="30" fill="white"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.14.18-.357.295-.6.295l.213-3.053 5.56-5.022c.24-.213-.054-.334-.373-.121l-6.869 4.326-2.96-.924c-.64-.203-.658-.64.135-.954l11.566-4.458c.538-.196 1.006.128.832.941z"/></svg>
+      </div>
+
+      {/* Video icon — top right */}
+      <div style={{ position: 'absolute', top: '14%', right: '10%', width: 60, height: 60, borderRadius: 16, background: 'linear-gradient(135deg,#1d4ed8,#60a5fa)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 14px 40px rgba(59,130,246,0.3),0 4px 12px rgba(0,0,0,0.5)', animation: 'sf-float-slow 5.5s ease-in-out 2s infinite', zIndex: 3 }}>
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>
+      </div>
+
+      {/* Rocket — bottom right */}
+      <div style={{ position: 'absolute', bottom: '18%', right: '8%', width: 60, height: 60, borderRadius: 16, background: 'linear-gradient(135deg,#7c3aed,#a855f7)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 14px 40px rgba(124,58,237,0.3),0 4px 12px rgba(0,0,0,0.5)', animation: 'sf-float-slow 7s ease-in-out 0.5s infinite', zIndex: 3, fontSize: 28 }}>🚀</div>
+
+      {/* Center content */}
+      <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', textAlign: 'center', zIndex: 10, width: '100%', maxWidth: 700, padding: '0 24px', boxSizing: 'border-box' }}>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '6px 16px', borderRadius: 99, background: 'rgba(124,58,237,0.1)', border: '1px solid rgba(124,58,237,0.22)', marginBottom: 22, animation: 'sf-fade-up 0.6s ease both' }}>
+          <span style={{ fontSize: 12 }}>⚡</span>
+          <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', color: 'rgba(196,181,253,0.8)', textTransform: 'uppercase' }}>Automatise · Gagne du Temps · Scale</span>
+        </div>
+        <div style={{ fontSize: 'clamp(58px,9vw,102px)', fontWeight: 900, letterSpacing: '-0.045em', color: '#F2F0FF', lineHeight: 0.88, fontFamily: "'Inter','Arial Black',sans-serif", animation: 'sf-fade-up 0.6s ease 0.08s both', filter: 'drop-shadow(0 0 50px rgba(167,139,250,0.22))' }}>ScaleFlow</div>
+        <div style={{ marginTop: 18, fontSize: 'clamp(17px,2.2vw,24px)', fontWeight: 800, color: 'rgba(241,240,247,0.88)', lineHeight: 1.2, animation: 'sf-fade-up 0.6s ease 0.15s both' }}>L'automatisation Instagram à grande échelle.</div>
+        <p style={{ fontSize: 14, color: 'rgba(148,163,184,0.48)', margin: '12px auto 28px', lineHeight: 1.65, maxWidth: 440, animation: 'sf-fade-up 0.6s ease 0.22s both' }}>
+          Mass posting, multi-comptes, planification avancée,<br />reels & stories et bien plus.
+        </p>
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'center', animation: 'sf-fade-up 0.6s ease 0.3s both' }}>
+          <a href={TELEGRAM_URL} target="_blank" rel="noreferrer"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '13px 22px', borderRadius: 10, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#F2F0FF', fontSize: 14, fontWeight: 700, textDecoration: 'none', transition: 'background 0.2s' }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.11)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.06)')}>
+            <TGIcon size={14} /> Acheter une clé
+          </a>
+          <button onClick={onStudio}
+            style={{ padding: '13px 26px', borderRadius: 10, background: 'linear-gradient(130deg,#7c3aed,#ec4899)', border: 'none', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', transition: 'opacity 0.2s', boxShadow: '0 6px 24px rgba(124,58,237,0.35)' }}
+            onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
+            onMouseLeave={e => (e.currentTarget.style.opacity = '1')}>
+            Se connecter →
+          </button>
+        </div>
+      </div>
+
+      {/* Bottom feature strip */}
+      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '14px 0', background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(16px)', borderTop: '1px solid rgba(255,255,255,0.06)', zIndex: 5 }}>
+        {[
+          { icon: '📤', label: 'MASS POSTING' },
+          { icon: '👥', label: 'MULTI-COMPTES' },
+          { icon: '🤖', label: 'AUTOMATISATION AVANCÉE' },
+          { icon: '🎬', label: 'REELS & STORIES' },
+        ].map((f, i, a) => (
+          <div key={f.label} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '0 28px', borderRight: i < a.length - 1 ? '1px solid rgba(255,255,255,0.07)' : 'none' }}>
+            <span style={{ fontSize: 14 }}>{f.icon}</span>
+            <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.11em', color: 'rgba(196,181,253,0.5)', textTransform: 'uppercase' }}>{f.label}</span>
+          </div>
+        ))}
+      </div>
+    </section>
   )
 }
 
@@ -398,10 +609,52 @@ const FEATURES = [
 ]
 
 // ── Pricing ───────────────────────────────────────────────────────────────────
-const PLANS = [
-  { name: 'Standard', price: '49,99$', period: '/mois', accent: '#60a5fa', features: ['2 500 crédits / mois', '50 téléphones max', 'Toutes les fonctionnalités', 'Mass Posting — 10 comptes max', 'Support 24/7'] },
-  { name: 'Pro', price: '59,99$', originalPrice: '99,99$', period: '/mois', accent: '#c084fc', popular: true, features: ['5 500 crédits / mois', '200 téléphones max', 'Toutes les fonctionnalités', 'Mass Posting illimité', 'Support 24/7'] },
-  { name: 'Organisation', price: '89,99$', originalPrice: '149,99$', period: '/mois', accent: '#34d399', features: ['11 000 crédits / mois', 'Téléphones illimités', 'Toutes les fonctionnalités', 'Mass Posting illimité', 'Support prioritaire', "Suggestions d'ajouts avec les devs"] },
+type PlanFeature = { text: string; included: boolean }
+interface Plan {
+  name: string; icon: string; tagline: string; credits: string; creditsColor: string
+  price: string; originalPrice?: string; accent: string; popular?: boolean; bestValue?: boolean
+  features: PlanFeature[]
+}
+const PLANS: Plan[] = [
+  {
+    name: 'Standard', icon: '⚡', tagline: 'Pour débuter', credits: '2 500 crédits / mois', creditsColor: '#60a5fa',
+    price: '49,99$', accent: '#60a5fa',
+    features: [
+      { text: 'Accès à tous les outils',       included: false },
+      { text: 'Toutes les fonctionnalités',     included: false },
+      { text: 'Mass Posting (10 comptes max)',  included: true  },
+      { text: '50 téléphones max',              included: true  },
+      { text: 'Support prioritaire',            included: false },
+      { text: 'Remix & CloneVid',               included: false },
+      { text: 'Banque vidéos + Captions',       included: true  },
+    ],
+  },
+  {
+    name: 'Pro', icon: '👑', tagline: 'Scale ton output', credits: '5 500 crédits / mois', creditsColor: '#a78bfa',
+    price: '59,99$', originalPrice: '99,99$', accent: '#a78bfa', popular: true,
+    features: [
+      { text: 'Accès à tous les outils',       included: true  },
+      { text: 'Toutes les fonctionnalités',     included: true  },
+      { text: 'Mass Posting illimité',          included: true  },
+      { text: '200 téléphones max',             included: true  },
+      { text: 'Support prioritaire',            included: true  },
+      { text: 'Remix & CloneVid',               included: true  },
+      { text: 'Banque vidéos + Captions',       included: true  },
+    ],
+  },
+  {
+    name: 'Organisation', icon: '🏢', tagline: 'Puissance illimitée', credits: '11 000 crédits / mois', creditsColor: '#34d399',
+    price: '89,99$', originalPrice: '149,99$', accent: '#34d399', bestValue: true,
+    features: [
+      { text: 'Accès à tous les outils',       included: true  },
+      { text: 'Toutes les fonctionnalités',     included: true  },
+      { text: 'Mass Posting illimité',          included: true  },
+      { text: 'Téléphones illimités',           included: true  },
+      { text: 'Support prioritaire',            included: true  },
+      { text: 'Remix & CloneVid',               included: true  },
+      { text: "Suggestions d'ajouts avec les devs", included: true  },
+    ],
+  },
 ]
 
 // ── FAQ ───────────────────────────────────────────────────────────────────────
@@ -424,14 +677,711 @@ const TGIcon = ({ size = 14 }: { size?: number }) => (
   </svg>
 )
 
-// ── Main ──────────────────────────────────────────────────────────────────────
-export function Landing() {
-  const [showAuth, setShowAuth] = useState(false)
-  const [faqOpen, setFaqOpen]   = useState<number | null>(null)
-  useGlobalCSS()
+const TUNNEL_CSS = `
+  @keyframes orbit-spin    { from { transform: rotate(0deg); }    to { transform: rotate(360deg); } }
+  @keyframes orbit-upright { from { transform: rotate(0deg); }    to { transform: rotate(-360deg); } }
+  @keyframes orbit-card-glow {
+    0%,100% { box-shadow: 0 4px 18px rgba(0,0,0,0.55); }
+    50%     { box-shadow: 0 4px 28px rgba(0,0,0,0.75); }
+  }
+  @keyframes tunnel-drift {
+    0%   { transform: translateZ(0px) rotateX(0deg); }
+    100% { transform: translateZ(60px) rotateX(0.4deg); }
+  }
+  @keyframes tunnel-card-float {
+    0%,100% { opacity: var(--base-op); }
+    50%      { opacity: calc(var(--base-op) + 0.08); }
+  }
+  @keyframes enter-btn-pulse {
+    0%,100% { box-shadow: 0 0 0 0 rgba(255,255,255,0.12), inset 0 1px 0 rgba(255,255,255,0.15); }
+    50%     { box-shadow: 0 0 28px 4px rgba(255,255,255,0.08), inset 0 1px 0 rgba(255,255,255,0.15); }
+  }
+  @keyframes brand-appear {
+    from { opacity: 0; letter-spacing: 0.5em; filter: blur(12px); }
+    to   { opacity: 1; letter-spacing: -0.03em; filter: blur(0); }
+  }
+  @keyframes reveal-in {
+    from { opacity: 0; transform: scale(1.04); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+  @keyframes reveal-word {
+    from { opacity: 0; transform: translateY(40px) skewY(2deg); }
+    to   { opacity: 1; transform: translateY(0) skewY(0deg); }
+  }
+  @keyframes reveal-sub {
+    from { opacity: 0; }
+    to   { opacity: 0.3; }
+  }
+`
+
+// ── 3D tunnel card positions ───────────────────────────────────────────────────
+// Each card: left%, top%, rotateY, rotateX, translateZ, width, height, image seed, base opacity
+const TUNNEL_CARDS = [
+  // ── Left wall, far ──
+  { x:-42, y:-26, ry: 44, rx:-8,  tz:-280, w:200, h:130, s: 10, op:0.55 },
+  { x:-50, y: -4, ry: 48, rx: 0,  tz:-180, w:240, h:158, s: 20, op:0.70 },
+  { x:-44, y: 18, ry: 42, rx: 8,  tz:-230, w:210, h:140, s: 30, op:0.60 },
+  // ── Left wall, near ──
+  { x:-58, y:-16, ry: 55, rx:-5,  tz: -60, w:280, h:190, s: 40, op:0.85 },
+  { x:-62, y: 26, ry: 52, rx: 7,  tz: -90, w:260, h:172, s: 50, op:0.80 },
+  // ── Left floor-ish ──
+  { x:-36, y: 42, ry: 30, rx: 22, tz:-160, w:230, h:148, s: 60, op:0.65 },
+  { x:-50, y: 52, ry: 38, rx: 30, tz: -80, w:270, h:170, s: 70, op:0.75 },
+  // ── Right wall, far ──
+  { x: 42, y:-26, ry:-44, rx:-8,  tz:-280, w:200, h:130, s: 80, op:0.55 },
+  { x: 50, y: -4, ry:-48, rx: 0,  tz:-180, w:240, h:158, s:100, op:0.70 },
+  { x: 44, y: 18, ry:-42, rx: 8,  tz:-230, w:210, h:140, s:110, op:0.60 },
+  // ── Right wall, near ──
+  { x: 58, y:-16, ry:-55, rx:-5,  tz: -60, w:280, h:190, s:120, op:0.85 },
+  { x: 62, y: 26, ry:-52, rx: 7,  tz: -90, w:260, h:172, s:130, op:0.80 },
+  // ── Right floor-ish ──
+  { x: 36, y: 42, ry:-30, rx: 22, tz:-160, w:230, h:148, s:140, op:0.65 },
+  { x: 50, y: 52, ry:-38, rx: 30, tz: -80, w:270, h:170, s:150, op:0.75 },
+  // ── Top center ──
+  { x: -8, y:-48, ry:  4, rx:-38, tz:-200, w:190, h:120, s:160, op:0.55 },
+  { x:  6, y:-52, ry: -6, rx:-42, tz:-120, w:220, h:140, s:170, op:0.65 },
+  // ── Center far ──
+  { x:-10, y:-10, ry:  8, rx: 4,  tz:-380, w:170, h:110, s:180, op:0.40 },
+  { x:  8, y:  6, ry: -5, rx:-3,  tz:-350, w:150, h: 96, s:190, op:0.35 },
+]
+
+// ── 3D Tunnel hero ─────────────────────────────────────────────────────────────
+function TunnelHero({ onEnter }: { onEnter: () => void }) {
+  useEffect(() => {
+    const id = 'sf-tunnel-css'
+    if (!document.getElementById(id)) {
+      const el = document.createElement('style')
+      el.id = id; el.textContent = TUNNEL_CSS
+      document.head.appendChild(el)
+    }
+  }, [])
 
   return (
-    <div style={{ minHeight: '100vh', background: '#06060f', color: '#F2F0FF', overflowX: 'hidden', fontFamily: "'Inter', system-ui, sans-serif" }}>
+    <section style={{
+      position: 'relative', height: '100vh', overflow: 'hidden',
+      cursor: 'none',
+      background: '#000',
+      backgroundImage: [
+        'linear-gradient(rgba(255,255,255,0.028) 1px, transparent 1px)',
+        'linear-gradient(90deg, rgba(255,255,255,0.028) 1px, transparent 1px)',
+      ].join(','),
+      backgroundSize: '52px 52px',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+    }}>
+      {/* Subtle radial vignette */}
+      <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse 70% 70% at 50% 50%, transparent 30%, rgba(0,0,0,0.72) 100%)', pointerEvents: 'none', zIndex: 2 }} />
+
+      {/* 3D perspective scene */}
+      <div style={{
+        position: 'absolute', inset: 0,
+        perspective: '900px',
+        perspectiveOrigin: '50% 50%',
+        overflow: 'visible',
+      }}>
+        <div style={{
+          position: 'absolute', inset: 0,
+          transformStyle: 'preserve-3d',
+          animation: 'tunnel-drift 8s ease-in-out infinite alternate',
+        }}>
+          {TUNNEL_CARDS.map((c, i) => (
+            <div
+              key={i}
+              style={{
+                position: 'absolute',
+                left: `calc(50% + ${c.x}vw - ${c.w / 2}px)`,
+                top:  `calc(50% + ${c.y}vh - ${c.h / 2}px)`,
+                width:  c.w,
+                height: c.h,
+                transform: `rotateY(${c.ry}deg) rotateX(${c.rx}deg) translateZ(${c.tz}px)`,
+                borderRadius: 10,
+                overflow: 'hidden',
+                border: '1px solid rgba(255,255,255,0.10)',
+                boxShadow: '0 8px 32px rgba(0,0,0,0.55)',
+                ['--base-op' as any]: c.op,
+                opacity: c.op,
+                animation: `tunnel-card-float ${5 + (i % 4)}s ease-in-out ${(i * 0.4) % 3}s infinite`,
+                willChange: 'transform, opacity',
+              }}
+            >
+              <img
+                src={`https://picsum.photos/seed/${c.s}/${c.w * 2}/${c.h * 2}`}
+                alt=""
+                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', filter: 'brightness(0.75) saturate(0.9)' }}
+                loading="lazy"
+                draggable={false}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Center content */}
+      <div style={{ position: 'relative', zIndex: 10, textAlign: 'center', userSelect: 'none' }}>
+        <h1 style={{
+          fontSize: 'clamp(64px, 11vw, 130px)',
+          fontWeight: 900,
+          letterSpacing: '-0.045em',
+          lineHeight: 1,
+          margin: '0 0 6px',
+          fontFamily: "'Inter', 'Arial Black', system-ui, sans-serif",
+          animation: 'brand-appear 1.2s cubic-bezier(0.16,1,0.3,1) 0.2s both',
+          background: 'linear-gradient(135deg, #ffffff 0%, rgba(200,180,255,0.9) 50%, #ffffff 100%)',
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
+          backgroundClip: 'text',
+          filter: 'drop-shadow(0 0 40px rgba(167,139,250,0.35))',
+        }}>
+          ScaleFlow
+        </h1>
+        <p style={{
+          fontSize: 14,
+          color: 'rgba(255,255,255,0.35)',
+          letterSpacing: '0.22em',
+          textTransform: 'uppercase',
+          margin: '0 0 48px',
+          animation: 'sf-fade-in 1s ease 1s both',
+          fontWeight: 500,
+        }}>
+          Instagram Automation
+        </p>
+
+        {/* Dot indicator */}
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginBottom: 40, animation: 'sf-fade-in 1s ease 1.1s both' }}>
+          {[1, 0, 0].map((active, i) => (
+            <div key={i} style={{ width: active ? 20 : 6, height: 6, borderRadius: 99, background: active ? '#fff' : 'rgba(255,255,255,0.2)', transition: 'width 0.3s' }} />
+          ))}
+        </div>
+
+        {/* Enter button */}
+        <button
+          onClick={onEnter}
+          style={{
+            display: 'inline-block',
+            padding: '13px 44px',
+            borderRadius: 99,
+            border: '1.5px solid rgba(255,255,255,0.3)',
+            background: 'rgba(255,255,255,0.06)',
+            backdropFilter: 'blur(12px)',
+            color: '#fff',
+            fontSize: 13,
+            fontWeight: 700,
+            letterSpacing: '0.18em',
+            textTransform: 'uppercase',
+            cursor: 'pointer',
+            animation: 'sf-fade-in 0.8s ease 1.3s both, enter-btn-pulse 3s ease-in-out 2s infinite',
+            transition: 'background 0.2s, border-color 0.2s, transform 0.15s',
+          }}
+          onMouseEnter={e => {
+            e.currentTarget.style.background = 'rgba(255,255,255,0.14)'
+            e.currentTarget.style.borderColor = 'rgba(255,255,255,0.55)'
+            e.currentTarget.style.transform = 'translateY(-2px)'
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.background = 'rgba(255,255,255,0.06)'
+            e.currentTarget.style.borderColor = 'rgba(255,255,255,0.3)'
+            e.currentTarget.style.transform = ''
+          }}
+        >
+          ENTER
+        </button>
+      </div>
+    </section>
+  )
+}
+
+// ── Custom cursor ─────────────────────────────────────────────────────────────
+function CustomCursor() {
+  const dotRef  = useRef<HTMLDivElement>(null)
+  const ringRef = useRef<HTMLDivElement>(null)
+  const pos     = useRef({ x: -100, y: -100 })
+  const ring    = useRef({ x: -100, y: -100 })
+  const hovering = useRef(false)
+
+  useEffect(() => {
+    let raf: number
+    const onMove = (e: MouseEvent) => { pos.current = { x: e.clientX, y: e.clientY } }
+    const onOver = (e: MouseEvent) => {
+      hovering.current = !!(e.target as HTMLElement).closest('button, a, [role="button"]')
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseover', onOver)
+
+    const tick = () => {
+      ring.current.x += (pos.current.x - ring.current.x) * 0.11
+      ring.current.y += (pos.current.y - ring.current.y) * 0.11
+      const scale = hovering.current ? 1.6 : 1
+      if (dotRef.current) {
+        dotRef.current.style.transform = `translate(${pos.current.x - 5}px,${pos.current.y - 5}px)`
+        dotRef.current.style.opacity   = hovering.current ? '0.5' : '1'
+      }
+      if (ringRef.current) {
+        ringRef.current.style.transform = `translate(${ring.current.x - 18}px,${ring.current.y - 18}px) scale(${scale})`
+      }
+      raf = requestAnimationFrame(tick)
+    }
+    tick()
+    return () => {
+      cancelAnimationFrame(raf)
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseover', onOver)
+    }
+  }, [])
+
+  return (
+    <>
+      <div ref={dotRef} style={{
+        position: 'fixed', top: 0, left: 0, zIndex: 99999, pointerEvents: 'none',
+        width: 10, height: 10, borderRadius: '50%', background: '#fff',
+        mixBlendMode: 'difference', willChange: 'transform',
+      }} />
+      <div ref={ringRef} style={{
+        position: 'fixed', top: 0, left: 0, zIndex: 99998, pointerEvents: 'none',
+        width: 36, height: 36, borderRadius: '50%',
+        border: '1.5px solid rgba(255,255,255,0.6)',
+        mixBlendMode: 'difference', willChange: 'transform',
+        transition: 'transform 0.08s ease',
+      }} />
+    </>
+  )
+}
+
+// ── Reveal screen — unified dark two-halves ────────────────────────────────────
+function RevealScreen({ onDiscover, onStudio }: { onDiscover: () => void; onStudio: () => void }) {
+  const [hoverTop, setHoverTop] = useState(false)
+  const [hoverBot, setHoverBot] = useState(false)
+  const [visible,  setVisible]  = useState(false)
+  useEffect(() => { const t = setTimeout(() => setVisible(true), 30); return () => clearTimeout(t) }, [])
+
+  const baseText: React.CSSProperties = {
+    fontFamily: "'Inter','Arial Black','Helvetica Neue',Arial,sans-serif",
+    fontWeight: 900,
+    letterSpacing: '-0.045em',
+    lineHeight: 0.88,
+    userSelect: 'none',
+    transition: 'transform 0.5s cubic-bezier(0.16,1,0.3,1)',
+  }
+  const grid: React.CSSProperties = {
+    position: 'absolute', inset: 0, pointerEvents: 'none',
+    backgroundImage: 'linear-gradient(rgba(255,255,255,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.04) 1px,transparent 1px)',
+    backgroundSize: '56px 56px',
+  }
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 200,
+      display: 'flex', flexDirection: 'column',
+      animation: 'reveal-in 0.5s cubic-bezier(0.16,1,0.3,1) both',
+      overflow: 'hidden', cursor: 'none',
+      background: '#07060e',
+    }}>
+      {/* Shared background glow */}
+      <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 600, height: 600, borderRadius: '50%', background: 'radial-gradient(closest-side, rgba(124,58,237,0.1), transparent)', filter: 'blur(80px)', pointerEvents: 'none', zIndex: 0 }} />
+
+      {/* ScaleFlow label — top-left, shared */}
+      <div style={{ position: 'absolute', top: 28, left: 36, zIndex: 20, display: 'flex', alignItems: 'center', gap: 8, opacity: visible ? 1 : 0, transition: 'opacity 0.5s 0.1s' }}>
+        <div style={{ width: 22, height: 22, borderRadius: 6, background: 'linear-gradient(130deg,#7c3aed,#a855f7)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <svg width="13" height="13" viewBox="0 0 200 200" fill="none"><text x="100" y="148" textAnchor="middle" fontFamily="'Arial Black',sans-serif" fontWeight="900" fontSize="148" fill="#fff">S</text></svg>
+        </div>
+        <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.25)' }}>ScaleFlow</span>
+      </div>
+
+      {/* Top half — Découvrir ScaleFlow */}
+      <div
+        onClick={onDiscover}
+        onMouseEnter={() => setHoverTop(true)}
+        onMouseLeave={() => setHoverTop(false)}
+        style={{
+          flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: hoverTop ? 'rgba(124,58,237,0.08)' : 'transparent',
+          cursor: 'none', position: 'relative', overflow: 'hidden', zIndex: 1,
+          transition: 'background 0.4s',
+        }}
+      >
+        <div style={grid} />
+        {hoverTop && <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse 50% 70% at 50% 50%, rgba(124,58,237,0.12), transparent)', pointerEvents: 'none' }} />}
+
+        <div style={{ textAlign: 'center', opacity: visible ? 1 : 0, transform: visible ? 'translateY(0)' : 'translateY(24px)', transition: 'opacity 0.6s 0.12s, transform 0.6s 0.12s cubic-bezier(0.16,1,0.3,1)', position: 'relative', zIndex: 2 }}>
+          <div style={{ ...baseText, fontSize: 'clamp(44px,9vw,120px)', color: '#F2F0FF', transform: hoverTop ? 'translateX(8px)' : 'none' }}>
+            DÉCOUVRIR
+          </div>
+          <div style={{ ...baseText, fontSize: 'clamp(44px,9vw,120px)', color: 'transparent', WebkitTextStroke: '2px rgba(255,255,255,0.35)', transform: hoverTop ? 'translateX(-8px)' : 'none' }}>
+            SCALEFLOW
+          </div>
+          <div style={{ marginTop: 18, fontSize: 11, fontWeight: 600, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.2)' }}>
+            Présentation · Fonctionnalités · Tarifs
+          </div>
+        </div>
+        <div style={{ position: 'absolute', right: 52, fontSize: 24, color: 'rgba(255,255,255,0.2)', opacity: hoverTop ? 1 : 0, transform: hoverTop ? 'translateX(0)' : 'translateX(-12px)', transition: 'opacity 0.3s, transform 0.3s', zIndex: 2 }}>→</div>
+      </div>
+
+      {/* Divider — with gradient line */}
+      <div style={{ height: 1, background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.12) 30%, rgba(124,58,237,0.4) 50%, rgba(255,255,255,0.12) 70%, transparent)', flexShrink: 0, zIndex: 10 }} />
+
+      {/* Bottom half — Studio */}
+      <div
+        onClick={onStudio}
+        onMouseEnter={() => setHoverBot(true)}
+        onMouseLeave={() => setHoverBot(false)}
+        style={{
+          flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: hoverBot ? 'rgba(236,72,153,0.05)' : 'transparent',
+          cursor: 'none', position: 'relative', overflow: 'hidden', zIndex: 1,
+          transition: 'background 0.4s',
+        }}
+      >
+        <div style={grid} />
+        {hoverBot && <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse 50% 70% at 50% 50%, rgba(236,72,153,0.1), transparent)', pointerEvents: 'none' }} />}
+
+        <div style={{ textAlign: 'center', opacity: visible ? 1 : 0, transform: visible ? 'translateY(0)' : 'translateY(24px)', transition: 'opacity 0.6s 0.22s, transform 0.6s 0.22s cubic-bezier(0.16,1,0.3,1)', position: 'relative', zIndex: 2 }}>
+          <div style={{ ...baseText, fontSize: 'clamp(56px,12vw,155px)', background: 'linear-gradient(130deg,#fff 0%,rgba(196,181,253,0.8) 60%,rgba(236,72,153,0.7) 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', transform: hoverBot ? 'translateX(8px)' : 'none' }}>
+            STUDIO
+          </div>
+          <div style={{ marginTop: 18, fontSize: 11, fontWeight: 600, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.2)' }}>
+            Connexion · Mass Posting · Cloud Phones
+          </div>
+        </div>
+        <div style={{ position: 'absolute', right: 52, fontSize: 24, color: 'rgba(255,255,255,0.2)', opacity: hoverBot ? 1 : 0, transform: hoverBot ? 'translateX(0)' : 'translateX(-12px)', transition: 'opacity 0.3s, transform 0.3s', zIndex: 2 }}>→</div>
+      </div>
+    </div>
+  )
+}
+
+// ── Orbit ring — Studio auth left panel ───────────────────────────────────────
+const ORBIT_COLORS = [
+  ['#c084fc','#7c3aed'], ['#f472b6','#db2777'], ['#60a5fa','#2563eb'],
+  ['#34d399','#059669'], ['#fb923c','#ea580c'], ['#a78bfa','#7c3aed'],
+  ['#f9a8d4','#ec4899'], ['#93c5fd','#3b82f6'], ['#6ee7b7','#10b981'],
+  ['#fcd34d','#f59e0b'], ['#c4b5fd','#8b5cf6'], ['#fbcfe8','#db2777'],
+  ['#bfdbfe','#3b82f6'], ['#d9f99d','#65a30d'],
+]
+const ORBIT_RADIUS = 190
+const ORBIT_DURATION = 28
+
+function OrbitPhoto({ index, total, color1, color2 }: { index: number; total: number; color1: string; color2: string }) {
+  const angleDeg = (360 / total) * index
+  const w = 72, h = 88
+  return (
+    <div style={{
+      position: 'absolute', top: '50%', left: '50%',
+      marginTop: -h / 2, marginLeft: -w / 2,
+      transform: `rotate(${angleDeg}deg) translateY(-${ORBIT_RADIUS}px)`,
+    }}>
+      <div style={{
+        width: w, height: h,
+        animation: `orbit-upright ${ORBIT_DURATION}s linear infinite`,
+        borderRadius: 12,
+        background: `linear-gradient(135deg, ${color1}, ${color2})`,
+        border: '1px solid rgba(255,255,255,0.12)',
+        boxShadow: '0 6px 24px rgba(0,0,0,0.6)',
+        overflow: 'hidden',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        {/* inner glow accent */}
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(135deg,rgba(255,255,255,0.18) 0%,transparent 60%)', borderRadius: 12 }} />
+        {/* subtle pattern */}
+        <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(4px)' }} />
+      </div>
+    </div>
+  )
+}
+
+// ── Studio auth — AIGNCY-style split layout ───────────────────────────────────
+function StudioAuth({ onBack }: { onBack: () => void }) {
+  const [tab,      setTab]      = useState<'login'|'register'>('login')
+  const [email,    setEmail]    = useState('')
+  const [password, setPassword] = useState('')
+  const [confirm,  setConfirm]  = useState('')
+  const [showPw,   setShowPw]   = useState(false)
+  const [loading,  setLoading]  = useState(false)
+  const [error,    setError]    = useState<string|null>(null)
+  const [success,  setSuccess]  = useState<string|null>(null)
+
+  useEffect(() => {
+    const fn = (e: KeyboardEvent) => { if (e.key === 'Escape') onBack() }
+    window.addEventListener('keydown', fn); return () => window.removeEventListener('keydown', fn)
+  }, [onBack])
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault(); setError(null); setSuccess(null); setLoading(true)
+    try {
+      if (tab === 'login') {
+        const { error: err } = await supabase.auth.signInWithPassword({ email, password })
+        if (err) throw err
+      } else {
+        if (password !== confirm) throw new Error('Les mots de passe ne correspondent pas.')
+        if (password.length < 6) throw new Error('Mot de passe trop court (6 caractères min).')
+        const { data, error: err } = await supabase.auth.signUp({ email, password })
+        if (err) throw err
+        if (data.user && !data.session) setSuccess('Compte créé ! Vérifie ta boîte mail.')
+      }
+    } catch (err: any) {
+      const raw = err instanceof Error ? err.message : String(err)
+      const r = raw.toLowerCase()
+      setError(
+        r.includes('invalid login') || r.includes('invalid credentials') ? 'Email ou mot de passe incorrect.' :
+        r.includes('email not confirmed') ? 'Email non confirmé — vérifie ta boîte mail.' :
+        r.includes('already registered') ? 'Un compte existe déjà avec cet email.' :
+        r.includes('rate limit') ? 'Trop de tentatives. Réessaie dans quelques minutes.' :
+        raw
+      )
+    } finally { setLoading(false) }
+  }
+
+  const inputStyle: React.CSSProperties = {
+    width: '100%', boxSizing: 'border-box',
+    padding: '12px 14px',
+    background: 'rgba(255,255,255,0.04)',
+    border: '1px solid rgba(255,255,255,0.09)',
+    borderRadius: 10,
+    color: '#F2F0FF',
+    fontSize: 14,
+    outline: 'none',
+    transition: 'border-color 0.2s',
+    fontFamily: 'inherit',
+  }
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 300,
+      display: 'flex',
+      animation: 'reveal-in 0.45s cubic-bezier(0.16,1,0.3,1) both',
+    }}>
+      {/* ── Left panel — Marketing ─────────────────────────────────────────── */}
+      <div style={{ flex: '0 0 55%', background: '#05030f', position: 'relative', overflow: 'hidden' }}>
+        {/* Glow */}
+        <div style={{ position: 'absolute', top: '42%', left: '50%', transform: 'translate(-50%,-50%)', width: 600, height: 600, borderRadius: '50%', background: 'radial-gradient(closest-side,rgba(109,40,217,0.18),transparent)', filter: 'blur(70px)', pointerEvents: 'none' }} />
+
+        {/* Floating phone cards */}
+        {[
+          { x: -34, y: -22, rot: -8,  views: '870K', g: '#c084fc' },
+          { x:  -6, y: -28, rot: -2,  views: '680K', g: '#f472b6' },
+          { x:  26, y: -20, rot:  6,  views: '1.1M', g: '#60a5fa' },
+          { x: -26, y:  20, rot: -5,  views: '920K', g: '#4ade80' },
+          { x:  28, y:  16, rot:  7,  views: '990K', g: '#fb923c' },
+        ].map((c, i) => (
+          <div key={i} style={{
+            position: 'absolute',
+            left: `calc(50% + ${c.x}% - 55px)`, top: `calc(50% + ${c.y}% - 80px)`,
+            width: 110, height: 160, transform: `rotate(${c.rot}deg)`,
+            borderRadius: 14, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.12)',
+            boxShadow: '0 20px 50px rgba(0,0,0,0.8)',
+            animation: `sf-float ${4.5 + i * 0.6}s ease-in-out ${i * 0.9}s infinite`, zIndex: 2,
+          }}>
+            <img src={REEL_PHOTOS[i % REEL_PHOTOS.length]} alt="" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '78%', objectFit: 'cover', display: 'block' }} loading="lazy" />
+            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '78%', background: 'linear-gradient(to bottom, rgba(0,0,0,0.06) 0%, transparent 40%, rgba(0,0,0,0.15) 100%)', pointerEvents: 'none' }} />
+            <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '6px 8px', background: 'rgba(0,0,0,0.62)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', gap: 4 }}>
+              <svg width="8" height="8" viewBox="0 0 24 24" fill="rgba(255,255,255,0.8)"><path d="M8 5v14l11-7z"/></svg>
+              <span style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.9)' }}>{c.views}</span>
+            </div>
+            <div style={{ position: 'absolute', top: 5, right: 5, width: 15, height: 15, borderRadius: '50%', background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, color: 'rgba(255,255,255,0.55)' }}>✕</div>
+          </div>
+        ))}
+
+        {/* Instagram icon */}
+        <div style={{ position: 'absolute', top: '10%', left: '8%', width: 54, height: 54, borderRadius: 15, background: 'linear-gradient(135deg,#833ab4 0%,#fd1d1d 50%,#fcb045 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 12px 32px rgba(253,29,29,0.35)', animation: 'sf-float-slow 5s ease-in-out infinite', zIndex: 3 }}>
+          <svg width="27" height="27" viewBox="0 0 24 24" fill="white"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
+        </div>
+
+        {/* Telegram icon */}
+        <div style={{ position: 'absolute', bottom: '18%', left: '6%', width: 50, height: 50, borderRadius: 14, background: 'linear-gradient(135deg,#229ED9,#1a7ab5)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 12px 32px rgba(34,158,217,0.3)', animation: 'sf-float-slow 6s ease-in-out 1.2s infinite', zIndex: 3 }}>
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="white"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.14.18-.357.295-.6.295l.213-3.053 5.56-5.022c.24-.213-.054-.334-.373-.121l-6.869 4.326-2.96-.924c-.64-.203-.658-.64.135-.954l11.566-4.458c.538-.196 1.006.128.832.941z"/></svg>
+        </div>
+
+        {/* Video icon */}
+        <div style={{ position: 'absolute', top: '12%', right: '8%', width: 50, height: 50, borderRadius: 14, background: 'linear-gradient(135deg,#1d4ed8,#60a5fa)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 12px 32px rgba(59,130,246,0.3)', animation: 'sf-float-slow 5.5s ease-in-out 2s infinite', zIndex: 3 }}>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>
+        </div>
+
+        {/* Rocket icon */}
+        <div style={{ position: 'absolute', bottom: '20%', right: '7%', width: 50, height: 50, borderRadius: 14, background: 'linear-gradient(135deg,#7c3aed,#a855f7)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 12px 32px rgba(124,58,237,0.3)', animation: 'sf-float-slow 7s ease-in-out 0.5s infinite', zIndex: 3, fontSize: 22 }}>🚀</div>
+
+        {/* Center text */}
+        <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', textAlign: 'center', zIndex: 10, width: '90%', pointerEvents: 'none' }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 13px', borderRadius: 99, background: 'rgba(124,58,237,0.1)', border: '1px solid rgba(124,58,237,0.22)', marginBottom: 16 }}>
+            <span style={{ fontSize: 11 }}>⚡</span>
+            <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.14em', color: 'rgba(196,181,253,0.8)', textTransform: 'uppercase' }}>Automatise · Gagne du Temps · Scale</span>
+          </div>
+          <div style={{ fontSize: 'clamp(36px,4.5vw,62px)', fontWeight: 900, letterSpacing: '-0.045em', color: '#F2F0FF', lineHeight: 0.88, fontFamily: "'Inter','Arial Black',sans-serif", filter: 'drop-shadow(0 0 40px rgba(167,139,250,0.22))' }}>ScaleFlow</div>
+          <div style={{ marginTop: 14, fontSize: 'clamp(14px,1.6vw,18px)', fontWeight: 800, color: 'rgba(241,240,247,0.85)', lineHeight: 1.25 }}>L'automatisation Instagram</div>
+          <div style={{ fontSize: 'clamp(14px,1.6vw,18px)', fontWeight: 800, color: 'rgba(241,240,247,0.85)', lineHeight: 1.25, marginBottom: 10 }}>à grande échelle.</div>
+          <p style={{ fontSize: 12, color: 'rgba(148,163,184,0.45)', margin: '0 auto', lineHeight: 1.6, maxWidth: 320 }}>Mass posting, multi-comptes, planification avancée, reels & stories.</p>
+        </div>
+
+        {/* Bottom feature strip */}
+        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, display: 'flex', justifyContent: 'center', flexWrap: 'wrap', alignItems: 'center', padding: '10px 0', background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(16px)', borderTop: '1px solid rgba(255,255,255,0.06)', gap: 0, zIndex: 5 }}>
+          {[{ icon: '📤', label: 'MASS POSTING' }, { icon: '👥', label: 'MULTI-COMPTES' }, { icon: '🎬', label: 'REELS & STORIES' }].map((f, i, a) => (
+            <div key={f.label} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '0 14px', borderRight: i < a.length - 1 ? '1px solid rgba(255,255,255,0.07)' : 'none' }}>
+              <span style={{ fontSize: 12 }}>{f.icon}</span>
+              <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.1em', color: 'rgba(196,181,253,0.5)', textTransform: 'uppercase' }}>{f.label}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Back button */}
+        <button onClick={onBack} style={{ position: 'absolute', top: 20, left: 20, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, color: 'rgba(148,163,184,0.6)', fontSize: 12, padding: '6px 12px', cursor: 'pointer', fontWeight: 600, letterSpacing: '0.06em', transition: 'background 0.2s', zIndex: 20 }}
+          onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.1)')}
+          onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.06)')}>
+          ← Retour
+        </button>
+      </div>
+
+      {/* ── Right panel — Form ─────────────────────────────────────────────── */}
+      <div style={{
+        flex: 1,
+        background: '#08060f',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: '32px 24px',
+        borderLeft: '1px solid rgba(255,255,255,0.05)',
+        overflowY: 'auto',
+      }}>
+        <div style={{ width: '100%', maxWidth: 360 }}>
+          {/* Tabs */}
+          <div style={{ display: 'flex', background: 'rgba(255,255,255,0.04)', borderRadius: 10, padding: 4, marginBottom: 32, border: '1px solid rgba(255,255,255,0.07)' }}>
+            {(['login','register'] as const).map(t => (
+              <button key={t} onClick={() => { setTab(t); setError(null); setSuccess(null); setPassword(''); setConfirm('') }}
+                style={{
+                  flex: 1, padding: '10px', borderRadius: 7, fontSize: 13, fontWeight: 700, border: 'none', cursor: 'pointer', transition: 'all 0.2s',
+                  ...(tab === t
+                    ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff', boxShadow: '0 2px 12px rgba(124,58,237,0.4)' }
+                    : { background: 'transparent', color: 'rgba(148,163,184,0.5)' }
+                  ),
+                }}>
+                {t === 'login' ? 'Sign In' : 'Sign Up'}
+              </button>
+            ))}
+          </div>
+
+          {/* Heading */}
+          <div style={{ marginBottom: 28 }}>
+            <h2 style={{ fontSize: 26, fontWeight: 900, color: '#F2F0FF', margin: '0 0 6px', letterSpacing: '-0.03em' }}>
+              {tab === 'login' ? 'Welcome back' : 'Créer un compte'}
+            </h2>
+            <p style={{ fontSize: 13, color: 'rgba(148,163,184,0.4)', margin: 0 }}>
+              {tab === 'login' ? 'Connecte-toi à ton compte ScaleFlow.' : 'Rejoins ScaleFlow en quelques secondes.'}
+            </p>
+          </div>
+
+          {/* Form */}
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div>
+              <label style={{ display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(148,163,184,0.5)', marginBottom: 7 }}>Email</label>
+              <input type="email" required value={email} onChange={e => setEmail(e.target.value)}
+                placeholder="you@example.com" style={inputStyle}
+                onFocus={e => (e.currentTarget.style.borderColor = 'rgba(139,92,246,0.5)')}
+                onBlur={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.09)')} />
+            </div>
+
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 7 }}>
+                <label style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(148,163,184,0.5)' }}>Password</label>
+              </div>
+              <div style={{ position: 'relative' }}>
+                <input type={showPw ? 'text' : 'password'} required value={password} onChange={e => setPassword(e.target.value)}
+                  placeholder="••••••••" style={{ ...inputStyle, paddingRight: 44 }}
+                  onFocus={e => (e.currentTarget.style.borderColor = 'rgba(139,92,246,0.5)')}
+                  onBlur={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.09)')} />
+                <button type="button" onClick={() => setShowPw(!showPw)}
+                  style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(148,163,184,0.4)', fontSize: 16, padding: 0 }}>
+                  {showPw ? '🙈' : '👁'}
+                </button>
+              </div>
+            </div>
+
+            {tab === 'register' && (
+              <div>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(148,163,184,0.5)', marginBottom: 7 }}>Confirmer</label>
+                <input type="password" required value={confirm} onChange={e => setConfirm(e.target.value)}
+                  placeholder="••••••••" style={inputStyle}
+                  onFocus={e => (e.currentTarget.style.borderColor = 'rgba(139,92,246,0.5)')}
+                  onBlur={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.09)')} />
+              </div>
+            )}
+
+            {error && (
+              <div style={{ padding: '10px 14px', borderRadius: 10, background: 'rgba(240,61,85,0.08)', border: '1px solid rgba(240,61,85,0.22)', color: '#f87171', fontSize: 13, display: 'flex', gap: 8 }}>
+                <span style={{ flexShrink: 0 }}>⚠</span><span>{error}</span>
+              </div>
+            )}
+            {success && (
+              <div style={{ padding: '10px 14px', borderRadius: 10, background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.22)', color: '#34d399', fontSize: 13, display: 'flex', gap: 8 }}>
+                <span style={{ flexShrink: 0 }}>✓</span><span>{success}</span>
+              </div>
+            )}
+
+            <button type="submit" disabled={loading}
+              style={{
+                width: '100%', padding: '14px', borderRadius: 10, border: 'none', cursor: loading ? 'wait' : 'pointer',
+                background: loading ? 'rgba(124,58,237,0.5)' : 'linear-gradient(130deg,#7c3aed,#ec4899)',
+                color: '#fff', fontSize: 15, fontWeight: 800, letterSpacing: '0.02em',
+                boxShadow: '0 4px 20px rgba(124,58,237,0.35)', marginTop: 4,
+                transition: 'opacity 0.2s',
+              }}
+              onMouseEnter={e => { if (!loading) e.currentTarget.style.opacity = '0.88' }}
+              onMouseLeave={e => (e.currentTarget.style.opacity = '1')}>
+              {loading ? '...' : tab === 'login' ? 'Sign In' : 'Créer mon compte'}
+            </button>
+          </form>
+
+          <p style={{ textAlign: 'center', marginTop: 24, fontSize: 12, color: 'rgba(148,163,184,0.35)' }}>
+            {tab === 'login' ? "Pas encore de compte ? " : "Déjà un compte ? "}
+            <button onClick={() => { setTab(tab === 'login' ? 'register' : 'login'); setError(null); setPassword(''); setConfirm('') }}
+              style={{ background: 'none', border: 'none', color: '#a78bfa', fontSize: 12, cursor: 'pointer', fontWeight: 600, textDecoration: 'underline', padding: 0 }}>
+              {tab === 'login' ? 'Sign up' : 'Sign in'}
+            </button>
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+type Stage = 'tunnel' | 'reveal' | 'site' | 'studio'
+
+function stageFromHash(): Stage {
+  const h = window.location.hash
+  if (h === '#discover') return 'site'
+  if (h === '#studio')   return 'studio'
+  return 'tunnel'
+}
+
+export function Landing() {
+  const [stage,   setStageRaw] = useState<Stage>(stageFromHash)
+  const [faqOpen, setFaqOpen]  = useState<number | null>(null)
+  useGlobalCSS()
+
+  // Keep hash in sync with stage
+  const goTo = (s: Stage) => {
+    if (s === 'site')   window.location.hash = '#discover'
+    else if (s === 'studio') window.location.hash = '#studio'
+    else history.pushState(null, '', window.location.pathname)
+    setStageRaw(s)
+  }
+
+  // Handle browser back/forward
+  useEffect(() => {
+    const handler = () => setStageRaw(stageFromHash())
+    window.addEventListener('hashchange', handler)
+    return () => window.removeEventListener('hashchange', handler)
+  }, [])
+
+  // Lock scroll while not on the main site
+  useEffect(() => {
+    document.body.style.overflow = stage === 'site' ? '' : 'hidden'
+    return () => { document.body.style.overflow = '' }
+  }, [stage])
+
+  // Scroll to top when arriving on discover
+  useEffect(() => {
+    if (stage === 'site') window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior })
+  }, [stage])
+
+  const onDiscover = () => goTo('site')
+  const onStudio   = () => goTo('studio')
+
+  return (
+    <div style={{ minHeight: '100vh', background: '#06060f', color: '#F2F0FF', overflowX: 'hidden', fontFamily: "'Inter', system-ui, sans-serif", cursor: stage === 'site' ? 'auto' : 'none' }}>
+      {stage !== 'site' && <CustomCursor />}
       <StarField />
 
       {/* Nebula glows — animated */}
@@ -441,15 +1391,21 @@ export function Landing() {
         <div style={{ position: 'absolute', bottom: '5%', left: '-5%', width: 500, height: 500, borderRadius: '50%', background: 'radial-gradient(closest-side, rgba(56,189,248,0.05), transparent)', filter: 'blur(50px)', animation: 'sf-nebula 14s ease-in-out infinite 4s' }} />
       </div>
 
-      {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
+      {stage === 'reveal' && <RevealScreen onDiscover={onDiscover} onStudio={onStudio} />}
+      {stage === 'studio' && <StudioAuth onBack={() => goTo('reveal')} />}
 
-      {/* ── Nav ─────────────────────────────────────────────────────────────── */}
-      <nav style={{ position: 'sticky', top: 0, zIndex: 50, background: 'rgba(6,6,15,0.8)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+      {/* Tunnel — only rendered on tunnel stage */}
+      {stage === 'tunnel' && <TunnelHero onEnter={() => goTo('reveal')} />}
+
+      {/* ── Nav (hidden while tunnel is fullscreen) ──────────────────────────── */}
+      {stage === 'site' && (
+      <nav style={{ position: 'sticky', top: 0, zIndex: 50, background: 'rgba(6,6,15,0.9)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
         <div style={{ maxWidth: 1140, margin: '0 auto', padding: '0 24px', height: 60, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+          {/* Logo — clicking returns to tunnel */}
+          <button onClick={() => goTo('tunnel')} style={{ display: 'flex', alignItems: 'center', gap: 9, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
             <SFMark size={28} />
             <span style={{ fontSize: 15, fontWeight: 800, color: '#F2F0FF', letterSpacing: '-0.3px' }}>ScaleFlow</span>
-          </div>
+          </button>
           <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             {[['#features','Fonctionnalités'], ['#pricing','Tarifs'], ['#faq','FAQ']].map(([href, label]) => (
               <a key={href} href={href} style={{ fontSize: 13, color: 'rgba(148,163,184,0.55)', textDecoration: 'none', padding: '6px 12px', borderRadius: 8, transition: 'color 0.15s' }}
@@ -464,78 +1420,21 @@ export function Landing() {
               onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.09)')} onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.05)')}>
               <TGIcon /> Acheter une clé
             </a>
-            <button onClick={() => setShowAuth(true)}
+            <button onClick={onStudio}
               style={{ padding: '7px 16px', borderRadius: 9, background: 'linear-gradient(130deg,#7c3aed,#a855f7)', border: 'none', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', transition: 'opacity 0.15s', animation: 'sf-pulse-glow 3s ease-in-out infinite' }}
               onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')} onMouseLeave={e => (e.currentTarget.style.opacity = '1')}>
-              Se connecter →
+              Studio →
             </button>
           </div>
         </div>
       </nav>
+      )}
 
-      {/* ── Hero ────────────────────────────────────────────────────────────── */}
-      <section style={{ position: 'relative', zIndex: 1, padding: '100px 24px 50px', textAlign: 'center', overflow: 'hidden' }}>
-        {/* Orbit rings decoration */}
-        <div style={{ position: 'absolute', top: '50%', left: '50%', pointerEvents: 'none', zIndex: 0 }}>
-          <OrbitRing size={500} duration={40} opacity={0.35} />
-          <OrbitRing size={760} duration={65} opacity={0.18} color="rgba(236,72,153,0.1)" />
-          <OrbitRing size={1050} duration={90} opacity={0.1} color="rgba(56,189,248,0.08)" />
-        </div>
+      {/* ── Site content — only rendered when stage==='site' ─────────────────── */}
+      {stage === 'site' && <>
 
-        <div style={{ maxWidth: 820, margin: '0 auto', position: 'relative', zIndex: 1 }}>
-          {/* Badge */}
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '5px 14px', borderRadius: 99, marginBottom: 28, background: 'rgba(255,255,255,0.035)', border: '1px solid rgba(255,255,255,0.07)', fontSize: 11, color: 'rgba(148,163,184,0.55)', letterSpacing: '0.06em', fontWeight: 600, textTransform: 'uppercase', animation: 'sf-fade-up 0.6s ease 0.1s both' }}>
-            <SFMark size={14} />
-            ScaleFlow — Instagram Automation
-          </div>
-
-          {/* Drawn phrase */}
-          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 18, animation: 'sf-fade-up 0.6s ease 0.2s both' }}>
-            <DrawnPhrase />
-          </div>
-
-          {/* Headline */}
-          <h1 style={{ fontSize: 'clamp(44px,8vw,84px)', fontWeight: 900, lineHeight: 1.02, letterSpacing: '-0.045em', margin: '0 0 26px', color: '#F2F0FF', animation: 'sf-fade-up 0.7s ease 0.3s both' }}>
-            Gère 100+ comptes<br />
-            <span style={{ background: 'linear-gradient(120deg,#a78bfa 0%,#ec4899 55%,#38bdf8 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-              sans effort.
-            </span>
-          </h1>
-
-          <p style={{ fontSize: 17, color: 'rgba(148,163,184,0.58)', maxWidth: 480, margin: '0 auto 44px', lineHeight: 1.7, animation: 'sf-fade-up 0.7s ease 0.4s both' }}>
-            Mass posting, IA, banque de contenu, stats temps réel.<br />
-            Tout ce qu'il faut pour scaler ton empire Instagram.
-          </p>
-
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, justifyContent: 'center', animation: 'sf-fade-up 0.7s ease 0.5s both' }}>
-            <button onClick={() => setShowAuth(true)}
-              style={{ padding: '14px 34px', borderRadius: 12, background: 'linear-gradient(130deg,#7c3aed,#ec4899)', border: 'none', color: '#fff', fontSize: 15, fontWeight: 800, cursor: 'pointer', letterSpacing: '-0.01em', animation: 'sf-pulse-glow 3s ease-in-out infinite', transition: 'transform 0.15s' }}
-              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)' }}
-              onMouseLeave={e => { e.currentTarget.style.transform = '' }}>
-              🚀 Accéder à l'app
-            </button>
-            <a href={TELEGRAM_URL} target="_blank" rel="noreferrer"
-              style={{ padding: '14px 28px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)', color: '#F2F0FF', fontSize: 15, fontWeight: 700, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 8, transition: 'background 0.15s, border-color 0.15s, transform 0.15s' }}
-              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.16)'; e.currentTarget.style.transform = 'translateY(-2px)' }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.09)'; e.currentTarget.style.transform = '' }}>
-              <TGIcon size={16} /> Acheter une clé
-            </a>
-          </div>
-
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 20, justifyContent: 'center', marginTop: 32, fontSize: 12, color: 'rgba(148,163,184,0.35)', animation: 'sf-fade-up 0.7s ease 0.6s both' }}>
-            {['✓ Mac & Windows', '✓ Version web disponible', '✓ Activation instantanée'].map(t => <span key={t}>{t}</span>)}
-          </div>
-
-          <CountdownBlock />
-        </div>
-      </section>
-
-      {/* ── App mockup ───────────────────────────────────────────────────────── */}
-      <section style={{ position: 'relative', zIndex: 1, padding: '60px 24px 100px' }}>
-        <FadeIn>
-          <AppMockup />
-        </FadeIn>
-      </section>
+      {/* ── Site hero ────────────────────────────────────────────────────────── */}
+      <SiteHero onStudio={onStudio} />
 
       <Divider />
 
@@ -598,55 +1497,113 @@ export function Landing() {
 
       {/* ── Pricing ───────────────────────────────────────────────────────────── */}
       <section id="pricing" style={{ position: 'relative', zIndex: 1, padding: '80px 24px' }}>
-        <div style={{ maxWidth: 960, margin: '0 auto' }}>
+        <div style={{ maxWidth: 980, margin: '0 auto' }}>
           <FadeIn>
-            <div style={{ textAlign: 'center', marginBottom: 56 }}>
+            <div style={{ textAlign: 'center', marginBottom: 48 }}>
               <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.14em', color: '#a78bfa', margin: '0 0 14px' }}>Tarifs</p>
               <h2 style={{ fontSize: 'clamp(28px,5vw,50px)', fontWeight: 900, letterSpacing: '-0.04em', margin: '0 0 14px', color: '#F2F0FF' }}>
                 Choisis ton{' '}
                 <span style={{ background: 'linear-gradient(120deg,#a78bfa,#ec4899)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>plan.</span>
               </h2>
-              <p style={{ fontSize: 15, color: 'rgba(148,163,184,0.5)' }}>Tout est inclus dès le Standard. Activation via Telegram.</p>
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginTop: 16, padding: '8px 18px', borderRadius: 99, background: 'rgba(251,146,60,0.1)', border: '1px solid rgba(251,146,60,0.3)' }}>
-                <span style={{ fontSize: 16 }}>🔥</span>
-                <span style={{ fontSize: 13, fontWeight: 800, color: '#fb923c' }}>-40% sur Pro &amp; Organisation jusqu'au 1er juillet</span>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginTop: 12, padding: '7px 18px', borderRadius: 99, background: 'rgba(251,146,60,0.08)', border: '1px solid rgba(251,146,60,0.25)' }}>
+                <span style={{ fontSize: 14 }}>🔥</span>
+                <span style={{ fontSize: 12, fontWeight: 800, color: '#fb923c' }}>-40% sur Pro & Organisation jusqu'au 1er juillet</span>
               </div>
             </div>
           </FadeIn>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(265px,1fr))', gap: 14 }}>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(280px,1fr))', gap: 16 }}>
             {PLANS.map((p, i) => (
               <FadeIn key={p.name} delay={i * 0.1}>
-                <div style={{ position: 'relative', background: '#0a0a14', borderRadius: 18, padding: '28px 24px', border: p.popular ? '1.5px solid rgba(124,58,237,0.4)' : '1px solid rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column', height: '100%', boxSizing: 'border-box', boxShadow: p.popular ? '0 0 50px rgba(124,58,237,0.1)' : 'none', transition: 'transform 0.2s, box-shadow 0.2s' }}
-                  onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = p.popular ? '0 20px 60px rgba(124,58,237,0.2)' : '0 12px 40px rgba(0,0,0,0.4)' }}
-                  onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = p.popular ? '0 0 50px rgba(124,58,237,0.1)' : 'none' }}>
-                  {p.popular && <div style={{ position: 'absolute', top: -13, left: '50%', transform: 'translateX(-50%)', padding: '3px 14px', borderRadius: 99, fontSize: 10, fontWeight: 900, color: '#fff', letterSpacing: '0.1em', background: 'linear-gradient(130deg,#7c3aed,#ec4899)', whiteSpace: 'nowrap' }}>POPULAIRE</div>}
-                  <p style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.12em', color: p.accent, margin: '0 0 8px' }}>{p.name}</p>
-                  <div style={{ marginBottom: 22 }}>
-                    {(p as any).originalPrice && (
-                      <span style={{ fontSize: 13, color: 'rgba(148,163,184,0.35)', textDecoration: 'line-through' }}>{(p as any).originalPrice}</span>
-                    )}
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, flexWrap: 'nowrap' }}>
-                      <span style={{ fontSize: 38, fontWeight: 900, color: '#F2F0FF', letterSpacing: '-0.04em', whiteSpace: 'nowrap' }}>{p.price}</span>
-                      <span style={{ fontSize: 13, color: 'rgba(148,163,184,0.38)', whiteSpace: 'nowrap' }}>{p.period}</span>
+                <div
+                  style={{
+                    position: 'relative',
+                    background: p.popular ? 'rgba(124,58,237,0.06)' : p.bestValue ? 'rgba(52,211,153,0.04)' : '#0b0b15',
+                    borderRadius: 20,
+                    border: p.popular ? '1.5px solid rgba(124,58,237,0.35)' : p.bestValue ? '1.5px solid rgba(52,211,153,0.3)' : '1px solid rgba(255,255,255,0.07)',
+                    display: 'flex', flexDirection: 'column',
+                    boxSizing: 'border-box',
+                    boxShadow: p.popular ? '0 0 60px rgba(124,58,237,0.12)' : p.bestValue ? '0 0 60px rgba(52,211,153,0.08)' : 'none',
+                    overflow: 'hidden',
+                    transition: 'transform 0.2s, box-shadow 0.2s',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; if (!p.popular && !p.bestValue) e.currentTarget.style.boxShadow = '0 12px 40px rgba(0,0,0,0.5)' }}
+                  onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = p.popular ? '0 0 60px rgba(124,58,237,0.12)' : p.bestValue ? '0 0 60px rgba(52,211,153,0.08)' : 'none' }}
+                >
+                  {/* Badge */}
+                  {(p.popular || p.bestValue) && (
+                    <div style={{ background: p.popular ? 'linear-gradient(90deg,#7c3aed,#a855f7)' : 'linear-gradient(90deg,#059669,#34d399)', padding: '6px 0', textAlign: 'center', fontSize: 10, fontWeight: 900, letterSpacing: '0.15em', color: '#fff' }}>
+                      {p.popular ? 'MOST POPULAR' : 'BEST VALUE'}
                     </div>
+                  )}
+
+                  <div style={{ padding: '24px 24px 28px' }}>
+                    {/* Plan header */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+                      <div style={{ width: 40, height: 40, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, background: `${p.accent}12`, border: `1px solid ${p.accent}25`, flexShrink: 0 }}>
+                        {p.icon}
+                      </div>
+                      <div>
+                        <p style={{ fontSize: 16, fontWeight: 800, color: '#F2F0FF', margin: 0, letterSpacing: '-0.02em' }}>{p.name}</p>
+                        <p style={{ fontSize: 12, color: 'rgba(148,163,184,0.45)', margin: 0 }}>{p.tagline}</p>
+                      </div>
+                    </div>
+
+                    {/* Credits badge */}
+                    <div style={{ background: `${p.creditsColor}12`, border: `1px solid ${p.creditsColor}25`, borderRadius: 8, padding: '7px 12px', marginBottom: 20, display: 'inline-block' }}>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: p.creditsColor }}>{p.credits}</span>
+                    </div>
+
+                    {/* Price */}
+                    <div style={{ marginBottom: 24 }}>
+                      {p.originalPrice && <div style={{ fontSize: 13, color: 'rgba(148,163,184,0.3)', textDecoration: 'line-through', marginBottom: 2 }}>{p.originalPrice} /mois</div>}
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+                        <span style={{ fontSize: 42, fontWeight: 900, color: '#F2F0FF', letterSpacing: '-0.04em', lineHeight: 1 }}>{p.price}</span>
+                        <span style={{ fontSize: 13, color: 'rgba(148,163,184,0.4)' }}>/mois</span>
+                      </div>
+                    </div>
+
+                    {/* Features */}
+                    <ul style={{ listStyle: 'none', margin: '0 0 24px', padding: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      {p.features.map(f => (
+                        <li key={f.text} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13 }}>
+                          {f.included ? (
+                            <span style={{ width: 18, height: 18, borderRadius: 5, background: `${p.accent}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                              <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M1.5 5L4 7.5L8.5 2.5" stroke={p.accent} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                            </span>
+                          ) : (
+                            <span style={{ width: 18, height: 18, borderRadius: 5, background: 'rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                              <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M1 1l6 6M7 1L1 7" stroke="rgba(148,163,184,0.3)" strokeWidth="1.5" strokeLinecap="round"/></svg>
+                            </span>
+                          )}
+                          <span style={{ color: f.included ? 'rgba(241,240,247,0.75)' : 'rgba(148,163,184,0.3)', textDecoration: f.included ? 'none' : 'line-through' }}>{f.text}</span>
+                        </li>
+                      ))}
+                    </ul>
+
+                    {/* CTA */}
+                    <a href={TELEGRAM_URL} target="_blank" rel="noreferrer"
+                      style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                        padding: '13px', borderRadius: 12, fontSize: 14, fontWeight: 700,
+                        textDecoration: 'none', transition: 'opacity 0.15s, transform 0.15s',
+                        ...(p.popular
+                          ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff', boxShadow: '0 4px 20px rgba(124,58,237,0.35)' }
+                          : p.bestValue
+                          ? { background: 'linear-gradient(130deg,#059669,#34d399)', color: '#fff', boxShadow: '0 4px 20px rgba(52,211,153,0.25)' }
+                          : { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#F2F0FF' }
+                        ),
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.opacity = '0.85'; e.currentTarget.style.transform = 'translateY(-1px)' }}
+                      onMouseLeave={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.transform = '' }}>
+                      Get Started →
+                    </a>
                   </div>
-                  <ul style={{ listStyle: 'none', margin: '0 0 24px', padding: 0, display: 'flex', flexDirection: 'column', gap: 9, flex: 1 }}>
-                    {p.features.map(f => (
-                      <li key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13, color: 'rgba(196,181,253,0.65)' }}>
-                        <span style={{ color: p.accent, flexShrink: 0 }}>✓</span>{f}
-                      </li>
-                    ))}
-                  </ul>
-                  <a href={TELEGRAM_URL} target="_blank" rel="noreferrer"
-                    style={{ display: 'block', textAlign: 'center', padding: '11px', borderRadius: 10, fontSize: 13, fontWeight: 700, textDecoration: 'none', transition: 'opacity 0.15s', ...(p.popular ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff', boxShadow: '0 4px 20px rgba(124,58,237,0.3)' } : { background: 'rgba(255,255,255,0.04)', border: `1px solid ${p.accent}28`, color: '#F2F0FF' }) }}
-                    onMouseEnter={e => (e.currentTarget.style.opacity = '0.8')} onMouseLeave={e => (e.currentTarget.style.opacity = '1')}>
-                    Choisir {p.name} →
-                  </a>
                 </div>
               </FadeIn>
             ))}
           </div>
-          <p style={{ textAlign: 'center', fontSize: 12, color: 'rgba(148,163,184,0.25)', marginTop: 24 }}>Paiement via Telegram · Crypto ou virement · Activation immédiate</p>
+          <p style={{ textAlign: 'center', fontSize: 12, color: 'rgba(148,163,184,0.22)', marginTop: 28 }}>All plans require activation via Telegram · Crypto or bank transfer · Immediate activation</p>
         </div>
       </section>
 
@@ -710,6 +1667,8 @@ export function Landing() {
           </div>
         </div>
       </footer>
+
+      </>} {/* end stage === 'site' */}
     </div>
   )
 }
