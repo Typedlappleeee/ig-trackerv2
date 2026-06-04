@@ -271,75 +271,174 @@ function CountdownBlock() {
   )
 }
 
-// ── Mockup fallback (SVG UI) shown when mockup.png not yet uploaded ───────────
+// ── Hero mockup composition ────────────────────────────────────────────────────
 function MockupFallback() {
+  const panel: React.CSSProperties = {
+    background: 'rgba(10,9,20,0.92)',
+    border: '1px solid rgba(255,255,255,0.07)',
+    borderRadius: 14,
+    backdropFilter: 'blur(12px)',
+    boxShadow: '0 20px 60px rgba(0,0,0,0.7)',
+  }
+  const phoneScreen: React.CSSProperties = {
+    width: 130, height: 220, borderRadius: 16,
+    background: '#0a0910', border: '6px solid #1a1828',
+    overflow: 'hidden', boxShadow: '0 24px 60px rgba(0,0,0,0.8)',
+    flexShrink: 0,
+  }
+  const ig = (color: string, label: string) => (
+    <div style={{ width: '100%', height: '100%', background: `linear-gradient(160deg, ${color}22, #0a0910)`, display: 'flex', flexDirection: 'column', padding: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 6 }}>
+        <div style={{ width: 20, height: 20, borderRadius: '50%', background: `linear-gradient(135deg, ${color}, #ec4899)` }} />
+        <span style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.7)' }}>{label}</span>
+      </div>
+      <div style={{ flex: 1, borderRadius: 8, background: `linear-gradient(160deg, ${color}40, ${color}15)`, marginBottom: 6 }} />
+      <div style={{ display: 'flex', gap: 8, justifyContent: 'space-around' }}>
+        {['♥','💬','✈️','🔖'].map(ic => <span key={ic} style={{ fontSize: 11 }}>{ic}</span>)}
+      </div>
+    </div>
+  )
+
   return (
-    <div style={{ position: 'relative', borderRadius: 20, overflow: 'hidden', border: '1px solid rgba(139,92,246,0.22)', boxShadow: '0 40px 100px rgba(0,0,0,0.75)', background: '#08080f' }}>
-      {/* Chrome bar */}
-      <div style={{ padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.045)', display: 'flex', alignItems: 'center', gap: 8, background: '#0b0b16' }}>
-        {['#ef4444','#f59e0b','#22c55e'].map(c => <div key={c} style={{ width: 10, height: 10, borderRadius: '50%', background: c, opacity: 0.5 }} />)}
-        <div style={{ flex: 1, margin: '0 10px', height: 20, borderRadius: 5, background: 'rgba(255,255,255,0.035)', display: 'flex', alignItems: 'center', paddingLeft: 10 }}>
-          <span style={{ fontSize: 10, color: 'rgba(148,163,184,0.22)' }}>scaleflow-fvtu.vercel.app</span>
+    <div style={{ position: 'relative', width: '100%', height: 560, overflow: 'hidden', borderRadius: 20 }}>
+      {/* Background */}
+      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(135deg, #0c0918 0%, #08060f 50%, #100a1e 100%)' }} />
+      <div style={{ position: 'absolute', top: '20%', left: '35%', width: 400, height: 400, borderRadius: '50%', background: 'radial-gradient(closest-side, rgba(124,58,237,0.2), transparent)', filter: 'blur(60px)' }} />
+      <div style={{ position: 'absolute', top: '40%', right: '10%', width: 250, height: 250, borderRadius: '50%', background: 'radial-gradient(closest-side, rgba(236,72,153,0.12), transparent)', filter: 'blur(40px)' }} />
+
+      {/* Phone — left edge */}
+      <div style={{ position: 'absolute', left: -20, top: 60, ...phoneScreen, transform: 'rotate(-6deg)' }}>
+        {ig('#a78bfa', 'lifestyle.ig')}
+      </div>
+
+      {/* Nouveau post panel — left */}
+      <div style={{ position: 'absolute', left: 120, top: 40, width: 230, ...panel, padding: 14, zIndex: 10 }}>
+        <p style={{ fontSize: 11, fontWeight: 700, color: '#F2F0FF', margin: '0 0 10px' }}>Nouveau post</p>
+        <p style={{ fontSize: 9, color: 'rgba(148,163,184,0.45)', margin: '0 0 6px' }}>Publier sur</p>
+        <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
+          {['#7c3aed','#ec4899','#3b82f6','#34d399','#f59e0b'].map((c,i) => (
+            <div key={i} style={{ width: 20, height: 20, borderRadius: '50%', background: `linear-gradient(135deg,${c},${c}88)`, border: '2px solid #0a0910' }} />
+          ))}
+          <div style={{ width: 20, height: 20, borderRadius: '50%', background: 'rgba(255,255,255,0.07)', border: '1px dashed rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>+</div>
+        </div>
+        <p style={{ fontSize: 9, color: 'rgba(148,163,184,0.45)', margin: '0 0 6px' }}>Média</p>
+        <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
+          {['#7c3aed','#ec4899','#3b82f6'].map((c,i) => (
+            <div key={i} style={{ width: 52, height: 52, borderRadius: 8, background: `linear-gradient(135deg,${c}30,${c}10)`, border: `1px solid ${c}25`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>🎬</div>
+          ))}
+        </div>
+        <div style={{ height: 28, borderRadius: 7, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', marginBottom: 10, display: 'flex', alignItems: 'center', paddingLeft: 8 }}>
+          <span style={{ fontSize: 9, color: 'rgba(148,163,184,0.25)' }}>Écrire une légende...</span>
+        </div>
+        <div style={{ padding: '8px 0', borderTop: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{ fontSize: 9, color: 'rgba(148,163,184,0.35)' }}>📅 Programmer</span>
+          <span style={{ fontSize: 9, color: 'rgba(148,163,184,0.35)' }}>28/05/2024 · 18:45</span>
+        </div>
+        <div style={{ marginTop: 8, padding: '9px 0', borderRadius: 9, background: 'linear-gradient(130deg,#7c3aed,#ec4899)', textAlign: 'center', fontSize: 11, fontWeight: 700, color: '#fff' }}>
+          Ajouter à la file
         </div>
       </div>
-      <div style={{ display: 'flex', height: 480 }}>
-        {/* Sidebar */}
-        <div style={{ width: 200, background: '#07070c', borderRight: '1px solid rgba(255,255,255,0.04)', display: 'flex', flexDirection: 'column', padding: '16px 10px', gap: 2, flexShrink: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', marginBottom: 12 }}>
-            <SFMark size={22} />
-            <span style={{ fontSize: 13, fontWeight: 800, color: '#F2F0FF' }}>ScaleFlow</span>
-          </div>
-          {[{ icon: '📊', label: 'Dashboard', active: false }, { icon: '📱', label: 'Téléphones', active: false }, { icon: '⚡', label: 'Mass Posting', active: true }, { icon: '📅', label: 'Programmation', active: false }, { icon: '🗂', label: 'Banque vidéos', active: false }, { icon: '🔀', label: 'Remix vidéo', active: false }, { icon: '🤖', label: 'Outils IA', active: false }].map(item => (
-            <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 8, fontSize: 12, background: item.active ? 'rgba(124,58,237,0.15)' : 'transparent', color: item.active ? '#a78bfa' : 'rgba(148,163,184,0.45)', borderLeft: item.active ? '2px solid #7c3aed' : '2px solid transparent' }}>
-              <span style={{ fontSize: 13 }}>{item.icon}</span>
-              <span style={{ fontWeight: item.active ? 600 : 400 }}>{item.label}</span>
+
+      {/* Central — brand + feature grid */}
+      <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', textAlign: 'center', zIndex: 5, pointerEvents: 'none' }}>
+        <div style={{ fontSize: 'clamp(28px,4vw,52px)', fontWeight: 900, letterSpacing: '-0.04em', color: '#F2F0FF', marginBottom: 4 }}>ScaleFlow</div>
+        <p style={{ fontSize: 10, letterSpacing: '0.22em', textTransform: 'uppercase', color: 'rgba(148,163,184,0.4)', margin: '0 0 28px' }}>Instagram Automation</p>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, maxWidth: 260, margin: '0 auto' }}>
+          {[
+            { icon: '⚡', label: 'MASS POSTING', c: '#a78bfa' },
+            { icon: '👥', label: 'MULTI-COMPTES', c: '#60a5fa' },
+            { icon: '🤖', label: 'AUTOMATION', c: '#34d399' },
+            { icon: '🎬', label: 'REELS & STORIES', c: '#f472b6' },
+          ].map(f => (
+            <div key={f.label} style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${f.c}20`, borderRadius: 10, padding: '10px 8px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
+              <span style={{ fontSize: 16 }}>{f.icon}</span>
+              <span style={{ fontSize: 7, fontWeight: 800, letterSpacing: '0.08em', color: f.c }}>{f.label}</span>
             </div>
           ))}
         </div>
-        {/* Main */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#07070c', minWidth: 0 }}>
-          <div style={{ padding: '14px 22px', borderBottom: '1px solid rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div>
-              <p style={{ fontSize: 14, fontWeight: 700, color: '#F2F0FF', margin: 0 }}>Mass Posting</p>
-              <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.4)', margin: '2px 0 0' }}>Poster sur plusieurs comptes en parallèle</p>
+        <div style={{ display: 'flex', gap: 8, marginTop: 8, justifyContent: 'center' }}>
+          {[
+            { icon: '📊', label: 'ANALYTIQUES', c: '#fbbf24' },
+            { icon: '⏱', label: 'GAIN DE TEMPS', c: '#4ade80' },
+            { icon: '📅', label: 'SCHEDULER', c: '#e879f9' },
+          ].map(f => (
+            <div key={f.label} style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${f.c}20`, borderRadius: 10, padding: '8px 10px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+              <span style={{ fontSize: 14 }}>{f.icon}</span>
+              <span style={{ fontSize: 7, fontWeight: 800, letterSpacing: '0.08em', color: f.c }}>{f.label}</span>
             </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <div style={{ padding: '6px 14px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', fontSize: 11, color: 'rgba(148,163,184,0.5)' }}>Paramètres</div>
-              <div style={{ padding: '6px 14px', borderRadius: 8, background: 'linear-gradient(130deg,#7c3aed,#ec4899)', fontSize: 11, color: '#fff', fontWeight: 700 }}>▶ Lancer</div>
-            </div>
-          </div>
-          <div style={{ flex: 1, display: 'flex', padding: 20, gap: 14, overflow: 'hidden' }}>
-            <div style={{ width: 200, display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0 }}>
-              <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(148,163,184,0.3)', margin: '0 0 6px' }}>12 Téléphones</p>
-              {[{ n:'Phone_001',g:'Groupe A',o:true,s:true},{n:'Phone_002',g:'Groupe A',o:true,s:true},{n:'Phone_003',g:'Groupe B',o:false,s:false},{n:'Phone_004',g:'Groupe B',o:true,s:true},{n:'Phone_005',g:'Groupe A',o:true,s:true},{n:'Phone_006',g:'Groupe C',o:false,s:false}].map(p => (
-                <div key={p.n} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '6px 8px', borderRadius: 7, background: p.s ? 'rgba(124,58,237,0.10)' : 'transparent', border: p.s ? '1px solid rgba(124,58,237,0.18)' : '1px solid transparent' }}>
-                  <div style={{ width: 6, height: 6, borderRadius: '50%', background: p.o ? '#22c55e' : 'rgba(148,163,184,0.2)', flexShrink: 0 }} />
-                  <div style={{ minWidth: 0 }}>
-                    <p style={{ fontSize: 11, fontWeight: 600, color: p.s ? '#c4b5fd' : 'rgba(148,163,184,0.45)', margin: 0 }}>{p.n}</p>
-                    <p style={{ fontSize: 9, color: 'rgba(148,163,184,0.28)', margin: 0 }}>{p.g}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
-              <div>
-                <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(148,163,184,0.3)', margin: '0 0 8px' }}>Vidéos — 3</p>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  {['#7c3aed','#ec4899','#3b82f6'].map((c,i) => <div key={i} style={{ width: 52, height: 52, borderRadius: 8, background: `${c}18`, border: `1px solid ${c}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>🎬</div>)}
-                </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Stats panel — right */}
+      <div style={{ position: 'absolute', right: 120, top: 50, width: 200, ...panel, padding: 14, zIndex: 10 }}>
+        <p style={{ fontSize: 11, fontWeight: 700, color: '#F2F0FF', margin: '0 0 14px' }}>Statistiques</p>
+        <div style={{ marginBottom: 12 }}>
+          <p style={{ fontSize: 9, color: 'rgba(148,163,184,0.4)', margin: '0 0 3px' }}>Vue d'ensemble</p>
+          <p style={{ fontSize: 28, fontWeight: 900, color: '#F2F0FF', margin: 0, letterSpacing: '-0.04em' }}>128,4K</p>
+          <p style={{ fontSize: 9, color: '#34d399', margin: '2px 0 0' }}>+72% ↑</p>
+        </div>
+        {/* Sparkline */}
+        <svg width="100%" height="44" viewBox="0 0 176 44" fill="none">
+          <defs>
+            <linearGradient id="sparkGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#7c3aed" stopOpacity="0.3"/>
+              <stop offset="100%" stopColor="#7c3aed" stopOpacity="0"/>
+            </linearGradient>
+          </defs>
+          <path d="M0,38 L22,30 L44,34 L66,20 L88,22 L110,10 L132,14 L154,6 L176,2" stroke="#a78bfa" strokeWidth="2" strokeLinecap="round" fill="none"/>
+          <path d="M0,38 L22,30 L44,34 L66,20 L88,22 L110,10 L132,14 L154,6 L176,2 L176,44 L0,44Z" fill="url(#sparkGrad)"/>
+        </svg>
+        <div style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between' }}>
+          {['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'].map(d => (
+            <span key={d} style={{ fontSize: 7, color: 'rgba(148,163,184,0.3)' }}>{d}</span>
+          ))}
+        </div>
+        <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+          <p style={{ fontSize: 9, fontWeight: 700, color: '#F2F0FF', margin: '0 0 8px' }}>Audience</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <svg width="40" height="40" viewBox="0 0 40 40">
+              <circle cx="20" cy="20" r="16" fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="6"/>
+              <circle cx="20" cy="20" r="16" fill="none" stroke="#7c3aed" strokeWidth="6" strokeDasharray="78 22" strokeDashoffset="25" strokeLinecap="round"/>
+              <circle cx="20" cy="20" r="16" fill="none" stroke="#ec4899" strokeWidth="6" strokeDasharray="22 78" strokeDashoffset="-53" strokeLinecap="round"/>
+            </svg>
+            <div style={{ fontSize: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'rgba(196,181,253,0.7)', marginBottom: 3 }}>
+                <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#7c3aed' }} /> Non-abonnés 78%
               </div>
-              <div style={{ flex: 1, fontFamily: 'monospace', display: 'flex', flexDirection: 'column', gap: 3 }}>
-                <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(148,163,184,0.3)', margin: '0 0 6px' }}>Live log</p>
-                {[{t:'14:22:01',m:'✅ Phone_001 — Publication réussie',c:'#22c55e'},{t:'14:22:03',m:'✅ Phone_002 — Publication réussie',c:'#22c55e'},{t:'14:22:05',m:'⏳ Phone_004 — Upload en cours…',c:'#a78bfa'},{t:'14:22:07',m:'✅ Phone_005 — Publication réussie',c:'#22c55e'}].map((l,i) => (
-                  <div key={i} style={{ display: 'flex', gap: 8, fontSize: 10 }}>
-                    <span style={{ color: 'rgba(148,163,184,0.25)', flexShrink: 0 }}>{l.t}</span>
-                    <span style={{ color: l.c }}>{l.m}</span>
-                  </div>
-                ))}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'rgba(244,114,182,0.7)' }}>
+                <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#ec4899' }} /> Abonnés 22%
               </div>
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Queue panel — bottom center */}
+      <div style={{ position: 'absolute', bottom: 24, left: '50%', transform: 'translateX(-50%)', width: 280, ...panel, padding: 12, zIndex: 10 }}>
+        <p style={{ fontSize: 10, fontWeight: 700, color: '#F2F0FF', margin: '0 0 8px' }}>File de publications</p>
+        {[
+          { label: 'Reel — Outfit of the day', time: '28 Mai 2024 à 18:45', c: '#a78bfa' },
+          { label: 'Story — New collection', time: '29 Mai 2024 à 20:30', c: '#60a5fa' },
+          { label: 'Reel — Lifestyle', time: '30 Mai 2024 à 12:00', c: '#34d399' },
+        ].map(item => (
+          <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+            <div style={{ width: 28, height: 28, borderRadius: 6, background: `${item.c}18`, border: `1px solid ${item.c}25`, flexShrink: 0 }} />
+            <div>
+              <p style={{ fontSize: 9, fontWeight: 600, color: 'rgba(241,240,247,0.8)', margin: 0 }}>{item.label}</p>
+              <p style={{ fontSize: 8, color: 'rgba(148,163,184,0.35)', margin: 0 }}>{item.time}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Phone — right edge */}
+      <div style={{ position: 'absolute', right: -20, top: 80, ...phoneScreen, transform: 'rotate(5deg)' }}>
+        {ig('#60a5fa', 'fashion.daily')}
+      </div>
+      {/* Phone — right bottom */}
+      <div style={{ position: 'absolute', right: 60, bottom: 20, width: 100, height: 170, borderRadius: 12, background: '#0a0910', border: '5px solid #1a1828', overflow: 'hidden', boxShadow: '0 20px 50px rgba(0,0,0,0.7)', transform: 'rotate(-3deg)' }}>
+        {ig('#34d399', 'beauty.tips')}
       </div>
     </div>
   )
@@ -549,6 +648,7 @@ function TunnelHero({ onEnter }: { onEnter: () => void }) {
   return (
     <section style={{
       position: 'relative', height: '100vh', overflow: 'hidden',
+      cursor: 'none',
       background: '#000',
       backgroundImage: [
         'linear-gradient(rgba(255,255,255,0.028) 1px, transparent 1px)',
@@ -678,7 +778,63 @@ function TunnelHero({ onEnter }: { onEnter: () => void }) {
   )
 }
 
-// ── Reveal screen — two clickable halves ─────────────────────────────────────
+// ── Custom cursor ─────────────────────────────────────────────────────────────
+function CustomCursor() {
+  const dotRef  = useRef<HTMLDivElement>(null)
+  const ringRef = useRef<HTMLDivElement>(null)
+  const pos     = useRef({ x: -100, y: -100 })
+  const ring    = useRef({ x: -100, y: -100 })
+  const hovering = useRef(false)
+
+  useEffect(() => {
+    let raf: number
+    const onMove = (e: MouseEvent) => { pos.current = { x: e.clientX, y: e.clientY } }
+    const onOver = (e: MouseEvent) => {
+      hovering.current = !!(e.target as HTMLElement).closest('button, a, [role="button"]')
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseover', onOver)
+
+    const tick = () => {
+      ring.current.x += (pos.current.x - ring.current.x) * 0.11
+      ring.current.y += (pos.current.y - ring.current.y) * 0.11
+      const scale = hovering.current ? 1.6 : 1
+      if (dotRef.current) {
+        dotRef.current.style.transform = `translate(${pos.current.x - 5}px,${pos.current.y - 5}px)`
+        dotRef.current.style.opacity   = hovering.current ? '0.5' : '1'
+      }
+      if (ringRef.current) {
+        ringRef.current.style.transform = `translate(${ring.current.x - 18}px,${ring.current.y - 18}px) scale(${scale})`
+      }
+      raf = requestAnimationFrame(tick)
+    }
+    tick()
+    return () => {
+      cancelAnimationFrame(raf)
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseover', onOver)
+    }
+  }, [])
+
+  return (
+    <>
+      <div ref={dotRef} style={{
+        position: 'fixed', top: 0, left: 0, zIndex: 99999, pointerEvents: 'none',
+        width: 10, height: 10, borderRadius: '50%', background: '#fff',
+        mixBlendMode: 'difference', willChange: 'transform',
+      }} />
+      <div ref={ringRef} style={{
+        position: 'fixed', top: 0, left: 0, zIndex: 99998, pointerEvents: 'none',
+        width: 36, height: 36, borderRadius: '50%',
+        border: '1.5px solid rgba(255,255,255,0.6)',
+        mixBlendMode: 'difference', willChange: 'transform',
+        transition: 'transform 0.08s ease',
+      }} />
+    </>
+  )
+}
+
+// ── Reveal screen — unified dark two-halves ────────────────────────────────────
 function RevealScreen({ onDiscover, onStudio }: { onDiscover: () => void; onStudio: () => void }) {
   const [hoverTop, setHoverTop] = useState(false)
   const [hoverBot, setHoverBot] = useState(false)
@@ -688,10 +844,15 @@ function RevealScreen({ onDiscover, onStudio }: { onDiscover: () => void; onStud
   const baseText: React.CSSProperties = {
     fontFamily: "'Inter','Arial Black','Helvetica Neue',Arial,sans-serif",
     fontWeight: 900,
-    letterSpacing: '-0.04em',
-    lineHeight: 0.9,
+    letterSpacing: '-0.045em',
+    lineHeight: 0.88,
     userSelect: 'none',
-    transition: 'transform 0.4s cubic-bezier(0.16,1,0.3,1)',
+    transition: 'transform 0.5s cubic-bezier(0.16,1,0.3,1)',
+  }
+  const grid: React.CSSProperties = {
+    position: 'absolute', inset: 0, pointerEvents: 'none',
+    backgroundImage: 'linear-gradient(rgba(255,255,255,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.04) 1px,transparent 1px)',
+    backgroundSize: '56px 56px',
   }
 
   return (
@@ -699,8 +860,20 @@ function RevealScreen({ onDiscover, onStudio }: { onDiscover: () => void; onStud
       position: 'fixed', inset: 0, zIndex: 200,
       display: 'flex', flexDirection: 'column',
       animation: 'reveal-in 0.5s cubic-bezier(0.16,1,0.3,1) both',
-      overflow: 'hidden',
+      overflow: 'hidden', cursor: 'none',
+      background: '#07060e',
     }}>
+      {/* Shared background glow */}
+      <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 600, height: 600, borderRadius: '50%', background: 'radial-gradient(closest-side, rgba(124,58,237,0.1), transparent)', filter: 'blur(80px)', pointerEvents: 'none', zIndex: 0 }} />
+
+      {/* ScaleFlow label — top-left, shared */}
+      <div style={{ position: 'absolute', top: 28, left: 36, zIndex: 20, display: 'flex', alignItems: 'center', gap: 8, opacity: visible ? 1 : 0, transition: 'opacity 0.5s 0.1s' }}>
+        <div style={{ width: 22, height: 22, borderRadius: 6, background: 'linear-gradient(130deg,#7c3aed,#a855f7)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <svg width="13" height="13" viewBox="0 0 200 200" fill="none"><text x="100" y="148" textAnchor="middle" fontFamily="'Arial Black',sans-serif" fontWeight="900" fontSize="148" fill="#fff">S</text></svg>
+        </div>
+        <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.25)' }}>ScaleFlow</span>
+      </div>
+
       {/* Top half — Découvrir ScaleFlow */}
       <div
         onClick={onDiscover}
@@ -708,41 +881,30 @@ function RevealScreen({ onDiscover, onStudio }: { onDiscover: () => void; onStud
         onMouseLeave={() => setHoverTop(false)}
         style={{
           flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: hoverTop ? '#f4f2ff' : '#ffffff',
-          cursor: 'pointer',
-          transition: 'background 0.3s',
-          position: 'relative', overflow: 'hidden',
+          background: hoverTop ? 'rgba(124,58,237,0.08)' : 'transparent',
+          cursor: 'none', position: 'relative', overflow: 'hidden', zIndex: 1,
+          transition: 'background 0.4s',
         }}
       >
-        {/* grid */}
-        <div style={{ position: 'absolute', inset: 0, opacity: 0.035, backgroundImage: 'linear-gradient(rgba(0,0,0,1) 1px,transparent 1px),linear-gradient(90deg,rgba(0,0,0,1) 1px,transparent 1px)', backgroundSize: '52px 52px', pointerEvents: 'none' }} />
+        <div style={grid} />
+        {hoverTop && <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse 50% 70% at 50% 50%, rgba(124,58,237,0.12), transparent)', pointerEvents: 'none' }} />}
 
-        {/* ScaleFlow tiny label top-left */}
-        <div style={{ position: 'absolute', top: 28, left: 36, display: 'flex', alignItems: 'center', gap: 8, opacity: visible ? 1 : 0, transition: 'opacity 0.5s 0.1s' }}>
-          <div style={{ width: 22, height: 22, borderRadius: 6, background: 'linear-gradient(130deg,#7c3aed,#a855f7)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <svg width="13" height="13" viewBox="0 0 200 200" fill="none"><text x="100" y="148" textAnchor="middle" fontFamily="'Arial Black',sans-serif" fontWeight="900" fontSize="148" fill="#fff">S</text></svg>
-          </div>
-          <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'rgba(0,0,0,0.25)' }}>ScaleFlow</span>
-        </div>
-
-        <div style={{ textAlign: 'center', opacity: visible ? 1 : 0, transform: visible ? 'translateY(0)' : 'translateY(24px)', transition: 'opacity 0.6s 0.15s, transform 0.6s 0.15s cubic-bezier(0.16,1,0.3,1)' }}>
-          <div style={{ ...baseText, fontSize: 'clamp(44px,9.5vw,128px)', color: '#0a0a0a', transform: hoverTop ? 'translateX(10px)' : 'none' }}>
+        <div style={{ textAlign: 'center', opacity: visible ? 1 : 0, transform: visible ? 'translateY(0)' : 'translateY(24px)', transition: 'opacity 0.6s 0.12s, transform 0.6s 0.12s cubic-bezier(0.16,1,0.3,1)', position: 'relative', zIndex: 2 }}>
+          <div style={{ ...baseText, fontSize: 'clamp(44px,9vw,120px)', color: '#F2F0FF', transform: hoverTop ? 'translateX(8px)' : 'none' }}>
             DÉCOUVRIR
           </div>
-          <div style={{ ...baseText, fontSize: 'clamp(44px,9.5vw,128px)', color: 'transparent', WebkitTextStroke: '2.5px #0a0a0a', transform: hoverTop ? 'translateX(-10px)' : 'none' }}>
+          <div style={{ ...baseText, fontSize: 'clamp(44px,9vw,120px)', color: 'transparent', WebkitTextStroke: '2px rgba(255,255,255,0.35)', transform: hoverTop ? 'translateX(-8px)' : 'none' }}>
             SCALEFLOW
           </div>
-          <div style={{ marginTop: 16, fontSize: 12, fontWeight: 600, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(0,0,0,0.28)' }}>
+          <div style={{ marginTop: 18, fontSize: 11, fontWeight: 600, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.2)' }}>
             Présentation · Fonctionnalités · Tarifs
           </div>
         </div>
-
-        {/* hover arrow */}
-        <div style={{ position: 'absolute', right: 48, fontSize: 28, color: 'rgba(0,0,0,0.15)', transition: 'opacity 0.3s, transform 0.3s', opacity: hoverTop ? 1 : 0, transform: hoverTop ? 'translateX(0)' : 'translateX(-10px)' }}>→</div>
+        <div style={{ position: 'absolute', right: 52, fontSize: 24, color: 'rgba(255,255,255,0.2)', opacity: hoverTop ? 1 : 0, transform: hoverTop ? 'translateX(0)' : 'translateX(-12px)', transition: 'opacity 0.3s, transform 0.3s', zIndex: 2 }}>→</div>
       </div>
 
-      {/* Divider */}
-      <div style={{ height: 1, background: '#0a0a0a', flexShrink: 0, position: 'relative', zIndex: 1 }} />
+      {/* Divider — with gradient line */}
+      <div style={{ height: 1, background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.12) 30%, rgba(124,58,237,0.4) 50%, rgba(255,255,255,0.12) 70%, transparent)', flexShrink: 0, zIndex: 10 }} />
 
       {/* Bottom half — Studio */}
       <div
@@ -751,28 +913,23 @@ function RevealScreen({ onDiscover, onStudio }: { onDiscover: () => void; onStud
         onMouseLeave={() => setHoverBot(false)}
         style={{
           flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: hoverBot ? '#1a0a2e' : '#0a0a0a',
-          cursor: 'pointer',
-          transition: 'background 0.3s',
-          position: 'relative', overflow: 'hidden',
+          background: hoverBot ? 'rgba(236,72,153,0.05)' : 'transparent',
+          cursor: 'none', position: 'relative', overflow: 'hidden', zIndex: 1,
+          transition: 'background 0.4s',
         }}
       >
-        {/* grid */}
-        <div style={{ position: 'absolute', inset: 0, opacity: 0.06, backgroundImage: 'linear-gradient(rgba(255,255,255,1) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,1) 1px,transparent 1px)', backgroundSize: '52px 52px', pointerEvents: 'none' }} />
-        {/* glow */}
-        {hoverBot && <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse 60% 80% at 50% 50%, rgba(124,58,237,0.18), transparent)', pointerEvents: 'none', transition: 'opacity 0.4s' }} />}
+        <div style={grid} />
+        {hoverBot && <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse 50% 70% at 50% 50%, rgba(236,72,153,0.1), transparent)', pointerEvents: 'none' }} />}
 
-        <div style={{ textAlign: 'center', opacity: visible ? 1 : 0, transform: visible ? 'translateY(0)' : 'translateY(24px)', transition: 'opacity 0.6s 0.25s, transform 0.6s 0.25s cubic-bezier(0.16,1,0.3,1)' }}>
-          <div style={{ ...baseText, fontSize: 'clamp(56px,12vw,160px)', background: 'linear-gradient(130deg,#fff 0%,rgba(196,181,253,0.85) 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', transform: hoverBot ? 'translateX(8px)' : 'none' }}>
+        <div style={{ textAlign: 'center', opacity: visible ? 1 : 0, transform: visible ? 'translateY(0)' : 'translateY(24px)', transition: 'opacity 0.6s 0.22s, transform 0.6s 0.22s cubic-bezier(0.16,1,0.3,1)', position: 'relative', zIndex: 2 }}>
+          <div style={{ ...baseText, fontSize: 'clamp(56px,12vw,155px)', background: 'linear-gradient(130deg,#fff 0%,rgba(196,181,253,0.8) 60%,rgba(236,72,153,0.7) 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', transform: hoverBot ? 'translateX(8px)' : 'none' }}>
             STUDIO
           </div>
-          <div style={{ marginTop: 16, fontSize: 12, fontWeight: 600, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.25)' }}>
+          <div style={{ marginTop: 18, fontSize: 11, fontWeight: 600, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.2)' }}>
             Connexion · Mass Posting · Cloud Phones
           </div>
         </div>
-
-        {/* hover arrow */}
-        <div style={{ position: 'absolute', right: 48, fontSize: 28, color: 'rgba(255,255,255,0.2)', transition: 'opacity 0.3s, transform 0.3s', opacity: hoverBot ? 1 : 0, transform: hoverBot ? 'translateX(0)' : 'translateX(-10px)' }}>→</div>
+        <div style={{ position: 'absolute', right: 52, fontSize: 24, color: 'rgba(255,255,255,0.2)', opacity: hoverBot ? 1 : 0, transform: hoverBot ? 'translateX(0)' : 'translateX(-12px)', transition: 'opacity 0.3s, transform 0.3s', zIndex: 2 }}>→</div>
       </div>
     </div>
   )
@@ -1046,7 +1203,8 @@ export function Landing() {
   }, [stage])
 
   return (
-    <div style={{ minHeight: '100vh', background: '#06060f', color: '#F2F0FF', overflowX: 'hidden', fontFamily: "'Inter', system-ui, sans-serif" }}>
+    <div style={{ minHeight: '100vh', background: '#06060f', color: '#F2F0FF', overflowX: 'hidden', fontFamily: "'Inter', system-ui, sans-serif", cursor: stage === 'site' ? 'auto' : 'none' }}>
+      {stage !== 'site' && <CustomCursor />}
       <StarField />
 
 
