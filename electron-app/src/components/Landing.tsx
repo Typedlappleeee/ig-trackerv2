@@ -399,10 +399,52 @@ const FEATURES = [
 ]
 
 // ── Pricing ───────────────────────────────────────────────────────────────────
-const PLANS = [
-  { name: 'Standard', price: '49,99$', period: '/mois', accent: '#60a5fa', features: ['2 500 crédits / mois', '50 téléphones max', 'Toutes les fonctionnalités', 'Mass Posting — 10 comptes max', 'Support 24/7'] },
-  { name: 'Pro', price: '59,99$', originalPrice: '99,99$', period: '/mois', accent: '#c084fc', popular: true, features: ['5 500 crédits / mois', '200 téléphones max', 'Toutes les fonctionnalités', 'Mass Posting illimité', 'Support 24/7'] },
-  { name: 'Organisation', price: '89,99$', originalPrice: '149,99$', period: '/mois', accent: '#34d399', features: ['11 000 crédits / mois', 'Téléphones illimités', 'Toutes les fonctionnalités', 'Mass Posting illimité', 'Support prioritaire', "Suggestions d'ajouts avec les devs"] },
+type PlanFeature = { text: string; included: boolean }
+interface Plan {
+  name: string; icon: string; tagline: string; credits: string; creditsColor: string
+  price: string; originalPrice?: string; accent: string; popular?: boolean; bestValue?: boolean
+  features: PlanFeature[]
+}
+const PLANS: Plan[] = [
+  {
+    name: 'Standard', icon: '⚡', tagline: 'Pour débuter', credits: '2 500 crédits / mois', creditsColor: '#60a5fa',
+    price: '49,99$', accent: '#60a5fa',
+    features: [
+      { text: 'Accès à tous les outils',       included: false },
+      { text: 'Toutes les fonctionnalités',     included: false },
+      { text: 'Mass Posting (10 comptes max)',  included: true  },
+      { text: '50 téléphones max',              included: true  },
+      { text: 'Support prioritaire',            included: false },
+      { text: 'Remix & CloneVid',               included: false },
+      { text: 'Banque vidéos + Captions',       included: true  },
+    ],
+  },
+  {
+    name: 'Pro', icon: '👑', tagline: 'Scale ton output', credits: '5 500 crédits / mois', creditsColor: '#a78bfa',
+    price: '59,99$', originalPrice: '99,99$', accent: '#a78bfa', popular: true,
+    features: [
+      { text: 'Accès à tous les outils',       included: true  },
+      { text: 'Toutes les fonctionnalités',     included: true  },
+      { text: 'Mass Posting illimité',          included: true  },
+      { text: '200 téléphones max',             included: true  },
+      { text: 'Support prioritaire',            included: true  },
+      { text: 'Remix & CloneVid',               included: true  },
+      { text: 'Banque vidéos + Captions',       included: true  },
+    ],
+  },
+  {
+    name: 'Organisation', icon: '🏢', tagline: 'Puissance illimitée', credits: '11 000 crédits / mois', creditsColor: '#34d399',
+    price: '89,99$', originalPrice: '149,99$', accent: '#34d399', bestValue: true,
+    features: [
+      { text: 'Accès à tous les outils',       included: true  },
+      { text: 'Toutes les fonctionnalités',     included: true  },
+      { text: 'Mass Posting illimité',          included: true  },
+      { text: 'Téléphones illimités',           included: true  },
+      { text: 'Support prioritaire',            included: true  },
+      { text: 'Remix & CloneVid',               included: true  },
+      { text: "Suggestions d'ajouts avec les devs", included: true  },
+    ],
+  },
 ]
 
 // ── FAQ ───────────────────────────────────────────────────────────────────────
@@ -1018,7 +1060,7 @@ export function Landing() {
       {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
       {stage === 'reveal' && (
         <RevealScreen
-          onDiscover={() => setStage('site')}
+          onDiscover={() => { setStage('site'); setTimeout(() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' }), 250) }}
           onStudio={() => setStage('studio')}
         />
       )}
@@ -1125,55 +1167,113 @@ export function Landing() {
 
       {/* ── Pricing ───────────────────────────────────────────────────────────── */}
       <section id="pricing" style={{ position: 'relative', zIndex: 1, padding: '80px 24px' }}>
-        <div style={{ maxWidth: 960, margin: '0 auto' }}>
+        <div style={{ maxWidth: 980, margin: '0 auto' }}>
           <FadeIn>
-            <div style={{ textAlign: 'center', marginBottom: 56 }}>
+            <div style={{ textAlign: 'center', marginBottom: 48 }}>
               <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.14em', color: '#a78bfa', margin: '0 0 14px' }}>Tarifs</p>
               <h2 style={{ fontSize: 'clamp(28px,5vw,50px)', fontWeight: 900, letterSpacing: '-0.04em', margin: '0 0 14px', color: '#F2F0FF' }}>
                 Choisis ton{' '}
                 <span style={{ background: 'linear-gradient(120deg,#a78bfa,#ec4899)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>plan.</span>
               </h2>
-              <p style={{ fontSize: 15, color: 'rgba(148,163,184,0.5)' }}>Tout est inclus dès le Standard. Activation via Telegram.</p>
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginTop: 16, padding: '8px 18px', borderRadius: 99, background: 'rgba(251,146,60,0.1)', border: '1px solid rgba(251,146,60,0.3)' }}>
-                <span style={{ fontSize: 16 }}>🔥</span>
-                <span style={{ fontSize: 13, fontWeight: 800, color: '#fb923c' }}>-40% sur Pro &amp; Organisation jusqu'au 1er juillet</span>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginTop: 12, padding: '7px 18px', borderRadius: 99, background: 'rgba(251,146,60,0.08)', border: '1px solid rgba(251,146,60,0.25)' }}>
+                <span style={{ fontSize: 14 }}>🔥</span>
+                <span style={{ fontSize: 12, fontWeight: 800, color: '#fb923c' }}>-40% sur Pro & Organisation jusqu'au 1er juillet</span>
               </div>
             </div>
           </FadeIn>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(265px,1fr))', gap: 14 }}>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(280px,1fr))', gap: 16 }}>
             {PLANS.map((p, i) => (
               <FadeIn key={p.name} delay={i * 0.1}>
-                <div style={{ position: 'relative', background: '#0a0a14', borderRadius: 18, padding: '28px 24px', border: p.popular ? '1.5px solid rgba(124,58,237,0.4)' : '1px solid rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column', height: '100%', boxSizing: 'border-box', boxShadow: p.popular ? '0 0 50px rgba(124,58,237,0.1)' : 'none', transition: 'transform 0.2s, box-shadow 0.2s' }}
-                  onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = p.popular ? '0 20px 60px rgba(124,58,237,0.2)' : '0 12px 40px rgba(0,0,0,0.4)' }}
-                  onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = p.popular ? '0 0 50px rgba(124,58,237,0.1)' : 'none' }}>
-                  {p.popular && <div style={{ position: 'absolute', top: -13, left: '50%', transform: 'translateX(-50%)', padding: '3px 14px', borderRadius: 99, fontSize: 10, fontWeight: 900, color: '#fff', letterSpacing: '0.1em', background: 'linear-gradient(130deg,#7c3aed,#ec4899)', whiteSpace: 'nowrap' }}>POPULAIRE</div>}
-                  <p style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.12em', color: p.accent, margin: '0 0 8px' }}>{p.name}</p>
-                  <div style={{ marginBottom: 22 }}>
-                    {(p as any).originalPrice && (
-                      <span style={{ fontSize: 13, color: 'rgba(148,163,184,0.35)', textDecoration: 'line-through' }}>{(p as any).originalPrice}</span>
-                    )}
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, flexWrap: 'nowrap' }}>
-                      <span style={{ fontSize: 38, fontWeight: 900, color: '#F2F0FF', letterSpacing: '-0.04em', whiteSpace: 'nowrap' }}>{p.price}</span>
-                      <span style={{ fontSize: 13, color: 'rgba(148,163,184,0.38)', whiteSpace: 'nowrap' }}>{p.period}</span>
+                <div
+                  style={{
+                    position: 'relative',
+                    background: p.popular ? 'rgba(124,58,237,0.06)' : p.bestValue ? 'rgba(52,211,153,0.04)' : '#0b0b15',
+                    borderRadius: 20,
+                    border: p.popular ? '1.5px solid rgba(124,58,237,0.35)' : p.bestValue ? '1.5px solid rgba(52,211,153,0.3)' : '1px solid rgba(255,255,255,0.07)',
+                    display: 'flex', flexDirection: 'column',
+                    boxSizing: 'border-box',
+                    boxShadow: p.popular ? '0 0 60px rgba(124,58,237,0.12)' : p.bestValue ? '0 0 60px rgba(52,211,153,0.08)' : 'none',
+                    overflow: 'hidden',
+                    transition: 'transform 0.2s, box-shadow 0.2s',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; if (!p.popular && !p.bestValue) e.currentTarget.style.boxShadow = '0 12px 40px rgba(0,0,0,0.5)' }}
+                  onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = p.popular ? '0 0 60px rgba(124,58,237,0.12)' : p.bestValue ? '0 0 60px rgba(52,211,153,0.08)' : 'none' }}
+                >
+                  {/* Badge */}
+                  {(p.popular || p.bestValue) && (
+                    <div style={{ background: p.popular ? 'linear-gradient(90deg,#7c3aed,#a855f7)' : 'linear-gradient(90deg,#059669,#34d399)', padding: '6px 0', textAlign: 'center', fontSize: 10, fontWeight: 900, letterSpacing: '0.15em', color: '#fff' }}>
+                      {p.popular ? 'MOST POPULAR' : 'BEST VALUE'}
                     </div>
+                  )}
+
+                  <div style={{ padding: '24px 24px 28px' }}>
+                    {/* Plan header */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+                      <div style={{ width: 40, height: 40, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, background: `${p.accent}12`, border: `1px solid ${p.accent}25`, flexShrink: 0 }}>
+                        {p.icon}
+                      </div>
+                      <div>
+                        <p style={{ fontSize: 16, fontWeight: 800, color: '#F2F0FF', margin: 0, letterSpacing: '-0.02em' }}>{p.name}</p>
+                        <p style={{ fontSize: 12, color: 'rgba(148,163,184,0.45)', margin: 0 }}>{p.tagline}</p>
+                      </div>
+                    </div>
+
+                    {/* Credits badge */}
+                    <div style={{ background: `${p.creditsColor}12`, border: `1px solid ${p.creditsColor}25`, borderRadius: 8, padding: '7px 12px', marginBottom: 20, display: 'inline-block' }}>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: p.creditsColor }}>{p.credits}</span>
+                    </div>
+
+                    {/* Price */}
+                    <div style={{ marginBottom: 24 }}>
+                      {p.originalPrice && <div style={{ fontSize: 13, color: 'rgba(148,163,184,0.3)', textDecoration: 'line-through', marginBottom: 2 }}>{p.originalPrice} /mois</div>}
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+                        <span style={{ fontSize: 42, fontWeight: 900, color: '#F2F0FF', letterSpacing: '-0.04em', lineHeight: 1 }}>{p.price}</span>
+                        <span style={{ fontSize: 13, color: 'rgba(148,163,184,0.4)' }}>/mois</span>
+                      </div>
+                    </div>
+
+                    {/* Features */}
+                    <ul style={{ listStyle: 'none', margin: '0 0 24px', padding: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      {p.features.map(f => (
+                        <li key={f.text} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13 }}>
+                          {f.included ? (
+                            <span style={{ width: 18, height: 18, borderRadius: 5, background: `${p.accent}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                              <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M1.5 5L4 7.5L8.5 2.5" stroke={p.accent} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                            </span>
+                          ) : (
+                            <span style={{ width: 18, height: 18, borderRadius: 5, background: 'rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                              <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M1 1l6 6M7 1L1 7" stroke="rgba(148,163,184,0.3)" strokeWidth="1.5" strokeLinecap="round"/></svg>
+                            </span>
+                          )}
+                          <span style={{ color: f.included ? 'rgba(241,240,247,0.75)' : 'rgba(148,163,184,0.3)', textDecoration: f.included ? 'none' : 'line-through' }}>{f.text}</span>
+                        </li>
+                      ))}
+                    </ul>
+
+                    {/* CTA */}
+                    <a href={TELEGRAM_URL} target="_blank" rel="noreferrer"
+                      style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                        padding: '13px', borderRadius: 12, fontSize: 14, fontWeight: 700,
+                        textDecoration: 'none', transition: 'opacity 0.15s, transform 0.15s',
+                        ...(p.popular
+                          ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff', boxShadow: '0 4px 20px rgba(124,58,237,0.35)' }
+                          : p.bestValue
+                          ? { background: 'linear-gradient(130deg,#059669,#34d399)', color: '#fff', boxShadow: '0 4px 20px rgba(52,211,153,0.25)' }
+                          : { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#F2F0FF' }
+                        ),
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.opacity = '0.85'; e.currentTarget.style.transform = 'translateY(-1px)' }}
+                      onMouseLeave={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.transform = '' }}>
+                      Get Started →
+                    </a>
                   </div>
-                  <ul style={{ listStyle: 'none', margin: '0 0 24px', padding: 0, display: 'flex', flexDirection: 'column', gap: 9, flex: 1 }}>
-                    {p.features.map(f => (
-                      <li key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13, color: 'rgba(196,181,253,0.65)' }}>
-                        <span style={{ color: p.accent, flexShrink: 0 }}>✓</span>{f}
-                      </li>
-                    ))}
-                  </ul>
-                  <a href={TELEGRAM_URL} target="_blank" rel="noreferrer"
-                    style={{ display: 'block', textAlign: 'center', padding: '11px', borderRadius: 10, fontSize: 13, fontWeight: 700, textDecoration: 'none', transition: 'opacity 0.15s', ...(p.popular ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff', boxShadow: '0 4px 20px rgba(124,58,237,0.3)' } : { background: 'rgba(255,255,255,0.04)', border: `1px solid ${p.accent}28`, color: '#F2F0FF' }) }}
-                    onMouseEnter={e => (e.currentTarget.style.opacity = '0.8')} onMouseLeave={e => (e.currentTarget.style.opacity = '1')}>
-                    Choisir {p.name} →
-                  </a>
                 </div>
               </FadeIn>
             ))}
           </div>
-          <p style={{ textAlign: 'center', fontSize: 12, color: 'rgba(148,163,184,0.25)', marginTop: 24 }}>Paiement via Telegram · Crypto ou virement · Activation immédiate</p>
+          <p style={{ textAlign: 'center', fontSize: 12, color: 'rgba(148,163,184,0.22)', marginTop: 28 }}>All plans require activation via Telegram · Crypto or bank transfer · Immediate activation</p>
         </div>
       </section>
 

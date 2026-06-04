@@ -156,13 +156,13 @@ const PAGE_ICON: Record<string, IconKey> = {
 // Section label component
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="space-section-label" style={{
-      padding: '10px 12px 4px',
+    <div style={{
+      padding: '12px 12px 5px',
       fontSize: 10,
       fontWeight: 700,
       textTransform: 'uppercase',
-      letterSpacing: '0.1em',
-      color: 'rgba(129,140,248,0.45)',
+      letterSpacing: '0.12em',
+      color: 'rgba(148,163,184,0.35)',
     }}>
       {children}
     </div>
@@ -172,7 +172,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 // Sidebar divider — subtle cosmic gradient
 function SidebarDivider() {
   return (
-    <div style={{ height: 1, margin: '4px 6px', background: 'linear-gradient(90deg, transparent, rgba(99,57,196,0.25), rgba(14,116,144,0.15), transparent)' }} />
+    <div style={{ height: 1, margin: '6px 10px', background: 'rgba(255,255,255,0.05)' }} />
   )
 }
 
@@ -502,9 +502,9 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             cursor: 'pointer',
             border: 'none',
             background: active
-              ? 'linear-gradient(90deg, rgba(34,211,238,0.06), rgba(139,92,246,0.1))'
-              : hovered ? 'rgba(255,255,255,0.045)' : 'transparent',
-            color: active ? '#F1F0F7' : hovered ? 'rgba(241,240,247,0.88)' : 'rgba(148,163,184,0.65)',
+              ? 'rgba(139,92,246,0.1)'
+              : hovered ? 'rgba(255,255,255,0.04)' : 'transparent',
+            color: active ? '#F2F0FF' : hovered ? 'rgba(241,240,247,0.85)' : 'rgba(148,163,184,0.55)',
             transition: 'background 140ms ease, color 140ms ease',
             transform: pressed ? 'scale(0.965)' : 'scale(1)',
             justifyContent: collapsed ? 'center' : 'flex-start',
@@ -513,22 +513,20 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             outline: 'none',
           }}
         >
-          {/* Active animated indicator — comet-style */}
+          {/* Active left indicator */}
           {active && (
             <span style={{
               position: 'absolute',
-              left: 0, top: 7, bottom: 7,
-              width: 2,
-              borderRadius: '0 2px 2px 0',
-              background: 'linear-gradient(180deg, #22d3ee, #818cf8, #7C3AED)',
-              boxShadow: '0 0 8px rgba(34,211,238,0.7), 0 0 16px rgba(139,92,246,0.4)',
-              animation: 'sf-nav-active 0.22s cubic-bezier(0.22,1,0.36,1) both',
+              left: 0, top: 6, bottom: 6,
+              width: 2.5,
+              borderRadius: '0 3px 3px 0',
+              background: 'linear-gradient(180deg, #a78bfa, #7c3aed)',
             }} />
           )}
           <span style={{
             flexShrink: 0,
             display: 'flex',
-            color: active ? '#22d3ee' : hovered ? 'rgba(196,181,253,0.65)' : 'rgba(148,163,184,0.45)',
+            color: active ? '#a78bfa' : hovered ? 'rgba(196,181,253,0.6)' : 'rgba(148,163,184,0.4)',
             transition: 'color 140ms ease',
           }}>
             <NavIcon d={ICONS[iconKey]} size={16} />
@@ -617,45 +615,21 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
           flexShrink: 0,
           display: isMobile ? 'none' : 'flex',
           flexDirection: 'column',
-          background: 'linear-gradient(180deg, #090912 0%, #07070F 60%, #060610 100%)',
-          borderRight: '1px solid rgba(99,57,196,0.18)',
+          background: '#0d0d14',
+          borderRight: '1px solid rgba(255,255,255,0.06)',
           transition: 'width 0.28s cubic-bezier(0.4,0,0.2,1)',
           overflow: 'hidden',
           position: 'relative',
         }}
       >
-        {/* Nebula blobs inside sidebar */}
-        <div className="space-nebula" style={{ width: 120, height: 120, top: -30, left: -30, background: 'rgba(99,57,196,0.18)', '--dur': '7s' } as React.CSSProperties} />
-        <div className="space-nebula" style={{ width: 80, height: 80, bottom: 80, right: -20, background: 'rgba(14,116,144,0.12)', '--dur': '9s' } as React.CSSProperties} />
-        <div className="space-nebula" style={{ width: 60, height: 60, top: '50%', left: '30%', background: 'rgba(139,92,246,0.08)', '--dur': '11s' } as React.CSSProperties} />
-        {/* Twinkling stars — scattered across full sidebar height */}
-        <div className="space-star" style={{ width: 2,   height: 2,   top:  '8%', right: 18, '--dur': '2.8s', '--delay': '0s',   '--drift': '5s'  } as React.CSSProperties} />
-        <div className="space-star" style={{ width: 1.5, height: 1.5, top: '15%', left: 22, '--dur': '3.9s', '--delay': '0.7s', '--drift': '7s'  } as React.CSSProperties} />
-        <div className="space-star" style={{ width: 1,   height: 1,   top: '22%', right: 30, '--dur': '5.1s', '--delay': '1.4s', '--drift': '9s'  } as React.CSSProperties} />
-        <div className="space-star" style={{ width: 2.5, height: 2.5, top: '30%', left: 14, '--dur': '3s',   '--delay': '0.2s', '--drift': '6s'  } as React.CSSProperties} />
-        <div className="space-star" style={{ width: 1.5, height: 1.5, top: '38%', right: 8,  '--dur': '3.5s', '--delay': '1.1s', '--drift': '7s'  } as React.CSSProperties} />
-        <div className="space-star" style={{ width: 1,   height: 1,   top: '47%', left: 35, '--dur': '4.3s', '--delay': '2.3s', '--drift': '8s'  } as React.CSSProperties} />
-        <div className="space-star" style={{ width: 2,   height: 2,   top: '55%', right: 22, '--dur': '2.6s', '--delay': '0.9s', '--drift': '5s'  } as React.CSSProperties} />
-        <div className="space-star" style={{ width: 1,   height: 1,   top: '63%', left: 18, '--dur': '6s',   '--delay': '1.7s', '--drift': '10s' } as React.CSSProperties} />
-        <div className="space-star" style={{ width: 2,   height: 2,   top: '70%', right: 16, '--dur': '4s',   '--delay': '0.6s', '--drift': '6s'  } as React.CSSProperties} />
-        <div className="space-star" style={{ width: 1.5, height: 1.5, top: '78%', left: 10, '--dur': '2.2s', '--delay': '0.4s', '--drift': '4s'  } as React.CSSProperties} />
-        <div className="space-star" style={{ width: 1,   height: 1,   top: '85%', right: 28, '--dur': '4.7s', '--delay': '3.1s', '--drift': '8s'  } as React.CSSProperties} />
-        <div className="space-star" style={{ width: 2,   height: 2,   top: '92%', left: 26, '--dur': '3.3s', '--delay': '1.5s', '--drift': '5s'  } as React.CSSProperties} />
         {/* ── Logo area ─────────────────────────────────────────────────── */}
         <div style={{ height: 56, display: 'flex', alignItems: 'center', gap: 10, padding: '0 10px', flexShrink: 0 }}>
-          {/* Logo box with orbit ring */}
+          {/* Logo box */}
           <div style={{ position: 'relative', width: 28, height: 28, flexShrink: 0 }}>
-            {/* Orbit ring */}
-            <div className="space-orbit" style={{
-              width: 40, height: 40,
-              top: -6, left: -6,
-              '--speed': '9s',
-            } as React.CSSProperties} />
             <div style={{
-              width: 28, height: 28, borderRadius: 8, position: 'relative', zIndex: 1,
-              background: 'rgba(34,211,238,0.08)',
-              border: '1px solid rgba(34,211,238,0.2)',
-              boxShadow: '0 0 14px rgba(34,211,238,0.15), 0 0 28px rgba(99,57,196,0.1)',
+              width: 28, height: 28, borderRadius: 8,
+              background: 'linear-gradient(135deg,rgba(124,58,237,0.25),rgba(34,211,238,0.1))',
+              border: '1px solid rgba(124,58,237,0.25)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
               <SFLogo size={18} />
