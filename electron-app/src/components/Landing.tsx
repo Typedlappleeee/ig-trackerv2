@@ -424,6 +424,196 @@ const TGIcon = ({ size = 14 }: { size?: number }) => (
   </svg>
 )
 
+const TUNNEL_CSS = `
+  @keyframes tunnel-drift {
+    0%   { transform: translateZ(0px) rotateX(0deg); }
+    100% { transform: translateZ(60px) rotateX(0.4deg); }
+  }
+  @keyframes tunnel-card-float {
+    0%,100% { opacity: var(--base-op); }
+    50%      { opacity: calc(var(--base-op) + 0.08); }
+  }
+  @keyframes enter-btn-pulse {
+    0%,100% { box-shadow: 0 0 0 0 rgba(255,255,255,0.12), inset 0 1px 0 rgba(255,255,255,0.15); }
+    50%     { box-shadow: 0 0 28px 4px rgba(255,255,255,0.08), inset 0 1px 0 rgba(255,255,255,0.15); }
+  }
+  @keyframes brand-appear {
+    from { opacity: 0; letter-spacing: 0.3em; }
+    to   { opacity: 1; letter-spacing: -0.04em; }
+  }
+`
+
+// ── 3D tunnel card positions ───────────────────────────────────────────────────
+// Each card: left%, top%, rotateY, rotateX, translateZ, width, height, image seed, base opacity
+const TUNNEL_CARDS = [
+  // ── Left wall, far ──
+  { x:-42, y:-26, ry: 44, rx:-8,  tz:-280, w:200, h:130, s: 10, op:0.55 },
+  { x:-50, y: -4, ry: 48, rx: 0,  tz:-180, w:240, h:158, s: 20, op:0.70 },
+  { x:-44, y: 18, ry: 42, rx: 8,  tz:-230, w:210, h:140, s: 30, op:0.60 },
+  // ── Left wall, near ──
+  { x:-58, y:-16, ry: 55, rx:-5,  tz: -60, w:280, h:190, s: 40, op:0.85 },
+  { x:-62, y: 26, ry: 52, rx: 7,  tz: -90, w:260, h:172, s: 50, op:0.80 },
+  // ── Left floor-ish ──
+  { x:-36, y: 42, ry: 30, rx: 22, tz:-160, w:230, h:148, s: 60, op:0.65 },
+  { x:-50, y: 52, ry: 38, rx: 30, tz: -80, w:270, h:170, s: 70, op:0.75 },
+  // ── Right wall, far ──
+  { x: 42, y:-26, ry:-44, rx:-8,  tz:-280, w:200, h:130, s: 80, op:0.55 },
+  { x: 50, y: -4, ry:-48, rx: 0,  tz:-180, w:240, h:158, s:100, op:0.70 },
+  { x: 44, y: 18, ry:-42, rx: 8,  tz:-230, w:210, h:140, s:110, op:0.60 },
+  // ── Right wall, near ──
+  { x: 58, y:-16, ry:-55, rx:-5,  tz: -60, w:280, h:190, s:120, op:0.85 },
+  { x: 62, y: 26, ry:-52, rx: 7,  tz: -90, w:260, h:172, s:130, op:0.80 },
+  // ── Right floor-ish ──
+  { x: 36, y: 42, ry:-30, rx: 22, tz:-160, w:230, h:148, s:140, op:0.65 },
+  { x: 50, y: 52, ry:-38, rx: 30, tz: -80, w:270, h:170, s:150, op:0.75 },
+  // ── Top center ──
+  { x: -8, y:-48, ry:  4, rx:-38, tz:-200, w:190, h:120, s:160, op:0.55 },
+  { x:  6, y:-52, ry: -6, rx:-42, tz:-120, w:220, h:140, s:170, op:0.65 },
+  // ── Center far ──
+  { x:-10, y:-10, ry:  8, rx: 4,  tz:-380, w:170, h:110, s:180, op:0.40 },
+  { x:  8, y:  6, ry: -5, rx:-3,  tz:-350, w:150, h: 96, s:190, op:0.35 },
+]
+
+// ── 3D Tunnel hero ─────────────────────────────────────────────────────────────
+function TunnelHero({ onEnter }: { onEnter: () => void }) {
+  useEffect(() => {
+    const id = 'sf-tunnel-css'
+    if (!document.getElementById(id)) {
+      const el = document.createElement('style')
+      el.id = id; el.textContent = TUNNEL_CSS
+      document.head.appendChild(el)
+    }
+  }, [])
+
+  return (
+    <section style={{
+      position: 'relative', height: '100vh', overflow: 'hidden',
+      background: '#000',
+      backgroundImage: [
+        'linear-gradient(rgba(255,255,255,0.028) 1px, transparent 1px)',
+        'linear-gradient(90deg, rgba(255,255,255,0.028) 1px, transparent 1px)',
+      ].join(','),
+      backgroundSize: '52px 52px',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+    }}>
+      {/* Subtle radial vignette */}
+      <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse 70% 70% at 50% 50%, transparent 30%, rgba(0,0,0,0.72) 100%)', pointerEvents: 'none', zIndex: 2 }} />
+
+      {/* 3D perspective scene */}
+      <div style={{
+        position: 'absolute', inset: 0,
+        perspective: '900px',
+        perspectiveOrigin: '50% 50%',
+        overflow: 'visible',
+      }}>
+        <div style={{
+          position: 'absolute', inset: 0,
+          transformStyle: 'preserve-3d',
+          animation: 'tunnel-drift 8s ease-in-out infinite alternate',
+        }}>
+          {TUNNEL_CARDS.map((c, i) => (
+            <div
+              key={i}
+              style={{
+                position: 'absolute',
+                left: `calc(50% + ${c.x}vw - ${c.w / 2}px)`,
+                top:  `calc(50% + ${c.y}vh - ${c.h / 2}px)`,
+                width:  c.w,
+                height: c.h,
+                transform: `rotateY(${c.ry}deg) rotateX(${c.rx}deg) translateZ(${c.tz}px)`,
+                borderRadius: 10,
+                overflow: 'hidden',
+                border: '1px solid rgba(255,255,255,0.10)',
+                boxShadow: '0 8px 32px rgba(0,0,0,0.55)',
+                ['--base-op' as any]: c.op,
+                opacity: c.op,
+                animation: `tunnel-card-float ${5 + (i % 4)}s ease-in-out ${(i * 0.4) % 3}s infinite`,
+                willChange: 'transform, opacity',
+              }}
+            >
+              <img
+                src={`https://picsum.photos/seed/${c.s}/${c.w * 2}/${c.h * 2}`}
+                alt=""
+                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', filter: 'brightness(0.75) saturate(0.9)' }}
+                loading="lazy"
+                draggable={false}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Center content */}
+      <div style={{ position: 'relative', zIndex: 10, textAlign: 'center', userSelect: 'none' }}>
+        <h1 style={{
+          fontSize: 'clamp(64px, 11vw, 130px)',
+          fontWeight: 900,
+          color: '#fff',
+          letterSpacing: '-0.04em',
+          lineHeight: 1,
+          margin: '0 0 8px',
+          fontFamily: "'Inter', 'Arial Black', system-ui, sans-serif",
+          animation: 'brand-appear 1.2s cubic-bezier(0.16,1,0.3,1) 0.2s both',
+          textShadow: '0 2px 40px rgba(0,0,0,0.8)',
+        }}>
+          ScaleFlow
+        </h1>
+        <p style={{
+          fontSize: 14,
+          color: 'rgba(255,255,255,0.35)',
+          letterSpacing: '0.22em',
+          textTransform: 'uppercase',
+          margin: '0 0 48px',
+          animation: 'sf-fade-in 1s ease 1s both',
+          fontWeight: 500,
+        }}>
+          Instagram Automation
+        </p>
+
+        {/* Dot indicator */}
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginBottom: 40, animation: 'sf-fade-in 1s ease 1.1s both' }}>
+          {[1, 0, 0].map((active, i) => (
+            <div key={i} style={{ width: active ? 20 : 6, height: 6, borderRadius: 99, background: active ? '#fff' : 'rgba(255,255,255,0.2)', transition: 'width 0.3s' }} />
+          ))}
+        </div>
+
+        {/* Enter button */}
+        <button
+          onClick={onEnter}
+          style={{
+            display: 'inline-block',
+            padding: '13px 44px',
+            borderRadius: 99,
+            border: '1.5px solid rgba(255,255,255,0.3)',
+            background: 'rgba(255,255,255,0.06)',
+            backdropFilter: 'blur(12px)',
+            color: '#fff',
+            fontSize: 13,
+            fontWeight: 700,
+            letterSpacing: '0.18em',
+            textTransform: 'uppercase',
+            cursor: 'pointer',
+            animation: 'sf-fade-in 0.8s ease 1.3s both, enter-btn-pulse 3s ease-in-out 2s infinite',
+            transition: 'background 0.2s, border-color 0.2s, transform 0.15s',
+          }}
+          onMouseEnter={e => {
+            e.currentTarget.style.background = 'rgba(255,255,255,0.14)'
+            e.currentTarget.style.borderColor = 'rgba(255,255,255,0.55)'
+            e.currentTarget.style.transform = 'translateY(-2px)'
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.background = 'rgba(255,255,255,0.06)'
+            e.currentTarget.style.borderColor = 'rgba(255,255,255,0.3)'
+            e.currentTarget.style.transform = ''
+          }}
+        >
+          ENTER
+        </button>
+      </div>
+    </section>
+  )
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 export function Landing() {
   const [showAuth, setShowAuth] = useState(false)
@@ -434,6 +624,7 @@ export function Landing() {
     <div style={{ minHeight: '100vh', background: '#06060f', color: '#F2F0FF', overflowX: 'hidden', fontFamily: "'Inter', system-ui, sans-serif" }}>
       <StarField />
 
+
       {/* Nebula glows — animated */}
       <div style={{ position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none', overflow: 'hidden' }}>
         <div style={{ position: 'absolute', top: '-15%', left: '30%', width: 1000, height: 1000, borderRadius: '50%', background: 'radial-gradient(closest-side, rgba(109,40,217,0.13), transparent)', filter: 'blur(50px)', animation: 'sf-nebula 8s ease-in-out infinite' }} />
@@ -443,8 +634,11 @@ export function Landing() {
 
       {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
 
+      {/* ── Tunnel intro (full screen) ───────────────────────────────────────── */}
+      <TunnelHero onEnter={() => setShowAuth(true)} />
+
       {/* ── Nav ─────────────────────────────────────────────────────────────── */}
-      <nav style={{ position: 'sticky', top: 0, zIndex: 50, background: 'rgba(6,6,15,0.8)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+      <nav style={{ position: 'sticky', top: 0, zIndex: 50, background: 'rgba(6,6,15,0.9)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
         <div style={{ maxWidth: 1140, margin: '0 auto', padding: '0 24px', height: 60, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
             <SFMark size={28} />
@@ -473,65 +667,8 @@ export function Landing() {
         </div>
       </nav>
 
-      {/* ── Hero ────────────────────────────────────────────────────────────── */}
-      <section style={{ position: 'relative', zIndex: 1, padding: '100px 24px 50px', textAlign: 'center', overflow: 'hidden' }}>
-        {/* Orbit rings decoration */}
-        <div style={{ position: 'absolute', top: '50%', left: '50%', pointerEvents: 'none', zIndex: 0 }}>
-          <OrbitRing size={500} duration={40} opacity={0.35} />
-          <OrbitRing size={760} duration={65} opacity={0.18} color="rgba(236,72,153,0.1)" />
-          <OrbitRing size={1050} duration={90} opacity={0.1} color="rgba(56,189,248,0.08)" />
-        </div>
-
-        <div style={{ maxWidth: 820, margin: '0 auto', position: 'relative', zIndex: 1 }}>
-          {/* Badge */}
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '5px 14px', borderRadius: 99, marginBottom: 28, background: 'rgba(255,255,255,0.035)', border: '1px solid rgba(255,255,255,0.07)', fontSize: 11, color: 'rgba(148,163,184,0.55)', letterSpacing: '0.06em', fontWeight: 600, textTransform: 'uppercase', animation: 'sf-fade-up 0.6s ease 0.1s both' }}>
-            <SFMark size={14} />
-            ScaleFlow — Instagram Automation
-          </div>
-
-          {/* Drawn phrase */}
-          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 18, animation: 'sf-fade-up 0.6s ease 0.2s both' }}>
-            <DrawnPhrase />
-          </div>
-
-          {/* Headline */}
-          <h1 style={{ fontSize: 'clamp(44px,8vw,84px)', fontWeight: 900, lineHeight: 1.02, letterSpacing: '-0.045em', margin: '0 0 26px', color: '#F2F0FF', animation: 'sf-fade-up 0.7s ease 0.3s both' }}>
-            Gère 100+ comptes<br />
-            <span style={{ background: 'linear-gradient(120deg,#a78bfa 0%,#ec4899 55%,#38bdf8 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-              sans effort.
-            </span>
-          </h1>
-
-          <p style={{ fontSize: 17, color: 'rgba(148,163,184,0.58)', maxWidth: 480, margin: '0 auto 44px', lineHeight: 1.7, animation: 'sf-fade-up 0.7s ease 0.4s both' }}>
-            Mass posting, IA, banque de contenu, stats temps réel.<br />
-            Tout ce qu'il faut pour scaler ton empire Instagram.
-          </p>
-
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, justifyContent: 'center', animation: 'sf-fade-up 0.7s ease 0.5s both' }}>
-            <button onClick={() => setShowAuth(true)}
-              style={{ padding: '14px 34px', borderRadius: 12, background: 'linear-gradient(130deg,#7c3aed,#ec4899)', border: 'none', color: '#fff', fontSize: 15, fontWeight: 800, cursor: 'pointer', letterSpacing: '-0.01em', animation: 'sf-pulse-glow 3s ease-in-out infinite', transition: 'transform 0.15s' }}
-              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)' }}
-              onMouseLeave={e => { e.currentTarget.style.transform = '' }}>
-              🚀 Accéder à l'app
-            </button>
-            <a href={TELEGRAM_URL} target="_blank" rel="noreferrer"
-              style={{ padding: '14px 28px', borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)', color: '#F2F0FF', fontSize: 15, fontWeight: 700, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 8, transition: 'background 0.15s, border-color 0.15s, transform 0.15s' }}
-              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.16)'; e.currentTarget.style.transform = 'translateY(-2px)' }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.09)'; e.currentTarget.style.transform = '' }}>
-              <TGIcon size={16} /> Acheter une clé
-            </a>
-          </div>
-
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 20, justifyContent: 'center', marginTop: 32, fontSize: 12, color: 'rgba(148,163,184,0.35)', animation: 'sf-fade-up 0.7s ease 0.6s both' }}>
-            {['✓ Mac & Windows', '✓ Version web disponible', '✓ Activation instantanée'].map(t => <span key={t}>{t}</span>)}
-          </div>
-
-          <CountdownBlock />
-        </div>
-      </section>
-
       {/* ── App mockup ───────────────────────────────────────────────────────── */}
-      <section style={{ position: 'relative', zIndex: 1, padding: '60px 24px 100px' }}>
+      <section style={{ position: 'relative', zIndex: 1, padding: '80px 24px 100px' }}>
         <FadeIn>
           <AppMockup />
         </FadeIn>
