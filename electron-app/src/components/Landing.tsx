@@ -5,16 +5,16 @@ import { supabase } from '@/lib/supabase'
 const TELEGRAM_URL = 'https://t.me/justquentin'
 const LAUNCH_DATE  = new Date('2026-06-01T00:00:00')
 
-// Real fashion/lifestyle photos for phone card mockups (Unsplash)
+// Portrait photos for phone card mockups — picsum reliable seeds
 const REEL_PHOTOS = [
-  'https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=400&h=640&fit=crop&q=85',
-  'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=400&h=640&fit=crop&q=85',
-  'https://images.unsplash.com/photo-1552058544-f2b08422138a?w=400&h=640&fit=crop&q=85',
-  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&h=640&fit=crop&q=85',
-  'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=400&h=640&fit=crop&q=85',
-  'https://images.unsplash.com/photo-1488161628813-04466f872be2?w=400&h=640&fit=crop&q=85',
-  'https://images.unsplash.com/photo-1469334031218-e382a71b716b?w=400&h=640&fit=crop&q=85',
-  'https://images.unsplash.com/photo-1485968579580-b6d095142e6e?w=400&h=640&fit=crop&q=85',
+  'https://picsum.photos/seed/reel-a/300/530',
+  'https://picsum.photos/seed/reel-b/300/530',
+  'https://picsum.photos/seed/reel-c/300/530',
+  'https://picsum.photos/seed/reel-d/300/530',
+  'https://picsum.photos/seed/reel-e/300/530',
+  'https://picsum.photos/seed/reel-f/300/530',
+  'https://picsum.photos/seed/reel-g/300/530',
+  'https://picsum.photos/seed/reel-h/300/530',
 ]
 
 // ── CSS Keyframes (injected once) ─────────────────────────────────────────────
@@ -486,9 +486,8 @@ function SiteHero({ onStudio }: { onStudio: () => void }) {
           animation: `sf-float ${4.5 + i * 0.6}s ease-in-out ${i * 0.9}s infinite`,
           zIndex: 2,
         }}>
-          <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(160deg, ${c.g1}30, #040310)` }}>
-            <img src={REEL_PHOTOS[i]} alt="" style={{ width: '100%', height: '78%', objectFit: 'cover', display: 'block', filter: 'brightness(0.88)' }} loading="lazy" />
-          </div>
+          <img src={REEL_PHOTOS[i]} alt="" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '78%', objectFit: 'cover', display: 'block' }} loading="lazy" />
+          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '78%', background: 'linear-gradient(to bottom, rgba(0,0,0,0.08) 0%, transparent 40%, rgba(0,0,0,0.18) 100%)', pointerEvents: 'none' }} />
           <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '8px 10px', background: 'rgba(0,0,0,0.62)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', gap: 5 }}>
             <svg width="9" height="9" viewBox="0 0 24 24" fill="rgba(255,255,255,0.8)"><path d="M8 5v14l11-7z"/></svg>
             <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.9)' }}>{c.views}</span>
@@ -1172,9 +1171,8 @@ function StudioAuth({ onBack }: { onBack: () => void }) {
             boxShadow: '0 20px 50px rgba(0,0,0,0.8)',
             animation: `sf-float ${4.5 + i * 0.6}s ease-in-out ${i * 0.9}s infinite`, zIndex: 2,
           }}>
-            <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(160deg,${c.g}25,#040310)` }}>
-              <img src={REEL_PHOTOS[i % REEL_PHOTOS.length]} alt="" style={{ width: '100%', height: '78%', objectFit: 'cover', display: 'block', filter: 'brightness(0.88)' }} loading="lazy" />
-            </div>
+            <img src={REEL_PHOTOS[i % REEL_PHOTOS.length]} alt="" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '78%', objectFit: 'cover', display: 'block' }} loading="lazy" />
+            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '78%', background: 'linear-gradient(to bottom, rgba(0,0,0,0.06) 0%, transparent 40%, rgba(0,0,0,0.15) 100%)', pointerEvents: 'none' }} />
             <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '6px 8px', background: 'rgba(0,0,0,0.62)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', gap: 4 }}>
               <svg width="8" height="8" viewBox="0 0 24 24" fill="rgba(255,255,255,0.8)"><path d="M8 5v14l11-7z"/></svg>
               <span style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.9)' }}>{c.views}</span>
