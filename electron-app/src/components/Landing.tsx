@@ -632,7 +632,7 @@ function TunnelHero({ onEnter }: { onEnter: () => void }) {
 // ── Reveal screen (after ENTER) ───────────────────────────────────────────────
 const REVEAL_LINES = ['MASS', 'POSTING', 'AUTOMATION', 'INSTAGRAM']
 
-function RevealScreen({ onClose }: { onClose: () => void }) {
+function RevealScreen({ onDiscover, onStudio }: { onDiscover: () => void; onStudio: () => void }) {
   const [visible, setVisible] = useState(false)
   useEffect(() => { requestAnimationFrame(() => setVisible(true)) }, [])
 
@@ -728,29 +728,57 @@ function RevealScreen({ onClose }: { onClose: () => void }) {
         Instagram · Cloud Phones · Scale
       </p>
 
-      {/* Enter / Close button */}
-      <button
-        onClick={onClose}
-        style={{
-          marginTop: 56,
-          padding: '14px 52px',
-          borderRadius: 99,
-          background: '#0a0a0a',
-          color: '#fff',
-          fontSize: 12,
-          fontWeight: 800,
-          letterSpacing: '0.22em',
-          textTransform: 'uppercase',
-          border: 'none',
-          cursor: 'pointer',
-          opacity: visible ? 1 : 0,
-          transition: 'opacity 0.6s ease 0.7s, background 0.2s, transform 0.15s',
-        }}
-        onMouseEnter={e => { e.currentTarget.style.background = '#1a0a2e'; e.currentTarget.style.transform = 'translateY(-2px)' }}
-        onMouseLeave={e => { e.currentTarget.style.background = '#0a0a0a'; e.currentTarget.style.transform = '' }}
-      >
-        ACCÉDER →
-      </button>
+      {/* Two CTA buttons */}
+      <div style={{
+        marginTop: 56,
+        display: 'flex', gap: 14, flexWrap: 'wrap', justifyContent: 'center',
+        opacity: visible ? 1 : 0,
+        transition: 'opacity 0.6s ease 0.7s',
+      }}>
+        {/* Discover — outline */}
+        <button
+          onClick={onDiscover}
+          style={{
+            padding: '14px 36px',
+            borderRadius: 99,
+            background: 'transparent',
+            color: '#0a0a0a',
+            fontSize: 12,
+            fontWeight: 800,
+            letterSpacing: '0.18em',
+            textTransform: 'uppercase',
+            border: '2px solid #0a0a0a',
+            cursor: 'pointer',
+            transition: 'background 0.2s, color 0.2s, transform 0.15s',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = '#0a0a0a'; e.currentTarget.style.color = '#fff'; e.currentTarget.style.transform = 'translateY(-2px)' }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#0a0a0a'; e.currentTarget.style.transform = '' }}
+        >
+          Découvrir ScaleFlow
+        </button>
+        {/* Studio — filled gradient */}
+        <button
+          onClick={onStudio}
+          style={{
+            padding: '14px 36px',
+            borderRadius: 99,
+            background: 'linear-gradient(130deg,#7c3aed,#ec4899)',
+            color: '#fff',
+            fontSize: 12,
+            fontWeight: 800,
+            letterSpacing: '0.18em',
+            textTransform: 'uppercase',
+            border: 'none',
+            cursor: 'pointer',
+            boxShadow: '0 8px 28px rgba(124,58,237,0.35)',
+            transition: 'opacity 0.2s, transform 0.15s',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.opacity = '0.88'; e.currentTarget.style.transform = 'translateY(-2px)' }}
+          onMouseLeave={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.transform = '' }}
+        >
+          Studio →
+        </button>
+      </div>
 
       {/* Bottom label */}
       <p style={{
@@ -769,10 +797,16 @@ function RevealScreen({ onClose }: { onClose: () => void }) {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 export function Landing() {
-  const [stage,    setStage]   = useState<'tunnel' | 'reveal'>('tunnel')
+  const [stage,    setStage]   = useState<'tunnel' | 'reveal' | 'site'>('tunnel')
   const [showAuth, setShowAuth] = useState(false)
   const [faqOpen, setFaqOpen]   = useState<number | null>(null)
   useGlobalCSS()
+
+  // Lock body scroll while on tunnel / reveal screens
+  useEffect(() => {
+    document.body.style.overflow = stage === 'site' ? '' : 'hidden'
+    return () => { document.body.style.overflow = '' }
+  }, [stage])
 
   return (
     <div style={{ minHeight: '100vh', background: '#06060f', color: '#F2F0FF', overflowX: 'hidden', fontFamily: "'Inter', system-ui, sans-serif" }}>
@@ -787,7 +821,12 @@ export function Landing() {
       </div>
 
       {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
-      {stage === 'reveal' && <RevealScreen onClose={() => { setStage('tunnel'); setShowAuth(true) }} />}
+      {stage === 'reveal' && (
+        <RevealScreen
+          onDiscover={() => setStage('site')}
+          onStudio={() => { setStage('site'); setShowAuth(true) }}
+        />
+      )}
 
       {/* ── Tunnel intro (full screen) ───────────────────────────────────────── */}
       <TunnelHero onEnter={() => setStage('reveal')} />
