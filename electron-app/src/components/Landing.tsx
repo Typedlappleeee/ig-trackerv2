@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { AuthPage } from '@/components/auth/AuthPage'
+import { supabase } from '@/lib/supabase'
 
 const TELEGRAM_URL = 'https://t.me/justquentin'
 const LAUNCH_DATE  = new Date('2026-06-01T00:00:00')
@@ -425,6 +426,12 @@ const TGIcon = ({ size = 14 }: { size?: number }) => (
 )
 
 const TUNNEL_CSS = `
+  @keyframes orbit-spin    { from { transform: rotate(0deg); }    to { transform: rotate(360deg); } }
+  @keyframes orbit-upright { from { transform: rotate(0deg); }    to { transform: rotate(-360deg); } }
+  @keyframes orbit-card-glow {
+    0%,100% { box-shadow: 0 4px 18px rgba(0,0,0,0.55); }
+    50%     { box-shadow: 0 4px 28px rgba(0,0,0,0.75); }
+  }
   @keyframes tunnel-drift {
     0%   { transform: translateZ(0px) rotateX(0deg); }
     100% { transform: translateZ(60px) rotateX(0.4deg); }
@@ -629,180 +636,368 @@ function TunnelHero({ onEnter }: { onEnter: () => void }) {
   )
 }
 
-// ── Reveal screen (after ENTER) ───────────────────────────────────────────────
-const REVEAL_LINES = ['MASS', 'POSTING', 'AUTOMATION', 'INSTAGRAM']
-
+// ── Reveal screen — two clickable halves ─────────────────────────────────────
 function RevealScreen({ onDiscover, onStudio }: { onDiscover: () => void; onStudio: () => void }) {
-  const [visible, setVisible] = useState(false)
-  useEffect(() => { requestAnimationFrame(() => setVisible(true)) }, [])
+  const [hoverTop, setHoverTop] = useState(false)
+  const [hoverBot, setHoverBot] = useState(false)
+  const [visible,  setVisible]  = useState(false)
+  useEffect(() => { const t = setTimeout(() => setVisible(true), 30); return () => clearTimeout(t) }, [])
+
+  const baseText: React.CSSProperties = {
+    fontFamily: "'Inter','Arial Black','Helvetica Neue',Arial,sans-serif",
+    fontWeight: 900,
+    letterSpacing: '-0.04em',
+    lineHeight: 0.9,
+    userSelect: 'none',
+    transition: 'transform 0.4s cubic-bezier(0.16,1,0.3,1)',
+  }
 
   return (
-    <div
-      style={{
-        position: 'fixed', inset: 0, zIndex: 200,
-        background: '#fff',
-        display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'center',
-        animation: 'reveal-in 0.55s cubic-bezier(0.16,1,0.3,1) both',
-        overflow: 'hidden',
-      }}
-    >
-      {/* Subtle background grid */}
-      <div style={{
-        position: 'absolute', inset: 0, opacity: 0.04,
-        backgroundImage: [
-          'linear-gradient(rgba(0,0,0,1) 1px, transparent 1px)',
-          'linear-gradient(90deg, rgba(0,0,0,1) 1px, transparent 1px)',
-        ].join(','),
-        backgroundSize: '48px 48px',
-        pointerEvents: 'none',
-      }} />
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 200,
+      display: 'flex', flexDirection: 'column',
+      animation: 'reveal-in 0.5s cubic-bezier(0.16,1,0.3,1) both',
+      overflow: 'hidden',
+    }}>
+      {/* Top half — Découvrir ScaleFlow */}
+      <div
+        onClick={onDiscover}
+        onMouseEnter={() => setHoverTop(true)}
+        onMouseLeave={() => setHoverTop(false)}
+        style={{
+          flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: hoverTop ? '#f4f2ff' : '#ffffff',
+          cursor: 'pointer',
+          transition: 'background 0.3s',
+          position: 'relative', overflow: 'hidden',
+        }}
+      >
+        {/* grid */}
+        <div style={{ position: 'absolute', inset: 0, opacity: 0.035, backgroundImage: 'linear-gradient(rgba(0,0,0,1) 1px,transparent 1px),linear-gradient(90deg,rgba(0,0,0,1) 1px,transparent 1px)', backgroundSize: '52px 52px', pointerEvents: 'none' }} />
 
-      {/* Top label */}
-      <div style={{
-        position: 'absolute', top: 40, left: 0, right: 0,
-        display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 10,
-        animation: 'reveal-sub 0.8s ease 0.2s both',
-      }}>
-        <div style={{
-          width: 28, height: 28, borderRadius: 8,
-          background: 'linear-gradient(130deg,#7c3aed,#a855f7)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
-          <svg width="16" height="16" viewBox="0 0 200 200" fill="none">
-            <text x="100" y="148" textAnchor="middle"
-              fontFamily="'Arial Black',Helvetica,sans-serif"
-              fontWeight="900" fontSize="148" fill="#fff">S</text>
-          </svg>
-        </div>
-        <span style={{
-          fontSize: 13, fontWeight: 800, letterSpacing: '0.22em',
-          textTransform: 'uppercase', color: 'rgba(0,0,0,0.3)',
-        }}>ScaleFlow</span>
-      </div>
-
-      {/* Main stacked words */}
-      <div style={{ position: 'relative', textAlign: 'center', lineHeight: 0.88 }}>
-        {REVEAL_LINES.map((word, i) => (
-          <div
-            key={word}
-            style={{
-              fontSize: 'clamp(52px, 11.5vw, 148px)',
-              fontWeight: 900,
-              letterSpacing: '-0.04em',
-              color: i === REVEAL_LINES.length - 1 ? 'transparent' : '#0a0a0a',
-              WebkitTextStroke: i === REVEAL_LINES.length - 1 ? '2px #0a0a0a' : undefined,
-              fontFamily: "'Inter','Arial Black','Helvetica Neue',Arial,sans-serif",
-              display: 'block',
-              opacity: visible ? 1 : 0,
-              transform: visible ? 'translateY(0) skewY(0deg)' : 'translateY(40px) skewY(2deg)',
-              transition: `opacity 0.65s cubic-bezier(0.16,1,0.3,1) ${0.1 + i * 0.1}s, transform 0.65s cubic-bezier(0.16,1,0.3,1) ${0.1 + i * 0.1}s`,
-            }}
-          >
-            {word}
+        {/* ScaleFlow tiny label top-left */}
+        <div style={{ position: 'absolute', top: 28, left: 36, display: 'flex', alignItems: 'center', gap: 8, opacity: visible ? 1 : 0, transition: 'opacity 0.5s 0.1s' }}>
+          <div style={{ width: 22, height: 22, borderRadius: 6, background: 'linear-gradient(130deg,#7c3aed,#a855f7)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <svg width="13" height="13" viewBox="0 0 200 200" fill="none"><text x="100" y="148" textAnchor="middle" fontFamily="'Arial Black',sans-serif" fontWeight="900" fontSize="148" fill="#fff">S</text></svg>
           </div>
-        ))}
+          <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'rgba(0,0,0,0.25)' }}>ScaleFlow</span>
+        </div>
 
-        {/* Accent bar under MASS */}
-        <div style={{
-          position: 'absolute', left: '10%', right: '10%',
-          bottom: -18, height: 3,
-          background: 'linear-gradient(90deg, #7c3aed, #ec4899)',
-          borderRadius: 99,
-          opacity: visible ? 1 : 0,
-          transition: 'opacity 0.5s ease 0.6s',
-        }} />
+        <div style={{ textAlign: 'center', opacity: visible ? 1 : 0, transform: visible ? 'translateY(0)' : 'translateY(24px)', transition: 'opacity 0.6s 0.15s, transform 0.6s 0.15s cubic-bezier(0.16,1,0.3,1)' }}>
+          <div style={{ ...baseText, fontSize: 'clamp(44px,9.5vw,128px)', color: '#0a0a0a', transform: hoverTop ? 'translateX(10px)' : 'none' }}>
+            DÉCOUVRIR
+          </div>
+          <div style={{ ...baseText, fontSize: 'clamp(44px,9.5vw,128px)', color: 'transparent', WebkitTextStroke: '2.5px #0a0a0a', transform: hoverTop ? 'translateX(-10px)' : 'none' }}>
+            SCALEFLOW
+          </div>
+          <div style={{ marginTop: 16, fontSize: 12, fontWeight: 600, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(0,0,0,0.28)' }}>
+            Présentation · Fonctionnalités · Tarifs
+          </div>
+        </div>
+
+        {/* hover arrow */}
+        <div style={{ position: 'absolute', right: 48, fontSize: 28, color: 'rgba(0,0,0,0.15)', transition: 'opacity 0.3s, transform 0.3s', opacity: hoverTop ? 1 : 0, transform: hoverTop ? 'translateX(0)' : 'translateX(-10px)' }}>→</div>
       </div>
 
-      {/* Subtitle */}
-      <p style={{
-        marginTop: 52,
-        fontSize: 13,
-        letterSpacing: '0.16em',
-        textTransform: 'uppercase',
-        color: 'rgba(0,0,0,0.3)',
-        fontWeight: 600,
-        opacity: visible ? 1 : 0,
-        transition: 'opacity 0.6s ease 0.55s',
-      }}>
-        Instagram · Cloud Phones · Scale
-      </p>
+      {/* Divider */}
+      <div style={{ height: 1, background: '#0a0a0a', flexShrink: 0, position: 'relative', zIndex: 1 }} />
 
-      {/* Two CTA buttons */}
+      {/* Bottom half — Studio */}
+      <div
+        onClick={onStudio}
+        onMouseEnter={() => setHoverBot(true)}
+        onMouseLeave={() => setHoverBot(false)}
+        style={{
+          flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: hoverBot ? '#1a0a2e' : '#0a0a0a',
+          cursor: 'pointer',
+          transition: 'background 0.3s',
+          position: 'relative', overflow: 'hidden',
+        }}
+      >
+        {/* grid */}
+        <div style={{ position: 'absolute', inset: 0, opacity: 0.06, backgroundImage: 'linear-gradient(rgba(255,255,255,1) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,1) 1px,transparent 1px)', backgroundSize: '52px 52px', pointerEvents: 'none' }} />
+        {/* glow */}
+        {hoverBot && <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse 60% 80% at 50% 50%, rgba(124,58,237,0.18), transparent)', pointerEvents: 'none', transition: 'opacity 0.4s' }} />}
+
+        <div style={{ textAlign: 'center', opacity: visible ? 1 : 0, transform: visible ? 'translateY(0)' : 'translateY(24px)', transition: 'opacity 0.6s 0.25s, transform 0.6s 0.25s cubic-bezier(0.16,1,0.3,1)' }}>
+          <div style={{ ...baseText, fontSize: 'clamp(56px,12vw,160px)', background: 'linear-gradient(130deg,#fff 0%,rgba(196,181,253,0.85) 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', transform: hoverBot ? 'translateX(8px)' : 'none' }}>
+            STUDIO
+          </div>
+          <div style={{ marginTop: 16, fontSize: 12, fontWeight: 600, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.25)' }}>
+            Connexion · Mass Posting · Cloud Phones
+          </div>
+        </div>
+
+        {/* hover arrow */}
+        <div style={{ position: 'absolute', right: 48, fontSize: 28, color: 'rgba(255,255,255,0.2)', transition: 'opacity 0.3s, transform 0.3s', opacity: hoverBot ? 1 : 0, transform: hoverBot ? 'translateX(0)' : 'translateX(-10px)' }}>→</div>
+      </div>
+    </div>
+  )
+}
+
+// ── Orbit ring — Studio auth left panel ───────────────────────────────────────
+const ORBIT_COLORS = [
+  ['#c084fc','#7c3aed'], ['#f472b6','#db2777'], ['#60a5fa','#2563eb'],
+  ['#34d399','#059669'], ['#fb923c','#ea580c'], ['#a78bfa','#7c3aed'],
+  ['#f9a8d4','#ec4899'], ['#93c5fd','#3b82f6'], ['#6ee7b7','#10b981'],
+  ['#fcd34d','#f59e0b'], ['#c4b5fd','#8b5cf6'], ['#fbcfe8','#db2777'],
+  ['#bfdbfe','#3b82f6'], ['#d9f99d','#65a30d'],
+]
+const ORBIT_RADIUS = 190
+const ORBIT_DURATION = 28
+
+function OrbitPhoto({ index, total, color1, color2 }: { index: number; total: number; color1: string; color2: string }) {
+  const angleDeg = (360 / total) * index
+  const w = 72, h = 88
+  return (
+    <div style={{
+      position: 'absolute', top: '50%', left: '50%',
+      marginTop: -h / 2, marginLeft: -w / 2,
+      transform: `rotate(${angleDeg}deg) translateY(-${ORBIT_RADIUS}px)`,
+    }}>
       <div style={{
-        marginTop: 56,
-        display: 'flex', gap: 14, flexWrap: 'wrap', justifyContent: 'center',
-        opacity: visible ? 1 : 0,
-        transition: 'opacity 0.6s ease 0.7s',
+        width: w, height: h,
+        animation: `orbit-upright ${ORBIT_DURATION}s linear infinite`,
+        borderRadius: 12,
+        background: `linear-gradient(135deg, ${color1}, ${color2})`,
+        border: '1px solid rgba(255,255,255,0.12)',
+        boxShadow: '0 6px 24px rgba(0,0,0,0.6)',
+        overflow: 'hidden',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
-        {/* Discover — outline */}
-        <button
-          onClick={onDiscover}
-          style={{
-            padding: '14px 36px',
-            borderRadius: 99,
-            background: 'transparent',
-            color: '#0a0a0a',
-            fontSize: 12,
-            fontWeight: 800,
-            letterSpacing: '0.18em',
-            textTransform: 'uppercase',
-            border: '2px solid #0a0a0a',
-            cursor: 'pointer',
-            transition: 'background 0.2s, color 0.2s, transform 0.15s',
-          }}
-          onMouseEnter={e => { e.currentTarget.style.background = '#0a0a0a'; e.currentTarget.style.color = '#fff'; e.currentTarget.style.transform = 'translateY(-2px)' }}
-          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#0a0a0a'; e.currentTarget.style.transform = '' }}
-        >
-          Découvrir ScaleFlow
-        </button>
-        {/* Studio — filled gradient */}
-        <button
-          onClick={onStudio}
-          style={{
-            padding: '14px 36px',
-            borderRadius: 99,
-            background: 'linear-gradient(130deg,#7c3aed,#ec4899)',
-            color: '#fff',
-            fontSize: 12,
-            fontWeight: 800,
-            letterSpacing: '0.18em',
-            textTransform: 'uppercase',
-            border: 'none',
-            cursor: 'pointer',
-            boxShadow: '0 8px 28px rgba(124,58,237,0.35)',
-            transition: 'opacity 0.2s, transform 0.15s',
-          }}
-          onMouseEnter={e => { e.currentTarget.style.opacity = '0.88'; e.currentTarget.style.transform = 'translateY(-2px)' }}
-          onMouseLeave={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.transform = '' }}
-        >
-          Studio →
+        {/* inner glow accent */}
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(135deg,rgba(255,255,255,0.18) 0%,transparent 60%)', borderRadius: 12 }} />
+        {/* subtle pattern */}
+        <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(4px)' }} />
+      </div>
+    </div>
+  )
+}
+
+// ── Studio auth — AIGNCY-style split layout ───────────────────────────────────
+function StudioAuth({ onBack }: { onBack: () => void }) {
+  const [tab,      setTab]      = useState<'login'|'register'>('login')
+  const [email,    setEmail]    = useState('')
+  const [password, setPassword] = useState('')
+  const [confirm,  setConfirm]  = useState('')
+  const [showPw,   setShowPw]   = useState(false)
+  const [loading,  setLoading]  = useState(false)
+  const [error,    setError]    = useState<string|null>(null)
+  const [success,  setSuccess]  = useState<string|null>(null)
+
+  useEffect(() => {
+    const fn = (e: KeyboardEvent) => { if (e.key === 'Escape') onBack() }
+    window.addEventListener('keydown', fn); return () => window.removeEventListener('keydown', fn)
+  }, [onBack])
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault(); setError(null); setSuccess(null); setLoading(true)
+    try {
+      if (tab === 'login') {
+        const { error: err } = await supabase.auth.signInWithPassword({ email, password })
+        if (err) throw err
+      } else {
+        if (password !== confirm) throw new Error('Les mots de passe ne correspondent pas.')
+        if (password.length < 6) throw new Error('Mot de passe trop court (6 caractères min).')
+        const { data, error: err } = await supabase.auth.signUp({ email, password })
+        if (err) throw err
+        if (data.user && !data.session) setSuccess('Compte créé ! Vérifie ta boîte mail.')
+      }
+    } catch (err: any) {
+      const raw = err instanceof Error ? err.message : String(err)
+      const r = raw.toLowerCase()
+      setError(
+        r.includes('invalid login') || r.includes('invalid credentials') ? 'Email ou mot de passe incorrect.' :
+        r.includes('email not confirmed') ? 'Email non confirmé — vérifie ta boîte mail.' :
+        r.includes('already registered') ? 'Un compte existe déjà avec cet email.' :
+        r.includes('rate limit') ? 'Trop de tentatives. Réessaie dans quelques minutes.' :
+        raw
+      )
+    } finally { setLoading(false) }
+  }
+
+  const inputStyle: React.CSSProperties = {
+    width: '100%', boxSizing: 'border-box',
+    padding: '12px 14px',
+    background: 'rgba(255,255,255,0.04)',
+    border: '1px solid rgba(255,255,255,0.09)',
+    borderRadius: 10,
+    color: '#F2F0FF',
+    fontSize: 14,
+    outline: 'none',
+    transition: 'border-color 0.2s',
+    fontFamily: 'inherit',
+  }
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 300,
+      display: 'flex',
+      animation: 'reveal-in 0.45s cubic-bezier(0.16,1,0.3,1) both',
+    }}>
+      {/* ── Left panel — Orbit ─────────────────────────────────────────────── */}
+      <div style={{
+        flex: '0 0 55%',
+        background: '#05030f',
+        position: 'relative', overflow: 'hidden',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        {/* Subtle grid */}
+        <div style={{ position: 'absolute', inset: 0, opacity: 0.035, backgroundImage: 'linear-gradient(rgba(139,92,246,1) 1px,transparent 1px),linear-gradient(90deg,rgba(139,92,246,1) 1px,transparent 1px)', backgroundSize: '48px 48px', pointerEvents: 'none' }} />
+        {/* Nebula glow */}
+        <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 500, height: 500, borderRadius: '50%', background: 'radial-gradient(closest-side, rgba(109,40,217,0.18), transparent)', filter: 'blur(60px)', pointerEvents: 'none' }} />
+
+        {/* Orbit container */}
+        <div style={{
+          position: 'relative', width: ORBIT_RADIUS * 2 + 80, height: ORBIT_RADIUS * 2 + 80,
+          animation: `orbit-spin ${ORBIT_DURATION}s linear infinite`,
+          flexShrink: 0,
+        }}>
+          {ORBIT_COLORS.map((c, i) => (
+            <OrbitPhoto key={i} index={i} total={ORBIT_COLORS.length} color1={c[0]} color2={c[1]} />
+          ))}
+        </div>
+
+        {/* Center text (stays fixed, not in orbit container) */}
+        <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', textAlign: 'center', pointerEvents: 'none', zIndex: 10 }}>
+          <p style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.22em', textTransform: 'uppercase', color: 'rgba(167,139,250,0.6)', margin: '0 0 12px' }}>ScaleFlow</p>
+          <div style={{ fontSize: 'clamp(26px,3.5vw,42px)', fontWeight: 900, letterSpacing: '-0.04em', color: '#fff', lineHeight: 0.92, fontFamily: "'Inter','Arial Black',sans-serif" }}>
+            <div>Poste.</div>
+            <div>Automatise.</div>
+            <div style={{ background: 'linear-gradient(120deg,#a78bfa,#ec4899)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Scale.</div>
+          </div>
+          <p style={{ fontSize: 12, color: 'rgba(148,163,184,0.45)', margin: '14px 0 0', letterSpacing: '0.02em' }}>
+            Automatisation Instagram à grande échelle.
+          </p>
+        </div>
+
+        {/* Back button */}
+        <button onClick={onBack} style={{ position: 'absolute', top: 24, left: 24, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, color: 'rgba(148,163,184,0.6)', fontSize: 12, padding: '6px 12px', cursor: 'pointer', fontWeight: 600, letterSpacing: '0.06em', transition: 'background 0.2s' }}
+          onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.1)')}
+          onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.06)')}>
+          ← Retour
         </button>
       </div>
 
-      {/* Bottom label */}
-      <p style={{
-        position: 'absolute', bottom: 32,
-        fontSize: 11, color: 'rgba(0,0,0,0.18)',
-        letterSpacing: '0.1em', fontWeight: 600,
-        textTransform: 'uppercase',
-        opacity: visible ? 1 : 0,
-        transition: 'opacity 0.6s ease 0.8s',
+      {/* ── Right panel — Form ─────────────────────────────────────────────── */}
+      <div style={{
+        flex: 1,
+        background: '#08060f',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: '32px 24px',
+        borderLeft: '1px solid rgba(255,255,255,0.05)',
+        overflowY: 'auto',
       }}>
-        © {new Date().getFullYear()} ScaleFlow
-      </p>
+        <div style={{ width: '100%', maxWidth: 360 }}>
+          {/* Tabs */}
+          <div style={{ display: 'flex', background: 'rgba(255,255,255,0.04)', borderRadius: 10, padding: 4, marginBottom: 32, border: '1px solid rgba(255,255,255,0.07)' }}>
+            {(['login','register'] as const).map(t => (
+              <button key={t} onClick={() => { setTab(t); setError(null); setSuccess(null); setPassword(''); setConfirm('') }}
+                style={{
+                  flex: 1, padding: '10px', borderRadius: 7, fontSize: 13, fontWeight: 700, border: 'none', cursor: 'pointer', transition: 'all 0.2s',
+                  ...(tab === t
+                    ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff', boxShadow: '0 2px 12px rgba(124,58,237,0.4)' }
+                    : { background: 'transparent', color: 'rgba(148,163,184,0.5)' }
+                  ),
+                }}>
+                {t === 'login' ? 'Sign In' : 'Sign Up'}
+              </button>
+            ))}
+          </div>
+
+          {/* Heading */}
+          <div style={{ marginBottom: 28 }}>
+            <h2 style={{ fontSize: 26, fontWeight: 900, color: '#F2F0FF', margin: '0 0 6px', letterSpacing: '-0.03em' }}>
+              {tab === 'login' ? 'Welcome back' : 'Créer un compte'}
+            </h2>
+            <p style={{ fontSize: 13, color: 'rgba(148,163,184,0.4)', margin: 0 }}>
+              {tab === 'login' ? 'Connecte-toi à ton compte ScaleFlow.' : 'Rejoins ScaleFlow en quelques secondes.'}
+            </p>
+          </div>
+
+          {/* Form */}
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div>
+              <label style={{ display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(148,163,184,0.5)', marginBottom: 7 }}>Email</label>
+              <input type="email" required value={email} onChange={e => setEmail(e.target.value)}
+                placeholder="you@example.com" style={inputStyle}
+                onFocus={e => (e.currentTarget.style.borderColor = 'rgba(139,92,246,0.5)')}
+                onBlur={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.09)')} />
+            </div>
+
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 7 }}>
+                <label style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(148,163,184,0.5)' }}>Password</label>
+              </div>
+              <div style={{ position: 'relative' }}>
+                <input type={showPw ? 'text' : 'password'} required value={password} onChange={e => setPassword(e.target.value)}
+                  placeholder="••••••••" style={{ ...inputStyle, paddingRight: 44 }}
+                  onFocus={e => (e.currentTarget.style.borderColor = 'rgba(139,92,246,0.5)')}
+                  onBlur={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.09)')} />
+                <button type="button" onClick={() => setShowPw(!showPw)}
+                  style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(148,163,184,0.4)', fontSize: 16, padding: 0 }}>
+                  {showPw ? '🙈' : '👁'}
+                </button>
+              </div>
+            </div>
+
+            {tab === 'register' && (
+              <div>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(148,163,184,0.5)', marginBottom: 7 }}>Confirmer</label>
+                <input type="password" required value={confirm} onChange={e => setConfirm(e.target.value)}
+                  placeholder="••••••••" style={inputStyle}
+                  onFocus={e => (e.currentTarget.style.borderColor = 'rgba(139,92,246,0.5)')}
+                  onBlur={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.09)')} />
+              </div>
+            )}
+
+            {error && (
+              <div style={{ padding: '10px 14px', borderRadius: 10, background: 'rgba(240,61,85,0.08)', border: '1px solid rgba(240,61,85,0.22)', color: '#f87171', fontSize: 13, display: 'flex', gap: 8 }}>
+                <span style={{ flexShrink: 0 }}>⚠</span><span>{error}</span>
+              </div>
+            )}
+            {success && (
+              <div style={{ padding: '10px 14px', borderRadius: 10, background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.22)', color: '#34d399', fontSize: 13, display: 'flex', gap: 8 }}>
+                <span style={{ flexShrink: 0 }}>✓</span><span>{success}</span>
+              </div>
+            )}
+
+            <button type="submit" disabled={loading}
+              style={{
+                width: '100%', padding: '14px', borderRadius: 10, border: 'none', cursor: loading ? 'wait' : 'pointer',
+                background: loading ? 'rgba(124,58,237,0.5)' : 'linear-gradient(130deg,#7c3aed,#ec4899)',
+                color: '#fff', fontSize: 15, fontWeight: 800, letterSpacing: '0.02em',
+                boxShadow: '0 4px 20px rgba(124,58,237,0.35)', marginTop: 4,
+                transition: 'opacity 0.2s',
+              }}
+              onMouseEnter={e => { if (!loading) e.currentTarget.style.opacity = '0.88' }}
+              onMouseLeave={e => (e.currentTarget.style.opacity = '1')}>
+              {loading ? '...' : tab === 'login' ? 'Sign In' : 'Créer mon compte'}
+            </button>
+          </form>
+
+          <p style={{ textAlign: 'center', marginTop: 24, fontSize: 12, color: 'rgba(148,163,184,0.35)' }}>
+            {tab === 'login' ? "Pas encore de compte ? " : "Déjà un compte ? "}
+            <button onClick={() => { setTab(tab === 'login' ? 'register' : 'login'); setError(null); setPassword(''); setConfirm('') }}
+              style={{ background: 'none', border: 'none', color: '#a78bfa', fontSize: 12, cursor: 'pointer', fontWeight: 600, textDecoration: 'underline', padding: 0 }}>
+              {tab === 'login' ? 'Sign up' : 'Sign in'}
+            </button>
+          </p>
+        </div>
+      </div>
     </div>
   )
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 export function Landing() {
-  const [stage,    setStage]   = useState<'tunnel' | 'reveal' | 'site'>('tunnel')
+  const [stage,    setStage]   = useState<'tunnel' | 'reveal' | 'site' | 'studio'>('tunnel')
   const [showAuth, setShowAuth] = useState(false)
   const [faqOpen, setFaqOpen]   = useState<number | null>(null)
   useGlobalCSS()
 
-  // Lock body scroll while on tunnel / reveal screens
+  // Lock body scroll while not on the main site
   useEffect(() => {
     document.body.style.overflow = stage === 'site' ? '' : 'hidden'
     return () => { document.body.style.overflow = '' }
@@ -824,9 +1019,10 @@ export function Landing() {
       {stage === 'reveal' && (
         <RevealScreen
           onDiscover={() => setStage('site')}
-          onStudio={() => { setStage('site'); setShowAuth(true) }}
+          onStudio={() => setStage('studio')}
         />
       )}
+      {stage === 'studio' && <StudioAuth onBack={() => setStage('reveal')} />}
 
       {/* ── Tunnel intro (full screen) ───────────────────────────────────────── */}
       <TunnelHero onEnter={() => setStage('reveal')} />
