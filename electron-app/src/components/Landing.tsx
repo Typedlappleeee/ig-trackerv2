@@ -444,6 +444,110 @@ function MockupFallback() {
   )
 }
 
+// ── Site hero (discover page full-screen marketing hero) ──────────────────────
+function SiteHero({ onStudio }: { onStudio: () => void }) {
+  const CARDS = [
+    { x: -32, y: -22, rot: -8,  views: '1.2M', g1: '#c084fc', g2: '#7c3aed', seed: 11 },
+    { x:  -8, y: -28, rot: -2,  views: '950K', g1: '#f472b6', g2: '#db2777', seed: 22 },
+    { x:  24, y: -20, rot:  6,  views: '780K', g1: '#60a5fa', g2: '#2563eb', seed: 33 },
+    { x: -26, y:  20, rot: -5,  views: '670K', g1: '#4ade80', g2: '#16a34a', seed: 44 },
+    { x:  30, y:  16, rot:  7,  views: '860K', g1: '#fb923c', g2: '#ea580c', seed: 55 },
+  ]
+  const cW = 130, cH = 185
+
+  return (
+    <section style={{ position: 'relative', height: 'calc(100vh - 60px)', overflow: 'hidden', background: '#06050f' }}>
+      {/* Purple glow */}
+      <div style={{ position: 'absolute', top: '42%', left: '50%', transform: 'translate(-50%,-50%)', width: 800, height: 800, borderRadius: '50%', background: 'radial-gradient(closest-side, rgba(109,40,217,0.16), transparent)', filter: 'blur(80px)', pointerEvents: 'none' }} />
+
+      {/* Floating phone cards */}
+      {CARDS.map((c, i) => (
+        <div key={i} style={{
+          position: 'absolute',
+          left: `calc(50% + ${c.x}% - ${cW / 2}px)`,
+          top: `calc(50% + ${c.y}% - ${cH / 2}px)`,
+          width: cW, height: cH,
+          transform: `rotate(${c.rot}deg)`,
+          borderRadius: 18, overflow: 'hidden',
+          border: '1px solid rgba(255,255,255,0.12)',
+          boxShadow: '0 24px 60px rgba(0,0,0,0.8)',
+          animation: `sf-float ${4.5 + i * 0.6}s ease-in-out ${i * 0.9}s infinite`,
+          zIndex: 2,
+        }}>
+          <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(160deg, ${c.g1}55, #040310)` }}>
+            <img src={`https://picsum.photos/seed/${c.seed}/${cW * 2}/${cH * 2}`} alt="" style={{ width: '100%', height: '78%', objectFit: 'cover', display: 'block', filter: 'brightness(0.72) saturate(0.85)' }} loading="lazy" />
+          </div>
+          <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '8px 10px', background: 'rgba(0,0,0,0.62)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', gap: 5 }}>
+            <svg width="9" height="9" viewBox="0 0 24 24" fill="rgba(255,255,255,0.8)"><path d="M8 5v14l11-7z"/></svg>
+            <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.9)' }}>{c.views}</span>
+          </div>
+          <div style={{ position: 'absolute', top: 6, right: 6, width: 18, height: 18, borderRadius: '50%', background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, color: 'rgba(255,255,255,0.55)' }}>✕</div>
+        </div>
+      ))}
+
+      {/* Instagram icon — top left */}
+      <div style={{ position: 'absolute', top: '12%', left: '8%', width: 64, height: 64, borderRadius: 18, background: 'linear-gradient(135deg,#833ab4 0%,#fd1d1d 50%,#fcb045 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 14px 40px rgba(253,29,29,0.35),0 4px 12px rgba(0,0,0,0.5)', animation: 'sf-float-slow 5s ease-in-out infinite', zIndex: 3 }}>
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="white"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
+      </div>
+
+      {/* Telegram — bottom left */}
+      <div style={{ position: 'absolute', bottom: '16%', left: '6%', width: 60, height: 60, borderRadius: 16, background: 'linear-gradient(135deg,#229ED9,#1a7ab5)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 14px 40px rgba(34,158,217,0.3),0 4px 12px rgba(0,0,0,0.5)', animation: 'sf-float-slow 6s ease-in-out 1.2s infinite', zIndex: 3 }}>
+        <svg viewBox="0 0 24 24" width="30" height="30" fill="white"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.14.18-.357.295-.6.295l.213-3.053 5.56-5.022c.24-.213-.054-.334-.373-.121l-6.869 4.326-2.96-.924c-.64-.203-.658-.64.135-.954l11.566-4.458c.538-.196 1.006.128.832.941z"/></svg>
+      </div>
+
+      {/* Video icon — top right */}
+      <div style={{ position: 'absolute', top: '14%', right: '10%', width: 60, height: 60, borderRadius: 16, background: 'linear-gradient(135deg,#1d4ed8,#60a5fa)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 14px 40px rgba(59,130,246,0.3),0 4px 12px rgba(0,0,0,0.5)', animation: 'sf-float-slow 5.5s ease-in-out 2s infinite', zIndex: 3 }}>
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>
+      </div>
+
+      {/* Rocket — bottom right */}
+      <div style={{ position: 'absolute', bottom: '18%', right: '8%', width: 60, height: 60, borderRadius: 16, background: 'linear-gradient(135deg,#7c3aed,#a855f7)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 14px 40px rgba(124,58,237,0.3),0 4px 12px rgba(0,0,0,0.5)', animation: 'sf-float-slow 7s ease-in-out 0.5s infinite', zIndex: 3, fontSize: 28 }}>🚀</div>
+
+      {/* Center content */}
+      <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', textAlign: 'center', zIndex: 10, width: '100%', maxWidth: 700, padding: '0 24px', boxSizing: 'border-box' }}>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '6px 16px', borderRadius: 99, background: 'rgba(124,58,237,0.1)', border: '1px solid rgba(124,58,237,0.22)', marginBottom: 22, animation: 'sf-fade-up 0.6s ease both' }}>
+          <span style={{ fontSize: 12 }}>⚡</span>
+          <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', color: 'rgba(196,181,253,0.8)', textTransform: 'uppercase' }}>Automatise · Gagne du Temps · Scale</span>
+        </div>
+        <div style={{ fontSize: 'clamp(58px,9vw,102px)', fontWeight: 900, letterSpacing: '-0.045em', color: '#F2F0FF', lineHeight: 0.88, fontFamily: "'Inter','Arial Black',sans-serif", animation: 'sf-fade-up 0.6s ease 0.08s both', filter: 'drop-shadow(0 0 50px rgba(167,139,250,0.22))' }}>ScaleFlow</div>
+        <div style={{ marginTop: 18, fontSize: 'clamp(17px,2.2vw,24px)', fontWeight: 800, color: 'rgba(241,240,247,0.88)', lineHeight: 1.2, animation: 'sf-fade-up 0.6s ease 0.15s both' }}>L'automatisation Instagram à grande échelle.</div>
+        <p style={{ fontSize: 14, color: 'rgba(148,163,184,0.48)', margin: '12px auto 28px', lineHeight: 1.65, maxWidth: 440, animation: 'sf-fade-up 0.6s ease 0.22s both' }}>
+          Mass posting, multi-comptes, planification avancée,<br />reels & stories et bien plus.
+        </p>
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'center', animation: 'sf-fade-up 0.6s ease 0.3s both' }}>
+          <a href={TELEGRAM_URL} target="_blank" rel="noreferrer"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '13px 22px', borderRadius: 10, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#F2F0FF', fontSize: 14, fontWeight: 700, textDecoration: 'none', transition: 'background 0.2s' }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.11)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.06)')}>
+            <TGIcon size={14} /> Acheter une clé
+          </a>
+          <button onClick={onStudio}
+            style={{ padding: '13px 26px', borderRadius: 10, background: 'linear-gradient(130deg,#7c3aed,#ec4899)', border: 'none', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', transition: 'opacity 0.2s', boxShadow: '0 6px 24px rgba(124,58,237,0.35)' }}
+            onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
+            onMouseLeave={e => (e.currentTarget.style.opacity = '1')}>
+            Se connecter →
+          </button>
+        </div>
+      </div>
+
+      {/* Bottom feature strip */}
+      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '14px 0', background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(16px)', borderTop: '1px solid rgba(255,255,255,0.06)', zIndex: 5 }}>
+        {[
+          { icon: '📤', label: 'MASS POSTING' },
+          { icon: '👥', label: 'MULTI-COMPTES' },
+          { icon: '🤖', label: 'AUTOMATISATION AVANCÉE' },
+          { icon: '🎬', label: 'REELS & STORIES' },
+        ].map((f, i, a) => (
+          <div key={f.label} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '0 28px', borderRight: i < a.length - 1 ? '1px solid rgba(255,255,255,0.07)' : 'none' }}>
+            <span style={{ fontSize: 14 }}>{f.icon}</span>
+            <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.11em', color: 'rgba(196,181,253,0.5)', textTransform: 'uppercase' }}>{f.label}</span>
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}
+
 // ── App mockup (screenshot) ───────────────────────────────────────────────────
 function AppMockup() {
   const [imgFailed, setImgFailed] = useState(false)
@@ -1035,44 +1139,80 @@ function StudioAuth({ onBack }: { onBack: () => void }) {
       display: 'flex',
       animation: 'reveal-in 0.45s cubic-bezier(0.16,1,0.3,1) both',
     }}>
-      {/* ── Left panel — Orbit ─────────────────────────────────────────────── */}
-      <div style={{
-        flex: '0 0 55%',
-        background: '#05030f',
-        position: 'relative', overflow: 'hidden',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}>
-        {/* Subtle grid */}
-        <div style={{ position: 'absolute', inset: 0, opacity: 0.035, backgroundImage: 'linear-gradient(rgba(139,92,246,1) 1px,transparent 1px),linear-gradient(90deg,rgba(139,92,246,1) 1px,transparent 1px)', backgroundSize: '48px 48px', pointerEvents: 'none' }} />
-        {/* Nebula glow */}
-        <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 500, height: 500, borderRadius: '50%', background: 'radial-gradient(closest-side, rgba(109,40,217,0.18), transparent)', filter: 'blur(60px)', pointerEvents: 'none' }} />
+      {/* ── Left panel — Marketing ─────────────────────────────────────────── */}
+      <div style={{ flex: '0 0 55%', background: '#05030f', position: 'relative', overflow: 'hidden' }}>
+        {/* Glow */}
+        <div style={{ position: 'absolute', top: '42%', left: '50%', transform: 'translate(-50%,-50%)', width: 600, height: 600, borderRadius: '50%', background: 'radial-gradient(closest-side,rgba(109,40,217,0.18),transparent)', filter: 'blur(70px)', pointerEvents: 'none' }} />
 
-        {/* Orbit container */}
-        <div style={{
-          position: 'relative', width: ORBIT_RADIUS * 2 + 80, height: ORBIT_RADIUS * 2 + 80,
-          animation: `orbit-spin ${ORBIT_DURATION}s linear infinite`,
-          flexShrink: 0,
-        }}>
-          {ORBIT_COLORS.map((c, i) => (
-            <OrbitPhoto key={i} index={i} total={ORBIT_COLORS.length} color1={c[0]} color2={c[1]} />
+        {/* Floating phone cards */}
+        {[
+          { x: -34, y: -22, rot: -8,  views: '1.2M', g: '#c084fc', seed: 11 },
+          { x:  -6, y: -28, rot: -2,  views: '950K', g: '#f472b6', seed: 22 },
+          { x:  26, y: -20, rot:  6,  views: '780K', g: '#60a5fa', seed: 33 },
+          { x: -26, y:  20, rot: -5,  views: '670K', g: '#4ade80', seed: 44 },
+          { x:  28, y:  16, rot:  7,  views: '860K', g: '#fb923c', seed: 55 },
+        ].map((c, i) => (
+          <div key={i} style={{
+            position: 'absolute',
+            left: `calc(50% + ${c.x}% - 55px)`, top: `calc(50% + ${c.y}% - 80px)`,
+            width: 110, height: 160, transform: `rotate(${c.rot}deg)`,
+            borderRadius: 14, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.12)',
+            boxShadow: '0 20px 50px rgba(0,0,0,0.8)',
+            animation: `sf-float ${4.5 + i * 0.6}s ease-in-out ${i * 0.9}s infinite`, zIndex: 2,
+          }}>
+            <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(160deg,${c.g}55,#040310)` }}>
+              <img src={`https://picsum.photos/seed/${c.seed}/220/320`} alt="" style={{ width: '100%', height: '78%', objectFit: 'cover', display: 'block', filter: 'brightness(0.72) saturate(0.85)' }} loading="lazy" />
+            </div>
+            <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '6px 8px', background: 'rgba(0,0,0,0.62)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', gap: 4 }}>
+              <svg width="8" height="8" viewBox="0 0 24 24" fill="rgba(255,255,255,0.8)"><path d="M8 5v14l11-7z"/></svg>
+              <span style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.9)' }}>{c.views}</span>
+            </div>
+            <div style={{ position: 'absolute', top: 5, right: 5, width: 15, height: 15, borderRadius: '50%', background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, color: 'rgba(255,255,255,0.55)' }}>✕</div>
+          </div>
+        ))}
+
+        {/* Instagram icon */}
+        <div style={{ position: 'absolute', top: '10%', left: '8%', width: 54, height: 54, borderRadius: 15, background: 'linear-gradient(135deg,#833ab4 0%,#fd1d1d 50%,#fcb045 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 12px 32px rgba(253,29,29,0.35)', animation: 'sf-float-slow 5s ease-in-out infinite', zIndex: 3 }}>
+          <svg width="27" height="27" viewBox="0 0 24 24" fill="white"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
+        </div>
+
+        {/* Telegram icon */}
+        <div style={{ position: 'absolute', bottom: '18%', left: '6%', width: 50, height: 50, borderRadius: 14, background: 'linear-gradient(135deg,#229ED9,#1a7ab5)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 12px 32px rgba(34,158,217,0.3)', animation: 'sf-float-slow 6s ease-in-out 1.2s infinite', zIndex: 3 }}>
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="white"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.14.18-.357.295-.6.295l.213-3.053 5.56-5.022c.24-.213-.054-.334-.373-.121l-6.869 4.326-2.96-.924c-.64-.203-.658-.64.135-.954l11.566-4.458c.538-.196 1.006.128.832.941z"/></svg>
+        </div>
+
+        {/* Video icon */}
+        <div style={{ position: 'absolute', top: '12%', right: '8%', width: 50, height: 50, borderRadius: 14, background: 'linear-gradient(135deg,#1d4ed8,#60a5fa)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 12px 32px rgba(59,130,246,0.3)', animation: 'sf-float-slow 5.5s ease-in-out 2s infinite', zIndex: 3 }}>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>
+        </div>
+
+        {/* Rocket icon */}
+        <div style={{ position: 'absolute', bottom: '20%', right: '7%', width: 50, height: 50, borderRadius: 14, background: 'linear-gradient(135deg,#7c3aed,#a855f7)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 12px 32px rgba(124,58,237,0.3)', animation: 'sf-float-slow 7s ease-in-out 0.5s infinite', zIndex: 3, fontSize: 22 }}>🚀</div>
+
+        {/* Center text */}
+        <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', textAlign: 'center', zIndex: 10, width: '90%', pointerEvents: 'none' }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 13px', borderRadius: 99, background: 'rgba(124,58,237,0.1)', border: '1px solid rgba(124,58,237,0.22)', marginBottom: 16 }}>
+            <span style={{ fontSize: 11 }}>⚡</span>
+            <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.14em', color: 'rgba(196,181,253,0.8)', textTransform: 'uppercase' }}>Automatise · Gagne du Temps · Scale</span>
+          </div>
+          <div style={{ fontSize: 'clamp(36px,4.5vw,62px)', fontWeight: 900, letterSpacing: '-0.045em', color: '#F2F0FF', lineHeight: 0.88, fontFamily: "'Inter','Arial Black',sans-serif", filter: 'drop-shadow(0 0 40px rgba(167,139,250,0.22))' }}>ScaleFlow</div>
+          <div style={{ marginTop: 14, fontSize: 'clamp(14px,1.6vw,18px)', fontWeight: 800, color: 'rgba(241,240,247,0.85)', lineHeight: 1.25 }}>L'automatisation Instagram</div>
+          <div style={{ fontSize: 'clamp(14px,1.6vw,18px)', fontWeight: 800, color: 'rgba(241,240,247,0.85)', lineHeight: 1.25, marginBottom: 10 }}>à grande échelle.</div>
+          <p style={{ fontSize: 12, color: 'rgba(148,163,184,0.45)', margin: '0 auto', lineHeight: 1.6, maxWidth: 320 }}>Mass posting, multi-comptes, planification avancée, reels & stories.</p>
+        </div>
+
+        {/* Bottom feature strip */}
+        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, display: 'flex', justifyContent: 'center', flexWrap: 'wrap', alignItems: 'center', padding: '10px 0', background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(16px)', borderTop: '1px solid rgba(255,255,255,0.06)', gap: 0, zIndex: 5 }}>
+          {[{ icon: '📤', label: 'MASS POSTING' }, { icon: '👥', label: 'MULTI-COMPTES' }, { icon: '🎬', label: 'REELS & STORIES' }].map((f, i, a) => (
+            <div key={f.label} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '0 14px', borderRight: i < a.length - 1 ? '1px solid rgba(255,255,255,0.07)' : 'none' }}>
+              <span style={{ fontSize: 12 }}>{f.icon}</span>
+              <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.1em', color: 'rgba(196,181,253,0.5)', textTransform: 'uppercase' }}>{f.label}</span>
+            </div>
           ))}
         </div>
 
-        {/* Center text (stays fixed, not in orbit container) */}
-        <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', textAlign: 'center', pointerEvents: 'none', zIndex: 10 }}>
-          <p style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.22em', textTransform: 'uppercase', color: 'rgba(167,139,250,0.6)', margin: '0 0 12px' }}>ScaleFlow</p>
-          <div style={{ fontSize: 'clamp(26px,3.5vw,42px)', fontWeight: 900, letterSpacing: '-0.04em', color: '#fff', lineHeight: 0.92, fontFamily: "'Inter','Arial Black',sans-serif" }}>
-            <div>Poste.</div>
-            <div>Automatise.</div>
-            <div style={{ background: 'linear-gradient(120deg,#a78bfa,#ec4899)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Scale.</div>
-          </div>
-          <p style={{ fontSize: 12, color: 'rgba(148,163,184,0.45)', margin: '14px 0 0', letterSpacing: '0.02em' }}>
-            Automatisation Instagram à grande échelle.
-          </p>
-        </div>
-
         {/* Back button */}
-        <button onClick={onBack} style={{ position: 'absolute', top: 24, left: 24, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, color: 'rgba(148,163,184,0.6)', fontSize: 12, padding: '6px 12px', cursor: 'pointer', fontWeight: 600, letterSpacing: '0.06em', transition: 'background 0.2s' }}
+        <button onClick={onBack} style={{ position: 'absolute', top: 20, left: 20, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, color: 'rgba(148,163,184,0.6)', fontSize: 12, padding: '6px 12px', cursor: 'pointer', fontWeight: 600, letterSpacing: '0.06em', transition: 'background 0.2s', zIndex: 20 }}
           onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.1)')}
           onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.06)')}>
           ← Retour
@@ -1190,23 +1330,53 @@ function StudioAuth({ onBack }: { onBack: () => void }) {
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
+type Stage = 'tunnel' | 'reveal' | 'site' | 'studio'
+
+function stageFromHash(): Stage {
+  const h = window.location.hash
+  if (h === '#discover') return 'site'
+  if (h === '#studio')   return 'studio'
+  return 'tunnel'
+}
+
 export function Landing() {
-  const [stage,    setStage]   = useState<'tunnel' | 'reveal' | 'site' | 'studio'>('tunnel')
-  const [showAuth, setShowAuth] = useState(false)
-  const [faqOpen, setFaqOpen]   = useState<number | null>(null)
+  const [stage,   setStageRaw] = useState<Stage>(stageFromHash)
+  const [faqOpen, setFaqOpen]  = useState<number | null>(null)
   useGlobalCSS()
 
-  // Lock body scroll while not on the main site
+  // Keep hash in sync with stage
+  const goTo = (s: Stage) => {
+    if (s === 'site')   window.location.hash = '#discover'
+    else if (s === 'studio') window.location.hash = '#studio'
+    else history.pushState(null, '', window.location.pathname)
+    setStageRaw(s)
+  }
+
+  // Handle browser back/forward
+  useEffect(() => {
+    const handler = () => setStageRaw(stageFromHash())
+    window.addEventListener('hashchange', handler)
+    return () => window.removeEventListener('hashchange', handler)
+  }, [])
+
+  // Lock scroll while not on the main site
   useEffect(() => {
     document.body.style.overflow = stage === 'site' ? '' : 'hidden'
     return () => { document.body.style.overflow = '' }
   }, [stage])
 
+  // Scroll to top when arriving on discover
+  useEffect(() => {
+    if (stage === 'site') window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior })
+  }, [stage])
+
+  const onDiscover = () => goTo('site')
+  const onStudio   = () => goTo('studio')
+
   return (
     <div style={{ minHeight: '100vh', background: '#06060f', color: '#F2F0FF', overflowX: 'hidden', fontFamily: "'Inter', system-ui, sans-serif", cursor: stage === 'site' ? 'auto' : 'none' }}>
       {stage !== 'site' && <CustomCursor />}
       <StarField />
-
 
       {/* Nebula glows — animated */}
       <div style={{ position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none', overflow: 'hidden' }}>
@@ -1215,25 +1385,21 @@ export function Landing() {
         <div style={{ position: 'absolute', bottom: '5%', left: '-5%', width: 500, height: 500, borderRadius: '50%', background: 'radial-gradient(closest-side, rgba(56,189,248,0.05), transparent)', filter: 'blur(50px)', animation: 'sf-nebula 14s ease-in-out infinite 4s' }} />
       </div>
 
-      {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
-      {stage === 'reveal' && (
-        <RevealScreen
-          onDiscover={() => { setStage('site'); setTimeout(() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' }), 250) }}
-          onStudio={() => setStage('studio')}
-        />
-      )}
-      {stage === 'studio' && <StudioAuth onBack={() => setStage('reveal')} />}
+      {stage === 'reveal' && <RevealScreen onDiscover={onDiscover} onStudio={onStudio} />}
+      {stage === 'studio' && <StudioAuth onBack={() => goTo('reveal')} />}
 
-      {/* ── Tunnel intro (full screen) ───────────────────────────────────────── */}
-      <TunnelHero onEnter={() => setStage('reveal')} />
+      {/* Tunnel — only rendered on tunnel stage */}
+      {stage === 'tunnel' && <TunnelHero onEnter={() => goTo('reveal')} />}
 
-      {/* ── Nav ─────────────────────────────────────────────────────────────── */}
+      {/* ── Nav (hidden while tunnel is fullscreen) ──────────────────────────── */}
+      {stage === 'site' && (
       <nav style={{ position: 'sticky', top: 0, zIndex: 50, background: 'rgba(6,6,15,0.9)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
         <div style={{ maxWidth: 1140, margin: '0 auto', padding: '0 24px', height: 60, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+          {/* Logo — clicking returns to tunnel */}
+          <button onClick={() => goTo('tunnel')} style={{ display: 'flex', alignItems: 'center', gap: 9, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
             <SFMark size={28} />
             <span style={{ fontSize: 15, fontWeight: 800, color: '#F2F0FF', letterSpacing: '-0.3px' }}>ScaleFlow</span>
-          </div>
+          </button>
           <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             {[['#features','Fonctionnalités'], ['#pricing','Tarifs'], ['#faq','FAQ']].map(([href, label]) => (
               <a key={href} href={href} style={{ fontSize: 13, color: 'rgba(148,163,184,0.55)', textDecoration: 'none', padding: '6px 12px', borderRadius: 8, transition: 'color 0.15s' }}
@@ -1248,21 +1414,21 @@ export function Landing() {
               onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.09)')} onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.05)')}>
               <TGIcon /> Acheter une clé
             </a>
-            <button onClick={() => setShowAuth(true)}
+            <button onClick={onStudio}
               style={{ padding: '7px 16px', borderRadius: 9, background: 'linear-gradient(130deg,#7c3aed,#a855f7)', border: 'none', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', transition: 'opacity 0.15s', animation: 'sf-pulse-glow 3s ease-in-out infinite' }}
               onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')} onMouseLeave={e => (e.currentTarget.style.opacity = '1')}>
-              Se connecter →
+              Studio →
             </button>
           </div>
         </div>
       </nav>
+      )}
 
-      {/* ── App mockup ───────────────────────────────────────────────────────── */}
-      <section style={{ position: 'relative', zIndex: 1, padding: '80px 24px 100px' }}>
-        <FadeIn>
-          <AppMockup />
-        </FadeIn>
-      </section>
+      {/* ── Site content — only rendered when stage==='site' ─────────────────── */}
+      {stage === 'site' && <>
+
+      {/* ── Site hero ────────────────────────────────────────────────────────── */}
+      <SiteHero onStudio={onStudio} />
 
       <Divider />
 
@@ -1495,6 +1661,8 @@ export function Landing() {
           </div>
         </div>
       </footer>
+
+      </>} {/* end stage === 'site' */}
     </div>
   )
 }

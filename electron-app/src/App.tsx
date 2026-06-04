@@ -700,9 +700,19 @@ function AppContent({ user }: { user: User }) {
 // Detect Electron vs web browser
 const isElectron = typeof window !== 'undefined' && !!window.electronAPI
 
+const FORCE_LOGOUT_VER = 'sf_v4'
+
 export default function App() {
   const { user, loading } = useAuth()
   const [splashDone, setSplashDone] = useState(false)
+
+  // Force re-login for all users (version bump invalidates old sessions)
+  useEffect(() => {
+    if (localStorage.getItem('sf_logout_ver') !== FORCE_LOGOUT_VER) {
+      supabase.auth.signOut()
+      localStorage.setItem('sf_logout_ver', FORCE_LOGOUT_VER)
+    }
+  }, [])
 
   // Web: show landing when not logged in (Electron keeps the auth page directly)
   if (!isElectron && !loading && !user) return <Landing />
