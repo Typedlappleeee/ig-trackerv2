@@ -438,8 +438,20 @@ const TUNNEL_CSS = `
     50%     { box-shadow: 0 0 28px 4px rgba(255,255,255,0.08), inset 0 1px 0 rgba(255,255,255,0.15); }
   }
   @keyframes brand-appear {
-    from { opacity: 0; letter-spacing: 0.3em; }
-    to   { opacity: 1; letter-spacing: -0.04em; }
+    from { opacity: 0; letter-spacing: 0.5em; filter: blur(12px); }
+    to   { opacity: 1; letter-spacing: -0.03em; filter: blur(0); }
+  }
+  @keyframes reveal-in {
+    from { opacity: 0; transform: scale(1.04); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+  @keyframes reveal-word {
+    from { opacity: 0; transform: translateY(40px) skewY(2deg); }
+    to   { opacity: 1; transform: translateY(0) skewY(0deg); }
+  }
+  @keyframes reveal-sub {
+    from { opacity: 0; }
+    to   { opacity: 0.3; }
   }
 `
 
@@ -548,13 +560,16 @@ function TunnelHero({ onEnter }: { onEnter: () => void }) {
         <h1 style={{
           fontSize: 'clamp(64px, 11vw, 130px)',
           fontWeight: 900,
-          color: '#fff',
-          letterSpacing: '-0.04em',
+          letterSpacing: '-0.045em',
           lineHeight: 1,
-          margin: '0 0 8px',
+          margin: '0 0 6px',
           fontFamily: "'Inter', 'Arial Black', system-ui, sans-serif",
           animation: 'brand-appear 1.2s cubic-bezier(0.16,1,0.3,1) 0.2s both',
-          textShadow: '0 2px 40px rgba(0,0,0,0.8)',
+          background: 'linear-gradient(135deg, #ffffff 0%, rgba(200,180,255,0.9) 50%, #ffffff 100%)',
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
+          backgroundClip: 'text',
+          filter: 'drop-shadow(0 0 40px rgba(167,139,250,0.35))',
         }}>
           ScaleFlow
         </h1>
@@ -614,8 +629,147 @@ function TunnelHero({ onEnter }: { onEnter: () => void }) {
   )
 }
 
+// ── Reveal screen (after ENTER) ───────────────────────────────────────────────
+const REVEAL_LINES = ['MASS', 'POSTING', 'AUTOMATION', 'INSTAGRAM']
+
+function RevealScreen({ onClose }: { onClose: () => void }) {
+  const [visible, setVisible] = useState(false)
+  useEffect(() => { requestAnimationFrame(() => setVisible(true)) }, [])
+
+  return (
+    <div
+      style={{
+        position: 'fixed', inset: 0, zIndex: 200,
+        background: '#fff',
+        display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+        animation: 'reveal-in 0.55s cubic-bezier(0.16,1,0.3,1) both',
+        overflow: 'hidden',
+      }}
+    >
+      {/* Subtle background grid */}
+      <div style={{
+        position: 'absolute', inset: 0, opacity: 0.04,
+        backgroundImage: [
+          'linear-gradient(rgba(0,0,0,1) 1px, transparent 1px)',
+          'linear-gradient(90deg, rgba(0,0,0,1) 1px, transparent 1px)',
+        ].join(','),
+        backgroundSize: '48px 48px',
+        pointerEvents: 'none',
+      }} />
+
+      {/* Top label */}
+      <div style={{
+        position: 'absolute', top: 40, left: 0, right: 0,
+        display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 10,
+        animation: 'reveal-sub 0.8s ease 0.2s both',
+      }}>
+        <div style={{
+          width: 28, height: 28, borderRadius: 8,
+          background: 'linear-gradient(130deg,#7c3aed,#a855f7)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <svg width="16" height="16" viewBox="0 0 200 200" fill="none">
+            <text x="100" y="148" textAnchor="middle"
+              fontFamily="'Arial Black',Helvetica,sans-serif"
+              fontWeight="900" fontSize="148" fill="#fff">S</text>
+          </svg>
+        </div>
+        <span style={{
+          fontSize: 13, fontWeight: 800, letterSpacing: '0.22em',
+          textTransform: 'uppercase', color: 'rgba(0,0,0,0.3)',
+        }}>ScaleFlow</span>
+      </div>
+
+      {/* Main stacked words */}
+      <div style={{ position: 'relative', textAlign: 'center', lineHeight: 0.88 }}>
+        {REVEAL_LINES.map((word, i) => (
+          <div
+            key={word}
+            style={{
+              fontSize: 'clamp(52px, 11.5vw, 148px)',
+              fontWeight: 900,
+              letterSpacing: '-0.04em',
+              color: i === REVEAL_LINES.length - 1 ? 'transparent' : '#0a0a0a',
+              WebkitTextStroke: i === REVEAL_LINES.length - 1 ? '2px #0a0a0a' : undefined,
+              fontFamily: "'Inter','Arial Black','Helvetica Neue',Arial,sans-serif",
+              display: 'block',
+              opacity: visible ? 1 : 0,
+              transform: visible ? 'translateY(0) skewY(0deg)' : 'translateY(40px) skewY(2deg)',
+              transition: `opacity 0.65s cubic-bezier(0.16,1,0.3,1) ${0.1 + i * 0.1}s, transform 0.65s cubic-bezier(0.16,1,0.3,1) ${0.1 + i * 0.1}s`,
+            }}
+          >
+            {word}
+          </div>
+        ))}
+
+        {/* Accent bar under MASS */}
+        <div style={{
+          position: 'absolute', left: '10%', right: '10%',
+          bottom: -18, height: 3,
+          background: 'linear-gradient(90deg, #7c3aed, #ec4899)',
+          borderRadius: 99,
+          opacity: visible ? 1 : 0,
+          transition: 'opacity 0.5s ease 0.6s',
+        }} />
+      </div>
+
+      {/* Subtitle */}
+      <p style={{
+        marginTop: 52,
+        fontSize: 13,
+        letterSpacing: '0.16em',
+        textTransform: 'uppercase',
+        color: 'rgba(0,0,0,0.3)',
+        fontWeight: 600,
+        opacity: visible ? 1 : 0,
+        transition: 'opacity 0.6s ease 0.55s',
+      }}>
+        Instagram · Cloud Phones · Scale
+      </p>
+
+      {/* Enter / Close button */}
+      <button
+        onClick={onClose}
+        style={{
+          marginTop: 56,
+          padding: '14px 52px',
+          borderRadius: 99,
+          background: '#0a0a0a',
+          color: '#fff',
+          fontSize: 12,
+          fontWeight: 800,
+          letterSpacing: '0.22em',
+          textTransform: 'uppercase',
+          border: 'none',
+          cursor: 'pointer',
+          opacity: visible ? 1 : 0,
+          transition: 'opacity 0.6s ease 0.7s, background 0.2s, transform 0.15s',
+        }}
+        onMouseEnter={e => { e.currentTarget.style.background = '#1a0a2e'; e.currentTarget.style.transform = 'translateY(-2px)' }}
+        onMouseLeave={e => { e.currentTarget.style.background = '#0a0a0a'; e.currentTarget.style.transform = '' }}
+      >
+        ACCÉDER →
+      </button>
+
+      {/* Bottom label */}
+      <p style={{
+        position: 'absolute', bottom: 32,
+        fontSize: 11, color: 'rgba(0,0,0,0.18)',
+        letterSpacing: '0.1em', fontWeight: 600,
+        textTransform: 'uppercase',
+        opacity: visible ? 1 : 0,
+        transition: 'opacity 0.6s ease 0.8s',
+      }}>
+        © {new Date().getFullYear()} ScaleFlow
+      </p>
+    </div>
+  )
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 export function Landing() {
+  const [stage,    setStage]   = useState<'tunnel' | 'reveal'>('tunnel')
   const [showAuth, setShowAuth] = useState(false)
   const [faqOpen, setFaqOpen]   = useState<number | null>(null)
   useGlobalCSS()
@@ -633,9 +787,10 @@ export function Landing() {
       </div>
 
       {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
+      {stage === 'reveal' && <RevealScreen onClose={() => { setStage('tunnel'); setShowAuth(true) }} />}
 
       {/* ── Tunnel intro (full screen) ───────────────────────────────────────── */}
-      <TunnelHero onEnter={() => setShowAuth(true)} />
+      <TunnelHero onEnter={() => setStage('reveal')} />
 
       {/* ── Nav ─────────────────────────────────────────────────────────────── */}
       <nav style={{ position: 'sticky', top: 0, zIndex: 50, background: 'rgba(6,6,15,0.9)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
