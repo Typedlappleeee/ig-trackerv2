@@ -1114,18 +1114,18 @@ type RepurposeResult = { ok: boolean; outputPath?: string; storagePath?: string;
 export function buildRepurposeVariant(seed: number, intensity: 'subtle' | 'medium' | 'aggressive' | 'vener', format: '9:16' | '1:1' | '16:9' | 'keep') {
   const ranges = {
     //              bri    con    sat    zoomMin zoomMax crop  crf  temp   hue
-    subtle:     { bri: 0.12, con: 0.12, sat: 0.40, zoomMin: 0.02, zoomMax: 0.07, crop: 6,  crf: 2, temp: 0.18, hue: 20 },
-    medium:     { bri: 0.22, con: 0.20, sat: 0.70, zoomMin: 0.04, zoomMax: 0.14, crop: 11, crf: 4, temp: 0.32, hue: 45 },
-    aggressive: { bri: 0.38, con: 0.35, sat: 1.10, zoomMin: 0.08, zoomMax: 0.22, crop: 18, crf: 6, temp: 0.50, hue: 75 },
-    vener:      { bri: 0.55, con: 0.50, sat: 1.50, zoomMin: 0.15, zoomMax: 0.32, crop: 25, crf: 9, temp: 0.70, hue: 110 },
+    subtle:     { bri: 0.06, con: 0.06, sat: 0.20, zoomMin: 0.01, zoomMax: 0.04, crop: 3,  crf: 1, temp: 0.09, hue: 10 },
+    medium:     { bri: 0.11, con: 0.10, sat: 0.35, zoomMin: 0.02, zoomMax: 0.07, crop: 6,  crf: 2, temp: 0.16, hue: 22 },
+    aggressive: { bri: 0.19, con: 0.18, sat: 0.55, zoomMin: 0.04, zoomMax: 0.11, crop: 9,  crf: 3, temp: 0.25, hue: 38 },
+    vener:      { bri: 0.28, con: 0.25, sat: 0.75, zoomMin: 0.08, zoomMax: 0.16, crop: 13, crf: 5, temp: 0.35, hue: 55 },
   }[intensity]
 
   const rng  = seededRng(seed)
   const sign = () => rng(0, 1) > 0.5 ? 1 : -1
 
-  const brightness = sign() * rng(0.03, ranges.bri)
-  const contrast   = 1 + sign() * rng(0.03, ranges.con)
-  const saturation = 1 + sign() * rng(0.08, ranges.sat)
+  const brightness = sign() * rng(0.015, ranges.bri)
+  const contrast   = 1 + sign() * rng(0.015, ranges.con)
+  const saturation = 1 + sign() * rng(0.04, ranges.sat)
   const zoomPct    = rng(ranges.zoomMin, ranges.zoomMax)
   const panX       = rng(0, 1)
   const panY       = rng(0, 1)
@@ -1141,7 +1141,7 @@ export function buildRepurposeVariant(seed: number, intensity: 'subtle' | 'mediu
   const bb = (isWarm ? 1 - tempStrength * 0.8  : 1 + tempStrength      ).toFixed(4)
 
   // Hue rotation — shifts all colors distinctly per variant
-  const hueShift = sign() * rng(5, ranges.hue)
+  const hueShift = sign() * rng(2, ranges.hue)
 
   // Lifted blacks (matte/faded look) — random 0 or applied
   const liftBlacks = rng(0, 1) > 0.5
