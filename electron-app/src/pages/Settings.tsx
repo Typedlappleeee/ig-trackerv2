@@ -1784,20 +1784,20 @@ function SubscriptionPanel() {
         {/* Credit packs */}
         <div className="mt-6">
           <p className="text-[13px] font-bold text-white mb-3">{t('creditPacks')}</p>
-          <div className="grid grid-cols-5 gap-3">
+          <div className="grid grid-cols-4 gap-3">
             {[
-              { cr: '500',    price: '19,99$' },
-              { cr: '1 200',  price: '39,99$' },
-              { cr: '2 500',  price: '74,99$' },
-              { cr: '6 000',  price: '164,99$' },
-              { cr: '15 000', price: '374,99$' },
+              { cr: '1 000',  price: '19$',  label: 'Mini Pack'  },
+              { cr: '5 000',  price: '79$',  label: 'Mega Pack'  },
+              { cr: '15 000', price: '179$', label: 'Giga Pack'  },
+              { cr: '50 000', price: '499$', label: 'Ultra Pack' },
             ].map(pk => (
               <a key={pk.cr} href="https://t.me/justquentin" target="_blank" rel="noreferrer"
                 className="rounded-xl p-3.5 text-center transition-all hover:brightness-110 no-underline"
                 style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(139,92,246,0.15)', textDecoration: 'none' }}>
+                <div className="text-[11px] font-semibold mb-1" style={{ color: '#a78bfa' }}>{pk.label}</div>
                 <div className="text-[15px] font-black text-white">{pk.cr}</div>
                 <div className="text-[10px] text-text2 mb-1.5">{t('creditsCosts')}</div>
-                <div className="text-[12px] font-bold" style={{ color: '#a78bfa' }}>{pk.price}</div>
+                <div className="text-[13px] font-bold" style={{ color: '#c4b5fd' }}>{pk.price}</div>
               </a>
             ))}
           </div>
