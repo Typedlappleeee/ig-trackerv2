@@ -580,7 +580,6 @@ function AppContent({ user }: { user: User }) {
   const [onboarding, setOnboarding]         = useState<boolean | null>(null)
   const [showTour, setShowTour]             = useState(() => !!localStorage.getItem(TOUR_KEY))
   const [showBeta, setShowBeta]             = useState(false)
-  const [showAiModal, setShowAiModal]       = useState(true)
   const [phoneCount, setPhoneCount]         = useState(0)
   const [lastRefresh, setLastRefresh]       = useState<Date | null>(null)
   const [refreshTick, setRefreshTick]       = useState(0)
@@ -816,7 +815,6 @@ function AppContent({ user }: { user: User }) {
   return (
     <LicenseContext.Provider value={license}>
     <CreditContext.Provider value={{ balance: creditBalance, loading: creditLoading, refresh: refreshCredits, setBalance: setCreditBalance, ownerId: creditOwnerId }}>
-      {showAiModal && <AiModelPopup onClose={() => setShowAiModal(false)} />}
       {showBeta && <BetaPopup onClose={dismissBeta} />}
       {showTour && <AppTour onClose={() => { localStorage.removeItem(TOUR_KEY); setShowTour(false) }} onNavigate={p => { setPage(p as Page); }} />}
       <Layout
