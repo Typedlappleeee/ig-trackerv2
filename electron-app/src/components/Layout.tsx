@@ -79,19 +79,19 @@ const NAV_SECTIONS: NavSection[] = [
     title: 'Principal',
     defaultOpen: true,
     items: [
-      { id: 'phones',      label: 'navPhones',   icon: '📱' },
+      { id: 'phones',      label: 'navPhones',      icon: '📱' },
+      { id: 'bank',        label: 'navBank',         icon: '🗂' },
+      { id: 'captionbank', label: 'navCaptionBank',  icon: '💬' },
     ],
   },
   {
     title: 'Instagram',
     defaultOpen: true,
     items: [
+      { id: 'storylink',   label: 'navStoryLink',    icon: '🔗', isNew: true },
       { id: 'posting',     label: 'navPosting',      icon: '🚀' },
       { id: 'massposting', label: 'navMassPosting',  icon: '⚡' },
       { id: 'scheduler',   label: 'navScheduler',    icon: '📅' },
-      { id: 'storylink',   label: 'navStoryLink',    icon: '🔗', isNew: true },
-      { id: 'bank',        label: 'navBank',         icon: '🗂' },
-      { id: 'captionbank', label: 'navCaptionBank',  icon: '💬' },
       { id: 'warmup',      label: 'navWarmup',       icon: '🔥', beta: true },
       { id: 'aitools',     label: 'navAiTools',      icon: '🔧' },
     ],

@@ -24,6 +24,7 @@ export default function StoryLink({ user }: { user: User }) {
   const [groupFilter, setGroupFilter]     = useState('Tous')
   const [groups, setGroups]               = useState<string[]>(['Tous'])
   const [selected, setSelected]           = useState<Set<string>>(new Set())
+  const [pickMode, setPickMode]           = useState<'phones' | 'groups'>('phones')
 
   const [configs, setConfigs]             = useState<Record<string, StoryCfg>>({})
   const [bankTarget, setBankTarget]       = useState<string | 'all' | null>(null)
@@ -77,6 +78,33 @@ export default function StoryLink({ user }: { user: User }) {
     })
   }
   function clearSelection() { setSelected(new Set()) }
+
+  // Phones belonging to a group (respecting permissions)
+  function phonesInGroup(g: string) {
+    return phones.filter(p => {
+      const grp = p.group?.name ?? p.groupName ?? null
+      if (role && !canAccessPhoneGroup(role, perms, grp)) return false
+      return grp === g
+    })
+  }
+  // Toggle an entire group's phones in/out of the selection
+  function toggleGroup(g: string) {
+    const inGroup = phonesInGroup(g)
+    const allSelected = inGroup.length > 0 && inGroup.every(p => selected.has(p.id))
+    setSelected(prev => {
+      const n = new Set(prev)
+      if (allSelected) inGroup.forEach(p => n.delete(p.id))
+      else inGroup.forEach(p => n.add(p.id))
+      return n
+    })
+    if (!allSelected) {
+      setConfigs(c => {
+        const n = { ...c }
+        inGroup.forEach(p => { if (!n[p.id]) n[p.id] = emptyCfg() })
+        return n
+      })
+    }
+  }
 
   function setCfg(id: string, patch: Partial<StoryCfg>) {
     setConfigs(c => ({ ...c, [id]: { ...(c[id] ?? emptyCfg()), ...patch } }))
@@ -228,63 +256,114 @@ export default function StoryLink({ user }: { user: User }) {
           <div>
             <label style={labelStyle}>Comptes</label>
 
-            {/* Group filter + search */}
-            <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
-              <select value={groupFilter} onChange={e => setGroupFilter(e.target.value)}
-                style={{ ...inputStyle, width: 'auto', flex: '0 0 110px', cursor: 'pointer' }}>
-                {groups.map(g => <option key={g} value={g} style={{ background: '#0E0E16' }}>{g}</option>)}
-              </select>
-              <input value={phoneSearch} onChange={e => setPhoneSearch(e.target.value)}
-                placeholder="Rechercher…" style={inputStyle} onFocus={focusOn} onBlur={focusOff} />
+            {/* Téléphones / Groupes toggle */}
+            <div style={{ display: 'flex', gap: 4, padding: 4, borderRadius: 11, marginBottom: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+              {([{ k: 'phones', l: 'Téléphones' }, { k: 'groups', l: 'Groupes' }] as const).map(m => (
+                <button key={m.k} onClick={() => setPickMode(m.k)} className="sf-press"
+                  style={{
+                    flex: 1, height: 32, borderRadius: 8, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', border: 'none',
+                    background: pickMode === m.k ? 'rgba(139,92,246,0.2)' : 'transparent',
+                    color: pickMode === m.k ? '#c4b5fd' : 'rgba(148,163,184,0.6)',
+                    transition: 'all 0.15s',
+                  }}>{m.l}</button>
+              ))}
             </div>
 
-            {/* Select all / clear */}
-            <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
-              <button onClick={selectAllVisible} className="sf-press"
-                style={{ flex: 1, height: 34, borderRadius: 9, fontSize: 12, fontWeight: 600, cursor: 'pointer', background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.25)', color: '#c4b5fd' }}>
-                Tout sélectionner
-              </button>
-              <button onClick={clearSelection} className="sf-press"
-                style={{ flex: 1, height: 34, borderRadius: 9, fontSize: 12, fontWeight: 600, cursor: 'pointer', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', color: 'rgba(148,163,184,0.6)' }}>
-                Effacer
-              </button>
-            </div>
+            {pickMode === 'phones' ? (
+              <>
+                {/* Group filter + search */}
+                <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+                  <select value={groupFilter} onChange={e => setGroupFilter(e.target.value)}
+                    style={{ ...inputStyle, width: 'auto', flex: '0 0 110px', cursor: 'pointer' }}>
+                    {groups.map(g => <option key={g} value={g} style={{ background: '#0E0E16' }}>{g}</option>)}
+                  </select>
+                  <input value={phoneSearch} onChange={e => setPhoneSearch(e.target.value)}
+                    placeholder="Rechercher…" style={inputStyle} onFocus={focusOn} onBlur={focusOff} />
+                </div>
 
-            {/* Phone list */}
-            <div style={{ maxHeight: 480, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 5, borderRadius: 12, border: '1px solid rgba(255,255,255,0.06)', padding: 8, background: 'rgba(13,13,20,0.5)' }}>
-              {loadingPhones ? (
-                <p style={{ fontSize: 12.5, color: 'rgba(148,163,184,0.5)', padding: 14, textAlign: 'center' }}>Chargement…</p>
-              ) : visiblePhones.length === 0 ? (
-                <p style={{ fontSize: 12.5, color: 'rgba(148,163,184,0.5)', padding: 14, textAlign: 'center' }}>Aucun compte</p>
-              ) : visiblePhones.map(p => {
-                const sel = selected.has(p.id)
-                const grp = p.group?.name ?? p.groupName
-                const j = jobFor(p.id)
-                return (
-                  <button key={p.id} onClick={() => togglePhone(p.id)}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 9, cursor: 'pointer', textAlign: 'left',
-                      background: sel ? 'rgba(236,72,153,0.13)' : 'transparent',
-                      border: `1px solid ${sel ? 'rgba(236,72,153,0.38)' : 'transparent'}`,
-                      transition: 'all 0.15s',
-                    }}>
-                    <span style={{
-                      width: 18, height: 18, borderRadius: 5, flexShrink: 0,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      background: sel ? 'linear-gradient(135deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.05)',
-                      border: sel ? 'none' : '1px solid rgba(255,255,255,0.12)',
-                    }}>
-                      {sel && <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>}
-                    </span>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ fontSize: 13.5, fontWeight: sel ? 600 : 400, color: sel ? '#fff' : 'rgba(226,232,240,0.7)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phoneName(p)}</p>
-                      {grp && <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.4)', marginTop: 1 }}>{grp}</p>}
-                    </div>
-                    {j && <span style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: statusDot(j.status), boxShadow: j.status === 'running' ? '0 0 6px #a78bfa' : 'none' }} />}
+                {/* Select all / clear */}
+                <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+                  <button onClick={selectAllVisible} className="sf-press"
+                    style={{ flex: 1, height: 34, borderRadius: 9, fontSize: 12, fontWeight: 600, cursor: 'pointer', background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.25)', color: '#c4b5fd' }}>
+                    Tout sélectionner
                   </button>
-                )
-              })}
-            </div>
+                  <button onClick={clearSelection} className="sf-press"
+                    style={{ flex: 1, height: 34, borderRadius: 9, fontSize: 12, fontWeight: 600, cursor: 'pointer', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', color: 'rgba(148,163,184,0.6)' }}>
+                    Effacer
+                  </button>
+                </div>
+
+                {/* Phone list */}
+                <div style={{ maxHeight: 480, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 5, borderRadius: 12, border: '1px solid rgba(255,255,255,0.06)', padding: 8, background: 'rgba(13,13,20,0.5)' }}>
+                  {loadingPhones ? (
+                    <p style={{ fontSize: 12.5, color: 'rgba(148,163,184,0.5)', padding: 14, textAlign: 'center' }}>Chargement…</p>
+                  ) : visiblePhones.length === 0 ? (
+                    <p style={{ fontSize: 12.5, color: 'rgba(148,163,184,0.5)', padding: 14, textAlign: 'center' }}>Aucun compte</p>
+                  ) : visiblePhones.map(p => {
+                    const sel = selected.has(p.id)
+                    const grp = p.group?.name ?? p.groupName
+                    const j = jobFor(p.id)
+                    return (
+                      <button key={p.id} onClick={() => togglePhone(p.id)}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 9, cursor: 'pointer', textAlign: 'left',
+                          background: sel ? 'rgba(236,72,153,0.13)' : 'transparent',
+                          border: `1px solid ${sel ? 'rgba(236,72,153,0.38)' : 'transparent'}`,
+                          transition: 'all 0.15s',
+                        }}>
+                        <span style={{
+                          width: 18, height: 18, borderRadius: 5, flexShrink: 0,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          background: sel ? 'linear-gradient(135deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.05)',
+                          border: sel ? 'none' : '1px solid rgba(255,255,255,0.12)',
+                        }}>
+                          {sel && <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>}
+                        </span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{ fontSize: 13.5, fontWeight: sel ? 600 : 400, color: sel ? '#fff' : 'rgba(226,232,240,0.7)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phoneName(p)}</p>
+                          {grp && <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.4)', marginTop: 1 }}>{grp}</p>}
+                        </div>
+                        {j && <span style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: statusDot(j.status), boxShadow: j.status === 'running' ? '0 0 6px #a78bfa' : 'none' }} />}
+                      </button>
+                    )
+                  })}
+                </div>
+              </>
+            ) : (
+              /* Groups mode — select whole groups at once */
+              <div style={{ maxHeight: 560, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6, borderRadius: 12, border: '1px solid rgba(255,255,255,0.06)', padding: 8, background: 'rgba(13,13,20,0.5)' }}>
+                {groups.filter(g => g !== 'Tous').length === 0 ? (
+                  <p style={{ fontSize: 12.5, color: 'rgba(148,163,184,0.5)', padding: 14, textAlign: 'center' }}>Aucun groupe</p>
+                ) : groups.filter(g => g !== 'Tous').map(g => {
+                  const inGroup = phonesInGroup(g)
+                  const selCount = inGroup.filter(p => selected.has(p.id)).length
+                  const allSel = inGroup.length > 0 && selCount === inGroup.length
+                  return (
+                    <button key={g} onClick={() => toggleGroup(g)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 11, padding: '12px 13px', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
+                        background: selCount > 0 ? 'rgba(236,72,153,0.12)' : 'transparent',
+                        border: `1px solid ${selCount > 0 ? 'rgba(236,72,153,0.35)' : 'transparent'}`,
+                        transition: 'all 0.15s',
+                      }}>
+                      <span style={{
+                        width: 18, height: 18, borderRadius: 5, flexShrink: 0,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        background: allSel ? 'linear-gradient(135deg,#7c3aed,#ec4899)' : selCount > 0 ? 'rgba(236,72,153,0.4)' : 'rgba(255,255,255,0.05)',
+                        border: selCount > 0 ? 'none' : '1px solid rgba(255,255,255,0.12)',
+                      }}>
+                        {allSel && <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>}
+                        {!allSel && selCount > 0 && <span style={{ width: 8, height: 2, background: '#fff', borderRadius: 1 }} />}
+                      </span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ fontSize: 13.5, fontWeight: selCount > 0 ? 600 : 400, color: selCount > 0 ? '#fff' : 'rgba(226,232,240,0.7)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g}</p>
+                        <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.4)', marginTop: 1 }}>{selCount}/{inGroup.length} compte{inGroup.length > 1 ? 's' : ''}</p>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
             <p style={{ fontSize: 12, color: 'rgba(148,163,184,0.45)', marginTop: 10 }}>
               {selected.size} sélectionné{selected.size > 1 ? 's' : ''} · {readyIds.length} prêt{readyIds.length > 1 ? 's' : ''}
             </p>
