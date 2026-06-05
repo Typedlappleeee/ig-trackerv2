@@ -610,52 +610,247 @@ const FEATURES = [
 
 // ── Pricing ───────────────────────────────────────────────────────────────────
 type PlanFeature = { text: string; included: boolean }
-interface Plan {
-  name: string; icon: string; tagline: string; credits: string; creditsColor: string
-  price: string; originalPrice?: string; accent: string; popular?: boolean; bestValue?: boolean
+interface PlanDef {
+  name: string; tagline: string; icon: string
+  credits: string; creditsColor: string; accent: string
+  monthlyPrice: string; yearlyPrice: string
+  originalMonthly: string; discount: string; yearlyBilled: string
+  popular?: boolean; bestValue?: boolean
+  btnLabel: string
   features: PlanFeature[]
 }
-const PLANS: Plan[] = [
+const PLANS: PlanDef[] = [
   {
-    name: 'Standard', icon: '⚡', tagline: 'Pour débuter', credits: '2 500 crédits / mois', creditsColor: '#60a5fa',
-    price: '49,99$', accent: '#60a5fa',
+    name: 'Standard', tagline: 'Pour débuter', icon: '⚡',
+    credits: '2 500 crédits / mois', creditsColor: '#60a5fa', accent: '#3b82f6',
+    monthlyPrice: '49,99$', yearlyPrice: '34,99$',
+    originalMonthly: '49,99$', discount: '30% OFF', yearlyBilled: '419,88$ facturé annuellement',
+    btnLabel: "S'abonner à Standard",
     features: [
-      { text: 'Accès à tous les outils',       included: false },
-      { text: 'Toutes les fonctionnalités',     included: false },
-      { text: 'Mass Posting (10 comptes max)',  included: true  },
-      { text: '50 téléphones max',              included: true  },
-      { text: 'Support prioritaire',            included: false },
-      { text: 'Remix & CloneVid',               included: false },
-      { text: 'Banque vidéos + Captions',       included: true  },
+      { text: 'Accès aux outils de base',       included: true  },
+      { text: 'Fonctionnalités sélectives',      included: true  },
+      { text: 'Mass Posting (10 comptes max)',   included: true  },
+      { text: 'Support prioritaire',             included: false },
+      { text: 'Remix & CloneVid',                included: false },
+      { text: 'Organisations multi-membres',     included: false },
     ],
   },
   {
-    name: 'Pro', icon: '👑', tagline: 'Scale ton output', credits: '5 500 crédits / mois', creditsColor: '#a78bfa',
-    price: '59,99$', originalPrice: '99,99$', accent: '#a78bfa', popular: true,
+    name: 'Pro', tagline: 'Scale ton output', icon: '👑',
+    credits: '5 500 crédits / mois', creditsColor: '#a78bfa', accent: '#7c3aed',
+    monthlyPrice: '79,99$', yearlyPrice: '59,99$',
+    originalMonthly: '79,99$', discount: '25% OFF', yearlyBilled: '719,88$ facturé annuellement',
+    popular: true,
+    btnLabel: "S'abonner à Pro",
     features: [
-      { text: 'Accès à tous les outils',       included: true  },
-      { text: 'Toutes les fonctionnalités',     included: true  },
-      { text: 'Mass Posting illimité',          included: true  },
-      { text: '200 téléphones max',             included: true  },
-      { text: 'Support prioritaire',            included: true  },
-      { text: 'Remix & CloneVid',               included: true  },
-      { text: 'Banque vidéos + Captions',       included: true  },
+      { text: 'Accès à tous les outils',         included: true  },
+      { text: 'Toutes les fonctionnalités',       included: true  },
+      { text: 'Mass Posting illimité',            included: true  },
+      { text: 'Support prioritaire',              included: true  },
+      { text: 'Remix & CloneVid',                 included: true  },
+      { text: 'Organisations multi-membres',      included: false },
     ],
   },
   {
-    name: 'Organisation', icon: '🏢', tagline: 'Puissance illimitée', credits: '11 000 crédits / mois', creditsColor: '#34d399',
-    price: '89,99$', originalPrice: '149,99$', accent: '#34d399', bestValue: true,
+    name: 'Organisation', tagline: 'Puissance illimitée', icon: '🏢',
+    credits: '11 000 crédits / mois', creditsColor: '#f59e0b', accent: '#f59e0b',
+    monthlyPrice: '119,99$', yearlyPrice: '89,99$',
+    originalMonthly: '119,99$', discount: '25% OFF', yearlyBilled: '1 079,88$ facturé annuellement',
+    bestValue: true,
+    btnLabel: "S'abonner à Organisation",
     features: [
-      { text: 'Accès à tous les outils',       included: true  },
-      { text: 'Toutes les fonctionnalités',     included: true  },
-      { text: 'Mass Posting illimité',          included: true  },
-      { text: 'Téléphones illimités',           included: true  },
-      { text: 'Support prioritaire',            included: true  },
-      { text: 'Remix & CloneVid',               included: true  },
-      { text: "Suggestions d'ajouts avec les devs", included: true  },
+      { text: 'Accès à tous les outils',         included: true  },
+      { text: 'Toutes les fonctionnalités',       included: true  },
+      { text: 'Mass Posting illimité',            included: true  },
+      { text: 'Support prioritaire',              included: true  },
+      { text: 'Remix & CloneVid',                 included: true  },
+      { text: 'Organisations multi-membres',      included: true  },
     ],
   },
 ]
+
+const CREDIT_PACKS = [
+  { name: 'Mini Pack',  credits: '10 000',  price: '25$',   popular: false, bestValue: false },
+  { name: 'Mega Pack',  credits: '30 000',  price: '60$',   popular: true,  bestValue: false },
+  { name: 'Giga Pack',  credits: '80 000',  price: '140$',  popular: false, bestValue: false },
+  { name: 'Ultra Pack', credits: '250 000', price: '300$',  popular: false, bestValue: true  },
+]
+
+// ── Pricing section component (needs local state for toggle) ────────────────
+function PricingSection() {
+  const [yearly, setYearly] = useState(true)
+
+  return (
+    <section id="pricing" style={{ position: 'relative', zIndex: 1, padding: '80px 24px' }}>
+      <div style={{ maxWidth: 1040, margin: '0 auto' }}>
+
+        {/* Header */}
+        <FadeIn>
+          <div style={{ textAlign: 'center', marginBottom: 40 }}>
+            <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.14em', color: '#a78bfa', margin: '0 0 12px' }}>Tarifs</p>
+            <h2 style={{ fontSize: 'clamp(28px,5vw,50px)', fontWeight: 900, letterSpacing: '-0.04em', margin: '0 0 28px', color: '#F2F0FF' }}>
+              Choisis ton{' '}
+              <span style={{ background: 'linear-gradient(120deg,#a78bfa,#ec4899)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>plan.</span>
+            </h2>
+            {/* Billing toggle */}
+            <div style={{ display: 'inline-flex', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 99, padding: 4, gap: 2 }}>
+              <button onClick={() => setYearly(false)} style={{ padding: '7px 22px', borderRadius: 99, fontSize: 13, fontWeight: 600, background: !yearly ? 'rgba(255,255,255,0.1)' : 'transparent', color: !yearly ? '#ffffff' : 'rgba(148,163,184,0.55)', border: 'none', cursor: 'pointer', transition: 'all 0.18s' }}>
+                Mensuel
+              </button>
+              <button onClick={() => setYearly(true)} style={{ padding: '7px 22px', borderRadius: 99, fontSize: 13, fontWeight: 600, background: yearly ? 'rgba(255,255,255,0.1)' : 'transparent', color: yearly ? '#ffffff' : 'rgba(148,163,184,0.55)', border: 'none', cursor: 'pointer', transition: 'all 0.18s', display: 'flex', alignItems: 'center', gap: 8 }}>
+                Annuel
+                <span style={{ fontSize: 10, fontWeight: 700, background: 'linear-gradient(90deg,#22d3ee,#818cf8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', border: '1px solid rgba(34,211,238,0.3)', padding: '1px 7px', borderRadius: 99 }}>
+                  Économise
+                </span>
+              </button>
+            </div>
+          </div>
+        </FadeIn>
+
+        {/* Plan cards */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16, marginBottom: 80 }}>
+          {PLANS.map((p, i) => (
+            <FadeIn key={p.name} delay={i * 0.08}>
+              <div
+                style={{
+                  position: 'relative',
+                  background: p.popular ? '#0d0b1e' : p.bestValue ? '#0c100a' : '#0b0b15',
+                  borderRadius: 18,
+                  border: p.popular ? '1.5px solid rgba(124,58,237,0.45)' : p.bestValue ? '1.5px solid rgba(245,158,11,0.45)' : '1px solid rgba(255,255,255,0.08)',
+                  display: 'flex', flexDirection: 'column',
+                  overflow: 'hidden',
+                  boxShadow: p.popular ? '0 0 60px rgba(124,58,237,0.14),0 20px 60px rgba(0,0,0,0.6)' : p.bestValue ? '0 0 60px rgba(245,158,11,0.08),0 20px 60px rgba(0,0,0,0.6)' : '0 20px 60px rgba(0,0,0,0.4)',
+                  transition: 'transform 0.2s',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-6px)' }}
+                onMouseLeave={e => { e.currentTarget.style.transform = '' }}
+              >
+                {p.popular && <div style={{ background: 'linear-gradient(90deg,#4f46e5,#7c3aed)', padding: '7px 0', textAlign: 'center', fontSize: 10, fontWeight: 900, letterSpacing: '0.18em', color: '#fff' }}>MOST POPULAR</div>}
+                {p.bestValue && <div style={{ background: 'linear-gradient(90deg,#d97706,#f59e0b)', padding: '7px 0', textAlign: 'center', fontSize: 10, fontWeight: 900, letterSpacing: '0.18em', color: '#fff' }}>BEST VALUE</div>}
+
+                <div style={{ padding: '22px 22px 26px', display: 'flex', flexDirection: 'column', flex: 1 }}>
+                  {/* Icon + name */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
+                    <div style={{ width: 42, height: 42, borderRadius: 12, flexShrink: 0, background: p.popular ? 'rgba(124,58,237,0.15)' : p.bestValue ? 'rgba(245,158,11,0.12)' : 'rgba(59,130,246,0.1)', border: `1px solid ${p.accent}40`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>
+                      {p.icon}
+                    </div>
+                    <div>
+                      <p style={{ fontSize: 17, fontWeight: 800, color: '#F2F0FF', margin: 0, letterSpacing: '-0.02em' }}>{p.name}</p>
+                      <p style={{ fontSize: 12, color: 'rgba(148,163,184,0.45)', margin: 0, marginTop: 1 }}>{p.tagline}</p>
+                    </div>
+                  </div>
+
+                  {/* Credits badge */}
+                  <div style={{ display: 'inline-block', marginBottom: 18, background: `${p.accent}18`, border: `1px solid ${p.accent}30`, borderRadius: 8, padding: '5px 12px' }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: p.creditsColor }}>{p.credits}</span>
+                  </div>
+
+                  {/* Price row */}
+                  <div style={{ marginBottom: 6 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
+                      {yearly && <span style={{ fontSize: 14, color: 'rgba(148,163,184,0.35)', textDecoration: 'line-through' }}>{p.originalMonthly}</span>}
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: 3 }}>
+                        <span style={{ fontSize: 40, fontWeight: 900, color: '#F2F0FF', letterSpacing: '-0.04em', lineHeight: 1 }}>{yearly ? p.yearlyPrice : p.monthlyPrice}</span>
+                        <span style={{ fontSize: 13, color: 'rgba(148,163,184,0.4)' }}>/mo</span>
+                      </div>
+                      {yearly && (
+                        <span style={{ fontSize: 11, fontWeight: 800, padding: '3px 8px', borderRadius: 6, background: p.popular ? 'rgba(124,58,237,0.2)' : p.bestValue ? 'rgba(245,158,11,0.15)' : 'rgba(59,130,246,0.15)', color: p.popular ? '#a78bfa' : p.bestValue ? '#f59e0b' : '#60a5fa', border: `1px solid ${p.accent}25` }}>
+                          {p.discount}
+                        </span>
+                      )}
+                    </div>
+                    {yearly && <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.28)', margin: 0 }}>{p.yearlyBilled}</p>}
+                  </div>
+
+                  {/* Divider */}
+                  <div style={{ height: 1, background: 'rgba(255,255,255,0.07)', margin: '16px 0' }} />
+
+                  {/* Features */}
+                  <ul style={{ listStyle: 'none', margin: '0 0 auto', padding: 0, display: 'flex', flexDirection: 'column', gap: 9 }}>
+                    {p.features.map(f => (
+                      <li key={f.text} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        {f.included ? (
+                          <span style={{ width: 18, height: 18, borderRadius: 5, flexShrink: 0, background: `${p.accent}1a`, border: `1px solid ${p.accent}35`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M1.5 5L4 7.5L8.5 2.5" stroke={p.creditsColor} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                          </span>
+                        ) : (
+                          <span style={{ width: 18, height: 18, borderRadius: 5, flexShrink: 0, background: 'rgba(255,255,255,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><circle cx="4" cy="4" r="2.5" stroke="rgba(148,163,184,0.22)" strokeWidth="1.2"/></svg>
+                          </span>
+                        )}
+                        <span style={{ fontSize: 13, color: f.included ? 'rgba(241,240,247,0.8)' : 'rgba(148,163,184,0.3)', textDecoration: f.included ? 'none' : 'line-through' }}>{f.text}</span>
+                      </li>
+                    ))}
+                  </ul>
+
+                  {/* CTA */}
+                  <div style={{ marginTop: 24 }}>
+                    <a href={TELEGRAM_URL} target="_blank" rel="noreferrer"
+                      style={{ display: 'block', textAlign: 'center', padding: '13px', borderRadius: 12, fontSize: 14, fontWeight: 700, textDecoration: 'none', transition: 'opacity 0.15s, transform 0.15s', ...(p.popular ? { background: 'linear-gradient(130deg,#4f46e5,#7c3aed)', color: '#fff', boxShadow: '0 4px 20px rgba(124,58,237,0.4)' } : p.bestValue ? { background: 'linear-gradient(130deg,#d97706,#f59e0b)', color: '#fff', boxShadow: '0 4px 20px rgba(245,158,11,0.3)' } : { background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', color: '#F2F0FF' }) }}
+                      onMouseEnter={e => { e.currentTarget.style.opacity = '0.85'; e.currentTarget.style.transform = 'translateY(-1px)' }}
+                      onMouseLeave={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.transform = '' }}>
+                      {p.btnLabel}
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </FadeIn>
+          ))}
+        </div>
+
+        {/* ── Credit packs ── */}
+        <FadeIn>
+          <div style={{ textAlign: 'center', marginBottom: 32 }}>
+            <h3 style={{ fontSize: 'clamp(22px,4vw,36px)', fontWeight: 900, letterSpacing: '-0.04em', color: '#F2F0FF', margin: '0 0 8px' }}>Credit Packs</h3>
+            <p style={{ fontSize: 13, color: 'rgba(148,163,184,0.4)', margin: 0 }}>Recharge à tout moment · Les crédits n'expirent jamais.</p>
+          </div>
+        </FadeIn>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14 }}>
+          {CREDIT_PACKS.map((pack, i) => (
+            <FadeIn key={pack.name} delay={i * 0.07}>
+              <div
+                style={{
+                  position: 'relative', background: pack.popular ? '#0d0b1e' : pack.bestValue ? '#0c100a' : '#0c0c18',
+                  borderRadius: 16,
+                  border: pack.popular ? '1.5px solid rgba(124,58,237,0.45)' : pack.bestValue ? '1.5px solid rgba(245,158,11,0.45)' : '1px solid rgba(255,255,255,0.08)',
+                  overflow: 'hidden', display: 'flex', flexDirection: 'column',
+                  transition: 'transform 0.2s',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)' }}
+                onMouseLeave={e => { e.currentTarget.style.transform = '' }}
+              >
+                {pack.popular && <div style={{ background: 'linear-gradient(90deg,#4f46e5,#7c3aed)', padding: '5px 0', textAlign: 'center', fontSize: 9, fontWeight: 900, letterSpacing: '0.18em', color: '#fff' }}>MOST POPULAR</div>}
+                {pack.bestValue && <div style={{ background: 'linear-gradient(90deg,#d97706,#f59e0b)', padding: '5px 0', textAlign: 'center', fontSize: 9, fontWeight: 900, letterSpacing: '0.18em', color: '#fff' }}>BEST VALUE</div>}
+                <div style={{ padding: '24px 18px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', flex: 1 }}>
+                  <div style={{ width: 38, height: 38, borderRadius: 11, marginBottom: 12, background: pack.popular ? 'rgba(124,58,237,0.15)' : pack.bestValue ? 'rgba(245,158,11,0.12)' : 'rgba(139,92,246,0.08)', border: pack.popular ? '1px solid rgba(124,58,237,0.3)' : pack.bestValue ? '1px solid rgba(245,158,11,0.3)' : '1px solid rgba(139,92,246,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                      <path d="M8 1.5l1.6 4.9H15l-4.2 3 1.6 4.9L8 11.3l-4.4 3.1 1.6-4.9L1 6.4h5.4z" fill={pack.popular ? '#a78bfa' : pack.bestValue ? '#f59e0b' : 'rgba(139,92,246,0.55)'}/>
+                    </svg>
+                  </div>
+                  <p style={{ fontSize: 15, fontWeight: 800, color: '#F2F0FF', margin: '0 0 10px', letterSpacing: '-0.02em' }}>{pack.name}</p>
+                  <p style={{ fontSize: 30, fontWeight: 900, color: '#F2F0FF', margin: '0 0 2px', letterSpacing: '-0.03em', lineHeight: 1 }}>{pack.credits}</p>
+                  <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.38)', margin: '0 0 14px' }}>crédits</p>
+                  <p style={{ fontSize: 26, fontWeight: 900, color: '#F2F0FF', margin: '0 0 auto', letterSpacing: '-0.03em' }}>{pack.price}</p>
+                  <a href={TELEGRAM_URL} target="_blank" rel="noreferrer"
+                    style={{ display: 'block', width: '100%', textAlign: 'center', marginTop: 18, padding: '10px', borderRadius: 10, fontSize: 13, fontWeight: 700, textDecoration: 'none', transition: 'opacity 0.15s', ...(pack.popular ? { background: 'linear-gradient(130deg,#4f46e5,#7c3aed)', color: '#fff' } : pack.bestValue ? { background: 'linear-gradient(130deg,#d97706,#f59e0b)', color: '#fff' } : { background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', color: '#F2F0FF' }) }}
+                    onMouseEnter={e => { e.currentTarget.style.opacity = '0.85' }}
+                    onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}>
+                    Acheter
+                  </a>
+                </div>
+              </div>
+            </FadeIn>
+          ))}
+        </div>
+
+        <p style={{ textAlign: 'center', fontSize: 11, color: 'rgba(148,163,184,0.18)', marginTop: 28 }}>
+          Activation via Telegram · Crypto ou virement bancaire · Activation immédiate
+        </p>
+      </div>
+    </section>
+  )
+}
 
 // ── FAQ ───────────────────────────────────────────────────────────────────────
 const QA = [
@@ -1458,117 +1653,8 @@ export function Landing() {
 
       <Divider />
 
-      {/* ── Pricing ───────────────────────────────────────────────────────────── */}
-      <section id="pricing" style={{ position: 'relative', zIndex: 1, padding: '80px 24px' }}>
-        <div style={{ maxWidth: 980, margin: '0 auto' }}>
-          <FadeIn>
-            <div style={{ textAlign: 'center', marginBottom: 48 }}>
-              <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.14em', color: '#a78bfa', margin: '0 0 14px' }}>Tarifs</p>
-              <h2 style={{ fontSize: 'clamp(28px,5vw,50px)', fontWeight: 900, letterSpacing: '-0.04em', margin: '0 0 14px', color: '#F2F0FF' }}>
-                Choisis ton{' '}
-                <span style={{ background: 'linear-gradient(120deg,#a78bfa,#ec4899)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>plan.</span>
-              </h2>
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginTop: 12, padding: '7px 18px', borderRadius: 99, background: 'rgba(251,146,60,0.08)', border: '1px solid rgba(251,146,60,0.25)' }}>
-                <span style={{ fontSize: 14 }}>🔥</span>
-                <span style={{ fontSize: 12, fontWeight: 800, color: '#fb923c' }}>-40% sur Pro & Organisation jusqu'au 1er juillet</span>
-              </div>
-            </div>
-          </FadeIn>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(280px,1fr))', gap: 16 }}>
-            {PLANS.map((p, i) => (
-              <FadeIn key={p.name} delay={i * 0.1}>
-                <div
-                  style={{
-                    position: 'relative',
-                    background: p.popular ? 'rgba(124,58,237,0.06)' : p.bestValue ? 'rgba(52,211,153,0.04)' : '#0b0b15',
-                    borderRadius: 20,
-                    border: p.popular ? '1.5px solid rgba(124,58,237,0.35)' : p.bestValue ? '1.5px solid rgba(52,211,153,0.3)' : '1px solid rgba(255,255,255,0.07)',
-                    display: 'flex', flexDirection: 'column',
-                    boxSizing: 'border-box',
-                    boxShadow: p.popular ? '0 0 60px rgba(124,58,237,0.12)' : p.bestValue ? '0 0 60px rgba(52,211,153,0.08)' : 'none',
-                    overflow: 'hidden',
-                    transition: 'transform 0.2s, box-shadow 0.2s',
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; if (!p.popular && !p.bestValue) e.currentTarget.style.boxShadow = '0 12px 40px rgba(0,0,0,0.5)' }}
-                  onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = p.popular ? '0 0 60px rgba(124,58,237,0.12)' : p.bestValue ? '0 0 60px rgba(52,211,153,0.08)' : 'none' }}
-                >
-                  {/* Badge */}
-                  {(p.popular || p.bestValue) && (
-                    <div style={{ background: p.popular ? 'linear-gradient(90deg,#7c3aed,#a855f7)' : 'linear-gradient(90deg,#059669,#34d399)', padding: '6px 0', textAlign: 'center', fontSize: 10, fontWeight: 900, letterSpacing: '0.15em', color: '#fff' }}>
-                      {p.popular ? 'MOST POPULAR' : 'BEST VALUE'}
-                    </div>
-                  )}
-
-                  <div style={{ padding: '24px 24px 28px' }}>
-                    {/* Plan header */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-                      <div style={{ width: 40, height: 40, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, background: `${p.accent}12`, border: `1px solid ${p.accent}25`, flexShrink: 0 }}>
-                        {p.icon}
-                      </div>
-                      <div>
-                        <p style={{ fontSize: 16, fontWeight: 800, color: '#F2F0FF', margin: 0, letterSpacing: '-0.02em' }}>{p.name}</p>
-                        <p style={{ fontSize: 12, color: 'rgba(148,163,184,0.45)', margin: 0 }}>{p.tagline}</p>
-                      </div>
-                    </div>
-
-                    {/* Credits badge */}
-                    <div style={{ background: `${p.creditsColor}12`, border: `1px solid ${p.creditsColor}25`, borderRadius: 8, padding: '7px 12px', marginBottom: 20, display: 'inline-block' }}>
-                      <span style={{ fontSize: 12, fontWeight: 700, color: p.creditsColor }}>{p.credits}</span>
-                    </div>
-
-                    {/* Price */}
-                    <div style={{ marginBottom: 24 }}>
-                      {p.originalPrice && <div style={{ fontSize: 13, color: 'rgba(148,163,184,0.3)', textDecoration: 'line-through', marginBottom: 2 }}>{p.originalPrice} /mois</div>}
-                      <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
-                        <span style={{ fontSize: 42, fontWeight: 900, color: '#F2F0FF', letterSpacing: '-0.04em', lineHeight: 1 }}>{p.price}</span>
-                        <span style={{ fontSize: 13, color: 'rgba(148,163,184,0.4)' }}>/mois</span>
-                      </div>
-                    </div>
-
-                    {/* Features */}
-                    <ul style={{ listStyle: 'none', margin: '0 0 24px', padding: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
-                      {p.features.map(f => (
-                        <li key={f.text} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13 }}>
-                          {f.included ? (
-                            <span style={{ width: 18, height: 18, borderRadius: 5, background: `${p.accent}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                              <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M1.5 5L4 7.5L8.5 2.5" stroke={p.accent} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                            </span>
-                          ) : (
-                            <span style={{ width: 18, height: 18, borderRadius: 5, background: 'rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                              <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M1 1l6 6M7 1L1 7" stroke="rgba(148,163,184,0.3)" strokeWidth="1.5" strokeLinecap="round"/></svg>
-                            </span>
-                          )}
-                          <span style={{ color: f.included ? 'rgba(241,240,247,0.75)' : 'rgba(148,163,184,0.3)', textDecoration: f.included ? 'none' : 'line-through' }}>{f.text}</span>
-                        </li>
-                      ))}
-                    </ul>
-
-                    {/* CTA */}
-                    <a href={TELEGRAM_URL} target="_blank" rel="noreferrer"
-                      style={{
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                        padding: '13px', borderRadius: 12, fontSize: 14, fontWeight: 700,
-                        textDecoration: 'none', transition: 'opacity 0.15s, transform 0.15s',
-                        ...(p.popular
-                          ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff', boxShadow: '0 4px 20px rgba(124,58,237,0.35)' }
-                          : p.bestValue
-                          ? { background: 'linear-gradient(130deg,#059669,#34d399)', color: '#fff', boxShadow: '0 4px 20px rgba(52,211,153,0.25)' }
-                          : { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#F2F0FF' }
-                        ),
-                      }}
-                      onMouseEnter={e => { e.currentTarget.style.opacity = '0.85'; e.currentTarget.style.transform = 'translateY(-1px)' }}
-                      onMouseLeave={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.transform = '' }}>
-                      Get Started →
-                    </a>
-                  </div>
-                </div>
-              </FadeIn>
-            ))}
-          </div>
-          <p style={{ textAlign: 'center', fontSize: 12, color: 'rgba(148,163,184,0.22)', marginTop: 28 }}>All plans require activation via Telegram · Crypto or bank transfer · Immediate activation</p>
-        </div>
-      </section>
+      {/* ── Pricing ── */}
+      <PricingSection />
 
       <Divider />
 

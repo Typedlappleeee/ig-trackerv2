@@ -992,22 +992,27 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
               </div>
             )}
 
-            {/* Credits button */}
+            {/* Credits chip */}
             {!credits.loading && (
               <button
                 onClick={() => onNavigate('settings', 'abonnement')}
                 style={{
-                  display: 'flex', alignItems: 'center', gap: 5,
-                  padding: '4px 10px', borderRadius: 6,
-                  border: '1px solid rgba(139,92,246,0.2)', background: 'transparent',
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  padding: '5px 12px', borderRadius: 8,
+                  background: credits.balance < 10 ? 'rgba(239,68,68,0.08)' : 'rgba(139,92,246,0.07)',
+                  border: credits.balance < 10 ? '1px solid rgba(239,68,68,0.25)' : '1px solid rgba(139,92,246,0.18)',
                   cursor: 'pointer', transition: 'background 0.15s',
                 }}
-                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.04)' }}
-                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}
+                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = credits.balance < 10 ? 'rgba(239,68,68,0.14)' : 'rgba(139,92,246,0.13)' }}
+                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = credits.balance < 10 ? 'rgba(239,68,68,0.08)' : 'rgba(139,92,246,0.07)' }}
               >
-                <span style={{ fontSize: 12, fontWeight: 700, color: credits.balance < 10 ? '#F87171' : '#A78BFA', fontVariantNumeric: 'tabular-nums' }}>
-                  💎 {credits.balance.toLocaleString('fr-FR')}
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke={credits.balance < 10 ? '#F87171' : '#a78bfa'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                <span style={{ fontSize: 12, fontWeight: 700, color: credits.balance < 10 ? '#F87171' : '#c4b5fd', fontVariantNumeric: 'tabular-nums' }}>
+                  {credits.balance.toLocaleString('fr-FR')}
                 </span>
+                <span style={{ fontSize: 10, color: credits.balance < 10 ? 'rgba(248,113,113,0.5)' : 'rgba(196,181,253,0.45)', fontWeight: 500 }}>cr</span>
               </button>
             )}
 
