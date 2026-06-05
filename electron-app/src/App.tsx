@@ -409,6 +409,103 @@ function BetaPopup({ onClose }: { onClose: () => void }) {
     </div>
   )
 }
+function AiModelPopup({ onClose }: { onClose: () => void }) {
+  const CATS = [
+    { name: 'Cosplay',        emoji: '🦸‍♀️' },
+    { name: 'E-Girl',         emoji: '🎀' },
+    { name: 'Fitness',        emoji: '💪' },
+    { name: 'Girl Next Door', emoji: '🌸' },
+    { name: 'Indoors',        emoji: '🏠' },
+    { name: 'Lifestyle',      emoji: '✨' },
+  ]
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 200,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      background: 'rgba(0,0,0,0.86)', backdropFilter: 'blur(18px)',
+    }}>
+      <div style={{
+        background: 'linear-gradient(145deg, #090815 0%, #0D0B20 100%)',
+        border: '1px solid rgba(139,92,246,0.22)',
+        borderRadius: 24, padding: '34px 30px 26px',
+        width: '100%', maxWidth: 540,
+        boxShadow: '0 40px 80px rgba(0,0,0,0.65), 0 0 0 1px rgba(139,92,246,0.07)',
+        animation: 'anim-scale-in 0.28s cubic-bezier(0.22,1,0.36,1) both',
+      }}>
+        {/* Badge */}
+        <div style={{ textAlign: 'center', marginBottom: 20 }}>
+          <div style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            background: 'rgba(139,92,246,0.13)', border: '1px solid rgba(139,92,246,0.28)',
+            borderRadius: 20, padding: '4px 14px', marginBottom: 14,
+          }}>
+            <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#a78bfa' }}>
+              Bientôt disponible
+            </span>
+          </div>
+          <h2 style={{
+            fontSize: 30, fontWeight: 900, letterSpacing: '-0.03em', margin: '0 0 8px',
+            background: 'linear-gradient(135deg, #e2e8f0 0%, #a78bfa 50%, #ec4899 100%)',
+            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+          }}>
+            Crée ta Modèle IA
+          </h2>
+          <p style={{ fontSize: 13, color: 'rgba(148,163,184,0.65)', lineHeight: 1.55, margin: 0 }}>
+            Génère des photos & vidéos de ta modèle virtuelle<br/>dans n'importe quel style, sans limite.
+          </p>
+        </div>
+
+        {/* Category grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 20 }}>
+          {CATS.map(cat => (
+            <div key={cat.name} style={{
+              borderRadius: 12, padding: '14px 10px', textAlign: 'center',
+              background: 'rgba(139,92,246,0.06)',
+              border: '1px solid rgba(139,92,246,0.11)',
+            }}>
+              <div style={{ fontSize: 22, marginBottom: 5 }}>{cat.emoji}</div>
+              <div style={{ fontSize: 10, fontWeight: 600, color: 'rgba(203,213,225,0.75)', letterSpacing: '0.04em' }}>
+                {cat.name}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Features */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginBottom: 22 }}>
+          {[
+            '🧠  IA entraînée sur ton style unique',
+            '📸  Photos & vidéos illimitées de ta modèle',
+            '🌍  Partage instantané sur tous tes réseaux',
+          ].map(f => (
+            <div key={f} style={{
+              background: 'rgba(139,92,246,0.05)', border: '1px solid rgba(139,92,246,0.1)',
+              borderRadius: 10, padding: '9px 14px',
+              fontSize: 12, color: 'rgba(203,213,225,0.8)',
+            }}>{f}</div>
+          ))}
+        </div>
+
+        <button
+          onClick={onClose}
+          style={{
+            width: '100%', padding: '13px',
+            background: 'linear-gradient(130deg, #7c3aed, #ec4899)',
+            border: 'none', borderRadius: 14,
+            color: '#fff', fontWeight: 700, fontSize: 14,
+            cursor: 'pointer', letterSpacing: '-0.01em',
+            boxShadow: '0 8px 24px rgba(124,58,237,0.35)',
+          }}
+          onMouseEnter={e => ((e.target as HTMLButtonElement).style.opacity = '0.88')}
+          onMouseLeave={e => ((e.target as HTMLButtonElement).style.opacity = '1')}
+        >
+          Super, j'attends ça ! →
+        </button>
+      </div>
+    </div>
+  )
+}
+
 import { LangProvider } from '@/lib/i18n'
 import { initPoller, stopPoller } from '@/lib/phonePoller'
 import { initIgStatsPoller } from '@/lib/igStatsPoller'
@@ -445,6 +542,7 @@ function AppContent({ user }: { user: User }) {
   const [onboarding, setOnboarding]         = useState<boolean | null>(null)
   const [showTour, setShowTour]             = useState(() => !!localStorage.getItem(TOUR_KEY))
   const [showBeta, setShowBeta]             = useState(false)
+  const [showAiModal, setShowAiModal]       = useState(true)
   const [phoneCount, setPhoneCount]         = useState(0)
   const [lastRefresh, setLastRefresh]       = useState<Date | null>(null)
   const [refreshTick, setRefreshTick]       = useState(0)
@@ -680,6 +778,7 @@ function AppContent({ user }: { user: User }) {
   return (
     <LicenseContext.Provider value={license}>
     <CreditContext.Provider value={{ balance: creditBalance, loading: creditLoading, refresh: refreshCredits, setBalance: setCreditBalance, ownerId: creditOwnerId }}>
+      {showAiModal && <AiModelPopup onClose={() => setShowAiModal(false)} />}
       {showBeta && <BetaPopup onClose={dismissBeta} />}
       {showTour && <AppTour onClose={() => { localStorage.removeItem(TOUR_KEY); setShowTour(false) }} onNavigate={p => { setPage(p as Page); }} />}
       <Layout
