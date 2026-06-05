@@ -614,7 +614,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
       {/* ── Sidebar (desktop only) ───────────────────────────────────────── */}
       <aside
         style={{
-          width: collapsed ? 52 : 220,
+          width: collapsed ? 52 : 240,
           flexShrink: 0,
           display: isMobile ? 'none' : 'flex',
           flexDirection: 'column',
