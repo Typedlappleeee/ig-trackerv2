@@ -585,6 +585,8 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
   }
 
   const pageLabels: Record<string, string> = {
+    hub:         t('navHub'),
+    scaleia:     'ScaleIA',
     phones:      t('pagePhones'),
     posting:     t('pagePosting'),
     massposting: t('pageMassPosting'),
