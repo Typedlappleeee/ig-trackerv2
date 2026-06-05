@@ -348,7 +348,7 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
         <BankPicker
           user={user}
           mode="multi"
-          resolveMode="full"
+          resolveMode="signed-url"
           onSelect={(paths, titles) => {
             const newSrcs = paths.map((url, i) => ({ url, name: titles?.[i] ?? 'bank video' }))
             setSources(prev => [...prev, ...newSrcs])
