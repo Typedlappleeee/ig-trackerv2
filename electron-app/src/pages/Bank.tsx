@@ -28,20 +28,28 @@ function nameWithoutExt(p: string): string {
   return dot > 0 ? b.slice(0, dot) : b
 }
 
-// ── Download helper — fetch as blob to bypass cross-origin restrictions ───────
-async function downloadFromUrl(url: string, filename: string) {
-  try {
-    const resp = await fetch(url)
-    const blob = await resp.blob()
-    const blobUrl = URL.createObjectURL(blob)
+// ── Download helper — use Supabase SDK (handles CORS) then blob URL ───────────
+const DOWNLOAD_BUCKET = 'content'
+async function downloadItem(item: ContentItem) {
+  const filename = getDownloadName(item)
+  if (item.storage_path) {
+    const { data, error } = await supabase.storage.from(DOWNLOAD_BUCKET).download(item.storage_path)
+    if (!error && data) {
+      const blobUrl = URL.createObjectURL(data)
+      const a = document.createElement('a')
+      a.href = blobUrl; a.download = filename
+      document.body.appendChild(a); a.click()
+      document.body.removeChild(a)
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 15000)
+      return
+    }
+  }
+  // fallback: file_url (legacy)
+  if (item.file_url) {
     const a = document.createElement('a')
-    a.href = blobUrl; a.download = filename
+    a.href = item.file_url; a.download = filename
     document.body.appendChild(a); a.click()
     document.body.removeChild(a)
-    setTimeout(() => URL.revokeObjectURL(blobUrl), 10000)
-  } catch {
-    // fallback: open in new tab
-    window.open(url, '_blank')
   }
 }
 
@@ -922,9 +930,7 @@ export function Bank({ user }: BankProps) {
                 onClick={async () => {
                   const sel = items.filter(i => selectedIds.has(i.id))
                   for (const it of sel) {
-                    const url = await getSignedUrl(it.storage_path ?? it.file_url)
-                    if (!url) continue
-                    await downloadFromUrl(url, getDownloadName(it))
+                    await downloadItem(it)
                     await new Promise(r => setTimeout(r, 400))
                   }
                 }}
@@ -1167,11 +1173,9 @@ export function Bank({ user }: BankProps) {
               icon: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>,
               label: 'Télécharger',
               action: async () => {
-                setCtxMenu(null)
                 const it = ctxMenu.item
-                const url = await getSignedUrl(it.storage_path ?? it.file_url)
-                if (!url) return
-                await downloadFromUrl(url, getDownloadName(it))
+                setCtxMenu(null)
+                await downloadItem(it)
               }
             },
             ...(ctxMenu.item.file_url && !ctxMenu.item.storage_path ? [{
