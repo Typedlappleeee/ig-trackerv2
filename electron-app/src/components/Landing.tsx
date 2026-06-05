@@ -670,10 +670,10 @@ const PLANS: PlanDef[] = [
 ]
 
 const CREDIT_PACKS = [
-  { name: 'Mini Pack',  credits: '10 000',  price: '25$',   popular: false, bestValue: false },
-  { name: 'Mega Pack',  credits: '30 000',  price: '60$',   popular: true,  bestValue: false },
-  { name: 'Giga Pack',  credits: '80 000',  price: '140$',  popular: false, bestValue: false },
-  { name: 'Ultra Pack', credits: '250 000', price: '300$',  popular: false, bestValue: true  },
+  { name: 'Mini Pack',  credits: '1 000',  price: '19$',   popular: false, bestValue: false },
+  { name: 'Mega Pack',  credits: '5 000',  price: '79$',   popular: true,  bestValue: false },
+  { name: 'Giga Pack',  credits: '15 000', price: '179$',  popular: false, bestValue: false },
+  { name: 'Ultra Pack', credits: '50 000', price: '499$',  popular: false, bestValue: true  },
 ]
 
 // ── Pricing section component (needs local state for toggle) ────────────────
