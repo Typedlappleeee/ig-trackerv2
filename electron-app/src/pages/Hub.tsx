@@ -24,36 +24,32 @@ type ToolDef = {
   labelKey: string
   descKey: string
   icon: keyof typeof ICONS
-  accent: string          // base hue for the card glow
+  accent: string
   badge?: 'NEW' | 'BETA' | 'SOON'
   category: 'instagram' | 'creation' | 'ai' | 'social'
 }
 
 const TOOLS: ToolDef[] = [
-  // Instagram
-  { id: 'phones',      labelKey: 'navPhones',      descKey: 'hubDescPhones',      icon: 'phone',    accent: '139,92,246', category: 'instagram' },
-  { id: 'posting',     labelKey: 'navPosting',     descKey: 'hubDescPosting',     icon: 'send',     accent: '139,92,246', category: 'instagram' },
-  { id: 'massposting', labelKey: 'navMassPosting', descKey: 'hubDescMassPosting', icon: 'zap',      accent: '236,72,153', category: 'instagram' },
-  { id: 'scheduler',   labelKey: 'navScheduler',   descKey: 'hubDescScheduler',   icon: 'calendar', accent: '34,211,238', category: 'instagram' },
-  { id: 'warmup',      labelKey: 'navWarmup',      descKey: 'hubDescWarmup',       icon: 'flame',    accent: '245,158,11', category: 'instagram', badge: 'BETA' },
-  // Creation / Montage
-  { id: 'bank',        labelKey: 'navBank',        descKey: 'hubDescBank',        icon: 'video',    accent: '34,211,238', category: 'creation' },
+  { id: 'phones',      labelKey: 'navPhones',      descKey: 'hubDescPhones',      icon: 'phone',    accent: '139,92,246',  category: 'instagram' },
+  { id: 'posting',     labelKey: 'navPosting',     descKey: 'hubDescPosting',     icon: 'send',     accent: '139,92,246',  category: 'instagram' },
+  { id: 'massposting', labelKey: 'navMassPosting', descKey: 'hubDescMassPosting', icon: 'zap',      accent: '236,72,153',  category: 'instagram' },
+  { id: 'scheduler',   labelKey: 'navScheduler',   descKey: 'hubDescScheduler',   icon: 'calendar', accent: '34,211,238',  category: 'instagram' },
+  { id: 'warmup',      labelKey: 'navWarmup',      descKey: 'hubDescWarmup',      icon: 'flame',    accent: '245,158,11',  category: 'instagram', badge: 'BETA' },
+  { id: 'bank',        labelKey: 'navBank',        descKey: 'hubDescBank',        icon: 'video',    accent: '34,211,238',  category: 'creation' },
   { id: 'remix',       labelKey: 'navRemix',       descKey: 'hubDescRemix',       icon: 'refresh',  accent: '129,140,248', category: 'creation' },
-  { id: 'repurpose',   labelKey: 'navRepurpose',   descKey: 'hubDescRepurpose',   icon: 'zap',      accent: '168,85,247', category: 'creation', badge: 'NEW' },
-  { id: 'mixer',       labelKey: 'navMixer',       descKey: 'hubDescMixer',       icon: 'edit',     accent: '236,72,153', category: 'creation', badge: 'NEW' },
-  // AI
-  { id: 'aitools',     labelKey: 'navAiTools',     descKey: 'hubDescAiTools',     icon: 'sparkles', accent: '168,85,247', category: 'ai' },
-  { id: 'captionbank', labelKey: 'navCaptionBank', descKey: 'hubDescCaptionBank', icon: 'chat',     accent: '139,92,246', category: 'ai' },
-  { id: 'scaleia',     labelKey: 'hubScaleIA',     descKey: 'hubDescScaleIA',     icon: 'sparkles', accent: '168,85,247', category: 'ai', badge: 'SOON' },
-  // Social
-  { id: 'community',   labelKey: 'navCommunity',   descKey: 'hubDescCommunity',   icon: 'chat',     accent: '34,211,238', category: 'social' },
+  { id: 'repurpose',   labelKey: 'navRepurpose',   descKey: 'hubDescRepurpose',   icon: 'zap',      accent: '168,85,247',  category: 'creation', badge: 'NEW' },
+  { id: 'mixer',       labelKey: 'navMixer',       descKey: 'hubDescMixer',       icon: 'edit',     accent: '236,72,153',  category: 'creation', badge: 'NEW' },
+  { id: 'aitools',     labelKey: 'navAiTools',     descKey: 'hubDescAiTools',     icon: 'sparkles', accent: '168,85,247',  category: 'ai' },
+  { id: 'captionbank', labelKey: 'navCaptionBank', descKey: 'hubDescCaptionBank', icon: 'chat',     accent: '139,92,246',  category: 'ai' },
+  { id: 'scaleia',     labelKey: 'hubScaleIA',     descKey: 'hubDescScaleIA',     icon: 'sparkles', accent: '168,85,247',  category: 'ai', badge: 'SOON' },
+  { id: 'community',   labelKey: 'navCommunity',   descKey: 'hubDescCommunity',   icon: 'chat',     accent: '34,211,238',  category: 'social' },
 ]
 
-const CATEGORIES: { id: ToolDef['category']; labelKey: string }[] = [
-  { id: 'instagram', labelKey: 'hubCatInstagram' },
-  { id: 'creation',  labelKey: 'hubCatCreation' },
-  { id: 'ai',        labelKey: 'hubCatAI' },
-  { id: 'social',    labelKey: 'hubCatSocial' },
+const CATEGORIES: { id: ToolDef['category']; labelKey: string; emoji: string }[] = [
+  { id: 'instagram', labelKey: 'hubCatInstagram', emoji: '🚀' },
+  { id: 'creation',  labelKey: 'hubCatCreation',  emoji: '🎬' },
+  { id: 'ai',        labelKey: 'hubCatAI',        emoji: '✨' },
+  { id: 'social',    labelKey: 'hubCatSocial',    emoji: '💬' },
 ]
 
 function badgeStyle(badge: NonNullable<ToolDef['badge']>): React.CSSProperties {
@@ -75,45 +71,46 @@ function ToolCard({ tool, index, onOpen }: { tool: ToolDef; index: number; onOpe
       onClick={() => { playNav(); onOpen() }}
       onMouseEnter={() => { setHover(true); playTick() }}
       onMouseLeave={() => setHover(false)}
-      className="hub-card"
       style={{
         position: 'relative',
         textAlign: 'left',
-        padding: 18,
-        borderRadius: 18,
+        padding: 22,
+        minHeight: 168,
+        display: 'flex',
+        flexDirection: 'column',
+        borderRadius: 20,
         cursor: 'pointer',
         background: hover
-          ? `linear-gradient(150deg, rgba(${a},0.12), rgba(14,14,22,0.9))`
-          : 'linear-gradient(150deg, rgba(255,255,255,0.025), rgba(14,14,22,0.85))',
-        border: `1px solid ${hover ? `rgba(${a},0.4)` : 'rgba(255,255,255,0.07)'}`,
+          ? `linear-gradient(155deg, rgba(${a},0.13), rgba(13,13,20,0.92))`
+          : 'linear-gradient(155deg, rgba(255,255,255,0.028), rgba(13,13,20,0.88))',
+        border: `1px solid ${hover ? `rgba(${a},0.42)` : 'rgba(255,255,255,0.07)'}`,
         boxShadow: hover
-          ? `0 12px 40px -8px rgba(${a},0.35), 0 0 0 1px rgba(${a},0.15)`
-          : '0 2px 12px -4px rgba(0,0,0,0.5)',
-        transform: hover ? 'translateY(-4px)' : 'translateY(0)',
-        transition: 'transform 0.28s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.28s, background 0.28s, border-color 0.28s',
+          ? `0 18px 50px -12px rgba(${a},0.4), 0 0 0 1px rgba(${a},0.15)`
+          : '0 2px 14px -6px rgba(0,0,0,0.5)',
+        transform: hover ? 'translateY(-5px)' : 'translateY(0)',
+        transition: 'transform 0.3s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.3s, background 0.3s, border-color 0.3s',
         overflow: 'hidden',
         animation: `hub-card-in 0.5s cubic-bezier(0.22,1,0.36,1) both`,
-        animationDelay: `${index * 0.035}s`,
+        animationDelay: `${index * 0.04}s`,
       }}
     >
       {/* Corner glow */}
       <div style={{
-        position: 'absolute', top: -40, right: -40, width: 120, height: 120,
-        background: `radial-gradient(circle, rgba(${a},${hover ? 0.3 : 0.12}) 0%, transparent 70%)`,
-        filter: 'blur(12px)', transition: 'all 0.3s', pointerEvents: 'none',
+        position: 'absolute', top: -50, right: -50, width: 150, height: 150,
+        background: `radial-gradient(circle, rgba(${a},${hover ? 0.32 : 0.12}) 0%, transparent 70%)`,
+        filter: 'blur(14px)', transition: 'all 0.3s', pointerEvents: 'none',
       }} />
 
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, marginBottom: 14 }}>
-        {/* Icon tile */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, marginBottom: 16 }}>
         <div style={{
-          width: 46, height: 46, borderRadius: 13, flexShrink: 0,
+          width: 52, height: 52, borderRadius: 15, flexShrink: 0,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: `linear-gradient(135deg, rgba(${a},0.22), rgba(${a},0.06))`,
-          border: `1px solid rgba(${a},0.25)`,
-          transform: hover ? 'scale(1.08) rotate(-4deg)' : 'scale(1)',
-          transition: 'transform 0.3s cubic-bezier(0.34,1.56,0.64,1)',
+          background: `linear-gradient(135deg, rgba(${a},0.24), rgba(${a},0.06))`,
+          border: `1px solid rgba(${a},0.28)`,
+          transform: hover ? 'scale(1.08) rotate(-5deg)' : 'scale(1)',
+          transition: 'transform 0.32s cubic-bezier(0.34,1.56,0.64,1)',
         }}>
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
+          <svg width="25" height="25" viewBox="0 0 24 24" fill="none"
             stroke={`rgb(${a})`} strokeWidth="1.85" strokeLinecap="round" strokeLinejoin="round">
             <path d={ICONS[tool.icon]} />
           </svg>
@@ -122,7 +119,7 @@ function ToolCard({ tool, index, onOpen }: { tool: ToolDef; index: number; onOpe
         {tool.badge && (
           <span style={{
             fontSize: 9, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase',
-            padding: '3px 7px', borderRadius: 5, flexShrink: 0, ...badgeStyle(tool.badge),
+            padding: '3px 8px', borderRadius: 6, flexShrink: 0, ...badgeStyle(tool.badge),
           }}>
             {tool.badge}
           </span>
@@ -130,22 +127,26 @@ function ToolCard({ tool, index, onOpen }: { tool: ToolDef; index: number; onOpe
       </div>
 
       <p style={{
-        fontSize: 14, fontWeight: 700, marginBottom: 5,
+        fontSize: 16, fontWeight: 700, marginBottom: 6,
         color: hover ? '#fff' : '#e8e6f0', transition: 'color 0.2s',
       }}>
         {t(tool.labelKey as any)}
       </p>
-      <p style={{ fontSize: 11.5, lineHeight: 1.55, color: 'rgba(148,163,184,0.62)' }}>
+      <p style={{ fontSize: 12.5, lineHeight: 1.6, color: 'rgba(148,163,184,0.62)', flex: 1 }}>
         {t(tool.descKey as any)}
       </p>
 
-      {/* Arrow hint */}
+      {/* Open hint */}
       <div style={{
-        position: 'absolute', bottom: 16, right: 16,
-        opacity: hover ? 1 : 0, transform: hover ? 'translateX(0)' : 'translateX(-6px)',
-        transition: 'all 0.25s', color: `rgb(${a})`,
+        marginTop: 14, display: 'flex', alignItems: 'center', gap: 6,
+        fontSize: 11.5, fontWeight: 600,
+        color: hover ? `rgb(${a})` : 'rgba(148,163,184,0.4)',
+        transition: 'color 0.25s',
       }}>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+        <span>{t('hubOpen')}</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"
+          strokeLinecap="round" strokeLinejoin="round"
+          style={{ transform: hover ? 'translateX(3px)' : 'translateX(0)', transition: 'transform 0.25s' }}>
           <path d="M5 12h14M13 6l6 6-6 6" />
         </svg>
       </div>
@@ -153,10 +154,31 @@ function ToolCard({ tool, index, onOpen }: { tool: ToolDef; index: number; onOpe
   )
 }
 
+// ── Category section ──────────────────────────────────────────────────────────
+function CategorySection({ emoji, title, tools, baseIndex, onNavigate }: {
+  emoji: string; title: string; tools: ToolDef[]; baseIndex: number; onNavigate: (p: Page) => void
+}) {
+  if (!tools.length) return null
+  return (
+    <section style={{ marginBottom: 40 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+        <span style={{ fontSize: 18 }}>{emoji}</span>
+        <h2 style={{ fontSize: 16, fontWeight: 800, letterSpacing: '-0.01em', color: '#e8e6f0' }}>{title}</h2>
+        <div style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, rgba(255,255,255,0.08), transparent)' }} />
+        <span style={{ fontSize: 11, color: 'rgba(148,163,184,0.4)', fontWeight: 600 }}>{tools.length}</span>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 18 }}>
+        {tools.map((tool, i) => (
+          <ToolCard key={tool.id} tool={tool} index={baseIndex + i} onOpen={() => onNavigate(tool.id)} />
+        ))}
+      </div>
+    </section>
+  )
+}
+
 export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: Page) => void }) {
   const t = useT()
   const [query, setQuery] = useState('')
-  const [activeCat, setActiveCat] = useState<ToolDef['category'] | 'all'>('all')
 
   const firstName = (user.email?.split('@')[0] ?? 'créateur').replace(/[._]/g, ' ')
   const greeting = (() => {
@@ -167,45 +189,41 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
     return t('hubGreetingEvening')
   })()
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    return TOOLS.filter(tool => {
-      if (activeCat !== 'all' && tool.category !== activeCat) return false
-      if (!q) return true
-      return t(tool.labelKey as any).toLowerCase().includes(q) || t(tool.descKey as any).toLowerCase().includes(q)
-    })
-  }, [query, activeCat, t])
+  const q = query.trim().toLowerCase()
+  const matches = (tool: ToolDef) =>
+    !q || t(tool.labelKey as any).toLowerCase().includes(q) || t(tool.descKey as any).toLowerCase().includes(q)
+
+  const searchResults = useMemo(() => TOOLS.filter(matches), [q, t])
 
   return (
-    <div style={{ maxWidth: 1200, margin: '0 auto', padding: '28px 4px 60px', animation: 'page-fade-in 0.4s ease both' }}>
+    <div style={{ minHeight: '100%', padding: '36px 36px 80px' }}>
+      <div style={{ maxWidth: 1180, margin: '0 auto', animation: 'page-fade-in 0.4s ease both' }}>
 
-      {/* ── Hero header ──────────────────────────────────────────────────────── */}
-      <div style={{ position: 'relative', marginBottom: 28 }}>
-        <div style={{
-          position: 'absolute', top: -60, left: '20%', width: 400, height: 160,
-          background: 'radial-gradient(ellipse, rgba(124,58,237,0.16) 0%, transparent 70%)',
-          filter: 'blur(40px)', pointerEvents: 'none',
-        }} />
-        <p style={{ fontSize: 13, color: 'rgba(167,139,250,0.75)', fontWeight: 600, letterSpacing: '0.02em', marginBottom: 6 }}>
-          {greeting}
-        </p>
-        <h1 style={{ fontSize: 34, fontWeight: 900, letterSpacing: '-0.03em', lineHeight: 1.05, marginBottom: 10, textTransform: 'capitalize' }}>
-          <span style={{ background: 'linear-gradient(120deg,#f2f0ff,#c4b5fd 60%,#67e8f9)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-            {firstName}
-          </span>
-        </h1>
-        <p style={{ fontSize: 14, color: 'rgba(148,163,184,0.6)', maxWidth: 540, lineHeight: 1.5 }}>
-          {t('hubSubtitle')}
-        </p>
-      </div>
+        {/* ── Hero ──────────────────────────────────────────────────────────── */}
+        <div style={{ position: 'relative', marginBottom: 36 }}>
+          <div style={{
+            position: 'absolute', top: -80, left: '10%', width: 460, height: 200,
+            background: 'radial-gradient(ellipse, rgba(124,58,237,0.18) 0%, transparent 70%)',
+            filter: 'blur(50px)', pointerEvents: 'none',
+          }} />
+          <p style={{ fontSize: 14, color: 'rgba(167,139,250,0.75)', fontWeight: 600, marginBottom: 8 }}>
+            {greeting}
+          </p>
+          <h1 style={{ fontSize: 42, fontWeight: 900, letterSpacing: '-0.035em', lineHeight: 1.05, marginBottom: 14, textTransform: 'capitalize' }}>
+            <span style={{ background: 'linear-gradient(120deg,#f2f0ff,#c4b5fd 55%,#67e8f9)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+              {firstName}
+            </span>
+          </h1>
+          <p style={{ fontSize: 15.5, color: 'rgba(148,163,184,0.62)', maxWidth: 580, lineHeight: 1.55 }}>
+            {t('hubSubtitle')}
+          </p>
+        </div>
 
-      {/* ── Search + categories ──────────────────────────────────────────────── */}
-      <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 22, flexWrap: 'wrap' }}>
-        {/* Search */}
-        <div style={{ position: 'relative', flex: '1 1 240px', minWidth: 220, maxWidth: 360 }}>
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="rgba(148,163,184,0.5)" strokeWidth="2"
+        {/* ── Search ────────────────────────────────────────────────────────── */}
+        <div style={{ position: 'relative', maxWidth: 440, marginBottom: 40 }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(148,163,184,0.5)" strokeWidth="2"
             strokeLinecap="round" strokeLinejoin="round"
-            style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)' }}>
+            style={{ position: 'absolute', left: 15, top: '50%', transform: 'translateY(-50%)' }}>
             <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
           </svg>
           <input
@@ -213,8 +231,8 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
             onChange={e => setQuery(e.target.value)}
             placeholder={t('hubSearchPlaceholder')}
             style={{
-              width: '100%', height: 40, paddingLeft: 38, paddingRight: 14,
-              borderRadius: 11, fontSize: 13,
+              width: '100%', height: 46, paddingLeft: 44, paddingRight: 16,
+              borderRadius: 13, fontSize: 14,
               background: 'rgba(14,14,22,0.8)', border: '1px solid rgba(255,255,255,0.08)',
               color: '#e8e6f0', outline: 'none', transition: 'border-color 0.2s, box-shadow 0.2s',
             }}
@@ -223,43 +241,37 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
           />
         </div>
 
-        {/* Category chips */}
-        <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
-          {(['all', ...CATEGORIES.map(c => c.id)] as const).map(catId => {
-            const active = activeCat === catId
-            const label = catId === 'all' ? t('hubCatAll') : t(CATEGORIES.find(c => c.id === catId)!.labelKey as any)
+        {/* ── Tools ─────────────────────────────────────────────────────────── */}
+        {q ? (
+          searchResults.length > 0 ? (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 18 }}>
+              {searchResults.map((tool, i) => (
+                <ToolCard key={tool.id} tool={tool} index={i} onOpen={() => onNavigate(tool.id)} />
+              ))}
+            </div>
+          ) : (
+            <div style={{ textAlign: 'center', padding: '80px 0', color: 'rgba(148,163,184,0.5)' }}>
+              <p style={{ fontSize: 32, marginBottom: 12 }}>🔍</p>
+              <p style={{ fontSize: 15 }}>{t('hubNoResults')}</p>
+            </div>
+          )
+        ) : (
+          CATEGORIES.map((cat, ci) => {
+            const tools = TOOLS.filter(tl => tl.category === cat.id)
+            const baseIndex = TOOLS.filter(tl => CATEGORIES.findIndex(c => c.id === tl.category) < ci).length
             return (
-              <button
-                key={catId}
-                onClick={() => { playTick(); setActiveCat(catId as any) }}
-                style={{
-                  fontSize: 12, fontWeight: 600, padding: '8px 14px', borderRadius: 100, cursor: 'pointer',
-                  background: active ? 'rgba(139,92,246,0.18)' : 'rgba(255,255,255,0.03)',
-                  border: `1px solid ${active ? 'rgba(139,92,246,0.4)' : 'rgba(255,255,255,0.07)'}`,
-                  color: active ? '#c4b5fd' : 'rgba(148,163,184,0.6)',
-                  transition: 'all 0.18s',
-                }}
-              >
-                {label}
-              </button>
+              <CategorySection
+                key={cat.id}
+                emoji={cat.emoji}
+                title={t(cat.labelKey as any)}
+                tools={tools}
+                baseIndex={baseIndex}
+                onNavigate={onNavigate}
+              />
             )
-          })}
-        </div>
+          })
+        )}
       </div>
-
-      {/* ── Tools grid ───────────────────────────────────────────────────────── */}
-      {filtered.length > 0 ? (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(248px, 1fr))', gap: 14 }}>
-          {filtered.map((tool, i) => (
-            <ToolCard key={tool.id} tool={tool} index={i} onOpen={() => onNavigate(tool.id)} />
-          ))}
-        </div>
-      ) : (
-        <div style={{ textAlign: 'center', padding: '60px 0', color: 'rgba(148,163,184,0.5)' }}>
-          <p style={{ fontSize: 28, marginBottom: 8 }}>🔍</p>
-          <p style={{ fontSize: 14 }}>{t('hubNoResults')}</p>
-        </div>
-      )}
     </div>
   )
 }
