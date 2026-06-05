@@ -566,6 +566,7 @@ import { Licences }          from '@/pages/Licences'
 import { Support }           from '@/pages/Support'
 import { Community }         from '@/pages/Community'
 import ScaleIA               from '@/pages/ScaleIA'
+import Hub                   from '@/pages/Hub'
 import { FullPageLoader }    from '@/components/ui/Spinner'
 import { Landing }           from '@/components/Landing'
 import { AppTour }           from '@/components/AppTour'
@@ -576,7 +577,7 @@ const TOUR_KEY  = 'scaleflow-show-tour'
 function AppContent({ user }: { user: User }) {
   const { currentOrg, myOrgs, loading: orgLoading, loadError: orgLoadError } = useOrg()
   const conns = useConnections(user)
-  const [page, setPage]                     = useState<Page>('community')
+  const [page, setPage]                     = useState<Page>('hub')
   const [settingsPanel, setSettingsPanel]   = useState<string | undefined>(undefined)
   const [onboarding, setOnboarding]         = useState<boolean | null>(null)
   const [showTour, setShowTour]             = useState(() => !!localStorage.getItem(TOUR_KEY))
@@ -587,6 +588,24 @@ function AppContent({ user }: { user: User }) {
   const [license, setLicense]               = useState<LicenseStatus | null>(null)
   const [creditBalance, setCreditBalance]   = useState(0)
   const [creditLoading, setCreditLoading]   = useState(true)
+
+  // Global click ripple — a tiny purple/cyan burst at every pointer click.
+  // Fully non-invasive: spawns a fixed overlay div that animates and self-removes.
+  useEffect(() => {
+    const onClick = (e: PointerEvent) => {
+      // Skip when clicking inside inputs/textareas (typing, not "actioning")
+      const tgt = e.target as HTMLElement | null
+      if (tgt && (tgt.closest('input, textarea, [contenteditable="true"]'))) return
+      const r = document.createElement('div')
+      r.className = 'sf-ripple'
+      r.style.left = `${e.clientX}px`
+      r.style.top  = `${e.clientY}px`
+      document.body.appendChild(r)
+      setTimeout(() => r.remove(), 550)
+    }
+    window.addEventListener('pointerdown', onClick)
+    return () => window.removeEventListener('pointerdown', onClick)
+  }, [])
 
   // Onboarding gate: only shown once per account, never again — even if the
   // user skipped without entering a bearer. We mark completion via
@@ -807,6 +826,7 @@ function AppContent({ user }: { user: User }) {
       case 'aitools':      return <AiTools     user={user} />
       case 'settings':     return <Settings    user={user} initialPanel={settingsPanel as any} onNavigate={(p) => setPage(p as any)} />
       case 'community':    return <Community    user={user} onNavigate={handleNavigate} />
+      case 'hub':          return <Hub          user={user} onNavigate={handleNavigate} />
       case 'scaleia':      return <ScaleIA />
       case 'support':      return <Support      user={user} />
       case 'licences':     return <Licences    user={user} />

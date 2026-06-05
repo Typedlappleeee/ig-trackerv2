@@ -53,6 +53,7 @@ function SFLogo({ size = 28 }: { size?: number }) {
 }
 
 export type Page =
+  | 'hub'
   | 'phones'
   | 'posting' | 'massposting' | 'scheduler' | 'bank' | 'captionbank' | 'aitools' | 'warmup'
   | 'montage' | 'remix' | 'repurpose' | 'mixer'
@@ -135,6 +136,7 @@ const ICONS = {
   chevronDown:  'M19 9l-7 7-7-7',
   chevronRight: 'M9 18l6-6-6-6',
   menu:         'M4 6h16M4 12h16M4 18h7',
+  grid:         'M4 5a1 1 0 0 1 1-1h5v6H4V5zm10-1h5a1 1 0 0 1 1 1v5h-6V4zM4 14h6v6H5a1 1 0 0 1-1-1v-5zm10 0h6v5a1 1 0 0 1-1 1h-5v-6z',
 } as const
 
 type IconKey = keyof typeof ICONS
@@ -414,7 +416,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
 
   const isVisibleTab = (id: Page): boolean => {
     if (id === 'licences')  return license.isSuperAdmin
-    if (id === 'support' || id === 'community' || id === 'scaleia') return true
+    if (id === 'support' || id === 'community' || id === 'scaleia' || id === 'hub') return true
     return role ? canSeeTab(role, perms, id as import('@/lib/supabase').PageKey) : true
   }
 
@@ -671,6 +673,30 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
 
         {/* ── Nav ───────────────────────────────────────────────────────── */}
         <nav style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '0 6px 8px' }}>
+
+          {/* Hub — home, pinned at top */}
+          <button
+            onClick={() => { playNav(); onNavigate('hub') }}
+            title={collapsed ? t('navHub') : undefined}
+            style={{
+              display: 'flex', alignItems: 'center', gap: collapsed ? 0 : 9,
+              width: '100%', height: 36, padding: '0 10px', borderRadius: 10,
+              fontSize: 13, fontWeight: page === 'hub' ? 600 : 400, textAlign: 'left',
+              cursor: 'pointer', border: 'none',
+              background: page === 'hub' ? 'rgba(255,255,255,0.09)' : 'transparent',
+              color: page === 'hub' ? '#ffffff' : 'rgba(148,163,184,0.58)',
+              transition: 'background 0.15s, color 0.15s',
+              justifyContent: collapsed ? 'center' : 'flex-start',
+              marginBottom: 2,
+            }}
+            onMouseEnter={e => { if (page !== 'hub') (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.05)' }}
+            onMouseLeave={e => { if (page !== 'hub') (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}
+          >
+            <span style={{ flexShrink: 0, color: page === 'hub' ? 'rgba(255,255,255,0.9)' : 'rgba(148,163,184,0.42)', display: 'flex' }}>
+              <NavIcon d={ICONS.grid} size={16} />
+            </span>
+            {!collapsed && <span style={{ flex: 1 }}>{t('navHub')}</span>}
+          </button>
 
           {/* Community — pinned */}
           {isVisibleTab('community') && (
