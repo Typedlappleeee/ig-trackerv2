@@ -34,6 +34,7 @@ const TOOLS: ToolDef[] = [
   { id: 'posting',     labelKey: 'navPosting',     descKey: 'hubDescPosting',     icon: 'send',     accent: '139,92,246',  category: 'instagram' },
   { id: 'massposting', labelKey: 'navMassPosting', descKey: 'hubDescMassPosting', icon: 'zap',      accent: '236,72,153',  category: 'instagram' },
   { id: 'scheduler',   labelKey: 'navScheduler',   descKey: 'hubDescScheduler',   icon: 'calendar', accent: '34,211,238',  category: 'instagram' },
+  { id: 'storylink',   labelKey: 'navStoryLink',   descKey: 'hubDescStoryLink',   icon: 'send',     accent: '236,72,153',  category: 'instagram', badge: 'NEW' },
   { id: 'warmup',      labelKey: 'navWarmup',      descKey: 'hubDescWarmup',      icon: 'flame',    accent: '245,158,11',  category: 'instagram', badge: 'BETA' },
   { id: 'bank',        labelKey: 'navBank',        descKey: 'hubDescBank',        icon: 'video',    accent: '34,211,238',  category: 'creation' },
   { id: 'remix',       labelKey: 'navRemix',       descKey: 'hubDescRemix',       icon: 'refresh',  accent: '129,140,248', category: 'creation' },

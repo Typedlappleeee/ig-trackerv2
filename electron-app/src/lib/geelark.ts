@@ -771,6 +771,216 @@ export async function updateInstagramProfile(
   log('✅ Toutes les modifications terminées !')
 }
 
+// ── Instagram Story with link sticker (ADB UI automation) ────────────────────
+// GéeLark has no native story endpoint, so we drive the Instagram app directly
+// via UIAutomator: download the image to the phone gallery, open the story
+// camera, pick the image, add a "Link" sticker with the chosen URL + label,
+// drag it to the bottom-right, then publish to "Your story".
+//
+// This relies on Instagram's UI and is inherently fragile across IG versions —
+// every step has a resource-id/text lookup with a coordinate fallback, and the
+// log() callback narrates each action so the flow can be tuned when IG changes.
+export interface StoryConfig {
+  imageUrl: string            // public/signed URL of the image to post
+  linkUrl:  string            // destination URL for the link sticker
+  linkText?: string           // optional custom label shown on the sticker
+}
+
+export async function postInstagramStory(
+  bearer: string,
+  phoneId: string,
+  config: StoryConfig,
+  log: (m: string) => void,
+): Promise<{ ok: boolean; error?: string }> {
+  const ready = await ensurePhoneRunning(bearer, phoneId, log)
+  if (!ready) throw new Error('Téléphone non démarré')
+
+  // ── Wake + unlock ──────────────────────────────────────────────────────────
+  log('📱 Réveil écran…')
+  await shellExec(bearer, phoneId, 'input keyevent 224')
+  await sleep(800)
+  await shellExec(bearer, phoneId, 'input swipe 540 1700 540 800 400')
+  await sleep(1200)
+
+  // ── Screen size ────────────────────────────────────────────────────────────
+  const { output: sizeOut } = await shellExec(bearer, phoneId, 'wm size')
+  const sm = sizeOut.match(/(\d+)x(\d+)/)
+  const sw = sm ? parseInt(sm[1]) : 1080
+  const sh = sm ? parseInt(sm[2]) : 2340
+  const cx = Math.floor(sw / 2)
+  log(`📐 Écran: ${sw}x${sh}`)
+
+  // ── 1. Download image into the phone gallery ───────────────────────────────
+  log('🖼 Téléchargement de l\'image…')
+  const imgPath = '/sdcard/DCIM/Camera/sf_story.jpg'
+  const dl = await shellExec(bearer, phoneId,
+    `curl -s -L --max-time 40 -o ${imgPath} "${config.imageUrl}" && echo DONE`)
+  if (!/DONE/.test(dl.output)) {
+    log('   ⚠️ curl image: sortie inattendue → on continue quand même')
+  }
+  await shellExec(bearer, phoneId,
+    `am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file://${imgPath}`)
+  await sleep(2000)
+
+  // ── 2. Open Instagram + the story camera ───────────────────────────────────
+  log('📲 Lancement Instagram…')
+  await shellExec(bearer, phoneId, 'am force-stop com.instagram.android')
+  await sleep(1200)
+  // Direct story-camera deep link (works on most IG builds); falls back to the
+  // home feed + swipe-right gesture if the activity is rejected.
+  const camStart = await shellExec(bearer, phoneId,
+    'am start -a android.intent.action.MAIN -c android.intent.category.LAUNCHER ' +
+    '-n com.instagram.android/com.instagram.android.activity.MainTabActivity')
+  void camStart
+  await sleep(7000)
+
+  let xml = await dumpXml(bearer, phoneId)
+
+  // Try to reach the story camera: tap the "+" / story creation entry, else
+  // swipe right on the feed (classic gesture that opens the camera).
+  log('🎬 Ouverture de la caméra story…')
+  const storyEntry =
+    findByResourceId(xml, 'feed_tab_avatar_plus', 'tab_story_camera', 'camera_tab', 'creation_tab') ??
+    findByText(xml, 'Your story', 'Votre story', 'Add to story', 'Ajouter à la story')
+  if (storyEntry) {
+    await shellExec(bearer, phoneId, `input tap ${storyEntry[0]} ${storyEntry[1]}`)
+  } else {
+    // Swipe right from far-left edge to open the camera
+    await shellExec(bearer, phoneId, `input swipe ${Math.floor(sw * 0.05)} ${Math.floor(sh * 0.5)} ${Math.floor(sw * 0.95)} ${Math.floor(sh * 0.5)} 300`)
+  }
+  await sleep(4000)
+
+  // ── 3. Pick the uploaded image from the gallery ────────────────────────────
+  log('🖼 Sélection de l\'image dans la galerie…')
+  xml = await dumpXml(bearer, phoneId)
+  const galleryBtn =
+    findByResourceId(xml, 'gallery_button', 'camera_gallery', 'gallery_thumbnail', 'media_thumbnail_tray') ??
+    findByText(xml, 'Gallery', 'Galerie')
+  if (galleryBtn) {
+    await shellExec(bearer, phoneId, `input tap ${galleryBtn[0]} ${galleryBtn[1]}`)
+  } else {
+    // Gallery thumbnail sits bottom-left of the capture button
+    await shellExec(bearer, phoneId, `input tap ${Math.floor(sw * 0.13)} ${Math.floor(sh * 0.88)}`)
+  }
+  await sleep(2500)
+
+  // Tap the first (most-recent) gallery image — the one we just downloaded.
+  xml = await dumpXml(bearer, phoneId)
+  const firstThumb =
+    findByResourceId(xml, 'gallery_grid_item', 'media_picker_grid_item') ??
+    [Math.floor(sw * 0.17), Math.floor(sh * 0.28)] as [number, number]
+  await shellExec(bearer, phoneId, `input tap ${firstThumb[0]} ${firstThumb[1]}`)
+  await sleep(3500)
+
+  // ── 4. Open the sticker tray and choose the Link sticker ───────────────────
+  log('🔗 Ajout du sticker lien…')
+  xml = await dumpXml(bearer, phoneId)
+  const stickerBtn =
+    findByResourceId(xml, 'sticker_button', 'sticker_tray_button', 'asset_button') ??
+    findByText(xml, 'Sticker', 'Autocollant', 'Stickers')
+  if (stickerBtn) {
+    await shellExec(bearer, phoneId, `input tap ${stickerBtn[0]} ${stickerBtn[1]}`)
+  } else {
+    // Sticker icon lives in the top-right toolbar
+    await shellExec(bearer, phoneId, `input tap ${Math.floor(sw * 0.78)} ${Math.floor(sh * 0.06)}`)
+  }
+  await sleep(2500)
+
+  xml = await dumpXml(bearer, phoneId)
+  const linkSticker =
+    findByText(xml, 'Link', 'Lien', 'LINK', 'LIEN') ??
+    findByResourceId(xml, 'link_sticker', 'sticker_link')
+  if (linkSticker) {
+    await shellExec(bearer, phoneId, `input tap ${linkSticker[0]} ${linkSticker[1]}`)
+  } else {
+    // Search the sticker tray for "link" if a search field exists
+    const searchPt = findByResourceId(xml, 'search_bar', 'sticker_search') ?? findByText(xml, 'Search', 'Rechercher')
+    if (searchPt) {
+      await shellExec(bearer, phoneId, `input tap ${searchPt[0]} ${searchPt[1]}`)
+      await sleep(900)
+      await shellExec(bearer, phoneId, `input text "link"`)
+      await sleep(1500)
+      const xml2 = await dumpXml(bearer, phoneId)
+      const lk2 = findByText(xml2, 'Link', 'Lien')
+      if (lk2) await shellExec(bearer, phoneId, `input tap ${lk2[0]} ${lk2[1]}`)
+      else { log('   ❌ Sticker lien introuvable'); return { ok: false, error: 'Sticker lien introuvable' } }
+    } else {
+      log('   ❌ Sticker lien introuvable'); return { ok: false, error: 'Sticker lien introuvable' }
+    }
+  }
+  await sleep(2500)
+
+  // ── 5. Type the URL (+ optional custom label) ──────────────────────────────
+  log('⌨️  Saisie de l\'URL…')
+  xml = await dumpXml(bearer, phoneId)
+  const urlField =
+    findByResourceId(xml, 'link_url', 'url_edit_text', 'web_url', 'link_edit_text') ??
+    findByText(xml, 'URL', 'https://') ??
+    [cx, Math.floor(sh * 0.32)] as [number, number]
+  await shellExec(bearer, phoneId, `input tap ${urlField[0]} ${urlField[1]}`)
+  await sleep(900)
+  await shellExec(bearer, phoneId, `input text "${escapeForInputText(config.linkUrl)}"`)
+  await sleep(1200)
+
+  // Optional custom sticker text
+  if (config.linkText?.trim()) {
+    xml = await dumpXml(bearer, phoneId)
+    const customPt =
+      findByText(xml, 'Customize sticker text', 'Personnaliser le texte', 'Sticker text', 'Texte du sticker') ??
+      findByResourceId(xml, 'customize_sticker_text', 'link_sticker_text', 'sticker_text_edit')
+    if (customPt) {
+      await shellExec(bearer, phoneId, `input tap ${customPt[0]} ${customPt[1]}`)
+      await sleep(900)
+      await shellExec(bearer, phoneId, `input text "${escapeForInputText(config.linkText.trim())}"`)
+      await sleep(1000)
+    }
+  }
+
+  // Confirm the link (Done / Terminé / checkmark in top-right)
+  xml = await dumpXml(bearer, phoneId)
+  const donePt =
+    findByText(xml, 'Done', 'Terminé', 'OK') ??
+    findByResourceId(xml, 'done_button', 'action_done', 'confirm_button')
+  if (donePt) {
+    await shellExec(bearer, phoneId, `input tap ${donePt[0]} ${donePt[1]}`)
+  } else {
+    await shellExec(bearer, phoneId, `input tap ${Math.floor(sw * 0.9)} ${Math.floor(sh * 0.06)}`)
+  }
+  await sleep(2500)
+
+  // ── 6. Drag the link sticker to the bottom-right ───────────────────────────
+  log('↘️  Positionnement du sticker en bas à droite…')
+  // The sticker appears roughly centered after confirmation; drag it down-right.
+  await shellExec(bearer, phoneId,
+    `input swipe ${cx} ${Math.floor(sh * 0.5)} ${Math.floor(sw * 0.8)} ${Math.floor(sh * 0.82)} 700`)
+  await sleep(1500)
+
+  // ── 7. Publish to "Your story" ─────────────────────────────────────────────
+  log('🚀 Publication de la story…')
+  xml = await dumpXml(bearer, phoneId)
+  const sharePt =
+    findByText(xml, 'Your story', 'Votre story', 'Share', 'Partager', 'Add to story', 'Ajouter à la story') ??
+    findByResourceId(xml, 'share_story_button', 'your_story_button', 'send_button')
+  if (sharePt) {
+    await shellExec(bearer, phoneId, `input tap ${sharePt[0]} ${sharePt[1]}`)
+  } else {
+    // "Your story" button sits bottom-left of the share screen
+    await shellExec(bearer, phoneId, `input tap ${Math.floor(sw * 0.2)} ${Math.floor(sh * 0.93)}`)
+  }
+  await sleep(5000)
+
+  // ── Verify we left the editor (best-effort) ────────────────────────────────
+  const finalXml = (await dumpXml(bearer, phoneId)).toLowerCase()
+  const stillEditing = /sticker_button|done_button|link_url|your story|votre story/.test(finalXml)
+  if (stillEditing) {
+    log('   ⚠️ L\'éditeur semble encore ouvert — vérifie manuellement.')
+    return { ok: false, error: 'Publication non confirmée (UI Instagram a peut-être changé)' }
+  }
+
+  log('✅ Story publiée !')
+  return { ok: true }
+}
+
 // ── Warmup actions (browse / like / reels / follow) ──────────────────────────
 async function runWarmupActions(
   bearer: string,

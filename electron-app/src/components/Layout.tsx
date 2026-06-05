@@ -55,7 +55,7 @@ function SFLogo({ size = 28 }: { size?: number }) {
 export type Page =
   | 'hub'
   | 'phones'
-  | 'posting' | 'massposting' | 'scheduler' | 'bank' | 'captionbank' | 'aitools' | 'warmup'
+  | 'posting' | 'massposting' | 'scheduler' | 'bank' | 'captionbank' | 'aitools' | 'warmup' | 'storylink'
   | 'montage' | 'remix' | 'repurpose' | 'mixer'
   | 'community' | 'support'
   | 'settings' | 'licences'
@@ -89,6 +89,7 @@ const NAV_SECTIONS: NavSection[] = [
       { id: 'posting',     label: 'navPosting',      icon: '🚀' },
       { id: 'massposting', label: 'navMassPosting',  icon: '⚡' },
       { id: 'scheduler',   label: 'navScheduler',    icon: '📅' },
+      { id: 'storylink',   label: 'navStoryLink',    icon: '🔗', isNew: true },
       { id: 'bank',        label: 'navBank',         icon: '🗂' },
       { id: 'captionbank', label: 'navCaptionBank',  icon: '💬' },
       { id: 'warmup',      label: 'navWarmup',       icon: '🔥', beta: true },
@@ -148,6 +149,7 @@ const PAGE_ICON: Record<string, IconKey> = {
   posting:     'send',
   massposting: 'zap',
   scheduler:   'calendar',
+  storylink:   'send',
   bank:        'video',
   captionbank: 'chat',
   warmup:      'flame',
@@ -591,6 +593,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
     posting:     t('pagePosting'),
     massposting: t('pageMassPosting'),
     scheduler:   t('pageScheduler'),
+    storylink:   t('navStoryLink'),
     bank:        t('pageBank'),
     captionbank: t('navCaptionBank'),
     aitools:     t('pageAiTools'),
