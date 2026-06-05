@@ -505,15 +505,16 @@ export async function updateInstagramProfile(
   await sleep(8000)
 
   // ── Profile tab ───────────────────────────────────────────────────────────
+  // New IG UI has 4 bottom tabs (no "+" in the bar) → Profile is at ~87.5% width
   let xml = await dumpXml(bearer, phoneId)
   const profileTabPt =
     findByText(xml, 'Profile', 'Profil') ??
     findByResourceId(xml, 'profile_tab', 'tab_avatar', 'navigation_profile',
-      'ig_bottom_bar_profile', 'tabIcon5', 'tab_icon_profile')
+      'ig_bottom_bar_profile', 'tabIcon5', 'tab_icon_profile', 'tab_icon_4')
   if (profileTabPt) {
     await shellExec(bearer, phoneId, `input tap ${profileTabPt[0]} ${profileTabPt[1]}`)
   } else {
-    await shellExec(bearer, phoneId, `input tap ${Math.floor(sw * 0.92)} ${Math.floor(sh * 0.965)}`)
+    await shellExec(bearer, phoneId, `input tap ${Math.floor(sw * 0.875)} ${Math.floor(sh * 0.965)}`)
   }
   await sleep(4000)
 
@@ -723,11 +724,11 @@ export async function updateInstagramProfile(
     const profTab2 =
       findByText(xml, 'Profile', 'Profil') ??
       findByResourceId(xml, 'profile_tab', 'tab_avatar', 'navigation_profile',
-        'ig_bottom_bar_profile', 'tabIcon5')
+        'ig_bottom_bar_profile', 'tabIcon5', 'tab_icon_4')
     if (profTab2) {
       await shellExec(bearer, phoneId, `input tap ${profTab2[0]} ${profTab2[1]}`)
     } else {
-      await shellExec(bearer, phoneId, `input tap ${Math.floor(sw * 0.92)} ${Math.floor(sh * 0.965)}`)
+      await shellExec(bearer, phoneId, `input tap ${Math.floor(sw * 0.875)} ${Math.floor(sh * 0.965)}`)
     }
     await sleep(4000)
 
@@ -1077,9 +1078,14 @@ export async function loginInstagramAccount(
       }
     }
 
+    // New IG UI (≥ mid-2025): "+" moved to top-left header; bottom bar now has 4 tabs.
+    // Keep old resource IDs for older IG versions, add new ones for the updated UI.
     const homeIndicators = [
       'home_tab', 'ig_bottom_bar', 'navigation_bar',
       'reels_tab', 'clips_tab', 'explore_tab',
+      // New IG UI indicators (bottom bar without "+", "+" is now a header button)
+      'creation_button', 'new_post_button', 'header_creation',
+      'for you', 'pour vous',
     ]
     if (homeIndicators.some(p => xmlLower.includes(p))) {
       log('✅ Connexion réussie !')
