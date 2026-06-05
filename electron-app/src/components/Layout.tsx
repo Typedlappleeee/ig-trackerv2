@@ -1000,6 +1000,11 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
 
           {/* Left: page title + breadcrumb */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, flex: 1 }}>
+            <span style={{
+              width: 6, height: 6, borderRadius: '50%', flexShrink: 0, marginRight: 3,
+              background: 'linear-gradient(135deg, #a78bfa, #22d3ee)',
+              boxShadow: '0 0 8px rgba(139,92,246,0.6)',
+            }} />
             <span style={{ fontSize: 13, fontWeight: 600, color: '#F1F0F7', whiteSpace: 'nowrap' }}>
               {pageLabels[page] ?? page}
             </span>
