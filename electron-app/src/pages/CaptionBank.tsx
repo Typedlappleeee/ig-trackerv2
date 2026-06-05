@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { useT } from '@/lib/i18n'
@@ -23,10 +23,10 @@ export interface CaptionItem {
 
 // ── Add / Edit modal ─────────────────────────────────────────────────────────
 function CaptionModal({
-  item, folders, onSave, onClose,
+  item, allFolders, onSave, onClose,
 }: {
   item?: CaptionItem
-  folders: string[]
+  allFolders: string[]
   onSave: (title: string, content: string, folder: string | null, tags: string[]) => void
   onClose: () => void
 }) {
@@ -75,14 +75,14 @@ function CaptionModal({
           <div className="space-y-1">
             <label className="text-xs text-muted">{t('bankFolders')}</label>
             <input
-              list="caption-folders"
+              list="caption-folders-dl"
               className="w-full bg-bg border border-border rounded-lg px-3 py-2 text-sm text-text focus:border-accent focus:outline-none"
               placeholder={t('bankFolderNamePlaceholder')}
               value={folder}
               onChange={e => setFolder(e.target.value)}
             />
-            <datalist id="caption-folders">
-              {folders.map(f => <option key={f} value={f} />)}
+            <datalist id="caption-folders-dl">
+              {allFolders.map(f => <option key={f} value={f} />)}
             </datalist>
           </div>
           <div className="space-y-1">
@@ -109,6 +109,7 @@ function CaptionModal({
 export function CaptionBank({ user }: CaptionBankProps) {
   const t = useT()
   const { currentOrg } = useOrg()
+  const newFolderRef = useRef<HTMLInputElement>(null)
 
   const [items,        setItems]        = useState<CaptionItem[]>([])
   const [loading,      setLoading]      = useState(true)
@@ -120,21 +121,60 @@ export function CaptionBank({ user }: CaptionBankProps) {
   const [deleting,     setDeleting]     = useState(false)
   const [error,        setError]        = useState('')
 
-  const folders = [...new Set(items.map(i => i.folder).filter(Boolean))] as string[]
+  // Persisted empty folders (folders with no captions yet)
+  const [emptyFolders,   setEmptyFolders]   = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem('sf-caption-folders') ?? '[]') } catch { return [] }
+  })
+  const [showNewFolder,  setShowNewFolder]  = useState(false)
+  const [newFolderInput, setNewFolderInput] = useState('')
+  const [hoveredFolder,  setHoveredFolder]  = useState<string | null>(null)
+
+  // Folders derived from items
+  const derivedFolders = [...new Set(items.map(i => i.folder).filter(Boolean))] as string[]
+
+  // All folders = derived + empty ones not yet populated
+  const allFolders = [...new Set([...derivedFolders, ...emptyFolders])].sort()
+
+  // When items change, clean up emptyFolders that now have items
+  useEffect(() => {
+    const occupied = new Set(items.map(i => i.folder).filter(Boolean))
+    const stillEmpty = emptyFolders.filter(f => !occupied.has(f))
+    if (stillEmpty.length !== emptyFolders.length) {
+      setEmptyFolders(stillEmpty)
+      localStorage.setItem('sf-caption-folders', JSON.stringify(stillEmpty))
+    }
+  }, [items])
+
+  const persistEmptyFolders = (next: string[]) => {
+    setEmptyFolders(next)
+    localStorage.setItem('sf-caption-folders', JSON.stringify(next))
+  }
+
+  const addEmptyFolder = (name: string) => {
+    const trimmed = name.trim()
+    if (!trimmed || allFolders.includes(trimmed)) return
+    persistEmptyFolders([...emptyFolders, trimmed])
+    setActiveFolder(trimmed)
+  }
+
+  const removeEmptyFolder = (name: string) => {
+    persistEmptyFolders(emptyFolders.filter(f => f !== name))
+    if (activeFolder === name) setActiveFolder(null)
+  }
+
+  const commitNewFolder = () => {
+    addEmptyFolder(newFolderInput)
+    setNewFolderInput('')
+    setShowNewFolder(false)
+  }
 
   const load = useCallback(async () => {
     setLoading(true)
     setError('')
     try {
-      let q = supabase
-        .from('caption_bank')
-        .select('*')
-        .order('created_at', { ascending: false })
-      if (currentOrg) {
-        q = q.eq('org_id', currentOrg.id)
-      } else {
-        q = q.eq('user_id', user.id).is('org_id', null)
-      }
+      let q = supabase.from('caption_bank').select('*').order('created_at', { ascending: false })
+      if (currentOrg) q = q.eq('org_id', currentOrg.id)
+      else q = q.eq('user_id', user.id).is('org_id', null)
       const { data, error: err } = await q
       if (err) throw err
       setItems(data ?? [])
@@ -155,14 +195,7 @@ export function CaptionBank({ user }: CaptionBankProps) {
         .eq('id', editItem.id)
       if (err) { setError(err.message); return }
     } else {
-      const row: any = {
-        user_id: user.id,
-        org_id: currentOrg?.id ?? null,
-        title: title || content.slice(0, 40),
-        content,
-        folder,
-        tags,
-      }
+      const row: any = { user_id: user.id, org_id: currentOrg?.id ?? null, title: title || content.slice(0, 40), content, folder, tags }
       const { error: err } = await supabase.from('caption_bank').insert(row)
       if (err) { setError(err.message); return }
     }
@@ -174,19 +207,12 @@ export function CaptionBank({ user }: CaptionBankProps) {
     setDeleting(true)
     const { error: err } = await supabase.from('caption_bank').delete().in('id', ids)
     if (err) setError(err.message)
-    else {
-      setSelected(new Set())
-      load()
-    }
+    else { setSelected(new Set()); load() }
     setDeleting(false)
   }
 
   const toggleSelect = (id: string) => {
-    setSelected(prev => {
-      const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
-      return next
-    })
+    setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
   }
 
   const filtered = items.filter(item => {
@@ -198,26 +224,115 @@ export function CaptionBank({ user }: CaptionBankProps) {
 
   return (
     <div className="flex h-full">
-      {/* Sidebar folders */}
-      <aside className="w-44 flex-shrink-0 border-r border-border p-3 space-y-1 overflow-y-auto">
+
+      {/* ── Sidebar ── */}
+      <aside style={{
+        width: 180, flexShrink: 0, borderRight: '1px solid rgba(255,255,255,0.07)',
+        padding: '10px 8px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2,
+      }}>
+        {/* All items */}
         <button
           onClick={() => setActiveFolder(null)}
-          className={`w-full text-left px-2 py-1.5 rounded-lg text-xs transition-colors ${activeFolder === null ? 'bg-accent/10 text-accent font-medium' : 'hover:bg-surface2 text-muted'}`}
+          style={{
+            width: '100%', textAlign: 'left', padding: '6px 10px', borderRadius: 8,
+            border: 'none', cursor: 'pointer', fontSize: 12,
+            background: activeFolder === null ? 'rgba(139,92,246,0.15)' : 'transparent',
+            color: activeFolder === null ? '#c4b5fd' : 'rgba(148,163,184,0.6)',
+            fontWeight: activeFolder === null ? 600 : 400,
+            transition: 'all 0.12s',
+          }}
         >
-          {t('bankAllItems')} ({items.length})
+          💬 Tout ({items.length})
         </button>
-        {folders.map(f => (
-          <button
-            key={f}
-            onClick={() => setActiveFolder(f)}
-            className={`w-full text-left px-2 py-1.5 rounded-lg text-xs transition-colors ${activeFolder === f ? 'bg-accent/10 text-accent font-medium' : 'hover:bg-surface2 text-muted'}`}
-          >
-            {f} ({items.filter(i => i.folder === f).length})
-          </button>
-        ))}
+
+        {/* Folder list */}
+        {allFolders.map(f => {
+          const count = items.filter(i => i.folder === f).length
+          const isActive = activeFolder === f
+          const isEmpty  = count === 0
+
+          return (
+            <div
+              key={f}
+              style={{ position: 'relative', display: 'flex', alignItems: 'center' }}
+              onMouseEnter={() => setHoveredFolder(f)}
+              onMouseLeave={() => setHoveredFolder(null)}
+            >
+              <button
+                onClick={() => setActiveFolder(f)}
+                style={{
+                  flex: 1, textAlign: 'left', padding: '6px 28px 6px 10px', borderRadius: 8,
+                  border: 'none', cursor: 'pointer', fontSize: 12, minWidth: 0,
+                  background: isActive ? 'rgba(139,92,246,0.15)' : 'transparent',
+                  color: isActive ? '#c4b5fd' : isEmpty ? 'rgba(148,163,184,0.35)' : 'rgba(148,163,184,0.6)',
+                  fontWeight: isActive ? 600 : 400,
+                  transition: 'all 0.12s',
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}
+              >
+                📁 {f}{!isEmpty && ` (${count})`}
+              </button>
+
+              {/* Delete button — only on empty folders or on hover */}
+              {hoveredFolder === f && (isEmpty || isActive) && (
+                <button
+                  onClick={e => { e.stopPropagation(); isEmpty ? removeEmptyFolder(f) : undefined }}
+                  title={isEmpty ? 'Supprimer le dossier' : undefined}
+                  style={{
+                    position: 'absolute', right: 4,
+                    background: 'none', border: 'none',
+                    color: isEmpty ? 'rgba(248,113,113,0.7)' : 'rgba(148,163,184,0.3)',
+                    cursor: isEmpty ? 'pointer' : 'default',
+                    fontSize: 14, lineHeight: 1, padding: '2px 3px', borderRadius: 4,
+                  }}
+                >
+                  {isEmpty ? '×' : ''}
+                </button>
+              )}
+            </div>
+          )
+        })}
+
+        {/* New folder input / button */}
+        <div style={{ marginTop: 6 }}>
+          {showNewFolder ? (
+            <input
+              ref={newFolderRef}
+              autoFocus
+              value={newFolderInput}
+              onChange={e => setNewFolderInput(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') commitNewFolder()
+                if (e.key === 'Escape') { setShowNewFolder(false); setNewFolderInput('') }
+              }}
+              onBlur={() => { if (newFolderInput.trim()) commitNewFolder(); else setShowNewFolder(false) }}
+              placeholder="Nom du dossier…"
+              style={{
+                width: '100%', padding: '5px 8px', borderRadius: 7,
+                background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.35)',
+                color: '#e2e8f0', fontSize: 11, outline: 'none',
+                boxSizing: 'border-box',
+              }}
+            />
+          ) : (
+            <button
+              onClick={() => { setShowNewFolder(true); setTimeout(() => newFolderRef.current?.focus(), 50) }}
+              style={{
+                width: '100%', padding: '5px 10px', borderRadius: 8,
+                border: '1px dashed rgba(139,92,246,0.25)', background: 'transparent',
+                color: 'rgba(139,92,246,0.6)', fontSize: 11, cursor: 'pointer',
+                transition: 'all 0.12s',
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(139,92,246,0.5)'; (e.currentTarget as HTMLButtonElement).style.color = '#a78bfa' }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(139,92,246,0.25)'; (e.currentTarget as HTMLButtonElement).style.color = 'rgba(139,92,246,0.6)' }}
+            >
+              + Nouveau dossier
+            </button>
+          )}
+        </div>
       </aside>
 
-      {/* Main area */}
+      {/* ── Main area ── */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
         <div className="flex items-center gap-2 p-3 border-b border-border">
@@ -245,6 +360,14 @@ export function CaptionBank({ user }: CaptionBankProps) {
         <div className="flex-1 overflow-y-auto p-3">
           {loading ? (
             <div className="flex justify-center pt-12"><Spinner size="md" /></div>
+          ) : activeFolder !== null && emptyFolders.includes(activeFolder) && filtered.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full gap-3 text-muted">
+              <span className="text-4xl">📁</span>
+              <p className="text-sm">Dossier vide</p>
+              <Button size="sm" onClick={() => { setEditItem(undefined); setShowModal(true) }}>
+                + Ajouter une caption
+              </Button>
+            </div>
           ) : filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full gap-3 text-muted">
               <span className="text-4xl">💬</span>
@@ -260,23 +383,14 @@ export function CaptionBank({ user }: CaptionBankProps) {
                   key={item.id}
                   onClick={() => toggleSelect(item.id)}
                   className={`group relative bg-surface border rounded-xl p-4 cursor-pointer transition-all ${
-                    selected.has(item.id)
-                      ? 'border-accent ring-1 ring-accent/30'
-                      : 'border-border hover:border-accent/40'
+                    selected.has(item.id) ? 'border-accent ring-1 ring-accent/30' : 'border-border hover:border-accent/40'
                   }`}
                 >
-                  {/* Checkbox */}
                   <div className={`absolute top-2 right-2 w-4 h-4 rounded-full border-2 transition-all ${selected.has(item.id) ? 'bg-accent border-accent' : 'border-border group-hover:border-accent/50'}`} />
 
-                  {/* Title */}
-                  {item.title && (
-                    <p className="text-xs font-semibold text-text mb-1 pr-6 truncate">{item.title}</p>
-                  )}
-
-                  {/* Content preview */}
+                  {item.title && <p className="text-xs font-semibold text-text mb-1 pr-6 truncate">{item.title}</p>}
                   <p className="text-xs text-muted line-clamp-4 whitespace-pre-wrap">{item.content}</p>
 
-                  {/* Footer */}
                   <div className="flex items-center gap-2 mt-3 pt-2 border-t border-border/50">
                     {item.folder && (
                       <span className="text-[10px] bg-surface2 text-muted px-1.5 py-0.5 rounded">{item.folder}</span>
@@ -309,7 +423,7 @@ export function CaptionBank({ user }: CaptionBankProps) {
       {showModal && (
         <CaptionModal
           item={editItem}
-          folders={folders}
+          allFolders={allFolders}
           onSave={handleSave}
           onClose={() => { setShowModal(false); setEditItem(undefined) }}
         />
