@@ -958,29 +958,9 @@ export function Bank({ user }: BankProps) {
                 {t('bankMoveSelected')} ({selectedIds.size})
               </button>
               <button
-                onClick={async () => {
+                onClick={() => {
                   const sel = items.filter(i => selectedIds.has(i.id))
-                  if (!sel.length) return
-                  const results = await Promise.all(
-                    sel.map(async it => {
-                      if (it.storage_path) {
-                        const { data } = await supabase.storage.from(DOWNLOAD_BUCKET).download(it.storage_path)
-                        if (data) return { blob: data, name: getDownloadName(it) }
-                      }
-                      return null
-                    })
-                  )
-                  results.forEach((r, i) => {
-                    if (!r) return
-                    setTimeout(() => {
-                      const url = URL.createObjectURL(r.blob)
-                      const a = document.createElement('a')
-                      a.href = url; a.download = r.name
-                      document.body.appendChild(a); a.click()
-                      document.body.removeChild(a)
-                      setTimeout(() => URL.revokeObjectURL(url), 15000)
-                    }, i * 300)
-                  })
+                  sel.forEach((it, i) => setTimeout(() => downloadItem(it), i * 600))
                 }}
                 className="text-[12px] px-2.5 py-1 rounded-md font-semibold transition-colors flex items-center gap-1.5"
                 style={{ background: 'rgba(34,197,94,0.1)', color: '#4ade80', border: '1px solid rgba(34,197,94,0.25)' }}
