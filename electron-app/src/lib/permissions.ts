@@ -7,26 +7,26 @@ import type { OrgRole, PermOverrides, PageKey, ActionKey } from './supabase'
 const ROLE_TABS: Record<OrgRole, Record<PageKey, boolean>> = {
   owner: {
     phones: true,
-    posting: true, massposting: true, scheduler: true, bank: true, warmup: true, aitools: true,
-    remix: true, repurpose: true, montage: true,
+    posting: true, massposting: true, scheduler: true, bank: true, captionbank: true, warmup: true, aitools: true,
+    remix: true, repurpose: true, montage: true, mixer: true,
     settings: true,
   },
   admin: {
     phones: true,
-    posting: true, massposting: true, scheduler: true, bank: true, warmup: true, aitools: true,
-    remix: true, repurpose: true, montage: true,
+    posting: true, massposting: true, scheduler: true, bank: true, captionbank: true, warmup: true, aitools: true,
+    remix: true, repurpose: true, montage: true, mixer: true,
     settings: true,
   },
   member: {
     phones: true,
-    posting: true, massposting: true, scheduler: true, bank: true, warmup: true, aitools: true,
-    remix: true, repurpose: true, montage: true,
+    posting: true, massposting: true, scheduler: true, bank: true, captionbank: true, warmup: true, aitools: true,
+    remix: true, repurpose: true, montage: true, mixer: true,
     settings: false,
   },
   viewer: {
     phones: true,
-    posting: false, massposting: false, scheduler: false, bank: true, warmup: false, aitools: false,
-    remix: false, repurpose: false, montage: false,
+    posting: false, massposting: false, scheduler: false, bank: true, captionbank: true, warmup: false, aitools: false,
+    remix: false, repurpose: false, montage: false, mixer: false,
     settings: false,
   },
 }
@@ -100,10 +100,12 @@ export const ALL_TABS: { key: PageKey; label: string; icon: string }[] = [
   { key: 'massposting', label: 'Mass Posting',                        icon: '⚡' },
   { key: 'scheduler',   label: 'Programmation',                       icon: '📅' },
   { key: 'bank',        label: 'Banque',                              icon: '🗂' },
+  { key: 'captionbank', label: 'Banque de Captions',                  icon: '💬' },
   { key: 'warmup',      label: 'Warmup',                              icon: '🔥' },
   { key: 'aitools',     label: 'Outils IA',                           icon: '🔧' },
   { key: 'remix',       label: 'Remix',                               icon: '🔀' },
   { key: 'repurpose',   label: 'CloneVid',                            icon: '⚡' },
+  { key: 'mixer',       label: 'Mixer',                               icon: '🎞️' },
   { key: 'settings',    label: 'Paramètres → Connexions (clés API)', icon: '🔑' },
 ]
 
