@@ -28,6 +28,28 @@ function nameWithoutExt(p: string): string {
   return dot > 0 ? b.slice(0, dot) : b
 }
 
+// ── Download helper — fetch as blob to bypass cross-origin restrictions ───────
+async function downloadFromUrl(url: string, filename: string) {
+  try {
+    const resp = await fetch(url)
+    const blob = await resp.blob()
+    const blobUrl = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = blobUrl; a.download = filename
+    document.body.appendChild(a); a.click()
+    document.body.removeChild(a)
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 10000)
+  } catch {
+    // fallback: open in new tab
+    window.open(url, '_blank')
+  }
+}
+
+function getDownloadName(item: ContentItem) {
+  const title = item.title ?? 'video'
+  return title.match(/\.[a-z0-9]+$/i) ? title : title + '.mp4'
+}
+
 // ── Context menu ─────────────────────────────────────────────────────────────
 interface CtxMenu {
   item: ContentItem
@@ -902,11 +924,8 @@ export function Bank({ user }: BankProps) {
                   for (const it of sel) {
                     const url = await getSignedUrl(it.storage_path ?? it.file_url)
                     if (!url) continue
-                    const ext = it.title.match(/\.[a-z0-9]+$/i)?.[0] ?? '.mp4'
-                    const name = it.title.endsWith('.mp4') || it.title.endsWith('.mov') ? it.title : it.title + ext
-                    const a = document.createElement('a')
-                    a.href = url; a.download = name; a.click()
-                    await new Promise(r => setTimeout(r, 300))
+                    await downloadFromUrl(url, getDownloadName(it))
+                    await new Promise(r => setTimeout(r, 400))
                   }
                 }}
                 className="text-[12px] px-2.5 py-1 rounded-md font-semibold transition-colors flex items-center gap-1.5"
@@ -1152,10 +1171,7 @@ export function Bank({ user }: BankProps) {
                 const it = ctxMenu.item
                 const url = await getSignedUrl(it.storage_path ?? it.file_url)
                 if (!url) return
-                const ext = it.title.match(/\.[a-z0-9]+$/i)?.[0] ?? '.mp4'
-                const name = it.title.endsWith('.mp4') || it.title.endsWith('.mov') ? it.title : it.title + ext
-                const a = document.createElement('a')
-                a.href = url; a.download = name; a.click()
+                await downloadFromUrl(url, getDownloadName(it))
               }
             },
             ...(ctxMenu.item.file_url && !ctxMenu.item.storage_path ? [{
