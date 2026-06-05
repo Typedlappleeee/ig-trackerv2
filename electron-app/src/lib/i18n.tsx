@@ -539,6 +539,7 @@ export const EN = {
 
   // Phones page extended
   phonesHeading: 'Phones',
+  phonesSubtitle: 'Manage and monitor all your cloud phones in one place.',
   phonesAutoLabel: 'Auto',
   phonesSyncGeelark: 'Sync GéeLark',
   phonesSearchPlaceholder: 'Search phone, account, group…',
@@ -1958,6 +1959,7 @@ export const FR: { [K in keyof typeof EN]?: string } = {
   linked: 'liés',
 
   phonesTitle: 'Téléphones',
+  phonesSubtitle: 'Gère et surveille tous tes cloud phones au même endroit.',
   syncGeelark: 'Sync GéeLark',
   syncingGeelark: 'Sync…',
   addPhone: 'Ajouter',

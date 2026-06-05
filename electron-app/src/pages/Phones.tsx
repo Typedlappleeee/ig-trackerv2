@@ -909,12 +909,25 @@ export function Phones({ user }: PhonesProps) {
 
         {/* ── Header ───────────────────────────────────────────────────────── */}
         <div style={{
-          flexShrink: 0, padding: '14px 32px 12px',
+          flexShrink: 0, padding: '20px 32px 16px',
           borderBottom: '1px solid rgba(255,255,255,0.055)',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
         }}>
-          <div>
-            <h1 style={{ fontSize: 16, fontWeight: 700, color: '#F2F0FF', margin: 0, letterSpacing: '-0.3px' }}>{t('phonesHeading')}</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 13, minWidth: 0 }}>
+            <div style={{
+              width: 44, height: 44, borderRadius: 13, flexShrink: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'linear-gradient(135deg, rgba(139,92,246,0.22), rgba(139,92,246,0.06))',
+              border: '1px solid rgba(139,92,246,0.25)', color: '#a78bfa',
+            }}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="7" y="2" width="10" height="20" rx="2.5"/><path d="M11 18h2"/>
+              </svg>
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <h1 style={{ fontSize: 23, fontWeight: 800, color: '#F2F0FF', margin: 0, letterSpacing: '-0.025em', lineHeight: 1.1 }}>{t('phonesHeading')}</h1>
+              <p style={{ fontSize: 13, color: 'rgba(148,163,184,0.6)', margin: '4px 0 0', lineHeight: 1.4 }}>{t('phonesSubtitle')}</p>
+            </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {/* Auto-refresh control */}
