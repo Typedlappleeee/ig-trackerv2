@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { zipSync, strToU8 } from 'fflate'
 import type { User } from '@supabase/supabase-js'
 import { supabase, type ContentItem } from '@/lib/supabase'
 import { useT, useLang } from '@/lib/i18n'
@@ -958,9 +959,46 @@ export function Bank({ user }: BankProps) {
                 {t('bankMoveSelected')} ({selectedIds.size})
               </button>
               <button
-                onClick={() => {
+                onClick={async () => {
                   const sel = items.filter(i => selectedIds.has(i.id))
-                  sel.forEach((it, i) => setTimeout(() => downloadItem(it), i * 600))
+                  if (!sel.length) return
+                  if (sel.length <= 5) {
+                    sel.forEach((it, i) => setTimeout(() => downloadItem(it), i * 600))
+                  } else {
+                    // More than 5 → bundle into a ZIP
+                    const files: Record<string, Uint8Array> = {}
+                    const seen = new Set<string>()
+                    await Promise.all(sel.map(async it => {
+                      let buf: ArrayBuffer | null = null
+                      if (it.storage_path) {
+                        const { data } = await supabase.storage.from(DOWNLOAD_BUCKET).download(it.storage_path)
+                        if (data) buf = await data.arrayBuffer()
+                      } else if (it.file_url) {
+                        try { buf = await (await fetch(it.file_url)).arrayBuffer() } catch (_) {}
+                      }
+                      if (!buf) return
+                      let name = getDownloadName(it)
+                      // Deduplicate filenames
+                      if (seen.has(name)) {
+                        const ext = name.includes('.') ? name.slice(name.lastIndexOf('.')) : '.mp4'
+                        const base = name.slice(0, name.lastIndexOf('.') || name.length)
+                        let n = 2
+                        while (seen.has(`${base}_${n}${ext}`)) n++
+                        name = `${base}_${n}${ext}`
+                      }
+                      seen.add(name)
+                      files[name] = new Uint8Array(buf)
+                    }))
+                    if (!Object.keys(files).length) return
+                    const zipped = zipSync(files, { level: 0 })
+                    const blob = new Blob([zipped], { type: 'application/zip' })
+                    const url = URL.createObjectURL(blob)
+                    const a = document.createElement('a')
+                    a.href = url; a.download = `banque_${Date.now()}.zip`
+                    document.body.appendChild(a); a.click()
+                    document.body.removeChild(a)
+                    setTimeout(() => URL.revokeObjectURL(url), 15000)
+                  }
                 }}
                 className="text-[12px] px-2.5 py-1 rounded-md font-semibold transition-colors flex items-center gap-1.5"
                 style={{ background: 'rgba(34,197,94,0.1)', color: '#4ade80', border: '1px solid rgba(34,197,94,0.25)' }}
@@ -970,7 +1008,7 @@ export function Bank({ user }: BankProps) {
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
                 </svg>
-                Télécharger ({selectedIds.size})
+                {selectedIds.size > 5 ? `ZIP (${selectedIds.size})` : `Télécharger (${selectedIds.size})`}
               </button>
               <button
                 onClick={deleteSelected}
