@@ -1108,7 +1108,7 @@ function seededRng(seed: number) {
 }
 
 // ── runFfmpegRepurposeWeb — generate one unique variant ───────────────────────
-type RepurposeResult = { ok: boolean; outputPath?: string; storagePath?: string; similarityPct?: number; transformSummary?: string[]; error?: string }
+type RepurposeResult = { ok: boolean; outputPath?: string; storagePath?: string; thumbnailPath?: string | null; similarityPct?: number; transformSummary?: string[]; error?: string }
 
 // Build per-variant transforms from a seed + intensity settings
 export function buildRepurposeVariant(seed: number, intensity: 'subtle' | 'medium' | 'aggressive' | 'vener', format: '9:16' | '1:1' | '16:9' | 'keep') {
@@ -1345,10 +1345,11 @@ export async function runRepurposeViaServer(opts: {
 
   // Flatten results in original seed order
   return batchResponses.flatMap(({ data, batch }) =>
-    (data.results as Array<{ ok: boolean; url?: string; storagePath?: string; error?: string }>).map((r, i) => ({
+    (data.results as Array<{ ok: boolean; url?: string; storagePath?: string; thumbnailPath?: string | null; error?: string }>).map((r, i) => ({
       ok:               r.ok,
       outputPath:       r.url,
       storagePath:      r.storagePath,
+      thumbnailPath:    r.thumbnailPath,
       transformSummary: batch[i]?.transformSummary,
       error:            r.error,
     }))

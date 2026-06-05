@@ -294,6 +294,7 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
                 let thumbnailPath: string | null = null
                 if (result.storagePath) {
                   storagePath = result.storagePath  // server already uploaded
+                  thumbnailPath = result.thumbnailPath ?? null
                 } else {
                   const up = await uploadVideoFromPath(result.outputPath!, scope)
                   storagePath   = up.storagePath
