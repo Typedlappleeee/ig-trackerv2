@@ -411,93 +411,131 @@ function BetaPopup({ onClose }: { onClose: () => void }) {
 }
 function AiModelPopup({ onClose }: { onClose: () => void }) {
   const CATS = [
-    { name: 'Cosplay',        emoji: '🦸‍♀️' },
-    { name: 'E-Girl',         emoji: '🎀' },
-    { name: 'Fitness',        emoji: '💪' },
-    { name: 'Girl Next Door', emoji: '🌸' },
-    { name: 'Indoors',        emoji: '🏠' },
-    { name: 'Lifestyle',      emoji: '✨' },
+    { name: 'COSPLAY',        bg: 'linear-gradient(160deg,#1a0a2e 0%,#2d1155 60%,#0d0118 100%)', accent: '#7c3aed' },
+    { name: 'E-GIRL',         bg: 'linear-gradient(160deg,#2d0a1e 0%,#5a1040 60%,#0f0110 100%)', accent: '#db2777' },
+    { name: 'FITNESS',        bg: 'linear-gradient(160deg,#0a1a2e 0%,#0e3560 60%,#010d18 100%)', accent: '#0ea5e9' },
+    { name: 'GIRL NEXT DOOR', bg: 'linear-gradient(160deg,#1a2210 0%,#2e4a15 60%,#080f02 100%)', accent: '#65a30d' },
+    { name: 'INDOORS',        bg: 'linear-gradient(160deg,#1a1210 0%,#3d2010 60%,#100802 100%)', accent: '#d97706' },
+    { name: 'LIFESTYLE',      bg: 'linear-gradient(160deg,#0f0f1a 0%,#1e1440 60%,#060610 100%)', accent: '#8b5cf6' },
   ]
+  const PLATFORMS = ['Instagram', 'TikTok', 'OnlyFans', 'Reddit', 'X', 'Snapchat', 'YouTube']
+
   return (
     <div style={{
       position: 'fixed', inset: 0, zIndex: 200,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: 'rgba(0,0,0,0.86)', backdropFilter: 'blur(18px)',
+      background: 'rgba(0,0,0,0.9)', backdropFilter: 'blur(20px)',
     }}>
       <div style={{
-        background: 'linear-gradient(145deg, #090815 0%, #0D0B20 100%)',
-        border: '1px solid rgba(139,92,246,0.22)',
-        borderRadius: 24, padding: '34px 30px 26px',
-        width: '100%', maxWidth: 540,
-        boxShadow: '0 40px 80px rgba(0,0,0,0.65), 0 0 0 1px rgba(139,92,246,0.07)',
+        background: 'linear-gradient(160deg, #07060f 0%, #0c0a1c 100%)',
+        border: '1px solid rgba(139,92,246,0.18)',
+        borderRadius: 20, padding: '28px 28px 24px',
+        width: '100%', maxWidth: 700, margin: '0 16px',
+        boxShadow: '0 48px 96px rgba(0,0,0,0.7)',
         animation: 'anim-scale-in 0.28s cubic-bezier(0.22,1,0.36,1) both',
       }}>
-        {/* Badge */}
-        <div style={{ textAlign: 'center', marginBottom: 20 }}>
-          <div style={{
-            display: 'inline-flex', alignItems: 'center', gap: 6,
-            background: 'rgba(139,92,246,0.13)', border: '1px solid rgba(139,92,246,0.28)',
-            borderRadius: 20, padding: '4px 14px', marginBottom: 14,
-          }}>
-            <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#a78bfa' }}>
-              Bientôt disponible
-            </span>
+
+        {/* ── Header row ── */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 22 }}>
+          <div>
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.3)',
+              borderRadius: 20, padding: '3px 12px', marginBottom: 10,
+            }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#a78bfa', display: 'inline-block', boxShadow: '0 0 6px #a78bfa' }} />
+              <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.14em', color: '#a78bfa' }}>Bientôt</span>
+            </div>
+            <div>
+              <h2 style={{ margin: 0, fontSize: 26, fontWeight: 900, letterSpacing: '-0.02em', color: '#f1f5f9', lineHeight: 1.1 }}>
+                SCALEFLOW
+              </h2>
+              <h3 style={{
+                margin: '2px 0 0', fontSize: 20, fontWeight: 900, letterSpacing: '-0.01em', lineHeight: 1.1,
+                background: 'linear-gradient(120deg, #818cf8, #a78bfa, #ec4899)',
+                WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+              }}>
+                CRÉE TA MODÈLE IA
+              </h3>
+            </div>
+            <p style={{ margin: '8px 0 0', fontSize: 12, color: 'rgba(148,163,184,0.6)', lineHeight: 1.5 }}>
+              Génère des photos & vidéos de ta modèle virtuelle<br />dans n'importe quel style, sans limite.
+            </p>
           </div>
-          <h2 style={{
-            fontSize: 30, fontWeight: 900, letterSpacing: '-0.03em', margin: '0 0 8px',
-            background: 'linear-gradient(135deg, #e2e8f0 0%, #a78bfa 50%, #ec4899 100%)',
-            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-          }}>
-            Crée ta Modèle IA
-          </h2>
-          <p style={{ fontSize: 13, color: 'rgba(148,163,184,0.65)', lineHeight: 1.55, margin: 0 }}>
-            Génère des photos & vidéos de ta modèle virtuelle<br/>dans n'importe quel style, sans limite.
-          </p>
+          <button
+            onClick={onClose}
+            style={{
+              background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+              borderRadius: 8, width: 30, height: 30, cursor: 'pointer',
+              color: 'rgba(148,163,184,0.6)', fontSize: 16, flexShrink: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+          >×</button>
         </div>
 
-        {/* Category grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 20 }}>
+        {/* ── Platform pills ── */}
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 18 }}>
+          {PLATFORMS.map(p => (
+            <div key={p} style={{
+              padding: '5px 12px', borderRadius: 20,
+              background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+              fontSize: 11, fontWeight: 500, color: 'rgba(203,213,225,0.7)',
+            }}>{p}</div>
+          ))}
+        </div>
+
+        {/* ── Category cards ── */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 8, marginBottom: 22 }}>
           {CATS.map(cat => (
             <div key={cat.name} style={{
-              borderRadius: 12, padding: '14px 10px', textAlign: 'center',
-              background: 'rgba(139,92,246,0.06)',
-              border: '1px solid rgba(139,92,246,0.11)',
+              borderRadius: 12, overflow: 'hidden', position: 'relative',
+              aspectRatio: '3/4', background: cat.bg,
+              border: `1px solid ${cat.accent}22`,
+              boxShadow: `0 8px 24px rgba(0,0,0,0.5), inset 0 0 30px ${cat.accent}18`,
             }}>
-              <div style={{ fontSize: 22, marginBottom: 5 }}>{cat.emoji}</div>
-              <div style={{ fontSize: 10, fontWeight: 600, color: 'rgba(203,213,225,0.75)', letterSpacing: '0.04em' }}>
-                {cat.name}
+              {/* Noise grain overlay */}
+              <div style={{
+                position: 'absolute', inset: 0,
+                background: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 200 200\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'n\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.9\' numOctaves=\'4\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23n)\' opacity=\'0.08\'/%3E%3C/svg%3E")',
+                opacity: 0.4, mixBlendMode: 'overlay',
+              }} />
+              {/* Glow blob */}
+              <div style={{
+                position: 'absolute', bottom: -10, left: '50%', transform: 'translateX(-50%)',
+                width: '80%', height: '60%',
+                background: `radial-gradient(ellipse, ${cat.accent}40 0%, transparent 70%)`,
+                pointerEvents: 'none',
+              }} />
+              {/* Label */}
+              <div style={{
+                position: 'absolute', bottom: 0, left: 0, right: 0,
+                padding: '20px 6px 8px',
+                background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, transparent 100%)',
+              }}>
+                <p style={{
+                  margin: 0, fontSize: 8.5, fontWeight: 800,
+                  textTransform: 'uppercase', letterSpacing: '0.06em',
+                  color: '#fff', textAlign: 'center',
+                }}>{cat.name}</p>
               </div>
             </div>
           ))}
         </div>
 
-        {/* Features */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginBottom: 22 }}>
-          {[
-            '🧠  IA entraînée sur ton style unique',
-            '📸  Photos & vidéos illimitées de ta modèle',
-            '🌍  Partage instantané sur tous tes réseaux',
-          ].map(f => (
-            <div key={f} style={{
-              background: 'rgba(139,92,246,0.05)', border: '1px solid rgba(139,92,246,0.1)',
-              borderRadius: 10, padding: '9px 14px',
-              fontSize: 12, color: 'rgba(203,213,225,0.8)',
-            }}>{f}</div>
-          ))}
-        </div>
-
+        {/* ── CTA ── */}
         <button
           onClick={onClose}
           style={{
             width: '100%', padding: '13px',
-            background: 'linear-gradient(130deg, #7c3aed, #ec4899)',
-            border: 'none', borderRadius: 14,
+            background: 'linear-gradient(130deg, #6d28d9, #db2777)',
+            border: 'none', borderRadius: 12,
             color: '#fff', fontWeight: 700, fontSize: 14,
-            cursor: 'pointer', letterSpacing: '-0.01em',
-            boxShadow: '0 8px 24px rgba(124,58,237,0.35)',
+            cursor: 'pointer', letterSpacing: '0.01em',
+            boxShadow: '0 8px 28px rgba(109,40,217,0.4)',
+            transition: 'opacity 0.15s',
           }}
-          onMouseEnter={e => ((e.target as HTMLButtonElement).style.opacity = '0.88')}
-          onMouseLeave={e => ((e.target as HTMLButtonElement).style.opacity = '1')}
+          onMouseEnter={e => ((e.currentTarget as HTMLButtonElement).style.opacity = '0.88')}
+          onMouseLeave={e => ((e.currentTarget as HTMLButtonElement).style.opacity = '1')}
         >
           Super, j'attends ça ! →
         </button>
