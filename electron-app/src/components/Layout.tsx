@@ -133,6 +133,7 @@ const ICONS = {
   bell:      'M15 17h5l-1.405-1.405A2.032 2.032 0 0 1 18 14.158V11a6.002 6.002 0 0 0-4-5.659V5a2 2 0 1 0-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 1 1-6 0v-1m6 0H9',
   chevronDown:  'M19 9l-7 7-7-7',
   chevronRight: 'M9 18l6-6-6-6',
+  menu:         'M4 6h16M4 12h16M4 18h7',
 } as const
 
 type IconKey = keyof typeof ICONS
@@ -462,6 +463,13 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
     : null
 
   const userInitial = user.email?.[0].toUpperCase() ?? '?'
+  const userName = user.email?.split('@')[0] ?? userInitial
+  const planLabel = license.isSuperAdmin
+    ? 'Super Admin'
+    : license.plan === 'organisation' ? 'Organisation'
+    : license.plan === 'pro'          ? 'Plan Pro'
+    : license.plan === 'standard'     ? 'Plan Standard'
+    : 'Free plan'
 
   // ── Sidebar NavItem ────────────────────────────────────────────────────────
   const SidebarNavItem = ({
@@ -491,42 +499,32 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: collapsed ? 0 : 8,
+            gap: collapsed ? 0 : 9,
             width: '100%',
-            height: 34,
-            padding: '0 8px',
-            borderRadius: 8,
+            height: 36,
+            padding: '0 10px',
+            borderRadius: 10,
             fontSize: 13,
-            fontWeight: active ? 500 : 400,
+            fontWeight: active ? 600 : 400,
             textAlign: 'left',
             cursor: 'pointer',
             border: 'none',
             background: active
-              ? 'rgba(139,92,246,0.1)'
-              : hovered ? 'rgba(255,255,255,0.04)' : 'transparent',
-            color: active ? '#F2F0FF' : hovered ? 'rgba(241,240,247,0.85)' : 'rgba(148,163,184,0.55)',
+              ? 'rgba(255,255,255,0.09)'
+              : hovered ? 'rgba(255,255,255,0.05)' : 'transparent',
+            color: active ? '#ffffff' : hovered ? 'rgba(241,240,247,0.85)' : 'rgba(148,163,184,0.58)',
             transition: 'background 140ms ease, color 140ms ease',
-            transform: pressed ? 'scale(0.965)' : 'scale(1)',
+            transform: pressed ? 'scale(0.968)' : 'scale(1)',
             justifyContent: collapsed ? 'center' : 'flex-start',
             flexShrink: 0,
             position: 'relative',
             outline: 'none',
           }}
         >
-          {/* Active left indicator */}
-          {active && (
-            <span style={{
-              position: 'absolute',
-              left: 0, top: 6, bottom: 6,
-              width: 2.5,
-              borderRadius: '0 3px 3px 0',
-              background: 'linear-gradient(180deg, #a78bfa, #7c3aed)',
-            }} />
-          )}
           <span style={{
             flexShrink: 0,
             display: 'flex',
-            color: active ? '#a78bfa' : hovered ? 'rgba(196,181,253,0.6)' : 'rgba(148,163,184,0.4)',
+            color: active ? 'rgba(255,255,255,0.9)' : hovered ? 'rgba(196,181,253,0.7)' : 'rgba(148,163,184,0.42)',
             transition: 'color 140ms ease',
           }}>
             <NavIcon d={ICONS[iconKey]} size={16} />
@@ -647,17 +645,20 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
           <button
             onClick={() => setCollapsed(v => !v)}
             style={{
-              width: 22, height: 22, borderRadius: 6,
-              border: '1px solid rgba(255,255,255,0.07)',
+              width: 26, height: 26, borderRadius: 7,
+              border: 'none',
               background: 'transparent',
-              color: 'rgba(148,163,184,0.4)',
+              color: 'rgba(148,163,184,0.38)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               cursor: 'pointer', flexShrink: 0,
               marginLeft: collapsed ? 'auto' : 0,
+              transition: 'color 0.15s, background 0.15s',
             }}
+            onMouseEnter={e => { e.currentTarget.style.color = 'rgba(241,240,247,0.7)'; e.currentTarget.style.background = 'rgba(255,255,255,0.05)' }}
+            onMouseLeave={e => { e.currentTarget.style.color = 'rgba(148,163,184,0.38)'; e.currentTarget.style.background = 'transparent' }}
             title={collapsed ? t('expandSidebar') : t('collapseSidebar')}
           >
-            <NavIcon d={collapsed ? ICONS.chevronRight : ICONS.chevronDown} size={11} />
+            <NavIcon d={ICONS.menu} size={14} />
           </button>
         </div>
 
@@ -670,25 +671,24 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
               onClick={() => { playNav(); onNavigate('community') }}
               title={collapsed ? t('navCommunity') : undefined}
               style={{
-                display: 'flex', alignItems: 'center', gap: collapsed ? 0 : 8,
-                width: '100%', height: 34, padding: '0 8px', borderRadius: 8,
-                fontSize: 13, fontWeight: page === 'community' ? 500 : 400, textAlign: 'left',
+                display: 'flex', alignItems: 'center', gap: collapsed ? 0 : 9,
+                width: '100%', height: 36, padding: '0 10px', borderRadius: 10,
+                fontSize: 13, fontWeight: page === 'community' ? 600 : 400, textAlign: 'left',
                 cursor: 'pointer', border: 'none',
-                borderLeft: page === 'community' ? '2px solid #8B5CF6' : '2px solid transparent',
-                background: page === 'community' ? 'rgba(139,92,246,0.1)' : 'transparent',
-                color: page === 'community' ? '#F1F0F7' : 'rgba(148,163,184,0.65)',
+                background: page === 'community' ? 'rgba(255,255,255,0.09)' : 'transparent',
+                color: page === 'community' ? '#ffffff' : 'rgba(148,163,184,0.58)',
                 transition: 'background 0.15s, color 0.15s',
                 justifyContent: collapsed ? 'center' : 'flex-start',
                 marginBottom: 2,
               }}
               onMouseEnter={e => {
-                if (page !== 'community') (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.04)'
+                if (page !== 'community') (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.05)'
               }}
               onMouseLeave={e => {
                 if (page !== 'community') (e.currentTarget as HTMLButtonElement).style.background = 'transparent'
               }}
             >
-              <span style={{ flexShrink: 0, color: page === 'community' ? '#8B5CF6' : 'rgba(148,163,184,0.5)', display: 'flex' }}>
+              <span style={{ flexShrink: 0, color: page === 'community' ? 'rgba(255,255,255,0.9)' : 'rgba(148,163,184,0.42)', display: 'flex' }}>
                 <NavIcon d={ICONS.chat} size={16} />
               </span>
               {!collapsed && (
@@ -788,24 +788,23 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             onClick={() => { playNav(); onNavigate('settings') }}
             title={collapsed ? t('navSettings') : undefined}
             style={{
-              display: 'flex', alignItems: 'center', gap: collapsed ? 0 : 8,
-              width: '100%', height: 34, padding: '0 8px', borderRadius: 8,
-              fontSize: 13, fontWeight: page === 'settings' ? 500 : 400, textAlign: 'left',
+              display: 'flex', alignItems: 'center', gap: collapsed ? 0 : 9,
+              width: '100%', height: 36, padding: '0 10px', borderRadius: 10,
+              fontSize: 13, fontWeight: page === 'settings' ? 600 : 400, textAlign: 'left',
               cursor: 'pointer', border: 'none',
-              borderLeft: page === 'settings' ? '2px solid #8B5CF6' : '2px solid transparent',
-              background: page === 'settings' ? 'rgba(139,92,246,0.1)' : 'transparent',
-              color: page === 'settings' ? '#F1F0F7' : 'rgba(148,163,184,0.65)',
+              background: page === 'settings' ? 'rgba(255,255,255,0.09)' : 'transparent',
+              color: page === 'settings' ? '#ffffff' : 'rgba(148,163,184,0.58)',
               transition: 'background 0.15s',
               justifyContent: collapsed ? 'center' : 'flex-start',
             }}
             onMouseEnter={e => {
-              if (page !== 'settings') (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.04)'
+              if (page !== 'settings') (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.05)'
             }}
             onMouseLeave={e => {
               if (page !== 'settings') (e.currentTarget as HTMLButtonElement).style.background = 'transparent'
             }}
           >
-            <span style={{ flexShrink: 0, color: page === 'settings' ? '#8B5CF6' : 'rgba(148,163,184,0.5)', display: 'flex' }}>
+            <span style={{ flexShrink: 0, color: page === 'settings' ? 'rgba(255,255,255,0.9)' : 'rgba(148,163,184,0.42)', display: 'flex' }}>
               <NavIcon d={ICONS.settings} size={16} />
             </span>
             {!collapsed && <span style={{ flex: 1 }}>{t('navSettings')}</span>}
@@ -816,24 +815,23 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
               onClick={() => { playNav(); onNavigate('licences') }}
               title={collapsed ? t('navAdmin') : undefined}
               style={{
-                display: 'flex', alignItems: 'center', gap: collapsed ? 0 : 8,
-                width: '100%', height: 34, padding: '0 8px', borderRadius: 8,
-                fontSize: 13, fontWeight: page === 'licences' ? 500 : 400, textAlign: 'left',
+                display: 'flex', alignItems: 'center', gap: collapsed ? 0 : 9,
+                width: '100%', height: 36, padding: '0 10px', borderRadius: 10,
+                fontSize: 13, fontWeight: page === 'licences' ? 600 : 400, textAlign: 'left',
                 cursor: 'pointer', border: 'none',
-                borderLeft: page === 'licences' ? '2px solid #8B5CF6' : '2px solid transparent',
-                background: page === 'licences' ? 'rgba(139,92,246,0.1)' : 'transparent',
-                color: page === 'licences' ? '#F1F0F7' : 'rgba(148,163,184,0.65)',
+                background: page === 'licences' ? 'rgba(255,255,255,0.09)' : 'transparent',
+                color: page === 'licences' ? '#ffffff' : 'rgba(148,163,184,0.58)',
                 transition: 'background 0.15s',
                 justifyContent: collapsed ? 'center' : 'flex-start',
               }}
               onMouseEnter={e => {
-                if (page !== 'licences') (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.04)'
+                if (page !== 'licences') (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.05)'
               }}
               onMouseLeave={e => {
                 if (page !== 'licences') (e.currentTarget as HTMLButtonElement).style.background = 'transparent'
               }}
             >
-              <span style={{ flexShrink: 0, color: page === 'licences' ? '#8B5CF6' : 'rgba(148,163,184,0.5)', display: 'flex' }}>
+              <span style={{ flexShrink: 0, color: page === 'licences' ? 'rgba(255,255,255,0.9)' : 'rgba(148,163,184,0.42)', display: 'flex' }}>
                 <NavIcon d={ICONS.shield} size={16} />
               </span>
               {!collapsed && <span style={{ flex: 1 }}>{t('navAdmin')}</span>}
@@ -893,9 +891,14 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
               {userInitial}
             </div>
             {!collapsed && (
-              <span style={{ flex: 1, fontSize: 11, color: 'rgba(148,163,184,0.55)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {user.email}
-              </span>
+              <div style={{ flex: 1, overflow: 'hidden' }}>
+                <div style={{ fontSize: 12, fontWeight: 500, color: '#F1F0F7', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {userName}
+                </div>
+                <div style={{ fontSize: 10, color: 'rgba(148,163,184,0.42)', marginTop: 1 }}>
+                  {planLabel}
+                </div>
+              </div>
             )}
           </button>
 
@@ -965,22 +968,27 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
               </div>
             )}
 
-            {/* Credits button */}
+            {/* Credits chip */}
             {!credits.loading && (
               <button
                 onClick={() => onNavigate('settings', 'abonnement')}
                 style={{
-                  display: 'flex', alignItems: 'center', gap: 5,
-                  padding: '4px 10px', borderRadius: 6,
-                  border: '1px solid rgba(139,92,246,0.2)', background: 'transparent',
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  padding: '5px 12px', borderRadius: 8,
+                  background: credits.balance < 10 ? 'rgba(239,68,68,0.08)' : 'rgba(139,92,246,0.07)',
+                  border: credits.balance < 10 ? '1px solid rgba(239,68,68,0.25)' : '1px solid rgba(139,92,246,0.18)',
                   cursor: 'pointer', transition: 'background 0.15s',
                 }}
-                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.04)' }}
-                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}
+                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = credits.balance < 10 ? 'rgba(239,68,68,0.14)' : 'rgba(139,92,246,0.13)' }}
+                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = credits.balance < 10 ? 'rgba(239,68,68,0.08)' : 'rgba(139,92,246,0.07)' }}
               >
-                <span style={{ fontSize: 12, fontWeight: 700, color: credits.balance < 10 ? '#F87171' : '#A78BFA', fontVariantNumeric: 'tabular-nums' }}>
-                  💎 {credits.balance.toLocaleString('fr-FR')}
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke={credits.balance < 10 ? '#F87171' : '#a78bfa'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                <span style={{ fontSize: 12, fontWeight: 700, color: credits.balance < 10 ? '#F87171' : '#c4b5fd', fontVariantNumeric: 'tabular-nums' }}>
+                  {credits.balance.toLocaleString('fr-FR')}
                 </span>
+                <span style={{ fontSize: 10, color: credits.balance < 10 ? 'rgba(248,113,113,0.5)' : 'rgba(196,181,253,0.45)', fontWeight: 500 }}>cr</span>
               </button>
             )}
 
