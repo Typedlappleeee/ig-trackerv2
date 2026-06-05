@@ -623,8 +623,8 @@ const PLANS: PlanDef[] = [
   {
     name: 'Standard', tagline: 'Pour débuter', icon: '⚡',
     credits: '2 500 crédits / mois', creditsColor: '#60a5fa', accent: '#3b82f6',
-    monthlyPrice: '49,99$', yearlyPrice: '34,99$',
-    originalMonthly: '49,99$', discount: '30% OFF', yearlyBilled: '419,88$ facturé annuellement',
+    monthlyPrice: '49,99$', yearlyPrice: '49,99$',
+    originalMonthly: '', discount: '', yearlyBilled: '',
     btnLabel: "S'abonner à Standard",
     features: [
       { text: 'Accès aux outils de base',       included: true  },
@@ -638,8 +638,8 @@ const PLANS: PlanDef[] = [
   {
     name: 'Pro', tagline: 'Scale ton output', icon: '👑',
     credits: '5 500 crédits / mois', creditsColor: '#a78bfa', accent: '#7c3aed',
-    monthlyPrice: '79,99$', yearlyPrice: '59,99$',
-    originalMonthly: '79,99$', discount: '25% OFF', yearlyBilled: '719,88$ facturé annuellement',
+    monthlyPrice: '99,99$', yearlyPrice: '59,99$',
+    originalMonthly: '99,99$', discount: '40% OFF', yearlyBilled: '719,88$ facturé annuellement',
     popular: true,
     btnLabel: "S'abonner à Pro",
     features: [
@@ -654,8 +654,8 @@ const PLANS: PlanDef[] = [
   {
     name: 'Organisation', tagline: 'Puissance illimitée', icon: '🏢',
     credits: '11 000 crédits / mois', creditsColor: '#f59e0b', accent: '#f59e0b',
-    monthlyPrice: '119,99$', yearlyPrice: '89,99$',
-    originalMonthly: '119,99$', discount: '25% OFF', yearlyBilled: '1 079,88$ facturé annuellement',
+    monthlyPrice: '149,99$', yearlyPrice: '89,99$',
+    originalMonthly: '149,99$', discount: '40% OFF', yearlyBilled: '1 079,88$ facturé annuellement',
     bestValue: true,
     btnLabel: "S'abonner à Organisation",
     features: [
@@ -748,18 +748,18 @@ function PricingSection() {
                   {/* Price row */}
                   <div style={{ marginBottom: 6 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
-                      {yearly && <span style={{ fontSize: 14, color: 'rgba(148,163,184,0.35)', textDecoration: 'line-through' }}>{p.originalMonthly}</span>}
+                      {yearly && p.originalMonthly && <span style={{ fontSize: 14, color: 'rgba(148,163,184,0.35)', textDecoration: 'line-through' }}>{p.originalMonthly}</span>}
                       <div style={{ display: 'flex', alignItems: 'baseline', gap: 3 }}>
                         <span style={{ fontSize: 40, fontWeight: 900, color: '#F2F0FF', letterSpacing: '-0.04em', lineHeight: 1 }}>{yearly ? p.yearlyPrice : p.monthlyPrice}</span>
                         <span style={{ fontSize: 13, color: 'rgba(148,163,184,0.4)' }}>/mo</span>
                       </div>
-                      {yearly && (
+                      {yearly && p.discount && (
                         <span style={{ fontSize: 11, fontWeight: 800, padding: '3px 8px', borderRadius: 6, background: p.popular ? 'rgba(124,58,237,0.2)' : p.bestValue ? 'rgba(245,158,11,0.15)' : 'rgba(59,130,246,0.15)', color: p.popular ? '#a78bfa' : p.bestValue ? '#f59e0b' : '#60a5fa', border: `1px solid ${p.accent}25` }}>
                           {p.discount}
                         </span>
                       )}
                     </div>
-                    {yearly && <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.28)', margin: 0 }}>{p.yearlyBilled}</p>}
+                    {yearly && p.yearlyBilled && <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.28)', margin: 0 }}>{p.yearlyBilled}</p>}
                   </div>
 
                   {/* Divider */}
