@@ -248,6 +248,18 @@ function AddMediaModal({ onFiles, onElectronPick, onClose }: {
 export function Bank({ user }: BankProps) {
   const t = useT()
   const { currentOrg, role, perms } = useOrg()
+  const [personalMode, setPersonalMode] = useState(false)
+  // true when we should show personal (user-scoped) items regardless of org
+  const isPersonal = personalMode || !currentOrg
+
+  // Scope helper — applies the correct user/org filter to any Supabase query
+  function scopeQ<T>(q: T): T {
+    const qq = q as any
+    return isPersonal
+      ? qq.eq('user_id', user.id).is('org_id', null)
+      : qq.eq('org_id', currentOrg!.id)
+  }
+
   const [items, setItems]         = useState<ContentItem[]>([])
   const [loading, setLoading]     = useState(true)
   const [adding, setAdding]       = useState(false)
@@ -296,9 +308,7 @@ export function Bank({ user }: BankProps) {
     if (!confirm(`${t('bankDeleteSelected')} ${selectedIds.size} video(s)? ${t('phoneDeleteMsg')}`)) return
     const ids = [...selectedIds]
     const toDelete = items.filter(i => ids.includes(i.id))
-    let q = supabase.from('content_bank').delete().in('id', ids)
-    if (currentOrg) q = q.eq('org_id', currentOrg.id)
-    else q = q.eq('user_id', user.id)
+    let q = scopeQ(supabase.from('content_bank').delete().in('id', ids))
     const { error: err } = await q
     if (err) {
       setError('Deletion failed: ' + err.message)
@@ -326,7 +336,7 @@ export function Bank({ user }: BankProps) {
   const dropRef = useRef<HTMLDivElement>(null)
   const dragCounter = useRef(0)
 
-  useEffect(() => { loadItems() }, [currentOrg?.id])
+  useEffect(() => { loadItems() }, [currentOrg?.id, personalMode])
 
   // Close context menu on outside click
   useEffect(() => {
@@ -345,7 +355,7 @@ export function Bank({ user }: BankProps) {
     let hasMigrationIssue = false
     while (true) {
       let q = supabase.from('content_bank').select('*').order('created_at', { ascending: false }).range(from, from + PAGE - 1)
-      q = currentOrg ? q.eq('org_id', currentOrg.id) : q.eq('user_id', user.id).is('org_id', null)
+      q = scopeQ(q)
       const { data, error: err } = await q
       if (err) { setError('Erreur lors du chargement.'); setLoading(false); return }
       const rows = (data ?? []) as ContentItem[]
@@ -369,7 +379,7 @@ export function Bank({ user }: BankProps) {
   async function insertBankRow(opts: { title: string; storagePath: string; thumbnailPath: string | null }) {
     const folder = selectedFolder ?? null
     const baseRow = {
-      user_id: user.id, org_id: currentOrg?.id ?? null, title: opts.title,
+      user_id: user.id, org_id: isPersonal ? null : (currentOrg?.id ?? null), title: opts.title,
       file_url:       null,
       storage_path:   opts.storagePath,
       thumbnail_path: opts.thumbnailPath,
@@ -381,7 +391,7 @@ export function Bank({ user }: BankProps) {
     if (res.error && /storage_path|thumbnail_path|folder/i.test(res.error.message) && /column|cache/i.test(res.error.message)) {
       setNeedsMigration(true)
       res = await supabase.from('content_bank').insert({
-        user_id: user.id, org_id: currentOrg?.id ?? null, title: opts.title, file_url: null,
+        user_id: user.id, org_id: isPersonal ? null : (currentOrg?.id ?? null), title: opts.title, file_url: null,
         duration: null, tags: [], notes: '',
       }).select().single()
     }
@@ -507,9 +517,7 @@ export function Bank({ user }: BankProps) {
 
   async function deleteItem(id: string) {
     const item = items.find(i => i.id === id)
-    let q = supabase.from('content_bank').delete().eq('id', id)
-    if (currentOrg) q = q.eq('org_id', currentOrg.id)
-    else q = q.eq('user_id', user.id)
+    let q = scopeQ(supabase.from('content_bank').delete().eq('id', id))
     const { error: err } = await q
     if (err) {
       setError('Deletion failed: ' + err.message)
@@ -553,8 +561,7 @@ export function Bank({ user }: BankProps) {
 
   async function renameFolder(oldName: string, newName: string) {
     if (!newName || newName === oldName) return
-    let q = supabase.from('content_bank').update({ folder: newName }).eq('folder', oldName)
-    q = currentOrg ? (q as any).eq('org_id', currentOrg.id) : (q as any).eq('user_id', user.id).is('org_id', null)
+    let q = scopeQ(supabase.from('content_bank').update({ folder: newName }).eq('folder', oldName))
     await q
     setItems(prev => prev.map(i => (i as unknown as {folder:string}).folder === oldName ? { ...i, folder: newName as unknown as string } : i))
     // Update localStorage empty folders
@@ -566,17 +573,14 @@ export function Bank({ user }: BankProps) {
     if (withVideos) {
       const toDelete = items.filter(i => (i as unknown as {folder?: string}).folder === name)
       if (toDelete.length > 0) {
-        let dq = supabase.from('content_bank').delete().in('id', toDelete.map(i => i.id))
-        if (currentOrg) dq = dq.eq('org_id', currentOrg.id)
-        else dq = dq.eq('user_id', user.id)
+        let dq = scopeQ(supabase.from('content_bank').delete().in('id', toDelete.map(i => i.id)))
         const { error: dErr } = await dq
         if (dErr) { setError('Deletion failed: ' + dErr.message); return }
         deleteStorageObjects(toDelete.flatMap(i => [i.storage_path, i.thumbnail_path]))
         setItems(prev => prev.filter(i => (i as unknown as {folder?: string}).folder !== name))
       }
     } else {
-      let qu = supabase.from('content_bank').update({ folder: null }).eq('folder', name)
-      qu = currentOrg ? (qu as any).eq('org_id', currentOrg.id) : (qu as any).eq('user_id', user.id).is('org_id', null)
+      let qu = scopeQ(supabase.from('content_bank').update({ folder: null }).eq('folder', name))
       await qu
       setItems(prev => prev.map(i => (i as unknown as {folder:string}).folder === name ? { ...i, folder: null as unknown as string } : i))
     }
@@ -586,8 +590,7 @@ export function Bank({ user }: BankProps) {
   }
 
   async function mergeFolderTo(fromFolder: string, toFolder: string | null) {
-    let qm = supabase.from('content_bank').update({ folder: toFolder }).eq('folder', fromFolder)
-    qm = currentOrg ? (qm as any).eq('org_id', currentOrg.id) : (qm as any).eq('user_id', user.id).is('org_id', null)
+    let qm = scopeQ(supabase.from('content_bank').update({ folder: toFolder }).eq('folder', fromFolder))
     await qm
     setItems(prev => prev.map(i => (i as unknown as {folder?:string}).folder === fromFolder ? { ...i, folder: toFolder as unknown as string } : i))
     persistEmptyFolders(emptyFolders.filter(f => f !== fromFolder))
@@ -698,6 +701,34 @@ export function Bank({ user }: BankProps) {
 
         {/* Right controls */}
         <div className="flex items-center gap-2 flex-shrink-0">
+          {/* Personal / Org toggle — only when in an org */}
+          {currentOrg && (
+            <div
+              className="flex rounded-lg overflow-hidden"
+              style={{ border: '1px solid rgba(139,92,246,0.18)', background: '#0E0E16' }}
+            >
+              <button
+                onClick={() => { setPersonalMode(false); setSelectedFolder(null) }}
+                className="px-3 py-1.5 text-[11px] font-semibold transition-colors flex items-center gap-1.5"
+                style={!personalMode ? { background: 'rgba(139,92,246,0.25)', color: '#A78BFA' } : { color: '#52525B' }}
+              >
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                </svg>
+                Orga
+              </button>
+              <button
+                onClick={() => { setPersonalMode(true); setSelectedFolder(null) }}
+                className="px-3 py-1.5 text-[11px] font-semibold transition-colors flex items-center gap-1.5"
+                style={personalMode ? { background: 'rgba(139,92,246,0.25)', color: '#A78BFA' } : { color: '#52525B' }}
+              >
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+                </svg>
+                Perso
+              </button>
+            </div>
+          )}
           {/* View toggle */}
           <div
             className="flex rounded-lg overflow-hidden"
