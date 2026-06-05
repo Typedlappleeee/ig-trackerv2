@@ -486,16 +486,28 @@ export function Scheduler({ user, onNavigate }: Props) {
         borderBottom: '1px solid rgba(255,255,255,0.06)',
       }}>
         <div className="sf-anim-slide-up" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 }}>
-          <div>
-            <h1 style={{
-              fontSize: 22, fontWeight: 700, color: '#F2F0FF',
-              margin: 0, lineHeight: 1, letterSpacing: '-0.04em',
+          <div style={{ display: 'flex', alignItems: 'center', gap: 13, minWidth: 0 }}>
+            <div style={{
+              width: 44, height: 44, borderRadius: 13, flexShrink: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'linear-gradient(135deg, rgba(34,211,238,0.2), rgba(34,211,238,0.05))',
+              border: '1px solid rgba(34,211,238,0.25)', color: '#22d3ee',
             }}>
-              {t('schedulerTitle')}
-            </h1>
-            <p style={{ fontSize: 12.5, color: 'rgba(148,163,184,0.52)', marginTop: 6, marginBottom: 0 }}>
-              {posts.length} {posts.length !== 1 ? t('schedulerTaskCountPlural') : t('schedulerTaskCount')}
-            </p>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2z"/>
+              </svg>
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <h1 style={{
+                fontSize: 23, fontWeight: 800, color: '#F2F0FF',
+                margin: 0, lineHeight: 1.1, letterSpacing: '-0.025em',
+              }}>
+                {t('schedulerTitle')}
+              </h1>
+              <p style={{ fontSize: 12.5, color: 'rgba(148,163,184,0.55)', marginTop: 5, marginBottom: 0 }}>
+                {posts.length} {posts.length !== 1 ? t('schedulerTaskCountPlural') : t('schedulerTaskCount')}
+              </p>
+            </div>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

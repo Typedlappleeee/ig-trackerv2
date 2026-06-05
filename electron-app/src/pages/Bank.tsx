@@ -669,19 +669,31 @@ export function Bank({ user }: BankProps) {
         style={{ borderBottom: '1px solid rgba(139,92,246,0.12)' }}
       >
         {/* Title + badge */}
-        <div className="flex items-center gap-3">
-          <div>
-            <h1 className="text-[22px] font-black text-white leading-none tracking-tight">{t('bankTitle')}</h1>
-            <p className="text-[12px] mt-0.5" style={{ color: '#52525B' }}>
+        <div className="flex items-center gap-3.5 min-w-0">
+          <div style={{
+            width: 44, height: 44, borderRadius: 13, flexShrink: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'linear-gradient(135deg, rgba(34,211,238,0.2), rgba(34,211,238,0.05))',
+            border: '1px solid rgba(34,211,238,0.25)', color: '#22d3ee',
+          }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M15 10l4.553-2.069A1 1 0 0 1 21 8.82v6.36a1 1 0 0 1-1.447.894L15 14M3 8a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8z"/>
+            </svg>
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2.5">
+              <h1 className="text-[23px] font-black text-white leading-none tracking-tight" style={{ letterSpacing: '-0.025em' }}>{t('bankTitle')}</h1>
+              <span
+                className="px-2.5 py-0.5 rounded-full text-[11px] font-bold"
+                style={{ background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.3)', color: '#A78BFA' }}
+              >
+                {items.length}
+              </span>
+            </div>
+            <p className="text-[12.5px] mt-1.5" style={{ color: 'rgba(148,163,184,0.55)' }}>
               {t('bankSubtitle')}
             </p>
           </div>
-          <span
-            className="px-2.5 py-0.5 rounded-full text-[11px] font-bold"
-            style={{ background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.3)', color: '#A78BFA' }}
-          >
-            {items.length}
-          </span>
         </div>
 
         {/* Search + controls */}

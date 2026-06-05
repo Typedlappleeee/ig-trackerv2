@@ -491,14 +491,27 @@ export function Posting({ user }: PostingProps) {
         {/* Page header */}
         <div className="flex-shrink-0 px-8 pt-6 pb-5 flex items-center justify-between"
           style={{ borderBottom: '1px solid rgba(139,92,246,0.08)' }}>
-          <div>
-            <h1 className="text-[22px] font-black tracking-tight leading-none" style={{
-              background: 'linear-gradient(135deg, #FFFFFF 0%, rgba(196,181,253,0.85) 100%)',
-              WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-            }}>{t('newPost')}</h1>
-            <p className="text-[12px] mt-1" style={{ color: 'rgba(148,163,184,0.5)' }}>
-              Reel Instagram · GéeLark Cloud
-            </p>
+          <div className="flex items-center gap-3.5 min-w-0">
+            <div style={{
+              width: 44, height: 44, borderRadius: 13, flexShrink: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'linear-gradient(135deg, rgba(139,92,246,0.22), rgba(139,92,246,0.06))',
+              border: '1px solid rgba(139,92,246,0.25)', color: '#a78bfa',
+            }}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
+              </svg>
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-[23px] font-black tracking-tight leading-none" style={{
+                background: 'linear-gradient(135deg, #FFFFFF 0%, rgba(196,181,253,0.85) 100%)',
+                WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+                letterSpacing: '-0.025em',
+              }}>{t('newPost')}</h1>
+              <p className="text-[12.5px] mt-1.5" style={{ color: 'rgba(148,163,184,0.55)' }}>
+                Reel Instagram · GéeLark Cloud
+              </p>
+            </div>
           </div>
           <button onClick={() => { setFilePath(null); setCaption(''); setTopic('') }}
             className="flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-[12px] font-medium transition-all hover:bg-white/[0.04]"

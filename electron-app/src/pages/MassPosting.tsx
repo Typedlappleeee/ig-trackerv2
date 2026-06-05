@@ -663,17 +663,17 @@ export function MassPosting({ user }: MassPostingProps) {
 
         {/* Left: title + status */}
         <div className="flex items-center gap-4 min-w-0">
-          <div className="flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center"
-            style={{ background: 'linear-gradient(135deg,rgba(124,58,237,0.25),rgba(168,85,247,0.12))', border: '1px solid rgba(139,92,246,0.25)', boxShadow: '0 0 20px -6px rgba(139,92,246,0.5)' }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <div className="flex-shrink-0 rounded-[13px] flex items-center justify-center" style={{ width: 44, height: 44, background: 'linear-gradient(135deg,rgba(124,58,237,0.25),rgba(168,85,247,0.12))', border: '1px solid rgba(139,92,246,0.25)', boxShadow: '0 0 20px -6px rgba(139,92,246,0.5)' }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.85" strokeLinecap="round" strokeLinejoin="round">
               <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
             </svg>
           </div>
           <div>
             <div className="flex items-center gap-2.5">
-              <h1 className="text-[20px] font-black tracking-tight leading-none" style={{
+              <h1 className="text-[23px] font-black tracking-tight leading-none" style={{
                 background: 'linear-gradient(135deg,#FFFFFF 0%,rgba(196,181,253,0.85) 100%)',
                 WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+                letterSpacing: '-0.025em',
               }}>Mass Posting</h1>
               {posting ? (
                 <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider"
