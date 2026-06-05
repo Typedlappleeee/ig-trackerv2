@@ -678,15 +678,17 @@ const TGIcon = ({ size = 14 }: { size?: number }) => (
 )
 
 const TUNNEL_CSS = `
-  @keyframes tunnel-ring-zoom {
-    0%   { transform: scale(0.04); opacity: 0; }
-    8%   { opacity: 1; }
-    78%  { opacity: 0.6; }
-    100% { transform: scale(3); opacity: 0; }
+  @keyframes portal-open {
+    from { transform: scale(0.1); opacity: 0; filter: blur(16px); }
+    to   { transform: scale(1);   opacity: 1; filter: blur(0px);  }
   }
-  @keyframes tunnel-glow-pulse {
-    0%,100% { opacity: 0.38; transform: translate(-50%,-50%) scale(1); }
-    50%     { opacity: 0.68; transform: translate(-50%,-50%) scale(1.1); }
+  @keyframes portal-breathe {
+    0%,100% { transform: scale(1); }
+    50%      { transform: scale(1.012); }
+  }
+  @keyframes portal-glow {
+    0%,100% { opacity: 0.32; }
+    50%     { opacity: 0.55; }
   }
   @keyframes enter-btn-pulse {
     0%,100% { box-shadow: 0 0 0 0 rgba(255,255,255,0.12), inset 0 1px 0 rgba(255,255,255,0.15); }
@@ -710,10 +712,19 @@ const TUNNEL_CSS = `
   }
 `
 
-const TUNNEL_RING_COUNT = 16
-const TUNNEL_RING_DURATION = 3.6
+// Concentric portal frames — widths in vw, inner → outer
+const PORTAL_FRAMES = [
+  { w:  7, op: 0.90, glow: true  },
+  { w: 14, op: 0.78, glow: false },
+  { w: 23, op: 0.66, glow: true  },
+  { w: 34, op: 0.54, glow: false },
+  { w: 47, op: 0.44, glow: false },
+  { w: 62, op: 0.34, glow: false },
+  { w: 80, op: 0.24, glow: false },
+  { w:102, op: 0.14, glow: false },
+]
 
-// ── Tunnel hero ────────────────────────────────────────────────────────────────
+// ── Portal tunnel hero ─────────────────────────────────────────────────────────
 function TunnelHero({ onEnter }: { onEnter: () => void }) {
   useEffect(() => {
     const id = 'sf-tunnel-css'
@@ -728,55 +739,54 @@ function TunnelHero({ onEnter }: { onEnter: () => void }) {
     <section style={{
       position: 'relative', height: '100vh', overflow: 'hidden',
       cursor: 'none',
-      background: '#02010a',
+      background: '#04030e',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
     }}>
 
-      {/* Perspective corridor lines — vanishing point at center */}
+      {/* Perspective lines from screen corners → center vanishing point */}
       <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 1 }} preserveAspectRatio="none">
-        <line x1="0"    y1="0"    x2="50%" y2="50%" stroke="rgba(139,92,246,0.12)" strokeWidth="1" />
-        <line x1="100%" y1="0"    x2="50%" y2="50%" stroke="rgba(139,92,246,0.12)" strokeWidth="1" />
-        <line x1="0"    y1="100%" x2="50%" y2="50%" stroke="rgba(139,92,246,0.12)" strokeWidth="1" />
-        <line x1="100%" y1="100%" x2="50%" y2="50%" stroke="rgba(139,92,246,0.12)" strokeWidth="1" />
-        <line x1="50%"  y1="0"    x2="50%" y2="50%" stroke="rgba(139,92,246,0.06)" strokeWidth="1" />
-        <line x1="50%"  y1="100%" x2="50%" y2="50%" stroke="rgba(139,92,246,0.06)" strokeWidth="1" />
-        <line x1="0"    y1="50%"  x2="50%" y2="50%" stroke="rgba(139,92,246,0.06)" strokeWidth="1" />
-        <line x1="100%" y1="50%"  x2="50%" y2="50%" stroke="rgba(139,92,246,0.06)" strokeWidth="1" />
+        <line x1="0"    y1="0"    x2="50%" y2="50%" stroke="rgba(139,92,246,0.10)" strokeWidth="1" />
+        <line x1="100%" y1="0"    x2="50%" y2="50%" stroke="rgba(139,92,246,0.10)" strokeWidth="1" />
+        <line x1="0"    y1="100%" x2="50%" y2="50%" stroke="rgba(139,92,246,0.10)" strokeWidth="1" />
+        <line x1="100%" y1="100%" x2="50%" y2="50%" stroke="rgba(139,92,246,0.10)" strokeWidth="1" />
+        <line x1="50%"  y1="0"    x2="50%" y2="50%" stroke="rgba(139,92,246,0.05)" strokeWidth="1" />
+        <line x1="50%"  y1="100%" x2="50%" y2="50%" stroke="rgba(139,92,246,0.05)" strokeWidth="1" />
+        <line x1="0"    y1="50%"  x2="50%" y2="50%" stroke="rgba(139,92,246,0.05)" strokeWidth="1" />
+        <line x1="100%" y1="50%"  x2="50%" y2="50%" stroke="rgba(139,92,246,0.05)" strokeWidth="1" />
       </svg>
 
-      {/* Zooming rings — create the fly-through tunnel illusion */}
-      <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1 }}>
-        {Array.from({ length: TUNNEL_RING_COUNT }).map((_, i) => {
-          const delay = -(i / TUNNEL_RING_COUNT) * TUNNEL_RING_DURATION
-          const accent = i % 4 === 0
-          return (
-            <div key={i} style={{
-              position: 'absolute',
-              width: '58vw',
-              height: '34vw',
-              border: accent
-                ? '1px solid rgba(167,139,250,0.75)'
-                : '1px solid rgba(109,64,220,0.38)',
-              borderRadius: '22px',
-              boxShadow: accent ? '0 0 20px rgba(139,92,246,0.14)' : 'none',
-              animation: `tunnel-ring-zoom ${TUNNEL_RING_DURATION}s linear ${delay}s infinite`,
-              willChange: 'transform, opacity',
-            }} />
-          )
-        })}
+      {/* Portal frames — open on mount, breathe slowly after */}
+      <div style={{
+        position: 'absolute', inset: 0,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        zIndex: 1,
+        animation: 'portal-open 1.6s cubic-bezier(0.16,1,0.3,1) 0.05s both',
+      }}>
+        {PORTAL_FRAMES.map((f, i) => (
+          <div key={i} style={{
+            position: 'absolute',
+            width:  `${f.w}vw`,
+            height: `${f.w * 0.56}vw`,
+            border: `1px solid rgba(139,92,246,${f.op})`,
+            borderRadius: `${8 + i * 5}px`,
+            boxShadow: f.glow ? `0 0 ${14 - i * 2}px rgba(139,92,246,0.18)` : 'none',
+            animation: `portal-breathe ${9 + i * 0.8}s ease-in-out ${i * 0.5}s infinite`,
+          }} />
+        ))}
       </div>
 
-      {/* Central purple glow */}
+      {/* Soft glow at center */}
       <div style={{
         position: 'absolute', top: '50%', left: '50%',
-        width: 520, height: 300,
-        background: 'radial-gradient(ellipse closest-side, rgba(109,40,217,0.30), transparent)',
-        filter: 'blur(55px)', pointerEvents: 'none', zIndex: 1,
-        animation: 'tunnel-glow-pulse 5s ease-in-out infinite',
+        transform: 'translate(-50%,-50%)',
+        width: 480, height: 280,
+        background: 'radial-gradient(ellipse closest-side, rgba(100,40,220,0.26), transparent)',
+        filter: 'blur(50px)', pointerEvents: 'none', zIndex: 1,
+        animation: 'portal-glow 7s ease-in-out infinite',
       }} />
 
-      {/* Deep vignette — keeps edges dark, text readable */}
-      <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse 58% 58% at 50% 50%, transparent 18%, rgba(2,1,10,0.94) 100%)', pointerEvents: 'none', zIndex: 2 }} />
+      {/* Light vignette — just softens edges without blackout */}
+      <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse 75% 75% at 50% 50%, transparent 35%, rgba(4,3,14,0.78) 100%)', pointerEvents: 'none', zIndex: 2 }} />
 
       {/* Center branding */}
       <div style={{ position: 'relative', zIndex: 10, textAlign: 'center', userSelect: 'none' }}>
@@ -787,7 +797,7 @@ function TunnelHero({ onEnter }: { onEnter: () => void }) {
           lineHeight: 1,
           margin: '0 0 6px',
           fontFamily: "'Inter', 'Arial Black', system-ui, sans-serif",
-          animation: 'brand-appear 1.2s cubic-bezier(0.16,1,0.3,1) 0.2s both',
+          animation: 'brand-appear 1.2s cubic-bezier(0.16,1,0.3,1) 0.4s both',
           background: 'linear-gradient(135deg, #ffffff 0%, rgba(200,180,255,0.9) 50%, #ffffff 100%)',
           WebkitBackgroundClip: 'text',
           WebkitTextFillColor: 'transparent',
@@ -802,13 +812,13 @@ function TunnelHero({ onEnter }: { onEnter: () => void }) {
           letterSpacing: '0.22em',
           textTransform: 'uppercase',
           margin: '0 0 48px',
-          animation: 'sf-fade-in 1s ease 1s both',
+          animation: 'sf-fade-in 1s ease 1.2s both',
           fontWeight: 500,
         }}>
           Instagram Automation
         </p>
 
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginBottom: 40, animation: 'sf-fade-in 1s ease 1.1s both' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginBottom: 40, animation: 'sf-fade-in 1s ease 1.3s both' }}>
           {[1, 0, 0].map((active, j) => (
             <div key={j} style={{ width: active ? 20 : 6, height: 6, borderRadius: 99, background: active ? '#fff' : 'rgba(255,255,255,0.2)' }} />
           ))}
@@ -821,7 +831,7 @@ function TunnelHero({ onEnter }: { onEnter: () => void }) {
             border: '1.5px solid rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.06)',
             backdropFilter: 'blur(12px)', color: '#fff', fontSize: 13, fontWeight: 700,
             letterSpacing: '0.18em', textTransform: 'uppercase', cursor: 'pointer',
-            animation: 'sf-fade-in 0.8s ease 1.3s both, enter-btn-pulse 3s ease-in-out 2s infinite',
+            animation: 'sf-fade-in 0.8s ease 1.5s both, enter-btn-pulse 3s ease-in-out 2.5s infinite',
             transition: 'background 0.2s, border-color 0.2s, transform 0.15s',
           }}
           onMouseEnter={e => {
