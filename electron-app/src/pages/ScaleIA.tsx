@@ -8,7 +8,7 @@ export default function ScaleIA() {
         backgroundImage: 'url(/scaleia-bg.webp)',
         backgroundSize: 'cover',
         backgroundPosition: 'center top',
-        filter: 'blur(2px) brightness(0.35)',
+        filter: 'blur(8px) brightness(0.3)',
         transform: 'scale(1.04)',
         pointerEvents: 'none',
       }} />
@@ -17,6 +17,12 @@ export default function ScaleIA() {
       <div style={{
         position: 'absolute', inset: 0,
         background: 'radial-gradient(ellipse at 50% 38%, rgba(124,58,237,0.22) 0%, rgba(6,6,14,0.75) 65%)',
+        pointerEvents: 'none',
+      }} />
+      {/* Extra mask on top to hide any logo/branding */}
+      <div style={{
+        position: 'absolute', top: 0, left: 0, right: 0, height: 80,
+        background: 'linear-gradient(to bottom, #06060e 40%, transparent)',
         pointerEvents: 'none',
       }} />
 
