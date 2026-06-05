@@ -60,7 +60,7 @@ module.exports = async (req, res) => {
         '-c:v', 'libx264', '-preset', 'ultrafast', '-tune', 'fastdecode',
         '-crf', String(v.crf ?? 30),
         '-pix_fmt', 'yuv420p', '-profile:v', 'main', '-level', '4.0',
-        '-c:a', 'copy',
+        '-c:a', 'aac', '-b:a', '128k', '-ar', '44100',
         '-movflags', '+faststart',
         outPaths[i],
       )
