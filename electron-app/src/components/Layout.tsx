@@ -58,6 +58,7 @@ export type Page =
   | 'montage' | 'remix' | 'repurpose' | 'mixer'
   | 'community' | 'support'
   | 'settings' | 'licences'
+  | 'scaleia'
 
 interface LayoutProps {
   user:      User
@@ -154,6 +155,7 @@ const PAGE_ICON: Record<string, IconKey> = {
   repurpose:   'zap',
   mixer:       'edit',
   textcopy:    'edit',
+  scaleia:     'sparkles',
 }
 
 // Section label component
@@ -412,7 +414,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
 
   const isVisibleTab = (id: Page): boolean => {
     if (id === 'licences')  return license.isSuperAdmin
-    if (id === 'support' || id === 'community') return true
+    if (id === 'support' || id === 'community' || id === 'scaleia') return true
     return role ? canSeeTab(role, perms, id as import('@/lib/supabase').PageKey) : true
   }
 
@@ -713,6 +715,49 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
               )}
             </button>
           )}
+
+          {/* ScaleIA — coming soon spotlight */}
+          <button
+            onClick={() => { playNav(); onNavigate('scaleia') }}
+            title={collapsed ? 'ScaleIA' : undefined}
+            style={{
+              display: 'flex', alignItems: 'center', gap: collapsed ? 0 : 9,
+              width: '100%', height: 36, padding: '0 10px', borderRadius: 10,
+              fontSize: 13, fontWeight: page === 'scaleia' ? 600 : 500, textAlign: 'left',
+              cursor: 'pointer', border: '1px solid rgba(139,92,246,0.22)',
+              background: page === 'scaleia'
+                ? 'linear-gradient(90deg,rgba(124,58,237,0.25),rgba(34,211,238,0.1))'
+                : 'linear-gradient(90deg,rgba(124,58,237,0.08),rgba(34,211,238,0.04))',
+              color: page === 'scaleia' ? '#c4b5fd' : 'rgba(196,181,253,0.7)',
+              transition: 'background 0.15s, color 0.15s',
+              justifyContent: collapsed ? 'center' : 'flex-start',
+              marginBottom: 2,
+            }}
+            onMouseEnter={e => {
+              if (page !== 'scaleia') (e.currentTarget as HTMLButtonElement).style.background = 'linear-gradient(90deg,rgba(124,58,237,0.15),rgba(34,211,238,0.07))'
+            }}
+            onMouseLeave={e => {
+              if (page !== 'scaleia') (e.currentTarget as HTMLButtonElement).style.background = 'linear-gradient(90deg,rgba(124,58,237,0.08),rgba(34,211,238,0.04))'
+            }}
+          >
+            <span style={{ flexShrink: 0, color: '#a78bfa', display: 'flex' }}>
+              <NavIcon d={ICONS.sparkles} size={16} color="#a78bfa" />
+            </span>
+            {!collapsed && (
+              <>
+                <span style={{ flex: 1, background: 'linear-gradient(90deg,#c4b5fd,#67e8f9)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', fontWeight: 700 }}>ScaleIA</span>
+                <span style={{
+                  fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.12em',
+                  padding: '2px 6px', borderRadius: 4, flexShrink: 0,
+                  background: 'linear-gradient(90deg,rgba(167,139,250,0.25),rgba(34,211,238,0.15))',
+                  color: '#a78bfa', border: '1px solid rgba(139,92,246,0.35)',
+                  boxShadow: '0 0 6px rgba(139,92,246,0.3)',
+                }}>
+                  SOON
+                </span>
+              </>
+            )}
+          </button>
 
           <SidebarDivider />
 

@@ -565,6 +565,7 @@ import { Licences }          from '@/pages/Licences'
 
 import { Support }           from '@/pages/Support'
 import { Community }         from '@/pages/Community'
+import ScaleIA               from '@/pages/ScaleIA'
 import { FullPageLoader }    from '@/components/ui/Spinner'
 import { Landing }           from '@/components/Landing'
 import { AppTour }           from '@/components/AppTour'
@@ -806,6 +807,7 @@ function AppContent({ user }: { user: User }) {
       case 'aitools':      return <AiTools     user={user} />
       case 'settings':     return <Settings    user={user} initialPanel={settingsPanel as any} onNavigate={(p) => setPage(p as any)} />
       case 'community':    return <Community    user={user} onNavigate={handleNavigate} />
+      case 'scaleia':      return <ScaleIA />
       case 'support':      return <Support      user={user} />
       case 'licences':     return <Licences    user={user} />
 
