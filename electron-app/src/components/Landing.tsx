@@ -873,25 +873,25 @@ const TGIcon = ({ size = 14 }: { size?: number }) => (
 )
 
 const TUNNEL_CSS = `
-  @keyframes portal-open {
-    from { transform: scale(0.1); opacity: 0; filter: blur(16px); }
-    to   { transform: scale(1);   opacity: 1; filter: blur(0px);  }
+  @keyframes sf-tile-float {
+    0%,100% { transform: translateY(0px); }
+    50%     { transform: translateY(-10px); }
   }
-  @keyframes portal-breathe {
-    0%,100% { transform: scale(1); }
-    50%      { transform: scale(1.012); }
+  @keyframes sf-tile-in {
+    from { opacity: 0; transform: translateY(18px) scale(0.94); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
   }
-  @keyframes portal-glow {
-    0%,100% { opacity: 0.32; }
-    50%     { opacity: 0.55; }
+  @keyframes sf-entry-brand {
+    from { opacity: 0; transform: translateY(10px); filter: blur(8px); }
+    to   { opacity: 1; transform: translateY(0); filter: blur(0); }
   }
-  @keyframes enter-btn-pulse {
-    0%,100% { box-shadow: 0 0 0 0 rgba(255,255,255,0.12), inset 0 1px 0 rgba(255,255,255,0.15); }
-    50%     { box-shadow: 0 0 28px 4px rgba(255,255,255,0.08), inset 0 1px 0 rgba(255,255,255,0.15); }
+  @keyframes sf-entry-sub {
+    from { opacity: 0; }
+    to   { opacity: 1; }
   }
-  @keyframes brand-appear {
-    from { opacity: 0; letter-spacing: 0.5em; filter: blur(12px); }
-    to   { opacity: 1; letter-spacing: -0.03em; filter: blur(0); }
+  @keyframes sf-enter-btn {
+    0%,100% { box-shadow: 0 0 0 0 rgba(255,255,255,0); }
+    50%     { box-shadow: 0 0 0 6px rgba(255,255,255,0.08); }
   }
   @keyframes reveal-in {
     from { opacity: 0; transform: scale(1.04); }
@@ -907,19 +907,36 @@ const TUNNEL_CSS = `
   }
 `
 
-// Concentric portal frames — widths in vw, inner → outer
-const PORTAL_FRAMES = [
-  { w:  7, op: 0.90, glow: true  },
-  { w: 14, op: 0.78, glow: false },
-  { w: 23, op: 0.66, glow: true  },
-  { w: 34, op: 0.54, glow: false },
-  { w: 47, op: 0.44, glow: false },
-  { w: 62, op: 0.34, glow: false },
-  { w: 80, op: 0.24, glow: false },
-  { w:102, op: 0.14, glow: false },
+// Placeholder — replace each null with a real image URL when available
+export const ENTRY_IMAGES: (string | null)[] = Array(14).fill(null)
+
+// Tile placement data: position, size, 3D rotation, float delay, placeholder colour
+interface EntryTile {
+  key: string; w: number; h: number
+  top?: string; bottom?: string; left?: string; right?: string
+  ry: number; rx: number; delay: number; bg: string
+}
+const ENTRY_TILES: EntryTile[] = [
+  // ── Left column ──────────────────────────────────────────────────────────────
+  { key:'l1', w:250, h:160, top:'3%',  left:'0%',   ry:-20, rx:4,  delay:0,    bg:'#141414' },
+  { key:'l2', w:185, h:118, top:'11%', left:'19%',  ry:-24, rx:7,  delay:0.15, bg:'#181818' },
+  { key:'l3', w:270, h:172, top:'36%', left:'-1%',  ry:-18, rx:1,  delay:0.3,  bg:'#101010' },
+  { key:'l4', w:175, h:112, top:'48%', left:'18%',  ry:-22, rx:0,  delay:0.45, bg:'#1a1a1a' },
+  { key:'l5', w:245, h:157, top:'63%', left:'0%',   ry:-17, rx:-4, delay:0.6,  bg:'#121212' },
+  { key:'l6', w:185, h:118, top:'78%', left:'18%',  ry:-13, rx:-5, delay:0.75, bg:'#161616' },
+  // ── Right column ─────────────────────────────────────────────────────────────
+  { key:'r1', w:185, h:118, top:'1%',  right:'18%', ry:24,  rx:7,  delay:0.1,  bg:'#161616' },
+  { key:'r2', w:250, h:160, top:'3%',  right:'0%',  ry:20,  rx:4,  delay:0.2,  bg:'#0f0f0f' },
+  { key:'r3', w:270, h:172, top:'35%', right:'-1%', ry:18,  rx:1,  delay:0.35, bg:'#151515' },
+  { key:'r4', w:175, h:112, top:'47%', right:'18%', ry:22,  rx:0,  delay:0.5,  bg:'#111111' },
+  { key:'r5', w:245, h:157, top:'63%', right:'0%',  ry:17,  rx:-4, delay:0.65, bg:'#1b1b1b' },
+  { key:'r6', w:185, h:118, top:'77%', right:'18%', ry:13,  rx:-5, delay:0.8,  bg:'#131313' },
+  // ── Top / bottom centre fill ──────────────────────────────────────────────────
+  { key:'tc', w:190, h:122, top:'5%',  left:'43%',  ry:0,   rx:12, delay:0.25, bg:'#181818' },
+  { key:'bc', w:190, h:122, top:'74%', left:'39%',  ry:0,   rx:-10, delay:0.7, bg:'#141414' },
 ]
 
-// ── Portal tunnel hero ─────────────────────────────────────────────────────────
+// ── AIGNCY-style entry hero ───────────────────────────────────────────────────
 function TunnelHero({ onEnter }: { onEnter: () => void }) {
   useEffect(() => {
     const id = 'sf-tunnel-css'
@@ -932,117 +949,99 @@ function TunnelHero({ onEnter }: { onEnter: () => void }) {
 
   return (
     <section style={{
-      position: 'relative', height: '100vh', overflow: 'hidden',
-      cursor: 'none',
-      background: '#04030e',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      position: 'relative', width: '100vw', height: '100vh',
+      overflow: 'hidden', background: '#000',
+      display: 'flex', flexDirection: 'column',
+      alignItems: 'center', justifyContent: 'center',
     }}>
 
-      {/* Perspective lines from screen corners → center vanishing point */}
-      <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 1 }} preserveAspectRatio="none">
-        <line x1="0"    y1="0"    x2="50%" y2="50%" stroke="rgba(139,92,246,0.10)" strokeWidth="1" />
-        <line x1="100%" y1="0"    x2="50%" y2="50%" stroke="rgba(139,92,246,0.10)" strokeWidth="1" />
-        <line x1="0"    y1="100%" x2="50%" y2="50%" stroke="rgba(139,92,246,0.10)" strokeWidth="1" />
-        <line x1="100%" y1="100%" x2="50%" y2="50%" stroke="rgba(139,92,246,0.10)" strokeWidth="1" />
-        <line x1="50%"  y1="0"    x2="50%" y2="50%" stroke="rgba(139,92,246,0.05)" strokeWidth="1" />
-        <line x1="50%"  y1="100%" x2="50%" y2="50%" stroke="rgba(139,92,246,0.05)" strokeWidth="1" />
-        <line x1="0"    y1="50%"  x2="50%" y2="50%" stroke="rgba(139,92,246,0.05)" strokeWidth="1" />
-        <line x1="100%" y1="50%"  x2="50%" y2="50%" stroke="rgba(139,92,246,0.05)" strokeWidth="1" />
-      </svg>
-
-      {/* Portal frames — open on mount, breathe slowly after */}
+      {/* ── Dot grid background ── */}
       <div style={{
-        position: 'absolute', inset: 0,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        zIndex: 1,
-        animation: 'portal-open 1.6s cubic-bezier(0.16,1,0.3,1) 0.05s both',
-      }}>
-        {PORTAL_FRAMES.map((f, i) => (
-          <div key={i} style={{
-            position: 'absolute',
-            width:  `${f.w}vw`,
-            height: `${f.w * 0.56}vw`,
-            border: `1px solid rgba(139,92,246,${f.op})`,
-            borderRadius: `${8 + i * 5}px`,
-            boxShadow: f.glow ? `0 0 ${14 - i * 2}px rgba(139,92,246,0.18)` : 'none',
-            animation: `portal-breathe ${9 + i * 0.8}s ease-in-out ${i * 0.5}s infinite`,
-          }} />
-        ))}
-      </div>
-
-      {/* Soft glow at center */}
-      <div style={{
-        position: 'absolute', top: '50%', left: '50%',
-        transform: 'translate(-50%,-50%)',
-        width: 480, height: 280,
-        background: 'radial-gradient(ellipse closest-side, rgba(100,40,220,0.26), transparent)',
-        filter: 'blur(50px)', pointerEvents: 'none', zIndex: 1,
-        animation: 'portal-glow 7s ease-in-out infinite',
+        position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 0,
+        backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.07) 1px, transparent 1px)',
+        backgroundSize: '40px 40px',
       }} />
 
-      {/* Light vignette — just softens edges without blackout */}
-      <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse 75% 75% at 50% 50%, transparent 35%, rgba(4,3,14,0.78) 100%)', pointerEvents: 'none', zIndex: 2 }} />
+      {/* ── Image tiles ── */}
+      {ENTRY_TILES.map((tile, idx) => (
+        <div
+          key={tile.key}
+          style={{
+            position: 'absolute',
+            top: tile.top, bottom: tile.bottom,
+            left: tile.left, right: tile.right,
+            animation: `sf-tile-float ${6 + idx * 0.3}s ease-in-out ${tile.delay}s infinite, sf-tile-in 0.7s ease ${tile.delay + 0.2}s both`,
+            zIndex: 2,
+          }}
+        >
+          <div style={{
+            width: tile.w, height: tile.h,
+            transform: `perspective(1000px) rotateY(${tile.ry}deg) rotateX(${tile.rx}deg)`,
+            borderRadius: 10,
+            overflow: 'hidden',
+            boxShadow: '0 8px 40px rgba(0,0,0,0.6)',
+          }}>
+            {ENTRY_IMAGES[idx]
+              ? <img src={ENTRY_IMAGES[idx]!} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+              : <div style={{ width: '100%', height: '100%', background: tile.bg }} />
+            }
+          </div>
+        </div>
+      ))}
 
-      {/* Center branding */}
+      {/* ── Center vignette so tiles don't bleed into text ── */}
+      <div style={{
+        position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 3,
+        background: 'radial-gradient(ellipse 55% 60% at 50% 50%, transparent 0%, rgba(0,0,0,0.72) 100%)',
+      }} />
+
+      {/* ── Brand ── */}
       <div style={{ position: 'relative', zIndex: 10, textAlign: 'center', userSelect: 'none' }}>
         <h1 style={{
-          fontSize: 'clamp(64px, 11vw, 130px)',
+          fontSize: 'clamp(72px, 12vw, 148px)',
           fontWeight: 900,
-          letterSpacing: '-0.045em',
-          lineHeight: 1,
-          margin: '0 0 6px',
+          letterSpacing: '-0.04em',
+          lineHeight: 0.92,
+          color: '#ffffff',
+          margin: '0 0 10px',
           fontFamily: "'Inter', 'Arial Black', system-ui, sans-serif",
-          animation: 'brand-appear 1.2s cubic-bezier(0.16,1,0.3,1) 0.4s both',
-          background: 'linear-gradient(135deg, #ffffff 0%, rgba(200,180,255,0.9) 50%, #ffffff 100%)',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent',
-          backgroundClip: 'text',
-          filter: 'drop-shadow(0 0 40px rgba(167,139,250,0.35))',
+          animation: 'sf-entry-brand 1s cubic-bezier(0.16,1,0.3,1) 0.3s both',
         }}>
           ScaleFlow
         </h1>
         <p style={{
-          fontSize: 14,
-          color: 'rgba(255,255,255,0.35)',
-          letterSpacing: '0.22em',
+          fontSize: 11,
+          color: 'rgba(255,255,255,0.32)',
+          letterSpacing: '0.26em',
           textTransform: 'uppercase',
-          margin: '0 0 48px',
-          animation: 'sf-fade-in 1s ease 1.2s both',
-          fontWeight: 500,
+          margin: 0,
+          fontWeight: 600,
+          animation: 'sf-entry-sub 1s ease 0.9s both',
         }}>
           Instagram Automation
         </p>
-
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginBottom: 40, animation: 'sf-fade-in 1s ease 1.3s both' }}>
-          {[1, 0, 0].map((active, j) => (
-            <div key={j} style={{ width: active ? 20 : 6, height: 6, borderRadius: 99, background: active ? '#fff' : 'rgba(255,255,255,0.2)' }} />
-          ))}
-        </div>
-
-        <button
-          onClick={onEnter}
-          style={{
-            display: 'inline-block', padding: '13px 44px', borderRadius: 99,
-            border: '1.5px solid rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.06)',
-            backdropFilter: 'blur(12px)', color: '#fff', fontSize: 13, fontWeight: 700,
-            letterSpacing: '0.18em', textTransform: 'uppercase', cursor: 'pointer',
-            animation: 'sf-fade-in 0.8s ease 1.5s both, enter-btn-pulse 3s ease-in-out 2.5s infinite',
-            transition: 'background 0.2s, border-color 0.2s, transform 0.15s',
-          }}
-          onMouseEnter={e => {
-            e.currentTarget.style.background = 'rgba(255,255,255,0.14)'
-            e.currentTarget.style.borderColor = 'rgba(255,255,255,0.55)'
-            e.currentTarget.style.transform = 'translateY(-2px)'
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.background = 'rgba(255,255,255,0.06)'
-            e.currentTarget.style.borderColor = 'rgba(255,255,255,0.3)'
-            e.currentTarget.style.transform = ''
-          }}
-        >
-          ENTER
-        </button>
       </div>
+
+      {/* ── ENTER button ── */}
+      <button
+        onClick={onEnter}
+        style={{
+          position: 'absolute', bottom: '6%', left: '50%', transform: 'translateX(-50%)',
+          zIndex: 10,
+          padding: '14px 52px', borderRadius: 99,
+          background: '#fff', color: '#000',
+          fontSize: 13, fontWeight: 800,
+          letterSpacing: '0.16em', textTransform: 'uppercase',
+          border: 'none', cursor: 'pointer',
+          animation: 'sf-tile-in 0.6s ease 1.2s both, sf-enter-btn 3s ease-in-out 2s infinite',
+          transition: 'transform 0.15s, background 0.15s',
+          boxShadow: '0 4px 28px rgba(255,255,255,0.18)',
+        }}
+        onMouseEnter={e => { e.currentTarget.style.transform = 'translateX(-50%) translateY(-2px) scale(1.03)' }}
+        onMouseLeave={e => { e.currentTarget.style.transform = 'translateX(-50%)' }}
+      >
+        ENTER
+      </button>
     </section>
   )
 }
