@@ -294,6 +294,7 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
                 let thumbnailPath: string | null = null
                 if (result.storagePath) {
                   storagePath = result.storagePath  // server already uploaded
+                  thumbnailPath = result.thumbnailPath ?? null
                 } else {
                   const up = await uploadVideoFromPath(result.outputPath!, scope)
                   storagePath   = up.storagePath
@@ -347,7 +348,7 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
         <BankPicker
           user={user}
           mode="multi"
-          resolveMode="full"
+          resolveMode="signed-url"
           onSelect={(paths, titles) => {
             const newSrcs = paths.map((url, i) => ({ url, name: titles?.[i] ?? 'bank video' }))
             setSources(prev => [...prev, ...newSrcs])

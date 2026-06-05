@@ -146,11 +146,13 @@ const PAGE_ICON: Record<string, IconKey> = {
   massposting: 'zap',
   scheduler:   'calendar',
   bank:        'video',
+  captionbank: 'chat',
   warmup:      'flame',
   aitools:     'sparkles',
   montage:     'scissors',
   remix:       'refresh',
   repurpose:   'zap',
+  mixer:       'edit',
   textcopy:    'edit',
 }
 
@@ -584,10 +586,13 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
     massposting: t('pageMassPosting'),
     scheduler:   t('pageScheduler'),
     bank:        t('pageBank'),
+    captionbank: t('navCaptionBank'),
     aitools:     t('pageAiTools'),
     warmup:      t('pageWarmup'),
     montage:     t('pageMontage'),
     remix:       t('pageRemix'),
+    repurpose:   t('navRepurpose'),
+    mixer:       t('navMixer'),
     textcopy:    t('pageTextcopy'),
     community:   t('pageCommunity'),
     support:     t('pageSupport'),
@@ -968,28 +973,52 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
               </div>
             )}
 
-            {/* Credits chip */}
+            {/* Credits chip + buy button */}
             {!credits.loading && (
-              <button
-                onClick={() => onNavigate('settings', 'abonnement')}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 6,
-                  padding: '5px 12px', borderRadius: 8,
-                  background: credits.balance < 10 ? 'rgba(239,68,68,0.08)' : 'rgba(139,92,246,0.07)',
-                  border: credits.balance < 10 ? '1px solid rgba(239,68,68,0.25)' : '1px solid rgba(139,92,246,0.18)',
-                  cursor: 'pointer', transition: 'background 0.15s',
-                }}
-                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = credits.balance < 10 ? 'rgba(239,68,68,0.14)' : 'rgba(139,92,246,0.13)' }}
-                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = credits.balance < 10 ? 'rgba(239,68,68,0.08)' : 'rgba(139,92,246,0.07)' }}
-              >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
-                  <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke={credits.balance < 10 ? '#F87171' : '#a78bfa'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-                <span style={{ fontSize: 12, fontWeight: 700, color: credits.balance < 10 ? '#F87171' : '#c4b5fd', fontVariantNumeric: 'tabular-nums' }}>
-                  {credits.balance.toLocaleString('fr-FR')}
-                </span>
-                <span style={{ fontSize: 10, color: credits.balance < 10 ? 'rgba(248,113,113,0.5)' : 'rgba(196,181,253,0.45)', fontWeight: 500 }}>cr</span>
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
+                {/* Balance pill */}
+                <button
+                  onClick={() => onNavigate('settings', 'abonnement')}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    padding: '5px 10px 5px 12px', borderRadius: '8px 0 0 8px',
+                    background: credits.balance < 10 ? 'rgba(239,68,68,0.08)' : 'rgba(139,92,246,0.07)',
+                    border: credits.balance < 10 ? '1px solid rgba(239,68,68,0.25)' : '1px solid rgba(139,92,246,0.18)',
+                    borderRight: 'none',
+                    cursor: 'pointer', transition: 'background 0.15s',
+                  }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = credits.balance < 10 ? 'rgba(239,68,68,0.14)' : 'rgba(139,92,246,0.13)' }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = credits.balance < 10 ? 'rgba(239,68,68,0.08)' : 'rgba(139,92,246,0.07)' }}
+                >
+                  {/* Diamond/gem icon */}
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                    <path d="M6 3h12l4 6-10 12L2 9l4-6z" stroke={credits.balance < 10 ? '#F87171' : '#a78bfa'} strokeWidth="2" strokeLinejoin="round" fill={credits.balance < 10 ? 'rgba(239,68,68,0.2)' : 'rgba(139,92,246,0.18)'}/>
+                    <path d="M2 9h20M12 3l4 6-4 12-4-12 4-6z" stroke={credits.balance < 10 ? '#F87171' : '#a78bfa'} strokeWidth="1.5" strokeLinejoin="round"/>
+                  </svg>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: credits.balance < 10 ? '#F87171' : '#c4b5fd', fontVariantNumeric: 'tabular-nums' }}>
+                    {credits.balance.toLocaleString('fr-FR')}
+                  </span>
+                </button>
+                {/* + button */}
+                <button
+                  onClick={() => onNavigate('settings', 'abonnement')}
+                  title="Acheter des crédits"
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    width: 26, height: 30, borderRadius: '0 8px 8px 0',
+                    background: credits.balance < 10 ? 'rgba(239,68,68,0.14)' : 'rgba(139,92,246,0.14)',
+                    border: credits.balance < 10 ? '1px solid rgba(239,68,68,0.25)' : '1px solid rgba(139,92,246,0.25)',
+                    cursor: 'pointer', transition: 'background 0.15s, opacity 0.15s',
+                    fontSize: 14, fontWeight: 700,
+                    color: credits.balance < 10 ? '#F87171' : '#a78bfa',
+                    lineHeight: 1,
+                  }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = credits.balance < 10 ? 'rgba(239,68,68,0.22)' : 'rgba(139,92,246,0.22)' }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = credits.balance < 10 ? 'rgba(239,68,68,0.14)' : 'rgba(139,92,246,0.14)' }}
+                >
+                  +
+                </button>
+              </div>
             )}
 
             {/* Notification bell */}

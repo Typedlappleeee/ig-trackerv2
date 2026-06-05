@@ -127,7 +127,7 @@ module.exports = async (req, res) => {
       '-c:v', 'libx264', '-preset', 'ultrafast',
       '-crf', '28',
       '-pix_fmt', 'yuv420p', '-profile:v', 'main', '-level', '4.0',
-      '-c:a', 'copy',
+      '-c:a', 'aac', '-b:a', '128k', '-ar', '44100',
       '-movflags', '+faststart',
       '-y', outPath,
     ], { maxBuffer: 100 * 1024 * 1024 })

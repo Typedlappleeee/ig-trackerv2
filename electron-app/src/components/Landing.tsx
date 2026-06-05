@@ -623,8 +623,8 @@ const PLANS: PlanDef[] = [
   {
     name: 'Standard', tagline: 'Pour débuter', icon: '⚡',
     credits: '2 500 crédits / mois', creditsColor: '#60a5fa', accent: '#3b82f6',
-    monthlyPrice: '49,99$', yearlyPrice: '34,99$',
-    originalMonthly: '49,99$', discount: '30% OFF', yearlyBilled: '419,88$ facturé annuellement',
+    monthlyPrice: '49,99$', yearlyPrice: '49,99$',
+    originalMonthly: '', discount: '', yearlyBilled: '',
     btnLabel: "S'abonner à Standard",
     features: [
       { text: 'Accès aux outils de base',       included: true  },
@@ -638,8 +638,8 @@ const PLANS: PlanDef[] = [
   {
     name: 'Pro', tagline: 'Scale ton output', icon: '👑',
     credits: '5 500 crédits / mois', creditsColor: '#a78bfa', accent: '#7c3aed',
-    monthlyPrice: '79,99$', yearlyPrice: '59,99$',
-    originalMonthly: '79,99$', discount: '25% OFF', yearlyBilled: '719,88$ facturé annuellement',
+    monthlyPrice: '99,99$', yearlyPrice: '59,99$',
+    originalMonthly: '99,99$', discount: '40% OFF', yearlyBilled: '719,88$ facturé annuellement',
     popular: true,
     btnLabel: "S'abonner à Pro",
     features: [
@@ -654,8 +654,8 @@ const PLANS: PlanDef[] = [
   {
     name: 'Organisation', tagline: 'Puissance illimitée', icon: '🏢',
     credits: '11 000 crédits / mois', creditsColor: '#f59e0b', accent: '#f59e0b',
-    monthlyPrice: '119,99$', yearlyPrice: '89,99$',
-    originalMonthly: '119,99$', discount: '25% OFF', yearlyBilled: '1 079,88$ facturé annuellement',
+    monthlyPrice: '149,99$', yearlyPrice: '89,99$',
+    originalMonthly: '149,99$', discount: '40% OFF', yearlyBilled: '1 079,88$ facturé annuellement',
     bestValue: true,
     btnLabel: "S'abonner à Organisation",
     features: [
@@ -670,10 +670,10 @@ const PLANS: PlanDef[] = [
 ]
 
 const CREDIT_PACKS = [
-  { name: 'Mini Pack',  credits: '10 000',  price: '25$',   popular: false, bestValue: false },
-  { name: 'Mega Pack',  credits: '30 000',  price: '60$',   popular: true,  bestValue: false },
-  { name: 'Giga Pack',  credits: '80 000',  price: '140$',  popular: false, bestValue: false },
-  { name: 'Ultra Pack', credits: '250 000', price: '300$',  popular: false, bestValue: true  },
+  { name: 'Mini Pack',  credits: '1 000',  price: '19$',   popular: false, bestValue: false },
+  { name: 'Mega Pack',  credits: '5 000',  price: '79$',   popular: true,  bestValue: false },
+  { name: 'Giga Pack',  credits: '15 000', price: '179$',  popular: false, bestValue: false },
+  { name: 'Ultra Pack', credits: '50 000', price: '499$',  popular: false, bestValue: true  },
 ]
 
 // ── Pricing section component (needs local state for toggle) ────────────────
@@ -748,18 +748,18 @@ function PricingSection() {
                   {/* Price row */}
                   <div style={{ marginBottom: 6 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
-                      {yearly && <span style={{ fontSize: 14, color: 'rgba(148,163,184,0.35)', textDecoration: 'line-through' }}>{p.originalMonthly}</span>}
+                      {yearly && p.originalMonthly && <span style={{ fontSize: 14, color: 'rgba(148,163,184,0.35)', textDecoration: 'line-through' }}>{p.originalMonthly}</span>}
                       <div style={{ display: 'flex', alignItems: 'baseline', gap: 3 }}>
                         <span style={{ fontSize: 40, fontWeight: 900, color: '#F2F0FF', letterSpacing: '-0.04em', lineHeight: 1 }}>{yearly ? p.yearlyPrice : p.monthlyPrice}</span>
                         <span style={{ fontSize: 13, color: 'rgba(148,163,184,0.4)' }}>/mo</span>
                       </div>
-                      {yearly && (
+                      {yearly && p.discount && (
                         <span style={{ fontSize: 11, fontWeight: 800, padding: '3px 8px', borderRadius: 6, background: p.popular ? 'rgba(124,58,237,0.2)' : p.bestValue ? 'rgba(245,158,11,0.15)' : 'rgba(59,130,246,0.15)', color: p.popular ? '#a78bfa' : p.bestValue ? '#f59e0b' : '#60a5fa', border: `1px solid ${p.accent}25` }}>
                           {p.discount}
                         </span>
                       )}
                     </div>
-                    {yearly && <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.28)', margin: 0 }}>{p.yearlyBilled}</p>}
+                    {yearly && p.yearlyBilled && <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.28)', margin: 0 }}>{p.yearlyBilled}</p>}
                   </div>
 
                   {/* Divider */}
@@ -873,25 +873,25 @@ const TGIcon = ({ size = 14 }: { size?: number }) => (
 )
 
 const TUNNEL_CSS = `
-  @keyframes portal-open {
-    from { transform: scale(0.1); opacity: 0; filter: blur(16px); }
-    to   { transform: scale(1);   opacity: 1; filter: blur(0px);  }
+  @keyframes sf-tile-float {
+    0%,100% { transform: translateY(0px); }
+    50%     { transform: translateY(-10px); }
   }
-  @keyframes portal-breathe {
-    0%,100% { transform: scale(1); }
-    50%      { transform: scale(1.012); }
+  @keyframes sf-tile-in {
+    from { opacity: 0; transform: translateY(18px) scale(0.94); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
   }
-  @keyframes portal-glow {
-    0%,100% { opacity: 0.32; }
-    50%     { opacity: 0.55; }
+  @keyframes sf-entry-brand {
+    from { opacity: 0; transform: translateY(10px); filter: blur(8px); }
+    to   { opacity: 1; transform: translateY(0); filter: blur(0); }
   }
-  @keyframes enter-btn-pulse {
-    0%,100% { box-shadow: 0 0 0 0 rgba(255,255,255,0.12), inset 0 1px 0 rgba(255,255,255,0.15); }
-    50%     { box-shadow: 0 0 28px 4px rgba(255,255,255,0.08), inset 0 1px 0 rgba(255,255,255,0.15); }
+  @keyframes sf-entry-sub {
+    from { opacity: 0; }
+    to   { opacity: 1; }
   }
-  @keyframes brand-appear {
-    from { opacity: 0; letter-spacing: 0.5em; filter: blur(12px); }
-    to   { opacity: 1; letter-spacing: -0.03em; filter: blur(0); }
+  @keyframes sf-enter-btn {
+    0%,100% { box-shadow: 0 0 0 0 rgba(255,255,255,0); }
+    50%     { box-shadow: 0 0 0 6px rgba(255,255,255,0.08); }
   }
   @keyframes reveal-in {
     from { opacity: 0; transform: scale(1.04); }
@@ -907,19 +907,40 @@ const TUNNEL_CSS = `
   }
 `
 
-// Concentric portal frames — widths in vw, inner → outer
-const PORTAL_FRAMES = [
-  { w:  7, op: 0.90, glow: true  },
-  { w: 14, op: 0.78, glow: false },
-  { w: 23, op: 0.66, glow: true  },
-  { w: 34, op: 0.54, glow: false },
-  { w: 47, op: 0.44, glow: false },
-  { w: 62, op: 0.34, glow: false },
-  { w: 80, op: 0.24, glow: false },
-  { w:102, op: 0.14, glow: false },
+// Fill with real image URLs when available — 16 slots (top×4, left×4, right×4, bottom×4)
+export const ENTRY_IMAGES: (string | null)[] = Array(16).fill(null)
+
+interface EntryTile {
+  key: string; w: number; h: number
+  top?: string; bottom?: string; left?: string; right?: string
+  ry: number; rx: number; delay: number; bg: string
+}
+
+// 4-wall layout: top / left / right / bottom — matching the ScaleFlow reference
+const ENTRY_TILES: EntryTile[] = [
+  // ── TOP wall (4 tiles, tilt tops away = positive rx) ─────────────────────────
+  { key:'t1', w:265, h:162, top:'2%',  left:'1%',   ry:-18, rx:32, delay:0,    bg:'#0d0d1a' },
+  { key:'t2', w:240, h:148, top:'1%',  left:'27%',  ry:-5,  rx:35, delay:0.1,  bg:'#0e0e1b' },
+  { key:'t3', w:240, h:148, top:'1%',  left:'53%',  ry:5,   rx:35, delay:0.2,  bg:'#0d0d1a' },
+  { key:'t4', w:265, h:162, top:'2%',  right:'1%',  ry:18,  rx:32, delay:0.3,  bg:'#0e0e1b' },
+  // ── LEFT wall (4 tiles, alternating near/far) ─────────────────────────────────
+  { key:'l1', w:290, h:178, top:'16%', left:'-2%',  ry:-22, rx:3,  delay:0.05, bg:'#0c0c19' },
+  { key:'l2', w:215, h:132, top:'27%', left:'15%',  ry:-26, rx:0,  delay:0.18, bg:'#0f0f1c' },
+  { key:'l3', w:285, h:175, top:'50%', left:'-2%',  ry:-21, rx:-3, delay:0.32, bg:'#0d0d1a' },
+  { key:'l4', w:215, h:132, top:'62%', left:'15%',  ry:-24, rx:-6, delay:0.46, bg:'#0e0e1b' },
+  // ── RIGHT wall (mirror of left) ───────────────────────────────────────────────
+  { key:'r1', w:290, h:178, top:'16%', right:'-2%', ry:22,  rx:3,  delay:0.08, bg:'#0f0f1c' },
+  { key:'r2', w:215, h:132, top:'27%', right:'15%', ry:26,  rx:0,  delay:0.22, bg:'#0c0c19' },
+  { key:'r3', w:285, h:175, top:'50%', right:'-2%', ry:21,  rx:-3, delay:0.36, bg:'#0e0e1b' },
+  { key:'r4', w:215, h:132, top:'62%', right:'15%', ry:24,  rx:-6, delay:0.5,  bg:'#0d0d1a' },
+  // ── BOTTOM wall (4 tiles, tilt bottoms away = negative rx) ───────────────────
+  { key:'b1', w:265, h:162, bottom:'2%', left:'1%',  ry:-18, rx:-32, delay:0.15, bg:'#0e0e1b' },
+  { key:'b2', w:240, h:148, bottom:'1%', left:'27%', ry:-5,  rx:-35, delay:0.25, bg:'#0d0d1a' },
+  { key:'b3', w:240, h:148, bottom:'1%', left:'53%', ry:5,   rx:-35, delay:0.35, bg:'#0e0e1b' },
+  { key:'b4', w:265, h:162, bottom:'2%', right:'1%', ry:18,  rx:-32, delay:0.45, bg:'#0c0c19' },
 ]
 
-// ── Portal tunnel hero ─────────────────────────────────────────────────────────
+// ── Entry hero — ScaleFlow reference style ────────────────────────────────────
 function TunnelHero({ onEnter }: { onEnter: () => void }) {
   useEffect(() => {
     const id = 'sf-tunnel-css'
@@ -932,116 +953,130 @@ function TunnelHero({ onEnter }: { onEnter: () => void }) {
 
   return (
     <section style={{
-      position: 'relative', height: '100vh', overflow: 'hidden',
-      cursor: 'none',
-      background: '#04030e',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      position: 'fixed', inset: 0,
+      overflow: 'hidden',
+      background: '#06060F',
+      display: 'flex', flexDirection: 'column',
+      alignItems: 'center', justifyContent: 'center',
     }}>
 
-      {/* Perspective lines from screen corners → center vanishing point */}
+      {/* ── Perspective grid lines from center ── */}
       <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 1 }} preserveAspectRatio="none">
-        <line x1="0"    y1="0"    x2="50%" y2="50%" stroke="rgba(139,92,246,0.10)" strokeWidth="1" />
-        <line x1="100%" y1="0"    x2="50%" y2="50%" stroke="rgba(139,92,246,0.10)" strokeWidth="1" />
-        <line x1="0"    y1="100%" x2="50%" y2="50%" stroke="rgba(139,92,246,0.10)" strokeWidth="1" />
-        <line x1="100%" y1="100%" x2="50%" y2="50%" stroke="rgba(139,92,246,0.10)" strokeWidth="1" />
-        <line x1="50%"  y1="0"    x2="50%" y2="50%" stroke="rgba(139,92,246,0.05)" strokeWidth="1" />
-        <line x1="50%"  y1="100%" x2="50%" y2="50%" stroke="rgba(139,92,246,0.05)" strokeWidth="1" />
-        <line x1="0"    y1="50%"  x2="50%" y2="50%" stroke="rgba(139,92,246,0.05)" strokeWidth="1" />
-        <line x1="100%" y1="50%"  x2="50%" y2="50%" stroke="rgba(139,92,246,0.05)" strokeWidth="1" />
+        {/* Corner lines */}
+        <line x1="50%" y1="50%" x2="0%"   y2="0%"   stroke="rgba(139,92,246,0.12)" strokeWidth="1" />
+        <line x1="50%" y1="50%" x2="100%" y2="0%"   stroke="rgba(139,92,246,0.12)" strokeWidth="1" />
+        <line x1="50%" y1="50%" x2="0%"   y2="100%" stroke="rgba(139,92,246,0.12)" strokeWidth="1" />
+        <line x1="50%" y1="50%" x2="100%" y2="100%" stroke="rgba(139,92,246,0.12)" strokeWidth="1" />
+        {/* Edge midpoint lines */}
+        <line x1="50%" y1="50%" x2="50%"  y2="0%"   stroke="rgba(139,92,246,0.07)" strokeWidth="1" />
+        <line x1="50%" y1="50%" x2="50%"  y2="100%" stroke="rgba(139,92,246,0.07)" strokeWidth="1" />
+        <line x1="50%" y1="50%" x2="0%"   y2="50%"  stroke="rgba(139,92,246,0.07)" strokeWidth="1" />
+        <line x1="50%" y1="50%" x2="100%" y2="50%"  stroke="rgba(139,92,246,0.07)" strokeWidth="1" />
+        {/* Intermediate lines for denser grid feel */}
+        <line x1="50%" y1="50%" x2="25%"  y2="0%"   stroke="rgba(139,92,246,0.05)" strokeWidth="1" />
+        <line x1="50%" y1="50%" x2="75%"  y2="0%"   stroke="rgba(139,92,246,0.05)" strokeWidth="1" />
+        <line x1="50%" y1="50%" x2="25%"  y2="100%" stroke="rgba(139,92,246,0.05)" strokeWidth="1" />
+        <line x1="50%" y1="50%" x2="75%"  y2="100%" stroke="rgba(139,92,246,0.05)" strokeWidth="1" />
+        <line x1="50%" y1="50%" x2="0%"   y2="25%"  stroke="rgba(139,92,246,0.05)" strokeWidth="1" />
+        <line x1="50%" y1="50%" x2="0%"   y2="75%"  stroke="rgba(139,92,246,0.05)" strokeWidth="1" />
+        <line x1="50%" y1="50%" x2="100%" y2="25%"  stroke="rgba(139,92,246,0.05)" strokeWidth="1" />
+        <line x1="50%" y1="50%" x2="100%" y2="75%"  stroke="rgba(139,92,246,0.05)" strokeWidth="1" />
       </svg>
 
-      {/* Portal frames — open on mount, breathe slowly after */}
-      <div style={{
-        position: 'absolute', inset: 0,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        zIndex: 1,
-        animation: 'portal-open 1.6s cubic-bezier(0.16,1,0.3,1) 0.05s both',
-      }}>
-        {PORTAL_FRAMES.map((f, i) => (
-          <div key={i} style={{
-            position: 'absolute',
-            width:  `${f.w}vw`,
-            height: `${f.w * 0.56}vw`,
-            border: `1px solid rgba(139,92,246,${f.op})`,
-            borderRadius: `${8 + i * 5}px`,
-            boxShadow: f.glow ? `0 0 ${14 - i * 2}px rgba(139,92,246,0.18)` : 'none',
-            animation: `portal-breathe ${9 + i * 0.8}s ease-in-out ${i * 0.5}s infinite`,
-          }} />
-        ))}
-      </div>
-
-      {/* Soft glow at center */}
+      {/* ── Purple ambient glow at center ── */}
       <div style={{
         position: 'absolute', top: '50%', left: '50%',
         transform: 'translate(-50%,-50%)',
-        width: 480, height: 280,
-        background: 'radial-gradient(ellipse closest-side, rgba(100,40,220,0.26), transparent)',
-        filter: 'blur(50px)', pointerEvents: 'none', zIndex: 1,
-        animation: 'portal-glow 7s ease-in-out infinite',
+        width: 600, height: 400,
+        background: 'radial-gradient(ellipse closest-side, rgba(109,40,217,0.22), transparent)',
+        filter: 'blur(60px)', pointerEvents: 'none', zIndex: 1,
       }} />
 
-      {/* Light vignette — just softens edges without blackout */}
-      <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse 75% 75% at 50% 50%, transparent 35%, rgba(4,3,14,0.78) 100%)', pointerEvents: 'none', zIndex: 2 }} />
+      {/* ── Image tiles (4-wall layout) ── */}
+      {ENTRY_TILES.map((tile, idx) => (
+        <div
+          key={tile.key}
+          style={{
+            position: 'absolute',
+            top: tile.top, bottom: tile.bottom,
+            left: tile.left, right: tile.right,
+            animation: `sf-tile-float ${7 + idx * 0.25}s ease-in-out ${tile.delay}s infinite, sf-tile-in 0.8s ease ${tile.delay + 0.1}s both`,
+            zIndex: 2,
+          }}
+        >
+          <div style={{
+            width: tile.w, height: tile.h,
+            transform: `perspective(1100px) rotateY(${tile.ry}deg) rotateX(${tile.rx}deg)`,
+            borderRadius: 14,
+            overflow: 'hidden',
+            border: '1px solid rgba(139,92,246,0.18)',
+            boxShadow: '0 8px 48px rgba(0,0,0,0.7), inset 0 1px 0 rgba(139,92,246,0.1)',
+          }}>
+            {ENTRY_IMAGES[idx]
+              ? <img src={ENTRY_IMAGES[idx]!} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+              : <div style={{ width: '100%', height: '100%', background: tile.bg }} />
+            }
+          </div>
+        </div>
+      ))}
 
-      {/* Center branding */}
-      <div style={{ position: 'relative', zIndex: 10, textAlign: 'center', userSelect: 'none' }}>
+      {/* ── Radial vignette to keep center readable ── */}
+      <div style={{
+        position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 3,
+        background: 'radial-gradient(ellipse 52% 55% at 50% 50%, transparent 0%, rgba(6,6,15,0.8) 100%)',
+      }} />
+
+      {/* ── Brand (centered via flexbox) ── */}
+      <div style={{ position: 'relative', zIndex: 10, textAlign: 'center', userSelect: 'none', animation: 'sf-entry-brand 1s cubic-bezier(0.16,1,0.3,1) 0.3s both' }}>
         <h1 style={{
-          fontSize: 'clamp(64px, 11vw, 130px)',
+          fontSize: 'clamp(68px, 10vw, 136px)',
           fontWeight: 900,
-          letterSpacing: '-0.045em',
+          letterSpacing: '-0.04em',
           lineHeight: 1,
-          margin: '0 0 6px',
+          color: '#ffffff',
+          margin: '0 0 10px',
           fontFamily: "'Inter', 'Arial Black', system-ui, sans-serif",
-          animation: 'brand-appear 1.2s cubic-bezier(0.16,1,0.3,1) 0.4s both',
-          background: 'linear-gradient(135deg, #ffffff 0%, rgba(200,180,255,0.9) 50%, #ffffff 100%)',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent',
-          backgroundClip: 'text',
-          filter: 'drop-shadow(0 0 40px rgba(167,139,250,0.35))',
+          display: 'inline-flex', alignItems: 'baseline', gap: '0.06em',
         }}>
-          ScaleFlow
+          ScaleFlow<span style={{ color: '#7C3AED', fontSize: '0.85em', lineHeight: 1 }}>.</span>
         </h1>
         <p style={{
-          fontSize: 14,
-          color: 'rgba(255,255,255,0.35)',
-          letterSpacing: '0.22em',
-          textTransform: 'uppercase',
-          margin: '0 0 48px',
-          animation: 'sf-fade-in 1s ease 1.2s both',
-          fontWeight: 500,
+          fontSize: 11, color: 'rgba(255,255,255,0.38)',
+          letterSpacing: '0.28em', textTransform: 'uppercase',
+          margin: '0 0 36px', fontWeight: 600,
+          animation: 'sf-entry-sub 1s ease 0.9s both',
         }}>
           Instagram Automation
         </p>
 
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginBottom: 40, animation: 'sf-fade-in 1s ease 1.3s both' }}>
-          {[1, 0, 0].map((active, j) => (
-            <div key={j} style={{ width: active ? 20 : 6, height: 6, borderRadius: 99, background: active ? '#fff' : 'rgba(255,255,255,0.2)' }} />
-          ))}
+        {/* ENTER — centered within the brand block */}
+        <div style={{ display: 'flex', justifyContent: 'center' }}>
+          <button
+            onClick={onEnter}
+            style={{
+              padding: '13px 52px', borderRadius: 99,
+              background: 'rgba(255,255,255,0.06)',
+              backdropFilter: 'blur(12px)',
+              color: '#fff', fontSize: 13, fontWeight: 700,
+              letterSpacing: '0.18em', textTransform: 'uppercase',
+              border: '1.5px solid rgba(255,255,255,0.28)', cursor: 'pointer',
+              animation: 'sf-tile-in 0.6s ease 1.3s both, sf-enter-btn 3s ease-in-out 2.5s infinite',
+              transition: 'all 0.2s',
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.background = 'rgba(124,58,237,0.25)'
+              e.currentTarget.style.borderColor = 'rgba(139,92,246,0.6)'
+              e.currentTarget.style.transform = 'translateY(-2px)'
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.background = 'rgba(255,255,255,0.06)'
+              e.currentTarget.style.borderColor = 'rgba(255,255,255,0.28)'
+              e.currentTarget.style.transform = ''
+            }}
+          >
+            ENTER
+          </button>
         </div>
-
-        <button
-          onClick={onEnter}
-          style={{
-            display: 'inline-block', padding: '13px 44px', borderRadius: 99,
-            border: '1.5px solid rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.06)',
-            backdropFilter: 'blur(12px)', color: '#fff', fontSize: 13, fontWeight: 700,
-            letterSpacing: '0.18em', textTransform: 'uppercase', cursor: 'pointer',
-            animation: 'sf-fade-in 0.8s ease 1.5s both, enter-btn-pulse 3s ease-in-out 2.5s infinite',
-            transition: 'background 0.2s, border-color 0.2s, transform 0.15s',
-          }}
-          onMouseEnter={e => {
-            e.currentTarget.style.background = 'rgba(255,255,255,0.14)'
-            e.currentTarget.style.borderColor = 'rgba(255,255,255,0.55)'
-            e.currentTarget.style.transform = 'translateY(-2px)'
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.background = 'rgba(255,255,255,0.06)'
-            e.currentTarget.style.borderColor = 'rgba(255,255,255,0.3)'
-            e.currentTarget.style.transform = ''
-          }}
-        >
-          ENTER
-        </button>
       </div>
     </section>
   )

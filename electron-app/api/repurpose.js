@@ -60,7 +60,7 @@ module.exports = async (req, res) => {
         '-c:v', 'libx264', '-preset', 'ultrafast', '-tune', 'fastdecode',
         '-crf', String(v.crf ?? 30),
         '-pix_fmt', 'yuv420p', '-profile:v', 'main', '-level', '4.0',
-        '-c:a', 'copy',
+        '-c:a', 'aac', '-b:a', '128k', '-ar', '44100',
         '-movflags', '+faststart',
         outPaths[i],
       )
@@ -70,11 +70,14 @@ module.exports = async (req, res) => {
     await execFileAsync(ffmpegPath, ffArgs, { maxBuffer: 100 * 1024 * 1024 })
 
     // ── Upload all outputs to Supabase in parallel ─────────────────────────
+    const thumbPaths = variants.map((_, i) => path.join(tmpDir, `rp_thumb_${ts}_${i}.jpg`))
+
     const results = await Promise.all(variants.map(async (variant, i) => {
       try {
+        const rand = Math.random().toString(36).slice(2)
         const resultPath = userId
-          ? `videos/users/${userId}/rp-out-${ts}_${i}_${Math.random().toString(36).slice(2)}.mp4`
-          : `repurpose-results/${ts}_${i}_${Math.random().toString(36).slice(2)}.mp4`
+          ? `videos/users/${userId}/rp-out-${ts}_${i}_${rand}.mp4`
+          : `repurpose-results/${ts}_${i}_${rand}.mp4`
 
         const outBuf = fs.readFileSync(outPaths[i])
         const { error: upErr } = await supabase.storage.from(bucket).upload(resultPath, outBuf, {
@@ -83,11 +86,32 @@ module.exports = async (req, res) => {
         if (upErr) throw new Error(upErr.message)
 
         const { data: { publicUrl } } = supabase.storage.from(bucket).getPublicUrl(resultPath)
-        return { ok: true, url: publicUrl, storagePath: resultPath }
+
+        // Extract thumbnail JPEG
+        let thumbnailPath = null
+        try {
+          await execFileAsync(ffmpegPath, [
+            '-nostdin', '-ss', '0.5', '-i', outPaths[i],
+            '-vframes', '1', '-q:v', '2', '-y', thumbPaths[i],
+          ], { maxBuffer: 10 * 1024 * 1024, timeout: 8000 })
+
+          const thumbBuf = fs.readFileSync(thumbPaths[i])
+          const thumbStoragePath = userId
+            ? `videos/users/${userId}/rp-thumb-${ts}_${i}_${rand}.jpg`
+            : `repurpose-results/${ts}_${i}_${rand}_thumb.jpg`
+
+          const { error: tUpErr } = await supabase.storage.from(bucket).upload(thumbStoragePath, thumbBuf, {
+            contentType: 'image/jpeg', upsert: true,
+          })
+          if (!tUpErr) thumbnailPath = thumbStoragePath
+        } catch (_) { /* thumbnail extraction is best-effort */ }
+
+        return { ok: true, url: publicUrl, storagePath: resultPath, thumbnailPath }
       } catch (err) {
         return { ok: false, error: String(err).slice(0, 300) }
       } finally {
         fs.rmSync(outPaths[i], { force: true })
+        fs.rmSync(thumbPaths[i], { force: true })
       }
     }))
 

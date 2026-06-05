@@ -897,6 +897,29 @@ export function Bank({ user }: BankProps) {
                 {t('bankMoveSelected')} ({selectedIds.size})
               </button>
               <button
+                onClick={async () => {
+                  const sel = items.filter(i => selectedIds.has(i.id))
+                  for (const it of sel) {
+                    const url = await getSignedUrl(it.storage_path ?? it.file_url)
+                    if (!url) continue
+                    const ext = it.title.match(/\.[a-z0-9]+$/i)?.[0] ?? '.mp4'
+                    const name = it.title.endsWith('.mp4') || it.title.endsWith('.mov') ? it.title : it.title + ext
+                    const a = document.createElement('a')
+                    a.href = url; a.download = name; a.click()
+                    await new Promise(r => setTimeout(r, 300))
+                  }
+                }}
+                className="text-[12px] px-2.5 py-1 rounded-md font-semibold transition-colors flex items-center gap-1.5"
+                style={{ background: 'rgba(34,197,94,0.1)', color: '#4ade80', border: '1px solid rgba(34,197,94,0.25)' }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(34,197,94,0.18)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'rgba(34,197,94,0.1)')}
+              >
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                Télécharger ({selectedIds.size})
+              </button>
+              <button
                 onClick={deleteSelected}
                 className="text-[12px] px-2.5 py-1 rounded-md font-semibold transition-colors flex items-center gap-1.5"
                 style={{ background: 'rgba(239,68,68,0.1)', color: '#F87171', border: '1px solid rgba(239,68,68,0.25)' }}
@@ -1120,6 +1143,20 @@ export function Bank({ user }: BankProps) {
               icon: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>,
               label: t('bankCtxEditTags'),
               action: () => { setTagsItem(ctxMenu.item); setCtxMenu(null) }
+            },
+            {
+              icon: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>,
+              label: 'Télécharger',
+              action: async () => {
+                setCtxMenu(null)
+                const it = ctxMenu.item
+                const url = await getSignedUrl(it.storage_path ?? it.file_url)
+                if (!url) return
+                const ext = it.title.match(/\.[a-z0-9]+$/i)?.[0] ?? '.mp4'
+                const name = it.title.endsWith('.mp4') || it.title.endsWith('.mov') ? it.title : it.title + ext
+                const a = document.createElement('a')
+                a.href = url; a.download = name; a.click()
+              }
             },
             ...(ctxMenu.item.file_url && !ctxMenu.item.storage_path ? [{
               icon: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>,
