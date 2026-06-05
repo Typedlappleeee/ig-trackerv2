@@ -907,36 +907,40 @@ const TUNNEL_CSS = `
   }
 `
 
-// Placeholder — replace each null with a real image URL when available
-export const ENTRY_IMAGES: (string | null)[] = Array(14).fill(null)
+// Fill with real image URLs when available — 16 slots (top×4, left×4, right×4, bottom×4)
+export const ENTRY_IMAGES: (string | null)[] = Array(16).fill(null)
 
-// Tile placement data: position, size, 3D rotation, float delay, placeholder colour
 interface EntryTile {
   key: string; w: number; h: number
   top?: string; bottom?: string; left?: string; right?: string
   ry: number; rx: number; delay: number; bg: string
 }
+
+// 4-wall layout: top / left / right / bottom — matching the ScaleFlow reference
 const ENTRY_TILES: EntryTile[] = [
-  // ── Left column ──────────────────────────────────────────────────────────────
-  { key:'l1', w:250, h:160, top:'3%',  left:'0%',   ry:-20, rx:4,  delay:0,    bg:'#141414' },
-  { key:'l2', w:185, h:118, top:'11%', left:'19%',  ry:-24, rx:7,  delay:0.15, bg:'#181818' },
-  { key:'l3', w:270, h:172, top:'36%', left:'-1%',  ry:-18, rx:1,  delay:0.3,  bg:'#101010' },
-  { key:'l4', w:175, h:112, top:'48%', left:'18%',  ry:-22, rx:0,  delay:0.45, bg:'#1a1a1a' },
-  { key:'l5', w:245, h:157, top:'63%', left:'0%',   ry:-17, rx:-4, delay:0.6,  bg:'#121212' },
-  { key:'l6', w:185, h:118, top:'78%', left:'18%',  ry:-13, rx:-5, delay:0.75, bg:'#161616' },
-  // ── Right column ─────────────────────────────────────────────────────────────
-  { key:'r1', w:185, h:118, top:'1%',  right:'18%', ry:24,  rx:7,  delay:0.1,  bg:'#161616' },
-  { key:'r2', w:250, h:160, top:'3%',  right:'0%',  ry:20,  rx:4,  delay:0.2,  bg:'#0f0f0f' },
-  { key:'r3', w:270, h:172, top:'35%', right:'-1%', ry:18,  rx:1,  delay:0.35, bg:'#151515' },
-  { key:'r4', w:175, h:112, top:'47%', right:'18%', ry:22,  rx:0,  delay:0.5,  bg:'#111111' },
-  { key:'r5', w:245, h:157, top:'63%', right:'0%',  ry:17,  rx:-4, delay:0.65, bg:'#1b1b1b' },
-  { key:'r6', w:185, h:118, top:'77%', right:'18%', ry:13,  rx:-5, delay:0.8,  bg:'#131313' },
-  // ── Top / bottom centre fill ──────────────────────────────────────────────────
-  { key:'tc', w:190, h:122, top:'5%',  left:'43%',  ry:0,   rx:12, delay:0.25, bg:'#181818' },
-  { key:'bc', w:190, h:122, top:'74%', left:'39%',  ry:0,   rx:-10, delay:0.7, bg:'#141414' },
+  // ── TOP wall (4 tiles, tilt tops away = positive rx) ─────────────────────────
+  { key:'t1', w:265, h:162, top:'2%',  left:'1%',   ry:-18, rx:32, delay:0,    bg:'#0d0d1a' },
+  { key:'t2', w:240, h:148, top:'1%',  left:'27%',  ry:-5,  rx:35, delay:0.1,  bg:'#0e0e1b' },
+  { key:'t3', w:240, h:148, top:'1%',  left:'53%',  ry:5,   rx:35, delay:0.2,  bg:'#0d0d1a' },
+  { key:'t4', w:265, h:162, top:'2%',  right:'1%',  ry:18,  rx:32, delay:0.3,  bg:'#0e0e1b' },
+  // ── LEFT wall (4 tiles, alternating near/far) ─────────────────────────────────
+  { key:'l1', w:290, h:178, top:'16%', left:'-2%',  ry:-22, rx:3,  delay:0.05, bg:'#0c0c19' },
+  { key:'l2', w:215, h:132, top:'27%', left:'15%',  ry:-26, rx:0,  delay:0.18, bg:'#0f0f1c' },
+  { key:'l3', w:285, h:175, top:'50%', left:'-2%',  ry:-21, rx:-3, delay:0.32, bg:'#0d0d1a' },
+  { key:'l4', w:215, h:132, top:'62%', left:'15%',  ry:-24, rx:-6, delay:0.46, bg:'#0e0e1b' },
+  // ── RIGHT wall (mirror of left) ───────────────────────────────────────────────
+  { key:'r1', w:290, h:178, top:'16%', right:'-2%', ry:22,  rx:3,  delay:0.08, bg:'#0f0f1c' },
+  { key:'r2', w:215, h:132, top:'27%', right:'15%', ry:26,  rx:0,  delay:0.22, bg:'#0c0c19' },
+  { key:'r3', w:285, h:175, top:'50%', right:'-2%', ry:21,  rx:-3, delay:0.36, bg:'#0e0e1b' },
+  { key:'r4', w:215, h:132, top:'62%', right:'15%', ry:24,  rx:-6, delay:0.5,  bg:'#0d0d1a' },
+  // ── BOTTOM wall (4 tiles, tilt bottoms away = negative rx) ───────────────────
+  { key:'b1', w:265, h:162, bottom:'2%', left:'1%',  ry:-18, rx:-32, delay:0.15, bg:'#0e0e1b' },
+  { key:'b2', w:240, h:148, bottom:'1%', left:'27%', ry:-5,  rx:-35, delay:0.25, bg:'#0d0d1a' },
+  { key:'b3', w:240, h:148, bottom:'1%', left:'53%', ry:5,   rx:-35, delay:0.35, bg:'#0e0e1b' },
+  { key:'b4', w:265, h:162, bottom:'2%', right:'1%', ry:18,  rx:-32, delay:0.45, bg:'#0c0c19' },
 ]
 
-// ── AIGNCY-style entry hero ───────────────────────────────────────────────────
+// ── Entry hero — ScaleFlow reference style ────────────────────────────────────
 function TunnelHero({ onEnter }: { onEnter: () => void }) {
   useEffect(() => {
     const id = 'sf-tunnel-css'
@@ -949,20 +953,46 @@ function TunnelHero({ onEnter }: { onEnter: () => void }) {
 
   return (
     <section style={{
-      position: 'relative', width: '100vw', height: '100vh',
-      overflow: 'hidden', background: '#000',
+      position: 'fixed', inset: 0,
+      overflow: 'hidden',
+      background: '#06060F',
       display: 'flex', flexDirection: 'column',
       alignItems: 'center', justifyContent: 'center',
     }}>
 
-      {/* ── Dot grid background ── */}
+      {/* ── Perspective grid lines from center ── */}
+      <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 1 }} preserveAspectRatio="none">
+        {/* Corner lines */}
+        <line x1="50%" y1="50%" x2="0%"   y2="0%"   stroke="rgba(139,92,246,0.12)" strokeWidth="1" />
+        <line x1="50%" y1="50%" x2="100%" y2="0%"   stroke="rgba(139,92,246,0.12)" strokeWidth="1" />
+        <line x1="50%" y1="50%" x2="0%"   y2="100%" stroke="rgba(139,92,246,0.12)" strokeWidth="1" />
+        <line x1="50%" y1="50%" x2="100%" y2="100%" stroke="rgba(139,92,246,0.12)" strokeWidth="1" />
+        {/* Edge midpoint lines */}
+        <line x1="50%" y1="50%" x2="50%"  y2="0%"   stroke="rgba(139,92,246,0.07)" strokeWidth="1" />
+        <line x1="50%" y1="50%" x2="50%"  y2="100%" stroke="rgba(139,92,246,0.07)" strokeWidth="1" />
+        <line x1="50%" y1="50%" x2="0%"   y2="50%"  stroke="rgba(139,92,246,0.07)" strokeWidth="1" />
+        <line x1="50%" y1="50%" x2="100%" y2="50%"  stroke="rgba(139,92,246,0.07)" strokeWidth="1" />
+        {/* Intermediate lines for denser grid feel */}
+        <line x1="50%" y1="50%" x2="25%"  y2="0%"   stroke="rgba(139,92,246,0.05)" strokeWidth="1" />
+        <line x1="50%" y1="50%" x2="75%"  y2="0%"   stroke="rgba(139,92,246,0.05)" strokeWidth="1" />
+        <line x1="50%" y1="50%" x2="25%"  y2="100%" stroke="rgba(139,92,246,0.05)" strokeWidth="1" />
+        <line x1="50%" y1="50%" x2="75%"  y2="100%" stroke="rgba(139,92,246,0.05)" strokeWidth="1" />
+        <line x1="50%" y1="50%" x2="0%"   y2="25%"  stroke="rgba(139,92,246,0.05)" strokeWidth="1" />
+        <line x1="50%" y1="50%" x2="0%"   y2="75%"  stroke="rgba(139,92,246,0.05)" strokeWidth="1" />
+        <line x1="50%" y1="50%" x2="100%" y2="25%"  stroke="rgba(139,92,246,0.05)" strokeWidth="1" />
+        <line x1="50%" y1="50%" x2="100%" y2="75%"  stroke="rgba(139,92,246,0.05)" strokeWidth="1" />
+      </svg>
+
+      {/* ── Purple ambient glow at center ── */}
       <div style={{
-        position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 0,
-        backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.07) 1px, transparent 1px)',
-        backgroundSize: '40px 40px',
+        position: 'absolute', top: '50%', left: '50%',
+        transform: 'translate(-50%,-50%)',
+        width: 600, height: 400,
+        background: 'radial-gradient(ellipse closest-side, rgba(109,40,217,0.22), transparent)',
+        filter: 'blur(60px)', pointerEvents: 'none', zIndex: 1,
       }} />
 
-      {/* ── Image tiles ── */}
+      {/* ── Image tiles (4-wall layout) ── */}
       {ENTRY_TILES.map((tile, idx) => (
         <div
           key={tile.key}
@@ -970,16 +1000,17 @@ function TunnelHero({ onEnter }: { onEnter: () => void }) {
             position: 'absolute',
             top: tile.top, bottom: tile.bottom,
             left: tile.left, right: tile.right,
-            animation: `sf-tile-float ${6 + idx * 0.3}s ease-in-out ${tile.delay}s infinite, sf-tile-in 0.7s ease ${tile.delay + 0.2}s both`,
+            animation: `sf-tile-float ${7 + idx * 0.25}s ease-in-out ${tile.delay}s infinite, sf-tile-in 0.8s ease ${tile.delay + 0.1}s both`,
             zIndex: 2,
           }}
         >
           <div style={{
             width: tile.w, height: tile.h,
-            transform: `perspective(1000px) rotateY(${tile.ry}deg) rotateX(${tile.rx}deg)`,
-            borderRadius: 10,
+            transform: `perspective(1100px) rotateY(${tile.ry}deg) rotateX(${tile.rx}deg)`,
+            borderRadius: 14,
             overflow: 'hidden',
-            boxShadow: '0 8px 40px rgba(0,0,0,0.6)',
+            border: '1px solid rgba(139,92,246,0.18)',
+            boxShadow: '0 8px 48px rgba(0,0,0,0.7), inset 0 1px 0 rgba(139,92,246,0.1)',
           }}>
             {ENTRY_IMAGES[idx]
               ? <img src={ENTRY_IMAGES[idx]!} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
@@ -989,59 +1020,64 @@ function TunnelHero({ onEnter }: { onEnter: () => void }) {
         </div>
       ))}
 
-      {/* ── Center vignette so tiles don't bleed into text ── */}
+      {/* ── Radial vignette to keep center readable ── */}
       <div style={{
         position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 3,
-        background: 'radial-gradient(ellipse 55% 60% at 50% 50%, transparent 0%, rgba(0,0,0,0.72) 100%)',
+        background: 'radial-gradient(ellipse 52% 55% at 50% 50%, transparent 0%, rgba(6,6,15,0.8) 100%)',
       }} />
 
-      {/* ── Brand ── */}
-      <div style={{ position: 'relative', zIndex: 10, textAlign: 'center', userSelect: 'none' }}>
+      {/* ── Brand (centered via flexbox) ── */}
+      <div style={{ position: 'relative', zIndex: 10, textAlign: 'center', userSelect: 'none', animation: 'sf-entry-brand 1s cubic-bezier(0.16,1,0.3,1) 0.3s both' }}>
         <h1 style={{
-          fontSize: 'clamp(72px, 12vw, 148px)',
+          fontSize: 'clamp(68px, 10vw, 136px)',
           fontWeight: 900,
           letterSpacing: '-0.04em',
-          lineHeight: 0.92,
+          lineHeight: 1,
           color: '#ffffff',
           margin: '0 0 10px',
           fontFamily: "'Inter', 'Arial Black', system-ui, sans-serif",
-          animation: 'sf-entry-brand 1s cubic-bezier(0.16,1,0.3,1) 0.3s both',
+          display: 'inline-flex', alignItems: 'baseline', gap: '0.06em',
         }}>
-          ScaleFlow
+          ScaleFlow<span style={{ color: '#7C3AED', fontSize: '0.85em', lineHeight: 1 }}>.</span>
         </h1>
         <p style={{
-          fontSize: 11,
-          color: 'rgba(255,255,255,0.32)',
-          letterSpacing: '0.26em',
-          textTransform: 'uppercase',
-          margin: 0,
-          fontWeight: 600,
+          fontSize: 11, color: 'rgba(255,255,255,0.38)',
+          letterSpacing: '0.28em', textTransform: 'uppercase',
+          margin: '0 0 36px', fontWeight: 600,
           animation: 'sf-entry-sub 1s ease 0.9s both',
         }}>
           Instagram Automation
         </p>
-      </div>
 
-      {/* ── ENTER button ── */}
-      <button
-        onClick={onEnter}
-        style={{
-          position: 'absolute', bottom: '6%', left: '50%', transform: 'translateX(-50%)',
-          zIndex: 10,
-          padding: '14px 52px', borderRadius: 99,
-          background: '#fff', color: '#000',
-          fontSize: 13, fontWeight: 800,
-          letterSpacing: '0.16em', textTransform: 'uppercase',
-          border: 'none', cursor: 'pointer',
-          animation: 'sf-tile-in 0.6s ease 1.2s both, sf-enter-btn 3s ease-in-out 2s infinite',
-          transition: 'transform 0.15s, background 0.15s',
-          boxShadow: '0 4px 28px rgba(255,255,255,0.18)',
-        }}
-        onMouseEnter={e => { e.currentTarget.style.transform = 'translateX(-50%) translateY(-2px) scale(1.03)' }}
-        onMouseLeave={e => { e.currentTarget.style.transform = 'translateX(-50%)' }}
-      >
-        ENTER
-      </button>
+        {/* ENTER — centered within the brand block */}
+        <div style={{ display: 'flex', justifyContent: 'center' }}>
+          <button
+            onClick={onEnter}
+            style={{
+              padding: '13px 52px', borderRadius: 99,
+              background: 'rgba(255,255,255,0.06)',
+              backdropFilter: 'blur(12px)',
+              color: '#fff', fontSize: 13, fontWeight: 700,
+              letterSpacing: '0.18em', textTransform: 'uppercase',
+              border: '1.5px solid rgba(255,255,255,0.28)', cursor: 'pointer',
+              animation: 'sf-tile-in 0.6s ease 1.3s both, sf-enter-btn 3s ease-in-out 2.5s infinite',
+              transition: 'all 0.2s',
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.background = 'rgba(124,58,237,0.25)'
+              e.currentTarget.style.borderColor = 'rgba(139,92,246,0.6)'
+              e.currentTarget.style.transform = 'translateY(-2px)'
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.background = 'rgba(255,255,255,0.06)'
+              e.currentTarget.style.borderColor = 'rgba(255,255,255,0.28)'
+              e.currentTarget.style.transform = ''
+            }}
+          >
+            ENTER
+          </button>
+        </div>
+      </div>
     </section>
   )
 }
