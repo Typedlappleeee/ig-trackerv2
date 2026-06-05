@@ -507,12 +507,12 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: collapsed ? 0 : 11,
+            gap: collapsed ? 0 : 10,
             width: '100%',
-            height: 42,
-            padding: '0 12px',
-            borderRadius: 11,
-            fontSize: 14.5,
+            height: 39,
+            padding: '0 11px',
+            borderRadius: 10,
+            fontSize: 14,
             fontWeight: active ? 600 : 450,
             textAlign: 'left',
             cursor: 'pointer',
@@ -535,7 +535,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             color: active ? 'rgba(255,255,255,0.9)' : hovered ? 'rgba(196,181,253,0.7)' : 'rgba(148,163,184,0.42)',
             transition: 'color 140ms ease',
           }}>
-            <NavIcon d={ICONS[iconKey]} size={18} />
+            <NavIcon d={ICONS[iconKey]} size={17} />
           </span>
           {!collapsed && (
             <>
@@ -623,7 +623,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
       {/* ── Sidebar (desktop only) ───────────────────────────────────────── */}
       <aside
         style={{
-          width: collapsed ? 56 : 256,
+          width: collapsed ? 54 : 248,
           flexShrink: 0,
           display: isMobile ? 'none' : 'flex',
           flexDirection: 'column',
@@ -685,8 +685,8 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             title={collapsed ? t('navHub') : undefined}
             style={{
               display: 'flex', alignItems: 'center', gap: collapsed ? 0 : 9,
-              width: '100%', height: 42, padding: '0 12px', borderRadius: 11,
-              fontSize: 14.5, fontWeight: page === 'hub' ? 600 : 400, textAlign: 'left',
+              width: '100%', height: 39, padding: '0 11px', borderRadius: 10,
+              fontSize: 14, fontWeight: page === 'hub' ? 600 : 400, textAlign: 'left',
               cursor: 'pointer', border: 'none',
               background: page === 'hub' ? 'rgba(255,255,255,0.09)' : 'transparent',
               color: page === 'hub' ? '#ffffff' : 'rgba(148,163,184,0.58)',
@@ -698,7 +698,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             onMouseLeave={e => { if (page !== 'hub') (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}
           >
             <span style={{ flexShrink: 0, color: page === 'hub' ? 'rgba(255,255,255,0.9)' : 'rgba(148,163,184,0.42)', display: 'flex' }}>
-              <NavIcon d={ICONS.grid} size={18} />
+              <NavIcon d={ICONS.grid} size={17} />
             </span>
             {!collapsed && <span style={{ flex: 1 }}>{t('navHub')}</span>}
           </button>
@@ -710,8 +710,8 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
               title={collapsed ? t('navCommunity') : undefined}
               style={{
                 display: 'flex', alignItems: 'center', gap: collapsed ? 0 : 9,
-                width: '100%', height: 42, padding: '0 12px', borderRadius: 11,
-                fontSize: 14.5, fontWeight: page === 'community' ? 600 : 400, textAlign: 'left',
+                width: '100%', height: 39, padding: '0 11px', borderRadius: 10,
+                fontSize: 14, fontWeight: page === 'community' ? 600 : 400, textAlign: 'left',
                 cursor: 'pointer', border: 'none',
                 background: page === 'community' ? 'rgba(255,255,255,0.09)' : 'transparent',
                 color: page === 'community' ? '#ffffff' : 'rgba(148,163,184,0.58)',
@@ -727,7 +727,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
               }}
             >
               <span style={{ flexShrink: 0, color: page === 'community' ? 'rgba(255,255,255,0.9)' : 'rgba(148,163,184,0.42)', display: 'flex' }}>
-                <NavIcon d={ICONS.chat} size={18} />
+                <NavIcon d={ICONS.chat} size={17} />
               </span>
               {!collapsed && (
                 <>
@@ -753,8 +753,8 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             title={collapsed ? 'ScaleIA' : undefined}
             style={{
               display: 'flex', alignItems: 'center', gap: collapsed ? 0 : 9,
-              width: '100%', height: 42, padding: '0 12px', borderRadius: 11,
-              fontSize: 14.5, fontWeight: page === 'scaleia' ? 600 : 500, textAlign: 'left',
+              width: '100%', height: 39, padding: '0 11px', borderRadius: 10,
+              fontSize: 14, fontWeight: page === 'scaleia' ? 600 : 500, textAlign: 'left',
               cursor: 'pointer', border: '1px solid rgba(139,92,246,0.22)',
               background: page === 'scaleia'
                 ? 'linear-gradient(90deg,rgba(124,58,237,0.25),rgba(34,211,238,0.1))'
@@ -772,7 +772,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             }}
           >
             <span style={{ flexShrink: 0, color: '#a78bfa', display: 'flex' }}>
-              <NavIcon d={ICONS.sparkles} size={18} color="#a78bfa" />
+              <NavIcon d={ICONS.sparkles} size={17} color="#a78bfa" />
             </span>
             {!collapsed && (
               <>
@@ -870,8 +870,8 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             title={collapsed ? t('navSettings') : undefined}
             style={{
               display: 'flex', alignItems: 'center', gap: collapsed ? 0 : 9,
-              width: '100%', height: 42, padding: '0 12px', borderRadius: 11,
-              fontSize: 14.5, fontWeight: page === 'settings' ? 600 : 400, textAlign: 'left',
+              width: '100%', height: 39, padding: '0 11px', borderRadius: 10,
+              fontSize: 14, fontWeight: page === 'settings' ? 600 : 400, textAlign: 'left',
               cursor: 'pointer', border: 'none',
               background: page === 'settings' ? 'rgba(255,255,255,0.09)' : 'transparent',
               color: page === 'settings' ? '#ffffff' : 'rgba(148,163,184,0.58)',
@@ -886,7 +886,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             }}
           >
             <span style={{ flexShrink: 0, color: page === 'settings' ? 'rgba(255,255,255,0.9)' : 'rgba(148,163,184,0.42)', display: 'flex' }}>
-              <NavIcon d={ICONS.settings} size={18} />
+              <NavIcon d={ICONS.settings} size={17} />
             </span>
             {!collapsed && <span style={{ flex: 1 }}>{t('navSettings')}</span>}
           </button>
@@ -897,8 +897,8 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
               title={collapsed ? t('navAdmin') : undefined}
               style={{
                 display: 'flex', alignItems: 'center', gap: collapsed ? 0 : 9,
-                width: '100%', height: 42, padding: '0 12px', borderRadius: 11,
-                fontSize: 14.5, fontWeight: page === 'licences' ? 600 : 400, textAlign: 'left',
+                width: '100%', height: 39, padding: '0 11px', borderRadius: 10,
+                fontSize: 14, fontWeight: page === 'licences' ? 600 : 400, textAlign: 'left',
                 cursor: 'pointer', border: 'none',
                 background: page === 'licences' ? 'rgba(255,255,255,0.09)' : 'transparent',
                 color: page === 'licences' ? '#ffffff' : 'rgba(148,163,184,0.58)',
@@ -913,7 +913,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
               }}
             >
               <span style={{ flexShrink: 0, color: page === 'licences' ? 'rgba(255,255,255,0.9)' : 'rgba(148,163,184,0.42)', display: 'flex' }}>
-                <NavIcon d={ICONS.shield} size={18} />
+                <NavIcon d={ICONS.shield} size={17} />
               </span>
               {!collapsed && <span style={{ flex: 1 }}>{t('navAdmin')}</span>}
             </button>
