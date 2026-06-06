@@ -13,6 +13,23 @@ type Job = { phoneId: string; status: JobStatus; logs: string[] }
 
 const emptyCfg = (): StoryCfg => ({ imageUrl: '', imageName: '', linkUrl: '', linkText: '' })
 
+// ── Per-phone link persistence (localStorage) ─────────────────────────────────
+const lsKey = (id: string) => `sf-story-link-${id}`
+
+function loadSavedLink(id: string): { linkUrl: string; linkText: string } | null {
+  try {
+    const raw = localStorage.getItem(lsKey(id))
+    return raw ? JSON.parse(raw) : null
+  } catch { return null }
+}
+
+function persistLink(id: string, linkUrl: string, linkText: string) {
+  try {
+    if (!linkUrl.trim() && !linkText.trim()) localStorage.removeItem(lsKey(id))
+    else localStorage.setItem(lsKey(id), JSON.stringify({ linkUrl, linkText }))
+  } catch { /* ignore */ }
+}
+
 export default function StoryLink({ user }: { user: User }) {
   const conns  = useConnections(user)
   const bearer = conns.bearer
@@ -27,7 +44,7 @@ export default function StoryLink({ user }: { user: User }) {
   const [pickMode, setPickMode]           = useState<'phones' | 'groups'>('phones')
 
   const [configs, setConfigs]             = useState<Record<string, StoryCfg>>({})
-  const [bankTarget, setBankTarget]       = useState<string | 'all' | null>(null)
+  const [bankTarget, setBankTarget]       = useState<string | 'all' | 'pool' | null>(null)
 
   const [running, setRunning]             = useState(false)
   const [jobs, setJobs]                   = useState<Job[]>([])
@@ -61,11 +78,17 @@ export default function StoryLink({ user }: { user: User }) {
     return true
   })
 
+  function cfgWithSaved(id: string, existing?: StoryCfg): StoryCfg {
+    if (existing) return existing
+    const saved = loadSavedLink(id)
+    return { ...emptyCfg(), ...(saved ?? {}) }
+  }
+
   function togglePhone(id: string) {
     setSelected(prev => {
       const n = new Set(prev)
       if (n.has(id)) { n.delete(id) }
-      else { n.add(id); setConfigs(c => c[id] ? c : { ...c, [id]: emptyCfg() }) }
+      else { n.add(id); setConfigs(c => ({ ...c, [id]: cfgWithSaved(id, c[id]) })) }
       return n
     })
   }
@@ -73,7 +96,7 @@ export default function StoryLink({ user }: { user: User }) {
     setSelected(new Set(visiblePhones.map(p => p.id)))
     setConfigs(c => {
       const n = { ...c }
-      visiblePhones.forEach(p => { if (!n[p.id]) n[p.id] = emptyCfg() })
+      visiblePhones.forEach(p => { if (!n[p.id]) n[p.id] = cfgWithSaved(p.id) })
       return n
     })
   }
@@ -100,14 +123,20 @@ export default function StoryLink({ user }: { user: User }) {
     if (!allSelected) {
       setConfigs(c => {
         const n = { ...c }
-        inGroup.forEach(p => { if (!n[p.id]) n[p.id] = emptyCfg() })
+        inGroup.forEach(p => { if (!n[p.id]) n[p.id] = cfgWithSaved(p.id, c[p.id]) })
         return n
       })
     }
   }
 
   function setCfg(id: string, patch: Partial<StoryCfg>) {
-    setConfigs(c => ({ ...c, [id]: { ...(c[id] ?? emptyCfg()), ...patch } }))
+    setConfigs(c => {
+      const updated = { ...(c[id] ?? emptyCfg()), ...patch }
+      if ('linkUrl' in patch || 'linkText' in patch) {
+        persistLink(id, updated.linkUrl, updated.linkText)
+      }
+      return { ...c, [id]: updated }
+    })
   }
   // Apply the first selected phone's config to all others
   function applyToAll() {
@@ -201,19 +230,34 @@ export default function StoryLink({ user }: { user: User }) {
       {bankTarget && (
         <BankPicker
           user={user}
-          mode="single"
+          mode={bankTarget === 'pool' ? 'multi' : 'single'}
           resolveMode="signed-url"
           onSelect={(paths, titles) => {
-            const url = paths[0]; const name = titles?.[0] ?? 'image banque'
-            if (url) {
-              if (bankTarget === 'all') {
+            if (bankTarget === 'pool') {
+              // Distribute pool images across selected phones round-robin
+              if (paths.length > 0) {
                 setConfigs(c => {
                   const n = { ...c }
-                  selectedIds.forEach(id => { n[id] = { ...(n[id] ?? emptyCfg()), imageUrl: url, imageName: name } })
+                  selectedIds.forEach((id, i) => {
+                    const url  = paths[i % paths.length]
+                    const name = titles?.[i % paths.length] ?? `image ${(i % paths.length) + 1}`
+                    n[id] = { ...(n[id] ?? emptyCfg()), imageUrl: url, imageName: name }
+                  })
                   return n
                 })
-              } else {
-                setCfg(bankTarget, { imageUrl: url, imageName: name })
+              }
+            } else {
+              const url = paths[0]; const name = titles?.[0] ?? 'image banque'
+              if (url) {
+                if (bankTarget === 'all') {
+                  setConfigs(c => {
+                    const n = { ...c }
+                    selectedIds.forEach(id => { n[id] = { ...(n[id] ?? emptyCfg()), imageUrl: url, imageName: name } })
+                    return n
+                  })
+                } else {
+                  setCfg(bankTarget, { imageUrl: url, imageName: name })
+                }
               }
             }
             setBankTarget(null)
@@ -323,6 +367,9 @@ export default function StoryLink({ user }: { user: User }) {
                           <p style={{ fontSize: 13.5, fontWeight: sel ? 600 : 400, color: sel ? '#fff' : 'rgba(226,232,240,0.7)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phoneName(p)}</p>
                           {grp && <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.4)', marginTop: 1 }}>{grp}</p>}
                         </div>
+                        {loadSavedLink(p.id) && !j && (
+                          <span title="Lien enregistré" style={{ fontSize: 10, color: 'rgba(34,211,238,0.7)', flexShrink: 0 }}>🔗</span>
+                        )}
                         {j && <span style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: statusDot(j.status), boxShadow: j.status === 'running' ? '0 0 6px #a78bfa' : 'none' }} />}
                       </button>
                     )
@@ -373,12 +420,20 @@ export default function StoryLink({ user }: { user: User }) {
           <div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 9 }}>
               <label style={{ ...labelStyle, marginBottom: 0 }}>Configuration par téléphone</label>
-              {selected.size >= 2 && (
-                <button onClick={applyToAll} className="sf-press"
-                  style={{ height: 30, padding: '0 12px', borderRadius: 8, fontSize: 11.5, fontWeight: 600, cursor: 'pointer', background: 'rgba(34,211,238,0.1)', border: '1px solid rgba(34,211,238,0.25)', color: '#67e8f9' }}>
-                  ⎘ Appliquer le 1ᵉʳ à tous
-                </button>
-              )}
+              <div style={{ display: 'flex', gap: 7 }}>
+                {selected.size >= 1 && (
+                  <button onClick={() => setBankTarget('pool')} className="sf-press"
+                    style={{ height: 30, padding: '0 12px', borderRadius: 8, fontSize: 11.5, fontWeight: 600, cursor: 'pointer', background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.28)', color: '#c4b5fd' }}>
+                    🎲 Pool d'images
+                  </button>
+                )}
+                {selected.size >= 2 && (
+                  <button onClick={applyToAll} className="sf-press"
+                    style={{ height: 30, padding: '0 12px', borderRadius: 8, fontSize: 11.5, fontWeight: 600, cursor: 'pointer', background: 'rgba(34,211,238,0.1)', border: '1px solid rgba(34,211,238,0.25)', color: '#67e8f9' }}>
+                    ⎘ Appliquer le 1ᵉʳ à tous
+                  </button>
+                )}
+              </div>
             </div>
 
             {selectedIds.length === 0 ? (
@@ -427,8 +482,16 @@ export default function StoryLink({ user }: { user: User }) {
                         {cfg.imageName && <p style={{ gridColumn: '1 / -1', fontSize: 11.5, color: '#4ade80', marginTop: -4 }}>✓ {cfg.imageName}</p>}
 
                         {/* Link */}
-                        <input value={cfg.linkUrl} onChange={e => setCfg(id, { linkUrl: e.target.value })}
-                          placeholder="https://lien.com" style={inputStyle} onFocus={focusOn} onBlur={focusOff} />
+                        <div style={{ position: 'relative' }}>
+                          <input value={cfg.linkUrl} onChange={e => setCfg(id, { linkUrl: e.target.value })}
+                            placeholder="https://lien.com" style={{ ...inputStyle, paddingRight: cfg.linkUrl ? 72 : 13 }} onFocus={focusOn} onBlur={focusOff} />
+                          {cfg.linkUrl && (
+                            <span style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center', gap: 5, pointerEvents: 'none' }}>
+                              <span style={{ fontSize: 9.5, fontWeight: 700, color: 'rgba(34,211,238,0.8)', letterSpacing: '0.05em' }}>ENREG.</span>
+                              <span style={{ fontSize: 11 }}>💾</span>
+                            </span>
+                          )}
+                        </div>
                         {/* Sticker text */}
                         <input value={cfg.linkText} onChange={e => setCfg(id, { linkText: e.target.value })}
                           placeholder="Texte du sticker (optionnel)" style={inputStyle} onFocus={focusOn} onBlur={focusOff} />
