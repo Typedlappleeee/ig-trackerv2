@@ -44,7 +44,7 @@ export default function StoryLink({ user }: { user: User }) {
   const [pickMode, setPickMode]           = useState<'phones' | 'groups'>('phones')
 
   const [configs, setConfigs]             = useState<Record<string, StoryCfg>>({})
-  const [bankTarget, setBankTarget]       = useState<string | 'all' | null>(null)
+  const [bankTarget, setBankTarget]       = useState<string | 'all' | 'pool' | null>(null)
 
   const [running, setRunning]             = useState(false)
   const [jobs, setJobs]                   = useState<Job[]>([])
@@ -230,19 +230,34 @@ export default function StoryLink({ user }: { user: User }) {
       {bankTarget && (
         <BankPicker
           user={user}
-          mode="single"
+          mode={bankTarget === 'pool' ? 'multi' : 'single'}
           resolveMode="signed-url"
           onSelect={(paths, titles) => {
-            const url = paths[0]; const name = titles?.[0] ?? 'image banque'
-            if (url) {
-              if (bankTarget === 'all') {
+            if (bankTarget === 'pool') {
+              // Distribute pool images across selected phones round-robin
+              if (paths.length > 0) {
                 setConfigs(c => {
                   const n = { ...c }
-                  selectedIds.forEach(id => { n[id] = { ...(n[id] ?? emptyCfg()), imageUrl: url, imageName: name } })
+                  selectedIds.forEach((id, i) => {
+                    const url  = paths[i % paths.length]
+                    const name = titles?.[i % paths.length] ?? `image ${(i % paths.length) + 1}`
+                    n[id] = { ...(n[id] ?? emptyCfg()), imageUrl: url, imageName: name }
+                  })
                   return n
                 })
-              } else {
-                setCfg(bankTarget, { imageUrl: url, imageName: name })
+              }
+            } else {
+              const url = paths[0]; const name = titles?.[0] ?? 'image banque'
+              if (url) {
+                if (bankTarget === 'all') {
+                  setConfigs(c => {
+                    const n = { ...c }
+                    selectedIds.forEach(id => { n[id] = { ...(n[id] ?? emptyCfg()), imageUrl: url, imageName: name } })
+                    return n
+                  })
+                } else {
+                  setCfg(bankTarget, { imageUrl: url, imageName: name })
+                }
               }
             }
             setBankTarget(null)
@@ -405,12 +420,20 @@ export default function StoryLink({ user }: { user: User }) {
           <div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 9 }}>
               <label style={{ ...labelStyle, marginBottom: 0 }}>Configuration par téléphone</label>
-              {selected.size >= 2 && (
-                <button onClick={applyToAll} className="sf-press"
-                  style={{ height: 30, padding: '0 12px', borderRadius: 8, fontSize: 11.5, fontWeight: 600, cursor: 'pointer', background: 'rgba(34,211,238,0.1)', border: '1px solid rgba(34,211,238,0.25)', color: '#67e8f9' }}>
-                  ⎘ Appliquer le 1ᵉʳ à tous
-                </button>
-              )}
+              <div style={{ display: 'flex', gap: 7 }}>
+                {selected.size >= 1 && (
+                  <button onClick={() => setBankTarget('pool')} className="sf-press"
+                    style={{ height: 30, padding: '0 12px', borderRadius: 8, fontSize: 11.5, fontWeight: 600, cursor: 'pointer', background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.28)', color: '#c4b5fd' }}>
+                    🎲 Pool d'images
+                  </button>
+                )}
+                {selected.size >= 2 && (
+                  <button onClick={applyToAll} className="sf-press"
+                    style={{ height: 30, padding: '0 12px', borderRadius: 8, fontSize: 11.5, fontWeight: 600, cursor: 'pointer', background: 'rgba(34,211,238,0.1)', border: '1px solid rgba(34,211,238,0.25)', color: '#67e8f9' }}>
+                    ⎘ Appliquer le 1ᵉʳ à tous
+                  </button>
+                )}
+              </div>
             </div>
 
             {selectedIds.length === 0 ? (
