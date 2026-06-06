@@ -356,6 +356,21 @@ function findByText(xml: string, ...texts: string[]): [number, number] | null {
   return null
 }
 
+// Partial / contains match — useful when the attribute value has extra words
+// (e.g. content-desc="Link sticker" when we search for "link")
+function findByTextPartial(xml: string, ...keywords: string[]): [number, number] | null {
+  for (const kw of keywords) {
+    const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const re = new RegExp(`<[^>]*(?:text|content-desc)="[^"]*${escaped}[^"]*"[^>]*>`, 'i')
+    const m = xml.match(re)
+    if (m) {
+      const pt = extractBoundsFromElement(m[0])
+      if (pt) return pt
+    }
+  }
+  return null
+}
+
 function findByResourceId(xml: string, ...ids: string[]): [number, number] | null {
   for (const id of ids) {
     const escaped = id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -813,14 +828,23 @@ export async function postInstagramStory(
   // ── 1. Download image into the phone gallery ───────────────────────────────
   log('🖼 Téléchargement de l\'image…')
   const imgPath = '/sdcard/DCIM/Camera/sf_story.jpg'
-  const dl = await shellExec(bearer, phoneId,
-    `curl -s -L --max-time 40 -o ${imgPath} "${config.imageUrl}" && echo DONE`)
-  if (!/DONE/.test(dl.output)) {
-    log('   ⚠️ curl image: sortie inattendue → on continue quand même')
+  // Try curl first; fall back to wget if curl isn't available on the device
+  await shellExec(bearer, phoneId,
+    `mkdir -p /sdcard/DCIM/Camera && ` +
+    `(curl -fsSL --max-time 60 -o ${imgPath} "${config.imageUrl}" 2>/dev/null || ` +
+    ` wget -q --timeout=60 -O ${imgPath} "${config.imageUrl}" 2>/dev/null) ; echo DL_DONE`)
+  // Verify the file was actually written (anything > 2 KB is likely a real image)
+  const checkDl = await shellExec(bearer, phoneId,
+    `wc -c < ${imgPath} 2>/dev/null || echo 0`)
+  const dlBytes = parseInt(checkDl.output.trim().split(/\s+/)[0] ?? '0', 10) || 0
+  log(`   📎 Image: ${dlBytes} octets`)
+  if (dlBytes < 2000) {
+    log(`   ❌ Échec téléchargement image (${dlBytes} octets)`)
+    return { ok: false, error: 'Impossible de télécharger l\'image sur le téléphone' }
   }
   await shellExec(bearer, phoneId,
     `am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file://${imgPath}`)
-  await sleep(2000)
+  await sleep(2500)
 
   // ── 2. Open Instagram + the story camera ───────────────────────────────────
   log('📲 Lancement Instagram…')
@@ -888,24 +912,30 @@ export async function postInstagramStory(
 
   xml = await dumpXml(bearer, phoneId)
   const linkSticker =
-    findByText(xml, 'Link', 'Lien', 'LINK', 'LIEN') ??
+    findByText(xml, 'Link', 'Lien', 'LINK', 'LIEN', 'Link sticker', 'Sticker lien', 'Add a link', 'Ajouter un lien') ??
+    findByTextPartial(xml, 'link') ??
     findByResourceId(xml, 'link_sticker', 'sticker_link')
   if (linkSticker) {
     await shellExec(bearer, phoneId, `input tap ${linkSticker[0]} ${linkSticker[1]}`)
   } else {
-    // Search the sticker tray for "link" if a search field exists
-    const searchPt = findByResourceId(xml, 'search_bar', 'sticker_search') ?? findByText(xml, 'Search', 'Rechercher')
+    // Search the sticker tray for "link" via its built-in search bar
+    const searchPt =
+      findByResourceId(xml, 'search_bar', 'sticker_search', 'search_box') ??
+      findByTextPartial(xml, 'search', 'recherch')
     if (searchPt) {
       await shellExec(bearer, phoneId, `input tap ${searchPt[0]} ${searchPt[1]}`)
       await sleep(900)
       await shellExec(bearer, phoneId, `input text "link"`)
-      await sleep(1500)
+      await sleep(1800)
       const xml2 = await dumpXml(bearer, phoneId)
-      const lk2 = findByText(xml2, 'Link', 'Lien')
+      const lk2 =
+        findByText(xml2, 'Link', 'Lien', 'LINK', 'LIEN', 'Link sticker', 'Add a link', 'Ajouter un lien') ??
+        findByTextPartial(xml2, 'link') ??
+        findByResourceId(xml2, 'link_sticker', 'sticker_link')
       if (lk2) await shellExec(bearer, phoneId, `input tap ${lk2[0]} ${lk2[1]}`)
-      else { log('   ❌ Sticker lien introuvable'); return { ok: false, error: 'Sticker lien introuvable' } }
+      else { log('   ❌ Sticker lien introuvable après recherche'); return { ok: false, error: 'Sticker lien introuvable' } }
     } else {
-      log('   ❌ Sticker lien introuvable'); return { ok: false, error: 'Sticker lien introuvable' }
+      log('   ❌ Barre de recherche de stickers introuvable'); return { ok: false, error: 'Sticker lien introuvable' }
     }
   }
   await sleep(2500)
