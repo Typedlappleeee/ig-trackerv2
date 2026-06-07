@@ -16,8 +16,9 @@ type Distribution = 'rotation' | 'random'
 // ── Persistent pool config ────────────────────────────────────────────────────
 const LS_PHOTO_POOL = 'sf-story-photo-pool'
 const LS_TEXT_POOL  = 'sf-story-text-pool'
-const LS_LINK       = 'sf-story-link-global'
 const LS_DISTRIB    = 'sf-story-distribution'
+// Per-phone link: one link = one account, persisted individually
+const lsLinkKey = (id: string) => `sf-story-link-${id}`
 
 function loadPhotoPool(): PoolPhoto[] {
   try { return JSON.parse(localStorage.getItem(LS_PHOTO_POOL) ?? '[]') } catch { return [] }
@@ -25,16 +26,19 @@ function loadPhotoPool(): PoolPhoto[] {
 function loadTextPool(): string[] {
   try { return JSON.parse(localStorage.getItem(LS_TEXT_POOL) ?? '[]') } catch { return [] }
 }
-function loadGlobalLink(): string {
-  return localStorage.getItem(LS_LINK) ?? ''
-}
 function loadDistrib(): Distribution {
   return (localStorage.getItem(LS_DISTRIB) as Distribution | null) ?? 'rotation'
+}
+function loadPhoneLink(id: string): string {
+  return localStorage.getItem(lsLinkKey(id)) ?? ''
+}
+function savePhoneLink(id: string, link: string) {
+  if (link.trim()) localStorage.setItem(lsLinkKey(id), link.trim())
+  else localStorage.removeItem(lsLinkKey(id))
 }
 
 function savePhotoPool(v: PoolPhoto[]) { localStorage.setItem(LS_PHOTO_POOL, JSON.stringify(v)) }
 function saveTextPool(v: string[])     { localStorage.setItem(LS_TEXT_POOL,  JSON.stringify(v)) }
-function saveGlobalLink(v: string)     { localStorage.setItem(LS_LINK,       v) }
 function saveDistrib(v: Distribution)  { localStorage.setItem(LS_DISTRIB,    v) }
 
 // ── Fisher-Yates shuffle ──────────────────────────────────────────────────────
@@ -63,8 +67,9 @@ export default function StoryLink({ user }: { user: User }) {
   // ── Pool config (persisted) ───────────────────────────────────────────────
   const [photoPool, setPhotoPool]     = useState<PoolPhoto[]>(loadPhotoPool)
   const [textPool, setTextPool]       = useState<string[]>(loadTextPool)
-  const [globalLink, setGlobalLink]   = useState(loadGlobalLink)
   const [distribution, setDistrib]    = useState<Distribution>(loadDistrib)
+  // Per-phone link map (1 link = 1 account), hydrated from localStorage on demand
+  const [phoneLinks, setPhoneLinks]   = useState<Record<string, string>>({})
 
   // ── UI state ──────────────────────────────────────────────────────────────
   const [showBankPicker, setShowBankPicker] = useState(false)
@@ -79,8 +84,14 @@ export default function StoryLink({ user }: { user: User }) {
   // ── Persist whenever pools change ─────────────────────────────────────────
   useEffect(() => savePhotoPool(photoPool), [photoPool])
   useEffect(() => saveTextPool(textPool),   [textPool])
-  useEffect(() => saveGlobalLink(globalLink), [globalLink])
   useEffect(() => saveDistrib(distribution),  [distribution])
+
+  // ── Per-phone link helpers ────────────────────────────────────────────────
+  const getLink = (id: string) => phoneLinks[id] ?? loadPhoneLink(id)
+  function setLink(id: string, link: string) {
+    setPhoneLinks(prev => ({ ...prev, [id]: link }))
+    savePhoneLink(id, link)
+  }
 
   // ── Load phones ───────────────────────────────────────────────────────────
   async function loadPhones() {
@@ -91,6 +102,12 @@ export default function StoryLink({ user }: { user: User }) {
       setPhones(list)
       const grps = [...new Set(list.map(p => p.group?.name ?? p.groupName).filter(Boolean) as string[])].sort()
       setGroups(['Tous', ...grps])
+      // Hydrate saved links into state for live preview
+      setPhoneLinks(prev => {
+        const n = { ...prev }
+        list.forEach(p => { if (n[p.id] === undefined) { const v = loadPhoneLink(p.id); if (v) n[p.id] = v } })
+        return n
+      })
     } catch (_) { /* ignore */ }
     setLoading(false)
   }
@@ -129,13 +146,16 @@ export default function StoryLink({ user }: { user: User }) {
       phoneId: id,
       photo: photoPool[photoIndices[i % photoIndices.length]],
       text:  textIndices.length > 0 ? textPool[textIndices[i % textIndices.length]] : '',
-      link:  globalLink.trim(),
+      link:  getLink(id).trim(),   // 1 link = 1 account
     }))
-  }, [photoPool, textPool, globalLink, distribution])
+  }, [photoPool, textPool, distribution, phoneLinks])
 
   const previewAssignments = buildAssignments(selectedIds)
 
-  const canRun = !!bearer && selectedIds.length > 0 && photoPool.length > 0 && globalLink.trim() !== '' && !running
+  // Phones selected but still missing their own link
+  const missingLinkIds = selectedIds.filter(id => !getLink(id).trim())
+
+  const canRun = !!bearer && selectedIds.length > 0 && photoPool.length > 0 && missingLinkIds.length === 0 && !running
 
   // ── Run ───────────────────────────────────────────────────────────────────
   async function run() {
@@ -441,24 +461,29 @@ export default function StoryLink({ user }: { user: User }) {
             </div>
           </div>
 
-          {/* ── Global link ── */}
-          <div style={card}>
-            <div style={{ marginBottom: 12 }}>
-              <span style={label}>🔗 Lien du sticker (global)</span>
-              <p style={{ fontSize: 12, color: 'rgba(148,163,184,0.45)', marginTop: -5 }}>
-                Même lien pour tous les comptes. Enregistré automatiquement.
-              </p>
-            </div>
-            <div style={{ position: 'relative' }}>
-              <input value={globalLink} onChange={e => setGlobalLink(e.target.value)}
-                placeholder="https://example.com/landing"
-                style={{ ...inputS, paddingRight: globalLink ? 75 : 12, borderColor: globalLink ? 'rgba(34,211,238,0.3)' : 'rgba(255,255,255,0.08)' }} />
-              {globalLink && (
-                <span style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center', gap: 4, pointerEvents: 'none' }}>
-                  <span style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: '0.05em', color: 'rgba(34,211,238,0.8)' }}>ENREG. 💾</span>
+          {/* ── Per-phone links notice ── */}
+          <div style={{ ...card, borderColor: missingLinkIds.length > 0 ? 'rgba(245,158,11,0.25)' : 'rgba(255,255,255,0.07)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <span style={label}>🔗 Liens — 1 lien par compte</span>
+                <p style={{ fontSize: 12, color: 'rgba(148,163,184,0.45)', marginTop: -5 }}>
+                  Chaque compte a son propre lien, éditable dans l'aperçu à droite et sauvegardé automatiquement.
+                </p>
+              </div>
+              {selectedIds.length > 0 && (
+                <span style={{ flexShrink: 0, fontSize: 12, fontWeight: 700, padding: '5px 11px', borderRadius: 20,
+                  background: missingLinkIds.length > 0 ? 'rgba(245,158,11,0.12)' : 'rgba(34,197,94,0.12)',
+                  border: `1px solid ${missingLinkIds.length > 0 ? 'rgba(245,158,11,0.3)' : 'rgba(34,197,94,0.3)'}`,
+                  color: missingLinkIds.length > 0 ? '#fbbf24' : '#4ade80' }}>
+                  {selectedIds.length - missingLinkIds.length}/{selectedIds.length} liens
                 </span>
               )}
             </div>
+            {missingLinkIds.length > 0 && (
+              <p style={{ fontSize: 12, color: 'rgba(251,191,36,0.85)', marginTop: 10 }}>
+                ⚠️ {missingLinkIds.length} compte{missingLinkIds.length > 1 ? 's' : ''} sans lien — remplis-{missingLinkIds.length > 1 ? 'les' : 'le'} à droite avant de publier.
+              </p>
+            )}
           </div>
 
           {/* ── Distribution mode ── */}
@@ -525,23 +550,38 @@ export default function StoryLink({ user }: { user: User }) {
                     )}
                   </div>
 
-                  <div style={{ padding: '7px 12px 9px', fontSize: 11, lineHeight: 1.6 }}>
+                  <div style={{ padding: '7px 12px 10px', fontSize: 11, lineHeight: 1.6 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 5, color: 'rgba(167,139,250,0.7)' }}>
                       <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
                       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 200 }}>{a.photo.name}</span>
                     </div>
-                    {a.link && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 5, color: 'rgba(34,211,238,0.65)', marginTop: 2 }}>
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 200 }}>{a.link.replace('https://', '')}</span>
-                      </div>
-                    )}
                     {a.text && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 5, color: 'rgba(148,163,184,0.5)', marginTop: 2 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 5, color: 'rgba(148,163,184,0.5)', marginTop: 3 }}>
                         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
                         <span style={{ fontStyle: 'italic' }}>"{a.text}"</span>
                       </div>
                     )}
+                    {/* Per-phone link — editable, 1 link = 1 account */}
+                    <div style={{ position: 'relative', marginTop: 7 }}>
+                      <svg style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={getLink(a.phoneId).trim() ? '#22d3ee' : 'rgba(148,163,184,0.4)'} strokeWidth="2" strokeLinecap="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                      <input
+                        value={getLink(a.phoneId)}
+                        onChange={e => setLink(a.phoneId, e.target.value)}
+                        disabled={running}
+                        placeholder="lien de ce compte…"
+                        style={{
+                          width: '100%', height: 32, paddingLeft: 26, paddingRight: getLink(a.phoneId).trim() ? 26 : 9,
+                          borderRadius: 8, fontSize: 11.5, color: '#e8e6f0', outline: 'none',
+                          background: 'rgba(8,8,14,0.7)',
+                          border: `1px solid ${getLink(a.phoneId).trim() ? 'rgba(34,211,238,0.3)' : 'rgba(245,158,11,0.3)'}`,
+                        }}
+                        onFocus={e => { e.currentTarget.style.borderColor = 'rgba(139,92,246,0.5)' }}
+                        onBlur={e => { e.currentTarget.style.borderColor = getLink(a.phoneId).trim() ? 'rgba(34,211,238,0.3)' : 'rgba(245,158,11,0.3)' }}
+                      />
+                      {getLink(a.phoneId).trim() && (
+                        <span style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', fontSize: 10, pointerEvents: 'none' }} title="Enregistré">💾</span>
+                      )}
+                    </div>
                   </div>
 
                   {openLog === a.phoneId && j && j.logs.length > 0 && (
