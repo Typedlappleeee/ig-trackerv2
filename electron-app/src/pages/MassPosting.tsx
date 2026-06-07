@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase, type Phone, type ContentItem } from '@/lib/supabase'
 import { useConnections } from '@/lib/connections'
@@ -264,15 +264,29 @@ export function MassPosting({ user }: MassPostingProps) {
     setSelVideos(prev => [...prev, { item: fake, localPath: path }])
   }
 
-  // Auto-assignment: round-robin (seq) or random (random) — Python _mp_mode_var
+  // Auto-assignment: round-robin (seq) or unique-random (random).
+  // In random mode we Fisher-Yates shuffle the video indices first so no two
+  // phones ever get the same video before the full list has been cycled once.
   const phoneList = phones.filter(p => selectedPhones.has(p.id))
-  const assignments = phoneList.map((phone, i) => {
-    if (selectedVideos.length === 0) return { phone, video: null, videoIndex: -1 }
-    const idx = mode === 'random'
-      ? Math.floor(Math.random() * selectedVideos.length)  // Note: stable per render — recomputed when phoneList/videos change
-      : i % selectedVideos.length
-    return { phone, video: selectedVideos[idx], videoIndex: idx }
-  })
+  const assignments = useMemo(() => {
+    if (selectedVideos.length === 0) return phoneList.map(phone => ({ phone, video: null, videoIndex: -1 }))
+    if (mode === 'random') {
+      const indices = selectedVideos.map((_, i) => i)
+      for (let i = indices.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [indices[i], indices[j]] = [indices[j], indices[i]]
+      }
+      return phoneList.map((phone, i) => {
+        const idx = indices[i % indices.length]
+        return { phone, video: selectedVideos[idx], videoIndex: idx }
+      })
+    }
+    return phoneList.map((phone, i) => {
+      const idx = i % selectedVideos.length
+      return { phone, video: selectedVideos[idx], videoIndex: idx }
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phoneList.map(p => p.id).join(','), selectedVideos.length, mode])
 
   async function stop() {
     stopRef.current = true
