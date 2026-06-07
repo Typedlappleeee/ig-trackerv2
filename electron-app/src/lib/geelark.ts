@@ -860,19 +860,21 @@ export async function postInstagramStory(
 
   let xml = await dumpXml(bearer, phoneId)
 
-  // Try to reach the story camera: tap the "+" / story creation entry, else
-  // swipe right on the feed (classic gesture that opens the camera).
+  // Try to reach the story camera.
+  // Priority: story-specific resource IDs → "Your story" text → swipe right from left edge.
+  // Do NOT use 'creation_tab' — that's the bottom-nav "+" for posts/reels, not stories.
   log('🎬 Ouverture de la caméra story…')
   const storyEntry =
-    findByResourceId(xml, 'feed_tab_avatar_plus', 'tab_story_camera', 'camera_tab', 'creation_tab') ??
-    findByText(xml, 'Your story', 'Votre story', 'Add to story', 'Ajouter à la story')
+    findByResourceId(xml, 'feed_tab_avatar_plus', 'tab_story_camera', 'tab_bar_camera_button') ??
+    findByText(xml, 'Your story', 'Votre story', 'Add to story', 'Ajouter à la story') ??
+    findByTextPartial(xml, 'your story', 'votre story')
   if (storyEntry) {
     await shellExec(bearer, phoneId, `input tap ${storyEntry[0]} ${storyEntry[1]}`)
   } else {
-    // Swipe right from far-left edge to open the camera
-    await shellExec(bearer, phoneId, `input swipe ${Math.floor(sw * 0.05)} ${Math.floor(sh * 0.5)} ${Math.floor(sw * 0.95)} ${Math.floor(sh * 0.5)} 300`)
+    // Classic gesture: swipe right from the far-left edge of the home feed
+    await shellExec(bearer, phoneId, `input swipe ${Math.floor(sw * 0.03)} ${Math.floor(sh * 0.5)} ${Math.floor(sw * 0.97)} ${Math.floor(sh * 0.5)} 350`)
   }
-  await sleep(4000)
+  await sleep(5000)
 
   // ── 3. Pick the uploaded image from the gallery ────────────────────────────
   log('🖼 Sélection de l\'image dans la galerie…')

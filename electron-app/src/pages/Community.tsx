@@ -1207,11 +1207,26 @@ export function Community({ user, onNavigate }: CommunityProps) {
       {/* ── Header ───────────────────────────────────────────────────────────── */}
       <div className="flex-shrink-0 flex items-center justify-between px-6 py-4"
         style={{ borderBottom: '1px solid rgba(139,92,246,0.12)', background: 'rgba(8,5,20,0.95)', backdropFilter: 'blur(12px)' }}>
-        <div>
-          <h1 className="text-[18px] font-black text-white leading-tight">{t('communityTitle')}</h1>
-          <p className="text-[11px] mt-0.5" style={{ color: 'rgba(196,181,253,0.4)' }}>
-            {t('communitySub')}
-          </p>
+        <div className="flex items-center gap-3">
+          <div style={{
+            width: 40, height: 40, borderRadius: 11, flexShrink: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'linear-gradient(135deg, rgba(139,92,246,0.22), rgba(236,72,153,0.1))',
+            border: '1px solid rgba(139,92,246,0.28)', color: '#a78bfa',
+          }}>
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+            </svg>
+          </div>
+          <div>
+            <h1 className="text-[22px] font-black leading-tight" style={{
+              background: 'linear-gradient(135deg,#FFFFFF 0%,rgba(196,181,253,0.85) 100%)',
+              WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+            }}>{t('communityTitle')}</h1>
+            <p className="text-[11px] mt-0.5" style={{ color: 'rgba(196,181,253,0.4)' }}>
+              {t('communitySub')}
+            </p>
+          </div>
         </div>
         <button onClick={() => setShowProfile(true)}
           className="flex items-center gap-2.5 pl-2.5 pr-3 py-2 rounded-xl transition-all hover:bg-white/[0.04] group"

@@ -157,8 +157,8 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
   const [saveToBank, setSaveToBank]     = useState(isWeb)
   const [bankFolder, setBankFolder]     = useState('')
   const [bankFolders, setBankFolders]   = useState<string[]>([])
-  const [creatingFolder, setCreatingFolder] = useState(false)
-  const [newFolderName, setNewFolderName]   = useState('')
+  const [showFolderModal, setShowFolderModal] = useState(false)
+  const [folderInput, setFolderInput]   = useState('')
   const [jobs, setJobs]                 = useState<VariantJob[]>([])
   const [running, setRunning]           = useState(false)
   const [totalDone, setTotalDone]       = useState(0)
@@ -362,13 +362,28 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
       {/* Header */}
       <div style={{ padding: '20px 24px 0', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16 }}>
-          <div>
-            <h1 style={{ fontSize: 20, fontWeight: 700, color: '#F1F0F7', letterSpacing: '-0.02em', marginBottom: 3 }}>CloneVid</h1>
-            <p style={{ fontSize: 13, color: 'rgba(148,163,184,0.55)' }}>
-              {sources.length > 1
-                ? `${sources.length} vidéos × ${count} variantes = ${totalJobs} au total`
-                : `1 video → N unique variants · invisible transformations`}
-            </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
+            <div style={{
+              width: 44, height: 44, borderRadius: 13, flexShrink: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'linear-gradient(135deg, rgba(34,211,238,0.22), rgba(34,211,238,0.06))',
+              border: '1px solid rgba(34,211,238,0.28)', color: '#22d3ee',
+              boxShadow: '0 0 20px -6px rgba(34,211,238,0.4)',
+            }}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M15 10l4.553-2.069A1 1 0 0 1 21 8.82v6.36a1 1 0 0 1-1.447.894L15 14M3 8a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8z"/>
+              </svg>
+            </div>
+            <div>
+              <h1 style={{ fontSize: 22, fontWeight: 900, letterSpacing: '-0.025em', lineHeight: 1.1, margin: 0,
+                background: 'linear-gradient(135deg,#FFFFFF 0%,rgba(34,211,238,0.85) 100%)',
+                WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>CloneVid</h1>
+              <p style={{ fontSize: 13, color: 'rgba(148,163,184,0.55)', marginTop: 4 }}>
+                {sources.length > 1
+                  ? `${sources.length} vidéos × ${count} variantes = ${totalJobs} au total`
+                  : `1 video → N variantes uniques · transformations invisibles`}
+              </p>
+            </div>
           </div>
           {jobs.length > 0 && (
             <div style={{ display: 'flex', gap: 12 }}>
@@ -545,63 +560,28 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
             </div>
 
             {(isWeb || saveToBank) && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                {/* Dropdown dossiers existants */}
-                <select
-                  value={bankFolder}
-                  onChange={e => { setBankFolder(e.target.value); setCreatingFolder(false) }}
-                  disabled={running}
-                  style={{ width: '100%', padding: '5px 8px', borderRadius: 7, fontSize: 11, background: 'rgba(255,255,255,0.05)', border: `1px solid ${bankFolder ? 'rgba(139,92,246,0.4)' : 'rgba(255,255,255,0.08)'}`, color: bankFolder ? '#c4b5fd' : 'rgba(148,163,184,0.5)', cursor: 'pointer', outline: 'none' }}
-                >
-                  <option value="" style={{ background: '#0c0919', color: '#94a3b8' }}>📁 Aucun dossier</option>
-                  {bankFolders.map(f => (
-                    <option key={f} value={f} style={{ background: '#0c0919', color: '#e2d9f3' }}>📁 {f}</option>
-                  ))}
-                </select>
-
-                {/* Nouveau dossier */}
-                {creatingFolder ? (
-                  <div style={{ display: 'flex', gap: 4 }}>
-                    <input
-                      autoFocus
-                      placeholder="Nom du nouveau dossier…"
-                      value={newFolderName}
-                      onChange={e => setNewFolderName(e.target.value)}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') {
-                          const n = newFolderName.trim()
-                          if (n) { setBankFolder(n); setBankFolders(prev => prev.includes(n) ? prev : [...prev, n]) }
-                          setNewFolderName(''); setCreatingFolder(false)
-                        }
-                        if (e.key === 'Escape') { setCreatingFolder(false); setNewFolderName('') }
-                      }}
-                      style={{ flex: 1, padding: '5px 8px', borderRadius: 7, fontSize: 11, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(139,92,246,0.5)', color: '#e2d9f3', outline: 'none' }}
-                    />
-                    <button
-                      onClick={() => {
-                        const n = newFolderName.trim()
-                        if (n) { setBankFolder(n); setBankFolders(prev => prev.includes(n) ? prev : [...prev, n]) }
-                        setNewFolderName(''); setCreatingFolder(false)
-                      }}
-                      style={{ padding: '5px 10px', borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: 'none', background: 'rgba(139,92,246,0.25)', color: '#a78bfa' }}
-                    >✓</button>
-                    <button
-                      onClick={() => { setCreatingFolder(false); setNewFolderName('') }}
-                      style={{ padding: '5px 8px', borderRadius: 7, fontSize: 11, cursor: 'pointer', border: 'none', background: 'rgba(255,255,255,0.05)', color: 'rgba(148,163,184,0.5)' }}
-                    >✕</button>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => setCreatingFolder(true)}
-                    disabled={running}
-                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, padding: '5px 0', borderRadius: 7, fontSize: 10, fontWeight: 600, cursor: 'pointer', border: '1px dashed rgba(139,92,246,0.3)', background: 'transparent', color: 'rgba(139,92,246,0.55)', transition: 'all 0.15s', width: '100%' }}
-                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(139,92,246,0.07)'; e.currentTarget.style.color = '#a78bfa'; e.currentTarget.style.borderColor = 'rgba(139,92,246,0.5)' }}
-                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'rgba(139,92,246,0.55)'; e.currentTarget.style.borderColor = 'rgba(139,92,246,0.3)' }}
-                  >
-                    + Nouveau dossier
-                  </button>
+              <button
+                onClick={() => { setFolderInput(bankFolder); setShowFolderModal(true) }}
+                disabled={running}
+                style={{
+                  width: '100%', display: 'flex', alignItems: 'center', gap: 7, padding: '6px 10px',
+                  borderRadius: 8, fontSize: 11.5, fontWeight: 600, cursor: running ? 'not-allowed' : 'pointer',
+                  background: bankFolder ? 'rgba(139,92,246,0.1)' : 'rgba(255,255,255,0.04)',
+                  border: `1px solid ${bankFolder ? 'rgba(139,92,246,0.35)' : 'rgba(255,255,255,0.08)'}`,
+                  color: bankFolder ? '#c4b5fd' : 'rgba(148,163,184,0.5)', textAlign: 'left',
+                }}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {bankFolder || 'Choisir un dossier…'}
+                </span>
+                {bankFolder && (
+                  <span
+                    role="button"
+                    onClick={e => { e.stopPropagation(); setBankFolder('') }}
+                    style={{ opacity: 0.5, lineHeight: 1, cursor: 'pointer', fontSize: 13 }}
+                  >✕</span>
                 )}
-              </div>
+              </button>
             )}
           </div>
 
@@ -670,6 +650,76 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
       </div>
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+
+      {/* ── Folder destination modal ───────────────────────────────────────── */}
+      {showFolderModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
+          onClick={() => setShowFolderModal(false)}>
+          <div style={{ borderRadius: 18, overflow: 'hidden', width: 320, background: '#0E0E16', border: '1px solid rgba(139,92,246,0.25)', boxShadow: '0 24px 80px -12px rgba(0,0,0,0.8)' }}
+            onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div style={{ padding: '14px 18px', borderBottom: '1px solid rgba(139,92,246,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                <span style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>Dossier de destination</span>
+              </div>
+              <button onClick={() => setShowFolderModal(false)}
+                style={{ width: 26, height: 26, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.05)', border: 'none', cursor: 'pointer', color: 'rgba(148,163,184,0.7)' }}>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+
+            {/* Free-type input — works for empty folders too */}
+            <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+              <input
+                autoFocus
+                placeholder="Nom du dossier (existant ou nouveau)…"
+                value={folderInput}
+                onChange={e => setFolderInput(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    const n = folderInput.trim()
+                    setBankFolder(n)
+                    if (n && !bankFolders.includes(n)) setBankFolders(prev => [...prev, n].sort())
+                    setShowFolderModal(false)
+                  }
+                  if (e.key === 'Escape') setShowFolderModal(false)
+                }}
+                style={{ width: '100%', padding: '7px 11px', borderRadius: 9, fontSize: 12.5, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(139,92,246,0.35)', color: '#e2d9f3', outline: 'none', boxSizing: 'border-box' }}
+              />
+              {folderInput.trim() && (
+                <button
+                  onClick={() => {
+                    const n = folderInput.trim()
+                    setBankFolder(n)
+                    if (n && !bankFolders.includes(n)) setBankFolders(prev => [...prev, n].sort())
+                    setShowFolderModal(false)
+                  }}
+                  style={{ marginTop: 7, width: '100%', padding: '6px 0', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', border: 'none', background: 'rgba(139,92,246,0.2)', color: '#c4b5fd' }}>
+                  ✓ Utiliser «{folderInput.trim()}»
+                </button>
+              )}
+            </div>
+
+            {/* Existing folders list */}
+            {bankFolders.length > 0 && (
+              <div style={{ maxHeight: 280, overflowY: 'auto', padding: '4px 0' }}>
+                {bankFolders.map(f => (
+                  <button key={f}
+                    onClick={() => { setBankFolder(f); setShowFolderModal(false) }}
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 18px', textAlign: 'left', background: f === bankFolder ? 'rgba(139,92,246,0.1)' : 'transparent', border: 'none', borderBottom: '1px solid rgba(255,255,255,0.04)', cursor: 'pointer', transition: 'background 0.15s' }}
+                    onMouseEnter={e => { if (f !== bankFolder) e.currentTarget.style.background = 'rgba(255,255,255,0.03)' }}
+                    onMouseLeave={e => { if (f !== bankFolder) e.currentTarget.style.background = 'transparent' }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.5"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                    <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: f === bankFolder ? '#c4b5fd' : '#e2e8f0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f}</span>
+                    {f === bankFolder && <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="2.5"><path d="M20 6L9 17l-5-5"/></svg>}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

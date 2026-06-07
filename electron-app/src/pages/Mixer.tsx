@@ -355,7 +355,7 @@ export function Mixer({ user }: MixerProps) {
           </div>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <h1 style={{ fontSize: 20, fontWeight: 900, letterSpacing: -0.5, lineHeight: 1, background: 'linear-gradient(135deg,#FFFFFF 0%,rgba(196,181,253,0.85) 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+              <h1 style={{ fontSize: 23, fontWeight: 900, letterSpacing: '-0.025em', lineHeight: 1, background: 'linear-gradient(135deg,#FFFFFF 0%,rgba(196,181,253,0.85) 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
                 Mélangeur
               </h1>
               {running ? (

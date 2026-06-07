@@ -560,13 +560,30 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
 
       {/* Header */}
       <div style={{
-        flexShrink: 0, padding: '24px 32px 20px',
+        flexShrink: 0, padding: '20px 32px 18px',
         borderBottom: `1px solid ${S.border}`,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        background: 'linear-gradient(90deg,rgba(139,92,246,0.05) 0%,transparent 60%)',
       }}>
-        <div>
-          <h1 style={{ fontSize: 24, fontWeight: 800, color: S.text, margin: 0, lineHeight: 1.1, letterSpacing: '-0.3px' }}>{t('settingsTitle')}</h1>
-          <p style={{ fontSize: 13, color: S.text3, margin: '4px 0 0' }}>{t('settingsSub')}</p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
+          <div style={{
+            width: 44, height: 44, borderRadius: 13, flexShrink: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'linear-gradient(135deg, rgba(139,92,246,0.22), rgba(139,92,246,0.06))',
+            border: '1px solid rgba(139,92,246,0.28)', color: '#a78bfa',
+            boxShadow: '0 0 20px -6px rgba(139,92,246,0.45)',
+          }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+          </div>
+          <div>
+            <h1 style={{ fontSize: 23, fontWeight: 900, color: S.text, margin: 0, lineHeight: 1.1, letterSpacing: '-0.025em',
+              background: 'linear-gradient(135deg,#FFFFFF 0%,rgba(196,181,253,0.85) 100%)',
+              WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>{t('settingsTitle')}</h1>
+            <p style={{ fontSize: 13, color: S.text3, margin: '4px 0 0' }}>{t('settingsSub')}</p>
+          </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           {saved && (

@@ -549,7 +549,7 @@ import { initPoller, stopPoller } from '@/lib/phonePoller'
 import { initIgStatsPoller } from '@/lib/igStatsPoller'
 import { Phones }            from '@/pages/Phones'
 import { Posting }           from '@/pages/Posting'
-import { Bank }              from '@/pages/Bank'
+import { BankHub }           from '@/pages/BankHub'
 import { Montage }           from '@/pages/Montage'
 import { Remix }             from '@/pages/Remix'
 import { AiTools }           from '@/pages/AiTools'
@@ -559,7 +559,6 @@ import { MassPosting }       from '@/pages/MassPosting'
 import { Scheduler }         from '@/pages/Scheduler'
 import { Warmup }            from '@/pages/Warmup'
 import { VideoRepurpose }    from '@/pages/VideoRepurpose'
-import { CaptionBank }       from '@/pages/CaptionBank'
 import { Mixer }             from '@/pages/Mixer'
 import { Licences }          from '@/pages/Licences'
 
@@ -818,12 +817,12 @@ function AppContent({ user }: { user: User }) {
       case 'massposting':  return <MassPosting user={user} />
       case 'scheduler':    return <Scheduler   user={user} onNavigate={p => handleNavigate(p as Page)} />
       case 'storylink':    return <StoryLink   user={user} />
-      case 'bank':         return <Bank        user={user} />
+      case 'bank':         return <BankHub     user={user} initialTab="videos" />
       case 'warmup':       return <Warmup      user={user} />
       case 'montage':      return <Montage     user={user} />
       case 'remix':        return <Remix       user={user} />
       case 'repurpose':    return <VideoRepurpose user={user} />
-      case 'captionbank':  return <CaptionBank  user={user} />
+      case 'captionbank':  return <BankHub      user={user} initialTab="captions" />
       case 'mixer':        return <Mixer        user={user} />
       case 'aitools':      return <AiTools     user={user} />
       case 'settings':     return <Settings    user={user} initialPanel={settingsPanel as any} onNavigate={(p) => setPage(p as any)} />
