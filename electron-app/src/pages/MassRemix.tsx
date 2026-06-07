@@ -1379,20 +1379,33 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
 
         {/* Header */}
         <div style={{
-          flexShrink: 0, padding: isMobile ? '11px 14px' : '14px 22px',
+          flexShrink: 0, padding: isMobile ? '11px 14px' : '16px 24px',
           borderBottom: '1px solid rgba(139,92,246,0.1)',
           background: 'linear-gradient(90deg,rgba(124,58,237,0.07) 0%,transparent 60%)',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
             {!isMobile && (
-              <div style={{ width: 36, height: 36, borderRadius: 11, background: 'linear-gradient(135deg,#7c3aed,#ec4899)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 3px 14px rgba(124,58,237,0.35)' }}>
-                <span style={{ fontSize: 18 }}>⚡</span>
+              <div style={{
+                width: 44, height: 44, borderRadius: 13, flexShrink: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: 'linear-gradient(135deg,rgba(124,58,237,0.25),rgba(236,72,153,0.12))',
+                border: '1px solid rgba(124,58,237,0.3)',
+                boxShadow: '0 0 20px -6px rgba(124,58,237,0.5)',
+              }}>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#c084fc" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/>
+                </svg>
               </div>
             )}
             <div>
-              <h1 style={{ fontSize: isMobile ? 15 : 18, fontWeight: 900, color: '#F1F0F7', letterSpacing: '-0.02em', lineHeight: 1.1 }}>{t('massRemixTitle')}</h1>
-              {!isMobile && <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.45)', marginTop: 2 }}>{t('massRemixSub')}</p>}
+              <h1 style={{ fontSize: isMobile ? 15 : 23, fontWeight: 900, letterSpacing: '-0.025em', lineHeight: 1.1, margin: 0,
+                background: isMobile ? undefined : 'linear-gradient(135deg,#FFFFFF 0%,rgba(196,181,253,0.85) 100%)',
+                WebkitBackgroundClip: isMobile ? undefined : 'text',
+                WebkitTextFillColor: isMobile ? '#F1F0F7' : 'transparent',
+                color: isMobile ? '#F1F0F7' : undefined,
+              }}>{t('massRemixTitle')}</h1>
+              {!isMobile && <p style={{ fontSize: 12, color: 'rgba(148,163,184,0.5)', marginTop: 4 }}>{t('massRemixSub')}</p>}
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>

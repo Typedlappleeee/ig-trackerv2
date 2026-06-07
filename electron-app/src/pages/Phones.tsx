@@ -925,7 +925,9 @@ export function Phones({ user }: PhonesProps) {
               </svg>
             </div>
             <div style={{ minWidth: 0 }}>
-              <h1 style={{ fontSize: 23, fontWeight: 800, color: '#F2F0FF', margin: 0, letterSpacing: '-0.025em', lineHeight: 1.1 }}>{t('phonesHeading')}</h1>
+              <h1 style={{ fontSize: 23, fontWeight: 900, margin: 0, letterSpacing: '-0.025em', lineHeight: 1.1,
+              background: 'linear-gradient(135deg,#FFFFFF 0%,rgba(196,181,253,0.85) 100%)',
+              WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>{t('phonesHeading')}</h1>
               <p style={{ fontSize: 13, color: 'rgba(148,163,184,0.6)', margin: '4px 0 0', lineHeight: 1.4 }}>{t('phonesSubtitle')}</p>
             </div>
           </div>

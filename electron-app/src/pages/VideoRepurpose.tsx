@@ -362,13 +362,28 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
       {/* Header */}
       <div style={{ padding: '20px 24px 0', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16 }}>
-          <div>
-            <h1 style={{ fontSize: 20, fontWeight: 700, color: '#F1F0F7', letterSpacing: '-0.02em', marginBottom: 3 }}>CloneVid</h1>
-            <p style={{ fontSize: 13, color: 'rgba(148,163,184,0.55)' }}>
-              {sources.length > 1
-                ? `${sources.length} vidéos × ${count} variantes = ${totalJobs} au total`
-                : `1 video → N unique variants · invisible transformations`}
-            </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
+            <div style={{
+              width: 44, height: 44, borderRadius: 13, flexShrink: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'linear-gradient(135deg, rgba(34,211,238,0.22), rgba(34,211,238,0.06))',
+              border: '1px solid rgba(34,211,238,0.28)', color: '#22d3ee',
+              boxShadow: '0 0 20px -6px rgba(34,211,238,0.4)',
+            }}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M15 10l4.553-2.069A1 1 0 0 1 21 8.82v6.36a1 1 0 0 1-1.447.894L15 14M3 8a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8z"/>
+              </svg>
+            </div>
+            <div>
+              <h1 style={{ fontSize: 22, fontWeight: 900, letterSpacing: '-0.025em', lineHeight: 1.1, margin: 0,
+                background: 'linear-gradient(135deg,#FFFFFF 0%,rgba(34,211,238,0.85) 100%)',
+                WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>CloneVid</h1>
+              <p style={{ fontSize: 13, color: 'rgba(148,163,184,0.55)', marginTop: 4 }}>
+                {sources.length > 1
+                  ? `${sources.length} vidéos × ${count} variantes = ${totalJobs} au total`
+                  : `1 video → N variantes uniques · transformations invisibles`}
+              </p>
+            </div>
           </div>
           {jobs.length > 0 && (
             <div style={{ display: 'flex', gap: 12 }}>
