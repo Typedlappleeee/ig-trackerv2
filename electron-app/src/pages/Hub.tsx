@@ -46,11 +46,11 @@ const TOOLS: ToolDef[] = [
   { id: 'community',   labelKey: 'navCommunity',   descKey: 'hubDescCommunity',   icon: 'chat',     accent: '34,211,238',  accent2: '129,140,248', category: 'social' },
 ]
 
-const CATEGORIES: { id: ToolDef['category']; labelKey: string; emoji: string }[] = [
-  { id: 'instagram', labelKey: 'hubCatInstagram', emoji: '🚀' },
-  { id: 'creation',  labelKey: 'hubCatCreation',  emoji: '🎬' },
-  { id: 'ai',        labelKey: 'hubCatAI',        emoji: '✨' },
-  { id: 'social',    labelKey: 'hubCatSocial',    emoji: '💬' },
+const CATEGORIES: { id: ToolDef['category']; labelKey: string; icon: keyof typeof ICONS; accent: string }[] = [
+  { id: 'instagram', labelKey: 'hubCatInstagram', icon: 'send',     accent: '139,92,246' },
+  { id: 'creation',  labelKey: 'hubCatCreation',  icon: 'video',    accent: '34,211,238' },
+  { id: 'ai',        labelKey: 'hubCatAI',        icon: 'sparkles', accent: '168,85,247' },
+  { id: 'social',    labelKey: 'hubCatSocial',    icon: 'chat',     accent: '236,72,153' },
 ]
 
 function IconGlyph({ icon, size = 24, color }: { icon: keyof typeof ICONS; size?: number; color: string }) {
@@ -238,14 +238,22 @@ function SpotlightBanner({ tool, onOpen }: { tool: ToolDef; onOpen: () => void }
 }
 
 // ── Category section ──────────────────────────────────────────────────────────
-function CategorySection({ emoji, title, tools, baseIndex, onNavigate }: {
-  emoji: string; title: string; tools: ToolDef[]; baseIndex: number; onNavigate: (p: Page) => void
+function CategorySection({ icon, accent, title, tools, baseIndex, onNavigate }: {
+  icon: keyof typeof ICONS; accent: string; title: string; tools: ToolDef[]; baseIndex: number; onNavigate: (p: Page) => void
 }) {
   if (!tools.length) return null
   return (
     <section style={{ marginBottom: 42 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
-        <span style={{ fontSize: 18 }}>{emoji}</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 11, marginBottom: 18 }}>
+        <span style={{
+          width: 28, height: 28, borderRadius: 9, flexShrink: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: `linear-gradient(135deg, rgba(${accent},0.95), rgba(${accent},0.55))`,
+          border: '1px solid rgba(255,255,255,0.14)',
+          boxShadow: `0 4px 14px -4px rgba(${accent},0.6)`,
+        }}>
+          <IconGlyph icon={icon} size={15} color="#fff" />
+        </span>
         <h2 style={{ fontSize: 16, fontWeight: 800, letterSpacing: '-0.01em', color: '#e8e6f0' }}>{title}</h2>
         <div style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, rgba(255,255,255,0.08), transparent)' }} />
         <span style={{ fontSize: 11, color: 'rgba(148,163,184,0.4)', fontWeight: 600 }}>{tools.length}</span>
@@ -383,8 +391,16 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
               ))}
             </div>
           ) : (
-            <div style={{ textAlign: 'center', padding: '80px 0', color: 'rgba(148,163,184,0.5)' }}>
-              <p style={{ fontSize: 32, marginBottom: 12 }}>🔍</p>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '80px 0', color: 'rgba(148,163,184,0.5)' }}>
+              <span style={{
+                width: 56, height: 56, borderRadius: 18, marginBottom: 16,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.18)',
+              }}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="rgba(167,139,250,0.8)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
+                </svg>
+              </span>
               <p style={{ fontSize: 15 }}>{t('hubNoResults')}</p>
             </div>
           )
@@ -395,7 +411,8 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
             return (
               <CategorySection
                 key={cat.id}
-                emoji={cat.emoji}
+                icon={cat.icon}
+                accent={cat.accent}
                 title={t(cat.labelKey as any)}
                 tools={tools}
                 baseIndex={baseIndex}
