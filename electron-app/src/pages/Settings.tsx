@@ -546,19 +546,27 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
   ]
 
   if (loading) return (
-    <div className="flex flex-col h-full bg-bg anim-page">
-      <div className="px-8 py-5 border-b border-border flex items-center gap-3" style={{ background: 'linear-gradient(90deg,rgba(139,92,246,0.05) 0%,transparent 60%)' }}>
-        <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'linear-gradient(135deg,rgba(139,92,246,0.22),rgba(139,92,246,0.06))', border: '1px solid rgba(139,92,246,0.28)' }}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+    <div className="flex flex-col h-full anim-page" style={{ background: S.base }}>
+      {/* Loading header — mirrors real header */}
+      <div className="flex items-center gap-4 px-8 py-5 border-b border-border flex-shrink-0"
+        style={{ background: 'linear-gradient(90deg,rgba(139,92,246,0.06) 0%,transparent 55%)' }}>
+        <div className="flex items-center justify-center w-11 h-11 rounded-xl flex-shrink-0"
+          style={{ background: 'linear-gradient(135deg,rgba(139,92,246,0.24),rgba(139,92,246,0.07))', border: '1px solid rgba(139,92,246,0.3)', boxShadow: '0 0 22px -6px rgba(139,92,246,0.5)' }}>
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
             <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
             <circle cx="12" cy="12" r="3"/>
           </svg>
         </div>
-        <h1 className="text-[22px] font-black text-text m-0" style={{ letterSpacing: '-0.02em' }}>{t('settingsTitle')}</h1>
+        <div>
+          <h1 className="text-[22px] font-black m-0" style={{ letterSpacing: '-0.025em', background: 'linear-gradient(135deg,#FFFFFF 0%,rgba(196,181,253,0.85) 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+            {t('settingsTitle')}
+          </h1>
+          <p className="text-[12px] m-0 mt-0.5" style={{ color: S.text3 }}>{user.email}</p>
+        </div>
       </div>
       <div className="flex-1 flex items-center justify-center gap-3">
         <span className="sf-spinner" />
-        <p className="text-[13px] text-text3 m-0">{t('settingsLoading')}</p>
+        <p className="text-[13px] m-0" style={{ color: S.text3 }}>{t('settingsLoading')}</p>
       </div>
     </div>
   )
@@ -567,37 +575,48 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
   return (
     <div className="anim-page" style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: S.base }}>
 
-      {/* Header */}
+      {/* ── Page header ──────────────────────────────────────────────────── */}
       <div style={{
-        flexShrink: 0, padding: '20px 32px 18px',
+        flexShrink: 0, padding: '18px 28px 16px',
         borderBottom: `1px solid ${S.border}`,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        background: 'linear-gradient(90deg,rgba(139,92,246,0.05) 0%,transparent 60%)',
+        background: 'linear-gradient(90deg,rgba(139,92,246,0.06) 0%,transparent 55%)',
+        position: 'relative',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
+        {/* Subtle top-edge glow line */}
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1, background: 'linear-gradient(90deg,transparent,rgba(139,92,246,0.35),transparent)', pointerEvents: 'none' }} />
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          {/* Gear icon with glow */}
           <div style={{
-            width: 44, height: 44, borderRadius: 13, flexShrink: 0,
+            width: 42, height: 42, borderRadius: 12, flexShrink: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'linear-gradient(135deg, rgba(139,92,246,0.22), rgba(139,92,246,0.06))',
-            border: '1px solid rgba(139,92,246,0.28)', color: '#a78bfa',
-            boxShadow: '0 0 20px -6px rgba(139,92,246,0.45)',
+            background: 'linear-gradient(135deg,rgba(139,92,246,0.24),rgba(139,92,246,0.07))',
+            border: '1px solid rgba(139,92,246,0.3)', color: '#a78bfa',
+            boxShadow: '0 0 22px -6px rgba(139,92,246,0.5)',
           }}>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
               <circle cx="12" cy="12" r="3"/>
             </svg>
           </div>
+
           <div>
-            <h1 style={{ fontSize: 23, fontWeight: 900, color: S.text, margin: 0, lineHeight: 1.1, letterSpacing: '-0.025em',
-              background: 'linear-gradient(135deg,#FFFFFF 0%,rgba(196,181,253,0.85) 100%)',
-              WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>{t('settingsTitle')}</h1>
-            <p style={{ fontSize: 13, color: S.text3, margin: '4px 0 0' }}>{t('settingsSub')}</p>
+            <h1 style={{
+              fontSize: 22, fontWeight: 900, margin: 0, lineHeight: 1.15, letterSpacing: '-0.025em',
+              background: 'linear-gradient(135deg,#FFFFFF 0%,rgba(196,181,253,0.9) 100%)',
+              WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+            }}>{t('settingsTitle')}</h1>
+            <p style={{ fontSize: 12, color: S.text3, margin: '3px 0 0', lineHeight: 1.3 }}>{user.email}</p>
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+
+        {/* Right — saved indicator + save button */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           {saved && (
-            <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#22C55E', fontWeight: 500 }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            <span className="anim-scale-in" style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#22C55E', fontWeight: 600,
+              background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.22)', borderRadius: 8, padding: '4px 10px' }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
               {t('settingsSaved')}
             </span>
           )}
@@ -605,10 +624,10 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
             onClick={panel === 'profile' ? saveProfile : panel === 'connexions' ? saveConnexions : save}
             disabled={saving}
             className="sf-btn sf-btn-primary"
-            style={{ display: 'flex', alignItems: 'center', gap: 7, opacity: saving ? 0.6 : 1 }}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
-            </svg>
+            style={{ gap: 7, opacity: saving ? 0.6 : 1 }}>
+            {saving
+              ? <span className="sf-spinner" style={{ width: 13, height: 13, borderWidth: 1.5 }} />
+              : <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>}
             {saving ? t('saving') : t('save')}
           </button>
         </div>
@@ -617,31 +636,39 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
       {/* Two-column layout */}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
 
-        {/* Left sidebar — main panels */}
-        <div style={{
-          width: 200, flexShrink: 0, overflowY: 'auto',
-          background: S.base,
+        {/* ── Left sidebar — main nav ───────────────────────────────────── */}
+        <div className="sf-sidebar-nav" style={{
+          width: 204, flexShrink: 0, overflowY: 'auto',
+          background: 'rgba(7,7,12,0.95)',
           borderRight: `1px solid ${S.border}`,
-          padding: '16px 10px',
-          display: 'flex', flexDirection: 'column', gap: 2,
+          padding: '14px 8px',
+          display: 'flex', flexDirection: 'column', gap: 1,
         }}>
-          <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: S.text3, padding: '0 8px', marginBottom: 8 }}>{t('navLabel')}</p>
-          {mainNavItems.map(item => {
-            const active = panel === item.k
-            return (
-              <NavItem key={item.k} active={active} icon={NAV_ICONS[item.k]} label={item.l} onClick={() => setPanel(item.k)} S={S} />
-            )
-          })}
+          <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: S.text3, padding: '0 10px', marginBottom: 10, marginTop: 2 }}>
+            {t('navLabel')}
+          </p>
 
-          {/* Help section */}
-          <div style={{ marginTop: 'auto', paddingTop: 20, borderTop: `1px solid ${S.border}` }}>
-            <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: S.text3, padding: '0 8px', marginBottom: 8 }}>{t('supportLabel')}</p>
+          {mainNavItems.map(item => (
+            <NavItem key={item.k} active={panel === item.k} icon={NAV_ICONS[item.k]} label={item.l} onClick={() => setPanel(item.k)} S={S} />
+          ))}
+
+          {/* Support link — pushed to bottom */}
+          <div style={{ marginTop: 'auto', paddingTop: 16 }}>
+            <div style={{ height: 1, background: `linear-gradient(90deg,transparent,${S.border},transparent)`, marginBottom: 14 }} />
+            <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: S.text3, padding: '0 10px', marginBottom: 8 }}>
+              {t('supportLabel')}
+            </p>
             <button onClick={() => onNavigate?.('support')} style={{
-              display: 'flex', alignItems: 'center', gap: 7,
+              display: 'flex', alignItems: 'center', gap: 8,
               padding: '7px 10px', borderRadius: 8, fontSize: 12,
-              color: S.accent3, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 500, width: '100%', textAlign: 'left',
+              color: S.accent3, background: 'rgba(139,92,246,0.06)',
+              border: '1px solid rgba(139,92,246,0.12)',
+              cursor: 'pointer', fontWeight: 500, width: '100%', textAlign: 'left',
+              transition: 'background 140ms ease, border-color 140ms ease',
             }}>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+              </svg>
               {t('contactSupport')}
             </button>
           </div>
@@ -653,18 +680,16 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
           {/* ── GÉNÉRAL panel ───────────────────────────────────────────── */}
           {panel === 'general' && (
             <>
-              {/* Sub-tab bar */}
+              {/* ── Sub-tab bar ─────────────────────────────────────────── */}
               <div style={{
-                flexShrink: 0, display: 'flex', gap: 0,
-                borderBottom: '1px solid rgba(255,255,255,0.06)',
-                padding: '0 28px',
+                flexShrink: 0, display: 'flex', gap: 0, alignItems: 'center',
+                borderBottom: `1px solid ${S.border}`,
+                padding: '0 24px',
+                background: 'rgba(0,0,0,0.15)',
               }}>
-                {GEN_SIDEBAR.map(item => {
-                  const active = genTab === item.id
-                  return (
-                    <SubTabBtn key={item.id} active={active} icon={GEN_ICONS[item.id]} label={t(item.labelKey)} onClick={() => setGenTab(item.id)} S={S} />
-                  )
-                })}
+                {GEN_SIDEBAR.map(item => (
+                  <SubTabBtn key={item.id} active={genTab === item.id} icon={GEN_ICONS[item.id]} label={t(item.labelKey)} onClick={() => setGenTab(item.id)} S={S} />
+                ))}
               </div>
 
               {/* Tab content */}
@@ -673,41 +698,45 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                 {/* ── APPARENCE ─────────────────────────────────────────── */}
                 {genTab === 'apparence' && (
                   <div className="sf-anim-slide-up" style={{ maxWidth: 640, display: 'flex', flexDirection: 'column', gap: 20 }}>
-                    <div>
-                      <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0 }}>{t('appearanceTitle')}</h2>
-                      <p style={{ fontSize: 13, color: S.text3, margin: '4px 0 0' }}>{t('appearanceSub')}</p>
+                    {/* Section header */}
+                    <div style={{ paddingBottom: 4 }}>
+                      <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0, letterSpacing: '-0.02em' }}>{t('appearanceTitle')}</h2>
+                      <p style={{ fontSize: 13, color: S.text3, margin: '5px 0 0', lineHeight: 1.5 }}>{t('appearanceSub')}</p>
                     </div>
 
-                    {/* Color theme */}
-                    <div style={cardSt}>
-                      <div style={{ marginBottom: 14 }}>
-                        <h3 style={cardTitleSt}>{t('colorTheme')}</h3>
-                        <p style={cardSubSt}>{t('colorThemeSub')}</p>
-                      </div>
+                    {/* ── Color theme card ─────────────────────────────── */}
+                    <div className="sf-card" style={{ padding: '20px 22px' }}>
+                      <h3 className="text-[11px] font-semibold uppercase tracking-widest text-text3 mb-1">{t('colorTheme')}</h3>
+                      <p style={{ fontSize: 12, color: S.text3, margin: '0 0 16px', lineHeight: 1.4 }}>{t('colorThemeSub')}</p>
+
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
-                        {THEMES.map(t => (
-                          <button key={t} onClick={() => { handleTheme(t); handleSwatchClick() }} style={{
-                            position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 7,
-                            padding: '12px 8px', borderRadius: 11, cursor: 'pointer', transition: 'all 0.15s',
-                            background: theme === t ? `${THEME_COLORS[t]}18` : 'rgba(255,255,255,0.03)',
-                            border: theme === t ? `1px solid ${THEME_COLORS[t]}55` : `1px solid ${S.border}`,
+                        {THEMES.map(th => (
+                          <button key={th} onClick={() => { handleTheme(th); handleSwatchClick() }} style={{
+                            position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
+                            padding: '14px 8px 12px', borderRadius: 12, cursor: 'pointer', transition: 'all 0.15s ease',
+                            background: theme === th ? `${THEME_COLORS[th]}14` : 'rgba(255,255,255,0.03)',
+                            border: theme === th ? `1px solid ${THEME_COLORS[th]}60` : `1px solid ${S.border}`,
+                            boxShadow: theme === th ? `0 0 16px -4px ${THEME_COLORS[th]}50` : 'none',
                           }}>
-                            {theme === t && (
+                            {theme === th && (
                               <span style={{
-                                position: 'absolute', top: 6, right: 6, width: 14, height: 14, borderRadius: '50%',
-                                background: THEME_COLORS[t], display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                fontSize: 8, color: '#fff', fontWeight: 900,
+                                position: 'absolute', top: 5, right: 5, width: 14, height: 14, borderRadius: '50%',
+                                background: THEME_COLORS[th], display: 'flex', alignItems: 'center', justifyContent: 'center',
                               }}>
-                                <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                                <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                               </span>
                             )}
-                            <div style={{ width: 26, height: 26, borderRadius: '50%', background: THEME_COLORS[t] }} />
-                            <span style={{ fontSize: 11, fontWeight: 500, color: S.text2 }}>{t}</span>
+                            <div style={{
+                              width: 28, height: 28, borderRadius: '50%', background: THEME_COLORS[th],
+                              boxShadow: `0 0 14px -2px ${THEME_COLORS[th]}80`,
+                            }} />
+                            <span style={{ fontSize: 11, fontWeight: theme === th ? 600 : 400, color: theme === th ? S.text : S.text2 }}>{th}</span>
                           </button>
                         ))}
                       </div>
+
                       {pixelUnlocked && (
-                        <div style={{ padding: '8px 12px', borderRadius: 8, fontSize: 12, color: S.text3, background: 'rgba(255,255,255,0.04)', border: `1px solid ${S.border}`, marginTop: 10 }}>
+                        <div style={{ padding: '8px 12px', borderRadius: 8, fontSize: 12, color: S.text3, background: 'rgba(255,255,255,0.04)', border: `1px solid ${S.border}`, marginTop: 14 }}>
                           {t('pixelUnlocked')}
                         </div>
                       )}

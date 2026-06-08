@@ -844,25 +844,21 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
     <>
       {/* ── Preview plan modal ── */}
       {previewOpen && !running && (
-        <div className="fixed inset-0 z-50 flex flex-col" style={{ background: 'rgba(3,1,8,0.97)' }}>
+        <div className="fixed inset-0 z-50 flex flex-col anim-scale-in" style={{ background: 'rgba(3,1,8,0.97)', backdropFilter: 'blur(12px)' }}>
           {/* Header */}
-          <div className="flex-shrink-0 flex items-center justify-between px-8 py-4"
-            style={{ borderBottom: '1px solid rgba(139,92,246,0.2)', background: 'rgba(12,8,28,0.9)' }}>
+          <div className="flex-shrink-0 flex items-center justify-between px-8 py-4 border-b border-border">
             <div>
-              <p className="text-[18px] font-black text-white">{t('massRemixPreviewTitle')}</p>
-              <p className="text-[12px]" style={{ color: 'rgba(148,163,184,0.6)' }}>{plannedPairs.length} {t('massRemixPairsHint')}</p>
+              <p className="text-[18px] font-black text-text">{t('massRemixPreviewTitle')}</p>
+              <p className="text-[12px] text-text3">{plannedPairs.length} {t('massRemixPairsHint')}</p>
             </div>
             <div className="flex items-center gap-3">
-              <button onClick={() => setPreviewOpen(false)}
-                className="px-4 py-2 rounded-xl text-[13px] font-semibold transition-all"
-                style={{ background: 'rgba(255,255,255,0.05)', color: 'rgba(196,181,253,0.7)', border: '1px solid rgba(255,255,255,0.08)' }}>
+              <button onClick={() => setPreviewOpen(false)} className="sf-btn sf-btn-secondary cursor-pointer">
                 {t('massRemixPreviewClose')}
               </button>
               <button
                 onClick={() => { setPreviewOpen(false); launch(plannedPairs) }}
-                className="px-6 py-2.5 rounded-xl text-[14px] font-bold transition-all"
-                style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff', boxShadow: '0 4px 20px rgba(124,58,237,0.4)' }}>
-                {t('massRemixLaunchBtn')} {plannedPairs.length} remix
+                className="sf-btn sf-btn-primary cursor-pointer">
+                <IconZap size={14} /> {t('massRemixLaunchBtn')} {plannedPairs.length} remix
               </button>
             </div>
           </div>
@@ -870,23 +866,23 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
           {/* Body */}
           <div className="flex-1 min-h-0 flex overflow-hidden">
             {/* Left: pair list */}
-            <div className="w-64 flex-shrink-0 overflow-y-auto" style={{ borderRight: '1px solid rgba(139,92,246,0.12)', background: 'rgba(8,5,20,0.7)' }}>
+            <div className="w-64 flex-shrink-0 overflow-y-auto bg-bg border-r border-border">
               {plannedPairs.map(pair => (
                 <button key={pair.id}
                   onClick={() => { setSelectedPairId(pair.id); setVidCurrentTime(0); setVidDuration(0) }}
-                  className="w-full text-left px-4 py-3 flex items-start gap-3 transition-all"
+                  className="w-full text-left px-4 py-3 flex items-start gap-3 transition-colors hover:bg-surface cursor-pointer"
                   style={{
                     borderBottom: '1px solid rgba(139,92,246,0.07)',
-                    borderLeft: selectedPairId === pair.id ? '3px solid #7c3aed' : '3px solid transparent',
-                    background: selectedPairId === pair.id ? 'rgba(139,92,246,0.12)' : 'transparent',
+                    borderLeft: selectedPairId === pair.id ? '3px solid var(--accent)' : '3px solid transparent',
+                    background: selectedPairId === pair.id ? 'rgba(139,92,246,0.1)' : 'transparent',
                   }}>
-                  <span className="text-[11px] font-black pt-0.5 flex-shrink-0" style={{ color: 'rgba(139,92,246,0.55)' }}>#{pair.id + 1}</span>
+                  <span className="text-[11px] font-black pt-0.5 flex-shrink-0 text-accent opacity-60">#{pair.id + 1}</span>
                   <div className="flex-1 min-w-0 space-y-0.5">
-                    <p className="text-[11px] font-mono truncate" style={{ color: 'rgba(226,217,243,0.75)' }}>{fileName(pair.originalPath)}</p>
-                    <p className="text-[10px] font-mono truncate" style={{ color: 'rgba(236,72,153,0.6)' }}>{fileName(pair.secondaryPath)}</p>
+                    <p className="text-[11px] font-mono truncate text-text">{fileName(pair.originalPath)}</p>
+                    <p className="text-[10px] font-mono truncate" style={{ color: 'rgba(236,72,153,0.7)' }}>{fileName(pair.secondaryPath)}</p>
                     {pair.cutSec != null
-                      ? <p className="text-[10px] font-semibold" style={{ color: '#eab308' }}>{pair.cutSec.toFixed(1)}s</p>
-                      : <p className="text-[10px]" style={{ color: 'rgba(148,163,184,0.3)' }}>{splitMode === 'manual' ? `${manualSplitSec}s (global)` : '🤖 auto'}</p>
+                      ? <p className="text-[10px] font-semibold text-warn">{pair.cutSec.toFixed(1)}s</p>
+                      : <p className="text-[10px] text-text3">{splitMode === 'manual' ? `${manualSplitSec}s (global)` : 'auto'}</p>
                     }
                   </div>
                 </button>
@@ -894,7 +890,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
             </div>
 
             {/* Right: video player */}
-            <div className="flex-1 min-w-0 flex flex-col items-center justify-center gap-5 p-8 overflow-y-auto">
+            <div className="flex-1 min-w-0 flex flex-col items-center justify-center gap-5 p-8 overflow-y-auto bg-bg">
               {selectedPair ? (
                 <>
                   {/* Hidden capture videos — seek independently to grab frames */}
@@ -902,7 +898,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                   <video ref={captureSecVidRef} key={'cap-sec-'  + selectedPair.secondaryPath} src={toFileUrl(selectedPair.secondaryPath)} preload="auto" muted style={{ display: 'none' }} />
 
                   {/* ── Main video ── */}
-                  <div className="relative rounded-2xl overflow-hidden flex-shrink-0"
+                  <div className="relative rounded-2xl overflow-hidden flex-shrink-0 border border-border"
                     style={{
                       background: '#000',
                       maxHeight: 'calc(100vh - 300px)',
@@ -942,37 +938,41 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                         const v = vidRef.current; if (!v) return; v.pause()
                         const t = Math.max(0, v.currentTime - 1/30); v.currentTime = t; setVidCurrentTime(t)
                         if (selectedPair.cutSec != null) captureBeforeAfter(selectedPair.cutSec)
-                      }} className="w-8 h-8 rounded-lg flex items-center justify-center"
-                        style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)', color: 'rgba(148,163,184,0.7)', fontSize: 13 }}>◁</button>
+                      }} className="sf-btn sf-btn-ghost sf-btn-sm sf-btn-icon cursor-pointer" aria-label="Frame back">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="19" x2="5" y2="5" stroke="currentColor" strokeWidth="2"/></svg>
+                      </button>
                       {/* Play/pause */}
                       <button onClick={() => { const v = vidRef.current; if (v) v.paused ? v.play() : v.pause() }}
-                        className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-                        style={{ background: 'rgba(139,92,246,0.18)', border: '1px solid rgba(139,92,246,0.35)', color: '#a78bfa', fontSize: 16 }}>
-                        {isPlaying ? '⏸' : '▶'}
+                        className="sf-btn sf-btn-secondary cursor-pointer" style={{ width: 36, height: 36, padding: 0 }} aria-label="Play/pause">
+                        {isPlaying
+                          ? <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+                          : <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                        }
                       </button>
                       {/* Frame forward */}
                       <button title={t('massRemixFrameForward')} onClick={() => {
                         const v = vidRef.current; if (!v) return; v.pause()
                         const t = Math.min(vidDuration, v.currentTime + 1/30); v.currentTime = t; setVidCurrentTime(t)
                         if (selectedPair.cutSec != null) captureBeforeAfter(selectedPair.cutSec)
-                      }} className="w-8 h-8 rounded-lg flex items-center justify-center"
-                        style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)', color: 'rgba(148,163,184,0.7)', fontSize: 13 }}>▷</button>
+                      }} className="sf-btn sf-btn-ghost sf-btn-sm sf-btn-icon cursor-pointer" aria-label="Frame forward">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19" stroke="currentColor" strokeWidth="2"/></svg>
+                      </button>
 
                       {/* Speed control */}
                       <div className="flex items-center gap-0.5 ml-1">
                         {([0.25, 0.5, 1] as const).map(r => (
                           <button key={r} onClick={() => { setPlaybackRate(r); if (vidRef.current) vidRef.current.playbackRate = r }}
-                            className="px-2 py-1 rounded-lg text-[10px] font-bold transition-all"
+                            className="sf-btn sf-btn-sm cursor-pointer"
                             style={playbackRate === r
-                              ? { background: 'rgba(139,92,246,0.3)', border: '1px solid rgba(139,92,246,0.6)', color: '#c4b5fd' }
-                              : { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', color: 'rgba(148,163,184,0.45)' }}>
+                              ? { background: 'rgba(139,92,246,0.25)', border: '1px solid rgba(139,92,246,0.5)', color: 'var(--accent-glow)' }
+                              : { background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-3)' }}>
                             {r === 1 ? '1×' : `${r}×`}
                           </button>
                         ))}
                       </div>
 
-                      <span className="text-[11px] font-mono tabular-nums ml-1" style={{ color: 'rgba(148,163,184,0.7)' }}>
-                        {vidCurrentTime.toFixed(3)}s <span style={{ color: 'rgba(148,163,184,0.3)' }}>/ {vidDuration.toFixed(3)}s</span>
+                      <span className="text-[11px] font-mono tabular-nums ml-1 text-text2">
+                        {vidCurrentTime.toFixed(3)}s <span className="text-text3">/ {vidDuration.toFixed(3)}s</span>
                       </span>
 
                       <div className="ml-auto flex items-center gap-2">
@@ -984,9 +984,9 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                                 setCutForPair(selectedPair.id, sec)
                                 vidRef.current?.pause()
                               }}
-                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-bold transition-all hover:brightness-110"
-                              style={{ background: 'linear-gradient(130deg,rgba(234,179,8,0.25),rgba(234,179,8,0.12))', border: '1px solid rgba(234,179,8,0.5)', color: '#eab308', boxShadow: '0 0 12px rgba(234,179,8,0.15)' }}>
-                              {t('massRemixCutHere')}
+                              className="sf-btn sf-btn-sm cursor-pointer"
+                              style={{ background: 'rgba(234,179,8,0.15)', border: '1px solid rgba(234,179,8,0.4)', color: '#eab308' }}>
+                              <IconScissors size={12} /> {t('massRemixCutHere')}
                             </button>
                             {plannedPairs.length > 1 && (
                               <button
@@ -995,8 +995,8 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                                   setPlannedPairs(prev => prev.map(p => ({ ...p, cutSec: sec })))
                                   vidRef.current?.pause()
                                 }}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-bold transition-all hover:brightness-110"
-                                style={{ background: 'linear-gradient(130deg,rgba(124,58,237,0.25),rgba(124,58,237,0.12))', border: '1px solid rgba(124,58,237,0.5)', color: '#a78bfa' }}>
+                                className="sf-btn sf-btn-sm cursor-pointer"
+                                style={{ background: 'rgba(124,58,237,0.15)', border: '1px solid rgba(124,58,237,0.4)', color: 'var(--accent-glow)' }}>
                                 {lang === 'en' ? 'Apply to all' : 'Appliquer à tout'}
                               </button>
                             )}
