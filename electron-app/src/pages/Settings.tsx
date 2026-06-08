@@ -1542,7 +1542,10 @@ function AdminPanel({ user: _user }: { user: User }) {
           <div key={k.id} className={`rounded-xl px-5 py-4 flex flex-wrap items-center gap-2 ${!k.is_active ? 'opacity-50' : ''}`}
             style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(139,92,246,0.1)' }}>
             <button onClick={() => copy(k.key)} className="font-mono text-[13px] text-text tracking-widest hover:text-accent transition-colors">
-              {k.key} <span className="text-[12px] text-text2">{copied === k.key ? '✓' : '⎘'}</span>
+              {k.key} {copied === k.key
+                ? <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{display:'inline',verticalAlign:'middle',color:'#22c55e'}}><path d="M20 6 9 17l-5-5"/></svg>
+                : <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{display:'inline',verticalAlign:'middle',opacity:.5}}><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+              }
             </button>
             <span className="text-[12px] px-2 py-0.5 rounded-full capitalize" style={{ background: 'rgba(139,92,246,0.15)', color: '#a78bfa' }}>{k.plan}</span>
             {!k.is_active
@@ -1785,9 +1788,9 @@ function SubscriptionPanel() {
                 style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
               >
                 {myOrgs.map(({ org }) => (
-                  <option key={org.id} value={org.id}>🏢 {org.name}</option>
+                  <option key={org.id} value={org.id}>{org.name}</option>
                 ))}
-                <option value="personal">{lang === 'en' ? '👤 My account' : '👤 Mon compte'}</option>
+                <option value="personal">{lang === 'en' ? 'My account' : 'Mon compte'}</option>
               </select>
             </div>
           )}

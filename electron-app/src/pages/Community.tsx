@@ -366,8 +366,10 @@ function MuteModal({ targetName, onMute, onClose }: {
             <p className="font-black text-white text-[14px]">{t('communityMuteTitle')} {targetName}</p>
             <p className="text-[10px] mt-0.5" style={{ color: 'rgba(251,191,36,0.5)' }}>{t('communityMuteDuration')}</p>
           </div>
-          <button onClick={onClose} className="w-7 h-7 rounded-lg flex items-center justify-center text-sm hover:bg-white/[0.06]"
-            style={{ color: 'rgba(196,181,253,0.5)' }}>✕</button>
+          <button onClick={onClose} aria-label="Fermer" className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-white/[0.06] cursor-pointer"
+            style={{ color: 'rgba(196,181,253,0.5)' }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          </button>
         </div>
         <div className="p-4 space-y-1.5">
           {DURATIONS.map(d => (
@@ -455,8 +457,10 @@ function ProfileModal({ profile, userId, isAdmin, onClose, onSaved }: {
             <p className="font-black text-white text-[15px]">{t('communityProfileTitle')}</p>
             <p className="text-[10px] mt-0.5" style={{ color: 'rgba(196,181,253,0.45)' }}>{t('communityProfileVisible')}</p>
           </div>
-          <button onClick={onClose} className="w-7 h-7 rounded-lg flex items-center justify-center text-sm hover:bg-white/[0.06]"
-            style={{ color: 'rgba(196,181,253,0.5)' }}>✕</button>
+          <button onClick={onClose} aria-label="Fermer" className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-white/[0.06] cursor-pointer"
+            style={{ color: 'rgba(196,181,253,0.5)' }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          </button>
         </div>
         <div className="p-5 space-y-5">
           <div className="flex flex-col items-center gap-3">
@@ -553,8 +557,10 @@ function CreateTopicModal({ onClose, onCreate }: {
             <p className="font-black text-white text-[15px]">{t('communityCreateTitle')}</p>
             <p className="text-[10px] mt-0.5" style={{ color: 'rgba(196,181,253,0.45)' }}>{t('communityCreateVisible')}</p>
           </div>
-          <button onClick={onClose} className="w-7 h-7 rounded-lg flex items-center justify-center text-sm hover:bg-white/[0.06]"
-            style={{ color: 'rgba(196,181,253,0.5)' }}>✕</button>
+          <button onClick={onClose} aria-label="Fermer" className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-white/[0.06] cursor-pointer"
+            style={{ color: 'rgba(196,181,253,0.5)' }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          </button>
         </div>
         <div className="p-5 space-y-4">
           {/* Emoji picker */}

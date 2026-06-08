@@ -215,7 +215,7 @@ function SpotlightBanner({ tool, onOpen }: { tool: ToolDef; onOpen: () => void }
           </div>
           {tool.badge && (
             <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', padding: '4px 10px', borderRadius: 7, ...badgeChip(tool.badge) }}>
-              ✦ {tool.badge}
+              {tool.badge}
             </span>
           )}
         </div>
