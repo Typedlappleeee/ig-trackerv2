@@ -669,44 +669,61 @@ export function MassPosting({ user }: MassPostingProps) {
   const canLaunch = !posting && !!bearer && phoneList.length > 0 && selectedVideos.length > 0
 
   return (
-    <div className="anim-page h-full flex flex-col overflow-hidden" style={{ background: '#07070B' }}>
+    <div className="anim-page h-full flex flex-col overflow-hidden bg-bg">
 
-      {/* ── Top header bar ──────────────────────────────────────────────────── */}
-      <header className="flex-shrink-0 px-8 pt-6 pb-5 flex items-center justify-between gap-6"
-        style={{ borderBottom: '1px solid rgba(139,92,246,0.08)', background: 'rgba(7,7,11,0.95)' }}>
+      {/* ── Premium page header ──────────────────────────────────────────────── */}
+      <header className="flex-shrink-0 px-7 pt-5 pb-4 flex items-center justify-between gap-4 border-b border-border bg-bg/95 backdrop-blur-sm">
 
-        {/* Left: title + status */}
+        {/* Left: icon + title */}
         <div className="flex items-center gap-4 min-w-0">
-          <div className="flex-shrink-0 rounded-[13px] flex items-center justify-center" style={{ width: 44, height: 44, background: 'linear-gradient(135deg,rgba(124,58,237,0.25),rgba(168,85,247,0.12))', border: '1px solid rgba(139,92,246,0.25)', boxShadow: '0 0 20px -6px rgba(139,92,246,0.5)' }}>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.85" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
-            </svg>
+          {/* Zap icon with gradient glow */}
+          <div className="relative flex-shrink-0">
+            <div className="absolute inset-0 rounded-[14px] blur-xl opacity-60"
+              style={{ background: 'linear-gradient(135deg, #ec4899, #f59e0b)' }} />
+            <div className="relative w-11 h-11 rounded-[14px] flex items-center justify-center border border-white/10"
+              style={{ background: 'linear-gradient(135deg, rgba(236,72,153,0.2), rgba(245,158,11,0.15))' }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="url(#zapGrad)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <defs>
+                  <linearGradient id="zapGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#f472b6" />
+                    <stop offset="100%" stopColor="#fbbf24" />
+                  </linearGradient>
+                </defs>
+                <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+              </svg>
+            </div>
           </div>
-          <div>
-            <div className="flex items-center gap-2.5">
-              <h1 className="text-[23px] font-black tracking-tight leading-none" style={{
-                background: 'linear-gradient(135deg,#FFFFFF 0%,rgba(196,181,253,0.85) 100%)',
-                WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-                letterSpacing: '-0.025em',
-              }}>Mass Posting</h1>
+
+          <div className="min-w-0">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <h1 className="text-xl font-black tracking-tight text-text" style={{ letterSpacing: '-0.03em' }}>
+                Mass Posting
+              </h1>
               {posting ? (
-                <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider"
-                  style={{ background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.3)', color: '#a78bfa' }}>
-                  <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />{t('running')}
+                <span className="sf-badge sf-badge-accent">
+                  <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
+                  {t('running')}
                 </span>
               ) : (
-                <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider"
-                  style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', color: '#52525b' }}>
-                  <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'rgba(82,82,91,0.6)' }} />{t('idle')}
+                <span className="sf-badge sf-badge-muted">
+                  <span className="w-1.5 h-1.5 rounded-full bg-text3" />
+                  {t('idle')}
+                </span>
+              )}
+              {/* Credit cost badge */}
+              {phoneList.length > 0 && (
+                <span className="sf-badge sf-badge-warn text-[10px]">
+                  <svg width="9" height="9" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="5" stroke="currentColor" strokeWidth="1.5"/><path d="M6 3.5v1.8l1.5 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+                  {phoneList.length * CREDIT_COSTS.mass_posting} cr
                 </span>
               )}
             </div>
-            <p className="text-[11px] mt-0.5 flex items-center gap-2" style={{ color: 'rgba(148,163,184,0.45)' }}>
+            <p className="text-text3 text-xs mt-0.5 flex items-center gap-1.5">
               <span>{phoneList.length} {lang === 'en' ? `target${phoneList.length !== 1 ? 's' : ''}` : `cible${phoneList.length !== 1 ? 's' : ''}`}</span>
-              <span>·</span>
+              <span className="text-border">·</span>
               <span>{selectedVideos.length} {lang === 'en' ? `video${selectedVideos.length !== 1 ? 's' : ''}` : `vidéo${selectedVideos.length !== 1 ? 's' : ''}`}</span>
               {posting && totalTasks > 0 && (
-                <><span>·</span><span style={{ color: '#a78bfa' }}>{doneTasks}/{totalTasks} {lang === 'en' ? `done` : `terminé${doneTasks !== 1 ? 's' : ''}`}</span></>
+                <><span className="text-border">·</span><span className="text-accent">{doneTasks}/{totalTasks} {lang === 'en' ? 'done' : `terminé${doneTasks !== 1 ? 's' : ''}`}</span></>
               )}
             </p>
           </div>
@@ -714,49 +731,43 @@ export function MassPosting({ user }: MassPostingProps) {
 
         {/* Right: controls */}
         <div className="flex items-center gap-2 flex-shrink-0">
-          {/* Assignment mode pill */}
-          <div className="flex rounded-xl p-1 gap-0.5"
-            style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+          {/* Assignment mode toggle */}
+          <div className="sf-tabs">
             {([{ k: 'seq', label: t('schedulerSequential') }, { k: 'random', label: t('schedulerRandom') }] as const).map(m => (
               <button key={m.k} onClick={() => setMode(m.k)}
-                className="px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-all"
-                style={mode === m.k
-                  ? { background: 'rgba(139,92,246,0.2)', color: '#c4b5fd', border: '1px solid rgba(139,92,246,0.28)' }
-                  : { color: 'rgba(82,82,91,0.9)' }}>
+                className={`sf-tab cursor-pointer ${mode === m.k ? 'active' : ''}`}>
                 {m.label}
               </button>
             ))}
           </div>
 
-          {/* Stop */}
+          {/* Stop button */}
           <button onClick={stop} disabled={!posting}
-            className="flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-[12px] font-semibold transition-all disabled:opacity-25 disabled:cursor-not-allowed"
-            style={{ background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.2)', color: '#f87171' }}>
-            <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><rect x="1" y="1" width="8" height="8" rx="1.5"/></svg>
+            className="sf-btn sf-btn-danger sf-btn-sm cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed">
+            <svg width="9" height="9" viewBox="0 0 10 10" fill="currentColor"><rect x="1" y="1" width="8" height="8" rx="1.5"/></svg>
             {t('stop')}
           </button>
 
-          {/* Schedule */}
+          {/* Schedule button */}
           <button onClick={() => setShowScheduleModal(true)}
             disabled={posting || !bearer || phoneList.length === 0 || selectedVideos.length === 0}
-            className="flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-[12px] font-semibold transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-            style={{ background: 'rgba(59,130,246,0.07)', border: '1px solid rgba(59,130,246,0.2)', color: '#93c5fd' }}>
+            className="sf-btn sf-btn-secondary sf-btn-sm cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed">
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="1" y="2" width="10" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.2"/><path d="M4 1v2M8 1v2M1 5h10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
             {t('schedule')}
           </button>
 
-          {/* Launch */}
+          {/* Launch button */}
           <button onClick={post} disabled={!canLaunch}
-            className="relative flex items-center gap-2 rounded-xl px-5 py-2 text-[13px] font-black text-white transition-all active:scale-[0.97] disabled:opacity-35 disabled:cursor-not-allowed overflow-hidden"
-            style={canLaunch ? {
-              background: 'linear-gradient(130deg,#6D28D9,#7C3AED,#A855F7)',
-              boxShadow: '0 4px 24px -4px rgba(124,58,237,0.6), inset 0 1px 0 rgba(255,255,255,0.12)',
-            } : { background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}>
-            {canLaunch && <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(105deg,transparent 40%,rgba(255,255,255,0.08) 50%,transparent 60%)', backgroundSize: '200% 100%', animation: 'progressShimmer 3s linear infinite' }} />}
+            className="sf-btn sf-btn-primary cursor-pointer disabled:opacity-35 disabled:cursor-not-allowed relative overflow-hidden"
+            style={canLaunch ? { background: 'linear-gradient(130deg,#6D28D9,#7C3AED,#A855F7)', boxShadow: '0 4px 24px -4px rgba(124,58,237,0.65), inset 0 1px 0 rgba(255,255,255,0.12)' } : {}}>
+            {canLaunch && (
+              <div className="absolute inset-0 pointer-events-none"
+                style={{ background: 'linear-gradient(105deg,transparent 40%,rgba(255,255,255,0.08) 50%,transparent 60%)', backgroundSize: '200% 100%', animation: 'progressShimmer 3s linear infinite' }} />
+            )}
             {posting ? (
-              <><svg className="animate-spin w-3.5 h-3.5" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="31.4" strokeDashoffset="10"/></svg>{t('running')}…</>
+              <><div className="sf-spinner w-3.5 h-3.5" />{t('running')}…</>
             ) : (
-              <><svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polygon points="3 1.5 11.5 6.5 3 11.5"/></svg>{t('launch')}</>
+              <><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polygon points="2.5 1.5 10.5 6 2.5 10.5"/></svg>{t('launch')}</>
             )}
           </button>
         </div>
@@ -764,201 +775,101 @@ export function MassPosting({ user }: MassPostingProps) {
 
       {/* Warning: no bearer */}
       {!bearer && (
-        <div className="flex-shrink-0 mx-6 mt-4 flex items-center gap-3 px-4 py-3 rounded-2xl text-[12px]"
-          style={{ background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.2)' }}>
-          <div className="w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(245,158,11,0.15)' }}>
-            <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M5.5 1L10 9.5H1L5.5 1Z" stroke="#FCD34D" strokeWidth="1.2" strokeLinejoin="round"/><path d="M5.5 4.5v2.5" stroke="#FCD34D" strokeWidth="1.2" strokeLinecap="round"/></svg>
+        <div className="flex-shrink-0 mx-6 mt-4 flex items-center gap-3 px-4 py-3 rounded-xl sf-card border-warn/20 bg-warn/5">
+          <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 bg-warn/10">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1.5L11.5 10.5H1.5L6.5 1.5Z" stroke="#F59E0B" strokeWidth="1.4" strokeLinejoin="round"/><path d="M6.5 5v3" stroke="#F59E0B" strokeWidth="1.4" strokeLinecap="round"/><circle cx="6.5" cy="9" r="0.6" fill="#F59E0B"/></svg>
           </div>
-          <p style={{ color: '#FCD34D' }}>{t('massPostingMissingToken')}</p>
+          <p className="text-warn text-xs font-semibold">{t('massPostingMissingToken')}</p>
         </div>
       )}
 
       {/* Live progress banner */}
       {posting && totalTasks > 0 && (
-        <div className="flex-shrink-0 mx-6 mt-4 rounded-2xl p-4"
-          style={{ background: '#0E0E16', border: '1px solid rgba(139,92,246,0.2)', boxShadow: '0 0 24px -8px rgba(139,92,246,0.3)' }}>
+        <div className="flex-shrink-0 mx-6 mt-4 sf-card rounded-xl p-4 border-accent/25"
+          style={{ boxShadow: '0 0 28px -6px rgba(124,58,237,0.3)' }}>
           <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-3">
-              <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />
-              <span className="text-[13px] font-bold text-white">{doneTasks + errorTasks} / {totalTasks} {t('massPostingTasksProgress')}</span>
+            <div className="flex items-center gap-3 flex-wrap">
+              <span className="w-2 h-2 rounded-full bg-accent animate-pulse flex-shrink-0" />
+              <span className="text-sm font-bold text-text">{doneTasks + errorTasks} / {totalTasks} {t('massPostingTasksProgress')}</span>
               <div className="flex items-center gap-1.5">
                 {activeTasks > 0 && (
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold" style={{ background: 'rgba(245,158,11,0.12)', color: '#f59e0b' }}>
+                  <span className="sf-badge sf-badge-warn text-[10px]">
                     {activeTasks} {t('massPostingActiveCount')}{lang === 'fr' && activeTasks !== 1 ? 's' : ''}
                   </span>
                 )}
                 {doneTasks > 0 && (
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold" style={{ background: 'rgba(34,197,94,0.1)', color: '#22c55e' }}>
-                    {doneTasks} ok
-                  </span>
+                  <span className="sf-badge sf-badge-ok text-[10px]">{doneTasks} ok</span>
                 )}
                 {errorTasks > 0 && (
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold" style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444' }}>
-                    {errorTasks} err
-                  </span>
+                  <span className="sf-badge sf-badge-danger text-[10px]">{errorTasks} err</span>
                 )}
               </div>
             </div>
-            <span className="text-[14px] font-black font-mono tabular-nums" style={{ color: progressPct >= 100 ? '#22c55e' : '#a78bfa' }}>{progressPct}%</span>
+            <span className="text-sm font-black font-mono tabular-nums"
+              style={{ color: progressPct >= 100 ? 'var(--ok, #22c55e)' : '#a78bfa' }}>
+              {progressPct}%
+            </span>
           </div>
-          <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.05)' }}>
-            <div className={`h-full rounded-full transition-all duration-700 ${progressPct >= 100 ? 'bg-ok' : 'sf-progress-bar'}`} style={{ width: `${progressPct}%` }} />
+          <div className="sf-progress">
+            <div className={`sf-progress-bar transition-all duration-700 ${progressPct >= 100 ? 'bg-ok' : ''}`}
+              style={{ width: `${progressPct}%`, ...(progressPct >= 100 ? { background: '#22c55e', animation: 'none' } : {}) }} />
           </div>
         </div>
       )}
 
-      {/* ── 3-column body ────────────────────────────────────────────────── */}
+      {/* ── 2-column body ────────────────────────────────────────────────────── */}
       <div className="flex-1 overflow-hidden flex min-h-0 mt-0">
 
-        {/* ── COL 1: Videos ────────────────────────────────────────────────── */}
-        <aside className="w-[270px] flex-shrink-0 flex flex-col"
-          style={{ borderRight: '1px solid rgba(139,92,246,0.08)', background: 'linear-gradient(180deg,#09090F 0%,#07070B 100%)' }}>
+        {/* ── LEFT SIDEBAR: Phone selection (280px) ────────────────────────── */}
+        <aside className="w-[280px] flex-shrink-0 flex flex-col border-r border-border bg-surface">
 
-          <div className="flex-shrink-0 px-4 pt-5 pb-4" style={{ borderBottom: '1px solid rgba(139,92,246,0.08)' }}>
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2.5">
-                <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.2)' }}>
-                  <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x="1" y="2" width="9" height="7" rx="1.5" stroke="#A78BFA" strokeWidth="1.2"/><path d="M10 5.5L12 4v5L10 7.5V5.5Z" stroke="#A78BFA" strokeWidth="1.2" strokeLinejoin="round"/></svg>
-                </div>
-                <p className="text-[13px] font-black text-white">{t('massPostingContent')}</p>
-              </div>
-              {selectedVideos.length > 0 && (
-                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full text-white"
-                  style={{ background: 'linear-gradient(130deg,#7C3AED,#A855F7)', boxShadow: '0 2px 10px -2px rgba(124,58,237,0.5)' }}>
-                  {selectedVideos.length}
-                </span>
-              )}
-            </div>
-
-            {/* Add buttons */}
-            <div className="space-y-1.5">
-              <button onClick={() => setShowBankPicker(true)}
-                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-[12px] font-bold transition-all hover:opacity-90 active:scale-[0.98]"
-                style={{ background: 'linear-gradient(130deg,#7C3AED,#A855F7)', color: '#fff', boxShadow: '0 3px 14px -4px rgba(124,58,237,0.5)' }}>
-                <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><rect x="0.5" y="0.5" width="4" height="4" rx="1" fill="white" opacity=".8"/><rect x="6.5" y="0.5" width="4" height="4" rx="1" fill="white" opacity=".6"/><rect x="0.5" y="6.5" width="4" height="4" rx="1" fill="white" opacity=".6"/><rect x="6.5" y="6.5" width="4" height="4" rx="1" fill="white" opacity=".4"/></svg>
-                {t('massPostingFromBank')}
-              </button>
-              <div className="flex gap-1.5">
-                <button onClick={() => pickLocalFile(-1)}
-                  className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-[12px] font-semibold transition-all hover:bg-white/[0.05]"
-                  style={{ border: '1px solid rgba(255,255,255,0.09)', color: 'rgba(148,163,184,0.7)' }}>
-                  <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M5.5 7V1M3 3.5L5.5 1L8 3.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/><path d="M1 8v1.5C1 10.3 1.7 11 2.5 11h6c.8 0 1.5-.7 1.5-1.5V8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
-                  {t('massPostingFromPC')}
-                </button>
-                <button onClick={openFolderPick}
-                  className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-[12px] font-semibold transition-all hover:bg-accent/10"
-                  style={{ border: '1px solid rgba(139,92,246,0.2)', color: '#a78bfa' }}>
-                  <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M1 8.5V4A1 1 0 0 1 2 3h2.5L5.5 4.5H9A1 1 0 0 1 10 5.5V8.5A1 1 0 0 1 9 9.5H2A1 1 0 0 1 1 8.5Z" stroke="currentColor" strokeWidth="1.1" strokeLinejoin="round"/></svg>
-                  {t('massPostingFromFolder')}
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {addingFolder && (
-            <div className="flex-shrink-0 flex items-center gap-2 px-4 py-2"
-              style={{ background: 'rgba(139,92,246,0.06)', borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
-              <svg className="animate-spin w-3 h-3 flex-shrink-0" style={{ color: '#a78bfa' }} viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="31.4" strokeDashoffset="10"/></svg>
-              <p className="text-[11px] font-semibold truncate" style={{ color: '#a78bfa' }}>{t('massPostingAddingFolder')} «{addingFolder}»…</p>
-            </div>
-          )}
-
-          <div className="flex-1 overflow-auto pb-2" style={{ scrollbarWidth: 'none' }}>
-            {selectedVideos.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full px-5 py-10 text-center">
-                <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
-                  style={{ background: 'rgba(139,92,246,0.06)', border: '1px dashed rgba(139,92,246,0.2)' }}>
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(82,82,91,0.7)" strokeWidth="1.3"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
-                </div>
-                <p className="text-[13px] font-bold text-white mb-1">{t('massPostingNoContent')}</p>
-                <p className="text-[11px] leading-relaxed max-w-[160px]" style={{ color: 'rgba(148,163,184,0.4)' }}>{t('massPostingNoContentHint')}</p>
-                <p className="text-[10px] mt-3" style={{ color: 'rgba(82,82,91,0.6)' }}>{t('massPostingFormats').split('\n').map((line, i) => <span key={i}>{line}{i === 0 ? <br/> : ''}</span>)}</p>
-              </div>
-            ) : (
-              <div className="py-2">
-                {selectedVideos.map((sv, selIdx) => {
-                  const fp = sv.localPath ?? sv.item.file_url
-                  return (
-                    <div key={sv.item.id}
-                      className="group flex items-center gap-3 px-4 py-2.5 transition-all hover:bg-white/[0.02]"
-                      style={{ borderBottom: '1px solid rgba(255,255,255,0.025)' }}>
-                      <div className="w-8 flex-shrink-0 rounded-lg overflow-hidden" style={{ aspectRatio: '9/16', background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.15)' }}>
-                        <VideoThumbnail filePath={fp ?? ''} thumbnailPath={sv.item.thumbnail_path} storagePath={sv.item.storage_path} />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-[10px] font-black tracking-widest uppercase mb-0.5" style={{ color: 'rgba(124,58,237,0.8)' }}>#{selIdx + 1}</p>
-                        <p className="text-[12px] font-semibold text-white truncate leading-tight">{sv.item.title}</p>
-                        {sv.item.folder && <p className="text-[10px] truncate" style={{ color: 'rgba(148,163,184,0.3)' }}>{sv.item.folder}</p>}
-                      </div>
-                      <button onClick={() => setSelVideos(prev => prev.filter((_, i) => i !== selIdx))}
-                        className="opacity-0 group-hover:opacity-100 w-5 h-5 flex items-center justify-center rounded-lg transition-all flex-shrink-0 hover:bg-danger/10"
-                        style={{ color: 'rgba(239,68,68,0.6)' }}>
-                        <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M1 1L7 7M7 1L1 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
-                      </button>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-        </aside>
-
-        {/* ── COL 2: Phones / Groups ───────────────────────────────────────── */}
-        <aside className="w-[250px] flex-shrink-0 flex flex-col"
-          style={{ borderRight: '1px solid rgba(139,92,246,0.08)', background: 'linear-gradient(180deg,#09090F 0%,#07070B 100%)' }}>
-
-          <div className="flex-shrink-0 px-4 pt-5 pb-4" style={{ borderBottom: '1px solid rgba(139,92,246,0.08)' }}>
+          {/* Sidebar header */}
+          <div className="flex-shrink-0 px-4 pt-4 pb-3 border-b border-border">
             <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2.5">
-                <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.2)' }}>
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="2" y="1" width="8" height="10" rx="1.5" stroke="#A78BFA" strokeWidth="1.2"/><circle cx="6" cy="9" r="0.8" fill="#A78BFA"/></svg>
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-accent/10 border border-accent/15">
+                  <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x="2.5" y="1" width="8" height="11" rx="1.5" stroke="#A78BFA" strokeWidth="1.2"/><circle cx="6.5" cy="9.5" r="0.8" fill="#A78BFA"/></svg>
                 </div>
-                <p className="text-[13px] font-black text-white">{t('massPostingTargets')}</p>
+                <span className="text-[13px] font-bold text-text">{t('massPostingTargets')}</span>
               </div>
               {selectedPhones.size > 0 && (
-                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full text-white"
-                  style={{ background: 'linear-gradient(130deg,#7C3AED,#A855F7)', boxShadow: '0 2px 10px -2px rgba(124,58,237,0.5)' }}>
-                  {selectedPhones.size}
-                </span>
+                <span className="sf-badge sf-badge-accent font-black">{selectedPhones.size}</span>
               )}
             </div>
 
             {/* Phones / Groups toggle */}
-            <div className="flex rounded-xl p-1 gap-0.5 mb-3"
-              style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <div className="sf-tabs mb-3 w-full">
               {([{ k: 'phones', l: t('massPostingPhones') }, { k: 'groups', l: t('massPostingGroups') }] as const).map(m => (
                 <button key={m.k} onClick={() => setPhonePickMode(m.k)}
-                  className="flex-1 py-1.5 rounded-lg text-[11px] font-semibold transition-all"
-                  style={phonePickMode === m.k
-                    ? { background: 'rgba(139,92,246,0.2)', color: '#c4b5fd', border: '1px solid rgba(139,92,246,0.28)' }
-                    : { color: 'rgba(82,82,91,0.9)' }}>
+                  className={`sf-tab cursor-pointer flex-1 ${phonePickMode === m.k ? 'active' : ''}`}>
                   {m.l}
                 </button>
               ))}
             </div>
 
+            {/* Phones mode filters */}
             {phonePickMode === 'phones' && (
               <div className="space-y-2">
                 {groups.length > 1 && (
                   <div className="relative">
                     <select value={groupFilter} onChange={e => setGroupFilter(e.target.value)}
-                      className="w-full appearance-none rounded-xl px-3 py-2 pr-7 text-[12px] focus:outline-none"
-                      style={{ background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.15)', color: '#C4B5FD' }}>
-                      {groups.map(g => <option key={g} value={g} style={{ background: '#0E0E16', color: '#fff' }}>{g}</option>)}
+                      className="sf-input appearance-none pr-7 cursor-pointer text-xs h-8">
+                      {groups.map(g => <option key={g} value={g} style={{ background: '#0C0C15', color: '#fff' }}>{g}</option>)}
                     </select>
                     <svg className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5L5 6.5L8 3.5" stroke="#8B5CF6" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
                   </div>
                 )}
                 <div className="relative">
-                  <svg className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" width="11" height="11" viewBox="0 0 11 11" fill="none"><circle cx="5" cy="5" r="3.5" stroke="rgba(139,92,246,0.5)" strokeWidth="1.2"/><path d="M7.5 7.5L10 10" stroke="rgba(139,92,246,0.5)" strokeWidth="1.2" strokeLinecap="round"/></svg>
+                  <svg className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" width="11" height="11" viewBox="0 0 11 11" fill="none"><circle cx="5" cy="5" r="3.5" stroke="rgba(139,92,246,0.4)" strokeWidth="1.2"/><path d="M7.5 7.5L10 10" stroke="rgba(139,92,246,0.4)" strokeWidth="1.2" strokeLinecap="round"/></svg>
                   <input type="text" placeholder={t('massPostingSearchPhone')} value={phoneSearch}
                     onChange={e => setPhoneSearch(e.target.value)}
-                    className="w-full pl-8 pr-3 py-2 rounded-xl text-[12px] placeholder:text-text3 focus:outline-none"
-                    style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(139,92,246,0.12)', color: '#E2E8F0' }}
+                    className="sf-input pl-8 text-xs h-8"
                   />
                 </div>
               </div>
             )}
+
+            {/* Groups mode: all/none buttons */}
             {phonePickMode === 'groups' && (
               <div className="flex gap-3">
                 <button onClick={() => {
@@ -968,60 +879,80 @@ export function MassPosting({ user }: MassPostingProps) {
                     if (role && !canAccessPhoneGroup(role, perms, p.group_name)) return false
                     return Boolean(p.group_name)
                   }).map(p => p.id)))
-                }} className="text-[12px] font-bold text-accent hover:text-white transition-colors">{t('massPostingAllGroup')}</button>
+                }} className="text-xs font-bold text-accent hover:text-text transition-colors cursor-pointer">{t('massPostingAllGroup')}</button>
                 <button onClick={() => { setSelectedGroups(new Set()); setSelPhones(new Set()) }}
-                  className="text-[12px] text-text3 hover:text-white transition-colors">{t('massPostingNoneGroup')}</button>
+                  className="text-xs text-text3 hover:text-text transition-colors cursor-pointer">{t('massPostingNoneGroup')}</button>
               </div>
             )}
           </div>
 
+          {/* Select all / Deselect bar (phones mode) */}
           {phonePickMode === 'phones' && (
-            <div className="flex-shrink-0 flex items-center gap-0 mx-4 mb-2 mt-2 rounded-xl overflow-hidden"
-              style={{ border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)' }}>
+            <div className="flex-shrink-0 flex items-center mx-3 my-2 rounded-lg overflow-hidden border border-border">
               <button onClick={() => setSelPhones(new Set(visiblePhones.map(p => p.id)))}
-                className="flex-1 py-1.5 text-[11px] font-bold text-accent hover:bg-accent/10 transition-colors">{t('massPostingAllGroup')}</button>
-              <div style={{ width: 1, background: 'rgba(255,255,255,0.06)', height: 20 }} />
+                className="flex-1 py-1.5 text-[11px] font-bold text-accent hover:bg-accent/8 transition-colors cursor-pointer">
+                {t('massPostingAllGroup')}
+              </button>
+              <div className="w-px h-5 bg-border" />
               <button onClick={() => setSelPhones(new Set())}
-                className="flex-1 py-1.5 text-[11px] text-text2 hover:text-white hover:bg-white/[0.04] transition-colors">{t('massPostingNoneGroup')}</button>
-              <div style={{ width: 1, background: 'rgba(255,255,255,0.06)', height: 20 }} />
-              <span className="px-3 text-[11px] font-medium" style={{ color: 'rgba(148,163,184,0.4)' }}>{visiblePhones.length}</span>
+                className="flex-1 py-1.5 text-[11px] text-text2 hover:text-text hover:bg-surface2 transition-colors cursor-pointer">
+                {t('massPostingNoneGroup')}
+              </button>
+              <div className="w-px h-5 bg-border" />
+              <span className="px-3 text-[11px] font-medium text-text3">{visiblePhones.length}</span>
             </div>
           )}
 
-          <div className="flex-1 overflow-auto pb-2" style={{ scrollbarWidth: 'none' }}>
+          {/* Phone / Group list */}
+          <div className="flex-1 overflow-auto" style={{ scrollbarWidth: 'thin' }}>
             {/* Phones mode */}
             {phonePickMode === 'phones' && visiblePhones.map(phone => {
               const checked = selectedPhones.has(phone.id)
               const asgn = assignments.find(a => a.phone.id === phone.id)
               const ts = taskStatuses.get(phone.id)
               const initials = (phone.ig_username?.[0] ?? phone.phone_name?.[0] ?? '?').toUpperCase()
-              const statusDot: Record<string, string> = { uploading: '#60a5fa', posting: '#f59e0b', done: '#22c55e', error: '#ef4444' }
+              const statusDotColor: Record<string, string> = { uploading: '#60a5fa', posting: '#f59e0b', done: '#22c55e', error: '#ef4444' }
               return (
                 <button key={phone.id} onClick={() => togglePhone(phone.id)}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 text-left transition-all relative"
-                  style={{ borderBottom: '1px solid rgba(255,255,255,0.025)', background: checked ? 'rgba(139,92,246,0.08)' : 'transparent' }}>
-                  {checked && <div className="absolute left-0 top-1 bottom-1 w-0.5 rounded-full" style={{ background: 'linear-gradient(180deg,#7C3AED,#A855F7)' }} />}
-                  <div className="w-8 h-8 rounded-xl flex items-center justify-center text-[12px] font-black flex-shrink-0"
-                    style={checked ? { background: avatarGradient(phone.phone_name ?? ''), color: '#fff', boxShadow: '0 2px 8px -2px rgba(124,58,237,0.5)' } : { background: 'rgba(255,255,255,0.05)', color: 'rgba(148,163,184,0.5)' }}>
+                  className="w-full flex items-center gap-3 px-3 py-2.5 text-left transition-all cursor-pointer relative hover:bg-surface2"
+                  style={{
+                    borderBottom: '1px solid var(--border, rgba(255,255,255,0.055))',
+                    background: checked ? 'rgba(124,58,237,0.07)' : undefined,
+                  }}>
+                  {/* Active indicator */}
+                  {checked && <div className="absolute left-0 top-2 bottom-2 w-0.5 rounded-full bg-accent" />}
+
+                  {/* Avatar */}
+                  <div className="w-8 h-8 rounded-xl flex items-center justify-center text-[12px] font-black flex-shrink-0 text-white"
+                    style={{ background: checked ? avatarGradient(phone.phone_name ?? '') : 'rgba(255,255,255,0.05)', boxShadow: checked ? '0 2px 8px -2px rgba(124,58,237,0.4)' : undefined }}>
                     {initials}
                   </div>
+
+                  {/* Info */}
                   <div className="min-w-0 flex-1">
-                    <p className={`text-[12px] font-semibold truncate ${checked ? 'text-white' : 'text-text2'}`}>{phone.phone_name}</p>
-                    {phone.ig_username && <p className="text-[10px] truncate" style={{ color: checked ? '#A78BFA' : 'rgba(139,92,246,0.4)' }}>@{phone.ig_username}</p>}
+                    <p className={`text-xs font-semibold truncate ${checked ? 'text-text' : 'text-text2'}`}>{phone.phone_name}</p>
+                    {phone.ig_username && (
+                      <p className="text-[10px] truncate" style={{ color: checked ? '#A78BFA' : 'rgba(139,92,246,0.4)' }}>@{phone.ig_username}</p>
+                    )}
                     {ts && ts.status !== 'idle' && ts.status !== 'pending' && (
-                      <p className="text-[10px] font-semibold flex items-center gap-1" style={{ color: statusDot[ts.status] ?? '#71717a' }}>
-                        <span className="w-1 h-1 rounded-full inline-block" style={{ background: statusDot[ts.status] ?? '#71717a' }} />
+                      <p className="text-[10px] font-semibold flex items-center gap-1 mt-0.5"
+                        style={{ color: statusDotColor[ts.status] ?? 'rgba(113,113,122,0.8)' }}>
+                        <span className="w-1 h-1 rounded-full inline-block" style={{ background: statusDotColor[ts.status] ?? 'rgba(113,113,122,0.8)' }} />
                         {STATUS_LABEL[ts.status]}
                       </p>
                     )}
                   </div>
+
+                  {/* Video index badge */}
                   {asgn?.video && (
-                    <span className="text-[10px] font-black px-1.5 py-0.5 rounded-lg flex-shrink-0" style={{ background: 'rgba(139,92,246,0.12)', color: '#a78bfa' }}>
-                      #{asgn.videoIndex + 1}
-                    </span>
+                    <span className="sf-badge sf-badge-accent text-[10px] flex-shrink-0">#{asgn.videoIndex + 1}</span>
                   )}
-                  <div className="w-4 h-4 rounded-md flex items-center justify-center flex-shrink-0"
-                    style={checked ? { background: 'linear-gradient(135deg,#7C3AED,#A855F7)', boxShadow: '0 0 8px rgba(139,92,246,0.4)' } : { border: '1px solid rgba(255,255,255,0.1)' }}>
+
+                  {/* Checkbox */}
+                  <div className="w-4 h-4 rounded-md flex items-center justify-center flex-shrink-0 transition-all"
+                    style={checked
+                      ? { background: 'linear-gradient(135deg,#7C3AED,#A855F7)', boxShadow: '0 0 8px rgba(139,92,246,0.4)' }
+                      : { border: '1px solid rgba(255,255,255,0.12)' }}>
                     {checked && <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M1.5 4L3 5.5L6.5 2" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
                   </div>
                 </button>
@@ -1032,16 +963,16 @@ export function MassPosting({ user }: MassPostingProps) {
             {phonePickMode === 'groups' && (() => {
               const realGroups = groups.filter(g => g !== 'Tous')
               if (realGroups.length === 0) return (
-                <div className="flex flex-col items-center justify-center h-full px-5 py-10 text-center">
-                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-3" style={{ background: 'rgba(139,92,246,0.06)', border: '1px dashed rgba(139,92,246,0.2)' }}>
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(82,82,91,0.7)" strokeWidth="1.3"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                <div className="sf-empty py-12">
+                  <div className="sf-empty-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(139,92,246,0.5)" strokeWidth="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                   </div>
-                  <p className="text-[12px] font-bold text-white mb-1">{t('massPostingNoGroup')}</p>
-                  <p className="text-[11px] text-text3">{t('massPostingNoGroupHint')}</p>
+                  <p className="sf-empty-title text-sm">{t('massPostingNoGroup')}</p>
+                  <p className="sf-empty-desc text-xs">{t('massPostingNoGroupHint')}</p>
                 </div>
               )
               return (
-                <div className="py-2">
+                <div className="py-1">
                   {realGroups.map(g => {
                     const inGroup = phones.filter(p => {
                       if (role && !canAccessPhoneGroup(role, perms, p.group_name)) return false
@@ -1051,21 +982,28 @@ export function MassPosting({ user }: MassPostingProps) {
                     const selCount = inGroup.filter(p => selectedPhones.has(p.id)).length
                     return (
                       <button key={g} onClick={() => toggleGroup(g)}
-                        className="w-full flex items-center gap-3 px-4 py-3 text-left transition-all relative"
-                        style={{ borderBottom: '1px solid rgba(255,255,255,0.025)', background: checked ? 'rgba(139,92,246,0.08)' : 'transparent' }}>
-                        {checked && <div className="absolute left-0 top-1 bottom-1 w-0.5 rounded-full" style={{ background: 'linear-gradient(180deg,#7C3AED,#A855F7)' }} />}
-                        <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-                          style={checked ? { background: 'linear-gradient(135deg,#7C3AED,#A855F7)', boxShadow: '0 2px 8px -2px rgba(124,58,237,0.5)' } : { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                        className="w-full flex items-center gap-3 px-3 py-3 text-left transition-all cursor-pointer relative hover:bg-surface2"
+                        style={{
+                          borderBottom: '1px solid var(--border, rgba(255,255,255,0.055))',
+                          background: checked ? 'rgba(124,58,237,0.07)' : undefined,
+                        }}>
+                        {checked && <div className="absolute left-0 top-2 bottom-2 w-0.5 rounded-full bg-accent" />}
+                        <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 transition-all"
+                          style={checked
+                            ? { background: 'linear-gradient(135deg,#7C3AED,#A855F7)', boxShadow: '0 2px 8px -2px rgba(124,58,237,0.5)' }
+                            : { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
                           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={checked ? 'white' : '#52525b'} strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className={`text-[13px] font-bold truncate ${checked ? 'text-white' : 'text-text2'}`}>{g}</p>
+                          <p className={`text-sm font-bold truncate ${checked ? 'text-text' : 'text-text2'}`}>{g}</p>
                           <p className="text-[11px]" style={{ color: checked ? '#a78bfa' : 'rgba(82,82,91,0.7)' }}>
                             {checked ? `${selCount}/${inGroup.length} ${t('massPostingSelCount')}` : `${inGroup.length} ${t('massPostingPhoneCount')}`}
                           </p>
                         </div>
                         <div className="w-4 h-4 rounded-md flex items-center justify-center flex-shrink-0"
-                          style={checked ? { background: 'linear-gradient(135deg,#7C3AED,#A855F7)' } : { border: '1px solid rgba(255,255,255,0.1)' }}>
+                          style={checked
+                            ? { background: 'linear-gradient(135deg,#7C3AED,#A855F7)' }
+                            : { border: '1px solid rgba(255,255,255,0.1)' }}>
                           {checked && <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M1.5 4L3 5.5L6.5 2" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
                         </div>
                       </button>
@@ -1075,103 +1013,196 @@ export function MassPosting({ user }: MassPostingProps) {
               )
             })()}
           </div>
+
+          {/* Selection count footer */}
+          {selectedPhones.size > 0 && (
+            <div className="flex-shrink-0 px-4 py-3 border-t border-border flex items-center justify-between">
+              <span className="text-xs text-text3">{t('massPostingSelCount')}</span>
+              <span className="sf-badge sf-badge-accent font-black text-sm">{selectedPhones.size}</span>
+            </div>
+          )}
         </aside>
 
-        {/* ── COL 3: Config + Assignments + Logs ───────────────────────────── */}
-        <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: 'none' }}>
-          <div className="px-6 py-6 space-y-4 max-w-4xl">
+        {/* ── RIGHT MAIN AREA ───────────────────────────────────────────────── */}
+        <div className="flex-1 overflow-y-auto bg-bg" style={{ scrollbarWidth: 'thin' }}>
+          <div className="px-6 py-5 space-y-4 max-w-4xl">
 
-            {/* Options */}
-            <div className="rounded-2xl overflow-hidden" style={{ background: '#0E0E16', border: '1px solid rgba(139,92,246,0.12)', boxShadow: '0 4px 32px -4px rgba(0,0,0,0.4)' }}>
-              <div className="flex items-center gap-2.5 px-5 pt-4 pb-3" style={{ borderBottom: '1px solid rgba(139,92,246,0.08)' }}>
-                <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: 'rgba(139,92,246,0.15)' }}>
+            {/* ── Video selection section ─────────────────────────────────── */}
+            <div className="sf-card overflow-hidden">
+              <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-border">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-6 h-6 rounded-lg flex items-center justify-center bg-accent/10 border border-accent/15">
+                    <svg width="12" height="12" viewBox="0 0 13 13" fill="none"><rect x="1" y="2" width="9" height="7" rx="1.5" stroke="#A78BFA" strokeWidth="1.2"/><path d="M10 5.5L12 4v5L10 7.5V5.5Z" stroke="#A78BFA" strokeWidth="1.2" strokeLinejoin="round"/></svg>
+                  </div>
+                  <span className="text-[13px] font-bold text-text">{t('massPostingContent')}</span>
+                </div>
+                {selectedVideos.length > 0 && (
+                  <span className="sf-badge sf-badge-accent font-black">{selectedVideos.length}</span>
+                )}
+              </div>
+
+              {/* Add buttons row */}
+              <div className="px-5 py-3 border-b border-border flex items-center gap-2 flex-wrap">
+                <button onClick={() => setShowBankPicker(true)}
+                  className="sf-btn sf-btn-primary sf-btn-sm cursor-pointer">
+                  <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><rect x="0.5" y="0.5" width="4" height="4" rx="1" fill="white" opacity=".8"/><rect x="6.5" y="0.5" width="4" height="4" rx="1" fill="white" opacity=".6"/><rect x="0.5" y="6.5" width="4" height="4" rx="1" fill="white" opacity=".6"/><rect x="6.5" y="6.5" width="4" height="4" rx="1" fill="white" opacity=".4"/></svg>
+                  {t('massPostingFromBank')}
+                </button>
+                <button onClick={() => pickLocalFile(-1)}
+                  className="sf-btn sf-btn-secondary sf-btn-sm cursor-pointer">
+                  <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M5.5 7V1M3 3.5L5.5 1L8 3.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/><path d="M1 8v1.5C1 10.3 1.7 11 2.5 11h6c.8 0 1.5-.7 1.5-1.5V8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
+                  {t('massPostingFromPC')}
+                </button>
+                <button onClick={openFolderPick}
+                  className="sf-btn sf-btn-secondary sf-btn-sm cursor-pointer">
+                  <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M1 8.5V4A1 1 0 0 1 2 3h2.5L5.5 4.5H9A1 1 0 0 1 10 5.5V8.5A1 1 0 0 1 9 9.5H2A1 1 0 0 1 1 8.5Z" stroke="currentColor" strokeWidth="1.1" strokeLinejoin="round"/></svg>
+                  {t('massPostingFromFolder')}
+                </button>
+                {addingFolder && (
+                  <span className="flex items-center gap-1.5 text-xs text-accent">
+                    <div className="sf-spinner w-3 h-3" />
+                    {t('massPostingAddingFolder')} «{addingFolder}»…
+                  </span>
+                )}
+              </div>
+
+              {/* Video grid */}
+              {selectedVideos.length === 0 ? (
+                <div className="sf-empty py-10">
+                  <div className="sf-empty-icon">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(139,92,246,0.4)" strokeWidth="1.4"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+                  </div>
+                  <p className="sf-empty-title">{t('massPostingNoContent')}</p>
+                  <p className="sf-empty-desc">{t('massPostingNoContentHint')}</p>
+                  <p className="text-[10px] text-text3 mt-1">{t('massPostingFormats').split('\n').map((line, i) => <span key={i}>{line}{i === 0 ? <br /> : ''}</span>)}</p>
+                </div>
+              ) : (
+                <div className="p-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                  {selectedVideos.map((sv, selIdx) => {
+                    const fp = sv.localPath ?? sv.item.file_url
+                    return (
+                      <div key={sv.item.id}
+                        className="group relative rounded-xl overflow-hidden border border-border bg-surface2 flex flex-col transition-all hover:border-accent/25 hover:-translate-y-0.5"
+                        style={{ aspectRatio: '9/16', maxHeight: 180 }}>
+                        {/* Thumbnail */}
+                        <div className="flex-1 overflow-hidden">
+                          <VideoThumbnail filePath={fp ?? ''} thumbnailPath={sv.item.thumbnail_path} storagePath={sv.item.storage_path} />
+                        </div>
+                        {/* Overlay info */}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+                        <div className="absolute bottom-0 left-0 right-0 p-2">
+                          <p className="text-[9px] font-black text-accent/80 tracking-wider mb-0.5">#{selIdx + 1}</p>
+                          <p className="text-[10px] font-semibold text-white truncate leading-tight">{sv.item.title}</p>
+                        </div>
+                        {/* Remove button */}
+                        <button onClick={() => setSelVideos(prev => prev.filter((_, i) => i !== selIdx))}
+                          className="absolute top-1.5 right-1.5 w-5 h-5 flex items-center justify-center rounded-lg opacity-0 group-hover:opacity-100 transition-all cursor-pointer bg-danger/20 hover:bg-danger/40 border border-danger/30 text-danger">
+                          <svg width="7" height="7" viewBox="0 0 8 8" fill="none"><path d="M1 1L7 7M7 1L1 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+                        </button>
+                        {/* Index badge */}
+                        <div className="absolute top-1.5 left-1.5 w-5 h-5 rounded-md flex items-center justify-center text-[9px] font-black text-white bg-black/50 border border-white/10">
+                          {selIdx + 1}
+                        </div>
+                      </div>
+                    )
+                  })}
+                  {/* Add more card */}
+                  <button onClick={() => setShowBankPicker(true)}
+                    className="rounded-xl border border-dashed border-border hover:border-accent/40 bg-surface/50 hover:bg-accent/5 transition-all cursor-pointer flex flex-col items-center justify-center gap-1.5 text-text3 hover:text-accent"
+                    style={{ aspectRatio: '9/16', maxHeight: 180 }}>
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+                    <span className="text-[10px] font-semibold">Ajouter</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* ── Options card ─────────────────────────────────────────────── */}
+            <div className="sf-card overflow-hidden">
+              <div className="flex items-center gap-2.5 px-5 pt-4 pb-3 border-b border-border">
+                <div className="w-6 h-6 rounded-lg flex items-center justify-center bg-accent/10 border border-accent/15">
                   <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="2" stroke="#A78BFA" strokeWidth="1.2"/><path d="M6 1v1.5M6 9.5V11M1 6h1.5M9.5 6H11" stroke="#A78BFA" strokeWidth="1.2" strokeLinecap="round"/></svg>
                 </div>
-                <span className="text-[12px] font-bold text-white">{t('massPostingPublishOptions')}</span>
+                <span className="text-[13px] font-bold text-text">{t('massPostingPublishOptions')}</span>
               </div>
               <div className="px-5 py-4">
                 <PostingOptions opts={postingOpts} onChange={o => { setPostingOpts(o); savePostingOpts(o) }} />
               </div>
             </div>
 
-            {/* Description */}
-            <div className="rounded-2xl overflow-hidden" style={{ background: '#0E0E16', border: '1px solid rgba(139,92,246,0.12)', boxShadow: '0 4px 32px -4px rgba(0,0,0,0.4)' }}>
-              <div className="flex items-center justify-between px-5 pt-4 pb-3" style={{ borderBottom: '1px solid rgba(139,92,246,0.08)' }}>
+            {/* ── Description card ─────────────────────────────────────────── */}
+            <div className="sf-card overflow-hidden">
+              <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-border">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: 'rgba(139,92,246,0.15)' }}>
+                  <div className="w-6 h-6 rounded-lg flex items-center justify-center bg-accent/10 border border-accent/15">
                     <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 2h10M1 5h7M1 8h8M1 11h5" stroke="#A78BFA" strokeWidth="1.2" strokeLinecap="round"/></svg>
                   </div>
-                  <span className="text-[12px] font-bold text-white">{t('massPostingDescription')}</span>
+                  <span className="text-[13px] font-bold text-text">{t('massPostingDescription')}</span>
                 </div>
-                <span className={`text-[11px] font-mono tabular-nums px-2 py-0.5 rounded-lg ${caption.length > 2200 ? 'text-danger' : 'text-text3'}`}
-                  style={{ background: caption.length > 2200 ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.04)' }}>
+                <span className={`text-[11px] font-mono tabular-nums px-2 py-0.5 rounded-lg sf-badge ${caption.length > 2200 ? 'sf-badge-danger' : 'sf-badge-muted'}`}>
                   {caption.length}/2200
                 </span>
               </div>
               <div className="p-5 space-y-3">
                 <textarea value={caption} onChange={e => setCaption(e.target.value)} rows={4}
                   placeholder={t('massPostingCaptionPlaceholder')}
-                  className="w-full rounded-xl px-4 py-3 text-[13px] placeholder:text-text3 resize-none focus:outline-none transition-all leading-relaxed"
-                  style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(139,92,246,0.1)', color: '#E2E8F0', fontFamily: 'inherit' }}
-                  onFocus={e => { e.target.style.borderColor = 'rgba(139,92,246,0.35)'; e.target.style.background = 'rgba(139,92,246,0.04)' }}
-                  onBlur={e => { e.target.style.borderColor = 'rgba(139,92,246,0.1)'; e.target.style.background = 'rgba(255,255,255,0.03)' }}
+                  className="sf-input sf-textarea w-full text-[13px] leading-relaxed"
+                  style={{ height: 'auto', minHeight: 96 }}
                 />
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                   <button onClick={generateCaption} disabled={!groqKey || generating}
-                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-[12px] font-bold transition-all disabled:opacity-40 hover:opacity-90"
-                    style={{ background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.25)', color: '#A78BFA' }}>
-                    {generating ? <span className="w-3 h-3 border-2 border-accent/50 border-t-accent rounded-full animate-spin inline-block" /> : <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M5.5 1L6.8 4.2H10.2L7.5 6.1L8.5 9.5L5.5 7.5L2.5 9.5L3.5 6.1L0.8 4.2H4.2L5.5 1Z" fill="#A78BFA"/></svg>}
+                    className="sf-btn sf-btn-secondary sf-btn-sm cursor-pointer disabled:opacity-40">
+                    {generating
+                      ? <div className="sf-spinner w-3 h-3" />
+                      : <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M5.5 1L6.8 4.2H10.2L7.5 6.1L8.5 9.5L5.5 7.5L2.5 9.5L3.5 6.1L0.8 4.2H4.2L5.5 1Z" fill="#A78BFA"/></svg>
+                    }
                     {generating ? t('massPostingGeneratingAI') : t('massPostingGenerateAI')}
                   </button>
                   <input type="text" value={customPrompt} onChange={e => setCustomPrompt(e.target.value)}
                     placeholder={t('massPostingCustomPrompt')}
-                    className="flex-1 px-3 py-2 rounded-xl text-[12px] placeholder:text-text3 focus:outline-none"
-                    style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(139,92,246,0.12)', color: '#E2E8F0' }}
+                    className="sf-input flex-1 text-xs h-8 min-w-[140px]"
                   />
                   <button onClick={() => setWithHashtags(v => !v)}
-                    className="px-3 py-2 rounded-xl text-[12px] font-black transition-all flex-shrink-0"
-                    style={withHashtags
-                      ? { background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.3)', color: '#A78BFA', boxShadow: '0 0 10px rgba(139,92,246,0.2)' }
-                      : { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#52525b' }}>
+                    className={`sf-btn sf-btn-sm cursor-pointer font-black text-base px-3 ${withHashtags ? 'sf-btn-primary' : 'sf-btn-secondary'}`}
+                    title="Inclure les hashtags"
+                    style={withHashtags ? { boxShadow: '0 0 10px rgba(139,92,246,0.3)' } : {}}>
                     #
                   </button>
                 </div>
               </div>
             </div>
 
-            {/* Assignments table */}
-            <div className="rounded-2xl overflow-hidden" style={{ background: '#0E0E16', border: '1px solid rgba(139,92,246,0.12)', boxShadow: '0 4px 32px -4px rgba(0,0,0,0.4)' }}>
-              <div className="flex items-center justify-between px-5 pt-4 pb-3" style={{ borderBottom: '1px solid rgba(139,92,246,0.08)' }}>
+            {/* ── Assignments table ─────────────────────────────────────────── */}
+            <div className="sf-card overflow-hidden">
+              <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-border">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: 'rgba(139,92,246,0.15)' }}>
+                  <div className="w-6 h-6 rounded-lg flex items-center justify-center bg-accent/10 border border-accent/15">
                     <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 3h10M1 6h10M1 9h10" stroke="#A78BFA" strokeWidth="1.2" strokeLinecap="round"/></svg>
                   </div>
-                  <span className="text-[12px] font-bold text-white">{t('massPostingAssignments')}</span>
+                  <span className="text-[13px] font-bold text-text">{t('massPostingAssignments')}</span>
                 </div>
                 {assignments.length > 0 && (
-                  <span className="text-[11px] px-2 py-0.5 rounded-full font-bold" style={{ background: 'rgba(139,92,246,0.1)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.2)' }}>
+                  <span className="sf-badge sf-badge-accent">
                     {assignments.length} {assignments.length !== 1 ? t('massPostingAssignmentCountPlural') : t('massPostingAssignmentCount')}
                   </span>
                 )}
               </div>
 
               {assignments.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-14 text-center">
-                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4" style={{ background: 'rgba(139,92,246,0.06)', border: '1px dashed rgba(139,92,246,0.2)' }}>
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(82,82,91,0.7)" strokeWidth="1.3"><path d="M9 17H5a2 2 0 0 0-2 2"/><path d="M11 17h8a2 2 0 0 1 2 2"/><rect x="1" y="3" width="22" height="12" rx="2"/></svg>
+                <div className="sf-empty">
+                  <div className="sf-empty-icon">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(139,92,246,0.4)" strokeWidth="1.4"><path d="M9 17H5a2 2 0 0 0-2 2"/><path d="M11 17h8a2 2 0 0 1 2 2"/><rect x="1" y="3" width="22" height="12" rx="2"/></svg>
                   </div>
-                  <p className="text-[13px] font-bold text-white mb-1">{t('massPostingAssignments')}</p>
-                  <p className="text-[12px] max-w-[280px] leading-relaxed" style={{ color: 'rgba(148,163,184,0.4)' }}>
-                    {t('massPostingNoAssignment')}
-                  </p>
+                  <p className="sf-empty-title">{t('massPostingAssignments')}</p>
+                  <p className="sf-empty-desc">{t('massPostingNoAssignment')}</p>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full text-[12px]">
+                  <table className="sf-table">
                     <thead>
-                      <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                      <tr>
                         {['#', 'Téléphone', 'Vidéo', 'Statut'].map((h, i) => (
-                          <th key={h} className={`py-2.5 text-[10px] font-bold uppercase tracking-widest text-text3 ${i === 3 ? 'text-right pr-5' : i === 0 ? 'pl-5 text-left' : 'px-3 text-left'}`}>{h}</th>
+                          <th key={h} className={i === 3 ? 'text-right' : i === 0 ? 'text-left' : 'text-left'}>{h}</th>
                         ))}
                       </tr>
                     </thead>
@@ -1179,54 +1210,51 @@ export function MassPosting({ user }: MassPostingProps) {
                       {assignments.map(({ phone, video, videoIndex }, rowIdx) => {
                         const ts = taskStatuses.get(phone.id)
                         const status = ts?.status ?? 'idle'
-                        const statusCfg: Record<string, { bg: string; fg: string }> = {
-                          idle:      { bg: 'rgba(82,82,91,0.12)',   fg: '#52525b' },
-                          pending:   { bg: 'rgba(82,82,91,0.12)',   fg: '#71717a' },
-                          uploading: { bg: 'rgba(96,165,250,0.12)', fg: '#60a5fa' },
-                          posting:   { bg: 'rgba(245,158,11,0.12)', fg: '#f59e0b' },
-                          done:      { bg: 'rgba(34,197,94,0.12)',  fg: '#22c55e' },
-                          error:     { bg: 'rgba(239,68,68,0.12)',  fg: '#ef4444' },
+                        const statusBadgeClass: Record<string, string> = {
+                          idle:      'sf-badge-muted',
+                          pending:   'sf-badge-muted',
+                          uploading: 'sf-badge-info',
+                          posting:   'sf-badge-warn',
+                          done:      'sf-badge-ok',
+                          error:     'sf-badge-danger',
                         }
-                        const cfg = statusCfg[status]
-                        const rowBg = status === 'done' ? 'rgba(34,197,94,0.02)' : status === 'error' ? 'rgba(239,68,68,0.02)' : status === 'posting' ? 'rgba(245,158,11,0.015)' : 'transparent'
                         return (
-                          <tr key={phone.id} style={{ background: rowBg, borderBottom: '1px solid rgba(255,255,255,0.025)' }}>
-                            <td className="pl-5 pr-3 py-3 font-mono text-[11px]" style={{ color: 'rgba(82,82,91,0.6)' }}>{rowIdx + 1}</td>
-                            <td className="px-3 py-3">
+                          <tr key={phone.id}>
+                            <td className="font-mono text-[11px] text-text3 w-10">{rowIdx + 1}</td>
+                            <td>
                               <div className="flex items-center gap-2">
-                                <div className="w-7 h-7 rounded-xl flex items-center justify-center text-[11px] font-black flex-shrink-0"
-                                  style={{ background: avatarGradient(phone.phone_name ?? ''), color: '#fff' }}>
+                                <div className="w-7 h-7 rounded-xl flex items-center justify-center text-[11px] font-black flex-shrink-0 text-white"
+                                  style={{ background: avatarGradient(phone.phone_name ?? '') }}>
                                   {(phone.ig_username?.[0] ?? phone.phone_name?.[0] ?? '?').toUpperCase()}
                                 </div>
                                 <div className="min-w-0">
-                                  <p className="font-semibold text-white truncate max-w-[110px]">{phone.phone_name}</p>
-                                  {phone.ig_username && <p className="text-[10px] truncate max-w-[110px]" style={{ color: 'rgba(139,92,246,0.6)' }}>@{phone.ig_username}</p>}
+                                  <p className="font-semibold text-text text-xs truncate max-w-[110px]">{phone.phone_name}</p>
+                                  {phone.ig_username && <p className="text-[10px] truncate max-w-[110px] text-accent/60">@{phone.ig_username}</p>}
                                 </div>
                               </div>
                             </td>
-                            <td className="px-3 py-3">
+                            <td>
                               {video ? (
                                 <div className="flex items-center gap-2">
-                                  <div className="w-6 flex-shrink-0 rounded-lg overflow-hidden" style={{ aspectRatio: '9/16', background: 'rgba(139,92,246,0.08)' }}>
+                                  <div className="w-5 flex-shrink-0 rounded overflow-hidden bg-accent/8" style={{ aspectRatio: '9/16' }}>
                                     <VideoThumbnail filePath={video.localPath ?? video.item.file_url ?? ''} thumbnailPath={video.item.thumbnail_path} storagePath={video.item.storage_path} />
                                   </div>
                                   <div className="min-w-0">
-                                    <span className="text-[10px] font-bold" style={{ color: '#7c3aed' }}>#{videoIndex + 1} </span>
-                                    <span className="text-text2 truncate max-w-[110px] inline-block align-middle text-[11px]">{video.item.title}</span>
+                                    <span className="text-[10px] font-bold text-accent">#{videoIndex + 1} </span>
+                                    <span className="text-text2 truncate max-w-[100px] inline-block align-middle text-[11px]">{video.item.title}</span>
                                   </div>
                                 </div>
-                              ) : <span className="text-text3 italic text-[11px]">—</span>}
+                              ) : <span className="text-text3 italic text-xs">—</span>}
                             </td>
-                            <td className="pr-5 pl-3 py-3 text-right">
+                            <td className="text-right">
                               <div className="inline-flex flex-col items-end gap-1">
-                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap"
-                                  style={{ background: cfg.bg, color: cfg.fg }}>
+                                <span className={`sf-badge ${statusBadgeClass[status]}`}>
                                   {STATUS_LABEL[status]}
                                 </span>
                                 {ts?.detail && <span className="text-[10px] text-text3 max-w-[110px] truncate">{ts.detail}</span>}
                                 {(status === 'uploading' || status === 'posting') && (
-                                  <div className="w-14 h-1 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
-                                    <div className="sf-progress-bar h-full" style={{ width: status === 'uploading' ? '55%' : '75%' }} />
+                                  <div className="sf-progress w-14">
+                                    <div className="sf-progress-bar" style={{ width: status === 'uploading' ? '55%' : '75%' }} />
                                   </div>
                                 )}
                               </div>
@@ -1240,56 +1268,70 @@ export function MassPosting({ user }: MassPostingProps) {
               )}
             </div>
 
-            {/* Bottom status bar */}
-            <div className="rounded-2xl p-4 flex items-center gap-6" style={{ background: '#0E0E16', border: '1px solid rgba(139,92,246,0.1)' }}>
+            {/* ── Action / readiness bar ────────────────────────────────────── */}
+            <div className="sf-card p-4 flex items-center gap-4 flex-wrap">
+              {/* Phones stat */}
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: phoneList.length > 0 ? 'rgba(139,92,246,0.15)' : 'rgba(255,255,255,0.04)', border: `1px solid ${phoneList.length > 0 ? 'rgba(139,92,246,0.25)' : 'rgba(255,255,255,0.07)'}` }}>
-                  <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x="2.5" y="1" width="8" height="11" rx="1.5" stroke={phoneList.length > 0 ? '#A78BFA' : 'rgba(82,82,91,0.6)'} strokeWidth="1.2"/></svg>
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center border transition-all"
+                  style={phoneList.length > 0
+                    ? { background: 'rgba(124,58,237,0.12)', border: '1px solid rgba(124,58,237,0.25)' }
+                    : { background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                  <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x="2.5" y="1" width="8" height="11" rx="1.5" stroke={phoneList.length > 0 ? '#A78BFA' : 'rgba(82,82,91,0.5)'} strokeWidth="1.2"/></svg>
                 </div>
                 <div>
-                  <p className="text-[18px] font-black leading-none" style={{ color: phoneList.length > 0 ? '#fff' : 'rgba(82,82,91,0.7)' }}>{phoneList.length}</p>
-                  <p className="text-[10px]" style={{ color: 'rgba(148,163,184,0.4)' }}>cibles sélectionnées</p>
+                  <p className="text-lg font-black leading-none" style={{ color: phoneList.length > 0 ? '#fff' : 'rgba(82,82,91,0.7)' }}>{phoneList.length}</p>
+                  <p className="text-[10px] text-text3">cibles sélectionnées</p>
                 </div>
               </div>
-              <div className="w-px h-8" style={{ background: 'rgba(255,255,255,0.06)' }} />
+
+              <div className="sf-divider-v h-8" />
+
+              {/* Videos stat */}
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: selectedVideos.length > 0 ? 'rgba(139,92,246,0.15)' : 'rgba(255,255,255,0.04)', border: `1px solid ${selectedVideos.length > 0 ? 'rgba(139,92,246,0.25)' : 'rgba(255,255,255,0.07)'}` }}>
-                  <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x="1" y="3" width="9" height="7" rx="1.5" stroke={selectedVideos.length > 0 ? '#A78BFA' : 'rgba(82,82,91,0.6)'} strokeWidth="1.2"/><path d="M10 5.5L12 4v5L10 7.5V5.5Z" stroke={selectedVideos.length > 0 ? '#A78BFA' : 'rgba(82,82,91,0.6)'} strokeWidth="1.2" strokeLinejoin="round"/></svg>
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center border transition-all"
+                  style={selectedVideos.length > 0
+                    ? { background: 'rgba(124,58,237,0.12)', border: '1px solid rgba(124,58,237,0.25)' }
+                    : { background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                  <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x="1" y="3" width="9" height="7" rx="1.5" stroke={selectedVideos.length > 0 ? '#A78BFA' : 'rgba(82,82,91,0.5)'} strokeWidth="1.2"/><path d="M10 5.5L12 4v5L10 7.5V5.5Z" stroke={selectedVideos.length > 0 ? '#A78BFA' : 'rgba(82,82,91,0.5)'} strokeWidth="1.2" strokeLinejoin="round"/></svg>
                 </div>
                 <div>
-                  <p className="text-[18px] font-black leading-none" style={{ color: selectedVideos.length > 0 ? '#fff' : 'rgba(82,82,91,0.7)' }}>{selectedVideos.length}</p>
-                  <p className="text-[10px]" style={{ color: 'rgba(148,163,184,0.4)' }}>vidéos sélectionnées</p>
+                  <p className="text-lg font-black leading-none" style={{ color: selectedVideos.length > 0 ? '#fff' : 'rgba(82,82,91,0.7)' }}>{selectedVideos.length}</p>
+                  <p className="text-[10px] text-text3">vidéos sélectionnées</p>
                 </div>
               </div>
-              <div className="w-px h-8" style={{ background: 'rgba(255,255,255,0.06)' }} />
+
+              <div className="sf-divider-v h-8 hidden sm:block" />
+
+              {/* Status indicator */}
               <div className="flex items-center gap-2 ml-auto">
-                <div className="w-2 h-2 rounded-full" style={{ background: canLaunch ? '#22C55E' : 'rgba(82,82,91,0.5)' }} />
-                <p className="text-[12px] font-semibold" style={{ color: canLaunch ? '#E2E8F0' : 'rgba(82,82,91,0.6)' }}>
+                <span className="w-2 h-2 rounded-full flex-shrink-0"
+                  style={{ background: canLaunch ? '#22C55E' : 'rgba(82,82,91,0.5)' }} />
+                <p className="text-xs font-semibold" style={{ color: canLaunch ? '#E2E8F0' : 'rgba(82,82,91,0.6)' }}>
                   {posting ? 'Publication en cours…' : canLaunch ? 'Prêt à lancer' : 'Vérifie tes paramètres puis lance la publication'}
                 </p>
               </div>
             </div>
 
-            {/* Log viewer */}
+            {/* ── Log viewer ───────────────────────────────────────────────── */}
             {logs.length > 0 && (
-              <div className="rounded-2xl overflow-hidden" style={{ background: '#0E0E16', border: '1px solid rgba(139,92,246,0.12)' }}>
-                <div className="flex items-center justify-between px-5 pt-3.5 pb-3" style={{ borderBottom: '1px solid rgba(139,92,246,0.08)' }}>
+              <div className="sf-card overflow-hidden">
+                <div className="flex items-center justify-between px-5 pt-3.5 pb-3 border-b border-border">
                   <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: 'rgba(139,92,246,0.15)' }}>
+                    <div className="w-6 h-6 rounded-lg flex items-center justify-center bg-accent/10 border border-accent/15">
                       <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M1 2h9M1 5h6M1 8h7" stroke="#A78BFA" strokeWidth="1.2" strokeLinecap="round"/></svg>
                     </div>
-                    <span className="text-[12px] font-bold text-white">Journal</span>
-                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(139,92,246,0.12)', color: '#7c3aed' }}>{logs.length}</span>
+                    <span className="text-[12px] font-bold text-text">Journal</span>
+                    <span className="sf-badge sf-badge-accent text-[10px]">{logs.length}</span>
                   </div>
                   {!posting && (
                     <button onClick={() => setLogs([])}
-                      className="text-[11px] text-text3 hover:text-white transition-colors flex items-center gap-1">
+                      className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer text-text3 hover:text-text">
                       <svg width="9" height="9" viewBox="0 0 9 9" fill="none"><path d="M1 2h7M3.5 2V1.5h2V2M2.5 2l.5 6h3l.5-6" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round"/></svg>
                       Effacer
                     </button>
                   )}
                 </div>
-                <div className="p-4 max-h-52 overflow-auto" style={{ background: 'rgba(0,0,0,0.4)', scrollbarWidth: 'none' }}>
+                <div className="p-4 max-h-56 overflow-auto bg-black/30" style={{ scrollbarWidth: 'thin' }}>
                   <div className="font-mono text-[11px] space-y-1">
                     {logs.map((l, i) => {
                       // Messages with an embedded screenshot: "text [screenshot]::data:image/..."
@@ -1299,11 +1341,11 @@ export function MassPosting({ user }: MassPostingProps) {
                       return (
                         <div key={i} className="flex flex-col gap-1 leading-relaxed">
                           <div className="flex gap-3">
-                            <span className="flex-shrink-0 tabular-nums" style={{ color: 'rgba(71,85,105,0.8)' }}>{l.time}</span>
+                            <span className="flex-shrink-0 tabular-nums text-text3/50">{l.time}</span>
                             <span className={l.level === 'ok' ? 'text-ok' : l.level === 'error' ? 'text-danger' : l.level === 'warn' ? 'text-warn' : 'text-text2'}>{msgText}</span>
                           </div>
                           {scUrl && (
-                            <img src={scUrl} alt="screenshot" style={{ maxHeight: 180, borderRadius: 6, border: '1px solid rgba(251,191,36,0.3)', marginLeft: 40, objectFit: 'contain' }} />
+                            <img src={scUrl} alt="screenshot" style={{ maxHeight: 180, borderRadius: 6, border: '1px solid rgba(245,158,11,0.3)', marginLeft: 40, objectFit: 'contain' }} />
                           )}
                         </div>
                       )
@@ -1318,46 +1360,35 @@ export function MassPosting({ user }: MassPostingProps) {
         </div>
       </div>
 
-      {/* ── Folder picker modal ───────────────────────────────────────────── */}
+      {/* ── Folder picker modal ───────────────────────────────────────────────── */}
       {showFolderPick && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
-          onClick={() => setShowFolderPick(false)}>
-          <div className="rounded-2xl overflow-hidden w-80 anim-scale-in"
-            onClick={e => e.stopPropagation()}
-            style={{ background: '#0E0E16', border: '1px solid rgba(139,92,246,0.25)', boxShadow: '0 24px 80px -12px rgba(0,0,0,0.8)' }}>
-            <div className="px-5 py-4 flex items-center justify-between"
-              style={{ borderBottom: '1px solid rgba(139,92,246,0.12)' }}>
+        <div className="sf-modal-bg" onClick={() => setShowFolderPick(false)}>
+          <div className="sf-modal w-80 anim-scale-in" onClick={e => e.stopPropagation()}>
+            <div className="sf-modal-header">
               <div className="flex items-center gap-2">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-                <p className="text-[14px] font-bold text-white">Choisir un dossier</p>
+                <p className="sf-modal-title">Choisir un dossier</p>
               </div>
               <button onClick={() => setShowFolderPick(false)}
-                className="w-7 h-7 flex items-center justify-center rounded-lg text-text3 hover:text-white transition-colors"
-                style={{ background: 'rgba(255,255,255,0.05)' }}>
+                className="sf-btn sf-btn-ghost sf-btn-icon sf-btn-sm cursor-pointer">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
             </div>
             {folderLoading ? (
               <div className="py-12 flex items-center justify-center gap-3">
-                <svg className="animate-spin w-4 h-4 text-accent" viewBox="0 0 24 24" fill="none">
-                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="31.4" strokeDashoffset="10"/>
-                </svg>
-                <span className="text-[13px] text-text3">Chargement…</span>
+                <div className="sf-spinner" />
+                <span className="text-sm text-text3">Chargement…</span>
               </div>
             ) : bankFolders.length === 0 ? (
-              <div className="py-12 text-center text-[13px] text-text3">Aucun dossier dans la banque</div>
+              <div className="py-12 text-center text-sm text-text3">Aucun dossier dans la banque</div>
             ) : (
               <div className="max-h-80 overflow-y-auto py-1">
                 {bankFolders.map(f => (
                   <button key={f.name} onClick={() => addFolderVideos(f.name)}
-                    className="w-full flex items-center gap-3 px-5 py-3 text-left transition-all hover:bg-white/[0.04]"
-                    style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                    className="w-full flex items-center gap-3 px-5 py-3 text-left transition-all hover:bg-surface2 cursor-pointer border-b border-border last:border-b-0">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.5"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-                    <span className="flex-1 text-[13px] font-semibold text-white truncate">{f.name}</span>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
-                      style={{ background: 'rgba(139,92,246,0.12)', color: '#a78bfa' }}>
-                      {f.count}
-                    </span>
+                    <span className="flex-1 text-sm font-semibold text-text truncate">{f.name}</span>
+                    <span className="sf-badge sf-badge-accent text-[10px]">{f.count}</span>
                   </button>
                 ))}
               </div>
