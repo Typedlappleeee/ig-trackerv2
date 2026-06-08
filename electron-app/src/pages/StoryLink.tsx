@@ -215,7 +215,11 @@ export default function StoryLink({ user }: { user: User }) {
   if (!conns.loading && !bearer) return (
     <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 40 }}>
       <div style={{ textAlign: 'center', maxWidth: 360 }}>
-        <p style={{ fontSize: 36, marginBottom: 14 }}>🔌</p>
+        <span style={{ display: 'inline-flex', marginBottom: 14, color: 'rgba(167,139,250,0.7)' }} aria-hidden="true">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+            <path d="m19 5 3-3M2 22l3-3"/><path d="M6.3 20.3a2.4 2.4 0 0 0 3.4 0L12 18l-6-6-2.3 2.3a2.4 2.4 0 0 0 0 3.4Z"/><path d="m7.5 13.5 1-1M10.5 16.5l1-1"/><path d="M12 6 18 12l2.3-2.3a2.4 2.4 0 0 0 0-3.4l-2.6-2.6a2.4 2.4 0 0 0-3.4 0Z"/>
+          </svg>
+        </span>
         <h2 style={{ fontSize: 19, fontWeight: 700, color: '#e8e6f0', marginBottom: 8 }}>GéeLark non connecté</h2>
         <p style={{ fontSize: 14, color: 'rgba(148,163,184,0.6)', lineHeight: 1.6 }}>
           Ajoute ta clé GéeLark dans les Réglages pour automatiser des stories.
@@ -378,7 +382,10 @@ export default function StoryLink({ user }: { user: User }) {
           <div style={card}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 13 }}>
               <div>
-                <span style={label}>📸 Pool de photos</span>
+                <span style={{ ...label, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.85" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+                  Pool de photos
+                </span>
                 <p style={{ fontSize: 12, color: 'rgba(148,163,184,0.45)', marginTop: -5 }}>
                   Les images seront distribuées automatiquement entre les téléphones.
                 </p>
@@ -408,8 +415,10 @@ export default function StoryLink({ user }: { user: User }) {
                       <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>
                     </svg>
                     <span style={{ fontSize: 12, color: '#c4b5fd', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ph.name}</span>
-                    <button onClick={() => setPhotoPool(prev => prev.filter((_, j) => j !== i))}
-                      style={{ flexShrink: 0, width: 18, height: 18, borderRadius: 5, background: 'rgba(239,68,68,0.15)', border: 'none', cursor: 'pointer', color: '#f87171', fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}>✕</button>
+                    <button onClick={() => setPhotoPool(prev => prev.filter((_, j) => j !== i))} aria-label="Retirer la photo"
+                      style={{ flexShrink: 0, width: 18, height: 18, borderRadius: 5, background: 'rgba(239,68,68,0.15)', border: 'none', cursor: 'pointer', color: '#f87171', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}>
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                    </button>
                   </div>
                 ))}
                 <button onClick={() => setShowBankPicker(true)}
@@ -424,7 +433,10 @@ export default function StoryLink({ user }: { user: User }) {
           {/* ── Text pool ── */}
           <div style={card}>
             <div style={{ marginBottom: 13 }}>
-              <span style={label}>💬 Pool de textes sticker</span>
+              <span style={{ ...label, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.85" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                Pool de textes sticker
+              </span>
               <p style={{ fontSize: 12, color: 'rgba(148,163,184,0.45)', marginTop: -5 }}>
                 Texte affiché sur le sticker lien. Laisse vide pour ne mettre que l'URL.
               </p>
@@ -435,8 +447,10 @@ export default function StoryLink({ user }: { user: User }) {
                 {textPool.map((txt, i) => (
                   <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '6px 12px', borderRadius: 20, background: 'rgba(34,211,238,0.08)', border: '1px solid rgba(34,211,238,0.2)' }}>
                     <span style={{ fontSize: 12.5, color: '#67e8f9' }}>{txt}</span>
-                    <button onClick={() => setTextPool(prev => prev.filter((_, j) => j !== i))}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(103,232,249,0.5)', fontSize: 11, padding: 0, lineHeight: 1 }}>✕</button>
+                    <button onClick={() => setTextPool(prev => prev.filter((_, j) => j !== i))} aria-label="Retirer le texte"
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(103,232,249,0.5)', padding: 0, lineHeight: 1, display: 'flex', alignItems: 'center' }}>
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                    </button>
                   </div>
                 ))}
               </div>
@@ -465,7 +479,10 @@ export default function StoryLink({ user }: { user: User }) {
           <div style={{ ...card, borderColor: missingLinkIds.length > 0 ? 'rgba(245,158,11,0.25)' : 'rgba(255,255,255,0.07)' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
-                <span style={label}>🔗 Liens — 1 lien par compte</span>
+                <span style={{ ...label, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.85" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                  Liens — 1 lien par compte
+                </span>
                 <p style={{ fontSize: 12, color: 'rgba(148,163,184,0.45)', marginTop: -5 }}>
                   Chaque compte a son propre lien, éditable dans l'aperçu à droite et sauvegardé automatiquement.
                 </p>
@@ -480,19 +497,27 @@ export default function StoryLink({ user }: { user: User }) {
               )}
             </div>
             {missingLinkIds.length > 0 && (
-              <p style={{ fontSize: 12, color: 'rgba(251,191,36,0.85)', marginTop: 10 }}>
-                ⚠️ {missingLinkIds.length} compte{missingLinkIds.length > 1 ? 's' : ''} sans lien — remplis-{missingLinkIds.length > 1 ? 'les' : 'le'} à droite avant de publier.
+              <p style={{ fontSize: 12, color: 'rgba(251,191,36,0.85)', marginTop: 10, display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+                <svg style={{ flexShrink: 0, marginTop: 1 }} width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.85" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+                <span>{missingLinkIds.length} compte{missingLinkIds.length > 1 ? 's' : ''} sans lien — remplis-{missingLinkIds.length > 1 ? 'les' : 'le'} à droite avant de publier.</span>
               </p>
             )}
           </div>
 
           {/* ── Distribution mode ── */}
           <div style={card}>
-            <span style={label}>🔀 Distribution</span>
+            <span style={{ ...label, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.85" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m18 14 4 4-4 4"/><path d="m18 2 4 4-4 4"/><path d="M2 18h1.973a4 4 0 0 0 3.3-1.7l5.454-8.6a4 4 0 0 1 3.3-1.7H22"/><path d="M2 6h1.972a4 4 0 0 1 3.6 2.2"/><path d="M22 18h-6.041a4 4 0 0 1-3.3-1.8l-.359-.45"/></svg>
+              Distribution
+            </span>
             <div style={{ display: 'flex', gap: 8 }}>
               {([
-                { k: 'rotation' as const, icon: '🔁', l: 'Rotation',  desc: 'A, B, C, A, B, C…' },
-                { k: 'random'   as const, icon: '🎲', l: 'Aléatoire', desc: 'mélangé à chaque lancement' },
+                { k: 'rotation' as const, icon: (
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.85" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg>
+                ), l: 'Rotation',  desc: 'A, B, C, A, B, C…' },
+                { k: 'random'   as const, icon: (
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.85" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect width="12" height="12" x="2" y="10" rx="2" ry="2"/><path d="m17.92 14 3.5-3.5a2.24 2.24 0 0 0 0-3l-5-4.92a2.24 2.24 0 0 0-3 0L10 6"/><path d="M6 18h.01"/><path d="M10 14h.01"/><path d="M15 6h.01"/><path d="M18 9h.01"/></svg>
+                ), l: 'Aléatoire', desc: 'mélangé à chaque lancement' },
               ]).map(m => (
                 <button key={m.k} onClick={() => setDistrib(m.k)}
                   style={{
@@ -500,7 +525,7 @@ export default function StoryLink({ user }: { user: User }) {
                     background: distribution === m.k ? 'rgba(139,92,246,0.18)' : 'rgba(255,255,255,0.03)',
                     outline: distribution === m.k ? '1px solid rgba(139,92,246,0.35)' : '1px solid rgba(255,255,255,0.06)',
                   }}>
-                  <div style={{ fontSize: 17, marginBottom: 5 }}>{m.icon}</div>
+                  <div style={{ marginBottom: 5, color: distribution === m.k ? '#c4b5fd' : 'rgba(226,232,240,0.6)' }}>{m.icon}</div>
                   <p style={{ fontSize: 13, fontWeight: 700, color: distribution === m.k ? '#c4b5fd' : 'rgba(226,232,240,0.6)' }}>{m.l}</p>
                   <p style={{ fontSize: 10.5, color: 'rgba(148,163,184,0.4)', marginTop: 2 }}>{m.desc}</p>
                 </button>
@@ -528,7 +553,9 @@ export default function StoryLink({ user }: { user: User }) {
           <div style={{ flex: 1, overflowY: 'auto', padding: '8px 12px' }}>
             {previewAssignments.length === 0 ? (
               <div style={{ padding: '40px 0', textAlign: 'center', color: 'rgba(148,163,184,0.3)', fontSize: 12 }}>
-                <p style={{ fontSize: 28, marginBottom: 10 }}>🎯</p>
+                <span style={{ display: 'inline-flex', marginBottom: 10 }} aria-hidden="true">
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+                </span>
                 <p>Sélectionne des comptes<br/>et ajoute des photos</p>
               </div>
             ) : previewAssignments.map(a => {
@@ -543,9 +570,9 @@ export default function StoryLink({ user }: { user: User }) {
                       {p ? phoneName(p) : a.phoneId.slice(-6)}
                     </span>
                     {hasLog && (
-                      <button onClick={() => setOpenLog(openLog === a.phoneId ? null : a.phoneId)}
-                        style={{ fontSize: 10, color: 'rgba(148,163,184,0.5)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 5px', borderRadius: 4, flexShrink: 0 }}>
-                        {openLog === a.phoneId ? '▲' : '▼'}
+                      <button onClick={() => setOpenLog(openLog === a.phoneId ? null : a.phoneId)} aria-label={openLog === a.phoneId ? 'Masquer les logs' : 'Afficher les logs'}
+                        style={{ color: 'rgba(148,163,184,0.5)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 5px', borderRadius: 4, flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ transform: openLog === a.phoneId ? 'rotate(180deg)' : 'none' }}><path d="m6 9 6 6 6-6"/></svg>
                       </button>
                     )}
                   </div>
@@ -579,7 +606,9 @@ export default function StoryLink({ user }: { user: User }) {
                         onBlur={e => { e.currentTarget.style.borderColor = getLink(a.phoneId).trim() ? 'rgba(34,211,238,0.3)' : 'rgba(245,158,11,0.3)' }}
                       />
                       {getLink(a.phoneId).trim() && (
-                        <span style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', fontSize: 10, pointerEvents: 'none' }} title="Enregistré">💾</span>
+                        <span style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', display: 'inline-flex', color: '#22d3ee' }} title="Enregistré" aria-label="Enregistré">
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.85" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"/><path d="M7 3v4a1 1 0 0 0 1 1h7"/></svg>
+                        </span>
                       )}
                     </div>
                   </div>
@@ -600,8 +629,9 @@ export default function StoryLink({ user }: { user: User }) {
           {running && (
             <div style={{ flexShrink: 0, padding: '10px 14px', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
               <button onClick={() => { abortRef.current = true; setRunning(false) }}
-                style={{ width: '100%', height: 38, borderRadius: 9, fontSize: 13, fontWeight: 700, cursor: 'pointer', background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.28)', color: '#f87171' }}>
-                ⏹ Arrêter
+                style={{ width: '100%', height: 38, borderRadius: 9, fontSize: 13, fontWeight: 700, cursor: 'pointer', background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.28)', color: '#f87171', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>
+                Arrêter
               </button>
             </div>
           )}

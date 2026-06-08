@@ -180,14 +180,16 @@ export function TextCopy({ user, onBack }: { user: User; onBack?: () => void }) 
               <span className="text-[15px] font-bold text-white">Videos ({videos.length})</span>
               <div className="flex gap-2">
                 <button onClick={pickLocal}
-                  className="rounded-xl px-4 py-2 text-[13px] font-semibold"
+                  className="rounded-xl px-4 py-2 text-[13px] font-semibold inline-flex items-center gap-2"
                   style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}>
-                  📁 Local
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M22 12H2M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11zM6 16h.01M10 16h.01"/></svg>
+                  Local
                 </button>
                 <button onClick={() => setShowBankPicker(true)}
-                  className="rounded-xl px-4 py-2 text-[13px] font-semibold"
+                  className="rounded-xl px-4 py-2 text-[13px] font-semibold inline-flex items-center gap-2"
                   style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}>
-                  🏦 Banque
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2 8h20M4 8V6a2 2 0 0 1 2-2h3.93a2 2 0 0 1 1.66.9l.82 1.2a2 2 0 0 0 1.66.9H20a2 2 0 0 1 2 2M2 8v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8M10 12h4"/></svg>
+                  Banque
                 </button>
                 {videos.length > 0 && (
                   <button onClick={() => setVideos([])}
@@ -291,13 +293,17 @@ export function TextCopy({ user, onBack }: { user: User; onBack?: () => void }) 
             <div className="flex gap-3">
               {(['download', 'bank'] as const).map(m => (
                 <button key={m} onClick={() => setExportMode(m)}
-                  className="flex-1 py-3 rounded-xl text-[13px] font-semibold transition-all"
+                  className="flex-1 py-3 rounded-xl text-[13px] font-semibold transition-all inline-flex items-center justify-center gap-2"
                   style={{
                     background: exportMode === m ? 'rgba(139,92,246,0.25)' : 'rgba(255,255,255,0.05)',
                     color: exportMode === m ? '#a78bfa' : 'rgba(255,255,255,0.4)',
                     border: `1px solid ${exportMode === m ? 'rgba(139,92,246,0.4)' : 'rgba(255,255,255,0.07)'}`,
                   }}>
-                  {m === 'download' ? '⬇ Download' : '🏦 Content bank'}
+                  {m === 'download' ? (
+                    <><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg> Download</>
+                  ) : (
+                    <><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2 8h20M4 8V6a2 2 0 0 1 2-2h3.93a2 2 0 0 1 1.66.9l.82 1.2a2 2 0 0 0 1.66.9H20a2 2 0 0 1 2 2M2 8v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8M10 12h4"/></svg> Content bank</>
+                  )}
                 </button>
               ))}
             </div>

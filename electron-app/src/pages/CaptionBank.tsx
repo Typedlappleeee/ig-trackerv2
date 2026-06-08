@@ -116,10 +116,11 @@ function CaptionModal({
                   padding: '5px 12px', borderRadius: 20, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 500,
                   background: folder === f && !showCustom ? 'rgba(139,92,246,0.25)' : 'rgba(255,255,255,0.05)',
                   color: folder === f && !showCustom ? '#c4b5fd' : '#a1a1aa',
-                  transition: 'all 0.12s',
+                  transition: 'all 0.12s', display: 'inline-flex', alignItems: 'center', gap: 6,
                 }}
               >
-                📁 {f}
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 14l1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.55 6a2 2 0 0 1-1.94 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.93a2 2 0 0 1 1.66.9l.82 1.2a2 2 0 0 0 1.66.9H18a2 2 0 0 1 2 2v2"/></svg>
+                {f}
               </button>
             ))}
 
@@ -514,8 +515,8 @@ export function CaptionBank({ user }: CaptionBankProps) {
             <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 60 }}><Spinner size="md" /></div>
           ) : activeFolder !== null && emptyFolders.includes(activeFolder) && filtered.length === 0 ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 14, color: '#52525B' }}>
-              <div style={{ width: 72, height: 72, borderRadius: 18, background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28 }}>
-                📁
+              <div style={{ width: 72, height: 72, borderRadius: 18, background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8B5CF6' }}>
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 14l1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.55 6a2 2 0 0 1-1.94 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.93a2 2 0 0 1 1.66.9l.82 1.2a2 2 0 0 0 1.66.9H18a2 2 0 0 1 2 2v2"/></svg>
               </div>
               <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: '#A1A1AA' }}>Dossier vide</p>
               <p style={{ margin: 0, fontSize: 12, color: '#52525B' }}>Ajoute une caption dans ce dossier</p>
@@ -593,8 +594,9 @@ export function CaptionBank({ user }: CaptionBankProps) {
                       display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap',
                     }}>
                       {item.folder && (
-                        <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 20, background: 'rgba(139,92,246,0.1)', color: '#A78BFA' }}>
-                          📁 {item.folder}
+                        <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 20, background: 'rgba(139,92,246,0.1)', color: '#A78BFA', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 14l1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.55 6a2 2 0 0 1-1.94 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.93a2 2 0 0 1 1.66.9l.82 1.2a2 2 0 0 0 1.66.9H18a2 2 0 0 1 2 2v2"/></svg>
+                          {item.folder}
                         </span>
                       )}
                       {item.tags.slice(0, 2).map(tag => (

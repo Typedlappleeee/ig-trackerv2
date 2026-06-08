@@ -232,14 +232,16 @@ export function MetadataChanger({ user, onBack }: MetadataChangerProps) {
             <p className="text-[15px] font-bold text-white">Vidéo source</p>
             <div className="flex gap-3 flex-wrap">
               <button onClick={() => { setShowBank(true); playWhoosh() }}
-                className="rounded-xl px-5 py-2.5 text-[13px] font-semibold text-white"
+                className="rounded-xl px-5 py-2.5 text-[13px] font-semibold text-white inline-flex items-center gap-2"
                 style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)' }}>
-                🗂 Depuis la banque
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2 8h20M4 8V6a2 2 0 0 1 2-2h3.93a2 2 0 0 1 1.66.9l.82 1.2a2 2 0 0 0 1.66.9H20a2 2 0 0 1 2 2M2 8v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8M10 12h4"/></svg>
+                Depuis la banque
               </button>
               <button onClick={pickFromPC}
-                className="rounded-xl px-5 py-2.5 text-[13px] font-semibold"
+                className="rounded-xl px-5 py-2.5 text-[13px] font-semibold inline-flex items-center gap-2"
                 style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}>
-                💾 Depuis le PC
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M22 12H2M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11zM6 16h.01M10 16h.01"/></svg>
+                Depuis le PC
               </button>
               {videoPath && (
                 <button onClick={() => { setVideoPath(null); setPhase('idle') }}
@@ -331,13 +333,13 @@ export function MetadataChanger({ user, onBack }: MetadataChangerProps) {
               <button onClick={process}
                 className="rounded-xl py-4 flex flex-col items-center gap-2 text-[13px] font-semibold transition-all"
                 style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}>
-                <span className="text-2xl">💾</span>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M22 12H2M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11zM6 16h.01M10 16h.01"/></svg>
                 Sauver sur le PC
               </button>
               <button onClick={processToBank}
                 className="rounded-xl py-4 flex flex-col items-center gap-2 text-[13px] font-semibold text-white transition-all"
                 style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)' }}>
-                <span className="text-2xl">☁</span>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 13v8m-4-4l4 4 4-4M20 16.58A5 5 0 0 0 18 7h-1.26A8 8 0 1 0 4 15.25"/></svg>
                 Traiter et exporter banque
               </button>
             </div>
@@ -379,13 +381,13 @@ export function MetadataChanger({ user, onBack }: MetadataChangerProps) {
                     <button onClick={() => uploadToBank(false)} disabled={uploading}
                       className="flex-1 py-2.5 rounded-xl text-[13px] font-semibold flex items-center justify-center gap-2 disabled:opacity-50 text-white"
                       style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)' }}>
-                      {uploading ? <><Spinner size="sm" /> Upload…</> : '☁ Ajouter à la banque'}
+                      {uploading ? <><Spinner size="sm" /> Upload…</> : <><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 13v8m-4-4l4 4 4-4M20 16.58A5 5 0 0 0 18 7h-1.26A8 8 0 1 0 4 15.25"/></svg> Ajouter à la banque</>}
                     </button>
                     {bankItemId && (
                       <button onClick={() => uploadToBank(true)} disabled={uploading}
                         className="flex-1 py-2.5 rounded-xl text-[13px] font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
                         style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)', color: '#f87171' }}>
-                        {uploading ? <><Spinner size="sm" /> Upload…</> : '🗑 Remplacer dans la banque'}
+                        {uploading ? <><Spinner size="sm" /> Upload…</> : <><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg> Remplacer dans la banque</>}
                       </button>
                     )}
                   </div>
@@ -408,7 +410,9 @@ export function MetadataChanger({ user, onBack }: MetadataChangerProps) {
           {/* Empty state */}
           {phase === 'idle' && (
             <div className="rounded-2xl p-10 text-center" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-              <p className="text-5xl mb-4">🏷</p>
+              <div className="mb-4 flex justify-center" style={{ color: 'rgba(196,181,253,0.55)' }}>
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/></svg>
+              </div>
               <p className="text-base font-bold text-white mb-2">Sélectionne une vidéo</p>
               <p className="text-[13px] text-text2 max-w-sm mx-auto">
                 L'outil lira ses métadonnées actuelles, les supprimera toutes et injectera un nouveau timestamp aléatoire — sans ré-encoder, en une seconde.

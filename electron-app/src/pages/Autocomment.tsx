@@ -321,7 +321,9 @@ export function Autocomment({ user }: AutocommentProps) {
               <div className="flex justify-center py-10"><Spinner /></div>
             ) : visiblePosts.length === 0 ? (
               <div className="px-5 py-10 text-center">
-                <p className="text-3xl mb-3">🎬</p>
+                <div className="mb-3 flex justify-center text-text2">
+                  <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 11V5a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v6m-16 0h16m-16 0v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8M4.5 4.5l2 4M9.5 4l2 4M14.5 4l2 4"/></svg>
+                </div>
                 <p className="text-[13px] text-text2">
                   {selectedPhone ? 'No video' : 'Choose an account above'}
                 </p>
@@ -353,7 +355,9 @@ export function Autocomment({ user }: AutocommentProps) {
           {!selectedPost ? (
             <div className="flex-1 flex items-center justify-center">
               <div className="rounded-2xl p-10 text-center" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                <div className="text-5xl mb-4">✈️</div>
+                <div className="mb-4 flex justify-center" style={{ color: 'rgba(196,181,253,0.55)' }}>
+                  <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></svg>
+                </div>
                 <p className="text-base font-bold text-white">Select a video</p>
                 <p className="text-[13px] text-text2 mt-1">Choose a video from the list to start</p>
               </div>
@@ -361,7 +365,10 @@ export function Autocomment({ user }: AutocommentProps) {
           ) : (
             <>
               <div className="flex-shrink-0 px-6 py-3.5 flex items-center gap-3" style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
-                <h2 className="text-[15px] font-bold text-white">💬 Comments</h2>
+                <h2 className="text-[15px] font-bold text-white flex items-center gap-2">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                  Comments
+                </h2>
                 <span className="text-[13px] text-text2">{comments.length}</span>
                 <button onClick={() => loadComments(selectedPost)} className="ml-auto text-text2 hover:text-white text-[15px] transition-colors">⟳</button>
               </div>
@@ -370,7 +377,9 @@ export function Autocomment({ user }: AutocommentProps) {
                   <div className="flex justify-center py-10"><Spinner /></div>
                 ) : comments.length === 0 ? (
                   <div className="rounded-2xl p-10 text-center" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                    <p className="text-3xl mb-3">💬</p>
+                    <div className="mb-3 flex justify-center text-text2">
+                      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                    </div>
                     <p className="text-[13px] text-text2">No comments loaded.</p>
                   </div>
                 ) : comments.map(c => (
@@ -421,18 +430,24 @@ export function Autocomment({ user }: AutocommentProps) {
               <div className="flex rounded-xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.09)' }}>
                 <button
                   onClick={() => setReplyMode('ai')}
-                  className="px-4 py-2 text-[13px] font-semibold transition-colors"
+                  className="px-4 py-2 text-[13px] font-semibold transition-colors inline-flex items-center gap-2"
                   style={replyMode === 'ai'
                     ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff' }
                     : { background: 'transparent', color: 'rgba(196,181,253,0.5)' }}
-                >🤖 IA Auto</button>
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 8V4H8M4 8h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2zM2 14h2M20 14h2M15 13v2M9 13v2"/></svg>
+                  IA Auto
+                </button>
                 <button
                   onClick={() => setReplyMode('manual')}
-                  className="px-4 py-2 text-[13px] font-semibold transition-colors"
+                  className="px-4 py-2 text-[13px] font-semibold transition-colors inline-flex items-center gap-2"
                   style={replyMode === 'manual'
                     ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff' }
                     : { background: 'transparent', color: 'rgba(196,181,253,0.5)' }}
-                >✍️ Manuel</button>
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
+                  Manuel
+                </button>
               </div>
             </div>
 
@@ -497,7 +512,8 @@ export function Autocomment({ user }: AutocommentProps) {
                       checked={useGeelark}
                       onChange={e => { setUseGeelark(e.target.checked); localStorage.setItem('autocomment-use-geelark', String(e.target.checked)) }}
                     />
-                    📱 Send via GéeLark phone <span className="text-text2">(indétectable, ~15s)</span>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0" aria-hidden="true"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><path d="M12 18h.01"/></svg>
+                    Send via GéeLark phone <span className="text-text2">(indétectable, ~15s)</span>
                   </label>
                 </div>
                 <Button size="sm" variant="secondary" onClick={() => setLogs([])}>🗑 Clear logs</Button>

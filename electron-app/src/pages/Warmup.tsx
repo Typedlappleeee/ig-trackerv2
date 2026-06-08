@@ -26,6 +26,60 @@ interface LoginCred { email: string; password: string; totpSecret: string }
 
 function fileName(p: string) { return p.split(/[\\/]/).pop() ?? p }
 
+// ── Inline Lucide-style icons (no emoji UI icons) ──────────────────────────────
+const svgBase = {
+  fill: 'none', stroke: 'currentColor', strokeWidth: 1.85,
+  strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const,
+}
+function IconBolt({ size = 18 }: { size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" {...svgBase} aria-hidden="true"><path d="M13 2 3 14h9l-1 8 10-12h-9z"/></svg>
+}
+function IconKey({ size = 16 }: { size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" {...svgBase} aria-hidden="true"><path d="m15.5 7.5 2.3 2.3a1 1 0 0 0 1.4 0l2.1-2.1a1 1 0 0 0 0-1.4L19 4"/><path d="m21 2-9.6 9.6"/><circle cx="7.5" cy="15.5" r="5.5"/></svg>
+}
+function IconPencil({ size = 16 }: { size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" {...svgBase} aria-hidden="true"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg>
+}
+function IconFlame({ size = 16 }: { size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" {...svgBase} aria-hidden="true"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>
+}
+function IconSmartphone({ size = 16 }: { size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" {...svgBase} aria-hidden="true"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/></svg>
+}
+function IconAlertTriangle({ size = 14 }: { size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" {...svgBase} aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+}
+function IconHeart({ size = 16 }: { size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" {...svgBase} aria-hidden="true"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>
+}
+function IconClapper({ size = 16 }: { size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" {...svgBase} aria-hidden="true"><path d="M20.2 6 3 11l-.9-2.4c-.3-1.1.3-2.2 1.3-2.5l13.5-4c1.1-.3 2.2.3 2.5 1.3Z"/><path d="m6.2 5.3 3.1 3.9"/><path d="m12.4 3.4 3.1 4"/><path d="M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></svg>
+}
+function IconUserPlus({ size = 16 }: { size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" {...svgBase} aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/></svg>
+}
+function IconSettings({ size = 14 }: { size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" {...svgBase} aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+}
+function IconClose({ size = 13 }: { size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" {...svgBase} strokeWidth={2.2} aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+}
+function IconSparkles({ size = 12 }: { size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" {...svgBase} aria-hidden="true"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/></svg>
+}
+function IconArrowLeft({ size = 18 }: { size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" {...svgBase} aria-hidden="true"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
+}
+function IconFolderOpen({ size = 15 }: { size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" {...svgBase} aria-hidden="true"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/></svg>
+}
+function IconPaperclip({ size = 12 }: { size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" {...svgBase} aria-hidden="true"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+}
+function IconConstruction({ size = 20 }: { size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" {...svgBase} aria-hidden="true"><rect x="2" y="6" width="20" height="8" rx="1"/><path d="M17 14v7"/><path d="M7 14v7"/><path d="M17 3v3"/><path d="M7 3v3"/><path d="M10 14 2.3 6.3"/><path d="m14 6 7.7 7.7"/><path d="m8 6 8 8"/></svg>
+}
+
 export function Warmup({ user }: WarmupProps) {
   const t = useT()
   const { lang } = useLang()
@@ -251,9 +305,9 @@ export function Warmup({ user }: WarmupProps) {
         {/* Header */}
         <div className="flex-shrink-0 px-8 pt-8 pb-6 flex items-center justify-between sf-topbar">
           <div className="flex items-center gap-4">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg"
-              style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.2), rgba(168,85,247,0.1))', border: '1px solid rgba(139,92,246,0.25)' }}>
-              ⚡
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+              style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.2), rgba(168,85,247,0.1))', border: '1px solid rgba(139,92,246,0.25)', color: '#a78bfa' }}>
+              <IconBolt size={18} />
             </div>
             <div>
               <h1 className="text-[22px] font-black text-text leading-none">{t('warmupPageTitle')}</h1>
@@ -264,8 +318,8 @@ export function Warmup({ user }: WarmupProps) {
         <div className="flex-1 overflow-y-auto px-8 pb-10 pt-8">
           <div className="max-w-lg sf-card rounded-2xl p-6 border border-warn/20" style={{ background: 'rgba(245,158,11,0.05)' }}>
             <div className="flex items-center gap-3 mb-3">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center text-sm"
-                style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)' }}>⚠</div>
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center text-warn"
+                style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)' }}><IconAlertTriangle size={15} /></div>
               <p className="text-[14px] font-bold text-warn">{t('warmupMissingToken')}</p>
             </div>
             <p className="text-[13px] text-text2">{t('warmupMissingTokenDesc')}</p>
@@ -275,10 +329,10 @@ export function Warmup({ user }: WarmupProps) {
     )
   }
 
-  const TABS: { id: Tab; label: string; icon: string; color: string }[] = [
-    { id: 'login',    label: 'LOG IN',    icon: '🔑', color: '#8B5CF6' },
-    { id: 'massEdit', label: 'MASS EDIT', icon: '✏️',  color: '#A855F7' },
-    { id: 'warmup',   label: 'WARMUP',    icon: '🔥', color: '#EC4899' },
+  const TABS: { id: Tab; label: string; icon: JSX.Element; color: string }[] = [
+    { id: 'login',    label: 'LOG IN',    icon: <IconKey size={14} />,    color: '#8B5CF6' },
+    { id: 'massEdit', label: 'MASS EDIT', icon: <IconPencil size={14} />, color: '#A855F7' },
+    { id: 'warmup',   label: 'WARMUP',    icon: <IconFlame size={14} />,  color: '#EC4899' },
   ]
 
   const jobShowing = running || (jobs.length > 0 && (doneCount + errorCount) === jobs.length)
@@ -290,9 +344,9 @@ export function Warmup({ user }: WarmupProps) {
       <div className="flex-shrink-0 px-8 pt-8 pb-5 sf-topbar">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg relative overflow-hidden"
-              style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.25), rgba(168,85,247,0.1))', border: '1px solid rgba(139,92,246,0.3)' }}>
-              <span className="relative z-10">⚡</span>
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center relative overflow-hidden"
+              style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.25), rgba(168,85,247,0.1))', border: '1px solid rgba(139,92,246,0.3)', color: '#a78bfa' }}>
+              <span className="relative z-10"><IconBolt size={18} /></span>
               {running && <div className="absolute inset-0 animate-ping rounded-xl opacity-20" style={{ background: 'linear-gradient(135deg, #7c3aed, #ec4899)' }} />}
             </div>
             <div>
@@ -338,7 +392,7 @@ export function Warmup({ user }: WarmupProps) {
               {/* Phone list header */}
               <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
                 <div className="flex items-center gap-2.5">
-                  <span className="text-sm">📱</span>
+                  <span className="text-accent flex items-center"><IconSmartphone size={15} /></span>
                   <p className="text-[14px] font-bold text-text">{t('warmupPhoneList')}</p>
                   {phones.length > 0 && (
                     <span className="sf-badge-violet">{phones.length}</span>
@@ -351,9 +405,10 @@ export function Warmup({ user }: WarmupProps) {
                     {t('warmupSelectAll')}
                   </button>
                   <button onClick={loadPhones}
-                    className="rounded-lg px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider transition-all hover:border-accent/40"
+                    className="rounded-lg px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider transition-all hover:border-accent/40 flex items-center gap-1.5"
                     style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(139,92,246,0.12)', color: '#71717a' }}>
-                    {loadingPhones ? '↻' : '⟳'} Sync
+                    <svg width="12" height="12" viewBox="0 0 24 24" {...svgBase} aria-hidden="true" style={loadingPhones ? { animation: 'spin 0.8s linear infinite' } : undefined}><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+                    Sync
                   </button>
                 </div>
               </div>
@@ -383,14 +438,14 @@ export function Warmup({ user }: WarmupProps) {
 
               {phonesError && (
                 <div className="mx-4 my-3 rounded-lg px-4 py-3 flex items-center gap-2" style={{ background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.18)' }}>
-                  <span className="text-danger text-sm">⚠</span>
+                  <span className="text-danger flex items-center flex-shrink-0"><IconAlertTriangle size={14} /></span>
                   <p className="text-[12px] text-danger font-mono">{phonesError}</p>
                 </div>
               )}
 
               {phones.length === 0 && !loadingPhones && !phonesError && (
                 <div className="py-12 flex flex-col items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl flex items-center justify-center text-xl" style={{ background: 'rgba(139,92,246,0.07)', border: '1px solid rgba(139,92,246,0.12)' }}>📱</div>
+                  <div className="w-12 h-12 rounded-xl flex items-center justify-center text-accent" style={{ background: 'rgba(139,92,246,0.07)', border: '1px solid rgba(139,92,246,0.12)' }}><IconSmartphone size={22} /></div>
                   <p className="text-[13px] text-text3 font-mono">{t('warmupNoPhone')}</p>
                   <p className="text-[11px] text-text3 text-center max-w-xs">{t('warmupNoPhoneDesc')}</p>
                 </div>
@@ -425,7 +480,7 @@ export function Warmup({ user }: WarmupProps) {
                           background: sel ? '#8b5cf6' : 'transparent',
                           width: '18px', height: '18px',
                         }}>
-                        {sel && <span className="text-[9px] text-white font-black leading-none">✓</span>}
+                        {sel && <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>}
                       </div>
 
                       {/* Phone info */}
@@ -476,8 +531,8 @@ export function Warmup({ user }: WarmupProps) {
                     {running && (
                       <div className="relative w-7 h-7 flex-shrink-0">
                         <div className="absolute inset-0 rounded-full animate-ping opacity-25" style={{ background: 'linear-gradient(135deg,#7c3aed,#ec4899)' }} />
-                        <div className="w-7 h-7 rounded-full flex items-center justify-center text-sm"
-                          style={{ background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.35)' }}>⚙</div>
+                        <div className="w-7 h-7 rounded-full flex items-center justify-center text-accent"
+                          style={{ background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.35)' }}><IconSettings size={14} /></div>
                       </div>
                     )}
                     <div>
@@ -525,8 +580,14 @@ export function Warmup({ user }: WarmupProps) {
                         background: job.status === 'done' ? 'rgba(34,197,94,0.04)' : job.status === 'error' ? 'rgba(239,68,68,0.04)' : job.status === 'running' ? 'rgba(139,92,246,0.06)' : 'rgba(255,255,255,0.02)',
                       }}>
                       <div className="px-3.5 py-2.5 flex items-center gap-2.5">
-                        <span className="text-sm flex-shrink-0">
-                          {job.status === 'done' ? '✓' : job.status === 'error' ? '✗' : job.status === 'running' ? '⟳' : '○'}
+                        <span className="flex items-center flex-shrink-0">
+                          {job.status === 'done'
+                            ? <svg width="14" height="14" viewBox="0 0 24 24" {...svgBase} strokeWidth={2.2} aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+                            : job.status === 'error'
+                            ? <svg width="14" height="14" viewBox="0 0 24 24" {...svgBase} strokeWidth={2.2} aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                            : job.status === 'running'
+                            ? <svg width="14" height="14" viewBox="0 0 24 24" {...svgBase} strokeWidth={2.2} aria-hidden="true" style={{ animation: 'spin 0.8s linear infinite' }}><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+                            : <svg width="14" height="14" viewBox="0 0 24 24" {...svgBase} aria-hidden="true"><circle cx="12" cy="12" r="9"/></svg>}
                         </span>
                         <div className="flex-1 min-w-0">
                           <p className="text-[12px] font-bold text-text truncate">{phoneName(job.phone)}</p>
@@ -565,9 +626,9 @@ export function Warmup({ user }: WarmupProps) {
                 {running && (
                   <div className="px-4 pb-4">
                     <button onClick={() => { abortRef.current.abort = true }}
-                      className="w-full py-2.5 rounded-xl text-[12px] font-bold font-mono uppercase tracking-wider transition-all"
+                      className="w-full py-2.5 rounded-xl text-[12px] font-bold font-mono uppercase tracking-wider transition-all flex items-center justify-center gap-1.5"
                       style={{ background: 'rgba(239,68,68,0.06)', color: '#f87171', border: '1px solid rgba(239,68,68,0.18)' }}>
-                      ✕ {t('warmupCancelOp')}
+                      <IconClose size={13} /> {t('warmupCancelOp')}
                     </button>
                   </div>
                 )}
@@ -578,7 +639,7 @@ export function Warmup({ user }: WarmupProps) {
             <div className="sf-card rounded-2xl p-1 flex gap-1">
               {TABS.map(tab => (
                 <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                  className="flex-1 py-2.5 rounded-xl text-[12px] font-bold uppercase tracking-wider transition-all font-mono"
+                  className="flex-1 py-2.5 rounded-xl text-[12px] font-bold uppercase tracking-wider transition-all font-mono flex items-center justify-center gap-1.5"
                   style={activeTab === tab.id
                     ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff', boxShadow: '0 2px 16px -4px rgba(124,58,237,0.5)' }
                     : { color: 'rgba(139,92,246,0.45)', background: 'transparent' }}>
@@ -592,8 +653,8 @@ export function Warmup({ user }: WarmupProps) {
               <div className="space-y-4 anim-slide-up">
                 <div className="sf-card rounded-2xl overflow-hidden">
                   <div className="px-5 py-4 flex items-center gap-3" style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
-                    <div className="w-7 h-7 rounded-lg flex items-center justify-center text-sm"
-                      style={{ background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.2)' }}>🔑</div>
+                    <div className="w-7 h-7 rounded-lg flex items-center justify-center text-accent"
+                      style={{ background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.2)' }}><IconKey size={15} /></div>
                     <div>
                       <p className="text-[13px] font-bold text-text">{t('warmupLoginCredentials')}</p>
                       <p className="text-[11px] text-text3 font-mono">{t('warmupLoginCredsSub')}</p>
@@ -602,7 +663,7 @@ export function Warmup({ user }: WarmupProps) {
 
                   {selectedPhones.length === 0 ? (
                     <div className="py-10 flex flex-col items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg" style={{ background: 'rgba(139,92,246,0.07)', border: '1px solid rgba(139,92,246,0.12)' }}>←</div>
+                      <div className="w-10 h-10 rounded-xl flex items-center justify-center text-accent" style={{ background: 'rgba(139,92,246,0.07)', border: '1px solid rgba(139,92,246,0.12)' }}><IconArrowLeft size={18} /></div>
                       <p className="text-[12px] text-text3 font-mono">{t('warmupSelectPhones')}</p>
                     </div>
                   ) : (
@@ -640,8 +701,8 @@ export function Warmup({ user }: WarmupProps) {
                                 }}
                               />
                               {cred.totpSecret && (
-                                <p className="text-[10px] font-mono px-1" style={{ color: 'rgba(139,92,246,0.7)' }}>
-                                  ✨ {t('warmupTotp2fa')}
+                                <p className="text-[10px] font-mono px-1 flex items-center gap-1" style={{ color: 'rgba(139,92,246,0.7)' }}>
+                                  <IconSparkles size={11} /> {t('warmupTotp2fa')}
                                 </p>
                               )}
                             </div>
@@ -655,7 +716,7 @@ export function Warmup({ user }: WarmupProps) {
                 {/* Warning */}
                 <div className="rounded-xl px-4 py-3 flex items-start gap-2.5"
                   style={{ background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.15)' }}>
-                  <span className="text-warn text-sm flex-shrink-0 mt-0.5">⚠</span>
+                  <span className="text-warn flex-shrink-0 mt-0.5 flex items-center"><IconAlertTriangle size={14} /></span>
                   <p className="text-[11px] font-mono leading-relaxed" style={{ color: 'rgba(245,158,11,0.8)' }}>
                     {t('warmupLoginWarning')}
                   </p>
@@ -668,7 +729,7 @@ export function Warmup({ user }: WarmupProps) {
                   loading={running}
                   onClick={launchLogin}
                 >
-                  🔑 {t('warmupLaunchLogin')} ({selectedPhones.length})
+                  <span className="inline-flex items-center gap-1.5"><IconKey size={14} /> {t('warmupLaunchLogin')} ({selectedPhones.length})</span>
                 </Button>
               </div>
             )}
@@ -681,7 +742,7 @@ export function Warmup({ user }: WarmupProps) {
                   borderRadius: 12, background: 'rgba(239,68,68,0.07)',
                   border: '1px solid rgba(239,68,68,0.22)',
                 }}>
-                  <span style={{ fontSize: 20, flexShrink: 0 }}>🚧</span>
+                  <span style={{ flexShrink: 0, color: '#EF4444', display: 'inline-flex' }}><IconConstruction size={20} /></span>
                   <div>
                     <p style={{ fontSize: 13, fontWeight: 700, color: '#EF4444', margin: 0 }}>Bug rencontré — fonctionnalité indisponible</p>
                     <p style={{ fontSize: 12, color: 'rgba(239,68,68,0.65)', margin: '3px 0 0' }}>Mass Edit est temporairement désactivé en raison d'un bug. Un correctif est en cours.</p>
@@ -689,8 +750,8 @@ export function Warmup({ user }: WarmupProps) {
                 </div>
                 <div className="sf-card rounded-2xl overflow-hidden">
                   <div className="px-5 py-4 flex items-center gap-3" style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
-                    <div className="w-7 h-7 rounded-lg flex items-center justify-center text-sm"
-                      style={{ background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.2)' }}>✏️</div>
+                    <div className="w-7 h-7 rounded-lg flex items-center justify-center"
+                      style={{ background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.2)', color: '#c084fc' }}><IconPencil size={15} /></div>
                     <div>
                       <p className="text-[13px] font-bold text-text">{t('warmupProfileEdits')}</p>
                       <p className="text-[11px] text-text3 font-mono">{t('warmupProfileEditsSub')}</p>
@@ -739,14 +800,15 @@ export function Warmup({ user }: WarmupProps) {
                             const p = await window.electronAPI?.pickAnyFile?.({ filters: [{ name: 'Images', extensions: ['jpg','jpeg','png','webp'] }] })
                             if (p) { setEditPicFile(p); setEditPicUrl('') }
                           }}
-                            className="rounded-lg px-3.5 py-2.5 text-[11px] font-bold font-mono flex-shrink-0 transition-all"
+                            aria-label={t('warmupProfilePic')}
+                            className="rounded-lg px-3.5 py-2.5 text-[11px] font-bold font-mono flex-shrink-0 transition-all flex items-center"
                             style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.18)', color: '#a78bfa' }}>
-                            📂
+                            <IconFolderOpen size={15} />
                           </button>
                         )}
                       </div>
                       {editPicFile && (
-                        <p className="text-[10px] mt-1.5 font-mono" style={{ color: 'rgba(139,92,246,0.7)' }}>📎 {fileName(editPicFile)}</p>
+                        <p className="text-[10px] mt-1.5 font-mono flex items-center gap-1" style={{ color: 'rgba(139,92,246,0.7)' }}><IconPaperclip size={11} /> {fileName(editPicFile)}</p>
                       )}
                       <p className="text-[10px] mt-1.5 text-text3 font-mono">{t('warmupDirectLink')}</p>
                     </div>
@@ -760,7 +822,7 @@ export function Warmup({ user }: WarmupProps) {
                   loading={running}
                   onClick={launchMassEdit}
                 >
-                  ✏️ {t('warmupApplyEdits')} ({selectedPhones.length})
+                  <span className="inline-flex items-center gap-1.5"><IconPencil size={14} /> {t('warmupApplyEdits')} ({selectedPhones.length})</span>
                 </Button>
               </div>
             )}
@@ -773,7 +835,7 @@ export function Warmup({ user }: WarmupProps) {
                   borderRadius: 12, background: 'rgba(239,68,68,0.07)',
                   border: '1px solid rgba(239,68,68,0.22)',
                 }}>
-                  <span style={{ fontSize: 20, flexShrink: 0 }}>🚧</span>
+                  <span style={{ flexShrink: 0, color: '#EF4444', display: 'inline-flex' }}><IconConstruction size={20} /></span>
                   <div>
                     <p style={{ fontSize: 13, fontWeight: 700, color: '#EF4444', margin: 0 }}>{t('warmupBugTitle')}</p>
                     <p style={{ fontSize: 12, color: 'rgba(239,68,68,0.65)', margin: '3px 0 0' }}>{t('warmupBugDesc')}</p>
@@ -781,8 +843,8 @@ export function Warmup({ user }: WarmupProps) {
                 </div>
                 <div className="sf-card rounded-2xl overflow-hidden">
                   <div className="px-5 py-4 flex items-center gap-3" style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
-                    <div className="w-7 h-7 rounded-lg flex items-center justify-center text-sm"
-                      style={{ background: 'rgba(236,72,153,0.12)', border: '1px solid rgba(236,72,153,0.2)' }}>🔥</div>
+                    <div className="w-7 h-7 rounded-lg flex items-center justify-center"
+                      style={{ background: 'rgba(236,72,153,0.12)', border: '1px solid rgba(236,72,153,0.2)', color: '#ec4899' }}><IconFlame size={15} /></div>
                     <div>
                       <p className="text-[13px] font-bold text-text">{t('warmupConfig')}</p>
                       <p className="text-[11px] text-text3 font-mono">{t('warmupConfigSub')}</p>
@@ -811,16 +873,16 @@ export function Warmup({ user }: WarmupProps) {
                       <p className="text-[10px] uppercase tracking-widest font-bold mb-3 text-text3 font-mono">{t('warmupEnabledActions')}</p>
                       <div className="space-y-2.5">
                         {([
-                          { key: 'like',   labelKey: 'warmupLikeLabel',   value: likePosts,       set: setLikePosts,       icon: '❤️' },
-                          { key: 'reels',  labelKey: 'warmupReelsLabel',  value: watchReels,      set: setWatchReels,      icon: '🎬' },
-                          { key: 'follow', labelKey: 'warmupFollowLabel', value: followSuggested, set: setFollowSuggested, icon: '➕' },
+                          { key: 'like',   labelKey: 'warmupLikeLabel',   value: likePosts,       set: setLikePosts,       icon: <IconHeart size={16} /> },
+                          { key: 'reels',  labelKey: 'warmupReelsLabel',  value: watchReels,      set: setWatchReels,      icon: <IconClapper size={16} /> },
+                          { key: 'follow', labelKey: 'warmupFollowLabel', value: followSuggested, set: setFollowSuggested, icon: <IconUserPlus size={16} /> },
                         ] as const).map(({ key, labelKey, value, set, icon }) => {
                           const disabled = browseMinutes === 0
                           return (
                             <div key={key}
                               className={`flex items-center gap-3 p-3 rounded-xl transition-all ${disabled ? 'opacity-35' : ''}`}
                               style={{ background: value && !disabled ? 'rgba(139,92,246,0.06)' : 'rgba(255,255,255,0.02)', border: `1px solid ${value && !disabled ? 'rgba(139,92,246,0.18)' : 'rgba(139,92,246,0.06)'}` }}>
-                              <span className="text-base flex-shrink-0">{icon}</span>
+                              <span className="flex items-center flex-shrink-0" style={{ color: value && !disabled ? '#c4b5fd' : '#71717a' }}>{icon}</span>
                               <span className="text-[12px] font-mono text-text2 flex-1">{t(labelKey)}</span>
                               <div onClick={() => !disabled && set(!value)}
                                 className="relative flex-shrink-0 w-8 h-4 rounded-full cursor-pointer transition-all"
@@ -836,7 +898,7 @@ export function Warmup({ user }: WarmupProps) {
                     {browseMinutes === 0 && (
                       <div className="rounded-lg px-3.5 py-2.5 flex items-center gap-2"
                         style={{ background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.15)' }}>
-                        <span className="text-warn text-sm">⚠</span>
+                        <span className="text-warn flex items-center flex-shrink-0"><IconAlertTriangle size={14} /></span>
                         <p className="text-[11px] font-mono" style={{ color: 'rgba(245,158,11,0.75)' }}>{t('warmupDurationZero')}</p>
                       </div>
                     )}
@@ -867,7 +929,7 @@ export function Warmup({ user }: WarmupProps) {
                   loading={running}
                   onClick={launchWarmup}
                 >
-                  🔥 {t('warmupLaunchBtn')} ({selectedPhones.length})
+                  <span className="inline-flex items-center gap-1.5"><IconFlame size={14} /> {t('warmupLaunchBtn')} ({selectedPhones.length})</span>
                 </Button>
               </div>
             )}

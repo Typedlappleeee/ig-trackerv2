@@ -123,8 +123,11 @@ function VariantCard({ job, index }: { job: VariantJob; index: number }) {
         {isDone && (
           <div style={{ display: 'flex', gap: 4 }}>
             <button onClick={() => job.outputPath && downloadBlob(job.outputPath, `variant_${index + 1}.mp4`)}
-              style={{ flex: 1, padding: '5px 0', borderRadius: 6, fontSize: 9, fontWeight: 700, cursor: 'pointer', border: 'none', background: 'rgba(34,211,238,0.12)', color: '#22d3ee', transition: 'background 0.15s' }}
-            >⬇ Télécharger</button>
+              style={{ flex: 1, padding: '5px 0', borderRadius: 6, fontSize: 9, fontWeight: 700, cursor: 'pointer', border: 'none', background: 'rgba(34,211,238,0.12)', color: '#22d3ee', transition: 'background 0.15s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}
+            >
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+              Télécharger
+            </button>
             {job.uploading && <span style={{ fontSize: 9, color: 'rgba(148,163,184,0.4)', display: 'flex', alignItems: 'center', paddingRight: 2 }}>☁…</span>}
             {job.uploadError && <span title={job.uploadError} style={{ fontSize: 9, color: '#f87171', cursor: 'help', display: 'flex', alignItems: 'center' }}>⚠</span>}
           </div>
@@ -428,7 +431,9 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
             >
               <input ref={fileInputRef} type="file" accept="video/*" multiple style={{ display: 'none' }}
                 onChange={e => { if (e.target.files) addFiles(e.target.files); e.target.value = '' }} />
-              <div style={{ fontSize: 20, marginBottom: 4, opacity: sources.length ? 1 : 0.4 }}>📁</div>
+              <div style={{ marginBottom: 4, opacity: sources.length ? 1 : 0.4, color: sources.length ? '#22d3ee' : 'rgba(226,232,240,0.6)', display: 'flex', justifyContent: 'center' }}>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 14l1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.55 6a2 2 0 0 1-1.94 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.93a2 2 0 0 1 1.66.9l.82 1.2a2 2 0 0 0 1.66.9H18a2 2 0 0 1 2 2v2"/></svg>
+              </div>
               <div style={{ fontSize: 11, fontWeight: 600, color: sources.length ? '#22d3ee' : 'rgba(226,232,240,0.6)', marginBottom: 2 }}>
                 {sources.length ? `${sources.length} vidéo${sources.length > 1 ? 's' : ''} sélectionnée${sources.length > 1 ? 's' : ''}` : t('repurposeDropVideo')}
               </div>
@@ -442,7 +447,7 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
               <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 3 }}>
                 {sources.map((src, i) => (
                   <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 8px', borderRadius: 7, background: 'rgba(34,211,238,0.04)', border: '1px solid rgba(34,211,238,0.1)' }}>
-                    <span style={{ fontSize: 10 }}>🎬</span>
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="rgba(34,211,238,0.7)" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }} aria-hidden="true"><path d="M4 11V5a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v6m-16 0h16m-16 0v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8M4.5 4.5l2 4M9.5 4l2 4M14.5 4l2 4"/></svg>
                     <span style={{ flex: 1, fontSize: 10, color: 'rgba(226,232,240,0.65)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {src.name.slice(0, 22)}{src.name.length > 22 ? '…' : ''}
                     </span>
@@ -466,7 +471,8 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
               onMouseEnter={e => { e.currentTarget.style.background = 'rgba(129,140,248,0.12)'; e.currentTarget.style.color = '#a78bfa' }}
               onMouseLeave={e => { e.currentTarget.style.background = 'rgba(129,140,248,0.06)'; e.currentTarget.style.color = 'rgba(167,139,250,0.7)' }}
             >
-              🗂 {t('repurposeFromBank')}
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2 8h20M4 8V6a2 2 0 0 1 2-2h3.93a2 2 0 0 1 1.66.9l.82 1.2a2 2 0 0 0 1.66.9H20a2 2 0 0 1 2 2M2 8v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8M10 12h4"/></svg>
+              {t('repurposeFromBank')}
             </button>
           </div>
 
@@ -547,7 +553,10 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
           {/* Export banque */}
           <div style={{ borderRadius: 9, padding: '9px 11px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: (isWeb || saveToBank) ? 9 : 0 }}>
-              <span style={{ fontSize: 11, flex: 1, color: 'rgba(226,232,240,0.65)', fontWeight: 500 }}>☁ {isWeb ? t('repurposeAutoExport') : t('repurposeSaveToBank')}</span>
+              <span style={{ fontSize: 11, flex: 1, color: 'rgba(226,232,240,0.65)', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }} aria-hidden="true"><path d="M12 13v8m-4-4l4 4 4-4M20 16.58A5 5 0 0 0 18 7h-1.26A8 8 0 1 0 4 15.25"/></svg>
+                {isWeb ? t('repurposeAutoExport') : t('repurposeSaveToBank')}
+              </span>
               {!isWeb && (
                 <button onClick={() => setSaveToBank(v => !v)} disabled={running}
                   className="relative w-9 h-5 rounded-full transition-colors flex-shrink-0"
@@ -631,7 +640,7 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
                   <div key={si}>
                     {sources.length > 1 && (
                       <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(148,163,184,0.5)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span style={{ fontSize: 10 }}>🎬</span>
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }} aria-hidden="true"><path d="M4 11V5a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v6m-16 0h16m-16 0v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8M4.5 4.5l2 4M9.5 4l2 4M14.5 4l2 4"/></svg>
                         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{src.name}</span>
                         <span style={{ fontSize: 10, color: 'rgba(34,211,238,0.4)', flexShrink: 0 }}>
                           {srcJobs.filter(j => j.status === 'done').length}/{srcJobs.length}

@@ -433,8 +433,13 @@ export function AdsPower({ user }: AdsPowerProps) {
               />
               <button
                 onClick={() => setShowKey(v => !v)}
-                style={{ position: 'absolute', right: 8, background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(148,163,184,0.4)', fontSize: 13, padding: 0 }}>
-                {showKey ? '🙈' : '👁'}
+                aria-label={showKey ? 'Hide API key' : 'Show API key'}
+                style={{ position: 'absolute', right: 8, background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(148,163,184,0.4)', fontSize: 13, padding: 0, display: 'flex', alignItems: 'center' }}>
+                {showKey ? (
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68M6.61 6.61A13.5 13.5 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61M14.12 14.12A3 3 0 1 1 9.88 9.88M1 1l22 22"/></svg>
+                ) : (
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+                )}
               </button>
             </div>
             <p style={{ fontSize: 10, color: 'rgba(148,163,184,0.25)', margin: '4px 0 0' }}>
@@ -475,7 +480,9 @@ export function AdsPower({ user }: AdsPowerProps) {
         <div style={{ flex: 1, overflowY: 'auto', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
           {profiles.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '40px 16px', color: 'rgba(148,163,184,0.35)' }}>
-              <p style={{ fontSize: 28, margin: '0 0 10px' }}>📘</p>
+              <div style={{ margin: '0 0 10px', display: 'flex', justifyContent: 'center' }}>
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
+              </div>
               <p style={{ fontSize: 12, margin: '0 0 14px', lineHeight: 1.6 }}>
                 {t('adspowerNoProfiles')}
               </p>
@@ -531,7 +538,9 @@ export function AdsPower({ user }: AdsPowerProps) {
               <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(148,163,184,0.4)', margin: '0 0 10px' }}>{t('adspowerVideo')}</p>
               {video ? (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div style={{ width: 48, height: 48, borderRadius: 8, background: 'rgba(124,58,237,0.15)', border: '1px solid rgba(124,58,237,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>🎬</div>
+                  <div style={{ width: 48, height: 48, borderRadius: 8, background: 'rgba(124,58,237,0.15)', border: '1px solid rgba(124,58,237,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#a78bfa' }}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 11V5a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v6m-16 0h16m-16 0v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8M4.5 4.5l2 4M9.5 4l2 4M14.5 4l2 4"/></svg>
+                  </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <p style={{ fontSize: 12, fontWeight: 600, color: '#F2F0FF', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{video.title}</p>
                     <button onClick={() => setVideo(null)} style={{ fontSize: 11, color: 'rgba(248,113,113,0.6)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginTop: 4 }}>{t('adspowerRemoveVideo')}</button>
@@ -594,7 +603,9 @@ export function AdsPower({ user }: AdsPowerProps) {
             <div style={{ flex: 1, overflowY: 'auto', padding: '12px 18px', display: 'flex', flexDirection: 'column', gap: 4, fontFamily: 'monospace' }}>
               {logs.length === 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'rgba(148,163,184,0.25)' }}>
-                  <p style={{ fontSize: 24, margin: '0 0 8px' }}>📋</p>
+                  <div style={{ margin: '0 0 8px', display: 'flex' }}>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
+                  </div>
                   <p style={{ fontSize: 12, margin: 0 }}>{t('adspowerLogsEmpty')}</p>
                 </div>
               ) : (
