@@ -1214,44 +1214,54 @@ export function Community({ user, onNavigate }: CommunityProps) {
   const [g1, g2] = gradientForId(user.id)
 
   return (
-    <div className="h-full flex flex-col overflow-hidden" style={{ background: '#06040f' }}>
+    <div className="h-full flex flex-col overflow-hidden anim-page" style={{ background: '#06040f' }}>
 
       {/* ── Header ───────────────────────────────────────────────────────────── */}
-      <div className="flex-shrink-0 flex items-center justify-between px-6 py-4"
-        style={{ borderBottom: '1px solid rgba(139,92,246,0.12)', background: 'rgba(8,5,20,0.95)', backdropFilter: 'blur(12px)' }}>
-        <div className="flex items-center gap-3">
-          <div style={{
-            width: 40, height: 40, borderRadius: 11, flexShrink: 0,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'linear-gradient(135deg, rgba(139,92,246,0.22), rgba(236,72,153,0.1))',
-            border: '1px solid rgba(139,92,246,0.28)', color: '#a78bfa',
-          }}>
-            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-            </svg>
+      <div className="flex-shrink-0 flex items-center justify-between px-6 py-3.5 sf-topbar">
+        <div className="flex items-center gap-3.5">
+          <div className="relative flex-shrink-0" style={{ width: 42, height: 42 }}>
+            <div style={{
+              width: 42, height: 42, borderRadius: 13, flexShrink: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'linear-gradient(135deg, rgba(34,211,238,0.18), rgba(139,92,246,0.22))',
+              border: '1px solid rgba(34,211,238,0.28)', color: '#22d3ee',
+              boxShadow: '0 0 18px rgba(34,211,238,0.18), inset 0 1px 0 rgba(255,255,255,0.08)',
+            }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+              </svg>
+            </div>
           </div>
           <div>
-            <h1 className="text-[22px] font-black leading-tight" style={{
-              background: 'linear-gradient(135deg,#FFFFFF 0%,rgba(196,181,253,0.85) 100%)',
-              WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-            }}>{t('communityTitle')}</h1>
-            <p className="text-[11px] mt-0.5" style={{ color: 'rgba(196,181,253,0.4)' }}>
+            <div className="flex items-center gap-2.5">
+              <h1 className="text-[20px] font-black leading-tight tracking-tight" style={{
+                background: 'linear-gradient(135deg,#FFFFFF 0%,rgba(34,211,238,0.9) 55%,rgba(139,92,246,0.85) 100%)',
+                WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+              }}>{t('communityTitle')}</h1>
+              {uniqueUserCount > 0 && (
+                <span className="sf-badge sf-badge-accent flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-current opacity-80" />
+                  {uniqueUserCount}
+                </span>
+              )}
+            </div>
+            <p className="text-[11px] mt-0.5 text-text3">
               {t('communitySub')}
             </p>
           </div>
         </div>
         <button onClick={() => setShowProfile(true)}
-          className="flex items-center gap-2.5 pl-2.5 pr-3 py-2 rounded-xl transition-all hover:bg-white/[0.04] group"
-          style={{ border: '1px solid rgba(139,92,246,0.12)' }}>
+          className="sf-btn sf-btn-ghost flex items-center gap-2.5 cursor-pointer"
+          style={{ height: 'auto', padding: '7px 12px 7px 8px' }}>
           <Avatar url={profile.avatar_url} name={profile.display_name || '?'} userId={user.id} size={28} />
           <div className="text-left">
             <p className="text-[11.5px] font-semibold leading-tight"
               style={{ color: profile.display_name ? 'white' : 'rgba(196,181,253,0.4)' }}>
               {profile.display_name || t('communitySetPseudo')}
             </p>
-            {currentOrg && <p className="text-[9.5px] leading-tight" style={{ color: 'rgba(139,92,246,0.7)' }}>{currentOrg.name}</p>}
+            {currentOrg && <p className="text-[9.5px] leading-tight text-accent opacity-70">{currentOrg.name}</p>}
           </div>
-          <span className="opacity-0 group-hover:opacity-50 transition-opacity ml-1 flex items-center" style={{ color: '#a78bfa' }} aria-hidden="true">
+          <span className="ml-1 flex items-center opacity-40" style={{ color: '#a78bfa' }} aria-hidden="true">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4z"/>
             </svg>
@@ -1261,13 +1271,13 @@ export function Community({ user, onNavigate }: CommunityProps) {
 
       {/* ── Muted banner ─────────────────────────────────────────────────────── */}
       {isMuted && (
-        <div className="flex-shrink-0 mx-5 mt-3 px-4 py-2 rounded-xl flex items-center gap-2"
-          style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)' }}>
-          <span className="flex items-center" style={{ color: 'rgba(251,191,36,0.8)' }} aria-hidden="true">
+        <div className="flex-shrink-0 mx-5 mt-3 px-4 py-2.5 rounded-xl flex items-center gap-2.5"
+          style={{ background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.22)', boxShadow: '0 0 0 1px rgba(245,158,11,0.06)' }}>
+          <span className="flex items-center flex-shrink-0 text-warn" aria-hidden="true">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
           </span>
-          <p className="text-[11px]" style={{ color: 'rgba(251,191,36,0.8)' }}>
-            {t('communityMutedBanner')} <strong>
+          <p className="text-[11.5px] text-warn">
+            {t('communityMutedBanner')} <strong className="font-bold">
               {new Date(mutedUntil!).toLocaleDateString('en-US', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}
             </strong>
           </p>

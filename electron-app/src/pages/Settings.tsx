@@ -41,16 +41,16 @@ function ToggleRow({
   accent?: boolean
 }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }} onClick={() => onChange(!checked)}>
+    <div className="flex items-center gap-3 cursor-pointer select-none" onClick={() => onChange(!checked)}>
       <div
-        className={`sf-toggle-track ${checked ? 'on' : 'off'}`}
+        className={`sf-toggle-track ${checked ? 'on' : 'off'} flex-shrink-0`}
         onClick={e => { e.stopPropagation(); onChange(!checked) }}
       >
         <span className="sf-toggle-thumb" />
       </div>
-      <div style={{ flex: 1, userSelect: 'none' }}>
-        <p style={{ fontSize: 13, fontWeight: 500, color: checked ? '#F2F0FF' : 'rgba(196,181,253,0.72)', margin: 0, transition: 'color 140ms ease' }}>{title}</p>
-        <p style={{ fontSize: 12, color: 'rgba(148,163,184,0.5)', marginTop: 2, marginBottom: 0 }}>{sub}</p>
+      <div className="flex-1">
+        <p className={`text-[13px] font-medium m-0 transition-colors duration-150 ${checked ? 'text-text' : 'text-text2'}`}>{title}</p>
+        <p className="text-[12px] text-text3 mt-0.5 mb-0">{sub}</p>
       </div>
     </div>
   )
@@ -455,27 +455,27 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
   }
 
   // ── Shared helpers ─────────────────────────────────────────────────────────
-  const card = 'rounded-2xl p-5 space-y-4'
-  const cardStyle = { background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }
-  const sectionTitle = 'text-[15px] font-bold text-white'
-  const sectionSub   = 'text-[12px] mt-0.5 mb-4'
+  const card = 'sf-card'
+  const cardStyle = {}
+  const sectionTitle = 'text-[11px] font-semibold uppercase tracking-widest text-text3'
+  const sectionSub   = 'text-[12px] mt-1 mb-4 text-text3'
 
   function SelectRow({ label, sub, value, onChange, options, first }: {
     label: string; sub: string; value: string; first?: boolean
     onChange: (v: string) => void; options: { value: string; label: string }[]
   }) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderTop: first ? 'none' : '1px solid rgba(255,255,255,0.04)' }}>
+      <div className={`flex items-center justify-between py-3 ${first ? '' : 'border-t border-border'}`}>
         <div>
-          <p style={{ fontSize: 13, fontWeight: 500, color: '#F2F0FF', margin: 0 }}>{label}</p>
-          <p style={{ fontSize: 12, color: 'rgba(148,163,184,0.5)', marginTop: 2, marginBottom: 0 }}>{sub}</p>
+          <p className="text-[13px] font-medium text-text m-0">{label}</p>
+          <p className="text-[12px] text-text3 mt-0.5 mb-0">{sub}</p>
         </div>
-        <div style={{ position: 'relative', flexShrink: 0 }}>
-          <select value={value} onChange={e => onChange(e.target.value)} className="sf-input"
-            style={{ appearance: 'none', padding: '7px 28px 7px 10px', fontSize: 12, fontWeight: 500, cursor: 'pointer', minWidth: 130 }}>
+        <div className="relative flex-shrink-0">
+          <select value={value} onChange={e => onChange(e.target.value)} className="sf-input cursor-pointer"
+            style={{ appearance: 'none', padding: '7px 28px 7px 10px', fontSize: 12, fontWeight: 500, minWidth: 130 }}>
             {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
-          <span style={{ position: 'absolute', right: 9, top: '50%', transform: 'translateY(-50%)', fontSize: 9, color: 'rgba(148,163,184,0.4)', pointerEvents: 'none' }}>▼</span>
+          <span className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-text3" style={{ fontSize: 9 }}>▼</span>
         </div>
       </div>
     )
@@ -485,14 +485,15 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
     label: string; sub: string; checked: boolean; onChange: (v: boolean) => void; first?: boolean
   }) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderTop: first ? 'none' : '1px solid rgba(255,255,255,0.04)' }}>
-        <div style={{ flex: 1, paddingRight: 16 }}>
-          <p style={{ fontSize: 13, fontWeight: 500, color: '#F2F0FF', margin: 0 }}>{label}</p>
-          <p style={{ fontSize: 12, color: 'rgba(148,163,184,0.5)', marginTop: 2, marginBottom: 0 }}>{sub}</p>
+      <div className={`flex items-center justify-between py-3 cursor-pointer ${first ? '' : 'border-t border-border'}`}
+        onClick={() => onChange(!checked)}>
+        <div className="flex-1 pr-4">
+          <p className="text-[13px] font-medium text-text m-0">{label}</p>
+          <p className="text-[12px] text-text3 mt-0.5 mb-0">{sub}</p>
         </div>
         <div
-          className={`sf-toggle-track ${checked ? 'on' : 'off'}`}
-          onClick={() => onChange(!checked)}
+          className={`sf-toggle-track ${checked ? 'on' : 'off'} flex-shrink-0`}
+          onClick={e => { e.stopPropagation(); onChange(!checked) }}
         >
           <span className="sf-toggle-thumb" />
         </div>
@@ -518,15 +519,16 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
   }
 
   const cardSt = {
-    background: S.surface,
-    border: `1px solid ${S.border}`,
-    borderRadius: 15,
-    padding: '20px 24px',
+    background: 'var(--color-surface, rgba(255,255,255,0.03))',
+    border: '1px solid var(--color-border, rgba(255,255,255,0.07))',
+    borderRadius: 14,
+    padding: '20px 22px',
     marginBottom: 0,
   }
 
   const cardTitleSt: CSSProperties = {
-    fontSize: 13, fontWeight: 700, color: S.text, marginBottom: 4, marginTop: 0,
+    fontSize: 11, fontWeight: 600, color: S.text3, marginBottom: 4, marginTop: 0,
+    textTransform: 'uppercase' as const, letterSpacing: '0.08em',
   }
 
   const cardSubSt: CSSProperties = {
@@ -544,19 +546,26 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
   ]
 
   if (loading) return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: S.base }}>
-      <div style={{ padding: '32px 40px 28px', borderBottom: `1px solid ${S.border}` }}>
-        <h1 style={{ fontSize: 26, fontWeight: 900, color: S.text, margin: 0, lineHeight: 1 }}>{t('settingsTitle')}</h1>
+    <div className="flex flex-col h-full bg-bg anim-page">
+      <div className="px-8 py-5 border-b border-border flex items-center gap-3" style={{ background: 'linear-gradient(90deg,rgba(139,92,246,0.05) 0%,transparent 60%)' }}>
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'linear-gradient(135deg,rgba(139,92,246,0.22),rgba(139,92,246,0.06))', border: '1px solid rgba(139,92,246,0.28)' }}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+        </div>
+        <h1 className="text-[22px] font-black text-text m-0" style={{ letterSpacing: '-0.02em' }}>{t('settingsTitle')}</h1>
       </div>
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <p style={{ fontSize: 13, color: S.text3 }}>{t('settingsLoading')}</p>
+      <div className="flex-1 flex items-center justify-center gap-3">
+        <span className="sf-spinner" />
+        <p className="text-[13px] text-text3 m-0">{t('settingsLoading')}</p>
       </div>
     </div>
   )
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: S.base }}>
+    <div className="anim-page" style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: S.base }}>
 
       {/* Header */}
       <div style={{
