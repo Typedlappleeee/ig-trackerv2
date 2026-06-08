@@ -8,13 +8,21 @@ import { Footer } from './components/Footer'
 
 export default function App() {
   return (
-    <div className="relative min-h-screen overflow-x-hidden">
-      {/* Background radial glows */}
-      <div className="pointer-events-none fixed inset-0 -z-10">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[900px] h-[900px] rounded-full opacity-30 blur-[120px] animate-glow"
-             style={{ background: 'radial-gradient(closest-side, #7c3aed, transparent)' }} />
-        <div className="absolute bottom-0 right-0 w-[600px] h-[600px] rounded-full opacity-20 blur-[120px] animate-glow"
-             style={{ background: 'radial-gradient(closest-side, #ec4899, transparent)' }} />
+    <div id="top" className="relative min-h-screen overflow-x-hidden bg-bg">
+      {/* Aurora background: large blurred radial blobs, fixed behind content */}
+      <div className="pointer-events-none fixed inset-0 -z-10" aria-hidden="true">
+        <div
+          className="absolute -top-40 left-1/2 h-[780px] w-[780px] -translate-x-1/2 rounded-full blur-[140px] animate-float-slow"
+          style={{ background: 'radial-gradient(closest-side, rgba(124,58,237,0.14), transparent)' }}
+        />
+        <div
+          className="absolute top-[20%] -left-32 h-[560px] w-[560px] rounded-full blur-[140px]"
+          style={{ background: 'radial-gradient(closest-side, rgba(34,211,238,0.10), transparent)' }}
+        />
+        <div
+          className="absolute bottom-[5%] -right-24 h-[620px] w-[620px] rounded-full blur-[140px]"
+          style={{ background: 'radial-gradient(closest-side, rgba(79,70,229,0.10), transparent)' }}
+        />
       </div>
 
       <Nav />

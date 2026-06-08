@@ -45,9 +45,10 @@ export function Button({
       disabled={disabled || loading}
       className={`
         inline-flex items-center justify-center gap-2
-        font-semibold border
+        font-semibold border cursor-pointer
         transition-all duration-150 ease-out
         active:scale-[0.97]
+        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-bg
         disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100
         ${variants[variant]}
         ${sizes[size]}

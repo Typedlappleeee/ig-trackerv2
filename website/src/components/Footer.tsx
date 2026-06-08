@@ -1,46 +1,74 @@
 import { Logo } from './Logo'
+import { IconTelegram } from './Icons'
+
+const COLUMNS = [
+  {
+    title: 'Produit',
+    links: [
+      { label: 'Fonctionnalités', href: '#features' },
+      { label: 'Tarifs', href: '#pricing' },
+      { label: 'FAQ', href: '#faq' },
+      { label: "Ouvrir l'app", href: 'https://scaleflow-fvtu.vercel.app/' },
+    ],
+  },
+  {
+    title: 'Légal',
+    links: [
+      { label: 'CGU', href: '#' },
+      { label: 'Confidentialité', href: '#' },
+      { label: 'Mentions légales', href: '#' },
+    ],
+  },
+]
 
 export function Footer() {
   return (
-    <footer className="border-t border-border/40 py-12 px-6 mt-12">
-      <div className="max-w-6xl mx-auto">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-10">
+    <footer className="relative mt-12 border-t border-border px-5 py-14">
+      <div className="mx-auto max-w-6xl">
+        <div className="grid grid-cols-2 gap-8 md:grid-cols-4">
           <div className="col-span-2">
             <Logo />
-            <p className="text-text2 text-sm mt-4 max-w-xs leading-relaxed">
-              L'app tout-en-un pour scaler ton Instagram à des dizaines, des centaines de comptes.
+            <p className="mt-4 max-w-xs text-sm leading-relaxed text-text2">
+              Le poste de pilotage premium pour faire grandir ton Instagram à des dizaines, des
+              centaines de comptes.
             </p>
-            <div className="flex gap-3 mt-4">
-              <a href="https://t.me/justquentin" target="_blank" rel="noreferrer"
-                 className="w-9 h-9 rounded-lg flex items-center justify-center glass hover:bg-white/10 transition-colors">
-                <span className="text-sm">✈</span>
+            <div className="mt-5 flex gap-3">
+              <a
+                href="https://t.me/justquentin"
+                target="_blank"
+                rel="noreferrer"
+                aria-label="ScaleFlow sur Telegram"
+                className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg text-text2 transition-colors duration-200 glass hover:text-text"
+              >
+                <IconTelegram />
               </a>
             </div>
           </div>
 
-          <div>
-            <div className="text-xs font-bold text-white uppercase tracking-wider mb-3">Produit</div>
-            <ul className="space-y-2 text-sm text-text2">
-              <li><a href="#features" className="hover:text-white transition-colors">Fonctionnalités</a></li>
-              <li><a href="#pricing"  className="hover:text-white transition-colors">Tarifs</a></li>
-              <li><a href="#faq"      className="hover:text-white transition-colors">FAQ</a></li>
-              <li><a href="https://scaleflow-fvtu.vercel.app/" className="hover:text-white transition-colors">Ouvrir l'app</a></li>
-            </ul>
-          </div>
-
-          <div>
-            <div className="text-xs font-bold text-white uppercase tracking-wider mb-3">Légal</div>
-            <ul className="space-y-2 text-sm text-text2">
-              <li><a href="#" className="hover:text-white transition-colors">CGU</a></li>
-              <li><a href="#" className="hover:text-white transition-colors">Confidentialité</a></li>
-              <li><a href="#" className="hover:text-white transition-colors">Mentions légales</a></li>
-            </ul>
-          </div>
+          {COLUMNS.map((col) => (
+            <div key={col.title}>
+              <div className="mb-3 text-xs font-bold uppercase tracking-[0.14em] text-text">
+                {col.title}
+              </div>
+              <ul className="space-y-2.5 text-sm text-text2">
+                {col.links.map((l) => (
+                  <li key={l.label}>
+                    <a
+                      href={l.href}
+                      className="cursor-pointer transition-colors duration-200 hover:text-text"
+                    >
+                      {l.label}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </div>
 
-        <div className="pt-8 border-t border-border/30 flex flex-wrap items-center justify-between gap-3 text-xs text-muted">
+        <div className="mt-12 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-8 text-xs text-muted">
           <span>© {new Date().getFullYear()} ScaleFlow — Tous droits réservés</span>
-          <span>Made with ⚡ in France</span>
+          <span>Conçu en France</span>
         </div>
       </div>
     </footer>

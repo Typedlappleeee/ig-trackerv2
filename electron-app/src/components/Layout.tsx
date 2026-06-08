@@ -1410,20 +1410,22 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
           display: 'flex', alignItems: 'stretch',
         }}>
           {([
-            { id: 'remix',    icon: '🔀', label: 'Remix'    },
-            { id: 'bank',     icon: '🗂',  label: 'Bank'     },
-            { id: 'phones',   icon: '📱', label: 'Phones'   },
-            { id: 'scheduler',icon: '📅', label: 'Planif.'  },
-            { id: 'settings', icon: '⚙️',  label: 'Config'   },
-          ] as Array<{ id: Page; icon: string; label: string }>).map(item => {
+            { id: 'remix',    iconKey: 'refresh',  label: 'Remix'    },
+            { id: 'bank',     iconKey: 'video',    label: 'Bank'     },
+            { id: 'phones',   iconKey: 'phone',    label: 'Phones'   },
+            { id: 'scheduler',iconKey: 'calendar', label: 'Planif.'  },
+            { id: 'settings', iconKey: 'settings', label: 'Config'   },
+          ] as Array<{ id: Page; iconKey: IconKey; label: string }>).map(item => {
             const active = page === item.id
             return (
               <button
                 key={item.id}
                 onClick={() => { playNav(); onNavigate(item.id) }}
+                aria-label={item.label}
+                aria-current={active ? 'page' : undefined}
                 style={{
                   flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                  gap: 2, border: 'none', background: 'transparent', cursor: 'pointer',
+                  gap: 3, border: 'none', background: 'transparent', cursor: 'pointer',
                   color: active ? '#A78BFA' : 'rgba(148,163,184,0.45)',
                   position: 'relative',
                   transition: 'color 0.15s',
@@ -1436,7 +1438,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
                     borderRadius: '0 0 2px 2px',
                   }} />
                 )}
-                <span style={{ fontSize: 20, lineHeight: 1 }}>{item.icon}</span>
+                <NavIcon d={ICONS[item.iconKey]} size={19} />
                 <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.03em' }}>{item.label}</span>
               </button>
             )

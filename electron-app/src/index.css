@@ -659,13 +659,23 @@ button, a, input, select, textarea {
    Settings — data-attribute driven CSS overrides
    ══════════════════════════════════════════════════════════════════════════════ */
 
-/* Animations off */
+/* Animations off (manual setting) */
 html.no-animations *,
 html.no-animations *::before,
 html.no-animations *::after {
   transition: none !important;
   animation-duration: 0.001ms !important;
   animation-iteration-count: 1 !important;
+}
+
+/* Accessibility: respect the OS "reduce motion" preference (UI/UX Pro Max rule) */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* Font size: zoom on body (Electron/Chromium supporte zoom) */
