@@ -1285,42 +1285,41 @@ export function Community({ user, onNavigate }: CommunityProps) {
       )}
 
       {/* ── Tabs ─────────────────────────────────────────────────────────────── */}
-      <div className="flex-shrink-0 flex px-5 gap-1"
+      <div className="flex-shrink-0 flex items-center px-5 py-2.5"
         style={{ borderBottom: '1px solid rgba(139,92,246,0.1)', background: 'rgba(8,5,20,0.7)' }}>
-        {([
-          { id: 'news'    as Tab, label: t('communityTabNews'),    icon: (
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>
-            </svg>
-          ) },
-          { id: 'topics'  as Tab, label: t('communityTabTopics'),  icon: (
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
-            </svg>
-          ) },
-          { id: 'support' as Tab, label: t('communityTabSupport'), icon: (
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2z"/><path d="M13 5v2"/><path d="M13 17v2"/><path d="M13 11v2"/>
-            </svg>
-          ) },
-        ]).map(tab_ => (
-          <button key={tab_.id} onClick={() => {
-              setTab(tab_.id)
-              if (tab_.id === 'support') setLastSeenSupportAt(new Date().toISOString())
-            }}
-            className="flex items-center gap-1.5 px-4 py-2.5 text-[12.5px] font-bold transition-all relative"
-            style={tab === tab_.id
-              ? { color: '#c4b5fd', borderBottom: '2px solid #8b5cf6', marginBottom: -1 }
-              : { color: 'rgba(196,181,253,0.35)', borderBottom: '2px solid transparent', marginBottom: -1 }}>
-            <span className="flex items-center">{tab_.icon}</span>
-            <span>{tab_.label}</span>
-            {tab_.id === 'support' && !isAdmin && tab !== 'support' &&
-              myThreadMessages.some(m => m.is_admin && new Date(m.created_at) > new Date(lastSeenSupportAt)) && (
-              <span className="w-2 h-2 rounded-full flex-shrink-0"
-                style={{ background: '#ec4899', boxShadow: '0 0 6px #ec4899' }} />
-            )}
-          </button>
-        ))}
+        <div className="sf-tabs">
+          {([
+            { id: 'news'    as Tab, label: t('communityTabNews'),    icon: (
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>
+              </svg>
+            ) },
+            { id: 'topics'  as Tab, label: t('communityTabTopics'),  icon: (
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+              </svg>
+            ) },
+            { id: 'support' as Tab, label: t('communityTabSupport'), icon: (
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2z"/><path d="M13 5v2"/><path d="M13 17v2"/><path d="M13 11v2"/>
+              </svg>
+            ) },
+          ]).map(tab_ => (
+            <button key={tab_.id} onClick={() => {
+                setTab(tab_.id)
+                if (tab_.id === 'support') setLastSeenSupportAt(new Date().toISOString())
+              }}
+              className={`sf-tab flex items-center gap-1.5 cursor-pointer${tab === tab_.id ? ' active' : ''}`}>
+              <span className="flex items-center">{tab_.icon}</span>
+              <span>{tab_.label}</span>
+              {tab_.id === 'support' && !isAdmin && tab !== 'support' &&
+                myThreadMessages.some(m => m.is_admin && new Date(m.created_at) > new Date(lastSeenSupportAt)) && (
+                <span className="w-2 h-2 rounded-full flex-shrink-0"
+                  style={{ background: '#ec4899', boxShadow: '0 0 6px #ec4899' }} />
+              )}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* ── NEWS TAB ─────────────────────────────────────────────────────────── */}
@@ -1338,7 +1337,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                 <>
                   {/* Featured / pinned card */}
                   {featuredMsg && (
-                    <div className="rounded-2xl overflow-hidden cursor-pointer transition-all hover:border-purple-400/60"
+                    <div className="sf-card sf-card-lift overflow-hidden cursor-pointer"
                       style={{ background: 'linear-gradient(135deg,#120840 0%,#07102c 60%,#0a0626 100%)', border: '1px solid rgba(139,92,246,0.4)', boxShadow: '0 8px 40px rgba(0,0,0,0.5)' }}
                       onClick={() => setSelectedPost(featuredMsg)}>
                       <div className="h-[3px]" style={{ background: 'linear-gradient(90deg,#7c3aed,#ec4899,#3b82f6)' }} />
@@ -1407,25 +1406,24 @@ export function Community({ user, onNavigate }: CommunityProps) {
                   {/* Admin: new post button or form */}
                   {isAdmin && !showNewsForm && (
                     <button onClick={() => setShowNewsForm(true)}
-                      className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all hover:border-purple-500/40"
+                      className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all cursor-pointer hover:border-purple-500/40"
                       style={{ background: 'rgba(139,92,246,0.05)', border: '1px dashed rgba(139,92,246,0.3)' }}>
-                      <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
-                        style={{ background: 'rgba(139,92,246,0.15)', color: '#c4b5fd' }}>
+                      <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
+                        style={{ background: 'rgba(139,92,246,0.18)', color: '#c4b5fd' }}>
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                          <path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>
+                          <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4z"/>
                         </svg>
                       </div>
-                      <span className="text-[12.5px] font-semibold" style={{ color: 'rgba(196,181,253,0.55)' }}>
+                      <span className="text-[12.5px] font-semibold" style={{ color: 'rgba(196,181,253,0.65)' }}>
                         {t('communityNewsNewPost')}
                       </span>
-                      <span className="ml-auto text-[9px] font-black px-2 py-0.5 rounded-lg"
-                        style={{ background: 'rgba(124,58,237,0.25)', color: '#f0a8ff' }}>ADMIN</span>
+                      <span className="ml-auto sf-badge sf-badge-accent text-[9px] font-black">ADMIN</span>
                     </button>
                   )}
 
                   {isAdmin && showNewsForm && (
-                    <div className="rounded-2xl overflow-hidden"
-                      style={{ background: 'rgba(8,5,20,0.9)', border: '1px solid rgba(139,92,246,0.3)' }}>
+                    <div className="sf-card overflow-hidden anim-scale-in"
+                      style={{ background: 'rgba(8,5,20,0.95)' }}>
                       <div className="px-4 py-3 flex items-center justify-between"
                         style={{ borderBottom: '1px solid rgba(139,92,246,0.12)', background: 'linear-gradient(135deg,rgba(139,92,246,0.1),rgba(236,72,153,0.05))' }}>
                         <div className="flex items-center gap-2">
@@ -1493,8 +1491,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                       <div className="space-y-2">
                         {newsMessages.slice(1).map(msg => (
                           <div key={msg.id}
-                            className="flex items-start gap-3 p-4 rounded-xl group transition-all cursor-pointer hover:border-purple-500/30"
-                            style={{ background: 'rgba(8,5,20,0.8)', border: '1px solid rgba(139,92,246,0.12)' }}
+                            className="sf-card sf-card-lift flex items-start gap-3 p-4 group cursor-pointer"
                             onClick={() => setSelectedPost(msg)}>
                             <Avatar url={msg.avatar_url} name={msg.display_name} userId={msg.user_id} size={38} />
                             <div className="flex-1 min-w-0">
@@ -1538,19 +1535,14 @@ export function Community({ user, onNavigate }: CommunityProps) {
                   )}
 
                   {newsMessages.length === 0 && !isAdmin && (
-                    <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
-                      <div className="w-16 h-16 rounded-2xl flex items-center justify-center"
-                        style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.12)', color: '#a78bfa' }}>
-                        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <div className="sf-empty py-20">
+                      <div className="sf-empty-icon" style={{ color: '#a78bfa', background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.12)' }}>
+                        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                           <path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>
                         </svg>
                       </div>
-                      <div className="space-y-1">
-                        <p className="font-bold text-white">{t('communityNewsEmpty')}</p>
-                        <p className="text-sm" style={{ color: 'rgba(196,181,253,0.4)' }}>
-                          {t('communityNewsEmptyHint')}
-                        </p>
-                      </div>
+                      <p className="sf-empty-title">{t('communityNewsEmpty')}</p>
+                      <p className="sf-empty-desc">{t('communityNewsEmptyHint')}</p>
                     </div>
                   )}
                 </>
@@ -1559,20 +1551,19 @@ export function Community({ user, onNavigate }: CommunityProps) {
           </div>
 
           {/* ── Right sidebar ─────────────────────────────────────────────────── */}
-          <div className="w-[240px] flex-shrink-0 overflow-y-auto p-4 space-y-4"
+          <div className="w-[240px] flex-shrink-0 overflow-y-auto p-4 space-y-3"
             style={{ borderLeft: '1px solid rgba(139,92,246,0.1)', background: 'rgba(8,5,20,0.5)' }}>
 
             {/* About */}
-            <div className="rounded-xl overflow-hidden"
-              style={{ background: 'rgba(139,92,246,0.05)', border: '1px solid rgba(139,92,246,0.15)' }}>
-              <div className="px-4 py-3"
-                style={{ borderBottom: '1px solid rgba(139,92,246,0.1)', background: 'rgba(139,92,246,0.07)' }}>
-                <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: '#a78bfa' }}>
+            <div className="sf-card overflow-hidden">
+              <div className="px-4 py-2.5"
+                style={{ borderBottom: '1px solid rgba(139,92,246,0.1)', background: 'rgba(139,92,246,0.06)' }}>
+                <p className="text-[10px] font-black uppercase tracking-widest text-accent">
                   {t('communityAbout')}
                 </p>
               </div>
               <div className="p-4 space-y-3">
-                <p className="text-[11.5px] leading-relaxed" style={{ color: 'rgba(196,181,253,0.5)' }}>
+                <p className="text-[11.5px] leading-relaxed text-text3">
                   {t('communityAboutDesc')}
                 </p>
                 <div className="grid grid-cols-3 gap-2">
@@ -1583,13 +1574,13 @@ export function Community({ user, onNavigate }: CommunityProps) {
                   ].map(s => (
                     <div key={s.label} className="rounded-lg p-2 text-center"
                       style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.1)' }}>
-                      <p className="text-[14px] font-black text-white">{s.value}</p>
-                      <p className="text-[9px] mt-0.5" style={{ color: 'rgba(196,181,253,0.4)' }}>{s.label}</p>
+                      <p className="text-[14px] font-black text-text">{s.value}</p>
+                      <p className="text-[9px] mt-0.5 text-text3">{s.label}</p>
                     </div>
                   ))}
                 </div>
                 <a href="https://t.me/+drqJbwraMag5M2I0" target="_blank" rel="noreferrer"
-                  className="w-full py-2 rounded-xl text-[12px] font-semibold transition-all flex items-center justify-center gap-1.5 hover:brightness-110"
+                  className="w-full py-2 rounded-xl text-[12px] font-semibold transition-all flex items-center justify-center gap-1.5 hover:brightness-110 cursor-pointer"
                   style={{ background: 'rgba(34,150,243,0.12)', color: '#60b8f5', border: '1px solid rgba(34,150,243,0.2)' }}>
                   {t('communityTelegram')}
                 </a>
@@ -1598,11 +1589,10 @@ export function Community({ user, onNavigate }: CommunityProps) {
 
             {/* Top members */}
             {topMembers.length > 0 && (
-              <div className="rounded-xl overflow-hidden"
-                style={{ background: 'rgba(139,92,246,0.05)', border: '1px solid rgba(139,92,246,0.15)' }}>
-                <div className="px-4 py-3"
-                  style={{ borderBottom: '1px solid rgba(139,92,246,0.1)', background: 'rgba(139,92,246,0.07)' }}>
-                  <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: '#a78bfa' }}>
+              <div className="sf-card overflow-hidden">
+                <div className="px-4 py-2.5"
+                  style={{ borderBottom: '1px solid rgba(139,92,246,0.1)', background: 'rgba(139,92,246,0.06)' }}>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-accent">
                     {t('communityTopMembers')}
                   </p>
                 </div>
@@ -1614,16 +1604,15 @@ export function Community({ user, onNavigate }: CommunityProps) {
                         {i + 1}
                       </span>
                       <Avatar url={m.avatar_url} name={m.display_name} userId={m.user_id} size={24} />
-                      <span className="flex-1 text-[11px] font-semibold text-white truncate">
+                      <span className="flex-1 text-[11px] font-semibold text-text truncate">
                         {m.display_name || t('communityAnonymous')}
                       </span>
-                      <span className="text-[10px] tabular-nums flex-shrink-0"
-                        style={{ color: 'rgba(196,181,253,0.3)' }}>
+                      <span className="text-[10px] tabular-nums flex-shrink-0 text-text3">
                         {m.count}
                       </span>
                     </div>
                   ))}
-                  <button className="w-full mt-1 py-1.5 rounded-lg text-[11px] font-semibold transition-all"
+                  <button className="w-full mt-1 py-1.5 rounded-lg text-[11px] font-semibold transition-all cursor-pointer"
                     style={{ background: 'transparent', color: 'rgba(196,181,253,0.35)', border: '1px solid rgba(139,92,246,0.1)' }}>
                     {t('communityViewLeaderboard')}
                   </button>
@@ -1632,28 +1621,27 @@ export function Community({ user, onNavigate }: CommunityProps) {
             )}
 
             {/* Help section */}
-            <div className="rounded-xl overflow-hidden"
-              style={{ background: 'rgba(139,92,246,0.05)', border: '1px solid rgba(139,92,246,0.15)' }}>
-              <div className="px-4 py-3"
-                style={{ borderBottom: '1px solid rgba(139,92,246,0.1)', background: 'rgba(139,92,246,0.07)' }}>
-                <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: '#a78bfa' }}>
+            <div className="sf-card overflow-hidden">
+              <div className="px-4 py-2.5"
+                style={{ borderBottom: '1px solid rgba(139,92,246,0.1)', background: 'rgba(139,92,246,0.06)' }}>
+                <p className="text-[10px] font-black uppercase tracking-widest text-accent">
                   {t('communityHelpTitle')}
                 </p>
               </div>
               <div className="p-3 space-y-2">
                 <button onClick={() => onNavigate?.('support')}
-                  className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left transition-all hover:bg-purple-500/10"
+                  className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left transition-all hover:bg-purple-500/10 cursor-pointer"
                   style={{ background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(139,92,246,0.18)' }}>
-                  <span className="flex-shrink-0 flex items-center" style={{ color: '#a78bfa' }} aria-hidden="true">
+                  <span className="flex-shrink-0 flex items-center text-accent" aria-hidden="true">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2z"/><path d="M13 5v2"/><path d="M13 17v2"/><path d="M13 11v2"/>
                     </svg>
                   </span>
                   <div className="flex-1 min-w-0">
-                    <p className="text-[12px] font-semibold text-white leading-tight">{t('communityOpenTicket')}</p>
-                    <p className="text-[9.5px] mt-0.5" style={{ color: 'rgba(196,181,253,0.4)' }}>{t('communityOpenTicketSub')}</p>
+                    <p className="text-[12px] font-semibold text-text leading-tight">{t('communityOpenTicket')}</p>
+                    <p className="text-[9.5px] mt-0.5 text-text3">{t('communityOpenTicketSub')}</p>
                   </div>
-                  <span className="text-[10px] flex-shrink-0" style={{ color: 'rgba(196,181,253,0.3)' }}>→</span>
+                  <span className="text-[10px] flex-shrink-0 text-text3">→</span>
                 </button>
               </div>
             </div>
@@ -1667,44 +1655,38 @@ export function Community({ user, onNavigate }: CommunityProps) {
           {topicsView === 'list' ? (
             <div className="flex-1 overflow-y-auto">
               <div className="p-5 max-w-3xl">
-                {/* Header row */}
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <h2 className="text-[16px] font-black text-white">{t('communityTopicsHeader')}</h2>
-                    <p className="text-[10px] mt-0.5" style={{ color: 'rgba(196,181,253,0.4)' }}>{topics.length} {t('communityTabTopics').toLowerCase()}</p>
+                {/* Toolbar */}
+                <div className="sf-toolbar mb-5">
+                  <div className="relative flex-1">
+                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 flex items-center text-text3" aria-hidden="true">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                      </svg>
+                    </span>
+                    <input type="text" value={topicSearch} onChange={e => setTopicSearch(e.target.value)}
+                      placeholder={t('communityTopicsSearch')}
+                      className="w-full sf-input pl-9 pr-4" style={{ height: 34 }} />
                   </div>
-                  <button onClick={() => { if (!requirePseudo()) return; setShowCreateTopic(true) }}
-                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-[12px] font-semibold transition-all btn-sf-primary">
-                    {t('communityTopicsCreate')}
-                  </button>
-                </div>
-
-                {/* Search */}
-                <div className="relative mb-5">
-                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 flex items-center" style={{ color: 'rgba(196,181,253,0.3)' }} aria-hidden="true">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                    </svg>
-                  </span>
-                  <input type="text" value={topicSearch} onChange={e => setTopicSearch(e.target.value)}
-                    placeholder={t('communityTopicsSearch')}
-                    className="w-full rounded-xl pl-9 pr-4 py-2.5 text-sm text-white outline-none sf-input" />
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <span className="text-[11px] text-text3 tabular-nums">{topics.length} {t('communityTabTopics').toLowerCase()}</span>
+                    <button onClick={() => { if (!requirePseudo()) return; setShowCreateTopic(true) }}
+                      className="sf-btn sf-btn-primary cursor-pointer" style={{ height: 34, padding: '0 14px', fontSize: 12, fontWeight: 600 }}>
+                      {t('communityTopicsCreate')}
+                    </button>
+                  </div>
                 </div>
 
                 {topics.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
-                    <div className="w-20 h-20 rounded-3xl flex items-center justify-center"
-                      style={{ background: 'linear-gradient(135deg,rgba(139,92,246,0.12),rgba(236,72,153,0.06))', border: '1px solid rgba(139,92,246,0.15)', color: '#c4b5fd' }}>
-                      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <div className="sf-empty py-20">
+                    <div className="sf-empty-icon" style={{ background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.15)', color: '#c4b5fd', width: 64, height: 64, borderRadius: 20 }}>
+                      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                         <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
                       </svg>
                     </div>
-                    <div className="space-y-1.5">
-                      <p className="text-base font-black text-white">{t('communityTopicsEmpty')}</p>
-                      <p className="text-sm" style={{ color: 'rgba(196,181,253,0.4)' }}>{t('communityTopicsEmptyHint')}</p>
-                    </div>
+                    <p className="sf-empty-title">{t('communityTopicsEmpty')}</p>
+                    <p className="sf-empty-desc">{t('communityTopicsEmptyHint')}</p>
                     <button onClick={() => { if (!requirePseudo()) return; setShowCreateTopic(true) }}
-                      className="px-5 py-2.5 rounded-xl text-sm font-semibold btn-sf-primary">
+                      className="sf-btn sf-btn-primary mt-2 cursor-pointer">
                       {t('communityTopicsEmptyCreate')}
                     </button>
                   </div>
@@ -1721,8 +1703,8 @@ export function Community({ user, onNavigate }: CommunityProps) {
                     const isJoined = joinedTopicIds.has(topic.id)
                     const canDelete = isAdmin || topic.created_by === user.id
                     return (
-                      <div className="relative group flex flex-col gap-3 p-4 rounded-2xl cursor-pointer transition-all hover:border-purple-500/40"
-                        style={{ background: isJoined ? 'rgba(139,92,246,0.08)' : 'rgba(8,5,20,0.8)', border: `1px solid ${isJoined ? 'rgba(139,92,246,0.25)' : 'rgba(139,92,246,0.1)'}` }}
+                      <div className="sf-card sf-card-lift relative group flex flex-col gap-3 p-4 cursor-pointer"
+                        style={isJoined ? { background: 'rgba(139,92,246,0.08)', borderColor: 'rgba(139,92,246,0.28)' } : {}}
                         onClick={() => { setSelectedTopic(topic); setTopicsView('chat') }}>
                         <div className="flex items-start gap-3">
                           <div className="w-11 h-11 rounded-xl flex items-center justify-center text-2xl flex-shrink-0"
@@ -1757,10 +1739,8 @@ export function Community({ user, onNavigate }: CommunityProps) {
                               if (isJoined) leaveTopic(topic.id)
                               else joinTopic(topic.id)
                             }}
-                            className="flex-shrink-0 px-3 py-1 rounded-lg text-[11px] font-bold transition-all"
-                            style={isJoined
-                              ? { background: 'rgba(239,68,68,0.1)', color: 'rgba(252,165,165,0.7)', border: '1px solid rgba(239,68,68,0.15)' }
-                              : { background: 'rgba(139,92,246,0.15)', color: '#c4b5fd', border: '1px solid rgba(139,92,246,0.25)' }}>
+                            className={`sf-btn flex-shrink-0 cursor-pointer${isJoined ? ' sf-btn-ghost' : ' sf-btn-secondary'}`}
+                            style={{ height: 28, padding: '0 12px', fontSize: 11, fontWeight: 700, ...(isJoined ? { color: 'rgba(252,165,165,0.75)', borderColor: 'rgba(239,68,68,0.2)' } : {}) }}>
                             {isJoined ? t('communityTopicsLeave') : t('communityTopicsJoin')}
                           </button>
                         </div>
@@ -1789,10 +1769,10 @@ export function Community({ user, onNavigate }: CommunityProps) {
                         </div>
                       )}
                       {filtered.length === 0 && topicSearch && (
-                        <div className="flex flex-col items-center py-12 gap-2 text-center">
-                          <p className="text-[13px] font-bold text-white">{t('communityTopicsNoResult')} « {topicSearch} »</p>
+                        <div className="sf-empty py-12">
+                          <p className="sf-empty-title">{t('communityTopicsNoResult')} « {topicSearch} »</p>
                           <button onClick={() => { setTopicSearch(''); setShowCreateTopic(true) }}
-                            className="text-[11px] mt-1" style={{ color: '#a78bfa' }}>
+                            className="sf-btn sf-btn-ghost cursor-pointer mt-1" style={{ fontSize: 11 }}>
                             {t('communityTopicsCreateThis')}
                           </button>
                         </div>
@@ -1809,26 +1789,29 @@ export function Community({ user, onNavigate }: CommunityProps) {
               <div className="flex-shrink-0 flex items-center gap-3 px-4 py-2.5"
                 style={{ borderBottom: '1px solid rgba(139,92,246,0.12)', background: 'rgba(8,5,20,0.7)' }}>
                 <button onClick={() => { setTopicsView('list'); setSelectedTopic(null) }}
-                  className="w-8 h-8 rounded-xl flex items-center justify-center transition-all hover:bg-white/[0.06]"
-                  style={{ color: '#a78bfa', border: '1px solid rgba(139,92,246,0.2)' }}>←</button>
+                  className="sf-btn sf-btn-ghost w-8 h-8 flex items-center justify-center cursor-pointer"
+                  style={{ padding: 0, borderColor: 'rgba(139,92,246,0.2)' }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+                </button>
                 <div className="w-8 h-8 rounded-xl flex items-center justify-center text-lg flex-shrink-0"
                   style={{ background: 'rgba(139,92,246,0.15)' }}>{selectedTopic?.emoji}</div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-[13px] font-black text-white leading-tight">{selectedTopic?.name}</p>
-                  <p className="text-[9px]" style={{ color: 'rgba(196,181,253,0.4)' }}>
+                  <p className="text-[13px] font-black text-text leading-tight">{selectedTopic?.name}</p>
+                  <p className="text-[9px] text-text3">
                     {(() => { const cnt = memberCounts.get(selectedTopic?.id ?? '') ?? 0; return `${cnt} ${cnt !== 1 ? t('communityMemberPlural') : t('communityMemberSingular')}` })()}
                   </p>
                 </div>
                 {selectedTopic && (
                   joinedTopicIds.has(selectedTopic.id) ? (
                     <button onClick={() => leaveTopic(selectedTopic.id)}
-                      className="px-3 py-1.5 rounded-xl text-[11px] font-semibold transition-all"
-                      style={{ background: 'rgba(239,68,68,0.08)', color: 'rgba(252,165,165,0.7)', border: '1px solid rgba(239,68,68,0.15)' }}>
+                      className="sf-btn sf-btn-ghost cursor-pointer"
+                      style={{ height: 30, padding: '0 12px', fontSize: 11, fontWeight: 600, color: 'rgba(252,165,165,0.7)', borderColor: 'rgba(239,68,68,0.2)' }}>
                       {t('communityTopicsLeave')}
                     </button>
                   ) : (
                     <button onClick={() => joinTopic(selectedTopic.id)}
-                      className="px-3 py-1.5 rounded-xl text-[11px] font-semibold transition-all btn-sf-primary">
+                      className="sf-btn sf-btn-primary cursor-pointer"
+                      style={{ height: 30, padding: '0 12px', fontSize: 11, fontWeight: 600 }}>
                       {t('communityTopicsJoin')}
                     </button>
                   )
@@ -1838,15 +1821,12 @@ export function Community({ user, onNavigate }: CommunityProps) {
               {/* Messages */}
               <div ref={topicListRef} className="flex-1 overflow-y-auto px-5 py-4">
                 {topicMessages.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-full gap-4">
-                    <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl"
-                      style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.12)' }}>
+                  <div className="sf-empty h-full">
+                    <div className="sf-empty-icon text-3xl" style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.12)', fontSize: 28, width: 60, height: 60, borderRadius: 16 }}>
                       {selectedTopic?.emoji}
                     </div>
-                    <div className="text-center space-y-1">
-                      <p className="font-bold text-white">{selectedTopic?.name}</p>
-                      <p className="text-sm" style={{ color: 'rgba(196,181,253,0.4)' }}>{t('communityTopicsFirstWrite')}</p>
-                    </div>
+                    <p className="sf-empty-title">{selectedTopic?.name}</p>
+                    <p className="sf-empty-desc">{t('communityTopicsFirstWrite')}</p>
                   </div>
                 ) : (
                   <>
@@ -2033,10 +2013,14 @@ export function Community({ user, onNavigate }: CommunityProps) {
               {/* Selected thread */}
               <div className="flex-1 flex flex-col overflow-hidden">
                 {!selectedThread ? (
-                  <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center p-6">
-                    <span className="text-5xl opacity-20">💬</span>
-                    <p className="font-bold text-white">{t('communityAdminSelectTicket')}</p>
-                    <p className="text-sm" style={{ color: 'rgba(196,181,253,0.4)' }}>{t('communityAdminSelectTicketHint')}</p>
+                  <div className="sf-empty flex-1">
+                    <div className="sf-empty-icon" style={{ color: '#a78bfa', background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.12)' }}>
+                      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2z"/><path d="M13 5v2"/><path d="M13 17v2"/><path d="M13 11v2"/>
+                      </svg>
+                    </div>
+                    <p className="sf-empty-title">{t('communityAdminSelectTicket')}</p>
+                    <p className="sf-empty-desc">{t('communityAdminSelectTicketHint')}</p>
                   </div>
                 ) : (
                   <>
@@ -2109,19 +2093,14 @@ export function Community({ user, onNavigate }: CommunityProps) {
               <div ref={listRef} className="flex-1 overflow-y-auto px-5 py-4">
                 {loading ? <div className="flex items-center justify-center h-full"><Spinner size="lg" /></div>
                 : myThreadMessages.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-full gap-4">
-                    <div className="w-20 h-20 rounded-3xl flex items-center justify-center"
-                      style={{ background: 'linear-gradient(135deg,rgba(96,165,250,0.12),rgba(139,92,246,0.06))', border: '1px solid rgba(96,165,250,0.15)', color: '#93c5fd' }}>
-                      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <div className="sf-empty h-full">
+                    <div className="sf-empty-icon" style={{ color: '#93c5fd', background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.15)', width: 64, height: 64, borderRadius: 20 }}>
+                      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                         <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2z"/><path d="M13 5v2"/><path d="M13 17v2"/><path d="M13 11v2"/>
                       </svg>
                     </div>
-                    <div className="text-center space-y-1.5">
-                      <p className="text-base font-black text-white">{t('communitySupportEmpty')}</p>
-                      <p className="text-sm" style={{ color: 'rgba(196,181,253,0.4)' }}>
-                        {t('communitySupportEmptyHint')}
-                      </p>
-                    </div>
+                    <p className="sf-empty-title">{t('communitySupportEmpty')}</p>
+                    <p className="sf-empty-desc">{t('communitySupportEmptyHint')}</p>
                   </div>
                 ) : (
                   <>
