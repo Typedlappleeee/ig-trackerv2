@@ -1251,32 +1251,42 @@ export function Phones({ user }: PhonesProps) {
               <div style={{ flex: 1, padding: '16px 28px 28px' }}>
 
                 {loading ? (
-                  /* ── Loading skeleton grid ─────────────────────────────── */
-                  <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-                    gap: 14,
-                  }}>
-                    {[0, 1, 2, 3, 4, 5].map(i => (
-                      <div key={i} className="sf-card" style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 14 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                          <div className="sf-skeleton" style={{ width: 38, height: 38, borderRadius: 10, flexShrink: 0 }} />
-                          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                            <div className="sf-skeleton" style={{ height: 12, width: '65%', borderRadius: 4 }} />
-                            <div className="sf-skeleton" style={{ height: 9, width: '40%', borderRadius: 4 }} />
-                          </div>
-                          <div className="sf-skeleton" style={{ height: 22, width: 60, borderRadius: 20 }} />
-                        </div>
-                        <div style={{ display: 'flex', gap: 6 }}>
-                          <div className="sf-skeleton" style={{ height: 22, width: 72, borderRadius: 20 }} />
-                          <div className="sf-skeleton" style={{ height: 22, width: 56, borderRadius: 20 }} />
-                        </div>
-                        <div style={{ display: 'flex', gap: 6, marginTop: 2 }}>
-                          <div className="sf-skeleton" style={{ height: 28, flex: 1, borderRadius: 8 }} />
-                          <div className="sf-skeleton" style={{ height: 28, flex: 1, borderRadius: 8 }} />
-                        </div>
-                      </div>
-                    ))}
+                  /* ── Loading skeleton rows ─────────────────────────────── */
+                  <div className="sf-table-wrap">
+                    <table className="sf-table">
+                      <thead>
+                        <tr>
+                          <th style={{ width: 44 }}></th>
+                          <th>{t('phonesDetailModel')}</th>
+                          <th style={{ width: 120 }}>{t('phonesDetailGroup')}</th>
+                          <th style={{ width: 160 }}>Instagram</th>
+                          <th style={{ width: 110 }}>{t('phonesIgStatus')}</th>
+                          <th style={{ width: 150 }}>{t('phonesDetailSerial').replace('N° ', '') === 'Série' ? 'Note' : 'Note'}</th>
+                          <th style={{ width: 90 }}></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[0,1,2,3,4,5,6,7].map(i => (
+                          <tr key={i}>
+                            <td style={{ textAlign: 'center' }}><div className="sf-skeleton" style={{ width: 8, height: 8, borderRadius: '50%', margin: '0 auto' }} /></td>
+                            <td>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                <div className="sf-skeleton" style={{ width: 30, height: 30, borderRadius: 8, flexShrink: 0 }} />
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                                  <div className="sf-skeleton" style={{ height: 11, width: 110, borderRadius: 3 }} />
+                                  <div className="sf-skeleton" style={{ height: 8, width: 70, borderRadius: 3 }} />
+                                </div>
+                              </div>
+                            </td>
+                            <td><div className="sf-skeleton" style={{ height: 20, width: 65, borderRadius: 5 }} /></td>
+                            <td><div className="sf-skeleton" style={{ height: 20, width: 100, borderRadius: 20 }} /></td>
+                            <td><div className="sf-skeleton" style={{ height: 20, width: 75, borderRadius: 20 }} /></td>
+                            <td><div className="sf-skeleton" style={{ height: 11, width: 90, borderRadius: 3 }} /></td>
+                            <td></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
 
                 ) : phones.length === 0 ? (
@@ -1324,34 +1334,48 @@ export function Phones({ user }: PhonesProps) {
                   </div>
 
                 ) : (
-                  /* ── Phone cards grid ───────────────────────────────────── */
-                  <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-                    gap: 14,
-                  }}>
-                    {visible.map((phone, i) => {
-                      const col = phoneColor(phone.phone_name)
-                      return (
-                        <PhoneCard
-                          key={phone.id}
-                          phone={phone}
-                          index={i}
-                          isSelected={selectedPhone?.id === phone.id}
-                          col={col}
-                          phones={phones}
-                          relativeTime={relativeTime}
-                          setSelectedPhone={setSelectedPhone}
-                          setContextMenu={setContextMenu}
-                          setSessionDialog={setSessionDialog}
-                          saveIgUsername={saveIgUsername}
-                          saveRemark={saveRemark}
-                          unlinkIg={unlinkIg}
-                          deletePhone={deletePhone}
-                          canDelete={canDelete}
-                        />
-                      )
-                    })}
+                  /* ── Phone table list ───────────────────────────────────── */
+                  <div className="sf-table-wrap">
+                    <table className="sf-table">
+                      <thead>
+                        <tr>
+                          <th style={{ width: 44 }}></th>
+                          <th>{t('phonesDetailModel')}</th>
+                          <th style={{ width: 120 }}>{t('phonesDetailGroup')}</th>
+                          <th style={{ width: 160 }}>Instagram</th>
+                          <th style={{ width: 110 }}>{t('phonesIgStatus')}</th>
+                          <th style={{ width: 150 }}>Note</th>
+                          <th style={{ width: 90 }}></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {visible.map((phone, i) => {
+                          const col = phoneColor(phone.phone_name)
+                          return (
+                            <PhoneRow
+                              key={phone.id}
+                              phone={phone}
+                              index={i}
+                              isSelected={selectedPhone?.id === phone.id}
+                              isLast={i === visible.length - 1}
+                              col={col}
+                              phones={phones}
+                              COLS={COLS}
+                              relativeTime={relativeTime}
+                              setSelectedPhone={setSelectedPhone}
+                              setContextMenu={setContextMenu}
+                              setSessionDialog={setSessionDialog}
+                              saveIgUsername={saveIgUsername}
+                              saveRemark={saveRemark}
+                              unlinkIg={unlinkIg}
+                              deletePhone={deletePhone}
+                              canDelete={canDelete}
+                              ActionBtn={ActionBtn}
+                            />
+                          )
+                        })}
+                      </tbody>
+                    </table>
                   </div>
                 )}
 
@@ -1765,6 +1789,113 @@ function PhoneRow({
   canDelete: boolean
   ActionBtn: React.ComponentType<{ onClick: () => void; title: string; children: React.ReactNode; danger?: boolean }>
 }) {
-  // Kept for backward compatibility — not rendered in the new grid layout.
-  return null
+  const t = useT()
+  const [hovered, setHovered] = useState(false)
+
+  return (
+    <tr
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onClick={() => setSelectedPhone(isSelected ? null : phone)}
+      onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setContextMenu({ phone, x: e.clientX, y: e.clientY }) }}
+      style={{
+        cursor: 'pointer',
+        background: isSelected
+          ? 'rgba(124,58,237,0.09)'
+          : hovered ? 'rgba(255,255,255,0.025)' : 'transparent',
+        transition: 'background 0.12s',
+        borderLeft: isSelected ? '2px solid rgba(139,92,246,0.7)' : '2px solid transparent',
+      }}
+    >
+      {/* Status dot */}
+      <td style={{ textAlign: 'center', padding: '0 8px' }}>
+        <StatusDot status={phone.status ?? 'offline'} />
+      </td>
+
+      {/* Phone name + serial */}
+      <td>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{
+            width: 30, height: 30, borderRadius: 8, flexShrink: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: `linear-gradient(135deg, ${col}22, ${col}0d)`,
+            border: `1px solid ${col}2e`, color: col,
+          }}>
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+              <rect x="2" y="0.5" width="9" height="12" rx="2" stroke="currentColor" strokeWidth="1.3"/>
+              <circle cx="6.5" cy="10.5" r="0.7" fill="currentColor"/>
+            </svg>
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <p style={{ fontSize: 13, fontWeight: 600, color: '#F2F0FF', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {phone.phone_name}
+            </p>
+            {phone.serial_no && (
+              <p style={{ fontSize: 10, fontFamily: 'monospace', color: 'rgba(148,163,184,0.32)', margin: '1px 0 0' }}>
+                {phone.serial_no}
+              </p>
+            )}
+          </div>
+        </div>
+      </td>
+
+      {/* Group */}
+      <td>
+        {phone.group_name
+          ? <span style={{
+              fontSize: 10, padding: '2px 7px', borderRadius: 5, fontWeight: 600,
+              background: 'rgba(139,92,246,0.1)', color: '#A78BFA',
+              border: '1px solid rgba(139,92,246,0.18)',
+            }}>{phone.group_name}</span>
+          : <span style={{ color: 'rgba(148,163,184,0.2)', fontSize: 13 }}>—</span>
+        }
+      </td>
+
+      {/* IG Username — inline editable */}
+      <td onClick={e => e.stopPropagation()}>
+        <IgCell phone={phone} onSave={saveIgUsername} />
+      </td>
+
+      {/* IG Status badge */}
+      <td>
+        <IgStatusBadge phone={phone} />
+      </td>
+
+      {/* Note — inline editable */}
+      <td onClick={e => e.stopPropagation()}>
+        <NoteCell phone={phone} onSave={saveRemark} />
+      </td>
+
+      {/* Actions */}
+      <td onClick={e => e.stopPropagation()} style={{ padding: '0 10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4 }}>
+          <ActionBtn onClick={() => setSessionDialog({ phone })} title={t('phonesRowSessionId')}>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <rect x="1.5" y="5" width="9" height="6.5" rx="1.2" stroke="currentColor" strokeWidth="1.3"/>
+              <path d="M4 5V3.5a2 2 0 0 1 4 0V5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+            </svg>
+          </ActionBtn>
+          <button
+            className="sf-btn sf-btn-ghost sf-btn-sm sf-btn-icon"
+            style={{ width: 28, height: 28, borderRadius: 6, cursor: 'pointer' }}
+            title="More"
+            onClick={e => { e.stopPropagation(); setContextMenu({ phone, x: e.clientX, y: e.clientY }) }}
+          >
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <circle cx="2" cy="6" r="1" fill="currentColor"/>
+              <circle cx="6" cy="6" r="1" fill="currentColor"/>
+              <circle cx="10" cy="6" r="1" fill="currentColor"/>
+            </svg>
+          </button>
+          {canDelete && (
+            <ActionBtn onClick={() => deletePhone(phone.id)} title={t('phonesRowDelete')} danger>
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path d="M2 3h8M4.5 3V2h3v1M4 3l.4 7h3.2L8 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </ActionBtn>
+          )}
+        </div>
+      </td>
+    </tr>
+  )
 }
