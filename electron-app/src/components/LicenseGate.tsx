@@ -241,7 +241,9 @@ export function LicenseGate({ userId, email: _email, onActivated, initialStep = 
                 onClick={() => setView('join')}
                 className="w-full text-left rounded-xl p-4 transition-all hover:scale-[1.02] flex items-center gap-4"
                 style={{ background: 'rgba(59,130,246,0.10)', border: '1px solid rgba(59,130,246,0.28)' }}>
-                <div className="text-2xl">🏢</div>
+                <div style={{ color: '#3b82f6' }}>
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-4M9 9v.01M9 12v.01M9 15v.01M9 18v.01" /></svg>
+                </div>
                 <div>
                   <div className="text-white text-sm font-bold">Rejoindre une orga</div>
                   <div className="text-[11px] text-[#6b5fa0] mt-0.5">Tu as un code d'invitation</div>
@@ -253,7 +255,9 @@ export function LicenseGate({ userId, email: _email, onActivated, initialStep = 
                 className="w-full text-left rounded-xl p-4 transition-all hover:scale-[1.02] flex items-center gap-4 relative overflow-hidden"
                 style={{ background: 'linear-gradient(130deg,rgba(124,58,237,0.18),rgba(236,72,153,0.18))', border: '1px solid rgba(168,85,247,0.40)' }}>
                 <div className="absolute top-2 right-2 text-[9px] font-bold text-white px-2 py-0.5 rounded-full" style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)' }}>NOUVEAU</div>
-                <div className="text-2xl">✨</div>
+                <div style={{ color: '#a855f7' }}>
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .962 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.582a.5.5 0 0 1 0 .962L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.962 0z" /></svg>
+                </div>
                 <div>
                   <div className="text-white text-sm font-bold">Créer une orga</div>
                   <div className="text-[11px] text-[#6b5fa0] mt-0.5">Clé de licence via Telegram</div>
@@ -280,7 +284,9 @@ export function LicenseGate({ userId, email: _email, onActivated, initialStep = 
                       onClick={() => { switchOrg(org.id); window.location.reload() }}
                       className="w-full py-2.5 px-4 rounded-xl text-sm font-semibold text-white transition-all flex items-center gap-2"
                       style={{ background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.25)' }}>
-                      <span>🏢</span>
+                      <span className="flex-shrink-0">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-4M9 9v.01M9 12v.01M9 15v.01M9 18v.01" /></svg>
+                      </span>
                       <span className="flex-1 text-left truncate">{org.name}</span>
                       <span className="text-[11px] text-blue-400">Accéder →</span>
                     </button>

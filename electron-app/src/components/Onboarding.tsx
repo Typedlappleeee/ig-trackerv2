@@ -143,9 +143,9 @@ export function Onboarding({ user, onComplete, orgId }: OnboardingProps) {
   }
 
   function StateIcon({ s }: { s: TestState }) {
-    if (s === 'testing') return <span className="animate-spin" style={{ color: '#a78bfa' }}>↻</span>
-    if (s === 'ok')      return <span className="text-ok">✓</span>
-    if (s === 'fail')    return <span className="text-danger">✗</span>
+    if (s === 'testing') return <svg className="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-6.22-8.56" /></svg>
+    if (s === 'ok')      return <svg className="text-ok" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>
+    if (s === 'fail')    return <svg className="text-danger" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg>
     return null
   }
 
@@ -202,7 +202,9 @@ export function Onboarding({ user, onComplete, orgId }: OnboardingProps) {
           <div className="glass-card rounded-2xl p-6 space-y-5">
             <div>
               <h2 className="text-lg font-bold text-text flex items-center gap-2">
-                <span className="text-2xl">📱</span> Token GéeLark
+                <span style={{ color: '#a78bfa' }}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4zM12 18h.01" /></svg>
+                </span> Token GéeLark
               </h2>
               <p className="text-sm text-text2 mt-1">Requis pour piloter tes cloud phones. Tu pourras configurer les clés IA plus tard dans Paramètres.</p>
             </div>
@@ -228,7 +230,12 @@ export function Onboarding({ user, onComplete, orgId }: OnboardingProps) {
               />
               <Button onClick={testBearer} loading={bearerState === 'testing'} disabled={!bearer.trim()} variant="secondary">
                 <StateIcon s={bearerState} />
-                {bearerState === 'testing' ? 'Test…' : '🔍 Tester la connexion'}
+                {bearerState === 'testing' ? 'Test…' : (
+                  <span className="inline-flex items-center gap-1.5">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.3-4.3" /></svg>
+                    Tester la connexion
+                  </span>
+                )}
               </Button>
               {bearerMsg && (
                 <p className={`text-xs px-3 py-2 rounded-lg ${bearerState === 'ok' ? 'bg-ok/10 text-ok' : 'bg-danger/10 text-danger'}`}>
@@ -247,7 +254,9 @@ export function Onboarding({ user, onComplete, orgId }: OnboardingProps) {
         {step === 2 && (
           <div className="glass-card rounded-2xl p-6 space-y-5 text-center">
             <div className="space-y-2">
-              <div className="text-5xl">🚀</div>
+              <div className="flex justify-center" style={{ color: '#a78bfa' }}>
+                <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09zM12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2zM9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5" /></svg>
+              </div>
               <h2 className="text-xl font-bold text-text">Prêt à démarrer !</h2>
               <p className="text-sm text-text2">Ton token GéeLark est configuré. Tu peux maintenant accéder à ScaleFlow.</p>
             </div>
