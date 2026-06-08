@@ -37,25 +37,18 @@ interface TicketMessage {
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
-const STATUS_LABELS: Record<TicketStatus, string> = {
-  open:        '🟡 Open',
-  in_progress: '🔵 In progress',
-  resolved:    '🟢 Resolved',
-  closed:      '⚫ Closed',
+const STATUS_BADGE_CLASS: Record<TicketStatus, string> = {
+  open:        'sf-badge sf-badge-warn',
+  in_progress: 'sf-badge sf-badge-accent',
+  resolved:    'sf-badge sf-badge-ok',
+  closed:      'sf-badge sf-badge-muted',
 }
 
-const STATUS_COLORS: Record<TicketStatus, string> = {
-  open:        'bg-yellow-500/15 text-yellow-400 border-yellow-500/25',
-  in_progress: 'bg-blue-500/15 text-blue-400 border-blue-500/25',
-  resolved:    'bg-green-500/15 text-green-400 border-green-500/25',
-  closed:      'bg-zinc-500/15 text-zinc-400 border-zinc-500/25',
-}
-
-const PRIORITY_LABELS: Record<TicketPriority, string> = {
-  low:    '▽ Low',
-  normal: '◇ Normal',
-  high:   '▲ High',
-  urgent: '🔴 Urgent',
+const STATUS_DOT_CLASS: Record<TicketStatus, string> = {
+  open:        'bg-yellow-400',
+  in_progress: 'bg-accent',
+  resolved:    'bg-ok',
+  closed:      'bg-zinc-500',
 }
 
 const PRIORITY_COLORS: Record<TicketPriority, string> = {
@@ -65,11 +58,18 @@ const PRIORITY_COLORS: Record<TicketPriority, string> = {
   urgent: 'text-red-400',
 }
 
-const CATEGORY_LABELS: Record<TicketCategory, string> = {
-  general:   '💬 General',
-  billing:   '💳 Billing',
-  technical: '⚙️ Technical',
-  other:     '📎 Other',
+const PRIORITY_BAR: Record<TicketPriority, string> = {
+  low:    'bg-zinc-500',
+  normal: 'bg-blue-500',
+  high:   'bg-orange-500',
+  urgent: 'bg-red-500',
+}
+
+const PRIORITY_BADGE_CLASS: Record<TicketPriority, string> = {
+  low:    'sf-badge sf-badge-muted',
+  normal: 'sf-badge sf-badge-accent',
+  high:   'sf-badge',
+  urgent: 'sf-badge sf-badge-danger',
 }
 
 function fmtDate(iso: string) {
@@ -77,18 +77,93 @@ function fmtDate(iso: string) {
   return d.toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
-// ── Badge ─────────────────────────────────────────────────────────────────────
+// ── SVG Icons ─────────────────────────────────────────────────────────────────
+function IconBack() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M19 12H5M12 5l-7 7 7 7"/>
+    </svg>
+  )
+}
+
+function IconSend() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+    </svg>
+  )
+}
+
+function IconTicket() {
+  return (
+    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2z"/><path d="M13 5v2"/><path d="M13 17v2"/><path d="M13 11v2"/>
+    </svg>
+  )
+}
+
+function IconRefresh() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+      <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+    </svg>
+  )
+}
+
+function IconPlus() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+    </svg>
+  )
+}
+
+function IconShield() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+    </svg>
+  )
+}
+
+function IconChevronRight() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <polyline points="9 18 15 12 9 6"/>
+    </svg>
+  )
+}
+
+// ── StatusBadge ───────────────────────────────────────────────────────────────
 function StatusBadge({ status }: { status: TicketStatus }) {
   const t = useT()
   const DYNAMIC_STATUS_LABELS: Record<TicketStatus, string> = {
-    open:        `🟡 ${t('supportStatusOpen')}`,
-    in_progress: `🔵 ${t('supportStatusInProgress')}`,
-    resolved:    `🟢 ${t('supportStatusResolved')}`,
-    closed:      `⚫ ${t('supportStatusClosed')}`,
+    open:        t('supportStatusOpen'),
+    in_progress: t('supportStatusInProgress'),
+    resolved:    t('supportStatusResolved'),
+    closed:      t('supportStatusClosed'),
   }
   return (
-    <span className={`text-[12px] px-2 py-0.5 rounded-full border font-medium ${STATUS_COLORS[status]}`}>
+    <span className={`inline-flex items-center gap-1.5 ${STATUS_BADGE_CLASS[status]}`}>
+      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${STATUS_DOT_CLASS[status]}`} />
       {DYNAMIC_STATUS_LABELS[status]}
+    </span>
+  )
+}
+
+// ── PriorityBadge ─────────────────────────────────────────────────────────────
+function PriorityBadge({ priority }: { priority: TicketPriority }) {
+  const t = useT()
+  const PRIORITY_LABEL: Record<TicketPriority, string> = {
+    low:    t('supportPriorityLow'),
+    normal: t('supportPriorityNormal'),
+    high:   t('supportPriorityHigh'),
+    urgent: t('supportPriorityUrgent'),
+  }
+  return (
+    <span className={PRIORITY_BADGE_CLASS[priority]}>
+      {PRIORITY_LABEL[priority]}
     </span>
   )
 }
@@ -134,39 +209,41 @@ function CreateTicketForm({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="anim-page space-y-6 max-w-2xl">
+      {/* Sub-header */}
       <div className="flex items-center gap-3">
         <button
           onClick={onCancel}
-          className="text-[13px] text-text2 hover:text-text transition-colors"
+          className="sf-btn sf-btn-ghost cursor-pointer focus-visible:ring-2 focus-visible:ring-accent/60 flex items-center gap-1.5"
         >
+          <IconBack />
           {t('supportBackBtn')}
         </button>
-        <h2 className="text-[22px] font-black text-white">{t('supportNewTicket')}</h2>
+        <h2 className="text-[20px] font-black text-text">{t('supportNewTicket')}</h2>
       </div>
 
-      <div className="rounded-2xl p-6 space-y-5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+      <div className="sf-card p-6 space-y-5">
         <div className="grid grid-cols-2 gap-5">
+          {/* Subject */}
           <div className="col-span-2 space-y-2">
-            <label className="text-[12px] font-medium text-text2 uppercase tracking-wide">{t('supportSubjectLabel')}</label>
+            <label className="block text-[11px] font-semibold text-text2 uppercase tracking-widest">{t('supportSubjectLabel')}</label>
             <input
               name="subject"
               value={subject}
               onChange={e => setSubject(e.target.value)}
               placeholder={t('supportSubjectPlaceholder')}
-              className="w-full rounded-xl px-4 py-2.5 text-[13px] focus:outline-none"
-              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
+              className="sf-input w-full cursor-text focus-visible:ring-2 focus-visible:ring-accent/60"
             />
           </div>
 
+          {/* Category */}
           <div className="space-y-2">
-            <label className="text-[12px] font-medium text-text2 uppercase tracking-wide">{t('supportCategoryLabel')}</label>
+            <label className="block text-[11px] font-semibold text-text2 uppercase tracking-widest">{t('supportCategoryLabel')}</label>
             <select
               name="category"
               value={category}
               onChange={e => setCategory(e.target.value as TicketCategory)}
-              className="w-full rounded-xl px-4 py-2.5 text-[13px] focus:outline-none"
-              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
+              className="sf-input w-full cursor-pointer focus-visible:ring-2 focus-visible:ring-accent/60"
             >
               {([['general', t('supportCategoryGeneral')], ['billing', t('supportCategoryBilling')], ['technical', t('supportCategoryTechnical')], ['other', t('supportCategoryOther')]] as [TicketCategory, string][]).map(([k, v]) => (
                 <option key={k} value={k} style={{ background: '#0d1120', color: '#e2d9f3' }}>{v}</option>
@@ -174,36 +251,44 @@ function CreateTicketForm({
             </select>
           </div>
 
+          {/* Description */}
           <div className="col-span-2 space-y-2">
-            <label className="text-[12px] font-medium text-text2 uppercase tracking-wide">{t('supportDescriptionLabel')}</label>
+            <label className="block text-[11px] font-semibold text-text2 uppercase tracking-widest">{t('supportDescriptionLabel')}</label>
             <textarea
               name="description"
               value={description}
               onChange={e => setDescription(e.target.value)}
               placeholder={t('supportDescPlaceholder')}
               rows={5}
-              className="w-full rounded-xl px-4 py-2.5 text-[13px] focus:outline-none resize-none"
-              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
+              className="sf-input w-full resize-none cursor-text focus-visible:ring-2 focus-visible:ring-accent/60"
             />
           </div>
         </div>
 
-        {error && <p className="text-[13px] text-red-400">{error}</p>}
+        {error && (
+          <p className="text-[13px] text-danger flex items-center gap-1.5">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            {error}
+          </p>
+        )}
 
-        <div className="flex justify-end gap-3">
+        <div className="flex justify-end gap-3 pt-1">
           <button
             onClick={onCancel}
-            className="rounded-xl px-5 py-2.5 text-[13px] font-semibold"
-            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
+            className="sf-btn sf-btn-secondary cursor-pointer focus-visible:ring-2 focus-visible:ring-accent/60"
           >
             {t('cancel')}
           </button>
           <button
             onClick={submit}
             disabled={saving}
-            className="rounded-xl px-5 py-2.5 text-[13px] font-semibold text-white disabled:opacity-50"
-            style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)' }}
+            className="sf-btn sf-btn-primary cursor-pointer disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-accent/60 flex items-center gap-2"
           >
+            {saving ? (
+              <span className="sf-spinner" />
+            ) : (
+              <IconSend />
+            )}
             {saving ? t('supportSendingBtn') : t('supportSendBtn')}
           </button>
         </div>
@@ -274,28 +359,42 @@ function ThreadView({
 
   const isClosed = ticket.status === 'closed' || ticket.status === 'resolved'
 
+  const categoryLabel: Record<string, string> = {
+    general:   t('supportCategoryGeneral'),
+    billing:   t('supportCategoryBilling'),
+    technical: t('supportCategoryTechnical'),
+    other:     t('supportCategoryOther'),
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="anim-page space-y-5 max-w-3xl">
       {/* Header */}
       <div className="flex items-start gap-4">
-        <button onClick={onBack} className="mt-1 text-[13px] text-text2 hover:text-text transition-colors shrink-0">
-          ←
+        <button
+          onClick={onBack}
+          className="sf-btn sf-btn-ghost cursor-pointer focus-visible:ring-2 focus-visible:ring-accent/60 mt-0.5 flex items-center gap-1.5 shrink-0"
+        >
+          <IconBack />
+          {t('supportBackBtn')}
         </button>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <h2 className="text-[20px] font-black text-white truncate">{ticket.subject}</h2>
+            <h2 className="text-[18px] font-black text-text truncate">{ticket.subject}</h2>
             <StatusBadge status={ticket.status} />
-            {isAdmin && (
-              <span className={`text-[13px] font-medium ${PRIORITY_COLORS[ticket.priority]}`}>
-                {({ low: t('supportPriorityLow'), normal: t('supportPriorityNormal'), high: t('supportPriorityHigh'), urgent: t('supportPriorityUrgent') } as Record<string,string>)[ticket.priority]}
-              </span>
-            )}
+            {isAdmin && <PriorityBadge priority={ticket.priority} />}
           </div>
-          <p className="text-[12px] text-text2 mt-1">
-            {ticket.user_email}
-            {ticket.org_name && <> · <span className="text-violet-400">{ticket.org_name}</span></>}
-            {' · '}{({ general: t('supportCategoryGeneral'), billing: t('supportCategoryBilling'), technical: t('supportCategoryTechnical'), other: t('supportCategoryOther') } as Record<string,string>)[ticket.category]}
-            {' · '}{fmtDate(ticket.created_at)}
+          <p className="text-[12px] text-text3 mt-1.5 flex items-center gap-1.5 flex-wrap">
+            <span>{ticket.user_email}</span>
+            {ticket.org_name && (
+              <>
+                <span className="text-border">·</span>
+                <span className="text-accent2">{ticket.org_name}</span>
+              </>
+            )}
+            <span className="text-border">·</span>
+            <span>{categoryLabel[ticket.category]}</span>
+            <span className="text-border">·</span>
+            <span>{fmtDate(ticket.created_at)}</span>
           </p>
         </div>
         {isAdmin && (
@@ -303,8 +402,7 @@ function ThreadView({
             name="ticket-status"
             value={ticket.status}
             onChange={e => onStatusChange(ticket.id, e.target.value as TicketStatus)}
-            className="shrink-0 rounded-xl px-3 py-2 text-[13px] focus:outline-none"
-            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
+            className="sf-input shrink-0 cursor-pointer focus-visible:ring-2 focus-visible:ring-accent/60"
           >
             <option value="open" style={{ background: '#0d1120', color: '#e2d9f3' }}>{t('supportStatusOpen')}</option>
             <option value="in_progress" style={{ background: '#0d1120', color: '#e2d9f3' }}>{t('supportStatusInProgress')}</option>
@@ -315,82 +413,83 @@ function ThreadView({
       </div>
 
       {/* Description card */}
-      <div className="rounded-2xl p-6" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-        <p className="text-[12px] font-medium text-text2 uppercase tracking-wide mb-3">{t('supportInitialDesc')}</p>
-        <p className="text-[13px] text-text whitespace-pre-wrap">{ticket.description}</p>
+      <div className="sf-card p-5">
+        <p className="text-[11px] font-semibold text-text3 uppercase tracking-widest mb-3">{t('supportInitialDesc')}</p>
+        <p className="text-[13px] text-text whitespace-pre-wrap leading-relaxed">{ticket.description}</p>
       </div>
 
       {/* Messages */}
-      <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+      <div className="sf-card overflow-hidden">
         <div className="max-h-80 overflow-y-auto p-5 space-y-4">
           {loading ? (
-            <p className="text-[13px] text-text2 text-center py-4">{t('supportLoading')}</p>
+            <div className="flex items-center justify-center gap-2 py-6 text-text3">
+              <span className="sf-spinner" />
+              <span className="text-[13px]">{t('supportLoading')}</span>
+            </div>
           ) : messages.length === 0 ? (
-            <p className="text-[13px] text-text2 text-center py-4">{t('supportNoMessages')}</p>
+            <p className="text-[13px] text-text3 text-center py-6">{t('supportNoMessages')}</p>
           ) : (
-            messages.map(m => (
-              <div
-                key={m.id}
-                className={`flex gap-3 ${m.sender_id === userId && !m.is_admin ? 'flex-row-reverse' : ''}`}
-              >
-                <div
-                  className={`w-8 h-8 rounded-full flex items-center justify-center text-[13px] font-bold shrink-0 ${
-                    m.is_admin ? 'bg-violet-600/30 text-violet-300' : 'bg-zinc-700 text-zinc-200'
-                  }`}
-                >
-                  {m.is_admin ? (
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                    </svg>
-                  ) : m.sender_email[0]?.toUpperCase()}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-[13px] font-medium text-text">
-                      {m.is_admin ? t('supportAdminLabel') : m.sender_email}
-                    </span>
-                    {m.is_admin && (
-                      <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-violet-500/20 text-violet-300 border border-violet-500/30">
-                        Admin
-                      </span>
-                    )}
-                    <span className="text-[12px] text-text2">{fmtDate(m.created_at)}</span>
-                  </div>
+            messages.map(m => {
+              const isOwn = m.sender_id === userId && !m.is_admin
+              return (
+                <div key={m.id} className={`flex gap-3 ${isOwn ? 'flex-row-reverse' : ''}`}>
+                  {/* Avatar */}
                   <div
-                    className={`rounded-xl px-4 py-3 text-[13px] text-text whitespace-pre-wrap ${
-                      m.is_admin
-                        ? 'bg-violet-600/10 border border-violet-500/20'
-                        : 'bg-zinc-800/60 border border-border/40'
+                    className={`w-8 h-8 rounded-full flex items-center justify-center text-[12px] font-bold shrink-0 ${
+                      m.is_admin ? 'bg-accent/20 text-accent' : 'bg-surface3 text-text2'
                     }`}
                   >
-                    {m.message}
+                    {m.is_admin ? <IconShield /> : m.sender_email[0]?.toUpperCase()}
+                  </div>
+
+                  {/* Bubble */}
+                  <div className={`flex-1 min-w-0 ${isOwn ? 'items-end' : 'items-start'} flex flex-col`}>
+                    <div className={`flex items-center gap-2 mb-1 ${isOwn ? 'flex-row-reverse' : ''}`}>
+                      <span className="text-[12px] font-semibold text-text">
+                        {m.is_admin ? t('supportAdminLabel') : m.sender_email}
+                      </span>
+                      {m.is_admin && (
+                        <span className="sf-badge sf-badge-accent text-[10px]">Admin</span>
+                      )}
+                      <span className="text-[11px] text-text3">{fmtDate(m.created_at)}</span>
+                    </div>
+                    <div
+                      className={`rounded-2xl px-4 py-3 text-[13px] text-text whitespace-pre-wrap leading-relaxed max-w-[85%] ${
+                        m.is_admin
+                          ? 'bg-accent/10 border border-accent/20 rounded-tl-sm'
+                          : isOwn
+                            ? 'bg-surface3 border border-border rounded-tr-sm'
+                            : 'bg-surface2 border border-border rounded-tl-sm'
+                      }`}
+                    >
+                      {m.message}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))
+              )
+            })
           )}
           <div ref={bottomRef} />
         </div>
 
         {/* Reply input */}
         {!isClosed && (
-          <div className="px-5 py-4 flex gap-3" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+          <div className="px-5 py-4 flex gap-3 border-t border-border">
             <input
               name="reply"
               value={reply}
               onChange={e => setReply(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendReply() } }}
               placeholder={t('supportReplyPlaceholder')}
-              className="flex-1 rounded-xl px-4 py-2.5 text-[13px] focus:outline-none"
-              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
+              className="sf-input flex-1 cursor-text focus-visible:ring-2 focus-visible:ring-accent/60"
             />
             <button
               onClick={sendReply}
               disabled={sending || !reply.trim()}
-              className="rounded-xl px-5 py-2.5 text-[13px] font-semibold text-white disabled:opacity-50"
-              style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)' }}
+              className="sf-btn sf-btn-primary cursor-pointer disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-accent/60 flex items-center gap-2"
             >
-              {sending ? '…' : t('supportReplyBtn')}
+              {sending ? <span className="sf-spinner" /> : <IconSend />}
+              {t('supportReplyBtn')}
             </button>
           </div>
         )}
@@ -422,19 +521,24 @@ function UserSupport({ user }: { user: User }) {
 
   useEffect(() => { load() }, [])
 
-  function openTicket(t: Ticket) {
-    // Refresh ticket from list in case status changed
-    setActive(t)
+  // suppress unused warning
+  void lang
+
+  function openTicket(tk: Ticket) {
+    setActive(tk)
     setView('thread')
   }
 
   if (view === 'create') {
     return (
-      <div className="h-full flex flex-col overflow-hidden">
-        <div className="flex-shrink-0 px-8 pt-7 pb-5" style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
-          <h1 className="text-[20px] font-black text-white leading-none">Support</h1>
+      <div className="sf-page anim-page">
+        <div className="sf-page-header">
+          <div>
+            <h1 className="sf-page-title">{t('supportTitle')}</h1>
+            <p className="sf-page-subtitle">{t('supportHelp')}</p>
+          </div>
         </div>
-        <div className="flex-1 overflow-y-auto px-10 pb-10 mt-8">
+        <div className="sf-page-body">
           <CreateTicketForm
             user={user}
             orgId={currentOrg?.id ?? null}
@@ -449,11 +553,14 @@ function UserSupport({ user }: { user: User }) {
 
   if (view === 'thread' && active) {
     return (
-      <div className="h-full flex flex-col overflow-hidden">
-        <div className="flex-shrink-0 px-8 pt-7 pb-5" style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
-          <h1 className="text-[20px] font-black text-white leading-none">Support</h1>
+      <div className="sf-page anim-page">
+        <div className="sf-page-header">
+          <div>
+            <h1 className="sf-page-title">{t('supportTitle')}</h1>
+            <p className="sf-page-subtitle">{t('supportHelp')}</p>
+          </div>
         </div>
-        <div className="flex-1 overflow-y-auto px-10 pb-10 mt-8">
+        <div className="sf-page-body">
           <ThreadView
             ticket={active}
             userId={user.id}
@@ -466,72 +573,85 @@ function UserSupport({ user }: { user: User }) {
     )
   }
 
+  const categoryLabel: Record<string, string> = {
+    general:   t('supportCategoryGeneral'),
+    billing:   t('supportCategoryBilling'),
+    technical: t('supportCategoryTechnical'),
+    other:     t('supportCategoryOther'),
+  }
+
   return (
-    <div className="h-full flex flex-col overflow-hidden">
+    <div className="sf-page anim-page">
       {/* Page header */}
-      <div className="flex-shrink-0 px-8 pt-7 pb-5 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
+      <div className="sf-page-header">
         <div>
-          <h1 className="text-[20px] font-black text-white leading-none">{t('supportTitle')}</h1>
-          <p className="text-[13px] text-text2 mt-0.5">{t('supportHelp')}</p>
+          <h1 className="sf-page-title">{t('supportTitle')}</h1>
+          <p className="sf-page-subtitle">{t('supportHelp')}</p>
         </div>
         <button
           onClick={() => setView('create')}
-          className="rounded-xl px-5 py-2.5 text-[13px] font-semibold text-white"
-          style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)' }}
+          className="sf-btn sf-btn-primary cursor-pointer focus-visible:ring-2 focus-visible:ring-accent/60 flex items-center gap-2"
         >
+          <IconPlus />
           {t('supportNewTicketBtn')}
         </button>
       </div>
 
       {/* Scrollable content */}
-      <div className="flex-1 overflow-y-auto px-10 pb-10">
-        <div className="mt-8 space-y-4">
-          {/* Tickets list */}
+      <div className="sf-page-body">
+        <div className="space-y-3">
           {loading ? (
-            <div className="rounded-2xl p-10 text-center" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-              <p className="text-[13px] text-text2">{t('loading')}</p>
+            <div className="sf-card p-10 flex items-center justify-center gap-3 text-text3">
+              <span className="sf-spinner" />
+              <span className="text-[13px]">{t('loading')}</span>
             </div>
           ) : tickets.length === 0 ? (
-            <div className="rounded-2xl p-10 text-center space-y-4" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-              <div className="flex justify-center" style={{ color: '#a78bfa' }}>
-                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2z"/><path d="M13 5v2"/><path d="M13 17v2"/><path d="M13 11v2"/>
-                </svg>
+            <div className="sf-empty">
+              <div className="text-accent/60">
+                <IconTicket />
               </div>
-              <p className="text-base font-bold text-white">{t('supportNoTicketsYet')}</p>
-              <p className="text-[13px] text-text2">{t('supportNoTicketsHint')}</p>
+              <p className="text-base font-bold text-text mt-2">{t('supportNoTicketsYet')}</p>
+              <p className="text-[13px] text-text3">{t('supportNoTicketsHint')}</p>
               <button
                 onClick={() => setView('create')}
-                className="mt-2 inline-flex items-center gap-1.5 rounded-xl px-5 py-2.5 text-[13px] font-semibold text-white"
-                style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)' }}
+                className="sf-btn sf-btn-primary cursor-pointer focus-visible:ring-2 focus-visible:ring-accent/60 flex items-center gap-2 mt-2"
               >
+                <IconPlus />
                 {t('supportCreateTicket')}
               </button>
             </div>
           ) : (
-            <div className="space-y-3">
-              {tickets.map(tk => (
-                <button
-                  key={tk.id}
-                  onClick={() => openTicket(tk)}
-                  className="w-full text-left rounded-2xl px-5 py-4 transition-all hover:bg-white/[0.03]"
-                  style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}
-                >
+            tickets.map(tk => (
+              <button
+                key={tk.id}
+                onClick={() => openTicket(tk)}
+                className="sf-card w-full text-left cursor-pointer hover:bg-surface2 transition-colors group focus-visible:ring-2 focus-visible:ring-accent/60 overflow-hidden flex"
+              >
+                {/* Left priority bar */}
+                <div className={`w-1 shrink-0 self-stretch ${PRIORITY_BAR[tk.priority]} opacity-70`} />
+
+                <div className="flex-1 min-w-0 px-5 py-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-[13px] font-medium text-text truncate">{tk.subject}</span>
+                      <div className="flex items-center gap-2 flex-wrap mb-1.5">
                         <StatusBadge status={tk.status} />
+                        <PriorityBadge priority={tk.priority} />
                       </div>
-                      <p className="text-[12px] text-text2 mt-1">
-                        {({ general: t('supportCategoryGeneral'), billing: t('supportCategoryBilling'), technical: t('supportCategoryTechnical'), other: t('supportCategoryOther') } as Record<string,string>)[tk.category]} · {fmtDate(tk.created_at)}
+                      <p className="text-[14px] font-semibold text-text truncate mb-1">{tk.subject}</p>
+                      <p className="text-[12px] text-text3 line-clamp-1 mb-2">{tk.description}</p>
+                      <p className="text-[11px] text-text3 flex items-center gap-1.5">
+                        <span>{categoryLabel[tk.category]}</span>
+                        <span className="text-border">·</span>
+                        <span>{fmtDate(tk.created_at)}</span>
                       </p>
                     </div>
-                    <span className="text-[13px] text-text2 shrink-0">→</span>
+                    <div className="text-text3 group-hover:text-text2 transition-colors mt-1 shrink-0">
+                      <IconChevronRight />
+                    </div>
                   </div>
-                </button>
-              ))}
-            </div>
+                </div>
+              </button>
+            ))
           )}
         </div>
       </div>
@@ -563,29 +683,39 @@ function AdminSupport({ user }: { user: User }) {
     if (active?.id === id) setActive(prev => prev ? { ...prev, status } : prev)
   }
 
-  const shown = tickets.filter(t => {
-    if (filter !== 'all' && t.status !== filter) return false
+  const shown = tickets.filter(tk => {
+    if (filter !== 'all' && tk.status !== filter) return false
     if (search) {
       const q = search.toLowerCase()
       return (
-        t.subject.toLowerCase().includes(q) ||
-        t.user_email.toLowerCase().includes(q) ||
-        (t.org_name ?? '').toLowerCase().includes(q)
+        tk.subject.toLowerCase().includes(q) ||
+        tk.user_email.toLowerCase().includes(q) ||
+        (tk.org_name ?? '').toLowerCase().includes(q)
       )
     }
     return true
   })
 
   const counts: Record<string, number> = { all: tickets.length }
-  for (const t of tickets) counts[t.status] = (counts[t.status] ?? 0) + 1
+  for (const tk of tickets) counts[tk.status] = (counts[tk.status] ?? 0) + 1
+
+  const categoryLabel: Record<string, string> = {
+    general:   t('supportCategoryGeneral'),
+    billing:   t('supportCategoryBilling'),
+    technical: t('supportCategoryTechnical'),
+    other:     t('supportCategoryOther'),
+  }
 
   if (active) {
     return (
-      <div className="h-full flex flex-col overflow-hidden">
-        <div className="flex-shrink-0 px-8 pt-7 pb-5" style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
-          <h1 className="text-[20px] font-black text-white leading-none">{t('supportAdminPanel')}</h1>
+      <div className="sf-page anim-page">
+        <div className="sf-page-header">
+          <div>
+            <h1 className="sf-page-title">{t('supportAdminPanel')}</h1>
+            <p className="sf-page-subtitle">{tickets.length} {t('supportAdminTotal')}</p>
+          </div>
         </div>
-        <div className="flex-1 overflow-y-auto px-10 pb-10 mt-8">
+        <div className="sf-page-body">
           <ThreadView
             ticket={active}
             userId={user.id}
@@ -599,102 +729,97 @@ function AdminSupport({ user }: { user: User }) {
   }
 
   return (
-    <div className="h-full flex flex-col overflow-hidden">
+    <div className="sf-page anim-page">
       {/* Page header */}
-      <div className="flex-shrink-0 px-8 pt-7 pb-5 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
+      <div className="sf-page-header">
         <div>
-          <h1 className="text-[20px] font-black text-white leading-none">{t('supportAdminTickets')}</h1>
-          <p className="text-[13px] text-text2 mt-0.5">{tickets.length} {t('supportAdminTotal')}</p>
+          <h1 className="sf-page-title">{t('supportAdminTickets')}</h1>
+          <p className="sf-page-subtitle">{tickets.length} {t('supportAdminTotal')}</p>
         </div>
         <button
           onClick={load}
-          className="rounded-xl px-5 py-2.5 text-[13px] font-semibold"
-          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
+          className="sf-btn sf-btn-secondary cursor-pointer focus-visible:ring-2 focus-visible:ring-accent/60 flex items-center gap-2"
         >
+          <IconRefresh />
           {t('supportAdminRefresh')}
         </button>
       </div>
 
       {/* Scrollable content */}
-      <div className="flex-1 overflow-y-auto px-10 pb-10">
-        <div className="mt-8 space-y-6">
+      <div className="sf-page-body space-y-5">
 
-          {/* Filters row */}
-          <div className="flex items-center gap-3 flex-wrap">
-            <input
-              name="search"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder={t('supportAdminSearchPlaceholder')}
-              className="flex-1 min-w-48 rounded-xl px-4 py-2.5 text-[13px] focus:outline-none"
-              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}
-            />
+        {/* Filters row */}
+        <div className="flex items-center gap-3 flex-wrap">
+          <input
+            name="search"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder={t('supportAdminSearchPlaceholder')}
+            className="sf-input flex-1 min-w-48 cursor-text focus-visible:ring-2 focus-visible:ring-accent/60"
+          />
+          <div className="sf-tabs flex items-center gap-1">
             {(['all', 'open', 'in_progress', 'resolved', 'closed'] as const).map(s => (
               <button
                 key={s}
                 onClick={() => setFilter(s)}
-                className={`rounded-xl px-4 py-2.5 text-[13px] font-medium border transition-colors ${
-                  filter === s
-                    ? 'bg-violet-600/20 border-violet-500/40 text-violet-300'
-                    : 'text-text2 hover:text-text'
-                }`}
-                style={filter !== s ? { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' } : {}}
+                className={`sf-tab cursor-pointer focus-visible:ring-2 focus-visible:ring-accent/60 ${filter === s ? 'sf-tab-active' : ''}`}
               >
-                {s === 'all' ? t('supportAdminAll') : t(`supportStatus${s === 'in_progress' ? 'InProgress' : s.charAt(0).toUpperCase() + s.slice(1)}` as Parameters<typeof t>[0])}
-                <span className="ml-1 text-[11px] opacity-70">({counts[s] ?? 0})</span>
+                {s === 'all'
+                  ? t('supportAdminAll')
+                  : t(`supportStatus${s === 'in_progress' ? 'InProgress' : s.charAt(0).toUpperCase() + s.slice(1)}` as Parameters<typeof t>[0])}
+                <span className="ml-1 opacity-60 text-[11px]">({counts[s] ?? 0})</span>
               </button>
             ))}
           </div>
-
-          {/* Table */}
-          {loading ? (
-            <div className="rounded-2xl p-10 text-center" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-              <p className="text-[13px] text-text2">{t('supportAdminLoading')}</p>
-            </div>
-          ) : shown.length === 0 ? (
-            <div className="rounded-2xl p-10 text-center" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-              <p className="text-[13px] text-text2">{t('supportAdminNoTickets')}</p>
-            </div>
-          ) : (
-            <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-              <table className="w-full">
-                <thead>
-                  <tr style={{ borderBottom: '1px solid rgba(139,92,246,0.1)', background: 'rgba(255,255,255,0.02)' }}>
-                    <th className="text-left px-5 py-3.5 text-[12px] font-semibold text-text2 uppercase tracking-wide">{t('supportAdminColSubject')}</th>
-                    <th className="text-left px-5 py-3.5 text-[12px] font-semibold text-text2 uppercase tracking-wide">{t('supportAdminColEmail')}</th>
-                    <th className="text-left px-5 py-3.5 text-[12px] font-semibold text-text2 uppercase tracking-wide">{t('supportAdminColOrg')}</th>
-                    <th className="text-left px-5 py-3.5 text-[12px] font-semibold text-text2 uppercase tracking-wide">{t('supportAdminColCat')}</th>
-                    <th className="text-left px-5 py-3.5 text-[12px] font-semibold text-text2 uppercase tracking-wide">{t('supportAdminColStatus')}</th>
-                    <th className="text-left px-5 py-3.5 text-[12px] font-semibold text-text2 uppercase tracking-wide">{t('supportAdminColPriority')}</th>
-                    <th className="text-left px-5 py-3.5 text-[12px] font-semibold text-text2 uppercase tracking-wide">{t('supportAdminColMsgs')}</th>
-                    <th className="text-left px-5 py-3.5 text-[12px] font-semibold text-text2 uppercase tracking-wide">{t('supportAdminColUpdated')}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {shown.map(tk => (
-                    <tr
-                      key={tk.id}
-                      onClick={() => setActive(tk)}
-                      className="cursor-pointer transition-colors hover:bg-white/[0.02]"
-                      style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}
-                    >
-                      <td className="px-5 py-4 text-[13px] font-medium text-text max-w-40 truncate">{tk.subject}</td>
-                      <td className="px-5 py-4 text-[13px] text-text2">{tk.user_email}</td>
-                      <td className="px-5 py-4 text-[13px] text-violet-400">{tk.org_name ?? '—'}</td>
-                      <td className="px-5 py-4 text-[13px] text-text2">{({ general: t('supportCategoryGeneral'), billing: t('supportCategoryBilling'), technical: t('supportCategoryTechnical'), other: t('supportCategoryOther') } as Record<string,string>)[tk.category]}</td>
-                      <td className="px-5 py-4"><StatusBadge status={tk.status} /></td>
-                      <td className={`px-5 py-4 text-[13px] font-medium ${PRIORITY_COLORS[tk.priority]}`}>
-                        {({ low: t('supportPriorityLow'), normal: t('supportPriorityNormal'), high: t('supportPriorityHigh'), urgent: t('supportPriorityUrgent') } as Record<string,string>)[tk.priority]}
-                      </td>
-                      <td className="px-5 py-4 text-[13px] text-text2 text-center">{tk.message_count ?? 0}</td>
-                      <td className="px-5 py-4 text-[13px] text-text2 whitespace-nowrap">{fmtDate(tk.updated_at)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
         </div>
+
+        {/* Table / states */}
+        {loading ? (
+          <div className="sf-card p-10 flex items-center justify-center gap-3 text-text3">
+            <span className="sf-spinner" />
+            <span className="text-[13px]">{t('supportAdminLoading')}</span>
+          </div>
+        ) : shown.length === 0 ? (
+          <div className="sf-empty">
+            <div className="text-accent/60"><IconTicket /></div>
+            <p className="text-[13px] text-text3 mt-2">{t('supportAdminNoTickets')}</p>
+          </div>
+        ) : (
+          <div className="sf-card overflow-hidden">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-border bg-surface2/50">
+                  <th className="text-left px-5 py-3.5 text-[11px] font-semibold text-text3 uppercase tracking-widest">{t('supportAdminColSubject')}</th>
+                  <th className="text-left px-5 py-3.5 text-[11px] font-semibold text-text3 uppercase tracking-widest">{t('supportAdminColEmail')}</th>
+                  <th className="text-left px-5 py-3.5 text-[11px] font-semibold text-text3 uppercase tracking-widest">{t('supportAdminColOrg')}</th>
+                  <th className="text-left px-5 py-3.5 text-[11px] font-semibold text-text3 uppercase tracking-widest">{t('supportAdminColCat')}</th>
+                  <th className="text-left px-5 py-3.5 text-[11px] font-semibold text-text3 uppercase tracking-widest">{t('supportAdminColStatus')}</th>
+                  <th className="text-left px-5 py-3.5 text-[11px] font-semibold text-text3 uppercase tracking-widest">{t('supportAdminColPriority')}</th>
+                  <th className="text-left px-5 py-3.5 text-[11px] font-semibold text-text3 uppercase tracking-widest">{t('supportAdminColMsgs')}</th>
+                  <th className="text-left px-5 py-3.5 text-[11px] font-semibold text-text3 uppercase tracking-widest">{t('supportAdminColUpdated')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {shown.map(tk => (
+                  <tr
+                    key={tk.id}
+                    onClick={() => setActive(tk)}
+                    className="cursor-pointer transition-colors hover:bg-surface2/60 border-t border-border/50 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/60"
+                  >
+                    <td className="px-5 py-4 text-[13px] font-semibold text-text max-w-40 truncate">{tk.subject}</td>
+                    <td className="px-5 py-4 text-[13px] text-text2">{tk.user_email}</td>
+                    <td className="px-5 py-4 text-[13px] text-accent2">{tk.org_name ?? '—'}</td>
+                    <td className="px-5 py-4 text-[13px] text-text2">{categoryLabel[tk.category]}</td>
+                    <td className="px-5 py-4"><StatusBadge status={tk.status} /></td>
+                    <td className="px-5 py-4"><PriorityBadge priority={tk.priority} /></td>
+                    <td className="px-5 py-4 text-[13px] text-text2 text-center">{tk.message_count ?? 0}</td>
+                    <td className="px-5 py-4 text-[13px] text-text3 whitespace-nowrap">{fmtDate(tk.updated_at)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   )
