@@ -51,7 +51,8 @@ async function geelark(bearer: string, path: string, body: unknown) {
   const headers = { Authorization: `Bearer ${bearer}` }
   if (window.electronAPI?.geelarkRequest) {
     const r = await window.electronAPI.geelarkRequest({ method: 'POST', url, headers, body })
-    return r.data as Record<string, unknown>
+    // r can be undefined on IPC timeout / network error — degrade gracefully
+    return (r?.data ?? {}) as Record<string, unknown>
   }
   // Web: route through Vercel proxy
   const res = await fetch('/api/geelark', {
@@ -563,11 +564,17 @@ export function MassPosting({ user }: MassPostingProps) {
           if (stopRef.current) { log('⏹ Polling interrompu (stop)', 'warn'); break }
           await new Promise(r => setTimeout(r, 10000))
           if (stopRef.current) { log('⏹ Polling interrompu (stop)', 'warn'); break }
-          const qRes = await geelark(bearer, '/task/query', { ids: [...pending] })
+          let qRes: Record<string, unknown>
+          try {
+            qRes = await geelark(bearer, '/task/query', { ids: [...pending] })
+          } catch (pollErr) {
+            log(`⚠️ Poll /task/query raté: ${pollErr instanceof Error ? pollErr.message : String(pollErr)} — on réessaie…`, 'warn')
+            continue
+          }
           pollCount++
 
           // RPA tasks may live under different response keys depending on the GéeLark API version
-          const d = (qRes['data'] as Record<string, unknown>) ?? {}
+          const d = (qRes['data'] as Record<string, unknown>) ?? qRes
           let items = (d['items'] ?? d['list'] ?? d['tasks'] ?? d['records']) as Array<Record<string, unknown>> | undefined
           if (!Array.isArray(items)) items = []
 
@@ -641,6 +648,12 @@ export function MassPosting({ user }: MassPostingProps) {
 
     } catch (e: unknown) {
       log(`❌ Erreur: ${e instanceof Error ? e.message : String(e)}`, 'error')
+      // Always stop phones on unexpected crash — so they don't stay on indefinitely
+      const stuck = activePhonesRef.current
+      if (stuck.length > 0) {
+        log(`🛑 Arrêt d'urgence de ${stuck.length} téléphone(s)…`, 'warn')
+        geelark(bearer, '/phone/stop', { ids: stuck }).catch(() => {})
+      }
     }
 
     activePhonesRef.current = []
