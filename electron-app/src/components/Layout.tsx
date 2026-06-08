@@ -517,10 +517,11 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
             cursor: 'pointer',
             border: 'none',
             background: active
-              ? 'rgba(255,255,255,0.09)'
-              : hovered ? 'rgba(255,255,255,0.05)' : 'transparent',
-            color: active ? '#ffffff' : hovered ? 'rgba(241,240,247,0.85)' : 'rgba(148,163,184,0.58)',
-            transition: 'background 140ms ease, color 140ms ease',
+              ? 'linear-gradient(90deg, rgba(124,58,237,0.16) 0%, rgba(139,92,246,0.08) 60%, transparent 100%)'
+              : hovered ? 'rgba(255,255,255,0.045)' : 'transparent',
+            color: active ? '#ede8ff' : hovered ? 'rgba(241,240,247,0.82)' : 'rgba(148,163,184,0.55)',
+            boxShadow: active ? 'inset 3px 0 0 rgba(139,92,246,0.85)' : 'none',
+            transition: 'background 140ms ease, color 140ms ease, box-shadow 140ms ease',
             transform: pressed ? 'scale(0.968)' : 'scale(1)',
             justifyContent: collapsed ? 'center' : 'flex-start',
             flexShrink: 0,
@@ -531,7 +532,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
           <span style={{
             flexShrink: 0,
             display: 'flex',
-            color: active ? 'rgba(255,255,255,0.9)' : hovered ? 'rgba(196,181,253,0.7)' : 'rgba(148,163,184,0.42)',
+            color: active ? '#c4b5fd' : hovered ? 'rgba(196,181,253,0.65)' : 'rgba(148,163,184,0.4)',
             transition: 'color 140ms ease',
           }}>
             <NavIcon d={ICONS[iconKey]} size={17} />
