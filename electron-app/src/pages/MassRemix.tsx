@@ -49,6 +49,26 @@ async function pLimit<T>(tasks: Array<() => Promise<T>>, concurrency: number): P
 
 interface MassRemixProps { user: User }
 
+// ── Inline Lucide-style icons (no emoji UI icons) ─────────────────────────────
+function SfIcon({ size = 16, children, ...rest }: { size?: number; children: React.ReactNode } & React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...rest}>
+      {children}
+    </svg>
+  )
+}
+const IconX            = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></SfIcon>
+const IconCheck        = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><polyline points="20 6 9 17 4 12"/></SfIcon>
+const IconLibrary      = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><path d="m16 6 4 14"/><path d="M12 6v14"/><path d="M8 8v12"/><path d="M4 4v16"/></SfIcon>
+const IconFolder       = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></SfIcon>
+const IconHardDrive    = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><line x1="22" y1="12" x2="2" y2="12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/><line x1="6" y1="16" x2="6.01" y2="16"/><line x1="10" y1="16" x2="10.01" y2="16"/></SfIcon>
+const IconClapperboard = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><path d="M20.2 6 3 11l-.9-2.4c-.3-1.1.3-2.2 1.3-2.5l13.5-4c1.1-.3 2.2.3 2.5 1.3Z"/><path d="m6.2 5.3 3.1 3.9"/><path d="m12.4 3.4 3.1 4"/><path d="M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></SfIcon>
+const IconScissors     = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></SfIcon>
+const IconShuffle      = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><path d="M16 3h5v5"/><path d="M4 20 21 3"/><path d="M21 16v5h-5"/><path d="m15 15 6 6"/><path d="M4 4l5 5"/></SfIcon>
+const IconZap          = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></SfIcon>
+const IconDownload     = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></SfIcon>
+const IconAlertTriangle = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></SfIcon>
+
 type Preset = '9:16' | '1:1' | '16:9'
 type ExportMode = 'bank' | 'folder'
 
@@ -150,15 +170,15 @@ function VideoSourcePanel({
       <div style={{ flex: 1, overflowY: 'auto', padding: '7px 9px', display: 'flex', flexDirection: 'column', gap: 2, minHeight: 0 }}>
         {paths.length === 0 ? (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 5, minHeight: 80 }}>
-            <span style={{ fontSize: 22, opacity: 0.09 }}>🎬</span>
+            <span style={{ color: '#94a3b8', opacity: 0.18 }}><IconClapperboard size={26} /></span>
             <p style={{ fontSize: 10, color: 'rgba(148,163,184,0.22)' }}>{t('massRemixNoVideo')}</p>
           </div>
         ) : paths.map((p, i) => (
           <div key={i} className="group" style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 7px', borderRadius: 6, background: `${accent}08` }}>
             <span style={{ fontSize: 8, fontWeight: 900, color: accent, opacity: 0.4, width: 11, textAlign: 'right', flexShrink: 0 }}>{i + 1}</span>
             <span style={{ fontSize: 10, fontFamily: 'monospace', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'rgba(226,217,243,0.48)' }}>{fileName(p)}</span>
-            <button onClick={() => onRemove(i)} className="opacity-0 group-hover:opacity-100"
-              style={{ fontSize: 9, color: '#f87171', background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0, transition: 'opacity 0.15s', lineHeight: 1, padding: 0 }}>✕</button>
+            <button onClick={() => onRemove(i)} aria-label={t('remove')} className="opacity-0 group-hover:opacity-100"
+              style={{ display: 'flex', alignItems: 'center', color: '#f87171', background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0, transition: 'opacity 0.15s', lineHeight: 1, padding: 0 }}><IconX size={11} /></button>
           </div>
         ))}
       </div>
@@ -166,20 +186,20 @@ function VideoSourcePanel({
       {/* Add buttons */}
       <div style={{ padding: '8px 9px', borderTop: `1px solid ${accent}14`, display: 'flex', gap: 4, flexShrink: 0 }}>
         <button onClick={onAddBank}
-          style={{ flex: 1, padding: '6px 0', borderRadius: 7, fontSize: 10, fontWeight: 600, cursor: 'pointer', background: `${accent}13`, color: accent, border: `1px solid ${accent}24`, transition: 'background 0.15s' }}
+          style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, padding: '6px 0', borderRadius: 7, fontSize: 10, fontWeight: 600, cursor: 'pointer', background: `${accent}13`, color: accent, border: `1px solid ${accent}24`, transition: 'background 0.15s' }}
           onMouseEnter={e => (e.currentTarget.style.background = `${accent}20`)}
           onMouseLeave={e => (e.currentTarget.style.background = `${accent}13`)}>
-          🗂 {t('massRemixBankSource')}
+          <IconLibrary size={13} /> {t('massRemixBankSource')}
         </button>
         <button onClick={onAddFolder}
-          style={{ flex: 1, padding: '6px 0', borderRadius: 7, fontSize: 10, fontWeight: 600, cursor: 'pointer', background: 'rgba(167,139,250,0.06)', color: '#a78bfa', border: '1px solid rgba(167,139,250,0.14)', transition: 'background 0.15s' }}
+          style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, padding: '6px 0', borderRadius: 7, fontSize: 10, fontWeight: 600, cursor: 'pointer', background: 'rgba(167,139,250,0.06)', color: '#a78bfa', border: '1px solid rgba(167,139,250,0.14)', transition: 'background 0.15s' }}
           onMouseEnter={e => (e.currentTarget.style.background = 'rgba(167,139,250,0.12)')}
           onMouseLeave={e => (e.currentTarget.style.background = 'rgba(167,139,250,0.06)')}>
-          📁 {t('massRemixFolderSource')}
+          <IconFolder size={13} /> {t('massRemixFolderSource')}
         </button>
         <button onClick={onAddPC}
-          style={{ flex: 1, padding: '6px 0', borderRadius: 7, fontSize: 10, fontWeight: 600, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.38)', border: '1px solid rgba(255,255,255,0.06)' }}>
-          💾 {t('massRemixPCSource')}
+          style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, padding: '6px 0', borderRadius: 7, fontSize: 10, fontWeight: 600, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.38)', border: '1px solid rgba(255,255,255,0.06)' }}>
+          <IconHardDrive size={13} /> {t('massRemixPCSource')}
         </button>
       </div>
     </div>
@@ -984,9 +1004,10 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                         )}
                         {selectedPair.cutSec != null && (
                           <button onClick={() => setCutForPair(selectedPair.id, undefined)}
-                            className="text-[11px] px-2 py-1 rounded-lg"
+                            aria-label={t('remove')}
+                            className="px-2 py-1 rounded-lg inline-flex items-center justify-center"
                             style={{ background: 'rgba(239,68,68,0.1)', color: '#f87171', border: '1px solid rgba(239,68,68,0.2)' }}>
-                            ✕
+                            <IconX size={12} />
                           </button>
                         )}
                       </div>
@@ -1013,8 +1034,8 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                           {/* Cut divider */}
                           <div className="flex flex-col items-center justify-center gap-0.5 flex-shrink-0 px-0.5">
                             <div style={{ width: 2, flex: 1, background: 'linear-gradient(180deg,transparent,#eab308)', borderRadius: 2, minHeight: 30 }} />
-                            <div className="rounded px-1 py-0.5" style={{ background: '#eab308' }}>
-                              <span style={{ fontSize: 8, fontWeight: 900, color: '#000', letterSpacing: '0.05em' }}>✂</span>
+                            <div className="rounded px-1 py-0.5 flex items-center justify-center" style={{ background: '#eab308', color: '#000' }}>
+                              <IconScissors size={11} strokeWidth={2.25} />
                             </div>
                             <div style={{ width: 2, flex: 1, background: 'linear-gradient(180deg,#eab308,transparent)', borderRadius: 2, minHeight: 30 }} />
                           </div>
@@ -1206,9 +1227,9 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                   </div>
                 </>
               ) : (
-                <div className="text-center space-y-3 opacity-40">
-                  <div className="text-6xl">🎬</div>
-                  <p className="text-[14px]" style={{ color: 'rgba(196,181,253,0.6)' }}>{t('massRemixSelectPreview')}</p>
+                <div className="text-center space-y-3 opacity-40 flex flex-col items-center" style={{ color: 'rgba(196,181,253,0.6)' }}>
+                  <IconClapperboard size={60} />
+                  <p className="text-[14px]">{t('massRemixSelectPreview')}</p>
                 </div>
               )}
             </div>
@@ -1277,8 +1298,8 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
         <div className="fixed inset-0 z-50 flex items-center justify-center p-6" style={{ background: 'rgba(3,1,8,0.88)', backdropFilter: 'blur(6px)' }}>
           <div className="w-full max-w-md rounded-2xl overflow-hidden" style={{ background: 'rgba(12,8,28,0.98)', border: `1px solid ${errorCount === 0 ? 'rgba(52,211,153,0.3)' : 'rgba(251,191,36,0.3)'}` }}>
             <div className="px-6 py-6 space-y-5">
-              <div className="text-center space-y-2">
-                <div className="text-5xl">{errorCount === 0 ? '✅' : '⚠️'}</div>
+              <div className="text-center space-y-2 flex flex-col items-center">
+                <div style={{ color: errorCount === 0 ? '#34d399' : '#fbbf24' }}>{errorCount === 0 ? <IconCheck size={44} strokeWidth={2.25} /> : <IconAlertTriangle size={44} />}</div>
                 <p className="text-[20px] font-black text-white">
                   {errorCount === 0 ? t('massRemixDoneTitle') : `${doneCount} / ${jobs.length} done`}
                 </p>
@@ -1290,7 +1311,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                     style={{ background: job.status === 'done' ? 'rgba(52,211,153,0.06)' : 'rgba(239,68,68,0.06)', border: `1px solid ${job.status === 'done' ? 'rgba(52,211,153,0.15)' : 'rgba(239,68,68,0.2)'}` }}
                     open={job.status === 'error'}>
                     <summary className="flex items-center gap-3 px-4 py-2.5 cursor-pointer list-none">
-                      <span className="text-base flex-shrink-0">{job.status === 'done' ? '✅' : '❌'}</span>
+                      <span className="flex-shrink-0" style={{ color: job.status === 'done' ? '#34d399' : '#f87171' }}>{job.status === 'done' ? <IconCheck size={16} strokeWidth={2.25} /> : <IconX size={16} strokeWidth={2.25} />}</span>
                       <div className="flex-1 min-w-0">
                         <p className="text-[13px] font-mono truncate text-white/70">{fileName(job.originalPath)}</p>
                         {job.error && <p className="text-[11px] font-semibold" style={{ color: '#f87171' }}>{job.error}</p>}
@@ -1301,7 +1322,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                           onClick={e => e.stopPropagation()}
                           className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all"
                           style={{ background: 'rgba(52,211,153,0.15)', color: '#34d399', border: '1px solid rgba(52,211,153,0.25)', textDecoration: 'none' }}>
-                          ⬇ MP4
+                          <IconDownload size={12} /> MP4
                         </a>
                       )}
                       {job.logs.length > 0 && (
@@ -1345,10 +1366,10 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
           <div className="rounded-2xl overflow-hidden w-80" onClick={e => e.stopPropagation()}
             style={{ background: '#0d0a1e', border: '1px solid rgba(139,92,246,0.25)' }}>
             <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(139,92,246,0.12)' }}>
-              <p className="text-[14px] font-bold text-white">
-                📁 {folderTarget === 'orig' ? t('massRemixFolderOriginals') : t('massRemixFolderPhase1')}
+              <p className="text-[14px] font-bold text-white flex items-center gap-2">
+                <IconFolder size={16} /> {folderTarget === 'orig' ? t('massRemixFolderOriginals') : t('massRemixFolderPhase1')}
               </p>
-              <button onClick={() => setFolderTarget(null)} className="text-text2 hover:text-white text-lg leading-none">✕</button>
+              <button onClick={() => setFolderTarget(null)} aria-label={t('cancel')} className="text-text2 hover:text-white leading-none"><IconX size={18} /></button>
             </div>
             {folderLoading ? (
               <div className="py-10 text-center text-text2 text-[13px]">{t('massRemixLoadingSource')}</div>
@@ -1360,7 +1381,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                   <button key={f.name} onClick={() => addFolderVideos(f.name)}
                     className="w-full flex items-center gap-3 px-5 py-3 text-left transition-all hover:bg-white/[0.03]"
                     style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                    <span className="text-[18px]">📂</span>
+                    <span style={{ color: '#a78bfa' }}><IconFolder size={18} /></span>
                     <span className="flex-1 text-[13px] font-semibold text-white truncate">{f.name}</span>
                     <span className="text-[11px] font-bold px-2 py-0.5 rounded-full"
                       style={{ background: 'rgba(139,92,246,0.12)', color: '#a78bfa' }}>
@@ -1417,7 +1438,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
             )}
             <button onClick={() => launch()} disabled={!canLaunch}
               style={{ display: 'flex', alignItems: 'center', gap: 6, padding: isMobile ? '8px 14px' : '8px 18px', fontSize: isMobile ? 12 : 13, fontWeight: 800, cursor: canLaunch ? 'pointer' : 'not-allowed', borderRadius: 11, border: 'none', color: '#fff', background: canLaunch ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.06)', boxShadow: canLaunch ? '0 3px 16px rgba(124,58,237,0.38)' : 'none', opacity: canLaunch ? 1 : 0.4, transition: 'all 0.2s' }}>
-              <span>⚡</span><span>{isMobile ? `${t('massRemixLaunchMobile')} (${copies})` : `${t('massRemixLaunchBtn')} ${copies} remix`}</span>
+              <IconZap size={isMobile ? 13 : 15} /><span>{isMobile ? `${t('massRemixLaunchMobile')} (${copies})` : `${t('massRemixLaunchBtn')} ${copies} remix`}</span>
             </button>
           </div>
         </div>
@@ -1465,7 +1486,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
               </div>
               <input type="range" min={1} max={50} value={Math.min(copies, 50)} onChange={e => setCopies(Number(e.target.value))} style={{ width: '100%' }} />
               {originals.length > 0 && secondaries.length > 0 && (
-                <p style={{ fontSize: 10, marginTop: 5, color: 'rgba(148,163,184,0.32)' }}>🔀 {originals.length} × {secondaries.length} → <span style={{ color: '#a78bfa', fontWeight: 700 }}>{copies} {t('massRemixVideoCount')}</span></p>
+                <p style={{ fontSize: 10, marginTop: 5, color: 'rgba(148,163,184,0.32)', display: 'flex', alignItems: 'center', gap: 5 }}><IconShuffle size={11} /> {originals.length} × {secondaries.length} → <span style={{ color: '#a78bfa', fontWeight: 700 }}>{copies} {t('massRemixVideoCount')}</span></p>
               )}
             </div>
 

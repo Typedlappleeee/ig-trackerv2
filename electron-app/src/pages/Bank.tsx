@@ -12,6 +12,23 @@ import { Spinner } from '@/components/ui/Spinner'
 
 interface BankProps { user: User }
 
+// ── Inline Lucide-style icons (no emoji UI icons) ─────────────────────────────
+function SfIcon({ size = 16, children, ...rest }: { size?: number; children: React.ReactNode } & React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...rest}>
+      {children}
+    </svg>
+  )
+}
+const IconX        = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></SfIcon>
+const IconCheck    = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><polyline points="20 6 9 17 4 12"/></SfIcon>
+const IconFolder   = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></SfIcon>
+const IconFolderOpen = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><path d="M6 14l1.45-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.55 6A2 2 0 0 1 18.45 20H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.93a2 2 0 0 1 1.66.9l.82 1.2a2 2 0 0 0 1.66.9H18a2 2 0 0 1 2 2v2"/></SfIcon>
+const IconClapperboard = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><path d="M20.2 6 3 11l-.9-2.4c-.3-1.1.3-2.2 1.3-2.5l13.5-4c1.1-.3 2.2.3 2.5 1.3Z"/><path d="m6.2 5.3 3.1 3.9"/><path d="m12.4 3.4 3.1 4"/><path d="M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></SfIcon>
+const IconImage    = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></SfIcon>
+const IconAlertTriangle = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></SfIcon>
+const IconLibrary  = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><path d="m16 6 4 14"/><path d="M12 6v14"/><path d="M8 8v12"/><path d="M4 4v16"/></SfIcon>
+
 function formatDuration(s: number | null): string {
   if (!s) return ''
   const m   = Math.floor(s / 60)
@@ -116,9 +133,9 @@ function MoveModal({ item, folders, onSave, onClose }: {
           <button
             key={f}
             onClick={() => { onSave(item.id, f); onClose() }}
-            className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${item.folder === f ? 'bg-accent/10 text-accent' : 'hover:bg-surface2 text-text'}`}
+            className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors flex items-center gap-2 ${item.folder === f ? 'bg-accent/10 text-accent' : 'hover:bg-surface2 text-text'}`}
           >
-            📂 {f}
+            <IconFolder size={14} className="flex-shrink-0" /> {f}
           </button>
         ))}
         <Button variant="secondary" size="sm" className="w-full" onClick={onClose}>{t('cancel')}</Button>
@@ -196,7 +213,7 @@ function AddMediaModal({ onFiles, onElectronPick, onClose }: {
       <div className="bg-surface border border-border rounded-2xl p-6 w-96 space-y-4 shadow-2xl" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-bold text-text">{t('bankAddMedia')}</h3>
-          <button onClick={onClose} className="text-text2 hover:text-text transition-colors text-lg leading-none">✕</button>
+          <button onClick={onClose} aria-label={t('cancel')} className="text-text2 hover:text-text transition-colors leading-none"><IconX size={18} /></button>
         </div>
 
         {/* Drag-drop zone */}
@@ -209,7 +226,7 @@ function AddMediaModal({ onFiles, onElectronPick, onClose }: {
             ${dragOver ? 'border-accent bg-accent/10' : 'border-border hover:border-accent/50 bg-surface2/40'}
           `}
         >
-          <span className="text-4xl">{dragOver ? '📂' : '🎬'}</span>
+          <span className={dragOver ? 'text-accent' : 'text-text2/40'}>{dragOver ? <IconFolderOpen size={44} /> : <IconClapperboard size={44} />}</span>
           <div className="text-center">
             <p className="text-sm font-semibold text-text">{t('bankDragFiles')}</p>
             <p className="text-xs text-text2 mt-0.5">{t('bankMediaTypes')}</p>
@@ -1039,7 +1056,7 @@ export function Bank({ user }: BankProps) {
                 style={{ color: '#52525B' }}
                 onMouseEnter={e => (e.currentTarget.style.color = '#A1A1AA')}
                 onMouseLeave={e => (e.currentTarget.style.color = '#52525B')}
-              >✕ {t('bankCancelSelection')}</button>
+              ><span className="inline-flex items-center gap-1.5"><IconX size={12} /> {t('bankCancelSelection')}</span></button>
             </div>
           )}
 
@@ -1075,7 +1092,7 @@ export function Bank({ user }: BankProps) {
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#F87171" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
               <span className="text-[13px] flex-1" style={{ color: '#F87171' }}>{error}</span>
-              <button onClick={() => setError(null)} style={{ color: '#F87171' }} className="hover:opacity-70 transition-opacity">✕</button>
+              <button onClick={() => setError(null)} aria-label={t('cancel')} style={{ color: '#F87171' }} className="hover:opacity-70 transition-opacity"><IconX size={14} /></button>
             </div>
           )}
 
@@ -1472,9 +1489,10 @@ function FolderRow({ name, count, active, onClick, onRename, onDelete, onMerge, 
         />
         <button
           onClick={() => { onRename(val.trim()); setEditing(false) }}
-          className="text-[11px] font-bold px-1.5 py-1 rounded"
+          aria-label={t('save')}
+          className="font-bold px-1.5 py-1 rounded inline-flex items-center justify-center"
           style={{ color: '#A78BFA', background: 'rgba(139,92,246,0.12)' }}
-        >✓</button>
+        ><IconCheck size={13} /></button>
       </div>
     )
   }
@@ -1613,15 +1631,15 @@ export function VideoThumbnail({ filePath, thumbnailPath, storagePath }: {
   }
 
   if (failed) return (
-    <div className="w-full h-full flex flex-col items-center justify-center bg-surface2 gap-1">
-      <span className="text-2xl">⚠️</span>
-      <span className="text-[10px] text-text2/50">{t('bankVideoUnableLoad')}</span>
+    <div className="w-full h-full flex flex-col items-center justify-center bg-surface2 gap-1 text-text2/50">
+      <IconAlertTriangle size={24} />
+      <span className="text-[10px]">{t('bankVideoUnableLoad')}</span>
     </div>
   )
 
   // 1. JPEG thumbnail
   if (thumbnailPath) {
-    if (loading || !thumbUrl) return <div className="w-full h-full flex items-center justify-center bg-surface2 text-4xl animate-pulse">🎬</div>
+    if (loading || !thumbUrl) return <div className="w-full h-full flex items-center justify-center bg-surface2 text-text2/40 animate-pulse"><IconClapperboard size={36} /></div>
     return (
       <img src={thumbUrl} alt=""
         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
@@ -1631,7 +1649,7 @@ export function VideoThumbnail({ filePath, thumbnailPath, storagePath }: {
 
   // 2. Cloud asset (image or video)
   if (storagePath) {
-    if (loading || !videoSrc) return <div className="w-full h-full flex items-center justify-center bg-surface2 text-4xl animate-pulse">🎬</div>
+    if (loading || !videoSrc) return <div className="w-full h-full flex items-center justify-center bg-surface2 text-text2/40 animate-pulse"><IconClapperboard size={36} /></div>
     if (isImagePath(storagePath)) {
       return (
         <img src={videoSrc} alt=""
@@ -1663,7 +1681,7 @@ export function VideoThumbnail({ filePath, thumbnailPath, storagePath }: {
     return 'localvideo://' + n
   })()
   if (!localUrl || failed) {
-    return <div className="w-full h-full flex items-center justify-center bg-surface2 text-4xl">🎬</div>
+    return <div className="w-full h-full flex items-center justify-center bg-surface2 text-text2/40"><IconClapperboard size={36} /></div>
   }
   return (
     <video
@@ -1736,9 +1754,10 @@ function VideoPlayerModal({ item, onClose }: { item: ContentItem; onClose: () =>
         {/* Close button — overlaid top-right */}
         <button
           onClick={onClose}
+          aria-label={t('cancel')}
           className="absolute top-3 right-3 z-20 w-8 h-8 rounded-full flex items-center justify-center text-white/70 hover:text-white transition-colors"
           style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(8px)' }}
-        >✕</button>
+        ><IconX size={16} /></button>
 
         {/* Title + duration overlay — top-left */}
         <div
@@ -1757,7 +1776,7 @@ function VideoPlayerModal({ item, onClose }: { item: ContentItem; onClose: () =>
         )}
         {urlError && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-white/60">
-            <span className="text-3xl">⚠️</span>
+            <IconAlertTriangle size={30} />
             <span className="text-sm">{t('bankVideoUnableLoad')}</span>
           </div>
         )}
@@ -2021,7 +2040,7 @@ export function BankPicker({ user, mode, onSelect, onClose, resolveMode = 'full'
         {/* Header */}
         <div className="px-5 py-4 border-b border-border flex items-center gap-4 flex-shrink-0">
           <div className="flex items-center gap-2.5">
-            <span className="text-xl">🗂</span>
+            <span className="text-accent"><IconLibrary size={20} /></span>
             <h2 className="text-sm font-semibold text-text">{t('bankTitle')}</h2>
             <span className="text-xs text-text2">
               {mode === 'multi' ? t('bankPickerMultiple') : t('bankPickerSingle')}
@@ -2058,7 +2077,7 @@ export function BankPicker({ user, mode, onSelect, onClose, resolveMode = 'full'
               {resolving ? t('bankPickerDownloading') : `${t('confirm')} (${selected.size})`}
             </Button>
           )}
-          <button onClick={onClose} className="text-text2 hover:text-text transition-colors text-xl leading-none">✕</button>
+          <button onClick={onClose} aria-label={t('cancel')} className="text-text2 hover:text-text transition-colors leading-none"><IconX size={18} /></button>
         </div>
         {resolving && (
           <div className="px-5 py-2 bg-accent/10 border-b border-accent/30 text-accent text-xs flex items-center gap-2">
@@ -2075,7 +2094,7 @@ export function BankPicker({ user, mode, onSelect, onClose, resolveMode = 'full'
                 selectedFolder === null ? 'bg-surface2 border-l-2 border-accent pl-[10px]' : 'hover:bg-surface2'
               }`}
             >
-              <span className="text-sm">🎬</span>
+              <span className="text-text2"><IconClapperboard size={14} /></span>
               <span className="text-xs text-text flex-1">{t('bankAllItems')}</span>
               <span className="text-[10px] text-text2">{items.length}</span>
             </button>
@@ -2087,7 +2106,7 @@ export function BankPicker({ user, mode, onSelect, onClose, resolveMode = 'full'
                   selectedFolder === f ? 'bg-surface2 border-l-2 border-accent pl-[10px]' : 'hover:bg-surface2'
                 }`}
               >
-                <span className="text-sm">📂</span>
+                <span className="text-text2"><IconFolder size={14} /></span>
                 <span className="text-xs text-text flex-1 truncate">{f}</span>
                 <span className="text-[10px] text-text2">
                   {items.filter(i => (i as unknown as {folder?: string}).folder === f).length}
@@ -2101,8 +2120,8 @@ export function BankPicker({ user, mode, onSelect, onClose, resolveMode = 'full'
             {loading ? (
               <div className="flex justify-center py-16"><Spinner size="lg" /></div>
             ) : visible.length === 0 ? (
-              <div className="text-center py-16 text-text2 space-y-2">
-                <p className="text-3xl">🎬</p>
+              <div className="text-center py-16 text-text2 space-y-2 flex flex-col items-center">
+                <IconClapperboard size={30} />
                 <p className="text-sm">{t('bankPickerNoVideo')}</p>
               </div>
             ) : (
@@ -2122,8 +2141,8 @@ export function BankPicker({ user, mode, onSelect, onClose, resolveMode = 'full'
                         <VideoThumbnail filePath={item.file_url ?? ''} thumbnailPath={item.thumbnail_path} storagePath={item.storage_path} />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent pointer-events-none" />
                         {isSelected && (
-                          <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-accent flex items-center justify-center">
-                            <span className="text-bg text-xs font-bold">✓</span>
+                          <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-accent flex items-center justify-center text-bg">
+                            <IconCheck size={14} strokeWidth={2.5} />
                           </div>
                         )}
                         {mode === 'multi' && !isSelected && (

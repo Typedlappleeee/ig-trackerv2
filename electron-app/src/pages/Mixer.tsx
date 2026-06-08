@@ -9,6 +9,20 @@ import type { CaptionItem } from './CaptionBank'
 interface MixerProps { user: User }
 type MixPosition = 'bottom' | 'center' | 'top'
 
+// ── Inline Lucide-style icons (no emoji UI icons) ─────────────────────────────
+function SfIcon({ size = 16, children, ...rest }: { size?: number; children: React.ReactNode } & React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...rest}>
+      {children}
+    </svg>
+  )
+}
+const IconX            = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></SfIcon>
+const IconClapperboard = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><path d="M20.2 6 3 11l-.9-2.4c-.3-1.1.3-2.2 1.3-2.5l13.5-4c1.1-.3 2.2.3 2.5 1.3Z"/><path d="m6.2 5.3 3.1 3.9"/><path d="m12.4 3.4 3.1 4"/><path d="M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></SfIcon>
+const IconChevronUp    = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><polyline points="18 15 12 9 6 15"/></SfIcon>
+const IconChevronDown  = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><polyline points="6 9 12 15 18 9"/></SfIcon>
+const IconAlignCenter  = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><line x1="21" y1="6" x2="3" y2="6"/><line x1="17" y1="12" x2="7" y2="12"/><line x1="19" y1="18" x2="5" y2="18"/></SfIcon>
+
 interface MixJob {
   id:        string
   videoItem: ContentItem
@@ -29,7 +43,7 @@ function VideoThumb({ item, size = 'sm' }: { item: ContentItem; size?: 'sm' | 'm
     <div style={{ width: '100%', height: h, background: '#0E0E16', borderRadius: 8, overflow: 'hidden', position: 'relative' }}>
       {url
         ? <img src={url} alt={item.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-        : <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', fontSize: 18 }}>🎬</div>
+        : <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'rgba(148,163,184,0.35)' }}><IconClapperboard size={18} /></div>
       }
     </div>
   )
@@ -130,7 +144,7 @@ function VideoPicker({
               Confirmer ({selected.size})
             </button>
           )}
-          <button onClick={onClose} style={{ color: '#52525b', fontSize: 20, background: 'none', border: 'none', cursor: 'pointer', lineHeight: 1 }}>✕</button>
+          <button onClick={onClose} aria-label="Fermer" style={{ display: 'flex', alignItems: 'center', color: '#52525b', background: 'none', border: 'none', cursor: 'pointer', lineHeight: 1 }}><IconX size={18} /></button>
         </div>
         <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
           <PickerSidebar folders={folders} active={folder} onSelect={setFolder} allCount={items.length} allLabel="Tout" />
@@ -215,7 +229,7 @@ function CaptionPicker({
               Confirmer ({selected.size})
             </button>
           )}
-          <button onClick={onClose} style={{ color: '#52525b', fontSize: 20, background: 'none', border: 'none', cursor: 'pointer', lineHeight: 1 }}>✕</button>
+          <button onClick={onClose} aria-label="Fermer" style={{ display: 'flex', alignItems: 'center', color: '#52525b', background: 'none', border: 'none', cursor: 'pointer', lineHeight: 1 }}><IconX size={18} /></button>
         </div>
         <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
           <PickerSidebar folders={folders} active={folder} onSelect={setFolder} allCount={items.length} allLabel="Tout" />
@@ -433,8 +447,8 @@ export function Mixer({ user }: MixerProps) {
                   <div key={v.id} style={{ position: 'relative' }}>
                     <VideoThumb item={v} />
                     <p style={{ fontSize: 9, color: '#52525b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '3px 2px', textAlign: 'center' }}>{v.title}</p>
-                    <button onClick={() => removeVideo(v.id)}
-                      style={{ position: 'absolute', top: 4, right: 4, width: 18, height: 18, borderRadius: 5, background: 'rgba(0,0,0,0.75)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ef4444', fontSize: 10, fontWeight: 700, lineHeight: 1 }}>✕</button>
+                    <button onClick={() => removeVideo(v.id)} aria-label="Retirer"
+                      style={{ position: 'absolute', top: 4, right: 4, width: 18, height: 18, borderRadius: 5, background: 'rgba(0,0,0,0.75)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ef4444', lineHeight: 1 }}><IconX size={11} strokeWidth={2.25} /></button>
                   </div>
                 ))}
               </div>
@@ -476,8 +490,8 @@ export function Mixer({ user }: MixerProps) {
                   <div key={c.id} style={{ position: 'relative', padding: '10px 12px', borderRadius: 12, background: '#0E0E16', border: '1px solid rgba(139,92,246,0.12)' }}>
                     {c.title && <p style={{ fontSize: 11, fontWeight: 600, color: '#e2e8f0', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: 20 }}>{c.title}</p>}
                     <p className="line-clamp-2" style={{ fontSize: 10, color: '#52525b', lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>{c.content}</p>
-                    <button onClick={() => removeCaption(c.id)}
-                      style={{ position: 'absolute', top: 8, right: 8, width: 16, height: 16, borderRadius: 4, background: 'rgba(239,68,68,0.1)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ef4444', fontSize: 9, fontWeight: 700, lineHeight: 1 }}>✕</button>
+                    <button onClick={() => removeCaption(c.id)} aria-label="Retirer"
+                      style={{ position: 'absolute', top: 8, right: 8, width: 16, height: 16, borderRadius: 4, background: 'rgba(239,68,68,0.1)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ef4444', lineHeight: 1 }}><IconX size={10} strokeWidth={2.25} /></button>
                   </div>
                 ))}
               </div>
@@ -493,8 +507,8 @@ export function Mixer({ user }: MixerProps) {
             <div style={{ display: 'flex', gap: 8 }}>
               {(['top', 'center', 'bottom'] as MixPosition[]).map(p => (
                 <button key={p} onClick={() => setPosition(p)}
-                  style={{ flex: 1, padding: '10px 0', borderRadius: 10, fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'all 0.12s', border: position === p ? '1px solid rgba(139,92,246,0.35)' : '1px solid rgba(255,255,255,0.06)', background: position === p ? 'rgba(139,92,246,0.18)' : 'rgba(255,255,255,0.03)', color: position === p ? '#c4b5fd' : '#52525b' }}>
-                  {p === 'top' ? '⬆ Haut' : p === 'center' ? '◉ Centre' : '⬇ Bas'}
+                  style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '10px 0', borderRadius: 10, fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'all 0.12s', border: position === p ? '1px solid rgba(139,92,246,0.35)' : '1px solid rgba(255,255,255,0.06)', background: position === p ? 'rgba(139,92,246,0.18)' : 'rgba(255,255,255,0.03)', color: position === p ? '#c4b5fd' : '#52525b' }}>
+                  {p === 'top' ? <><IconChevronUp size={14} /> Haut</> : p === 'center' ? <><IconAlignCenter size={14} /> Centre</> : <><IconChevronDown size={14} /> Bas</>}
                 </button>
               ))}
             </div>

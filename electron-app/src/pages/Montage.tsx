@@ -13,6 +13,22 @@ import { useT, useLang } from '@/lib/i18n'
 
 interface MontageProps { user: User }
 
+// ── Inline Lucide-style icons (no emoji UI icons) ─────────────────────────────
+function SfIcon({ size = 16, children, ...rest }: { size?: number; children: React.ReactNode } & React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...rest}>
+      {children}
+    </svg>
+  )
+}
+const IconX            = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></SfIcon>
+const IconCheck        = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><polyline points="20 6 9 17 4 12"/></SfIcon>
+const IconClapperboard = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><path d="M20.2 6 3 11l-.9-2.4c-.3-1.1.3-2.2 1.3-2.5l13.5-4c1.1-.3 2.2.3 2.5 1.3Z"/><path d="m6.2 5.3 3.1 3.9"/><path d="m12.4 3.4 3.1 4"/><path d="M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></SfIcon>
+const IconPalette      = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></SfIcon>
+const IconSliders      = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></SfIcon>
+const IconScissors     = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></SfIcon>
+const IconZap          = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></SfIcon>
+
 // ── Types ─────────────────────────────────────────────────────────────────────────────
 interface TimelineClip {
   uid:       string
@@ -63,8 +79,8 @@ const FILTER_CSS: Record<Filter, string> = {
 }
 
 const COLORS = ['#4f9eff','#a56ef5','#00ccaa','#ffaa2a','#ff6ec7','#2dde78','#ff5c6e','#00e5d4']
-const TRANSITIONS: { type: Transition['type']; label: string; icon: string }[] = [
-  { type: 'cut',     label: 'Cut',      icon: '✂' },
+const TRANSITIONS: { type: Transition['type']; label: string; icon: React.ReactNode }[] = [
+  { type: 'cut',     label: 'Cut',      icon: <IconScissors size={15} /> },
   { type: 'fade',    label: 'Fade',     icon: '◑' },
   { type: 'dissolve',label: 'Dissolve', icon: '◌' },
   { type: 'wipe',    label: 'Wipe',     icon: '→' },
@@ -184,8 +200,9 @@ function ClipBlock({
       {isSelected && (
         <button
           onClick={e => { e.stopPropagation(); onDelete(clip.uid) }}
-          className="absolute -top-2 -right-2 w-4 h-4 bg-danger rounded-full text-white text-[9px] flex items-center justify-center z-20 hover:scale-110 transition-transform"
-        >✕</button>
+          aria-label="Delete clip"
+          className="absolute -top-2 -right-2 w-4 h-4 bg-danger rounded-full text-white flex items-center justify-center z-20 hover:scale-110 transition-transform"
+        ><IconX size={10} strokeWidth={2.25} /></button>
       )}
     </div>
   )
@@ -215,8 +232,8 @@ function PropertiesPanel({
   const t = useT()
   if (!clip) return (
     <div className="flex items-center justify-center h-full text-xs text-text2 p-4 text-center">
-      <div className="space-y-2">
-        <p className="text-2xl">🎬</p>
+      <div className="space-y-2 flex flex-col items-center">
+        <IconClapperboard size={24} />
         <p>{t('montageSelectClipProps')}</p>
       </div>
     </div>
@@ -686,12 +703,12 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
   const filteredBank  = bankItems.filter(i => !bankSearch || i.title.toLowerCase().includes(bankSearch.toLowerCase()) || i.tags.some(t => t.toLowerCase().includes(bankSearch.toLowerCase())))
   const PRESET_DIMS: Record<Preset, string> = { '9:16': '1080×1920', '1:1': '1080×1080', '16:9': '1920×1080' }
 
-  const TABS: { id: Tab; label: string; icon: string }[] = [
-    { id: 'medias',      label: t('montageMediaTab'),       icon: '🎬' },
+  const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
+    { id: 'medias',      label: t('montageMediaTab'),       icon: <IconClapperboard size={14} /> },
     { id: 'texte',       label: t('montageTextTab'),        icon: '𝐓' },
     { id: 'transitions', label: t('montageTransitionsTab'), icon: '◑' },
-    { id: 'filtres',     label: t('montageFiltersTab'),     icon: '🎨' },
-    { id: 'ajustement',  label: t('montageAdjustTab'),      icon: '⚙' },
+    { id: 'filtres',     label: t('montageFiltersTab'),     icon: <IconPalette size={14} /> },
+    { id: 'ajustement',  label: t('montageAdjustTab'),      icon: <IconSliders size={14} /> },
   ]
   const FILTER_LABELS_DYN: Record<Filter, string> = {
     none: t('montageFilterOriginal'), vivid: t('montageFilterVivid'), warm: t('montageFilterWarm'), cold: t('montageFilterCold'),
@@ -705,9 +722,9 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
       {/* OS drop overlay */}
       {osDragging && (
         <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
-          <div className="border-2 border-dashed border-accent rounded-2xl px-20 py-12 bg-bg/90 backdrop-blur text-center space-y-3">
-            <p className="text-5xl">🎬</p>
-            <p className="text-xl font-semibold text-accent">{t('montageDropVideoHere')}</p>
+          <div className="border-2 border-dashed border-accent rounded-2xl px-20 py-12 bg-bg/90 backdrop-blur text-center space-y-3 flex flex-col items-center text-accent">
+            <IconClapperboard size={48} />
+            <p className="text-xl font-semibold">{t('montageDropVideoHere')}</p>
           </div>
         </div>
       )}
@@ -797,8 +814,8 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
             <div className="flex-1 overflow-auto py-1">
               {bankLoading ? <div className="flex justify-center py-8"><Spinner size="sm" /></div>
               : filteredBank.length === 0 ? (
-                <div className="px-3 py-6 text-center text-[11px] text-text2 space-y-2">
-                  <p className="text-2xl">🎬</p>
+                <div className="px-3 py-6 text-center text-[11px] text-text2 space-y-2 flex flex-col items-center">
+                  <IconClapperboard size={24} />
                   <p>{bankItems.length === 0 ? t('montageBankEmpty') : t('montageBankNoResults')}</p>
                 </div>
               ) : filteredBank.map(item => (
@@ -827,7 +844,7 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
                   className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-surface transition-colors"
                 >
                   <div className="flex items-center gap-2">
-                    <span className="text-base">⚡</span>
+                    <span className="text-accent"><IconZap size={16} /></span>
                     <div className="text-left">
                       <p className="text-xs font-semibold text-text">{t('montageAutoCaption')}</p>
                       <p className="text-[9px] text-text2">{t('montageAutoCaptionDesc')}</p>
@@ -937,7 +954,7 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
                     <div key={ov.uid} className="flex items-center gap-2 bg-surface2 rounded-lg px-2 py-1.5">
                       <input value={ov.text} onChange={e => setTexts(prev => prev.map(t => t.uid === ov.uid ? { ...t, text: e.target.value } : t))}
                         className="flex-1 bg-transparent text-[11px] text-text focus:outline-none" />
-                      <button onClick={() => setTexts(prev => prev.filter(t => t.uid !== ov.uid))} className="text-text2 hover:text-danger text-xs">✕</button>
+                      <button onClick={() => setTexts(prev => prev.filter(t => t.uid !== ov.uid))} aria-label="Delete" className="text-text2 hover:text-danger inline-flex items-center"><IconX size={13} /></button>
                     </div>
                   ))}
                 </div>
@@ -1193,7 +1210,7 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
               </code>
             )}
           </div>
-          <button onClick={() => setExpResult(null)} className="opacity-60 hover:opacity-100">✕</button>
+          <button onClick={() => setExpResult(null)} aria-label="Fermer" className="opacity-60 hover:opacity-100 inline-flex items-center"><IconX size={14} /></button>
         </div>
       )}
     </div>
