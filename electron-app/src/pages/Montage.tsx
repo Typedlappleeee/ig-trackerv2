@@ -81,9 +81,9 @@ const FILTER_CSS: Record<Filter, string> = {
 const COLORS = ['#4f9eff','#a56ef5','#00ccaa','#ffaa2a','#ff6ec7','#2dde78','#ff5c6e','#00e5d4']
 const TRANSITIONS: { type: Transition['type']; label: string; icon: React.ReactNode }[] = [
   { type: 'cut',     label: 'Cut',      icon: <IconScissors size={15} /> },
-  { type: 'fade',    label: 'Fade',     icon: '◑' },
-  { type: 'dissolve',label: 'Dissolve', icon: '◌' },
-  { type: 'wipe',    label: 'Wipe',     icon: '→' },
+  { type: 'fade',    label: 'Fade',     icon: <SfIcon size={15}><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 0 20"/></SfIcon> },
+  { type: 'dissolve',label: 'Dissolve', icon: <SfIcon size={15}><circle cx="12" cy="12" r="10" strokeDasharray="4 2"/></SfIcon> },
+  { type: 'wipe',    label: 'Wipe',     icon: <SfIcon size={15}><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></SfIcon> },
 ]
 
 let _ci = 0
@@ -572,7 +572,7 @@ export function Montage({ user }: MontageProps) {
         clips: ffmpegClips, outputPath: out, preset, transition: 'cut',
       })
       setExporting(false)
-      if (res?.ok) setExpResult({ ok: true, msg: `✓ Exported: ${out}` })
+      if (res?.ok) setExpResult({ ok: true, msg: `Exported: ${out}` })
       else setExpResult({ ok: false, msg: res?.error ?? 'FFmpeg error', command: res?.command })
     } catch (e) {
       setExporting(false)
@@ -705,8 +705,8 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
 
   const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
     { id: 'medias',      label: t('montageMediaTab'),       icon: <IconClapperboard size={14} /> },
-    { id: 'texte',       label: t('montageTextTab'),        icon: '𝐓' },
-    { id: 'transitions', label: t('montageTransitionsTab'), icon: '◑' },
+    { id: 'texte',       label: t('montageTextTab'),        icon: <SfIcon size={14}><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></SfIcon> },
+    { id: 'transitions', label: t('montageTransitionsTab'), icon: <IconScissors size={14} /> },
     { id: 'filtres',     label: t('montageFiltersTab'),     icon: <IconPalette size={14} /> },
     { id: 'ajustement',  label: t('montageAdjustTab'),      icon: <IconSliders size={14} /> },
   ]
@@ -716,27 +716,31 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
   }
 
   return (
-    <div ref={dropRef} className="flex flex-col h-full min-h-0 bg-bg"
+    <div ref={dropRef} className="flex flex-col h-full min-h-0 bg-bg anim-page"
       onDragOver={onOsDragOver} onDragLeave={onOsDragLeave} onDrop={onOsDrop}>
 
       {/* OS drop overlay */}
       {osDragging && (
         <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
-          <div className="border-2 border-dashed border-accent rounded-2xl px-20 py-12 bg-bg/90 backdrop-blur text-center space-y-3 flex flex-col items-center text-accent">
-            <IconClapperboard size={48} />
+          <div className="border-2 border-dashed border-accent rounded-2xl px-20 py-12 bg-bg/90 backdrop-blur text-center space-y-4 flex flex-col items-center text-accent">
+            <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.3)' }}>
+              <IconClapperboard size={32} />
+            </div>
             <p className="text-xl font-semibold">{t('montageDropVideoHere')}</p>
           </div>
         </div>
       )}
 
-      {/* ── TOP TOOLBAR (CapCut-style) ─────────────────────────────────────────────────────────────────── */}
-      <div className="flex-shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)' }}>
-        {/* Row 1: project name + tabs */}
+      {/* ── TOP TOOLBAR ───────────────────────────────────────────────────── */}
+      <div className="flex-shrink-0 border-b border-border bg-surface">
         <div className="flex items-center">
-          {/* Project name */}
-          <div className="w-56 flex-shrink-0 px-4 py-3" style={{ borderRight: '1px solid rgba(255,255,255,0.06)' }}>
+          {/* Project name + icon */}
+          <div className="w-56 flex-shrink-0 px-4 py-2.5 border-r border-border flex items-center gap-2">
+            <div className="w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(139,92,246,0.15)' }}>
+              <IconClapperboard size={12} style={{ color: '#a78bfa' }} />
+            </div>
             <input value={projectName} onChange={e => setProjName(e.target.value)}
-              className="text-[13px] font-semibold text-white bg-transparent focus:outline-none w-full truncate"
+              className="text-[13px] font-semibold text-text bg-transparent focus:outline-none w-full truncate"
               placeholder={t('montageProjectName')} />
           </div>
 
@@ -744,7 +748,7 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
           <div className="flex flex-1 overflow-x-auto">
             {TABS.map(t => (
               <button key={t.id} onClick={() => setActiveTab(t.id)}
-                className={`flex items-center gap-1.5 px-5 py-3 text-[12px] font-medium border-b-2 transition-all whitespace-nowrap ${
+                className={`flex items-center gap-1.5 px-5 py-2.5 text-[12px] font-medium border-b-2 transition-all whitespace-nowrap cursor-pointer ${
                   activeTab === t.id
                     ? 'border-accent text-accent'
                     : 'border-transparent text-text2 hover:text-text'
@@ -755,17 +759,17 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
           </div>
 
           {/* Right controls */}
-          <div className="flex items-center gap-2 px-4 flex-shrink-0" style={{ borderLeft: '1px solid rgba(255,255,255,0.06)' }}>
+          <div className="flex items-center gap-2 px-4 flex-shrink-0 border-l border-border">
             <span className="text-[11px] text-text2">{t('montageFormat')}</span>
             {(['9:16','1:1','16:9'] as Preset[]).map(p => (
               <button key={p} onClick={() => setPreset(p)}
-                className={`px-2.5 py-1.5 rounded-lg text-[11px] font-mono transition-all ${preset === p ? 'text-white' : 'text-text2 hover:text-text'}`}
+                className={`px-2.5 py-1.5 rounded-lg text-[11px] font-mono transition-all cursor-pointer ${preset === p ? 'text-white' : 'text-text2 hover:text-text'}`}
                 style={preset === p ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)' } : { background: 'rgba(255,255,255,0.05)' }}>
                 {p}
               </button>
             ))}
             <span className="text-[10px] text-text2 ml-1">{PRESET_DIMS[preset]}</span>
-            <div className="w-px h-5 mx-1" style={{ background: 'rgba(255,255,255,0.08)' }} />
+            <div className="w-px h-5 mx-1 bg-border" />
             <Button size="sm" onClick={handleExport} loading={exporting} disabled={!clips.length}>
               {t('montageExport')}
             </Button>
@@ -863,7 +867,7 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
                       disabled={!selectedClip || aiCapLoading || !conns.anthropic}
                       className="mt-2.5 w-full flex items-center justify-center gap-1.5 py-2 rounded-lg text-[11px] font-semibold transition-all bg-gradient-to-r from-violet-600 to-accent text-white hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
                     >
-                      {aiCapLoading ? <><Spinner size="sm" /><span>{t('montageAnalyzing')}</span></> : <><span>✨</span><span>{t('montageGenerateAI')}</span></>}
+                      {aiCapLoading ? <><Spinner size="sm" /><span>{t('montageAnalyzing')}</span></> : <><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9.94 14.34A2 2 0 0 0 8.66 13l-6.13-1.9a.5.5 0 0 1 0-.95l6.13-1.9a2 2 0 0 0 1.28-1.28l1.9-6.13a.5.5 0 0 1 .95 0l1.9 6.13a2 2 0 0 0 1.28 1.28l6.13 1.9a.5.5 0 0 1 0 .95l-6.13 1.9a2 2 0 0 0-1.28 1.28l-1.9 6.13a.5.5 0 0 1-.95 0z"/></svg><span>{t('montageGenerateAI')}</span></>}
                     </button>
                     {!conns.anthropic && !conns.loading && (
                       <p className="text-[9px] text-amber-400/80">{t('montageAIKeyRequired')}</p>
@@ -921,7 +925,7 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
                       <p className="text-[9px] text-text2/60 italic">Enter text to see the preview on the video.</p>
                     )}
                     {autoCaptionText.trim() && (
-                      <p className="text-[9px] text-ok/80">✓ Text shown for the full video duration</p>
+                      <p className="text-[9px] text-ok/80 flex items-center gap-1"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg> Text shown for the full video duration</p>
                     )}
                   </div>
                 )}
@@ -966,7 +970,7 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
           {activeTab === 'transitions' && (
             <div className="p-3 space-y-3 flex-1 overflow-auto">
               <p className="text-[10px] text-text2 uppercase tracking-wider font-semibold">{t('montageTransitionsTab')}</p>
-              <p className="text-[10px] text-text2">Click the ◑ badge between two clips to change the transition.</p>
+              <p className="text-[10px] text-text2">Click the transition badge between two clips to change the transition.</p>
               <div className="space-y-2 pt-1">
                 {TRANSITIONS.map(tr => (
                   <div key={tr.type} className="flex items-center gap-3 px-3 py-2 bg-surface2 rounded-lg">
@@ -1018,7 +1022,7 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
                   <div className="h-1.5 bg-surface2 rounded-full overflow-hidden">
                     <div className="h-full bg-accent rounded-full transition-all" style={{ width: `${Math.min(100, (total / 90) * 100)}%` }} />
                   </div>
-                  <p className="text-[9px] text-text2">{total > 90 ? `⚠ ${t('montageReelsLimit')}` : `${Math.round((total / 90) * 100)}% of 90s`}</p>
+                  <p className="text-[9px] text-text2 flex items-center gap-1">{total > 90 ? <><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="text-warn"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>{t('montageReelsLimit')}</> : `${Math.round((total / 90) * 100)}% of 90s`}</p>
                 </div>
               </div>
             </div>
@@ -1033,14 +1037,16 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
               {playingIndex === null ? (
                 <button
                   onClick={playAll}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-accent rounded-lg text-white text-xs font-semibold hover:bg-accent/80 transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-accent rounded-lg text-white text-xs font-semibold hover:bg-accent/80 transition-colors cursor-pointer"
                 >
-                  ▶ Play all ({clips.length} clips)
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                  Play all ({clips.length} clips)
                 </button>
               ) : (
                 <div className="flex items-center gap-2">
-                  <button onClick={stopAll} className="px-3 py-1.5 bg-surface/80 rounded-lg text-text text-xs hover:bg-surface transition-colors">
-                    ⏹ Stop
+                  <button onClick={stopAll} className="px-3 py-1.5 bg-surface/80 rounded-lg text-text text-xs hover:bg-surface transition-colors cursor-pointer flex items-center gap-1.5">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+                    Stop
                   </button>
                   <span className="text-xs text-white/70 bg-black/40 px-2 py-1 rounded">
                     Clip {playingIndex + 1}/{clips.length}
@@ -1064,8 +1070,12 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
               onTimeUpdate={onTimeUpdate}
             />
           ) : (
-            <div className="text-center text-text2 space-y-3">
-              <p className="text-5xl">▶</p>
+            <div className="text-center text-text2 space-y-3 flex flex-col items-center">
+              <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.12)' }}>
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <polygon points="5 3 19 12 5 21 5 3"/>
+                </svg>
+              </div>
               <p className="text-sm">{t('montageSelectClipPreview')}</p>
               <p className="text-xs text-text2/60">{t('montageOrDragVideo')}</p>
             </div>
@@ -1148,8 +1158,9 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
             <div className="px-2 py-1">
               <div className="text-[9px] text-text2 mb-1 uppercase tracking-wider">{t('montageVideoTrack')}</div>
               {clips.length === 0 ? (
-                <div className="flex items-center text-[11px] text-text2/50 h-12 px-4">
-                  ← Click a clip in Media to add it
+                <div className="flex items-center gap-2 text-[11px] text-text2/50 h-12 px-4">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+                  Click a clip in Media to add it
                 </div>
               ) : (
                 <div className="flex items-center gap-0.5">
@@ -1187,7 +1198,7 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
                       className="absolute h-full bg-accent/30 border border-accent/50 rounded text-[9px] text-accent flex items-center px-1.5 overflow-hidden cursor-pointer hover:bg-accent/50"
                       style={{ left: ov.startTime * scale, width: Math.max((ov.endTime - ov.startTime) * scale, 40) }}
                       onClick={e => { e.stopPropagation() }}>
-                      𝐓 {ov.text.slice(0, 12)}
+                      <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="flex-shrink-0 mr-0.5"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>{ov.text.slice(0, 12)}
                     </div>
                   ))}
                 </div>
