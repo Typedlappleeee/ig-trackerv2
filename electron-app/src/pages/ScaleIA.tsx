@@ -21,7 +21,7 @@ function Icon({ name, size = 15 }: { name: IconName; size?: number }) {
 
 export default function ScaleIA() {
   return (
-    <div style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', background: '#06060e' }}>
+    <div className="anim-page" style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', background: '#06060e' }}>
 
       {/* ── Real background screenshot ───────────────────────────────────────── */}
       <div style={{
@@ -62,6 +62,19 @@ export default function ScaleIA() {
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
         gap: 0,
       }}>
+        {/* Header icon */}
+        <div style={{
+          width: 56, height: 56, borderRadius: 16, marginBottom: 20,
+          background: 'linear-gradient(135deg, rgba(124,58,237,0.3), rgba(167,139,250,0.1))',
+          border: '1px solid rgba(139,92,246,0.3)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: '0 0 32px rgba(139,92,246,0.3)',
+        }}>
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M9.94 14.34A2 2 0 0 0 8.66 13l-6.13-1.9a.5.5 0 0 1 0-.95l6.13-1.9a2 2 0 0 0 1.28-1.28l1.9-6.13a.5.5 0 0 1 .95 0l1.9 6.13a2 2 0 0 0 1.28 1.28l6.13 1.9a.5.5 0 0 1 0 .95l-6.13 1.9a2 2 0 0 0-1.28 1.28l-1.9 6.13a.5.5 0 0 1-.95 0z"/>
+          </svg>
+        </div>
+
         {/* BIENTÔT chip */}
         <div style={{
           fontSize: 10, fontWeight: 800, letterSpacing: '0.3em', textTransform: 'uppercase',

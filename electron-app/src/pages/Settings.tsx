@@ -465,8 +465,8 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
     onChange: (v: string) => void; options: { value: string; label: string }[]
   }) {
     return (
-      <div className={`flex items-center justify-between py-3 ${first ? '' : 'border-t border-border'}`}>
-        <div>
+      <div className={`flex items-center justify-between py-3 px-[22px] ${first ? '' : 'border-t border-border'}`}>
+        <div className="flex-1 pr-4">
           <p className="text-[13px] font-medium text-text m-0">{label}</p>
           <p className="text-[12px] text-text3 mt-0.5 mb-0">{sub}</p>
         </div>
@@ -485,7 +485,7 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
     label: string; sub: string; checked: boolean; onChange: (v: boolean) => void; first?: boolean
   }) {
     return (
-      <div className={`flex items-center justify-between py-3 cursor-pointer ${first ? '' : 'border-t border-border'}`}
+      <div className={`flex items-center justify-between py-3 px-[22px] cursor-pointer select-none ${first ? '' : 'border-t border-border'}`}
         onClick={() => onChange(!checked)}>
         <div className="flex-1 pr-4">
           <p className="text-[13px] font-medium text-text m-0">{label}</p>
@@ -742,8 +742,8 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                       )}
                     </div>
 
-                    {/* Toggles + dropdowns */}
-                    <div style={cardSt}>
+                    {/* ── Appearance toggles & selects card ───────────── */}
+                    <div className="sf-card" style={{ padding: '6px 0' }}>
                       <SettingToggle first label={t('darkMode')} sub={t('darkModeSub')}
                         checked={darkMode} onChange={v => { setDarkMode(v); localStorage.setItem('sf-dark', v ? '1' : '0'); applyAppearanceCSS({ dark: v }) }} />
                       <SettingToggle label={t('uiAnimations')} sub={t('uiAnimationsSub')}
@@ -767,21 +767,22 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                         options={[{ value: 'etendue', label: t('sidebarExpanded') }, { value: 'reduite', label: t('sidebarReduced') }, { value: 'masquee', label: t('sidebarHidden') }]} />
                     </div>
 
-                    {/* Preview */}
-                    <div style={cardSt}>
-                      <div style={{ marginBottom: 12 }}>
-                        <h3 style={cardTitleSt}>{t('preview')}</h3>
-                        <p style={cardSubSt}>{t('previewSub')}</p>
-                      </div>
-                      <div style={{ borderRadius: 11, overflow: 'hidden', background: 'rgba(0,0,0,0.3)', border: `1px solid ${S.border}`, height: 100 }}>
+                    {/* ── UI Preview card ───────────────────────────────── */}
+                    <div className="sf-card" style={{ padding: '20px 22px' }}>
+                      <h3 className="text-[11px] font-semibold uppercase tracking-widest text-text3 mb-1">{t('preview')}</h3>
+                      <p style={{ fontSize: 12, color: S.text3, margin: '0 0 14px', lineHeight: 1.4 }}>{t('previewSub')}</p>
+                      <div style={{ borderRadius: 10, overflow: 'hidden', background: 'rgba(0,0,0,0.35)', border: `1px solid ${S.border}`, height: 96 }}>
                         <div style={{ display: 'flex', height: '100%' }}>
-                          <div style={{ width: 40, height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 8, gap: 6, background: 'rgba(0,0,0,0.3)' }}>
-                            <div style={{ width: 20, height: 20, borderRadius: 4, background: 'var(--color-accent, #4f9eff)', opacity: 0.8 }} />
-                            {[1,2,3,4].map(i => <div key={i} style={{ width: 16, height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.1)' }} />)}
+                          <div style={{ width: 38, height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 8, gap: 5, background: 'rgba(0,0,0,0.32)', borderRight: `1px solid ${S.border}` }}>
+                            <div style={{ width: 20, height: 20, borderRadius: 4, background: 'var(--color-accent, #4f9eff)', opacity: 0.85, boxShadow: '0 0 8px rgba(79,158,255,0.4)' }} />
+                            {[1,2,3,4].map(i => <div key={i} style={{ width: 15, height: 5, borderRadius: 3, background: 'rgba(255,255,255,0.1)' }} />)}
                           </div>
                           <div style={{ flex: 1, padding: 8, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, alignContent: 'start' }}>
                             {[1,2,3,4,5,6].map(i => (
-                              <div key={i} style={{ height: 24, borderRadius: 6, background: i === 2 ? `var(--color-accent, #4f9eff)22` : 'rgba(255,255,255,0.06)', border: i === 2 ? `1px solid var(--color-accent, #4f9eff)40` : `1px solid ${S.border}` }} />
+                              <div key={i} style={{ height: 22, borderRadius: 5,
+                                background: i === 2 ? `rgba(var(--color-accent, 79,158,255),0.12)` : 'rgba(255,255,255,0.055)',
+                                border: `1px solid ${i === 2 ? 'rgba(79,158,255,0.28)' : S.border}`,
+                              }} />
                             ))}
                           </div>
                         </div>
@@ -793,26 +794,31 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                 {/* ── SONS ──────────────────────────────────────────────── */}
                 {genTab === 'sons' && (
                   <div className="sf-anim-slide-up" style={{ maxWidth: 640, display: 'flex', flexDirection: 'column', gap: 20 }}>
-                    <div>
-                      <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0 }}>{t('soundsTitle')}</h2>
-                      <p style={{ fontSize: 13, color: S.text3, margin: '4px 0 0' }}>{t('soundsSub')}</p>
+                    <div style={{ paddingBottom: 4 }}>
+                      <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0, letterSpacing: '-0.02em' }}>{t('soundsTitle')}</h2>
+                      <p style={{ fontSize: 13, color: S.text3, margin: '5px 0 0', lineHeight: 1.5 }}>{t('soundsSub')}</p>
                     </div>
-                    <div style={cardSt}>
+
+                    <div className="sf-card" style={{ padding: '6px 0' }}>
                       <SettingToggle first label={t('navSounds')} sub={t('navSoundsSub')}
                         checked={notifySound} onChange={v => setNotifySound(v)} />
                       <SettingToggle label={t('ambientMusic')} sub={t('ambientMusicSub')}
                         checked={musicOn} onChange={v => { setMusicOn(v); setMusicEnabled(v) }} />
                     </div>
+
                     {musicOn && (
-                      <div style={cardSt}>
-                        <h3 style={cardTitleSt}>{t('musicTrack')}</h3>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
+                      <div className="sf-card" style={{ padding: '20px 22px' }}>
+                        <h3 className="text-[11px] font-semibold uppercase tracking-widest text-text3 mb-4">{t('musicTrack')}</h3>
+
+                        {/* Horizontal track scroll */}
+                        <div style={{ display: 'flex', gap: 8, marginBottom: 20, overflowX: 'auto', paddingBottom: 4 }}>
                           {TRACKS.map((tr, i) => (
                             <button key={i} onClick={() => { setMusicTrackS(i); setTrack(i) }} style={{
-                              display: 'flex', alignItems: 'center', gap: 8,
-                              padding: '7px 14px', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: 'pointer',
+                              display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0,
+                              padding: '8px 14px', borderRadius: 10, fontSize: 13, fontWeight: 500, cursor: 'pointer',
+                              transition: 'all 140ms ease',
                               ...(musicTrack === i
-                                ? { background: 'rgba(139,92,246,0.18)', border: `1px solid ${S.borderAccent}`, color: S.accent3 }
+                                ? { background: 'rgba(139,92,246,0.18)', border: `1px solid ${S.borderAccent}`, color: S.accent3, boxShadow: `0 0 14px -4px rgba(139,92,246,0.4)` }
                                 : { background: 'rgba(255,255,255,0.04)', border: `1px solid ${S.border}`, color: S.text3 }),
                             }}>
                               <svg width="11" height="11" viewBox="0 0 24 24" fill={musicTrack === i ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -822,14 +828,24 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                             </button>
                           ))}
                         </div>
-                        <div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                            <p style={{ fontSize: 13, fontWeight: 500, color: S.text, margin: 0 }}>{t('volume')}</p>
-                            <p style={{ fontSize: 13, fontWeight: 700, color: S.accent3, margin: 0 }}>{Math.round(musicVol * 100)}%</p>
+
+                        {/* Volume slider */}
+                        <div style={{ paddingTop: 4, borderTop: `1px solid ${S.border}` }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, paddingTop: 14 }}>
+                            <div className="flex items-center gap-2">
+                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: S.text3 }}>
+                                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                                <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+                              </svg>
+                              <p style={{ fontSize: 13, fontWeight: 500, color: S.text, margin: 0 }}>{t('volume')}</p>
+                            </div>
+                            <span style={{ fontSize: 13, fontWeight: 700, color: S.accent3, background: 'rgba(139,92,246,0.1)', border: `1px solid ${S.borderAccent}`, borderRadius: 6, padding: '2px 8px' }}>
+                              {Math.round(musicVol * 100)}%
+                            </span>
                           </div>
                           <input type="range" min={0} max={1} step={0.05} value={musicVol}
                             onChange={e => { const v = parseFloat(e.target.value); setMusicVol(v); setVolume(v) }}
-                            style={{ width: '100%', accentColor: S.accent }} />
+                            style={{ width: '100%', accentColor: S.accent, cursor: 'pointer' }} />
                         </div>
                       </div>
                     )}
@@ -839,39 +855,49 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                 {/* ── NOTIFICATIONS ─────────────────────────────────────── */}
                 {genTab === 'notifications' && (
                   <div className="sf-anim-slide-up" style={{ maxWidth: 640, display: 'flex', flexDirection: 'column', gap: 20 }}>
-                    <div>
-                      <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0 }}>{t('notificationsTitle')}</h2>
-                      <p style={{ fontSize: 13, color: S.text3, margin: '4px 0 0' }}>{t('notificationsSub')}</p>
+                    <div style={{ paddingBottom: 4 }}>
+                      <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0, letterSpacing: '-0.02em' }}>{t('notificationsTitle')}</h2>
+                      <p style={{ fontSize: 13, color: S.text3, margin: '5px 0 0', lineHeight: 1.5 }}>{t('notificationsSub')}</p>
                     </div>
-                    <div style={cardSt}>
-                      <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: S.text3, margin: '0 0 14px' }}>{t('inApp')}</h3>
-                      <SettingToggle first label={t('popupNotifs')} sub={t('popupNotifsSub')}
-                        checked={notifyPopup} onChange={v => setNotifyPopup(v)} />
-                      <SettingToggle label={t('errorAlerts')} sub={t('errorAlertsSub')}
-                        checked={notifyErrors} onChange={v => setNotifyErrors(v)} />
-                      <SettingToggle label={t('updatesNotifs')} sub={t('updatesNotifsSub')}
-                        checked={notifyUpdates} onChange={v => setNotifyUpdates(v)} />
+
+                    <div className="sf-card" style={{ padding: '16px 22px 6px' }}>
+                      <h3 className="text-[11px] font-semibold uppercase tracking-widest text-text3 mb-3">{t('inApp')}</h3>
+                      <div style={{ borderTop: `1px solid ${S.border}` }}>
+                        <SettingToggle first label={t('popupNotifs')} sub={t('popupNotifsSub')}
+                          checked={notifyPopup} onChange={v => setNotifyPopup(v)} />
+                        <SettingToggle label={t('errorAlerts')} sub={t('errorAlertsSub')}
+                          checked={notifyErrors} onChange={v => setNotifyErrors(v)} />
+                        <SettingToggle label={t('updatesNotifs')} sub={t('updatesNotifsSub')}
+                          checked={notifyUpdates} onChange={v => setNotifyUpdates(v)} />
+                      </div>
                     </div>
-                    <div style={cardSt}>
-                      <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: S.text3, margin: '0 0 14px' }}>{t('systemNotifs')}</h3>
-                      <SettingToggle first
-                        label={t('desktopNotifs')}
-                        sub={t('desktopNotifsSub')}
-                        checked={notifyDesktop}
-                        onChange={async v => {
-                          if (v && 'Notification' in window) {
-                            const perm = await Notification.requestPermission()
-                            setNotifyDesktop(perm === 'granted')
-                          } else {
-                            setNotifyDesktop(false)
-                          }
-                        }}
-                      />
+
+                    <div className="sf-card" style={{ padding: '16px 22px 6px' }}>
+                      <h3 className="text-[11px] font-semibold uppercase tracking-widest text-text3 mb-3">{t('systemNotifs')}</h3>
+                      <div style={{ borderTop: `1px solid ${S.border}` }}>
+                        <SettingToggle first
+                          label={t('desktopNotifs')}
+                          sub={t('desktopNotifsSub')}
+                          checked={notifyDesktop}
+                          onChange={async v => {
+                            if (v && 'Notification' in window) {
+                              const perm = await Notification.requestPermission()
+                              setNotifyDesktop(perm === 'granted')
+                            } else {
+                              setNotifyDesktop(false)
+                            }
+                          }}
+                        />
+                      </div>
                       {notifyDesktop && (
-                        <button onClick={() => new Notification('ScaleFlow', { body: lang === 'en' ? 'Desktop notifications are active' : 'Les notifications bureau sont actives', icon: '/icon.png' })}
-                          style={{ marginTop: 10, fontSize: 12, color: S.accent3, background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>
-                          {t('testNotif')}
-                        </button>
+                        <div style={{ padding: '0 0 14px' }}>
+                          <button
+                            onClick={() => new Notification('ScaleFlow', { body: lang === 'en' ? 'Desktop notifications are active' : 'Les notifications bureau sont actives', icon: '/icon.png' })}
+                            className="sf-btn sf-btn-ghost sf-btn-sm" style={{ gap: 6 }}>
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                            {t('testNotif')}
+                          </button>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -880,35 +906,35 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                 {/* ── LANGUE & RÉGION ────────────────────────────────────── */}
                 {genTab === 'langue' && (
                   <div className="sf-anim-slide-up" style={{ maxWidth: 640, display: 'flex', flexDirection: 'column', gap: 20 }}>
-                    <div>
-                      <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0 }}>{t('languageTitle')}</h2>
-                      <p style={{ fontSize: 13, color: S.text3, margin: '4px 0 0' }}>{t('languageSub')}</p>
+                    <div style={{ paddingBottom: 4 }}>
+                      <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0, letterSpacing: '-0.02em' }}>{t('languageTitle')}</h2>
+                      <p style={{ fontSize: 13, color: S.text3, margin: '5px 0 0', lineHeight: 1.5 }}>{t('languageSub')}</p>
                     </div>
 
-                    {/* Language toggle */}
-                    <div style={cardSt}>
-                      <div style={{ marginBottom: 16 }}>
-                        <h3 style={cardTitleSt}>{t('languageLabel')}</h3>
-                        <p style={cardSubSt}>{t('languageLabelSub')}</p>
-                      </div>
+                    <div className="sf-card" style={{ padding: '20px 22px' }}>
+                      <h3 className="text-[11px] font-semibold uppercase tracking-widest text-text3 mb-1">{t('languageLabel')}</h3>
+                      <p style={{ fontSize: 12, color: S.text3, margin: '0 0 16px', lineHeight: 1.4 }}>{t('languageLabelSub')}</p>
+
                       <div style={{ display: 'flex', gap: 10 }}>
                         {(['fr', 'en'] as const).map(l => (
-                          <button
-                            key={l}
-                            onClick={() => setAppLang(l)}
-                            style={{
-                              display: 'flex', alignItems: 'center', gap: 10,
-                              padding: '12px 20px', borderRadius: 11, cursor: 'pointer',
-                              fontSize: 14, fontWeight: 600, transition: 'all 0.15s',
-                              background: lang === l ? `rgba(139,92,246,0.15)` : 'rgba(255,255,255,0.03)',
-                              border: lang === l ? `1px solid rgba(139,92,246,0.45)` : `1px solid ${S.border}`,
-                              color: lang === l ? S.accent3 : S.text3,
-                            }}
-                          >
-                            <span style={{ fontSize: 20 }}>{l === 'fr' ? '🇫🇷' : '🇬🇧'}</span>
-                            <span>{l === 'fr' ? t('langFr') : t('langEn')}</span>
+                          <button key={l} onClick={() => setAppLang(l)} style={{
+                            display: 'flex', alignItems: 'center', gap: 10, flex: 1,
+                            padding: '14px 20px', borderRadius: 12, cursor: 'pointer',
+                            fontSize: 14, fontWeight: 600, transition: 'all 0.15s ease',
+                            background: lang === l ? 'rgba(139,92,246,0.15)' : 'rgba(255,255,255,0.03)',
+                            border: lang === l ? '1px solid rgba(139,92,246,0.45)' : `1px solid ${S.border}`,
+                            color: lang === l ? S.accent3 : S.text3,
+                            boxShadow: lang === l ? '0 0 16px -6px rgba(139,92,246,0.4)' : 'none',
+                          }}>
+                            {/* Globe SVG instead of emoji flag */}
+                            <div style={{ width: 28, height: 28, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              background: lang === l ? 'rgba(139,92,246,0.2)' : 'rgba(255,255,255,0.06)',
+                              border: `1px solid ${lang === l ? 'rgba(139,92,246,0.3)' : S.border}`, fontSize: 16 }}>
+                              {l === 'fr' ? 'FR' : 'EN'}
+                            </div>
+                            <span style={{ fontSize: 13 }}>{l === 'fr' ? t('langFr') : t('langEn')}</span>
                             {lang === l && (
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: 4 }}>
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: 'auto' }}>
                                 <polyline points="20 6 9 17 4 12"/>
                               </svg>
                             )}
@@ -922,73 +948,65 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                 {/* ── SÉCURITÉ ──────────────────────────────────────────── */}
                 {genTab === 'securite' && (
                   <div className="sf-anim-slide-up" style={{ maxWidth: 640, display: 'flex', flexDirection: 'column', gap: 20 }}>
-                    <div>
-                      <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0 }}>{t('securityTitle')}</h2>
-                      <p style={{ fontSize: 13, color: S.text3, margin: '4px 0 0' }}>{t('securitySub')}</p>
+                    <div style={{ paddingBottom: 4 }}>
+                      <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0, letterSpacing: '-0.02em' }}>{t('securityTitle')}</h2>
+                      <p style={{ fontSize: 13, color: S.text3, margin: '5px 0 0', lineHeight: 1.5 }}>{t('securitySub')}</p>
                     </div>
 
-                    {/* Session info */}
-                    <div style={cardSt}>
-                      <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: S.text3, margin: '0 0 14px' }}>{t('activeSession')}</h3>
+                    {/* Active session info */}
+                    <div className="sf-card" style={{ padding: '20px 22px' }}>
+                      <h3 className="text-[11px] font-semibold uppercase tracking-widest text-text3 mb-4">{t('activeSession')}</h3>
                       {[
                         { label: t('account'),     value: user.email ?? '—' },
                         { label: t('connectedOn'), value: user.created_at ? new Date(user.created_at).toLocaleDateString(lang === 'en' ? 'en-US' : 'fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : '—' },
                         { label: t('sessionId'),   value: user.id.slice(0, 8) + '…' },
-                      ].map(row => (
-                        <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 0', borderBottom: `1px solid ${S.border}` }}>
+                      ].map((row, idx) => (
+                        <div key={row.label} className="flex items-center justify-between py-3" style={{ borderBottom: idx < 2 ? `1px solid ${S.border}` : 'none' }}>
                           <span style={{ fontSize: 12, color: S.text3 }}>{row.label}</span>
-                          <span style={{ fontSize: 12, fontWeight: 500, color: S.text, fontFamily: 'ui-monospace, monospace' }}>{row.value}</span>
+                          <span style={{ fontSize: 12, fontWeight: 500, color: S.text, fontFamily: 'ui-monospace, monospace',
+                            background: 'rgba(255,255,255,0.04)', border: `1px solid ${S.border}`, borderRadius: 6, padding: '2px 8px' }}>
+                            {row.value}
+                          </span>
                         </div>
                       ))}
                     </div>
 
-                    {/* Options */}
-                    <div style={cardSt}>
-                      <SettingToggle first label={t('twoFA')}
-                        sub={t('twoFASub')}
+                    {/* Security options */}
+                    <div className="sf-card" style={{ padding: '6px 0' }}>
+                      <SettingToggle first label={t('twoFA')} sub={t('twoFASub')}
                         checked={twoFA} onChange={v => setTwoFA(v)} />
                       <SelectRow label={t('autoLogout')} sub={t('autoLogoutSub')}
                         value={sessionTimeout} onChange={v => setSessionTimeout(v)}
                         options={[
-                          { value: 'jamais',  label: t('never') },
-                          { value: '1h',      label: t('after1h') },
-                          { value: '8h',      label: t('after8h') },
-                          { value: '24h',     label: t('after24h') },
+                          { value: 'jamais', label: t('never') },
+                          { value: '1h',     label: t('after1h') },
+                          { value: '8h',     label: t('after8h') },
+                          { value: '24h',    label: t('after24h') },
                         ]} />
                     </div>
 
-                    {/* Actions */}
-                    <div style={cardSt}>
-                      <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: S.text3, margin: '0 0 14px' }}>{t('accountActions')}</h3>
+                    {/* Account actions */}
+                    <div className="sf-card" style={{ padding: '20px 22px' }}>
+                      <h3 className="text-[11px] font-semibold uppercase tracking-widest text-text3 mb-4">{t('accountActions')}</h3>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                        <button
-                          onClick={async () => { await supabase.auth.signOut() }}
-                          className="sf-btn sf-btn-danger sf-btn-sm"
-                          style={{ display: 'flex', alignItems: 'center', gap: 9, textAlign: 'left', width: '100%' }}>
+                        <button onClick={async () => { await supabase.auth.signOut() }}
+                          className="sf-btn sf-btn-danger sf-btn-sm" style={{ justifyContent: 'flex-start', width: '100%' }}>
                           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
                           {t('signOutBtn')}
                         </button>
-                        <button
-                          onClick={async () => {
-                            const { error } = await supabase.auth.resetPasswordForEmail(user.email ?? '')
-                            if (!error) setError(null)
-                          }}
-                          className="sf-btn sf-btn-ghost sf-btn-sm"
-                          style={{ display: 'flex', alignItems: 'center', gap: 9, textAlign: 'left', width: '100%' }}>
+                        <button onClick={async () => { const { error } = await supabase.auth.resetPasswordForEmail(user.email ?? ''); if (!error) setError(null) }}
+                          className="sf-btn sf-btn-ghost sf-btn-sm" style={{ justifyContent: 'flex-start', width: '100%' }}>
                           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
                           {t('sendResetEmail')}
                         </button>
-                        {/* Change password inline */}
                         {!pwChangeOpen ? (
-                          <button
-                            onClick={() => setPwChangeOpen(true)}
-                            className="sf-btn sf-btn-secondary sf-btn-sm"
-                            style={{ display: 'flex', alignItems: 'center', gap: 9, textAlign: 'left', width: '100%' }}>
+                          <button onClick={() => setPwChangeOpen(true)}
+                            className="sf-btn sf-btn-secondary sf-btn-sm" style={{ justifyContent: 'flex-start', width: '100%' }}>
                             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
                             {t('changePassword')}
                           </button>
                         ) : (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '12px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '14px', borderRadius: 10, background: 'rgba(139,92,246,0.05)', border: '1px solid rgba(139,92,246,0.15)' }}>
                             <input type="password" className="sf-input" placeholder={t('newPassword')} value={newPw} onChange={e => setNewPw(e.target.value)} style={{ width: '100%' }} />
                             <input type="password" className="sf-input" placeholder={t('confirmPassword')} value={confirmPw} onChange={e => setConfirmPw(e.target.value)} style={{ width: '100%' }} />
                             {pwError && <p style={{ fontSize: 12, color: '#F87171', margin: 0 }}>{pwError}</p>}
@@ -1015,29 +1033,39 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                 {/* ── AVANCÉ ────────────────────────────────────────────── */}
                 {genTab === 'avance' && (
                   <div className="sf-anim-slide-up" style={{ maxWidth: 640, display: 'flex', flexDirection: 'column', gap: 20 }}>
-                    <div>
-                      <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0 }}>{t('advancedTitle')}</h2>
-                      <p style={{ fontSize: 13, color: S.text3, margin: '4px 0 0' }}>{t('advancedSub')}</p>
+                    <div style={{ paddingBottom: 4 }}>
+                      <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0, letterSpacing: '-0.02em' }}>{t('advancedTitle')}</h2>
+                      <p style={{ fontSize: 13, color: S.text3, margin: '5px 0 0', lineHeight: 1.5 }}>{t('advancedSub')}</p>
                     </div>
 
-                    <div style={cardSt}>
+                    <div className="sf-card" style={{ padding: '6px 0' }}>
                       <SettingToggle first label={t('developerMode')} sub={t('developerModeSub')}
                         checked={devMode} onChange={v => setDevMode(v)} />
                     </div>
 
                     {devMode && (
-                      <div style={{ borderRadius: 11, padding: 16, fontFamily: 'ui-monospace, monospace', fontSize: 11, lineHeight: 1.7, background: 'rgba(0,0,0,0.4)', border: `1px solid ${S.border}`, color: S.text3 }}>
-                        <p style={{ margin: 0 }}>user_id: {user.id}</p>
-                        <p style={{ margin: 0 }}>email: {user.email}</p>
-                        <p style={{ margin: 0 }}>org: {currentOrg?.id ?? 'solo'}</p>
-                        <p style={{ margin: 0 }}>role: {role ?? 'n/a'}</p>
-                        <p style={{ margin: 0 }}>app_version: 2.0.0</p>
-                        <p style={{ margin: 0 }}>electron: {typeof window !== 'undefined' && (window as any).electronAPI ? 'oui' : 'non'}</p>
+                      <div style={{ borderRadius: 10, padding: '14px 16px', fontFamily: 'ui-monospace, monospace', fontSize: 11, lineHeight: 1.85,
+                        background: 'rgba(0,0,0,0.45)', border: `1px solid rgba(139,92,246,0.18)`, color: S.text3,
+                        boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.4)' }}>
+                        {[
+                          ['user_id', user.id],
+                          ['email', user.email],
+                          ['org', currentOrg?.id ?? 'solo'],
+                          ['role', role ?? 'n/a'],
+                          ['app_version', '2.0.0'],
+                          ['electron', typeof window !== 'undefined' && (window as any).electronAPI ? 'oui' : 'non'],
+                        ].map(([k, v]) => (
+                          <p key={k} style={{ margin: 0 }}>
+                            <span style={{ color: S.accent3 }}>{k}</span>
+                            <span style={{ color: 'rgba(255,255,255,0.3)' }}>{': '}</span>
+                            <span style={{ color: S.text }}>{v}</span>
+                          </p>
+                        ))}
                       </div>
                     )}
 
-                    <div style={cardSt}>
-                      <h3 style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: S.text3, margin: '0 0 14px' }}>{t('dataCache')}</h3>
+                    <div className="sf-card" style={{ padding: '20px 22px' }}>
+                      <h3 className="text-[11px] font-semibold uppercase tracking-widest text-text3 mb-4">{t('dataCache')}</h3>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                         <button
                           onClick={() => {
@@ -1093,8 +1121,8 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                       </div>
                     </div>
 
-                    <div style={{ textAlign: 'center', paddingTop: 8 }}>
-                      <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.3)', margin: 0 }}>{t('version')}</p>
+                    <div style={{ textAlign: 'center', paddingTop: 10 }}>
+                      <p style={{ fontSize: 11, color: S.text3, margin: 0, letterSpacing: '0.04em' }}>{t('version')}</p>
                     </div>
                   </div>
                 )}
@@ -1104,61 +1132,64 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
 
           {/* ── Other panels ─────────────────────────────────────────────── */}
           {panel !== 'general' && (
-            <div style={{ flex: 1, overflowY: 'auto', padding: '28px 32px' }}>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '28px 30px' }}>
 
-              {/* Profil */}
+              {/* ── Profil ───────────────────────────────────────────────── */}
               {panel === 'profile' && (
-                <div className="sf-anim-slide-up" style={{ maxWidth: 560, display: 'flex', flexDirection: 'column', gap: 20 }}>
-                  <div>
-                    <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0 }}>{t('profileTitle')}</h2>
-                    <p style={{ fontSize: 13, color: S.text3, margin: '4px 0 0' }}>{t('profileSub')}</p>
+                <div className="sf-anim-slide-up" style={{ maxWidth: 540, display: 'flex', flexDirection: 'column', gap: 20 }}>
+                  <div style={{ paddingBottom: 4 }}>
+                    <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0, letterSpacing: '-0.02em' }}>{t('profileTitle')}</h2>
+                    <p style={{ fontSize: 13, color: S.text3, margin: '5px 0 0', lineHeight: 1.5 }}>{t('profileSub')}</p>
                   </div>
 
-                  {/* Avatar card */}
-                  <div style={{ ...cardSt, display: 'flex', alignItems: 'center', gap: 16 }}>
+                  {/* Avatar identity card */}
+                  <div className="sf-card" style={{ padding: '20px 22px', display: 'flex', alignItems: 'center', gap: 18 }}>
+                    {/* Gradient avatar with initial */}
                     <div style={{
-                      width: 52, height: 52, borderRadius: '50%', flexShrink: 0,
+                      width: 58, height: 58, borderRadius: '50%', flexShrink: 0,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      background: 'linear-gradient(135deg, #7C3AED, #EC4899)',
-                      fontSize: 18, fontWeight: 700, color: '#fff',
-                      boxShadow: '0 0 0 3px rgba(139,92,246,0.18)',
+                      background: 'linear-gradient(135deg,#7C3AED 0%,#EC4899 100%)',
+                      fontSize: 22, fontWeight: 800, color: '#fff', letterSpacing: '-0.01em',
+                      boxShadow: '0 0 0 3px rgba(139,92,246,0.2), 0 0 24px -8px rgba(139,92,246,0.6)',
                     }}>
                       {(displayName || profileName || user.email || '?').charAt(0).toUpperCase()}
                     </div>
-                    <div style={{ flex: 1 }}>
-                      <p style={{ fontSize: 15, fontWeight: 700, color: S.text, margin: 0 }}>{displayName || profileName || t('user')}</p>
-                      <p style={{ fontSize: 12, color: S.text3, margin: '3px 0 6px' }}>{user.email}</p>
-                      <span className={`sf-badge ${role === 'owner' ? 'sf-badge-accent' : role === 'admin' ? 'sf-badge-accent' : 'sf-badge-muted'}`}>
+
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ fontSize: 16, fontWeight: 700, color: S.text, margin: '0 0 2px', letterSpacing: '-0.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {displayName || profileName || t('user')}
+                      </p>
+                      <p style={{ fontSize: 12, color: S.text3, margin: '0 0 8px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.email}</p>
+                      <span className={`sf-badge ${role === 'owner' || role === 'admin' ? 'sf-badge-accent' : 'sf-badge-muted'}`}>
                         {role === 'owner' ? t('owner') : role === 'admin' ? t('admin') : role === 'member' ? t('member') : t('solo')}
                       </span>
                     </div>
                   </div>
 
-                  {/* Form */}
-                  <div style={{ ...cardSt, display: 'flex', flexDirection: 'column', gap: 16 }}>
-                    <h3 style={cardTitleSt}>{t('personalInfo')}</h3>
-                    <div>
-                      <label style={{ fontSize: 12, fontWeight: 600, color: 'rgba(148,163,184,0.65)', marginBottom: 6, display: 'block', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Email</label>
-                      <input type="email" className="sf-input" value={profileEmail} onChange={e => setProfileEmail(e.target.value)} style={{ width: '100%' }} />
-                    </div>
-                    <div>
-                      <label style={{ fontSize: 12, fontWeight: 600, color: 'rgba(148,163,184,0.65)', marginBottom: 6, display: 'block', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('fullName')}</label>
-                      <input className="sf-input" placeholder="Jean Dupont" value={profileName} onChange={e => setProfileName(e.target.value)} style={{ width: '100%' }} />
-                    </div>
-                    <div>
-                      <label style={{ fontSize: 12, fontWeight: 600, color: 'rgba(148,163,184,0.65)', marginBottom: 6, display: 'block', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('username')}</label>
-                      <input className="sf-input" placeholder="@jean" value={displayName} onChange={e => setDisplayName(e.target.value)} style={{ width: '100%' }} />
+                  {/* Profile form */}
+                  <div className="sf-card" style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    <h3 className="text-[11px] font-semibold uppercase tracking-widest text-text3 mb-1">{t('personalInfo')}</h3>
+                    <div style={{ borderTop: `1px solid ${S.border}`, paddingTop: 14, display: 'flex', flexDirection: 'column', gap: 14 }}>
+                      {[
+                        { label: 'Email', type: 'email', value: profileEmail, onChange: (v: string) => setProfileEmail(v), placeholder: 'you@example.com' },
+                        { label: t('fullName'), type: 'text', value: profileName, onChange: (v: string) => setProfileName(v), placeholder: 'Jean Dupont' },
+                        { label: t('username'), type: 'text', value: displayName, onChange: (v: string) => setDisplayName(v), placeholder: '@jean' },
+                      ].map(field => (
+                        <div key={field.label}>
+                          <label className="text-[13px] font-medium text-text2" style={{ display: 'block', marginBottom: 6 }}>{field.label}</label>
+                          <input type={field.type} className="sf-input" placeholder={field.placeholder} value={field.value}
+                            onChange={e => field.onChange(e.target.value)} style={{ width: '100%' }} />
+                        </div>
+                      ))}
                     </div>
                   </div>
 
                   {/* Danger zone */}
-                  <div style={{ ...cardSt, background: 'rgba(239,68,68,0.03)', border: '1px solid rgba(239,68,68,0.15)' }}>
-                    <h3 style={{ ...cardTitleSt, color: '#EF4444', marginBottom: 12 }}>{t('dangerZone')}</h3>
-                    <p style={{ fontSize: 12, color: 'rgba(148,163,184,0.5)', marginBottom: 14, marginTop: 0 }}>{t('dangerZoneSub')}</p>
-                    <button
-                      onClick={async () => { await supabase.auth.signOut() }}
-                      className="sf-btn sf-btn-danger sf-btn-sm"
-                      style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                  <div className="sf-card" style={{ padding: '20px 22px', background: 'rgba(239,68,68,0.03)', borderColor: 'rgba(239,68,68,0.18)' }}>
+                    <h3 style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#EF4444', margin: '0 0 6px' }}>{t('dangerZone')}</h3>
+                    <p style={{ fontSize: 12, color: 'rgba(148,163,184,0.5)', margin: '0 0 14px', lineHeight: 1.5 }}>{t('dangerZoneSub')}</p>
+                    <button onClick={async () => { await supabase.auth.signOut() }}
+                      className="sf-btn sf-btn-danger sf-btn-sm cursor-pointer">
                       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
                       {t('signOutBtn')}
                     </button>
@@ -1168,71 +1199,106 @@ export function Settings({ user, initialPanel, initialTab, onNavigate }: Setting
                 </div>
               )}
 
-              {/* Connexions */}
+              {/* ── Connexions ───────────────────────────────────────────── */}
               {panel === 'connexions' && canSeeConnexions && (
-                <div className="sf-anim-slide-up" style={{ maxWidth: 560, display: 'flex', flexDirection: 'column', gap: 20 }}>
-                  <div>
-                    <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0 }}>{t('connexionsTitle')}</h2>
-                    <p style={{ fontSize: 13, color: S.text3, margin: '4px 0 0' }}>{t('connexionsSub')}</p>
+                <div className="sf-anim-slide-up" style={{ maxWidth: 540, display: 'flex', flexDirection: 'column', gap: 20 }}>
+                  <div style={{ paddingBottom: 4 }}>
+                    <h2 style={{ fontSize: 18, fontWeight: 700, color: S.text, margin: 0, letterSpacing: '-0.02em' }}>{t('connexionsTitle')}</h2>
+                    <p style={{ fontSize: 13, color: S.text3, margin: '5px 0 0', lineHeight: 1.5 }}>{t('connexionsSub')}</p>
                   </div>
 
-                  {/* Org/solo notice */}
+                  {/* Org / solo mode banner */}
                   <div style={{
-                    display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 11, fontSize: 12,
+                    display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 10, fontSize: 12,
                     ...(currentOrg
-                      ? { background: 'rgba(139,92,246,0.08)', border: `1px solid ${S.borderAccent}`, color: S.accent3 }
+                      ? { background: 'rgba(139,92,246,0.09)', border: `1px solid ${S.borderAccent}`, color: S.accent3 }
                       : { background: 'rgba(255,255,255,0.04)', border: `1px solid ${S.border}`, color: S.text3 }),
                   }}>
-                    {currentOrg
-                      ? <><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg><span>{t('orgMode')} — <strong>{currentOrg.name}</strong>{!canEditOrgConnexions && <span style={{ color: '#F59E0B' }}> · {t('readOnly')}</span>}</span></>
-                      : <><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg><span>{t('soloMode')}</span></>}
+                    {currentOrg ? (
+                      <>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
+                        <span>{t('orgMode')} — <strong style={{ color: S.text }}>{currentOrg.name}</strong>
+                          {!canEditOrgConnexions && <span style={{ color: '#F59E0B' }}> · {t('readOnly')}</span>}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+                        <span>{t('soloMode')}</span>
+                      </>
+                    )}
                   </div>
 
-                  <div style={{ ...cardSt, display: 'flex', flexDirection: 'column', gap: 16 }}>
-                    <h3 style={cardTitleSt}>GéeLark</h3>
-                    <div>
-                      <label style={{ fontSize: 12, fontWeight: 600, color: 'rgba(148,163,184,0.65)', marginBottom: 6, display: 'block', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('bearerToken')}</label>
-                      <input type="password" className="sf-input" placeholder="Bearer …" value={bearer} onChange={e => setBearer(e.target.value)} disabled={!!currentOrg && !canEditOrgConnexions} style={{ width: '100%' }} />
-                    </div>
-                    <div>
-                      <label style={{ fontSize: 12, fontWeight: 600, color: 'rgba(148,163,184,0.65)', marginBottom: 6, display: 'block', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('proxyUrl')}</label>
-                      <input className="sf-input" placeholder="http://proxy:8080" value={proxyUrl} onChange={e => setProxyUrl(e.target.value)} disabled={!!currentOrg && !canEditOrgConnexions} style={{ width: '100%' }} />
-                    </div>
-                    <div>
-                      <label style={{ fontSize: 12, fontWeight: 600, color: 'rgba(148,163,184,0.65)', marginBottom: 6, display: 'block', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t('igSessionId')}</label>
-                      <input type="password" className="sf-input" placeholder="sessionid=…" value={igSession} onChange={e => setIgSession(e.target.value)} disabled={!!currentOrg && !canEditOrgConnexions} style={{ width: '100%' }} />
+                  {/* GéeLark credentials */}
+                  <div className="sf-card" style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    <h3 className="text-[11px] font-semibold uppercase tracking-widest text-text3 mb-1">GéeLark</h3>
+                    <div style={{ borderTop: `1px solid ${S.border}`, paddingTop: 14, display: 'flex', flexDirection: 'column', gap: 14 }}>
+                      {[
+                        { label: t('bearerToken'), type: 'password', placeholder: 'Bearer …', value: bearer, onChange: (v: string) => setBearer(v) },
+                        { label: t('proxyUrl'), type: 'text', placeholder: 'http://proxy:8080', value: proxyUrl, onChange: (v: string) => setProxyUrl(v) },
+                        { label: t('igSessionId'), type: 'password', placeholder: 'sessionid=…', value: igSession, onChange: (v: string) => setIgSession(v) },
+                      ].map(field => (
+                        <div key={field.label}>
+                          <label className="text-[13px] font-medium text-text2" style={{ display: 'block', marginBottom: 6 }}>{field.label}</label>
+                          <input type={field.type} className="sf-input" placeholder={field.placeholder} value={field.value}
+                            onChange={e => field.onChange(e.target.value)}
+                            disabled={!!currentOrg && !canEditOrgConnexions} style={{ width: '100%' }} />
+                        </div>
+                      ))}
                     </div>
                   </div>
 
-                  <div style={{ ...cardSt, display: 'flex', flexDirection: 'column', gap: 16 }}>
-                    <h3 style={cardTitleSt}>{t('aiApiKeys')}</h3>
-                    <div>
-                      <label style={{ fontSize: 12, fontWeight: 600, color: 'rgba(148,163,184,0.65)', marginBottom: 6, display: 'block', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Groq API Key</label>
-                      <input type="password" className="sf-input" placeholder="gsk_…" value={groqKey} onChange={e => setGroqKey(e.target.value)} disabled={!!currentOrg && !canEditOrgConnexions} style={{ width: '100%' }} />
-                    </div>
-                    <div>
-                      <label style={{ fontSize: 12, fontWeight: 600, color: 'rgba(148,163,184,0.65)', marginBottom: 6, display: 'block', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Anthropic API Key</label>
-                      <input type="password" className="sf-input" placeholder="sk-ant-…" value={anthropicKey} onChange={e => setAnthropicKey(e.target.value)} disabled={!!currentOrg && !canEditOrgConnexions} style={{ width: '100%' }} />
+                  {/* AI API Keys */}
+                  <div className="sf-card" style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    <h3 className="text-[11px] font-semibold uppercase tracking-widest text-text3 mb-1">{t('aiApiKeys')}</h3>
+                    <div style={{ borderTop: `1px solid ${S.border}`, paddingTop: 14, display: 'flex', flexDirection: 'column', gap: 14 }}>
+                      {[
+                        { label: 'Groq API Key', placeholder: 'gsk_…', value: groqKey, onChange: (v: string) => setGroqKey(v) },
+                        { label: 'Anthropic API Key', placeholder: 'sk-ant-…', value: anthropicKey, onChange: (v: string) => setAnthropicKey(v) },
+                      ].map(field => (
+                        <div key={field.label}>
+                          <label className="text-[13px] font-medium text-text2" style={{ display: 'block', marginBottom: 6 }}>{field.label}</label>
+                          <input type="password" className="sf-input" placeholder={field.placeholder} value={field.value}
+                            onChange={e => field.onChange(e.target.value)}
+                            disabled={!!currentOrg && !canEditOrgConnexions} style={{ width: '100%' }} />
+                        </div>
+                      ))}
                     </div>
                   </div>
+
                   {error && <p style={{ fontSize: 12, color: '#EF4444', margin: 0 }}>{error}</p>}
                 </div>
               )}
 
               {/* Organisation */}
-              {panel === 'organization' && <OrganizationPanel user={user} />}
+              {panel === 'organization' && (
+                <div className="sf-anim-slide-up" style={{ maxWidth: 720 }}>
+                  <OrganizationPanel user={user} />
+                </div>
+              )}
 
               {/* Admin */}
-              {panel === 'admin' && license.isSuperAdmin && <AdminPanel user={user} />}
+              {panel === 'admin' && license.isSuperAdmin && (
+                <div className="sf-anim-slide-up">
+                  <AdminPanel user={user} />
+                </div>
+              )}
 
               {/* Abonnement */}
-              {panel === 'abonnement' && <SubscriptionPanel />}
+              {panel === 'abonnement' && (
+                <div className="sf-anim-slide-up">
+                  <SubscriptionPanel />
+                </div>
+              )}
 
               {/* App Desktop */}
               {panel === 'desktop' && <DesktopDownloadPanel S={S} />}
 
               {error && panel !== 'profile' && panel !== 'connexions' && (
-                <div style={{ marginTop: 16, padding: '10px 14px', borderRadius: 11, fontSize: 12, color: '#EF4444', maxWidth: 560, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>{error}</div>
+                <div style={{ marginTop: 16, padding: '10px 14px', borderRadius: 10, fontSize: 12, color: '#EF4444', maxWidth: 540,
+                  background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
+                  {error}
+                </div>
               )}
             </div>
           )}
