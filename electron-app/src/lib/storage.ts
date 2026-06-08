@@ -38,8 +38,8 @@ function scopeFolder(scope: UploadScope): string {
 // Returns null if extraction fails (e.g. unsupported codec) or times out.
 // Hard timeout = 8s so a hung decoder doesn't block the upload pipeline forever.
 export async function generateThumbnail(videoBlob: Blob, atSeconds = 0.5): Promise<Blob | null> {
-  // Try multiple seek times — some videos have black frames at the start
-  const seekTimes = [atSeconds, 1.5, 2.5, 0.1]
+  // Try 2 seek times — reduces worst-case wait from 48s (4×12s) to 12s (2×6s)
+  const seekTimes = [atSeconds, 1.5]
   for (const t of seekTimes) {
     const result = await _tryCapture(videoBlob, t)
     if (result) return result
@@ -68,7 +68,8 @@ function _tryCapture(videoBlob: Blob, atSeconds: number): Promise<Blob | null> {
       cleanup()
       resolve(out)
     }
-    const timeoutId = setTimeout(() => finish(null), 12000)
+    // 6s per attempt (was 12s) — still generous for slow decoders
+    const timeoutId = setTimeout(() => finish(null), 6000)
 
     v.onloadedmetadata = () => { v.currentTime = Math.min(atSeconds, Math.max(0, (v.duration || 1) - 0.1)) }
     v.onseeked = () => {
@@ -76,17 +77,18 @@ function _tryCapture(videoBlob: Blob, atSeconds: number): Promise<Blob | null> {
         const c = document.createElement('canvas')
         const w = v.videoWidth || 720
         const h = v.videoHeight || 1280
-        const maxSide = 480
+        // 320px max side (was 480) — still sharp enough for a thumbnail
+        const maxSide = 320
         const ratio = Math.min(1, maxSide / Math.max(w, h))
         c.width  = Math.round(w * ratio)
         c.height = Math.round(h * ratio)
         const ctx = c.getContext('2d', { willReadFrequently: true })
         if (!ctx) return finish(null)
         ctx.drawImage(v, 0, 0, c.width, c.height)
-        // Check if frame is actually black — if so, signal failure to try next seek time
         const px = ctx.getImageData(c.width >> 1, c.height >> 1, 1, 1).data
         if (px[0] < 8 && px[1] < 8 && px[2] < 8) { finish(null); return }
-        c.toBlob(b => finish(b), 'image/jpeg', 0.78)
+        // 0.72 quality (was 0.78) — smaller file, faster upload, unnoticeable for thumbnails
+        c.toBlob(b => finish(b), 'image/jpeg', 0.72)
       } catch {
         finish(null)
       }
@@ -135,19 +137,23 @@ export async function uploadVideoFromBlob(
   const folder = scopeFolder(scope)
   const storagePath = `videos/${folder}/${id}.${ext}`
 
-  onProgress?.('thumbnail')
   const isImage = IMAGE_EXTS.has(ext)
-  const thumb = isImage
-    ? await generateImageThumbnail(blob).catch(() => null)
-    : await generateThumbnail(blob).catch(err => {
-        console.warn('[storage] thumbnail generation failed:', err)
-        return null
-      })
 
+  // Run thumbnail generation and video upload in parallel — for a 100 MB video
+  // that takes 10s to upload, a 3s thumbnail generation becomes free/overlapping.
   onProgress?.('uploading-video')
-  const upRes = await supabase.storage.from(BUCKET).upload(storagePath, blob, {
-    contentType: mime, upsert: false,
-  })
+  const [thumb, upRes] = await Promise.all([
+    isImage
+      ? generateImageThumbnail(blob).catch(() => null)
+      : generateThumbnail(blob).catch(err => {
+          console.warn('[storage] thumbnail generation failed:', err)
+          return null
+        }),
+    supabase.storage.from(BUCKET).upload(storagePath, blob, {
+      contentType: mime, upsert: false,
+    }),
+  ])
+
   if (upRes.error) throw new Error('Upload vidéo : ' + upRes.error.message)
 
   let thumbnailPath: string | null = null
