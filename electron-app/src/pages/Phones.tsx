@@ -1261,7 +1261,7 @@ export function Phones({ user }: PhonesProps) {
                           <th style={{ width: 120 }}>{t('phonesDetailGroup')}</th>
                           <th style={{ width: 160 }}>Instagram</th>
                           <th style={{ width: 110 }}>{t('phonesIgStatus')}</th>
-                          <th style={{ width: 150 }}>{t('phonesDetailSerial').replace('N° ', '') === 'Série' ? 'Note' : 'Note'}</th>
+                          <th style={{ width: 150 }}>Note</th>
                           <th style={{ width: 90 }}></th>
                         </tr>
                       </thead>
@@ -1791,6 +1791,13 @@ function PhoneRow({
 }) {
   const t = useT()
   const [hovered, setHovered] = useState(false)
+  const online = phone.status === 'online'
+
+  const cellStyle: React.CSSProperties = {
+    padding: '9px 12px',
+    background: isSelected ? 'rgba(124,58,237,0.07)' : 'transparent',
+    transition: 'background 0.12s',
+  }
 
   return (
     <tr
@@ -1798,40 +1805,42 @@ function PhoneRow({
       onMouseLeave={() => setHovered(false)}
       onClick={() => setSelectedPhone(isSelected ? null : phone)}
       onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setContextMenu({ phone, x: e.clientX, y: e.clientY }) }}
-      style={{
-        cursor: 'pointer',
-        background: isSelected
-          ? 'rgba(124,58,237,0.09)'
-          : hovered ? 'rgba(255,255,255,0.025)' : 'transparent',
-        transition: 'background 0.12s',
-        borderLeft: isSelected ? '2px solid rgba(139,92,246,0.7)' : '2px solid transparent',
-      }}
+      style={{ cursor: 'pointer' }}
     >
-      {/* Status dot */}
-      <td style={{ textAlign: 'center', padding: '0 8px' }}>
-        <StatusDot status={phone.status ?? 'offline'} />
+      {/* Status dot — first td carries the left accent bar */}
+      <td style={{
+        ...cellStyle,
+        width: 44, textAlign: 'center',
+        boxShadow: isSelected ? 'inset 3px 0 0 rgba(139,92,246,0.75)' : 'none',
+      }}>
+        <span style={{
+          display: 'inline-block',
+          width: 8, height: 8, borderRadius: '50%',
+          background: online ? '#22C55E' : 'rgba(148,163,184,0.22)',
+          boxShadow: online ? '0 0 0 3px rgba(34,197,94,0.15)' : 'none',
+          flexShrink: 0,
+        }} />
       </td>
 
       {/* Phone name + serial */}
-      <td>
+      <td style={cellStyle}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {/* Colored avatar */}
           <div style={{
             width: 30, height: 30, borderRadius: 8, flexShrink: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: `linear-gradient(135deg, ${col}22, ${col}0d)`,
-            border: `1px solid ${col}2e`, color: col,
+            background: `linear-gradient(135deg, ${col}28, ${col}10)`,
+            border: `1px solid ${col}30`, color: col,
+            fontSize: 12, fontWeight: 700,
           }}>
-            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-              <rect x="2" y="0.5" width="9" height="12" rx="2" stroke="currentColor" strokeWidth="1.3"/>
-              <circle cx="6.5" cy="10.5" r="0.7" fill="currentColor"/>
-            </svg>
+            {phone.phone_name.charAt(0).toUpperCase()}
           </div>
           <div style={{ minWidth: 0 }}>
             <p style={{ fontSize: 13, fontWeight: 600, color: '#F2F0FF', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {phone.phone_name}
             </p>
             {phone.serial_no && (
-              <p style={{ fontSize: 10, fontFamily: 'monospace', color: 'rgba(148,163,184,0.32)', margin: '1px 0 0' }}>
+              <p style={{ fontSize: 10, fontFamily: 'monospace', color: 'rgba(148,163,184,0.3)', margin: '1px 0 0' }}>
                 {phone.serial_no}
               </p>
             )}
@@ -1840,35 +1849,41 @@ function PhoneRow({
       </td>
 
       {/* Group */}
-      <td>
+      <td style={cellStyle}>
         {phone.group_name
           ? <span style={{
-              fontSize: 10, padding: '2px 7px', borderRadius: 5, fontWeight: 600,
+              display: 'inline-block',
+              fontSize: 10, padding: '2px 8px', borderRadius: 5, fontWeight: 600,
               background: 'rgba(139,92,246,0.1)', color: '#A78BFA',
               border: '1px solid rgba(139,92,246,0.18)',
+              whiteSpace: 'nowrap',
             }}>{phone.group_name}</span>
-          : <span style={{ color: 'rgba(148,163,184,0.2)', fontSize: 13 }}>—</span>
+          : <span style={{ color: 'rgba(148,163,184,0.2)' }}>—</span>
         }
       </td>
 
       {/* IG Username — inline editable */}
-      <td onClick={e => e.stopPropagation()}>
+      <td style={cellStyle} onClick={e => e.stopPropagation()}>
         <IgCell phone={phone} onSave={saveIgUsername} />
       </td>
 
       {/* IG Status badge */}
-      <td>
+      <td style={cellStyle}>
         <IgStatusBadge phone={phone} />
       </td>
 
       {/* Note — inline editable */}
-      <td onClick={e => e.stopPropagation()}>
+      <td style={cellStyle} onClick={e => e.stopPropagation()}>
         <NoteCell phone={phone} onSave={saveRemark} />
       </td>
 
-      {/* Actions */}
-      <td onClick={e => e.stopPropagation()} style={{ padding: '0 10px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4 }}>
+      {/* Actions — visible on hover or selected */}
+      <td style={{ ...cellStyle, padding: '9px 10px' }} onClick={e => e.stopPropagation()}>
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 3,
+          opacity: hovered || isSelected ? 1 : 0,
+          transition: 'opacity 0.15s',
+        }}>
           <ActionBtn onClick={() => setSessionDialog({ phone })} title={t('phonesRowSessionId')}>
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
               <rect x="1.5" y="5" width="9" height="6.5" rx="1.2" stroke="currentColor" strokeWidth="1.3"/>
@@ -1876,9 +1891,13 @@ function PhoneRow({
             </svg>
           </ActionBtn>
           <button
-            className="sf-btn sf-btn-ghost sf-btn-sm sf-btn-icon"
-            style={{ width: 28, height: 28, borderRadius: 6, cursor: 'pointer' }}
-            title="More"
+            style={{
+              width: 26, height: 26, borderRadius: 6,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+              color: 'rgba(148,163,184,0.52)', cursor: 'pointer',
+            }}
+            title="Plus"
             onClick={e => { e.stopPropagation(); setContextMenu({ phone, x: e.clientX, y: e.clientY }) }}
           >
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
