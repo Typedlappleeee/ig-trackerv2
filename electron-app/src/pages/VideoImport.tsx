@@ -1,6 +1,5 @@
 import { useState, useRef } from 'react'
 import type { User } from '@supabase/supabase-js'
-import { Button } from '@/components/ui/Button'
 import { Spinner } from '@/components/ui/Spinner'
 import { supabase } from '@/lib/supabase'
 import { uploadVideoFromBlob, type UploadScope } from '@/lib/storage'
@@ -127,26 +126,24 @@ export function VideoImport({ user }: { user: User }) {
     <div className="h-full flex flex-col overflow-hidden anim-page">
 
       {/* ── Page header ─────────────────────────────────────────────────────── */}
-      <div className="sf-page-header">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-            style={{ background: 'linear-gradient(135deg, rgba(124,58,237,0.25), rgba(236,72,153,0.15))', border: '1px solid rgba(139,92,246,0.25)' }}>
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-              <polyline points="17 8 12 3 7 8"/>
-              <line x1="12" y1="3" x2="12" y2="15"/>
-            </svg>
-          </div>
-          <div>
-            <h1 className="sf-page-title">Importer depuis les réseaux</h1>
-            <p className="sf-page-sub">Colle un lien Instagram ou TikTok — la vidéo est téléchargée et ajoutée à ta banque.</p>
-          </div>
+      <div className="flex-shrink-0 px-8 pt-7 pb-5 flex items-center gap-3 border-b border-border">
+        <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+          style={{ background: 'linear-gradient(135deg, rgba(124,58,237,0.25), rgba(236,72,153,0.15))', border: '1px solid rgba(139,92,246,0.25)' }}>
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+        </div>
+        <div>
+          <h1 className="text-[20px] font-black text-text leading-none">Importer depuis les réseaux</h1>
+          <p className="text-[13px] text-text2 mt-0.5">Colle un lien Instagram ou TikTok — la vidéo est téléchargée et ajoutée à ta banque.</p>
         </div>
       </div>
 
       {/* ── Content ─────────────────────────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto sf-page-body">
-        <div className="max-w-2xl mx-auto space-y-5">
+      <div className="flex-1 overflow-y-auto px-8 pb-10">
+        <div className="max-w-2xl mx-auto space-y-5 pt-6">
 
           {/* URL input card */}
           <div className="sf-card p-5 space-y-4">
@@ -165,25 +162,25 @@ export function VideoImport({ user }: { user: User }) {
               <button
                 onClick={handleImport}
                 disabled={!url.trim() || loading}
-                className="sf-btn sf-btn-primary cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                className="sf-btn sf-btn-primary cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
                 style={{ minWidth: 100 }}
               >
                 {loading ? <Spinner size="sm" /> : (
-                  <span className="flex items-center gap-1.5">
+                  <>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                       <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                       <polyline points="17 8 12 3 7 8"/>
                       <line x1="12" y1="3" x2="12" y2="15"/>
                     </svg>
                     Importer
-                  </span>
+                  </>
                 )}
               </button>
             </div>
 
             {/* Status */}
             {status && (
-              <div className="flex items-center gap-2.5 py-2">
+              <div className="flex items-center gap-2.5 py-1">
                 <Spinner size="sm" />
                 <p className="text-sm text-text2 animate-pulse">{status}</p>
               </div>
@@ -191,8 +188,7 @@ export function VideoImport({ user }: { user: User }) {
 
             {/* Error */}
             {error && (
-              <div className="rounded-xl px-4 py-3 flex items-start gap-3"
-                style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
+              <div className="rounded-xl px-4 py-3 flex items-start gap-3 bg-danger/5 border border-danger/20">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#f87171" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="mt-0.5 flex-shrink-0">
                   <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
                 </svg>
@@ -232,8 +228,7 @@ export function VideoImport({ user }: { user: User }) {
                   ),
                 },
               ].map(p => (
-                <div key={p.name} className="flex items-center gap-3 rounded-xl px-4 py-3"
-                  style={{ background: 'rgba(139,92,246,0.04)', border: '1px solid rgba(139,92,246,0.1)' }}>
+                <div key={p.name} className="flex items-center gap-3 rounded-xl px-4 py-3 border border-accent/10 bg-accent/[0.03]">
                   <span className="text-accent">{p.icon}</span>
                   <div>
                     <p className="text-[13px] font-semibold text-text">{p.name}</p>
@@ -256,13 +251,11 @@ export function VideoImport({ user }: { user: User }) {
               </div>
               <div className="space-y-2">
                 {imported.map((v, i) => (
-                  <div key={i} className="flex items-center gap-3 rounded-xl p-3"
-                    style={{ background: 'rgba(34,197,94,0.05)', border: '1px solid rgba(34,197,94,0.12)' }}>
+                  <div key={i} className="flex items-center gap-3 rounded-xl p-3 bg-ok/5 border border-ok/12">
                     {v.thumbnailUrl
                       ? <img src={v.thumbnailUrl} alt={v.title} className="w-14 h-10 rounded-lg object-cover flex-shrink-0" />
                       : (
-                        <div className="w-14 h-10 rounded-lg flex-shrink-0 flex items-center justify-center"
-                          style={{ background: 'rgba(139,92,246,0.1)' }}>
+                        <div className="w-14 h-10 rounded-lg flex-shrink-0 flex items-center justify-center bg-accent/10">
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                             <rect x="2" y="2" width="20" height="20" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>
                           </svg>

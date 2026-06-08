@@ -20,14 +20,30 @@ function SfIcon({ size = 16, children, ...rest }: { size?: number; children: Rea
     </svg>
   )
 }
-const IconX        = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></SfIcon>
-const IconCheck    = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><polyline points="20 6 9 17 4 12"/></SfIcon>
-const IconFolder   = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></SfIcon>
-const IconFolderOpen = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><path d="M6 14l1.45-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.55 6A2 2 0 0 1 18.45 20H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.93a2 2 0 0 1 1.66.9l.82 1.2a2 2 0 0 0 1.66.9H18a2 2 0 0 1 2 2v2"/></SfIcon>
+const IconX            = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></SfIcon>
+const IconCheck        = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><polyline points="20 6 9 17 4 12"/></SfIcon>
+const IconFolder       = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></SfIcon>
+const IconFolderOpen   = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><path d="M6 14l1.45-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.55 6A2 2 0 0 1 18.45 20H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.93a2 2 0 0 1 1.66.9l.82 1.2a2 2 0 0 0 1.66.9H18a2 2 0 0 1 2 2v2"/></SfIcon>
 const IconClapperboard = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><path d="M20.2 6 3 11l-.9-2.4c-.3-1.1.3-2.2 1.3-2.5l13.5-4c1.1-.3 2.2.3 2.5 1.3Z"/><path d="m6.2 5.3 3.1 3.9"/><path d="m12.4 3.4 3.1 4"/><path d="M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></SfIcon>
-const IconImage    = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></SfIcon>
-const IconAlertTriangle = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></SfIcon>
-const IconLibrary  = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><path d="m16 6 4 14"/><path d="M12 6v14"/><path d="M8 8v12"/><path d="M4 4v16"/></SfIcon>
+const IconImage        = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></SfIcon>
+const IconAlertTriangle= (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></SfIcon>
+const IconLibrary      = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><path d="m16 6 4 14"/><path d="M12 6v14"/><path d="M8 8v12"/><path d="M4 4v16"/></SfIcon>
+const IconSearch       = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></SfIcon>
+const IconGrid         = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></SfIcon>
+const IconList         = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></SfIcon>
+const IconPlus         = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></SfIcon>
+const IconRefresh      = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></SfIcon>
+const IconTrash        = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></SfIcon>
+const IconDownload     = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></SfIcon>
+const IconMove         = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></SfIcon>
+const IconPencil       = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></SfIcon>
+const IconTag          = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></SfIcon>
+const IconUpload       = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></SfIcon>
+const IconUsers        = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></SfIcon>
+const IconUser         = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></SfIcon>
+const IconPlay         = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p} fill="white" stroke="none"><polygon points="5,3 19,12 5,21"/></SfIcon>
+const IconMoreVert     = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p} fill="currentColor" stroke="none"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></SfIcon>
+const IconDotsVertical = IconMoreVert
 
 function formatDuration(s: number | null): string {
   if (!s) return ''
@@ -92,19 +108,26 @@ function RenameModal({ item, onSave, onClose }: {
   const t = useT()
   const [val, setVal] = useState(item.title)
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
-      <div className="bg-surface border border-border rounded-xl p-5 w-80 space-y-4" onClick={e => e.stopPropagation()}>
-        <h3 className="text-sm font-semibold text-text">{t('bankRenameVideo')}</h3>
-        <input
-          autoFocus
-          className="w-full bg-bg border border-border rounded-lg px-3 py-2 text-sm text-text focus:border-accent focus:outline-none"
-          value={val}
-          onChange={e => setVal(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter') { onSave(item.id, val.trim()); onClose() } if (e.key === 'Escape') onClose() }}
-        />
-        <div className="flex gap-2 justify-end">
-          <Button variant="secondary" size="sm" onClick={onClose}>{t('cancel')}</Button>
-          <Button size="sm" onClick={() => { onSave(item.id, val.trim()); onClose() }} disabled={!val.trim()}>{t('save')}</Button>
+    <div className="sf-modal-bg" onClick={onClose}>
+      <div className="sf-modal w-80 anim-scale-in" onClick={e => e.stopPropagation()}>
+        <div className="sf-modal-header">
+          <h3 className="sf-modal-title">{t('bankRenameVideo')}</h3>
+          <button onClick={onClose} className="sf-btn sf-btn-ghost sf-btn-icon sf-btn-sm cursor-pointer" aria-label={t('cancel')}>
+            <IconX size={15} />
+          </button>
+        </div>
+        <div className="p-5 space-y-4">
+          <input
+            autoFocus
+            className="sf-input w-full"
+            value={val}
+            onChange={e => setVal(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') { onSave(item.id, val.trim()); onClose() } if (e.key === 'Escape') onClose() }}
+          />
+          <div className="flex gap-2 justify-end">
+            <button className="sf-btn sf-btn-secondary sf-btn-sm cursor-pointer" onClick={onClose}>{t('cancel')}</button>
+            <button className="sf-btn sf-btn-primary sf-btn-sm cursor-pointer" onClick={() => { onSave(item.id, val.trim()); onClose() }} disabled={!val.trim()}>{t('save')}</button>
+          </div>
         </div>
       </div>
     </div>
@@ -120,25 +143,34 @@ function MoveModal({ item, folders, onSave, onClose }: {
 }) {
   const t = useT()
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
-      <div className="bg-surface border border-border rounded-xl p-5 w-72 space-y-3" onClick={e => e.stopPropagation()}>
-        <h3 className="text-sm font-semibold text-text">{t('bankMoveTo')}</h3>
-        <button
-          onClick={() => { onSave(item.id, null); onClose() }}
-          className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${!item.folder ? 'bg-accent/10 text-accent' : 'hover:bg-surface2 text-text'}`}
-        >
-          {t('bankAllNoFolder')}
-        </button>
-        {folders.map(f => (
-          <button
-            key={f}
-            onClick={() => { onSave(item.id, f); onClose() }}
-            className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors flex items-center gap-2 ${item.folder === f ? 'bg-accent/10 text-accent' : 'hover:bg-surface2 text-text'}`}
-          >
-            <IconFolder size={14} className="flex-shrink-0" /> {f}
+    <div className="sf-modal-bg" onClick={onClose}>
+      <div className="sf-modal w-72 anim-scale-in" onClick={e => e.stopPropagation()}>
+        <div className="sf-modal-header">
+          <h3 className="sf-modal-title">{t('bankMoveTo')}</h3>
+          <button onClick={onClose} className="sf-btn sf-btn-ghost sf-btn-icon sf-btn-sm cursor-pointer" aria-label={t('cancel')}>
+            <IconX size={15} />
           </button>
-        ))}
-        <Button variant="secondary" size="sm" className="w-full" onClick={onClose}>{t('cancel')}</Button>
+        </div>
+        <div className="p-3 space-y-1 max-h-72 overflow-y-auto">
+          <button
+            onClick={() => { onSave(item.id, null); onClose() }}
+            className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors cursor-pointer ${!item.folder ? 'bg-accent/10 text-accent' : 'hover:bg-surface2 text-text'}`}
+          >
+            {t('bankAllNoFolder')}
+          </button>
+          {folders.map(f => (
+            <button
+              key={f}
+              onClick={() => { onSave(item.id, f); onClose() }}
+              className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors flex items-center gap-2 cursor-pointer ${item.folder === f ? 'bg-accent/10 text-accent' : 'hover:bg-surface2 text-text'}`}
+            >
+              <IconFolder size={14} className="flex-shrink-0" /> {f}
+            </button>
+          ))}
+        </div>
+        <div className="p-3 border-t border-border">
+          <button className="sf-btn sf-btn-secondary w-full cursor-pointer" onClick={onClose}>{t('cancel')}</button>
+        </div>
       </div>
     </div>
   )
@@ -153,24 +185,31 @@ function TagsModal({ item, onSave, onClose }: {
   const t = useT()
   const [val, setVal] = useState(item.tags.join(', '))
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
-      <div className="bg-surface border border-border rounded-xl p-5 w-80 space-y-4" onClick={e => e.stopPropagation()}>
-        <h3 className="text-sm font-semibold text-text">{t('bankTagsTitle')}</h3>
-        <input
-          autoFocus
-          placeholder={t('bankTagsPlaceholder')}
-          className="w-full bg-bg border border-border rounded-lg px-3 py-2 text-sm text-text focus:border-accent focus:outline-none"
-          value={val}
-          onChange={e => setVal(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Escape') onClose() }}
-        />
-        <p className="text-[11px] text-text2">{t('bankTagsSeparate')}</p>
-        <div className="flex gap-2 justify-end">
-          <Button variant="secondary" size="sm" onClick={onClose}>{t('cancel')}</Button>
-          <Button size="sm" onClick={() => {
-            const tags = val.split(',').map(tag => tag.trim()).filter(Boolean)
-            onSave(item.id, tags); onClose()
-          }}>{t('save')}</Button>
+    <div className="sf-modal-bg" onClick={onClose}>
+      <div className="sf-modal w-80 anim-scale-in" onClick={e => e.stopPropagation()}>
+        <div className="sf-modal-header">
+          <h3 className="sf-modal-title">{t('bankTagsTitle')}</h3>
+          <button onClick={onClose} className="sf-btn sf-btn-ghost sf-btn-icon sf-btn-sm cursor-pointer" aria-label={t('cancel')}>
+            <IconX size={15} />
+          </button>
+        </div>
+        <div className="p-5 space-y-3">
+          <input
+            autoFocus
+            placeholder={t('bankTagsPlaceholder')}
+            className="sf-input w-full"
+            value={val}
+            onChange={e => setVal(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Escape') onClose() }}
+          />
+          <p className="text-[11px] text-text3">{t('bankTagsSeparate')}</p>
+          <div className="flex gap-2 justify-end">
+            <button className="sf-btn sf-btn-secondary sf-btn-sm cursor-pointer" onClick={onClose}>{t('cancel')}</button>
+            <button className="sf-btn sf-btn-primary sf-btn-sm cursor-pointer" onClick={() => {
+              const tags = val.split(',').map(tag => tag.trim()).filter(Boolean)
+              onSave(item.id, tags); onClose()
+            }}>{t('save')}</button>
+          </div>
         </div>
       </div>
     </div>
@@ -209,55 +248,67 @@ function AddMediaModal({ onFiles, onElectronPick, onClose }: {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={onClose}>
-      <div className="bg-surface border border-border rounded-2xl p-6 w-96 space-y-4 shadow-2xl" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-bold text-text">{t('bankAddMedia')}</h3>
-          <button onClick={onClose} aria-label={t('cancel')} className="text-text2 hover:text-text transition-colors leading-none"><IconX size={18} /></button>
-        </div>
-
-        {/* Drag-drop zone */}
-        <div
-          onDragOver={e => { e.preventDefault(); setDragOver(true) }}
-          onDragLeave={() => setDragOver(false)}
-          onDrop={handleDrop}
-          className={`
-            border-2 border-dashed rounded-xl flex flex-col items-center justify-center gap-3 py-10 transition-all cursor-default
-            ${dragOver ? 'border-accent bg-accent/10' : 'border-border hover:border-accent/50 bg-surface2/40'}
-          `}
-        >
-          <span className={dragOver ? 'text-accent' : 'text-text2/40'}>{dragOver ? <IconFolderOpen size={44} /> : <IconClapperboard size={44} />}</span>
-          <div className="text-center">
-            <p className="text-sm font-semibold text-text">{t('bankDragFiles')}</p>
-            <p className="text-xs text-text2 mt-0.5">{t('bankMediaTypes')}</p>
+    <div className="sf-modal-bg" onClick={onClose}>
+      <div className="sf-modal w-96 anim-scale-in" onClick={e => e.stopPropagation()}>
+        <div className="sf-modal-header">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(34,211,238,0.12)', color: '#22d3ee' }}>
+              <IconUpload size={16} />
+            </div>
+            <h3 className="sf-modal-title">{t('bankAddMedia')}</h3>
           </div>
+          <button onClick={onClose} className="sf-btn sf-btn-ghost sf-btn-icon sf-btn-sm cursor-pointer" aria-label={t('cancel')}>
+            <IconX size={15} />
+          </button>
         </div>
 
-        <div className="flex items-center gap-3">
-          <div className="flex-1 h-px bg-border" />
-          <span className="text-xs text-text2">{t('bankOr')}</span>
-          <div className="flex-1 h-px bg-border" />
-        </div>
+        <div className="p-5 space-y-4">
+          {/* Drag-drop zone */}
+          <div
+            onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={handleDrop}
+            className={`
+              border-2 border-dashed rounded-xl flex flex-col items-center justify-center gap-3 py-10 transition-all cursor-default
+              ${dragOver ? 'border-accent bg-accent/10' : 'border-border hover:border-accent/50 bg-surface2/40'}
+            `}
+          >
+            <span className={dragOver ? 'text-accent' : 'text-text3'}>
+              {dragOver ? <IconFolderOpen size={44} /> : <IconClapperboard size={44} />}
+            </span>
+            <div className="text-center">
+              <p className="text-sm font-semibold text-text">{t('bankDragFiles')}</p>
+              <p className="text-xs text-text2 mt-0.5">{t('bankMediaTypes')}</p>
+            </div>
+          </div>
 
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="video/*,image/*,audio/*,.gif"
-          multiple
-          style={{ display: 'none' }}
-          onChange={e => {
-            const files = Array.from(e.target.files ?? [])
-            if (files.length > 0) onFiles(files)
-            e.target.value = ''
-            onClose()
-          }}
-        />
-        <button
-          onClick={handlePickClick}
-          className="w-full bg-accent hover:bg-accent2 text-white font-semibold py-2.5 rounded-xl text-sm transition-colors"
-        >
-          {t('bankChoosePC')}
-        </button>
+          <div className="flex items-center gap-3">
+            <div className="flex-1 h-px bg-border" />
+            <span className="text-xs text-text3">{t('bankOr')}</span>
+            <div className="flex-1 h-px bg-border" />
+          </div>
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="video/*,image/*,audio/*,.gif"
+            multiple
+            style={{ display: 'none' }}
+            onChange={e => {
+              const files = Array.from(e.target.files ?? [])
+              if (files.length > 0) onFiles(files)
+              e.target.value = ''
+              onClose()
+            }}
+          />
+          <button
+            onClick={handlePickClick}
+            className="sf-btn sf-btn-primary w-full cursor-pointer"
+          >
+            <IconPlus size={14} />
+            {t('bankChoosePC')}
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -424,10 +475,10 @@ export function Bank({ user }: BankProps) {
 
   function uploadProgressLabels(phase: string): string {
     const labels: Record<string, string> = {
-      'reading':          '📂 Lecture du fichier…',
-      'uploading-video':  '☁ Upload vers Supabase…',
-      'thumbnail':        '🖼 Generating thumbnail…',
-      'uploading-thumb':  '☁ Upload de la miniature…',
+      'reading':          'Lecture du fichier…',
+      'uploading-video':  'Upload vers Supabase…',
+      'thumbnail':        'Generating thumbnail…',
+      'uploading-thumb':  'Upload de la miniature…',
     }
     return labels[phase] ?? ''
   }
@@ -437,7 +488,7 @@ export function Bank({ user }: BankProps) {
     const title = nameWithoutExt(filePath)
     const scope: UploadScope = currentOrg ? { mode: 'org', id: currentOrg.id } : { mode: 'user', id: user.id }
 
-    setAdding(true); setUploadStatus(`📤 Lecture de ${basename(filePath)}…`)
+    setAdding(true); setUploadStatus(`Lecture de ${basename(filePath)}…`)
     try {
       const { storagePath, thumbnailPath } = await uploadVideoFromPath(filePath, scope, phase => setUploadStatus(uploadProgressLabels(phase)))
       await insertBankRow({ title, storagePath, thumbnailPath })
@@ -453,7 +504,7 @@ export function Bank({ user }: BankProps) {
     const title = (file.name.match(/^(.*?)(\.[^.]+)?$/)?.[1]) ?? file.name
     const scope: UploadScope = currentOrg ? { mode: 'org', id: currentOrg.id } : { mode: 'user', id: user.id }
 
-    setAdding(true); setUploadStatus(`📤 ${file.name}`)
+    setAdding(true); setUploadStatus(file.name)
     try {
       const { storagePath, thumbnailPath } = await uploadVideoFromBlob(file, file.name, scope, phase => setUploadStatus(`${file.name} : ${uploadProgressLabels(phase)}`))
       await insertBankRow({ title, storagePath, thumbnailPath })
@@ -469,14 +520,14 @@ export function Bank({ user }: BankProps) {
   async function reuploadItem(item: ContentItem) {
     if (!item.file_url) return
     const scope: UploadScope = currentOrg ? { mode: 'org', id: currentOrg.id } : { mode: 'user', id: user.id }
-    setUploadStatus(`📤 Migration de ${item.title}…`)
+    setUploadStatus(`Migration de ${item.title}…`)
     try {
       const { storagePath, thumbnailPath } = await uploadVideoFromPath(item.file_url, scope, phase => {
         const labels: Record<string, string> = {
-          'reading':          '📂 Lecture du fichier local…',
-          'uploading-video':  '☁ Upload vers Supabase…',
-          'thumbnail':        '🖼 Miniature…',
-          'uploading-thumb':  '☁ Upload miniature…',
+          'reading':          'Lecture du fichier local…',
+          'uploading-video':  'Upload vers Supabase…',
+          'thumbnail':        'Miniature…',
+          'uploading-thumb':  'Upload miniature…',
         }
         setUploadStatus(`${item.title} : ${labels[phase] ?? ''}`)
       })
@@ -666,66 +717,43 @@ export function Bank({ user }: BankProps) {
             className="flex flex-col items-center gap-4 px-20 py-14 rounded-3xl"
             style={{
               background: 'rgba(7,7,11,0.92)',
-              border: '2px dashed #8B5CF6',
-              boxShadow: '0 0 60px -10px rgba(139,92,246,0.6)',
+              border: '2px dashed rgba(34,211,238,0.6)',
+              boxShadow: '0 0 60px -10px rgba(34,211,238,0.4)',
               backdropFilter: 'blur(24px)',
             }}
           >
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#8B5CF6" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
-            </svg>
-            <p className="text-[15px] font-bold text-white">{t('bankDropFiles')}</p>
-            <p className="text-[12px]" style={{ color: '#A1A1AA' }}>{t('bankMediaTypes')}</p>
+            <div className="text-accent">
+              <IconUpload size={48} />
+            </div>
+            <p className="text-[15px] font-bold text-text">{t('bankDropFiles')}</p>
+            <p className="text-[12px] text-text3">{t('bankMediaTypes')}</p>
           </div>
         </div>
       )}
 
-      {/* ── Header ── */}
-      <header
-        className="flex-shrink-0 px-8 pt-7 pb-5 flex items-center justify-between gap-4"
-        style={{ borderBottom: '1px solid rgba(139,92,246,0.12)' }}
-      >
-        {/* Title + badge */}
+      {/* ── Premium page header ── */}
+      <header className="flex-shrink-0 px-8 pt-6 pb-5 flex items-center justify-between gap-4" style={{ borderBottom: '1px solid rgba(34,211,238,0.1)' }}>
+        {/* Icon + title */}
         <div className="flex items-center gap-3.5 min-w-0">
-          <div style={{
-            width: 44, height: 44, borderRadius: 13, flexShrink: 0,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'linear-gradient(135deg, rgba(34,211,238,0.2), rgba(34,211,238,0.05))',
-            border: '1px solid rgba(34,211,238,0.25)', color: '#22d3ee',
-          }}>
+          <div
+            className="w-11 h-11 rounded-[13px] flex items-center justify-center flex-shrink-0"
+            style={{
+              background: 'linear-gradient(135deg, rgba(34,211,238,0.2), rgba(34,211,238,0.05))',
+              border: '1px solid rgba(34,211,238,0.3)',
+              boxShadow: '0 0 20px -6px rgba(34,211,238,0.4)',
+              color: '#22d3ee',
+            }}
+          >
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
               <path d="M15 10l4.553-2.069A1 1 0 0 1 21 8.82v6.36a1 1 0 0 1-1.447.894L15 14M3 8a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8z"/>
             </svg>
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2.5">
-              <h1 className="text-[23px] font-black text-white leading-none tracking-tight" style={{ letterSpacing: '-0.025em' }}>{t('bankTitle')}</h1>
-              <span
-                className="px-2.5 py-0.5 rounded-full text-[11px] font-bold"
-                style={{ background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.3)', color: '#A78BFA' }}
-              >
-                {items.length}
-              </span>
+              <h1 className="text-[22px] font-black text-text leading-none tracking-tight" style={{ letterSpacing: '-0.025em' }}>{t('bankTitle')}</h1>
+              <span className="sf-badge sf-badge-accent text-[11px]">{items.length}</span>
             </div>
-            <p className="text-[12.5px] mt-1.5" style={{ color: 'rgba(148,163,184,0.55)' }}>
-              {t('bankSubtitle')}
-            </p>
-          </div>
-        </div>
-
-        {/* Search + controls */}
-        <div className="flex items-center gap-2 flex-1 max-w-lg">
-          <div className="relative flex-1">
-            <svg className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#52525B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-            </svg>
-            <input
-              type="text"
-              placeholder={t('bankSearchPlaceholder')}
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="sf-search w-full pl-9 pr-4 py-2 text-[13px]"
-            />
+            <p className="text-[12px] mt-1 text-text3">{t('bankSubtitle')}</p>
           </div>
         </div>
 
@@ -733,107 +761,99 @@ export function Bank({ user }: BankProps) {
         <div className="flex items-center gap-2 flex-shrink-0">
           {/* Personal / Org toggle — only when in an org */}
           {currentOrg && (
-            <div
-              className="flex rounded-lg overflow-hidden"
-              style={{ border: '1px solid rgba(139,92,246,0.18)', background: '#0E0E16' }}
-            >
+            <div className="sf-tabs">
               <button
                 onClick={() => { setPersonalMode(false); setSelectedFolder(null) }}
-                className="px-3 py-1.5 text-[11px] font-semibold transition-colors flex items-center gap-1.5"
-                style={!personalMode ? { background: 'rgba(139,92,246,0.25)', color: '#A78BFA' } : { color: '#52525B' }}
+                className={`sf-tab cursor-pointer flex items-center gap-1.5 ${!personalMode ? 'active' : ''}`}
               >
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-                </svg>
+                <IconUsers size={11} />
                 Orga
               </button>
               <button
                 onClick={() => { setPersonalMode(true); setSelectedFolder(null) }}
-                className="px-3 py-1.5 text-[11px] font-semibold transition-colors flex items-center gap-1.5"
-                style={personalMode ? { background: 'rgba(139,92,246,0.25)', color: '#A78BFA' } : { color: '#52525B' }}
+                className={`sf-tab cursor-pointer flex items-center gap-1.5 ${personalMode ? 'active' : ''}`}
               >
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
-                </svg>
+                <IconUser size={11} />
                 Perso
               </button>
             </div>
           )}
+
           {/* View toggle */}
-          <div
-            className="flex rounded-lg overflow-hidden"
-            style={{ border: '1px solid rgba(139,92,246,0.18)', background: '#0E0E16' }}
-          >
+          <div className="sf-tabs">
             <button
               onClick={() => setViewMode('grid')}
-              className="px-2.5 py-1.5 transition-colors"
-              style={viewMode === 'grid' ? { background: 'rgba(139,92,246,0.25)', color: '#A78BFA' } : { color: '#52525B' }}
+              className={`sf-tab cursor-pointer ${viewMode === 'grid' ? 'active' : ''}`}
               title={t('bankGridView')}
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
-              </svg>
+              <IconGrid size={13} />
             </button>
             <button
               onClick={() => setViewMode('list')}
-              className="px-2.5 py-1.5 transition-colors"
-              style={viewMode === 'list' ? { background: 'rgba(139,92,246,0.25)', color: '#A78BFA' } : { color: '#52525B' }}
+              className={`sf-tab cursor-pointer ${viewMode === 'list' ? 'active' : ''}`}
               title={t('bankListView')}
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/>
-                <line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
-              </svg>
+              <IconList size={13} />
             </button>
           </div>
 
           <button
             onClick={loadItems}
-            className="px-3 py-2 rounded-lg text-[12px] font-medium transition-colors"
-            style={{ background: '#0E0E16', border: '1px solid rgba(139,92,246,0.18)', color: '#A1A1AA' }}
+            className="sf-btn sf-btn-ghost sf-btn-icon cursor-pointer"
             title={t('refresh')}
           >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
-            </svg>
+            <IconRefresh size={14} />
           </button>
 
           <button
             onClick={() => setShowAddModal(true)}
-            className="btn-sf-primary px-4 py-2 rounded-lg text-[13px] font-semibold flex items-center gap-1.5"
+            className="sf-btn sf-btn-primary cursor-pointer"
           >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            <IconPlus size={13} />
             {t('add')}
           </button>
         </div>
       </header>
 
-      {/* ── Toolbar (type filters + select-all + count) ── */}
-      <div
-        className="flex-shrink-0 px-8 py-2.5 flex items-center gap-3"
-        style={{ borderBottom: '1px solid rgba(139,92,246,0.08)' }}
-      >
-        {/* Select-all checkbox */}
+      {/* ── Toolbar ── */}
+      <div className="sf-toolbar px-8">
+        {/* Search */}
+        <div className="relative flex-1 max-w-xs">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none text-text3">
+            <IconSearch size={13} />
+          </span>
+          <input
+            type="text"
+            placeholder={t('bankSearchPlaceholder')}
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="sf-input w-full pl-9 pr-4"
+          />
+        </div>
+
+        <div className="w-px h-5 bg-border flex-shrink-0" />
+
+        {/* Select-all */}
         <button
           onClick={() => setSelectedIds(prev => prev.size === visible.length ? new Set() : new Set(visible.map(i => i.id)))}
-          className="flex items-center gap-1.5 text-[12px] font-medium transition-colors px-2 py-1 rounded"
-          style={{ color: selectedIds.size === visible.length && visible.length > 0 ? '#A78BFA' : '#52525B' }}
+          className="flex items-center gap-1.5 text-[12px] font-medium transition-colors px-2 py-1 rounded cursor-pointer"
+          style={{ color: selectedIds.size === visible.length && visible.length > 0 ? 'var(--accent-lt)' : 'var(--text-3)' }}
           title={t('bankSelectAll')}
         >
           <div
             className="w-4 h-4 rounded flex items-center justify-center flex-shrink-0 transition-all"
             style={selectedIds.size === visible.length && visible.length > 0
-              ? { background: '#8B5CF6', border: '1px solid #8B5CF6' }
-              : { background: 'transparent', border: '1px solid rgba(139,92,246,0.3)' }}
+              ? { background: 'var(--accent)', border: '1px solid var(--accent)' }
+              : { background: 'transparent', border: '1px solid var(--border-md)' }}
           >
             {selectedIds.size > 0 && <svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"><polyline points="2,6 5,9 10,3"/></svg>}
           </div>
           <span className="hidden sm:inline">{t('bankSelectAllLabel')}</span>
         </button>
 
-        <div style={{ width: '1px', height: '16px', background: 'rgba(139,92,246,0.15)' }} />
+        <div className="w-px h-5 bg-border flex-shrink-0" />
 
-        {/* Type pills */}
+        {/* Type filter pills */}
         <div className="flex gap-1">
           {([
             { k: 'all',   l: t('bankTypeAll')   },
@@ -845,23 +865,26 @@ export function Bank({ user }: BankProps) {
             <button
               key={tf.k}
               onClick={() => setTypeFilter(tf.k)}
-              className="px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all"
-              style={typeFilter === tf.k
-                ? { background: 'rgba(139,92,246,0.2)', color: '#A78BFA', border: '1px solid rgba(139,92,246,0.4)' }
-                : { background: 'transparent', color: '#52525B', border: '1px solid transparent' }}
+              className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer ${
+                typeFilter === tf.k
+                  ? 'bg-accent/20 text-accent border border-accent/40'
+                  : 'bg-transparent text-text3 border border-transparent hover:text-text2'
+              }`}
             >{tf.l}</button>
           ))}
         </div>
 
         <div className="flex-1" />
 
-        <span className="text-[12px]" style={{ color: '#52525B' }}>
+        <span className="text-[12px] text-text3 flex-shrink-0">
           {visible.length} item{visible.length !== 1 ? 's' : ''}
         </span>
+
         {adding && (
-          <span className="flex items-center gap-1.5 text-[12px]" style={{ color: '#A78BFA' }}>
-            <span className="animate-spin inline-block">↻</span> {t('bankUploading')}
-          </span>
+          <div className="flex items-center gap-2 text-[12px] text-accent flex-shrink-0">
+            <span className="sf-spinner" />
+            {t('bankUploading')}
+          </div>
         )}
       </div>
 
@@ -871,36 +894,27 @@ export function Bank({ user }: BankProps) {
         {/* ── Folder sidebar ── */}
         <aside
           className="w-52 flex-shrink-0 flex flex-col overflow-hidden"
-          style={{ borderRight: '1px solid rgba(139,92,246,0.1)' }}
+          style={{ borderRight: '1px solid var(--border)' }}
         >
           {/* Sidebar header */}
-          <div
-            className="px-4 py-3 flex items-center justify-between flex-shrink-0"
-            style={{ borderBottom: '1px solid rgba(139,92,246,0.08)' }}
-          >
-            <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#52525B' }}>{t('bankFolders')}</span>
+          <div className="px-4 py-3 flex items-center justify-between flex-shrink-0" style={{ borderBottom: '1px solid var(--border)' }}>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-text3">{t('bankFolders')}</span>
             <button
               onClick={() => setShowNewFolder(v => !v)}
-              className="w-5 h-5 rounded flex items-center justify-center transition-colors"
-              style={{ color: '#52525B' }}
+              className="w-5 h-5 rounded flex items-center justify-center transition-colors text-text3 hover:text-accent cursor-pointer"
               title={t('bankNewFolderTitle')}
-              onMouseEnter={e => (e.currentTarget.style.color = '#A78BFA')}
-              onMouseLeave={e => (e.currentTarget.style.color = '#52525B')}
             >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              <IconPlus size={12} />
             </button>
           </div>
 
           {/* New folder input */}
           {showNewFolder && (
-            <div
-              className="px-3 py-2 flex gap-1.5 flex-shrink-0"
-              style={{ borderBottom: '1px solid rgba(139,92,246,0.08)' }}
-            >
+            <div className="px-3 py-2 flex gap-1.5 flex-shrink-0" style={{ borderBottom: '1px solid var(--border)' }}>
               <input
                 autoFocus
                 placeholder={t('bankFolderNamePlaceholder')}
-                className="sf-search flex-1 px-2.5 py-1.5 text-[12px]"
+                className="sf-input flex-1 text-[12px]"
                 value={newFolderName}
                 onChange={e => setNewFolderName(e.target.value)}
                 onKeyDown={e => {
@@ -910,8 +924,7 @@ export function Bank({ user }: BankProps) {
               />
               <button
                 onClick={createFolder}
-                className="px-2 py-1 rounded-md text-[11px] font-semibold"
-                style={{ background: 'rgba(139,92,246,0.2)', color: '#A78BFA', border: '1px solid rgba(139,92,246,0.35)' }}
+                className="sf-btn sf-btn-primary sf-btn-sm cursor-pointer"
               >OK</button>
             </div>
           )}
@@ -921,21 +934,18 @@ export function Bank({ user }: BankProps) {
             {/* All items */}
             <button
               onClick={() => setSelectedFolder(null)}
-              className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-all group"
+              className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-all group cursor-pointer"
               style={selectedFolder === null
-                ? { background: 'rgba(139,92,246,0.1)', borderLeft: '2px solid #8B5CF6', paddingLeft: '10px' }
+                ? { background: 'rgba(139,92,246,0.1)', borderLeft: '2px solid var(--accent)', paddingLeft: '10px' }
                 : { borderLeft: '2px solid transparent' }}
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={selectedFolder === null ? '#A78BFA' : '#52525B'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={selectedFolder === null ? 'var(--accent-lt)' : 'var(--text-3)'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
               </svg>
-              <span className="text-[13px] font-medium flex-1" style={{ color: selectedFolder === null ? '#FFFFFF' : '#A1A1AA' }}>
+              <span className="text-[13px] font-medium flex-1" style={{ color: selectedFolder === null ? 'var(--text-1)' : 'var(--text-2)' }}>
                 {t('bankAllItems')}
               </span>
-              <span
-                className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0"
-                style={{ background: 'rgba(139,92,246,0.1)', color: '#A78BFA' }}
-              >{items.length}</span>
+              <span className="sf-badge sf-badge-accent text-[10px] flex-shrink-0">{items.length}</span>
             </button>
 
             {folders.map(f => (
@@ -957,36 +967,30 @@ export function Bank({ user }: BankProps) {
         {/* ── Main content area ── */}
         <main className="flex-1 flex flex-col overflow-hidden">
 
-          {/* ── Selection bar (bottom-ish, shown as top banner when active) ── */}
+          {/* ── Selection toolbar (shown when items are selected) ── */}
           {selectionMode && (
             <div
-              className="flex-shrink-0 px-6 py-2.5 flex items-center gap-3"
-              style={{ background: 'rgba(139,92,246,0.08)', borderBottom: '1px solid rgba(139,92,246,0.2)' }}
+              className="flex-shrink-0 px-6 py-2.5 flex items-center gap-2.5"
+              style={{ background: 'rgba(139,92,246,0.06)', borderBottom: '1px solid rgba(139,92,246,0.2)' }}
             >
-              <div
-                className="w-2 h-2 rounded-full flex-shrink-0"
-                style={{ background: '#8B5CF6', boxShadow: '0 0 8px rgba(139,92,246,0.8)' }}
-              />
-              <span className="text-[13px] font-bold" style={{ color: '#A78BFA' }}>
-                {selectedIds.size} {t('bankSelected')}
-              </span>
+              <div className="w-2 h-2 rounded-full flex-shrink-0 bg-accent" style={{ boxShadow: '0 0 8px rgba(139,92,246,0.8)' }} />
+              <span className="text-[13px] font-bold text-accent">{selectedIds.size} {t('bankSelected')}</span>
+
               <button
                 onClick={() => setSelectedIds(prev => prev.size === visible.length ? new Set() : new Set(visible.map(i => i.id)))}
-                className="text-[12px] px-2.5 py-1 rounded-md font-medium transition-colors"
-                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: '#A1A1AA' }}
+                className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer"
               >
                 {selectedIds.size === visible.length ? t('bankDeselectAll') : t('selectAll')}
               </button>
+
               <button
                 onClick={() => setShowBulkMove(true)}
-                className="text-[12px] px-2.5 py-1 rounded-md font-semibold transition-colors flex items-center gap-1.5"
-                style={{ background: 'rgba(139,92,246,0.15)', color: '#A78BFA', border: '1px solid rgba(139,92,246,0.3)' }}
+                className="sf-btn sf-btn-secondary sf-btn-sm cursor-pointer flex items-center gap-1.5"
               >
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-                </svg>
+                <IconMove size={11} />
                 {t('bankMoveSelected')} ({selectedIds.size})
               </button>
+
               <button
                 onClick={async () => {
                   const sel = items.filter(i => selectedIds.has(i.id))
@@ -1029,34 +1033,29 @@ export function Bank({ user }: BankProps) {
                     setTimeout(() => URL.revokeObjectURL(url), 15000)
                   }
                 }}
-                className="text-[12px] px-2.5 py-1 rounded-md font-semibold transition-colors flex items-center gap-1.5"
+                className="sf-btn sf-btn-sm cursor-pointer flex items-center gap-1.5"
                 style={{ background: 'rgba(34,197,94,0.1)', color: '#4ade80', border: '1px solid rgba(34,197,94,0.25)' }}
-                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(34,197,94,0.18)')}
-                onMouseLeave={e => (e.currentTarget.style.background = 'rgba(34,197,94,0.1)')}
               >
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
-                </svg>
+                <IconDownload size={11} />
                 {selectedIds.size > 5 ? `ZIP (${selectedIds.size})` : `Télécharger (${selectedIds.size})`}
               </button>
+
               <button
                 onClick={deleteSelected}
-                className="text-[12px] px-2.5 py-1 rounded-md font-semibold transition-colors flex items-center gap-1.5"
-                style={{ background: 'rgba(239,68,68,0.1)', color: '#F87171', border: '1px solid rgba(239,68,68,0.25)' }}
+                className="sf-btn sf-btn-danger sf-btn-sm cursor-pointer flex items-center gap-1.5"
               >
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/>
-                </svg>
+                <IconTrash size={11} />
                 {t('bankDeleteSelected')} ({selectedIds.size})
               </button>
+
               <div className="flex-1" />
+
               <button
                 onClick={exitSelection}
-                className="text-[12px] transition-colors px-2 py-1 rounded"
-                style={{ color: '#52525B' }}
-                onMouseEnter={e => (e.currentTarget.style.color = '#A1A1AA')}
-                onMouseLeave={e => (e.currentTarget.style.color = '#52525B')}
-              ><span className="inline-flex items-center gap-1.5"><IconX size={12} /> {t('bankCancelSelection')}</span></button>
+                className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer flex items-center gap-1.5"
+              >
+                <IconX size={12} /> {t('bankCancelSelection')}
+              </button>
             </div>
           )}
 
@@ -1066,18 +1065,15 @@ export function Bank({ user }: BankProps) {
               className="mx-6 mt-4 rounded-xl p-4 flex items-start gap-3 flex-shrink-0"
               style={{ background: 'rgba(251,191,36,0.07)', border: '1px solid rgba(251,191,36,0.22)' }}
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FBBF24" strokeWidth="2" strokeLinecap="round" className="flex-shrink-0 mt-0.5">
-                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-                <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-              </svg>
+              <span className="flex-shrink-0 mt-0.5 text-warn"><IconAlertTriangle size={16} /></span>
               <div className="flex-1 min-w-0">
-                <p className="text-[13px] font-semibold" style={{ color: '#FBBF24' }}>Migration requise — colonne "folder" manquante</p>
-                <p className="text-[11px] mt-0.5" style={{ color: '#A1A1AA' }}>Colle ce SQL dans Supabase → SQL Editor → Run :</p>
-                <code className="text-[11px] font-mono block mt-1" style={{ color: '#A1A1AA' }}>{MIGRATION_SQL.trim()}</code>
+                <p className="text-[13px] font-semibold text-warn">Migration requise — colonne "folder" manquante</p>
+                <p className="text-[11px] mt-0.5 text-text2">Colle ce SQL dans Supabase → SQL Editor → Run :</p>
+                <code className="text-[11px] font-mono block mt-1 text-text2">{MIGRATION_SQL.trim()}</code>
               </div>
               <button
                 onClick={() => { navigator.clipboard.writeText(MIGRATION_SQL); setSqlCopied(true); setTimeout(() => setSqlCopied(false), 2000) }}
-                className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold flex-shrink-0 transition-colors"
+                className="sf-btn sf-btn-sm cursor-pointer flex-shrink-0"
                 style={{ background: 'rgba(251,191,36,0.12)', color: '#FBBF24', border: '1px solid rgba(251,191,36,0.28)' }}
               >
                 {sqlCopied ? t('bankSqlCopied') : t('copy')}
@@ -1090,9 +1086,11 @@ export function Bank({ user }: BankProps) {
               className="mx-6 mt-4 px-4 py-3 rounded-xl flex items-center gap-3 flex-shrink-0"
               style={{ background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.2)' }}
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#F87171" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-              <span className="text-[13px] flex-1" style={{ color: '#F87171' }}>{error}</span>
-              <button onClick={() => setError(null)} aria-label={t('cancel')} style={{ color: '#F87171' }} className="hover:opacity-70 transition-opacity"><IconX size={14} /></button>
+              <span className="text-danger flex-shrink-0">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              </span>
+              <span className="text-[13px] flex-1 text-danger">{error}</span>
+              <button onClick={() => setError(null)} aria-label={t('cancel')} className="text-danger hover:opacity-70 transition-opacity cursor-pointer"><IconX size={14} /></button>
             </div>
           )}
 
@@ -1101,8 +1099,8 @@ export function Bank({ user }: BankProps) {
               className="mx-6 mt-4 px-4 py-3 rounded-xl flex items-center gap-3 flex-shrink-0"
               style={{ background: 'rgba(139,92,246,0.07)', border: '1px solid rgba(139,92,246,0.2)' }}
             >
-              <span className="animate-spin" style={{ color: '#A78BFA' }}>↻</span>
-              <span className="text-[13px]" style={{ color: '#A78BFA' }}>{uploadStatus}</span>
+              <span className="sf-spinner flex-shrink-0" />
+              <span className="text-[13px] text-accent">{uploadStatus}</span>
             </div>
           )}
 
@@ -1112,35 +1110,32 @@ export function Bank({ user }: BankProps) {
               <div className="flex justify-center py-20"><Spinner size="lg" /></div>
 
             ) : items.length === 0 ? (
-              /* Empty state */
-              <div className="flex flex-col items-center justify-center py-24 text-center">
-                <div
-                  className="w-20 h-20 rounded-2xl flex items-center justify-center mb-6"
-                  style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.18)' }}
-                >
-                  <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#8B5CF6" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+              /* Empty state — no items at all */
+              <div className="sf-empty py-24">
+                <div className="sf-empty-icon">
+                  <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
                     <polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
                   </svg>
                 </div>
-                <h2 className="text-[16px] font-bold text-white mb-2">{t('bankEmptyTitle')}</h2>
-                <p className="text-[13px] max-w-xs" style={{ color: '#A1A1AA' }}>
-                  {t('bankEmptyDesc')}
-                </p>
+                <p className="sf-empty-title">{t('bankEmptyTitle')}</p>
+                <p className="sf-empty-desc">{t('bankEmptyDesc')}</p>
                 <button
                   onClick={() => setShowAddModal(true)}
-                  className="btn-sf-primary mt-5 px-5 py-2.5 rounded-xl text-[13px] font-semibold"
+                  className="sf-btn sf-btn-primary mt-4 cursor-pointer"
                 >
+                  <IconPlus size={13} />
                   {t('bankAddMediaBtn')}
                 </button>
               </div>
 
             ) : visible.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-20 text-center">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#52525B" strokeWidth="1.5" strokeLinecap="round" className="mb-3">
-                  <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                </svg>
-                <p className="text-[14px] font-medium text-white">{t('bankNoResults')}</p>
-                <p className="text-[12px] mt-1" style={{ color: '#52525B' }}>{t('bankNoResultsHint')}</p>
+              /* Empty state — no search results */
+              <div className="sf-empty py-20">
+                <div className="sf-empty-icon">
+                  <IconSearch size={28} />
+                </div>
+                <p className="sf-empty-title">{t('bankNoResults')}</p>
+                <p className="sf-empty-desc">{t('bankNoResultsHint')}</p>
               </div>
 
             ) : viewMode === 'grid' ? (
@@ -1164,8 +1159,8 @@ export function Bank({ user }: BankProps) {
               <div className="sf-card overflow-hidden">
                 {/* List header */}
                 <div
-                  className="grid gap-3 px-4 py-2 text-[10px] font-bold uppercase tracking-widest"
-                  style={{ gridTemplateColumns: '40px 1fr 80px 100px 32px', color: '#52525B', borderBottom: '1px solid rgba(139,92,246,0.1)' }}
+                  className="grid gap-3 px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-text3"
+                  style={{ gridTemplateColumns: '40px 1fr 80px 100px 32px', borderBottom: '1px solid var(--border)' }}
                 >
                   <span />
                   <span>{t('bankColName')}</span>
@@ -1179,7 +1174,7 @@ export function Bank({ user }: BankProps) {
                     className="grid gap-3 px-4 py-2.5 items-center group cursor-default transition-colors"
                     style={{
                       gridTemplateColumns: '40px 1fr 80px 100px 32px',
-                      borderBottom: idx < visible.length - 1 ? '1px solid rgba(139,92,246,0.07)' : 'none',
+                      borderBottom: idx < visible.length - 1 ? '1px solid var(--border)' : 'none',
                       background: selectedIds.has(item.id) ? 'rgba(139,92,246,0.06)' : undefined,
                     }}
                     onMouseEnter={e => { if (!selectedIds.has(item.id)) e.currentTarget.style.background = 'rgba(139,92,246,0.04)' }}
@@ -1189,43 +1184,43 @@ export function Bank({ user }: BankProps) {
                     {/* Thumbnail */}
                     <div
                       className="w-9 h-9 rounded-lg overflow-hidden flex-shrink-0 cursor-pointer relative"
-                      style={{ background: '#0E0E16', border: '1px solid rgba(139,92,246,0.15)' }}
+                      style={{ background: 'var(--surface-2)', border: '1px solid var(--border)' }}
                       onClick={() => selectionMode ? toggleSelection(item.id) : (item.file_url || item.storage_path) && setPlayingItem(item)}
                     >
                       <VideoThumbnail filePath={item.file_url} thumbnailPath={item.thumbnail_path} storagePath={item.storage_path} />
                       {/* Checkbox overlay when selected */}
                       {isSelected(item) && (
                         <div className="absolute inset-0 flex items-center justify-center" style={{ background: 'rgba(139,92,246,0.7)' }}>
-                          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"><polyline points="2,6 5,9 10,3"/></svg>
+                          <IconCheck size={12} className="text-white" />
                         </div>
                       )}
                     </div>
 
                     {/* Name */}
                     <div className="min-w-0">
-                      <p className="text-[13px] font-medium text-white truncate">{item.title}</p>
-                      {item.notes && <p className="text-[11px] truncate mt-0.5" style={{ color: '#52525B' }}>{item.notes}</p>}
+                      <p className="text-[13px] font-medium text-text truncate">{item.title}</p>
+                      {item.notes && <p className="text-[11px] truncate mt-0.5 text-text3">{item.notes}</p>}
                     </div>
 
                     {/* Duration */}
-                    <span className="text-[12px]" style={{ color: '#52525B' }}>
+                    <span className="text-[12px] text-text3">
                       {item.duration ? formatDuration(item.duration) : '—'}
                     </span>
 
                     {/* Tags */}
                     <div className="flex gap-1 overflow-hidden">
                       {item.tags.slice(0, 2).map(tag => (
-                        <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: 'rgba(139,92,246,0.12)', color: '#A78BFA' }}>#{tag}</span>
+                        <span key={tag} className="sf-badge sf-badge-accent text-[10px]">#{tag}</span>
                       ))}
                     </div>
 
                     {/* Actions */}
                     <button
-                      className="w-6 h-6 rounded-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                      style={{ background: 'rgba(139,92,246,0.1)', color: '#A78BFA' }}
+                      className="w-6 h-6 rounded-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-accent cursor-pointer"
+                      style={{ background: 'rgba(139,92,246,0.1)' }}
                       onClick={e => { e.stopPropagation(); openCtx(e, item) }}
                     >
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
+                      <IconMoreVert size={12} />
                     </button>
                   </div>
                 ))}
@@ -1238,34 +1233,34 @@ export function Bank({ user }: BankProps) {
       {/* ── Premium context menu ── */}
       {ctxMenu && (
         <div
-          className="fixed z-[60] rounded-xl py-1.5 min-w-[188px] shadow-2xl"
+          className="fixed z-[60] rounded-xl py-1.5 min-w-[188px] shadow-2xl anim-scale-in"
           style={{
             left: ctxMenu.x,
             top: ctxMenu.y,
-            background: '#0E0E16',
-            border: '1px solid rgba(139,92,246,0.2)',
+            background: 'var(--surface)',
+            border: '1px solid rgba(139,92,246,0.22)',
             boxShadow: '0 16px 48px -8px rgba(0,0,0,0.7), 0 0 0 1px rgba(0,0,0,0.5)',
           }}
           onMouseDown={e => e.stopPropagation()}
         >
           {[
             {
-              icon: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>,
+              icon: <IconPencil size={12} />,
               label: t('bankCtxRename'),
               action: () => { setRenameItem(ctxMenu.item); setCtxMenu(null) }
             },
             {
-              icon: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>,
+              icon: <IconMove size={12} />,
               label: t('bankCtxMoveTo'),
               action: () => { setMoveItem(ctxMenu.item); setCtxMenu(null) }
             },
             {
-              icon: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>,
+              icon: <IconTag size={12} />,
               label: t('bankCtxEditTags'),
               action: () => { setTagsItem(ctxMenu.item); setCtxMenu(null) }
             },
             {
-              icon: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>,
+              icon: <IconDownload size={12} />,
               label: 'Télécharger',
               action: async () => {
                 const it = ctxMenu.item
@@ -1274,7 +1269,7 @@ export function Bank({ user }: BankProps) {
               }
             },
             ...(ctxMenu.item.file_url && !ctxMenu.item.storage_path ? [{
-              icon: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>,
+              icon: <IconUpload size={12} />,
               label: t('bankCtxUpload'),
               action: () => { reuploadItem(ctxMenu.item); setCtxMenu(null) }
             }] : []),
@@ -1282,26 +1277,20 @@ export function Bank({ user }: BankProps) {
             <button
               key={label}
               onClick={action}
-              className="w-full text-left px-3.5 py-2 text-[13px] flex items-center gap-2.5 transition-colors"
-              style={{ color: '#A1A1AA' }}
-              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(139,92,246,0.08)'; e.currentTarget.style.color = '#FFFFFF' }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#A1A1AA' }}
+              className="w-full text-left px-3.5 py-2 text-[13px] flex items-center gap-2.5 transition-colors cursor-pointer text-text2 hover:bg-accent/10 hover:text-text"
             >
-              <span style={{ color: '#8B5CF6' }}>{icon}</span>
+              <span className="text-accent">{icon}</span>
               {label}
             </button>
           ))}
-          <div style={{ height: '1px', background: 'rgba(139,92,246,0.12)', margin: '4px 0' }} />
+          <div className="h-px bg-border mx-2 my-1" />
           <button
             onClick={() => deleteItem(ctxMenu.item.id)}
-            className="w-full text-left px-3.5 py-2 text-[13px] flex items-center gap-2.5 transition-colors"
-            style={{ color: '#F87171' }}
-            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.08)' }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+            className="w-full text-left px-3.5 py-2 text-[13px] flex items-center gap-2.5 transition-colors cursor-pointer text-danger hover:bg-danger/10"
+            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(239,68,68,0.1)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
           >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/>
-            </svg>
+            <IconTrash size={12} />
             {t('bankCtxDelete')}
           </button>
         </div>
@@ -1314,57 +1303,43 @@ export function Bank({ user }: BankProps) {
 
       {/* ── Folder action modal ── */}
       {folderModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => setFolderModal(null)}>
-          <div
-            className="rounded-2xl p-6 w-80 space-y-4"
-            style={{ background: '#0E0E16', border: '1px solid rgba(139,92,246,0.2)', boxShadow: '0 24px 64px -16px rgba(0,0,0,0.8)' }}
-            onClick={e => e.stopPropagation()}
-          >
+        <div className="sf-modal-bg" onClick={() => setFolderModal(null)}>
+          <div className="sf-modal w-80 anim-scale-in" onClick={e => e.stopPropagation()}>
             {folderModal.mode === 'delete' ? (<>
-              <div>
-                <p className="font-semibold text-white text-[14px]">
-                  {t('bankDeleteFolderTitle')} <span style={{ color: '#A78BFA' }}>"{folderModal.name}"</span>
-                </p>
-                <p className="text-[12px] mt-1" style={{ color: '#A1A1AA' }}>
+              <div className="sf-modal-header">
+                <h3 className="sf-modal-title">{t('bankDeleteFolderTitle')} <span className="text-accent">"{folderModal.name}"</span></h3>
+              </div>
+              <div className="p-5 space-y-3">
+                <p className="text-[12px] text-text2">
                   {items.filter(i => (i as unknown as {folder?:string}).folder === folderModal.name).length} {t('bankVideosInFolder')}
                 </p>
-              </div>
-              <div className="flex flex-col gap-2">
-                <button
-                  onClick={() => deleteFolder(folderModal.name, false)}
-                  className="w-full py-2.5 rounded-xl text-[13px] font-semibold text-white transition-colors"
-                  style={{ background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.3)' }}
-                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(139,92,246,0.25)')}
-                  onMouseLeave={e => (e.currentTarget.style.background = 'rgba(139,92,246,0.15)')}
-                >
-                  {t('bankDeleteFolderKeep')}
-                </button>
-                <button
-                  onClick={() => deleteFolder(folderModal.name, true)}
-                  className="w-full py-2.5 rounded-xl text-[13px] font-semibold transition-colors"
-                  style={{ background: 'rgba(239,68,68,0.1)', color: '#F87171', border: '1px solid rgba(239,68,68,0.25)' }}
-                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(239,68,68,0.18)')}
-                  onMouseLeave={e => (e.currentTarget.style.background = 'rgba(239,68,68,0.1)')}
-                >
-                  {t('bankDeleteFolderAll')}
-                </button>
-                <button
-                  onClick={() => setFolderModal(null)}
-                  className="w-full py-2.5 rounded-xl text-[13px] font-medium transition-colors"
-                  style={{ background: 'rgba(255,255,255,0.04)', color: '#A1A1AA', border: '1px solid rgba(255,255,255,0.07)' }}
-                >{t('cancel')}</button>
+                <div className="flex flex-col gap-2">
+                  <button
+                    onClick={() => deleteFolder(folderModal.name, false)}
+                    className="sf-btn sf-btn-secondary w-full cursor-pointer"
+                  >
+                    {t('bankDeleteFolderKeep')}
+                  </button>
+                  <button
+                    onClick={() => deleteFolder(folderModal.name, true)}
+                    className="sf-btn sf-btn-danger w-full cursor-pointer"
+                  >
+                    {t('bankDeleteFolderAll')}
+                  </button>
+                  <button
+                    onClick={() => setFolderModal(null)}
+                    className="sf-btn sf-btn-ghost w-full cursor-pointer"
+                  >{t('cancel')}</button>
+                </div>
               </div>
             </>) : (<>
-              <p className="font-semibold text-white text-[14px]">
-                {t('bankMoveVideosFrom')} <span style={{ color: '#A78BFA' }}>"{folderModal.name}"</span> {t('bankMoveVideosTo')}
-              </p>
-              <div className="flex flex-col gap-1 max-h-56 overflow-auto">
+              <div className="sf-modal-header">
+                <h3 className="sf-modal-title">{t('bankMoveVideosFrom')} <span className="text-accent">"{folderModal.name}"</span> {t('bankMoveVideosTo')}</h3>
+              </div>
+              <div className="p-3 flex flex-col gap-1 max-h-56 overflow-auto">
                 <button
                   onClick={() => mergeFolderTo(folderModal.name, null)}
-                  className="text-left px-3 py-2 rounded-lg text-[13px] transition-colors"
-                  style={{ color: '#A1A1AA' }}
-                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(139,92,246,0.08)'; e.currentTarget.style.color = '#fff' }}
-                  onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#A1A1AA' }}
+                  className="text-left px-3 py-2 rounded-lg text-[13px] transition-colors cursor-pointer text-text2 hover:bg-accent/10 hover:text-text"
                 >
                   {t('bankRootNoFolder')}
                 </button>
@@ -1372,20 +1347,18 @@ export function Bank({ user }: BankProps) {
                   <button
                     key={f}
                     onClick={() => mergeFolderTo(folderModal.name, f)}
-                    className="text-left px-3 py-2 rounded-lg text-[13px] transition-colors"
-                    style={{ color: '#A1A1AA' }}
-                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(139,92,246,0.08)'; e.currentTarget.style.color = '#fff' }}
-                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#A1A1AA' }}
+                    className="text-left px-3 py-2 rounded-lg text-[13px] transition-colors cursor-pointer text-text2 hover:bg-accent/10 hover:text-text"
                   >
                     {f}
                   </button>
                 ))}
               </div>
-              <button
-                onClick={() => setFolderModal(null)}
-                className="w-full py-2.5 rounded-xl text-[13px] font-medium transition-colors"
-                style={{ background: 'rgba(255,255,255,0.04)', color: '#A1A1AA', border: '1px solid rgba(255,255,255,0.07)' }}
-              >{t('cancel')}</button>
+              <div className="p-3 border-t border-border">
+                <button
+                  onClick={() => setFolderModal(null)}
+                  className="sf-btn sf-btn-ghost w-full cursor-pointer"
+                >{t('cancel')}</button>
+              </div>
             </>)}
           </div>
         </div>
@@ -1393,22 +1366,17 @@ export function Bank({ user }: BankProps) {
 
       {/* ── Bulk move modal ── */}
       {showBulkMove && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => setShowBulkMove(false)}>
-          <div
-            className="rounded-2xl p-6 w-72 space-y-4"
-            style={{ background: '#0E0E16', border: '1px solid rgba(139,92,246,0.2)', boxShadow: '0 24px 64px -16px rgba(0,0,0,0.8)' }}
-            onClick={e => e.stopPropagation()}
-          >
-            <p className="font-semibold text-white text-[14px]">
-              {t('bankMoveSelected')} {selectedIds.size} video{selectedIds.size > 1 ? 's' : ''} {t('bankVideosBulkTo')}
-            </p>
-            <div className="flex flex-col gap-1 max-h-64 overflow-auto">
+        <div className="sf-modal-bg" onClick={() => setShowBulkMove(false)}>
+          <div className="sf-modal w-72 anim-scale-in" onClick={e => e.stopPropagation()}>
+            <div className="sf-modal-header">
+              <h3 className="sf-modal-title">
+                {t('bankMoveSelected')} {selectedIds.size} video{selectedIds.size > 1 ? 's' : ''} {t('bankVideosBulkTo')}
+              </h3>
+            </div>
+            <div className="p-3 flex flex-col gap-1 max-h-64 overflow-auto">
               <button
                 onClick={() => moveSelected(null)}
-                className="text-left px-3 py-2 rounded-lg text-[13px] transition-colors"
-                style={{ color: '#A1A1AA' }}
-                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(139,92,246,0.08)'; e.currentTarget.style.color = '#fff' }}
-                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#A1A1AA' }}
+                className="text-left px-3 py-2 rounded-lg text-[13px] transition-colors cursor-pointer text-text2 hover:bg-accent/10 hover:text-text"
               >
                 {t('bankRootNoFolder')}
               </button>
@@ -1416,20 +1384,18 @@ export function Bank({ user }: BankProps) {
                 <button
                   key={f}
                   onClick={() => moveSelected(f)}
-                  className="text-left px-3 py-2 rounded-lg text-[13px] transition-colors"
-                  style={{ color: '#A1A1AA' }}
-                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(139,92,246,0.08)'; e.currentTarget.style.color = '#fff' }}
-                  onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#A1A1AA' }}
+                  className="text-left px-3 py-2 rounded-lg text-[13px] transition-colors cursor-pointer text-text2 hover:bg-accent/10 hover:text-text"
                 >
                   {f}
                 </button>
               ))}
             </div>
-            <button
-              onClick={() => setShowBulkMove(false)}
-              className="w-full py-2.5 rounded-xl text-[13px] font-medium"
-              style={{ background: 'rgba(255,255,255,0.04)', color: '#A1A1AA', border: '1px solid rgba(255,255,255,0.07)' }}
-            >{t('cancel')}</button>
+            <div className="p-3 border-t border-border">
+              <button
+                onClick={() => setShowBulkMove(false)}
+                className="sf-btn sf-btn-ghost w-full cursor-pointer"
+              >{t('cancel')}</button>
+            </div>
           </div>
         </div>
       )}
@@ -1479,7 +1445,7 @@ function FolderRow({ name, count, active, onClick, onRename, onDelete, onMerge, 
       <div className="flex items-center gap-1.5 px-3 py-1.5">
         <input
           autoFocus
-          className="sf-search flex-1 px-2 py-1 text-[12px]"
+          className="sf-input flex-1 text-[12px]"
           value={val}
           onChange={e => setVal(e.target.value)}
           onKeyDown={e => {
@@ -1490,8 +1456,7 @@ function FolderRow({ name, count, active, onClick, onRename, onDelete, onMerge, 
         <button
           onClick={() => { onRename(val.trim()); setEditing(false) }}
           aria-label={t('save')}
-          className="font-bold px-1.5 py-1 rounded inline-flex items-center justify-center"
-          style={{ color: '#A78BFA', background: 'rgba(139,92,246,0.12)' }}
+          className="sf-btn sf-btn-primary sf-btn-sm cursor-pointer"
         ><IconCheck size={13} /></button>
       </div>
     )
@@ -1502,9 +1467,9 @@ function FolderRow({ name, count, active, onClick, onRename, onDelete, onMerge, 
       className="flex items-center gap-2 px-3 py-2.5 cursor-pointer transition-all group"
       style={
         dragOver
-          ? { background: 'rgba(139,92,246,0.15)', borderLeft: '2px solid #8B5CF6', paddingLeft: '10px' }
+          ? { background: 'rgba(139,92,246,0.15)', borderLeft: '2px solid var(--accent)', paddingLeft: '10px' }
           : active
-          ? { background: 'rgba(139,92,246,0.08)', borderLeft: '2px solid #8B5CF6', paddingLeft: '10px' }
+          ? { background: 'rgba(139,92,246,0.08)', borderLeft: '2px solid var(--accent)', paddingLeft: '10px' }
           : { borderLeft: '2px solid transparent' }
       }
       onClick={onClick}
@@ -1519,55 +1484,40 @@ function FolderRow({ name, count, active, onClick, onRename, onDelete, onMerge, 
         if (itemId) onDropItem(itemId)
       }}
     >
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={active || dragOver ? '#A78BFA' : '#52525B'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
-        {dragOver
-          ? <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></>
-          : <><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></>
-        }
-      </svg>
+      <span style={{ color: active || dragOver ? 'var(--accent-lt)' : 'var(--text-3)' }} className="flex-shrink-0">
+        {dragOver ? <IconFolderOpen size={13} /> : <IconFolder size={13} />}
+      </span>
       <span
         className="text-[12px] font-medium flex-1 truncate"
-        style={{ color: active ? '#FFFFFF' : '#A1A1AA' }}
+        style={{ color: active ? 'var(--text-1)' : 'var(--text-2)' }}
       >{name}</span>
 
       {showActions ? (
         <div className="flex gap-0.5 flex-shrink-0">
           <button
             onClick={e => { e.stopPropagation(); setEditing(true) }}
-            className="w-5 h-5 rounded flex items-center justify-center transition-colors"
-            style={{ color: '#52525B' }}
-            onMouseEnter={e => (e.currentTarget.style.color = '#A78BFA')}
-            onMouseLeave={e => (e.currentTarget.style.color = '#52525B')}
+            className="w-5 h-5 rounded flex items-center justify-center transition-colors text-text3 hover:text-accent cursor-pointer"
             title={t('bankFolderRename')}
           >
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            <IconPencil size={10} />
           </button>
           <button
             onClick={e => { e.stopPropagation(); onMerge() }}
-            className="w-5 h-5 rounded flex items-center justify-center transition-colors"
-            style={{ color: '#52525B' }}
-            onMouseEnter={e => (e.currentTarget.style.color = '#A78BFA')}
-            onMouseLeave={e => (e.currentTarget.style.color = '#52525B')}
+            className="w-5 h-5 rounded flex items-center justify-center transition-colors text-text3 hover:text-accent cursor-pointer"
             title={t('bankFolderMergeTo')}
           >
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+            <IconMove size={10} />
           </button>
           <button
             onClick={e => { e.stopPropagation(); onDelete() }}
-            className="w-5 h-5 rounded flex items-center justify-center transition-colors"
-            style={{ color: '#52525B' }}
-            onMouseEnter={e => (e.currentTarget.style.color = '#F87171')}
-            onMouseLeave={e => (e.currentTarget.style.color = '#52525B')}
+            className="w-5 h-5 rounded flex items-center justify-center transition-colors text-text3 hover:text-danger cursor-pointer"
             title={t('bankFolderDelete')}
           >
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg>
+            <IconTrash size={10} />
           </button>
         </div>
       ) : (
-        <span
-          className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0"
-          style={{ background: 'rgba(139,92,246,0.08)', color: '#52525B' }}
-        >{count}</span>
+        <span className="sf-badge sf-badge-muted text-[10px] flex-shrink-0">{count}</span>
       )}
     </div>
   )
@@ -1755,7 +1705,7 @@ function VideoPlayerModal({ item, onClose }: { item: ContentItem; onClose: () =>
         <button
           onClick={onClose}
           aria-label={t('cancel')}
-          className="absolute top-3 right-3 z-20 w-8 h-8 rounded-full flex items-center justify-center text-white/70 hover:text-white transition-colors"
+          className="absolute top-3 right-3 z-20 w-8 h-8 rounded-full flex items-center justify-center text-white/70 hover:text-white transition-colors cursor-pointer"
           style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(8px)' }}
         ><IconX size={16} /></button>
 
@@ -1814,10 +1764,9 @@ function VideoCard({ item, onContextMenu, onPlay, selectionMode, isSelected, onT
       onDragStart={e => e.dataTransfer.setData('bank-item-id', item.id)}
       className="group cursor-default select-none rounded-xl overflow-hidden transition-all"
       style={{
-        background: '#0E0E16',
-        border: isSelected ? '1px solid #8B5CF6' : '1px solid rgba(139,92,246,0.12)',
+        background: 'var(--surface)',
+        border: isSelected ? '1px solid var(--accent)' : '1px solid var(--border)',
         boxShadow: isSelected ? '0 0 0 2px rgba(139,92,246,0.25)' : undefined,
-        transform: undefined,
       }}
       onContextMenu={e => !selectionMode && onContextMenu(e, item)}
     >
@@ -1835,31 +1784,27 @@ function VideoCard({ item, onContextMenu, onPlay, selectionMode, isSelected, onT
           style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, transparent 50%, rgba(0,0,0,0.15) 100%)' }}
         />
 
-        {/* Hover scale effect */}
+        {/* Hover tint */}
         <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
           style={{ background: 'rgba(139,92,246,0.06)' }} />
 
         {/* Checkbox — top-left */}
         <button
-          className="absolute top-2 left-2 z-10 w-5 h-5 rounded-md flex items-center justify-center transition-all"
+          className="absolute top-2 left-2 z-10 w-5 h-5 rounded-md flex items-center justify-center transition-all cursor-pointer"
           style={isSelected
-            ? { background: '#8B5CF6', border: '1px solid #8B5CF6', opacity: 1 }
+            ? { background: 'var(--accent)', border: '1px solid var(--accent)', opacity: 1 }
             : { background: 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.3)', opacity: 0 }
           }
           onClick={e => { e.stopPropagation(); onToggleSelect?.() }}
           title={isSelected ? t('bankCardDeselect') : t('bankCardSelect')}
         >
-          {isSelected && (
-            <svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round">
-              <polyline points="2,6 5,9 10,3"/>
-            </svg>
-          )}
+          {isSelected && <IconCheck size={9} className="text-white" strokeWidth={2.5} />}
         </button>
 
         {/* Show checkbox on hover (css approach via group) */}
         {!isSelected && (
           <button
-            className="absolute top-2 left-2 z-10 w-5 h-5 rounded-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all"
+            className="absolute top-2 left-2 z-10 w-5 h-5 rounded-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
             style={{ background: 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.35)' }}
             onClick={e => { e.stopPropagation(); onToggleSelect?.() }}
           />
@@ -1872,9 +1817,7 @@ function VideoCard({ item, onContextMenu, onPlay, selectionMode, isSelected, onT
               className="w-11 h-11 rounded-full flex items-center justify-center"
               style={{ background: 'rgba(139,92,246,0.75)', backdropFilter: 'blur(8px)', boxShadow: '0 0 20px rgba(139,92,246,0.5)' }}
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="white" style={{ marginLeft: '2px' }}>
-                <polygon points="5,3 19,12 5,21"/>
-              </svg>
+              <IconPlay size={16} />
             </div>
           </div>
         )}
@@ -1892,16 +1835,14 @@ function VideoCard({ item, onContextMenu, onPlay, selectionMode, isSelected, onT
         {/* Menu button — top right on hover */}
         {!selectionMode && (
           <button
-            className="absolute top-2 right-2 w-6 h-6 rounded-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10"
+            className="absolute top-2 right-2 w-6 h-6 rounded-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10 cursor-pointer"
             style={{ background: 'rgba(0,0,0,0.65)', color: '#fff', backdropFilter: 'blur(4px)' }}
             onClick={e => { e.stopPropagation(); onContextMenu(e, item) }}
             title={t('bankCardOptions')}
             onMouseEnter={e => (e.currentTarget.style.background = 'rgba(139,92,246,0.6)')}
             onMouseLeave={e => (e.currentTarget.style.background = 'rgba(0,0,0,0.65)')}
           >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-              <circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/>
-            </svg>
+            <IconMoreVert size={12} />
           </button>
         )}
 
@@ -1923,16 +1864,12 @@ function VideoCard({ item, onContextMenu, onPlay, selectionMode, isSelected, onT
 
       {/* Tags row */}
       {item.tags.length > 0 && (
-        <div className="px-2.5 py-2 flex flex-wrap gap-1" style={{ borderTop: '1px solid rgba(139,92,246,0.08)' }}>
+        <div className="px-2.5 py-2 flex flex-wrap gap-1" style={{ borderTop: '1px solid var(--border)' }}>
           {item.tags.slice(0, 3).map(tag => (
-            <span
-              key={tag}
-              className="text-[9px] px-1.5 py-0.5 rounded font-medium"
-              style={{ background: 'rgba(139,92,246,0.1)', color: '#A78BFA' }}
-            >#{tag}</span>
+            <span key={tag} className="sf-badge sf-badge-accent text-[9px]">#{tag}</span>
           ))}
           {item.tags.length > 3 && (
-            <span className="text-[9px]" style={{ color: '#52525B' }}>+{item.tags.length - 3}</span>
+            <span className="text-[9px] text-text3">+{item.tags.length - 3}</span>
           )}
         </div>
       )}
@@ -2032,56 +1969,63 @@ export function BankPicker({ user, mode, onSelect, onClose, resolveMode = 'full'
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={onClose}>
+    <div className="sf-modal-bg" onClick={onClose}>
       <div
-        className="bg-surface border border-border rounded-2xl w-[880px] max-w-[95vw] h-[80vh] flex flex-col overflow-hidden"
+        className="bg-surface border border-border rounded-2xl w-[880px] max-w-[95vw] h-[80vh] flex flex-col overflow-hidden anim-scale-in"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="px-5 py-4 border-b border-border flex items-center gap-4 flex-shrink-0">
+        <div className="sf-modal-header px-5 py-4">
           <div className="flex items-center gap-2.5">
             <span className="text-accent"><IconLibrary size={20} /></span>
-            <h2 className="text-sm font-semibold text-text">{t('bankTitle')}</h2>
+            <h2 className="sf-modal-title">{t('bankTitle')}</h2>
             <span className="text-xs text-text2">
               {mode === 'multi' ? t('bankPickerMultiple') : t('bankPickerSingle')}
             </span>
           </div>
-          <div className="flex-1" />
-          <input
-            type="text"
-            placeholder={t('bankPickerSearch')}
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="w-44 bg-bg border border-border rounded-lg px-3 py-1.5 text-xs text-text placeholder:text-text2 focus:border-accent focus:outline-none"
-          />
-          {mode === 'multi' && visible.length > 0 && (
-            <button
-              onClick={() => {
-                setSelected(prev => {
-                  const allSelected = visible.every(v => prev.has(v.id))
-                  const next = new Set(prev)
-                  if (allSelected) visible.forEach(v => next.delete(v.id))
-                  else             visible.forEach(v => { if (v.file_url || v.storage_path) next.add(v.id) })
-                  return next
-                })
-              }}
-              className="px-2.5 py-1.5 rounded-lg text-[11px] font-medium text-text2 hover:text-text transition-colors"
-              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}
-              title={selectedFolder ? `${t('selectAll')} "${selectedFolder}"` : t('selectAll')}
-            >
-              {visible.every(v => selected.has(v.id)) ? t('bankPickerDeselect') : t('bankPickerSelectAll')}
-            </button>
-          )}
-          {mode === 'multi' && selected.size > 0 && (
-            <Button size="sm" onClick={confirm} disabled={!!resolving}>
-              {resolving ? t('bankPickerDownloading') : `${t('confirm')} (${selected.size})`}
-            </Button>
-          )}
-          <button onClick={onClose} aria-label={t('cancel')} className="text-text2 hover:text-text transition-colors leading-none"><IconX size={18} /></button>
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none text-text3">
+                <IconSearch size={12} />
+              </span>
+              <input
+                type="text"
+                placeholder={t('bankPickerSearch')}
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="sf-input sf-input-sm pl-8 w-44"
+              />
+            </div>
+            {mode === 'multi' && visible.length > 0 && (
+              <button
+                onClick={() => {
+                  setSelected(prev => {
+                    const allSelected = visible.every(v => prev.has(v.id))
+                    const next = new Set(prev)
+                    if (allSelected) visible.forEach(v => next.delete(v.id))
+                    else             visible.forEach(v => { if (v.file_url || v.storage_path) next.add(v.id) })
+                    return next
+                  })
+                }}
+                className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer"
+                title={selectedFolder ? `${t('selectAll')} "${selectedFolder}"` : t('selectAll')}
+              >
+                {visible.every(v => selected.has(v.id)) ? t('bankPickerDeselect') : t('bankPickerSelectAll')}
+              </button>
+            )}
+            {mode === 'multi' && selected.size > 0 && (
+              <button className="sf-btn sf-btn-primary sf-btn-sm cursor-pointer" onClick={confirm} disabled={!!resolving}>
+                {resolving ? t('bankPickerDownloading') : `${t('confirm')} (${selected.size})`}
+              </button>
+            )}
+            <button onClick={onClose} aria-label={t('cancel')} className="sf-btn sf-btn-ghost sf-btn-icon sf-btn-sm cursor-pointer"><IconX size={16} /></button>
+          </div>
         </div>
+
         {resolving && (
-          <div className="px-5 py-2 bg-accent/10 border-b border-accent/30 text-accent text-xs flex items-center gap-2">
-            <span className="animate-spin">↻</span><span>📥 {t('bankPickerDownloadingCloud')}: {resolving}</span>
+          <div className="px-5 py-2 border-b border-accent/30 text-accent text-xs flex items-center gap-2" style={{ background: 'rgba(139,92,246,0.08)' }}>
+            <span className="sf-spinner flex-shrink-0" />
+            <span>{t('bankPickerDownloadingCloud')}: {resolving}</span>
           </div>
         )}
 
@@ -2090,7 +2034,7 @@ export function BankPicker({ user, mode, onSelect, onClose, resolveMode = 'full'
           <div className="w-44 flex-shrink-0 border-r border-border overflow-auto py-1">
             <button
               onClick={() => setSelectedFolder(null)}
-              className={`w-full flex items-center gap-2 px-3 py-2 text-left transition-colors ${
+              className={`w-full flex items-center gap-2 px-3 py-2 text-left transition-colors cursor-pointer ${
                 selectedFolder === null ? 'bg-surface2 border-l-2 border-accent pl-[10px]' : 'hover:bg-surface2'
               }`}
             >
@@ -2102,7 +2046,7 @@ export function BankPicker({ user, mode, onSelect, onClose, resolveMode = 'full'
               <button
                 key={f}
                 onClick={() => setSelectedFolder(f)}
-                className={`w-full flex items-center gap-2 px-3 py-2 text-left transition-colors ${
+                className={`w-full flex items-center gap-2 px-3 py-2 text-left transition-colors cursor-pointer ${
                   selectedFolder === f ? 'bg-surface2 border-l-2 border-accent pl-[10px]' : 'hover:bg-surface2'
                 }`}
               >
@@ -2120,32 +2064,32 @@ export function BankPicker({ user, mode, onSelect, onClose, resolveMode = 'full'
             {loading ? (
               <div className="flex justify-center py-16"><Spinner size="lg" /></div>
             ) : visible.length === 0 ? (
-              <div className="text-center py-16 text-text2 space-y-2 flex flex-col items-center">
-                <IconClapperboard size={30} />
-                <p className="text-sm">{t('bankPickerNoVideo')}</p>
+              <div className="sf-empty py-16">
+                <div className="sf-empty-icon"><IconClapperboard size={30} /></div>
+                <p className="sf-empty-desc">{t('bankPickerNoVideo')}</p>
               </div>
             ) : (
               <div className="grid grid-cols-3 xl:grid-cols-4 gap-3">
                 {visible.map(item => {
-                  const isSelected = selected.has(item.id)
+                  const isItemSelected = selected.has(item.id)
                   return (
                     <button
                       key={item.id}
                       onClick={() => toggle(item)}
-                      className={`text-left rounded-xl overflow-hidden border-2 transition-all ${
-                        isSelected ? 'border-accent ring-2 ring-accent/30' : 'border-border hover:border-accent/40'
+                      className={`text-left rounded-xl overflow-hidden border-2 transition-all cursor-pointer ${
+                        isItemSelected ? 'border-accent ring-2 ring-accent/30' : 'border-border hover:border-accent/40'
                       } ${!item.file_url && !item.storage_path ? 'opacity-50 cursor-not-allowed' : ''}`}
                       disabled={!item.file_url && !item.storage_path}
                     >
                       <div className="relative aspect-[9/16] bg-surface2">
                         <VideoThumbnail filePath={item.file_url ?? ''} thumbnailPath={item.thumbnail_path} storagePath={item.storage_path} />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent pointer-events-none" />
-                        {isSelected && (
+                        {isItemSelected && (
                           <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-accent flex items-center justify-center text-bg">
                             <IconCheck size={14} strokeWidth={2.5} />
                           </div>
                         )}
-                        {mode === 'multi' && !isSelected && (
+                        {mode === 'multi' && !isItemSelected && (
                           <div className="absolute top-2 right-2 w-6 h-6 rounded-full border-2 border-white/50 bg-black/30" />
                         )}
                         <p className="absolute bottom-2 left-2 right-2 text-[11px] font-semibold text-white truncate">
