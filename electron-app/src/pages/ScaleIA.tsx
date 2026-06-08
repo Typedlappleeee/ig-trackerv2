@@ -1,3 +1,24 @@
+import type { ReactNode } from 'react'
+
+// ── Inline Lucide-style SVG icons (no emoji UI chrome) ─────────────────────────
+type IconName = 'bot' | 'sparkles' | 'image' | 'trending-up'
+
+function Icon({ name, size = 15 }: { name: IconName; size?: number }) {
+  const paths: Record<IconName, ReactNode> = {
+    'bot': <><path d="M12 8V4H8" /><rect width="16" height="12" x="4" y="8" rx="2" /><path d="M2 14h2M20 14h2M15 13v2M9 13v2" /></>,
+    'sparkles': <path d="M9.94 14.34A2 2 0 0 0 8.66 13l-6.13-1.9a.5.5 0 0 1 0-.95l6.13-1.9a2 2 0 0 0 1.28-1.28l1.9-6.13a.5.5 0 0 1 .95 0l1.9 6.13a2 2 0 0 0 1.28 1.28l6.13 1.9a.5.5 0 0 1 0 .95l-6.13 1.9a2 2 0 0 0-1.28 1.28l-1.9 6.13a.5.5 0 0 1-.95 0z" />,
+    'image': <><rect width="18" height="18" x="3" y="3" rx="2" /><circle cx="9" cy="9" r="2" /><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" /></>,
+    'trending-up': <><path d="M16 7h6v6" /><path d="m22 7-8.5 8.5-5-5L2 17" /></>,
+  }
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
+      style={{ display: 'inline-block', verticalAlign: 'middle' }}>
+      {paths[name]}
+    </svg>
+  )
+}
+
 export default function ScaleIA() {
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', background: '#06060e' }}>
@@ -76,10 +97,10 @@ export default function ScaleIA() {
         {/* Feature pills */}
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center', maxWidth: 520, marginBottom: 44 }}>
           {[
-            { icon: '🤖', label: 'Modèle IA Custom' },
-            { icon: '✨', label: 'Contenu génératif' },
-            { icon: '📸', label: 'Photos & Vidéos IA' },
-            { icon: '📈', label: 'Empire Instagram' },
+            { icon: <Icon name="bot" />, label: 'Modèle IA Custom' },
+            { icon: <Icon name="sparkles" />, label: 'Contenu génératif' },
+            { icon: <Icon name="image" />, label: 'Photos & Vidéos IA' },
+            { icon: <Icon name="trending-up" />, label: 'Empire Instagram' },
           ].map((f, i) => (
             <div key={i} style={{
               display: 'flex', alignItems: 'center', gap: 7,
@@ -88,7 +109,7 @@ export default function ScaleIA() {
               border: '1px solid rgba(255,255,255,0.09)',
               fontSize: 12, color: 'rgba(226,232,240,0.7)',
             }}>
-              <span>{f.icon}</span>
+              <span style={{ display: 'flex', color: '#a78bfa' }}>{f.icon}</span>
               <span style={{ fontWeight: 500 }}>{f.label}</span>
             </div>
           ))}

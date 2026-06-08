@@ -338,7 +338,11 @@ function ThreadView({
                     m.is_admin ? 'bg-violet-600/30 text-violet-300' : 'bg-zinc-700 text-zinc-200'
                   }`}
                 >
-                  {m.is_admin ? '🛡' : m.sender_email[0]?.toUpperCase()}
+                  {m.is_admin ? (
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                    </svg>
+                  ) : m.sender_email[0]?.toUpperCase()}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
@@ -489,7 +493,11 @@ function UserSupport({ user }: { user: User }) {
             </div>
           ) : tickets.length === 0 ? (
             <div className="rounded-2xl p-10 text-center space-y-4" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-              <div className="text-4xl">🎫</div>
+              <div className="flex justify-center" style={{ color: '#a78bfa' }}>
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2z"/><path d="M13 5v2"/><path d="M13 17v2"/><path d="M13 11v2"/>
+                </svg>
+              </div>
               <p className="text-base font-bold text-white">{t('supportNoTicketsYet')}</p>
               <p className="text-[13px] text-text2">{t('supportNoTicketsHint')}</p>
               <button

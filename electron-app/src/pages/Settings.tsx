@@ -135,13 +135,13 @@ type GeneralTab = 'apparence' | 'sons' | 'notifications' | 'langue' | 'securite'
 type Panel = 'general' | 'profile' | 'connexions' | 'organization' | 'admin' | 'abonnement' | 'desktop'
 interface SettingsProps { user: User; initialPanel?: Panel; initialTab?: GeneralTab; onNavigate?: (page: string) => void }
 
-const GEN_SIDEBAR_IDS: { id: GeneralTab; labelKey: 'tabAppearance' | 'tabSounds' | 'tabNotifications' | 'tabLanguage' | 'tabSecurity' | 'tabAdvanced'; icon: string }[] = [
-  { id: 'apparence',     labelKey: 'tabAppearance',    icon: '🎨' },
-  { id: 'sons',          labelKey: 'tabSounds',        icon: '🔊' },
-  { id: 'notifications', labelKey: 'tabNotifications', icon: '🔔' },
-  { id: 'langue',        labelKey: 'tabLanguage',      icon: '🌐' },
-  { id: 'securite',      labelKey: 'tabSecurity',      icon: '🔒' },
-  { id: 'avance',        labelKey: 'tabAdvanced',      icon: '⚙️' },
+const GEN_SIDEBAR_IDS: { id: GeneralTab; labelKey: 'tabAppearance' | 'tabSounds' | 'tabNotifications' | 'tabLanguage' | 'tabSecurity' | 'tabAdvanced' }[] = [
+  { id: 'apparence',     labelKey: 'tabAppearance'    },
+  { id: 'sons',          labelKey: 'tabSounds'        },
+  { id: 'notifications', labelKey: 'tabNotifications' },
+  { id: 'langue',        labelKey: 'tabLanguage'      },
+  { id: 'securite',      labelKey: 'tabSecurity'      },
+  { id: 'avance',        labelKey: 'tabAdvanced'      },
 ]
 // Keep backward compat alias
 const GEN_SIDEBAR = GEN_SIDEBAR_IDS
@@ -1226,13 +1226,29 @@ function DesktopDownloadPanel({ S }: { S: StyleObj }) {
       {/* Feature list */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {[
-          { icon: '🔔', label: t('desktopFeature1') },
-          { icon: '⚡', label: t('desktopFeature2') },
-          { icon: '🎬', label: t('desktopFeature3') },
-          { icon: '🤝', label: t('desktopFeature4') },
+          { icon: (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+            </svg>
+          ), label: t('desktopFeature1') },
+          { icon: (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+            </svg>
+          ), label: t('desktopFeature2') },
+          { icon: (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="7" x2="7" y2="7"/><line x1="2" y1="17" x2="7" y2="17"/><line x1="17" y1="17" x2="22" y2="17"/><line x1="17" y1="7" x2="22" y2="7"/>
+            </svg>
+          ), label: t('desktopFeature3') },
+          { icon: (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+            </svg>
+          ), label: t('desktopFeature4') },
         ].map(f => (
           <div key={f.label} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-            <span style={{ fontSize: 16 }}>{f.icon}</span>
+            <span style={{ display: 'flex', alignItems: 'center', color: S.accent3 }}>{f.icon}</span>
             <span style={{ fontSize: 13, color: S.text2 }}>{f.label}</span>
           </div>
         ))}
@@ -1246,7 +1262,11 @@ function DesktopDownloadPanel({ S }: { S: StyleObj }) {
         border: '1px solid rgba(124,58,237,0.25)',
         textAlign: 'center',
       }}>
-        <span style={{ fontSize: 32 }}>🖥️</span>
+        <span style={{ display: 'flex', alignItems: 'center', color: S.accent3 }}>
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+          </svg>
+        </span>
         <p style={{ fontSize: 16, fontWeight: 700, color: S.text, margin: 0 }}>
           {lang === 'en' ? 'Coming soon' : 'Prochainement'}
         </p>

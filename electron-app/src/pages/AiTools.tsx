@@ -10,6 +10,37 @@ import { useT, useLang } from '@/lib/i18n'
 
 interface AiToolsProps { user: User }
 
+// ── Inline Lucide-style SVG icons (no emoji UI chrome) ─────────────────────────
+type IconName =
+  | 'search' | 'message-square' | 'calendar' | 'clapperboard' | 'anchor'
+  | 'user' | 'globe' | 'search-check' | 'sparkles' | 'tag' | 'pen-line'
+  | 'flame' | 'dna' | 'image'
+
+function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
+  const paths: Record<IconName, React.ReactNode> = {
+    'search': <><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></>,
+    'message-square': <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />,
+    'calendar': <><rect width="18" height="18" x="3" y="4" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></>,
+    'clapperboard': <><path d="M20.2 6 3 11l-.9-2.4c-.3-1.1.3-2.2 1.3-2.5l13.5-4c1.1-.3 2.2.3 2.5 1.3Z" /><path d="m6.2 5.3 3.1 3.9M12.4 3.4l3.1 4M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" /></>,
+    'anchor': <><circle cx="12" cy="5" r="3" /><path d="M12 22V8M5 12H2a10 10 0 0 0 20 0h-3" /></>,
+    'user': <><circle cx="12" cy="8" r="5" /><path d="M20 21a8 8 0 0 0-16 0" /></>,
+    'globe': <><circle cx="12" cy="12" r="10" /><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20M2 12h20" /></>,
+    'search-check': <><path d="m8 11 2 2 4-4" /><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></>,
+    'sparkles': <path d="M9.94 14.34A2 2 0 0 0 8.66 13l-6.13-1.9a.5.5 0 0 1 0-.95l6.13-1.9a2 2 0 0 0 1.28-1.28l1.9-6.13a.5.5 0 0 1 .95 0l1.9 6.13a2 2 0 0 0 1.28 1.28l6.13 1.9a.5.5 0 0 1 0 .95l-6.13 1.9a2 2 0 0 0-1.28 1.28l-1.9 6.13a.5.5 0 0 1-.95 0z" />,
+    'tag': <><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z" /><circle cx="7.5" cy="7.5" r=".5" fill="currentColor" /></>,
+    'pen-line': <><path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z" /></>,
+    'flame': <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />,
+    'dna': <><path d="M2 15c6.667-6 13.333 0 20-6" /><path d="M9 22c1.798-1.998 2.518-3.995 2.807-5.993" /><path d="M15 2c-1.798 1.998-2.518 3.995-2.807 5.993" /><path d="m17 6-2.5-2.5M14 8l-1-1M7 18l2.5 2.5M10 16l1 1M5 14l-3-3M22 13l-3-3" /></>,
+    'image': <><rect width="18" height="18" x="3" y="3" rx="2" /><circle cx="9" cy="9" r="2" /><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" /></>,
+  }
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      {paths[name]}
+    </svg>
+  )
+}
+
 type GroqToolId =
   | 'strat' | 'caption' | 'plan'
   | 'script' | 'hooks' | 'bio' | 'replies' | 'translate' | 'competitor'
@@ -94,7 +125,7 @@ function SelectInput({ value, onChange, options }: { value: string; onChange: (v
 }
 
 function ToolShell({ title, icon, children, onBack, error }: {
-  title: string; icon: string; children: React.ReactNode; onBack: () => void; error?: string | null
+  title: string; icon: React.ReactNode; children: React.ReactNode; onBack: () => void; error?: string | null
 }) {
   const t = useT()
   return (
@@ -107,8 +138,8 @@ function ToolShell({ title, icon, children, onBack, error }: {
             style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)', color: '#a78bfa' }}>
             ← {t('back')}
           </button>
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
-            style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.2), rgba(236,72,153,0.1))', border: '1px solid rgba(139,92,246,0.3)' }}>
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+            style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.2), rgba(236,72,153,0.1))', border: '1px solid rgba(139,92,246,0.3)', color: '#c4b5fd' }}>
             {icon}
           </div>
           <div>
@@ -164,12 +195,12 @@ function StratConcurrente({ groqKey, onBack }: { groqKey: string; onBack: () => 
   }
 
   return (
-    <ToolShell title="Niche Strategy" icon="🔍" onBack={onBack} error={error}>
+    <ToolShell title="Niche Strategy" icon={<Icon name="search" />} onBack={onBack} error={error}>
       <FormSection label="Niche ou compte concurrent">
         <p className="text-[12px] text-text2 font-mono">Enter a competitor handle or niche for a complete strategy.</p>
         <FieldInput placeholder="@concurrent ou niche (ex: fitness, crypto)" value={handle} onChange={setHandle} />
         <div className="flex gap-2.5">
-          <Button onClick={run} loading={loading} disabled={!handle.trim()}>🔍 Analyser la niche</Button>
+          <Button onClick={run} loading={loading} disabled={!handle.trim()}><span className="inline-flex items-center gap-1.5"><Icon name="search" size={15} />Analyser la niche</span></Button>
           {result && <CopyButton text={result} />}
         </div>
       </FormSection>
@@ -198,7 +229,7 @@ function CaptionsVirales({ groqKey, onBack }: { groqKey: string; onBack: () => v
   }
 
   return (
-    <ToolShell title="Captions Virales" icon="💬" onBack={onBack} error={error}>
+    <ToolShell title="Captions Virales" icon={<Icon name="message-square" />} onBack={onBack} error={error}>
       <FormSection label="Configuration de la caption">
         <p className="text-[12px] text-text2 font-mono">Hook + body + CTA + 15 hashtags generated automatically.</p>
         <div className="grid grid-cols-2 gap-3">
@@ -206,7 +237,7 @@ function CaptionsVirales({ groqKey, onBack }: { groqKey: string; onBack: () => v
           <SelectInput value={tone} onChange={setTone} options={TONES} />
         </div>
         <div className="flex gap-2.5">
-          <Button onClick={run} loading={loading} disabled={!subject.trim()}>✨ Générer la caption</Button>
+          <Button onClick={run} loading={loading} disabled={!subject.trim()}><span className="inline-flex items-center gap-1.5"><Icon name="sparkles" size={15} />Générer la caption</span></Button>
           {result && <CopyButton text={result} />}
         </div>
       </FormSection>
@@ -238,12 +269,12 @@ function Planificateur({ groqKey, onBack, userId }: { groqKey: string; onBack: (
   }
 
   return (
-    <ToolShell title="7-Day Planner" icon="📅" onBack={onBack} error={error}>
+    <ToolShell title="7-Day Planner" icon={<Icon name="calendar" />} onBack={onBack} error={error}>
       <FormSection label="Editorial Niche">
         <p className="text-[12px] text-text2 font-mono">Full editorial calendar — 7 days with times, types and ideas.</p>
         <FieldInput placeholder="Niche (fitness, crypto, lifestyle…)" value={niche} onChange={setNiche} />
         <div className="flex gap-2.5">
-          <Button onClick={run} loading={loading} disabled={!niche.trim()}>📅 Générer le planning</Button>
+          <Button onClick={run} loading={loading} disabled={!niche.trim()}><span className="inline-flex items-center gap-1.5"><Icon name="calendar" size={15} />Générer le planning</span></Button>
           {result && <CopyButton text={result} />}
         </div>
       </FormSection>
@@ -283,7 +314,7 @@ Format le script comme si c'était prêt à lire face caméra. Inclus les indica
   }
 
   return (
-    <ToolShell title="Script Reel Complet" icon="🎬" onBack={onBack} error={error}>
+    <ToolShell title="Script Reel Complet" icon={<Icon name="clapperboard" />} onBack={onBack} error={error}>
       <FormSection label="Reel Settings">
         <p className="text-[12px] text-text2 font-mono">Camera-ready script — hook, body, CTA with precise timings.</p>
         <FieldInput placeholder="Video topic" value={subject} onChange={setSubject} />
@@ -307,7 +338,7 @@ Format le script comme si c'était prêt à lire face caméra. Inclus les indica
           </div>
         </div>
         <div className="flex gap-2.5">
-          <Button onClick={run} loading={loading} disabled={!subject.trim()}>🎬 Générer le script</Button>
+          <Button onClick={run} loading={loading} disabled={!subject.trim()}><span className="inline-flex items-center gap-1.5"><Icon name="clapperboard" size={15} />Générer le script</span></Button>
           {result && <CopyButton text={result} />}
         </div>
       </FormSection>
@@ -351,12 +382,12 @@ Chaque hook doit faire maximum 2 lignes. Format :
   }
 
   return (
-    <ToolShell title="3 Hooks A/B/C" icon="🪝" onBack={onBack} error={error}>
+    <ToolShell title="3 Hooks A/B/C" icon={<Icon name="anchor" />} onBack={onBack} error={error}>
       <FormSection label="Video Topic">
         <p className="text-[12px] text-text2 font-mono">3 radically different hooks to test the best one.</p>
         <FieldInput placeholder="Video topic" value={subject} onChange={setSubject} />
         <div className="flex gap-2.5">
-          <Button onClick={run} loading={loading} disabled={!subject.trim()}>🪝 Générer les hooks</Button>
+          <Button onClick={run} loading={loading} disabled={!subject.trim()}><span className="inline-flex items-center gap-1.5"><Icon name="anchor" size={15} />Générer les hooks</span></Button>
           {result && <CopyButton text={result} />}
         </div>
       </FormSection>
@@ -397,7 +428,7 @@ Réponds avec :
   }
 
   return (
-    <ToolShell title="Bio Optimizer" icon="👤" onBack={onBack} error={error}>
+    <ToolShell title="Bio Optimizer" icon={<Icon name="user" />} onBack={onBack} error={error}>
       <FormSection label="Bio et objectif">
         <p className="text-[12px] text-text2 font-mono">Rewrites your bio to maximize conversions based on your goal.</p>
         <FieldInput placeholder="Ta bio actuelle (colle-la ici)" value={bio} onChange={setBio} textarea rows={3} />
@@ -406,7 +437,7 @@ Réponds avec :
           <SelectInput value={goal} onChange={setGoal} options={['Followers', 'Sales', 'Bio link traffic', 'DMs', 'Brand awareness']} />
         </div>
         <div className="flex gap-2.5">
-          <Button onClick={run} loading={loading} disabled={!bio.trim()}>👤 Optimiser la bio</Button>
+          <Button onClick={run} loading={loading} disabled={!bio.trim()}><span className="inline-flex items-center gap-1.5"><Icon name="user" size={15} />Optimiser la bio</span></Button>
           {result && <CopyButton text={result} />}
         </div>
       </FormSection>
@@ -442,13 +473,13 @@ Commentaire 2 → [réponse]
   }
 
   return (
-    <ToolShell title="Comment Replies" icon="💬" onBack={onBack} error={error}>
+    <ToolShell title="Comment Replies" icon={<Icon name="message-square" />} onBack={onBack} error={error}>
       <FormSection label="Comments to process">
         <p className="text-[12px] text-text2 font-mono">Up to 20 comments (one per line) — personalized reply for each.</p>
         <FieldInput placeholder={"Commentaire 1\nCommentaire 2\nCommentaire 3…"} value={comments} onChange={setComments} textarea rows={5} />
         <SelectInput value={tone} onChange={setTone} options={['Friendly', 'Professional', 'Humorous', 'Motivating', 'Mysterious']} />
         <div className="flex gap-2.5">
-          <Button onClick={run} loading={loading} disabled={!comments.trim()}>💬 Générer les réponses</Button>
+          <Button onClick={run} loading={loading} disabled={!comments.trim()}><span className="inline-flex items-center gap-1.5"><Icon name="message-square" size={15} />Générer les réponses</span></Button>
           {result && <CopyButton text={result} />}
         </div>
       </FormSection>
@@ -493,7 +524,7 @@ Pour chaque langue, format :
   }
 
   return (
-    <ToolShell title="Multi-Market Translator" icon="🌍" onBack={onBack} error={error}>
+    <ToolShell title="Multi-Market Translator" icon={<Icon name="globe" />} onBack={onBack} error={error}>
       <FormSection label="Caption and target markets">
         <p className="text-[12px] text-text2 font-mono">Adaptation culturelle + hashtags locaux — pas juste une traduction.</p>
         <FieldInput placeholder="Paste your caption here…" value={caption} onChange={setCaption} textarea rows={4} />
@@ -511,7 +542,7 @@ Pour chaque langue, format :
           </div>
         </div>
         <div className="flex gap-2.5">
-          <Button onClick={run} loading={loading} disabled={!caption.trim() || !langs.length}>🌍 Traduire & adapter</Button>
+          <Button onClick={run} loading={loading} disabled={!caption.trim() || !langs.length}><span className="inline-flex items-center gap-1.5"><Icon name="globe" size={15} />Traduire & adapter</span></Button>
           {result && <CopyButton text={result} />}
         </div>
       </FormSection>
@@ -559,7 +590,7 @@ Produis une analyse complète :
   }
 
   return (
-    <ToolShell title="Competitor Analysis" icon="🕵️" onBack={onBack} error={error}>
+    <ToolShell title="Competitor Analysis" icon={<Icon name="search-check" />} onBack={onBack} error={error}>
       <FormSection label="Account to analyze">
         <p className="text-[12px] text-text2 font-mono">Gaps, hook formulas, action plan — to outperform a competitor.</p>
         <div className="grid grid-cols-2 gap-3">
@@ -567,7 +598,7 @@ Produis une analyse complète :
           <FieldInput placeholder="Niche (optionnel)" value={niche} onChange={setNiche} />
         </div>
         <div className="flex gap-2.5">
-          <Button onClick={run} loading={loading} disabled={!handle.trim()}>🕵️ Analyser le concurrent</Button>
+          <Button onClick={run} loading={loading} disabled={!handle.trim()}><span className="inline-flex items-center gap-1.5"><Icon name="search-check" size={15} />Analyser le concurrent</span></Button>
           {result && <CopyButton text={result} />}
         </div>
       </FormSection>
@@ -577,35 +608,35 @@ Produis une analyse complète :
 }
 
 // ── Hub tool metadata ─────────────────────────────────────────────────────────
-const GROQ_TOOLS: { id: GroqToolId; icon: string; title: string; desc: string; tags: string[] }[] = [
-  { id: 'script',     icon: '🎬', title: 'Script Reel',            desc: 'Full camera-ready script — hook, body, CTA with timings.',              tags: ['Script', 'Hook', 'CTA'] },
-  { id: 'hooks',      icon: '🪝', title: '3 Hooks A/B/C',          desc: '3 radically different hooks to test the best one.',                     tags: ['A/B Test', 'Hook', 'Copywriting'] },
-  { id: 'caption',    icon: '💬', title: 'Captions Virales',        desc: 'Full caption: hook, body, CTA and 15 hashtags.',                        tags: ['Caption', 'Hashtags'] },
-  { id: 'bio',        icon: '👤', title: 'Bio Optimizer',           desc: 'Rewrites your bio to maximize follows, sales or traffic.',              tags: ['Bio', 'Profil', 'SEO'] },
-  { id: 'replies',    icon: '💬', title: 'Comment Replies',         desc: 'Personalized replies for 20 comments in one click.',                   tags: ['Engagement', 'Commentaires'] },
-  { id: 'translate',  icon: '🌍', title: 'Multi-Market Translator', desc: 'Adapts your caption for EN/ES/PT/DE/IT with local hashtags.',          tags: ['International', 'Traduction'] },
-  { id: 'competitor', icon: '🕵️', title: 'Competitor Analysis',    desc: 'Gaps, hook formulas, action plan to outperform an account.',           tags: ['Concurrent', 'Stratégie'] },
-  { id: 'strat',      icon: '🔍', title: 'Niche Strategy',          desc: 'Frequency, times, hashtags and Reels ideas for a niche.',              tags: ['Niche', 'Planning'] },
-  { id: 'plan',       icon: '📅', title: '7-Day Planner',           desc: 'Full 7-day editorial calendar with times and ideas.',                  tags: ['Calendrier', 'Contenu'] },
+const GROQ_TOOLS: { id: GroqToolId; icon: React.ReactNode; title: string; desc: string; tags: string[] }[] = [
+  { id: 'script',     icon: <Icon name="clapperboard" />,   title: 'Script Reel',            desc: 'Full camera-ready script — hook, body, CTA with timings.',              tags: ['Script', 'Hook', 'CTA'] },
+  { id: 'hooks',      icon: <Icon name="anchor" />,         title: '3 Hooks A/B/C',          desc: '3 radically different hooks to test the best one.',                     tags: ['A/B Test', 'Hook', 'Copywriting'] },
+  { id: 'caption',    icon: <Icon name="message-square" />, title: 'Captions Virales',        desc: 'Full caption: hook, body, CTA and 15 hashtags.',                        tags: ['Caption', 'Hashtags'] },
+  { id: 'bio',        icon: <Icon name="user" />,           title: 'Bio Optimizer',           desc: 'Rewrites your bio to maximize follows, sales or traffic.',              tags: ['Bio', 'Profil', 'SEO'] },
+  { id: 'replies',    icon: <Icon name="message-square" />, title: 'Comment Replies',         desc: 'Personalized replies for 20 comments in one click.',                   tags: ['Engagement', 'Commentaires'] },
+  { id: 'translate',  icon: <Icon name="globe" />,          title: 'Multi-Market Translator', desc: 'Adapts your caption for EN/ES/PT/DE/IT with local hashtags.',          tags: ['International', 'Traduction'] },
+  { id: 'competitor', icon: <Icon name="search-check" />,   title: 'Competitor Analysis',    desc: 'Gaps, hook formulas, action plan to outperform an account.',           tags: ['Concurrent', 'Stratégie'] },
+  { id: 'strat',      icon: <Icon name="search" />,         title: 'Niche Strategy',          desc: 'Frequency, times, hashtags and Reels ideas for a niche.',              tags: ['Niche', 'Planning'] },
+  { id: 'plan',       icon: <Icon name="calendar" />,       title: '7-Day Planner',           desc: 'Full 7-day editorial calendar with times and ideas.',                  tags: ['Calendrier', 'Contenu'] },
 ]
 
-const VISION_TOOLS_META: { id: VisionToolId; icon: string; title: string; desc: string; tags: string[]; needsAnthopic: boolean }[] = [
-  { id: 'vision-score',     icon: '🔥', title: 'Viral Score',      desc: 'Score 1-10 on 5 criteria: hook, retention, text, thumbnail, dynamism.', tags: ['Vidéo', 'Score', 'Claude'], needsAnthopic: true },
-  { id: 'vision-structure', icon: '🧬', title: 'Viral Structure',  desc: 'Breaks down a video\'s timeline: hook, value, CTA, transitions.',        tags: ['Vidéo', 'Timeline', 'Claude'], needsAnthopic: true },
-  { id: 'vision-thumb',     icon: '🖼', title: 'Audit Thumbnail',   desc: 'Score contrast, readability, emotion, colors + priority fixes.',         tags: ['Image', 'CTR', 'Claude'], needsAnthopic: true },
+const VISION_TOOLS_META: { id: VisionToolId; icon: React.ReactNode; title: string; desc: string; tags: string[]; needsAnthopic: boolean }[] = [
+  { id: 'vision-score',     icon: <Icon name="flame" />, title: 'Viral Score',      desc: 'Score 1-10 on 5 criteria: hook, retention, text, thumbnail, dynamism.', tags: ['Vidéo', 'Score', 'Claude'], needsAnthopic: true },
+  { id: 'vision-structure', icon: <Icon name="dna" />,   title: 'Viral Structure',  desc: 'Breaks down a video\'s timeline: hook, value, CTA, transitions.',        tags: ['Vidéo', 'Timeline', 'Claude'], needsAnthopic: true },
+  { id: 'vision-thumb',     icon: <Icon name="image" />, title: 'Audit Thumbnail',   desc: 'Score contrast, readability, emotion, colors + priority fixes.',         tags: ['Image', 'CTR', 'Claude'], needsAnthopic: true },
 ]
 
 // ── Premium tool card ─────────────────────────────────────────────────────────
 function ToolCard({ icon, title, desc, tags, locked, onClick }: {
-  icon: string; title: string; desc: string; tags: string[]; locked?: boolean; onClick: () => void
+  icon: React.ReactNode; title: string; desc: string; tags: string[]; locked?: boolean; onClick: () => void
 }) {
   return (
     <button onClick={onClick}
       className="sf-card rounded-2xl p-4 text-left space-y-3 transition-all card-lift group"
       style={{ opacity: locked ? 0.55 : 1 }}>
       <div className="flex items-start justify-between gap-2">
-        <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0 transition-all group-hover:scale-110"
-          style={{ background: 'linear-gradient(135deg,rgba(124,58,237,0.18),rgba(168,85,247,0.08))', border: '1px solid rgba(139,92,246,0.2)' }}>
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-all group-hover:scale-110"
+          style={{ background: 'linear-gradient(135deg,rgba(124,58,237,0.18),rgba(168,85,247,0.08))', border: '1px solid rgba(139,92,246,0.2)', color: '#c4b5fd' }}>
           {icon}
         </div>
         {locked && (
@@ -760,14 +791,14 @@ export function AiTools({ user }: AiToolsProps) {
             <SectionHeader label="Video Processing" badge="FFmpeg" />
             <div className="grid grid-cols-3 gap-4 anim-stagger">
               <ToolCard
-                icon="🏷"
+                icon={<Icon name="tag" />}
                 title="Metadata Changer"
                 desc="Removes all metadata and injects a random timestamp."
                 tags={['FFmpeg', 'Stream copy', 'Instant']}
                 onClick={() => setActive('metadata')}
               />
               <ToolCard
-                icon="✍️"
+                icon={<Icon name="pen-line" />}
                 title="Texte IA"
                 desc="Add text at multiple positions to create unique video copies."
                 tags={['FFmpeg', 'Texte', 'Anti-ban']}

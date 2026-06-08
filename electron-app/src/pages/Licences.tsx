@@ -211,7 +211,12 @@ export function Licences({ user: _user }: Props) {
       {/* Page header */}
       <div className="flex-shrink-0 px-8 pt-7 pb-5 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
         <div>
-          <h1 className="text-[20px] font-black text-white leading-none">🛡 Admin — {t('licencesTitle')}</h1>
+          <h1 className="text-[20px] font-black text-white leading-none flex items-center gap-2">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ color: '#a78bfa' }}>
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            </svg>
+            Admin — {t('licencesTitle')}
+          </h1>
           <p className="text-[13px] text-text2 mt-0.5">{t('licencesSub')}</p>
         </div>
       </div>
@@ -319,7 +324,11 @@ export function Licences({ user: _user }: Props) {
             </div>
           ) : filtered.length === 0 ? (
             <div className="rounded-2xl p-10 text-center" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-              <p className="text-base font-bold text-white mb-2">🔑</p>
+              <div className="flex justify-center mb-3" style={{ color: '#a78bfa' }}>
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <circle cx="7.5" cy="15.5" r="4.5"/><path d="m10.7 12.3 8.3-8.3"/><path d="m17 5 3 3"/><path d="m14 8 3 3"/>
+                </svg>
+              </div>
               <p className="text-[13px] text-text2">{t('noKeys')}</p>
             </div>
           ) : (
@@ -390,7 +399,12 @@ export function Licences({ user: _user }: Props) {
         {/* ── Credit Codes ──────────────────────────────────────────────────── */}
         <div className="mt-10 space-y-6">
           <div>
-            <h2 className="text-[22px] font-black text-white leading-none">💎 Credit codes</h2>
+            <h2 className="text-[22px] font-black text-white leading-none flex items-center gap-2">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ color: '#a78bfa' }}>
+                <path d="M6 3h12l4 6-10 13L2 9z"/><path d="M11 3 8 9l4 13 4-13-3-6"/><path d="M2 9h20"/>
+              </svg>
+              Credit codes
+            </h2>
             <p className="text-[13px] text-text2 mt-0.5">Generate codes that users can redeem for credits</p>
           </div>
 
@@ -430,7 +444,11 @@ export function Licences({ user: _user }: Props) {
               <div className="p-10 text-center text-[13px] text-text2">{t('loading')}</div>
             ) : creditCodes.length === 0 ? (
               <div className="p-10 text-center">
-                <p className="text-2xl mb-3">💎</p>
+                <div className="flex justify-center mb-3" style={{ color: '#a78bfa' }}>
+                  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M6 3h12l4 6-10 13L2 9z"/><path d="M11 3 8 9l4 13 4-13-3-6"/><path d="M2 9h20"/>
+                  </svg>
+                </div>
                 <p className="text-[13px] text-text2">No codes created.</p>
               </div>
             ) : (

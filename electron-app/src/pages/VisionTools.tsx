@@ -4,6 +4,26 @@ import { Button } from '@/components/ui/Button'
 
 export type VisionToolId = 'vision-score' | 'vision-structure' | 'vision-thumb'
 
+// ── Inline Lucide-style SVG icons (no emoji UI chrome) ─────────────────────────
+type IconName = 'flame' | 'dna' | 'image' | 'video' | 'folder-open'
+
+function Icon({ name, size = 22 }: { name: IconName; size?: number }) {
+  const paths: Record<IconName, React.ReactNode> = {
+    'flame': <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />,
+    'dna': <><path d="M2 15c6.667-6 13.333 0 20-6" /><path d="M9 22c1.798-1.998 2.518-3.995 2.807-5.993" /><path d="M15 2c-1.798 1.998-2.518 3.995-2.807 5.993" /><path d="m17 6-2.5-2.5M14 8l-1-1M7 18l2.5 2.5M10 16l1 1M5 14l-3-3M22 13l-3-3" /></>,
+    'image': <><rect width="18" height="18" x="3" y="3" rx="2" /><circle cx="9" cy="9" r="2" /><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" /></>,
+    'video': <><path d="m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5" /><rect x="2" y="6" width="14" height="12" rx="2" /></>,
+    'folder-open': <path d="m6 14 1.45-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.55 6a2 2 0 0 1-1.94 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2" />,
+  }
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
+      style={{ display: 'inline-block', verticalAlign: 'middle' }}>
+      {paths[name]}
+    </svg>
+  )
+}
+
 interface Props {
   user: User
   tool: VisionToolId
@@ -30,7 +50,7 @@ function ScoreBar({ score, label, comment }: { score: number; label: string; com
   )
 }
 
-function ToolShell({ title, icon, children, onBack }: { title: string; icon: string; children: React.ReactNode; onBack: () => void }) {
+function ToolShell({ title, icon, children, onBack }: { title: string; icon: React.ReactNode; children: React.ReactNode; onBack: () => void }) {
   return (
     <div className="h-full flex flex-col overflow-hidden">
       <div className="flex-shrink-0 px-8 pt-7 pb-5 flex items-center gap-4" style={{ borderBottom: '1px solid rgba(139,92,246,0.1)' }}>
@@ -39,7 +59,7 @@ function ToolShell({ title, icon, children, onBack }: { title: string; icon: str
           style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}>
           ← Back
         </button>
-        <span className="text-2xl">{icon}</span>
+        <span className="flex items-center" style={{ color: '#c4b5fd' }}>{icon}</span>
         <h1 className="text-[22px] font-black text-white leading-none">{title}</h1>
       </div>
       <div className="flex-1 overflow-y-auto px-10 pb-10 pt-8">
@@ -112,7 +132,7 @@ Return ONLY valid JSON, no explanation outside the JSON:
   const overallColor = result ? (result.overall >= 7 ? '#34d399' : result.overall >= 5 ? '#fbbf24' : '#f87171') : '#a78bfa'
 
   return (
-    <ToolShell title="Viral Score" icon="🔥" onBack={onBack}>
+    <ToolShell title="Viral Score" icon={<Icon name="flame" />} onBack={onBack}>
       <div className="space-y-5">
         <p className="text-[13px] text-text2">
           Upload a video, Claude analyzes the frames and scores its viral potential on 5 criteria.
@@ -127,7 +147,7 @@ Return ONLY valid JSON, no explanation outside the JSON:
             const p = await window.electronAPI!.pickVideoFile()
             if (p) { setFilePath(p); setResult(null); setError(null) }
           }}>
-            📂 Choose a video
+            <span className="inline-flex items-center gap-2"><Icon name="folder-open" size={16} />Choose a video</span>
           </Button>
         </div>
 
@@ -138,7 +158,7 @@ Return ONLY valid JSON, no explanation outside the JSON:
         )}
 
         <Button className="w-full" disabled={!filePath || !anthropicKey} loading={loading} onClick={analyze}>
-          🔥 Analyze viral potential
+          <span className="inline-flex items-center gap-2"><Icon name="flame" size={16} />Analyze viral potential</span>
         </Button>
 
         {!anthropicKey && (
@@ -233,7 +253,7 @@ Return ONLY valid JSON:
   }
 
   return (
-    <ToolShell title="Viral Structure" icon="🧬" onBack={onBack}>
+    <ToolShell title="Viral Structure" icon={<Icon name="dna" />} onBack={onBack}>
       <div className="space-y-5">
         <p className="text-[13px] text-text2">
           Breaks down a video's narrative structure — hook, value, CTA — to understand why it works.
@@ -248,7 +268,7 @@ Return ONLY valid JSON:
             const p = await window.electronAPI!.pickVideoFile()
             if (p) { setFilePath(p); setResult(null); setError(null) }
           }}>
-            📂 Choose a video
+            <span className="inline-flex items-center gap-2"><Icon name="folder-open" size={16} />Choose a video</span>
           </Button>
         </div>
 
@@ -259,7 +279,7 @@ Return ONLY valid JSON:
         )}
 
         <Button className="w-full" disabled={!filePath || !anthropicKey} loading={loading} onClick={analyze}>
-          🧬 Analyze structure
+          <span className="inline-flex items-center gap-2"><Icon name="dna" size={16} />Analyze structure</span>
         </Button>
 
         {!anthropicKey && (
@@ -403,20 +423,20 @@ Rate each category 1-10. Return ONLY valid JSON:
   const overallColor = result ? (result.overall >= 7 ? '#34d399' : result.overall >= 5 ? '#fbbf24' : '#f87171') : '#a78bfa'
 
   return (
-    <ToolShell title="Thumbnail Audit" icon="🖼" onBack={onBack}>
+    <ToolShell title="Thumbnail Audit" icon={<Icon name="image" />} onBack={onBack}>
       <div className="space-y-5">
         <p className="text-[13px] text-text2">
           Analyzes your thumbnail on 5 performance criteria. Accepts an image or video (takes the first frame).
         </p>
 
         <div className="flex gap-2">
-          {[{ label: '🖼 Image', v: false }, { label: '🎬 Video', v: true }].map(({ label, v }) => (
+          {[{ label: 'Image', iconName: 'image' as IconName, v: false }, { label: 'Video', iconName: 'video' as IconName, v: true }].map(({ label, iconName, v }) => (
             <button key={String(v)} onClick={() => { setIsVideo(v); setFilePath(null); setResult(null) }}
-              className="flex-1 py-2.5 rounded-xl text-[13px] font-bold"
+              className="flex-1 py-2.5 rounded-xl text-[13px] font-bold inline-flex items-center justify-center gap-2"
               style={isVideo === v
                 ? { background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff' }
                 : { background: 'rgba(255,255,255,0.05)', color: 'rgba(196,181,253,0.5)', border: '1px solid rgba(255,255,255,0.07)' }
-              }>{label}</button>
+              }><Icon name={iconName} size={15} />{label}</button>
           ))}
         </div>
 
@@ -431,7 +451,7 @@ Rate each category 1-10. Return ONLY valid JSON:
               : await window.electronAPI!.pickAnyFile!({ filters: [{ name: 'Images', extensions: ['jpg','jpeg','png','webp'] }] })
             if (p) { setFilePath(p); setResult(null); setError(null) }
           }}>
-            📂 {isVideo ? 'Choose a video' : 'Choose an image'}
+            <span className="inline-flex items-center gap-2"><Icon name="folder-open" size={16} />{isVideo ? 'Choose a video' : 'Choose an image'}</span>
           </Button>
         </div>
 
@@ -442,7 +462,7 @@ Rate each category 1-10. Return ONLY valid JSON:
         )}
 
         <Button className="w-full" disabled={!filePath || !anthropicKey} loading={loading} onClick={analyze}>
-          🖼 Audit thumbnail
+          <span className="inline-flex items-center gap-2"><Icon name="image" size={16} />Audit thumbnail</span>
         </Button>
 
         {!anthropicKey && (
