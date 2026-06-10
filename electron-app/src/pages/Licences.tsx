@@ -209,9 +209,9 @@ export function Licences({ user: _user }: Props) {
 
       {/* ── Page header ─────────────────────────────────────────────────────── */}
       <div className="flex-shrink-0 px-8 pt-7 pb-5 flex items-center justify-between border-b border-border">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-            style={{ background: 'linear-gradient(135deg, rgba(124,58,237,0.25), rgba(236,72,153,0.15))', border: '1px solid rgba(139,92,246,0.25)' }}>
+        <div className="flex items-center gap-3 sf-anim-slide-up sf-d50">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 sf-anim-scale-spring sf-d100"
+            style={{ background: 'linear-gradient(135deg, rgba(124,58,237,0.25), rgba(236,72,153,0.15))', border: '1px solid rgba(139,92,246,0.25)', boxShadow: '0 0 18px -6px rgba(139,92,246,0.45)' }}>
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>
             </svg>
@@ -229,7 +229,7 @@ export function Licences({ user: _user }: Props) {
       <div className="flex-1 overflow-y-auto px-8 pb-10">
 
         {/* Stats */}
-        <div className="grid grid-cols-4 gap-4 mt-6">
+        <div className="grid grid-cols-4 gap-4 mt-6 anim-stagger">
           {[
             { label: t('totalKeys'),     value: stats.total,   color: 'text-text',   icon: <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/> },
             { label: t('availableKeys'), value: stats.active,  color: 'text-ok',     icon: <><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></> },
@@ -249,7 +249,7 @@ export function Licences({ user: _user }: Props) {
         </div>
 
         {/* Create key */}
-        <div className="sf-card p-6 space-y-5 mt-6">
+        <div className="sf-card p-6 space-y-5 mt-6 sf-anim-slide-up sf-d150">
           <div className="flex items-center gap-2 mb-1">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M12 5v14M5 12h14"/>
@@ -317,7 +317,7 @@ export function Licences({ user: _user }: Props) {
         </div>
 
         {/* List */}
-        <div className="space-y-4 mt-6">
+        <div className="space-y-4 mt-6 sf-anim-slide-up sf-d200">
           <div className="flex flex-wrap gap-3 items-center">
             <Input
               value={search}
@@ -421,7 +421,7 @@ export function Licences({ user: _user }: Props) {
         </div>
 
         {/* ── Credit Codes ──────────────────────────────────────────────────── */}
-        <div className="mt-10 space-y-5">
+        <div className="mt-10 space-y-5 sf-reveal">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
               style={{ background: 'linear-gradient(135deg, rgba(124,58,237,0.2), rgba(6,182,212,0.1))', border: '1px solid rgba(139,92,246,0.2)' }}>

@@ -765,7 +765,7 @@ export function Bank({ user }: BankProps) {
         {/* Icon + title */}
         <div className="flex items-center gap-3.5 min-w-0">
           <div
-            className="w-11 h-11 rounded-[13px] flex items-center justify-center flex-shrink-0"
+            className="w-11 h-11 rounded-[13px] flex items-center justify-center flex-shrink-0 sf-anim-scale-spring"
             style={{
               background: 'linear-gradient(135deg, rgba(34,211,238,0.2), rgba(34,211,238,0.05))',
               border: '1px solid rgba(34,211,238,0.3)',
@@ -777,7 +777,7 @@ export function Bank({ user }: BankProps) {
               <path d="M15 10l4.553-2.069A1 1 0 0 1 21 8.82v6.36a1 1 0 0 1-1.447.894L15 14M3 8a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8z"/>
             </svg>
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 sf-anim-slide-up sf-d50">
             <div className="flex items-center gap-2.5">
               <h1 className="text-[22px] font-black text-text leading-none tracking-tight" style={{ letterSpacing: '-0.025em' }}>{t('bankTitle')}</h1>
               <span className="sf-badge sf-badge-accent text-[11px]">{items.length}</span>
@@ -787,7 +787,7 @@ export function Bank({ user }: BankProps) {
         </div>
 
         {/* Right controls */}
-        <div className="flex items-center gap-2 flex-shrink-0">
+        <div className="flex items-center gap-2 flex-shrink-0 sf-anim-slide-up sf-d100">
           {/* Personal / Org toggle — only when in an org */}
           {currentOrg && (
             <div className="sf-tabs">
@@ -812,14 +812,14 @@ export function Bank({ user }: BankProps) {
           <div className="sf-tabs">
             <button
               onClick={() => setViewMode('grid')}
-              className={`sf-tab cursor-pointer ${viewMode === 'grid' ? 'active' : ''}`}
+              className={`sf-tab sf-press cursor-pointer ${viewMode === 'grid' ? 'active' : ''}`}
               title={t('bankGridView')}
             >
               <IconGrid size={13} />
             </button>
             <button
               onClick={() => setViewMode('list')}
-              className={`sf-tab cursor-pointer ${viewMode === 'list' ? 'active' : ''}`}
+              className={`sf-tab sf-press cursor-pointer ${viewMode === 'list' ? 'active' : ''}`}
               title={t('bankListView')}
             >
               <IconList size={13} />
@@ -845,7 +845,7 @@ export function Bank({ user }: BankProps) {
       </header>
 
       {/* ── Toolbar ── */}
-      <div className="sf-toolbar px-8">
+      <div className="sf-toolbar px-8 sf-anim-slide-up sf-d150">
         {/* Search */}
         <div className="relative flex-1 max-w-xs">
           <span className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none text-text3">
@@ -930,7 +930,7 @@ export function Bank({ user }: BankProps) {
             <span className="text-[10px] font-bold uppercase tracking-widest text-text3">{t('bankFolders')}</span>
             <button
               onClick={() => setShowNewFolder(v => !v)}
-              className="w-5 h-5 rounded flex items-center justify-center transition-colors text-text3 hover:text-accent cursor-pointer"
+              className="w-5 h-5 rounded flex items-center justify-center transition-colors text-text3 hover:text-accent cursor-pointer sf-press"
               title={t('bankNewFolderTitle')}
             >
               <IconPlus size={12} />
@@ -959,7 +959,7 @@ export function Bank({ user }: BankProps) {
           )}
 
           {/* Folder list */}
-          <div className="flex-1 overflow-y-auto py-1">
+          <div className="flex-1 overflow-y-auto py-1 anim-stagger">
             {/* All items */}
             <button
               onClick={() => setSelectedFolder(null)}
@@ -1141,7 +1141,7 @@ export function Bank({ user }: BankProps) {
             ) : items.length === 0 ? (
               /* Empty state — no items at all */
               <div className="sf-empty py-24">
-                <div className="sf-empty-icon">
+                <div className="sf-empty-icon sf-anim-scale-spring">
                   <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
                     <polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
                   </svg>
@@ -1160,7 +1160,7 @@ export function Bank({ user }: BankProps) {
             ) : visible.length === 0 ? (
               /* Empty state — no search results */
               <div className="sf-empty py-20">
-                <div className="sf-empty-icon">
+                <div className="sf-empty-icon sf-anim-scale-spring">
                   <IconSearch size={28} />
                 </div>
                 <p className="sf-empty-title">{t('bankNoResults')}</p>
@@ -1525,21 +1525,21 @@ function FolderRow({ name, count, active, onClick, onRename, onDelete, onMerge, 
         <div className="flex gap-0.5 flex-shrink-0">
           <button
             onClick={e => { e.stopPropagation(); setEditing(true) }}
-            className="w-5 h-5 rounded flex items-center justify-center transition-colors text-text3 hover:text-accent cursor-pointer"
+            className="w-5 h-5 rounded flex items-center justify-center transition-colors text-text3 hover:text-accent cursor-pointer sf-press"
             title={t('bankFolderRename')}
           >
             <IconPencil size={10} />
           </button>
           <button
             onClick={e => { e.stopPropagation(); onMerge() }}
-            className="w-5 h-5 rounded flex items-center justify-center transition-colors text-text3 hover:text-accent cursor-pointer"
+            className="w-5 h-5 rounded flex items-center justify-center transition-colors text-text3 hover:text-accent cursor-pointer sf-press"
             title={t('bankFolderMergeTo')}
           >
             <IconMove size={10} />
           </button>
           <button
             onClick={e => { e.stopPropagation(); onDelete() }}
-            className="w-5 h-5 rounded flex items-center justify-center transition-colors text-text3 hover:text-danger cursor-pointer"
+            className="w-5 h-5 rounded flex items-center justify-center transition-colors text-text3 hover:text-danger cursor-pointer sf-press"
             title={t('bankFolderDelete')}
           >
             <IconTrash size={10} />
@@ -1734,7 +1734,7 @@ function VideoPlayerModal({ item, onClose }: { item: ContentItem; onClose: () =>
         <button
           onClick={onClose}
           aria-label={t('cancel')}
-          className="absolute top-3 right-3 z-20 w-8 h-8 rounded-full flex items-center justify-center text-white/70 hover:text-white transition-colors cursor-pointer"
+          className="absolute top-3 right-3 z-20 w-8 h-8 rounded-full flex items-center justify-center text-white/70 hover:text-white transition-colors cursor-pointer sf-press"
           style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(8px)' }}
         ><IconX size={16} /></button>
 
