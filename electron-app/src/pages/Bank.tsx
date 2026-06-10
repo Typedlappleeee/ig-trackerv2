@@ -732,7 +732,7 @@ export function Bank({ user }: BankProps) {
   return (
     <div
       ref={dropRef}
-      className={`h-full flex flex-col overflow-hidden anim-page transition-colors ${dragging ? 'ring-2 ring-inset ring-accent/40' : ''}`}
+      className={`h-full flex flex-col overflow-y-auto overflow-x-hidden anim-page transition-colors ${dragging ? 'ring-2 ring-inset ring-accent/40' : ''}`}
       style={{ background: '#07070B' }}
       onDragOver={onDragOver}
       onDragEnter={onDragEnter}
@@ -917,13 +917,13 @@ export function Bank({ user }: BankProps) {
         )}
       </div>
 
-      {/* ── Body: sidebar + main ── */}
-      <div className="flex flex-1 min-h-0 overflow-hidden">
+      {/* ── Body: sidebar + main (page scrolls, sidebar stays sticky) ── */}
+      <div className="flex flex-1">
 
-        {/* ── Folder sidebar ── */}
+        {/* ── Folder sidebar — sticky while the page scrolls ── */}
         <aside
           className="w-52 flex-shrink-0 flex flex-col overflow-hidden"
-          style={{ borderRight: '1px solid var(--border)' }}
+          style={{ borderRight: '1px solid var(--border)', position: 'sticky', top: 0, alignSelf: 'flex-start', maxHeight: 'calc(100vh - 54px)' }}
         >
           {/* Sidebar header */}
           <div className="px-4 py-3 flex items-center justify-between flex-shrink-0" style={{ borderBottom: '1px solid var(--border)' }}>
@@ -1134,7 +1134,7 @@ export function Bank({ user }: BankProps) {
           )}
 
           {/* ── Scrollable content ── */}
-          <div className="flex-1 overflow-y-auto px-6 py-5">
+          <div className="flex-1 px-6 py-5">
             {loading ? (
               <div className="flex justify-center py-20"><Spinner size="lg" /></div>
 
