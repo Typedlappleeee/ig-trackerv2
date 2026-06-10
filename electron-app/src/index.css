@@ -1806,3 +1806,257 @@ html[data-theme="light"] canvas { filter: invert(1) hue-rotate(180deg); }
 /* ── Opt-in tactile press (apply .sf-press where wanted) ────────────────── */
 .sf-press { transition: transform 0.09s cubic-bezier(0.4, 0, 0.2, 1); }
 .sf-press:active:not(:disabled) { transform: scale(0.96); }
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   ScaleFlow v4 — Cinematic layer
+   Final cascade layer: refines every core component app-wide.
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+/* ── Film grain overlay — imperceptible texture that kills "flat digital" look ─ */
+#root::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 2147483646;
+  pointer-events: none;
+  opacity: 0.85;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.014 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+html[data-glass="off"] #root::after { display: none; }
+
+/* ── Cinematic page entrance (slight rise + blur settle) ─────────────────── */
+@keyframes sf-page-cine {
+  0%   { opacity: 0; transform: translateY(12px) scale(0.995); filter: blur(5px); }
+  60%  { filter: blur(0); }
+  100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+}
+.anim-page { animation: sf-page-cine 0.42s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+/* Extended stagger — covers long grids */
+.anim-stagger > *:nth-child(11) { animation-delay: 0.33s; }
+.anim-stagger > *:nth-child(12) { animation-delay: 0.36s; }
+.anim-stagger > *:nth-child(13) { animation-delay: 0.38s; }
+.anim-stagger > *:nth-child(14) { animation-delay: 0.40s; }
+.anim-stagger > *:nth-child(n+15) { animation-delay: 0.42s; }
+
+/* ── Reveal — generic opt-in entrance for sections ───────────────────────── */
+@keyframes sf-reveal {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: none; }
+}
+.sf-reveal { animation: sf-reveal 0.45s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+/* ── Cards — layered depth + living hover ────────────────────────────────── */
+.sf-card {
+  box-shadow:
+    0 1px 2px rgba(0,0,0,0.3),
+    0 4px 14px rgba(0,0,0,0.22),
+    inset 0 1px 0 rgba(255,255,255,0.035);
+  transition: border-color 200ms ease, box-shadow 240ms ease, transform 240ms cubic-bezier(0.22,1,0.36,1);
+}
+.sf-card:hover {
+  border-color: rgba(139,92,246,0.26);
+  box-shadow:
+    0 2px 6px rgba(0,0,0,0.3),
+    0 10px 34px -6px rgba(0,0,0,0.5),
+    0 0 24px -8px rgba(124,58,237,0.25),
+    inset 0 1px 0 rgba(255,255,255,0.05);
+}
+.sf-card-lift:hover {
+  transform: translateY(-3px) scale(1.004);
+  box-shadow:
+    0 4px 10px rgba(0,0,0,0.3),
+    0 18px 46px -10px rgba(0,0,0,0.62),
+    0 0 36px -6px rgba(124,58,237,0.35),
+    inset 0 1px 0 rgba(255,255,255,0.06);
+}
+
+/* Spotlight card — soft radial light at the top (opt-in) */
+.sf-spotlight {
+  position: relative;
+  overflow: hidden;
+}
+.sf-spotlight::before {
+  content: '';
+  position: absolute;
+  top: -60px; left: 50%;
+  width: 70%; height: 120px;
+  transform: translateX(-50%);
+  background: radial-gradient(ellipse at center, rgba(167,139,250,0.14) 0%, transparent 70%);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 300ms ease;
+}
+.sf-spotlight:hover::before { opacity: 1; }
+
+/* ── Buttons — tactile, luminous ─────────────────────────────────────────── */
+.sf-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  filter: saturate(0.6);
+}
+.sf-btn:focus-visible {
+  box-shadow: 0 0 0 2px var(--base), 0 0 0 4px rgba(139,92,246,0.6);
+}
+.sf-btn-primary {
+  background: linear-gradient(150deg, #8B5CF6 0%, #7C3AED 45%, #5B21B6 100%);
+  box-shadow:
+    0 1px 3px rgba(0,0,0,0.35),
+    0 0 24px -6px rgba(124,58,237,0.65),
+    inset 0 1px 0 rgba(255,255,255,0.18),
+    inset 0 -1px 0 rgba(0,0,0,0.2);
+}
+.sf-btn-primary:hover {
+  background: linear-gradient(150deg, #A78BFA 0%, #8B5CF6 45%, #6D28D9 100%);
+  box-shadow:
+    0 2px 8px rgba(0,0,0,0.35),
+    0 0 42px -4px rgba(139,92,246,0.8),
+    inset 0 1px 0 rgba(255,255,255,0.22),
+    inset 0 -1px 0 rgba(0,0,0,0.2);
+  transform: translateY(-1px);
+}
+.sf-btn-secondary:hover { transform: translateY(-1px); }
+.sf-btn-ghost:hover     { transform: translateY(-0.5px); }
+.sf-btn-danger:hover    { box-shadow: 0 0 22px -6px rgba(239,68,68,0.5); }
+
+/* ── Inputs — breathing focus ────────────────────────────────────────────── */
+@keyframes sf-focus-in {
+  from { box-shadow: 0 0 0 0 rgba(139,92,246,0.3); }
+  to   { box-shadow: 0 0 0 3px rgba(139,92,246,0.12), 0 0 18px -4px rgba(139,92,246,0.25); }
+}
+.sf-input:focus {
+  animation: sf-focus-in 220ms ease both;
+  border-color: rgba(167,139,250,0.65);
+  background: rgba(139,92,246,0.05);
+}
+
+/* ── Tabs — glassy track + glowing active pill ───────────────────────────── */
+.sf-tabs {
+  background: rgba(255,255,255,0.025);
+  border: 1px solid rgba(255,255,255,0.06);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.sf-tab { position: relative; }
+.sf-tab.active {
+  background: linear-gradient(140deg, rgba(139,92,246,0.22), rgba(124,58,237,0.1));
+  color: #EDE8FF;
+  box-shadow:
+    inset 0 0 0 1px rgba(139,92,246,0.28),
+    0 2px 10px -2px rgba(124,58,237,0.3),
+    inset 0 1px 0 rgba(255,255,255,0.06);
+}
+.sf-tab.active::after {
+  content: '';
+  position: absolute;
+  left: 20%; right: 20%; bottom: -1px;
+  height: 1.5px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, rgba(167,139,250,0.9), transparent);
+}
+
+/* ── Modal — spring entrance + animated backdrop ─────────────────────────── */
+@keyframes sf-backdrop-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes sf-modal-pop {
+  0%   { opacity: 0; transform: translateY(14px) scale(0.94); }
+  60%  { opacity: 1; }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+.sf-modal-bg {
+  animation: sf-backdrop-in 0.22s ease both;
+  background: rgba(2,2,6,0.82);
+  backdrop-filter: blur(20px) saturate(1.2);
+  -webkit-backdrop-filter: blur(20px) saturate(1.2);
+}
+.sf-modal {
+  animation: sf-modal-pop 0.36s cubic-bezier(0.22, 1.4, 0.36, 1) both;
+  box-shadow:
+    0 24px 80px -16px rgba(0,0,0,0.8),
+    0 0 0 1px rgba(255,255,255,0.04),
+    0 0 80px -24px rgba(124,58,237,0.4),
+    inset 0 1px 0 rgba(255,255,255,0.05);
+}
+
+/* ── Empty states — gently floating icon with halo ───────────────────────── */
+.sf-empty-icon {
+  animation: float 4.5s ease-in-out infinite;
+  position: relative;
+  box-shadow: 0 0 36px -8px rgba(124,58,237,0.35), inset 0 1px 0 rgba(255,255,255,0.05);
+}
+.sf-empty-icon::after {
+  content: '';
+  position: absolute;
+  inset: -14px;
+  border-radius: inherit;
+  background: radial-gradient(ellipse at center, rgba(124,58,237,0.12) 0%, transparent 70%);
+  z-index: -1;
+}
+
+/* ── Progress bar — light sweep on top of fill ───────────────────────────── */
+.sf-progress { height: 5px; box-shadow: inset 0 1px 2px rgba(0,0,0,0.4); }
+.sf-progress-bar {
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 0 12px -2px rgba(139,92,246,0.6);
+}
+.sf-progress-bar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.28) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: sf-shimmer 1.8s linear infinite;
+}
+
+/* ── Tables — accent rail on row hover ───────────────────────────────────── */
+.sf-table tbody tr:hover td:first-child { box-shadow: inset 2px 0 0 rgba(139,92,246,0.45); }
+.sf-table th { backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+
+/* ── Toolbar — subtle glass strip ────────────────────────────────────────── */
+.sf-toolbar {
+  background: rgba(255,255,255,0.012);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* ── Badges — inner light ────────────────────────────────────────────────── */
+.sf-badge { box-shadow: inset 0 1px 0 rgba(255,255,255,0.06); }
+
+/* ── Spinner — accent ring with soft glow ────────────────────────────────── */
+.sf-spinner { filter: drop-shadow(0 0 6px rgba(139,92,246,0.45)); }
+
+/* ── Section labels — gradient tick ──────────────────────────────────────── */
+.sf-section-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sf-section-label::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(139,92,246,0.22), transparent);
+}
+
+/* ── Page body scrollbar refinement ──────────────────────────────────────── */
+.sf-page-body::-webkit-scrollbar { width: 6px; }
+.sf-page-body::-webkit-scrollbar-thumb {
+  background: linear-gradient(rgba(139,92,246,0.3), rgba(124,58,237,0.18));
+  border-radius: 99px;
+}
+.sf-page-body::-webkit-scrollbar-thumb:hover { background: rgba(139,92,246,0.5); }
+
+/* ── Skeleton — premium violet-tinted wave ───────────────────────────────── */
+.sf-skeleton {
+  background: linear-gradient(100deg,
+    rgba(255,255,255,0.03) 20%,
+    rgba(167,139,250,0.08) 50%,
+    rgba(255,255,255,0.03) 80%);
+  background-size: 200% 100%;
+  animation: sf-shimmer 1.6s ease-in-out infinite;
+}
+
+/* ── Kill all v4 motion for reduced-motion users ─────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  #root::after { display: none; }
+}
