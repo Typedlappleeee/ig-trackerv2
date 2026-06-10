@@ -158,12 +158,12 @@ function ToolShell({ title, icon, children, onBack, error }: {
             {t('back')}
           </button>
 
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 sf-anim-scale-spring sf-d50"
             style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.22), rgba(236,72,153,0.1))', border: '1px solid rgba(139,92,246,0.28)', color: '#c4b5fd' }}>
             {icon}
           </div>
 
-          <div>
+          <div className="sf-anim-slide-up sf-d100">
             <h1 className="text-[19px] font-black text-text leading-none">{title}</h1>
             <p className="text-[10px] text-text3 font-mono mt-0.5 uppercase tracking-widest">{t('aiToolsTitle')} — Studio</p>
           </div>
@@ -652,7 +652,7 @@ function ToolCard({ icon, title, desc, tags, locked, onClick }: {
   icon: React.ReactNode; title: string; desc: string; tags: string[]; locked?: boolean; onClick: () => void
 }) {
   return (
-    <button onClick={onClick} className="cursor-pointer text-left w-full group relative rounded-2xl p-4 transition-all card-lift overflow-hidden"
+    <button onClick={onClick} className="cursor-pointer text-left w-full group relative rounded-2xl p-4 transition-all card-lift sf-card-lift sf-spotlight overflow-hidden"
       style={{
         background: '#0E0E16',
         border: '1px solid rgba(139,92,246,0.12)',
@@ -699,7 +699,7 @@ function ToolCard({ icon, title, desc, tags, locked, onClick }: {
 // ── Section header with divider line ──────────────────────────────────────────
 function SectionHeader({ label, badge, icon }: { label: string; badge?: string; icon?: React.ReactNode }) {
   return (
-    <div className="flex items-center gap-3 mb-4">
+    <div className="flex items-center gap-3 mb-4 sf-anim-slide-up">
       {icon && (
         <span className="text-text3" style={{ opacity: 0.7 }}>{icon}</span>
       )}
@@ -750,12 +750,12 @@ export function AiTools({ user }: AiToolsProps) {
         {/* Page header */}
         <div className="flex-shrink-0 px-8 pt-8 pb-6 sf-topbar">
           <div className="flex items-center gap-4">
-            <div className="relative w-11 h-11 rounded-2xl flex items-center justify-center overflow-hidden flex-shrink-0"
+            <div className="relative w-11 h-11 rounded-2xl flex items-center justify-center overflow-hidden flex-shrink-0 sf-anim-scale-spring"
               style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.22), rgba(236,72,153,0.12))', border: '1px solid rgba(139,92,246,0.28)' }}>
               <span className="text-accent relative z-10"><Icon name="sparkles" size={22} /></span>
               <div className="absolute inset-0 anim-glow rounded-2xl" />
             </div>
-            <div>
+            <div className="sf-anim-slide-up sf-d50">
               <h1 className="text-[22px] font-black leading-none sf-text-gradient">{t('aiToolsTitle')}</h1>
               <p className="text-[11px] text-text3 font-mono mt-0.5 tracking-widest uppercase">AI Creative Studio</p>
             </div>
@@ -816,13 +816,13 @@ export function AiTools({ user }: AiToolsProps) {
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             {/* Icon with glow */}
-            <div className="relative w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 overflow-hidden"
+            <div className="relative w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 overflow-hidden sf-anim-scale-spring"
               style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.25), rgba(236,72,153,0.13))', border: '1px solid rgba(139,92,246,0.3)' }}>
               <span className="relative z-10 text-accent"><Icon name="sparkles" size={22} /></span>
               <div className="absolute inset-0 anim-glow rounded-2xl" />
             </div>
 
-            <div>
+            <div className="sf-anim-slide-up sf-d50">
               <h1 className="text-[26px] font-black leading-none sf-text-gradient">{t('aiToolsTitle')}</h1>
               <p className="text-[11px] text-text3 font-mono mt-1 tracking-widest uppercase">AI Creative Studio</p>
             </div>
@@ -830,7 +830,7 @@ export function AiTools({ user }: AiToolsProps) {
 
           {/* Anthropic key warning badge */}
           {!conns.anthropic && (
-            <div className="flex items-center gap-2 rounded-xl px-3.5 py-2 flex-shrink-0"
+            <div className="flex items-center gap-2 rounded-xl px-3.5 py-2 flex-shrink-0 sf-anim-scale-in sf-d150"
               style={{ background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.18)' }}>
               <span className="text-warn"><Icon name="alert-triangle" size={13} /></span>
               <p className="text-[11px] font-mono font-semibold" style={{ color: 'rgba(245,158,11,0.8)' }}>Missing Anthropic key</p>
@@ -839,7 +839,7 @@ export function AiTools({ user }: AiToolsProps) {
         </div>
 
         {/* Subtitle / description */}
-        <p className="mt-4 text-[13px] text-text2 max-w-xl leading-relaxed">
+        <p className="mt-4 text-[13px] text-text2 max-w-xl leading-relaxed sf-anim-slide-up sf-d100">
           Supercharge your content with AI-powered tools — from viral scripts and captions to competitor intelligence.
         </p>
       </div>
