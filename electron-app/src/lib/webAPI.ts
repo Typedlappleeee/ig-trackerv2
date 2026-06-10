@@ -264,9 +264,8 @@ export function buildWebAPI() {
       }
 
       try {
-        // 1. Fetch video bytes — signed Supabase URLs include auth token so they're
-        //    directly accessible via CORS; blob/data URLs work in browser too.
-        //    Fall back to server proxy only if direct fetch fails.
+        // Signed Supabase URLs embed their auth token — fetch directly without server proxy.
+        // Fallback to serverProxy only if direct fetch fails.
         let bytes: Uint8Array | null = null
         try {
           bytes = await fetchFileBytes(opts.filePath)
