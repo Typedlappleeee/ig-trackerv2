@@ -19,17 +19,27 @@ module.exports = async (req, res) => {
       return res.status(405).json({ ok: false, error: 'Method not allowed' })
     }
 
-    const { storagePath, bucket = 'content', bearer } = req.body ?? {}
-    if (!storagePath || !bearer) {
-      return res.status(400).json({ ok: false, error: 'Missing storagePath or bearer' })
+    const { storagePath, bucket = 'content', bearer, signedUrl } = req.body ?? {}
+    if ((!storagePath && !signedUrl) || !bearer) {
+      return res.status(400).json({ ok: false, error: 'Missing storagePath/signedUrl or bearer' })
     }
 
-    const supabase = getSupabaseAdmin()
-
-    // Step 1: Download from Supabase (server-side, no CORS)
-    const { data: blob, error: dlErr } = await supabase.storage.from(bucket).download(storagePath)
-    if (dlErr || !blob) {
-      return res.status(200).json({ ok: false, error: 'Supabase download failed: ' + (dlErr?.message ?? 'unknown') })
+    let blob
+    // If we have a signed URL, fetch it directly (no service role key needed)
+    if (signedUrl) {
+      const dlRes = await fetch(signedUrl)
+      if (!dlRes.ok) {
+        return res.status(200).json({ ok: false, error: `Signed URL fetch failed: ${dlRes.status}` })
+      }
+      blob = await dlRes.blob()
+    } else {
+      const supabase = getSupabaseAdmin()
+      // Step 1: Download from Supabase (server-side, no CORS)
+      const { data: dlBlob, error: dlErr } = await supabase.storage.from(bucket).download(storagePath)
+      if (dlErr || !dlBlob) {
+        return res.status(200).json({ ok: false, error: 'Supabase download failed: ' + (dlErr?.message ?? 'unknown') })
+      }
+      blob = dlBlob
     }
 
     const bytes = Buffer.from(await blob.arrayBuffer())
