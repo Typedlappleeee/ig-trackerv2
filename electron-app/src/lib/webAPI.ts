@@ -244,29 +244,29 @@ export function buildWebAPI() {
     // ── Upload video to GéeLark ─────────────────────────────────────────────
     async uploadVideoGeelark(opts: { bearer: string; filePath: string }) {
       try {
-        // Step 1: get video bytes
-        // Strategy A: direct fetch (blob: URLs + signed Supabase URLs)
+        // For any remote URL (Supabase signed URLs, CDN, etc.) delegate to the
+        // server-side proxy which fetches the URL without CORS restrictions and
+        // does NOT require SUPABASE_SERVICE_ROLE_KEY when given a signedUrl.
+        if (opts.filePath.startsWith('http://') || opts.filePath.startsWith('https://')) {
+          const r = await fetch('/api/geelark-upload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ signedUrl: opts.filePath, bearer: opts.bearer }),
+          })
+          try { return await r.json() } catch { return { ok: false, error: `Erreur serveur (HTTP ${r.status})` } }
+        }
+
+        // For blob: / data: URLs (locally picked files) download in-browser then
+        // push to GéeLark directly — no server round-trip needed.
         let bytes: Uint8Array | null = null
         try {
           const r = await fetch(opts.filePath)
           if (r.ok) bytes = new Uint8Array(await r.arrayBuffer())
-        } catch { /* CORS or network — try SDK */ }
-
-        // Strategy B: Supabase SDK (authenticated client, no admin key needed)
-        if (!bytes) {
-          const m = opts.filePath.match(/\/object\/(?:sign|public)\/([^/?]+)\/(.+?)(?:\?|$)/)
-          if (m) {
-            try {
-              const { supabase } = await import('./supabase')
-              const { data, error } = await supabase.storage.from(m[1]).download(decodeURIComponent(m[2]))
-              if (!error && data) bytes = new Uint8Array(await data.arrayBuffer())
-            } catch { /* fall through */ }
-          }
-        }
+        } catch { /* ignore */ }
 
         if (!bytes) return { ok: false, error: 'Impossible de lire la vidéo (source introuvable)' }
 
-        // Step 2: get GéeLark presigned upload URL
+        // Get GéeLark presigned upload URL
         const urlRes = await fetch('/api/gx', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -285,7 +285,7 @@ export function buildWebAPI() {
         const token       = resourceUrl ?? apiResp?.['token'] as string | undefined
         if (!uploadUrl || !token) return { ok: false, error: 'Réponse GéeLark invalide' }
 
-        // Step 3: PUT bytes to GéeLark S3
+        // PUT bytes to GéeLark S3
         let putRes = await fetch(uploadUrl, { method: 'PUT', body: bytes.buffer as ArrayBuffer })
         if (!putRes.ok) {
           putRes = await fetch(uploadUrl, { method: 'PUT', headers: { 'Content-Type': 'video/mp4' }, body: bytes.buffer as ArrayBuffer })
