@@ -243,25 +243,23 @@ export function buildWebAPI() {
 
     // ── Upload video to GéeLark ─────────────────────────────────────────────
     async uploadVideoGeelark(opts: { bearer: string; filePath: string }) {
-      // Helper: server-side proxy (handles CORS + large files without timeout on Pro plans)
+      // Helper: server-side proxy with signedUrl (no SUPABASE_SERVICE_ROLE_KEY needed)
       const serverProxy = async (): Promise<{ ok: boolean; token?: string; error?: string }> => {
-        const m1 = opts.filePath.match(/\/object\/sign\/([^/?]+)\/(.+?)(?:\?|$)/)
         const r = await fetch('/api/geelark-upload', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            storagePath: m1 ? decodeURIComponent(m1[2]) : opts.filePath,
-            bucket: m1 ? m1[1] : 'content',
+            signedUrl: opts.filePath,
             bearer: opts.bearer,
           }),
         })
-        return r.json()
+        try { return await r.json() } catch { return { ok: false, error: `Erreur serveur (HTTP ${r.status})` } }
       }
 
       try {
-        // 1. Supabase signed URLs → always use server proxy (browser fetch blocked by CORS)
-        const isSupabaseUrl = opts.filePath.includes('.supabase.co') || opts.filePath.includes('/object/sign/')
-        if (isSupabaseUrl) return serverProxy()
+        // 1. Any remote URL → server proxy fetches it without CORS (no admin key needed)
+        const isRemoteUrl = opts.filePath.startsWith('http://') || opts.filePath.startsWith('https://')
+        if (isRemoteUrl) return serverProxy()
 
         // 2. Blob/data URLs → fetch directly in browser (no CORS, avoids server timeout)
         let bytes: Uint8Array | null = null
