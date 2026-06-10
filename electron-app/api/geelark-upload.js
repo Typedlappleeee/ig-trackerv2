@@ -14,6 +14,9 @@ function getSupabaseAdmin() {
 
 module.exports = async (req, res) => {
   try {
+    if (req.method === 'GET') {
+      return res.status(200).json({ version: SV, ok: true })
+    }
     if (req.method !== 'POST') {
       return res.status(405).json({ ok: false, error: 'Method not allowed' })
     }
