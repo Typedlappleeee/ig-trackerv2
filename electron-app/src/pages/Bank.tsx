@@ -344,16 +344,8 @@ export function Bank({ user }: BankProps) {
   const [sqlCopied, setSqlCopied]           = useState(false)
   // Type filter (Python: Tous/Vidéo/Photo/GIF/Audio)
   const [typeFilter, setTypeFilter] = useState<'all' | 'video' | 'photo' | 'gif' | 'audio'>('all')
-  // Empty folders — scoped per user so accounts don't bleed into each other
-  const folderKey = `bank-empty-folders-${user.id}`
-  const [emptyFolders, setEmptyFolders] = useState<string[]>(() => {
-    try { return JSON.parse(localStorage.getItem(`bank-empty-folders-${user.id}`) ?? '[]') } catch { return [] }
-  })
-
-  function persistEmptyFolders(next: string[]) {
-    setEmptyFolders(next)
-    localStorage.setItem(folderKey, JSON.stringify(next))
-  }
+  // Empty folders — now stored in Supabase (sentinel rows) so all org members see them
+  const [emptyFolders, setEmptyFolders] = useState<string[]>([])
 
   // Context menu
   const [ctxMenu, setCtxMenu]       = useState<CtxMenu | null>(null)
@@ -417,7 +409,6 @@ export function Bank({ user }: BankProps) {
 
   async function loadItems() {
     setLoading(true)
-    // Fetch all pages — Supabase default page size is 1000, so paginate to get every row.
     const PAGE = 1000
     let allRows: ContentItem[] = []
     let from = 0
@@ -430,14 +421,41 @@ export function Bank({ user }: BankProps) {
       const rows = (data ?? []) as ContentItem[]
       if (rows.length > 0 && !hasMigrationIssue && !('folder' in rows[0])) hasMigrationIssue = true
       allRows = allRows.concat(rows)
-      if (rows.length < PAGE) break   // last page
+      if (rows.length < PAGE) break
       from += PAGE
     }
     {
-      let rows = allRows
+      // Sentinel rows mark empty folders so all org members can see them.
+      // They are identified by notes === '__sf_folder__' and no storage_path.
+      const isSentinel = (i: ContentItem) => i.notes === '__sf_folder__' && !i.storage_path && !i.file_url
+      const sentinelFolders = allRows.filter(isSentinel).map(i => i.title).filter(Boolean)
+      let rows = allRows.filter(i => !isSentinel(i))
+
+      // Migrate legacy localStorage folders to Supabase (one-time, per org)
+      const lsKey = `bank-empty-folders-${user.id}`
+      const lsFolders: string[] = (() => { try { return JSON.parse(localStorage.getItem(lsKey) ?? '[]') } catch { return [] } })()
+      const existingFolderNames = new Set([
+        ...rows.map(i => (i as any).folder).filter(Boolean),
+        ...sentinelFolders,
+      ])
+      const toMigrate = lsFolders.filter(f => !existingFolderNames.has(f))
+      if (toMigrate.length > 0) {
+        await Promise.all(toMigrate.map(name =>
+          supabase.from('content_bank').insert({
+            user_id: user.id, org_id: isPersonal ? null : (currentOrg?.id ?? null),
+            title: name, file_url: null, storage_path: null, thumbnail_path: null,
+            folder: name, duration: null, tags: [], notes: '__sf_folder__',
+          })
+        ))
+        localStorage.removeItem(lsKey)
+      } else if (lsFolders.length > 0) {
+        localStorage.removeItem(lsKey)
+      }
+
       // In org mode, filter out folders the member is not allowed to see
       if (role) rows = rows.filter(i => canAccessBankFolder(role, perms, i.folder ?? null))
       setItems(rows)
+      setEmptyFolders(sentinelFolders)
       if (hasMigrationIssue) setNeedsMigration(true)
     }
     setLoading(false)
@@ -619,9 +637,14 @@ export function Bank({ user }: BankProps) {
   async function createFolder() {
     const name = newFolderName.trim()
     if (!name) return
-    // Folders persist as: 1) folder text on content items, 2) localStorage list for empty folders
     if (!emptyFolders.includes(name)) {
-      persistEmptyFolders([...emptyFolders, name])
+      // Store in Supabase so all org members can see the empty folder
+      await supabase.from('content_bank').insert({
+        user_id: user.id, org_id: isPersonal ? null : (currentOrg?.id ?? null),
+        title: name, file_url: null, storage_path: null, thumbnail_path: null,
+        folder: name, duration: null, tags: [], notes: '__sf_folder__',
+      })
+      setEmptyFolders(prev => [...prev, name])
     }
     setNewFolderName('')
     setShowNewFolder(false)
@@ -630,11 +653,14 @@ export function Bank({ user }: BankProps) {
 
   async function renameFolder(oldName: string, newName: string) {
     if (!newName || newName === oldName) return
-    let q = scopeQ(supabase.from('content_bank').update({ folder: newName }).eq('folder', oldName))
-    await q
+    // Rename all items in the folder
+    await scopeQ(supabase.from('content_bank').update({ folder: newName }).eq('folder', oldName))
+    // Also rename the sentinel row (title = folder name, folder = folder name)
+    await scopeQ(supabase.from('content_bank')
+      .update({ title: newName, folder: newName })
+      .eq('notes', '__sf_folder__').eq('folder', oldName))
     setItems(prev => prev.map(i => (i as unknown as {folder:string}).folder === oldName ? { ...i, folder: newName as unknown as string } : i))
-    // Update localStorage empty folders
-    persistEmptyFolders(emptyFolders.map(f => f === oldName ? newName : f))
+    setEmptyFolders(prev => prev.map(f => f === oldName ? newName : f))
     if (selectedFolder === oldName) setSelectedFolder(newName)
   }
 
@@ -653,16 +679,19 @@ export function Bank({ user }: BankProps) {
       await qu
       setItems(prev => prev.map(i => (i as unknown as {folder:string}).folder === name ? { ...i, folder: null as unknown as string } : i))
     }
-    persistEmptyFolders(emptyFolders.filter(f => f !== name))
+    // Delete the sentinel row for this folder from Supabase
+    await scopeQ(supabase.from('content_bank').delete().eq('notes', '__sf_folder__').eq('folder', name))
+    setEmptyFolders(prev => prev.filter(f => f !== name))
     if (selectedFolder === name) setSelectedFolder(null)
     setFolderModal(null)
   }
 
   async function mergeFolderTo(fromFolder: string, toFolder: string | null) {
-    let qm = scopeQ(supabase.from('content_bank').update({ folder: toFolder }).eq('folder', fromFolder))
-    await qm
+    await scopeQ(supabase.from('content_bank').update({ folder: toFolder }).eq('folder', fromFolder))
+    // Delete sentinel of the merged folder
+    await scopeQ(supabase.from('content_bank').delete().eq('notes', '__sf_folder__').eq('folder', fromFolder))
     setItems(prev => prev.map(i => (i as unknown as {folder?:string}).folder === fromFolder ? { ...i, folder: toFolder as unknown as string } : i))
-    persistEmptyFolders(emptyFolders.filter(f => f !== fromFolder))
+    setEmptyFolders(prev => prev.filter(f => f !== fromFolder))
     if (selectedFolder === fromFolder) setSelectedFolder(toFolder)
     setFolderModal(null)
   }
