@@ -432,7 +432,7 @@ export function Posting({ user }: PostingProps) {
       }}>
 
         {/* Panel header */}
-        <div className="flex-shrink-0 px-4 pt-5 pb-3" style={{ borderBottom: '1px solid var(--border)' }}>
+        <div className="flex-shrink-0 px-4 pt-5 pb-3 sf-anim-slide-up sf-d50" style={{ borderBottom: '1px solid var(--border)' }}>
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
@@ -484,7 +484,7 @@ export function Posting({ user }: PostingProps) {
         </div>
 
         {/* Select all / none bar */}
-        <div className="flex-shrink-0 flex items-center px-3 py-1.5 gap-1" style={{ borderBottom: '1px solid var(--border)' }}>
+        <div className="flex-shrink-0 flex items-center px-3 py-1.5 gap-1 sf-anim-slide-up sf-d100" style={{ borderBottom: '1px solid var(--border)' }}>
           <button
             onClick={() => setSelPhones(new Set(visiblePhones.map(p => p.id)))}
             className="sf-btn sf-btn-ghost sf-btn-sm flex-1 text-[11px] font-semibold"
@@ -507,7 +507,7 @@ export function Posting({ user }: PostingProps) {
         {/* Phone list */}
         <div className="flex-1 overflow-y-auto sf-scroll">
           {visiblePhones.length === 0 ? (
-            <div className="sf-empty py-12">
+            <div className="sf-empty py-12 sf-reveal">
               <div className="sf-empty-icon">
                 <IconPhone />
               </div>
@@ -569,7 +569,7 @@ export function Posting({ user }: PostingProps) {
         </div>
 
         {/* Footer summary */}
-        <div className="flex-shrink-0 p-3" style={{ borderTop: '1px solid var(--border)' }}>
+        <div className="flex-shrink-0 p-3 sf-anim-slide-up sf-d150" style={{ borderTop: '1px solid var(--border)' }}>
           <div
             className="rounded-xl px-3 py-2.5 flex items-center gap-2.5"
             style={{
@@ -599,7 +599,7 @@ export function Posting({ user }: PostingProps) {
 
         {/* Page header */}
         <div className="sf-page-header">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 sf-anim-slide-up sf-d50">
             <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
               style={{
                 background: 'linear-gradient(135deg, rgba(124,58,237,0.22) 0%, rgba(124,58,237,0.08) 100%)',
@@ -613,7 +613,7 @@ export function Posting({ user }: PostingProps) {
               <p className="sf-page-sub">Reel Instagram · GéeLark Cloud</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 sf-anim-slide-up sf-d100">
             {/* Credit pill */}
             {credits.balance !== null && (
               <div className="sf-badge sf-badge-muted gap-1.5">
@@ -636,7 +636,7 @@ export function Posting({ user }: PostingProps) {
 
         {/* Scrollable body */}
         <div className="flex-1 overflow-y-auto sf-scroll">
-          <div className="px-7 py-5 space-y-4 max-w-2xl">
+          <div className="px-7 py-5 space-y-4 max-w-2xl anim-stagger">
 
             {/* Warning banner */}
             {!bearer && (
@@ -653,7 +653,7 @@ export function Posting({ user }: PostingProps) {
             )}
 
             {/* ── VIDEO CARD ─────────────────────────────────────────────── */}
-            <div className="sf-card overflow-hidden">
+            <div className="sf-card sf-spotlight overflow-hidden">
               {/* Card header */}
               <div className="flex items-center gap-2.5 px-5 py-3.5" style={{ borderBottom: '1px solid var(--border)' }}>
                 <div className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0"

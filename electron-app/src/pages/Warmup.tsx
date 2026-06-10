@@ -323,8 +323,8 @@ export function Warmup({ user }: WarmupProps) {
     return (
       <div className="sf-page anim-page">
         <div className="sf-page-header">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            <div style={{
+          <div className="sf-anim-slide-up sf-d50" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <div className="sf-anim-scale-spring" style={{
               width: 40, height: 40, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center',
               background: 'linear-gradient(135deg, rgba(139,92,246,0.2), rgba(168,85,247,0.1))',
               border: '1px solid rgba(139,92,246,0.25)', color: '#a78bfa',
@@ -368,8 +368,8 @@ export function Warmup({ user }: WarmupProps) {
 
       {/* ── Page header ─────────────────────────────────────────────────────── */}
       <div className="sf-page-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <div style={{
+        <div className="sf-anim-slide-up sf-d50" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div className="sf-anim-scale-spring" style={{
             width: 40, height: 40, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center',
             background: 'linear-gradient(135deg, rgba(139,92,246,0.25), rgba(168,85,247,0.1))',
             border: '1px solid rgba(139,92,246,0.3)', color: '#a78bfa', position: 'relative', overflow: 'hidden',
@@ -390,7 +390,7 @@ export function Warmup({ user }: WarmupProps) {
         </div>
 
         {/* Status pills */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div className="sf-anim-slide-up sf-d100" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <div className="sf-card" style={{ padding: '6px 12px', display: 'flex', alignItems: 'center', gap: 8, borderRadius: 10 }}>
             <span className={onlineCount > 0 ? 'sf-ping-dot' : undefined}
               style={onlineCount > 0 ? undefined : { width: 7, height: 7, borderRadius: '50%', background: '#3f3f46', display: 'inline-block' }} />
@@ -423,7 +423,7 @@ export function Warmup({ user }: WarmupProps) {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 420px', gap: 20, maxWidth: 1140 }}>
 
           {/* ── Left: phone list ──────────────────────────────────────────── */}
-          <div>
+          <div className="sf-anim-slide-up sf-d150">
             <div className="sf-card" style={{ overflow: 'hidden' }}>
 
               {/* Phone list header */}
@@ -574,7 +574,7 @@ export function Warmup({ user }: WarmupProps) {
           </div>
 
           {/* ── Right: control panel ──────────────────────────────────────── */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div className="sf-anim-slide-up sf-d200" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
             {/* ── Execution / job panel ── */}
             {jobShowing && (
@@ -863,7 +863,7 @@ export function Warmup({ user }: WarmupProps) {
                     </div>
                   </div>
 
-                  <div style={{ padding: '18px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  <div className="anim-stagger" style={{ padding: '18px', display: 'flex', flexDirection: 'column', gap: 16 }}>
                     {/* Profile name */}
                     <div>
                       <label style={{ display: 'block', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 700, color: 'var(--text-4)', marginBottom: 6, fontFamily: 'monospace' }}>
@@ -991,7 +991,7 @@ export function Warmup({ user }: WarmupProps) {
                       <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 700, color: 'var(--text-4)', fontFamily: 'monospace', marginBottom: 10 }}>
                         {t('warmupNavDuration')}
                       </p>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
+                      <div className="anim-stagger" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
                         {[0, 5, 10, 15, 20, 30].map(m => (
                           <button key={m} onClick={() => setBrowseMinutes(m)}
                             className="cursor-pointer"
@@ -1013,7 +1013,7 @@ export function Warmup({ user }: WarmupProps) {
                       <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 700, color: 'var(--text-4)', fontFamily: 'monospace', marginBottom: 10 }}>
                         {t('warmupEnabledActions')}
                       </p>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <div className="anim-stagger" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                         {([
                           { key: 'like',   labelKey: 'warmupLikeLabel',   value: likePosts,       set: setLikePosts,       icon: <IconHeart size={15} /> },
                           { key: 'reels',  labelKey: 'warmupReelsLabel',  value: watchReels,      set: setWatchReels,      icon: <IconClapper size={15} /> },
@@ -1061,7 +1061,7 @@ export function Warmup({ user }: WarmupProps) {
                   <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 700, color: 'var(--text-4)', fontFamily: 'monospace', marginBottom: 12 }}>
                     {t('warmupSummary')}
                   </p>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
+                  <div className="anim-stagger" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
                     {[
                       { label: t('warmupPhones'),        value: String(selectedPhones.length),  color: selectedPhones.length > 0 ? 'var(--accent-glow)' : 'var(--text-4)' },
                       { label: t('warmupNavigation'),    value: browseMinutes === 0 ? '—' : `${browseMinutes} min`, color: browseMinutes > 0 ? 'var(--ok)' : 'var(--text-4)' },

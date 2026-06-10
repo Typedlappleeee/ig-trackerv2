@@ -259,13 +259,13 @@ function ChatRow({ msg, isOwn, compact, isAdmin, likeCount, liked, onLike, onDel
               </span>
             )}
             <button onClick={() => onLike(msg.id)}
-              className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-lg text-[11px] transition-all"
+              className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-lg text-[11px] transition-all sf-press"
               style={{ color: liked ? '#f472b6' : 'rgba(196,181,253,0.4)', background: liked ? 'rgba(236,72,153,0.12)' : 'transparent' }}>
               ❤️ {likeCount > 0 && <span className="text-[10px] tabular-nums">{likeCount}</span>}
             </button>
             {isAdmin && !isOwn && onMute && (
               <button onClick={() => onMute(msg.user_id, msg.display_name)}
-                className="w-5 h-5 flex items-center justify-center rounded"
+                className="w-5 h-5 flex items-center justify-center rounded sf-press"
                 style={{ color: 'rgba(251,191,36,0.6)' }} title="Mute" aria-label="Mute">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/>
@@ -274,7 +274,7 @@ function ChatRow({ msg, isOwn, compact, isAdmin, likeCount, liked, onLike, onDel
             )}
             {isAdmin && (
               <button onClick={() => onDelete(msg.id)}
-                className="w-5 h-5 flex items-center justify-center rounded"
+                className="w-5 h-5 flex items-center justify-center rounded sf-press"
                 style={{ color: 'rgba(239,68,68,0.6)' }} title="Delete" aria-label="Delete">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>
@@ -316,7 +316,7 @@ function SupportMsgRow({ msg, isAdmin, compact, onDelete }: {
               style={{ color: 'rgba(196,181,253,0.5)' }}>{timeAgo(msg.created_at)}</span>
             {isAdmin && (
               <button onClick={() => onDelete(msg.id)}
-                className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center sf-press"
                 style={{ color: 'rgba(239,68,68,0.6)' }} aria-label="Delete">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>
@@ -366,7 +366,7 @@ function MuteModal({ targetName, onMute, onClose }: {
             <p className="font-black text-white text-[14px]">{t('communityMuteTitle')} {targetName}</p>
             <p className="text-[10px] mt-0.5" style={{ color: 'rgba(251,191,36,0.5)' }}>{t('communityMuteDuration')}</p>
           </div>
-          <button onClick={onClose} aria-label="Fermer" className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-white/[0.06] cursor-pointer"
+          <button onClick={onClose} aria-label="Fermer" className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-white/[0.06] cursor-pointer sf-press"
             style={{ color: 'rgba(196,181,253,0.5)' }}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
           </button>
@@ -457,7 +457,7 @@ function ProfileModal({ profile, userId, isAdmin, onClose, onSaved }: {
             <p className="font-black text-white text-[15px]">{t('communityProfileTitle')}</p>
             <p className="text-[10px] mt-0.5" style={{ color: 'rgba(196,181,253,0.45)' }}>{t('communityProfileVisible')}</p>
           </div>
-          <button onClick={onClose} aria-label="Fermer" className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-white/[0.06] cursor-pointer"
+          <button onClick={onClose} aria-label="Fermer" className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-white/[0.06] cursor-pointer sf-press"
             style={{ color: 'rgba(196,181,253,0.5)' }}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
           </button>
@@ -557,7 +557,7 @@ function CreateTopicModal({ onClose, onCreate }: {
             <p className="font-black text-white text-[15px]">{t('communityCreateTitle')}</p>
             <p className="text-[10px] mt-0.5" style={{ color: 'rgba(196,181,253,0.45)' }}>{t('communityCreateVisible')}</p>
           </div>
-          <button onClick={onClose} aria-label="Fermer" className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-white/[0.06] cursor-pointer"
+          <button onClick={onClose} aria-label="Fermer" className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-white/[0.06] cursor-pointer sf-press"
             style={{ color: 'rgba(196,181,253,0.5)' }}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
           </button>
@@ -569,7 +569,7 @@ function CreateTopicModal({ onClose, onCreate }: {
             <div className="flex flex-wrap gap-1.5">
               {TOPIC_EMOJIS.map(e => (
                 <button key={e} onClick={() => setEmoji(e)}
-                  className="w-8 h-8 rounded-lg text-[17px] flex items-center justify-center transition-all"
+                  className="w-8 h-8 rounded-lg text-[17px] flex items-center justify-center transition-all sf-press"
                   style={emoji === e
                     ? { background: 'rgba(139,92,246,0.35)', border: '1.5px solid rgba(139,92,246,0.7)' }
                     : { background: 'rgba(255,255,255,0.04)', border: '1.5px solid transparent' }}>
@@ -1224,7 +1224,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
 
       {/* ── Header ───────────────────────────────────────────────────────────── */}
       <div className="flex-shrink-0 flex items-center justify-between px-6 py-3.5 sf-topbar">
-        <div className="flex items-center gap-3.5">
+        <div className="flex items-center gap-3.5 sf-anim-slide-up sf-d50">
           <div className="relative flex-shrink-0" style={{ width: 42, height: 42 }}>
             <div style={{
               width: 42, height: 42, borderRadius: 13, flexShrink: 0,
@@ -1257,7 +1257,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
           </div>
         </div>
         <button onClick={() => setShowProfile(true)}
-          className="sf-btn sf-btn-ghost flex items-center gap-2.5 cursor-pointer"
+          className="sf-btn sf-btn-ghost flex items-center gap-2.5 cursor-pointer sf-anim-slide-up sf-d100"
           style={{ height: 'auto', padding: '7px 12px 7px 8px' }}>
           <Avatar url={profile.avatar_url} name={profile.display_name || '?'} userId={user.id} size={28} />
           <div className="text-left">
@@ -1277,7 +1277,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
 
       {/* ── Muted banner ─────────────────────────────────────────────────────── */}
       {isMuted && (
-        <div className="flex-shrink-0 mx-5 mt-3 px-4 py-2.5 rounded-xl flex items-center gap-2.5"
+        <div className="flex-shrink-0 mx-5 mt-3 px-4 py-2.5 rounded-xl flex items-center gap-2.5 sf-anim-slide-up"
           style={{ background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.22)', boxShadow: '0 0 0 1px rgba(245,158,11,0.06)' }}>
           <span className="flex items-center flex-shrink-0 text-warn" aria-hidden="true">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
@@ -1293,7 +1293,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
       {/* ── Tabs ─────────────────────────────────────────────────────────────── */}
       <div className="flex-shrink-0 flex items-center px-5 py-2.5"
         style={{ borderBottom: '1px solid rgba(139,92,246,0.1)', background: 'rgba(8,5,20,0.7)' }}>
-        <div className="sf-tabs">
+        <div className="sf-tabs sf-anim-slide-up sf-d150">
           {([
             { id: 'news'    as Tab, label: t('communityTabNews'),    icon: (
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -1334,7 +1334,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
 
           {/* Main feed */}
           <div ref={listRef} className="flex-1 overflow-y-auto">
-            <div className="p-5 space-y-4 max-w-3xl">
+            <div className="p-5 space-y-4 max-w-3xl anim-stagger">
               {loading ? (
                 <div className="flex items-center justify-center py-20">
                   <Spinner size="lg" />
@@ -1343,7 +1343,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                 <>
                   {/* Featured / pinned card */}
                   {featuredMsg && (
-                    <div className="sf-card sf-card-lift overflow-hidden cursor-pointer"
+                    <div className="sf-card sf-card-lift sf-spotlight overflow-hidden cursor-pointer"
                       style={{ background: 'linear-gradient(135deg,#120840 0%,#07102c 60%,#0a0626 100%)', border: '1px solid rgba(139,92,246,0.4)', boxShadow: '0 8px 40px rgba(0,0,0,0.5)' }}
                       onClick={() => setSelectedPost(featuredMsg)}>
                       <div className="h-[3px]" style={{ background: 'linear-gradient(90deg,#7c3aed,#ec4899,#3b82f6)' }} />
@@ -1388,7 +1388,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                           </div>
                           <div className="flex items-center gap-3">
                             <button onClick={e => { e.stopPropagation(); toggleLike(featuredMsg.id) }}
-                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-semibold transition-all"
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-semibold transition-all sf-press"
                               style={myLikes.has(featuredMsg.id)
                                 ? { background: 'rgba(236,72,153,0.15)', color: '#f472b6', border: '1px solid rgba(236,72,153,0.25)' }
                                 : { background: 'rgba(255,255,255,0.05)', color: 'rgba(196,181,253,0.5)', border: '1px solid rgba(255,255,255,0.07)' }}>
@@ -1396,7 +1396,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                             </button>
                             {isAdmin && (
                               <button onClick={e => { e.stopPropagation(); deleteMessage(featuredMsg.id) }}
-                                className="transition-opacity hover:opacity-80 flex items-center"
+                                className="transition-opacity hover:opacity-80 flex items-center sf-press"
                                 style={{ color: 'rgba(239,68,68,0.5)' }} title="Delete" aria-label="Delete">
                                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                                   <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>
@@ -1440,7 +1440,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                           </span>
                           <p className="text-[12px] font-black text-white">{t('communityNewsNewPost').replace('+ ', '')}</p>
                         </div>
-                        <button onClick={() => setShowNewsForm(false)} style={{ color: 'rgba(196,181,253,0.4)' }}>✕</button>
+                        <button onClick={() => setShowNewsForm(false)} className="cursor-pointer sf-press" style={{ color: 'rgba(196,181,253,0.4)' }}>✕</button>
                       </div>
                       <div className="p-4 space-y-3">
                         <input type="text" value={newsTitle} onChange={e => setNewsTitle(e.target.value)}
@@ -1519,7 +1519,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                                 <span>·</span>
                                 <span>{timeAgo(msg.created_at)}</span>
                                 <button onClick={e => { e.stopPropagation(); toggleLike(msg.id) }}
-                                  className="flex items-center gap-1 transition-colors"
+                                  className="flex items-center gap-1 transition-colors sf-press"
                                   style={{ color: myLikes.has(msg.id) ? '#f472b6' : 'rgba(196,181,253,0.35)' }}>
                                   ❤️ {reactions.get(msg.id) ?? 0}
                                 </button>
@@ -1527,7 +1527,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                             </div>
                             {isAdmin && (
                               <button onClick={e => { e.stopPropagation(); deleteMessage(msg.id) }}
-                                className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-1 flex items-center"
+                                className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-1 flex items-center sf-press"
                                 style={{ color: 'rgba(239,68,68,0.5)' }} aria-label="Delete">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                                   <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>
@@ -1557,7 +1557,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
           </div>
 
           {/* ── Right sidebar ─────────────────────────────────────────────────── */}
-          <div className="w-[240px] flex-shrink-0 overflow-y-auto p-4 space-y-3"
+          <div className="w-[240px] flex-shrink-0 overflow-y-auto p-4 space-y-3 anim-stagger"
             style={{ borderLeft: '1px solid rgba(139,92,246,0.1)', background: 'rgba(8,5,20,0.5)' }}>
 
             {/* About */}
@@ -1662,7 +1662,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
             <div className="flex-1 overflow-y-auto">
               <div className="p-5 max-w-3xl">
                 {/* Toolbar */}
-                <div className="sf-toolbar mb-5">
+                <div className="sf-toolbar mb-5 sf-anim-slide-up sf-d50">
                   <div className="relative flex-1">
                     <span className="absolute left-3.5 top-1/2 -translate-y-1/2 flex items-center text-text3" aria-hidden="true">
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
@@ -1727,7 +1727,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                           </div>
                           {canDelete && (
                             <button onClick={e => { e.stopPropagation(); deleteTopic(topic.id) }}
-                              className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-lg"
+                              className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-lg sf-press"
                               style={{ color: 'rgba(239,68,68,0.6)' }} title="Delete" aria-label="Delete">
                               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                                 <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>
@@ -1755,7 +1755,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                   }
 
                   return (
-                    <div className="space-y-5">
+                    <div className="space-y-5 sf-reveal">
                       {joined.length > 0 && (
                         <div>
                           <p className="text-[9px] uppercase tracking-widest font-black mb-3 px-0.5" style={{ color: 'rgba(139,92,246,0.5)' }}>{t('communityTopicsMyCommunities')}</p>
@@ -1792,7 +1792,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
             /* ── Topic chat view ── */
             <>
               {/* Topic header */}
-              <div className="flex-shrink-0 flex items-center gap-3 px-4 py-2.5"
+              <div className="flex-shrink-0 flex items-center gap-3 px-4 py-2.5 sf-anim-slide-up sf-d50"
                 style={{ borderBottom: '1px solid rgba(139,92,246,0.12)', background: 'rgba(8,5,20,0.7)' }}>
                 <button onClick={() => { setTopicsView('list'); setSelectedTopic(null) }}
                   className="sf-btn sf-btn-ghost w-8 h-8 flex items-center justify-center cursor-pointer"
@@ -1879,7 +1879,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 pb-0.5">
                                   {compact && <span className="text-[9px] tabular-nums mr-1" style={{ color: 'rgba(196,181,253,0.35)' }}>{timeAgo(msg.created_at)}</span>}
                                   <button onClick={() => deleteTopicMessage(msg.id)}
-                                    className="w-5 h-5 flex items-center justify-center rounded"
+                                    className="w-5 h-5 flex items-center justify-center rounded sf-press"
                                     style={{ color: 'rgba(239,68,68,0.6)' }} aria-label="Delete">
                                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                                       <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>
@@ -1898,7 +1898,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
               </div>
 
               {/* Input */}
-              <div className="flex-shrink-0 px-4 py-3"
+              <div className="flex-shrink-0 px-4 py-3 sf-anim-slide-up sf-d100"
                 style={{ borderTop: '1px solid rgba(139,92,246,0.1)', background: 'rgba(6,4,15,0.95)' }}>
                 {isMuted ? (
                   <div className="flex items-center gap-2 px-4 py-3 rounded-xl"
@@ -1932,7 +1932,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                           className="flex-1 bg-transparent text-[13px] text-white resize-none outline-none leading-relaxed"
                           style={{ minHeight: 22, maxHeight: 120 }} />
                         <button onClick={() => topicVideoRef.current?.click()} title={t('communityAttachVideo')} aria-label={t('communityAttachVideo')}
-                          className="flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-all"
+                          className="flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-all sf-press"
                           style={{ color: topicVideo ? '#a78bfa' : 'rgba(196,181,253,0.35)', background: topicVideo ? 'rgba(139,92,246,0.15)' : 'transparent' }}>
                           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
                         </button>
@@ -1959,7 +1959,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
           {isAdmin ? (
             <>
               {/* Thread list */}
-              <div className="w-56 flex-shrink-0 overflow-y-auto"
+              <div className="w-56 flex-shrink-0 overflow-y-auto sf-reveal"
                 style={{ borderRight: '1px solid rgba(139,92,246,0.1)', background: 'rgba(8,5,20,0.4)' }}>
                 <div className="px-3 pt-3 pb-2">
                   <p className="text-[9px] uppercase tracking-widest font-black mb-3 px-1"
@@ -2077,7 +2077,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                             className="flex-1 bg-transparent text-[13px] text-white resize-none outline-none leading-relaxed"
                             style={{ minHeight: 22, maxHeight: 120 }} />
                           <button onClick={() => chatVideoRef.current?.click()} title={t('communityAttachVideo')} aria-label={t('communityAttachVideo')}
-                            className="flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-all"
+                            className="flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-all sf-press"
                             style={{ color: chatVideo ? '#a78bfa' : 'rgba(196,181,253,0.35)', background: chatVideo ? 'rgba(139,92,246,0.15)' : 'transparent' }}>
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
                           </button>
@@ -2125,7 +2125,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                   </>
                 )}
               </div>
-              <div className="flex-shrink-0 px-4 py-3"
+              <div className="flex-shrink-0 px-4 py-3 sf-anim-slide-up sf-d100"
                 style={{ borderTop: '1px solid rgba(96,165,250,0.1)', background: 'rgba(6,4,15,0.95)' }}>
                 {isMuted ? (
                   <div className="flex items-center gap-2 px-4 py-3 rounded-xl"
@@ -2165,7 +2165,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                           className="flex-1 bg-transparent text-[13px] text-white resize-none outline-none leading-relaxed"
                           style={{ minHeight: 22, maxHeight: 120 }} />
                         <button onClick={() => chatVideoRef.current?.click()} title={t('communityAttachVideo')} aria-label={t('communityAttachVideo')}
-                          className="flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-all"
+                          className="flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-all sf-press"
                           style={{ color: chatVideo ? '#93c5fd' : 'rgba(147,197,253,0.35)', background: chatVideo ? 'rgba(96,165,250,0.15)' : 'transparent' }}>
                           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
                         </button>
@@ -2209,7 +2209,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
               <div className="flex items-center gap-2">
                 {isAdmin && (
                   <button onClick={() => { deleteMessage(selectedPost.id); setSelectedPost(null) }}
-                    className="opacity-50 hover:opacity-80 transition-opacity flex items-center"
+                    className="opacity-50 hover:opacity-80 transition-opacity flex items-center sf-press"
                     style={{ color: '#f87171' }} aria-label="Delete">
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                       <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>
@@ -2217,7 +2217,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
                   </button>
                 )}
                 <button onClick={() => setSelectedPost(null)}
-                  className="w-7 h-7 rounded-lg flex items-center justify-center text-sm hover:bg-white/[0.06]"
+                  className="w-7 h-7 rounded-lg flex items-center justify-center text-sm hover:bg-white/[0.06] sf-press"
                   style={{ color: 'rgba(196,181,253,0.5)' }}>✕</button>
               </div>
             </div>
@@ -2236,7 +2236,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
             <div className="flex-shrink-0 flex items-center justify-between px-5 py-3"
               style={{ borderTop: '1px solid rgba(139,92,246,0.1)', background: 'rgba(6,4,15,0.6)' }}>
               <button onClick={() => toggleLike(selectedPost.id)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-semibold transition-all"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-semibold transition-all sf-press"
                 style={myLikes.has(selectedPost.id)
                   ? { background: 'rgba(236,72,153,0.15)', color: '#f472b6', border: '1px solid rgba(236,72,153,0.25)' }
                   : { background: 'rgba(255,255,255,0.05)', color: 'rgba(196,181,253,0.5)', border: '1px solid rgba(255,255,255,0.07)' }}>

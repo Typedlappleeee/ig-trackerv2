@@ -245,31 +245,30 @@ export function buildWebAPI() {
     // ── Upload video to GéeLark ─────────────────────────────────────────────
     async uploadVideoGeelark(opts: { bearer: string; filePath: string }) {
       try {
+        // Step 1: get video bytes — try multiple strategies in order
         let bytes: Uint8Array | null = null
 
-        // Strategy A: Supabase SDK avec la session utilisateur (pas de clé admin)
-        const supabaseMatch = opts.filePath.match(/\/object\/(?:sign|public)\/([^/?]+)\/(.+?)(?:\?|$)/)
-        if (supabaseMatch) {
-          try {
-            const { supabase } = await import('./supabase')
-            const { data, error } = await supabase.storage
-              .from(supabaseMatch[1])
-              .download(decodeURIComponent(supabaseMatch[2]))
-            if (!error && data) bytes = new Uint8Array(await data.arrayBuffer())
-          } catch { /* fall through */ }
-        }
+        // Strategy A: direct fetch (works for blob: URLs and signed Supabase URLs)
+        try {
+          const r = await fetch(opts.filePath)
+          if (r.ok) bytes = new Uint8Array(await r.arrayBuffer())
+        } catch { /* fall through */ }
 
-        // Strategy B: fetch direct (blob: URLs + signed URLs si CORS ok)
+        // Strategy B: Supabase SDK download (works when strategy A is blocked by CORS)
         if (!bytes) {
-          try {
-            const r = await fetch(opts.filePath)
-            if (r.ok) bytes = new Uint8Array(await r.arrayBuffer())
-          } catch { /* ignore */ }
+          const m = opts.filePath.match(/\/object\/(?:sign|public)\/([^/?]+)\/(.+?)(?:\?|$)/)
+          if (m) {
+            try {
+              const { supabase } = await import('./supabase')
+              const { data, error } = await supabase.storage.from(m[1]).download(decodeURIComponent(m[2]))
+              if (!error && data) bytes = new Uint8Array(await data.arrayBuffer())
+            } catch { /* fall through */ }
+          }
         }
 
-        if (!bytes) return { ok: false, error: '[E001] Impossible de télécharger la vidéo source' }
+        if (!bytes) return { ok: false, error: 'Impossible de lire la vidéo (CORS ou source introuvable)' }
 
-        // Obtenir l'URL de dépôt GéeLark
+        // Step 2: get GéeLark presigned upload URL
         const urlRes = await fetch('/api/gx', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -281,18 +280,19 @@ export function buildWebAPI() {
           }),
         })
         const urlData = await urlRes.json() as Record<string, unknown>
-        if (!urlData.ok) return { ok: false, error: `[E002] GéeLark URL: ${(urlData as any).error ?? urlRes.status}` }
+        if (!urlData.ok) return { ok: false, error: String((urlData as any).error ?? 'GéeLark URL error') }
         const apiResp = ((urlData.data as Record<string, unknown>)?.['data'] ?? urlData.data) as Record<string, unknown>
-        const uploadUrl = apiResp?.['uploadUrl'] as string | undefined
-        const token     = (apiResp?.['resourceUrl'] ?? apiResp?.['token']) as string | undefined
-        if (!uploadUrl || !token) return { ok: false, error: `[E003] GéeLark: pas d'uploadUrl/resourceUrl. Clés: ${Object.keys(apiResp ?? {}).join(',')}` }
+        const uploadUrl   = apiResp?.['uploadUrl']   as string | undefined
+        const resourceUrl = apiResp?.['resourceUrl'] as string | undefined
+        const token       = resourceUrl ?? apiResp?.['token'] as string | undefined
+        if (!uploadUrl || !token) return { ok: false, error: 'Réponse GéeLark invalide (pas de uploadUrl/resourceUrl)' }
 
-        // PUT vers S3 GéeLark
+        // Step 3: PUT bytes to GéeLark S3
         let putRes = await fetch(uploadUrl, { method: 'PUT', body: bytes.buffer as ArrayBuffer })
         if (!putRes.ok) {
           putRes = await fetch(uploadUrl, { method: 'PUT', headers: { 'Content-Type': 'video/mp4' }, body: bytes.buffer as ArrayBuffer })
         }
-        if (!putRes.ok) return { ok: false, error: `[E004] S3 PUT échoué: ${putRes.status}` }
+        if (!putRes.ok) return { ok: false, error: `S3 PUT échoué: ${putRes.status}` }
 
         return { ok: true, token }
       } catch (err) {

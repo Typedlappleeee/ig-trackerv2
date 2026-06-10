@@ -512,7 +512,7 @@ export function Scheduler({ user, onNavigate }: Props) {
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 18 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
             {/* Icon */}
-            <div style={{
+            <div className="sf-anim-scale-spring" style={{
               width: 46, height: 46, borderRadius: 14, flexShrink: 0,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               background: 'linear-gradient(135deg, rgba(34,211,238,0.18) 0%, rgba(34,211,238,0.05) 100%)',
@@ -524,7 +524,7 @@ export function Scheduler({ user, onNavigate }: Props) {
             </div>
 
             {/* Text */}
-            <div style={{ minWidth: 0 }}>
+            <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
               <h1 className="sf-page-title" style={{ fontSize: 22, letterSpacing: '-0.03em' }}>
                 {t('schedulerTitle')}
               </h1>
@@ -535,7 +535,7 @@ export function Scheduler({ user, onNavigate }: Props) {
           </div>
 
           {/* Right: stat chips + refresh */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <div className="sf-anim-slide-up sf-d100" style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
             {pending.length > 0 && (
               <span className="sf-badge sf-badge-warn" style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
                 <IconClock size={11} color="#F59E0B" />
@@ -559,7 +559,7 @@ export function Scheduler({ user, onNavigate }: Props) {
         </div>
 
         {/* Tabs — underline style */}
-        <div style={{
+        <div className="sf-anim-slide-up sf-d150" style={{
           display: 'flex', gap: 0,
           borderBottom: '1px solid rgba(255,255,255,0.06)',
         }}>
@@ -608,7 +608,7 @@ export function Scheduler({ user, onNavigate }: Props) {
       </div>
 
       {/* ── Toolbar ──────────────────────────────────────────────────────────────── */}
-      <div className="sf-toolbar">
+      <div className="sf-toolbar sf-anim-slide-up sf-d200">
         {/* Search */}
         <div className="sf-search" style={{ flex: 1, maxWidth: 320, position: 'relative' }}>
           <span className="sf-search-icon" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
@@ -696,7 +696,7 @@ export function Scheduler({ user, onNavigate }: Props) {
         )}
 
         {/* ── Info banner ─────────────────────────────────────────────────────── */}
-        <div style={{
+        <div className="sf-reveal sf-d300" style={{
           marginTop: 28,
           display: 'flex', alignItems: 'flex-start', gap: 10,
           padding: '12px 16px',

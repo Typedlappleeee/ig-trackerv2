@@ -346,6 +346,18 @@ export function MassPosting({ user }: MassPostingProps) {
     setGenerating(false)
   }
 
+  // Resolve the upload path for a selected video.
+  // Priority: localPath → file_url (signed URL from BankPicker) → fresh signed URL from storage_path
+  async function resolveVideoPath(sv: SelectedVideo): Promise<string | null> {
+    if (sv.localPath) return sv.localPath
+    if (sv.item.file_url) return sv.item.file_url
+    if (sv.item.storage_path) {
+      const { getSignedUrl } = await import('@/lib/storage')
+      return getSignedUrl(sv.item.storage_path).catch(() => null)
+    }
+    return null
+  }
+
   async function scheduleMassPost(scheduledAt: Date) {
     if (!bearer)                    { log('Missing GéeLark token — Settings', 'error'); return }
     if (phoneList.length === 0)     { log('Select at least one phone', 'warn'); return }
@@ -370,7 +382,7 @@ export function MassPosting({ user }: MassPostingProps) {
       const tokenMap = new Map<number, string>()
       for (let i = 0; i < videosToSchedule.length; i++) {
         const sv = videosToSchedule[i]
-        const filePath = sv.localPath ?? sv.item.file_url
+        const filePath = await resolveVideoPath(sv)
         if (!filePath) { log(`❌ Chemin manquant pour ${sv.item.title}`, 'error'); return }
         const up = await window.electronAPI!.uploadVideoGeelark({ bearer, filePath })
         if (!up.ok || !up.token) { log(`❌ Upload échoué pour ${sv.item.title}: ${up.error}`, 'error'); return }
@@ -434,7 +446,7 @@ export function MassPosting({ user }: MassPostingProps) {
           if (a.videoIndex === vi) setPhoneStatus(a.phone.id, { status: 'uploading' })
         })
 
-        const fileSource = sv.localPath ?? sv.item.file_url
+        const fileSource = await resolveVideoPath(sv)
         if (!fileSource) {
           log(`⚠️ Vidéo ${vi + 1} sans source — ignorée`, 'warn')
           continue
@@ -690,7 +702,7 @@ export function MassPosting({ user }: MassPostingProps) {
         {/* Left: icon + title */}
         <div className="flex items-center gap-4 min-w-0">
           {/* Zap icon with gradient glow */}
-          <div className="relative flex-shrink-0">
+          <div className="relative flex-shrink-0 sf-anim-scale-spring">
             <div className="absolute inset-0 rounded-[14px] blur-xl opacity-60"
               style={{ background: 'linear-gradient(135deg, #ec4899, #f59e0b)' }} />
             <div className="relative w-11 h-11 rounded-[14px] flex items-center justify-center border border-white/10"
@@ -707,7 +719,7 @@ export function MassPosting({ user }: MassPostingProps) {
             </div>
           </div>
 
-          <div className="min-w-0">
+          <div className="min-w-0 sf-anim-slide-up sf-d50">
             <div className="flex items-center gap-2.5 flex-wrap">
               <h1 className="text-xl font-black tracking-tight text-text" style={{ letterSpacing: '-0.03em' }}>
                 Mass Posting
@@ -743,7 +755,7 @@ export function MassPosting({ user }: MassPostingProps) {
         </div>
 
         {/* Right: controls */}
-        <div className="flex items-center gap-2 flex-shrink-0">
+        <div className="flex items-center gap-2 flex-shrink-0 sf-anim-slide-up sf-d100">
           {/* Assignment mode toggle */}
           <div className="sf-tabs">
             {([{ k: 'seq', label: t('schedulerSequential') }, { k: 'random', label: t('schedulerRandom') }] as const).map(m => (
@@ -788,7 +800,7 @@ export function MassPosting({ user }: MassPostingProps) {
 
       {/* Warning: no bearer */}
       {!bearer && (
-        <div className="flex-shrink-0 mx-6 mt-4 flex items-center gap-3 px-4 py-3 rounded-xl sf-card border-warn/20 bg-warn/5">
+        <div className="flex-shrink-0 mx-6 mt-4 flex items-center gap-3 px-4 py-3 rounded-xl sf-card border-warn/20 bg-warn/5 sf-anim-slide-up">
           <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 bg-warn/10">
             <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1.5L11.5 10.5H1.5L6.5 1.5Z" stroke="#F59E0B" strokeWidth="1.4" strokeLinejoin="round"/><path d="M6.5 5v3" stroke="#F59E0B" strokeWidth="1.4" strokeLinecap="round"/><circle cx="6.5" cy="9" r="0.6" fill="#F59E0B"/></svg>
           </div>
@@ -798,7 +810,7 @@ export function MassPosting({ user }: MassPostingProps) {
 
       {/* Live progress banner */}
       {posting && totalTasks > 0 && (
-        <div className="flex-shrink-0 mx-6 mt-4 sf-card rounded-xl p-4 border-accent/25"
+        <div className="flex-shrink-0 mx-6 mt-4 sf-card rounded-xl p-4 border-accent/25 sf-anim-slide-up"
           style={{ boxShadow: '0 0 28px -6px rgba(124,58,237,0.3)' }}>
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-3 flex-wrap">
@@ -1038,7 +1050,7 @@ export function MassPosting({ user }: MassPostingProps) {
 
         {/* ── RIGHT MAIN AREA ───────────────────────────────────────────────── */}
         <div className="flex-1 overflow-y-auto bg-bg" style={{ scrollbarWidth: 'thin' }}>
-          <div className="px-6 py-5 space-y-4 max-w-4xl">
+          <div className="px-6 py-5 space-y-4 max-w-4xl anim-stagger">
 
             {/* ── Video selection section ─────────────────────────────────── */}
             <div className="sf-card overflow-hidden">
@@ -1109,7 +1121,8 @@ export function MassPosting({ user }: MassPostingProps) {
                         </div>
                         {/* Remove button */}
                         <button onClick={() => setSelVideos(prev => prev.filter((_, i) => i !== selIdx))}
-                          className="absolute top-1.5 right-1.5 w-5 h-5 flex items-center justify-center rounded-lg opacity-0 group-hover:opacity-100 transition-all cursor-pointer bg-danger/20 hover:bg-danger/40 border border-danger/30 text-danger">
+                          className="absolute top-1.5 right-1.5 w-5 h-5 flex items-center justify-center rounded-lg opacity-0 group-hover:opacity-100 transition-all cursor-pointer bg-danger/20 hover:bg-danger/40 border border-danger/30 text-danger sf-press"
+                          style={{ transition: 'opacity 150ms ease, background-color 150ms ease, transform 90ms cubic-bezier(0.4, 0, 0.2, 1)' }}>
                           <svg width="7" height="7" viewBox="0 0 8 8" fill="none"><path d="M1 1L7 7M7 1L1 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
                         </button>
                         {/* Index badge */}
@@ -1121,8 +1134,8 @@ export function MassPosting({ user }: MassPostingProps) {
                   })}
                   {/* Add more card */}
                   <button onClick={() => setShowBankPicker(true)}
-                    className="rounded-xl border border-dashed border-border hover:border-accent/40 bg-surface/50 hover:bg-accent/5 transition-all cursor-pointer flex flex-col items-center justify-center gap-1.5 text-text3 hover:text-accent"
-                    style={{ aspectRatio: '9/16', maxHeight: 180 }}>
+                    className="rounded-xl border border-dashed border-border hover:border-accent/40 bg-surface/50 hover:bg-accent/5 transition-all cursor-pointer flex flex-col items-center justify-center gap-1.5 text-text3 hover:text-accent sf-hover-lift"
+                    style={{ aspectRatio: '9/16', maxHeight: 180, transition: 'all 200ms cubic-bezier(0.22, 1, 0.36, 1)' }}>
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
                     <span className="text-[10px] font-semibold">Ajouter</span>
                   </button>

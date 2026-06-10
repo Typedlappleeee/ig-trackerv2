@@ -23,25 +23,22 @@ module.exports = async (req, res) => {
       return res.status(400).json({ ok: false, error: 'Missing storagePath/signedUrl or bearer' })
     }
 
-    let blob
+    let bytes
     if (signedUrl) {
-      // Direct fetch — no admin key needed (signed URL already contains auth token)
+      // Signed URL already contains auth token — fetch directly, no service role key needed
       const dlRes = await fetch(signedUrl)
       if (!dlRes.ok) {
-        return res.status(200).json({ ok: false, error: `Fetch vidéo échoué: ${dlRes.status}` })
+        return res.status(200).json({ ok: false, error: `Download failed: ${dlRes.status}` })
       }
-      blob = await dlRes.blob()
+      bytes = Buffer.from(await dlRes.arrayBuffer())
     } else {
-      // storagePath path — requires SUPABASE_SERVICE_ROLE_KEY
       const supabase = getSupabaseAdmin()
-      const { data: dlBlob, error: dlErr } = await supabase.storage.from(bucket).download(storagePath)
-      if (dlErr || !dlBlob) {
+      const { data: blob, error: dlErr } = await supabase.storage.from(bucket).download(storagePath)
+      if (dlErr || !blob) {
         return res.status(200).json({ ok: false, error: 'Supabase download failed: ' + (dlErr?.message ?? 'unknown') })
       }
-      blob = dlBlob
+      bytes = Buffer.from(await blob.arrayBuffer())
     }
-
-    const bytes = Buffer.from(await blob.arrayBuffer())
 
     const glUrlRes = await fetch('https://openapi.geelark.com/open/v1/upload/getUrl', {
       method: 'POST',
