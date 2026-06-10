@@ -138,6 +138,7 @@ function SpotlightBanner({ tool, onOpen }: { tool: ToolDef; onOpen: () => void }
       onMouseEnter={() => { setHover(true); playTick() }}
       onMouseLeave={() => setHover(false)}
       aria-label={t(tool.labelKey as any)}
+      className="sf-spotlight"
       style={{
         position: 'relative', overflow: 'hidden', textAlign: 'left', cursor: 'pointer',
         borderRadius: 20, padding: '28px 28px', minHeight: 160, width: '100%',
@@ -231,7 +232,7 @@ function ToolCard({ tool, index, onOpen }: { tool: ToolDef; index: number; onOpe
           : '0 1px 8px -4px rgba(0,0,0,0.5)',
         transform: hover ? 'translateY(-3px)' : 'translateY(0)',
         transition: 'all 0.28s cubic-bezier(0.34,1.4,0.64,1)',
-        animation: 'hub-card-in 0.45s cubic-bezier(0.22,1,0.36,1) both',
+        animation: 'hub-card-in 0.45s cubic-bezier(0.22,1,0.36,1) backwards',
         animationDelay: `${index * 0.04}s`,
       }}
     >
@@ -390,7 +391,7 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
   ]
 
   return (
-    <div style={{ minHeight: '100%', paddingBottom: 80 }}>
+    <div className="anim-page" style={{ minHeight: '100%', paddingBottom: 80 }}>
 
       {/* ── Hero ──────────────────────────────────────────────────────────────── */}
       <div style={{ position: 'relative', overflow: 'hidden', padding: '44px 40px 36px' }}>
@@ -413,7 +414,7 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
           {/* Left: text + actions */}
           <div style={{ flex: 1, paddingRight: 60 }}>
             {/* Greeting pill */}
-            <div style={{
+            <div className="sf-anim-slide-up sf-d50" style={{
               display: 'inline-flex', alignItems: 'center', gap: 7,
               padding: '4px 12px 4px 8px', borderRadius: 100, marginBottom: 16,
               background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.22)',
@@ -425,19 +426,19 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
             </div>
 
             {/* Name */}
-            <h1 style={{ fontSize: 52, fontWeight: 900, letterSpacing: '-0.045em', lineHeight: 1, marginBottom: 14, textTransform: 'capitalize' }}>
+            <h1 className="sf-anim-slide-up sf-d100" style={{ fontSize: 52, fontWeight: 900, letterSpacing: '-0.045em', lineHeight: 1, marginBottom: 14, textTransform: 'capitalize' }}>
               <span style={{ background: 'linear-gradient(115deg, #f0ecff 0%, #c4b5fd 45%, #67e8f9 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
                 {firstName}
               </span>
             </h1>
 
             {/* Subtitle */}
-            <p style={{ fontSize: 15, color: 'rgba(148,163,184,0.6)', maxWidth: 480, lineHeight: 1.6, marginBottom: 28 }}>
+            <p className="sf-anim-slide-up sf-d150" style={{ fontSize: 15, color: 'rgba(148,163,184,0.6)', maxWidth: 480, lineHeight: 1.6, marginBottom: 28 }}>
               {t('hubSubtitle')}
             </p>
 
             {/* Quick action chips */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 9 }}>
+            <div className="sf-anim-slide-up sf-d200" style={{ display: 'flex', flexWrap: 'wrap', gap: 9 }}>
               {quickActions.map(qa => (
                 <button
                   key={qa.id}
@@ -473,14 +474,14 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
           </div>
 
           {/* Right: decorative 3D sphere */}
-          <div style={{ position: 'relative', width: 260, height: 240, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="sf-anim-scale-spring sf-d250" style={{ position: 'relative', width: 260, height: 240, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <DecoSphere />
           </div>
         </div>
       </div>
 
       {/* ── Content ──────────────────────────────────────────────────────────── */}
-      <div style={{ maxWidth: 1100, margin: '0 auto', padding: '0 40px' }}>
+      <div className="anim-stagger" style={{ maxWidth: 1100, margin: '0 auto', padding: '0 40px' }}>
 
         {/* Search bar — full width */}
         <div style={{ position: 'relative', marginBottom: 32 }}>
@@ -535,7 +536,7 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '80px 0' }}>
-              <span style={{
+              <span className="sf-anim-scale-spring" style={{
                 width: 52, height: 52, borderRadius: 16, marginBottom: 14,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 background: 'rgba(139,92,246,0.07)', border: '1px solid rgba(139,92,246,0.18)',
