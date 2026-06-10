@@ -62,6 +62,7 @@ function wasmQueue<T>(fn: () => Promise<T>): Promise<T> {
 
 // ── Build the web electronAPI object ────────────────────────────────────────
 export function buildWebAPI() {
+  console.log('[webAPI] v4f213a5 — upload via SDK Supabase, pas de proxy serveur')
   return {
 
     // ── GéeLark proxy ──────────────────────────────────────────────────────
@@ -295,7 +296,7 @@ export function buildWebAPI() {
 
         return { ok: true, token }
       } catch (err) {
-        return { ok: false, error: err instanceof Error ? err.message : String(err) }
+        return { ok: false, error: `[E000] ${err instanceof Error ? err.message : String(err)}` }
       }
     },
 

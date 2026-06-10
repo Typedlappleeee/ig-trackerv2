@@ -1,7 +1,6 @@
 // Server-side GéeLark video upload proxy.
-// Downloads the video from Supabase using the service role key (no CORS issues),
-// then uploads to GéeLark's presigned S3 URL.
-// Accepts: POST { storagePath, bucket, bearer }
+// Accepts: POST { signedUrl, bearer }              — fetch direct, no admin key needed
+//       or POST { storagePath, bucket, bearer }    — Supabase service role key required
 // Returns: { ok, token } or { ok: false, error }
 
 const { createClient } = require('@supabase/supabase-js')
@@ -50,7 +49,6 @@ module.exports = async (req, res) => {
       return res.status(200).json({ ok: false, error: `GéeLark URL error: ${glUrlRes.status}` })
     }
     const glData = await glUrlRes.json()
-    console.log('GéeLark /upload/getUrl response:', JSON.stringify(glData))
     if (glData.code !== 0) {
       return res.status(200).json({ ok: false, error: `GéeLark error: ${glData.msg ?? glData.code}` })
     }
