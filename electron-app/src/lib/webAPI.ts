@@ -244,57 +244,48 @@ export function buildWebAPI() {
 
     // ── Upload video to GéeLark ─────────────────────────────────────────────
     async uploadVideoGeelark(opts: { bearer: string; filePath: string }) {
-      const V = '[CLIENT-v6]'
+      const V = '[CLIENT-v7]'
       console.log(`${V} uploadVideoGeelark filePath=${opts.filePath.slice(0, 80)}`)
       try {
+        // Pour toute URL distante → proxy serveur (pas de CORS, pas de clé admin)
+        // Le serveur télécharge la vidéo ET upload vers S3 GéeLark
+        if (opts.filePath.startsWith('https://') || opts.filePath.startsWith('http://')) {
+          console.log(`${V} [A] URL distante → proxy serveur /api/geelark-upload`)
+          const r = await fetch('/api/geelark-upload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ signedUrl: opts.filePath, bearer: opts.bearer }),
+          })
+          try {
+            const result = await r.json()
+            console.log(`${V} [A] résultat serveur:`, result)
+            return result
+          } catch {
+            return { ok: false, error: `${V}[E-SRV] Erreur serveur HTTP ${r.status}` }
+          }
+        }
+
+        // Pour blob: URLs (fichiers locaux) → téléchargement navigateur + upload direct
+        console.log(`${V} [B] blob URL → téléchargement direct`)
         let bytes: Uint8Array | null = null
-        let downloadMethod = ''
-
-        // Strategy A: Supabase SDK (session utilisateur, pas de clé admin)
-        const supabaseMatch = opts.filePath.match(/\/object\/(?:sign|public)\/([^/?]+)\/(.+?)(?:\?|$)/)
-        if (supabaseMatch) {
-          console.log(`${V} [A] tentative SDK Supabase bucket=${supabaseMatch[1]} path=${supabaseMatch[2].slice(0, 60)}`)
-          try {
-            const { supabase } = await import('./supabase')
-            const { data, error } = await supabase.storage
-              .from(supabaseMatch[1])
-              .download(decodeURIComponent(supabaseMatch[2]))
-            if (error) {
-              console.warn(`${V} [A] SDK error: ${error.message}`)
-            } else if (data) {
-              bytes = new Uint8Array(await data.arrayBuffer())
-              downloadMethod = 'SDK'
-              console.log(`${V} [A] SDK ok, ${bytes.length} bytes`)
-            }
-          } catch (e) {
-            console.warn(`${V} [A] SDK exception: ${e}`)
+        try {
+          const r = await fetch(opts.filePath)
+          if (r.ok) {
+            bytes = new Uint8Array(await r.arrayBuffer())
+            console.log(`${V} [B] fetch ok, ${bytes.length} bytes`)
+          } else {
+            console.warn(`${V} [B] fetch HTTP ${r.status}`)
           }
-        }
-
-        // Strategy B: fetch direct (blob: URLs + signed URLs si CORS ok)
-        if (!bytes) {
-          console.log(`${V} [B] tentative fetch direct`)
-          try {
-            const r = await fetch(opts.filePath)
-            if (r.ok) {
-              bytes = new Uint8Array(await r.arrayBuffer())
-              downloadMethod = 'fetch'
-              console.log(`${V} [B] fetch ok, ${bytes.length} bytes`)
-            } else {
-              console.warn(`${V} [B] fetch HTTP ${r.status}`)
-            }
-          } catch (e) {
-            console.warn(`${V} [B] fetch exception: ${e}`)
-          }
+        } catch (e) {
+          console.warn(`${V} [B] fetch exception: ${e}`)
         }
 
         if (!bytes) {
-          console.error(`${V} [E001] toutes les strategies ont échoué`)
-          return { ok: false, error: `${V}[E001] Impossible de télécharger la vidéo (SDK et fetch ont échoué)` }
+          return { ok: false, error: `${V}[E001] Impossible de lire le fichier local` }
         }
 
         // Obtenir l'URL de dépôt GéeLark
-        console.log(`${V} [C] demande uploadUrl GéeLark (${bytes.length} bytes via ${downloadMethod})`)
+        console.log(`${V} [C] demande uploadUrl GéeLark (${bytes.length} bytes)`)
         const urlRes = await fetch('/api/gx', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -307,14 +298,12 @@ export function buildWebAPI() {
         })
         const urlData = await urlRes.json() as Record<string, unknown>
         if (!urlData.ok) {
-          console.error(`${V} [E002] GéeLark getUrl failed:`, urlData)
           return { ok: false, error: `${V}[E002] GéeLark getUrl: ${(urlData as any).error ?? urlRes.status}` }
         }
         const apiResp = ((urlData.data as Record<string, unknown>)?.['data'] ?? urlData.data) as Record<string, unknown>
         const uploadUrl = apiResp?.['uploadUrl'] as string | undefined
         const token     = (apiResp?.['resourceUrl'] ?? apiResp?.['token']) as string | undefined
         if (!uploadUrl || !token) {
-          console.error(`${V} [E003] pas uploadUrl/resourceUrl, clés:`, Object.keys(apiResp ?? {}))
           return { ok: false, error: `${V}[E003] GéeLark: pas d'uploadUrl/resourceUrl — clés: ${Object.keys(apiResp ?? {}).join(',')}` }
         }
 
