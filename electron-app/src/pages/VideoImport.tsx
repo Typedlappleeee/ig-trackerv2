@@ -123,11 +123,11 @@ export function VideoImport({ user }: { user: User }) {
   }
 
   return (
-    <div className="h-full flex flex-col overflow-hidden anim-page">
+    <div className="h-full flex flex-col overflow-y-auto anim-page">
 
       {/* ── Page header ─────────────────────────────────────────────────────── */}
       <div className="flex-shrink-0 px-8 pt-7 pb-5 flex items-center gap-3 border-b border-border">
-        <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+        <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 sf-anim-scale-spring sf-d50"
           style={{ background: 'linear-gradient(135deg, rgba(124,58,237,0.25), rgba(236,72,153,0.15))', border: '1px solid rgba(139,92,246,0.25)' }}>
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
@@ -135,15 +135,15 @@ export function VideoImport({ user }: { user: User }) {
             <line x1="12" y1="3" x2="12" y2="15"/>
           </svg>
         </div>
-        <div>
+        <div className="sf-anim-slide-up sf-d100">
           <h1 className="text-[20px] font-black text-text leading-none">Importer depuis les réseaux</h1>
           <p className="text-[13px] text-text2 mt-0.5">Colle un lien Instagram ou TikTok — la vidéo est téléchargée et ajoutée à ta banque.</p>
         </div>
       </div>
 
-      {/* ── Content ─────────────────────────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto px-8 pb-10">
-        <div className="max-w-2xl mx-auto space-y-5 pt-6">
+      {/* ── Content (scrolls with the page) ─────────────────────────────────── */}
+      <div className="flex-1 px-8 pb-10">
+        <div className="max-w-2xl mx-auto space-y-5 pt-6 anim-stagger">
 
           {/* URL input card */}
           <div className="sf-card p-5 space-y-4">
@@ -247,7 +247,7 @@ export function VideoImport({ user }: { user: User }) {
             <div className="sf-card p-5 space-y-3">
               <div className="flex items-center justify-between">
                 <p className="text-[12px] font-semibold uppercase tracking-wider text-text2">Importées cette session</p>
-                <span className="sf-badge sf-badge-ok">{imported.length}</span>
+                <span className="sf-badge sf-badge-ok sf-anim-scale-in">{imported.length}</span>
               </div>
               <div className="space-y-2">
                 {imported.map((v, i) => (

@@ -348,7 +348,7 @@ export default function StoryLink({ user }: { user: User }) {
       <header className="sf-page-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           {/* Icon with pink glow */}
-          <div style={{
+          <div className="sf-anim-scale-spring" style={{
             width: 44, height: 44, borderRadius: 13, flexShrink: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             background: 'linear-gradient(135deg, rgba(236,72,153,0.22), rgba(236,72,153,0.06))',
@@ -361,15 +361,15 @@ export default function StoryLink({ user }: { user: User }) {
 
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-              <h1 className="sf-page-title" style={{
+              <h1 className="sf-page-title sf-anim-slide-up sf-d50" style={{
                 background: 'linear-gradient(135deg, #FFFFFF 0%, rgba(244,114,182,0.9) 100%)',
                 WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
               }}>
                 StoryLink
               </h1>
-              <span className="sf-badge sf-badge-new" style={{ fontSize: 9, letterSpacing: '0.1em' }}>NEW</span>
+              <span className="sf-badge sf-badge-new sf-anim-scale-spring sf-d150" style={{ fontSize: 9, letterSpacing: '0.1em' }}>NEW</span>
             </div>
-            <p className="sf-page-sub">Configure les pools une fois, publie en 1 clic.</p>
+            <p className="sf-page-sub sf-anim-slide-up sf-d100">Configure les pools une fois, publie en 1 clic.</p>
           </div>
         </div>
 
@@ -397,7 +397,7 @@ export default function StoryLink({ user }: { user: User }) {
       </header>
 
       {/* ── Body: 3-column split ─────────────────────────────────────────────── */}
-      <div style={{ flex: 1, overflow: 'hidden', display: 'grid', gridTemplateColumns: '272px 1fr 304px', minHeight: 0 }}>
+      <div className="anim-stagger" style={{ flex: 1, overflow: 'hidden', display: 'grid', gridTemplateColumns: '272px 1fr 304px', minHeight: 0 }}>
 
         {/* ══ COL 1 — Phone selector ══════════════════════════════════════════ */}
         <div style={{ borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--surface)' }}>
@@ -515,7 +515,7 @@ export default function StoryLink({ user }: { user: User }) {
         </div>
 
         {/* ══ COL 2 — Pool config (centre) ════════════════════════════════════ */}
-        <div className="sf-scroll" style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div className="sf-scroll anim-stagger" style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
           {/* ── Photo pool ─────────────────────────────────────────────────── */}
           <div className="sf-card" style={{ padding: 18 }}>
@@ -571,7 +571,7 @@ export default function StoryLink({ user }: { user: User }) {
                     <button
                       onClick={() => setPhotoPool(prev => prev.filter((_, j) => j !== i))}
                       aria-label="Retirer la photo"
-                      className="sf-btn-icon"
+                      className="sf-btn-icon sf-press"
                       style={{
                         flexShrink: 0, width: 18, height: 18, borderRadius: 5, cursor: 'pointer',
                         background: 'rgba(239,68,68,0.12)', border: 'none', color: '#f87171',
@@ -619,6 +619,7 @@ export default function StoryLink({ user }: { user: User }) {
                     <button
                       onClick={() => setTextPool(prev => prev.filter((_, j) => j !== i))}
                       aria-label="Retirer le texte"
+                      className="sf-press"
                       style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(103,232,249,0.5)', padding: 0, lineHeight: 1, display: 'flex', alignItems: 'center' }}
                     >
                       <IconX />
@@ -714,6 +715,7 @@ export default function StoryLink({ user }: { user: User }) {
                   <button
                     key={m.k}
                     onClick={() => setDistrib(m.k)}
+                    className="sf-hover-lift sf-press"
                     style={{
                       flex: 1, padding: '13px 14px', borderRadius: 11, textAlign: 'left', cursor: 'pointer',
                       background: active ? 'rgba(139,92,246,0.15)' : 'rgba(255,255,255,0.025)',

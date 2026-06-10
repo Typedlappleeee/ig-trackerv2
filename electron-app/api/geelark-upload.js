@@ -27,28 +27,26 @@ module.exports = async (req, res) => {
       return res.status(400).json({ ok: false, error: `${SV}[SV-E001] Missing storagePath/signedUrl or bearer` })
     }
 
-    let blob
+    let bytes
     if (signedUrl) {
-      // Direct fetch — no admin key needed
+      // Direct fetch — no admin key needed (signed URL already contains auth token)
       console.log(`${SV} [SV-A] fetch signedUrl (${String(signedUrl).slice(0, 80)})`)
       const dlRes = await fetch(signedUrl)
       if (!dlRes.ok) {
         return res.status(200).json({ ok: false, error: `${SV}[SV-E002] Fetch vidéo échoué: ${dlRes.status}` })
       }
-      blob = await dlRes.blob()
-      console.log(`${SV} [SV-A] fetch ok, ${blob.size} bytes`)
+      bytes = Buffer.from(await dlRes.arrayBuffer())
+      console.log(`${SV} [SV-A] fetch ok, ${bytes.length} bytes`)
     } else {
       // storagePath — requires SUPABASE_SERVICE_ROLE_KEY
       console.log(`${SV} [SV-B] storagePath path, tentative admin client`)
       const supabase = getSupabaseAdmin()
-      const { data: dlBlob, error: dlErr } = await supabase.storage.from(bucket).download(storagePath)
-      if (dlErr || !dlBlob) {
+      const { data: blob, error: dlErr } = await supabase.storage.from(bucket).download(storagePath)
+      if (dlErr || !blob) {
         return res.status(200).json({ ok: false, error: `${SV}[SV-E003] Supabase download failed: ${dlErr?.message ?? 'unknown'}` })
       }
-      blob = dlBlob
+      bytes = Buffer.from(await blob.arrayBuffer())
     }
-
-    const bytes = Buffer.from(await blob.arrayBuffer())
 
     const glUrlRes = await fetch('https://openapi.geelark.com/open/v1/upload/getUrl', {
       method: 'POST',
@@ -56,11 +54,11 @@ module.exports = async (req, res) => {
       body: JSON.stringify({ fileType: 'mp4' }),
     })
     if (!glUrlRes.ok) {
-      return res.status(200).json({ ok: false, error: `GéeLark URL error: ${glUrlRes.status}` })
+      return res.status(200).json({ ok: false, error: `${SV}[SV-E004a] GéeLark URL HTTP: ${glUrlRes.status}` })
     }
     const glData = await glUrlRes.json()
     if (glData.code !== 0) {
-      return res.status(200).json({ ok: false, error: `${SV}[SV-E004] GéeLark error: ${glData.msg ?? glData.code}` })
+      return res.status(200).json({ ok: false, error: `${SV}[SV-E004b] GéeLark error: ${glData.msg ?? glData.code}` })
     }
     const d = glData.data ?? {}
     const uploadUrl = d.uploadUrl

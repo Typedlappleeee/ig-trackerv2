@@ -71,7 +71,7 @@ function ToolShell({ title, subtitle, headerIcon, children, onBack }: {
     <div className="h-full flex flex-col overflow-hidden anim-page">
       {/* Premium header */}
       <div className="flex-shrink-0 px-8 pt-7 pb-6" style={{ borderBottom: '1px solid var(--border)' }}>
-        <div className="flex items-center gap-4 mb-4">
+        <div className="flex items-center gap-4 mb-4 sf-anim-slide-up sf-d50">
           <button
             onClick={onBack}
             className="sf-btn sf-btn-ghost sf-btn-sm cursor-pointer"
@@ -80,10 +80,10 @@ function ToolShell({ title, subtitle, headerIcon, children, onBack }: {
             Back
           </button>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 sf-anim-slide-up sf-d100">
           {/* Icon with glow */}
           <div className="relative flex-shrink-0">
-            <div className="w-12 h-12 rounded-2xl flex items-center justify-center"
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center sf-anim-scale-spring sf-d150"
               style={{
                 background: 'linear-gradient(135deg, rgba(124,58,237,0.2), rgba(236,72,153,0.12))',
                 border: '1px solid rgba(139,92,246,0.3)',
@@ -177,7 +177,7 @@ Return ONLY valid JSON, no explanation outside the JSON:
       headerIcon={<Icon name="flame" size={24} />}
       onBack={onBack}
     >
-      <div className="space-y-5">
+      <div className="space-y-5 anim-stagger">
         {/* File picker */}
         <div className="sf-card p-5 space-y-3">
           <div className="flex items-center gap-3">
@@ -227,9 +227,9 @@ Return ONLY valid JSON, no explanation outside the JSON:
         </button>
 
         {result && (
-          <div className="space-y-4 anim-scale-in">
+          <div className="space-y-4 anim-scale-in anim-stagger">
             {/* Overall score */}
-            <div className="sf-card p-6 text-center space-y-2" style={{ borderColor: `${overallColor}30` }}>
+            <div className="sf-card sf-spotlight p-6 text-center space-y-2" style={{ borderColor: `${overallColor}30` }}>
               <p className="text-[11px] uppercase tracking-widest font-bold text-text3">Overall Score</p>
               <p className="text-[56px] font-black leading-none" style={{ color: overallColor }}>{result.overall.toFixed(1)}</p>
               <p className="text-[12px] text-text3">/ 10</p>
@@ -321,7 +321,7 @@ Return ONLY valid JSON:
       headerIcon={<Icon name="dna" size={24} />}
       onBack={onBack}
     >
-      <div className="space-y-5">
+      <div className="space-y-5 anim-stagger">
         {/* File picker */}
         <div className="sf-card p-5 space-y-3">
           <div className="flex items-center gap-3">
@@ -370,7 +370,7 @@ Return ONLY valid JSON:
         </button>
 
         {result && (
-          <div className="space-y-4 anim-scale-in">
+          <div className="space-y-4 anim-scale-in anim-stagger">
             {/* Timeline */}
             <div className="sf-card p-5 space-y-4">
               <p className="text-[14px] font-bold text-text">Timeline</p>
@@ -516,7 +516,7 @@ Rate each category 1-10. Return ONLY valid JSON:
       headerIcon={<Icon name="eye" size={24} />}
       onBack={onBack}
     >
-      <div className="space-y-5">
+      <div className="space-y-5 anim-stagger">
         {/* File type toggle */}
         <div className="sf-tabs">
           {[
@@ -587,9 +587,9 @@ Rate each category 1-10. Return ONLY valid JSON:
         </button>
 
         {result && (
-          <div className="space-y-4 anim-scale-in">
+          <div className="space-y-4 anim-scale-in anim-stagger">
             {/* Overall score */}
-            <div className="sf-card p-6 text-center space-y-2" style={{ borderColor: `${overallColor}30` }}>
+            <div className="sf-card sf-spotlight p-6 text-center space-y-2" style={{ borderColor: `${overallColor}30` }}>
               <p className="text-[11px] uppercase tracking-widest font-bold text-text3">Overall Score</p>
               <p className="text-[56px] font-black leading-none" style={{ color: overallColor }}>{result.overall.toFixed(1)}</p>
               <p className="text-[12px] text-text3">/ 10</p>
