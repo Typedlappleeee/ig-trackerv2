@@ -243,33 +243,32 @@ export function buildWebAPI() {
 
     // ── Upload video to GéeLark ─────────────────────────────────────────────
     async uploadVideoGeelark(opts: { bearer: string; filePath: string }) {
-      // Helper: server-side proxy with signedUrl (no SUPABASE_SERVICE_ROLE_KEY needed)
-      const serverProxy = async (): Promise<{ ok: boolean; token?: string; error?: string }> => {
-        const r = await fetch('/api/geelark-upload', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            signedUrl: opts.filePath,
-            bearer: opts.bearer,
-          }),
-        })
-        try { return await r.json() } catch { return { ok: false, error: `Erreur serveur (HTTP ${r.status})` } }
-      }
-
       try {
-        // 1. Any remote URL → server proxy fetches it without CORS (no admin key needed)
-        const isRemoteUrl = opts.filePath.startsWith('http://') || opts.filePath.startsWith('https://')
-        if (isRemoteUrl) return serverProxy()
-
-        // 2. Blob/data URLs → fetch directly in browser (no CORS, avoids server timeout)
         let bytes: Uint8Array | null = null
-        try {
-          bytes = await fetchFileBytes(opts.filePath)
-        } catch {
-          return serverProxy()
+
+        // Strategy A: Supabase SDK avec la session utilisateur (pas de clé admin)
+        const supabaseMatch = opts.filePath.match(/\/object\/(?:sign|public)\/([^/?]+)\/(.+?)(?:\?|$)/)
+        if (supabaseMatch) {
+          try {
+            const { supabase } = await import('./supabase')
+            const { data, error } = await supabase.storage
+              .from(supabaseMatch[1])
+              .download(decodeURIComponent(supabaseMatch[2]))
+            if (!error && data) bytes = new Uint8Array(await data.arrayBuffer())
+          } catch { /* fall through */ }
         }
 
-        // 2. Get GéeLark presigned upload URL
+        // Strategy B: fetch direct (blob: URLs + signed URLs si CORS ok)
+        if (!bytes) {
+          try {
+            const r = await fetch(opts.filePath)
+            if (r.ok) bytes = new Uint8Array(await r.arrayBuffer())
+          } catch { /* ignore */ }
+        }
+
+        if (!bytes) return { ok: false, error: '[E001] Impossible de télécharger la vidéo source' }
+
+        // Obtenir l'URL de dépôt GéeLark
         const urlRes = await fetch('/api/gx', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -281,27 +280,22 @@ export function buildWebAPI() {
           }),
         })
         const urlData = await urlRes.json() as Record<string, unknown>
-        if (!urlData.ok) return serverProxy()
+        if (!urlData.ok) return { ok: false, error: `[E002] GéeLark URL: ${(urlData as any).error ?? urlRes.status}` }
         const apiResp = ((urlData.data as Record<string, unknown>)?.['data'] ?? urlData.data) as Record<string, unknown>
-        const uploadUrl   = apiResp?.['uploadUrl']   as string | undefined
-        const resourceUrl = apiResp?.['resourceUrl'] as string | undefined
-        const token       = resourceUrl ?? apiResp?.['token'] as string | undefined
-        if (!uploadUrl || !token) return serverProxy()
+        const uploadUrl = apiResp?.['uploadUrl'] as string | undefined
+        const token     = (apiResp?.['resourceUrl'] ?? apiResp?.['token']) as string | undefined
+        if (!uploadUrl || !token) return { ok: false, error: `[E003] GéeLark: pas d'uploadUrl/resourceUrl. Clés: ${Object.keys(apiResp ?? {}).join(',')}` }
 
-        // 3. PUT bytes directly to S3 (no server hop → no timeout truncation)
+        // PUT vers S3 GéeLark
         let putRes = await fetch(uploadUrl, { method: 'PUT', body: bytes.buffer as ArrayBuffer })
         if (!putRes.ok) {
-          putRes = await fetch(uploadUrl, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'video/mp4' },
-            body: bytes.buffer as ArrayBuffer,
-          })
+          putRes = await fetch(uploadUrl, { method: 'PUT', headers: { 'Content-Type': 'video/mp4' }, body: bytes.buffer as ArrayBuffer })
         }
-        if (!putRes.ok) return serverProxy()
+        if (!putRes.ok) return { ok: false, error: `[E004] S3 PUT échoué: ${putRes.status}` }
 
         return { ok: true, token }
       } catch (err) {
-        return { ok: false, error: err instanceof Error ? err.message : String(err) }
+        return { ok: false, error: `[E000] ${err instanceof Error ? err.message : String(err)}` }
       }
     },
 
