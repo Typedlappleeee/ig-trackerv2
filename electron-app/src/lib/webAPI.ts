@@ -259,11 +259,8 @@ export function buildWebAPI() {
       }
 
       try {
-        // 1. Supabase signed URLs → always use server proxy (browser fetch blocked by CORS)
-        const isSupabaseUrl = opts.filePath.includes('.supabase.co') || opts.filePath.includes('/object/sign/')
-        if (isSupabaseUrl) return serverProxy()
-
-        // 2. Blob/data URLs → fetch directly in browser (no CORS, avoids server timeout)
+        // Signed Supabase URLs embed their auth token — fetch directly without server proxy.
+        // Fallback to serverProxy only if direct fetch fails.
         let bytes: Uint8Array | null = null
         try {
           bytes = await fetchFileBytes(opts.filePath)
