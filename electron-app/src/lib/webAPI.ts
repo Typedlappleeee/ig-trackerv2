@@ -289,11 +289,7 @@ export function buildWebAPI() {
         // Step 3: PUT bytes to GéeLark S3
         let putRes = await fetch(uploadUrl, { method: 'PUT', body: bytes.buffer as ArrayBuffer })
         if (!putRes.ok) {
-          putRes = await fetch(uploadUrl, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'video/mp4' },
-            body: bytes.buffer as ArrayBuffer,
-          })
+          putRes = await fetch(uploadUrl, { method: 'PUT', headers: { 'Content-Type': 'video/mp4' }, body: bytes.buffer as ArrayBuffer })
         }
         if (!putRes.ok) return { ok: false, error: `S3 PUT échoué: ${putRes.status}` }
 
