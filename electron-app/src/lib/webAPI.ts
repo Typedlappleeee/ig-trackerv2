@@ -243,34 +243,31 @@ export function buildWebAPI() {
 
     // ── Upload video to GéeLark ─────────────────────────────────────────────
     async uploadVideoGeelark(opts: { bearer: string; filePath: string }) {
-      // Helper: server-side proxy fallback.
-      // Any full URL is sent as signedUrl — server fetches directly, no admin key needed.
-      // Only bare storage paths (no scheme) need the admin client.
-      const serverProxy = async (): Promise<{ ok: boolean; token?: string; error?: string }> => {
-        const isUrl = opts.filePath.startsWith('https://') || opts.filePath.startsWith('http://')
-        const m1 = opts.filePath.match(/\/object\/sign\/([^/?]+)\/(.+?)(?:\?|$)/)
-        const body = isUrl
-          ? { signedUrl: opts.filePath, bearer: opts.bearer }
-          : { storagePath: m1 ? decodeURIComponent(m1[2]) : opts.filePath, bucket: m1 ? m1[1] : 'content', bearer: opts.bearer }
-        const r = await fetch('/api/geelark-upload', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-        })
-        return r.json()
-      }
-
       try {
-        // Signed Supabase URLs embed their auth token — fetch directly without server proxy.
-        // Fallback to serverProxy only if direct fetch fails.
+        // Step 1: get video bytes — try multiple strategies in order
         let bytes: Uint8Array | null = null
+
+        // Strategy A: direct fetch (works for blob: URLs and signed Supabase URLs)
         try {
-          bytes = await fetchFileBytes(opts.filePath)
-        } catch {
-          return serverProxy()
+          const r = await fetch(opts.filePath)
+          if (r.ok) bytes = new Uint8Array(await r.arrayBuffer())
+        } catch { /* fall through */ }
+
+        // Strategy B: Supabase SDK download (works when strategy A is blocked by CORS)
+        if (!bytes) {
+          const m = opts.filePath.match(/\/object\/(?:sign|public)\/([^/?]+)\/(.+?)(?:\?|$)/)
+          if (m) {
+            try {
+              const { supabase } = await import('./supabase')
+              const { data, error } = await supabase.storage.from(m[1]).download(decodeURIComponent(m[2]))
+              if (!error && data) bytes = new Uint8Array(await data.arrayBuffer())
+            } catch { /* fall through */ }
+          }
         }
 
-        // 2. Get GéeLark presigned upload URL
+        if (!bytes) return { ok: false, error: 'Impossible de lire la vidéo (CORS ou source introuvable)' }
+
+        // Step 2: get GéeLark presigned upload URL
         const urlRes = await fetch('/api/gx', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -282,14 +279,14 @@ export function buildWebAPI() {
           }),
         })
         const urlData = await urlRes.json() as Record<string, unknown>
-        if (!urlData.ok) return serverProxy()
+        if (!urlData.ok) return { ok: false, error: String((urlData as any).error ?? 'GéeLark URL error') }
         const apiResp = ((urlData.data as Record<string, unknown>)?.['data'] ?? urlData.data) as Record<string, unknown>
         const uploadUrl   = apiResp?.['uploadUrl']   as string | undefined
         const resourceUrl = apiResp?.['resourceUrl'] as string | undefined
         const token       = resourceUrl ?? apiResp?.['token'] as string | undefined
-        if (!uploadUrl || !token) return serverProxy()
+        if (!uploadUrl || !token) return { ok: false, error: 'Réponse GéeLark invalide (pas de uploadUrl/resourceUrl)' }
 
-        // 3. PUT bytes directly to S3 (no server hop → no timeout truncation)
+        // Step 3: PUT bytes to GéeLark S3
         let putRes = await fetch(uploadUrl, { method: 'PUT', body: bytes.buffer as ArrayBuffer })
         if (!putRes.ok) {
           putRes = await fetch(uploadUrl, {
@@ -298,7 +295,7 @@ export function buildWebAPI() {
             body: bytes.buffer as ArrayBuffer,
           })
         }
-        if (!putRes.ok) return serverProxy()
+        if (!putRes.ok) return { ok: false, error: `S3 PUT échoué: ${putRes.status}` }
 
         return { ok: true, token }
       } catch (err) {
