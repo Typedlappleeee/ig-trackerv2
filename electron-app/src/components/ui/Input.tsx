@@ -31,7 +31,14 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           `}
           {...props}
         />
-        {error && <p className="text-xs text-danger flex items-center gap-1"><span>⚠</span>{error}</p>}
+        {error && (
+          <p className="text-xs text-danger flex items-center gap-1.5">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0" aria-hidden="true">
+              <circle cx="12" cy="12" r="10" /><path d="M12 8v4M12 16h.01" />
+            </svg>
+            {error}
+          </p>
+        )}
         {hint && !error && <p className="text-[11px] text-text2/60">{hint}</p>}
       </div>
     )

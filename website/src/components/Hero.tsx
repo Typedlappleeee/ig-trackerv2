@@ -1,150 +1,105 @@
+import { IconDownload, IconArrowRight, IconCheck } from './Icons'
+import { AppMockup } from './AppMockup'
+
+const WINDOWS_URL =
+  'https://github.com/typedlappleeee/ig-trackerv2/releases/latest/download/ScaleFlow-Setup.exe'
+const MAC_URL =
+  'https://github.com/typedlappleeee/ig-trackerv2/releases/latest/download/ScaleFlow.dmg'
+const RELEASES_URL = 'https://github.com/typedlappleeee/ig-trackerv2/releases'
+
+const STATS = [
+  { value: '100+', label: 'comptes pilotés en parallèle' },
+  { value: '1M+', label: 'posts publiés' },
+  { value: '24/7', label: 'support inclus' },
+]
+
+const REASSURANCE = [
+  'Mac & Windows',
+  'Version web sans installation',
+  'Aucune carte requise pour tester',
+]
+
 export function Hero() {
   return (
-    <section className="relative pt-24 pb-16 px-6">
-      <div className="max-w-5xl mx-auto text-center">
-        <div className="inline-flex items-center gap-2 px-3 py-1.5 mb-6 rounded-full text-[11px] font-medium text-text2"
-             style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.20)' }}>
-          <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-          Nouvelle version 2.0 disponible
+    <section className="relative px-5 pt-36 pb-20 sm:pt-40">
+      <div className="mx-auto max-w-6xl">
+        <div className="mx-auto max-w-3xl text-center">
+          <span className="eyebrow">
+            <span className="h-1.5 w-1.5 rounded-full bg-cyan animate-pulse-dot" />
+            Automatisation Instagram multi-comptes
+          </span>
+
+          <h1 className="mt-6 text-4xl font-extrabold leading-[1.05] text-text sm:text-6xl">
+            Pilote ton Instagram
+            <br className="hidden sm:block" />{' '}
+            <span className="gradient-text">à grande échelle.</span>
+          </h1>
+
+          <p className="mx-auto mt-6 max-w-2xl text-base text-text2 sm:text-lg">
+            Mass posting, programmation, warmup, IA et remix vidéo réunis dans un seul poste de
+            pilotage. La seule app pensée pour gérer{' '}
+            <span className="font-semibold text-text">des centaines de comptes</span> sans
+            t'éparpiller.
+          </p>
+
+          <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
+            <a href={WINDOWS_URL} className="btn-primary w-full sm:w-auto">
+              <IconDownload width={18} height={18} />
+              Télécharger gratuitement
+            </a>
+            <a href="#features" className="btn-secondary w-full sm:w-auto">
+              Voir les fonctionnalités
+              <IconArrowRight width={18} height={18} />
+            </a>
+          </div>
+
+          <div className="mt-5 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-text2">
+            <a href={MAC_URL} className="cursor-pointer underline-offset-2 transition-colors duration-200 hover:text-text hover:underline">
+              Version Mac (.dmg)
+            </a>
+            <span className="text-muted">·</span>
+            <a
+              href={RELEASES_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="cursor-pointer underline-offset-2 transition-colors duration-200 hover:text-text hover:underline"
+            >
+              Toutes les versions
+            </a>
+          </div>
+
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs text-text2">
+            {REASSURANCE.map((r) => (
+              <span key={r} className="inline-flex items-center gap-1.5">
+                <IconCheck width={15} height={15} className="text-cyan" />
+                {r}
+              </span>
+            ))}
+          </div>
         </div>
 
-        <h1 className="text-5xl md:text-7xl font-black text-white tracking-tight leading-[1.05] mb-6">
-          Automatise ton Instagram<br/>
-          <span className="gradient-text">à grande échelle.</span>
-        </h1>
-
-        <p className="text-lg md:text-xl text-text2 max-w-2xl mx-auto mb-10 leading-relaxed">
-          Mass posting, banque de contenu, IA, statistiques temps réel.
-          La seule app conçue pour gérer <span className="text-white font-semibold">100+ comptes</span> sans se prendre la tête.
-        </p>
-
-        <div className="flex flex-wrap items-center justify-center gap-3 mb-6">
-          <a
-            href="https://github.com/typedlappleeee/ig-trackerv2/releases/latest/download/ScaleFlow-Setup.exe"
-            className="btn-primary"
-          >
-            ⬇ Télécharger pour Windows
-          </a>
-          <a href="https://scaleflow-fvtu.vercel.app/" target="_blank" rel="noreferrer" className="btn-secondary">
-            🌐 Ouvrir dans le navigateur
-          </a>
-        </div>
-
-        <div className="flex flex-wrap items-center justify-center gap-4 mb-12 text-[11px] text-text2">
-          <a href="https://github.com/typedlappleeee/ig-trackerv2/releases/latest/download/ScaleFlow.dmg"
-             className="underline hover:text-text transition-colors">
-            Version Mac (.dmg)
-          </a>
-          <span className="text-muted">·</span>
-          <a href="https://github.com/typedlappleeee/ig-trackerv2/releases" target="_blank" rel="noreferrer"
-             className="underline hover:text-text transition-colors">
-            Toutes les versions
-          </a>
-        </div>
-
-        <div className="flex flex-wrap items-center justify-center gap-6 text-xs text-text2">
-          <div className="flex items-center gap-2">
-            <span className="text-green-400">✓</span> Téléchargement Mac / Windows
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-green-400">✓</span> Version web sans installation
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-green-400">✓</span> Aucune carte requise pour tester
-          </div>
+        {/* Trust stats */}
+        <div className="mx-auto mt-12 grid max-w-2xl grid-cols-3 gap-3">
+          {STATS.map((s) => (
+            <div key={s.label} className="glass rounded-2xl px-3 py-4 text-center">
+              <div className="text-2xl font-extrabold text-text sm:text-3xl">{s.value}</div>
+              <div className="mt-1 text-[11px] leading-snug text-text2 sm:text-xs">{s.label}</div>
+            </div>
+          ))}
         </div>
 
         {/* App mockup */}
-        <div className="relative mt-20">
-          <div className="absolute inset-x-0 -top-20 h-40 bg-brand-gradient opacity-20 blur-3xl rounded-full" />
-          <div className="relative mx-auto rounded-2xl overflow-hidden glass" style={{ boxShadow: '0 30px 80px -20px rgba(139,92,246,0.4)' }}>
-            <div className="flex items-center gap-1.5 px-4 py-3 border-b border-border">
-              <div className="w-3 h-3 rounded-full bg-red-500/60" />
-              <div className="w-3 h-3 rounded-full bg-yellow-500/60" />
-              <div className="w-3 h-3 rounded-full bg-green-500/60" />
-              <span className="ml-3 text-[10px] text-text2 font-mono">scaleflow.app — Dashboard</span>
-            </div>
-            <MockDashboard />
-          </div>
+        <div className="relative mt-16">
+          <div
+            className="pointer-events-none absolute inset-x-0 -top-10 mx-auto h-48 max-w-3xl rounded-full opacity-60 blur-3xl"
+            style={{
+              background:
+                'linear-gradient(135deg, rgba(34,211,238,.25), rgba(129,140,248,.25), rgba(168,85,247,.25))',
+            }}
+          />
+          <AppMockup />
         </div>
       </div>
     </section>
-  )
-}
-
-function MockDashboard() {
-  const phones = [
-    { name: 'iPhone-01', followers: '12.4K', views: '847K', status: 'online' },
-    { name: 'iPhone-02', followers: '8.9K',  views: '512K', status: 'online' },
-    { name: 'iPhone-03', followers: '23.1K', views: '1.2M', status: 'busy' },
-    { name: 'iPhone-04', followers: '5.7K',  views: '301K', status: 'online' },
-    { name: 'iPhone-05', followers: '14.2K', views: '923K', status: 'offline' },
-    { name: 'iPhone-06', followers: '19.8K', views: '1.4M', status: 'online' },
-  ]
-  return (
-    <div className="bg-bg p-6">
-      <div className="flex items-center justify-between mb-5">
-        <div className="flex items-center gap-3">
-          <h3 className="text-sm font-bold text-white">📊 Dashboard</h3>
-          <span className="text-[10px] text-text2">6 téléphones · synced il y a 12s</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <button className="px-3 py-1 rounded-md text-[10px] font-semibold text-white" style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)' }}>
-            + Mass Post
-          </button>
-        </div>
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-4 gap-3 mb-5">
-        {[
-          { label: 'Followers', value: '84.1K',  color: '#a78bfa' },
-          { label: 'Views',     value: '5.2M',   color: '#ec4899' },
-          { label: 'Videos',    value: '247',    color: '#34d399' },
-          { label: 'Engagement',value: '4.7%',   color: '#fbbf24' },
-        ].map(s => (
-          <div key={s.label} className="rounded-lg p-3 glass">
-            <div className="text-[10px] text-text2 uppercase tracking-wider">{s.label}</div>
-            <div className="text-lg font-black text-white mt-0.5" style={{ color: s.color }}>{s.value}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Phones table */}
-      <div className="rounded-lg overflow-hidden glass">
-        <table className="w-full text-left text-xs">
-          <thead>
-            <tr className="text-[10px] uppercase tracking-wider text-text2">
-              <th className="px-3 py-2 font-medium">Compte</th>
-              <th className="px-3 py-2 font-medium">Followers</th>
-              <th className="px-3 py-2 font-medium">Views</th>
-              <th className="px-3 py-2 font-medium">Statut</th>
-            </tr>
-          </thead>
-          <tbody>
-            {phones.map(p => (
-              <tr key={p.name} className="border-t border-border/40">
-                <td className="px-3 py-2 font-mono text-white">{p.name}</td>
-                <td className="px-3 py-2 text-text">{p.followers}</td>
-                <td className="px-3 py-2 text-text">{p.views}</td>
-                <td className="px-3 py-2">
-                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${
-                    p.status === 'online'  ? 'bg-green-500/15 text-green-400'  :
-                    p.status === 'busy'    ? 'bg-yellow-500/15 text-yellow-400' :
-                    'bg-zinc-500/15 text-zinc-400'
-                  }`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${
-                      p.status === 'online' ? 'bg-green-400' :
-                      p.status === 'busy'   ? 'bg-yellow-400' : 'bg-zinc-400'
-                    }`} />
-                    {p.status}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
   )
 }

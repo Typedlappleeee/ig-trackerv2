@@ -14,6 +14,112 @@ interface MemberRow extends OrgMember {
   display_name: string | null
 }
 
+// ── Inline Lucide-style icon set (no emoji UI icons) ────────────────────────
+type IconName =
+  | 'building' | 'users' | 'roles' | 'logs' | 'user'
+  | 'ticket' | 'pencil' | 'x' | 'lock' | 'settings' | 'paperclip'
+
+function Icon({ name, size = 16, className, label }: {
+  name: IconName
+  size?: number
+  className?: string
+  /** When set, the icon is exposed to assistive tech with this label; otherwise it's decorative. */
+  label?: string
+}) {
+  const a11y = label
+    ? { role: 'img' as const, 'aria-label': label }
+    : { 'aria-hidden': true as const }
+  const common = {
+    width: size, height: size, viewBox: '0 0 24 24', fill: 'none',
+    stroke: 'currentColor', strokeWidth: 1.75,
+    strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const,
+    className,
+  }
+  switch (name) {
+    case 'building': // building-2
+      return (
+        <svg {...common} {...a11y}>
+          <path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18" />
+          <path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2" />
+          <path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2" />
+          <path d="M10 6h4M10 10h4M10 14h4M10 18h4" />
+        </svg>
+      )
+    case 'users':
+      return (
+        <svg {...common} {...a11y}>
+          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+          <circle cx="9" cy="7" r="4" />
+          <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+          <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+        </svg>
+      )
+    case 'roles': // venetian-mask
+      return (
+        <svg {...common} {...a11y}>
+          <path d="M18 11c-1.5 0-2.5.5-3 2" />
+          <path d="M4 6a2 2 0 0 0-2 2v4a5 5 0 0 0 5 5 8 8 0 0 0 5-2 8 8 0 0 0 5 2 5 5 0 0 0 5-5V8a2 2 0 0 0-2-2h-3a8 8 0 0 0-5 2 8 8 0 0 0-5-2z" />
+          <path d="M6 11c1.5 0 2.5.5 3 2" />
+        </svg>
+      )
+    case 'logs': // clipboard-list
+      return (
+        <svg {...common} {...a11y}>
+          <rect width="8" height="4" x="8" y="2" rx="1" ry="1" />
+          <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+          <path d="M12 11h4M12 16h4M8 11h.01M8 16h.01" />
+        </svg>
+      )
+    case 'user':
+      return (
+        <svg {...common} {...a11y}>
+          <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+          <circle cx="12" cy="7" r="4" />
+        </svg>
+      )
+    case 'ticket':
+      return (
+        <svg {...common} {...a11y}>
+          <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z" />
+          <path d="M13 5v2M13 17v2M13 11v2" />
+        </svg>
+      )
+    case 'pencil':
+      return (
+        <svg {...common} {...a11y}>
+          <path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497Z" />
+          <path d="m15 5 4 4" />
+        </svg>
+      )
+    case 'x':
+      return (
+        <svg {...common} {...a11y}>
+          <path d="M18 6 6 18M6 6l12 12" />
+        </svg>
+      )
+    case 'lock':
+      return (
+        <svg {...common} {...a11y}>
+          <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+          <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+        </svg>
+      )
+    case 'settings':
+      return (
+        <svg {...common} {...a11y}>
+          <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+          <circle cx="12" cy="12" r="3" />
+        </svg>
+      )
+    case 'paperclip':
+      return (
+        <svg {...common} {...a11y}>
+          <path d="M13.234 20.252 21 12.3a4.243 4.243 0 0 0-6-6L5.42 16.23a2.829 2.829 0 0 0 4 4L17.59 12" />
+        </svg>
+      )
+  }
+}
+
 // Generate URL-safe random token
 function genToken(): string {
   const a = new Uint8Array(24)
@@ -392,18 +498,18 @@ export function OrganizationPanel({ user }: Props) {
       {/* Sub-tabs */}
       <div className="flex gap-1 border-b border-border">
         {([
-          { k: 'orgas',   l: '🏢 Organisations' },
-          { k: 'membres', l: '👥 Membres'        },
-          ...(canManage ? [{ k: 'roles', l: '🎭 Rôles' }] : []),
-          ...(canManage ? [{ k: 'logs',  l: '📋 Logs' }] : []),
+          { k: 'orgas',   label: 'Organisations', icon: 'building' as const },
+          { k: 'membres', label: 'Membres',        icon: 'users'    as const },
+          ...(canManage ? [{ k: 'roles', label: 'Rôles', icon: 'roles' as const }] : []),
+          ...(canManage ? [{ k: 'logs',  label: 'Logs',  icon: 'logs'  as const }] : []),
         ] as const).map(t => (
           <button
             key={t.k}
             onClick={() => setOrgTab(t.k as typeof orgTab)}
-            className={`px-4 py-2 text-sm font-semibold transition-colors -mb-px border-b-2 ${
+            className={`px-4 py-2 text-sm font-semibold transition-colors -mb-px border-b-2 inline-flex items-center gap-1.5 ${
               orgTab === t.k ? 'border-accent text-accent bg-accent/5' : 'border-transparent text-text2 hover:text-text'
             }`}
-          >{t.l}</button>
+          ><Icon name={t.icon} size={15} />{t.label}</button>
         ))}
       </div>
 
@@ -411,7 +517,7 @@ export function OrganizationPanel({ user }: Props) {
       {orgTab === 'orgas' && <>
         {/* My display name */}
         <section className="bg-card border border-border rounded-xl p-5 space-y-3">
-          <h2 className="text-sm font-bold text-text">👤 Mon nom dans les organisations</h2>
+          <h2 className="text-sm font-bold text-text inline-flex items-center gap-2"><Icon name="user" size={16} />Mon nom dans les organisations</h2>
           <p className="text-text2 text-xs">Visible par les autres membres. Si vide, ton email est affiché.</p>
           {editingName ? (
             <DisplayNameEditor initial={myDisplayName} onSave={saveDisplayName} onCancel={() => setEditingName(false)} busy={busy} />
@@ -424,7 +530,7 @@ export function OrganizationPanel({ user }: Props) {
                 <p className="text-text text-sm font-medium truncate">{myDisplayName || <span className="text-text2 italic">Aucun nom — {user.email}</span>}</p>
                 {myDisplayName && <p className="text-text2 text-xs truncate">{user.email}</p>}
               </div>
-              <Button size="sm" variant="secondary" onClick={() => setEditingName(true)}>✎ Modifier</Button>
+              <Button size="sm" variant="secondary" onClick={() => setEditingName(true)}><span className="inline-flex items-center gap-1.5"><Icon name="pencil" size={14} />Modifier</span></Button>
             </div>
           )}
         </section>
@@ -432,7 +538,7 @@ export function OrganizationPanel({ user }: Props) {
         {/* My orgs */}
         <section className="bg-card border border-border rounded-xl p-5 space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold text-text">🏢 Mes organisations</h2>
+            <h2 className="text-sm font-bold text-text inline-flex items-center gap-2"><Icon name="building" size={16} />Mes organisations</h2>
             {!myOrgs.some(({ member }) => member.role === 'owner') && (
               <Button size="sm" onClick={() => setCreating(v => !v)}>+ Nouvelle</Button>
             )}
@@ -461,7 +567,7 @@ export function OrganizationPanel({ user }: Props) {
                 return (
                   <li key={org.id} className={`rounded-lg border ${currentOrg?.id === org.id ? 'border-accent/40 bg-accent/5' : 'border-border bg-surface'}`}>
                     <div className="flex items-center gap-3 p-3">
-                      <span className="text-xl">🏢</span>
+                      <span className="text-accent"><Icon name="building" size={22} /></span>
                       <div className="flex-1 min-w-0">
                         <p className="text-text font-medium truncate">{org.name}</p>
                         <p className="text-text2 text-xs">{ROLE_LABELS[member.role]}</p>
@@ -473,8 +579,9 @@ export function OrganizationPanel({ user }: Props) {
                         <Button size="sm" variant="secondary"
                           onClick={() => { setRenamingOrgId(org.id); setRenameValue(org.name) }}
                           disabled={!canRename}
+                          aria-label="Renommer"
                           title={canRename ? 'Renommer' : `Renommage disponible dans ${daysLeft} jour${daysLeft > 1 ? 's' : ''}`}>
-                          ✎
+                          <Icon name="pencil" size={14} />
                         </Button>
                       )}
                       {isOwner ? (
@@ -484,8 +591,8 @@ export function OrganizationPanel({ user }: Props) {
                       )}
                     </div>
                     {isOwner && !canRename && (
-                      <p className="px-3 pb-2 text-[11px]" style={{ color: 'rgba(196,181,253,0.4)' }}>
-                        🔒 Renommage disponible dans <strong>{daysLeft}</strong> jour{daysLeft > 1 ? 's' : ''}
+                      <p className="px-3 pb-2 text-[11px] inline-flex items-center gap-1.5" style={{ color: 'rgba(196,181,253,0.4)' }}>
+                        <Icon name="lock" size={12} /><span>Renommage disponible dans <strong>{daysLeft}</strong> jour{daysLeft > 1 ? 's' : ''}</span>
                       </p>
                     )}
                     {isRenaming && (
@@ -506,7 +613,7 @@ export function OrganizationPanel({ user }: Props) {
 
         {/* Join via token */}
         <section className="bg-card border border-border rounded-xl p-5 space-y-3">
-          <h2 className="text-sm font-bold text-text">🎟 Rejoindre une organisation</h2>
+          <h2 className="text-sm font-bold text-text inline-flex items-center gap-2"><Icon name="ticket" size={16} />Rejoindre une organisation</h2>
           <div className="flex gap-2">
             <Input value={joinToken} onChange={e => setJoinToken(e.target.value)} placeholder="Colle ton code d'invitation"
               onKeyDown={e => { if (e.key === 'Enter') acceptInvite() }} />
@@ -519,19 +626,19 @@ export function OrganizationPanel({ user }: Props) {
       {orgTab === 'membres' && (
         !currentOrg ? (
           <div className="bg-card border border-border rounded-xl p-8 text-center space-y-2">
-            <p className="text-2xl">🏢</p>
+            <p className="flex justify-center text-text2"><Icon name="building" size={32} /></p>
             <p className="text-text font-semibold">Aucune organisation active</p>
             <p className="text-text2 text-sm">Active une organisation dans l'onglet "Organisations" pour gérer ses membres.</p>
           </div>
         ) : !canManage ? (
           <div className="bg-card border border-border rounded-xl p-8 text-center space-y-2">
-            <p className="text-2xl">🔒</p>
+            <p className="flex justify-center text-text2"><Icon name="lock" size={32} /></p>
             <p className="text-text font-semibold">Accès réservé aux admins</p>
             <p className="text-text2 text-sm">Seuls les propriétaires et admins peuvent gérer les membres.</p>
           </div>
         ) : (
           <section className="bg-card border border-border rounded-xl p-5 space-y-4">
-            <h2 className="text-sm font-bold text-text">👥 Membres de "{currentOrg.name}"</h2>
+            <h2 className="text-sm font-bold text-text inline-flex items-center gap-2"><Icon name="users" size={16} />Membres de "{currentOrg.name}"</h2>
 
             <ul className="space-y-2">
               {members.map(m => {
@@ -620,7 +727,7 @@ export function OrganizationPanel({ user }: Props) {
                   onSystemRole={r => { setInvRole(r); setInvTemplateId(null) }}
                   onTemplate={t => { setInvTemplateId(t.id); setInvRole('member') }}
                 />
-                <Button onClick={createInvite} loading={busy}>🎟 Générer un code</Button>
+                <Button onClick={createInvite} loading={busy}><span className="inline-flex items-center gap-1.5"><Icon name="ticket" size={15} />Générer un code</span></Button>
               </div>
 
             {invites.length > 0 && (
@@ -638,7 +745,7 @@ export function OrganizationPanel({ user }: Props) {
                       className="bg-bg px-2 py-1 rounded font-mono text-[10px] cursor-pointer hover:text-accent"
                       title="Cliquer pour copier le code complet"
                     >{inv.token.slice(0, 12)}…</code>
-                    <button onClick={() => revokeInvite(inv)} className="text-danger hover:opacity-70" title="Révoquer ce code">✕</button>
+                    <button onClick={() => revokeInvite(inv)} className="text-danger hover:opacity-70 inline-flex items-center" title="Révoquer ce code" aria-label="Révoquer ce code"><Icon name="x" size={14} /></button>
                   </li>
                 ))}
               </ul>
@@ -652,7 +759,7 @@ export function OrganizationPanel({ user }: Props) {
         <section className="bg-card border border-border rounded-xl overflow-hidden">
           <div className="px-5 py-3 border-b border-border flex items-center justify-between">
             <div>
-              <h2 className="text-sm font-bold text-text">🎭 Rôles personnalisés</h2>
+              <h2 className="text-sm font-bold text-text inline-flex items-center gap-2"><Icon name="roles" size={16} />Rôles personnalisés</h2>
               <p className="text-xs text-text2 mt-0.5">Crée des templates de permissions réutilisables pour ton agence</p>
             </div>
             <Button size="sm" onClick={() => setCreatingTemplate(true)}>+ Nouveau rôle</Button>
@@ -660,7 +767,7 @@ export function OrganizationPanel({ user }: Props) {
           <div className="divide-y divide-border">
             {roleTemplates.length === 0 && !creatingTemplate && (
               <div className="px-5 py-8 text-center">
-                <p className="text-3xl mb-2">🎭</p>
+                <p className="flex justify-center mb-2 text-text2"><Icon name="roles" size={34} /></p>
                 <p className="text-sm font-medium text-text mb-1">Aucun rôle personnalisé</p>
                 <p className="text-xs text-text2 mb-4">Crée des templates comme "Content Manager", "Analyst"… pour assigner des permissions en un clic.</p>
                 <Button size="sm" onClick={() => setCreatingTemplate(true)}>Créer mon premier rôle</Button>
@@ -686,8 +793,8 @@ export function OrganizationPanel({ user }: Props) {
                       <p className="text-[10px] text-text2 truncate">{permSummary(t.perm_overrides)}</p>
                     </div>
                     <div className="flex gap-1">
-                      <button onClick={() => setEditingTemplate(t)} className="text-xs text-accent hover:opacity-70 px-2 py-1 rounded hover:bg-accent/10 transition-colors">✎ Éditer</button>
-                      <button onClick={() => deleteTemplate(t)} className="text-xs text-danger hover:opacity-70 px-2 py-1 rounded hover:bg-danger/10 transition-colors">✕</button>
+                      <button onClick={() => setEditingTemplate(t)} className="text-xs text-accent hover:opacity-70 px-2 py-1 rounded hover:bg-accent/10 transition-colors inline-flex items-center gap-1.5"><Icon name="pencil" size={13} />Éditer</button>
+                      <button onClick={() => deleteTemplate(t)} className="text-xs text-danger hover:opacity-70 px-2 py-1 rounded hover:bg-danger/10 transition-colors inline-flex items-center" aria-label="Supprimer le rôle"><Icon name="x" size={14} /></button>
                     </div>
                   </div>
                 )}
@@ -719,7 +826,7 @@ export function OrganizationPanel({ user }: Props) {
         <section className="bg-card border border-border rounded-xl overflow-hidden">
           <div className="px-5 py-3 border-b border-border flex items-center justify-between">
             <div>
-              <h2 className="text-sm font-bold text-text">📋 Logs d'activité</h2>
+              <h2 className="text-sm font-bold text-text inline-flex items-center gap-2"><Icon name="logs" size={16} />Logs d'activité</h2>
               <p className="text-xs text-text2 mt-0.5">Actions récentes des membres (200 dernières)</p>
             </div>
             <button onClick={loadLogs} className="text-xs text-accent hover:opacity-70 transition-opacity">⟳ Rafraîchir</button>
@@ -757,7 +864,7 @@ export function OrganizationPanel({ user }: Props) {
                               </span>
                             )}
                             {typeof log.details.file === 'string' && (
-                              <span className="text-[10px] text-text2 font-mono">📎 {log.details.file}</span>
+                              <span className="text-[10px] text-text2 font-mono inline-flex items-center gap-1"><Icon name="paperclip" size={11} />{log.details.file}</span>
                             )}
                           </div>
                         )}
@@ -907,7 +1014,8 @@ function PermEditor({
       <div>
         <p className="text-xs font-bold text-text mb-2">Onglets accessibles</p>
         <p className="text-[10px] text-text2 mb-2">
-          ⚙ "Paramètres → Connexions" contrôle l'accès aux clés API de l'organisation (token GéeLark, Groq, etc.).
+          <Icon name="settings" size={11} className="inline-block align-[-1px] mr-1" />
+          "Paramètres → Connexions" contrôle l'accès aux clés API de l'organisation (token GéeLark, Groq, etc.).
           Par défaut bloqué pour les membres et lecteurs.
         </p>
         <div className="grid grid-cols-2 gap-1.5">
@@ -1067,7 +1175,7 @@ function InvitePermModal({
         {/* Header */}
         <div className="px-6 py-5 border-b border-border flex-shrink-0">
           <div className="flex items-center gap-3 mb-1">
-            <span className="text-2xl">🎟</span>
+            <span className="text-accent"><Icon name="ticket" size={26} /></span>
             <div>
               <h2 className="text-sm font-bold text-text">Code généré — Configure les permissions</h2>
               <p className="text-xs text-text2 mt-0.5">

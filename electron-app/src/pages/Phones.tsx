@@ -205,8 +205,6 @@ function SessionDialog({
 
   const busy = testing || saving
 
-  const inputBorderColor = testResult === 'ok' ? '#22C55E' : testResult === 'fail' ? '#EF4444' : 'rgba(255,255,255,0.09)'
-
   return (
     <div
       className="sf-modal-bg"
@@ -215,11 +213,24 @@ function SessionDialog({
       <div className="sf-modal sf-anim-scale-spring" style={{ width: 480, maxWidth: '90vw' }}>
         {/* Header */}
         <div className="sf-modal-header">
-          <div>
-            <h2 className="sf-modal-title">{t('phoneSessionTitle')}</h2>
-            {phone.ig_username && (
-              <p style={{ fontSize: 12, color: '#8B5CF6', margin: '4px 0 0' }}>@{phone.ig_username}</p>
-            )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{
+              width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'linear-gradient(135deg, rgba(139,92,246,0.25), rgba(139,92,246,0.08))',
+              border: '1px solid rgba(139,92,246,0.3)', color: '#a78bfa',
+            }}>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <rect x="1.5" y="5.5" width="13" height="9" rx="2" stroke="currentColor" strokeWidth="1.4"/>
+                <path d="M5.5 5.5V4a2.5 2.5 0 0 1 5 0v1.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+              </svg>
+            </div>
+            <div>
+              <h2 className="sf-modal-title">{t('phoneSessionTitle')}</h2>
+              {phone.ig_username && (
+                <p style={{ fontSize: 12, color: '#8B5CF6', margin: '2px 0 0' }}>@{phone.ig_username}</p>
+              )}
+            </div>
           </div>
           <button onClick={onClose} className="sf-btn sf-btn-ghost sf-btn-icon" style={{ width: 28, height: 28, borderRadius: 8 }}>
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
@@ -232,8 +243,8 @@ function SessionDialog({
           {/* Auto-extract via GéeLark shell */}
           {phone.geelark_id && bearer && (
             <div style={{
-              background: '#111120', border: '1px solid rgba(255,255,255,0.09)',
-              borderRadius: 11, padding: 12, display: 'flex', flexDirection: 'column', gap: 8,
+              background: 'rgba(139,92,246,0.04)', border: '1px solid rgba(139,92,246,0.15)',
+              borderRadius: 11, padding: 14, display: 'flex', flexDirection: 'column', gap: 10,
             }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div>
@@ -242,7 +253,7 @@ function SessionDialog({
                 </div>
                 <div style={{ display: 'flex', gap: 6 }}>
                   {extracting && (
-                    <button className="sf-btn sf-btn-secondary sf-btn-sm" onClick={cancelExtract}>
+                    <button className="sf-btn sf-btn-secondary sf-btn-sm" onClick={cancelExtract} style={{ cursor: 'pointer' }}>
                       {t('phoneCancelExtract')}
                     </button>
                   )}
@@ -253,8 +264,9 @@ function SessionDialog({
               </div>
               {extractLogs.length > 0 && (
                 <div style={{
-                  background: '#07070C', borderRadius: 8, padding: 8,
+                  background: 'rgba(0,0,0,0.35)', borderRadius: 8, padding: '8px 10px',
                   maxHeight: 160, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2,
+                  border: '1px solid rgba(255,255,255,0.06)',
                 }}>
                   {extractLogs.map((l, i) => (
                     <p key={i} style={{
@@ -265,16 +277,25 @@ function SessionDialog({
                   <div ref={logsEndRef} />
                 </div>
               )}
-              {extractError && <p style={{ fontSize: 11, color: '#EF4444', margin: 0 }}>{extractError}</p>}
+              {extractError && (
+                <p style={{ fontSize: 11, color: '#EF4444', margin: 0, display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                    <circle cx="6" cy="6" r="5" stroke="currentColor" strokeWidth="1.3"/>
+                    <path d="M6 3.5v3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+                    <circle cx="6" cy="8.5" r="0.6" fill="currentColor"/>
+                  </svg>
+                  {extractError}
+                </p>
+              )}
             </div>
           )}
 
           {/* Manual instructions */}
           <div style={{
-            background: '#111120', border: '1px solid rgba(255,255,255,0.09)',
-            borderRadius: 11, padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 3,
+            background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)',
+            borderRadius: 11, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 4,
           }}>
-            <p style={{ fontSize: 11, fontWeight: 600, color: '#F2F0FF', margin: 0 }}>{t('phoneManualInstructions')}</p>
+            <p style={{ fontSize: 11, fontWeight: 600, color: '#F2F0FF', margin: '0 0 4px' }}>{t('phoneManualInstructions')}</p>
             {[
               <>1. Open <span style={{ color: '#8B5CF6' }}>{t('phoneManualStep1Chrome')}</span> in Chrome</>,
               <>2. Press <span style={{ color: '#8B5CF6' }}>{t('phoneManualStep2DevTools')}</span> (DevTools)</>,
@@ -287,7 +308,7 @@ function SessionDialog({
 
           {/* Session input */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <label style={{ fontSize: 11, fontWeight: 500, color: 'rgba(196,181,253,0.72)' }}>{t('phoneSessionLabel')}</label>
+            <label style={{ fontSize: 11, fontWeight: 600, color: 'rgba(196,181,253,0.8)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>{t('phoneSessionLabel')}</label>
             <div style={{ position: 'relative' }}>
               <input
                 ref={inputRef}
@@ -339,7 +360,7 @@ function SessionDialog({
 
         {/* Footer */}
         <div className="sf-modal-footer">
-          <button onClick={onClose} disabled={busy} className="sf-btn sf-btn-ghost">
+          <button onClick={onClose} disabled={busy} className="sf-btn sf-btn-ghost" style={{ cursor: 'pointer' }}>
             {t('cancel')}
           </button>
           <Button size="sm" onClick={save} loading={busy} disabled={!value.trim()}>
@@ -863,6 +884,7 @@ export function Phones({ user }: PhonesProps) {
       <button
         onClick={onClick}
         title={title}
+        className="sf-press"
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
         style={{
@@ -902,41 +924,50 @@ export function Phones({ user }: PhonesProps) {
       )}
 
       <div
-        className="sf-anim-slide-up"
-        style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#07070C' }}
+        className="anim-page"
+        style={{ height: '100%', display: 'flex', flexDirection: 'column', overflowY: 'auto', overflowX: 'hidden', background: 'var(--bg, #07070C)' }}
         onClick={() => setContextMenu(null)}
       >
 
-        {/* ── Header ───────────────────────────────────────────────────────── */}
+        {/* ── Premium Page Header ──────────────────────────────────────────── */}
         <div style={{
-          flexShrink: 0, padding: '20px 32px 16px',
-          borderBottom: '1px solid rgba(255,255,255,0.055)',
+          flexShrink: 0,
+          padding: '24px 32px 20px',
+          borderBottom: '1px solid rgba(139,92,246,0.1)',
+          background: 'linear-gradient(180deg, rgba(139,92,246,0.04) 0%, transparent 100%)',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 13, minWidth: 0 }}>
+          {/* Left: icon + title + subtitle */}
+          <div className="sf-anim-slide-up sf-d50" style={{ display: 'flex', alignItems: 'center', gap: 16, minWidth: 0 }}>
             <div style={{
-              width: 44, height: 44, borderRadius: 13, flexShrink: 0,
+              width: 48, height: 48, borderRadius: 14, flexShrink: 0,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: 'linear-gradient(135deg, rgba(139,92,246,0.22), rgba(139,92,246,0.06))',
-              border: '1px solid rgba(139,92,246,0.25)', color: '#a78bfa',
+              background: 'linear-gradient(135deg, rgba(139,92,246,0.3), rgba(139,92,246,0.08))',
+              border: '1px solid rgba(139,92,246,0.35)',
+              color: '#a78bfa',
+              boxShadow: '0 0 28px -6px rgba(124,58,237,0.5)',
             }}>
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="7" y="2" width="10" height="20" rx="2.5"/><path d="M11 18h2"/>
               </svg>
             </div>
             <div style={{ minWidth: 0 }}>
-              <h1 style={{ fontSize: 23, fontWeight: 900, margin: 0, letterSpacing: '-0.025em', lineHeight: 1.1,
-              background: 'linear-gradient(135deg,#FFFFFF 0%,rgba(196,181,253,0.85) 100%)',
-              WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>{t('phonesHeading')}</h1>
-              <p style={{ fontSize: 13, color: 'rgba(148,163,184,0.6)', margin: '4px 0 0', lineHeight: 1.4 }}>{t('phonesSubtitle')}</p>
+              <h1 style={{
+                fontSize: 24, fontWeight: 900, margin: 0, letterSpacing: '-0.03em', lineHeight: 1.1,
+                background: 'linear-gradient(135deg, #FFFFFF 0%, rgba(196,181,253,0.85) 100%)',
+                WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+              }}>{t('phonesHeading')}</h1>
+              <p style={{ fontSize: 13, color: 'rgba(148,163,184,0.6)', margin: '5px 0 0', lineHeight: 1.4 }}>{t('phonesSubtitle')}</p>
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            {/* Auto-refresh control */}
+
+          {/* Right: auto-refresh control + sync button */}
+          <div className="sf-anim-slide-up sf-d100" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {/* Auto-refresh pill */}
             <div style={{
               display: 'flex', alignItems: 'center', gap: 8,
-              padding: '6px 10px', borderRadius: 8,
-              background: '#0C0C15', border: '1px solid rgba(139,92,246,0.22)',
+              padding: '7px 12px', borderRadius: 10,
+              background: 'rgba(12,12,21,0.9)', border: '1px solid rgba(139,92,246,0.2)',
               flexShrink: 0,
             }}>
               <button
@@ -972,569 +1003,776 @@ export function Phones({ user }: PhonesProps) {
               {autoRefresh && bearer && <Countdown secondsLeft={countdown} />}
             </div>
 
-            {/* Sync button */}
+            {/* Sync / Add button */}
             <button
               onClick={syncFromGeelark} disabled={!bearer || syncing}
-              className="sf-btn sf-btn-primary sf-btn-sm"
+              className="sf-btn sf-btn-primary"
               style={{
-                display: 'flex', alignItems: 'center', gap: 7,
+                display: 'flex', alignItems: 'center', gap: 8,
                 cursor: (!bearer || syncing) ? 'not-allowed' : 'pointer',
                 opacity: (!bearer || syncing) ? 0.5 : 1,
               }}
             >
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ flexShrink: 0, animation: syncing ? 'spin 1s linear infinite' : 'none' }}>
-                <path d="M12 7A5 5 0 1 1 9.5 2.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
-                <path d="M9 1l1.5 1.5L9 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+              <svg width="15" height="15" viewBox="0 0 15 15" fill="none" style={{ flexShrink: 0, animation: syncing ? 'spin 1s linear infinite' : 'none' }}>
+                <path d="M13 7.5A5.5 5.5 0 1 1 10 2.7" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+                <path d="M9.5 1.5l2 1.5L9.5 4.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
-              {t('phonesSyncGeelark')}
+              {syncing ? t('phonesSyncing') : t('phonesSyncGeelark')}
             </button>
+
+            {/* Plan limit badge */}
+            {phoneLimit !== Infinity && (
+              <span style={{
+                fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 20,
+                background: phones.length >= phoneLimit ? 'rgba(239,68,68,0.1)' : 'rgba(139,92,246,0.1)',
+                border: `1px solid ${phones.length >= phoneLimit ? 'rgba(239,68,68,0.25)' : 'rgba(139,92,246,0.2)'}`,
+                color: phones.length >= phoneLimit ? '#F87171' : '#A78BFA',
+                whiteSpace: 'nowrap', flexShrink: 0,
+              }}>
+                {phones.length} / {phoneLimit}
+              </span>
+            )}
           </div>
         </div>
 
-        {/* ── Main scrollable area (cards + table scroll together) ─────────── */}
-        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-
-        {/* ── Summary cards ─────────────────────────────────────────────────── */}
-        {(() => {
+        {/* ── Stats bar ─────────────────────────────────────────────────────── */}
+        {!loading && phones.length > 0 && (() => {
           const onlinePct = phones.length ? Math.round((onlineCount / phones.length) * 100) : 0
-
-          const summaryCards = [
+          const withSession = phones.filter(p => p.ig_sessionid).length
+          const statChips = [
             {
-              label: t('phoneSummaryTotal'), value: phones.length, sub: t('phoneSummaryPhonesSub'),
-              color: '#8B5CF6', f: 'all' as const,
+              label: t('phoneSummaryTotal'), value: phones.length,
               icon: (
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                  <rect x="5" y="1" width="10" height="18" rx="2.5" stroke="currentColor" strokeWidth="1.5"/>
-                  <circle cx="10" cy="15.5" r="1" fill="currentColor"/>
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                  <rect x="3.5" y="0.5" width="7" height="13" rx="2" stroke="currentColor" strokeWidth="1.3"/>
+                  <circle cx="7" cy="11" r="0.7" fill="currentColor"/>
                 </svg>
               ),
+              color: '#a78bfa', filter: 'all' as const,
             },
             {
-              label: t('phoneSummaryOnline'), value: onlineCount, sub: `${onlinePct}% ${t('phoneSummaryActivePct')}`,
-              color: '#22C55E', f: 'online' as const,
-              icon: (
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                  <circle cx="10" cy="10" r="3" fill="currentColor"/>
-                  <circle cx="10" cy="10" r="6.5" stroke="currentColor" strokeWidth="1.5" strokeDasharray="2 2"/>
-                </svg>
-              ),
+              label: t('phoneSummaryOnline'), value: onlineCount,
+              sub: `${onlinePct}%`,
+              icon: <span className="sf-ping-dot" style={{ background: '#22C55E', width: 8, height: 8 }} />,
+              color: '#22C55E', filter: 'online' as const,
             },
             {
-              label: t('phoneSummaryOffline'), value: offlineCount, sub: `${100 - onlinePct}% ${t('phoneSummaryInactivePct')}`,
-              color: 'rgba(148,163,184,0.52)', f: 'offline' as const,
+              label: t('phoneSummaryOffline'), value: offlineCount,
               icon: (
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                  <circle cx="10" cy="10" r="6.5" stroke="currentColor" strokeWidth="1.5"/>
-                  <path d="M7 7l6 6M13 7l-6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+                  <circle cx="4" cy="4" r="3.5" stroke="currentColor" strokeWidth="1.2"/>
                 </svg>
               ),
+              color: 'rgba(148,163,184,0.5)', filter: 'offline' as const,
             },
+            ...(withSession > 0 ? [{
+              label: t('phoneSession'), value: withSession,
+              icon: (
+                <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                  <rect x="1.5" y="5.5" width="10" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.3"/>
+                  <path d="M4.5 5.5V4a2 2 0 0 1 4 0v1.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+                </svg>
+              ),
+              color: '#8b5cf6', filter: null,
+            }] : []),
           ]
-
-          const staggerClasses = ['sf-d50', 'sf-d100', 'sf-d150']
           return (
             <div style={{
-              padding: '16px 32px 12px',
-              display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10,
+              flexShrink: 0, padding: '14px 32px 0',
+              display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
             }}>
-              {summaryCards.map((card, ci) => (
+              {statChips.map((chip, ci) => (
                 <button
-                  key={card.label}
-                  onClick={() => { if (card.f) setFilter(card.f) }}
-                  className={`sf-stat-card sf-anim-slide-up ${staggerClasses[ci]}`}
+                  key={chip.label}
+                  onClick={() => chip.filter && setFilter(chip.filter)}
+                  className={`anim-scale-in sf-d${(ci + 1) * 50}`}
                   style={{
-                    background: (card.f && filter === card.f) ? `rgba(124,58,237,0.08)` : '#0C0C15',
-                    border: (card.f && filter === card.f) ? '1px solid rgba(139,92,246,0.22)' : '1px solid rgba(255,255,255,0.055)',
-                    borderRadius: 11, padding: '14px 16px',
-                    display: 'flex', alignItems: 'center', gap: 14,
-                    cursor: card.f ? 'pointer' : 'default',
-                    transition: 'all 0.15s', textAlign: 'left',
+                    display: 'inline-flex', alignItems: 'center', gap: 7,
+                    padding: '6px 12px', borderRadius: 20,
+                    background: chip.filter && filter === chip.filter
+                      ? 'rgba(124,58,237,0.12)'
+                      : 'rgba(255,255,255,0.04)',
+                    border: chip.filter && filter === chip.filter
+                      ? '1px solid rgba(139,92,246,0.3)'
+                      : '1px solid rgba(255,255,255,0.08)',
+                    cursor: chip.filter ? 'pointer' : 'default',
+                    transition: 'all 0.15s',
                   }}
                 >
-                  <div style={{
-                    width: 36, height: 36, borderRadius: 10, flexShrink: 0,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    background: 'rgba(124,58,237,0.08)',
-                    color: card.color,
-                  }}>
-                    {card.icon}
-                  </div>
-                  <div>
-                    <p className="sf-anim-count-up" style={{ fontSize: 26, fontWeight: 800, color: '#F2F0FF', margin: 0, lineHeight: 1, letterSpacing: '-0.04em' }}>{card.value}</p>
-                    <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(148,163,184,0.52)', margin: '4px 0 0' }}>{card.label}</p>
-                  </div>
+                  <span style={{ color: chip.color, display: 'flex', alignItems: 'center' }}>{chip.icon}</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: '#F2F0FF', fontVariantNumeric: 'tabular-nums' }}>{chip.value}</span>
+                  <span style={{ fontSize: 11, color: 'rgba(148,163,184,0.55)', fontWeight: 500 }}>{chip.label}</span>
+                  {chip.sub && <span style={{ fontSize: 10, color: chip.color, fontWeight: 600 }}>{chip.sub}</span>}
                 </button>
               ))}
+              {lastUpdated && (
+                <span style={{
+                  fontSize: 11, color: 'rgba(148,163,184,0.35)', marginLeft: 'auto',
+                  display: 'flex', alignItems: 'center', gap: 5,
+                }}>
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                    <circle cx="5" cy="5" r="4" stroke="currentColor" strokeWidth="1.2"/>
+                    <path d="M5 2.5v2.5l1.5 1" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                  {lastUpdated.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              )}
             </div>
           )
         })()}
 
-        {/* ── Main area ────────────────────────────────────────────────────── */}
-        <div style={{ flex: 1, display: 'flex' }}>
+        {/* ── Content area (scrolls with the page) ───────────────────────────── */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
 
-          {/* Table area */}
-          <div style={{ flex: 1, padding: '4px 32px 32px', minWidth: 0 }}>
+          {/* ── Main area (cards + detail panel) ──────────────────────────── */}
+          <div style={{ flex: 1, display: 'flex' }}>
 
-            {/* Alerts */}
-            {!bearer && (
-              <div style={{
-                padding: '10px 14px', borderRadius: 8, marginBottom: 12,
-                background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)',
-                color: '#F59E0B', fontSize: 13, display: 'flex', alignItems: 'center', gap: 8,
-              }}>
-                <svg width="15" height="15" viewBox="0 0 15 15" fill="none" style={{ flexShrink: 0 }}>
-                  <path d="M7.5 1L14 13.5H1L7.5 1z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/>
-                  <path d="M7.5 6v3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
-                  <circle cx="7.5" cy="11" r="0.7" fill="currentColor"/>
-                </svg>
-                {t('phoneMissingToken')}
-              </div>
-            )}
-            {error && (
-              <div style={{
-                padding: '10px 14px', borderRadius: 8, marginBottom: 12,
-                background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)',
-                color: '#EF4444', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
-              }}>
-                <span>{error}</span>
-                <button onClick={() => setError(null)} style={{ background: 'none', border: 'none', color: '#EF4444', cursor: 'pointer', opacity: 0.6, padding: 0, fontSize: 14 }}>
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
-                </button>
-              </div>
-            )}
-            {pollError && (
-              <div style={{
-                padding: '10px 14px', borderRadius: 8, marginBottom: 12,
-                background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)',
-                color: '#F59E0B', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
-              }}>
-                <span>{pollError}</span>
-                <button onClick={() => setPollError(null)} style={{ background: 'none', border: 'none', color: '#F59E0B', cursor: 'pointer', opacity: 0.6, padding: 0 }}>
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
-                </button>
-              </div>
-            )}
+            {/* Cards + toolbar column */}
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
 
-            {/* Toolbar */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-              {/* Search */}
-              <div style={{ flex: 1, position: 'relative' }}>
-                <span style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'rgba(148,163,184,0.35)', pointerEvents: 'none' }}>
-                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                    <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.4"/>
-                    <path d="M9.5 9.5l3 3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
-                  </svg>
-                </span>
-                <input
-                  type="text"
-                  placeholder={t('phonesSearchPlaceholder')}
-                  value={search}
-                  onChange={e => setSearch(e.target.value)}
-                  className="sf-input"
-                  style={{ width: '100%', boxSizing: 'border-box', paddingLeft: 34, paddingRight: 14 }}
-                />
-              </div>
+              {/* ── Toolbar ──────────────────────────────────────────────── */}
+              <div className="sf-toolbar" style={{ gap: 8 }}>
+                {/* Search */}
+                <div style={{ flex: 1, position: 'relative', minWidth: 160 }}>
+                  <span style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'rgba(148,163,184,0.35)', pointerEvents: 'none' }}>
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                      <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.4"/>
+                      <path d="M9.5 9.5l3 3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+                    </svg>
+                  </span>
+                  <input
+                    type="text"
+                    placeholder={t('phonesSearchPlaceholder')}
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                    className="sf-input"
+                    style={{ width: '100%', boxSizing: 'border-box', paddingLeft: 34, paddingRight: 14 }}
+                  />
+                </div>
 
-              {/* Group filter */}
-              <div style={{ position: 'relative', flexShrink: 0 }}>
-                <select
-                  value={groupFilter}
-                  onChange={e => setGroupFilter(e.target.value)}
-                  className="sf-input"
-                  style={{
-                    appearance: 'none', paddingRight: 28, paddingLeft: 12,
-                    fontSize: 12, fontWeight: 500, cursor: 'pointer',
-                  }}
-                >
-                  <option value="all">{t('phonesAllGroups')}</option>
-                  {groups.map(g => <option key={g} value={g}>{g}</option>)}
-                </select>
-                <span style={{ position: 'absolute', right: 9, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: 'rgba(148,163,184,0.4)', fontSize: 9 }}>▼</span>
-              </div>
-
-              {/* Status filter — pill selector */}
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: 2,
-                background: '#0C0C15', border: '1px solid rgba(255,255,255,0.09)',
-                borderRadius: 20, padding: '3px 4px', flexShrink: 0,
-              }}>
-                {(['all', 'online', 'offline'] as const).map(v => (
-                  <button
-                    key={v}
-                    onClick={() => setFilter(v)}
+                {/* Group filter */}
+                <div style={{ position: 'relative', flexShrink: 0 }}>
+                  <select
+                    value={groupFilter}
+                    onChange={e => setGroupFilter(e.target.value)}
+                    className="sf-input"
                     style={{
-                      padding: '4px 11px', borderRadius: 16, fontSize: 11, fontWeight: 600,
-                      border: 'none', cursor: 'pointer', transition: 'all 0.15s',
-                      background: filter === v ? '#7C3AED' : 'transparent',
-                      color: filter === v ? '#fff' : 'rgba(148,163,184,0.52)',
+                      appearance: 'none', paddingRight: 28, paddingLeft: 12,
+                      fontSize: 12, fontWeight: 500, cursor: 'pointer',
                     }}
                   >
-                    {v === 'all' ? t('phonesFilterAll') : v === 'online' ? t('phonesFilterOnline') : t('phonesFilterOffline')}
-                  </button>
-                ))}
-              </div>
-
-              {/* Sync button */}
-              <button
-                onClick={syncFromGeelark}
-                disabled={!bearer || syncing}
-                className="sf-btn sf-btn-primary sf-btn-sm"
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 6,
-                  cursor: (!bearer || syncing) ? 'not-allowed' : 'pointer',
-                  opacity: (!bearer || syncing) ? 0.5 : 1,
-                  flexShrink: 0,
-                }}
-              >
-                <svg width="13" height="13" viewBox="0 0 13 13" fill="none" style={{ animation: syncing ? 'spin 1s linear infinite' : 'none' }}>
-                  <path d="M11 6.5A4.5 4.5 0 1 1 8.5 2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                  <path d="M8 1.5l1.5 1.5L8 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-                {syncing ? t('phonesSyncing') : t('phonesSync')}
-              </button>
-            </div>
-
-            {/* Table */}
-            {loading ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                {/* Stat card skeletons */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 4 }}>
-                  {[0, 1, 2].map(i => (
-                    <div key={i} className="sf-skeleton" style={{ height: 72, borderRadius: 11 }} />
-                  ))}
+                    <option value="all">{t('phonesAllGroups')}</option>
+                    {groups.map(g => <option key={g} value={g}>{g}</option>)}
+                  </select>
+                  <span style={{ position: 'absolute', right: 9, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: 'rgba(148,163,184,0.4)', fontSize: 9 }}>▼</span>
                 </div>
-                {/* Table row skeletons */}
-                <div style={{ background: '#0C0C15', border: '1px solid rgba(255,255,255,0.055)', borderRadius: 11, overflow: 'hidden' }}>
-                  {[0, 1, 2, 3, 4].map(i => (
-                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 16px', borderBottom: i < 4 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
-                      <div className="sf-skeleton" style={{ width: 34, height: 34, borderRadius: 9, flexShrink: 0 }} />
-                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                        <div className="sf-skeleton" style={{ height: 11, width: `${55 + i * 7}%`, borderRadius: 4 }} />
-                        <div className="sf-skeleton" style={{ height: 9, width: '35%', borderRadius: 4 }} />
-                      </div>
-                      <div className="sf-skeleton" style={{ height: 22, width: 70, borderRadius: 20 }} />
-                      <div className="sf-skeleton" style={{ height: 22, width: 58, borderRadius: 20 }} />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : phones.length === 0 ? (
-              /* Empty state */
-              <div style={{
-                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                padding: '72px 32px', textAlign: 'center',
-                background: '#0C0C15', border: '1px solid rgba(255,255,255,0.055)', borderRadius: 15,
-              }}>
+
+                {/* Status filter pills */}
                 <div style={{
-                  width: 64, height: 64, borderRadius: 16, marginBottom: 20,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: 'rgba(124,58,237,0.10)', border: '1px solid rgba(139,92,246,0.22)',
-                  color: '#8B5CF6',
+                  display: 'flex', alignItems: 'center', gap: 2,
+                  background: 'rgba(12,12,21,0.8)', border: '1px solid rgba(255,255,255,0.08)',
+                  borderRadius: 20, padding: '3px 4px', flexShrink: 0,
                 }}>
-                  <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-                    <rect x="6" y="1" width="16" height="26" rx="3.5" stroke="currentColor" strokeWidth="1.8"/>
-                    <circle cx="14" cy="22" r="1.5" fill="currentColor"/>
-                    <path d="M10 5h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                  </svg>
+                  {(['all', 'online', 'offline'] as const).map(v => (
+                    <button
+                      key={v}
+                      onClick={() => setFilter(v)}
+                      style={{
+                        padding: '4px 12px', borderRadius: 16, fontSize: 11, fontWeight: 600,
+                        border: 'none', cursor: 'pointer', transition: 'all 0.15s',
+                        background: filter === v ? '#7C3AED' : 'transparent',
+                        color: filter === v ? '#fff' : 'rgba(148,163,184,0.52)',
+                      }}
+                    >
+                      {v === 'all' ? t('phonesFilterAll') : v === 'online' ? t('phonesFilterOnline') : t('phonesFilterOffline')}
+                    </button>
+                  ))}
                 </div>
-                <p style={{ fontSize: 16, fontWeight: 700, color: '#F2F0FF', margin: '0 0 8px' }}>{t('phonesNoConfigured')}</p>
-                <p style={{ fontSize: 13, color: 'rgba(148,163,184,0.52)', margin: '0 0 24px', maxWidth: 320 }}>
-                  {t('phonesNoConfiguredDesc')}
-                </p>
+
+                {/* Refresh button */}
                 <button
-                  onClick={syncFromGeelark}
-                  disabled={!bearer || syncing}
-                  className="sf-btn sf-btn-primary"
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 8,
-                    cursor: (!bearer || syncing) ? 'not-allowed' : 'pointer',
-                    opacity: (!bearer || syncing) ? 0.5 : 1,
-                  }}
+                  onClick={() => poller.pollNow()}
+                  className="sf-btn sf-btn-secondary sf-btn-sm"
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', flexShrink: 0 }}
+                  title="Refresh now"
                 >
-                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                    <path d="M12 7A5 5 0 1 1 9.5 2.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
-                    <path d="M9 1l1.5 1.5L9 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                  <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                    <path d="M11 6.5A4.5 4.5 0 1 1 8.5 2.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+                    <path d="M8 1.5l1.5 1.5L8 4.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
-                  {t('phonesSyncGeelark')}
+                  {t('phonesSync')}
                 </button>
               </div>
-            ) : (
-              <div style={{
-                background: '#0C0C15', border: '1px solid rgba(255,255,255,0.055)',
-                borderRadius: 11, overflow: 'hidden',
-              }}>
-                {/* Table header */}
-                <div style={{
-                  display: 'grid', gridTemplateColumns: COLS,
-                  alignItems: 'center', padding: '10px 16px',
-                  borderBottom: '1px solid rgba(255,255,255,0.055)',
-                  background: 'rgba(255,255,255,0.018)',
-                  fontSize: 10, fontWeight: 600, textTransform: 'uppercase',
-                  letterSpacing: '0.07em', color: 'rgba(148,163,184,0.45)',
-                  userSelect: 'none',
-                }}>
-                  <span>{t('phonesTableNum')}</span>
-                  <span>{t('phonesTablePhone')}</span>
-                  <span>{t('phonesTableGroup')}</span>
-                  <span>{t('phonesTableGeelark')}</span>
-                  <span>{t('phonesTableActions')}</span>
-                </div>
 
-                {visible.length === 0 ? (
-                  <p style={{ padding: '40px 20px', textAlign: 'center', fontSize: 13, color: 'rgba(148,163,184,0.52)', margin: 0 }}>
-                    {t('phonesNoSearchResults')}
-                  </p>
+              {/* ── Alerts ───────────────────────────────────────────────── */}
+              {(!bearer || error || pollError) && (
+                <div style={{ padding: '12px 28px 0', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {!bearer && (
+                    <div className="sf-anim-slide-up" style={{
+                      padding: '10px 14px', borderRadius: 10,
+                      background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.18)',
+                      color: '#F59E0B', fontSize: 13, display: 'flex', alignItems: 'center', gap: 8,
+                    }}>
+                      <svg width="15" height="15" viewBox="0 0 15 15" fill="none" style={{ flexShrink: 0 }}>
+                        <path d="M7.5 1L14 13.5H1L7.5 1z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/>
+                        <path d="M7.5 6v3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+                        <circle cx="7.5" cy="11" r="0.7" fill="currentColor"/>
+                      </svg>
+                      {t('phoneMissingToken')}
+                    </div>
+                  )}
+                  {error && (
+                    <div className="sf-anim-slide-up" style={{
+                      padding: '10px 14px', borderRadius: 10,
+                      background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.18)',
+                      color: '#EF4444', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+                    }}>
+                      <span>{error}</span>
+                      <button onClick={() => setError(null)} className="sf-press" style={{ background: 'none', border: 'none', color: '#EF4444', cursor: 'pointer', opacity: 0.6, padding: 0 }}>
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
+                      </button>
+                    </div>
+                  )}
+                  {pollError && (
+                    <div className="sf-anim-slide-up" style={{
+                      padding: '10px 14px', borderRadius: 10,
+                      background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.18)',
+                      color: '#F59E0B', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+                    }}>
+                      <span>{pollError}</span>
+                      <button onClick={() => setPollError(null)} className="sf-press" style={{ background: 'none', border: 'none', color: '#F59E0B', cursor: 'pointer', opacity: 0.6, padding: 0 }}>
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ── Content ───────────────────────────────────────────────── */}
+              <div style={{ flex: 1, padding: '16px 28px 28px' }}>
+
+                {loading ? (
+                  /* ── Loading skeleton rows ─────────────────────────────── */
+                  <div className="sf-table-wrap">
+                    <table className="sf-table">
+                      <thead>
+                        <tr>
+                          <th style={{ width: 44 }}></th>
+                          <th>{t('phonesDetailModel')}</th>
+                          <th style={{ width: 120 }}>{t('phonesDetailGroup')}</th>
+                          <th style={{ width: 160 }}>Instagram</th>
+                          <th style={{ width: 110 }}>{t('phonesIgStatus')}</th>
+                          <th style={{ width: 150 }}>Note</th>
+                          <th style={{ width: 90 }}></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[0,1,2,3,4,5,6,7].map(i => (
+                          <tr key={i}>
+                            <td style={{ textAlign: 'center' }}><div className="sf-skeleton" style={{ width: 8, height: 8, borderRadius: '50%', margin: '0 auto' }} /></td>
+                            <td>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                <div className="sf-skeleton" style={{ width: 30, height: 30, borderRadius: 8, flexShrink: 0 }} />
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                                  <div className="sf-skeleton" style={{ height: 11, width: 110, borderRadius: 3 }} />
+                                  <div className="sf-skeleton" style={{ height: 8, width: 70, borderRadius: 3 }} />
+                                </div>
+                              </div>
+                            </td>
+                            <td><div className="sf-skeleton" style={{ height: 20, width: 65, borderRadius: 5 }} /></td>
+                            <td><div className="sf-skeleton" style={{ height: 20, width: 100, borderRadius: 20 }} /></td>
+                            <td><div className="sf-skeleton" style={{ height: 20, width: 75, borderRadius: 20 }} /></td>
+                            <td><div className="sf-skeleton" style={{ height: 11, width: 90, borderRadius: 3 }} /></td>
+                            <td></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                ) : phones.length === 0 ? (
+                  /* ── Empty state ────────────────────────────────────────── */
+                  <div className="sf-empty sf-reveal">
+                    <div className="sf-empty-icon" style={{ width: 64, height: 64, borderRadius: 18 }}>
+                      <svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="#a78bfa" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="6" y="1" width="16" height="26" rx="3.5"/>
+                        <circle cx="14" cy="22" r="1.5" fill="#a78bfa" stroke="none"/>
+                        <path d="M10 5h8"/>
+                      </svg>
+                    </div>
+                    <p className="sf-empty-title">{t('phonesNoConfigured')}</p>
+                    <p className="sf-empty-desc">{t('phonesNoConfiguredDesc')}</p>
+                    <button
+                      onClick={syncFromGeelark}
+                      disabled={!bearer || syncing}
+                      className="sf-btn sf-btn-primary"
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 8,
+                        cursor: (!bearer || syncing) ? 'not-allowed' : 'pointer',
+                        opacity: (!bearer || syncing) ? 0.5 : 1,
+                      }}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                        <path d="M12 7A5 5 0 1 1 9.5 2.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+                        <path d="M9 1l1.5 1.5L9 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                      {t('phonesSyncGeelark')}
+                    </button>
+                  </div>
+
+                ) : visible.length === 0 ? (
+                  /* ── No search results ──────────────────────────────────── */
+                  <div className="sf-empty sf-reveal">
+                    <div className="sf-empty-icon">
+                      <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="#a78bfa" strokeWidth="1.6" strokeLinecap="round">
+                        <circle cx="9.5" cy="9.5" r="7"/>
+                        <path d="M15 15l5 5"/>
+                        <path d="M7 9.5h5M9.5 7v5" strokeLinejoin="round"/>
+                      </svg>
+                    </div>
+                    <p className="sf-empty-title">{t('phonesNoSearchResults')}</p>
+                    <p className="sf-empty-desc">Try adjusting your search or filters.</p>
+                  </div>
+
                 ) : (
-                  visible.map((phone, i) => {
-                    const col = phoneColor(phone.phone_name)
-                    const isSelected = selectedPhone?.id === phone.id
-                    return (
-                      <PhoneRow
-                        key={phone.id}
-                        phone={phone}
-                        index={i}
-                        isSelected={isSelected}
-                        isLast={i === visible.length - 1}
-                        col={col}
-                        phones={phones}
-                        COLS={COLS}
-                        relativeTime={relativeTime}
-                        setSelectedPhone={setSelectedPhone}
-                        setContextMenu={setContextMenu}
-                        setSessionDialog={setSessionDialog}
-                        saveIgUsername={saveIgUsername}
-                        saveRemark={saveRemark}
-                        unlinkIg={unlinkIg}
-                        deletePhone={deletePhone}
-                        canDelete={canDelete}
-                        ActionBtn={ActionBtn}
-                      />
-                    )
-                  })
+                  /* ── Phone table list ───────────────────────────────────── */
+                  <div className="sf-table-wrap">
+                    <table className="sf-table">
+                      <thead>
+                        <tr>
+                          <th style={{ width: 44 }}></th>
+                          <th>{t('phonesDetailModel')}</th>
+                          <th style={{ width: 120 }}>{t('phonesDetailGroup')}</th>
+                          <th style={{ width: 160 }}>Instagram</th>
+                          <th style={{ width: 110 }}>{t('phonesIgStatus')}</th>
+                          <th style={{ width: 150 }}>Note</th>
+                          <th style={{ width: 90 }}></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {visible.map((phone, i) => {
+                          const col = phoneColor(phone.phone_name)
+                          return (
+                            <PhoneRow
+                              key={phone.id}
+                              phone={phone}
+                              index={i}
+                              isSelected={selectedPhone?.id === phone.id}
+                              isLast={i === visible.length - 1}
+                              col={col}
+                              phones={phones}
+                              COLS={COLS}
+                              relativeTime={relativeTime}
+                              setSelectedPhone={setSelectedPhone}
+                              setContextMenu={setContextMenu}
+                              setSessionDialog={setSessionDialog}
+                              saveIgUsername={saveIgUsername}
+                              saveRemark={saveRemark}
+                              unlinkIg={unlinkIg}
+                              deletePhone={deletePhone}
+                              canDelete={canDelete}
+                              ActionBtn={ActionBtn}
+                            />
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {!loading && visible.length > 0 && (
+                  <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.3)', marginTop: 16, textAlign: 'center' }}>
+                    {visible.length} {t('phonesCountOf')} {phones.length} {phones.length > 1 ? t('phonesPhonesPlural') : t('phonesPhonesSuffix')}
+                  </p>
                 )}
               </div>
-            )}
+            </div>
 
-            {!loading && visible.length > 0 && (
-              <p style={{ fontSize: 11, color: 'rgba(148,163,184,0.3)', marginTop: 10 }}>
-                {visible.length} {t('phonesCountOf')} {phones.length} {phones.length > 1 ? t('phonesPhonesPlural') : t('phonesPhonesSuffix')}
-                {lastUpdated && (
-                  <span> · {t('phonesUpdatedAt')} {lastUpdated.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
-                )}
-              </p>
-            )}
-          </div>
-
-          {/* ── Right detail panel ──────────────────────────────────────────── */}
-          {selectedPhone && (() => {
-            const p = selectedPhone
-            const col = phoneColor(p.phone_name)
-            return (
-              <div style={{
-                width: 300, flexShrink: 0,
-                borderLeft: '1px solid rgba(255,255,255,0.055)',
-                background: '#0C0C15', overflowY: 'auto',
-              }}>
-                {/* Panel header */}
-                <div style={{ padding: '18px 18px 14px', borderBottom: '1px solid rgba(255,255,255,0.055)' }}>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <div style={{
-                        width: 40, height: 40, borderRadius: 11, flexShrink: 0,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        background: `linear-gradient(135deg, ${col}22, ${col}11)`,
-                        border: `1px solid ${col}33`, color: col,
-                      }}>
-                        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                          <rect x="4" y="1" width="10" height="16" rx="2.5" stroke="currentColor" strokeWidth="1.5"/>
-                          <circle cx="9" cy="14" r="0.8" fill="currentColor"/>
-                        </svg>
+            {/* ── Right detail panel ──────────────────────────────────────── */}
+            {selectedPhone && (() => {
+              const p = selectedPhone
+              const col = phoneColor(p.phone_name)
+              return (
+                <div className="sf-reveal" style={{
+                  width: 300, flexShrink: 0,
+                  borderLeft: '1px solid rgba(139,92,246,0.12)',
+                  background: 'rgba(12,12,21,0.95)', overflowY: 'auto',
+                }}>
+                  {/* Panel header */}
+                  <div style={{ padding: '20px 18px 16px', borderBottom: '1px solid rgba(255,255,255,0.055)' }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <div style={{
+                          width: 42, height: 42, borderRadius: 12, flexShrink: 0,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          background: `linear-gradient(135deg, ${col}25, ${col}0d)`,
+                          border: `1px solid ${col}33`, color: col,
+                        }}>
+                          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                            <rect x="4" y="1" width="10" height="16" rx="2.5" stroke="currentColor" strokeWidth="1.5"/>
+                            <circle cx="9" cy="14" r="0.8" fill="currentColor"/>
+                          </svg>
+                        </div>
+                        <div>
+                          <p style={{ fontSize: 14, fontWeight: 700, color: '#F2F0FF', margin: 0, lineHeight: 1.2 }}>{p.phone_name}</p>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
+                            <StatusDot status={p.status ?? 'offline'} />
+                            {p.group_name && (
+                              <span style={{
+                                fontSize: 10, padding: '2px 7px', borderRadius: 5, fontWeight: 600,
+                                background: 'rgba(139,92,246,0.12)', color: '#A78BFA',
+                                border: '1px solid rgba(139,92,246,0.22)',
+                              }}>
+                                {p.group_name}
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <p style={{ fontSize: 14, fontWeight: 700, color: '#F2F0FF', margin: 0, lineHeight: 1.2 }}>{p.phone_name}</p>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
-                          <StatusDot status={p.status ?? 'offline'} />
-                          {p.group_name && (
-                            <span style={{
-                              fontSize: 10, padding: '2px 6px', borderRadius: 4, fontWeight: 600,
-                              background: 'rgba(139,92,246,0.12)', color: '#A78BFA',
-                              border: '1px solid rgba(139,92,246,0.22)',
-                            }}>
-                              {p.group_name}
-                            </span>
-                          )}
+                      <button
+                        onClick={() => setSelectedPhone(null)}
+                        className="sf-btn sf-btn-ghost sf-btn-icon"
+                        style={{ width: 26, height: 26, borderRadius: 7, flexShrink: 0, cursor: 'pointer' }}
+                      >
+                        <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                          <path d="M1 1l8 8M9 1L1 9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+                        </svg>
+                      </button>
+                    </div>
+                    {/* Quick actions */}
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      {[
+                        { label: t('phoneSession'), icon: <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="1.5" y="5" width="9" height="6.5" rx="1.2" stroke="currentColor" strokeWidth="1.3"/><path d="M4 5V3.5a2 2 0 0 1 4 0V5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>, action: () => setSessionDialog({ phone: p }) },
+                        { label: t('phonesSync'), icon: <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M10.5 6A4.5 4.5 0 1 1 8 2.2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/><path d="M7.5 1l1.5 1.5L7.5 4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>, action: () => poller.pollNow() },
+                      ].map(a => (
+                        <button key={a.label} onClick={a.action}
+                          style={{
+                            flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                            padding: '7px 0', borderRadius: 8, fontSize: 11, fontWeight: 500,
+                            background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)',
+                            color: 'rgba(196,181,253,0.72)', cursor: 'pointer', transition: 'all 0.15s',
+                          }}
+                          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(139,92,246,0.1)'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(139,92,246,0.25)' }}
+                          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.04)'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.09)' }}
+                        >
+                          {a.icon}{a.label}
+                        </button>
+                      ))}
+                      <button
+                        onClick={e => { e.stopPropagation(); setContextMenu({ phone: p, x: e.clientX, y: e.clientY }) }}
+                        className="sf-press"
+                        style={{
+                          width: 34, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          borderRadius: 8, background: 'rgba(255,255,255,0.04)',
+                          border: '1px solid rgba(255,255,255,0.09)',
+                          color: 'rgba(148,163,184,0.52)', cursor: 'pointer',
+                        }}
+                      >
+                        <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                          <circle cx="6.5" cy="2" r="1" fill="currentColor"/>
+                          <circle cx="6.5" cy="6.5" r="1" fill="currentColor"/>
+                          <circle cx="6.5" cy="11" r="1" fill="currentColor"/>
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Info rows */}
+                  <div style={{ padding: '16px 18px', borderBottom: '1px solid rgba(255,255,255,0.055)' }}>
+                    <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(148,163,184,0.35)', margin: '0 0 12px' }}>{t('phonesInfoSection')}</p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+                      {[
+                        { label: t('phonesDetailModel'),    value: p.phone_name },
+                        { label: t('phonesDetailSerial'),   value: p.serial_no ?? '—' },
+                        { label: t('phonesDetailGeelarkId'), value: p.geelark_id ?? '—' },
+                        { label: t('phonesDetailGroup'),    value: p.group_name ?? '—' },
+                        { label: t('phonesDetailLastSync'), value: p.synced_at ? relativeTime(p.synced_at) : '—' },
+                      ].map(row => (
+                        <div key={row.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                          <span style={{ fontSize: 11, color: 'rgba(148,163,184,0.45)', flexShrink: 0 }}>{row.label}</span>
+                          <span style={{ fontSize: 11, fontWeight: 500, color: '#F2F0FF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 160, textAlign: 'right' }}>{row.value}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Instagram section */}
+                  {p.ig_username && (
+                    <div style={{ padding: '16px 18px', borderBottom: '1px solid rgba(255,255,255,0.055)' }}>
+                      <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(148,163,184,0.35)', margin: '0 0 12px' }}>{t('phonesIgSection')}</p>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                        <div style={{
+                          width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          color: 'white', fontSize: 13, fontWeight: 700,
+                          background: 'linear-gradient(135deg, #833ab4, #fd1d1d, #fcb045)',
+                        }}>
+                          {p.ig_username.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <p style={{ fontSize: 13, fontWeight: 600, color: '#8B5CF6', margin: 0 }}>@{p.ig_username}</p>
+                          {(p.followers || p.following) ? (
+                            <p style={{ fontSize: 10, color: 'rgba(148,163,184,0.45)', margin: '2px 0 0' }}>
+                              {p.followers ? `${p.followers >= 1000 ? `${(p.followers / 1000).toFixed(1)}K` : p.followers} ${t('phonesIgFollowers')}` : ''}
+                              {p.followers && p.following ? ' · ' : ''}
+                              {p.following ? `${p.following} ${t('phonesIgFollowing')}` : ''}
+                            </p>
+                          ) : null}
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span style={{ fontSize: 11, color: 'rgba(148,163,184,0.45)' }}>{t('phonesIgStatus')}</span>
+                          <span style={{
+                            fontSize: 11, fontWeight: 600,
+                            color: p.ig_status === 'active' ? '#22C55E' : (p.ig_status === 'expired' || p.ig_status === 'error') ? '#EF4444' : 'rgba(148,163,184,0.52)',
+                          }}>
+                            {p.ig_status === 'active' ? t('phonesIgStatusActive') : p.ig_status === 'expired' ? t('phonesIgStatusExpired') : p.ig_status === 'error' ? t('phonesIgStatusError') : t('phonesIgNotConfigured')}
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span style={{ fontSize: 11, color: 'rgba(148,163,184,0.45)' }}>{t('phonesIgSession')}</span>
+                          <span style={{ fontSize: 11, fontWeight: 600, color: p.ig_sessionid ? '#22C55E' : 'rgba(148,163,184,0.52)' }}>
+                            {p.ig_sessionid ? t('phonesIgSessionConfigured') : t('phonesIgNotConfigured')}
+                          </span>
                         </div>
                       </div>
                     </div>
-                    <button
-                      onClick={() => setSelectedPhone(null)}
-                      style={{
-                        width: 26, height: 26, borderRadius: 6, flexShrink: 0,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)',
-                        color: 'rgba(148,163,184,0.52)', cursor: 'pointer',
-                      }}
-                    >
-                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                        <path d="M1 1l8 8M9 1L1 9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
-                      </svg>
-                    </button>
-                  </div>
+                  )}
+
                   {/* Quick actions */}
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    {[
-                      { label: t('phoneSession'), icon: <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="1.5" y="5" width="9" height="6.5" rx="1.2" stroke="currentColor" strokeWidth="1.3"/><path d="M4 5V3.5a2 2 0 0 1 4 0V5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>, action: () => setSessionDialog({ phone: p }) },
-                      { label: t('phonesSync'), icon: <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M10.5 6A4.5 4.5 0 1 1 8 2.2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/><path d="M7.5 1l1.5 1.5L7.5 4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>, action: () => poller.pollNow() },
-                    ].map(a => (
-                      <button key={a.label} onClick={a.action}
-                        style={{
-                          flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
-                          padding: '6px 0', borderRadius: 7, fontSize: 11, fontWeight: 500,
-                          background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)',
-                          color: 'rgba(196,181,253,0.72)', cursor: 'pointer', transition: 'all 0.15s',
-                        }}
-                      >
-                        {a.icon}{a.label}
-                      </button>
-                    ))}
-                    <button
-                      onClick={e => { e.stopPropagation(); setContextMenu({ phone: p, x: e.clientX, y: e.clientY }) }}
-                      style={{
-                        width: 32, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        borderRadius: 7, background: 'rgba(255,255,255,0.05)',
-                        border: '1px solid rgba(255,255,255,0.09)',
-                        color: 'rgba(148,163,184,0.52)', cursor: 'pointer',
-                      }}
-                    >
-                      <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-                        <circle cx="6.5" cy="2" r="1" fill="currentColor"/>
-                        <circle cx="6.5" cy="6.5" r="1" fill="currentColor"/>
-                        <circle cx="6.5" cy="11" r="1" fill="currentColor"/>
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Info rows */}
-                <div style={{ padding: '14px 18px', borderBottom: '1px solid rgba(255,255,255,0.055)' }}>
-                  <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'rgba(148,163,184,0.35)', margin: '0 0 10px' }}>{t('phonesInfoSection')}</p>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {[
-                      { label: t('phonesDetailModel'),    value: p.phone_name },
-                      { label: t('phonesDetailSerial'),   value: p.serial_no ?? '—' },
-                      { label: t('phonesDetailGeelarkId'), value: p.geelark_id ?? '—' },
-                      { label: t('phonesDetailGroup'),    value: p.group_name ?? '—' },
-                      { label: t('phonesDetailLastSync'), value: p.synced_at ? relativeTime(p.synced_at) : '—' },
-                    ].map(row => (
-                      <div key={row.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                        <span style={{ fontSize: 11, color: 'rgba(148,163,184,0.45)', flexShrink: 0 }}>{row.label}</span>
-                        <span style={{ fontSize: 11, fontWeight: 500, color: '#F2F0FF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 160, textAlign: 'right' }}>{row.value}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Instagram section */}
-                {p.ig_username && (
-                  <div style={{ padding: '14px 18px', borderBottom: '1px solid rgba(255,255,255,0.055)' }}>
-                    <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'rgba(148,163,184,0.35)', margin: '0 0 10px' }}>{t('phonesIgSection')}</p>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-                      <div style={{
-                        width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        color: 'white', fontSize: 13, fontWeight: 700,
-                        background: 'linear-gradient(135deg, #833ab4, #fd1d1d, #fcb045)',
+                  <div style={{ padding: '16px 18px' }}>
+                    <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(148,163,184,0.35)', margin: '0 0 10px' }}>{t('phonesQuickActions')}</p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <button onClick={() => setSessionDialog({ phone: p })} className="sf-btn sf-btn-ghost" style={{
+                        width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px',
+                        borderRadius: 8, fontSize: 12, fontWeight: 500, textAlign: 'left',
+                        color: 'rgba(196,181,253,0.72)', cursor: 'pointer',
+                        justifyContent: 'flex-start',
                       }}>
-                        {p.ig_username.charAt(0).toUpperCase()}
-                      </div>
-                      <div>
-                        <p style={{ fontSize: 13, fontWeight: 600, color: '#8B5CF6', margin: 0 }}>@{p.ig_username}</p>
-                        {(p.followers || p.following) ? (
-                          <p style={{ fontSize: 10, color: 'rgba(148,163,184,0.45)', margin: '2px 0 0' }}>
-                            {p.followers ? `${p.followers >= 1000 ? `${(p.followers / 1000).toFixed(1)}K` : p.followers} ${t('phonesIgFollowers')}` : ''}
-                            {p.followers && p.following ? ' · ' : ''}
-                            {p.following ? `${p.following} ${t('phonesIgFollowing')}` : ''}
-                          </p>
-                        ) : null}
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: 11, color: 'rgba(148,163,184,0.45)' }}>{t('phonesIgStatus')}</span>
-                        <span style={{
-                          fontSize: 11, fontWeight: 600,
-                          color: p.ig_status === 'active' ? '#22C55E' : (p.ig_status === 'expired' || p.ig_status === 'error') ? '#EF4444' : 'rgba(148,163,184,0.52)',
+                        <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x="1.5" y="5.5" width="10" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.4"/><path d="M4.5 5.5V4a2 2 0 0 1 4 0v1.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
+                        {t('phonesSessionIdAction')}
+                      </button>
+                      {p.ig_username && (
+                        <button onClick={() => { unlinkIg(p.id); setSelectedPhone(null) }} className="sf-btn sf-btn-ghost" style={{
+                          width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px',
+                          borderRadius: 8, fontSize: 12, fontWeight: 500, textAlign: 'left',
+                          color: 'rgba(196,181,253,0.72)', cursor: 'pointer',
+                          justifyContent: 'flex-start',
                         }}>
-                          {p.ig_status === 'active' ? t('phonesIgStatusActive') : p.ig_status === 'expired' ? t('phonesIgStatusExpired') : p.ig_status === 'error' ? t('phonesIgStatusError') : t('phonesIgNotConfigured')}
-                        </span>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: 11, color: 'rgba(148,163,184,0.45)' }}>{t('phonesIgSession')}</span>
-                        <span style={{ fontSize: 11, fontWeight: 600, color: p.ig_sessionid ? '#22C55E' : 'rgba(148,163,184,0.52)' }}>
-                          {p.ig_sessionid ? t('phonesIgSessionConfigured') : t('phonesIgNotConfigured')}
-                        </span>
-                      </div>
+                          <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 6.5C2 4 4 2 6.5 2s4.5 2 4.5 4.5S9 11 6.5 11" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/><path d="M2 11l4-4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
+                          {t('phonesUnlinkIgAction')}
+                        </button>
+                      )}
+                      {canDelete && (
+                        <button onClick={() => { deletePhone(p.id); setSelectedPhone(null) }} className="sf-btn sf-btn-ghost" style={{
+                          width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px',
+                          borderRadius: 8, fontSize: 12, fontWeight: 500, textAlign: 'left',
+                          color: '#EF4444', cursor: 'pointer',
+                          justifyContent: 'flex-start',
+                        }}>
+                          <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 3.5h9M5 3.5V2h3v1.5M4.5 3.5l.5 7h3l.5-7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                          {t('phonesDeleteAction')}
+                        </button>
+                      )}
                     </div>
-                  </div>
-                )}
-
-                {/* Actions rapides */}
-                <div style={{ padding: '14px 18px' }}>
-                  <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'rgba(148,163,184,0.35)', margin: '0 0 8px' }}>{t('phonesQuickActions')}</p>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    <button onClick={() => setSessionDialog({ phone: p })} style={{
-                      width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px',
-                      borderRadius: 7, fontSize: 12, fontWeight: 500, textAlign: 'left',
-                      background: 'none', border: 'none', color: 'rgba(196,181,253,0.72)', cursor: 'pointer',
-                      transition: 'background 0.12s',
-                    }}
-                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.05)' }}
-                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'none' }}
-                    >
-                      <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x="1.5" y="5.5" width="10" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.4"/><path d="M4.5 5.5V4a2 2 0 0 1 4 0v1.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
-                      {t('phonesSessionIdAction')}
-                    </button>
-                    {p.ig_username && (
-                      <button onClick={() => { unlinkIg(p.id); setSelectedPhone(null) }} style={{
-                        width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px',
-                        borderRadius: 7, fontSize: 12, fontWeight: 500, textAlign: 'left',
-                        background: 'none', border: 'none', color: 'rgba(196,181,253,0.72)', cursor: 'pointer',
-                        transition: 'background 0.12s',
-                      }}
-                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.05)' }}
-                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'none' }}
-                      >
-                        <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 6.5C2 4 4 2 6.5 2s4.5 2 4.5 4.5S9 11 6.5 11" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/><path d="M2 11l4-4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
-                        {t('phonesUnlinkIgAction')}
-                      </button>
-                    )}
-                    {canDelete && (
-                      <button onClick={() => { deletePhone(p.id); setSelectedPhone(null) }} style={{
-                        width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px',
-                        borderRadius: 7, fontSize: 12, fontWeight: 500, textAlign: 'left',
-                        background: 'none', border: 'none', color: '#EF4444', cursor: 'pointer',
-                        transition: 'background 0.12s',
-                      }}
-                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.08)' }}
-                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'none' }}
-                      >
-                        <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 3.5h9M5 3.5V2h3v1.5M4.5 3.5l.5 7h3l.5-7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                        {t('phonesDeleteAction')}
-                      </button>
-                    )}
                   </div>
                 </div>
-              </div>
-            )
-          })()}
+              )
+            })()}
+          </div>
         </div>
       </div>
-      </div>{/* end scrollable wrapper */}
     </>
   )
 }
 
-// ── PhoneRow sub-component (keeps hover state local) ─────────────────────────
+// ── PhoneCard sub-component ───────────────────────────────────────────────────
+function PhoneCard({
+  phone, index, isSelected, col, phones,
+  relativeTime, setSelectedPhone, setContextMenu, setSessionDialog,
+  saveIgUsername, saveRemark, unlinkIg, deletePhone, canDelete,
+}: {
+  phone: Phone; index: number; isSelected: boolean; col: string
+  phones: Phone[]
+  relativeTime: (iso: string) => string
+  setSelectedPhone: (p: Phone | null) => void
+  setContextMenu: (v: { phone: Phone; x: number; y: number } | null) => void
+  setSessionDialog: (v: { phone: Phone } | null) => void
+  saveIgUsername: (id: string, u: string) => Promise<void>
+  saveRemark: (id: string, v: string) => Promise<void>
+  unlinkIg: (id: string) => Promise<void>
+  deletePhone: (id: string) => Promise<void>
+  canDelete: boolean
+}) {
+  const t = useT()
+  const online = phone.status === 'online'
+
+  return (
+    <div
+      className="sf-card anim-scale-in"
+      style={{
+        padding: '16px',
+        display: 'flex', flexDirection: 'column', gap: 12,
+        cursor: 'pointer',
+        borderColor: isSelected ? 'rgba(139,92,246,0.45)' : undefined,
+        boxShadow: isSelected ? '0 0 0 1px rgba(139,92,246,0.2), 0 8px 32px -8px rgba(0,0,0,0.5)' : undefined,
+        position: 'relative', overflow: 'hidden',
+      }}
+      onClick={() => setSelectedPhone(isSelected ? null : phone)}
+      onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setContextMenu({ phone, x: e.clientX, y: e.clientY }) }}
+    >
+      {/* Subtle top highlight when selected */}
+      {isSelected && (
+        <div style={{
+          position: 'absolute', top: 0, left: 0, right: 0, height: 2,
+          background: 'linear-gradient(90deg, transparent, rgba(139,92,246,0.6), transparent)',
+          pointerEvents: 'none',
+        }} />
+      )}
+
+      {/* Card header: icon + name + status */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+        {/* Phone icon with gradient */}
+        <div style={{
+          width: 40, height: 40, borderRadius: 11, flexShrink: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: `linear-gradient(135deg, ${col}22, ${col}0d)`,
+          border: `1px solid ${col}2e`, color: col,
+        }}>
+          <svg width="17" height="17" viewBox="0 0 17 17" fill="none">
+            <rect x="3.5" y="1" width="10" height="15" rx="2.5" stroke="currentColor" strokeWidth="1.4"/>
+            <circle cx="8.5" cy="13.5" r="0.8" fill="currentColor"/>
+          </svg>
+        </div>
+
+        {/* Name + serial */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{
+            fontSize: 13, fontWeight: 700, color: '#F2F0FF',
+            margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            lineHeight: 1.3,
+          }}>
+            {phone.phone_name}
+          </p>
+          {(phone.serial_no || phone.geelark_id) && (
+            <p style={{ fontSize: 10, fontFamily: 'monospace', color: 'rgba(148,163,184,0.35)', margin: '2px 0 0' }}>
+              {phone.serial_no ? `SN: ${phone.serial_no}` : `GL: ${phone.geelark_id}`}
+            </p>
+          )}
+        </div>
+
+        {/* Online/offline status */}
+        <StatusDot status={phone.status ?? 'offline'} />
+      </div>
+
+      {/* Badges row: IG username + group + IG status */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+        {phone.ig_username ? (
+          <div style={{
+            display: 'inline-flex', alignItems: 'center', gap: 5,
+            padding: '3px 8px 3px 5px', borderRadius: 20,
+            background: 'linear-gradient(135deg, rgba(131,58,180,0.12), rgba(252,29,29,0.06))',
+            border: '1px solid rgba(139,92,246,0.2)',
+          }}>
+            <div style={{
+              width: 16, height: 16, borderRadius: '50%',
+              background: 'linear-gradient(135deg, #833ab4, #fd1d1d)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 8, fontWeight: 700, color: '#fff', flexShrink: 0,
+            }}>
+              {phone.ig_username.charAt(0).toUpperCase()}
+            </div>
+            <span style={{ fontSize: 11, fontWeight: 600, color: '#a78bfa' }}>@{phone.ig_username}</span>
+          </div>
+        ) : (
+          <span style={{ fontSize: 11, color: 'rgba(148,163,184,0.3)', fontStyle: 'italic' }}>{t('phoneIgCellAdd')}</span>
+        )}
+
+        {phone.group_name && (
+          <span style={{
+            fontSize: 10, padding: '2px 7px', borderRadius: 5, fontWeight: 600,
+            background: 'rgba(139,92,246,0.1)', color: '#A78BFA',
+            border: '1px solid rgba(139,92,246,0.18)',
+          }}>
+            {phone.group_name}
+          </span>
+        )}
+
+        <span style={{ marginLeft: 'auto' }}>
+          <IgStatusBadge phone={phone} />
+        </span>
+      </div>
+
+      {/* Remark (if any) */}
+      {phone.remark && (
+        <p style={{
+          fontSize: 11, color: 'rgba(196,181,253,0.55)', margin: 0,
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          fontStyle: 'italic',
+        }}>
+          {phone.remark}
+        </p>
+      )}
+
+      {/* Action buttons */}
+      <div
+        style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}
+        onClick={e => e.stopPropagation()}
+      >
+        <button
+          className="sf-btn sf-btn-secondary sf-btn-sm"
+          onClick={() => setSessionDialog({ phone })}
+          title={t('phonesRowSessionId')}
+          style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, cursor: 'pointer' }}
+        >
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+            <rect x="1.5" y="5" width="9" height="6.5" rx="1.2" stroke="currentColor" strokeWidth="1.3"/>
+            <path d="M4 5V3.5a2 2 0 0 1 4 0V5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+          </svg>
+          {t('phoneSession')}
+        </button>
+        <button
+          className="sf-btn sf-btn-ghost sf-btn-sm sf-btn-icon"
+          onClick={() => setSelectedPhone(isSelected ? null : phone)}
+          title={t('phonesRowViewDetails')}
+          style={{ width: 30, height: 30, cursor: 'pointer' }}
+        >
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+            <ellipse cx="6.5" cy="6.5" rx="5" ry="3" stroke="currentColor" strokeWidth="1.4"/>
+            <circle cx="6.5" cy="6.5" r="1.5" fill="currentColor"/>
+          </svg>
+        </button>
+        <button
+          className="sf-btn sf-btn-ghost sf-btn-sm sf-btn-icon"
+          onClick={e => { e.stopPropagation(); setContextMenu({ phone, x: e.clientX, y: e.clientY }) }}
+          title="More options"
+          style={{ width: 30, height: 30, cursor: 'pointer' }}
+        >
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+            <circle cx="2" cy="6.5" r="1" fill="currentColor"/>
+            <circle cx="6.5" cy="6.5" r="1" fill="currentColor"/>
+            <circle cx="11" cy="6.5" r="1" fill="currentColor"/>
+          </svg>
+        </button>
+        {canDelete && (
+          <button
+            className="sf-btn sf-btn-ghost sf-btn-sm sf-btn-icon"
+            onClick={() => deletePhone(phone.id)}
+            title={t('phonesRowDelete')}
+            style={{ width: 30, height: 30, color: '#EF4444', cursor: 'pointer' }}
+          >
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+              <path d="M2 3.5h9M5 3.5V2h3v1.5M4.5 3.5l.5 7h3l.5-7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// Keep legacy PhoneRow for compatibility (used by ActionBtn)
 function PhoneRow({
   phone, index, isSelected, isLast, col, phones, COLS,
   relativeTime, setSelectedPhone, setContextMenu, setSessionDialog,
@@ -1555,115 +1793,131 @@ function PhoneRow({
 }) {
   const t = useT()
   const [hovered, setHovered] = useState(false)
-
-  const rowBg = isSelected
-    ? 'rgba(124,58,237,0.07)'
-    : hovered
-    ? 'rgba(139,92,246,0.03)'
-    : 'transparent'
+  const online = phone.status === 'online'
 
   const cellStyle: React.CSSProperties = {
+    padding: '9px 12px',
+    background: isSelected ? 'rgba(124,58,237,0.07)' : 'transparent',
     transition: 'background 0.12s',
   }
 
   return (
-    <div
-      style={{
-        display: 'grid', gridTemplateColumns: COLS,
-        alignItems: 'center', padding: '11px 16px',
-        background: rowBg,
-        borderBottom: isLast ? 'none' : '1px solid rgba(255,255,255,0.04)',
-        borderLeft: (isSelected || hovered) ? '3px solid #7C3AED' : '3px solid transparent',
-        transition: 'background 0.15s, border-color 0.15s',
-        cursor: 'pointer',
-      }}
+    <tr
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onClick={() => setSelectedPhone(isSelected ? null : phone)}
       onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setContextMenu({ phone, x: e.clientX, y: e.clientY }) }}
+      style={{ cursor: 'pointer' }}
     >
-      {/* # */}
-      <span style={{ ...cellStyle, fontSize: 11, color: 'rgba(148,163,184,0.3)', fontVariantNumeric: 'tabular-nums' }}>{index + 1}</span>
+      {/* Status dot — first td carries the left accent bar */}
+      <td style={{
+        ...cellStyle,
+        width: 44, textAlign: 'center',
+        boxShadow: isSelected ? 'inset 3px 0 0 rgba(139,92,246,0.75)' : 'none',
+      }}>
+        <span style={{
+          display: 'inline-block',
+          width: 8, height: 8, borderRadius: '50%',
+          background: online ? '#22C55E' : 'rgba(148,163,184,0.22)',
+          boxShadow: online ? '0 0 0 3px rgba(34,197,94,0.15)' : 'none',
+          flexShrink: 0,
+        }} />
+      </td>
 
-      {/* Téléphone */}
-      <div style={{ ...cellStyle, display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, paddingRight: 8 }}>
-        <div style={{
-          width: 34, height: 34, borderRadius: 9, flexShrink: 0,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: `linear-gradient(135deg, ${col}22, ${col}0d)`,
-          border: `1px solid ${col}2e`, color: col,
-        }}>
-          <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
-            <rect x="3" y="1" width="9" height="13" rx="2" stroke="currentColor" strokeWidth="1.4"/>
-            <circle cx="7.5" cy="11.5" r="0.7" fill="currentColor"/>
-          </svg>
-        </div>
-        <div style={{ minWidth: 0 }}>
-          <p style={{ fontSize: 13, fontWeight: 700, color: '#F2F0FF', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.3 }}>
-            {phone.phone_name}
-          </p>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 3 }}>
-            {phone.group_name && (
-              <span style={{
-                fontSize: 10, padding: '1px 6px', borderRadius: 4, fontWeight: 600,
-                background: 'rgba(139,92,246,0.10)', color: '#A78BFA',
-                border: '1px solid rgba(139,92,246,0.18)', whiteSpace: 'nowrap',
-              }}>
-                {phone.group_name}
-              </span>
-            )}
-            <p style={{ fontSize: 10, fontFamily: 'monospace', color: 'rgba(148,163,184,0.35)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {phone.serial_no ? `SN: ${phone.serial_no}` : phone.geelark_id ? `GL: ${phone.geelark_id}` : ''}
+      {/* Phone name + serial */}
+      <td style={cellStyle}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {/* Colored avatar */}
+          <div style={{
+            width: 30, height: 30, borderRadius: 8, flexShrink: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: `linear-gradient(135deg, ${col}28, ${col}10)`,
+            border: `1px solid ${col}30`, color: col,
+            fontSize: 12, fontWeight: 700,
+          }}>
+            {phone.phone_name.charAt(0).toUpperCase()}
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <p style={{ fontSize: 13, fontWeight: 600, color: '#F2F0FF', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {phone.phone_name}
             </p>
+            {phone.serial_no && (
+              <p style={{ fontSize: 10, fontFamily: 'monospace', color: 'rgba(148,163,184,0.3)', margin: '1px 0 0' }}>
+                {phone.serial_no}
+              </p>
+            )}
           </div>
         </div>
-      </div>
+      </td>
 
-      {/* Groupe */}
-      <div style={{ ...cellStyle, minWidth: 0, paddingRight: 8 }}>
-        {phone.group_name ? (
-          <>
-            <p style={{ fontSize: 12, fontWeight: 500, color: 'rgba(196,181,253,0.72)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{phone.group_name}</p>
-            <p style={{ fontSize: 10, color: 'rgba(148,163,184,0.35)', margin: 0 }}>
-              {phones.filter(p2 => p2.group_name === phone.group_name).length} ph.
-            </p>
-          </>
-        ) : (
-          <span style={{ fontSize: 12, color: 'rgba(148,163,184,0.25)' }}>—</span>
-        )}
-      </div>
+      {/* Group */}
+      <td style={cellStyle}>
+        {phone.group_name
+          ? <span style={{
+              display: 'inline-block',
+              fontSize: 10, padding: '2px 8px', borderRadius: 5, fontWeight: 600,
+              background: 'rgba(139,92,246,0.1)', color: '#A78BFA',
+              border: '1px solid rgba(139,92,246,0.18)',
+              whiteSpace: 'nowrap',
+            }}>{phone.group_name}</span>
+          : <span style={{ color: 'rgba(148,163,184,0.2)' }}>—</span>
+        }
+      </td>
 
-      {/* GéeLark status */}
-      <div style={cellStyle}><StatusDot status={phone.status ?? 'offline'} /></div>
+      {/* IG Username — inline editable */}
+      <td style={cellStyle} onClick={e => e.stopPropagation()}>
+        <IgCell phone={phone} onSave={saveIgUsername} />
+      </td>
 
-      {/* Actions */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }} onClick={e => e.stopPropagation()}>
-        <button className="sf-btn sf-btn-ghost sf-btn-sm sf-btn-icon" onClick={() => poller.pollNow()} title={t('phonesRowRefresh')} style={{ width: 28, height: 28 }}>
-          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-            <path d="M11 6.5A4.5 4.5 0 1 1 8.5 2.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
-            <path d="M8 1.5l1.5 1.5L8 4.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        </button>
-        <button className="sf-btn sf-btn-ghost sf-btn-sm sf-btn-icon" onClick={() => setSelectedPhone(isSelected ? null : phone)} title={t('phonesRowViewDetails')} style={{ width: 28, height: 28 }}>
-          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-            <ellipse cx="6.5" cy="6.5" rx="5" ry="3" stroke="currentColor" strokeWidth="1.4"/>
-            <circle cx="6.5" cy="6.5" r="1.5" fill="currentColor"/>
-          </svg>
-        </button>
-        <button className="sf-btn sf-btn-ghost sf-btn-sm sf-btn-icon" onClick={() => setSessionDialog({ phone })} title={t('phonesRowSessionId')} style={{ width: 28, height: 28 }}>
-          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-            <rect x="1.5" y="5.5" width="10" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.4"/>
-            <path d="M4.5 5.5V4a2 2 0 0 1 4 0v1.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
-          </svg>
-        </button>
-        {canDelete && (
-          <button className="sf-btn sf-btn-ghost sf-btn-sm sf-btn-icon" onClick={() => deletePhone(phone.id)} title={t('phonesRowDelete')} style={{ width: 28, height: 28, color: '#EF4444' }}>
-            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-              <path d="M2 3.5h9M5 3.5V2h3v1.5M4.5 3.5l.5 7h3l.5-7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+      {/* IG Status badge */}
+      <td style={cellStyle}>
+        <IgStatusBadge phone={phone} />
+      </td>
+
+      {/* Note — inline editable */}
+      <td style={cellStyle} onClick={e => e.stopPropagation()}>
+        <NoteCell phone={phone} onSave={saveRemark} />
+      </td>
+
+      {/* Actions — visible on hover or selected */}
+      <td style={{ ...cellStyle, padding: '9px 10px' }} onClick={e => e.stopPropagation()}>
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 3,
+          opacity: hovered || isSelected ? 1 : 0,
+          transition: 'opacity 0.15s',
+        }}>
+          <ActionBtn onClick={() => setSessionDialog({ phone })} title={t('phonesRowSessionId')}>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <rect x="1.5" y="5" width="9" height="6.5" rx="1.2" stroke="currentColor" strokeWidth="1.3"/>
+              <path d="M4 5V3.5a2 2 0 0 1 4 0V5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+            </svg>
+          </ActionBtn>
+          <button
+            className="sf-press"
+            style={{
+              width: 26, height: 26, borderRadius: 6,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+              color: 'rgba(148,163,184,0.52)', cursor: 'pointer',
+            }}
+            title="Plus"
+            onClick={e => { e.stopPropagation(); setContextMenu({ phone, x: e.clientX, y: e.clientY }) }}
+          >
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <circle cx="2" cy="6" r="1" fill="currentColor"/>
+              <circle cx="6" cy="6" r="1" fill="currentColor"/>
+              <circle cx="10" cy="6" r="1" fill="currentColor"/>
             </svg>
           </button>
-        )}
-      </div>
-    </div>
+          {canDelete && (
+            <ActionBtn onClick={() => deletePhone(phone.id)} title={t('phonesRowDelete')} danger>
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path d="M2 3h8M4.5 3V2h3v1M4 3l.4 7h3.2L8 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </ActionBtn>
+          )}
+        </div>
+      </td>
+    </tr>
   )
 }

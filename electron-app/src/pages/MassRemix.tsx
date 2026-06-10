@@ -49,6 +49,26 @@ async function pLimit<T>(tasks: Array<() => Promise<T>>, concurrency: number): P
 
 interface MassRemixProps { user: User }
 
+// ── Inline Lucide-style icons (no emoji UI icons) ─────────────────────────────
+function SfIcon({ size = 16, children, ...rest }: { size?: number; children: React.ReactNode } & React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...rest}>
+      {children}
+    </svg>
+  )
+}
+const IconX            = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></SfIcon>
+const IconCheck        = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><polyline points="20 6 9 17 4 12"/></SfIcon>
+const IconLibrary      = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><path d="m16 6 4 14"/><path d="M12 6v14"/><path d="M8 8v12"/><path d="M4 4v16"/></SfIcon>
+const IconFolder       = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></SfIcon>
+const IconHardDrive    = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><line x1="22" y1="12" x2="2" y2="12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/><line x1="6" y1="16" x2="6.01" y2="16"/><line x1="10" y1="16" x2="10.01" y2="16"/></SfIcon>
+const IconClapperboard = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><path d="M20.2 6 3 11l-.9-2.4c-.3-1.1.3-2.2 1.3-2.5l13.5-4c1.1-.3 2.2.3 2.5 1.3Z"/><path d="m6.2 5.3 3.1 3.9"/><path d="m12.4 3.4 3.1 4"/><path d="M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></SfIcon>
+const IconScissors     = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></SfIcon>
+const IconShuffle      = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><path d="M16 3h5v5"/><path d="M4 20 21 3"/><path d="M21 16v5h-5"/><path d="m15 15 6 6"/><path d="M4 4l5 5"/></SfIcon>
+const IconZap          = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></SfIcon>
+const IconDownload     = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></SfIcon>
+const IconAlertTriangle = (p: { size?: number } & React.SVGProps<SVGSVGElement>) => <SfIcon {...p}><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></SfIcon>
+
 type Preset = '9:16' | '1:1' | '16:9'
 type ExportMode = 'bank' | 'folder'
 
@@ -128,58 +148,75 @@ function VideoSourcePanel({
 }) {
   const t = useT()
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', borderRadius: 14, border: `1px solid ${accent}28`, background: `${accent}06`, overflow: 'hidden', minHeight: 0, minWidth: 0 }}>
+    <div className="sf-card sf-spotlight flex flex-col overflow-hidden" style={{ flex: 1, minHeight: 0, minWidth: 0, borderColor: `${accent}30` }}>
       {/* Panel header */}
-      <div style={{ padding: '10px 13px', borderBottom: `1px solid ${accent}16`, display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-        <div style={{ width: 3, height: 13, borderRadius: 99, background: accent, flexShrink: 0 }} />
-        <p style={{ fontSize: 12, fontWeight: 700, color: '#F1F0F7', flex: 1 }}>{title}</p>
-        <span style={{ fontSize: 8, fontWeight: 800, letterSpacing: '0.1em', padding: '2px 6px', borderRadius: 4, background: `${accent}16`, color: accent, border: `1px solid ${accent}28` }}>{phase}</span>
-        {paths.length > 0 && <span style={{ fontSize: 11, fontWeight: 800, color: accent, marginLeft: 2 }}>{paths.length}</span>}
+      <div className="flex items-center gap-2 px-3.5 py-2.5 flex-shrink-0 border-b border-border">
+        <div style={{ width: 3, height: 14, borderRadius: 99, background: accent, flexShrink: 0 }} />
+        <p className="text-[12px] font-bold text-text flex-1">{title}</p>
+        <span className="text-[9px] font-black tracking-widest px-2 py-0.5 rounded"
+          style={{ background: `${accent}18`, color: accent, border: `1px solid ${accent}30`, letterSpacing: '0.12em' }}>
+          {phase}
+        </span>
+        {paths.length > 0 && (
+          <span className="text-[11px] font-black tabular-nums" style={{ color: accent }}>{paths.length}</span>
+        )}
       </div>
 
       {loading && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 13px', background: 'rgba(167,139,250,0.06)', flexShrink: 0 }}>
-          <svg style={{ width: 11, height: 11, color: '#a78bfa', animation: 'spin 0.9s linear infinite', flexShrink: 0 }} viewBox="0 0 24 24" fill="none">
+        <div className="flex items-center gap-2 px-3.5 py-1.5 flex-shrink-0" style={{ background: 'rgba(167,139,250,0.05)' }}>
+          <svg className="sf-spinner" style={{ width: 11, height: 11, color: '#a78bfa' }} viewBox="0 0 24 24" fill="none">
             <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="31.4" strokeDashoffset="10" />
           </svg>
-          <span style={{ fontSize: 10, color: '#a78bfa', fontWeight: 600 }}>{t('massRemixLoadingSource')}</span>
+          <span className="text-[10px] font-semibold" style={{ color: '#a78bfa' }}>{t('massRemixLoadingSource')}</span>
         </div>
       )}
 
       {/* File list */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '7px 9px', display: 'flex', flexDirection: 'column', gap: 2, minHeight: 0 }}>
+      <div className="flex-1 overflow-y-auto flex flex-col gap-1 p-2" style={{ minHeight: 0 }}>
         {paths.length === 0 ? (
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 5, minHeight: 80 }}>
-            <span style={{ fontSize: 22, opacity: 0.09 }}>🎬</span>
-            <p style={{ fontSize: 10, color: 'rgba(148,163,184,0.22)' }}>{t('massRemixNoVideo')}</p>
+          <div className="flex-1 flex flex-col items-center justify-center gap-2" style={{ minHeight: 80 }}>
+            <span className="text-text3 opacity-20"><IconClapperboard size={28} /></span>
+            <p className="text-[10px] text-text3 opacity-40">{t('massRemixNoVideo')}</p>
           </div>
         ) : paths.map((p, i) => (
-          <div key={i} className="group" style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 7px', borderRadius: 6, background: `${accent}08` }}>
-            <span style={{ fontSize: 8, fontWeight: 900, color: accent, opacity: 0.4, width: 11, textAlign: 'right', flexShrink: 0 }}>{i + 1}</span>
-            <span style={{ fontSize: 10, fontFamily: 'monospace', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'rgba(226,217,243,0.48)' }}>{fileName(p)}</span>
-            <button onClick={() => onRemove(i)} className="opacity-0 group-hover:opacity-100"
-              style={{ fontSize: 9, color: '#f87171', background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0, transition: 'opacity 0.15s', lineHeight: 1, padding: 0 }}>✕</button>
+          <div key={i} className="group flex items-center gap-2 px-2.5 py-1.5 rounded-lg transition-colors"
+            style={{ background: `${accent}08` }}
+            onMouseEnter={e => (e.currentTarget.style.background = `${accent}14`)}
+            onMouseLeave={e => (e.currentTarget.style.background = `${accent}08`)}>
+            <span className="text-[9px] font-black tabular-nums flex-shrink-0 w-4 text-right"
+              style={{ color: accent, opacity: 0.5 }}>{i + 1}</span>
+            <span className="text-[10px] font-mono flex-1 truncate text-text3">{fileName(p)}</span>
+            <button onClick={() => onRemove(i)} aria-label={t('remove')}
+              className="opacity-0 group-hover:opacity-100 flex items-center justify-center cursor-pointer transition-opacity sf-press"
+              style={{ color: 'var(--danger)', background: 'none', border: 'none', padding: 2, lineHeight: 1, transition: 'opacity 0.15s ease, transform 0.09s cubic-bezier(0.4,0,0.2,1)' }}>
+              <IconX size={11} />
+            </button>
           </div>
         ))}
       </div>
 
       {/* Add buttons */}
-      <div style={{ padding: '8px 9px', borderTop: `1px solid ${accent}14`, display: 'flex', gap: 4, flexShrink: 0 }}>
+      <div className="flex gap-1.5 p-2 flex-shrink-0 border-t border-border">
         <button onClick={onAddBank}
-          style={{ flex: 1, padding: '6px 0', borderRadius: 7, fontSize: 10, fontWeight: 600, cursor: 'pointer', background: `${accent}13`, color: accent, border: `1px solid ${accent}24`, transition: 'background 0.15s' }}
-          onMouseEnter={e => (e.currentTarget.style.background = `${accent}20`)}
-          onMouseLeave={e => (e.currentTarget.style.background = `${accent}13`)}>
-          🗂 {t('massRemixBankSource')}
+          className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-[10px] font-semibold cursor-pointer transition-colors"
+          style={{ background: `${accent}14`, color: accent, border: `1px solid ${accent}28` }}
+          onMouseEnter={e => (e.currentTarget.style.background = `${accent}22`)}
+          onMouseLeave={e => (e.currentTarget.style.background = `${accent}14`)}>
+          <IconLibrary size={12} /> {t('massRemixBankSource')}
         </button>
         <button onClick={onAddFolder}
-          style={{ flex: 1, padding: '6px 0', borderRadius: 7, fontSize: 10, fontWeight: 600, cursor: 'pointer', background: 'rgba(167,139,250,0.06)', color: '#a78bfa', border: '1px solid rgba(167,139,250,0.14)', transition: 'background 0.15s' }}
-          onMouseEnter={e => (e.currentTarget.style.background = 'rgba(167,139,250,0.12)')}
-          onMouseLeave={e => (e.currentTarget.style.background = 'rgba(167,139,250,0.06)')}>
-          📁 {t('massRemixFolderSource')}
+          className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-[10px] font-semibold cursor-pointer transition-colors"
+          style={{ background: 'rgba(167,139,250,0.08)', color: '#a78bfa', border: '1px solid rgba(167,139,250,0.2)' }}
+          onMouseEnter={e => (e.currentTarget.style.background = 'rgba(167,139,250,0.15)')}
+          onMouseLeave={e => (e.currentTarget.style.background = 'rgba(167,139,250,0.08)')}>
+          <IconFolder size={12} /> {t('massRemixFolderSource')}
         </button>
         <button onClick={onAddPC}
-          style={{ flex: 1, padding: '6px 0', borderRadius: 7, fontSize: 10, fontWeight: 600, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.38)', border: '1px solid rgba(255,255,255,0.06)' }}>
-          💾 {t('massRemixPCSource')}
+          className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-[10px] font-semibold cursor-pointer transition-colors"
+          style={{ background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.45)', border: '1px solid rgba(255,255,255,0.07)' }}
+          onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.08)')}
+          onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.04)')}>
+          <IconHardDrive size={12} /> {t('massRemixPCSource')}
         </button>
       </div>
     </div>
@@ -824,25 +861,33 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
     <>
       {/* ── Preview plan modal ── */}
       {previewOpen && !running && (
-        <div className="fixed inset-0 z-50 flex flex-col" style={{ background: 'rgba(3,1,8,0.97)' }}>
+        <div className="fixed inset-0 z-50 flex flex-col anim-scale-in"
+          style={{ background: 'rgba(3,1,8,0.97)', backdropFilter: 'blur(14px)' }}>
           {/* Header */}
-          <div className="flex-shrink-0 flex items-center justify-between px-8 py-4"
-            style={{ borderBottom: '1px solid rgba(139,92,246,0.2)', background: 'rgba(12,8,28,0.9)' }}>
-            <div>
-              <p className="text-[18px] font-black text-white">{t('massRemixPreviewTitle')}</p>
-              <p className="text-[12px]" style={{ color: 'rgba(148,163,184,0.6)' }}>{plannedPairs.length} {t('massRemixPairsHint')}</p>
-            </div>
+          <div className="flex-shrink-0 flex items-center justify-between px-6 py-4 border-b border-border"
+            style={{ background: 'linear-gradient(90deg,rgba(124,58,237,0.08),transparent)' }}>
             <div className="flex items-center gap-3">
+              <div className="flex items-center justify-center w-9 h-9 rounded-xl flex-shrink-0"
+                style={{ background: 'rgba(124,58,237,0.18)', border: '1px solid rgba(124,58,237,0.3)' }}>
+                <IconClapperboard size={18} style={{ color: '#c084fc' }} />
+              </div>
+              <div>
+                <p className="text-[17px] font-black text-text leading-tight">{t('massRemixPreviewTitle')}</p>
+                <p className="text-[11px] text-text3">
+                  <span className="text-accent font-bold">{plannedPairs.length}</span> {t('massRemixPairsHint')}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
               <button onClick={() => setPreviewOpen(false)}
-                className="px-4 py-2 rounded-xl text-[13px] font-semibold transition-all"
-                style={{ background: 'rgba(255,255,255,0.05)', color: 'rgba(196,181,253,0.7)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                className="sf-btn sf-btn-secondary cursor-pointer">
                 {t('massRemixPreviewClose')}
               </button>
               <button
                 onClick={() => { setPreviewOpen(false); launch(plannedPairs) }}
-                className="px-6 py-2.5 rounded-xl text-[14px] font-bold transition-all"
-                style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)', color: '#fff', boxShadow: '0 4px 20px rgba(124,58,237,0.4)' }}>
-                {t('massRemixLaunchBtn')} {plannedPairs.length} remix
+                className="sf-btn sf-btn-primary cursor-pointer"
+                style={{ boxShadow: '0 4px 16px rgba(124,58,237,0.4)' }}>
+                <IconZap size={13} /> {t('massRemixLaunchBtn')} {plannedPairs.length} remix
               </button>
             </div>
           </div>
@@ -850,23 +895,23 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
           {/* Body */}
           <div className="flex-1 min-h-0 flex overflow-hidden">
             {/* Left: pair list */}
-            <div className="w-64 flex-shrink-0 overflow-y-auto" style={{ borderRight: '1px solid rgba(139,92,246,0.12)', background: 'rgba(8,5,20,0.7)' }}>
+            <div className="w-64 flex-shrink-0 overflow-y-auto bg-bg border-r border-border">
               {plannedPairs.map(pair => (
                 <button key={pair.id}
                   onClick={() => { setSelectedPairId(pair.id); setVidCurrentTime(0); setVidDuration(0) }}
-                  className="w-full text-left px-4 py-3 flex items-start gap-3 transition-all"
+                  className="w-full text-left px-4 py-3 flex items-start gap-3 transition-colors hover:bg-surface cursor-pointer"
                   style={{
                     borderBottom: '1px solid rgba(139,92,246,0.07)',
-                    borderLeft: selectedPairId === pair.id ? '3px solid #7c3aed' : '3px solid transparent',
-                    background: selectedPairId === pair.id ? 'rgba(139,92,246,0.12)' : 'transparent',
+                    borderLeft: selectedPairId === pair.id ? '3px solid var(--accent)' : '3px solid transparent',
+                    background: selectedPairId === pair.id ? 'rgba(139,92,246,0.1)' : 'transparent',
                   }}>
-                  <span className="text-[11px] font-black pt-0.5 flex-shrink-0" style={{ color: 'rgba(139,92,246,0.55)' }}>#{pair.id + 1}</span>
+                  <span className="text-[11px] font-black pt-0.5 flex-shrink-0 text-accent opacity-60">#{pair.id + 1}</span>
                   <div className="flex-1 min-w-0 space-y-0.5">
-                    <p className="text-[11px] font-mono truncate" style={{ color: 'rgba(226,217,243,0.75)' }}>{fileName(pair.originalPath)}</p>
-                    <p className="text-[10px] font-mono truncate" style={{ color: 'rgba(236,72,153,0.6)' }}>{fileName(pair.secondaryPath)}</p>
+                    <p className="text-[11px] font-mono truncate text-text">{fileName(pair.originalPath)}</p>
+                    <p className="text-[10px] font-mono truncate" style={{ color: 'rgba(236,72,153,0.7)' }}>{fileName(pair.secondaryPath)}</p>
                     {pair.cutSec != null
-                      ? <p className="text-[10px] font-semibold" style={{ color: '#eab308' }}>{pair.cutSec.toFixed(1)}s</p>
-                      : <p className="text-[10px]" style={{ color: 'rgba(148,163,184,0.3)' }}>{splitMode === 'manual' ? `${manualSplitSec}s (global)` : '🤖 auto'}</p>
+                      ? <p className="text-[10px] font-semibold text-warn">{pair.cutSec.toFixed(1)}s</p>
+                      : <p className="text-[10px] text-text3">{splitMode === 'manual' ? `${manualSplitSec}s (global)` : 'auto'}</p>
                     }
                   </div>
                 </button>
@@ -874,7 +919,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
             </div>
 
             {/* Right: video player */}
-            <div className="flex-1 min-w-0 flex flex-col items-center justify-center gap-5 p-8 overflow-y-auto">
+            <div className="flex-1 min-w-0 flex flex-col items-center justify-center gap-5 p-8 overflow-y-auto bg-bg">
               {selectedPair ? (
                 <>
                   {/* Hidden capture videos — seek independently to grab frames */}
@@ -882,7 +927,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                   <video ref={captureSecVidRef} key={'cap-sec-'  + selectedPair.secondaryPath} src={toFileUrl(selectedPair.secondaryPath)} preload="auto" muted style={{ display: 'none' }} />
 
                   {/* ── Main video ── */}
-                  <div className="relative rounded-2xl overflow-hidden flex-shrink-0"
+                  <div className="relative rounded-2xl overflow-hidden flex-shrink-0 border border-border"
                     style={{
                       background: '#000',
                       maxHeight: 'calc(100vh - 300px)',
@@ -922,37 +967,41 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                         const v = vidRef.current; if (!v) return; v.pause()
                         const t = Math.max(0, v.currentTime - 1/30); v.currentTime = t; setVidCurrentTime(t)
                         if (selectedPair.cutSec != null) captureBeforeAfter(selectedPair.cutSec)
-                      }} className="w-8 h-8 rounded-lg flex items-center justify-center"
-                        style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)', color: 'rgba(148,163,184,0.7)', fontSize: 13 }}>◁</button>
+                      }} className="sf-btn sf-btn-ghost sf-btn-sm sf-btn-icon cursor-pointer" aria-label="Frame back">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="19" x2="5" y2="5" stroke="currentColor" strokeWidth="2"/></svg>
+                      </button>
                       {/* Play/pause */}
                       <button onClick={() => { const v = vidRef.current; if (v) v.paused ? v.play() : v.pause() }}
-                        className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-                        style={{ background: 'rgba(139,92,246,0.18)', border: '1px solid rgba(139,92,246,0.35)', color: '#a78bfa', fontSize: 16 }}>
-                        {isPlaying ? '⏸' : '▶'}
+                        className="sf-btn sf-btn-secondary cursor-pointer" style={{ width: 36, height: 36, padding: 0 }} aria-label="Play/pause">
+                        {isPlaying
+                          ? <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+                          : <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                        }
                       </button>
                       {/* Frame forward */}
                       <button title={t('massRemixFrameForward')} onClick={() => {
                         const v = vidRef.current; if (!v) return; v.pause()
                         const t = Math.min(vidDuration, v.currentTime + 1/30); v.currentTime = t; setVidCurrentTime(t)
                         if (selectedPair.cutSec != null) captureBeforeAfter(selectedPair.cutSec)
-                      }} className="w-8 h-8 rounded-lg flex items-center justify-center"
-                        style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)', color: 'rgba(148,163,184,0.7)', fontSize: 13 }}>▷</button>
+                      }} className="sf-btn sf-btn-ghost sf-btn-sm sf-btn-icon cursor-pointer" aria-label="Frame forward">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19" stroke="currentColor" strokeWidth="2"/></svg>
+                      </button>
 
                       {/* Speed control */}
                       <div className="flex items-center gap-0.5 ml-1">
                         {([0.25, 0.5, 1] as const).map(r => (
                           <button key={r} onClick={() => { setPlaybackRate(r); if (vidRef.current) vidRef.current.playbackRate = r }}
-                            className="px-2 py-1 rounded-lg text-[10px] font-bold transition-all"
+                            className="sf-btn sf-btn-sm cursor-pointer"
                             style={playbackRate === r
-                              ? { background: 'rgba(139,92,246,0.3)', border: '1px solid rgba(139,92,246,0.6)', color: '#c4b5fd' }
-                              : { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', color: 'rgba(148,163,184,0.45)' }}>
+                              ? { background: 'rgba(139,92,246,0.25)', border: '1px solid rgba(139,92,246,0.5)', color: 'var(--accent-glow)' }
+                              : { background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-3)' }}>
                             {r === 1 ? '1×' : `${r}×`}
                           </button>
                         ))}
                       </div>
 
-                      <span className="text-[11px] font-mono tabular-nums ml-1" style={{ color: 'rgba(148,163,184,0.7)' }}>
-                        {vidCurrentTime.toFixed(3)}s <span style={{ color: 'rgba(148,163,184,0.3)' }}>/ {vidDuration.toFixed(3)}s</span>
+                      <span className="text-[11px] font-mono tabular-nums ml-1 text-text2">
+                        {vidCurrentTime.toFixed(3)}s <span className="text-text3">/ {vidDuration.toFixed(3)}s</span>
                       </span>
 
                       <div className="ml-auto flex items-center gap-2">
@@ -964,9 +1013,9 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                                 setCutForPair(selectedPair.id, sec)
                                 vidRef.current?.pause()
                               }}
-                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-bold transition-all hover:brightness-110"
-                              style={{ background: 'linear-gradient(130deg,rgba(234,179,8,0.25),rgba(234,179,8,0.12))', border: '1px solid rgba(234,179,8,0.5)', color: '#eab308', boxShadow: '0 0 12px rgba(234,179,8,0.15)' }}>
-                              {t('massRemixCutHere')}
+                              className="sf-btn sf-btn-sm cursor-pointer"
+                              style={{ background: 'rgba(234,179,8,0.15)', border: '1px solid rgba(234,179,8,0.4)', color: '#eab308' }}>
+                              <IconScissors size={12} /> {t('massRemixCutHere')}
                             </button>
                             {plannedPairs.length > 1 && (
                               <button
@@ -975,8 +1024,8 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                                   setPlannedPairs(prev => prev.map(p => ({ ...p, cutSec: sec })))
                                   vidRef.current?.pause()
                                 }}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-bold transition-all hover:brightness-110"
-                                style={{ background: 'linear-gradient(130deg,rgba(124,58,237,0.25),rgba(124,58,237,0.12))', border: '1px solid rgba(124,58,237,0.5)', color: '#a78bfa' }}>
+                                className="sf-btn sf-btn-sm cursor-pointer"
+                                style={{ background: 'rgba(124,58,237,0.15)', border: '1px solid rgba(124,58,237,0.4)', color: 'var(--accent-glow)' }}>
                                 {lang === 'en' ? 'Apply to all' : 'Appliquer à tout'}
                               </button>
                             )}
@@ -984,9 +1033,10 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                         )}
                         {selectedPair.cutSec != null && (
                           <button onClick={() => setCutForPair(selectedPair.id, undefined)}
-                            className="text-[11px] px-2 py-1 rounded-lg"
+                            aria-label={t('remove')}
+                            className="px-2 py-1 rounded-lg inline-flex items-center justify-center sf-press"
                             style={{ background: 'rgba(239,68,68,0.1)', color: '#f87171', border: '1px solid rgba(239,68,68,0.2)' }}>
-                            ✕
+                            <IconX size={12} />
                           </button>
                         )}
                       </div>
@@ -1013,8 +1063,8 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                           {/* Cut divider */}
                           <div className="flex flex-col items-center justify-center gap-0.5 flex-shrink-0 px-0.5">
                             <div style={{ width: 2, flex: 1, background: 'linear-gradient(180deg,transparent,#eab308)', borderRadius: 2, minHeight: 30 }} />
-                            <div className="rounded px-1 py-0.5" style={{ background: '#eab308' }}>
-                              <span style={{ fontSize: 8, fontWeight: 900, color: '#000', letterSpacing: '0.05em' }}>✂</span>
+                            <div className="rounded px-1 py-0.5 flex items-center justify-center" style={{ background: '#eab308', color: '#000' }}>
+                              <IconScissors size={11} strokeWidth={2.25} />
                             </div>
                             <div style={{ width: 2, flex: 1, background: 'linear-gradient(180deg,#eab308,transparent)', borderRadius: 2, minHeight: 30 }} />
                           </div>
@@ -1206,9 +1256,9 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                   </div>
                 </>
               ) : (
-                <div className="text-center space-y-3 opacity-40">
-                  <div className="text-6xl">🎬</div>
-                  <p className="text-[14px]" style={{ color: 'rgba(196,181,253,0.6)' }}>{t('massRemixSelectPreview')}</p>
+                <div className="text-center space-y-3 opacity-40 flex flex-col items-center" style={{ color: 'rgba(196,181,253,0.6)' }}>
+                  <IconClapperboard size={60} />
+                  <p className="text-[14px]">{t('massRemixSelectPreview')}</p>
                 </div>
               )}
             </div>
@@ -1218,53 +1268,89 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
 
       {/* ── Progress modal ── */}
       {running && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-6" style={{ background: 'rgba(3,1,8,0.92)', backdropFilter: 'blur(8px)' }}>
-          <div className="w-full max-w-md rounded-2xl overflow-hidden" style={{ background: 'rgba(12,8,28,0.98)', border: '1px solid rgba(139,92,246,0.3)', boxShadow: '0 0 60px rgba(124,58,237,0.25)' }}>
-            <div className="px-6 py-5" style={{ borderBottom: '1px solid rgba(139,92,246,0.15)', background: 'linear-gradient(135deg,rgba(124,58,237,0.12),rgba(236,72,153,0.06))' }}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-6"
+          style={{ background: 'rgba(3,1,8,0.92)', backdropFilter: 'blur(10px)' }}>
+          <div className="anim-scale-in w-full max-w-md rounded-2xl overflow-hidden sf-card"
+            style={{ boxShadow: '0 0 60px rgba(124,58,237,0.22)', borderColor: 'rgba(139,92,246,0.3)' }}>
+            {/* Modal header */}
+            <div className="px-5 py-4 border-b border-border"
+              style={{ background: 'linear-gradient(135deg,rgba(124,58,237,0.12),rgba(236,72,153,0.05))' }}>
               <div className="flex items-center gap-3">
-                <div className="relative w-10 h-10 flex-shrink-0">
-                  <div className="absolute inset-0 rounded-full animate-ping opacity-30" style={{ background: 'linear-gradient(135deg,#7c3aed,#ec4899)' }} />
-                  <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.3)' }}>
+                <div className="relative w-9 h-9 flex-shrink-0">
+                  <div className="absolute inset-0 rounded-full animate-ping opacity-25"
+                    style={{ background: 'linear-gradient(135deg,#7c3aed,#ec4899)' }} />
+                  <div className="w-9 h-9 rounded-full flex items-center justify-center"
+                    style={{ background: 'rgba(139,92,246,0.18)', border: '1px solid rgba(139,92,246,0.35)' }}>
                     <Spinner size="sm" />
                   </div>
                 </div>
                 <div>
-                  <p className="text-[15px] font-black text-white">{t('massRemixGenerating')}</p>
-                  <p className="text-[13px] text-text2">
-                    {runningCount} running · {doneCount} done · {errorCount} error(s)
+                  <p className="text-[15px] font-black text-text">{t('massRemixGenerating')}</p>
+                  <p className="text-[12px] text-text2">
+                    <span className="text-accent font-semibold">{runningCount}</span> running
+                    {' · '}
+                    <span className="text-ok font-semibold">{doneCount}</span> done
+                    {errorCount > 0 && <>{' · '}<span className="text-danger font-semibold">{errorCount}</span> error(s)</>}
                   </p>
+                </div>
+                <div className="ml-auto">
+                  <span className="sf-badge sf-badge-accent text-[13px] font-black tabular-nums">{progress}%</span>
                 </div>
               </div>
             </div>
 
-            <div className="px-6 py-5 space-y-4">
-              <div className="flex items-center justify-between text-[13px] mb-1">
-                <span className="text-text2">{doneCount + errorCount} / {jobs.length}</span>
-                <span className="font-bold" style={{ color: '#a78bfa' }}>{progress}%</span>
-                <span className="text-text2">{runningCount} {t('massRemixActive')}</span>
-              </div>
-              <div className="h-2.5 rounded-full overflow-hidden" style={{ background: 'rgba(139,92,246,0.12)' }}>
-                <div className="h-full rounded-full transition-all duration-500"
-                  style={{ width: `${progress}%`, background: 'linear-gradient(90deg,#7c3aed,#ec4899)' }} />
+            <div className="px-5 py-4 flex flex-col gap-4">
+              {/* Progress bar */}
+              <div>
+                <div className="flex items-center justify-between text-[11px] mb-1.5">
+                  <span className="text-text3 font-medium">{doneCount + errorCount} / {jobs.length} processed</span>
+                  <span className="text-text3">{runningCount} {t('massRemixActive')}</span>
+                </div>
+                <div className="sf-progress">
+                  <div className="sf-progress-bar transition-all duration-500"
+                    style={{ width: `${progress}%` }} />
+                </div>
               </div>
 
-              <div className="space-y-1.5 max-h-52 overflow-auto">
+              {/* Job rows */}
+              <div className="flex flex-col gap-1 max-h-52 overflow-auto">
                 {jobs.map(job => (
-                  <div key={job.id} className="flex items-center gap-3 px-3 py-2 rounded-xl"
-                    style={{ background: job.status === 'done' ? 'rgba(52,211,153,0.06)' : job.status === 'error' ? 'rgba(239,68,68,0.06)' : job.status === 'pending' ? 'transparent' : 'rgba(139,92,246,0.06)' }}>
-                    <span className="w-5 text-[12px] font-bold flex-shrink-0 text-center text-text2">#{job.id + 1}</span>
-                    <span className="flex-1 text-[12px] font-mono truncate text-text2">{fileName(job.originalPath)}</span>
-                    <span className="text-[11px] font-semibold flex-shrink-0"
-                      style={{ color: job.status === 'done' ? '#34d399' : job.status === 'error' ? '#f87171' : job.status === 'pending' ? 'rgba(196,181,253,0.3)' : '#a78bfa' }}>
+                  <div key={job.id}
+                    className="flex items-center gap-2.5 px-3 py-2 rounded-xl transition-colors"
+                    style={{
+                      background: job.status === 'done'
+                        ? 'rgba(52,211,153,0.06)'
+                        : job.status === 'error'
+                          ? 'rgba(239,68,68,0.06)'
+                          : job.status === 'pending'
+                            ? 'transparent'
+                            : 'rgba(139,92,246,0.07)',
+                    }}>
+                    <span className="text-[11px] font-black tabular-nums flex-shrink-0 text-text3 w-5 text-center">
+                      #{job.id + 1}
+                    </span>
+                    <span className="flex-1 text-[11px] font-mono truncate text-text2">
+                      {fileName(job.originalPath)}
+                    </span>
+                    <span className="text-[10px] font-semibold flex-shrink-0"
+                      style={{
+                        color: job.status === 'done'
+                          ? 'var(--ok)'
+                          : job.status === 'error'
+                            ? 'var(--danger)'
+                            : job.status === 'pending'
+                              ? 'rgba(196,181,253,0.3)'
+                              : 'var(--accent)',
+                      }}>
                       {STATUS_LABEL[job.status]}
                     </span>
                   </div>
                 ))}
               </div>
 
-              <button onClick={() => { abortRef.current = true; setRunning(false) }}
-                className="w-full py-2.5 rounded-xl text-[13px] font-semibold"
-                style={{ background: 'rgba(239,68,68,0.08)', color: '#f87171', border: '1px solid rgba(239,68,68,0.2)' }}>
+              <button
+                onClick={() => { abortRef.current = true; setRunning(false) }}
+                className="sf-btn sf-btn-danger w-full justify-center cursor-pointer">
                 {t('massRemixCancelBtn')}
               </button>
             </div>
@@ -1274,45 +1360,79 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
 
       {/* ── Done summary modal ── */}
       {!running && jobs.length > 0 && (doneCount + errorCount) === jobs.length && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-6" style={{ background: 'rgba(3,1,8,0.88)', backdropFilter: 'blur(6px)' }}>
-          <div className="w-full max-w-md rounded-2xl overflow-hidden" style={{ background: 'rgba(12,8,28,0.98)', border: `1px solid ${errorCount === 0 ? 'rgba(52,211,153,0.3)' : 'rgba(251,191,36,0.3)'}` }}>
-            <div className="px-6 py-6 space-y-5">
-              <div className="text-center space-y-2">
-                <div className="text-5xl">{errorCount === 0 ? '✅' : '⚠️'}</div>
-                <p className="text-[20px] font-black text-white">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-6"
+          style={{ background: 'rgba(3,1,8,0.88)', backdropFilter: 'blur(8px)' }}>
+          <div className="anim-scale-in w-full max-w-md rounded-2xl overflow-hidden sf-card"
+            style={{ borderColor: errorCount === 0 ? 'rgba(52,211,153,0.32)' : 'rgba(251,191,36,0.32)', boxShadow: `0 0 50px ${errorCount === 0 ? 'rgba(52,211,153,0.12)' : 'rgba(251,191,36,0.1)'}` }}>
+            <div className="px-6 py-6 flex flex-col gap-5">
+              {/* Result icon + title */}
+              <div className="flex flex-col items-center gap-2 text-center">
+                <div className="flex items-center justify-center w-14 h-14 rounded-2xl sf-anim-scale-spring"
+                  style={{
+                    background: errorCount === 0 ? 'rgba(52,211,153,0.12)' : 'rgba(251,191,36,0.1)',
+                    border: `1px solid ${errorCount === 0 ? 'rgba(52,211,153,0.3)' : 'rgba(251,191,36,0.25)'}`,
+                  }}>
+                  {errorCount === 0
+                    ? <IconCheck size={28} style={{ color: '#34d399' }} strokeWidth={2.25} />
+                    : <IconAlertTriangle size={28} style={{ color: '#fbbf24' }} />}
+                </div>
+                <p className="text-[20px] font-black text-text">
                   {errorCount === 0 ? t('massRemixDoneTitle') : `${doneCount} / ${jobs.length} done`}
                 </p>
-                {errorCount > 0 && <p className="text-[13px]" style={{ color: '#fbbf24' }}>{errorCount} error(s)</p>}
+                {errorCount > 0 && (
+                  <p className="text-[13px] font-semibold text-warn">{errorCount} error(s)</p>
+                )}
+                <div className="flex items-center gap-2">
+                  <span className="sf-badge sf-badge-ok">{doneCount} success</span>
+                  {errorCount > 0 && <span className="sf-badge sf-badge-danger">{errorCount} failed</span>}
+                </div>
               </div>
-              <div className="space-y-2 max-h-72 overflow-auto">
+
+              {/* Job details */}
+              <div className="flex flex-col gap-1.5 max-h-72 overflow-auto">
                 {jobs.map(job => (
                   <details key={job.id} className="rounded-xl overflow-hidden"
-                    style={{ background: job.status === 'done' ? 'rgba(52,211,153,0.06)' : 'rgba(239,68,68,0.06)', border: `1px solid ${job.status === 'done' ? 'rgba(52,211,153,0.15)' : 'rgba(239,68,68,0.2)'}` }}
+                    style={{
+                      background: job.status === 'done' ? 'rgba(52,211,153,0.05)' : 'rgba(239,68,68,0.05)',
+                      border: `1px solid ${job.status === 'done' ? 'rgba(52,211,153,0.15)' : 'rgba(239,68,68,0.18)'}`,
+                    }}
                     open={job.status === 'error'}>
                     <summary className="flex items-center gap-3 px-4 py-2.5 cursor-pointer list-none">
-                      <span className="text-base flex-shrink-0">{job.status === 'done' ? '✅' : '❌'}</span>
+                      <span className="flex-shrink-0"
+                        style={{ color: job.status === 'done' ? '#34d399' : '#f87171' }}>
+                        {job.status === 'done'
+                          ? <IconCheck size={15} strokeWidth={2.25} />
+                          : <IconX size={15} strokeWidth={2.25} />}
+                      </span>
                       <div className="flex-1 min-w-0">
-                        <p className="text-[13px] font-mono truncate text-white/70">{fileName(job.originalPath)}</p>
-                        {job.error && <p className="text-[11px] font-semibold" style={{ color: '#f87171' }}>{job.error}</p>}
+                        <p className="text-[12px] font-mono truncate text-text2">{fileName(job.originalPath)}</p>
+                        {job.error && (
+                          <p className="text-[11px] font-semibold text-danger">{job.error}</p>
+                        )}
                       </div>
                       {job.status === 'done' && job.outputPath?.startsWith('blob:') && (
                         <a href={job.outputPath}
                           download={`remix_${String(job.id + 1).padStart(3, '0')}.mp4`}
                           onClick={e => e.stopPropagation()}
-                          className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all"
+                          className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-colors"
                           style={{ background: 'rgba(52,211,153,0.15)', color: '#34d399', border: '1px solid rgba(52,211,153,0.25)', textDecoration: 'none' }}>
-                          ⬇ MP4
+                          <IconDownload size={11} /> MP4
                         </a>
                       )}
                       {job.logs.length > 0 && (
-                        <span className="text-[10px] flex-shrink-0" style={{ color: 'rgba(196,181,253,0.4)' }}>▼ logs</span>
+                        <span className="text-[9px] flex-shrink-0 text-text3 opacity-50">logs</span>
                       )}
                     </summary>
                     {job.logs.length > 0 && (
-                      <div className="px-4 pb-3 space-y-0.5 border-t" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+                      <div className="px-4 pb-3 flex flex-col gap-0.5 border-t border-border">
                         {job.logs.map((line, i) => (
                           <p key={i} className="text-[10px] font-mono break-all leading-snug"
-                            style={{ color: line.startsWith('❌') ? '#f87171' : line.startsWith('✅') ? '#34d399' : line.startsWith('⚠️') ? '#fbbf24' : 'rgba(196,181,253,0.55)' }}>
+                            style={{
+                              color: line.startsWith('❌') ? '#f87171'
+                                : line.startsWith('✅') ? '#34d399'
+                                  : line.startsWith('⚠️') ? '#fbbf24'
+                                    : 'rgba(196,181,253,0.55)',
+                            }}>
                             {line}
                           </p>
                         ))}
@@ -1321,7 +1441,10 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                   </details>
                 ))}
               </div>
-              <Button onClick={() => { setJobs([]); setRunning(false) }} className="w-full">{t('massRemixCloseBtn')}</Button>
+
+              <Button onClick={() => { setJobs([]); setRunning(false) }} className="w-full">
+                {t('massRemixCloseBtn')}
+              </Button>
             </div>
           </div>
         </div>
@@ -1342,30 +1465,40 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
       {folderTarget !== null && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
           onClick={() => setFolderTarget(null)}>
-          <div className="rounded-2xl overflow-hidden w-80" onClick={e => e.stopPropagation()}
-            style={{ background: '#0d0a1e', border: '1px solid rgba(139,92,246,0.25)' }}>
-            <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(139,92,246,0.12)' }}>
-              <p className="text-[14px] font-bold text-white">
-                📁 {folderTarget === 'orig' ? t('massRemixFolderOriginals') : t('massRemixFolderPhase1')}
+          <div className="anim-scale-in w-80 rounded-2xl overflow-hidden sf-card"
+            style={{ borderColor: 'rgba(139,92,246,0.28)' }}
+            onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div className="px-4 py-3.5 flex items-center justify-between border-b border-border">
+              <p className="text-[14px] font-bold text-text flex items-center gap-2">
+                <IconFolder size={16} style={{ color: 'var(--accent)' }} />
+                {folderTarget === 'orig' ? t('massRemixFolderOriginals') : t('massRemixFolderPhase1')}
               </p>
-              <button onClick={() => setFolderTarget(null)} className="text-text2 hover:text-white text-lg leading-none">✕</button>
+              <button onClick={() => setFolderTarget(null)} aria-label={t('cancel')}
+                className="sf-btn-ghost p-1.5 rounded-lg cursor-pointer transition-colors text-text2 hover:text-text sf-press"
+                style={{ transition: 'color 0.15s ease, transform 0.09s cubic-bezier(0.4,0,0.2,1)' }}>
+                <IconX size={16} />
+              </button>
             </div>
+
             {folderLoading ? (
-              <div className="py-10 text-center text-text2 text-[13px]">{t('massRemixLoadingSource')}</div>
+              <div className="py-10 text-center text-text2 text-[13px] flex items-center justify-center gap-2">
+                <span className="sf-spinner" />
+                {t('massRemixLoadingSource')}
+              </div>
             ) : folderList.length === 0 ? (
-              <div className="py-10 text-center text-text2 text-[13px]">{t('massRemixNoFolders')}</div>
+              <div className="sf-empty py-10 text-[13px]">{t('massRemixNoFolders')}</div>
             ) : (
-              <div className="max-h-80 overflow-y-auto py-2">
+              <div className="max-h-80 overflow-y-auto py-1.5">
                 {folderList.map(f => (
                   <button key={f.name} onClick={() => addFolderVideos(f.name)}
-                    className="w-full flex items-center gap-3 px-5 py-3 text-left transition-all hover:bg-white/[0.03]"
-                    style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                    <span className="text-[18px]">📂</span>
-                    <span className="flex-1 text-[13px] font-semibold text-white truncate">{f.name}</span>
-                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full"
-                      style={{ background: 'rgba(139,92,246,0.12)', color: '#a78bfa' }}>
-                      {f.count} vid.
-                    </span>
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-left cursor-pointer transition-colors"
+                    style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.03)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                    <span style={{ color: 'var(--accent)' }}><IconFolder size={16} /></span>
+                    <span className="flex-1 text-[13px] font-semibold text-text truncate">{f.name}</span>
+                    <span className="sf-badge sf-badge-accent text-[10px]">{f.count} vid.</span>
                   </button>
                 ))}
               </div>
@@ -1375,63 +1508,95 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
       )}
 
       {/* ── MAIN PAGE ── */}
-      <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div className="anim-page flex flex-col overflow-hidden" style={{ height: '100%' }}>
 
-        {/* Header */}
-        <div style={{
-          flexShrink: 0, padding: isMobile ? '11px 14px' : '16px 24px',
-          borderBottom: '1px solid rgba(139,92,246,0.1)',
-          background: 'linear-gradient(90deg,rgba(124,58,237,0.07) 0%,transparent 60%)',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
+        {/* ── Premium Page Header ── */}
+        <div className="flex-shrink-0 flex items-center justify-between border-b border-border"
+          style={{
+            padding: isMobile ? '10px 14px' : '14px 24px',
+            background: 'linear-gradient(90deg,rgba(124,58,237,0.08) 0%,rgba(236,72,153,0.03) 50%,transparent 100%)',
+          }}>
+          {/* Left: icon + title */}
+          <div className="flex items-center gap-3 sf-anim-slide-up sf-d50">
             {!isMobile && (
-              <div style={{
-                width: 44, height: 44, borderRadius: 13, flexShrink: 0,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: 'linear-gradient(135deg,rgba(124,58,237,0.25),rgba(236,72,153,0.12))',
-                border: '1px solid rgba(124,58,237,0.3)',
-                boxShadow: '0 0 20px -6px rgba(124,58,237,0.5)',
-              }}>
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#c084fc" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/>
-                </svg>
+              <div className="flex-shrink-0 flex items-center justify-center rounded-xl"
+                style={{
+                  width: 42, height: 42,
+                  background: 'linear-gradient(135deg,rgba(124,58,237,0.22),rgba(236,72,153,0.10))',
+                  border: '1px solid rgba(124,58,237,0.32)',
+                  boxShadow: '0 0 18px -4px rgba(124,58,237,0.45)',
+                }}>
+                <IconZap size={20} style={{ color: '#c084fc' }} />
               </div>
             )}
             <div>
-              <h1 style={{ fontSize: isMobile ? 15 : 23, fontWeight: 900, letterSpacing: '-0.025em', lineHeight: 1.1, margin: 0,
-                background: isMobile ? undefined : 'linear-gradient(135deg,#FFFFFF 0%,rgba(196,181,253,0.85) 100%)',
-                WebkitBackgroundClip: isMobile ? undefined : 'text',
-                WebkitTextFillColor: isMobile ? '#F1F0F7' : 'transparent',
-                color: isMobile ? '#F1F0F7' : undefined,
-              }}>{t('massRemixTitle')}</h1>
-              {!isMobile && <p style={{ fontSize: 12, color: 'rgba(148,163,184,0.5)', marginTop: 4 }}>{t('massRemixSub')}</p>}
+              <h1 className="font-black leading-none tracking-tight"
+                style={{
+                  fontSize: isMobile ? 16 : 22, margin: 0,
+                  background: 'linear-gradient(135deg,#FFFFFF 0%,rgba(196,181,253,0.82) 100%)',
+                  WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+                }}>
+                {t('massRemixTitle')}
+              </h1>
+              {!isMobile && (
+                <p className="text-[11px] text-text3 mt-0.5 font-medium">{t('massRemixSub')}</p>
+              )}
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+
+          {/* Right: stats + actions */}
+          <div className="flex items-center gap-2 sf-anim-slide-up sf-d100">
+            {/* Live stats badges */}
+            {!isMobile && originals.length > 0 && (
+              <span className="sf-badge sf-badge-accent text-[10px] font-bold">
+                {originals.length} orig.
+              </span>
+            )}
+            {!isMobile && secondaries.length > 0 && (
+              <span className="sf-badge text-[10px] font-bold"
+                style={{ background: 'rgba(236,72,153,0.12)', color: '#ec4899', border: '1px solid rgba(236,72,153,0.25)' }}>
+                {secondaries.length} phase 1
+              </span>
+            )}
             {!isMobile && (
               <button onClick={openPreview} disabled={!canLaunch}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 13px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: canLaunch ? 'pointer' : 'not-allowed', background: canLaunch ? 'rgba(139,92,246,0.1)' : 'rgba(255,255,255,0.03)', color: canLaunch ? '#a78bfa' : 'rgba(255,255,255,0.18)', border: `1px solid ${canLaunch ? 'rgba(139,92,246,0.26)' : 'rgba(255,255,255,0.06)'}`, opacity: canLaunch ? 1 : 0.5, transition: 'all 0.15s' }}>
+                className="sf-btn sf-btn-ghost text-[12px] cursor-pointer transition-all"
+                style={{ opacity: canLaunch ? 1 : 0.4, cursor: canLaunch ? 'pointer' : 'not-allowed' }}>
+                <IconClapperboard size={13} />
                 {t('massRemixPlanBtn')}
               </button>
             )}
-            <button onClick={() => launch()} disabled={!canLaunch}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: isMobile ? '8px 14px' : '8px 18px', fontSize: isMobile ? 12 : 13, fontWeight: 800, cursor: canLaunch ? 'pointer' : 'not-allowed', borderRadius: 11, border: 'none', color: '#fff', background: canLaunch ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.06)', boxShadow: canLaunch ? '0 3px 16px rgba(124,58,237,0.38)' : 'none', opacity: canLaunch ? 1 : 0.4, transition: 'all 0.2s' }}>
-              <span>⚡</span><span>{isMobile ? `${t('massRemixLaunchMobile')} (${copies})` : `${t('massRemixLaunchBtn')} ${copies} remix`}</span>
+            <button
+              onClick={() => launch()} disabled={!canLaunch}
+              className="sf-btn sf-btn-primary transition-all"
+              style={{
+                fontSize: isMobile ? 12 : 13, fontWeight: 800,
+                opacity: canLaunch ? 1 : 0.45,
+                cursor: canLaunch ? 'pointer' : 'not-allowed',
+                boxShadow: canLaunch ? '0 4px 18px rgba(124,58,237,0.4)' : 'none',
+              }}>
+              <IconZap size={isMobile ? 13 : 14} />
+              <span>
+                {isMobile
+                  ? `${t('massRemixLaunchMobile')} (${copies})`
+                  : `${t('massRemixLaunchBtn')} ${copies} remix`}
+              </span>
             </button>
           </div>
         </div>
 
-        {/* Body */}
-        <div style={{
-          flex: 1, minHeight: 0, display: 'flex',
-          flexDirection: isMobile ? 'column' : 'row',
-          gap: isMobile ? 10 : 14, padding: isMobile ? '12px' : '16px 22px',
-          overflow: isMobile ? 'auto' : 'hidden',
-        }}>
+        {/* ── Body ── */}
+        <div className="flex-1 min-h-0 flex"
+          style={{
+            flexDirection: isMobile ? 'column' : 'row',
+            gap: isMobile ? 10 : 12,
+            padding: isMobile ? '12px' : '14px 20px',
+            overflow: isMobile ? 'auto' : 'hidden',
+          }}>
 
-          {/* LEFT: two source panels SIDE BY SIDE */}
-          <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 10 : 10 }}>
+          {/* ── LEFT: two source panels side by side ── */}
+          <div className="flex-1 min-w-0 min-h-0 flex anim-stagger"
+            style={{ flexDirection: isMobile ? 'column' : 'row', gap: 10 }}>
             <VideoSourcePanel
               title={t('massRemixPanelOriginals')} phase="PHASE 2" accent="#8b5cf6"
               paths={originals} loading={addingTarget === 'orig'}
@@ -1450,104 +1615,218 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
             />
           </div>
 
-          {/* RIGHT: config sidebar */}
-          <div style={{ width: isMobile ? '100%' : 248, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 7, overflowY: isMobile ? undefined : 'auto' }}>
+          {/* ── RIGHT: config sidebar ── */}
+          <div className="flex flex-col gap-2 anim-stagger"
+            style={{ width: isMobile ? '100%' : 248, flexShrink: 0, overflowY: isMobile ? undefined : 'auto' }}>
 
-            {!isMobile && <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', color: 'rgba(148,163,184,0.22)', textTransform: 'uppercase', padding: '0 2px' }}>{t('massRemixConfiguration')}</p>}
+            {!isMobile && (
+              <p className="text-[9px] font-bold tracking-widest uppercase text-text3 opacity-40 px-0.5">
+                {t('massRemixConfiguration')}
+              </p>
+            )}
 
-            {/* Copies */}
-            <div style={{ borderRadius: 12, padding: '12px 13px', background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)' }}>
-              <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(148,163,184,0.35)', marginBottom: 9 }}>{t('massRemixCopies')}</p>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 7 }}>
-                <button onClick={() => setCopies(c => Math.max(1, c - 1))} style={{ width: 28, height: 28, borderRadius: 8, fontSize: 15, fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: 'rgba(196,181,253,0.7)', cursor: 'pointer', flexShrink: 0 }}>−</button>
-                <input type="number" min={1} max={200} value={copies} onChange={e => setCopies(Math.max(1, Math.min(200, Number(e.target.value))))} style={{ flex: 1, background: 'transparent', border: 'none', textAlign: 'center', fontSize: 26, fontWeight: 900, color: '#F1F0F7', outline: 'none' }} />
-                <button onClick={() => setCopies(c => Math.min(200, c + 1))} style={{ width: 28, height: 28, borderRadius: 8, fontSize: 15, fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: 'rgba(196,181,253,0.7)', cursor: 'pointer', flexShrink: 0 }}>+</button>
+            {/* ── Copies card ── */}
+            <div className="sf-card p-3 flex flex-col gap-2">
+              <p className="text-[9px] font-bold tracking-widest uppercase text-text3 opacity-50">
+                {t('massRemixCopies')}
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCopies(c => Math.max(1, c - 1))}
+                  className="flex-shrink-0 flex items-center justify-center rounded-lg text-[15px] font-black cursor-pointer transition-colors sf-press"
+                  style={{ width: 28, height: 28, background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', color: 'var(--accent)', transition: 'background-color 0.15s ease, transform 0.09s cubic-bezier(0.4,0,0.2,1)' }}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(139,92,246,0.12)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.05)')}>
+                  −
+                </button>
+                <input
+                  type="number" min={1} max={200} value={copies}
+                  onChange={e => setCopies(Math.max(1, Math.min(200, Number(e.target.value))))}
+                  className="flex-1 bg-transparent border-none text-center font-black text-text outline-none"
+                  style={{ fontSize: 26 }} />
+                <button
+                  onClick={() => setCopies(c => Math.min(200, c + 1))}
+                  className="flex-shrink-0 flex items-center justify-center rounded-lg text-[15px] font-black cursor-pointer transition-colors sf-press"
+                  style={{ width: 28, height: 28, background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', color: 'var(--accent)', transition: 'background-color 0.15s ease, transform 0.09s cubic-bezier(0.4,0,0.2,1)' }}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(139,92,246,0.12)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.05)')}>
+                  +
+                </button>
               </div>
-              <input type="range" min={1} max={50} value={Math.min(copies, 50)} onChange={e => setCopies(Number(e.target.value))} style={{ width: '100%' }} />
+              <input type="range" min={1} max={50} value={Math.min(copies, 50)}
+                onChange={e => setCopies(Number(e.target.value))} className="w-full" />
               {originals.length > 0 && secondaries.length > 0 && (
-                <p style={{ fontSize: 10, marginTop: 5, color: 'rgba(148,163,184,0.32)' }}>🔀 {originals.length} × {secondaries.length} → <span style={{ color: '#a78bfa', fontWeight: 700 }}>{copies} {t('massRemixVideoCount')}</span></p>
+                <p className="text-[10px] text-text3 flex items-center gap-1.5">
+                  <IconShuffle size={10} />
+                  {originals.length} × {secondaries.length} →{' '}
+                  <span className="text-accent font-bold">{copies} {t('massRemixVideoCount')}</span>
+                </p>
               )}
             </div>
 
-            {/* AI toggle */}
-            <button onClick={() => setAiEnabled(v => { const next = !v; localStorage.setItem('sf_remix_ai', next ? '1' : '0'); return next })}
-              style={{ borderRadius: 12, padding: '10px 13px', textAlign: 'left', cursor: 'pointer', width: '100%', border: 'none', background: aiEnabled ? 'rgba(124,58,237,0.1)' : 'rgba(255,255,255,0.025)', outline: `1px solid ${aiEnabled ? 'rgba(139,92,246,0.35)' : 'rgba(255,255,255,0.07)'}`, boxShadow: aiEnabled ? '0 0 14px rgba(124,58,237,0.1)' : 'none', transition: 'all 0.2s' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-                  <div style={{ width: 28, height: 28, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: aiEnabled ? 'rgba(139,92,246,0.15)' : 'rgba(255,255,255,0.05)' }}><span style={{ fontSize: 13 }}>✨</span></div>
+            {/* ── AI toggle card ── */}
+            <button
+              onClick={() => setAiEnabled(v => { const next = !v; localStorage.setItem('sf_remix_ai', next ? '1' : '0'); return next })}
+              className="sf-card sf-card-lift p-3 text-left cursor-pointer transition-all w-full"
+              style={{
+                background: aiEnabled ? 'rgba(124,58,237,0.1)' : undefined,
+                borderColor: aiEnabled ? 'rgba(139,92,246,0.4)' : undefined,
+                boxShadow: aiEnabled ? '0 0 16px rgba(124,58,237,0.08)' : 'none',
+              }}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex-shrink-0 flex items-center justify-center w-7 h-7 rounded-lg"
+                    style={{ background: aiEnabled ? 'rgba(139,92,246,0.18)' : 'rgba(255,255,255,0.05)' }}>
+                    {/* Sparkle SVG icon */}
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={aiEnabled ? '#c084fc' : 'rgba(196,181,253,0.45)'} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M12 2L9.5 9.5 2 12l7.5 2.5L12 22l2.5-7.5L22 12l-7.5-2.5z"/>
+                    </svg>
+                  </div>
                   <div>
-                    <p style={{ fontSize: 12, fontWeight: 700, color: aiEnabled ? '#c4b5fd' : 'rgba(196,181,253,0.45)', lineHeight: 1.2 }}>{t('massRemixAiLabel')}</p>
-                    <p style={{ fontSize: 9, color: 'rgba(148,163,184,0.3)', lineHeight: 1.2 }}>{t('massRemixAiSub')}</p>
+                    <p className="text-[12px] font-bold leading-tight"
+                      style={{ color: aiEnabled ? '#c4b5fd' : 'rgba(196,181,253,0.45)' }}>
+                      {t('massRemixAiLabel')}
+                    </p>
+                    <p className="text-[9px] text-text3 leading-tight">{t('massRemixAiSub')}</p>
                   </div>
                 </div>
-                <div style={{ width: 32, height: 18, borderRadius: 99, position: 'relative', flexShrink: 0, background: aiEnabled ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.1)', transition: 'background 0.2s' }}>
-                  <span style={{ position: 'absolute', top: 2, width: 14, height: 14, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.3)', transition: 'transform 0.2s', transform: `translateX(${aiEnabled ? 16 : 2}px)`, display: 'block' }} />
+                {/* Toggle pill */}
+                <div className="flex-shrink-0 relative rounded-full transition-all duration-200"
+                  style={{ width: 32, height: 18, background: aiEnabled ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.1)' }}>
+                  <span className="absolute top-0.5 block rounded-full bg-white transition-transform duration-200"
+                    style={{ width: 14, height: 14, boxShadow: '0 1px 3px rgba(0,0,0,0.3)', transform: `translateX(${aiEnabled ? 16 : 2}px)` }} />
                 </div>
               </div>
-              {aiEnabled && <p style={{ marginTop: 6, fontSize: 10, color: 'rgba(148,163,184,0.38)', lineHeight: 1.4 }}>{manualText.trim() ? t('massRemixManualActive') : t('massRemixAutoAnalyze')}</p>}
-              {aiEnabled && !anthropicKey && !manualText.trim() && <p style={{ marginTop: 4, fontSize: 10, fontWeight: 600, color: '#fbbf24' }}>{t('massRemixNoAnthropicKey')}</p>}
+              {aiEnabled && (
+                <p className="mt-1.5 text-[10px] text-text3 leading-snug">
+                  {manualText.trim() ? t('massRemixManualActive') : t('massRemixAutoAnalyze')}
+                </p>
+              )}
+              {aiEnabled && !anthropicKey && !manualText.trim() && (
+                <p className="mt-1 text-[10px] font-semibold text-warn">{t('massRemixNoAnthropicKey')}</p>
+              )}
             </button>
 
+            {/* AI manual text */}
             {aiEnabled && (
-              <div style={{ borderRadius: 10, padding: '8px 11px', background: 'rgba(124,58,237,0.05)', border: '1px solid rgba(139,92,246,0.18)', display: 'flex', flexDirection: 'column', gap: 5 }}>
-                <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', color: 'rgba(139,92,246,0.55)', textTransform: 'uppercase' }}>{t('massRemixManualTextLabel')}</p>
-                <textarea value={manualText} onChange={e => { setManualText(e.target.value); localStorage.setItem('sf_remix_manual_text', e.target.value) }} placeholder={t('massRemixManualPlaceholder')} rows={2} style={{ width: '100%', borderRadius: 8, padding: '6px 9px', fontSize: 11, resize: 'none', outline: 'none', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(139,92,246,0.2)', color: '#e2e8f0', lineHeight: 1.4, fontFamily: 'inherit' }} />
+              <div className="sf-card p-3 flex flex-col gap-2"
+                style={{ borderColor: 'rgba(139,92,246,0.22)' }}>
+                <p className="text-[9px] font-bold tracking-widest uppercase"
+                  style={{ color: 'rgba(139,92,246,0.6)' }}>
+                  {t('massRemixManualTextLabel')}
+                </p>
+                <textarea
+                  value={manualText}
+                  onChange={e => { setManualText(e.target.value); localStorage.setItem('sf_remix_manual_text', e.target.value) }}
+                  placeholder={t('massRemixManualPlaceholder')}
+                  rows={2}
+                  className="sf-input w-full text-[11px] resize-none"
+                  style={{ lineHeight: 1.4 }} />
               </div>
             )}
 
-            {/* Point de coupe */}
-            <div style={{ borderRadius: 12, padding: '12px 13px', background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(148,163,184,0.35)' }}>{t('massRemixCutPoint')}</p>
-              <div style={{ display: 'flex', gap: 5 }}>
+            {/* ── Cut point card ── */}
+            <div className="sf-card p-3 flex flex-col gap-2.5">
+              <p className="text-[9px] font-bold tracking-widest uppercase text-text3 opacity-50">
+                {t('massRemixCutPoint')}
+              </p>
+              <div className="flex gap-1.5">
                 {(['auto', 'manual'] as const).map(m => (
-                  <button key={m} onClick={() => { setSplitMode(m); if (m === 'manual' && canLaunch) openPreview() }}
-                    style={{ flex: 1, padding: '7px 0', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s', border: 'none', background: splitMode === m ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.05)', color: splitMode === m ? '#fff' : 'rgba(196,181,253,0.38)', boxShadow: splitMode === m ? '0 2px 10px rgba(124,58,237,0.28)' : 'none', outline: splitMode === m ? 'none' : '1px solid rgba(255,255,255,0.07)' }}>
+                  <button key={m}
+                    onClick={() => { setSplitMode(m); if (m === 'manual' && canLaunch) openPreview() }}
+                    className="flex-1 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer transition-all"
+                    style={{
+                      border: 'none',
+                      background: splitMode === m ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.05)',
+                      color: splitMode === m ? '#fff' : 'rgba(196,181,253,0.4)',
+                      boxShadow: splitMode === m ? '0 2px 10px rgba(124,58,237,0.3)' : 'none',
+                      outline: splitMode === m ? 'none' : '1px solid rgba(255,255,255,0.07)',
+                    }}>
                     {m === 'auto' ? t('massRemixAutoMode') : t('massRemixManualMode')}
                   </button>
                 ))}
               </div>
-              <p style={{ fontSize: 10, color: 'rgba(148,163,184,0.32)', lineHeight: 1.4 }}>{splitMode === 'auto' ? t('massRemixAutoDesc') : t('massRemixManualDesc')}</p>
+              <p className="text-[10px] text-text3 leading-snug">
+                {splitMode === 'auto' ? t('massRemixAutoDesc') : t('massRemixManualDesc')}
+              </p>
             </div>
 
-            {/* Format */}
-            <div style={{ borderRadius: 12, padding: '12px 13px', background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)' }}>
-              <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(148,163,184,0.35)', marginBottom: 8 }}>{t('massRemixFormat')}</p>
-              <div style={{ display: 'flex', gap: 5 }}>
+            {/* ── Format card ── */}
+            <div className="sf-card p-3 flex flex-col gap-2.5">
+              <p className="text-[9px] font-bold tracking-widest uppercase text-text3 opacity-50">
+                {t('massRemixFormat')}
+              </p>
+              <div className="flex gap-1.5">
                 {(['9:16', '1:1', '16:9'] as Preset[]).map(p => (
                   <button key={p} onClick={() => setPreset(p)}
-                    style={{ flex: 1, padding: '7px 0', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s', border: 'none', background: preset === p ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.05)', color: preset === p ? '#fff' : 'rgba(196,181,253,0.38)', boxShadow: preset === p ? '0 2px 10px rgba(124,58,237,0.28)' : 'none', outline: preset === p ? 'none' : '1px solid rgba(255,255,255,0.07)' }}>
+                    className="flex-1 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer transition-all"
+                    style={{
+                      border: 'none',
+                      background: preset === p ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.05)',
+                      color: preset === p ? '#fff' : 'rgba(196,181,253,0.4)',
+                      boxShadow: preset === p ? '0 2px 10px rgba(124,58,237,0.3)' : 'none',
+                      outline: preset === p ? 'none' : '1px solid rgba(255,255,255,0.07)',
+                    }}>
                     {p}
                   </button>
                 ))}
               </div>
             </div>
 
-            {/* Destination */}
-            <div style={{ borderRadius: 12, padding: '12px 13px', background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(148,163,184,0.35)' }}>{t('massRemixDestination')}</p>
-              <div style={{ display: 'flex', gap: 5 }}>
+            {/* ── Destination card ── */}
+            <div className="sf-card p-3 flex flex-col gap-2.5">
+              <p className="text-[9px] font-bold tracking-widest uppercase text-text3 opacity-50">
+                {t('massRemixDestination')}
+              </p>
+              <div className="flex gap-1.5">
                 {(['bank', 'folder'] as ExportMode[]).map(m => (
                   <button key={m} onClick={() => setExportMode(m)}
-                    style={{ flex: 1, padding: '7px 0', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s', border: 'none', background: exportMode === m ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.05)', color: exportMode === m ? '#fff' : 'rgba(196,181,253,0.38)', boxShadow: exportMode === m ? '0 2px 10px rgba(124,58,237,0.28)' : 'none', outline: exportMode === m ? 'none' : '1px solid rgba(255,255,255,0.07)' }}>
+                    className="flex-1 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer transition-all"
+                    style={{
+                      border: 'none',
+                      background: exportMode === m ? 'linear-gradient(130deg,#7c3aed,#ec4899)' : 'rgba(255,255,255,0.05)',
+                      color: exportMode === m ? '#fff' : 'rgba(196,181,253,0.4)',
+                      boxShadow: exportMode === m ? '0 2px 10px rgba(124,58,237,0.3)' : 'none',
+                      outline: exportMode === m ? 'none' : '1px solid rgba(255,255,255,0.07)',
+                    }}>
                     {m === 'bank' ? t('massRemixBankDest') : t('massRemixFolderDest')}
                   </button>
                 ))}
               </div>
+
               {exportMode === 'bank' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                <div className="flex flex-col gap-1.5">
                   {bankFolders.length > 0 && (
-                    <select value={bankFolders.includes(bankFolder) ? bankFolder : ''} onChange={e => setBankFolder(e.target.value)} style={{ width: '100%', borderRadius: 8, padding: '6px 9px', fontSize: 11, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2d9f3', outline: 'none', cursor: 'pointer' }}>
+                    <select
+                      value={bankFolders.includes(bankFolder) ? bankFolder : ''}
+                      onChange={e => setBankFolder(e.target.value)}
+                      className="sf-input w-full text-[11px] cursor-pointer">
                       <option value="" style={{ background: '#0c0919', color: '#e2d9f3' }}>{t('massRemixRootFolder')}</option>
-                      {bankFolders.map(f => <option key={f} value={f} style={{ background: '#0c0919', color: '#e2d9f3' }}>{f}</option>)}
+                      {bankFolders.map(f => (
+                        <option key={f} value={f} style={{ background: '#0c0919', color: '#e2d9f3' }}>{f}</option>
+                      ))}
                     </select>
                   )}
-                  <input type="text" placeholder={bankFolders.length > 0 ? t('massRemixNewFolderPlaceholder') : t('massRemixFolderOptional')} value={bankFolder} onChange={e => setBankFolder(e.target.value)} style={{ width: '100%', borderRadius: 8, padding: '6px 9px', fontSize: 11, background: 'rgba(255,255,255,0.05)', border: `1px solid ${bankFolder.trim() ? 'rgba(139,92,246,0.5)' : 'rgba(255,255,255,0.09)'}`, color: '#e2d9f3', outline: 'none' }} />
+                  <input
+                    type="text"
+                    placeholder={bankFolders.length > 0 ? t('massRemixNewFolderPlaceholder') : t('massRemixFolderOptional')}
+                    value={bankFolder}
+                    onChange={e => setBankFolder(e.target.value)}
+                    className="sf-input w-full text-[11px]"
+                    style={{ borderColor: bankFolder.trim() ? 'rgba(139,92,246,0.5)' : undefined }} />
                 </div>
               )}
+
               {exportMode === 'folder' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                  <button onClick={async () => { const f = await window.electronAPI?.pickOutputFolder?.(); if (f) setOutputFolder(f) }} style={{ width: '100%', borderRadius: 8, padding: '6px 9px', fontSize: 11, fontWeight: 600, cursor: 'pointer', background: 'rgba(139,92,246,0.1)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.2)' }}>{t('massRemixChooseFolder')}</button>
-                  {outputFolder && <p style={{ fontSize: 10, fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'rgba(148,163,184,0.32)' }}>{outputFolder}</p>}
+                <div className="flex flex-col gap-1.5">
+                  <button
+                    onClick={async () => { const f = await window.electronAPI?.pickOutputFolder?.(); if (f) setOutputFolder(f) }}
+                    className="sf-btn sf-btn-ghost w-full text-[11px] cursor-pointer justify-center">
+                    <IconFolder size={12} /> {t('massRemixChooseFolder')}
+                  </button>
+                  {outputFolder && (
+                    <p className="text-[10px] font-mono truncate text-text3">{outputFolder}</p>
+                  )}
                 </div>
               )}
             </div>

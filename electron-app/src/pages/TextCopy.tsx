@@ -142,204 +142,323 @@ export function TextCopy({ user, onBack }: { user: User; onBack?: () => void }) 
   const pct    = total > 0 ? Math.round((done + errors) / total * 100) : 0
 
   return (
-    <div className="h-full flex flex-col overflow-hidden">
+    <div className="h-full flex flex-col overflow-y-auto anim-page">
 
-      {/* Header */}
-      <div className="flex-shrink-0 px-10 pt-9 pb-7 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-        <div className="flex items-center gap-3">
-          {onBack && <button onClick={onBack} className="text-white/40 hover:text-white text-lg">←</button>}
-          <div>
-            <h1 className="text-[28px] font-black text-white leading-none">Texte IA — Dupliquer</h1>
-            <p className="text-[13px] text-text2 mt-0.5">Add text at multiple positions to create unique copies.</p>
+      {/* ── Header ────────────────────────────────────────────────────────── */}
+      <div className="flex-shrink-0 px-8 pt-7 pb-5 flex items-center justify-between border-b border-border">
+        <div className="flex items-center gap-4 sf-anim-slide-up sf-d50">
+          {onBack && (
+            <>
+              <button
+                onClick={onBack}
+                className="sf-btn sf-btn-ghost cursor-pointer flex items-center gap-1.5 text-[13px]"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="m15 18-6-6 6-6"/>
+                </svg>
+                Retour
+              </button>
+              <div className="w-px h-6 bg-border" />
+            </>
+          )}
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 sf-anim-scale-spring sf-d100"
+              style={{ background: 'linear-gradient(135deg, rgba(124,58,237,0.25), rgba(236,72,153,0.15))', border: '1px solid rgba(139,92,246,0.25)' }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M17 12H3M3 12l4-4M3 12l4 4M7 5l10-2v14L7 19"/>
+              </svg>
+            </div>
+            <div>
+              <h1 className="text-[20px] font-black text-text leading-none">Texte IA — Dupliquer</h1>
+              <p className="text-[13px] text-text2 mt-0.5">Add text at multiple positions to create unique copies.</p>
+            </div>
           </div>
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-3 sf-anim-slide-up sf-d150">
           {!running ? (
-            <button onClick={generate} disabled={!text.trim() || !videos.length}
-              className="rounded-xl px-5 py-2.5 text-[13px] font-semibold text-white disabled:opacity-40"
-              style={{ background: 'linear-gradient(130deg,#7c3aed,#ec4899)' }}>
-              ▶ Generate {videos.length * copies > 0 ? `(${videos.length * copies} videos)` : ''}
+            <button
+              onClick={generate}
+              disabled={!text.trim() || !videos.length}
+              className="sf-btn sf-btn-primary cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-2"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <polygon points="5 3 19 12 5 21 5 3"/>
+              </svg>
+              Generate {videos.length * copies > 0 ? `(${videos.length * copies} videos)` : ''}
             </button>
           ) : (
-            <button onClick={() => { abortRef.current = true }}
-              className="rounded-xl px-5 py-2.5 text-[13px] font-semibold"
-              style={{ background: 'rgba(239,68,68,0.2)', color: '#f87171', border: '1px solid rgba(239,68,68,0.3)' }}>
-              ⏹ Stop
+            <button
+              onClick={() => { abortRef.current = true }}
+              className="sf-btn sf-btn-danger cursor-pointer inline-flex items-center gap-2"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <rect x="3" y="3" width="18" height="18" rx="2"/>
+              </svg>
+              Stop
             </button>
           )}
         </div>
       </div>
 
-      {/* Scrollable content */}
-      <div className="flex-1 overflow-y-auto px-10 pb-10">
-        <div className="max-w-3xl mx-auto space-y-6 pt-8">
+      {/* ── Content (scrolls with the page) ─────────────────────────────────── */}
+      <div className="flex-1 px-8 pb-10">
+        <div className="max-w-3xl mx-auto space-y-5 pt-6 anim-stagger">
 
           {/* Videos */}
-          <section className="rounded-2xl p-6" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+          <div className="sf-card p-6">
             <div className="flex items-center justify-between mb-4">
-              <span className="text-[15px] font-bold text-white">Videos ({videos.length})</span>
+              <div className="flex items-center gap-2">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="m15 10 5 5-5 5"/><rect x="2" y="7" width="13" height="10" rx="2"/>
+                </svg>
+                <span className="text-[14px] font-bold text-text">Videos ({videos.length})</span>
+              </div>
               <div className="flex gap-2">
-                <button onClick={pickLocal}
-                  className="rounded-xl px-4 py-2 text-[13px] font-semibold"
-                  style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}>
-                  📁 Local
+                <button
+                  onClick={pickLocal}
+                  className="sf-btn sf-btn-secondary cursor-pointer inline-flex items-center gap-2 text-[12px]"
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M22 12H2M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11zM6 16h.01M10 16h.01"/></svg>
+                  Local
                 </button>
-                <button onClick={() => setShowBankPicker(true)}
-                  className="rounded-xl px-4 py-2 text-[13px] font-semibold"
-                  style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}>
-                  🏦 Banque
+                <button
+                  onClick={() => setShowBankPicker(true)}
+                  className="sf-btn sf-btn-secondary cursor-pointer inline-flex items-center gap-2 text-[12px]"
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2 8h20M4 8V6a2 2 0 0 1 2-2h3.93a2 2 0 0 1 1.66.9l.82 1.2a2 2 0 0 0 1.66.9H20a2 2 0 0 1 2 2M2 8v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8M10 12h4"/></svg>
+                  Banque
                 </button>
                 {videos.length > 0 && (
-                  <button onClick={() => setVideos([])}
-                    className="rounded-xl px-4 py-2 text-[13px] font-semibold"
-                    style={{ background: 'rgba(239,68,68,0.12)', color: '#f87171', border: '1px solid rgba(239,68,68,0.2)' }}>
+                  <button
+                    onClick={() => setVideos([])}
+                    className="sf-btn sf-btn-danger cursor-pointer text-[12px]"
+                  >
                     Clear
                   </button>
                 )}
               </div>
             </div>
-            {videos.length === 0
-              ? <p className="text-[13px] text-text2 text-center py-6">No video — local or from the bank</p>
-              : (
-                <ul className="flex flex-col gap-2">
-                  {videos.map((v, i) => (
-                    <li key={i} className="flex items-center justify-between text-[13px] px-4 py-3 rounded-xl"
-                      style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                      <span className="text-white/70 truncate max-w-xs">{v.name}</span>
-                      <button onClick={() => setVideos(prev => prev.filter((_, j) => j !== i))}
-                        className="text-white/30 hover:text-red-400 ml-2 text-[13px]">✕</button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-          </section>
+            {videos.length === 0 ? (
+              <div className="sf-empty py-8">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="m15 10 5 5-5 5"/><rect x="2" y="7" width="13" height="10" rx="2"/>
+                </svg>
+                <p>No video — local or from the bank</p>
+              </div>
+            ) : (
+              <ul className="flex flex-col gap-2">
+                {videos.map((v, i) => (
+                  <li key={i} className="flex items-center justify-between text-[13px] px-4 py-3 rounded-xl bg-surface2 border border-border">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="text-text2 flex-shrink-0">
+                        <path d="m15 10 5 5-5 5"/><rect x="2" y="7" width="13" height="10" rx="2"/>
+                      </svg>
+                      <span className="text-text2 truncate max-w-xs">{v.name}</span>
+                    </div>
+                    <button
+                      onClick={() => setVideos(prev => prev.filter((_, j) => j !== i))}
+                      className="text-text2 hover:text-danger ml-2 cursor-pointer flex-shrink-0 transition-colors sf-press"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                      </svg>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
 
           {/* Text config */}
-          <section className="rounded-2xl p-6 flex flex-col gap-5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-            <span className="text-[15px] font-bold text-white">Text</span>
-            <textarea value={text} onChange={e => setText(e.target.value)}
-              placeholder="Enter the text to display on the video…" rows={3}
-              className="w-full rounded-xl px-4 py-3 text-[13px] text-white resize-none outline-none"
-              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)' }} />
+          <div className="sf-card p-6 flex flex-col gap-5">
+            <div className="flex items-center gap-2 mb-1">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/>
+              </svg>
+              <span className="text-[14px] font-bold text-text">Text</span>
+            </div>
+            <textarea
+              value={text}
+              onChange={e => setText(e.target.value)}
+              placeholder="Enter the text to display on the video…"
+              rows={3}
+              className="sf-input resize-none"
+            />
 
             <div className="grid grid-cols-2 gap-5">
               <div className="flex flex-col gap-2">
-                <label className="text-[12px] text-text2">Font size</label>
+                <label className="text-[12px] text-text2 uppercase tracking-wide">Font size</label>
                 <div className="flex items-center gap-3">
-                  <input type="range" min={36} max={130} value={fontSize}
-                    onChange={e => setFontSize(Number(e.target.value))} className="flex-1" />
-                  <span className="text-[13px] text-white w-8">{fontSize}</span>
+                  <input
+                    type="range" min={36} max={130} value={fontSize}
+                    onChange={e => setFontSize(Number(e.target.value))}
+                    className="flex-1 accent-accent"
+                  />
+                  <span className="text-[13px] text-text w-8">{fontSize}</span>
                 </div>
               </div>
               <div className="flex flex-col gap-2">
-                <label className="text-[12px] text-text2">Color</label>
+                <label className="text-[12px] text-text2 uppercase tracking-wide">Color</label>
                 <div className="flex items-center gap-3">
-                  <input type="color" value={fontColor} onChange={e => setFontColor(e.target.value)}
-                    className="h-9 w-14 rounded-lg cursor-pointer border-0 bg-transparent" />
-                  <span className="text-[13px] text-white/60">{fontColor}</span>
+                  <input
+                    type="color" value={fontColor}
+                    onChange={e => setFontColor(e.target.value)}
+                    className="h-9 w-14 rounded-lg cursor-pointer border-0 bg-transparent"
+                  />
+                  <span className="text-[13px] text-text2">{fontColor}</span>
                 </div>
               </div>
-              <div className="flex items-center gap-3">
-                <button onClick={() => setBold(b => !b)}
-                  className={`rounded-xl px-4 py-2.5 text-[13px] font-bold transition-all ${bold ? 'text-violet-300' : 'text-white/30'}`}
-                  style={{ background: bold ? 'rgba(139,92,246,0.2)' : 'rgba(255,255,255,0.05)', border: `1px solid ${bold ? 'rgba(139,92,246,0.3)' : 'rgba(255,255,255,0.07)'}` }}>
-                  Bold
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setBold(b => !b)}
+                  className={`sf-btn cursor-pointer font-bold transition-all ${bold ? 'text-accent' : 'text-text2'}`}
+                  style={bold ? { background: 'rgba(139,92,246,0.2)', border: '1px solid rgba(139,92,246,0.3)' } : { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}
+                >
+                  B Bold
                 </button>
-                <button onClick={() => setShadow(s => !s)}
-                  className={`rounded-xl px-4 py-2.5 text-[13px] font-semibold transition-all ${shadow ? 'text-violet-300' : 'text-white/30'}`}
-                  style={{ background: shadow ? 'rgba(139,92,246,0.2)' : 'rgba(255,255,255,0.05)', border: `1px solid ${shadow ? 'rgba(139,92,246,0.3)' : 'rgba(255,255,255,0.07)'}` }}>
+                <button
+                  onClick={() => setShadow(s => !s)}
+                  className={`sf-btn cursor-pointer transition-all ${shadow ? 'text-accent' : 'text-text2'}`}
+                  style={shadow ? { background: 'rgba(139,92,246,0.2)', border: '1px solid rgba(139,92,246,0.3)' } : { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}
+                >
                   Shadow
                 </button>
               </div>
               <div className="flex flex-col gap-2">
-                <label className="text-[12px] text-text2">Format</label>
-                <select value={preset} onChange={e => setPreset(e.target.value as any)}
-                  className="rounded-xl px-4 py-2.5 text-[13px] text-white outline-none"
-                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#e2e8f0' }}>
+                <label className="text-[12px] text-text2 uppercase tracking-wide">Format</label>
+                <select
+                  value={preset}
+                  onChange={e => setPreset(e.target.value as any)}
+                  className="sf-input text-[13px] cursor-pointer"
+                >
                   <option value="9:16" style={{ background: '#0d1120', color: '#e2d9f3' }}>9:16 (Reels)</option>
                   <option value="1:1" style={{ background: '#0d1120', color: '#e2d9f3' }}>1:1 (Square)</option>
                   <option value="16:9" style={{ background: '#0d1120', color: '#e2d9f3' }}>16:9 (Landscape)</option>
                 </select>
               </div>
             </div>
-          </section>
+          </div>
 
           {/* Copies */}
-          <section className="rounded-2xl p-6 flex flex-col gap-5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+          <div className="sf-card p-6 flex flex-col gap-4">
             <div className="flex items-center justify-between">
-              <span className="text-[15px] font-bold text-white">Number of copies</span>
-              <span className="text-[13px] font-semibold text-violet-400">{copies} position{copies > 1 ? 's' : ''}</span>
+              <div className="flex items-center gap-2">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
+                </svg>
+                <span className="text-[14px] font-bold text-text">Number of copies</span>
+              </div>
+              <span className="sf-badge sf-badge-accent">{copies} position{copies > 1 ? 's' : ''}</span>
             </div>
-            <input type="range" min={1} max={5} value={copies} onChange={e => setCopies(Number(e.target.value))} />
+            <input
+              type="range" min={1} max={5} value={copies}
+              onChange={e => setCopies(Number(e.target.value))}
+              className="accent-accent"
+            />
             <div className="flex gap-2 flex-wrap">
               {POSITIONS.slice(0, copies).map((p, i) => (
-                <span key={i} className="text-[12px] px-3 py-1.5 rounded-full"
-                  style={{ background: 'rgba(139,92,246,0.15)', color: '#c4b5fd' }}>
+                <span key={i} className="sf-badge sf-badge-muted sf-anim-scale-in">
                   {p.label} ({Math.round(p.yFrac * 100)}%)
                 </span>
               ))}
             </div>
             <p className="text-[13px] text-text2">
               {videos.length} video{videos.length !== 1 ? 's' : ''} × {copies} position{copies !== 1 ? 's' : ''} ={' '}
-              <strong className="text-white/60">{videos.length * copies} file{videos.length * copies !== 1 ? 's' : ''}</strong>
+              <strong className="text-text">{videos.length * copies} file{videos.length * copies !== 1 ? 's' : ''}</strong>
             </p>
-          </section>
+          </div>
 
           {/* Export destination */}
-          <section className="rounded-2xl p-6 flex flex-col gap-4" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-            <span className="text-[15px] font-bold text-white">Destination of generated videos</span>
+          <div className="sf-card p-6 flex flex-col gap-4">
+            <div className="flex items-center gap-2 mb-1">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+              <span className="text-[14px] font-bold text-text">Destination of generated videos</span>
+            </div>
             <div className="flex gap-3">
               {(['download', 'bank'] as const).map(m => (
-                <button key={m} onClick={() => setExportMode(m)}
-                  className="flex-1 py-3 rounded-xl text-[13px] font-semibold transition-all"
+                <button
+                  key={m}
+                  onClick={() => setExportMode(m)}
+                  className={`flex-1 py-3 rounded-xl text-[13px] font-semibold transition-all inline-flex items-center justify-center gap-2 cursor-pointer ${exportMode === m ? 'text-accent' : 'text-text2 hover:text-text'}`}
                   style={{
-                    background: exportMode === m ? 'rgba(139,92,246,0.25)' : 'rgba(255,255,255,0.05)',
-                    color: exportMode === m ? '#a78bfa' : 'rgba(255,255,255,0.4)',
-                    border: `1px solid ${exportMode === m ? 'rgba(139,92,246,0.4)' : 'rgba(255,255,255,0.07)'}`,
-                  }}>
-                  {m === 'download' ? '⬇ Download' : '🏦 Content bank'}
+                    background: exportMode === m ? 'rgba(139,92,246,0.15)' : 'rgba(255,255,255,0.04)',
+                    border: `1px solid ${exportMode === m ? 'rgba(139,92,246,0.35)' : 'rgba(255,255,255,0.07)'}`,
+                  }}
+                >
+                  {m === 'download' ? (
+                    <>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+                      Download
+                    </>
+                  ) : (
+                    <>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2 8h20M4 8V6a2 2 0 0 1 2-2h3.93a2 2 0 0 1 1.66.9l.82 1.2a2 2 0 0 0 1.66.9H20a2 2 0 0 1 2 2M2 8v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8M10 12h4"/></svg>
+                      Content bank
+                    </>
+                  )}
                 </button>
               ))}
             </div>
-          </section>
+          </div>
 
           {/* Progress */}
           {jobs.length > 0 && (
-            <section className="rounded-2xl p-6 flex flex-col gap-5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+            <div className="sf-card p-6 flex flex-col gap-4">
               <div className="flex items-center justify-between">
-                <span className="text-[15px] font-bold text-white">{done}/{total} done</span>
-                <span className="text-[13px] text-text2">{pct}%</span>
+                <div className="flex items-center gap-2">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                  </svg>
+                  <span className="text-[14px] font-bold text-text">{done}/{total} done</span>
+                </div>
+                <span className="sf-badge sf-badge-muted">{pct}%</span>
               </div>
-              <div className="h-2 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
-                <div className="h-full rounded-full transition-all"
-                  style={{ width: `${pct}%`, background: errors > 0 ? '#f87171' : 'linear-gradient(130deg,#7c3aed,#ec4899)' }} />
+              <div className="h-2 rounded-full overflow-hidden bg-surface2">
+                <div
+                  className="h-full rounded-full transition-all"
+                  style={{ width: `${pct}%`, background: errors > 0 ? 'var(--danger)' : 'linear-gradient(130deg,#7c3aed,#ec4899)' }}
+                />
               </div>
               <div className="flex flex-col gap-2 max-h-64 overflow-y-auto">
                 {jobs.map(job => (
-                  <div key={job.id} className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl"
-                    style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
-                    <span className="truncate text-[13px] text-white/70 flex-1">
+                  <div key={job.id} className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl bg-surface2 border border-border">
+                    <span className="truncate text-[13px] text-text2 flex-1">
                       {job.videoName.replace(/\.[^.]+$/, '')} — {POSITIONS[job.posIdx].label}
                     </span>
-                    {job.status === 'pending'    && <span className="text-text2 text-[12px]">Pending</span>}
-                    {job.status === 'processing' && <span className="text-violet-400 text-[12px] animate-pulse">⚙ FFmpeg…</span>}
-                    {job.status === 'uploading'  && <span className="text-blue-400 text-[12px] animate-pulse">⬆ Bank…</span>}
-                    {job.status === 'error'      && <span className="text-red-400 text-[12px]" title={job.error}>❌</span>}
+                    {job.status === 'pending'    && <span className="sf-badge sf-badge-muted">Pending</span>}
+                    {job.status === 'processing' && (
+                      <span className="sf-badge sf-badge-accent animate-pulse flex items-center gap-1">
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+                        FFmpeg…
+                      </span>
+                    )}
+                    {job.status === 'uploading'  && (
+                      <span className="sf-badge sf-badge-muted animate-pulse flex items-center gap-1">
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                        Bank…
+                      </span>
+                    )}
+                    {job.status === 'error' && (
+                      <span className="sf-badge sf-badge-danger sf-anim-scale-in" title={job.error}>Error</span>
+                    )}
                     {job.status === 'done' && exportMode === 'download' && job.outputPath && (
-                      <a href={job.outputPath}
+                      <a
+                        href={job.outputPath}
                         download={`textcopy_${String(job.id + 1).padStart(3, '0')}.mp4`}
-                        className="text-[12px] font-semibold px-3 py-1.5 rounded-xl"
-                        style={{ background: 'rgba(34,197,94,0.15)', color: '#4ade80' }}>
-                        ↓ Download
+                        className="sf-badge sf-badge-ok hover:opacity-80 transition-opacity sf-anim-scale-in"
+                      >
+                        Download
                       </a>
                     )}
                     {job.status === 'done' && exportMode === 'bank' && (
-                      <span className="text-[12px] text-green-400">✓ Bank</span>
+                      <span className="sf-badge sf-badge-ok sf-anim-scale-in">Bank</span>
                     )}
                   </div>
                 ))}
               </div>
-            </section>
+            </div>
           )}
 
         </div>

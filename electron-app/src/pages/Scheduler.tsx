@@ -119,6 +119,14 @@ function IconCalendar({ size = 48, color = 'currentColor' }: { size?: number; co
   )
 }
 
+function IconCalendarSm({ size = 20, color = 'currentColor' }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2z"/>
+    </svg>
+  )
+}
+
 function IconPhone({ size = 12, color = 'currentColor' }: { size?: number; color?: string }) {
   return (
     <svg width={size} height={size} viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -200,6 +208,15 @@ function IconClose({ size = 12, color = 'currentColor' }: { size?: number; color
   )
 }
 
+function IconSearch({ size = 14, color = 'currentColor' }: { size?: number; color?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="7" cy="7" r="5" stroke={color} strokeWidth="1.4" />
+      <path d="M11 11l3 3" stroke={color} strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+  )
+}
+
 // ── Status pill ────────────────────────────────────────────────────────────────
 
 function StatusPill({ status }: { status: ScheduleStatus }) {
@@ -255,7 +272,7 @@ function StatChip({ icon, label }: { icon: JSX.Element; label: string }) {
       display: 'inline-flex', alignItems: 'center', gap: 5,
       background: 'rgba(255,255,255,0.04)', color: 'rgba(196,181,253,0.72)',
       border: '1px solid rgba(255,255,255,0.055)', borderRadius: 6,
-      padding: '3px 9px', fontSize: 12,
+      padding: '3px 9px', fontSize: 11,
     }}>
       {icon}
       {label}
@@ -360,6 +377,7 @@ export function Scheduler({ user, onNavigate }: Props) {
   const [posts, setPosts]         = useState<ScheduledPost[]>([])
   const [loading, setLoading]     = useState(true)
   const [tab, setTab]             = useState<TabFilter>('pending')
+  const [search, setSearch]       = useState('')
   const [cancelling, setCancelling] = useState<string | null>(null)
   const [runningPost, setRunningPost] = useState<string | null>(null)
   const [runLogs, setRunLogs]     = useState<{ id: string; msgs: string[] } | null>(null)
@@ -408,8 +426,8 @@ export function Scheduler({ user, onNavigate }: Props) {
     if (delay <= 0) {
       run()
     } else {
-      const t = setTimeout(run, delay)
-      timersRef.current.set(post.id, t)
+      const timer = setTimeout(run, delay)
+      timersRef.current.set(post.id, timer)
     }
   }, [reload])
 
@@ -459,14 +477,14 @@ export function Scheduler({ user, onNavigate }: Props) {
   }, [user.id, scheduleExecution])
 
   useEffect(() => {
-    const t = timersRef.current
-    return () => { t.forEach(timer => clearTimeout(timer)); t.clear() }
+    const timers = timersRef.current
+    return () => { timers.forEach(timer => clearTimeout(timer)); timers.clear() }
   }, [])
 
   async function cancel(id: string) {
     setCancelling(id)
-    const t = timersRef.current.get(id)
-    if (t) { clearTimeout(t); timersRef.current.delete(id) }
+    const timer = timersRef.current.get(id)
+    if (timer) { clearTimeout(timer); timersRef.current.delete(id) }
     await cancelScheduledPost(id)
     setPosts(prev => prev.map(p => p.id === id ? { ...p, status: 'cancelled' } : p))
     setCancelling(null)
@@ -474,52 +492,65 @@ export function Scheduler({ user, onNavigate }: Props) {
 
   const pending = posts.filter(p => p.status === 'pending' || p.status === 'running')
   const history = posts.filter(p => p.status === 'done' || p.status === 'failed' || p.status === 'cancelled')
-  const shown   = tab === 'pending' ? pending : history
+
+  // Apply search filter
+  const baseShown = tab === 'pending' ? pending : history
+  const shown = search.trim()
+    ? baseShown.filter(p =>
+        p.caption?.toLowerCase().includes(search.toLowerCase()) ||
+        p.phones.some(ph => (ph.ig_username ?? ph.phone_name ?? '').toLowerCase().includes(search.toLowerCase()))
+      )
+    : baseShown
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#07070C' }}>
+    <div className="sf-page anim-page">
 
-      {/* ── Page header ───────────────────────────────────────────────────────── */}
-      <div style={{
-        flexShrink: 0,
-        padding: '28px 32px 0',
-        borderBottom: '1px solid rgba(255,255,255,0.06)',
-      }}>
-        <div className="sf-anim-slide-up" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 13, minWidth: 0 }}>
-            <div style={{
-              width: 44, height: 44, borderRadius: 13, flexShrink: 0,
+      {/* ── Page header ─────────────────────────────────────────────────────────── */}
+      <div className="sf-page-header" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 0, padding: '24px 28px 0', borderBottom: 'none' }}>
+
+        {/* Title row */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 18 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
+            {/* Icon */}
+            <div className="sf-anim-scale-spring" style={{
+              width: 46, height: 46, borderRadius: 14, flexShrink: 0,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: 'linear-gradient(135deg, rgba(34,211,238,0.2), rgba(34,211,238,0.05))',
-              border: '1px solid rgba(34,211,238,0.25)', color: '#22d3ee',
+              background: 'linear-gradient(135deg, rgba(34,211,238,0.18) 0%, rgba(34,211,238,0.05) 100%)',
+              border: '1px solid rgba(34,211,238,0.22)',
+              boxShadow: '0 0 22px -6px rgba(34,211,238,0.3)',
+              color: '#22d3ee',
             }}>
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2z"/>
-              </svg>
+              <IconCalendarSm size={22} color="#22d3ee" />
             </div>
-            <div style={{ minWidth: 0 }}>
-              <h1 style={{
-                fontSize: 23, fontWeight: 800, color: '#F2F0FF',
-                margin: 0, lineHeight: 1.1, letterSpacing: '-0.025em',
-              }}>
+
+            {/* Text */}
+            <div className="sf-anim-slide-up sf-d50" style={{ minWidth: 0 }}>
+              <h1 className="sf-page-title" style={{ fontSize: 22, letterSpacing: '-0.03em' }}>
                 {t('schedulerTitle')}
               </h1>
-              <p style={{ fontSize: 12.5, color: 'rgba(148,163,184,0.55)', marginTop: 5, marginBottom: 0 }}>
+              <p className="sf-page-sub">
                 {posts.length} {posts.length !== 1 ? t('schedulerTaskCountPlural') : t('schedulerTaskCount')}
               </p>
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {/* Right: stat chips + refresh */}
+          <div className="sf-anim-slide-up sf-d100" style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
             {pending.length > 0 && (
-              <span className="sf-badge sf-badge-ok" style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-                <IconClock size={11} color="#22C55E" />
+              <span className="sf-badge sf-badge-warn" style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                <IconClock size={11} color="#F59E0B" />
                 {pending.length} {t('schedulerPendingCount')}
+              </span>
+            )}
+            {history.length > 0 && (
+              <span className="sf-badge sf-badge-muted" style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                <IconCheck size={11} color="rgba(148,163,184,0.52)" />
+                {history.length} {t('schedulerTabHistory')}
               </span>
             )}
             <button
               onClick={reload}
-              className="sf-btn sf-btn-ghost sf-btn-sm sf-btn-icon"
+              className="sf-btn sf-btn-ghost sf-btn-sm sf-btn-icon cursor-pointer"
               title="Actualiser"
             >
               <IconRefresh size={14} color="rgba(196,181,253,0.72)" spinning={loading} />
@@ -527,11 +558,10 @@ export function Scheduler({ user, onNavigate }: Props) {
           </div>
         </div>
 
-        {/* ── Tabs — underline style ────────────────────────────────────────── */}
-        <div style={{
+        {/* Tabs — underline style */}
+        <div className="sf-anim-slide-up sf-d150" style={{
           display: 'flex', gap: 0,
           borderBottom: '1px solid rgba(255,255,255,0.06)',
-          marginBottom: 0,
         }}>
           {([
             { id: 'pending' as TabFilter, label: t('schedulerTabPending'), count: pending.length },
@@ -540,6 +570,7 @@ export function Scheduler({ user, onNavigate }: Props) {
             <button
               key={tabItem.id}
               onClick={() => setTab(tabItem.id)}
+              className="cursor-pointer"
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 8,
                 padding: '10px 18px',
@@ -576,51 +607,70 @@ export function Scheduler({ user, onNavigate }: Props) {
         </div>
       </div>
 
-      {/* ── Post list ─────────────────────────────────────────────────────────── */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '20px 32px 32px', scrollbarWidth: 'none' }}>
+      {/* ── Toolbar ──────────────────────────────────────────────────────────────── */}
+      <div className="sf-toolbar sf-anim-slide-up sf-d200">
+        {/* Search */}
+        <div className="sf-search" style={{ flex: 1, maxWidth: 320, position: 'relative' }}>
+          <span className="sf-search-icon" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
+            <IconSearch size={14} color="rgba(100,116,139,0.5)" />
+          </span>
+          <input
+            type="text"
+            className="sf-input"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search posts…"
+            style={{ paddingLeft: 32, height: 32, fontSize: 12.5 }}
+          />
+        </div>
+
+        <div style={{ flex: 1 }} />
+
+        {/* Refresh */}
+        <button
+          onClick={reload}
+          disabled={loading}
+          className="sf-btn sf-btn-secondary sf-btn-sm cursor-pointer"
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, opacity: loading ? 0.6 : 1 }}
+        >
+          <IconRefresh size={13} color="rgba(196,181,253,0.72)" spinning={loading} />
+          {t('refresh') || 'Refresh'}
+        </button>
+      </div>
+
+      {/* ── Page body ─────────────────────────────────────────────────────────────── */}
+      <div className="sf-page-body">
         {loading ? (
-          /* ── Skeleton loading ─────────────────────────────────────────────── */
+          /* ── Skeleton loading ─────────────────────────────────────────────────── */
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {[0, 1, 2, 3].map(i => (
               <div
                 key={i}
                 className="sf-skeleton"
                 style={{
-                  height: 80,
-                  borderRadius: 12,
-                  opacity: 1 - i * 0.15,
+                  height: 88,
+                  borderRadius: 14,
+                  opacity: 1 - i * 0.18,
                 }}
               />
             ))}
           </div>
         ) : shown.length === 0 ? (
-          /* ── Empty state ──────────────────────────────────────────────────── */
-          <div className="sf-anim-scale-spring" style={{
-            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-            padding: '60px 24px', textAlign: 'center',
-            background: '#0C0C15', border: '1px solid rgba(255,255,255,0.055)',
-            borderRadius: 16, marginTop: 8,
-          }}>
-            <div style={{
-              width: 64, height: 64,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: 'rgba(124,58,237,0.06)',
-              border: '1px dashed rgba(139,92,246,0.2)',
-              borderRadius: 16,
-              marginBottom: 18,
-            }}>
-              <IconCalendar size={32} color="rgba(139,92,246,0.45)" />
+          /* ── Empty state ──────────────────────────────────────────────────────── */
+          <div className="sf-empty anim-scale-in sf-card" style={{ marginTop: 8 }}>
+            <div className="sf-empty-icon">
+              <IconCalendar size={26} color="rgba(139,92,246,0.6)" />
             </div>
-            <p style={{ fontSize: 15, fontWeight: 700, color: '#F2F0FF', margin: 0 }}>
+            <p className="sf-empty-title">
               {tab === 'pending' ? t('schedulerEmptyPending') : t('schedulerEmptyHistory')}
             </p>
-            <p style={{ fontSize: 13, color: 'rgba(148,163,184,0.52)', marginTop: 8, marginBottom: 0 }}>
+            <p className="sf-empty-desc">
               {tab === 'pending' ? t('schedulerEmptyPendingHint') : t('schedulerEmptyHistoryHint')}
             </p>
             {tab === 'pending' && (
               <button
-                className="sf-btn sf-btn-primary sf-btn-sm"
-                style={{ marginTop: 20 }}
+                className="sf-btn sf-btn-primary cursor-pointer"
+                style={{ marginTop: 4 }}
                 onClick={() => onNavigate?.('massposting')}
               >
                 {t('schedulerSchedulePost')}
@@ -628,7 +678,7 @@ export function Scheduler({ user, onNavigate }: Props) {
             )}
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div className="anim-stagger" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {shown.map((post, index) => (
               <PostCard
                 key={post.id}
@@ -644,14 +694,10 @@ export function Scheduler({ user, onNavigate }: Props) {
             ))}
           </div>
         )}
-      </div>
 
-      {/* ── Info banner ───────────────────────────────────────────────────────── */}
-      <div style={{
-        flexShrink: 0, padding: '12px 32px 16px',
-        borderTop: '1px solid rgba(255,255,255,0.04)',
-      }}>
-        <div style={{
+        {/* ── Info banner ─────────────────────────────────────────────────────── */}
+        <div className="sf-reveal sf-d300" style={{
+          marginTop: 28,
           display: 'flex', alignItems: 'flex-start', gap: 10,
           padding: '12px 16px',
           background: 'rgba(124,58,237,0.05)', border: '1px solid rgba(139,92,246,0.12)',
@@ -694,22 +740,18 @@ function PostCard({ post, index, isOwn, canCancel, isRunning, runLogs, cancellin
     : post.status === 'cancelled'? 'rgba(148,163,184,0.2)'
     : '#F59E0B'  // pending → amber
 
-  // Stagger delay classes — cap at index 4 (sf-d250 max for 5 items)
-  const delayMap = ['sf-d50', 'sf-d100', 'sf-d150', 'sf-d200', 'sf-d250']
-  const staggerClass = `sf-anim-slide-up ${delayMap[Math.min(index, delayMap.length - 1)]}`
-
   return (
     <div
-      className={staggerClass}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
-        background: hovered ? 'rgba(124,58,237,0.035)' : '#0C0C15',
-        border: `1px solid ${hovered ? 'rgba(139,92,246,0.18)' : 'rgba(255,255,255,0.055)'}`,
+        background: hovered ? 'rgba(124,58,237,0.032)' : 'var(--surface)',
+        border: `1px solid ${hovered ? 'rgba(139,92,246,0.2)' : 'rgba(255,255,255,0.055)'}`,
         borderLeft: `3px solid ${statusColor}`,
-        borderRadius: 12,
-        padding: '16px 18px',
-        transition: 'background 0.18s ease, border-color 0.18s ease',
+        borderRadius: 14,
+        padding: '16px 20px',
+        transition: 'background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease',
+        boxShadow: hovered ? '0 6px 24px -8px rgba(0,0,0,0.4)' : 'none',
       }}
     >
       {/* ── Row 1: status + type + user — right: actions ──────────────────── */}
@@ -743,7 +785,7 @@ function PostCard({ post, index, isOwn, canCancel, isRunning, runLogs, cancellin
           <button
             onClick={onCancel}
             disabled={cancelling}
-            className="sf-btn sf-btn-danger sf-btn-sm"
+            className="sf-btn sf-btn-danger sf-btn-sm cursor-pointer"
             style={{
               flexShrink: 0,
               display: 'inline-flex', alignItems: 'center', gap: 5,
@@ -758,7 +800,7 @@ function PostCard({ post, index, isOwn, canCancel, isRunning, runLogs, cancellin
       </div>
 
       {/* ── Row 2: scheduled time + time until ─────────────────────────────── */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 11, flexWrap: 'wrap' }}>
         <span style={{
           display: 'inline-flex', alignItems: 'center', gap: 5,
           color: '#A78BFA', fontSize: 12, fontWeight: 600,
@@ -848,6 +890,7 @@ function PostCard({ post, index, isOwn, canCancel, isRunning, runLogs, cancellin
           {!showLogs ? (
             <button
               onClick={() => setShowLogs(true)}
+              className="cursor-pointer"
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 6,
                 background: 'none', border: 'none', cursor: 'pointer',

@@ -3,29 +3,115 @@
 @tailwind utilities;
 
 @layer base {
-  html { scroll-behavior: smooth; }
-  body { font-family: 'Inter', system-ui, sans-serif; }
+  html {
+    scroll-behavior: smooth;
+    scroll-padding-top: 6rem;
+  }
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background-color: #06060E;
+    color: #F2F0FF;
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3 {
+    letter-spacing: -0.03em;
+  }
+  ::selection {
+    background: rgba(139, 92, 246, 0.35);
+    color: #F2F0FF;
+  }
+  :focus-visible {
+    outline: 2px solid rgba(34, 211, 238, 0.85);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
 }
 
 @layer components {
   .gradient-text {
-    background: linear-gradient(130deg, #a78bfa, #ec4899);
+    background: linear-gradient(135deg, #22D3EE 0%, #818CF8 45%, #A855F7 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
+
   .glass {
-    background: rgba(255,255,255,0.03);
-    border: 1px solid rgba(139,92,246,0.15);
-    backdrop-filter: blur(8px);
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
   }
+
+  .glass-strong {
+    background: rgba(255, 255, 255, 0.055);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+  }
+
+  /* Gradient border wrapper (for highlighted pricing card) */
+  .gradient-ring {
+    position: relative;
+    background:
+      linear-gradient(#0a0a16, #0a0a16) padding-box,
+      linear-gradient(135deg, #22D3EE 0%, #818CF8 45%, #A855F7 100%) border-box;
+    border: 1.5px solid transparent;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl font-semibold cursor-pointer transition-all duration-200;
+  }
+
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-bold text-white shadow-lg shadow-purple-500/20 transition-all hover:scale-[1.02];
-    background: linear-gradient(130deg,#7c3aed,#ec4899);
+    @apply btn px-6 py-3 text-white;
+    background: linear-gradient(135deg, #22D3EE 0%, #818CF8 45%, #A855F7 100%);
+    box-shadow: 0 8px 30px -8px rgba(124, 58, 237, 0.55);
   }
+  .btn-primary:hover {
+    box-shadow: 0 12px 40px -8px rgba(124, 58, 237, 0.75);
+    filter: brightness(1.06);
+  }
+
   .btn-secondary {
-    @apply inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold text-text2 hover:text-text transition-colors;
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(139,92,246,0.2);
+    @apply btn px-6 py-3 text-text;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+  }
+  .btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(34, 211, 238, 0.35);
+  }
+
+  .eyebrow {
+    @apply inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-xs font-medium text-text2;
+    background: rgba(139, 92, 246, 0.08);
+    border: 1px solid rgba(139, 92, 246, 0.22);
+  }
+}
+
+@layer utilities {
+  .section-label {
+    @apply text-xs font-semibold uppercase tracking-[0.2em] gradient-text;
+  }
+}
+
+/* Respect reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .btn-primary:hover,
+  .btn-secondary:hover {
+    transform: none !important;
   }
 }

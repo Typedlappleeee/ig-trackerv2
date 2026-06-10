@@ -8,48 +8,66 @@ interface AppTourProps {
 interface TourStep {
   title:    string
   desc:     string
-  icon:     string
+  iconName: string
   page?:    string   // if set, navigates to this page when step is shown
   color:    string
 }
 
+// Lucide-style step icons (no emoji per UI/UX Pro Max rule)
+const STEP_ICON_PATHS: Record<string, string> = {
+  welcome: 'M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .962 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.582a.5.5 0 0 1 0 .962L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.962 0z',
+  send:    'M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z',
+  video:   'm22 8-6 4 6 4V8Z M14 6H4a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2Z',
+  zap:     'M13 2L3 14h9l-1 8 10-12h-9l1-8z',
+  folder:  'M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8l-2-2H4z',
+  rocket:  'M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09zM12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2zM9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5',
+}
+
+function StepIcon({ name, size, color }: { name: string; size: number; color: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d={STEP_ICON_PATHS[name]} />
+    </svg>
+  )
+}
+
 const STEPS: TourStep[] = [
   {
-    icon: '👋',
+    iconName: 'welcome',
     title: 'Bienvenue sur ScaleFlow',
     desc: 'ScaleFlow automatise ta présence sur Instagram — posting, remix, stats et plus. Ce tour rapide te montre les fonctionnalités clés.',
     color: '#7C3AED',
   },
   {
-    icon: '📤',
+    iconName: 'send',
     title: 'Mass Posting',
     desc: 'Poste automatiquement une vidéo sur plusieurs comptes Instagram en même temps. Sélectionne tes téléphones, ta vidéo, et lance.',
     page: 'massposting',
     color: '#7C3AED',
   },
   {
-    icon: '🎬',
+    iconName: 'video',
     title: 'MassRemix',
     desc: 'Génère des dizaines de remix uniques depuis un pool de vidéos. Chaque remix est différent pour éviter le duplicate content.',
     page: 'remix',
     color: '#059669',
   },
   {
-    icon: '⚡',
+    iconName: 'zap',
     title: 'CloneVid',
     desc: 'Clone et transforme tes vidéos avec zoom, couleurs, crop et overlay texte. Parfait pour le anti-ban à grande échelle.',
     page: 'repurpose',
     color: '#D97706',
   },
   {
-    icon: '🗄️',
+    iconName: 'folder',
     title: 'Banque de contenu',
     desc: 'Stocke et organise toutes tes vidéos par dossiers. Retrouve-les facilement pour tes campagnes de posting.',
     page: 'bank',
     color: '#DC2626',
   },
   {
-    icon: '🚀',
+    iconName: 'rocket',
     title: 'C\'est parti !',
     desc: 'Tu es prêt à utiliser ScaleFlow. Si tu as des questions, ouvre un ticket dans la section Support.',
     color: '#7C3AED',
@@ -105,8 +123,9 @@ export function AppTour({ onClose, onNavigate }: AppTourProps) {
             background: `${current.color}22`,
             border: `1.5px solid ${current.color}44`,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 28,
-          }}>{current.icon}</div>
+          }}>
+            <StepIcon name={current.iconName} size={28} color={current.color} />
+          </div>
 
           {/* Step counter */}
           <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', color: 'rgba(167,139,250,0.6)', marginBottom: 6, textTransform: 'uppercase' }}>

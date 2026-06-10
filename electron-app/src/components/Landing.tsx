@@ -13,6 +13,51 @@ const REEL_PHOTOS = [
   '/reels/reel-5.png',
 ]
 
+// ── Lucide-style inline icon set ──────────────────────────────────────────────
+// Single reusable helper — maps a name to clean SVG paths (stroke-based, color
+// inherited via currentColor). Decorative by default (aria-hidden); pass a label
+// for icon-only buttons.
+type IconName =
+  | 'zap' | 'send' | 'users' | 'bot' | 'clapperboard' | 'bar-chart-3'
+  | 'calendar' | 'timer' | 'folder-archive' | 'shuffle' | 'smartphone'
+  | 'crown' | 'building-2' | 'eye' | 'eye-off' | 'alert-triangle' | 'check'
+
+const ICON_PATHS: Record<IconName, React.ReactNode> = {
+  zap:              <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8Z" />,
+  send:            (<><path d="m22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" /></>),
+  users:           (<><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></>),
+  bot:             (<><path d="M12 8V4H8" /><rect width="16" height="12" x="4" y="8" rx="2" /><path d="M2 14h2" /><path d="M20 14h2" /><path d="M15 13v2" /><path d="M9 13v2" /></>),
+  clapperboard:    (<><path d="M20.2 6 3 11l-.9-2.4c-.3-1.1.3-2.2 1.3-2.5l13.5-4c1.1-.3 2.2.3 2.5 1.3Z" /><path d="m6.2 5.3 3.1 3.9" /><path d="m12.4 3.4 3.1 4" /><path d="M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" /></>),
+  'bar-chart-3':   (<><path d="M3 3v18h18" /><path d="M18 17V9" /><path d="M13 17V5" /><path d="M8 17v-3" /></>),
+  calendar:        (<><path d="M8 2v4" /><path d="M16 2v4" /><rect width="18" height="18" x="3" y="4" rx="2" /><path d="M3 10h18" /></>),
+  timer:           (<><path d="M10 2h4" /><path d="M12 14v-4" /><circle cx="12" cy="14" r="8" /></>),
+  'folder-archive':(<><circle cx="15" cy="19" r="2" /><path d="M20.9 19.8A2 2 0 0 0 22 18V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h11" /><path d="M15 11v-1" /><path d="M15 17v-2" /></>),
+  shuffle:         (<><path d="M2 18h1.4c1.3 0 2.5-.6 3.3-1.7l6.1-8.6c.7-1.1 2-1.7 3.3-1.7H22" /><path d="m18 2 4 4-4 4" /><path d="M2 6h1.9c1.5 0 2.9.9 3.6 2.2" /><path d="M22 18h-5.9c-1.3 0-2.6-.7-3.3-1.8l-.5-.8" /><path d="m18 14 4 4-4 4" /></>),
+  smartphone:      (<><rect width="14" height="20" x="5" y="2" rx="2" ry="2" /><path d="M12 18h.01" /></>),
+  crown:           (<><path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.52l4.276 3.664a1 1 0 0 0 1.516-.294z" /><path d="M5 21h14" /></>),
+  'building-2':    (<><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z" /><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2" /><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2" /><path d="M10 6h4" /><path d="M10 10h4" /><path d="M10 14h4" /><path d="M10 18h4" /></>),
+  eye:             (<><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0" /><circle cx="12" cy="12" r="3" /></>),
+  'eye-off':       (<><path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49" /><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242" /><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143" /><path d="m2 2 20 20" /></>),
+  'alert-triangle':(<><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" /><path d="M12 9v4" /><path d="M12 17h.01" /></>),
+  check:            <path d="M20 6 9 17l-5-5" />,
+}
+
+function Icon({ name, size = 16, label, style }: { name: IconName; size?: number; label?: string; style?: React.CSSProperties }) {
+  return (
+    <svg
+      width={size} height={size} viewBox="0 0 24 24"
+      fill="none" stroke="currentColor" strokeWidth="1.75"
+      strokeLinecap="round" strokeLinejoin="round"
+      role={label ? 'img' : undefined}
+      aria-label={label}
+      aria-hidden={label ? undefined : true}
+      style={style}
+    >
+      {ICON_PATHS[name]}
+    </svg>
+  )
+}
+
 // ── CSS Keyframes (injected once) ─────────────────────────────────────────────
 const GLOBAL_CSS = `
   @keyframes sf-float {
@@ -339,7 +384,7 @@ function MockupFallback() {
           <span style={{ fontSize: 9, color: 'rgba(148,163,184,0.25)' }}>Écrire une légende...</span>
         </div>
         <div style={{ padding: '8px 0', borderTop: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: 9, color: 'rgba(148,163,184,0.35)' }}>📅 Programmer</span>
+          <span style={{ fontSize: 9, color: 'rgba(148,163,184,0.35)', display: 'inline-flex', alignItems: 'center', gap: 4 }}><Icon name="calendar" size={10} /> Programmer</span>
           <span style={{ fontSize: 9, color: 'rgba(148,163,184,0.35)' }}>28/05/2024 · 18:45</span>
         </div>
         <div style={{ marginTop: 8, padding: '9px 0', borderRadius: 9, background: 'linear-gradient(130deg,#7c3aed,#ec4899)', textAlign: 'center', fontSize: 11, fontWeight: 700, color: '#fff' }}>
@@ -353,25 +398,25 @@ function MockupFallback() {
         <p style={{ fontSize: 10, letterSpacing: '0.22em', textTransform: 'uppercase', color: 'rgba(148,163,184,0.4)', margin: '0 0 28px' }}>Instagram Automation</p>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, maxWidth: 260, margin: '0 auto' }}>
           {[
-            { icon: '⚡', label: 'MASS POSTING', c: '#a78bfa' },
-            { icon: '👥', label: 'MULTI-COMPTES', c: '#60a5fa' },
-            { icon: '🤖', label: 'AUTOMATION', c: '#34d399' },
-            { icon: '🎬', label: 'REELS & STORIES', c: '#f472b6' },
+            { iconName: 'zap' as IconName, label: 'MASS POSTING', c: '#a78bfa' },
+            { iconName: 'users' as IconName, label: 'MULTI-COMPTES', c: '#60a5fa' },
+            { iconName: 'bot' as IconName, label: 'AUTOMATION', c: '#34d399' },
+            { iconName: 'clapperboard' as IconName, label: 'REELS & STORIES', c: '#f472b6' },
           ].map(f => (
             <div key={f.label} style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${f.c}20`, borderRadius: 10, padding: '10px 8px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
-              <span style={{ fontSize: 16 }}>{f.icon}</span>
+              <span style={{ color: f.c, display: 'flex' }}><Icon name={f.iconName} size={16} /></span>
               <span style={{ fontSize: 7, fontWeight: 800, letterSpacing: '0.08em', color: f.c }}>{f.label}</span>
             </div>
           ))}
         </div>
         <div style={{ display: 'flex', gap: 8, marginTop: 8, justifyContent: 'center' }}>
           {[
-            { icon: '📊', label: 'ANALYTIQUES', c: '#fbbf24' },
-            { icon: '⏱', label: 'GAIN DE TEMPS', c: '#4ade80' },
-            { icon: '📅', label: 'SCHEDULER', c: '#e879f9' },
+            { iconName: 'bar-chart-3' as IconName, label: 'ANALYTIQUES', c: '#fbbf24' },
+            { iconName: 'timer' as IconName, label: 'GAIN DE TEMPS', c: '#4ade80' },
+            { iconName: 'calendar' as IconName, label: 'SCHEDULER', c: '#e879f9' },
           ].map(f => (
             <div key={f.label} style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${f.c}20`, borderRadius: 10, padding: '8px 10px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-              <span style={{ fontSize: 14 }}>{f.icon}</span>
+              <span style={{ color: f.c, display: 'flex' }}><Icon name={f.iconName} size={14} /></span>
               <span style={{ fontSize: 7, fontWeight: 800, letterSpacing: '0.08em', color: f.c }}>{f.label}</span>
             </div>
           ))}
@@ -513,7 +558,7 @@ function SiteHero({ onStudio }: { onStudio: () => void }) {
       {/* Center content */}
       <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', textAlign: 'center', zIndex: 10, width: '100%', maxWidth: 700, padding: '0 24px', boxSizing: 'border-box' }}>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '6px 16px', borderRadius: 99, background: 'rgba(124,58,237,0.1)', border: '1px solid rgba(124,58,237,0.22)', marginBottom: 22, animation: 'sf-fade-up 0.6s ease both' }}>
-          <span style={{ fontSize: 12 }}>⚡</span>
+          <span style={{ color: 'rgba(196,181,253,0.9)', display: 'flex' }}><Icon name="zap" size={13} /></span>
           <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', color: 'rgba(196,181,253,0.8)', textTransform: 'uppercase' }}>Automatise · Gagne du Temps · Scale</span>
         </div>
         <div style={{ fontSize: 'clamp(58px,9vw,102px)', fontWeight: 900, letterSpacing: '-0.045em', color: '#F2F0FF', lineHeight: 0.88, fontFamily: "'Inter','Arial Black',sans-serif", animation: 'sf-fade-up 0.6s ease 0.08s both', filter: 'drop-shadow(0 0 50px rgba(167,139,250,0.22))' }}>ScaleFlow</div>
@@ -540,13 +585,13 @@ function SiteHero({ onStudio }: { onStudio: () => void }) {
       {/* Bottom feature strip */}
       <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '14px 0', background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(16px)', borderTop: '1px solid rgba(255,255,255,0.06)', zIndex: 5 }}>
         {[
-          { icon: '📤', label: 'MASS POSTING' },
-          { icon: '👥', label: 'MULTI-COMPTES' },
-          { icon: '🤖', label: 'AUTOMATISATION AVANCÉE' },
-          { icon: '🎬', label: 'REELS & STORIES' },
+          { iconName: 'send' as IconName, label: 'MASS POSTING' },
+          { iconName: 'users' as IconName, label: 'MULTI-COMPTES' },
+          { iconName: 'bot' as IconName, label: 'AUTOMATISATION AVANCÉE' },
+          { iconName: 'clapperboard' as IconName, label: 'REELS & STORIES' },
         ].map((f, i, a) => (
           <div key={f.label} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '0 28px', borderRight: i < a.length - 1 ? '1px solid rgba(255,255,255,0.07)' : 'none' }}>
-            <span style={{ fontSize: 14 }}>{f.icon}</span>
+            <span style={{ color: 'rgba(196,181,253,0.6)', display: 'flex' }}><Icon name={f.iconName} size={14} /></span>
             <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.11em', color: 'rgba(196,181,253,0.5)', textTransform: 'uppercase' }}>{f.label}</span>
           </div>
         ))}
@@ -599,19 +644,19 @@ function AppMockup() {
 }
 
 // ── Features ──────────────────────────────────────────────────────────────────
-const FEATURES = [
-  { icon: '⚡', title: 'Mass Posting',      color: '#a78bfa', text: 'Poste sur des dizaines de comptes en parallèle. Sélectionne tes vidéos, lance — chaque téléphone se ferme après sa publication.' },
-  { icon: '🗂', title: 'Banque de contenu', color: '#ec4899', text: 'Organise et stocke tes vidéos dans le cloud. Import drag & drop, miniatures auto, partage par organisation.' },
-  { icon: '🔀', title: 'Remix & CloneVid',  color: '#38bdf8', text: 'Génère des copies uniques via FFmpeg : zoom, couleurs, crop, overlay texte. Anti duplicate content à grande échelle.' },
-  { icon: '🤖', title: 'Outils IA',         color: '#34d399', text: 'Scripts, hooks, captions virales, analyse thumbnail. Powered by Groq Llama & Claude Vision.' },
-  { icon: '📅', title: 'Programmation',     color: '#fbbf24', text: "Planifie tes posts. Le scheduler s'exécute même app fermée via Supabase Edge Functions." },
-  { icon: '📱', title: 'Suivi téléphones',  color: '#f472b6', text: "Status temps réel de chaque GéeLark phone, sync auto, gestion par groupes et sessions Instagram." },
+const FEATURES: { iconName: IconName; title: string; color: string; text: string }[] = [
+  { iconName: 'zap',            title: 'Mass Posting',      color: '#a78bfa', text: 'Poste sur des dizaines de comptes en parallèle. Sélectionne tes vidéos, lance — chaque téléphone se ferme après sa publication.' },
+  { iconName: 'folder-archive', title: 'Banque de contenu', color: '#ec4899', text: 'Organise et stocke tes vidéos dans le cloud. Import drag & drop, miniatures auto, partage par organisation.' },
+  { iconName: 'shuffle',        title: 'Remix & CloneVid',  color: '#38bdf8', text: 'Génère des copies uniques via FFmpeg : zoom, couleurs, crop, overlay texte. Anti duplicate content à grande échelle.' },
+  { iconName: 'bot',            title: 'Outils IA',         color: '#34d399', text: 'Scripts, hooks, captions virales, analyse thumbnail. Powered by Groq Llama & Claude Vision.' },
+  { iconName: 'calendar',       title: 'Programmation',     color: '#fbbf24', text: "Planifie tes posts. Le scheduler s'exécute même app fermée via Supabase Edge Functions." },
+  { iconName: 'smartphone',     title: 'Suivi téléphones',  color: '#f472b6', text: "Status temps réel de chaque GéeLark phone, sync auto, gestion par groupes et sessions Instagram." },
 ]
 
 // ── Pricing ───────────────────────────────────────────────────────────────────
 type PlanFeature = { text: string; included: boolean }
 interface PlanDef {
-  name: string; tagline: string; icon: string
+  name: string; tagline: string; iconName: IconName
   credits: string; creditsColor: string; accent: string
   monthlyPrice: string; yearlyPrice: string
   originalMonthly: string; discount: string; yearlyBilled: string
@@ -621,7 +666,7 @@ interface PlanDef {
 }
 const PLANS: PlanDef[] = [
   {
-    name: 'Standard', tagline: 'Pour débuter', icon: '⚡',
+    name: 'Standard', tagline: 'Pour débuter', iconName: 'zap',
     credits: '2 500 crédits / mois', creditsColor: '#60a5fa', accent: '#3b82f6',
     monthlyPrice: '49,99$', yearlyPrice: '49,99$',
     originalMonthly: '', discount: '', yearlyBilled: '',
@@ -636,7 +681,7 @@ const PLANS: PlanDef[] = [
     ],
   },
   {
-    name: 'Pro', tagline: 'Scale ton output', icon: '👑',
+    name: 'Pro', tagline: 'Scale ton output', iconName: 'crown',
     credits: '5 500 crédits / mois', creditsColor: '#a78bfa', accent: '#7c3aed',
     monthlyPrice: '99,99$', yearlyPrice: '59,99$',
     originalMonthly: '99,99$', discount: '40% OFF', yearlyBilled: '719,88$ facturé annuellement',
@@ -652,7 +697,7 @@ const PLANS: PlanDef[] = [
     ],
   },
   {
-    name: 'Organisation', tagline: 'Puissance illimitée', icon: '🏢',
+    name: 'Organisation', tagline: 'Puissance illimitée', iconName: 'building-2',
     credits: '11 000 crédits / mois', creditsColor: '#f59e0b', accent: '#f59e0b',
     monthlyPrice: '149,99$', yearlyPrice: '89,99$',
     originalMonthly: '149,99$', discount: '40% OFF', yearlyBilled: '1 079,88$ facturé annuellement',
@@ -731,8 +776,8 @@ function PricingSection() {
                 <div style={{ padding: '22px 22px 26px', display: 'flex', flexDirection: 'column', flex: 1 }}>
                   {/* Icon + name */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
-                    <div style={{ width: 42, height: 42, borderRadius: 12, flexShrink: 0, background: p.popular ? 'rgba(124,58,237,0.15)' : p.bestValue ? 'rgba(245,158,11,0.12)' : 'rgba(59,130,246,0.1)', border: `1px solid ${p.accent}40`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>
-                      {p.icon}
+                    <div style={{ width: 42, height: 42, borderRadius: 12, flexShrink: 0, background: p.popular ? 'rgba(124,58,237,0.15)' : p.bestValue ? 'rgba(245,158,11,0.12)' : 'rgba(59,130,246,0.1)', border: `1px solid ${p.accent}40`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: p.accent }}>
+                      <Icon name={p.iconName} size={20} />
                     </div>
                     <div>
                       <p style={{ fontSize: 17, fontWeight: 800, color: '#F2F0FF', margin: 0, letterSpacing: '-0.02em' }}>{p.name}</p>
@@ -1391,7 +1436,7 @@ function StudioAuth({ onBack }: { onBack: () => void }) {
         {/* Center text */}
         <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', textAlign: 'center', zIndex: 10, width: '90%', pointerEvents: 'none' }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 13px', borderRadius: 99, background: 'rgba(124,58,237,0.1)', border: '1px solid rgba(124,58,237,0.22)', marginBottom: 16 }}>
-            <span style={{ fontSize: 11 }}>⚡</span>
+            <span style={{ color: 'rgba(196,181,253,0.9)', display: 'flex' }}><Icon name="zap" size={12} /></span>
             <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.14em', color: 'rgba(196,181,253,0.8)', textTransform: 'uppercase' }}>Automatise · Gagne du Temps · Scale</span>
           </div>
           <div style={{ fontSize: 'clamp(36px,4.5vw,62px)', fontWeight: 900, letterSpacing: '-0.045em', color: '#F2F0FF', lineHeight: 0.88, fontFamily: "'Inter','Arial Black',sans-serif", filter: 'drop-shadow(0 0 40px rgba(167,139,250,0.22))' }}>ScaleFlow</div>
@@ -1402,9 +1447,9 @@ function StudioAuth({ onBack }: { onBack: () => void }) {
 
         {/* Bottom feature strip */}
         <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, display: 'flex', justifyContent: 'center', flexWrap: 'wrap', alignItems: 'center', padding: '10px 0', background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(16px)', borderTop: '1px solid rgba(255,255,255,0.06)', gap: 0, zIndex: 5 }}>
-          {[{ icon: '📤', label: 'MASS POSTING' }, { icon: '👥', label: 'MULTI-COMPTES' }, { icon: '🎬', label: 'REELS & STORIES' }].map((f, i, a) => (
+          {[{ iconName: 'send' as IconName, label: 'MASS POSTING' }, { iconName: 'users' as IconName, label: 'MULTI-COMPTES' }, { iconName: 'clapperboard' as IconName, label: 'REELS & STORIES' }].map((f, i, a) => (
             <div key={f.label} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '0 14px', borderRight: i < a.length - 1 ? '1px solid rgba(255,255,255,0.07)' : 'none' }}>
-              <span style={{ fontSize: 12 }}>{f.icon}</span>
+              <span style={{ color: 'rgba(196,181,253,0.6)', display: 'flex' }}><Icon name={f.iconName} size={12} /></span>
               <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.1em', color: 'rgba(196,181,253,0.5)', textTransform: 'uppercase' }}>{f.label}</span>
             </div>
           ))}
@@ -1474,8 +1519,9 @@ function StudioAuth({ onBack }: { onBack: () => void }) {
                   onFocus={e => (e.currentTarget.style.borderColor = 'rgba(139,92,246,0.5)')}
                   onBlur={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.09)')} />
                 <button type="button" onClick={() => setShowPw(!showPw)}
-                  style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(148,163,184,0.4)', fontSize: 16, padding: 0 }}>
-                  {showPw ? '🙈' : '👁'}
+                  aria-label={showPw ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+                  style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(148,163,184,0.4)', padding: 0, display: 'flex', alignItems: 'center' }}>
+                  <Icon name={showPw ? 'eye-off' : 'eye'} size={18} label={showPw ? 'Masquer le mot de passe' : 'Afficher le mot de passe'} />
                 </button>
               </div>
             </div>
@@ -1491,13 +1537,13 @@ function StudioAuth({ onBack }: { onBack: () => void }) {
             )}
 
             {error && (
-              <div style={{ padding: '10px 14px', borderRadius: 10, background: 'rgba(240,61,85,0.08)', border: '1px solid rgba(240,61,85,0.22)', color: '#f87171', fontSize: 13, display: 'flex', gap: 8 }}>
-                <span style={{ flexShrink: 0 }}>⚠</span><span>{error}</span>
+              <div style={{ padding: '10px 14px', borderRadius: 10, background: 'rgba(240,61,85,0.08)', border: '1px solid rgba(240,61,85,0.22)', color: '#f87171', fontSize: 13, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                <span style={{ flexShrink: 0, display: 'flex', marginTop: 1 }}><Icon name="alert-triangle" size={15} /></span><span>{error}</span>
               </div>
             )}
             {success && (
-              <div style={{ padding: '10px 14px', borderRadius: 10, background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.22)', color: '#34d399', fontSize: 13, display: 'flex', gap: 8 }}>
-                <span style={{ flexShrink: 0 }}>✓</span><span>{success}</span>
+              <div style={{ padding: '10px 14px', borderRadius: 10, background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.22)', color: '#34d399', fontSize: 13, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                <span style={{ flexShrink: 0, display: 'flex', marginTop: 1 }}><Icon name="check" size={15} /></span><span>{success}</span>
               </div>
             )}
 
@@ -1650,7 +1696,7 @@ export function Landing() {
                 <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 16, padding: '22px', height: '100%', boxSizing: 'border-box', transition: 'border-color 0.2s, transform 0.2s, box-shadow 0.2s' }}
                   onMouseEnter={e => { e.currentTarget.style.borderColor = `${f.color}35`; e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = `0 16px 40px rgba(0,0,0,0.3)` }}
                   onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.05)'; e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '' }}>
-                  <div style={{ width: 42, height: 42, borderRadius: 11, marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, background: `${f.color}10`, border: `1px solid ${f.color}20` }}>{f.icon}</div>
+                  <div style={{ width: 42, height: 42, borderRadius: 11, marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', color: f.color, background: `${f.color}10`, border: `1px solid ${f.color}20` }}><Icon name={f.iconName} size={20} /></div>
                   <p style={{ fontSize: 14, fontWeight: 700, color: '#F2F0FF', margin: '0 0 7px' }}>{f.title}</p>
                   <p style={{ fontSize: 13, color: 'rgba(148,163,184,0.5)', margin: 0, lineHeight: 1.65 }}>{f.text}</p>
                 </div>

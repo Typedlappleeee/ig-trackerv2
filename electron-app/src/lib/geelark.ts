@@ -850,31 +850,43 @@ export async function postInstagramStory(
   log('📲 Lancement Instagram…')
   await shellExec(bearer, phoneId, 'am force-stop com.instagram.android')
   await sleep(1200)
-  // Direct story-camera deep link (works on most IG builds); falls back to the
-  // home feed + swipe-right gesture if the activity is rejected.
-  const camStart = await shellExec(bearer, phoneId,
-    'am start -a android.intent.action.MAIN -c android.intent.category.LAUNCHER ' +
-    '-n com.instagram.android/com.instagram.android.activity.MainTabActivity')
-  void camStart
+
+  // Most reliable path: Instagram's dedicated story-camera deep link. This jumps
+  // straight to the capture screen and skips the fragile home-feed avatar tap.
+  log('🎬 Ouverture de la caméra story…')
+  await shellExec(bearer, phoneId,
+    'am start -a android.intent.action.VIEW -d "instagram://story-camera" com.instagram.android')
   await sleep(7000)
 
+  // Verify we actually reached the camera. If we're still on the home feed
+  // (the deep link was ignored on this IG build), tap the "Your story" avatar.
   let xml = await dumpXml(bearer, phoneId)
-
-  // Try to reach the story camera.
-  // Priority: story-specific resource IDs → "Your story" text → swipe right from left edge.
-  // Do NOT use 'creation_tab' — that's the bottom-nav "+" for posts/reels, not stories.
-  log('🎬 Ouverture de la caméra story…')
-  const storyEntry =
-    findByResourceId(xml, 'feed_tab_avatar_plus', 'tab_story_camera', 'tab_bar_camera_button') ??
-    findByText(xml, 'Your story', 'Votre story', 'Add to story', 'Ajouter à la story') ??
-    findByTextPartial(xml, 'your story', 'votre story')
-  if (storyEntry) {
-    await shellExec(bearer, phoneId, `input tap ${storyEntry[0]} ${storyEntry[1]}`)
-  } else {
-    // Classic gesture: swipe right from the far-left edge of the home feed
-    await shellExec(bearer, phoneId, `input swipe ${Math.floor(sw * 0.03)} ${Math.floor(sh * 0.5)} ${Math.floor(sw * 0.97)} ${Math.floor(sh * 0.5)} 350`)
+  const onCamera =
+    findByResourceId(xml, 'gallery_button', 'camera_gallery', 'gallery_thumbnail', 'capture_button', 'camera_shutter_button') ??
+    findByText(xml, 'Gallery', 'Galerie', 'Story', 'Boomerang', 'Layout')
+  if (!onCamera) {
+    log('   ↩︎ Deep link ignoré — tap sur l\'avatar « Your story »…')
+    // Open the regular home feed first.
+    await shellExec(bearer, phoneId,
+      'am start -a android.intent.action.MAIN -c android.intent.category.LAUNCHER ' +
+      '-n com.instagram.android/com.instagram.android.activity.MainTabActivity')
+    await sleep(6000)
+    xml = await dumpXml(bearer, phoneId)
+    // The story-tray avatar carries a "+ Your story" content-desc; the clickable
+    // node is the avatar circle, NOT the text label below it. Match the avatar /
+    // plus badge resource-ids first, then fall back to the tray's left edge.
+    const storyEntry =
+      findByResourceId(xml, 'feed_tab_avatar_plus', 'tab_story_camera', 'tab_bar_camera_button', 'avatar_image_view') ??
+      findByText(xml, 'Your story', 'Votre story', 'Add to story', 'Ajouter à la story') ??
+      findByTextPartial(xml, 'your story', 'votre story')
+    if (storyEntry) {
+      await shellExec(bearer, phoneId, `input tap ${storyEntry[0]} ${storyEntry[1]}`)
+    } else {
+      // First avatar in the stories tray: top-left, just under the app bar.
+      await shellExec(bearer, phoneId, `input tap ${Math.floor(sw * 0.12)} ${Math.floor(sh * 0.13)}`)
+    }
+    await sleep(5000)
   }
-  await sleep(5000)
 
   // ── 3. Pick the uploaded image from the gallery ────────────────────────────
   log('🖼 Sélection de l\'image dans la galerie…')
