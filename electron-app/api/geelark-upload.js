@@ -24,29 +24,22 @@ module.exports = async (req, res) => {
       return res.status(400).json({ ok: false, error: 'Missing storagePath/signedUrl or bearer' })
     }
 
-    let blob
-    // If we have a signed URL, fetch it directly (no service role key needed)
+    let bytes
     if (signedUrl) {
+      // Signed URL already contains auth token — fetch directly, no service role key needed
       const dlRes = await fetch(signedUrl)
       if (!dlRes.ok) {
-        return res.status(200).json({ ok: false, error: `Signed URL fetch failed: ${dlRes.status}` })
+        return res.status(200).json({ ok: false, error: `Download failed: ${dlRes.status}` })
       }
-      blob = await dlRes.blob()
+      bytes = Buffer.from(await dlRes.arrayBuffer())
     } else {
       const supabase = getSupabaseAdmin()
-      // Step 1: Download from Supabase (server-side, no CORS)
-      const { data: dlBlob, error: dlErr } = await supabase.storage.from(bucket).download(storagePath)
-      if (dlErr || !dlBlob) {
+      const { data: blob, error: dlErr } = await supabase.storage.from(bucket).download(storagePath)
+      if (dlErr || !blob) {
         return res.status(200).json({ ok: false, error: 'Supabase download failed: ' + (dlErr?.message ?? 'unknown') })
       }
-      blob = dlBlob
+      bytes = Buffer.from(await blob.arrayBuffer())
     }
-
-    const bytes = Buffer.from(await blob.arrayBuffer())
-
-    // Step 2: Get presigned upload URL from GéeLark (always use 'mp4' — they reject other types)
-    const sourceStr = storagePath ?? signedUrl ?? ''
-    const ext = (sourceStr.split('?')[0].split('.').pop() ?? 'mp4').toLowerCase()
 
     const glUrlRes = await fetch('https://openapi.geelark.com/open/v1/upload/getUrl', {
       method: 'POST',
