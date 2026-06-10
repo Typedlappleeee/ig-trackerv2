@@ -45,7 +45,8 @@ module.exports = async (req, res) => {
     const bytes = Buffer.from(await blob.arrayBuffer())
 
     // Step 2: Get presigned upload URL from GéeLark (always use 'mp4' — they reject other types)
-    const ext = (storagePath.split('.').pop() ?? 'mp4').toLowerCase()
+    const sourceStr = storagePath ?? signedUrl ?? ''
+    const ext = (sourceStr.split('?')[0].split('.').pop() ?? 'mp4').toLowerCase()
 
     const glUrlRes = await fetch('https://openapi.geelark.com/open/v1/upload/getUrl', {
       method: 'POST',

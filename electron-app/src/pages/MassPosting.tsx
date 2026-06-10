@@ -346,6 +346,18 @@ export function MassPosting({ user }: MassPostingProps) {
     setGenerating(false)
   }
 
+  // Resolve the upload path for a selected video.
+  // Priority: localPath → file_url (signed URL from BankPicker) → fresh signed URL from storage_path
+  async function resolveVideoPath(sv: SelectedVideo): Promise<string | null> {
+    if (sv.localPath) return sv.localPath
+    if (sv.item.file_url) return sv.item.file_url
+    if (sv.item.storage_path) {
+      const { getSignedUrl } = await import('@/lib/storage')
+      return getSignedUrl(sv.item.storage_path).catch(() => null)
+    }
+    return null
+  }
+
   async function scheduleMassPost(scheduledAt: Date) {
     if (!bearer)                    { log('Missing GéeLark token — Settings', 'error'); return }
     if (phoneList.length === 0)     { log('Select at least one phone', 'warn'); return }
@@ -370,7 +382,7 @@ export function MassPosting({ user }: MassPostingProps) {
       const tokenMap = new Map<number, string>()
       for (let i = 0; i < videosToSchedule.length; i++) {
         const sv = videosToSchedule[i]
-        const filePath = sv.localPath ?? sv.item.file_url
+        const filePath = await resolveVideoPath(sv)
         if (!filePath) { log(`❌ Chemin manquant pour ${sv.item.title}`, 'error'); return }
         const up = await window.electronAPI!.uploadVideoGeelark({ bearer, filePath })
         if (!up.ok || !up.token) { log(`❌ Upload échoué pour ${sv.item.title}: ${up.error}`, 'error'); return }
@@ -434,7 +446,7 @@ export function MassPosting({ user }: MassPostingProps) {
           if (a.videoIndex === vi) setPhoneStatus(a.phone.id, { status: 'uploading' })
         })
 
-        const fileSource = sv.localPath ?? sv.item.file_url
+        const fileSource = await resolveVideoPath(sv)
         if (!fileSource) {
           log(`⚠️ Vidéo ${vi + 1} sans source — ignorée`, 'warn')
           continue
