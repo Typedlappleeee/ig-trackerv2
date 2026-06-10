@@ -62,6 +62,7 @@ function wasmQueue<T>(fn: () => Promise<T>): Promise<T> {
 
 // ── Build the web electronAPI object ────────────────────────────────────────
 export function buildWebAPI() {
+  console.log('[webAPI] v4f213a5 — upload via SDK Supabase, pas de proxy serveur')
   return {
 
     // ── GéeLark proxy ──────────────────────────────────────────────────────
