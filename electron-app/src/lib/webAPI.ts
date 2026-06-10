@@ -243,13 +243,18 @@ export function buildWebAPI() {
 
     // ── Upload video to GéeLark ─────────────────────────────────────────────
     async uploadVideoGeelark(opts: { bearer: string; filePath: string }) {
-      // Helper: server-side proxy (handles CORS + large files without timeout on Pro plans)
+      // Helper: server-side proxy fallback
       const serverProxy = async (): Promise<{ ok: boolean; token?: string; error?: string }> => {
+        const isSignedUrl = opts.filePath.includes('.supabase.co') && opts.filePath.includes('/object/sign/')
         const m1 = opts.filePath.match(/\/object\/sign\/([^/?]+)\/(.+?)(?:\?|$)/)
         const r = await fetch('/api/geelark-upload', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
+          body: JSON.stringify(isSignedUrl ? {
+            // Pass signed URL directly — server can fetch it without service role key
+            signedUrl: opts.filePath,
+            bearer: opts.bearer,
+          } : {
             storagePath: m1 ? decodeURIComponent(m1[2]) : opts.filePath,
             bucket: m1 ? m1[1] : 'content',
             bearer: opts.bearer,
@@ -259,11 +264,9 @@ export function buildWebAPI() {
       }
 
       try {
-        // 1. Supabase signed URLs → always use server proxy (browser fetch blocked by CORS)
-        const isSupabaseUrl = opts.filePath.includes('.supabase.co') || opts.filePath.includes('/object/sign/')
-        if (isSupabaseUrl) return serverProxy()
-
-        // 2. Blob/data URLs → fetch directly in browser (no CORS, avoids server timeout)
+        // 1. Fetch video bytes — signed Supabase URLs include auth token so they're
+        //    directly accessible via CORS; blob/data URLs work in browser too.
+        //    Fall back to server proxy only if direct fetch fails.
         let bytes: Uint8Array | null = null
         try {
           bytes = await fetchFileBytes(opts.filePath)
