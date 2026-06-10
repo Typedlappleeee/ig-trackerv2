@@ -159,7 +159,8 @@ function VideoPicker({
                   const sel = selected.has(item.id)
                   return (
                     <div key={item.id} onClick={() => toggle(item.id)}
-                      style={{ cursor: 'pointer', borderRadius: 10, overflow: 'hidden', border: `2px solid ${sel ? '#8B5CF6' : 'rgba(139,92,246,0.08)'}`, background: '#07070B', transition: 'border-color 0.12s', position: 'relative' }}>
+                      className="sf-hover-lift"
+                      style={{ cursor: 'pointer', borderRadius: 10, overflow: 'hidden', border: `2px solid ${sel ? '#8B5CF6' : 'rgba(139,92,246,0.08)'}`, background: '#07070B', transition: 'border-color 0.12s, transform 0.25s cubic-bezier(0.22,1,0.36,1), box-shadow 0.25s ease', position: 'relative' }}>
                       <VideoThumb item={item} size="md" />
                       <p style={{ fontSize: 10, color: '#94a3b8', padding: '5px 6px 5px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</p>
                       {sel && (
@@ -244,6 +245,7 @@ function CaptionPicker({
                   const sel = selected.has(item.id)
                   return (
                     <div key={item.id} onClick={() => toggle(item.id)}
+                      className="sf-hover-lift"
                       style={{ padding: '12px 14px', borderRadius: 12, background: sel ? 'rgba(139,92,246,0.1)' : 'rgba(255,255,255,0.025)', border: `1px solid ${sel ? 'rgba(139,92,246,0.4)' : 'rgba(255,255,255,0.07)'}`, cursor: 'pointer', transition: 'all 0.12s', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
                       <div style={{ width: 18, height: 18, borderRadius: 5, border: `2px solid ${sel ? '#8B5CF6' : 'rgba(255,255,255,0.15)'}`, background: sel ? '#8B5CF6' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
                         {sel && <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><polyline points="1.5 5 4 7.5 8.5 2.5" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
@@ -355,7 +357,7 @@ export function Mixer({ user }: MixerProps) {
 
       {/* ── Premium Header ── */}
       <header className="sf-page-header" style={{ background: 'rgba(7,7,12,0.96)', backdropFilter: 'blur(20px)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+        <div className="sf-anim-slide-up sf-d50" style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           {/* Icon badge */}
           <div style={{
             width: 44, height: 44, borderRadius: 13, flexShrink: 0,
@@ -394,7 +396,7 @@ export function Mixer({ user }: MixerProps) {
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+        <div className="sf-anim-slide-up sf-d100" style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
           {/* Mode toggle */}
           <div className="sf-tabs">
             {([{ k: 'random' as const, label: 'Aléatoire' }, { k: 'all' as const, label: 'Tout combiner' }] as const).map(m => (
@@ -419,7 +421,7 @@ export function Mixer({ user }: MixerProps) {
       </header>
 
       {/* ── Body ── */}
-      <div style={{ flex: 1, overflow: 'hidden', display: 'flex', minHeight: 0 }}>
+      <div className="anim-stagger" style={{ flex: 1, overflow: 'hidden', display: 'flex', minHeight: 0 }}>
 
         {/* Col 1 — Videos */}
         <aside style={{ width: 275, flexShrink: 0, display: 'flex', flexDirection: 'column', borderRight: '1px solid var(--border)', background: 'var(--surface)' }}>
@@ -524,10 +526,10 @@ export function Mixer({ user }: MixerProps) {
         </aside>
 
         {/* Col 3 — Configuration panel */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto', background: 'var(--base)', padding: '24px 28px', gap: 20 }}>
+        <div className="anim-stagger" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto', background: 'var(--base)', padding: '24px 28px', gap: 20 }}>
 
           {/* Config card */}
-          <div className="sf-card" style={{ padding: '20px 22px' }}>
+          <div className="sf-card sf-spotlight" style={{ padding: '20px 22px' }}>
             <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-4)', textTransform: 'uppercase', letterSpacing: '0.11em', marginBottom: 18 }}>Configuration du texte</p>
 
             {/* Position */}
@@ -598,7 +600,7 @@ export function Mixer({ user }: MixerProps) {
 
       {/* ── Results strip ── */}
       {jobs.length > 0 && (
-        <div style={{ flexShrink: 0, height: 228, borderTop: '1px solid var(--border)', padding: '14px 20px', overflowX: 'auto', background: 'var(--surface)' }}>
+        <div className="sf-anim-slide-up" style={{ flexShrink: 0, height: 228, borderTop: '1px solid var(--border)', padding: '14px 20px', overflowX: 'auto', background: 'var(--surface)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexShrink: 0 }}>
             <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.09em' }}>Résultats</p>
             {running && <div className="sf-spinner" style={{ width: 14, height: 14, borderWidth: 1.5 }} />}
@@ -620,6 +622,7 @@ export function Mixer({ user }: MixerProps) {
                   )}
                   {job.status === 'done' && job.outputUrl && (
                     <a href={job.outputUrl} download onClick={e => e.stopPropagation()}
+                      className="sf-press"
                       style={{ position: 'absolute', bottom: 4, right: 4, background: 'rgba(0,0,0,0.7)', borderRadius: 6, padding: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
                       <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                     </a>

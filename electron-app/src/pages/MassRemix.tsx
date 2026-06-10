@@ -148,7 +148,7 @@ function VideoSourcePanel({
 }) {
   const t = useT()
   return (
-    <div className="sf-card flex flex-col overflow-hidden" style={{ flex: 1, minHeight: 0, minWidth: 0, borderColor: `${accent}30` }}>
+    <div className="sf-card sf-spotlight flex flex-col overflow-hidden" style={{ flex: 1, minHeight: 0, minWidth: 0, borderColor: `${accent}30` }}>
       {/* Panel header */}
       <div className="flex items-center gap-2 px-3.5 py-2.5 flex-shrink-0 border-b border-border">
         <div style={{ width: 3, height: 14, borderRadius: 99, background: accent, flexShrink: 0 }} />
@@ -187,8 +187,8 @@ function VideoSourcePanel({
               style={{ color: accent, opacity: 0.5 }}>{i + 1}</span>
             <span className="text-[10px] font-mono flex-1 truncate text-text3">{fileName(p)}</span>
             <button onClick={() => onRemove(i)} aria-label={t('remove')}
-              className="opacity-0 group-hover:opacity-100 flex items-center justify-center cursor-pointer transition-opacity"
-              style={{ color: 'var(--danger)', background: 'none', border: 'none', padding: 2, lineHeight: 1 }}>
+              className="opacity-0 group-hover:opacity-100 flex items-center justify-center cursor-pointer transition-opacity sf-press"
+              style={{ color: 'var(--danger)', background: 'none', border: 'none', padding: 2, lineHeight: 1, transition: 'opacity 0.15s ease, transform 0.09s cubic-bezier(0.4,0,0.2,1)' }}>
               <IconX size={11} />
             </button>
           </div>
@@ -1034,7 +1034,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                         {selectedPair.cutSec != null && (
                           <button onClick={() => setCutForPair(selectedPair.id, undefined)}
                             aria-label={t('remove')}
-                            className="px-2 py-1 rounded-lg inline-flex items-center justify-center"
+                            className="px-2 py-1 rounded-lg inline-flex items-center justify-center sf-press"
                             style={{ background: 'rgba(239,68,68,0.1)', color: '#f87171', border: '1px solid rgba(239,68,68,0.2)' }}>
                             <IconX size={12} />
                           </button>
@@ -1367,7 +1367,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
             <div className="px-6 py-6 flex flex-col gap-5">
               {/* Result icon + title */}
               <div className="flex flex-col items-center gap-2 text-center">
-                <div className="flex items-center justify-center w-14 h-14 rounded-2xl"
+                <div className="flex items-center justify-center w-14 h-14 rounded-2xl sf-anim-scale-spring"
                   style={{
                     background: errorCount === 0 ? 'rgba(52,211,153,0.12)' : 'rgba(251,191,36,0.1)',
                     border: `1px solid ${errorCount === 0 ? 'rgba(52,211,153,0.3)' : 'rgba(251,191,36,0.25)'}`,
@@ -1475,7 +1475,8 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                 {folderTarget === 'orig' ? t('massRemixFolderOriginals') : t('massRemixFolderPhase1')}
               </p>
               <button onClick={() => setFolderTarget(null)} aria-label={t('cancel')}
-                className="sf-btn-ghost p-1.5 rounded-lg cursor-pointer transition-colors text-text2 hover:text-text">
+                className="sf-btn-ghost p-1.5 rounded-lg cursor-pointer transition-colors text-text2 hover:text-text sf-press"
+                style={{ transition: 'color 0.15s ease, transform 0.09s cubic-bezier(0.4,0,0.2,1)' }}>
                 <IconX size={16} />
               </button>
             </div>
@@ -1516,7 +1517,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
             background: 'linear-gradient(90deg,rgba(124,58,237,0.08) 0%,rgba(236,72,153,0.03) 50%,transparent 100%)',
           }}>
           {/* Left: icon + title */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 sf-anim-slide-up sf-d50">
             {!isMobile && (
               <div className="flex-shrink-0 flex items-center justify-center rounded-xl"
                 style={{
@@ -1544,7 +1545,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
           </div>
 
           {/* Right: stats + actions */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 sf-anim-slide-up sf-d100">
             {/* Live stats badges */}
             {!isMobile && originals.length > 0 && (
               <span className="sf-badge sf-badge-accent text-[10px] font-bold">
@@ -1594,7 +1595,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
           }}>
 
           {/* ── LEFT: two source panels side by side ── */}
-          <div className="flex-1 min-w-0 min-h-0 flex"
+          <div className="flex-1 min-w-0 min-h-0 flex anim-stagger"
             style={{ flexDirection: isMobile ? 'column' : 'row', gap: 10 }}>
             <VideoSourcePanel
               title={t('massRemixPanelOriginals')} phase="PHASE 2" accent="#8b5cf6"
@@ -1615,7 +1616,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
           </div>
 
           {/* ── RIGHT: config sidebar ── */}
-          <div className="flex flex-col gap-2"
+          <div className="flex flex-col gap-2 anim-stagger"
             style={{ width: isMobile ? '100%' : 248, flexShrink: 0, overflowY: isMobile ? undefined : 'auto' }}>
 
             {!isMobile && (
@@ -1632,8 +1633,8 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setCopies(c => Math.max(1, c - 1))}
-                  className="flex-shrink-0 flex items-center justify-center rounded-lg text-[15px] font-black cursor-pointer transition-colors"
-                  style={{ width: 28, height: 28, background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', color: 'var(--accent)' }}
+                  className="flex-shrink-0 flex items-center justify-center rounded-lg text-[15px] font-black cursor-pointer transition-colors sf-press"
+                  style={{ width: 28, height: 28, background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', color: 'var(--accent)', transition: 'background-color 0.15s ease, transform 0.09s cubic-bezier(0.4,0,0.2,1)' }}
                   onMouseEnter={e => (e.currentTarget.style.background = 'rgba(139,92,246,0.12)')}
                   onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.05)')}>
                   −
@@ -1645,8 +1646,8 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
                   style={{ fontSize: 26 }} />
                 <button
                   onClick={() => setCopies(c => Math.min(200, c + 1))}
-                  className="flex-shrink-0 flex items-center justify-center rounded-lg text-[15px] font-black cursor-pointer transition-colors"
-                  style={{ width: 28, height: 28, background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', color: 'var(--accent)' }}
+                  className="flex-shrink-0 flex items-center justify-center rounded-lg text-[15px] font-black cursor-pointer transition-colors sf-press"
+                  style={{ width: 28, height: 28, background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', color: 'var(--accent)', transition: 'background-color 0.15s ease, transform 0.09s cubic-bezier(0.4,0,0.2,1)' }}
                   onMouseEnter={e => (e.currentTarget.style.background = 'rgba(139,92,246,0.12)')}
                   onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.05)')}>
                   +
@@ -1666,7 +1667,7 @@ Return ONLY a valid JSON array, no explanation. Empty array [] if truly no text.
             {/* ── AI toggle card ── */}
             <button
               onClick={() => setAiEnabled(v => { const next = !v; localStorage.setItem('sf_remix_ai', next ? '1' : '0'); return next })}
-              className="sf-card p-3 text-left cursor-pointer transition-all w-full"
+              className="sf-card sf-card-lift p-3 text-left cursor-pointer transition-all w-full"
               style={{
                 background: aiEnabled ? 'rgba(124,58,237,0.1)' : undefined,
                 borderColor: aiEnabled ? 'rgba(139,92,246,0.4)' : undefined,
