@@ -374,7 +374,7 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
 
       {/* ── Premium Header ── */}
       <header className="sf-page-header" style={{ background: 'rgba(7,7,12,0.96)', backdropFilter: 'blur(20px)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+        <div className="sf-anim-slide-up sf-d50" style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           {/* Zap icon badge */}
           <div style={{
             width: 44, height: 44, borderRadius: 13, flexShrink: 0,
@@ -413,7 +413,7 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
 
         {/* Stats when running */}
         {jobs.length > 0 && (
-          <div style={{ display: 'flex', gap: 10 }}>
+          <div className="anim-stagger" style={{ display: 'flex', gap: 10 }}>
             {[
               { label: t('repurposeGeneratedHeader'), value: `${totalDone}/${jobs.length}` },
               { label: t('repurposeSimilarityHeader'), value: avgSimVal != null ? `${avgSimVal}%` : '—' },
@@ -439,7 +439,7 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
       <div style={{ flex: 1, overflow: 'hidden', display: 'flex', minHeight: 0 }}>
 
         {/* ── Left panel ── */}
-        <div style={{ width: 278, flexShrink: 0, borderRight: '1px solid var(--border)', overflowY: 'auto', background: 'var(--surface)', display: 'flex', flexDirection: 'column', gap: 0 }}>
+        <div className="anim-stagger" style={{ width: 278, flexShrink: 0, borderRight: '1px solid var(--border)', overflowY: 'auto', background: 'var(--surface)', display: 'flex', flexDirection: 'column', gap: 0 }}>
 
           {/* Upload zone */}
           <div style={{ padding: '16px 14px 0' }}>
@@ -448,7 +448,7 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
               onDragOver={e => { e.preventDefault(); setDragging(true) }}
               onDragLeave={() => setDragging(false)}
               onClick={() => fileInputRef.current?.click()}
-              className="cursor-pointer"
+              className="cursor-pointer sf-hover-lift"
               style={{
                 borderRadius: 14, border: `2px dashed ${dragging ? '#22d3ee' : sources.length ? 'rgba(34,211,238,0.35)' : 'var(--border-md)'}`,
                 background: dragging ? 'rgba(34,211,238,0.06)' : sources.length ? 'rgba(34,211,238,0.03)' : 'rgba(255,255,255,0.02)',
@@ -631,7 +631,7 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
                     <span
                       role="button"
                       onClick={e => { e.stopPropagation(); setBankFolder('') }}
-                      className="cursor-pointer"
+                      className="cursor-pointer sf-press"
                       style={{ opacity: 0.5, lineHeight: 1, cursor: 'pointer', fontSize: 13 }}
                     >
                       <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -678,7 +678,7 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
         {/* ── Right: variants grid ── */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '20px 22px', background: 'var(--base)' }}>
           {jobs.length === 0 ? (
-            <div className="sf-empty" style={{ height: '100%' }}>
+            <div className="sf-empty anim-stagger" style={{ height: '100%' }}>
               {/* Animated icon */}
               <div style={{ position: 'relative', width: 76, height: 76, margin: '0 auto 8px' }}>
                 <div style={{ position: 'absolute', inset: -14, borderRadius: '50%', border: '1px dashed rgba(34,211,238,0.18)', animation: 'spin 14s linear infinite' }} />

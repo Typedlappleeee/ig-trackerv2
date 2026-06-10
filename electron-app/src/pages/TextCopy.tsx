@@ -142,11 +142,11 @@ export function TextCopy({ user, onBack }: { user: User; onBack?: () => void }) 
   const pct    = total > 0 ? Math.round((done + errors) / total * 100) : 0
 
   return (
-    <div className="h-full flex flex-col overflow-hidden anim-page">
+    <div className="h-full flex flex-col overflow-y-auto anim-page">
 
       {/* ── Header ────────────────────────────────────────────────────────── */}
       <div className="flex-shrink-0 px-8 pt-7 pb-5 flex items-center justify-between border-b border-border">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 sf-anim-slide-up sf-d50">
           {onBack && (
             <>
               <button
@@ -162,7 +162,7 @@ export function TextCopy({ user, onBack }: { user: User; onBack?: () => void }) 
             </>
           )}
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 sf-anim-scale-spring sf-d100"
               style={{ background: 'linear-gradient(135deg, rgba(124,58,237,0.25), rgba(236,72,153,0.15))', border: '1px solid rgba(139,92,246,0.25)' }}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M17 12H3M3 12l4-4M3 12l4 4M7 5l10-2v14L7 19"/>
@@ -174,7 +174,7 @@ export function TextCopy({ user, onBack }: { user: User; onBack?: () => void }) 
             </div>
           </div>
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-3 sf-anim-slide-up sf-d150">
           {!running ? (
             <button
               onClick={generate}
@@ -200,9 +200,9 @@ export function TextCopy({ user, onBack }: { user: User; onBack?: () => void }) 
         </div>
       </div>
 
-      {/* ── Scrollable content ──────────────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto px-8 pb-10">
-        <div className="max-w-3xl mx-auto space-y-5 pt-6">
+      {/* ── Content (scrolls with the page) ─────────────────────────────────── */}
+      <div className="flex-1 px-8 pb-10">
+        <div className="max-w-3xl mx-auto space-y-5 pt-6 anim-stagger">
 
           {/* Videos */}
           <div className="sf-card p-6">
@@ -257,7 +257,7 @@ export function TextCopy({ user, onBack }: { user: User; onBack?: () => void }) 
                     </div>
                     <button
                       onClick={() => setVideos(prev => prev.filter((_, j) => j !== i))}
-                      className="text-text2 hover:text-danger ml-2 cursor-pointer flex-shrink-0 transition-colors"
+                      className="text-text2 hover:text-danger ml-2 cursor-pointer flex-shrink-0 transition-colors sf-press"
                     >
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                         <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
@@ -357,7 +357,7 @@ export function TextCopy({ user, onBack }: { user: User; onBack?: () => void }) 
             />
             <div className="flex gap-2 flex-wrap">
               {POSITIONS.slice(0, copies).map((p, i) => (
-                <span key={i} className="sf-badge sf-badge-muted">
+                <span key={i} className="sf-badge sf-badge-muted sf-anim-scale-in">
                   {p.label} ({Math.round(p.yFrac * 100)}%)
                 </span>
               ))}
@@ -441,19 +441,19 @@ export function TextCopy({ user, onBack }: { user: User; onBack?: () => void }) 
                       </span>
                     )}
                     {job.status === 'error' && (
-                      <span className="sf-badge sf-badge-danger" title={job.error}>Error</span>
+                      <span className="sf-badge sf-badge-danger sf-anim-scale-in" title={job.error}>Error</span>
                     )}
                     {job.status === 'done' && exportMode === 'download' && job.outputPath && (
                       <a
                         href={job.outputPath}
                         download={`textcopy_${String(job.id + 1).padStart(3, '0')}.mp4`}
-                        className="sf-badge sf-badge-ok hover:opacity-80 transition-opacity"
+                        className="sf-badge sf-badge-ok hover:opacity-80 transition-opacity sf-anim-scale-in"
                       >
                         Download
                       </a>
                     )}
                     {job.status === 'done' && exportMode === 'bank' && (
-                      <span className="sf-badge sf-badge-ok">Bank</span>
+                      <span className="sf-badge sf-badge-ok sf-anim-scale-in">Bank</span>
                     )}
                   </div>
                 ))}

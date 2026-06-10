@@ -63,7 +63,7 @@ export default function ScaleIA() {
         gap: 0,
       }}>
         {/* Header icon */}
-        <div style={{
+        <div className="sf-anim-scale-spring" style={{
           width: 56, height: 56, borderRadius: 16, marginBottom: 20,
           background: 'linear-gradient(135deg, rgba(124,58,237,0.3), rgba(167,139,250,0.1))',
           border: '1px solid rgba(139,92,246,0.3)',
@@ -76,7 +76,7 @@ export default function ScaleIA() {
         </div>
 
         {/* BIENTÔT chip */}
-        <div style={{
+        <div className="sf-anim-slide-up sf-d50" style={{
           fontSize: 10, fontWeight: 800, letterSpacing: '0.3em', textTransform: 'uppercase',
           color: '#a78bfa', border: '1px solid rgba(139,92,246,0.45)',
           padding: '5px 14px', borderRadius: 100, background: 'rgba(139,92,246,0.1)',
@@ -86,7 +86,7 @@ export default function ScaleIA() {
         </div>
 
         {/* Title */}
-        <div style={{ marginBottom: 18, textAlign: 'center' }}>
+        <div className="sf-anim-slide-up sf-d100" style={{ marginBottom: 18, textAlign: 'center' }}>
           <span style={{
             fontSize: 68, fontWeight: 900, letterSpacing: '-0.03em',
             background: 'linear-gradient(135deg, #e2e8f0 0%, #c4b5fd 45%, #67e8f9 100%)',
@@ -99,7 +99,7 @@ export default function ScaleIA() {
         </div>
 
         {/* Subtitle */}
-        <p style={{
+        <p className="sf-anim-slide-up sf-d150" style={{
           fontSize: 15, color: 'rgba(226,232,240,0.55)', textAlign: 'center',
           maxWidth: 480, lineHeight: 1.65, marginBottom: 32,
         }}>
@@ -108,7 +108,7 @@ export default function ScaleIA() {
         </p>
 
         {/* Feature pills */}
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center', maxWidth: 520, marginBottom: 44 }}>
+        <div className="sf-anim-slide-up sf-d200" style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center', maxWidth: 520, marginBottom: 44 }}>
           {[
             { icon: <Icon name="bot" />, label: 'Modèle IA Custom' },
             { icon: <Icon name="sparkles" />, label: 'Contenu génératif' },
@@ -129,7 +129,7 @@ export default function ScaleIA() {
         </div>
 
         {/* Progress bar */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+        <div className="sf-anim-slide-up sf-d250" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
           <span style={{ fontSize: 11, color: 'rgba(167,139,250,0.7)', letterSpacing: '0.1em', fontWeight: 600 }}>EN DÉVELOPPEMENT</span>
           <div style={{ width: 240, height: 3, background: 'rgba(255,255,255,0.08)', borderRadius: 99, overflow: 'hidden' }}>
             <div style={{

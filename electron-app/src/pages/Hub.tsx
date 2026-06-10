@@ -89,12 +89,13 @@ function DecoSphere() {
         background: 'radial-gradient(circle at 45% 40%, rgba(99,102,241,0.35) 0%, rgba(124,58,237,0.2) 40%, transparent 70%)',
         filter: 'blur(24px)',
       }} />
-      {/* Sphere body */}
+      {/* Sphere body — gentle float */}
       <div style={{
         position: 'absolute', inset: 20,
         borderRadius: '50%',
         background: 'radial-gradient(circle at 35% 30%, #4c3a8a 0%, #2d1f5e 35%, #18103a 65%, #0c0820 100%)',
         boxShadow: '0 0 60px -10px rgba(99,102,241,0.6), inset 0 2px 20px rgba(255,255,255,0.06), inset -10px -10px 30px rgba(0,0,0,0.5)',
+        animation: 'float 6s ease-in-out infinite',
       }} />
       {/* Highlight */}
       <div style={{
@@ -102,6 +103,7 @@ function DecoSphere() {
         borderRadius: '50%',
         background: 'radial-gradient(ellipse, rgba(255,255,255,0.22) 0%, transparent 80%)',
         filter: 'blur(4px)',
+        animation: 'float 6s ease-in-out infinite',
       }} />
       {/* Ring */}
       <div style={{
@@ -111,7 +113,32 @@ function DecoSphere() {
         border: '1.5px solid rgba(139,92,246,0.35)',
         boxShadow: '0 0 20px rgba(139,92,246,0.2)',
       }} />
-      {/* Sparkle stars */}
+      {/* Orbiting satellite — travels the tilted ring */}
+      <div style={{
+        position: 'absolute', top: '50%', left: '50%',
+        width: 280, height: 280, marginTop: -140, marginLeft: -140,
+        transform: 'rotateX(72deg)',
+        pointerEvents: 'none',
+      }}>
+        <div style={{ position: 'absolute', inset: 0, animation: 'orbit-spin 11s linear infinite' }}>
+          <div style={{
+            position: 'absolute', top: -5, left: '50%', marginLeft: -5,
+            width: 10, height: 10, borderRadius: '50%',
+            background: 'radial-gradient(circle at 35% 35%, #e9d5ff, #a78bfa 55%, #7c3aed)',
+            boxShadow: '0 0 14px 4px rgba(167,139,250,0.75)',
+          }} />
+        </div>
+        {/* Second satellite — slower, opposite direction, cyan */}
+        <div style={{ position: 'absolute', inset: 18, animation: 'sf-orbit-ccw 19s linear infinite' }}>
+          <div style={{
+            position: 'absolute', bottom: -3, left: '50%', marginLeft: -3,
+            width: 6, height: 6, borderRadius: '50%',
+            background: 'radial-gradient(circle at 35% 35%, #cffafe, #22d3ee)',
+            boxShadow: '0 0 10px 3px rgba(34,211,238,0.55)',
+          }} />
+        </div>
+      </div>
+      {/* Sparkle stars — twinkling */}
       {[
         { top: 14, left: 130, size: 14, opacity: 0.9 },
         { top: 60, left: 240, size: 10, opacity: 0.7 },
@@ -119,7 +146,10 @@ function DecoSphere() {
         { top: 10,  left: 50,  size: 7,  opacity: 0.5 },
       ].map((s, i) => (
         <svg key={i} width={s.size} height={s.size} viewBox="0 0 24 24" fill="rgba(196,181,253,0.8)"
-          style={{ position: 'absolute', top: s.top, left: s.left, opacity: s.opacity }} aria-hidden="true">
+          style={{
+            position: 'absolute', top: s.top, left: s.left, opacity: s.opacity,
+            animation: `star-twinkle ${2.8 + i * 0.9}s ease-in-out ${i * 0.6}s infinite`,
+          }} aria-hidden="true">
           <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z" />
         </svg>
       ))}
@@ -138,6 +168,7 @@ function SpotlightBanner({ tool, onOpen }: { tool: ToolDef; onOpen: () => void }
       onMouseEnter={() => { setHover(true); playTick() }}
       onMouseLeave={() => setHover(false)}
       aria-label={t(tool.labelKey as any)}
+      className="sf-spotlight"
       style={{
         position: 'relative', overflow: 'hidden', textAlign: 'left', cursor: 'pointer',
         borderRadius: 20, padding: '28px 28px', minHeight: 160, width: '100%',
@@ -231,7 +262,7 @@ function ToolCard({ tool, index, onOpen }: { tool: ToolDef; index: number; onOpe
           : '0 1px 8px -4px rgba(0,0,0,0.5)',
         transform: hover ? 'translateY(-3px)' : 'translateY(0)',
         transition: 'all 0.28s cubic-bezier(0.34,1.4,0.64,1)',
-        animation: 'hub-card-in 0.45s cubic-bezier(0.22,1,0.36,1) both',
+        animation: 'hub-card-in 0.45s cubic-bezier(0.22,1,0.36,1) backwards',
         animationDelay: `${index * 0.04}s`,
       }}
     >
@@ -390,7 +421,7 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
   ]
 
   return (
-    <div style={{ minHeight: '100%', paddingBottom: 80 }}>
+    <div className="anim-page" style={{ minHeight: '100%', paddingBottom: 80 }}>
 
       {/* ── Hero ──────────────────────────────────────────────────────────────── */}
       <div style={{ position: 'relative', overflow: 'hidden', padding: '44px 40px 36px' }}>
@@ -413,7 +444,7 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
           {/* Left: text + actions */}
           <div style={{ flex: 1, paddingRight: 60 }}>
             {/* Greeting pill */}
-            <div style={{
+            <div className="sf-anim-slide-up sf-d50" style={{
               display: 'inline-flex', alignItems: 'center', gap: 7,
               padding: '4px 12px 4px 8px', borderRadius: 100, marginBottom: 16,
               background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.22)',
@@ -425,19 +456,19 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
             </div>
 
             {/* Name */}
-            <h1 style={{ fontSize: 52, fontWeight: 900, letterSpacing: '-0.045em', lineHeight: 1, marginBottom: 14, textTransform: 'capitalize' }}>
+            <h1 className="sf-anim-slide-up sf-d100" style={{ fontSize: 52, fontWeight: 900, letterSpacing: '-0.045em', lineHeight: 1, marginBottom: 14, textTransform: 'capitalize' }}>
               <span style={{ background: 'linear-gradient(115deg, #f0ecff 0%, #c4b5fd 45%, #67e8f9 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
                 {firstName}
               </span>
             </h1>
 
             {/* Subtitle */}
-            <p style={{ fontSize: 15, color: 'rgba(148,163,184,0.6)', maxWidth: 480, lineHeight: 1.6, marginBottom: 28 }}>
+            <p className="sf-anim-slide-up sf-d150" style={{ fontSize: 15, color: 'rgba(148,163,184,0.6)', maxWidth: 480, lineHeight: 1.6, marginBottom: 28 }}>
               {t('hubSubtitle')}
             </p>
 
             {/* Quick action chips */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 9 }}>
+            <div className="sf-anim-slide-up sf-d200" style={{ display: 'flex', flexWrap: 'wrap', gap: 9 }}>
               {quickActions.map(qa => (
                 <button
                   key={qa.id}
@@ -473,14 +504,14 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
           </div>
 
           {/* Right: decorative 3D sphere */}
-          <div style={{ position: 'relative', width: 260, height: 240, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="sf-anim-scale-spring sf-d250" style={{ position: 'relative', width: 260, height: 240, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <DecoSphere />
           </div>
         </div>
       </div>
 
       {/* ── Content ──────────────────────────────────────────────────────────── */}
-      <div style={{ maxWidth: 1100, margin: '0 auto', padding: '0 40px' }}>
+      <div className="anim-stagger" style={{ maxWidth: 1100, margin: '0 auto', padding: '0 40px' }}>
 
         {/* Search bar — full width */}
         <div style={{ position: 'relative', marginBottom: 32 }}>
@@ -535,7 +566,7 @@ export default function Hub({ user, onNavigate }: { user: User; onNavigate: (p: 
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '80px 0' }}>
-              <span style={{
+              <span className="sf-anim-scale-spring" style={{
                 width: 52, height: 52, borderRadius: 16, marginBottom: 14,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 background: 'rgba(139,92,246,0.07)', border: '1px solid rgba(139,92,246,0.18)',

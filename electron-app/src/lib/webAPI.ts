@@ -243,13 +243,18 @@ export function buildWebAPI() {
 
     // ── Upload video to GéeLark ─────────────────────────────────────────────
     async uploadVideoGeelark(opts: { bearer: string; filePath: string }) {
-      // Helper: server-side proxy (handles CORS + large files without timeout on Pro plans)
+      // Helper: server-side proxy fallback
       const serverProxy = async (): Promise<{ ok: boolean; token?: string; error?: string }> => {
+        const isSignedUrl = opts.filePath.includes('.supabase.co') && opts.filePath.includes('/object/sign/')
         const m1 = opts.filePath.match(/\/object\/sign\/([^/?]+)\/(.+?)(?:\?|$)/)
         const r = await fetch('/api/geelark-upload', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
+          body: JSON.stringify(isSignedUrl ? {
+            // Pass signed URL directly — server can fetch it without service role key
+            signedUrl: opts.filePath,
+            bearer: opts.bearer,
+          } : {
             storagePath: m1 ? decodeURIComponent(m1[2]) : opts.filePath,
             bucket: m1 ? m1[1] : 'content',
             bearer: opts.bearer,
