@@ -200,7 +200,7 @@ export function MetadataChanger({ user, onBack }: MetadataChangerProps) {
           onClose={() => setShowBank(false)} />
       )}
 
-      <div className="h-full flex flex-col overflow-hidden anim-page">
+      <div className="h-full flex flex-col overflow-y-auto anim-page">
         {/* ── Header ────────────────────────────────────────────────────────── */}
         <div className="flex-shrink-0 px-8 pt-7 pb-5 flex items-center gap-4 border-b border-border">
           <button
@@ -229,7 +229,7 @@ export function MetadataChanger({ user, onBack }: MetadataChangerProps) {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-8 pb-10">
+        <div className="flex-1 px-8 pb-10">
           <div className="space-y-5 max-w-3xl mx-auto pt-6 anim-stagger">
 
             {/* Video selection */}

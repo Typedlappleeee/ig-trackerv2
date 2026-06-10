@@ -123,7 +123,7 @@ export function VideoImport({ user }: { user: User }) {
   }
 
   return (
-    <div className="h-full flex flex-col overflow-hidden anim-page">
+    <div className="h-full flex flex-col overflow-y-auto anim-page">
 
       {/* ── Page header ─────────────────────────────────────────────────────── */}
       <div className="flex-shrink-0 px-8 pt-7 pb-5 flex items-center gap-3 border-b border-border">
@@ -141,8 +141,8 @@ export function VideoImport({ user }: { user: User }) {
         </div>
       </div>
 
-      {/* ── Content ─────────────────────────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto px-8 pb-10">
+      {/* ── Content (scrolls with the page) ─────────────────────────────────── */}
+      <div className="flex-1 px-8 pb-10">
         <div className="max-w-2xl mx-auto space-y-5 pt-6 anim-stagger">
 
           {/* URL input card */}

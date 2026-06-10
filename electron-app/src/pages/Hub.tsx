@@ -89,12 +89,13 @@ function DecoSphere() {
         background: 'radial-gradient(circle at 45% 40%, rgba(99,102,241,0.35) 0%, rgba(124,58,237,0.2) 40%, transparent 70%)',
         filter: 'blur(24px)',
       }} />
-      {/* Sphere body */}
+      {/* Sphere body — gentle float */}
       <div style={{
         position: 'absolute', inset: 20,
         borderRadius: '50%',
         background: 'radial-gradient(circle at 35% 30%, #4c3a8a 0%, #2d1f5e 35%, #18103a 65%, #0c0820 100%)',
         boxShadow: '0 0 60px -10px rgba(99,102,241,0.6), inset 0 2px 20px rgba(255,255,255,0.06), inset -10px -10px 30px rgba(0,0,0,0.5)',
+        animation: 'float 6s ease-in-out infinite',
       }} />
       {/* Highlight */}
       <div style={{
@@ -102,6 +103,7 @@ function DecoSphere() {
         borderRadius: '50%',
         background: 'radial-gradient(ellipse, rgba(255,255,255,0.22) 0%, transparent 80%)',
         filter: 'blur(4px)',
+        animation: 'float 6s ease-in-out infinite',
       }} />
       {/* Ring */}
       <div style={{
@@ -111,7 +113,32 @@ function DecoSphere() {
         border: '1.5px solid rgba(139,92,246,0.35)',
         boxShadow: '0 0 20px rgba(139,92,246,0.2)',
       }} />
-      {/* Sparkle stars */}
+      {/* Orbiting satellite — travels the tilted ring */}
+      <div style={{
+        position: 'absolute', top: '50%', left: '50%',
+        width: 280, height: 280, marginTop: -140, marginLeft: -140,
+        transform: 'rotateX(72deg)',
+        pointerEvents: 'none',
+      }}>
+        <div style={{ position: 'absolute', inset: 0, animation: 'orbit-spin 11s linear infinite' }}>
+          <div style={{
+            position: 'absolute', top: -5, left: '50%', marginLeft: -5,
+            width: 10, height: 10, borderRadius: '50%',
+            background: 'radial-gradient(circle at 35% 35%, #e9d5ff, #a78bfa 55%, #7c3aed)',
+            boxShadow: '0 0 14px 4px rgba(167,139,250,0.75)',
+          }} />
+        </div>
+        {/* Second satellite — slower, opposite direction, cyan */}
+        <div style={{ position: 'absolute', inset: 18, animation: 'sf-orbit-ccw 19s linear infinite' }}>
+          <div style={{
+            position: 'absolute', bottom: -3, left: '50%', marginLeft: -3,
+            width: 6, height: 6, borderRadius: '50%',
+            background: 'radial-gradient(circle at 35% 35%, #cffafe, #22d3ee)',
+            boxShadow: '0 0 10px 3px rgba(34,211,238,0.55)',
+          }} />
+        </div>
+      </div>
+      {/* Sparkle stars — twinkling */}
       {[
         { top: 14, left: 130, size: 14, opacity: 0.9 },
         { top: 60, left: 240, size: 10, opacity: 0.7 },
@@ -119,7 +146,10 @@ function DecoSphere() {
         { top: 10,  left: 50,  size: 7,  opacity: 0.5 },
       ].map((s, i) => (
         <svg key={i} width={s.size} height={s.size} viewBox="0 0 24 24" fill="rgba(196,181,253,0.8)"
-          style={{ position: 'absolute', top: s.top, left: s.left, opacity: s.opacity }} aria-hidden="true">
+          style={{
+            position: 'absolute', top: s.top, left: s.left, opacity: s.opacity,
+            animation: `star-twinkle ${2.8 + i * 0.9}s ease-in-out ${i * 0.6}s infinite`,
+          }} aria-hidden="true">
           <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z" />
         </svg>
       ))}

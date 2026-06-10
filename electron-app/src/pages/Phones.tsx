@@ -925,7 +925,7 @@ export function Phones({ user }: PhonesProps) {
 
       <div
         className="anim-page"
-        style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg, #07070C)' }}
+        style={{ height: '100%', display: 'flex', flexDirection: 'column', overflowY: 'auto', overflowX: 'hidden', background: 'var(--bg, #07070C)' }}
         onClick={() => setContextMenu(null)}
       >
 
@@ -1121,8 +1121,8 @@ export function Phones({ user }: PhonesProps) {
           )
         })()}
 
-        {/* ── Scrollable content area ────────────────────────────────────────── */}
-        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+        {/* ── Content area (scrolls with the page) ───────────────────────────── */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
 
           {/* ── Main area (cards + detail panel) ──────────────────────────── */}
           <div style={{ flex: 1, display: 'flex' }}>

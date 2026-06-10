@@ -142,7 +142,7 @@ export function TextCopy({ user, onBack }: { user: User; onBack?: () => void }) 
   const pct    = total > 0 ? Math.round((done + errors) / total * 100) : 0
 
   return (
-    <div className="h-full flex flex-col overflow-hidden anim-page">
+    <div className="h-full flex flex-col overflow-y-auto anim-page">
 
       {/* ── Header ────────────────────────────────────────────────────────── */}
       <div className="flex-shrink-0 px-8 pt-7 pb-5 flex items-center justify-between border-b border-border">
@@ -200,8 +200,8 @@ export function TextCopy({ user, onBack }: { user: User; onBack?: () => void }) 
         </div>
       </div>
 
-      {/* ── Scrollable content ──────────────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto px-8 pb-10">
+      {/* ── Content (scrolls with the page) ─────────────────────────────────── */}
+      <div className="flex-1 px-8 pb-10">
         <div className="max-w-3xl mx-auto space-y-5 pt-6 anim-stagger">
 
           {/* Videos */}

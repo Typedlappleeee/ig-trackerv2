@@ -2056,6 +2056,26 @@ html[data-glass="off"] #root::after { display: none; }
   animation: sf-shimmer 1.6s ease-in-out infinite;
 }
 
+/* ── Document flow: page headers scroll away with content ────────────────── */
+/* The page itself becomes the scroller; sf-page-body grows naturally instead
+   of scrolling internally. Pages with inline overflow:hidden (editor/chat
+   layouts) keep their fixed chrome — inline styles win over this layer. */
+.sf-page {
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(139,92,246,0.25) transparent;
+}
+.sf-page::-webkit-scrollbar { width: 6px; }
+.sf-page::-webkit-scrollbar-thumb {
+  background: linear-gradient(rgba(139,92,246,0.3), rgba(124,58,237,0.18));
+  border-radius: 99px;
+}
+.sf-page-body {
+  flex: 1 0 auto;
+  overflow: visible;
+}
+
 /* ── Kill all v4 motion for reduced-motion users ─────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   #root::after { display: none; }

@@ -148,7 +148,7 @@ function ToolShell({ title, icon, children, onBack, error }: {
 }) {
   const t = useT()
   return (
-    <div className="h-full flex flex-col overflow-hidden bg-bg anim-page">
+    <div className="h-full flex flex-col overflow-y-auto bg-bg anim-page">
       {/* Header */}
       <div className="flex-shrink-0 px-8 pt-7 pb-5 sf-topbar">
         <div className="flex items-center gap-4">
@@ -170,7 +170,7 @@ function ToolShell({ title, icon, children, onBack, error }: {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-8 pb-10 pt-6">
+      <div className="flex-1 px-8 pb-10 pt-6">
         <div className="max-w-2xl space-y-4">
           {error && (
             <div className="rounded-xl px-4 py-3 flex items-center gap-3 anim-scale-in"
@@ -746,7 +746,7 @@ export function AiTools({ user }: AiToolsProps) {
   // No Groq key state
   if (!conns.groq) {
     return (
-      <div className="h-full flex flex-col overflow-hidden bg-bg anim-page">
+      <div className="h-full flex flex-col overflow-y-auto bg-bg anim-page">
         {/* Page header */}
         <div className="flex-shrink-0 px-8 pt-8 pb-6 sf-topbar">
           <div className="flex items-center gap-4">
@@ -762,7 +762,7 @@ export function AiTools({ user }: AiToolsProps) {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-8 pb-10 pt-8">
+        <div className="flex-1 px-8 pb-10 pt-8">
           <div className="max-w-lg">
             <div className="sf-card rounded-2xl p-6 anim-scale-in"
               style={{ background: 'rgba(245,158,11,0.04)', borderColor: 'rgba(245,158,11,0.18)' }}>
@@ -809,7 +809,7 @@ export function AiTools({ user }: AiToolsProps) {
 
   // ── Hub ────────────────────────────────────────────────────────────────────
   return (
-    <div className="h-full flex flex-col overflow-hidden bg-bg anim-page">
+    <div className="h-full flex flex-col overflow-y-auto bg-bg anim-page">
 
       {/* ── Premium page header ── */}
       <div className="flex-shrink-0 px-8 pt-8 pb-6 sf-topbar">
@@ -844,8 +844,8 @@ export function AiTools({ user }: AiToolsProps) {
         </p>
       </div>
 
-      {/* ── Scrollable content ── */}
-      <div className="flex-1 overflow-y-auto px-8 pb-10">
+      {/* ── Content (scrolls with the page) ── */}
+      <div className="flex-1 px-8 pb-10">
         <div className="pt-7 space-y-10 max-w-6xl">
 
           {/* ── Video Processing section ── */}
