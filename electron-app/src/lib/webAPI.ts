@@ -244,12 +244,12 @@ export function buildWebAPI() {
     // ── Upload video to GéeLark ─────────────────────────────────────────────
     async uploadVideoGeelark(opts: { bearer: string; filePath: string }) {
       // Helper: server-side proxy fallback.
-      // For Supabase signed URLs, pass the URL directly so the server fetches it
-      // without needing SUPABASE_SERVICE_ROLE_KEY.
+      // Any full URL is sent as signedUrl — server fetches directly, no admin key needed.
+      // Only bare storage paths (no scheme) need the admin client.
       const serverProxy = async (): Promise<{ ok: boolean; token?: string; error?: string }> => {
-        const isSignedUrl = opts.filePath.includes('.supabase.co') && opts.filePath.includes('/object/sign/')
+        const isUrl = opts.filePath.startsWith('https://') || opts.filePath.startsWith('http://')
         const m1 = opts.filePath.match(/\/object\/sign\/([^/?]+)\/(.+?)(?:\?|$)/)
-        const body = isSignedUrl
+        const body = isUrl
           ? { signedUrl: opts.filePath, bearer: opts.bearer }
           : { storagePath: m1 ? decodeURIComponent(m1[2]) : opts.filePath, bucket: m1 ? m1[1] : 'content', bearer: opts.bearer }
         const r = await fetch('/api/geelark-upload', {
