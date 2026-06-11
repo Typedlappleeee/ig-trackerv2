@@ -165,15 +165,15 @@ function gradientForId(id: string): [string, string] {
 
 function timeAgo(iso: string): string {
   const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000)
-  if (diff < 60)        return 'just now'
-  if (diff < 3600)      return `${Math.floor(diff / 60)}min`
-  if (diff < 86400)     return `${Math.floor(diff / 3600)}h`
-  if (diff < 86400 * 7) return `${Math.floor(diff / 86400)}d`
-  return new Date(iso).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })
+  if (diff < 60)        return 'à l’instant'
+  if (diff < 3600)      return `${Math.floor(diff / 60)} min`
+  if (diff < 86400)     return `${Math.floor(diff / 3600)} h`
+  if (diff < 86400 * 7) return `${Math.floor(diff / 86400)} j`
+  return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
 }
 
 function fullDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-US', {
+  return new Date(iso).toLocaleDateString('fr-FR', {
     weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
     hour: '2-digit', minute: '2-digit',
   })
@@ -1281,7 +1281,7 @@ export function Community({ user, onNavigate }: CommunityProps) {
           </span>
           <p className="text-[11.5px] text-warn">
             {t('communityMutedBanner')} <strong className="font-bold">
-              {new Date(mutedUntil!).toLocaleDateString('en-US', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}
+              {new Date(mutedUntil!).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}
             </strong>
           </p>
         </div>
