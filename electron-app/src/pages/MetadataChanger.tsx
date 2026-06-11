@@ -503,7 +503,7 @@ export function MetadataChanger({ user, onBack }: MetadataChangerProps) {
                 <div className="text-center">
                   <p className="text-base font-bold text-text mb-2">Sélectionne une vidéo</p>
                   <p className="text-[13px] text-text2 max-w-sm">
-                    L'outil lira ses métadonnées actuelles, les supprimera toutes et injectera un nouveau timestamp aléatoire — sans ré-encoder, en une seconde.
+                    L’outil lira ses métadonnées actuelles, les supprimera toutes et injectera un nouveau timestamp aléatoire — sans ré-encoder, en une seconde.
                   </p>
                 </div>
               </div>

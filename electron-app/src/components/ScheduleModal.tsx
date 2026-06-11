@@ -38,7 +38,7 @@ export function ScheduleModal({ type, phonesCount, videosCount, videoTitle, onCo
   const tomorrow = new Date(now); tomorrow.setDate(tomorrow.getDate() + 1)
 
   const QUICK_DATES = [
-    { label: "Aujourd'hui", date: startOfDay(now) },
+    { label: "Aujourd’hui", date: startOfDay(now) },
     { label: 'Demain',      date: startOfDay(tomorrow) },
     { label: 'Dans 2 jours', date: (() => { const d = startOfDay(now); d.setDate(d.getDate() + 2); return d })() },
     { label: 'Dans 3 jours', date: (() => { const d = startOfDay(now); d.setDate(d.getDate() + 3); return d })() },

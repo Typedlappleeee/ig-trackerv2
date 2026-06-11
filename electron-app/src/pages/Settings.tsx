@@ -1377,7 +1377,7 @@ function DesktopDownloadPanel({ S }: { S: StyleObj }) {
         <p style={{ fontSize: 13, color: S.text3, margin: 0 }}>
           {lang === 'en'
             ? 'The desktop app is under development. Stay tuned!'
-            : "L'application desktop est en cours de développement. Restez connecté !"}
+            : "L’application desktop est en cours de développement. Restez connecté !"}
         </p>
       </div>
 
@@ -1867,7 +1867,7 @@ function SubscriptionPanel() {
                 <span className="text-2xl font-black text-white">59,99$</span>
                 <span className="text-[12px] text-text2">{t('perMonth')}</span>
               </div>
-              <p className="text-[10px] mt-0.5" style={{ color: '#fb923c' }}>jusqu'au 1er juillet</p>
+              <p className="text-[10px] mt-0.5" style={{ color: '#fb923c' }}>jusqu’au 1er juillet</p>
             </div>
             <ul className="space-y-1.5 flex-1">
               {[
@@ -1901,7 +1901,7 @@ function SubscriptionPanel() {
                 <span className="text-2xl font-black text-white">89,99$</span>
                 <span className="text-[12px] text-text2">{t('perMonth')}</span>
               </div>
-              <p className="text-[10px] mt-0.5" style={{ color: '#fb923c' }}>jusqu'au 1er juillet</p>
+              <p className="text-[10px] mt-0.5" style={{ color: '#fb923c' }}>jusqu’au 1er juillet</p>
             </div>
             <ul className="space-y-1.5 flex-1">
               {[
@@ -1910,7 +1910,7 @@ function SubscriptionPanel() {
                 lang === 'en' ? 'All features' : 'Toutes les fonctionnalités',
                 `Mass Posting ${lang === 'en' ? 'unlimited' : 'illimité'}`,
                 `Support 24/7 ${lang === 'en' ? 'priority' : 'prioritaire'}`,
-                lang === 'en' ? 'Feature suggestions' : "Proposition d'ajouts",
+                lang === 'en' ? 'Feature suggestions' : "Proposition d’ajouts",
               ].map(f => (
                 <li key={f} className="flex items-start gap-2 text-[12px] text-text2">
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#22C55E" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginTop: 2, flexShrink: 0 }}><polyline points="20 6 9 17 4 12"/></svg>{f}

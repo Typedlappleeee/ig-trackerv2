@@ -426,7 +426,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
     return () => clearInterval(t)
   }, [])
 
-  // Auto-redirect to community when the current page isn't accessible in this org
+  // Auto-redirect to community when the current page isn’t accessible in this org
   useEffect(() => {
     if (!orgLoading && page !== 'settings' && !isVisibleTab(page)) {
       onNavigate('community')
@@ -463,7 +463,7 @@ export function Layout({ user, page, onNavigate, onRefresh, phoneCount, lastRefr
   const lastRefreshLabel = lastRefresh
     ? (() => {
         const diff = Math.floor((now - lastRefresh.getTime()) / 1000)
-        if (diff < 60) return 'Màj à l\'instant'
+        if (diff < 60) return 'Màj à l’instant'
         if (diff < 3600) return `Màj il y a ${Math.floor(diff / 60)}m`
         return `Màj ${lastRefresh.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`
       })()

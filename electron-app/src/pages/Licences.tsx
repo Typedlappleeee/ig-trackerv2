@@ -37,7 +37,7 @@ function daysLeft(expiresAt: string | null, lang: string = 'fr'): string {
   if (!expiresAt) return lang === 'en' ? '∞ lifetime' : '∞ vie'
   const diff = Math.ceil((new Date(expiresAt).getTime() - Date.now()) / 86_400_000)
   if (diff < 0)  return lang === 'en' ? 'Expired' : 'Expiré'
-  if (diff === 0) return lang === 'en' ? 'Expires today' : "Expire aujourd'hui"
+  if (diff === 0) return lang === 'en' ? 'Expires today' : "Expire aujourd’hui"
   return lang === 'en' ? `${diff}d left` : `${diff}j restants`
 }
 

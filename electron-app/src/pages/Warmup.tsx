@@ -240,7 +240,7 @@ export function Warmup({ user }: WarmupProps) {
     initJobs(targets)
 
     // editPicFile is a local path — the phone uses curl to download the URL so a
-    // local file path won't work. Only URL-based profile pictures are supported.
+    // local file path won’t work. Only URL-based profile pictures are supported.
     const resolvedPicUrl = editPicUrl.trim() || undefined
 
     const config = {
@@ -844,7 +844,7 @@ export function Warmup({ user }: WarmupProps) {
                   <span style={{ flexShrink: 0, color: 'var(--danger)', display: 'inline-flex' }}><IconConstruction size={20} /></span>
                   <div>
                     <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--danger)', margin: 0 }}>Bug rencontré — fonctionnalité indisponible</p>
-                    <p style={{ fontSize: 12, color: 'rgba(239,68,68,0.65)', margin: '3px 0 0' }}>Mass Edit est temporairement désactivé en raison d'un bug. Un correctif est en cours.</p>
+                    <p style={{ fontSize: 12, color: 'rgba(239,68,68,0.65)', margin: '3px 0 0' }}>Mass Edit est temporairement désactivé en raison d’un bug. Un correctif est en cours.</p>
                   </div>
                 </div>
 

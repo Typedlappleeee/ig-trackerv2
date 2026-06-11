@@ -471,7 +471,7 @@ export function VideoRepurpose({ user }: VideoRepurposeProps) {
                 {sources.length ? `${sources.length} vidéo${sources.length > 1 ? 's' : ''} sélectionnée${sources.length > 1 ? 's' : ''}` : t('repurposeDropVideo')}
               </div>
               <div style={{ fontSize: 10, color: 'var(--text-4)' }}>
-                {sources.length ? "Cliquer pour en ajouter d'autres" : 'MP4, MOV, WebM — plusieurs fichiers OK'}
+                {sources.length ? "Cliquer pour en ajouter d’autres" : 'MP4, MOV, WebM — plusieurs fichiers OK'}
               </div>
             </div>
 

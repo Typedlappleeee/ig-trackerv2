@@ -23,7 +23,7 @@ function Icon({ name, size = 16, className, label }: {
   name: IconName
   size?: number
   className?: string
-  /** When set, the icon is exposed to assistive tech with this label; otherwise it's decorative. */
+  /** When set, the icon is exposed to assistive tech with this label; otherwise it’s decorative. */
   label?: string
 }) {
   const a11y = label
@@ -135,7 +135,7 @@ export function OrganizationPanel({ user }: Props) {
   const [busy, setBusy]         = useState(false)
   const [msg, setMsg]           = useState<string | null>(null)
   const [err, setErr]           = useState<string | null>(null)
-  // Set to the new org's id right after createOrg succeeds; triggers the API setup wizard.
+  // Set to the new org’s id right after createOrg succeeds; triggers the API setup wizard.
   const [setupForOrg, setSetupForOrg] = useState<string | null>(null)
 
   // Detail view (admin / owner) for currentOrg
@@ -293,7 +293,7 @@ export function OrganizationPanel({ user }: Props) {
     if (error) {
       const msg = /not_authenticated/.test(error.message) ? 'Non authentifié — reconnecte-toi'
                 : /name_required/.test(error.message)     ? 'Le nom est requis'
-                : /org_limit_reached/.test(error.message) ? 'Tu ne peux créer qu\'une seule organisation'
+                : /org_limit_reached/.test(error.message) ? 'Tu ne peux créer qu’une seule organisation'
                 : error.message
       flash(msg, true)
       return
@@ -328,7 +328,7 @@ export function OrganizationPanel({ user }: Props) {
       .eq('id', org.id)
     setBusy(false)
     if (error) { flash(error.message, true); return }
-    flash('Nom de l\'organisation modifié')
+    flash('Nom de l’organisation modifié')
     setRenamingOrgId(null)
     await refresh()
   }
@@ -340,7 +340,7 @@ export function OrganizationPanel({ user }: Props) {
       .eq('org_id', orgId).eq('user_id', user.id)
     setBusy(false)
     if (error) { flash(error.message, true); return }
-    flash('Tu as quitté l\'organisation')
+    flash('Tu as quitté l’organisation')
     switchOrg(null)
     await refresh()
   }
@@ -387,7 +387,7 @@ export function OrganizationPanel({ user }: Props) {
     const { data, error } = await supabase.rpc('accept_org_invite', { p_token: token })
     setBusy(false)
     if (error) {
-      const msg = /invite_not_found/.test(error.message)     ? 'Code d\'invitation invalide'
+      const msg = /invite_not_found/.test(error.message)     ? 'Code d’invitation invalide'
                 : /invite_already_used/.test(error.message)  ? 'Ce code a déjà été utilisé'
                 : /invite_expired/.test(error.message)       ? 'Code expiré'
                 : error.message
@@ -404,12 +404,12 @@ export function OrganizationPanel({ user }: Props) {
         .eq('user_id', org?.owner_id ?? '').eq('is_active', true).maybeSingle()
       const expired = ownerKey?.expires_at ? new Date(ownerKey.expires_at) < new Date() : false
       if (!ownerKey || expired) {
-        flash("Cette organisation n'a pas d'abonnement actif.", true)
+        flash("Cette organisation n’a pas d’abonnement actif.", true)
         await refresh()
         return
       }
     }
-    flash('Bienvenue dans l\'organisation ✓')
+    flash('Bienvenue dans l’organisation ✓')
     // Apply pre-configured permissions from the invite token if any
     if (orgId) {
       const { data: inv } = await supabase
@@ -424,7 +424,7 @@ export function OrganizationPanel({ user }: Props) {
         }
       }
     }
-    // Persist the target org so it's selected after the reload
+    // Persist the target org so it’s selected after the reload
     if (orgId) localStorage.setItem('ig-tracker-current-org', orgId)
     // Full reload is the most reliable way to flush all stale auth/org state
     setTimeout(() => window.location.reload(), 800)
@@ -546,7 +546,7 @@ export function OrganizationPanel({ user }: Props) {
 
           {creating && (
             <div className="flex gap-2 items-center bg-surface rounded-lg p-3">
-              <Input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Nom de l'organisation"
+              <Input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Nom de l’organisation"
                 onKeyDown={e => { if (e.key === 'Enter') createOrg() }} />
               <Button size="sm" onClick={createOrg} loading={busy}>Créer</Button>
               <Button size="sm" variant="secondary" onClick={() => setCreating(false)}>Annuler</Button>
@@ -554,7 +554,7 @@ export function OrganizationPanel({ user }: Props) {
           )}
 
           {myOrgs.length === 0 ? (
-            <p className="text-text2 text-sm">Aucune organisation. Crée-en une ou rejoins-en une avec un code d'invitation.</p>
+            <p className="text-text2 text-sm">Aucune organisation. Crée-en une ou rejoins-en une avec un code d’invitation.</p>
           ) : (
             <ul className="space-y-2">
               {myOrgs.map(({ org, member }) => {
@@ -615,7 +615,7 @@ export function OrganizationPanel({ user }: Props) {
         <section className="bg-card border border-border rounded-xl p-5 space-y-3">
           <h2 className="text-sm font-bold text-text inline-flex items-center gap-2"><Icon name="ticket" size={16} />Rejoindre une organisation</h2>
           <div className="flex gap-2">
-            <Input value={joinToken} onChange={e => setJoinToken(e.target.value)} placeholder="Colle ton code d'invitation"
+            <Input value={joinToken} onChange={e => setJoinToken(e.target.value)} placeholder="Colle ton code d’invitation"
               onKeyDown={e => { if (e.key === 'Enter') acceptInvite() }} />
             <Button onClick={acceptInvite} loading={busy} disabled={!joinToken.trim()}>Rejoindre</Button>
           </div>
@@ -628,7 +628,7 @@ export function OrganizationPanel({ user }: Props) {
           <div className="bg-card border border-border rounded-xl p-8 text-center space-y-2">
             <p className="flex justify-center text-text2"><Icon name="building" size={32} /></p>
             <p className="text-text font-semibold">Aucune organisation active</p>
-            <p className="text-text2 text-sm">Active une organisation dans l'onglet "Organisations" pour gérer ses membres.</p>
+            <p className="text-text2 text-sm">Active une organisation dans l’onglet "Organisations" pour gérer ses membres.</p>
           </div>
         ) : !canManage ? (
           <div className="bg-card border border-border rounded-xl p-8 text-center space-y-2">
@@ -716,7 +716,7 @@ export function OrganizationPanel({ user }: Props) {
 
             {/* Invites */}
             <div className="border-t border-border pt-4 space-y-3">
-              <h3 className="text-xs font-bold text-text uppercase tracking-wider">Générer un code d'invitation</h3>
+              <h3 className="text-xs font-bold text-text uppercase tracking-wider">Générer un code d’invitation</h3>
               <p className="text-text2 text-xs">Chaque code est <strong className="text-text">à usage unique</strong> : une fois utilisé, il devient invalide.</p>
               <div className="flex gap-2 flex-wrap">
                 <Input value={invLabel} onChange={e => setInvLabel(e.target.value)} placeholder="Note (ex: Pour Pierre) — optionnel" />
@@ -814,7 +814,7 @@ export function OrganizationPanel({ user }: Props) {
           {roleTemplates.length > 0 && (
             <div className="px-5 py-3 border-t border-border bg-surface/30">
               <p className="text-[10px] text-text2">
-                Pour appliquer un rôle à un membre, va dans l'onglet <strong className="text-text">Membres</strong> et clique sur son nom.
+                Pour appliquer un rôle à un membre, va dans l’onglet <strong className="text-text">Membres</strong> et clique sur son nom.
               </p>
             </div>
           )}
@@ -826,7 +826,7 @@ export function OrganizationPanel({ user }: Props) {
         <section className="bg-card border border-border rounded-xl overflow-hidden">
           <div className="px-5 py-3 border-b border-border flex items-center justify-between">
             <div>
-              <h2 className="text-sm font-bold text-text inline-flex items-center gap-2"><Icon name="logs" size={16} />Logs d'activité</h2>
+              <h2 className="text-sm font-bold text-text inline-flex items-center gap-2"><Icon name="logs" size={16} />Logs d’activité</h2>
               <p className="text-xs text-text2 mt-0.5">Actions récentes des membres (200 dernières)</p>
             </div>
             <button onClick={loadLogs} className="text-xs text-accent hover:opacity-70 transition-opacity">⟳ Rafraîchir</button>
@@ -889,7 +889,7 @@ export function OrganizationPanel({ user }: Props) {
           availableGroups={groups}
           roleTemplates={roleTemplates}
           onSave={perms => saveInvitePerms(invitePermModal, perms)}
-          onSkip={() => { setInvitePermModal(null); flash('Code généré et copié ✓ — partage-le, il ne marche qu\'une fois') }}
+          onSkip={() => { setInvitePermModal(null); flash('Code généré et copié ✓ — partage-le, il ne marche qu’une fois') }}
         />
       )}
     </div>
@@ -1015,7 +1015,7 @@ function PermEditor({
         <p className="text-xs font-bold text-text mb-2">Onglets accessibles</p>
         <p className="text-[10px] text-text2 mb-2">
           <Icon name="settings" size={11} className="inline-block align-[-1px] mr-1" />
-          "Paramètres → Connexions" contrôle l'accès aux clés API de l'organisation (token GéeLark, Groq, etc.).
+          "Paramètres → Connexions" contrôle l’accès aux clés API de l’organisation (token GéeLark, Groq, etc.).
           Par défaut bloqué pour les membres et lecteurs.
         </p>
         <div className="grid grid-cols-2 gap-1.5">

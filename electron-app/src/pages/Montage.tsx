@@ -104,7 +104,7 @@ function basename(p: string) { return p.replace(/\\/g, '/').split('/').pop() ?? 
 function localSrc(p: string | null | undefined): string | null {
   if (!p) return null
   if (p.startsWith('http') || p.startsWith('blob:') || p.startsWith('data:')) return p
-  if (!window.electronAPI) return null  // web mode: can't serve local file paths
+  if (!window.electronAPI) return null  // web mode: can’t serve local file paths
   const n = p.replace(/\\/g, '/')
   const withSlash = n.startsWith('/') ? n : `/${n}`
   return `localvideo://${encodeURI(withSlash)}`
@@ -610,13 +610,13 @@ export function Montage({ user }: MontageProps) {
 Regarde ces frames de la vidéo et génère UNE SEULE caption courte (5-12 mots max) à superposer directement sur la vidéo.
 
 RÈGLES ABSOLUES :
-- Style "POV:" quand c'est pertinent (ex: "POV: tu découvres un endroit secret", "POV: quand la vie te surprend")
+- Style "POV:" quand c’est pertinent (ex: "POV: tu découvres un endroit secret", "POV: quand la vie te surprend")
 - Sinon une phrase accrocheuse, mystérieuse ou émotionnelle
-- PAS de hashtags, PAS de guillemets, PAS d'explication
+- PAS de hashtags, PAS de guillemets, PAS d’explication
 - Minuscules possibles, peut commencer par une minuscule
 - EN FRANÇAIS
 
-Réponds UNIQUEMENT avec la caption, rien d'autre.`,
+Réponds UNIQUEMENT avec la caption, rien d’autre.`,
             },
           ],
         }],
@@ -652,7 +652,7 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
     if (!item) { setPreviewSrc(null); return }
     if (item.file_url) { setPreviewSrc(localSrc(item.file_url)); return }
     if (item.storage_path) {
-      // Clear first so we don't briefly play the wrong clip when clip changes
+      // Clear first so we don’t briefly play the wrong clip when clip changes
       setPreviewSrc(null)
       getSignedUrl(item.storage_path)
         .then(url => { if (!cancelled) setPreviewSrc(url) })
@@ -696,7 +696,7 @@ Réponds UNIQUEMENT avec la caption, rien d'autre.`,
     if (playingIndex !== null && !playAdvancedRef.current) {
       const clip = clips[playingIndex]
       const end  = clip?.trimEnd > 0 ? clip.trimEnd : Infinity
-      // Detect 0.25s early to compensate for timeupdate's ~250ms firing interval.
+      // Detect 0.25s early to compensate for timeupdate’s ~250ms firing interval.
       // This ensures we never overshoot the cut point and show unwanted content.
       if (v.currentTime >= end - 0.25) { v.pause(); onVideoEnded() }
     }

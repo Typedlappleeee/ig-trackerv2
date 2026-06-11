@@ -208,7 +208,7 @@ function StratConcurrente({ groqKey, onBack }: { groqKey: string; onBack: () => 
     setLoading(true); setError(null); setResult('')
     try {
       const text = await groqCall(groqKey,
-        `Expert Instagram growth hacking. Analyse la stratégie pour la niche/compte : ${handle.trim()}. Recommandations structurées : 1) Type de contenu à créer, 2) Fréquence idéale, 3) Heures de publication optimales, 4) Stratégie hashtags, 5) Idées Reels viraux, 6) Tactiques d'engagement. Bullet points clairs.`,
+        `Expert Instagram growth hacking. Analyse la stratégie pour la niche/compte : ${handle.trim()}. Recommandations structurées : 1) Type de contenu à créer, 2) Fréquence idéale, 3) Heures de publication optimales, 4) Stratégie hashtags, 5) Idées Reels viraux, 6) Tactiques d’engagement. Bullet points clairs.`,
         700)
       setResult(text)
     } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
@@ -325,9 +325,9 @@ Ton : ${tone}
 Structure obligatoire :
 🎣 HOOK (0-3s) : phrase choc ou question qui arrête le scroll
 📖 CORPS (corps principal) : développement en étapes claires, chaque point sur une nouvelle ligne
-🚀 CTA (dernières secondes) : appel à l'action précis (follow, like, commentaire)
+🚀 CTA (dernières secondes) : appel à l’action précis (follow, like, commentaire)
 
-Format le script comme si c'était prêt à lire face caméra. Inclus les indications de timing. Maximum ${duration === '15s' ? '80' : duration === '30s' ? '150' : '280'} mots.`,
+Format le script comme si c’était prêt à lire face caméra. Inclus les indications de timing. Maximum ${duration === '15s' ? '80' : duration === '30s' ? '150' : '280'} mots.`,
         600)
       setResult(text)
     } catch (e) { setError(e instanceof Error ? e.message : String(e)) }
@@ -378,7 +378,7 @@ function HooksAB({ groqKey, onBack }: { groqKey: string; onBack: () => void }) {
     setLoading(true); setError(null); setResult('')
     try {
       const text = await groqCall(groqKey,
-        `Tu es expert en copywriting Instagram. Pour le sujet : "${subject.trim()}", génère exactement 3 hooks d'accroche radicalement différents pour un Reel.
+        `Tu es expert en copywriting Instagram. Pour le sujet : "${subject.trim()}", génère exactement 3 hooks d’accroche radicalement différents pour un Reel.
 
 HOOK A — Style CURIOSITÉ : crée une tension, donne envie de savoir la suite
 HOOK B — Style CHOC/CONTRADICTION : affirmation surprenante ou contre-intuitive
@@ -594,15 +594,15 @@ Produis une analyse complète :
 [types de vidéos, formats, fréquence, longueur, style]
 
 🪝 FORMULES DE HOOKS
-[les patterns de hooks qu'ils utilisent le plus]
+[les patterns de hooks qu’ils utilisent le plus]
 
 📊 POINTS FORTS À COPIER
-[ce qu'ils font bien et que tu peux répliquer]
+[ce qu’ils font bien et que tu peux répliquer]
 
 💥 GAPS & OPPORTUNITÉS
-[ce qu'ils ne font pas et que tu peux exploiter pour les dépasser]
+[ce qu’ils ne font pas et que tu peux exploiter pour les dépasser]
 
-🎯 PLAN D'ACTION
+🎯 PLAN D’ACTION
 [3 actions concrètes à mettre en place cette semaine]`,
         800)
       setResult(text)
@@ -643,7 +643,7 @@ const GROQ_TOOLS: { id: GroqToolId; icon: React.ReactNode; title: string; desc: 
 
 const VISION_TOOLS_META: { id: VisionToolId; icon: React.ReactNode; title: string; desc: string; tags: string[]; needsAnthopic: boolean }[] = [
   { id: 'vision-score',     icon: <Icon name="flame" />, title: 'Viral Score',      desc: 'Score 1-10 on 5 criteria: hook, retention, text, thumbnail, dynamism.', tags: ['Vidéo', 'Score', 'Claude'], needsAnthopic: true },
-  { id: 'vision-structure', icon: <Icon name="dna" />,   title: 'Viral Structure',  desc: 'Breaks down a video\'s timeline: hook, value, CTA, transitions.',        tags: ['Vidéo', 'Timeline', 'Claude'], needsAnthopic: true },
+  { id: 'vision-structure', icon: <Icon name="dna" />,   title: 'Viral Structure',  desc: 'Breaks down a video’s timeline: hook, value, CTA, transitions.',        tags: ['Vidéo', 'Timeline', 'Claude'], needsAnthopic: true },
   { id: 'vision-thumb',     icon: <Icon name="image" />, title: 'Audit Thumbnail',   desc: 'Score contrast, readability, emotion, colors + priority fixes.',         tags: ['Image', 'CTR', 'Claude'], needsAnthopic: true },
 ]
 

@@ -173,7 +173,7 @@ Return ONLY valid JSON, no explanation outside the JSON:
   return (
     <ToolShell
       title="Viral Score"
-      subtitle="AI analysis of your video's viral potential across 5 key criteria"
+      subtitle="AI analysis of your video’s viral potential across 5 key criteria"
       headerIcon={<Icon name="flame" size={24} />}
       onBack={onBack}
     >
@@ -317,7 +317,7 @@ Return ONLY valid JSON:
   return (
     <ToolShell
       title="Viral Structure"
-      subtitle="Deconstruct your video's narrative — hook, value, CTA — to understand why it works"
+      subtitle="Deconstruct your video’s narrative — hook, value, CTA — to understand why it works"
       headerIcon={<Icon name="dna" size={24} />}
       onBack={onBack}
     >
