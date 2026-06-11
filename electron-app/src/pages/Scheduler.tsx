@@ -44,6 +44,7 @@ import {
 } from '@/lib/schedulerService'
 import { Spinner } from '@/components/ui/Spinner'
 import { CreateScheduleModal } from '@/components/CreateScheduleModal'
+import { CreateStoryScheduleModal } from '@/components/CreateStoryScheduleModal'
 import { useCredits } from '@/lib/credits'
 import { useToast } from '@/components/Toast'
 
@@ -387,6 +388,7 @@ export function Scheduler({ user, onNavigate }: Props) {
   const [search, setSearch]       = useState('')
   const [cancelling, setCancelling] = useState<string | null>(null)
   const [showCreate, setShowCreate] = useState(false)
+  const [showStoryCreate, setShowStoryCreate] = useState(false)
   const [showTypeChoice, setShowTypeChoice] = useState(false)
   const [runningPost, setRunningPost] = useState<string | null>(null)
   const [runLogs, setRunLogs]     = useState<{ id: string; msgs: string[] } | null>(null)
@@ -754,12 +756,21 @@ export function Scheduler({ user, onNavigate }: Props) {
         </div>
       </div>
 
-      {/* ── Create modal — schedule directly from this page ───────────────────── */}
+      {/* ── Create modal — Reel ──────────────────────────────────────────────── */}
       {showCreate && (
         <CreateScheduleModal
           user={user}
           onCreated={() => { setShowCreate(false); reload() }}
           onClose={() => setShowCreate(false)}
+        />
+      )}
+
+      {/* ── Create modal — Story ─────────────────────────────────────────────── */}
+      {showStoryCreate && (
+        <CreateStoryScheduleModal
+          user={user}
+          onCreated={() => { setShowStoryCreate(false); reload() }}
+          onClose={() => setShowStoryCreate(false)}
         />
       )}
 
@@ -806,7 +817,7 @@ export function Scheduler({ user, onNavigate }: Props) {
               </button>
               {/* Story */}
               <button
-                onClick={() => { setShowTypeChoice(false); onNavigate?.('storylink') }}
+                onClick={() => { setShowTypeChoice(false); setShowStoryCreate(true) }}
                 className="cursor-pointer"
                 style={{
                   padding: '22px 16px', borderRadius: 10, textAlign: 'left',
@@ -824,7 +835,7 @@ export function Scheduler({ user, onNavigate }: Props) {
                 </div>
                 <p style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 700, color: '#E9EAF0' }}>Story avec lien</p>
                 <p style={{ margin: 0, fontSize: 11.5, lineHeight: 1.5, color: 'rgba(233,234,240,0.42)' }}>
-                  Photos + sticker lien par compte. Tu configures sur la page Story puis « Programmer ».
+                  Photos + sticker lien par compte. Configure et programme directement ici.
                 </p>
               </button>
             </div>
