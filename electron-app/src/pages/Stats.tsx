@@ -11,6 +11,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase, type Phone } from '@/lib/supabase'
 import { useOrg } from '@/lib/orgContext'
+import { pollAllNow } from '@/lib/igStatsPoller'
 import {
   ACCENT, ACCENT_L, TEXT_1, TEXT_2, TEXT_3, HAIR, BG_1, OK, ERR, SANS,
 } from '@/lib/theme'
@@ -122,6 +123,14 @@ export default function Stats({ user }: { user: User }) {
   const [sortKey, setSortKey] = useState<SortKey>('followers')
   const [sortDesc, setSortDesc] = useState(true)
   const [search, setSearch]   = useState('')
+  const [refreshing, setRefreshing] = useState(false)
+
+  async function forceRefresh() {
+    if (refreshing) return
+    setRefreshing(true)
+    try { await pollAllNow() } finally { setRefreshing(false) }
+    // le Realtime sur `phones` recharge déjà la liste à chaque écriture
+  }
 
   const load = useCallback(async () => {
     let q = supabase.from('phones').select('*').order('followers', { ascending: false })
@@ -247,8 +256,21 @@ export default function Stats({ user }: { user: User }) {
               Mise à jour en continu — un compte est rafraîchi toutes les ~20 secondes.
             </p>
           </div>
-          {/* Period toggle */}
+          {/* Refresh + period toggle */}
           <div style={{ display: 'flex', gap: 6 }}>
+            <button
+              onClick={forceRefresh}
+              disabled={refreshing}
+              title="Force la collecte immédiate de tous les comptes (sinon rotation automatique ~20 s/compte)"
+              style={{
+                padding: '7px 14px', borderRadius: 7, cursor: refreshing ? 'wait' : 'pointer',
+                fontSize: 12, fontWeight: 600,
+                background: 'rgba(99,102,241,0.14)',
+                border: '1px solid rgba(99,102,241,0.4)',
+                color: ACCENT_L, opacity: refreshing ? 0.6 : 1,
+                transition: 'all 0.15s',
+              }}
+            >{refreshing ? 'Collecte…' : '↻ Actualiser'}</button>
             {([7, 30] as Period[]).map(p => (
               <button
                 key={p}

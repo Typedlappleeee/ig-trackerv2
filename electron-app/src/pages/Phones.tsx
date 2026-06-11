@@ -801,10 +801,13 @@ export function Phones({ user }: PhonesProps) {
 
   // ── Save ig_username ─────────────────────────────────────────────────────
   async function saveIgUsername(id: string, username: string) {
+    // Normalise : pas de @ ni d'espaces en base — le poller et l'API IG
+    // attendent le pseudo nu
+    const clean = username.replace(/^@+/, '').trim() || null
     const { error: err } = await supabase
-      .from('phones').update({ ig_username: username || null }).eq('id', id)
+      .from('phones').update({ ig_username: clean }).eq('id', id)
     if (!err)
-      setPhones(prev => prev.map(p => p.id === id ? { ...p, ig_username: username || null } : p))
+      setPhones(prev => prev.map(p => p.id === id ? { ...p, ig_username: clean } : p))
   }
 
   async function saveRemark(id: string, remark: string) {
